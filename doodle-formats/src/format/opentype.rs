@@ -2305,7 +2305,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             };
 
             module.define_format(
-                "opentype.layout.anchor_table",
+                "opentype.common.anchor_table",
                 record([
                     ("table_start", pos32()),
                     ("anchor_format", base.u16be()),
@@ -2329,380 +2329,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             )
         };
 
-        let single_substitution = /* STUB */ Format::EMPTY;
-        let multiple_substitution = /* STUB */ Format::EMPTY;
-        let alternate_substitution = /* STUB */ Format::EMPTY;
-        let ligature_substitution = /* STUB */ Format::EMPTY;
-        let contextual_substitution = /* STUB */ Format::EMPTY;
-        let chained_contexts_substitution = /* STUB */ Format::EMPTY;
-        let extension_substitution = /* STUB */ Format::EMPTY;
-        let reverse_chaining_contextual_single_substitution = /* STUB */ Format::EMPTY;
-
-        let single_pos = {
-            let single_pos_format1 = |table_start: Expr| {
-                record([
-                    (
-                        "coverage_offset",
-                        offset16(table_start.clone(), coverage_table.call(), base),
-                    ),
-                    ("value_format", value_format_flags.call()),
-                    (
-                        "value_record",
-                        value_record.call_args(vec![table_start, var("value_format")]),
-                    ),
-                ])
-            };
-            let single_pos_format2 = |table_start: Expr| {
-                record([
-                    (
-                        "coverage_offset",
-                        offset16(table_start.clone(), coverage_table.call(), base),
-                    ),
-                    ("value_format", value_format_flags.call()),
-                    ("value_count", base.u16be()),
-                    (
-                        "value_records",
-                        repeat_count(
-                            var("value_count"),
-                            value_record.call_args(vec![table_start, var("value_format")]),
-                        ),
-                    ),
-                ])
-            };
-            record([
-                ("table_start", pos32()),
-                ("pos_format", base.u16be()),
-                (
-                    "subtable",
-                    match_variant(
-                        var("pos_format"),
-                        [
-                            (
-                                Pattern::U16(1),
-                                "Format1",
-                                single_pos_format1(var("table_start")),
-                            ),
-                            (
-                                Pattern::U16(2),
-                                "Format2",
-                                single_pos_format2(var("table_start")),
-                            ),
-                            // REVIEW - should this be a permanent hard-failure?
-                            (Pattern::Wildcard, "BadFormat", Format::Fail),
-                        ],
-                    ),
-                ),
-            ])
-        };
-        let pair_pos = {
-            let pair_value_record =
-                |table_start: Expr, value_format1: Expr, value_format2: Expr| {
-                    record([
-                        // NOTE - first glyph id is listed in the Coverage table
-                        ("second_glyph", base.u16be()),
-                        (
-                            "value_record1",
-                            optional_value_record(table_start.clone(), value_format1),
-                        ),
-                        (
-                            "value_record2",
-                            optional_value_record(table_start, value_format2),
-                        ),
-                    ])
-                };
-            let pair_set = |value_format1: Expr, value_format2: Expr| {
-                record([
-                    ("table_start", pos32()),
-                    ("pair_value_count", base.u16be()),
-                    (
-                        "pair_value_records",
-                        repeat_count(
-                            var("pair_value_count"),
-                            pair_value_record(var("table_start"), value_format1, value_format2),
-                        ),
-                    ),
-                ])
-            };
-            let pair_pos_format1 = |table_start: Expr| {
-                record([
-                    (
-                        "coverage",
-                        offset16(table_start, coverage_table.call(), base),
-                    ),
-                    ("value_format1", value_format_flags.call()),
-                    ("value_format2", value_format_flags.call()),
-                    ("pair_set_count", base.u16be()),
-                    (
-                        "pair_sets",
-                        repeat_count(
-                            var("pair_set_count"),
-                            offset16(
-                                var("table_start"),
-                                pair_set(var("value_format1"), var("value_format2")),
-                                base,
-                            ),
-                        ),
-                    ),
-                ])
-            };
-            let class2_record = |table_start: Expr, value_format1: Expr, value_format2: Expr| {
-                record([
-                    (
-                        "value_record1",
-                        optional_value_record(table_start.clone(), value_format1),
-                    ),
-                    (
-                        "value_record2",
-                        optional_value_record(table_start, value_format2),
-                    ),
-                ])
-            };
-            let class1_record = |table_start: Expr,
-                                 class2_count: Expr,
-                                 value_format1: Expr,
-                                 value_format2: Expr| {
-                record([(
-                    "class2_records",
-                    repeat_count(
-                        class2_count,
-                        class2_record(table_start, value_format1, value_format2),
-                    ),
-                )])
-            };
-            let pair_pos_format2 = |pair_pos_start: Expr| {
-                record([
-                    (
-                        "coverage",
-                        offset16(pair_pos_start.clone(), coverage_table.call(), base),
-                    ),
-                    ("value_format1", value_format_flags.call()),
-                    ("value_format2", value_format_flags.call()),
-                    (
-                        "class_def1",
-                        offset16(pair_pos_start.clone(), class_def.call(), base),
-                    ),
-                    (
-                        "class_def2",
-                        offset16(pair_pos_start.clone(), class_def.call(), base),
-                    ),
-                    ("class1_count", base.u16be()),
-                    ("class2_count", base.u16be()),
-                    (
-                        "class1_records",
-                        repeat_count(
-                            var("class1_count"),
-                            class1_record(
-                                pair_pos_start,
-                                var("class2_count"),
-                                var("value_format1"),
-                                var("value_format2"),
-                            ),
-                        ),
-                    ),
-                ])
-            };
-            record([
-                ("table_start", pos32()),
-                ("pos_format", base.u16be()),
-                (
-                    "subtable",
-                    match_variant(
-                        var("pos_format"),
-                        [
-                            (
-                                Pattern::U16(1),
-                                "Format1",
-                                pair_pos_format1(var("table_start")),
-                            ),
-                            (
-                                Pattern::U16(2),
-                                "Format2",
-                                pair_pos_format2(var("table_start")),
-                            ),
-                            // REVIEW - should this be a permanent hard-failure?
-                            (Pattern::Wildcard, "BadFormat", Format::Fail),
-                        ],
-                    ),
-                ),
-            ])
-        };
-        let cursive_pos = {
-            let entry_exit_record = |table_start: Expr| {
-                record([
-                    (
-                        "entry_anchor",
-                        offset16(table_start.clone(), anchor_table.call(), base),
-                    ),
-                    (
-                        "exit_anchor",
-                        offset16(table_start, anchor_table.call(), base),
-                    ),
-                ])
-            };
-            let cursive_pos_format1 = |table_start: Expr| {
-                record([
-                    (
-                        "coverage",
-                        offset16(table_start.clone(), coverage_table.call(), base),
-                    ),
-                    ("entry_exit_count", base.u16be()),
-                    (
-                        "entry_exit_records",
-                        repeat_count(var("entry_exit_count"), entry_exit_record(table_start)),
-                    ),
-                ])
-            };
-            record([
-                ("table_start", pos32()),
-                ("pos_format", base.u16be()),
-                (
-                    "subtable",
-                    match_variant(
-                        var("pos_format"),
-                        [
-                            // NOTE - even though there is only one variant in the ad-hoc type, the current implementation preserves it as an enum rather than inline the single possible format
-                            // REVIEW - consider the implications of either avoiding the `Format1` variant-enum wrapper type by aliasing this format against format1, versus keeping things the way they are right now
-                            (
-                                Pattern::U16(1),
-                                "Format1",
-                                cursive_pos_format1(var("table_start")),
-                            ),
-                            (Pattern::Wildcard, "BadFormat", Format::Fail),
-                        ],
-                    ),
-                ),
-            ])
-        };
-        let mark_base_pos = /* STUB */ Format::EMPTY;
-        let mark_lig_pos = /* STUB */ Format::EMPTY;
-        let mark_mark_pos = /* STUB */ Format::EMPTY;
-        let sequence_context = /* STUB */ Format::EMPTY;
-        let chained_sequence_context = /* STUB */ Format::EMPTY;
-        let pos_extension = /* STUB */ Format::EMPTY;
-
         // shared structure of GSUB and GPOS tables
-        let lookup_table = |tag: u32| {
-            // NOTE - tag is a model-external value, lookup-type is model-internal.
-            let lookup_subtable = |tag: u32, lookup_type: Expr| {
-                const GSUB: u32 = magic(b"GSUB");
-                const GPOS: u32 = magic(b"GPOS");
-                match tag {
-                    // natural pattern-match on tag
-                    GSUB => {
-                        // in-model pattern-match on lookup-type
-                        match_variant(
-                            lookup_type,
-                            [
-                                // REVIEW - are these variant names too concise?
-                                (Pattern::U16(1), "MonoSub", single_substitution),
-                                (Pattern::U16(2), "PolySub", multiple_substitution),
-                                (Pattern::U16(3), "AltSub", alternate_substitution),
-                                (Pattern::U16(4), "LigSub", ligature_substitution),
-                                (Pattern::U16(5), "CtxSub", contextual_substitution),
-                                (
-                                    Pattern::U16(6),
-                                    "ChainCtxSub",
-                                    chained_contexts_substitution,
-                                ),
-                                (Pattern::U16(7), "ExtSub", extension_substitution),
-                                (
-                                    Pattern::U16(8),
-                                    "RevChainCtxMonoSub",
-                                    reverse_chaining_contextual_single_substitution,
-                                ),
-                                // REVIEW - should this be a hard-fail, or do we want to produce a dummy object instead (possibly with a trace of the value of lookup_type)?
-                                (Pattern::Wildcard, "UnknownLookupSubtable", Format::Fail),
-                            ],
-                        )
-                    }
-                    GPOS => {
-                        // in-model pattern-match on lookup-type
-                        match_variant(
-                            lookup_type,
-                            [
-                                (Pattern::U16(1), "SinglePos", single_pos),
-                                (Pattern::U16(2), "PairPos", pair_pos),
-                                (Pattern::U16(3), "CursivePos", cursive_pos),
-                                (Pattern::U16(4), "MarkBasePos", mark_base_pos),
-                                (Pattern::U16(5), "MarkLigPos", mark_lig_pos),
-                                (Pattern::U16(6), "MarkMarkPos", mark_mark_pos),
-                                (Pattern::U16(7), "SequenceContext", sequence_context),
-                                (
-                                    Pattern::U16(8),
-                                    "ChainedSequenceContext",
-                                    chained_sequence_context,
-                                ),
-                                (Pattern::U16(9), "PosExtension", pos_extension),
-                                // REVIEW - should this be a hard-fail, or do we want to produce a dummy object instead (possibly with a trace of the value of lookup_type)?
-                                (Pattern::Wildcard, "UnknownLookupSubtable", Format::Fail),
-                            ],
-                        )
-                    }
-                    _ => Format::Fail,
-                }
-            };
-            let lookup_flag = {
-                // NOTE - we currently have no good way to group together multiple adjacent bits with flags_bits16 so we will instead parse as a single U8 for the first byte (0xFF00) and then as a series of flags in the second byte (0xFF)
-                let macf = base.u8();
-                let lo_bits = flags_bits8([
-                    None,                           // Bit 7 (0x80) - reserved
-                    None,                           // Bit 6 (0x40) - reserved
-                    None,                           // Bit 5 (0x20) - reserved
-                    Some("use_mark_filtering_set"), // Bit 4 (0x10) - indicator flag for presence of markFilteringSet field in Lookup table structure
-                    Some("ignore_marks"), // Bit 3 (0x8) - if set, skips  over combining marks
-                    Some("ignore_ligatures"), // Bit 2 (0x4) - if set, skips over ligatures
-                    Some("ignore_base_glyphs"), // Bit 1 (0x2) - if set, skips over base glyphs
-                    Some("right_to_left"), // Bit 0 (0x1) - [GPOS type 3 only] when set, last glyph matched input will be positioned on baseline
-                ]);
-                map(
-                    tuple([macf, lo_bits]),
-                    lambda_tuple(
-                        ["macf", "lo"],
-                        prepend_field(
-                            // present the fields in the order listed from LSB-to-MSB in [https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#lookup-table], though it mostly doesn't matter
-                            ("mark_attachment_class_filter", var("macf")),
-                            (
-                                var("lo"),
-                                [
-                                    "right_to_left",
-                                    "ignore_base_glyphs",
-                                    "ignore_ligatures",
-                                    "ignore_marks",
-                                    "use_mark_filtering_set",
-                                ],
-                            ),
-                        ),
-                    ),
-                )
-            };
-            // STUB - initial pass to merely provide a structure without gaps (but not full-featured coverage of each sub-component)
-            // FIXME - refine and enrich this
-            record([
-                ("table_start", pos32()),
-                ("lookup_type", base.u16be()),
-                ("lookup_flag", lookup_flag),
-                ("sub_table_count", base.u16be()),
-                (
-                    "subtables",
-                    repeat_count(
-                        var("sub_table_count"),
-                        offset16(
-                            var("table_start"),
-                            lookup_subtable(tag, var("lookup_type")),
-                            base,
-                        ),
-                    ),
-                ),
-                (
-                    "mark_filtering_set",
-                    if_then_else(
-                        record_proj(var("lookup_flag"), "use_mark_filtering_set"),
-                        format_some(base.u16be()),
-                        format_none(),
-                    ),
-                ),
-            ])
-        };
+
         let lang_sys = {
             // Language System Table
             module.define_format(
@@ -2802,21 +2430,409 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             )
         };
 
-        let lookup_list = |tag: u32| {
-            record([
-                ("table_start", pos32()),
-                ("lookup_count", base.u16be()),
-                (
-                    "lookups",
-                    repeat_count(
-                        var("lookup_count"),
-                        offset16(var("table_start"), lookup_table(tag), base),
-                    ),
-                ),
-            ])
+        // Subtables used by both GSUB and GPOS
+        let sequence_context = {
+            /* STUB */
+            module.define_format("opentype.common.sequence_context", Format::EMPTY)
+        };
+        let chained_sequence_context = {
+            /* STUB */
+            module.define_format("opentype.common.chained_sequence_context", Format::EMPTY)
         };
 
         let layout_table = |tag: u32| {
+            let single_subst = /* STUB */ Format::EMPTY;
+            let multiple_subst = /* STUB */ Format::EMPTY;
+            let alternate_subst = /* STUB */ Format::EMPTY;
+            let ligature_subst = /* STUB */ Format::EMPTY;
+            let subst_extension = /* STUB */ Format::EMPTY;
+            let reverse_chain_single_subst = /* STUB */ Format::EMPTY;
+
+            let single_pos = {
+                let single_pos_format1 = |table_start: Expr| {
+                    record([
+                        (
+                            "coverage_offset",
+                            offset16(table_start.clone(), coverage_table.call(), base),
+                        ),
+                        ("value_format", value_format_flags.call()),
+                        (
+                            "value_record",
+                            value_record.call_args(vec![table_start, var("value_format")]),
+                        ),
+                    ])
+                };
+                let single_pos_format2 = |table_start: Expr| {
+                    record([
+                        (
+                            "coverage_offset",
+                            offset16(table_start.clone(), coverage_table.call(), base),
+                        ),
+                        ("value_format", value_format_flags.call()),
+                        ("value_count", base.u16be()),
+                        (
+                            "value_records",
+                            repeat_count(
+                                var("value_count"),
+                                value_record.call_args(vec![table_start, var("value_format")]),
+                            ),
+                        ),
+                    ])
+                };
+                record([
+                    ("table_start", pos32()),
+                    ("pos_format", base.u16be()),
+                    (
+                        "subtable",
+                        match_variant(
+                            var("pos_format"),
+                            [
+                                (
+                                    Pattern::U16(1),
+                                    "Format1",
+                                    single_pos_format1(var("table_start")),
+                                ),
+                                (
+                                    Pattern::U16(2),
+                                    "Format2",
+                                    single_pos_format2(var("table_start")),
+                                ),
+                                // REVIEW - should this be a permanent hard-failure?
+                                (Pattern::Wildcard, "BadFormat", Format::Fail),
+                            ],
+                        ),
+                    ),
+                ])
+            };
+            let pair_pos = {
+                let pair_value_record =
+                    |table_start: Expr, value_format1: Expr, value_format2: Expr| {
+                        record([
+                            // NOTE - first glyph id is listed in the Coverage table
+                            ("second_glyph", base.u16be()),
+                            (
+                                "value_record1",
+                                optional_value_record(table_start.clone(), value_format1),
+                            ),
+                            (
+                                "value_record2",
+                                optional_value_record(table_start, value_format2),
+                            ),
+                        ])
+                    };
+                let pair_set = |value_format1: Expr, value_format2: Expr| {
+                    record([
+                        ("table_start", pos32()),
+                        ("pair_value_count", base.u16be()),
+                        (
+                            "pair_value_records",
+                            repeat_count(
+                                var("pair_value_count"),
+                                pair_value_record(var("table_start"), value_format1, value_format2),
+                            ),
+                        ),
+                    ])
+                };
+                let pair_pos_format1 = |table_start: Expr| {
+                    record([
+                        (
+                            "coverage",
+                            offset16(table_start, coverage_table.call(), base),
+                        ),
+                        ("value_format1", value_format_flags.call()),
+                        ("value_format2", value_format_flags.call()),
+                        ("pair_set_count", base.u16be()),
+                        (
+                            "pair_sets",
+                            repeat_count(
+                                var("pair_set_count"),
+                                offset16(
+                                    var("table_start"),
+                                    pair_set(var("value_format1"), var("value_format2")),
+                                    base,
+                                ),
+                            ),
+                        ),
+                    ])
+                };
+                let class2_record =
+                    |table_start: Expr, value_format1: Expr, value_format2: Expr| {
+                        record([
+                            (
+                                "value_record1",
+                                optional_value_record(table_start.clone(), value_format1),
+                            ),
+                            (
+                                "value_record2",
+                                optional_value_record(table_start, value_format2),
+                            ),
+                        ])
+                    };
+                let class1_record = |table_start: Expr,
+                                     class2_count: Expr,
+                                     value_format1: Expr,
+                                     value_format2: Expr| {
+                    record([(
+                        "class2_records",
+                        repeat_count(
+                            class2_count,
+                            class2_record(table_start, value_format1, value_format2),
+                        ),
+                    )])
+                };
+                let pair_pos_format2 = |pair_pos_start: Expr| {
+                    record([
+                        (
+                            "coverage",
+                            offset16(pair_pos_start.clone(), coverage_table.call(), base),
+                        ),
+                        ("value_format1", value_format_flags.call()),
+                        ("value_format2", value_format_flags.call()),
+                        (
+                            "class_def1",
+                            offset16(pair_pos_start.clone(), class_def.call(), base),
+                        ),
+                        (
+                            "class_def2",
+                            offset16(pair_pos_start.clone(), class_def.call(), base),
+                        ),
+                        ("class1_count", base.u16be()),
+                        ("class2_count", base.u16be()),
+                        (
+                            "class1_records",
+                            repeat_count(
+                                var("class1_count"),
+                                class1_record(
+                                    pair_pos_start,
+                                    var("class2_count"),
+                                    var("value_format1"),
+                                    var("value_format2"),
+                                ),
+                            ),
+                        ),
+                    ])
+                };
+                record([
+                    ("table_start", pos32()),
+                    ("pos_format", base.u16be()),
+                    (
+                        "subtable",
+                        match_variant(
+                            var("pos_format"),
+                            [
+                                (
+                                    Pattern::U16(1),
+                                    "Format1",
+                                    pair_pos_format1(var("table_start")),
+                                ),
+                                (
+                                    Pattern::U16(2),
+                                    "Format2",
+                                    pair_pos_format2(var("table_start")),
+                                ),
+                                // REVIEW - should this be a permanent hard-failure?
+                                (Pattern::Wildcard, "BadFormat", Format::Fail),
+                            ],
+                        ),
+                    ),
+                ])
+            };
+            let cursive_pos = {
+                let entry_exit_record = |table_start: Expr| {
+                    record([
+                        (
+                            "entry_anchor",
+                            offset16(table_start.clone(), anchor_table.call(), base),
+                        ),
+                        (
+                            "exit_anchor",
+                            offset16(table_start, anchor_table.call(), base),
+                        ),
+                    ])
+                };
+                let cursive_pos_format1 = |table_start: Expr| {
+                    record([
+                        (
+                            "coverage",
+                            offset16(table_start.clone(), coverage_table.call(), base),
+                        ),
+                        ("entry_exit_count", base.u16be()),
+                        (
+                            "entry_exit_records",
+                            repeat_count(var("entry_exit_count"), entry_exit_record(table_start)),
+                        ),
+                    ])
+                };
+                record([
+                    ("table_start", pos32()),
+                    ("pos_format", base.u16be()),
+                    (
+                        "subtable",
+                        match_variant(
+                            var("pos_format"),
+                            [
+                                // NOTE - even though there is only one variant in the ad-hoc type, the current implementation preserves it as an enum rather than inline the single possible format
+                                // REVIEW - consider the implications of either avoiding the `Format1` variant-enum wrapper type by aliasing this format against format1, versus keeping things the way they are right now
+                                (
+                                    Pattern::U16(1),
+                                    "Format1",
+                                    cursive_pos_format1(var("table_start")),
+                                ),
+                                (Pattern::Wildcard, "BadFormat", Format::Fail),
+                            ],
+                        ),
+                    ),
+                ])
+            };
+            let mark_base_pos = /* STUB */ Format::EMPTY;
+            let mark_lig_pos = /* STUB */ Format::EMPTY;
+            let mark_mark_pos = /* STUB */ Format::EMPTY;
+            let pos_extension = /* STUB */ Format::EMPTY;
+
+            let lookup_list = |tag: u32| {
+                let lookup_table = |tag: u32| {
+                    // NOTE - tag is a model-external value, lookup-type is model-internal.
+                    let lookup_subtable = |tag: u32, lookup_type: Expr| {
+                        const GSUB: u32 = magic(b"GSUB");
+                        const GPOS: u32 = magic(b"GPOS");
+                        match tag {
+                            // natural pattern-match on tag
+                            GSUB => {
+                                // in-model pattern-match on lookup-type
+                                match_variant(
+                                    lookup_type,
+                                    [
+                                        // REVIEW - are these variant names too concise?
+                                        (Pattern::U16(1), "SingleSubst", single_subst),
+                                        (Pattern::U16(2), "MultipleSubst", multiple_subst),
+                                        (Pattern::U16(3), "AlternateSubst", alternate_subst),
+                                        (Pattern::U16(4), "LigatureSubst", ligature_subst),
+                                        (
+                                            Pattern::U16(5),
+                                            "SequenceContext",
+                                            sequence_context.call(),
+                                        ),
+                                        (
+                                            Pattern::U16(6),
+                                            "ChainedSequenceContext",
+                                            chained_sequence_context.call(),
+                                        ),
+                                        (Pattern::U16(7), "SubstExtension", subst_extension),
+                                        (
+                                            Pattern::U16(8),
+                                            "ReverseChainSingleSubst",
+                                            reverse_chain_single_subst,
+                                        ),
+                                        // REVIEW - should this be a hard-fail, or do we want to produce a dummy object instead (possibly with a trace of the value of lookup_type)?
+                                        (Pattern::Wildcard, "UnknownLookupSubtable", Format::Fail),
+                                    ],
+                                )
+                            }
+                            GPOS => {
+                                // in-model pattern-match on lookup-type
+                                match_variant(
+                                    lookup_type,
+                                    [
+                                        (Pattern::U16(1), "SinglePos", single_pos),
+                                        (Pattern::U16(2), "PairPos", pair_pos),
+                                        (Pattern::U16(3), "CursivePos", cursive_pos),
+                                        (Pattern::U16(4), "MarkBasePos", mark_base_pos),
+                                        (Pattern::U16(5), "MarkLigPos", mark_lig_pos),
+                                        (Pattern::U16(6), "MarkMarkPos", mark_mark_pos),
+                                        (
+                                            Pattern::U16(7),
+                                            "SequenceContext",
+                                            sequence_context.call(),
+                                        ),
+                                        (
+                                            Pattern::U16(8),
+                                            "ChainedSequenceContext",
+                                            chained_sequence_context.call(),
+                                        ),
+                                        (Pattern::U16(9), "PosExtension", pos_extension),
+                                        // REVIEW - should this be a hard-fail, or do we want to produce a dummy object instead (possibly with a trace of the value of lookup_type)?
+                                        (Pattern::Wildcard, "UnknownLookupSubtable", Format::Fail),
+                                    ],
+                                )
+                            }
+                            _ => Format::Fail,
+                        }
+                    };
+                    let lookup_flag = {
+                        // NOTE - we currently have no good way to group together multiple adjacent bits with flags_bits16 so we will instead parse as a single U8 for the first byte (0xFF00) and then as a series of flags in the second byte (0xFF)
+                        let macf = base.u8();
+                        let lo_bits = flags_bits8([
+                            None,                           // Bit 7 (0x80) - reserved
+                            None,                           // Bit 6 (0x40) - reserved
+                            None,                           // Bit 5 (0x20) - reserved
+                            Some("use_mark_filtering_set"), // Bit 4 (0x10) - indicator flag for presence of markFilteringSet field in Lookup table structure
+                            Some("ignore_marks"), // Bit 3 (0x8) - if set, skips  over combining marks
+                            Some("ignore_ligatures"), // Bit 2 (0x4) - if set, skips over ligatures
+                            Some("ignore_base_glyphs"), // Bit 1 (0x2) - if set, skips over base glyphs
+                            Some("right_to_left"), // Bit 0 (0x1) - [GPOS type 3 only] when set, last glyph matched input will be positioned on baseline
+                        ]);
+                        map(
+                            tuple([macf, lo_bits]),
+                            lambda_tuple(
+                                ["macf", "lo"],
+                                prepend_field(
+                                    // present the fields in the order listed from LSB-to-MSB in [https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#lookup-table], though it mostly doesn't matter
+                                    ("mark_attachment_class_filter", var("macf")),
+                                    (
+                                        var("lo"),
+                                        [
+                                            "right_to_left",
+                                            "ignore_base_glyphs",
+                                            "ignore_ligatures",
+                                            "ignore_marks",
+                                            "use_mark_filtering_set",
+                                        ],
+                                    ),
+                                ),
+                            ),
+                        )
+                    };
+                    // STUB - initial pass to merely provide a structure without gaps (but not full-featured coverage of each sub-component)
+                    // FIXME - refine and enrich this
+                    record([
+                        ("table_start", pos32()),
+                        ("lookup_type", base.u16be()),
+                        ("lookup_flag", lookup_flag),
+                        ("sub_table_count", base.u16be()),
+                        (
+                            "subtables",
+                            repeat_count(
+                                var("sub_table_count"),
+                                offset16(
+                                    var("table_start"),
+                                    lookup_subtable(tag, var("lookup_type")),
+                                    base,
+                                ),
+                            ),
+                        ),
+                        (
+                            "mark_filtering_set",
+                            if_then_else(
+                                record_proj(var("lookup_flag"), "use_mark_filtering_set"),
+                                format_some(base.u16be()),
+                                format_none(),
+                            ),
+                        ),
+                    ])
+                };
+                record([
+                    ("table_start", pos32()),
+                    ("lookup_count", base.u16be()),
+                    (
+                        "lookups",
+                        repeat_count(
+                            var("lookup_count"),
+                            offset16(var("table_start"), lookup_table(tag), base),
+                        ),
+                    ),
+                ])
+            };
+
             record([
                 ("table_start", pos32()),
                 ("major_version", expect_u16be(base, 1)),
@@ -2836,8 +2852,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ])
         };
         // !SECTION
-        let gpos_table =
-            { module.define_format("opentype.gpos_table", layout_table(magic(b"GPOS"))) };
+        let gpos_table = module.define_format("opentype.gpos_table", layout_table(magic(b"GPOS")));
+        let gsub_table = module.define_format("opentype.gsub_table", layout_table(magic(b"GSUB")));
 
         module.define_format_args(
             "opentype.table_directory.table_links",
@@ -2956,6 +2972,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 (
                     "gpos",
                     optional_table("start", "tables", magic(b"GPOS"), gpos_table.call()),
+                ),
+                (
+                    "gsub",
+                    optional_table("start", "tables", magic(b"GSUB"), gsub_table.call()),
                 ),
                 // !SECTION
                 // STUB - add more tables
