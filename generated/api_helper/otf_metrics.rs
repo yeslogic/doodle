@@ -1232,47 +1232,77 @@ struct FeatureRecord {
     feature: Option<FeatureTable>,
 }
 
-pub type OpentypeLookupSubtable = opentype_gpos_table_lookup_list_link_lookups_link_subtables_link;
+pub type OpentypeGposLookupSubtable =
+    opentype_gpos_table_lookup_list_link_lookups_link_subtables_link;
+pub type OpentypeGsubLookupSubtable =
+    opentype_gsub_table_lookup_list_link_lookups_link_subtables_link;
 
-impl TryPromote<OpentypeLookupSubtable> for LookupSubtable {
+impl TryPromote<OpentypeGsubLookupSubtable> for LookupSubtable {
     type Error = UnknownValueError<u16>;
 
-    fn try_promote(orig: &OpentypeLookupSubtable) -> Result<Self, Self::Error> {
+    fn try_promote(orig: &OpentypeGsubLookupSubtable) -> Result<Self, Self::Error> {
         Ok(match orig {
-            &OpentypeLookupSubtable::ChainedSequenceContext => {
+            OpentypeGsubLookupSubtable::SingleSubst => LookupSubtable::SingleSubst,
+            OpentypeGsubLookupSubtable::MultipleSubst => LookupSubtable::MultipleSubst,
+            OpentypeGsubLookupSubtable::AlternateSubst => LookupSubtable::AlternateSubst,
+            OpentypeGsubLookupSubtable::LigatureSubst => LookupSubtable::LigatureSubst,
+            OpentypeGsubLookupSubtable::SequenceContext => LookupSubtable::SequenceContext,
+            OpentypeGsubLookupSubtable::ChainedSequenceContext => {
                 LookupSubtable::ChainedSequenceContext
             }
-            &OpentypeLookupSubtable::SequenceContext => LookupSubtable::SequenceContext,
-            &OpentypeLookupSubtable::PosExtension => LookupSubtable::PosExtension,
-            &OpentypeLookupSubtable::MarkBasePos => LookupSubtable::MarkBasePos,
-            &OpentypeLookupSubtable::MarkLigPos => LookupSubtable::MarkLigPos,
-            &OpentypeLookupSubtable::MarkMarkPos => LookupSubtable::MarkMarkPos,
-            OpentypeLookupSubtable::CursivePos(cursive_pos) => {
+            OpentypeGsubLookupSubtable::SubstExtension => LookupSubtable::SubstExtension,
+            OpentypeGsubLookupSubtable::ReverseChainSingleSubst => {
+                LookupSubtable::ReverseChainSingleSubst
+            }
+        })
+    }
+}
+
+impl TryPromote<OpentypeGposLookupSubtable> for LookupSubtable {
+    type Error = UnknownValueError<u16>;
+
+    fn try_promote(orig: &OpentypeGposLookupSubtable) -> Result<Self, Self::Error> {
+        Ok(match orig {
+            &OpentypeGposLookupSubtable::ChainedSequenceContext => {
+                LookupSubtable::ChainedSequenceContext
+            }
+            &OpentypeGposLookupSubtable::SequenceContext => LookupSubtable::SequenceContext,
+            &OpentypeGposLookupSubtable::PosExtension => LookupSubtable::PosExtension,
+            &OpentypeGposLookupSubtable::MarkBasePos => LookupSubtable::MarkBasePos,
+            &OpentypeGposLookupSubtable::MarkLigPos => LookupSubtable::MarkLigPos,
+            &OpentypeGposLookupSubtable::MarkMarkPos => LookupSubtable::MarkMarkPos,
+            OpentypeGposLookupSubtable::CursivePos(cursive_pos) => {
                 LookupSubtable::CursivePos(CursivePos::try_promote(cursive_pos)?)
             }
-            OpentypeLookupSubtable::PairPos(pair_pos) => {
+            OpentypeGposLookupSubtable::PairPos(pair_pos) => {
                 LookupSubtable::PairPos(PairPos::try_promote(pair_pos)?)
             }
-            OpentypeLookupSubtable::SinglePos(single_pos) => {
+            OpentypeGposLookupSubtable::SinglePos(single_pos) => {
                 LookupSubtable::SinglePos(SinglePos::try_promote(single_pos)?)
             }
         })
     }
 }
 
-// STUB - only includes cases for GPOS so far
-// NOTE - not copy because it won't be once we enrich the cases
 #[derive(Clone, Debug)]
 enum LookupSubtable {
-    ChainedSequenceContext,
-    SequenceContext,
-    PosExtension,
+    SinglePos(SinglePos),
+    PairPos(PairPos),
+    CursivePos(CursivePos),
     MarkBasePos,
     MarkLigPos,
     MarkMarkPos,
-    PairPos(PairPos),
-    SinglePos(SinglePos),
-    CursivePos(CursivePos),
+    PosExtension,
+
+    SequenceContext,
+    ChainedSequenceContext,
+
+    SingleSubst,
+    MultipleSubst,
+    AlternateSubst,
+    LigatureSubst,
+    SubstExtension,
+    ReverseChainSingleSubst,
 }
 
 pub type OpentypeCursivePos =
@@ -1343,12 +1373,12 @@ struct EntryExitRecord {
     exit_anchor: Option<AnchorTable>,
 }
 
-pub type OpentypeAnchorTable = opentype_layout_anchor_table;
-pub type OpentypeAnchorTableTable = opentype_layout_anchor_table_table;
+pub type OpentypeAnchorTable = opentype_common_anchor_table;
+pub type OpentypeAnchorTableTable = opentype_common_anchor_table_table;
 
-pub type OpentypeAnchorTableFormat1 = opentype_layout_anchor_table_table_Format1;
-pub type OpentypeAnchorTableFormat2 = opentype_layout_anchor_table_table_Format2;
-pub type OpentypeAnchorTableFormat3 = opentype_layout_anchor_table_table_Format3;
+pub type OpentypeAnchorTableFormat1 = opentype_common_anchor_table_table_Format1;
+pub type OpentypeAnchorTableFormat2 = opentype_common_anchor_table_table_Format2;
+pub type OpentypeAnchorTableFormat3 = opentype_common_anchor_table_table_Format3;
 
 impl TryPromote<OpentypeAnchorTable> for AnchorTable {
     type Error = UnknownValueError<u16>;
@@ -1713,14 +1743,33 @@ struct ValueRecord {
     y_advance_device: Option<Option<DeviceOrVariationIndexTable>>,
 }
 
-type LookupFlag = opentype_gpos_table_lookup_list_link_lookups_link_lookup_flag;
+type LookupFlag = opentype_gsub_table_lookup_list_link_lookups_link_lookup_flag;
 
-pub type OpentypeLookupTable = opentype_gpos_table_lookup_list_link_lookups_link;
+pub type OpentypeGposLookupTable = opentype_gpos_table_lookup_list_link_lookups_link;
+pub type OpentypeGsubLookupTable = opentype_gsub_table_lookup_list_link_lookups_link;
 
-impl TryPromote<OpentypeLookupTable> for LookupTable {
+impl TryPromote<OpentypeGposLookupTable> for LookupTable {
     type Error = UnknownValueError<u16>;
 
-    fn try_promote(orig: &OpentypeLookupTable) -> Result<Self, Self::Error> {
+    fn try_promote(orig: &OpentypeGposLookupTable) -> Result<Self, Self::Error> {
+        let mut subtables = Vec::with_capacity(orig.subtables.len());
+        for offset in orig.subtables.iter() {
+            subtables.push(try_promote_opt(&offset.link)?);
+        }
+
+        Ok(LookupTable {
+            lookup_type: orig.lookup_type,
+            lookup_flag: orig.lookup_flag,
+            subtables,
+            mark_filtering_set: orig.mark_filtering_set,
+        })
+    }
+}
+
+impl TryPromote<OpentypeGsubLookupTable> for LookupTable {
+    type Error = UnknownValueError<u16>;
+
+    fn try_promote(orig: &OpentypeGsubLookupTable) -> Result<Self, Self::Error> {
         let mut subtables = Vec::with_capacity(orig.subtables.len());
         for offset in orig.subtables.iter() {
             subtables.push(try_promote_opt(&offset.link)?);
@@ -1749,7 +1798,6 @@ type LookupList = Vec<Option<LookupTable>>;
 
 pub type OpentypeScriptList = opentype_common_script_list;
 pub type OpentypeFeatureList = opentype_common_feature_list;
-pub type OpentypeLookupList = opentype_gpos_table_lookup_list_link;
 
 impl Promote<OpentypeScriptList> for ScriptList {
     fn promote(orig: &OpentypeScriptList) -> Self {
@@ -1763,10 +1811,25 @@ impl Promote<OpentypeFeatureList> for FeatureList {
     }
 }
 
-impl TryPromote<OpentypeLookupList> for LookupList {
+pub type OpentypeGposLookupList = opentype_gpos_table_lookup_list_link;
+pub type OpentypeGsubLookupList = opentype_gsub_table_lookup_list_link;
+
+impl TryPromote<OpentypeGposLookupList> for LookupList {
     type Error = UnknownValueError<u16>;
 
-    fn try_promote(orig: &OpentypeLookupList) -> Result<Self, Self::Error> {
+    fn try_promote(orig: &OpentypeGposLookupList) -> Result<Self, Self::Error> {
+        let mut accum = Vec::with_capacity(orig.lookups.len());
+        for offset in orig.lookups.iter() {
+            accum.push(try_promote_opt(&offset.link)?);
+        }
+        Ok(accum)
+    }
+}
+
+impl TryPromote<OpentypeGsubLookupList> for LookupList {
+    type Error = UnknownValueError<u16>;
+
+    fn try_promote(orig: &OpentypeGsubLookupList) -> Result<Self, Self::Error> {
         let mut accum = Vec::with_capacity(orig.lookups.len());
         for offset in orig.lookups.iter() {
             accum.push(try_promote_opt(&offset.link)?);
@@ -1776,7 +1839,8 @@ impl TryPromote<OpentypeLookupList> for LookupList {
 }
 
 #[derive(Clone, Debug)]
-struct GposMetrics {
+/// Common API type for summarizing GPOS and GSUB
+struct LayoutMetrics {
     major_version: u16,
     minor_version: u16,
     script_list: Option<ScriptList>,
@@ -1794,7 +1858,8 @@ pub struct OptionalTableMetrics {
     gasp: Option<GaspMetrics>,
     // STUB - more tables may end up in between these fields as we add support for them in the order in which microsoft lists them
     gdef: Option<GdefMetrics>,
-    gpos: Option<GposMetrics>,
+    gpos: Option<LayoutMetrics>,
+    gsub: Option<LayoutMetrics>,
     // STUB - add more tables as we expand opentype definition
 }
 
@@ -2125,12 +2190,26 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
             let gpos = &dir.table_links.gpos;
             gpos.as_ref()
                 .map(|gpos| {
-                    TestResult::Ok(GposMetrics {
+                    TestResult::Ok(LayoutMetrics {
                         major_version: gpos.major_version,
                         minor_version: gpos.minor_version,
                         script_list: try_promote_opt(&gpos.script_list.link)?,
                         feature_list: try_promote_opt(&gpos.feature_list.link)?,
                         lookup_list: try_promote_opt(&gpos.lookup_list.link)?,
+                    })
+                })
+                .transpose()?
+        };
+        let gsub = {
+            let gsub = &dir.table_links.gsub;
+            gsub.as_ref()
+                .map(|gsub| {
+                    TestResult::Ok(LayoutMetrics {
+                        major_version: gsub.major_version,
+                        minor_version: gsub.minor_version,
+                        script_list: try_promote_opt(&gsub.script_list.link)?,
+                        feature_list: try_promote_opt(&gsub.feature_list.link)?,
+                        lookup_list: try_promote_opt(&gsub.lookup_list.link)?,
                     })
                 })
                 .transpose()?
@@ -2145,6 +2224,7 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
             // TODO - add more optional tables as they are added to the spec
             gdef,
             gpos,
+            gsub,
         }
     };
     let extraMagic = dir
@@ -2168,7 +2248,7 @@ fn is_extra(table_id: &u32) -> bool {
     match &bytes {
         b"cmap" | b"head" | b"hhea" | b"hmtx" | b"maxp" | b"name" | b"OS/2" | b"post" => false,
         b"cvt " | b"fpgm" | b"loca" | b"glyf" | b"prep" | b"gasp" => false,
-        b"GDEF" | b"GPOS" => false,
+        b"GDEF" | b"GPOS" | b"GSUB" => false,
         // FIXME - update with more cases as we handle more table records
         _ => true,
     }
@@ -2264,7 +2344,9 @@ fn show_optional_metrics(optional: &OptionalTableMetrics, conf: &Config) {
     show_gasp_metrics(&optional.gasp, conf);
     // STUB - anything between gasp and gdef go here
     show_gdef_metrics(&optional.gdef, conf);
-    show_gpos_metrics(&optional.gpos, conf);
+
+    show_layout_metrics(&optional.gpos, Ctxt::from(TableDiscriminator::Gpos), conf);
+    show_layout_metrics(&optional.gsub, Ctxt::from(TableDiscriminator::Gsub), conf);
 }
 
 fn show_cvt_metrics(cvt: &Option<CvtMetrics>, _conf: &Config) {
@@ -2329,8 +2411,15 @@ fn show_gdef_metrics(gdef: &Option<GdefMetrics>, conf: &Config) {
     }
 }
 
-fn show_gpos_metrics(gpos: &Option<GposMetrics>, conf: &Config) {
-    if let Some(GposMetrics {
+fn format_table_disc(disc: TableDiscriminator) -> &'static str {
+    match disc {
+        TableDiscriminator::Gpos => "GPOS",
+        TableDiscriminator::Gsub => "GSUB",
+    }
+}
+
+fn show_layout_metrics(gpos: &Option<LayoutMetrics>, ctxt: Ctxt, conf: &Config) {
+    if let Some(LayoutMetrics {
         major_version,
         minor_version,
         script_list,
@@ -2339,7 +2428,8 @@ fn show_gpos_metrics(gpos: &Option<GposMetrics>, conf: &Config) {
     }) = gpos
     {
         println!(
-            "GPOS: version {}",
+            "{}: version {}",
+            format_table_disc(ctxt.get_disc().expect("Ctxt missing TableDiscriminator")),
             format_version_major_minor(*major_version, *minor_version)
         );
         if let Some(script_list) = script_list {
@@ -2349,7 +2439,6 @@ fn show_gpos_metrics(gpos: &Option<GposMetrics>, conf: &Config) {
             show_feature_list(&feature_list, conf);
         }
         if let Some(lookup_list) = lookup_list {
-            let ctxt = Ctxt::from(TableDiscriminator::Gpos);
             show_lookup_list(&lookup_list, ctxt, conf);
         }
     }
@@ -2505,12 +2594,6 @@ fn format_lookup_subtable(subtable: &Option<LookupSubtable>, show_lookup_type: b
     // STUB - because the subtables are both partial (more variants exist) and abridged (existing variants are missing details), reimplement as necessary
     if let Some(subtable) = subtable {
         let (label, contents) = match subtable {
-            LookupSubtable::ChainedSequenceContext => ("ChainCtxtPos", format!("(..)")),
-            LookupSubtable::SequenceContext => ("CtxPos", format!("(..)")),
-            LookupSubtable::PosExtension => ("ExtPos", format!("(..)")),
-            LookupSubtable::MarkBasePos => ("MarkBaseAttach", format!("(..)")),
-            LookupSubtable::MarkLigPos => ("MarkLigAttach", format!("(..)")),
-            LookupSubtable::MarkMarkPos => ("MarkMarkAttach", format!("(..)")),
             LookupSubtable::SinglePos(single_pos) => {
                 let contents = {
                     match single_pos {
@@ -2532,7 +2615,7 @@ fn format_lookup_subtable(subtable: &Option<LookupSubtable>, show_lookup_type: b
                         }
                     }
                 };
-                ("SingleAdjust", contents)
+                ("SinglePos", contents)
             }
             LookupSubtable::PairPos(pair_pos) => {
                 let contents = {
@@ -2593,7 +2676,7 @@ fn format_lookup_subtable(subtable: &Option<LookupSubtable>, show_lookup_type: b
                         }
                     }
                 };
-                ("PairAdjust", contents)
+                ("PairPos", contents)
             }
             LookupSubtable::CursivePos(cursive_pos) => {
                 let contents = {
@@ -2611,8 +2694,22 @@ fn format_lookup_subtable(subtable: &Option<LookupSubtable>, show_lookup_type: b
                         }
                     }
                 };
-                ("CursAttach", contents)
+                ("CursivePos", contents)
             }
+            LookupSubtable::MarkBasePos => ("MarkBasePos", format!("(..)")),
+            LookupSubtable::MarkLigPos => ("MarkLigPos", format!("(..)")),
+            LookupSubtable::MarkMarkPos => ("MarkMarkPos", format!("(..)")),
+            LookupSubtable::PosExtension => ("PosExt", format!("(..)")),
+
+            LookupSubtable::SingleSubst => ("SingleSubst", format!("(..)")),
+            LookupSubtable::MultipleSubst => ("MultipleSubst", format!("(..)")),
+            LookupSubtable::AlternateSubst => ("AlternateSubst", format!("(..)")),
+            LookupSubtable::LigatureSubst => ("LigatureSubst", format!("(..)")),
+            LookupSubtable::SubstExtension => ("SubstExt", format!("(..)")),
+            LookupSubtable::ReverseChainSingleSubst => ("RevChainSingleSubst", format!("(..)")),
+
+            LookupSubtable::SequenceContext => ("SeqCtx", format!("(..)")),
+            LookupSubtable::ChainedSequenceContext => ("ChainSeqCtx", format!("(..)")),
         };
         if show_lookup_type {
             format!("{label}{contents}")
@@ -2772,21 +2869,28 @@ fn format_lookup_type(ctxt: Ctxt, ltype: u16) -> &'static str {
     match ctxt.get_disc() {
         None => unreachable!("format_lookup_kind called with neutral (whence := None) Ctxt"),
         Some(TableDiscriminator::Gpos) => match ltype {
-            1 => "Single adjustment",
-            2 => "Pair adjustment",
-            3 => "Cursive attachment",
-            4 => "Mark-to-base attachment",
-            5 => "Mark-to-ligature attachment",
-            6 => "Mark-to-mark attachment",
-            7 => "Contextual positioning",
-            8 => "Chained contexts positioning",
-            9 => "Positioning extension",
+            1 => "SinglePos",
+            2 => "PairPos",
+            3 => "CursivePos",
+            4 => "MarkBasePos",
+            5 => "MarkLigPos",
+            6 => "MarkMarkPos",
+            7 => "SequenceContext",
+            8 => "ChainedSequenceContext",
+            9 => "PosExt",
             _ => unreachable!("unexpected GPOS lookup-type {ltype} (expected 1..=9)"),
         },
-        Some(TableDiscriminator::Gsub) => {
-            // STUB - implement this properly once we add support for GSUB
-            unimplemented!("GSUB not implemented yet so this branch is dormant");
-        }
+        Some(TableDiscriminator::Gsub) => match ltype {
+            1 => "SingleSubst",
+            2 => "MultipleSubst",
+            3 => "AlternateSubst",
+            4 => "LigatureSubst",
+            5 => "SequenceContext",
+            6 => "ChainedSequenceContext",
+            7 => "SubstExt",
+            8 => "ReverseChainedSingleSubst",
+            _ => unreachable!("unexpected GSUB lookup-type {ltype} (expected 1..=8)"),
+        },
     }
 }
 
