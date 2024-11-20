@@ -2573,10 +2573,10 @@ fn show_lookup_table(table: &LookupTable, ctxt: Ctxt, conf: &Config) {
     // NOTE - because we print the kind of the lookup here, we don't need to list it for every element
     // LINK[format-lookup-subtable] -  (see format_lookup_subtable below)
     print!(
-        "LookupTable: kind={}, flags={}",
+        "LookupTable: kind={}",
         format_lookup_type(ctxt, table.lookup_type),
-        format_lookup_flag(&table.lookup_flag),
     );
+    show_lookup_flag(&table.lookup_flag);
     if let Some(filtering_set) = table.mark_filtering_set {
         print!(", markFilteringSet=GDEF->MarkGlyphSet[{}]", filtering_set)
     }
@@ -2830,6 +2830,21 @@ where
         (Some(x), Some(y)) => Some(format!("{what}: ({x},{y})")),
         (Some(x), None) => Some(format!("{what}[x]: {x}")),
         (None, Some(y)) => Some(format!("{what}[y]: {y}")),
+    }
+}
+
+/// Prints a summary of a given `LookupFlag` value, including logic to avoid printing anything for the default flag value.
+///
+/// Because of this elision, will also print a prefix that separates the displayed content from the previous field
+fn show_lookup_flag(flags: &LookupFlag) {
+    if flags.mark_attachment_class_filter != 0
+        || flags.right_to_left
+        || flags.ignore_ligatures
+        || flags.ignore_base_glyphs
+        || flags.ignore_marks
+        || flags.use_mark_filtering_set
+    {
+        print!(", flags={}", format_lookup_flag(flags))
     }
 }
 
