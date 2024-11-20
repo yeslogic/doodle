@@ -2277,6 +2277,57 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 )
             }
         };
+        let anchor_table = {
+            let anchor_format1 =
+                record([("x_coordinate", s16be(base)), ("y_coordinate", s16be(base))]);
+            let anchor_format2 = record([
+                ("x_coordinate", s16be(base)),
+                ("y_coordinate", s16be(base)),
+                ("anchor_point", base.u16be()),
+            ]);
+            let anchor_format3 = |table_start: Expr| {
+                record([
+                    ("x_coordinate", s16be(base)),
+                    ("y_coordinate", s16be(base)),
+                    (
+                        "x_device_offset",
+                        offset16(
+                            table_start.clone(),
+                            device_or_variation_index_table.call(),
+                            base,
+                        ),
+                    ),
+                    (
+                        "y_device_offset",
+                        offset16(table_start, device_or_variation_index_table.call(), base),
+                    ),
+                ])
+            };
+
+            module.define_format(
+                "opentype.layout.anchor_table",
+                record([
+                    ("table_start", pos32()),
+                    ("anchor_format", base.u16be()),
+                    (
+                        "table",
+                        match_variant(
+                            var("anchor_format"),
+                            [
+                                (Pattern::U16(1), "Format1", anchor_format1),
+                                (Pattern::U16(2), "Format2", anchor_format2),
+                                (
+                                    Pattern::U16(3),
+                                    "Format3",
+                                    anchor_format3(var("table_start")),
+                                ),
+                                (Pattern::Wildcard, "BadFormat", Format::Fail),
+                            ],
+                        ),
+                    ),
+                ]),
+            )
+        };
 
         let single_substitution = /* STUB */ Format::EMPTY;
         let multiple_substitution = /* STUB */ Format::EMPTY;
@@ -2475,13 +2526,59 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ),
             ])
         };
-        let cursive_attachment = /* STUB */ Format::EMPTY;
-        let mark_to_base_attachment = /* STUB */ Format::EMPTY;
-        let mark_to_ligature_attachment = /* STUB */ Format::EMPTY;
-        let mark_to_mark_attachment = /* STUB */ Format::EMPTY;
-        let contextual_positioning = /* STUB */ Format::EMPTY;
-        let chained_contexts_positioning = /* STUB */ Format::EMPTY;
-        let extension_positioning = /* STUB */ Format::EMPTY;
+        let cursive_pos = {
+            let entry_exit_record = |table_start: Expr| {
+                record([
+                    (
+                        "entry_anchor",
+                        offset16(table_start.clone(), anchor_table.call(), base),
+                    ),
+                    (
+                        "exit_anchor",
+                        offset16(table_start, anchor_table.call(), base),
+                    ),
+                ])
+            };
+            let cursive_pos_format1 = |table_start: Expr| {
+                record([
+                    (
+                        "coverage",
+                        offset16(table_start.clone(), coverage_table.call(), base),
+                    ),
+                    ("entry_exit_count", base.u16be()),
+                    (
+                        "entry_exit_records",
+                        repeat_count(var("entry_exit_count"), entry_exit_record(table_start)),
+                    ),
+                ])
+            };
+            record([
+                ("table_start", pos32()),
+                ("pos_format", base.u16be()),
+                (
+                    "subtable",
+                    match_variant(
+                        var("pos_format"),
+                        [
+                            // NOTE - even though there is only one variant in the ad-hoc type, the current implementation preserves it as an enum rather than inline the single possible format
+                            // REVIEW - consider the implications of either avoiding the `Format1` variant-enum wrapper type by aliasing this format against format1, versus keeping things the way they are right now
+                            (
+                                Pattern::U16(1),
+                                "Format1",
+                                cursive_pos_format1(var("table_start")),
+                            ),
+                            (Pattern::Wildcard, "BadFormat", Format::Fail),
+                        ],
+                    ),
+                ),
+            ])
+        };
+        let mark_base_pos = /* STUB */ Format::EMPTY;
+        let mark_lig_pos = /* STUB */ Format::EMPTY;
+        let mark_mark_pos = /* STUB */ Format::EMPTY;
+        let sequence_context = /* STUB */ Format::EMPTY;
+        let chained_sequence_context = /* STUB */ Format::EMPTY;
+        let pos_extension = /* STUB */ Format::EMPTY;
 
         // shared structure of GSUB and GPOS tables
         let lookup_table = |tag: u32| {
@@ -2523,19 +2620,19 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         match_variant(
                             lookup_type,
                             [
-                                (Pattern::U16(1), "SingleAdjust", single_pos),
-                                (Pattern::U16(2), "PairAdjust", pair_pos),
-                                (Pattern::U16(3), "CursAttach", cursive_attachment),
-                                (Pattern::U16(4), "MarkBaseAttach", mark_to_base_attachment),
+                                (Pattern::U16(1), "SinglePos", single_pos),
+                                (Pattern::U16(2), "PairPos", pair_pos),
+                                (Pattern::U16(3), "CursivePos", cursive_pos),
+                                (Pattern::U16(4), "MarkBasePos", mark_base_pos),
+                                (Pattern::U16(5), "MarkLigPos", mark_lig_pos),
+                                (Pattern::U16(6), "MarkMarkPos", mark_mark_pos),
+                                (Pattern::U16(7), "SequenceContext", sequence_context),
                                 (
-                                    Pattern::U16(5),
-                                    "MarkLigAttach",
-                                    mark_to_ligature_attachment,
+                                    Pattern::U16(8),
+                                    "ChainedSequenceContext",
+                                    chained_sequence_context,
                                 ),
-                                (Pattern::U16(6), "MarkMarkAttach", mark_to_mark_attachment),
-                                (Pattern::U16(7), "CtxPos", contextual_positioning),
-                                (Pattern::U16(8), "ChainCtxPos", chained_contexts_positioning),
-                                (Pattern::U16(9), "ExtPos", extension_positioning),
+                                (Pattern::U16(9), "PosExtension", pos_extension),
                                 // REVIEW - should this be a hard-fail, or do we want to produce a dummy object instead (possibly with a trace of the value of lookup_type)?
                                 (Pattern::Wildcard, "UnknownLookupSubtable", Format::Fail),
                             ],
