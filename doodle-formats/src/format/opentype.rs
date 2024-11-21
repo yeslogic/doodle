@@ -2430,10 +2430,115 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             )
         };
 
-        // Subtables used by both GSUB and GPOS
+        let sequence_lookup_record = module.define_format(
+            "opentype.common.sequence_lookup",
+            record([
+                ("sequence_index", base.u16be()),
+                ("lookup_list_index", base.u16be()),
+            ]),
+        );
+
+        // Sub-tables used by both GSUB and GPOS
         let sequence_context = {
-            /* STUB */
-            module.define_format("opentype.common.sequence_context", Format::EMPTY)
+            let rule_set = {
+                let rule = record([
+                    (
+                        "glyph_count",
+                        where_lambda(base.u16be(), "count", is_nonzero_u16(var("count"))),
+                    ),
+                    ("seq_lookup_count", base.u16be()),
+                    (
+                        "input_sequence",
+                        repeat_count(sub(var("glyph_count"), Expr::U16(1)), base.u16be()),
+                    ),
+                    (
+                        "seq_lookup_records",
+                        repeat_count(var("seq_lookup_count"), sequence_lookup_record.call()),
+                    ),
+                ]);
+                record([
+                    ("table_start", pos32()),
+                    ("rule_count", base.u16be()),
+                    (
+                        "rules",
+                        repeat_count(var("rule_count"), offset16(var("table_start"), rule, base)),
+                    ),
+                ])
+            };
+            let sequence_context_format1 = {
+                record([
+                    ("table_start", pos32()),
+                    (
+                        "coverage",
+                        offset16(var("table_start"), coverage_table.call(), base),
+                    ),
+                    ("seq_rule_set_count", base.u16be()),
+                    (
+                        "seq_rule_sets",
+                        repeat_count(
+                            var("seq_rule_set_count"),
+                            offset16(var("table_start"), rule_set.clone(), base),
+                        ),
+                    ),
+                ])
+            };
+            let sequence_context_format2 = {
+                record([
+                    ("table_start", pos32()),
+                    (
+                        "coverage",
+                        offset16(var("table_start"), coverage_table.call(), base),
+                    ),
+                    (
+                        "class_def",
+                        offset16(var("table_start"), class_def.call(), base),
+                    ),
+                    ("class_seq_rule_set_count", base.u16be()),
+                    (
+                        "class_seq_rule_sets",
+                        repeat_count(
+                            var("class_seq_rule_set_count"),
+                            offset16(var("table_start"), rule_set, base),
+                        ),
+                    ),
+                ])
+            };
+            let sequence_context_format3 = {
+                record([
+                    ("table_start", pos32()),
+                    ("glyph_count", base.u16be()),
+                    ("seq_lookup_count", base.u16be()),
+                    (
+                        "coverage_tables",
+                        repeat_count(
+                            var("glyph_count"),
+                            offset16(var("table_start"), coverage_table.call(), base),
+                        ),
+                    ),
+                    (
+                        "seq_lookup_records",
+                        repeat_count(var("seq_lookup_count"), sequence_lookup_record.call()),
+                    ),
+                ])
+            };
+            module.define_format(
+                "opentype.common.sequence_context",
+                record([
+                    ("format", base.u16be()),
+                    (
+                        "subst",
+                        match_variant(
+                            var("format"),
+                            [
+                                (Pattern::U16(1), "Format1", sequence_context_format1),
+                                (Pattern::U16(2), "Format2", sequence_context_format2),
+                                (Pattern::U16(3), "Format3", sequence_context_format3),
+                                (Pattern::Wildcard, "BadFormat", Format::Fail),
+                            ],
+                        ),
+                    ),
+                ]),
+            )
         };
         let chained_sequence_context = {
             /* STUB */

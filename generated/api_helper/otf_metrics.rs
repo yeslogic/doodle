@@ -183,6 +183,12 @@ where
     }
 }
 
+impl<T: Clone> Promote<T> for T {
+    fn promote(orig: &T) -> T {
+        orig.clone()
+    }
+}
+
 // !SECTION
 
 // SECTION - *Metrics and mid- to low-level API-enrichment analogues for raw gencode types
@@ -1246,7 +1252,9 @@ impl TryPromote<OpentypeGsubLookupSubtable> for LookupSubtable {
             OpentypeGsubLookupSubtable::MultipleSubst => LookupSubtable::MultipleSubst,
             OpentypeGsubLookupSubtable::AlternateSubst => LookupSubtable::AlternateSubst,
             OpentypeGsubLookupSubtable::LigatureSubst => LookupSubtable::LigatureSubst,
-            OpentypeGsubLookupSubtable::SequenceContext => LookupSubtable::SequenceContext,
+            OpentypeGsubLookupSubtable::SequenceContext(seq_ctx) => {
+                LookupSubtable::SequenceContext(SequenceContext::promote(seq_ctx))
+            }
             OpentypeGsubLookupSubtable::ChainedSequenceContext => {
                 LookupSubtable::ChainedSequenceContext
             }
@@ -1263,23 +1271,25 @@ impl TryPromote<OpentypeGposLookupSubtable> for LookupSubtable {
 
     fn try_promote(orig: &OpentypeGposLookupSubtable) -> Result<Self, Self::Error> {
         Ok(match orig {
-            &OpentypeGposLookupSubtable::ChainedSequenceContext => {
-                LookupSubtable::ChainedSequenceContext
-            }
-            &OpentypeGposLookupSubtable::SequenceContext => LookupSubtable::SequenceContext,
-            &OpentypeGposLookupSubtable::PosExtension => LookupSubtable::PosExtension,
-            &OpentypeGposLookupSubtable::MarkBasePos => LookupSubtable::MarkBasePos,
-            &OpentypeGposLookupSubtable::MarkLigPos => LookupSubtable::MarkLigPos,
-            &OpentypeGposLookupSubtable::MarkMarkPos => LookupSubtable::MarkMarkPos,
-            OpentypeGposLookupSubtable::CursivePos(cursive_pos) => {
-                LookupSubtable::CursivePos(CursivePos::try_promote(cursive_pos)?)
+            OpentypeGposLookupSubtable::SinglePos(single_pos) => {
+                LookupSubtable::SinglePos(SinglePos::try_promote(single_pos)?)
             }
             OpentypeGposLookupSubtable::PairPos(pair_pos) => {
                 LookupSubtable::PairPos(PairPos::try_promote(pair_pos)?)
             }
-            OpentypeGposLookupSubtable::SinglePos(single_pos) => {
-                LookupSubtable::SinglePos(SinglePos::try_promote(single_pos)?)
+            OpentypeGposLookupSubtable::CursivePos(cursive_pos) => {
+                LookupSubtable::CursivePos(CursivePos::try_promote(cursive_pos)?)
             }
+            OpentypeGposLookupSubtable::MarkBasePos => LookupSubtable::MarkBasePos,
+            OpentypeGposLookupSubtable::MarkLigPos => LookupSubtable::MarkLigPos,
+            OpentypeGposLookupSubtable::MarkMarkPos => LookupSubtable::MarkMarkPos,
+            OpentypeGposLookupSubtable::SequenceContext(seq_ctx) => {
+                LookupSubtable::SequenceContext(SequenceContext::promote(seq_ctx))
+            }
+            OpentypeGposLookupSubtable::ChainedSequenceContext => {
+                LookupSubtable::ChainedSequenceContext
+            }
+            OpentypeGposLookupSubtable::PosExtension => LookupSubtable::PosExtension,
         })
     }
 }
@@ -1294,7 +1304,7 @@ enum LookupSubtable {
     MarkMarkPos,
     PosExtension,
 
-    SequenceContext,
+    SequenceContext(SequenceContext),
     ChainedSequenceContext,
 
     SingleSubst,
@@ -1304,6 +1314,154 @@ enum LookupSubtable {
     SubstExtension,
     ReverseChainSingleSubst,
 }
+
+pub type OpentypeSequenceContext = opentype_common_sequence_context;
+pub type OpentypeSequenceContextInner = opentype_common_sequence_context_subst;
+pub type OpentypeSequenceContextFormat1 = opentype_common_sequence_context_subst_Format1;
+pub type OpentypeSequenceContextFormat2 = opentype_common_sequence_context_subst_Format2;
+pub type OpentypeSequenceContextFormat3 = opentype_common_sequence_context_subst_Format3;
+
+impl Promote<OpentypeSequenceContext> for SequenceContext {
+    fn promote(orig: &OpentypeSequenceContext) -> Self {
+        // FIXME - if we rename the field `subst`, fix this
+        SequenceContext::promote(&orig.subst)
+    }
+}
+
+impl Promote<OpentypeSequenceContextInner> for SequenceContext {
+    fn promote(orig: &OpentypeSequenceContextInner) -> Self {
+        match orig {
+            OpentypeSequenceContextInner::Format1(f1) => {
+                SequenceContext::Format1(SequenceContextFormat1::promote(f1))
+            }
+            OpentypeSequenceContextInner::Format2(f2) => {
+                SequenceContext::Format2(SequenceContextFormat2::promote(f2))
+            }
+            OpentypeSequenceContextInner::Format3(f3) => {
+                SequenceContext::Format3(SequenceContextFormat3::promote(f3))
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+enum SequenceContext {
+    Format1(SequenceContextFormat1),
+    Format2(SequenceContextFormat2),
+    Format3(SequenceContextFormat3),
+}
+
+pub type OpentypeSequenceLookup = opentype_common_sequence_lookup;
+type SequenceLookup = OpentypeSequenceLookup;
+
+impl Promote<OpentypeSequenceContextFormat1> for SequenceContextFormat1 {
+    fn promote(orig: &OpentypeSequenceContextFormat1) -> Self {
+        Self {
+            coverage: promote_opt(&orig.coverage.link),
+            seq_rule_sets: orig
+                .seq_rule_sets
+                .iter()
+                .map(|offset| promote_opt(&offset.link))
+                .collect(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct SequenceContextFormat1 {
+    coverage: Option<CoverageTable>,
+    seq_rule_sets: Vec<Option<RuleSet>>,
+}
+
+impl Promote<OpentypeSequenceContextFormat2> for SequenceContextFormat2 {
+    fn promote(orig: &OpentypeSequenceContextFormat2) -> Self {
+        Self {
+            coverage: promote_opt(&orig.coverage.link),
+            class_def: promote_opt(&orig.class_def.link),
+            class_seq_rule_sets: orig
+                .class_seq_rule_sets
+                .iter()
+                .map(|offset| promote_opt(&offset.link))
+                .collect(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct SequenceContextFormat2 {
+    coverage: Option<CoverageTable>,
+    class_def: Option<ClassDef>,
+    class_seq_rule_sets: Vec<Option<RuleSet>>,
+}
+
+impl Promote<OpentypeSequenceContextFormat3> for SequenceContextFormat3 {
+    fn promote(orig: &OpentypeSequenceContextFormat3) -> Self {
+        Self {
+            glyph_count: orig.glyph_count,
+            coverage_tables: orig
+                .coverage_tables
+                .iter()
+                .map(|offset| promote_opt(&offset.link))
+                .collect(),
+            // NOTE - can only clone here (instead of calling promote) because SequenceLookup := OpentypeSequenceLookup
+            // REVIEW - given that Clone => Promote<Self>, do we want to abstract this to avoid the need to refactor if SequenceLookup is redefined (with a manual Promote impl)?
+            seq_lookup_records: orig.seq_lookup_records.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct SequenceContextFormat3 {
+    glyph_count: u16,
+    coverage_tables: Vec<Option<CoverageTable>>,
+    seq_lookup_records: Vec<SequenceLookup>,
+}
+
+pub type OpentypeRuleSet = opentype_common_sequence_context_subst_Format1_seq_rule_sets_link;
+
+// REVIEW - if RuleSet becomes an alias instead of a newtype, remove this definition and rename the following impl on Vec<Option<Rule>>
+impl Promote<OpentypeRuleSet> for RuleSet {
+    fn promote(orig: &OpentypeRuleSet) -> Self {
+        Self(<Vec<Option<Rule>>>::promote(orig))
+    }
+}
+
+impl Promote<OpentypeRuleSet> for Vec<Option<Rule>> {
+    fn promote(orig: &OpentypeRuleSet) -> Self {
+        orig.rules
+            .iter()
+            .map(|opt_rule| promote_opt(&opt_rule.link))
+            .collect()
+    }
+}
+
+#[derive(Debug, Clone)]
+#[repr(transparent)]
+// REVIEW - should this be a simple type alias instead?
+struct RuleSet(Vec<Option<Rule>>);
+
+pub type OpentypeRule =
+    opentype_common_sequence_context_subst_Format1_seq_rule_sets_link_rules_link;
+
+impl Promote<OpentypeRule> for Rule {
+    fn promote(orig: &OpentypeRule) -> Self {
+        Rule {
+            glyph_count: orig.glyph_count,
+            input_sequence: orig.input_sequence.clone(),
+            // NOTE - we can only specify seq_lookup_records this way because we use SequenceLookup as its own analogue
+            seq_lookup_records: orig.seq_lookup_records.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct Rule {
+    glyph_count: u16, // REVIEW <- this field can be re-synthesized via `input_sequence.len() + 1`
+    input_sequence: Vec<u16>,
+    seq_lookup_records: Vec<SequenceLookup>,
+}
+
+// NOTE - forgoing a type-analogue as it would be a carbon copy of the machine-generated type
 
 pub type OpentypeCursivePos =
     opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_CursivePos;
@@ -2708,7 +2866,45 @@ fn format_lookup_subtable(subtable: &Option<LookupSubtable>, show_lookup_type: b
             LookupSubtable::SubstExtension => ("SubstExt", format!("(..)")),
             LookupSubtable::ReverseChainSingleSubst => ("RevChainSingleSubst", format!("(..)")),
 
-            LookupSubtable::SequenceContext => ("SeqCtx", format!("(..)")),
+            LookupSubtable::SequenceContext(seq_ctx) => {
+                let contents = match seq_ctx {
+                    SequenceContext::Format1(SequenceContextFormat1 {
+                        coverage,
+                        seq_rule_sets,
+                    }) => {
+                        if let Some(coverage_table) = coverage {
+                            format!("SimpleGlyphs({})", format_coverage_table(coverage_table))
+                        } else {
+                            assert!(
+                                seq_rule_sets.is_empty(),
+                                "non-empty seq_rule_sets has no coverage table to correspond to"
+                            );
+                            format!("SimpleGlyphs[0]")
+                        }
+                    }
+                    SequenceContext::Format2(SequenceContextFormat2 {
+                        coverage,
+                        class_seq_rule_sets,
+                        ..
+                    }) => {
+                        if let Some(coverage_table) = coverage {
+                            format!("ClassBased({})", format_coverage_table(coverage_table))
+                        } else {
+                            assert!(class_seq_rule_sets.is_empty(), "non-empty class_seq_rule_sets has no coverage table to correspond to");
+                            format!("ClassBased[0]")
+                        }
+                    }
+                    SequenceContext::Format3(SequenceContextFormat3 {
+                        glyph_count,
+                        coverage_tables,
+                        seq_lookup_records,
+                    }) => {
+                        // TODO -implement proper display method
+                        format!("(..)")
+                    }
+                };
+                ("SeqCtx", contents)
+            }
             LookupSubtable::ChainedSequenceContext => ("ChainSeqCtx", format!("(..)")),
         };
         if show_lookup_type {
