@@ -140,6 +140,26 @@ trait TryPromote<Original>: Sized {
     fn try_promote(orig: &Original) -> Result<Self, Self::Error>;
 }
 
+trait TryFromRef<Original: _Ref>: Sized
+{
+    type Error: std::error::Error;
+
+    /// Fallibly convert from the GAT `Ref<'a>` defined on Original, into `Self`.
+    fn try_from_ref<'a>(orig: <Original as _Ref>::Ref<'a>) -> Result<Self, Self::Error>;
+}
+
+trait _Ref {
+    type Ref<'a>;
+}
+
+impl<T, U> _Ref for (T, U)
+where
+    T: Copy + 'static,
+    U: 'static,
+{
+    type Ref<'a> = (T, &'a U);
+}
+
 fn promote_vec<O, T>(orig_slice: &[O]) -> Vec<T>
 where
     T: Promote<O>,
@@ -188,8 +208,34 @@ impl<T: Clone> Promote<T> for T {
         orig.clone()
     }
 }
-
 // !SECTION
+
+/// Crate-private mirco-module for compile-time same-type assertions that can be chained
+pub(crate) mod refl {
+    pub(crate) trait Refl<T> {
+        type Solution;
+    }
+
+    impl<T> Refl<T> for T {
+        type Solution = T;
+    }
+
+    /// A === B => A, type error otherwise
+    ///
+    /// If Refl is too heavy-handed we can drop the forced unification and use this to merely document
+    /// our expectations about what should be equal without rejecting parameters that are different.
+    pub(crate) type ReflType<A, B> = <A as Refl<B>>::Solution;
+}
+use refl::ReflType;
+
+/// Shorthand for qualifying a TryPromote::Error item
+type TPErr<Src, Tgt> = <Tgt as TryPromote<Src>>::Error;
+
+/// Shorthand for qualifying a TryFromRef::Error item in the same style as `TPErr`
+type TFRErr<Src, Tgt> = <Tgt as TryFromRef<Src>>::Error;
+
+/// Hint to remind us that an error is being produced locally
+type Local<T> = T;
 
 // SECTION - *Metrics and mid- to low-level API-enrichment analogues for raw gencode types
 #[derive(Clone, Debug)]
@@ -348,7 +394,7 @@ impl PlatformEncodingLanguageId {
 }
 
 impl TryFrom<(u16, u16, u16)> for PlatformEncodingLanguageId {
-    type Error = UnknownValueError<u16>;
+    type Error = Local<UnknownValueError<u16>>;
 
     fn try_from(value: (u16, u16, u16)) -> Result<Self, Self::Error> {
         let (platform_id, encoding_id, language_id) = value;
@@ -387,7 +433,7 @@ enum UnicodeEncodingId {
 }
 
 impl TryFrom<u16> for UnicodeEncodingId {
-    type Error = UnknownValueError<u16>;
+    type Error = Local<UnknownValueError<u16>>;
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match value {
@@ -443,7 +489,7 @@ enum MacintoshEncodingId {
 }
 
 impl TryFrom<u16> for MacintoshEncodingId {
-    type Error = UnknownValueError<u16>;
+    type Error = Local<UnknownValueError<u16>>;
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match value {
@@ -465,7 +511,7 @@ enum MacintoshLanguageId {
 }
 
 impl TryFrom<u16> for MacintoshLanguageId {
-    type Error = UnknownValueError<u16>;
+    type Error = Local<UnknownValueError<u16>>;
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match value {
@@ -500,7 +546,7 @@ enum WindowsEncodingId {
 }
 
 impl TryFrom<u16> for WindowsEncodingId {
-    type Error = UnknownValueError<u16>;
+    type Error = Local<UnknownValueError<u16>>;
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         Ok(match value {
@@ -717,7 +763,7 @@ struct MarkGlyphSet {
 type OpentypeMarkGlyphSet = opentype_mark_glyph_set;
 
 impl TryPromote<OpentypeMarkGlyphSet> for MarkGlyphSet {
-    type Error = UnknownValueError<u16>;
+    type Error = Local<UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeMarkGlyphSet) -> Result<Self, Self::Error> {
         match orig.format {
@@ -745,20 +791,25 @@ impl TryPromote<OpentypeMarkGlyphSet> for MarkGlyphSet {
 type ItemVariationStore = u32;
 
 impl TryPromote<OpentypeGdefTableData> for GdefTableDataMetrics {
-    type Error = <MarkGlyphSet as TryPromote<OpentypeMarkGlyphSet>>::Error;
+    type Error = ReflType<
+        TPErr<OpentypeMarkGlyphSet, MarkGlyphSet>,
+        UnknownValueError<u16>,
+    >;
 
     fn try_promote(orig: &OpentypeGdefTableData) -> Result<Self, Self::Error> {
-        match orig {
-            OpentypeGdefTableData::Version1_0 => Ok(Self::NoData),
+        Ok(match orig {
+            OpentypeGdefTableData::Version1_0 => Self::NoData,
             OpentypeGdefTableData::Version1_2(opentype_gdef_table_data_Version1_2 {
                 mark_glyph_sets_def,
-            }) => Ok(GdefTableDataMetrics::MarkGlyphSetsDef(try_promote_opt(
-                &mark_glyph_sets_def.link,
-            )?)),
+            }) => {
+                GdefTableDataMetrics::MarkGlyphSetsDef(
+                    try_promote_opt(&mark_glyph_sets_def.link)?
+                )
+            },
             OpentypeGdefTableData::Version1_3(opentype_gdef_table_data_Version1_3 {
                 item_var_store,
-            }) => Ok(GdefTableDataMetrics::ItemVarStore(*item_var_store)),
-        }
+            }) => GdefTableDataMetrics::ItemVarStore(*item_var_store),
+        })
     }
 }
 
@@ -890,7 +941,10 @@ struct LigCaretList {
 type OpentypeLigCaretList = opentype_gdef_table_lig_caret_list_link;
 
 impl TryPromote<OpentypeLigCaretList> for LigCaretList {
-    type Error = <LigGlyph as TryPromote<OpentypeLigGlyph>>::Error;
+    type Error = ReflType<
+        TPErr<OpentypeLigGlyph, LigGlyph>,
+        UnknownValueError<u16>
+    >;
 
     fn try_promote(orig: &OpentypeLigCaretList) -> Result<Self, Self::Error> {
         let mut lig_glyphs = Vec::with_capacity(orig.lig_glyph_offsets.len());
@@ -912,7 +966,10 @@ struct LigGlyph {
 type OpentypeLigGlyph = opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link;
 
 impl TryPromote<OpentypeLigGlyph> for LigGlyph {
-    type Error = UnknownValueError<u16>;
+    type Error = ReflType<
+        TPErr<OpentypeCaretValue, CaretValue>,
+        UnknownValueError<u16>
+    >;
 
     fn try_promote(orig: &OpentypeLigGlyph) -> Result<Self, Self::Error> {
         let mut caret_values = Vec::with_capacity(orig.caret_values.len());
@@ -956,10 +1013,10 @@ fn bits<const N: usize>(raw: u8) -> i8 {
     }
 }
 
-impl<'a> TryFrom<(u16, &'a Vec<u16>)> for DeltaValues {
-    type Error = UnknownValueError<u16>;
+impl TryFromRef<(u16, Vec<u16>)> for DeltaValues {
+    type Error = Local<UnknownValueError<u16>>;
 
-    fn try_from(value: (u16, &Vec<u16>)) -> Result<Self, Self::Error> {
+    fn try_from_ref<'a>(value: (u16, &'a Vec<u16>)) -> Result<Self, Self::Error> {
         match value.0 {
             0x0001 => {
                 // 2-bit Deltas
@@ -1063,7 +1120,10 @@ type OpentypeVariationIndexTable =
     opentype_common_device_or_variation_index_table_VariationIndexTable;
 
 impl TryPromote<OpentypeDeviceOrVariationIndexTable> for DeviceOrVariationIndexTable {
-    type Error = UnknownValueError<u16>;
+    type Error = ReflType<
+        TFRErr<(u16, Vec<u16>), DeltaValues>,
+        UnknownValueError<u16>,
+    >;
 
     fn try_promote(orig: &OpentypeDeviceOrVariationIndexTable) -> Result<Self, Self::Error> {
         match orig {
@@ -1071,11 +1131,11 @@ impl TryPromote<OpentypeDeviceOrVariationIndexTable> for DeviceOrVariationIndexT
                 start_size,
                 end_size,
                 delta_format,
-                ref delta_values,
+                ref delta_values
             }) => Ok(DeviceOrVariationIndexTable::DeviceTable(DeviceTable {
                 start_size,
                 end_size,
-                delta_values: DeltaValues::try_from((delta_format, delta_values))?,
+                delta_values: DeltaValues::try_from_ref((delta_format, delta_values))?,
             })),
             &OpentypeDeviceOrVariationIndexTable::VariationIndexTable(
                 OpentypeVariationIndexTable {
@@ -1094,7 +1154,10 @@ impl TryPromote<OpentypeDeviceOrVariationIndexTable> for DeviceOrVariationIndexT
 }
 
 impl TryPromote<OpentypeCaretValueRaw> for CaretValue {
-    type Error = <CaretValue as TryPromote<OpentypeCaretValue>>::Error;
+    type Error = ReflType<
+        TPErr<OpentypeCaretValue, CaretValue>,
+        UnknownValueError<u16>,
+    >;
 
     fn try_promote(orig: &OpentypeCaretValueRaw) -> Result<Self, Self::Error> {
         Self::try_promote(&orig.data)
@@ -1102,8 +1165,10 @@ impl TryPromote<OpentypeCaretValueRaw> for CaretValue {
 }
 
 impl TryPromote<OpentypeCaretValue> for CaretValue {
-    type Error =
-        <DeviceOrVariationIndexTable as TryPromote<OpentypeDeviceOrVariationIndexTable>>::Error;
+    type Error = ReflType<
+        TPErr<OpentypeDeviceOrVariationIndexTable, DeviceOrVariationIndexTable>,
+        UnknownValueError<u16>,
+    >;
 
     fn try_promote(orig: &OpentypeCaretValue) -> Result<Self, Self::Error> {
         match orig {
@@ -1244,7 +1309,7 @@ pub type OpentypeGsubLookupSubtable =
     opentype_gsub_table_lookup_list_link_lookups_link_subtables_link;
 
 impl TryPromote<OpentypeGsubLookupSubtable> for LookupSubtable {
-    type Error = UnknownValueError<u16>;
+    type Error = std::convert::Infallible; // this is only temporarily the case, as we are almost certainly going to have errors in at least on lookup subtable format
 
     fn try_promote(orig: &OpentypeGsubLookupSubtable) -> Result<Self, Self::Error> {
         Ok(match orig {
@@ -1267,7 +1332,16 @@ impl TryPromote<OpentypeGsubLookupSubtable> for LookupSubtable {
 }
 
 impl TryPromote<OpentypeGposLookupSubtable> for LookupSubtable {
-    type Error = UnknownValueError<u16>;
+    type Error = ReflType<
+        ReflType<
+            TPErr<OpentypeSinglePos, SinglePos>,
+            TPErr<OpentypePairPos, PairPos>,
+        >,
+        ReflType<
+            TPErr<OpentypeCursivePos, CursivePos>,
+            UnknownValueError<u16>,
+        >,
+    >;
 
     fn try_promote(orig: &OpentypeGposLookupSubtable) -> Result<Self, Self::Error> {
         Ok(match orig {
@@ -1471,7 +1545,10 @@ pub type OpentypeCursivePosFormat1 =
     opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_CursivePos_subtable_Format1;
 
 impl TryPromote<OpentypeCursivePos> for CursivePos {
-    type Error = UnknownValueError<u16>;
+    type Error = ReflType<
+        TPErr<OpentypeCursivePosSubtable, CursivePos>,
+        UnknownValueError<u16>,
+    >;
 
     fn try_promote(orig: &OpentypeCursivePos) -> Result<Self, Self::Error> {
         CursivePos::try_promote(&orig.subtable)
@@ -1479,7 +1556,10 @@ impl TryPromote<OpentypeCursivePos> for CursivePos {
 }
 
 impl TryPromote<OpentypeCursivePosSubtable> for CursivePos {
-    type Error = UnknownValueError<u16>;
+    type Error = ReflType<
+        TPErr<OpentypeCursivePosFormat1, CursivePosFormat1>,
+        UnknownValueError<u16>,
+    >;
 
     fn try_promote(orig: &OpentypeCursivePosSubtable) -> Result<Self, Self::Error> {
         match orig {
@@ -1496,7 +1576,10 @@ enum CursivePos {
 }
 
 impl TryPromote<OpentypeCursivePosFormat1> for CursivePosFormat1 {
-    type Error = UnknownValueError<u16>;
+    type Error = ReflType<
+        TPErr<OpentypeEntryExitRecord, EntryExitRecord>,
+        UnknownValueError<u16>,
+    >;
 
     fn try_promote(orig: &OpentypeCursivePosFormat1) -> Result<Self, Self::Error> {
         Ok(CursivePosFormat1 {
@@ -1515,7 +1598,10 @@ struct CursivePosFormat1 {
 pub type OpentypeEntryExitRecord = opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_CursivePos_subtable_Format1_entry_exit_records;
 
 impl TryPromote<OpentypeEntryExitRecord> for EntryExitRecord {
-    type Error = UnknownValueError<u16>;
+    type Error = ReflType<
+        TPErr<OpentypeAnchorTable, AnchorTable>,
+        UnknownValueError<u16>,
+    >;
 
     fn try_promote(orig: &OpentypeEntryExitRecord) -> Result<Self, Self::Error> {
         Ok(EntryExitRecord {
@@ -1539,7 +1625,10 @@ pub type OpentypeAnchorTableFormat2 = opentype_common_anchor_table_table_Format2
 pub type OpentypeAnchorTableFormat3 = opentype_common_anchor_table_table_Format3;
 
 impl TryPromote<OpentypeAnchorTable> for AnchorTable {
-    type Error = UnknownValueError<u16>;
+    type Error = ReflType<
+        TPErr<OpentypeAnchorTableTable, AnchorTable>,
+        UnknownValueError<u16>,
+    >;
 
     fn try_promote(orig: &OpentypeAnchorTable) -> Result<Self, Self::Error> {
         AnchorTable::try_promote(&orig.table)
@@ -1547,7 +1636,10 @@ impl TryPromote<OpentypeAnchorTable> for AnchorTable {
 }
 
 impl TryPromote<OpentypeAnchorTableTable> for AnchorTable {
-    type Error = UnknownValueError<u16>;
+    type Error = ReflType<
+        TPErr<OpentypeAnchorTableFormat3, AnchorTableFormat3>,
+        UnknownValueError<u16>,
+    >;
 
     fn try_promote(orig: &OpentypeAnchorTableTable) -> Result<Self, Self::Error> {
         Ok(match orig {
@@ -1596,7 +1688,10 @@ impl Promote<OpentypeAnchorTableFormat2> for AnchorTableFormat2 {
 }
 
 impl TryPromote<OpentypeAnchorTableFormat3> for AnchorTableFormat3 {
-    type Error = UnknownValueError<u16>;
+    type Error = ReflType<
+        TPErr<OpentypeDeviceOrVariationIndexTable, DeviceOrVariationIndexTable>,
+        UnknownValueError<u16>,
+    >;
 
     fn try_promote(orig: &OpentypeAnchorTableFormat3) -> Result<Self, Self::Error> {
         Ok(AnchorTableFormat3 {
@@ -1639,7 +1734,10 @@ pub type OpentypePairPosFormat2 =
     opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairPos_subtable_Format2;
 
 impl TryPromote<OpentypePairPos> for PairPos {
-    type Error = UnknownValueError<u16>;
+    type Error = ReflType<
+        TPErr<OpentypePairPosSubtable, PairPos>,
+        UnknownValueError<u16>,
+    >;
 
     fn try_promote(orig: &OpentypePairPos) -> Result<Self, Self::Error> {
         Self::try_promote(&orig.subtable)
@@ -1647,7 +1745,13 @@ impl TryPromote<OpentypePairPos> for PairPos {
 }
 
 impl TryPromote<OpentypePairPosSubtable> for PairPos {
-    type Error = UnknownValueError<u16>;
+    type Error = ReflType<
+        ReflType<
+            TPErr<OpentypePairPosFormat1, PairPosFormat1>,
+            TPErr<OpentypePairPosFormat2, PairPosFormat2>,
+        >,
+        UnknownValueError<u16>,
+    >;
 
     fn try_promote(orig: &OpentypePairPosSubtable) -> Result<Self, Self::Error> {
         Ok(match orig {
@@ -1668,7 +1772,10 @@ enum PairPos {
 }
 
 impl TryPromote<OpentypePairPosFormat1> for PairPosFormat1 {
-    type Error = UnknownValueError<u16>;
+    type Error = ReflType<
+        TPErr<OpentypePairSet, PairSet>,
+        UnknownValueError<u16>,
+    >;
 
     fn try_promote(orig: &OpentypePairPosFormat1) -> Result<Self, Self::Error> {
         let mut pair_sets = Vec::with_capacity(orig.pair_sets.len());
@@ -1685,7 +1792,10 @@ impl TryPromote<OpentypePairPosFormat1> for PairPosFormat1 {
 }
 
 impl TryPromote<OpentypePairPosFormat2> for PairPosFormat2 {
-    type Error = UnknownValueError<u16>;
+    type Error = ReflType<
+        TPErr<OpentypeClass2Record, Class2Record>,
+        UnknownValueError<u16>,
+    >;
 
     fn try_promote(orig: &OpentypePairPosFormat2) -> Result<Self, Self::Error> {
         let mut store = Vec::with_capacity(orig.class1_count as usize * orig.class2_count as usize);
@@ -1725,7 +1835,10 @@ type Class1RecordList = Wec<Class2Record>;
 pub type OpentypeClass2Record = opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairPos_subtable_Format2_class1_records_class2_records;
 
 impl TryPromote<OpentypeClass2Record> for Class2Record {
-    type Error = UnknownValueError<u16>;
+    type Error = ReflType<
+        TPErr<OpentypeValueRecord, ValueRecord>,
+        UnknownValueError<u16>,
+    >;
 
     fn try_promote(orig: &OpentypeClass2Record) -> Result<Self, Self::Error> {
         Ok(Class2Record {
@@ -1747,7 +1860,10 @@ pub type OpentypePairValueRecord = opentype_gpos_table_lookup_list_link_lookups_
 type PairSet = Vec<PairValueRecord>;
 
 impl TryPromote<OpentypePairSet> for PairSet {
-    type Error = UnknownValueError<u16>;
+    type Error = ReflType<
+        TPErr<OpentypePairValueRecord, PairValueRecord>,
+        UnknownValueError<u16>,
+    >;
 
     fn try_promote(orig: &OpentypePairSet) -> Result<Self, Self::Error> {
         let mut accum = Vec::with_capacity(orig.pair_value_records.len());
@@ -1759,7 +1875,10 @@ impl TryPromote<OpentypePairSet> for PairSet {
 }
 
 impl TryPromote<OpentypePairValueRecord> for PairValueRecord {
-    type Error = UnknownValueError<u16>;
+    type Error = ReflType<
+        TPErr<OpentypeValueRecord, ValueRecord>,
+        UnknownValueError<u16>,
+    >;
 
     fn try_promote(orig: &OpentypePairValueRecord) -> Result<Self, Self::Error> {
         Ok(PairValueRecord {
@@ -1777,9 +1896,9 @@ struct PairValueRecord {
     value_record2: Option<ValueRecord>,
 }
 
-pub type OpentypeSingleAdjust =
+pub type OpentypeSinglePos =
     opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_SinglePos;
-pub type OpentypeSingleAdjustSubtable =
+pub type OpentypeSinglePosSubtable =
     opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_SinglePos_subtable;
 
 pub type OpentypeSinglePosFormat1 =
@@ -1787,23 +1906,32 @@ pub type OpentypeSinglePosFormat1 =
 pub type OpentypeSinglePosFormat2 =
     opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_SinglePos_subtable_Format2;
 
-impl TryPromote<OpentypeSingleAdjust> for SinglePos {
-    type Error = UnknownValueError<u16>;
+impl TryPromote<OpentypeSinglePos> for SinglePos {
+    type Error = ReflType<
+        TPErr<OpentypeSinglePosSubtable, SinglePos>,
+        UnknownValueError<u16>
+    >;
 
-    fn try_promote(orig: &OpentypeSingleAdjust) -> Result<Self, Self::Error> {
+    fn try_promote(orig: &OpentypeSinglePos) -> Result<Self, Self::Error> {
         Self::try_promote(&orig.subtable)
     }
 }
 
-impl TryPromote<OpentypeSingleAdjustSubtable> for SinglePos {
-    type Error = UnknownValueError<u16>;
+impl TryPromote<OpentypeSinglePosSubtable> for SinglePos {
+    type Error = ReflType<
+        ReflType<
+            TPErr<OpentypeSinglePosFormat1, SinglePosFormat1>,
+            TPErr<OpentypeSinglePosFormat2, SinglePosFormat2>,
+        >,
+        UnknownValueError<u16>,
+    >;
 
-    fn try_promote(orig: &OpentypeSingleAdjustSubtable) -> Result<Self, Self::Error> {
+    fn try_promote(orig: &OpentypeSinglePosSubtable) -> Result<Self, Self::Error> {
         Ok(match orig {
-            OpentypeSingleAdjustSubtable::Format1(f1) => {
+            OpentypeSinglePosSubtable::Format1(f1) => {
                 SinglePos::Format1(SinglePosFormat1::try_promote(f1)?)
             }
-            OpentypeSingleAdjustSubtable::Format2(f2) => {
+            OpentypeSinglePosSubtable::Format2(f2) => {
                 SinglePos::Format2(SinglePosFormat2::try_promote(f2)?)
             }
         })
@@ -1817,7 +1945,10 @@ enum SinglePos {
 }
 
 impl TryPromote<OpentypeSinglePosFormat1> for SinglePosFormat1 {
-    type Error = UnknownValueError<u16>;
+    type Error = ReflType<
+        TPErr<OpentypeValueRecord, ValueRecord>,
+        UnknownValueError<u16>,
+    >;
 
     fn try_promote(orig: &OpentypeSinglePosFormat1) -> Result<Self, Self::Error> {
         Ok(SinglePosFormat1 {
@@ -1828,7 +1959,10 @@ impl TryPromote<OpentypeSinglePosFormat1> for SinglePosFormat1 {
 }
 
 impl TryPromote<OpentypeSinglePosFormat2> for SinglePosFormat2 {
-    type Error = UnknownValueError<u16>;
+    type Error = ReflType<
+        TPErr<OpentypeValueRecord, ValueRecord>,
+        UnknownValueError<u16>,
+    >;
 
     fn try_promote(orig: &OpentypeSinglePosFormat2) -> Result<Self, Self::Error> {
         let mut value_records = Vec::with_capacity(orig.value_records.len());
@@ -1857,7 +1991,10 @@ struct SinglePosFormat2 {
 pub type OpentypeValueRecord = opentype_common_value_record;
 
 impl TryPromote<OpentypeValueRecord> for ValueRecord {
-    type Error = UnknownValueError<u16>;
+    type Error = ReflType<
+        TPErr<OpentypeDeviceOrVariationIndexTable, DeviceOrVariationIndexTable>,
+        UnknownValueError<u16>,
+    >;
 
     fn try_promote(orig: &OpentypeValueRecord) -> Result<Self, Self::Error> {
         Ok(ValueRecord {
@@ -1907,7 +2044,11 @@ pub type OpentypeGposLookupTable = opentype_gpos_table_lookup_list_link_lookups_
 pub type OpentypeGsubLookupTable = opentype_gsub_table_lookup_list_link_lookups_link;
 
 impl TryPromote<OpentypeGposLookupTable> for LookupTable {
-    type Error = UnknownValueError<u16>;
+    type Error =
+        ReflType<
+            TPErr<OpentypeGposLookupSubtable, LookupSubtable>,
+            UnknownValueError<u16>,
+        >;
 
     fn try_promote(orig: &OpentypeGposLookupTable) -> Result<Self, Self::Error> {
         let mut subtables = Vec::with_capacity(orig.subtables.len());
@@ -1925,7 +2066,12 @@ impl TryPromote<OpentypeGposLookupTable> for LookupTable {
 }
 
 impl TryPromote<OpentypeGsubLookupTable> for LookupTable {
-    type Error = UnknownValueError<u16>;
+    type Error =
+        ReflType<
+            TPErr<OpentypeGsubLookupSubtable, LookupSubtable>,
+            std::convert::Infallible,
+            // may easily become `UnknownValueError<u16>` but infallible for now
+        >;
 
     fn try_promote(orig: &OpentypeGsubLookupTable) -> Result<Self, Self::Error> {
         let mut subtables = Vec::with_capacity(orig.subtables.len());
@@ -1973,7 +2119,10 @@ pub type OpentypeGposLookupList = opentype_gpos_table_lookup_list_link;
 pub type OpentypeGsubLookupList = opentype_gsub_table_lookup_list_link;
 
 impl TryPromote<OpentypeGposLookupList> for LookupList {
-    type Error = UnknownValueError<u16>;
+    type Error = ReflType<
+        TPErr<OpentypeGposLookupTable, LookupTable>,
+        UnknownValueError<u16>,
+    >;
 
     fn try_promote(orig: &OpentypeGposLookupList) -> Result<Self, Self::Error> {
         let mut accum = Vec::with_capacity(orig.lookups.len());
@@ -1985,7 +2134,7 @@ impl TryPromote<OpentypeGposLookupList> for LookupList {
 }
 
 impl TryPromote<OpentypeGsubLookupList> for LookupList {
-    type Error = UnknownValueError<u16>;
+    type Error = TPErr<OpentypeGsubLookupTable, LookupTable>;
 
     fn try_promote(orig: &OpentypeGsubLookupList) -> Result<Self, Self::Error> {
         let mut accum = Vec::with_capacity(orig.lookups.len());
@@ -2741,14 +2890,14 @@ fn show_lookup_table(table: &LookupTable, ctxt: Ctxt, conf: &Config) {
     print!(": ");
     show_items_inline(
         &table.subtables,
-        |subtable| format_lookup_subtable(subtable, false),
+        |subtable| format_lookup_subtable(subtable, false, conf),
         conf.inline_bookend,
         |n_skipped| format!("...({n_skipped} skipped)..."),
     );
 }
 
 // ANCHOR[format-lookup-subtable]
-fn format_lookup_subtable(subtable: &Option<LookupSubtable>, show_lookup_type: bool) -> String {
+fn format_lookup_subtable(subtable: &Option<LookupSubtable>, show_lookup_type: bool, _conf: &Config) -> String {
     // STUB - because the subtables are both partial (more variants exist) and abridged (existing variants are missing details), reimplement as necessary
     if let Some(subtable) = subtable {
         let (label, contents) = match subtable {
@@ -2895,12 +3044,26 @@ fn format_lookup_subtable(subtable: &Option<LookupSubtable>, show_lookup_type: b
                         }
                     }
                     SequenceContext::Format3(SequenceContextFormat3 {
-                        glyph_count,
                         coverage_tables,
                         seq_lookup_records,
+                        ..
                     }) => {
-                        // TODO -implement proper display method
-                        format!("(..)")
+                        // REVIEW - since we are already within an inline elision context, try to avoid taking up too much space per item, but this might not want to be a hardcoded value
+                        const INLINE_INLINE_BOOKEND: usize = 1;
+                        // FIXME - show_lookup_table calls this function through show_items_inline already, so we might want to reduce how many values we are willing to show proportionally
+                        let input_pattern = format_items_inline(
+                            coverage_tables,
+                            |cov| if let Some(coverage_table) = cov { format_coverage_table(coverage_table) } else { String::from("[]") },
+                            INLINE_INLINE_BOOKEND,
+                            |n| format!("(..{n}..)")
+                        );
+                        let seq_lookups = format_items_inline(
+                            seq_lookup_records,
+                            |seq_lookup| format_sequence_lookup(seq_lookup),
+                            INLINE_INLINE_BOOKEND,
+                            |n| format!("(..{n}..)")
+                        );
+                        format!("{input_pattern}=>{seq_lookups}")
                     }
                 };
                 ("SeqCtx", contents)
@@ -2915,6 +3078,12 @@ fn format_lookup_subtable(subtable: &Option<LookupSubtable>, show_lookup_type: b
     } else {
         format!("<none>")
     }
+}
+
+fn format_sequence_lookup(sl: &SequenceLookup) -> String {
+    let s_ix = sl.sequence_index;
+    let ll_ix = sl.lookup_list_index;
+    format!("[{}]@{}", ll_ix, s_ix)
 }
 
 /// Checks that the given ClassDef (assumed to be Some) contains the expected number of classes.
@@ -3418,39 +3587,42 @@ fn show_gasp_metrics(gasp: &Option<GaspMetrics>, conf: &Config) {
     }
 }
 
+// REVIEW - this construction suggests we may really want a Write-generic or Fragment-like output model to avoid duplication between I/O show and String formatting functions
 fn show_items_inline<T>(
     items: &[T],
     show_fn: impl Fn(&T) -> String,
     bookend: usize,
     ellipsis: impl Fn(usize) -> String,
 ) {
+    let oput = format_items_inline(items, show_fn, bookend, ellipsis);
+    println!("{oput}");
+}
+
+fn format_items_inline<T>(
+    items: &[T],
+    show_fn: impl Fn(&T) -> String,
+    bookend: usize,
+    ellipsis: impl Fn(usize) -> String,
+) -> String
+{
+    // Allocate a buffer big enough to hold one string per item in the array, or enough items to show both bookends and one ellipsis-string
+    let mut buffer = Vec::<String>::with_capacity(Ord::min(items.len(), bookend * 2 + 1));
+
     let count = items.len();
     if count > bookend * 2 {
-        print!("[");
         for ix in 0..bookend {
-            if ix > 0 {
-                print!(", ");
-            }
-            print!("{}", show_fn(&items[ix]));
+            buffer.push(show_fn(&items[ix]));
         }
-        print!("{}", ellipsis(count - bookend * 2));
+        buffer.push(ellipsis(count - bookend * 2));
         for ix in (count - bookend)..count {
-            if ix > count - bookend {
-                print!(", ");
-            }
-            print!("{}", show_fn(&items[ix]));
+            buffer.push(show_fn(&items[ix]));
         }
-        println!("]");
     } else {
-        print!("[");
         for ix in 0..count {
-            if ix > 0 {
-                print!(", ");
-            }
-            print!("{}", show_fn(&items[ix]));
+            buffer.push(show_fn(&items[ix]));
         }
-        println!("]");
     }
+    format!("[{}]", buffer.join(", "))
 }
 
 /// Enumerates the contents of a slice, showing only the first and last `bookend` items if the slice is long enough.
@@ -3507,8 +3679,7 @@ enum DirectionHint {
 }
 
 impl TryFrom<u16> for DirectionHint {
-    // TODO - replace with actual error-type
-    type Error = ();
+    type Error = Local<UnknownValueError<u16>>;
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match value {
@@ -3517,7 +3688,10 @@ impl TryFrom<u16> for DirectionHint {
             2 => Ok(DirectionHint::NeutralLR),
             0xffff => Ok(DirectionHint::StrongRL),
             0xfffe => Ok(DirectionHint::NeutralRL),
-            _ => Err(()),
+            _ => Err(UnknownValueError {
+                what: String::from("direction-hint"),
+                bad_value: value,
+            }),
         }
     }
 }
