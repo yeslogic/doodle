@@ -2465,54 +2465,51 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ),
                 ])
             };
-            let sequence_context_format1 = {
+            let sequence_context_format1 = |table_start: Expr| {
                 record([
-                    ("table_start", pos32()),
                     (
                         "coverage",
-                        offset16(var("table_start"), coverage_table.call(), base),
+                        offset16(table_start.clone(), coverage_table.call(), base),
                     ),
                     ("seq_rule_set_count", base.u16be()),
                     (
                         "seq_rule_sets",
                         repeat_count(
                             var("seq_rule_set_count"),
-                            offset16(var("table_start"), rule_set.clone(), base),
+                            offset16(table_start, rule_set.clone(), base),
                         ),
                     ),
                 ])
             };
-            let sequence_context_format2 = {
+            let sequence_context_format2 = |table_start: Expr| {
                 record([
-                    ("table_start", pos32()),
                     (
                         "coverage",
-                        offset16(var("table_start"), coverage_table.call(), base),
+                        offset16(table_start.clone(), coverage_table.call(), base),
                     ),
                     (
                         "class_def",
-                        offset16(var("table_start"), class_def.call(), base),
+                        offset16(table_start.clone(), class_def.call(), base),
                     ),
                     ("class_seq_rule_set_count", base.u16be()),
                     (
                         "class_seq_rule_sets",
                         repeat_count(
                             var("class_seq_rule_set_count"),
-                            offset16(var("table_start"), rule_set, base),
+                            offset16(table_start, rule_set.clone(), base),
                         ),
                     ),
                 ])
             };
-            let sequence_context_format3 = {
+            let sequence_context_format3 = |table_start: Expr| {
                 record([
-                    ("table_start", pos32()),
                     ("glyph_count", base.u16be()),
                     ("seq_lookup_count", base.u16be()),
                     (
                         "coverage_tables",
                         repeat_count(
                             var("glyph_count"),
-                            offset16(var("table_start"), coverage_table.call(), base),
+                            offset16(table_start, coverage_table.call(), base),
                         ),
                     ),
                     (
@@ -2524,15 +2521,16 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             module.define_format(
                 "opentype.common.sequence_context",
                 record([
+                    ("table_start", pos32()),
                     ("format", base.u16be()),
                     (
                         "subst",
                         match_variant(
                             var("format"),
                             [
-                                (Pattern::U16(1), "Format1", sequence_context_format1),
-                                (Pattern::U16(2), "Format2", sequence_context_format2),
-                                (Pattern::U16(3), "Format3", sequence_context_format3),
+                                (Pattern::U16(1), "Format1", sequence_context_format1(var("table_start"))),
+                                (Pattern::U16(2), "Format2", sequence_context_format2(var("table_start"))),
+                                (Pattern::U16(3), "Format3", sequence_context_format3(var("table_start"))),
                                 (Pattern::Wildcard, "BadFormat", Format::Fail),
                             ],
                         ),
