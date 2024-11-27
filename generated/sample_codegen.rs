@@ -1849,7 +1849,7 @@ data: opentype_coverage_table_data
 }
 
 #[derive(Debug, Clone)]
-pub struct opentype_common_sequence_context_subst_Format1_coverage {
+pub struct opentype_common_chained_sequence_context_subst_Format1_coverage {
 offset: u16,
 link: Option<opentype_coverage_table>
 }
@@ -1869,7 +1869,7 @@ link: Option<opentype_gdef_table_attach_list_link_attach_point_offsets_link>
 #[derive(Debug, Clone)]
 pub struct opentype_gdef_table_attach_list_link {
 table_start: u32,
-coverage: opentype_common_sequence_context_subst_Format1_coverage,
+coverage: opentype_common_chained_sequence_context_subst_Format1_coverage,
 glyph_count: u16,
 attach_point_offsets: Vec<opentype_gdef_table_attach_list_link_attach_point_offsets>
 }
@@ -1952,7 +1952,7 @@ link: Option<opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link>
 #[derive(Debug, Clone)]
 pub struct opentype_gdef_table_lig_caret_list_link {
 table_start: u32,
-coverage: opentype_common_sequence_context_subst_Format1_coverage,
+coverage: opentype_common_chained_sequence_context_subst_Format1_coverage,
 lig_glyph_count: u16,
 lig_glyph_offsets: Vec<opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets>
 }
@@ -2105,6 +2105,76 @@ use_mark_filtering_set: bool
 }
 
 #[derive(Debug, Copy, Clone)]
+pub struct opentype_common_sequence_lookup {
+sequence_index: u16,
+lookup_list_index: u16
+}
+
+#[derive(Debug, Clone)]
+pub struct opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link_chained_seq_rules {
+backtrack_glyph_count: u16,
+backtrack_sequence: Vec<u16>,
+input_glyph_count: u16,
+input_sequence: Vec<u16>,
+lookahead_glyph_count: u16,
+lookahead_sequence: Vec<u16>,
+seq_lookup_count: u16,
+seq_lookup_records: Vec<opentype_common_sequence_lookup>
+}
+
+#[derive(Debug, Clone)]
+pub struct opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link {
+table_start: u32,
+chained_seq_rule_count: u16,
+chained_seq_rules: Vec<opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link_chained_seq_rules>
+}
+
+#[derive(Debug, Clone)]
+pub struct opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets {
+offset: u16,
+link: Option<opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link>
+}
+
+#[derive(Debug, Clone)]
+pub struct opentype_common_chained_sequence_context_subst_Format1 {
+coverage: opentype_common_chained_sequence_context_subst_Format1_coverage,
+chained_seq_rule_set_count: u16,
+chained_seq_rule_sets: Vec<opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets>
+}
+
+#[derive(Debug, Clone)]
+pub struct opentype_common_chained_sequence_context_subst_Format2 {
+coverage: opentype_common_chained_sequence_context_subst_Format1_coverage,
+backtrack_class_def: opentype_gdef_table_glyph_class_def,
+input_class_def: opentype_gdef_table_glyph_class_def,
+lookahead_class_def: opentype_gdef_table_glyph_class_def,
+chained_class_seq_rule_set_count: u16,
+chained_class_seq_rule_sets: Vec<opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets>
+}
+
+#[derive(Debug, Clone)]
+pub struct opentype_common_chained_sequence_context_subst_Format3 {
+backtrack_glyph_count: u16,
+backtrack_coverages: Vec<opentype_common_chained_sequence_context_subst_Format1_coverage>,
+input_glyph_count: u16,
+input_coverages: Vec<opentype_common_chained_sequence_context_subst_Format1_coverage>,
+lookahead_glyph_count: u16,
+lookahead_coverages: Vec<opentype_common_chained_sequence_context_subst_Format1_coverage>,
+seq_lookup_count: u16,
+seq_lookup_records: Vec<opentype_common_sequence_lookup>
+}
+
+#[derive(Debug, Clone)]
+pub enum opentype_common_chained_sequence_context_subst { Format1(opentype_common_chained_sequence_context_subst_Format1), Format2(opentype_common_chained_sequence_context_subst_Format2), Format3(opentype_common_chained_sequence_context_subst_Format3) }
+
+#[derive(Debug, Clone)]
+pub struct opentype_common_chained_sequence_context {
+table_start: u32,
+format: u16,
+subst: opentype_common_chained_sequence_context_subst
+}
+
+#[derive(Debug, Copy, Clone)]
 pub struct opentype_common_anchor_table_table_Format1 {
 x_coordinate: u16,
 y_coordinate: u16
@@ -2149,7 +2219,7 @@ exit_anchor: opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_Cu
 
 #[derive(Debug, Clone)]
 pub struct opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_CursivePos_subtable_Format1 {
-coverage: opentype_common_sequence_context_subst_Format1_coverage,
+coverage: opentype_common_chained_sequence_context_subst_Format1_coverage,
 entry_exit_count: u16,
 entry_exit_records: Vec<opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_CursivePos_subtable_Format1_entry_exit_records>
 }
@@ -2210,7 +2280,7 @@ link: Option<opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_Pa
 
 #[derive(Debug, Clone)]
 pub struct opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairPos_subtable_Format1 {
-coverage: opentype_common_sequence_context_subst_Format1_coverage,
+coverage: opentype_common_chained_sequence_context_subst_Format1_coverage,
 value_format1: opentype_common_value_format_flags,
 value_format2: opentype_common_value_format_flags,
 pair_set_count: u16,
@@ -2230,7 +2300,7 @@ class2_records: Vec<opentype_gpos_table_lookup_list_link_lookups_link_subtables_
 
 #[derive(Debug, Clone)]
 pub struct opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairPos_subtable_Format2 {
-coverage: opentype_common_sequence_context_subst_Format1_coverage,
+coverage: opentype_common_chained_sequence_context_subst_Format1_coverage,
 value_format1: opentype_common_value_format_flags,
 value_format2: opentype_common_value_format_flags,
 class_def1: opentype_gdef_table_glyph_class_def,
@@ -2248,12 +2318,6 @@ pub struct opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_Pair
 table_start: u32,
 pos_format: u16,
 subtable: opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairPos_subtable
-}
-
-#[derive(Debug, Copy, Clone)]
-pub struct opentype_common_sequence_lookup {
-sequence_index: u16,
-lookup_list_index: u16
 }
 
 #[derive(Debug, Clone)]
@@ -2285,14 +2349,14 @@ link: Option<opentype_common_sequence_context_subst_Format1_seq_rule_sets_link>
 
 #[derive(Debug, Clone)]
 pub struct opentype_common_sequence_context_subst_Format1 {
-coverage: opentype_common_sequence_context_subst_Format1_coverage,
+coverage: opentype_common_chained_sequence_context_subst_Format1_coverage,
 seq_rule_set_count: u16,
 seq_rule_sets: Vec<opentype_common_sequence_context_subst_Format1_seq_rule_sets>
 }
 
 #[derive(Debug, Clone)]
 pub struct opentype_common_sequence_context_subst_Format2 {
-coverage: opentype_common_sequence_context_subst_Format1_coverage,
+coverage: opentype_common_chained_sequence_context_subst_Format1_coverage,
 class_def: opentype_gdef_table_glyph_class_def,
 class_seq_rule_set_count: u16,
 class_seq_rule_sets: Vec<opentype_common_sequence_context_subst_Format1_seq_rule_sets>
@@ -2302,7 +2366,7 @@ class_seq_rule_sets: Vec<opentype_common_sequence_context_subst_Format1_seq_rule
 pub struct opentype_common_sequence_context_subst_Format3 {
 glyph_count: u16,
 seq_lookup_count: u16,
-coverage_tables: Vec<opentype_common_sequence_context_subst_Format1_coverage>,
+coverage_tables: Vec<opentype_common_chained_sequence_context_subst_Format1_coverage>,
 seq_lookup_records: Vec<opentype_common_sequence_lookup>
 }
 
@@ -2318,14 +2382,14 @@ subst: opentype_common_sequence_context_subst
 
 #[derive(Debug, Clone)]
 pub struct opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_SinglePos_subtable_Format1 {
-coverage_offset: opentype_common_sequence_context_subst_Format1_coverage,
+coverage_offset: opentype_common_chained_sequence_context_subst_Format1_coverage,
 value_format: opentype_common_value_format_flags,
 value_record: opentype_common_value_record
 }
 
 #[derive(Debug, Clone)]
 pub struct opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_SinglePos_subtable_Format2 {
-coverage_offset: opentype_common_sequence_context_subst_Format1_coverage,
+coverage_offset: opentype_common_chained_sequence_context_subst_Format1_coverage,
 value_format: opentype_common_value_format_flags,
 value_count: u16,
 value_records: Vec<opentype_common_value_record>
@@ -2342,7 +2406,7 @@ subtable: opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_Singl
 }
 
 #[derive(Debug, Clone)]
-pub enum opentype_gpos_table_lookup_list_link_lookups_link_subtables_link { ChainedSequenceContext, CursivePos(opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_CursivePos), MarkBasePos, MarkLigPos, MarkMarkPos, PairPos(opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairPos), PosExtension, SequenceContext(opentype_common_sequence_context), SinglePos(opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_SinglePos) }
+pub enum opentype_gpos_table_lookup_list_link_lookups_link_subtables_link { ChainedSequenceContext(opentype_common_chained_sequence_context), CursivePos(opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_CursivePos), MarkBasePos, MarkLigPos, MarkMarkPos, PairPos(opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairPos), PosExtension, SequenceContext(opentype_common_sequence_context), SinglePos(opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_SinglePos) }
 
 #[derive(Debug, Clone)]
 pub struct opentype_gpos_table_lookup_list_link_lookups_link_subtables {
@@ -2390,7 +2454,7 @@ lookup_list: opentype_gpos_table_lookup_list
 }
 
 #[derive(Debug, Clone)]
-pub enum opentype_gsub_table_lookup_list_link_lookups_link_subtables_link { AlternateSubst, ChainedSequenceContext, LigatureSubst, MultipleSubst, ReverseChainSingleSubst, SequenceContext(opentype_common_sequence_context), SingleSubst, SubstExtension }
+pub enum opentype_gsub_table_lookup_list_link_lookups_link_subtables_link { AlternateSubst, ChainedSequenceContext(opentype_common_chained_sequence_context), LigatureSubst, MultipleSubst, ReverseChainSingleSubst, SequenceContext(opentype_common_sequence_context), SingleSubst, SubstExtension }
 
 #[derive(Debug, Clone)]
 pub struct opentype_gsub_table_lookup_list_link_lookups_link_subtables {
@@ -4570,7 +4634,7 @@ let range_shift = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let table_records = ((|| PResult::Ok({
 let mut accum = Vec::new();
 for _ in 0..num_tables {
-accum.push((Decoder_opentype_table_record(_input, start.clone()))?);
+accum.push((Decoder_opentype_table_record(_input))?);
 }
 accum
 }))())?;
@@ -4678,7 +4742,7 @@ let b = _input.read_byte()?;
 PResult::Ok(b)
 }
 
-fn Decoder_opentype_table_record<'input>(_input: &mut Parser<'input>, start: u32) -> Result<opentype_table_record, ParseError> {
+fn Decoder_opentype_table_record<'input>(_input: &mut Parser<'input>) -> Result<opentype_table_record, ParseError> {
 let table_id = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let checksum = ((|| PResult::Ok((Decoder21(_input))?))())?;
 let offset = ((|| PResult::Ok((Decoder21(_input))?))())?;
@@ -6375,7 +6439,7 @@ false => {
 None
 }
 }))())?;
-opentype_common_sequence_context_subst_Format1_coverage { offset, link }
+opentype_common_chained_sequence_context_subst_Format1_coverage { offset, link }
 }))())?;
 let glyph_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let attach_point_offsets = ((|| PResult::Ok({
@@ -6470,7 +6534,7 @@ false => {
 None
 }
 }))())?;
-opentype_common_sequence_context_subst_Format1_coverage { offset, link }
+opentype_common_chained_sequence_context_subst_Format1_coverage { offset, link }
 }))())?;
 let lig_glyph_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let lig_glyph_offsets = ((|| PResult::Ok({
@@ -6862,7 +6926,7 @@ false => {
 None
 }
 }))())?;
-opentype_common_sequence_context_subst_Format1_coverage { offset, link }
+opentype_common_chained_sequence_context_subst_Format1_coverage { offset, link }
 }))())?;
 let value_format = ((|| PResult::Ok((Decoder_opentype_common_value_format_flags(_input))?))())?;
 let value_record = ((|| PResult::Ok((Decoder_opentype_common_value_record(_input, table_start.clone(), value_format.clone()))?))())?;
@@ -6895,7 +6959,7 @@ false => {
 None
 }
 }))())?;
-opentype_common_sequence_context_subst_Format1_coverage { offset, link }
+opentype_common_chained_sequence_context_subst_Format1_coverage { offset, link }
 }))())?;
 let value_format = ((|| PResult::Ok((Decoder_opentype_common_value_format_flags(_input))?))())?;
 let value_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
@@ -6952,7 +7016,7 @@ false => {
 None
 }
 }))())?;
-opentype_common_sequence_context_subst_Format1_coverage { offset, link }
+opentype_common_chained_sequence_context_subst_Format1_coverage { offset, link }
 }))())?;
 let value_format1 = ((|| PResult::Ok((Decoder_opentype_common_value_format_flags(_input))?))())?;
 let value_format2 = ((|| PResult::Ok((Decoder_opentype_common_value_format_flags(_input))?))())?;
@@ -7043,7 +7107,7 @@ false => {
 None
 }
 }))())?;
-opentype_common_sequence_context_subst_Format1_coverage { offset, link }
+opentype_common_chained_sequence_context_subst_Format1_coverage { offset, link }
 }))())?;
 let value_format1 = ((|| PResult::Ok((Decoder_opentype_common_value_format_flags(_input))?))())?;
 let value_format2 = ((|| PResult::Ok((Decoder_opentype_common_value_format_flags(_input))?))())?;
@@ -7171,7 +7235,7 @@ false => {
 None
 }
 }))())?;
-opentype_common_sequence_context_subst_Format1_coverage { offset, link }
+opentype_common_chained_sequence_context_subst_Format1_coverage { offset, link }
 }))())?;
 let entry_exit_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let entry_exit_records = ((|| PResult::Ok({
@@ -7263,8 +7327,8 @@ opentype_gpos_table_lookup_list_link_lookups_link_subtables_link::SequenceContex
 },
 
 8u16 => {
-let _ = (Decoder46(_input))?;
-opentype_gpos_table_lookup_list_link_lookups_link_subtables_link::ChainedSequenceContext
+let inner = (Decoder_opentype_common_chained_sequence_context(_input))?;
+opentype_gpos_table_lookup_list_link_lookups_link_subtables_link::ChainedSequenceContext(inner)
 },
 
 9u16 => {
@@ -7489,8 +7553,8 @@ opentype_gsub_table_lookup_list_link_lookups_link_subtables_link::SequenceContex
 },
 
 6u16 => {
-let _ = (Decoder46(_input))?;
-opentype_gsub_table_lookup_list_link_lookups_link_subtables_link::ChainedSequenceContext
+let inner = (Decoder_opentype_common_chained_sequence_context(_input))?;
+opentype_gsub_table_lookup_list_link_lookups_link_subtables_link::ChainedSequenceContext(inner)
 },
 
 7u16 => {
@@ -7681,7 +7745,7 @@ false => {
 None
 }
 }))())?;
-opentype_common_sequence_context_subst_Format1_coverage { offset, link }
+opentype_common_chained_sequence_context_subst_Format1_coverage { offset, link }
 }))())?;
 let seq_rule_set_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let seq_rule_sets = ((|| PResult::Ok({
@@ -7805,7 +7869,7 @@ false => {
 None
 }
 }))())?;
-opentype_common_sequence_context_subst_Format1_coverage { offset, link }
+opentype_common_chained_sequence_context_subst_Format1_coverage { offset, link }
 }))())?;
 let class_def = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
@@ -7958,7 +8022,7 @@ false => {
 None
 }
 }))())?;
-opentype_common_sequence_context_subst_Format1_coverage { offset, link }
+opentype_common_chained_sequence_context_subst_Format1_coverage { offset, link }
 });
 }
 accum
@@ -7982,8 +8046,418 @@ return Err(ParseError::FailToken);
 PResult::Ok(opentype_common_sequence_context { table_start, format, subst })
 }
 
-fn Decoder46<'input>(_input: &mut Parser<'input>) -> Result<(), ParseError> {
-PResult::Ok(())
+fn Decoder_opentype_common_chained_sequence_context<'input>(_input: &mut Parser<'input>) -> Result<opentype_common_chained_sequence_context, ParseError> {
+let table_start = ((|| PResult::Ok({
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+}))())?;
+let format = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let subst = ((|| PResult::Ok(match format {
+1u16 => {
+let inner = {
+let coverage = ((|| PResult::Ok({
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match offset != 0u16 {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_coverage_table(_input))?;
+((|val: opentype_coverage_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
+_input.close_peek_context()?;
+ret
+},
+
+false => {
+None
+}
+}))())?;
+opentype_common_chained_sequence_context_subst_Format1_coverage { offset, link }
+}))())?;
+let chained_seq_rule_set_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let chained_seq_rule_sets = ((|| PResult::Ok({
+let mut accum = Vec::new();
+for _ in 0..chained_seq_rule_set_count {
+accum.push({
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match offset != 0u16 {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
+let ret = ((|| PResult::Ok({
+let inner = {
+let table_start = ((|| PResult::Ok({
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+}))())?;
+let chained_seq_rule_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let chained_seq_rules = ((|| PResult::Ok({
+let mut accum = Vec::new();
+for _ in 0..chained_seq_rule_count {
+accum.push({
+let backtrack_glyph_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let backtrack_sequence = ((|| PResult::Ok({
+let mut accum = Vec::new();
+for _ in 0..backtrack_glyph_count {
+accum.push((Decoder24(_input))?);
+}
+accum
+}))())?;
+let input_glyph_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let input_sequence = ((|| PResult::Ok({
+let mut accum = Vec::new();
+for _ in 0..try_sub!(input_glyph_count, 1u16) {
+accum.push((Decoder24(_input))?);
+}
+accum
+}))())?;
+let lookahead_glyph_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let lookahead_sequence = ((|| PResult::Ok({
+let mut accum = Vec::new();
+for _ in 0..lookahead_glyph_count {
+accum.push((Decoder24(_input))?);
+}
+accum
+}))())?;
+let seq_lookup_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let seq_lookup_records = ((|| PResult::Ok({
+let mut accum = Vec::new();
+for _ in 0..seq_lookup_count {
+accum.push((Decoder_opentype_common_sequence_lookup(_input))?);
+}
+accum
+}))())?;
+opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link_chained_seq_rules { backtrack_glyph_count, backtrack_sequence, input_glyph_count, input_sequence, lookahead_glyph_count, lookahead_sequence, seq_lookup_count, seq_lookup_records }
+});
+}
+accum
+}))())?;
+opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link { table_start, chained_seq_rule_count, chained_seq_rules }
+};
+((|val: opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link| PResult::Ok(Some(val)))(inner))?
+}))())?;
+_input.close_peek_context()?;
+ret
+},
+
+false => {
+None
+}
+}))())?;
+opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets { offset, link }
+});
+}
+accum
+}))())?;
+opentype_common_chained_sequence_context_subst_Format1 { coverage, chained_seq_rule_set_count, chained_seq_rule_sets }
+};
+opentype_common_chained_sequence_context_subst::Format1(inner)
+},
+
+2u16 => {
+let inner = {
+let coverage = ((|| PResult::Ok({
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match offset != 0u16 {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_coverage_table(_input))?;
+((|val: opentype_coverage_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
+_input.close_peek_context()?;
+ret
+},
+
+false => {
+None
+}
+}))())?;
+opentype_common_chained_sequence_context_subst_Format1_coverage { offset, link }
+}))())?;
+let backtrack_class_def = ((|| PResult::Ok({
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match offset != 0u16 {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_class_def(_input))?;
+((|val: opentype_class_def| PResult::Ok(Some(val)))(inner))?
+}))())?;
+_input.close_peek_context()?;
+ret
+},
+
+false => {
+None
+}
+}))())?;
+opentype_gdef_table_glyph_class_def { offset, link }
+}))())?;
+let input_class_def = ((|| PResult::Ok({
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match offset != 0u16 {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_class_def(_input))?;
+((|val: opentype_class_def| PResult::Ok(Some(val)))(inner))?
+}))())?;
+_input.close_peek_context()?;
+ret
+},
+
+false => {
+None
+}
+}))())?;
+opentype_gdef_table_glyph_class_def { offset, link }
+}))())?;
+let lookahead_class_def = ((|| PResult::Ok({
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match offset != 0u16 {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_class_def(_input))?;
+((|val: opentype_class_def| PResult::Ok(Some(val)))(inner))?
+}))())?;
+_input.close_peek_context()?;
+ret
+},
+
+false => {
+None
+}
+}))())?;
+opentype_gdef_table_glyph_class_def { offset, link }
+}))())?;
+let chained_class_seq_rule_set_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let chained_class_seq_rule_sets = ((|| PResult::Ok({
+let mut accum = Vec::new();
+for _ in 0..chained_class_seq_rule_set_count {
+accum.push({
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match offset != 0u16 {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
+let ret = ((|| PResult::Ok({
+let inner = {
+let table_start = ((|| PResult::Ok({
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+}))())?;
+let chained_seq_rule_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let chained_seq_rules = ((|| PResult::Ok({
+let mut accum = Vec::new();
+for _ in 0..chained_seq_rule_count {
+accum.push({
+let backtrack_glyph_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let backtrack_sequence = ((|| PResult::Ok({
+let mut accum = Vec::new();
+for _ in 0..backtrack_glyph_count {
+accum.push((Decoder24(_input))?);
+}
+accum
+}))())?;
+let input_glyph_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let input_sequence = ((|| PResult::Ok({
+let mut accum = Vec::new();
+for _ in 0..try_sub!(input_glyph_count, 1u16) {
+accum.push((Decoder24(_input))?);
+}
+accum
+}))())?;
+let lookahead_glyph_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let lookahead_sequence = ((|| PResult::Ok({
+let mut accum = Vec::new();
+for _ in 0..lookahead_glyph_count {
+accum.push((Decoder24(_input))?);
+}
+accum
+}))())?;
+let seq_lookup_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let seq_lookup_records = ((|| PResult::Ok({
+let mut accum = Vec::new();
+for _ in 0..seq_lookup_count {
+accum.push((Decoder_opentype_common_sequence_lookup(_input))?);
+}
+accum
+}))())?;
+opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link_chained_seq_rules { backtrack_glyph_count, backtrack_sequence, input_glyph_count, input_sequence, lookahead_glyph_count, lookahead_sequence, seq_lookup_count, seq_lookup_records }
+});
+}
+accum
+}))())?;
+opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link { table_start, chained_seq_rule_count, chained_seq_rules }
+};
+((|val: opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link| PResult::Ok(Some(val)))(inner))?
+}))())?;
+_input.close_peek_context()?;
+ret
+},
+
+false => {
+None
+}
+}))())?;
+opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets { offset, link }
+});
+}
+accum
+}))())?;
+opentype_common_chained_sequence_context_subst_Format2 { coverage, backtrack_class_def, input_class_def, lookahead_class_def, chained_class_seq_rule_set_count, chained_class_seq_rule_sets }
+};
+opentype_common_chained_sequence_context_subst::Format2(inner)
+},
+
+3u16 => {
+let inner = {
+let backtrack_glyph_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let backtrack_coverages = ((|| PResult::Ok({
+let mut accum = Vec::new();
+for _ in 0..backtrack_glyph_count {
+accum.push({
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match offset != 0u16 {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_coverage_table(_input))?;
+((|val: opentype_coverage_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
+_input.close_peek_context()?;
+ret
+},
+
+false => {
+None
+}
+}))())?;
+opentype_common_chained_sequence_context_subst_Format1_coverage { offset, link }
+});
+}
+accum
+}))())?;
+let input_glyph_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let input_coverages = ((|| PResult::Ok({
+let mut accum = Vec::new();
+for _ in 0..input_glyph_count {
+accum.push({
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match offset != 0u16 {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_coverage_table(_input))?;
+((|val: opentype_coverage_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
+_input.close_peek_context()?;
+ret
+},
+
+false => {
+None
+}
+}))())?;
+opentype_common_chained_sequence_context_subst_Format1_coverage { offset, link }
+});
+}
+accum
+}))())?;
+let lookahead_glyph_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let lookahead_coverages = ((|| PResult::Ok({
+let mut accum = Vec::new();
+for _ in 0..lookahead_glyph_count {
+accum.push({
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match offset != 0u16 {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_coverage_table(_input))?;
+((|val: opentype_coverage_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
+_input.close_peek_context()?;
+ret
+},
+
+false => {
+None
+}
+}))())?;
+opentype_common_chained_sequence_context_subst_Format1_coverage { offset, link }
+});
+}
+accum
+}))())?;
+let seq_lookup_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let seq_lookup_records = ((|| PResult::Ok({
+let mut accum = Vec::new();
+for _ in 0..seq_lookup_count {
+accum.push((Decoder_opentype_common_sequence_lookup(_input))?);
+}
+accum
+}))())?;
+opentype_common_chained_sequence_context_subst_Format3 { backtrack_glyph_count, backtrack_coverages, input_glyph_count, input_coverages, lookahead_glyph_count, lookahead_coverages, seq_lookup_count, seq_lookup_records }
+};
+opentype_common_chained_sequence_context_subst::Format3(inner)
+},
+
+_ => {
+return Err(ParseError::FailToken);
+}
+}))())?;
+PResult::Ok(opentype_common_chained_sequence_context { table_start, format, subst })
 }
 
 fn Decoder_opentype_coverage_table<'input>(_input: &mut Parser<'input>) -> Result<opentype_coverage_table, ParseError> {
