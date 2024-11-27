@@ -384,9 +384,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     const SHORT_OFFSET16: u16 = 0;
     const LONG_OFFSET32: u16 = 1;
 
-    let table_record = module.define_format_args(
+    let table_record = module.define_format(
         "opentype.table_record",
-        vec![START_ARG],
         record([
             ("table_id", tag.call()), // should be ascending within the repetition "table_records" field in table_directory
             ("checksum", base.u32be()),
@@ -2528,9 +2527,21 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         match_variant(
                             var("format"),
                             [
-                                (Pattern::U16(1), "Format1", sequence_context_format1(var("table_start"))),
-                                (Pattern::U16(2), "Format2", sequence_context_format2(var("table_start"))),
-                                (Pattern::U16(3), "Format3", sequence_context_format3(var("table_start"))),
+                                (
+                                    Pattern::U16(1),
+                                    "Format1",
+                                    sequence_context_format1(var("table_start")),
+                                ),
+                                (
+                                    Pattern::U16(2),
+                                    "Format2",
+                                    sequence_context_format2(var("table_start")),
+                                ),
+                                (
+                                    Pattern::U16(3),
+                                    "Format3",
+                                    sequence_context_format3(var("table_start")),
+                                ),
                                 (Pattern::Wildcard, "BadFormat", Format::Fail),
                             ],
                         ),
@@ -2539,8 +2550,147 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             )
         };
         let chained_sequence_context = {
-            /* STUB */
-            module.define_format("opentype.common.chained_sequence_context", Format::EMPTY)
+            let rule_set = {
+                let chained_sequence_rule = record([
+                    ("backtrack_glyph_count", base.u16be()),
+                    (
+                        "backtrack_sequence",
+                        repeat_count(var("backtrack_glyph_count"), base.u16be()),
+                    ),
+                    ("input_glyph_count", base.u16be()),
+                    (
+                        "input_sequence",
+                        repeat_count(sub(var("input_glyph_count"), Expr::U16(1)), base.u16be()),
+                    ),
+                    ("lookahead_glyph_count", base.u16be()),
+                    (
+                        "lookahead_sequence",
+                        repeat_count(var("lookahead_glyph_count"), base.u16be()),
+                    ),
+                    ("seq_lookup_count", base.u16be()),
+                    (
+                        "seq_lookup_records",
+                        repeat_count(var("seq_lookup_count"), sequence_lookup_record.call()),
+                    ),
+                ]);
+                record([
+                    ("table_start", pos32()),
+                    ("chained_seq_rule_count", base.u16be()),
+                    (
+                        "chained_seq_rules",
+                        repeat_count(var("chained_seq_rule_count"), chained_sequence_rule),
+                    ),
+                ])
+            };
+            let chained_sequence_context_format1 = |table_start: Expr| {
+                record([
+                    (
+                        "coverage",
+                        offset16(table_start.clone(), coverage_table.call(), base),
+                    ),
+                    ("chained_seq_rule_set_count", base.u16be()),
+                    (
+                        "chained_seq_rule_sets",
+                        repeat_count(
+                            var("chained_seq_rule_set_count"),
+                            offset16(table_start, rule_set.clone(), base),
+                        ),
+                    ),
+                ])
+            };
+            let chained_sequence_context_format2 = |table_start: Expr| {
+                record([
+                    (
+                        "coverage",
+                        offset16(table_start.clone(), coverage_table.call(), base),
+                    ),
+                    (
+                        "backtrack_class_def",
+                        offset16(table_start.clone(), class_def.call(), base),
+                    ),
+                    (
+                        "input_class_def",
+                        offset16(table_start.clone(), class_def.call(), base),
+                    ),
+                    (
+                        "lookahead_class_def",
+                        offset16(table_start.clone(), class_def.call(), base),
+                    ),
+                    ("chained_class_seq_rule_set_count", base.u16be()),
+                    (
+                        "chained_class_seq_rule_sets",
+                        repeat_count(
+                            var("chained_class_seq_rule_set_count"),
+                            offset16(table_start, rule_set.clone(), base),
+                        ),
+                    ),
+                ])
+            };
+            let chained_sequence_context_format3 = |table_start: Expr| {
+                record([
+                    ("backtrack_glyph_count", base.u16be()),
+                    (
+                        "backtrack_coverages",
+                        repeat_count(
+                            var("backtrack_glyph_count"),
+                            offset16(table_start.clone(), coverage_table.call(), base),
+                        ),
+                    ),
+                    ("input_glyph_count", base.u16be()),
+                    (
+                        "input_coverages",
+                        repeat_count(
+                            var("input_glyph_count"),
+                            offset16(table_start.clone(), coverage_table.call(), base),
+                        ),
+                    ),
+                    ("lookahead_glyph_count", base.u16be()),
+                    (
+                        "lookahead_coverages",
+                        repeat_count(
+                            var("lookahead_glyph_count"),
+                            offset16(table_start, coverage_table.call(), base),
+                        ),
+                    ),
+                    ("seq_lookup_count", base.u16be()),
+                    (
+                        "seq_lookup_records",
+                        repeat_count(var("seq_lookup_count"), sequence_lookup_record.call()),
+                    ),
+                ])
+            };
+            module.define_format(
+                "opentype.common.chained_sequence_context",
+                record([
+                    ("table_start", pos32()),
+                    ("format", base.u16be()),
+                    // REVIEW - this is a GSUB-biased field-name, do we have a better field-name for this?
+                    (
+                        "subst",
+                        match_variant(
+                            var("format"),
+                            [
+                                (
+                                    Pattern::U16(1),
+                                    "Format1",
+                                    chained_sequence_context_format1(var("table_start")),
+                                ),
+                                (
+                                    Pattern::U16(2),
+                                    "Format2",
+                                    chained_sequence_context_format2(var("table_start")),
+                                ),
+                                (
+                                    Pattern::U16(3),
+                                    "Format3",
+                                    chained_sequence_context_format3(var("table_start")),
+                                ),
+                                (Pattern::Wildcard, "BadFormat", Format::Fail),
+                            ],
+                        ),
+                    ),
+                ]),
+            )
         };
 
         let layout_table = |tag: u32| {
@@ -3108,10 +3258,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ("range_shift", base.u16be()), // TODO[validation] - should be (NumTables x 16) - searchRange
             (
                 "table_records",
-                repeat_count(
-                    var("num_tables"),
-                    table_record.call_args(vec![var("start")]),
-                ),
+                repeat_count(var("num_tables"), table_record.call()),
             ),
             (
                 "table_links",
