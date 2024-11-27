@@ -140,8 +140,7 @@ trait TryPromote<Original>: Sized {
     fn try_promote(orig: &Original) -> Result<Self, Self::Error>;
 }
 
-trait TryFromRef<Original: _Ref>: Sized
-{
+trait TryFromRef<Original: _Ref>: Sized {
     type Error: std::error::Error;
 
     /// Fallibly convert from the GAT `Ref<'a>` defined on Original, into `Self`.
@@ -208,8 +207,98 @@ impl<T: Clone> Promote<T> for T {
         orig.clone()
     }
 }
+
+/// Type-agnostic macro for dereferencing machine-generated Offset16 abstactions
+/// into Option<T> of the promotable dereference-value
+macro_rules! promote_link {
+    () => {
+        (|offset| promote_opt(&offset.link))
+    };
+}
+
 // !SECTION
 
+// SECTION - Generic (but niche-use-case) helper definitions
+#[derive(Clone)]
+#[repr(transparent)]
+struct SemVec<Sem, T> {
+    inner: Vec<T>,
+    __proxy: std::marker::PhantomData<Sem>,
+}
+
+impl<Sem, T> SemVec<Sem, T> {
+    pub fn new() -> Self {
+        Self {
+            inner: Vec::new(),
+            __proxy: std::marker::PhantomData,
+        }
+    }
+
+    pub fn with_capacity(cap: usize) -> Self {
+        Self {
+            inner: Vec::with_capacity(cap),
+            __proxy: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<Sem, T> From<Vec<T>> for SemVec<Sem, T> {
+    fn from(v: Vec<T>) -> Self {
+        Self {
+            inner: v,
+            __proxy: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<Sem, T> FromIterator<T> for SemVec<Sem, T> {
+    fn from_iter<I>(iter: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+    {
+        Self {
+            inner: Vec::from_iter(iter),
+            __proxy: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<T> std::fmt::Debug for SemVec<ClassId, T>
+where
+    T: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // REVIEW - consider whether we need this distinction when ChainedRule already discriminates on Sem
+        f.debug_tuple("ClassIds").field(&self.inner).finish()
+    }
+}
+
+impl<T> std::fmt::Debug for SemVec<GlyphId, T>
+where
+    T: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // REVIEW - consider whether we need this distinction when ChainedRule already discriminates on Sem
+        f.debug_tuple("GlyphIds").field(&self.inner).finish()
+    }
+}
+
+impl<Sem, T> std::ops::Deref for SemVec<Sem, T> {
+    type Target = Vec<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+/// Marker type for indicating a SemVec (or any types above it) holds GlyphId-semantics u16 values
+#[derive(Clone)]
+struct GlyphId;
+/// Marker type for indicating a SemVec (or any types above it) holds ClassId-semantics u16 values
+#[derive(Clone)]
+struct ClassId;
+
+// !SECTION
 /// Crate-private mirco-module for compile-time same-type assertions that can be chained
 pub(crate) mod refl {
     pub(crate) trait Refl<T> {
@@ -791,10 +880,7 @@ impl TryPromote<OpentypeMarkGlyphSet> for MarkGlyphSet {
 type ItemVariationStore = u32;
 
 impl TryPromote<OpentypeGdefTableData> for GdefTableDataMetrics {
-    type Error = ReflType<
-        TPErr<OpentypeMarkGlyphSet, MarkGlyphSet>,
-        UnknownValueError<u16>,
-    >;
+    type Error = ReflType<TPErr<OpentypeMarkGlyphSet, MarkGlyphSet>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeGdefTableData) -> Result<Self, Self::Error> {
         Ok(match orig {
@@ -802,10 +888,8 @@ impl TryPromote<OpentypeGdefTableData> for GdefTableDataMetrics {
             OpentypeGdefTableData::Version1_2(opentype_gdef_table_data_Version1_2 {
                 mark_glyph_sets_def,
             }) => {
-                GdefTableDataMetrics::MarkGlyphSetsDef(
-                    try_promote_opt(&mark_glyph_sets_def.link)?
-                )
-            },
+                GdefTableDataMetrics::MarkGlyphSetsDef(try_promote_opt(&mark_glyph_sets_def.link)?)
+            }
             OpentypeGdefTableData::Version1_3(opentype_gdef_table_data_Version1_3 {
                 item_var_store,
             }) => GdefTableDataMetrics::ItemVarStore(*item_var_store),
@@ -926,7 +1010,7 @@ impl Promote<OpentypeAttachList> for AttachList {
             attach_points: orig
                 .attach_point_offsets
                 .iter()
-                .map(|offset| promote_opt(&offset.link))
+                .map(promote_link!())
                 .collect(),
         }
     }
@@ -941,10 +1025,7 @@ struct LigCaretList {
 type OpentypeLigCaretList = opentype_gdef_table_lig_caret_list_link;
 
 impl TryPromote<OpentypeLigCaretList> for LigCaretList {
-    type Error = ReflType<
-        TPErr<OpentypeLigGlyph, LigGlyph>,
-        UnknownValueError<u16>
-    >;
+    type Error = ReflType<TPErr<OpentypeLigGlyph, LigGlyph>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeLigCaretList) -> Result<Self, Self::Error> {
         let mut lig_glyphs = Vec::with_capacity(orig.lig_glyph_offsets.len());
@@ -966,10 +1047,7 @@ struct LigGlyph {
 type OpentypeLigGlyph = opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link;
 
 impl TryPromote<OpentypeLigGlyph> for LigGlyph {
-    type Error = ReflType<
-        TPErr<OpentypeCaretValue, CaretValue>,
-        UnknownValueError<u16>
-    >;
+    type Error = ReflType<TPErr<OpentypeCaretValue, CaretValue>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeLigGlyph) -> Result<Self, Self::Error> {
         let mut caret_values = Vec::with_capacity(orig.caret_values.len());
@@ -1120,10 +1198,7 @@ type OpentypeVariationIndexTable =
     opentype_common_device_or_variation_index_table_VariationIndexTable;
 
 impl TryPromote<OpentypeDeviceOrVariationIndexTable> for DeviceOrVariationIndexTable {
-    type Error = ReflType<
-        TFRErr<(u16, Vec<u16>), DeltaValues>,
-        UnknownValueError<u16>,
-    >;
+    type Error = ReflType<TFRErr<(u16, Vec<u16>), DeltaValues>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeDeviceOrVariationIndexTable) -> Result<Self, Self::Error> {
         match orig {
@@ -1131,7 +1206,7 @@ impl TryPromote<OpentypeDeviceOrVariationIndexTable> for DeviceOrVariationIndexT
                 start_size,
                 end_size,
                 delta_format,
-                ref delta_values
+                ref delta_values,
             }) => Ok(DeviceOrVariationIndexTable::DeviceTable(DeviceTable {
                 start_size,
                 end_size,
@@ -1154,10 +1229,7 @@ impl TryPromote<OpentypeDeviceOrVariationIndexTable> for DeviceOrVariationIndexT
 }
 
 impl TryPromote<OpentypeCaretValueRaw> for CaretValue {
-    type Error = ReflType<
-        TPErr<OpentypeCaretValue, CaretValue>,
-        UnknownValueError<u16>,
-    >;
+    type Error = ReflType<TPErr<OpentypeCaretValue, CaretValue>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeCaretValueRaw) -> Result<Self, Self::Error> {
         Self::try_promote(&orig.data)
@@ -1320,8 +1392,8 @@ impl TryPromote<OpentypeGsubLookupSubtable> for LookupSubtable {
             OpentypeGsubLookupSubtable::SequenceContext(seq_ctx) => {
                 LookupSubtable::SequenceContext(SequenceContext::promote(seq_ctx))
             }
-            OpentypeGsubLookupSubtable::ChainedSequenceContext => {
-                LookupSubtable::ChainedSequenceContext
+            OpentypeGsubLookupSubtable::ChainedSequenceContext(chain_ctx) => {
+                LookupSubtable::ChainedSequenceContext(ChainedSequenceContext::promote(chain_ctx))
             }
             OpentypeGsubLookupSubtable::SubstExtension => LookupSubtable::SubstExtension,
             OpentypeGsubLookupSubtable::ReverseChainSingleSubst => {
@@ -1333,14 +1405,8 @@ impl TryPromote<OpentypeGsubLookupSubtable> for LookupSubtable {
 
 impl TryPromote<OpentypeGposLookupSubtable> for LookupSubtable {
     type Error = ReflType<
-        ReflType<
-            TPErr<OpentypeSinglePos, SinglePos>,
-            TPErr<OpentypePairPos, PairPos>,
-        >,
-        ReflType<
-            TPErr<OpentypeCursivePos, CursivePos>,
-            UnknownValueError<u16>,
-        >,
+        ReflType<TPErr<OpentypeSinglePos, SinglePos>, TPErr<OpentypePairPos, PairPos>>,
+        ReflType<TPErr<OpentypeCursivePos, CursivePos>, UnknownValueError<u16>>,
     >;
 
     fn try_promote(orig: &OpentypeGposLookupSubtable) -> Result<Self, Self::Error> {
@@ -1360,8 +1426,8 @@ impl TryPromote<OpentypeGposLookupSubtable> for LookupSubtable {
             OpentypeGposLookupSubtable::SequenceContext(seq_ctx) => {
                 LookupSubtable::SequenceContext(SequenceContext::promote(seq_ctx))
             }
-            OpentypeGposLookupSubtable::ChainedSequenceContext => {
-                LookupSubtable::ChainedSequenceContext
+            OpentypeGposLookupSubtable::ChainedSequenceContext(chain_ctx) => {
+                LookupSubtable::ChainedSequenceContext(ChainedSequenceContext::promote(chain_ctx))
             }
             OpentypeGposLookupSubtable::PosExtension => LookupSubtable::PosExtension,
         })
@@ -1379,7 +1445,7 @@ enum LookupSubtable {
     PosExtension,
 
     SequenceContext(SequenceContext),
-    ChainedSequenceContext,
+    ChainedSequenceContext(ChainedSequenceContext),
 
     SingleSubst,
     MultipleSubst,
@@ -1387,6 +1453,188 @@ enum LookupSubtable {
     LigatureSubst,
     SubstExtension,
     ReverseChainSingleSubst,
+}
+
+pub type OpentypeChainedSequenceContext = opentype_common_chained_sequence_context;
+pub type OpentypeChainedSequenceContextInner = opentype_common_chained_sequence_context_subst;
+pub type OpentypeChainedSequenceContextFormat1 =
+    opentype_common_chained_sequence_context_subst_Format1;
+pub type OpentypeChainedSequenceContextFormat2 =
+    opentype_common_chained_sequence_context_subst_Format2;
+pub type OpentypeChainedSequenceContextFormat3 =
+    opentype_common_chained_sequence_context_subst_Format3;
+
+pub type OpentypeChainedRuleSet =
+    opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link;
+pub type OpentypeChainedRule = opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link_chained_seq_rules;
+
+impl<Sem> Promote<OpentypeChainedRuleSet> for ChainedRuleSet<Sem>
+where
+    ChainedRule<Sem>: Promote<OpentypeChainedRule>,
+{
+    fn promote(orig: &OpentypeChainedRuleSet) -> Self {
+        promote_vec(&orig.chained_seq_rules)
+    }
+}
+
+impl<Sem> Promote<OpentypeChainedRule> for ChainedRule<Sem> {
+    fn promote(orig: &OpentypeChainedRule) -> Self {
+        ChainedRule {
+            backtrack_glyph_count: orig.backtrack_glyph_count,
+            backtrack_sequence: orig.backtrack_sequence.clone().into(),
+            input_glyph_count: orig.input_glyph_count,
+            input_sequence: orig.input_sequence.clone().into(),
+            lookahead_glyph_count: orig.lookahead_glyph_count,
+            lookahead_sequence: orig.lookahead_sequence.clone().into(),
+            seq_lookup_records: promote_vec(&orig.seq_lookup_records),
+        }
+    }
+}
+
+type ChainedRuleSet<Sem> = Vec<ChainedRule<Sem>>;
+
+#[derive(Clone)]
+struct ChainedRule<Sem> {
+    backtrack_glyph_count: u16, // REVIEW - this field can be re-synthesized from backtrack_sequence.len()
+    backtrack_sequence: SemVec<Sem, u16>,
+    input_glyph_count: u16, // REVIEW - this field can be re-synthesized from input_sequence.len() + 1
+    input_sequence: SemVec<Sem, u16>, // NOTE - unlike the other two sequence-arrays, this one is one shorter than its associated glyph_count field
+    lookahead_glyph_count: u16, // REVIEW - this field can be re-synthesized from lookahead_sequence.len()
+    lookahead_sequence: SemVec<Sem, u16>,
+    seq_lookup_records: Vec<SequenceLookup>,
+}
+
+impl std::fmt::Debug for ChainedRule<GlyphId> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // REVIEW - at the debug level, present a view of ChainedRule<GlyphId> as if it were its own type `ChainedSequenceRule`
+        f.debug_struct("ChainedSequenceRule")
+            .field("backtrack_glyph_count", &self.backtrack_glyph_count)
+            .field("backtrack_sequence", &self.backtrack_sequence)
+            .field("input_glyph_count", &self.input_glyph_count)
+            .field("input_sequence", &self.input_sequence)
+            .field("lookahead_glyph_count", &self.lookahead_glyph_count)
+            .field("lookahead_sequence", &self.lookahead_sequence)
+            .field("seq_lookup_records", &self.seq_lookup_records)
+            .finish()
+    }
+}
+
+impl std::fmt::Debug for ChainedRule<ClassId> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // REVIEW - at the debug level, present a view of ChainedRule<ClassId> as if it were its own type `ChainedClassSequenceRule`
+        f.debug_struct("ChainedClassSequenceRule")
+            .field("backtrack_glyph_count", &self.backtrack_glyph_count)
+            .field("backtrack_sequence", &self.backtrack_sequence)
+            .field("input_glyph_count", &self.input_glyph_count)
+            .field("input_sequence", &self.input_sequence)
+            .field("lookahead_glyph_count", &self.lookahead_glyph_count)
+            .field("lookahead_sequence", &self.lookahead_sequence)
+            .field("seq_lookup_records", &self.seq_lookup_records)
+            .finish()
+    }
+}
+
+impl Promote<OpentypeChainedSequenceContext> for ChainedSequenceContext {
+    fn promote(orig: &OpentypeChainedSequenceContext) -> Self {
+        Self::promote(&orig.subst)
+    }
+}
+
+impl Promote<OpentypeChainedSequenceContextInner> for ChainedSequenceContext {
+    fn promote(orig: &OpentypeChainedSequenceContextInner) -> Self {
+        match orig {
+            OpentypeChainedSequenceContextInner::Format1(f1) => {
+                ChainedSequenceContext::Format1(ChainedSequenceContextFormat1::promote(f1))
+            }
+            OpentypeChainedSequenceContextInner::Format2(f2) => {
+                ChainedSequenceContext::Format2(ChainedSequenceContextFormat2::promote(f2))
+            }
+            OpentypeChainedSequenceContextInner::Format3(f3) => {
+                ChainedSequenceContext::Format3(ChainedSequenceContextFormat3::promote(f3))
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+enum ChainedSequenceContext {
+    Format1(ChainedSequenceContextFormat1),
+    Format2(ChainedSequenceContextFormat2),
+    Format3(ChainedSequenceContextFormat3),
+}
+
+impl Promote<OpentypeChainedSequenceContextFormat1> for ChainedSequenceContextFormat1 {
+    fn promote(orig: &OpentypeChainedSequenceContextFormat1) -> Self {
+        ChainedSequenceContextFormat1 {
+            coverage: promote_opt(&orig.coverage.link),
+            chained_seq_rule_sets: orig
+                .chained_seq_rule_sets
+                .iter()
+                .map(promote_link!())
+                .collect(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ChainedSequenceContextFormat1 {
+    coverage: Option<CoverageTable>,
+    chained_seq_rule_sets: Vec<Option<ChainedRuleSet<GlyphId>>>,
+}
+
+impl Promote<OpentypeChainedSequenceContextFormat2> for ChainedSequenceContextFormat2 {
+    fn promote(orig: &OpentypeChainedSequenceContextFormat2) -> Self {
+        Self {
+            coverage: promote_opt(&orig.coverage.link),
+            backtrack_class_def: promote_opt(&orig.backtrack_class_def.link),
+            input_class_def: promote_opt(&orig.input_class_def.link),
+            lookahead_class_def: promote_opt(&orig.lookahead_class_def.link),
+            chained_class_seq_rule_sets: orig
+                .chained_class_seq_rule_sets
+                .iter()
+                .map(promote_link!())
+                .collect(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ChainedSequenceContextFormat2 {
+    coverage: Option<CoverageTable>,
+    backtrack_class_def: Option<ClassDef>,
+    input_class_def: Option<ClassDef>,
+    lookahead_class_def: Option<ClassDef>,
+    chained_class_seq_rule_sets: Vec<Option<ChainedRuleSet<ClassId>>>,
+}
+
+impl Promote<OpentypeChainedSequenceContextFormat3> for ChainedSequenceContextFormat3 {
+    fn promote(orig: &OpentypeChainedSequenceContextFormat3) -> Self {
+        type OpentypeCoverageTableLink =
+            opentype_common_chained_sequence_context_subst_Format1_coverage;
+        let follow = |covs: &Vec<OpentypeCoverageTableLink>| -> Vec<Option<CoverageTable>> {
+            covs.iter().map(promote_link!()).collect()
+        };
+        Self {
+            backtrack_glyph_count: orig.backtrack_glyph_count,
+            backtrack_coverages: follow(&orig.backtrack_coverages),
+            input_glyph_count: orig.input_glyph_count,
+            input_coverages: follow(&orig.input_coverages),
+            lookahead_glyph_count: orig.lookahead_glyph_count,
+            lookahead_coverages: follow(&orig.lookahead_coverages),
+            seq_lookup_records: promote_vec(&orig.seq_lookup_records),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ChainedSequenceContextFormat3 {
+    backtrack_glyph_count: u16, // REVIEW - this field can be re-synthesized from `backtrack_coverages.len()`
+    backtrack_coverages: Vec<Option<CoverageTable>>,
+    input_glyph_count: u16, // REVIEW - this field can be re-synthesized from `input_coverages.len()`
+    input_coverages: Vec<Option<CoverageTable>>,
+    lookahead_glyph_count: u16, // REVIEW - this field can be re-synthesized from `lookahead_coverages.len()`
+    lookahead_coverages: Vec<Option<CoverageTable>>,
+    seq_lookup_records: Vec<SequenceLookup>,
 }
 
 pub type OpentypeSequenceContext = opentype_common_sequence_context;
@@ -1530,7 +1778,7 @@ impl Promote<OpentypeRule> for Rule {
 
 #[derive(Debug, Clone)]
 struct Rule {
-    glyph_count: u16, // REVIEW <- this field can be re-synthesized via `input_sequence.len() + 1`
+    glyph_count: u16, // REVIEW - this field can be re-synthesized via `input_sequence.len() + 1`
     input_sequence: Vec<u16>,
     seq_lookup_records: Vec<SequenceLookup>,
 }
@@ -1545,10 +1793,7 @@ pub type OpentypeCursivePosFormat1 =
     opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_CursivePos_subtable_Format1;
 
 impl TryPromote<OpentypeCursivePos> for CursivePos {
-    type Error = ReflType<
-        TPErr<OpentypeCursivePosSubtable, CursivePos>,
-        UnknownValueError<u16>,
-    >;
+    type Error = ReflType<TPErr<OpentypeCursivePosSubtable, CursivePos>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeCursivePos) -> Result<Self, Self::Error> {
         CursivePos::try_promote(&orig.subtable)
@@ -1556,10 +1801,8 @@ impl TryPromote<OpentypeCursivePos> for CursivePos {
 }
 
 impl TryPromote<OpentypeCursivePosSubtable> for CursivePos {
-    type Error = ReflType<
-        TPErr<OpentypeCursivePosFormat1, CursivePosFormat1>,
-        UnknownValueError<u16>,
-    >;
+    type Error =
+        ReflType<TPErr<OpentypeCursivePosFormat1, CursivePosFormat1>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeCursivePosSubtable) -> Result<Self, Self::Error> {
         match orig {
@@ -1576,10 +1819,7 @@ enum CursivePos {
 }
 
 impl TryPromote<OpentypeCursivePosFormat1> for CursivePosFormat1 {
-    type Error = ReflType<
-        TPErr<OpentypeEntryExitRecord, EntryExitRecord>,
-        UnknownValueError<u16>,
-    >;
+    type Error = ReflType<TPErr<OpentypeEntryExitRecord, EntryExitRecord>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeCursivePosFormat1) -> Result<Self, Self::Error> {
         Ok(CursivePosFormat1 {
@@ -1598,10 +1838,7 @@ struct CursivePosFormat1 {
 pub type OpentypeEntryExitRecord = opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_CursivePos_subtable_Format1_entry_exit_records;
 
 impl TryPromote<OpentypeEntryExitRecord> for EntryExitRecord {
-    type Error = ReflType<
-        TPErr<OpentypeAnchorTable, AnchorTable>,
-        UnknownValueError<u16>,
-    >;
+    type Error = ReflType<TPErr<OpentypeAnchorTable, AnchorTable>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeEntryExitRecord) -> Result<Self, Self::Error> {
         Ok(EntryExitRecord {
@@ -1625,10 +1862,7 @@ pub type OpentypeAnchorTableFormat2 = opentype_common_anchor_table_table_Format2
 pub type OpentypeAnchorTableFormat3 = opentype_common_anchor_table_table_Format3;
 
 impl TryPromote<OpentypeAnchorTable> for AnchorTable {
-    type Error = ReflType<
-        TPErr<OpentypeAnchorTableTable, AnchorTable>,
-        UnknownValueError<u16>,
-    >;
+    type Error = ReflType<TPErr<OpentypeAnchorTableTable, AnchorTable>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeAnchorTable) -> Result<Self, Self::Error> {
         AnchorTable::try_promote(&orig.table)
@@ -1636,10 +1870,8 @@ impl TryPromote<OpentypeAnchorTable> for AnchorTable {
 }
 
 impl TryPromote<OpentypeAnchorTableTable> for AnchorTable {
-    type Error = ReflType<
-        TPErr<OpentypeAnchorTableFormat3, AnchorTableFormat3>,
-        UnknownValueError<u16>,
-    >;
+    type Error =
+        ReflType<TPErr<OpentypeAnchorTableFormat3, AnchorTableFormat3>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeAnchorTableTable) -> Result<Self, Self::Error> {
         Ok(match orig {
@@ -1734,10 +1966,7 @@ pub type OpentypePairPosFormat2 =
     opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairPos_subtable_Format2;
 
 impl TryPromote<OpentypePairPos> for PairPos {
-    type Error = ReflType<
-        TPErr<OpentypePairPosSubtable, PairPos>,
-        UnknownValueError<u16>,
-    >;
+    type Error = ReflType<TPErr<OpentypePairPosSubtable, PairPos>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypePairPos) -> Result<Self, Self::Error> {
         Self::try_promote(&orig.subtable)
@@ -1772,10 +2001,7 @@ enum PairPos {
 }
 
 impl TryPromote<OpentypePairPosFormat1> for PairPosFormat1 {
-    type Error = ReflType<
-        TPErr<OpentypePairSet, PairSet>,
-        UnknownValueError<u16>,
-    >;
+    type Error = ReflType<TPErr<OpentypePairSet, PairSet>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypePairPosFormat1) -> Result<Self, Self::Error> {
         let mut pair_sets = Vec::with_capacity(orig.pair_sets.len());
@@ -1792,10 +2018,7 @@ impl TryPromote<OpentypePairPosFormat1> for PairPosFormat1 {
 }
 
 impl TryPromote<OpentypePairPosFormat2> for PairPosFormat2 {
-    type Error = ReflType<
-        TPErr<OpentypeClass2Record, Class2Record>,
-        UnknownValueError<u16>,
-    >;
+    type Error = ReflType<TPErr<OpentypeClass2Record, Class2Record>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypePairPosFormat2) -> Result<Self, Self::Error> {
         let mut store = Vec::with_capacity(orig.class1_count as usize * orig.class2_count as usize);
@@ -1835,10 +2058,7 @@ type Class1RecordList = Wec<Class2Record>;
 pub type OpentypeClass2Record = opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairPos_subtable_Format2_class1_records_class2_records;
 
 impl TryPromote<OpentypeClass2Record> for Class2Record {
-    type Error = ReflType<
-        TPErr<OpentypeValueRecord, ValueRecord>,
-        UnknownValueError<u16>,
-    >;
+    type Error = ReflType<TPErr<OpentypeValueRecord, ValueRecord>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeClass2Record) -> Result<Self, Self::Error> {
         Ok(Class2Record {
@@ -1860,10 +2080,7 @@ pub type OpentypePairValueRecord = opentype_gpos_table_lookup_list_link_lookups_
 type PairSet = Vec<PairValueRecord>;
 
 impl TryPromote<OpentypePairSet> for PairSet {
-    type Error = ReflType<
-        TPErr<OpentypePairValueRecord, PairValueRecord>,
-        UnknownValueError<u16>,
-    >;
+    type Error = ReflType<TPErr<OpentypePairValueRecord, PairValueRecord>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypePairSet) -> Result<Self, Self::Error> {
         let mut accum = Vec::with_capacity(orig.pair_value_records.len());
@@ -1875,10 +2092,7 @@ impl TryPromote<OpentypePairSet> for PairSet {
 }
 
 impl TryPromote<OpentypePairValueRecord> for PairValueRecord {
-    type Error = ReflType<
-        TPErr<OpentypeValueRecord, ValueRecord>,
-        UnknownValueError<u16>,
-    >;
+    type Error = ReflType<TPErr<OpentypeValueRecord, ValueRecord>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypePairValueRecord) -> Result<Self, Self::Error> {
         Ok(PairValueRecord {
@@ -1907,10 +2121,7 @@ pub type OpentypeSinglePosFormat2 =
     opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_SinglePos_subtable_Format2;
 
 impl TryPromote<OpentypeSinglePos> for SinglePos {
-    type Error = ReflType<
-        TPErr<OpentypeSinglePosSubtable, SinglePos>,
-        UnknownValueError<u16>
-    >;
+    type Error = ReflType<TPErr<OpentypeSinglePosSubtable, SinglePos>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeSinglePos) -> Result<Self, Self::Error> {
         Self::try_promote(&orig.subtable)
@@ -1945,10 +2156,7 @@ enum SinglePos {
 }
 
 impl TryPromote<OpentypeSinglePosFormat1> for SinglePosFormat1 {
-    type Error = ReflType<
-        TPErr<OpentypeValueRecord, ValueRecord>,
-        UnknownValueError<u16>,
-    >;
+    type Error = ReflType<TPErr<OpentypeValueRecord, ValueRecord>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeSinglePosFormat1) -> Result<Self, Self::Error> {
         Ok(SinglePosFormat1 {
@@ -1959,10 +2167,7 @@ impl TryPromote<OpentypeSinglePosFormat1> for SinglePosFormat1 {
 }
 
 impl TryPromote<OpentypeSinglePosFormat2> for SinglePosFormat2 {
-    type Error = ReflType<
-        TPErr<OpentypeValueRecord, ValueRecord>,
-        UnknownValueError<u16>,
-    >;
+    type Error = ReflType<TPErr<OpentypeValueRecord, ValueRecord>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeSinglePosFormat2) -> Result<Self, Self::Error> {
         let mut value_records = Vec::with_capacity(orig.value_records.len());
@@ -2045,10 +2250,7 @@ pub type OpentypeGsubLookupTable = opentype_gsub_table_lookup_list_link_lookups_
 
 impl TryPromote<OpentypeGposLookupTable> for LookupTable {
     type Error =
-        ReflType<
-            TPErr<OpentypeGposLookupSubtable, LookupSubtable>,
-            UnknownValueError<u16>,
-        >;
+        ReflType<TPErr<OpentypeGposLookupSubtable, LookupSubtable>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeGposLookupTable) -> Result<Self, Self::Error> {
         let mut subtables = Vec::with_capacity(orig.subtables.len());
@@ -2066,12 +2268,11 @@ impl TryPromote<OpentypeGposLookupTable> for LookupTable {
 }
 
 impl TryPromote<OpentypeGsubLookupTable> for LookupTable {
-    type Error =
-        ReflType<
-            TPErr<OpentypeGsubLookupSubtable, LookupSubtable>,
-            std::convert::Infallible,
-            // may easily become `UnknownValueError<u16>` but infallible for now
-        >;
+    type Error = ReflType<
+        TPErr<OpentypeGsubLookupSubtable, LookupSubtable>,
+        std::convert::Infallible,
+        // may easily become `UnknownValueError<u16>` but infallible for now
+    >;
 
     fn try_promote(orig: &OpentypeGsubLookupTable) -> Result<Self, Self::Error> {
         let mut subtables = Vec::with_capacity(orig.subtables.len());
@@ -2119,10 +2320,7 @@ pub type OpentypeGposLookupList = opentype_gpos_table_lookup_list_link;
 pub type OpentypeGsubLookupList = opentype_gsub_table_lookup_list_link;
 
 impl TryPromote<OpentypeGposLookupList> for LookupList {
-    type Error = ReflType<
-        TPErr<OpentypeGposLookupTable, LookupTable>,
-        UnknownValueError<u16>,
-    >;
+    type Error = ReflType<TPErr<OpentypeGposLookupTable, LookupTable>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeGposLookupList) -> Result<Self, Self::Error> {
         let mut accum = Vec::with_capacity(orig.lookups.len());
@@ -2897,7 +3095,11 @@ fn show_lookup_table(table: &LookupTable, ctxt: Ctxt, conf: &Config) {
 }
 
 // ANCHOR[format-lookup-subtable]
-fn format_lookup_subtable(subtable: &Option<LookupSubtable>, show_lookup_type: bool, _conf: &Config) -> String {
+fn format_lookup_subtable(
+    subtable: &Option<LookupSubtable>,
+    show_lookup_type: bool,
+    _conf: &Config,
+) -> String {
     // STUB - because the subtables are both partial (more variants exist) and abridged (existing variants are missing details), reimplement as necessary
     if let Some(subtable) = subtable {
         let (label, contents) = match subtable {
@@ -3022,13 +3224,13 @@ fn format_lookup_subtable(subtable: &Option<LookupSubtable>, show_lookup_type: b
                         seq_rule_sets,
                     }) => {
                         if let Some(coverage_table) = coverage {
-                            format!("SimpleGlyphs({})", format_coverage_table(coverage_table))
+                            format!("Glyphs({})", format_coverage_table(coverage_table))
                         } else {
                             assert!(
                                 seq_rule_sets.is_empty(),
                                 "non-empty seq_rule_sets has no coverage table to correspond to"
                             );
-                            format!("SimpleGlyphs[0]")
+                            format!("Glyphs[0]")
                         }
                     }
                     SequenceContext::Format2(SequenceContextFormat2 {
@@ -3037,10 +3239,10 @@ fn format_lookup_subtable(subtable: &Option<LookupSubtable>, show_lookup_type: b
                         ..
                     }) => {
                         if let Some(coverage_table) = coverage {
-                            format!("ClassBased({})", format_coverage_table(coverage_table))
+                            format!("Classes({})", format_coverage_table(coverage_table))
                         } else {
                             assert!(class_seq_rule_sets.is_empty(), "non-empty class_seq_rule_sets has no coverage table to correspond to");
-                            format!("ClassBased[0]")
+                            format!("Classes[0]")
                         }
                     }
                     SequenceContext::Format3(SequenceContextFormat3 {
@@ -3053,22 +3255,124 @@ fn format_lookup_subtable(subtable: &Option<LookupSubtable>, show_lookup_type: b
                         // FIXME - show_lookup_table calls this function through show_items_inline already, so we might want to reduce how many values we are willing to show proportionally
                         let input_pattern = format_items_inline(
                             coverage_tables,
-                            |cov| if let Some(coverage_table) = cov { format_coverage_table(coverage_table) } else { String::from("[]") },
+                            |cov| {
+                                if let Some(coverage_table) = cov {
+                                    format_coverage_table(coverage_table)
+                                } else {
+                                    String::from("[]")
+                                }
+                            },
                             INLINE_INLINE_BOOKEND,
-                            |n| format!("(..{n}..)")
+                            |n| format!("(..{n}..)"),
                         );
                         let seq_lookups = format_items_inline(
                             seq_lookup_records,
                             |seq_lookup| format_sequence_lookup(seq_lookup),
                             INLINE_INLINE_BOOKEND,
-                            |n| format!("(..{n}..)")
+                            |n| format!("(..{n}..)"),
                         );
                         format!("{input_pattern}=>{seq_lookups}")
                     }
                 };
                 ("SeqCtx", contents)
             }
-            LookupSubtable::ChainedSequenceContext => ("ChainSeqCtx", format!("(..)")),
+            LookupSubtable::ChainedSequenceContext(chain_ctx) => {
+                let contents = match chain_ctx {
+                    ChainedSequenceContext::Format1(ChainedSequenceContextFormat1 {
+                        coverage,
+                        chained_seq_rule_sets,
+                    }) => {
+                        if let Some(coverage_table) = coverage {
+                            // TODO - even if it means overly verbose output, this might be too little info to be useful compared to discriminant-only display
+                            format!("ChainedGlyphs({})", format_coverage_table(coverage_table))
+                        } else {
+                            assert!(chained_seq_rule_sets.is_empty(), "non-empty chained_seq_rule_sets has no coverage table to correspond to");
+                            format!("ChainedGlyphs[0]")
+                        }
+                    }
+                    ChainedSequenceContext::Format2(ChainedSequenceContextFormat2 {
+                        coverage,
+                        chained_class_seq_rule_sets,
+                        ..
+                    }) => {
+                        if let Some(coverage_table) = coverage {
+                            // TODO - even if it means overly verbose output, this might be too little info to be useful compared to discriminant-only display
+                            // REVIEW - consider what other details (e.g. class-def summary metrics) to show in implicitly- or explictly-verbose display format
+                            format!("ChainedClasses({})", format_coverage_table(coverage_table))
+                        } else {
+                            assert!(chained_class_seq_rule_sets.is_empty(), "non-empty chained_class_seq_rule_sets has no coverage table to correspond to");
+                            format!("ChainedClases[0]")
+                        }
+                    }
+                    ChainedSequenceContext::Format3(ChainedSequenceContextFormat3 {
+                        backtrack_coverages,
+                        input_coverages,
+                        lookahead_coverages,
+                        seq_lookup_records,
+                        ..
+                    }) => {
+                        // REVIEW - since we are already within an inline elision context, try to avoid taking up too much space per item, but this might not want to be a hardcoded value
+                        const INLINE_INLINE_BOOKEND: usize = 1;
+                        // FIXME - show_lookup_table calls this function through show_items_inline already, so we might want to reduce how many values we are willing to show proportionally
+                        let backtrack_pattern = if backtrack_coverages.is_empty() {
+                            String::new()
+                        } else {
+                            let tmp = format_items_inline(
+                                backtrack_coverages,
+                                |cov| {
+                                    if let Some(coverage_table) = cov {
+                                        format_coverage_table(coverage_table)
+                                    } else {
+                                        String::from("[]")
+                                    }
+                                },
+                                INLINE_INLINE_BOOKEND,
+                                |n| format!("(..{n}..)"),
+                            );
+                            format!("(?<={tmp})")
+                        };
+                        let input_pattern = format_items_inline(
+                            input_coverages,
+                            |cov| {
+                                if let Some(coverage_table) = cov {
+                                    format_coverage_table(coverage_table)
+                                } else {
+                                    String::from("[]")
+                                }
+                            },
+                            INLINE_INLINE_BOOKEND,
+                            |n| format!("(..{n}..)"),
+                        );
+                        let lookahead_pattern = if lookahead_coverages.is_empty() {
+                            String::new()
+                        } else {
+                            let tmp = format_items_inline(
+                                lookahead_coverages,
+                                |cov| {
+                                    if let Some(coverage_table) = cov {
+                                        format_coverage_table(coverage_table)
+                                    } else {
+                                        String::from("[]")
+                                    }
+                                },
+                                INLINE_INLINE_BOOKEND,
+                                |n| format!("(..{n}..)"),
+                            );
+                            format!("(?={tmp})")
+                        };
+                        let seq_lookups = format_items_inline(
+                            seq_lookup_records,
+                            |seq_lookup| format_sequence_lookup(seq_lookup),
+                            INLINE_INLINE_BOOKEND,
+                            |n| format!("(..{n}..)"),
+                        );
+                        format!(
+                            "{backtrack_pattern}{input_pattern}{lookahead_pattern}=>{seq_lookups}"
+                        )
+                    }
+                };
+                ("ChainSeqCtx", contents)
+            }
         };
         if show_lookup_type {
             format!("{label}{contents}")
@@ -3394,26 +3698,26 @@ fn format_coverage_table(cov: &CoverageTable) -> String {
     match cov {
         CoverageTable::Format1 { ref glyph_array } => {
             let num_glyphs = glyph_array.len();
-            let first_glyph = glyph_array.first().expect("empty glyph-array");
-            let last_glyph = glyph_array.last().expect("empty glyph-array");
-            format!("[{num_glyphs} glyphs in [{first_glyph},{last_glyph}]]")
+            match glyph_array.as_slice() {
+                &[] => format!("∅"),
+                &[id] => format!("[glyphId={id}]"),
+                &[first, .., last] => format!("[{num_glyphs} ∈ [{first},{last}]]"),
+            }
         }
-        CoverageTable::Format2 { ref range_records } => {
-            let num_glyphs: u16 = range_records
-                .iter()
-                .map(|rr| rr.end_glyph_id - rr.start_glyph_id + 1)
-                .sum();
-            let num_ranges = range_records.len();
-            let min_glyph = range_records
-                .first()
-                .expect("empty RangeRecord-array")
-                .start_glyph_id;
-            let max_glyph = range_records
-                .last()
-                .expect("empty RangeRecord-array")
-                .end_glyph_id;
-            format!("[{num_glyphs} glyphs ({num_ranges} ranges) in [{min_glyph},{max_glyph}]]")
-        }
+        CoverageTable::Format2 { ref range_records } => match range_records.as_slice() {
+            &[] => format!("∅"),
+            &[rr] => format!("[∀ glyphId ∈ [{},{}]]", rr.start_glyph_id, rr.end_glyph_id),
+            &[first, .., last] => {
+                let num_glyphs: u16 = range_records
+                    .iter()
+                    .map(|rr| rr.end_glyph_id - rr.start_glyph_id + 1)
+                    .sum();
+                let num_ranges = range_records.len();
+                let min_glyph = first.start_glyph_id;
+                let max_glyph = last.end_glyph_id;
+                format!("[{num_ranges} ranges; {num_glyphs} ∈ [{min_glyph},{max_glyph}]]")
+            }
+        },
     }
 }
 
@@ -3603,8 +3907,7 @@ fn format_items_inline<T>(
     show_fn: impl Fn(&T) -> String,
     bookend: usize,
     ellipsis: impl Fn(usize) -> String,
-) -> String
-{
+) -> String {
     // Allocate a buffer big enough to hold one string per item in the array, or enough items to show both bookends and one ellipsis-string
     let mut buffer = Vec::<String>::with_capacity(Ord::min(items.len(), bookend * 2 + 1));
 
