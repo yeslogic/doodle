@@ -1,6 +1,6 @@
+use num_traits::{one, One};
 use std::borrow::Cow;
 use std::ops::{Bound, RangeBounds};
-use num_traits::{One, one};
 
 pub use crate::byte_set::ByteSet;
 pub use crate::parser::{

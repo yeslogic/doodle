@@ -1417,9 +1417,7 @@ impl TypeChecker {
     /// Otherwise, returns an `Err` indicating that the unification was not possible.
     fn unify_utype_baseset(&mut self, ut: Rc<UType>, bs: BaseSet) -> TCResult<Constraint> {
         match ut.as_ref() {
-            UType::Var(uv) => {
-                self.unify_var_baseset(*uv, bs)
-            }
+            UType::Var(uv) => self.unify_var_baseset(*uv, bs),
             UType::Base(b) => {
                 let ret = bs.unify(&BaseSet::Single(*b))?.to_constraint();
                 Ok(ret)

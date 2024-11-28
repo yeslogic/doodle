@@ -1,6 +1,6 @@
-use core::panic;
 use std::collections::BTreeSet;
 
+use crate::bounds::Bounds;
 use crate::byte_set::ByteSet;
 use crate::{
     Arith, BaseType, Expr, Format, IntRel, IntoLabel, Label, Pattern, TypeHint, UnaryOp, ValueType,
@@ -61,7 +61,7 @@ pub fn flags_bits8(field_names: [Option<&'static str>; 8]) -> Format {
         if let Some(name) = field_name {
             flags.push((
                 Label::Borrowed(name),
-                is_nonzero_u8(mask_bits(var(BINDING_NAME), ix as u8, 1)),
+                is_nonzero(mask_bits(var(BINDING_NAME), ix as u8, 1)),
             ));
         }
     }
@@ -141,7 +141,7 @@ pub fn flags_bits16(field_names: [Option<&'static str>; 16]) -> Format {
         if let Some(name) = field_name {
             flags.push((
                 Label::Borrowed(name),
-                is_nonzero_u16(mask_bits16(var(BINDING_NAME), ix as u8, 1)),
+                is_nonzero(mask_bits16(var(BINDING_NAME), ix as u8, 1)),
             ));
         }
     }
@@ -497,6 +497,14 @@ pub fn as_char(x: Expr) -> Expr {
     Expr::AsChar(Box::new(x))
 }
 
+pub fn pred(x: Expr) -> Expr {
+    Expr::Unary(UnaryOp::IntPred, Box::new(x))
+}
+
+pub fn succ(x: Expr) -> Expr {
+    Expr::Unary(UnaryOp::IntSucc, Box::new(x))
+}
+
 pub fn add(x: Expr, y: Expr) -> Expr {
     Expr::Arith(Arith::Add, Box::new(x), Box::new(y))
 }
@@ -646,20 +654,11 @@ pub fn record_repeat<const N: usize>(field_names: [&'static str; N], format: For
     Format::Record(iter.collect())
 }
 
-/// Returns an Expr that evaluates to `true` if the given U8-typed expression is non-zero
-pub fn is_nonzero_u8(expr: Expr) -> Expr {
-    expr_ne(expr, Expr::U8(0))
+/// Returns an Expr that evaluates to `true` if the given expression (of an arbitrary Uint type) is non-zero
+pub fn is_nonzero(expr: Expr) -> Expr {
+    is_within(expr, Bounds::exact(0))
 }
 
-/// Returns an Expr that evaluates to `true` if the given U16-typed expression is non-zero
-pub fn is_nonzero_u16(expr: Expr) -> Expr {
-    expr_ne(expr, Expr::U16(0))
-}
-
-/// Returns an Expr that evaluates to `true` if the given U32-typed expression is non-zero
-pub fn is_nonzero_u32(expr: Expr) -> Expr {
-    expr_ne(expr, Expr::U32(0))
-}
 /// Helper for constructing `Option::None` within the Expr model-language.
 pub const fn expr_none() -> Expr {
     Expr::LiftOption(None)
@@ -693,14 +692,9 @@ pub fn format_none() -> Format {
     compute(expr_none())
 }
 
-/// Shortcut for `where_lambda` applied over the simple predicate [`is_nonzero_u8`]
-pub fn where_nonzero_u8(format: Format) -> Format {
-    where_lambda(format, "x", is_nonzero_u8(var("x")))
-}
-
-/// Shortcut for `where_lambda` applied over the simple predicate [`is_nonzero_u16`]
-pub fn where_nonzero_u16(format: Format) -> Format {
-    where_lambda(format, "x", is_nonzero_u16(var("x")))
+/// Shortcut for `where_lambda` applied over the simple predicate [`is_nonzero`]
+pub fn where_nonzero(format: Format) -> Format {
+    where_lambda(format, "x", is_nonzero(var("x")))
 }
 
 /// Helper for constructing `Format::ForEach`
@@ -881,6 +875,9 @@ pub fn f_concat() -> Expr {
     lambda("xs", concat(var("xs")))
 }
 
+/// Given a sequence `seq` of type `Seq(T)`, return an expression of type `Bool`
+/// that is `true` if any element of `seq` yields `true` when `f` is called over it,
+/// and `false` otherwise (including when the sequence is empty).
 pub fn seq_any<F>(f: F, seq: Expr) -> Expr
 where
     F: FnOnce(Expr) -> Expr,
@@ -914,11 +911,12 @@ pub fn slice(len: Expr, inner: Format) -> Format {
     Format::Slice(Box::new(len), Box::new(inner))
 }
 
-/// Constructs a balanced (i.e. minimiazed max depth) tree of `bitor`-joined
-/// nodes of type Expr (U8 or U16).
+/// Constructs a balanced (i.e. minimized max depth) tree of `bitor`-joined
+/// nodes of type Expr.
 ///
-/// Does not work if there are more than 16 elements in `nodes`
-pub fn balanced_bitor_max16(mut nodes: Vec<Expr>) -> Expr {
+/// Will yield an unbalanced AST if there are more than 16 elements in `nodes`
+pub fn balanced_bitor_max16(nodes: Vec<Expr>) -> Expr {
+    /*
     let n = nodes.len();
 
     let (l, r) = match () {
@@ -948,6 +946,56 @@ pub fn balanced_bitor_max16(mut nodes: Vec<Expr>) -> Expr {
         }
     };
     bit_or(l, r)
+    */
+    balance_merge((), move |_| nodes, bit_or)
+}
+
+/// Generic function for computing an N-way binary operation using a generic seed-value
+/// and generation-function.
+///
+/// The `combine` operation should ideally be invariant under reordering and regrouping
+/// (i.e. commutative and associative) as the internal tree structure of the Expr is not
+/// specified.
+///
+/// Relies on the guarantee that the given seed and initialization function will together
+/// produce a non-empty Vector, and will panic if the resulting vector is empty.
+pub fn balance_merge<Seed, MkNodes, Combine>(
+    seed: Seed,
+    mk_nodes: MkNodes,
+    combine: Combine,
+) -> Expr
+where
+    MkNodes: FnOnce(Seed) -> Vec<Expr>,
+    Combine: Fn(Expr, Expr) -> Expr,
+{
+    let nodes = mk_nodes(seed);
+
+    if nodes.is_empty() {
+        unreachable!("balance_merge: mk_nodes(seed) yielded empty vector");
+    }
+
+    let mut stratum = nodes;
+    loop {
+        match stratum.len() {
+            0 => unreachable!("stratum cannot be empty"),
+            1 => return stratum.drain(..).next().unwrap(),
+            _ => {
+                let mut tmp = Vec::with_capacity(stratum.len().div_ceil(2));
+                let mut it = stratum.drain(..);
+                while let Some(l) = it.next() {
+                    if let Some(r) = it.next() {
+                        tmp.push(combine(l, r));
+                        continue;
+                    } else {
+                        tmp.push(l);
+                        break;
+                    }
+                }
+                std::mem::drop(it);
+                stratum = tmp;
+            }
+        }
+    }
 }
 
 /// Helper function for `Format::AccumUntil`
@@ -968,9 +1016,30 @@ pub fn accum_until(
 }
 
 /// Computes the final element of a sequence-typed Expr, evaluating to None if it is empty
-pub fn seq_opt_last(seq: Expr) -> Expr {
+pub fn seq_last_checked(seq: Expr) -> Expr {
     expr_opt_if(
-        expr_gt(seq_length(seq.clone()), Expr::U32(0)),
-        index_unchecked(seq.clone(), sub(seq_length(seq.clone()), Expr::U32(1))),
+        is_within(seq_length(seq.clone()), Bounds::at_least(1)),
+        index_unchecked(seq.clone(), pred(seq_length(seq))),
+    )
+}
+
+/// Computes the final element of a sequence-typed Expr provided that it is guaranteed to be non-empty.
+///
+/// Will result in a runtime panic if called on an empty sequence.
+pub fn seq_last_unchecked(seq: Expr) -> Expr {
+    index_unchecked(seq.clone(), pred(seq_length(seq)))
+}
+
+/// Returns `true` if the value of `x` is contained by `bounds` and false if it lies outside.
+///
+/// If `x` is not an integral-typed value, will cause a runtime error
+/// when encountered by the interpreter or compiler.
+pub fn is_within(x: Expr, bounds: Bounds) -> Expr {
+    expr_match(
+        x,
+        [
+            (Pattern::Int(bounds), Expr::Bool(true)),
+            (Pattern::Wildcard, Expr::Bool(false)),
+        ],
     )
 }
