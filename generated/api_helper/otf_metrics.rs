@@ -403,7 +403,7 @@ struct NameMetrics {
 struct NameRecord {
     plat_encoding_lang: PlatformEncodingLanguageId,
     name_id: NameId,
-    buf: Option<String>,
+    buf: String,
 }
 
 // STUB - turn into enum?
@@ -695,7 +695,7 @@ impl std::fmt::Display for NameId {
 
 #[derive(Clone, Debug)]
 struct LangTagRecord {
-    lang_tag: Option<String>,
+    lang_tag: String,
 }
 
 #[derive(Clone, Debug)]
@@ -989,8 +989,8 @@ struct AttachPoint {
 
 #[derive(Clone, Debug)]
 struct AttachList {
-    coverage: Option<CoverageTable>,
-    attach_points: Vec<Option<AttachPoint>>,
+    coverage: CoverageTable,
+    attach_points: Vec<AttachPoint>,
 }
 
 impl Promote<OpentypeAttachPoint> for AttachPoint {
@@ -1006,11 +1006,11 @@ type OpentypeAttachList = opentype_gdef_table_attach_list_link;
 impl Promote<OpentypeAttachList> for AttachList {
     fn promote(orig: &OpentypeAttachList) -> Self {
         AttachList {
-            coverage: promote_opt(&orig.coverage.link),
+            coverage: CoverageTable::promote(&orig.coverage.link),
             attach_points: orig
                 .attach_point_offsets
                 .iter()
-                .map(promote_link!())
+                .map(|offset| AttachPoint::promote(&offset.link))
                 .collect(),
         }
     }
@@ -1018,8 +1018,8 @@ impl Promote<OpentypeAttachList> for AttachList {
 
 #[derive(Clone, Debug)]
 struct LigCaretList {
-    coverage: Option<CoverageTable>,
-    lig_glyphs: Vec<Option<LigGlyph>>,
+    coverage: CoverageTable,
+    lig_glyphs: Vec<LigGlyph>,
 }
 
 type OpentypeLigCaretList = opentype_gdef_table_lig_caret_list_link;
@@ -1030,10 +1030,10 @@ impl TryPromote<OpentypeLigCaretList> for LigCaretList {
     fn try_promote(orig: &OpentypeLigCaretList) -> Result<Self, Self::Error> {
         let mut lig_glyphs = Vec::with_capacity(orig.lig_glyph_offsets.len());
         for offset in orig.lig_glyph_offsets.iter() {
-            lig_glyphs.push(try_promote_opt(&offset.link)?);
+            lig_glyphs.push(LigGlyph::try_promote(&offset.link)?);
         }
         Ok(LigCaretList {
-            coverage: promote_opt(&orig.coverage.link),
+            coverage: CoverageTable::promote(&orig.coverage.link),
             lig_glyphs,
         })
     }
@@ -1041,7 +1041,7 @@ impl TryPromote<OpentypeLigCaretList> for LigCaretList {
 
 #[derive(Clone, Debug)]
 struct LigGlyph {
-    caret_values: Vec<Option<CaretValue>>,
+    caret_values: Vec<CaretValue>,
 }
 
 type OpentypeLigGlyph = opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link;
@@ -1052,7 +1052,7 @@ impl TryPromote<OpentypeLigGlyph> for LigGlyph {
     fn try_promote(orig: &OpentypeLigGlyph) -> Result<Self, Self::Error> {
         let mut caret_values = Vec::with_capacity(orig.caret_values.len());
         for offset in orig.caret_values.iter() {
-            caret_values.push(try_promote_opt(&offset.link)?); // &caret_value.data
+            caret_values.push(CaretValue::try_promote(&offset.link)?); // &caret_value.data
         }
         Ok(LigGlyph { caret_values })
     }
@@ -1177,7 +1177,7 @@ enum CaretValue {
     ContourPoint(u16), // Format2
     DesignUnitsWithTable {
         coordinate: u16,
-        device: Option<DeviceOrVariationIndexTable>,
+        device: DeviceOrVariationIndexTable,
     }, // Format3
 }
 
@@ -1253,7 +1253,7 @@ impl TryPromote<OpentypeCaretValue> for CaretValue {
             OpentypeCaretValue::Format3(OpentypeCaretValueFormat3 { coordinate, table }) => {
                 Ok(CaretValue::DesignUnitsWithTable {
                     coordinate: *coordinate,
-                    device: try_promote_opt(&table.link)?,
+                    device: DeviceOrVariationIndexTable::try_promote(&table.link)?,
                 })
             }
         }
@@ -1296,7 +1296,7 @@ impl Promote<OpentypeLangSysRecord> for LangSysRecord {
     fn promote(orig: &OpentypeLangSysRecord) -> Self {
         LangSysRecord {
             lang_sys_tag: orig.lang_sys_tag,
-            lang_sys: promote_opt(&orig.lang_sys.link),
+            lang_sys: LangSys::promote(&orig.lang_sys.link),
         }
     }
 }
@@ -1304,7 +1304,7 @@ impl Promote<OpentypeLangSysRecord> for LangSysRecord {
 #[derive(Clone, Debug)]
 struct LangSysRecord {
     lang_sys_tag: u32,
-    lang_sys: Option<LangSys>,
+    lang_sys: LangSys,
 }
 
 pub type OpentypeScriptTable = opentype_common_script_table;
@@ -1330,7 +1330,7 @@ impl Promote<OpentypeScriptRecord> for ScriptRecord {
     fn promote(orig: &OpentypeScriptRecord) -> Self {
         ScriptRecord {
             script_tag: orig.script_tag,
-            script: promote_opt(&orig.script.link),
+            script: ScriptTable::promote(&orig.script.link),
         }
     }
 }
@@ -1338,7 +1338,7 @@ impl Promote<OpentypeScriptRecord> for ScriptRecord {
 #[derive(Clone, Debug)]
 struct ScriptRecord {
     script_tag: u32,
-    script: Option<ScriptTable>,
+    script: ScriptTable,
 }
 
 pub type OpentypeFeatureTable = opentype_common_feature_table;
@@ -1364,7 +1364,7 @@ impl Promote<OpentypeFeatureRecord> for FeatureRecord {
     fn promote(orig: &OpentypeFeatureRecord) -> Self {
         FeatureRecord {
             feature_tag: orig.feature_tag,
-            feature: promote_opt(&orig.feature.link),
+            feature: FeatureTable::promote(&orig.feature.link),
         }
     }
 }
@@ -1372,7 +1372,7 @@ impl Promote<OpentypeFeatureRecord> for FeatureRecord {
 #[derive(Clone, Debug)]
 struct FeatureRecord {
     feature_tag: u32,
-    feature: Option<FeatureTable>,
+    feature: FeatureTable,
 }
 
 pub type OpentypeGposLookupSubtable =
@@ -1385,7 +1385,9 @@ impl TryPromote<OpentypeGsubLookupSubtable> for LookupSubtable {
 
     fn try_promote(orig: &OpentypeGsubLookupSubtable) -> Result<Self, Self::Error> {
         Ok(match orig {
-            OpentypeGsubLookupSubtable::SingleSubst => LookupSubtable::SingleSubst,
+            OpentypeGsubLookupSubtable::SingleSubst(single_subst) => {
+                LookupSubtable::SingleSubst(SingleSubst::promote(single_subst))
+            }
             OpentypeGsubLookupSubtable::MultipleSubst => LookupSubtable::MultipleSubst,
             OpentypeGsubLookupSubtable::AlternateSubst => LookupSubtable::AlternateSubst,
             OpentypeGsubLookupSubtable::LigatureSubst => LookupSubtable::LigatureSubst,
@@ -1447,12 +1449,76 @@ enum LookupSubtable {
     SequenceContext(SequenceContext),
     ChainedSequenceContext(ChainedSequenceContext),
 
-    SingleSubst,
+    SingleSubst(SingleSubst),
     MultipleSubst,
     AlternateSubst,
     LigatureSubst,
     SubstExtension,
     ReverseChainSingleSubst,
+}
+
+pub type OpentypeSingleSubst =
+    opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_SingleSubst;
+pub type OpentypeSingleSubstInner =
+    opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_SingleSubst_subst;
+pub type OpentypeSingleSubstFormat1 =
+    opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_SingleSubst_subst_Format1;
+pub type OpentypeSingleSubstFormat2 =
+    opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_SingleSubst_subst_Format2;
+
+impl Promote<OpentypeSingleSubst> for SingleSubst {
+    fn promote(orig: &OpentypeSingleSubst) -> Self {
+        SingleSubst::promote(&orig.subst)
+    }
+}
+
+impl Promote<OpentypeSingleSubstInner> for SingleSubst {
+    fn promote(orig: &OpentypeSingleSubstInner) -> Self {
+        match orig {
+            OpentypeSingleSubstInner::Format1(f1) => {
+                SingleSubst::Format1(SingleSubstFormat1::promote(f1))
+            }
+            OpentypeSingleSubstInner::Format2(f2) => {
+                SingleSubst::Format2(SingleSubstFormat2::promote(f2))
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+enum SingleSubst {
+    Format1(SingleSubstFormat1),
+    Format2(SingleSubstFormat2),
+}
+
+impl Promote<OpentypeSingleSubstFormat1> for SingleSubstFormat1 {
+    fn promote(orig: &OpentypeSingleSubstFormat1) -> Self {
+        SingleSubstFormat1 {
+            coverage: CoverageTable::promote(&orig.coverage.link),
+            delta_glyph_id: orig.delta_glyph_id,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct SingleSubstFormat1 {
+    coverage: CoverageTable,
+    delta_glyph_id: s16,
+}
+
+impl Promote<OpentypeSingleSubstFormat2> for SingleSubstFormat2 {
+    fn promote(orig: &OpentypeSingleSubstFormat2) -> Self {
+        SingleSubstFormat2 {
+            coverage: CoverageTable::promote(&orig.coverage.link),
+            substitute_glyph_ids: orig.substitute_glyph_ids.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct SingleSubstFormat2 {
+    coverage: CoverageTable,
+    substitute_glyph_ids: Vec<u16>,
 }
 
 pub type OpentypeChainedSequenceContext = opentype_common_chained_sequence_context;
@@ -1566,7 +1632,7 @@ enum ChainedSequenceContext {
 impl Promote<OpentypeChainedSequenceContextFormat1> for ChainedSequenceContextFormat1 {
     fn promote(orig: &OpentypeChainedSequenceContextFormat1) -> Self {
         ChainedSequenceContextFormat1 {
-            coverage: promote_opt(&orig.coverage.link),
+            coverage: CoverageTable::promote(&orig.coverage.link),
             chained_seq_rule_sets: orig
                 .chained_seq_rule_sets
                 .iter()
@@ -1578,17 +1644,17 @@ impl Promote<OpentypeChainedSequenceContextFormat1> for ChainedSequenceContextFo
 
 #[derive(Debug, Clone)]
 struct ChainedSequenceContextFormat1 {
-    coverage: Option<CoverageTable>,
+    coverage: CoverageTable,
     chained_seq_rule_sets: Vec<Option<ChainedRuleSet<GlyphId>>>,
 }
 
 impl Promote<OpentypeChainedSequenceContextFormat2> for ChainedSequenceContextFormat2 {
     fn promote(orig: &OpentypeChainedSequenceContextFormat2) -> Self {
         Self {
-            coverage: promote_opt(&orig.coverage.link),
-            backtrack_class_def: promote_opt(&orig.backtrack_class_def.link),
-            input_class_def: promote_opt(&orig.input_class_def.link),
-            lookahead_class_def: promote_opt(&orig.lookahead_class_def.link),
+            coverage: CoverageTable::promote(&orig.coverage.link),
+            backtrack_class_def: ClassDef::promote(&orig.backtrack_class_def.link),
+            input_class_def: ClassDef::promote(&orig.input_class_def.link),
+            lookahead_class_def: ClassDef::promote(&orig.lookahead_class_def.link),
             chained_class_seq_rule_sets: orig
                 .chained_class_seq_rule_sets
                 .iter()
@@ -1600,10 +1666,10 @@ impl Promote<OpentypeChainedSequenceContextFormat2> for ChainedSequenceContextFo
 
 #[derive(Debug, Clone)]
 struct ChainedSequenceContextFormat2 {
-    coverage: Option<CoverageTable>,
-    backtrack_class_def: Option<ClassDef>,
-    input_class_def: Option<ClassDef>,
-    lookahead_class_def: Option<ClassDef>,
+    coverage: CoverageTable,
+    backtrack_class_def: ClassDef,
+    input_class_def: ClassDef,
+    lookahead_class_def: ClassDef,
     chained_class_seq_rule_sets: Vec<Option<ChainedRuleSet<ClassId>>>,
 }
 
@@ -1611,8 +1677,10 @@ impl Promote<OpentypeChainedSequenceContextFormat3> for ChainedSequenceContextFo
     fn promote(orig: &OpentypeChainedSequenceContextFormat3) -> Self {
         type OpentypeCoverageTableLink =
             opentype_common_chained_sequence_context_subst_Format1_coverage;
-        let follow = |covs: &Vec<OpentypeCoverageTableLink>| -> Vec<Option<CoverageTable>> {
-            covs.iter().map(promote_link!()).collect()
+        let follow = |covs: &Vec<OpentypeCoverageTableLink>| -> Vec<CoverageTable> {
+            covs.iter()
+                .map(|offset| CoverageTable::promote(&offset.link))
+                .collect()
         };
         Self {
             backtrack_glyph_count: orig.backtrack_glyph_count,
@@ -1629,11 +1697,11 @@ impl Promote<OpentypeChainedSequenceContextFormat3> for ChainedSequenceContextFo
 #[derive(Debug, Clone)]
 struct ChainedSequenceContextFormat3 {
     backtrack_glyph_count: u16, // REVIEW - this field can be re-synthesized from `backtrack_coverages.len()`
-    backtrack_coverages: Vec<Option<CoverageTable>>,
+    backtrack_coverages: Vec<CoverageTable>,
     input_glyph_count: u16, // REVIEW - this field can be re-synthesized from `input_coverages.len()`
-    input_coverages: Vec<Option<CoverageTable>>,
+    input_coverages: Vec<CoverageTable>,
     lookahead_glyph_count: u16, // REVIEW - this field can be re-synthesized from `lookahead_coverages.len()`
-    lookahead_coverages: Vec<Option<CoverageTable>>,
+    lookahead_coverages: Vec<CoverageTable>,
     seq_lookup_records: Vec<SequenceLookup>,
 }
 
@@ -1679,31 +1747,27 @@ type SequenceLookup = OpentypeSequenceLookup;
 impl Promote<OpentypeSequenceContextFormat1> for SequenceContextFormat1 {
     fn promote(orig: &OpentypeSequenceContextFormat1) -> Self {
         Self {
-            coverage: promote_opt(&orig.coverage.link),
-            seq_rule_sets: orig
-                .seq_rule_sets
-                .iter()
-                .map(|offset| promote_opt(&offset.link))
-                .collect(),
+            coverage: CoverageTable::promote(&orig.coverage.link),
+            seq_rule_sets: orig.seq_rule_sets.iter().map(promote_link!()).collect(),
         }
     }
 }
 
 #[derive(Debug, Clone)]
 struct SequenceContextFormat1 {
-    coverage: Option<CoverageTable>,
+    coverage: CoverageTable,
     seq_rule_sets: Vec<Option<RuleSet>>,
 }
 
 impl Promote<OpentypeSequenceContextFormat2> for SequenceContextFormat2 {
     fn promote(orig: &OpentypeSequenceContextFormat2) -> Self {
         Self {
-            coverage: promote_opt(&orig.coverage.link),
-            class_def: promote_opt(&orig.class_def.link),
+            coverage: CoverageTable::promote(&orig.coverage.link),
+            class_def: ClassDef::promote(&orig.class_def.link),
             class_seq_rule_sets: orig
                 .class_seq_rule_sets
                 .iter()
-                .map(|offset| promote_opt(&offset.link))
+                .map(promote_link!())
                 .collect(),
         }
     }
@@ -1711,8 +1775,8 @@ impl Promote<OpentypeSequenceContextFormat2> for SequenceContextFormat2 {
 
 #[derive(Debug, Clone)]
 struct SequenceContextFormat2 {
-    coverage: Option<CoverageTable>,
-    class_def: Option<ClassDef>,
+    coverage: CoverageTable,
+    class_def: ClassDef,
     class_seq_rule_sets: Vec<Option<RuleSet>>,
 }
 
@@ -1723,7 +1787,7 @@ impl Promote<OpentypeSequenceContextFormat3> for SequenceContextFormat3 {
             coverage_tables: orig
                 .coverage_tables
                 .iter()
-                .map(|offset| promote_opt(&offset.link))
+                .map(|offset| CoverageTable::promote(&offset.link))
                 .collect(),
             // NOTE - can only clone here (instead of calling promote) because SequenceLookup := OpentypeSequenceLookup
             // REVIEW - given that Clone => Promote<Self>, do we want to abstract this to avoid the need to refactor if SequenceLookup is redefined (with a manual Promote impl)?
@@ -1735,7 +1799,7 @@ impl Promote<OpentypeSequenceContextFormat3> for SequenceContextFormat3 {
 #[derive(Debug, Clone)]
 struct SequenceContextFormat3 {
     glyph_count: u16,
-    coverage_tables: Vec<Option<CoverageTable>>,
+    coverage_tables: Vec<CoverageTable>,
     seq_lookup_records: Vec<SequenceLookup>,
 }
 
@@ -1744,15 +1808,15 @@ pub type OpentypeRuleSet = opentype_common_sequence_context_subst_Format1_seq_ru
 // REVIEW - if RuleSet becomes an alias instead of a newtype, remove this definition and rename the following impl on Vec<Option<Rule>>
 impl Promote<OpentypeRuleSet> for RuleSet {
     fn promote(orig: &OpentypeRuleSet) -> Self {
-        Self(<Vec<Option<Rule>>>::promote(orig))
+        Self(<Vec<Rule>>::promote(orig))
     }
 }
 
-impl Promote<OpentypeRuleSet> for Vec<Option<Rule>> {
+impl Promote<OpentypeRuleSet> for Vec<Rule> {
     fn promote(orig: &OpentypeRuleSet) -> Self {
         orig.rules
             .iter()
-            .map(|opt_rule| promote_opt(&opt_rule.link))
+            .map(|offset| Rule::promote(&offset.link))
             .collect()
     }
 }
@@ -1760,7 +1824,7 @@ impl Promote<OpentypeRuleSet> for Vec<Option<Rule>> {
 #[derive(Debug, Clone)]
 #[repr(transparent)]
 // REVIEW - should this be a simple type alias instead?
-struct RuleSet(Vec<Option<Rule>>);
+struct RuleSet(Vec<Rule>);
 
 pub type OpentypeRule =
     opentype_common_sequence_context_subst_Format1_seq_rule_sets_link_rules_link;
@@ -1823,7 +1887,7 @@ impl TryPromote<OpentypeCursivePosFormat1> for CursivePosFormat1 {
 
     fn try_promote(orig: &OpentypeCursivePosFormat1) -> Result<Self, Self::Error> {
         Ok(CursivePosFormat1 {
-            coverage: promote_opt(&orig.coverage.link),
+            coverage: CoverageTable::promote(&orig.coverage.link),
             entry_exit_records: try_promote_vec(&orig.entry_exit_records)?,
         })
     }
@@ -1831,7 +1895,7 @@ impl TryPromote<OpentypeCursivePosFormat1> for CursivePosFormat1 {
 
 #[derive(Debug, Clone)]
 struct CursivePosFormat1 {
-    coverage: Option<CoverageTable>,
+    coverage: CoverageTable,
     entry_exit_records: Vec<EntryExitRecord>,
 }
 
@@ -2006,12 +2070,12 @@ impl TryPromote<OpentypePairPosFormat1> for PairPosFormat1 {
     fn try_promote(orig: &OpentypePairPosFormat1) -> Result<Self, Self::Error> {
         let mut pair_sets = Vec::with_capacity(orig.pair_sets.len());
         for offset in orig.pair_sets.iter() {
-            let pair_set = try_promote_opt(&offset.link)?;
+            let pair_set = PairSet::try_promote(&offset.link)?;
             pair_sets.push(pair_set)
         }
 
         Ok(PairPosFormat1 {
-            coverage: promote_opt(&orig.coverage.link),
+            coverage: CoverageTable::promote(&orig.coverage.link),
             pair_sets,
         })
     }
@@ -2031,9 +2095,9 @@ impl TryPromote<OpentypePairPosFormat2> for PairPosFormat2 {
         let class1_records = Wec::from_vec(store, orig.class2_count as usize);
 
         Ok(PairPosFormat2 {
-            coverage: promote_opt(&orig.coverage.link),
-            class_def1: promote_opt(&orig.class_def1.link),
-            class_def2: promote_opt(&orig.class_def2.link),
+            coverage: CoverageTable::promote(&orig.coverage.link),
+            class_def1: ClassDef::promote(&orig.class_def1.link),
+            class_def2: ClassDef::promote(&orig.class_def2.link),
             class1_records,
         })
     }
@@ -2041,15 +2105,15 @@ impl TryPromote<OpentypePairPosFormat2> for PairPosFormat2 {
 
 #[derive(Debug, Clone)]
 struct PairPosFormat1 {
-    coverage: Option<CoverageTable>,
-    pair_sets: Vec<Option<PairSet>>,
+    coverage: CoverageTable,
+    pair_sets: Vec<PairSet>,
 }
 
 #[derive(Debug, Clone)]
 struct PairPosFormat2 {
-    coverage: Option<CoverageTable>,
-    class_def1: Option<ClassDef>,
-    class_def2: Option<ClassDef>,
+    coverage: CoverageTable,
+    class_def1: ClassDef,
+    class_def2: ClassDef,
     class1_records: Class1RecordList,
 }
 
@@ -2160,7 +2224,7 @@ impl TryPromote<OpentypeSinglePosFormat1> for SinglePosFormat1 {
 
     fn try_promote(orig: &OpentypeSinglePosFormat1) -> Result<Self, Self::Error> {
         Ok(SinglePosFormat1 {
-            coverage: promote_opt(&orig.coverage_offset.link),
+            coverage: CoverageTable::promote(&orig.coverage_offset.link),
             value_record: ValueRecord::try_promote(&orig.value_record)?,
         })
     }
@@ -2175,7 +2239,7 @@ impl TryPromote<OpentypeSinglePosFormat2> for SinglePosFormat2 {
             value_records.push(ValueRecord::try_promote(value_record)?);
         }
         Ok(SinglePosFormat2 {
-            coverage: promote_opt(&orig.coverage_offset.link),
+            coverage: CoverageTable::promote(&orig.coverage_offset.link),
             value_records,
         })
     }
@@ -2183,13 +2247,13 @@ impl TryPromote<OpentypeSinglePosFormat2> for SinglePosFormat2 {
 
 #[derive(Debug, Clone)]
 struct SinglePosFormat1 {
-    coverage: Option<CoverageTable>,
+    coverage: CoverageTable,
     value_record: ValueRecord,
 }
 
 #[derive(Debug, Clone)]
 struct SinglePosFormat2 {
-    coverage: Option<CoverageTable>,
+    coverage: CoverageTable,
     value_records: Vec<ValueRecord>,
 }
 
@@ -2210,22 +2274,22 @@ impl TryPromote<OpentypeValueRecord> for ValueRecord {
             x_placement_device: orig
                 .x_placement_device
                 .as_ref()
-                .map(|offset| try_promote_opt(&offset.link))
+                .map(|offset| DeviceOrVariationIndexTable::try_promote(&offset.link))
                 .transpose()?,
             y_placement_device: orig
                 .y_placement_device
                 .as_ref()
-                .map(|offset| try_promote_opt(&offset.link))
+                .map(|offset| DeviceOrVariationIndexTable::try_promote(&offset.link))
                 .transpose()?,
             x_advance_device: orig
                 .x_advance_device
                 .as_ref()
-                .map(|offset| try_promote_opt(&offset.link))
+                .map(|offset| DeviceOrVariationIndexTable::try_promote(&offset.link))
                 .transpose()?,
             y_advance_device: orig
                 .y_advance_device
                 .as_ref()
-                .map(|offset| try_promote_opt(&offset.link))
+                .map(|offset| DeviceOrVariationIndexTable::try_promote(&offset.link))
                 .transpose()?,
         })
     }
@@ -2237,10 +2301,10 @@ struct ValueRecord {
     y_placement: Option<i16>,
     x_advance: Option<i16>,
     y_advance: Option<i16>,
-    x_placement_device: Option<Option<DeviceOrVariationIndexTable>>,
-    y_placement_device: Option<Option<DeviceOrVariationIndexTable>>,
-    x_advance_device: Option<Option<DeviceOrVariationIndexTable>>,
-    y_advance_device: Option<Option<DeviceOrVariationIndexTable>>,
+    x_placement_device: Option<DeviceOrVariationIndexTable>,
+    y_placement_device: Option<DeviceOrVariationIndexTable>,
+    x_advance_device: Option<DeviceOrVariationIndexTable>,
+    y_advance_device: Option<DeviceOrVariationIndexTable>,
 }
 
 type LookupFlag = opentype_gsub_table_lookup_list_link_lookups_link_lookup_flag;
@@ -2255,7 +2319,7 @@ impl TryPromote<OpentypeGposLookupTable> for LookupTable {
     fn try_promote(orig: &OpentypeGposLookupTable) -> Result<Self, Self::Error> {
         let mut subtables = Vec::with_capacity(orig.subtables.len());
         for offset in orig.subtables.iter() {
-            subtables.push(try_promote_opt(&offset.link)?);
+            subtables.push(LookupSubtable::try_promote(&offset.link)?);
         }
 
         Ok(LookupTable {
@@ -2277,7 +2341,7 @@ impl TryPromote<OpentypeGsubLookupTable> for LookupTable {
     fn try_promote(orig: &OpentypeGsubLookupTable) -> Result<Self, Self::Error> {
         let mut subtables = Vec::with_capacity(orig.subtables.len());
         for offset in orig.subtables.iter() {
-            subtables.push(try_promote_opt(&offset.link)?);
+            subtables.push(LookupSubtable::try_promote(&offset.link)?);
         }
 
         Ok(LookupTable {
@@ -2293,13 +2357,13 @@ impl TryPromote<OpentypeGsubLookupTable> for LookupTable {
 struct LookupTable {
     lookup_type: u16,
     lookup_flag: LookupFlag,
-    subtables: Vec<Option<LookupSubtable>>,
+    subtables: Vec<LookupSubtable>,
     mark_filtering_set: Option<u16>,
 }
 
 type ScriptList = Vec<ScriptRecord>;
 type FeatureList = Vec<FeatureRecord>;
-type LookupList = Vec<Option<LookupTable>>;
+type LookupList = Vec<LookupTable>;
 
 pub type OpentypeScriptList = opentype_common_script_list;
 pub type OpentypeFeatureList = opentype_common_feature_list;
@@ -2325,7 +2389,7 @@ impl TryPromote<OpentypeGposLookupList> for LookupList {
     fn try_promote(orig: &OpentypeGposLookupList) -> Result<Self, Self::Error> {
         let mut accum = Vec::with_capacity(orig.lookups.len());
         for offset in orig.lookups.iter() {
-            accum.push(try_promote_opt(&offset.link)?);
+            accum.push(LookupTable::try_promote(&offset.link)?);
         }
         Ok(accum)
     }
@@ -2337,7 +2401,7 @@ impl TryPromote<OpentypeGsubLookupList> for LookupList {
     fn try_promote(orig: &OpentypeGsubLookupList) -> Result<Self, Self::Error> {
         let mut accum = Vec::with_capacity(orig.lookups.len());
         for offset in orig.lookups.iter() {
-            accum.push(try_promote_opt(&offset.link)?);
+            accum.push(LookupTable::try_promote(&offset.link)?);
         }
         Ok(accum)
     }
@@ -2348,9 +2412,9 @@ impl TryPromote<OpentypeGsubLookupList> for LookupList {
 struct LayoutMetrics {
     major_version: u16,
     minor_version: u16,
-    script_list: Option<ScriptList>,
-    feature_list: Option<FeatureList>,
-    lookup_list: Option<LookupList>,
+    script_list: ScriptList,
+    feature_list: FeatureList,
+    lookup_list: LookupList,
 }
 
 #[derive(Clone, Debug)]
@@ -2536,10 +2600,7 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
                         record.encoding,
                         record.language,
                     ))?;
-                    let buf = match &record.offset.link {
-                        Some(link) => Some(plat_encoding_lang.convert(&link)),
-                        None => None,
-                    };
+                    let buf = plat_encoding_lang.convert(&record.offset.link);
                     tmp.push(NameRecord {
                         plat_encoding_lang,
                         name_id: NameId(record.name_id),
@@ -2554,10 +2615,7 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
                     opentype_name_table_data::NameVersion1(v1data) => {
                         let mut tmp = Vec::with_capacity(v1data.lang_tag_records.len());
                         for record in v1data.lang_tag_records.iter() {
-                            let lang_tag = match &record.offset.link {
-                                Some(link) => Some(utf16be_convert(&link)),
-                                None => None,
-                            };
+                            let lang_tag = utf16be_convert(&record.offset.link);
                             tmp.push(LangTagRecord { lang_tag })
                         }
                         Some(tmp)
@@ -2698,9 +2756,9 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
                     TestResult::Ok(LayoutMetrics {
                         major_version: gpos.major_version,
                         minor_version: gpos.minor_version,
-                        script_list: try_promote_opt(&gpos.script_list.link)?,
-                        feature_list: try_promote_opt(&gpos.feature_list.link)?,
-                        lookup_list: try_promote_opt(&gpos.lookup_list.link)?,
+                        script_list: ScriptList::try_promote(&gpos.script_list.link)?,
+                        feature_list: FeatureList::try_promote(&gpos.feature_list.link)?,
+                        lookup_list: LookupList::try_promote(&gpos.lookup_list.link)?,
                     })
                 })
                 .transpose()?
@@ -2712,9 +2770,9 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
                     TestResult::Ok(LayoutMetrics {
                         major_version: gsub.major_version,
                         minor_version: gsub.minor_version,
-                        script_list: try_promote_opt(&gsub.script_list.link)?,
-                        feature_list: try_promote_opt(&gsub.feature_list.link)?,
-                        lookup_list: try_promote_opt(&gsub.lookup_list.link)?,
+                        script_list: ScriptList::try_promote(&gsub.script_list.link)?,
+                        feature_list: FeatureList::try_promote(&gsub.feature_list.link)?,
+                        lookup_list: LookupList::try_promote(&gsub.lookup_list.link)?,
                     })
                 })
                 .transpose()?
@@ -2937,15 +2995,9 @@ fn show_layout_metrics(gpos: &Option<LayoutMetrics>, ctxt: Ctxt, conf: &Config) 
             format_table_disc(ctxt.get_disc().expect("Ctxt missing TableDiscriminator")),
             format_version_major_minor(*major_version, *minor_version)
         );
-        if let Some(script_list) = script_list {
-            show_script_list(&script_list, conf);
-        }
-        if let Some(feature_list) = feature_list {
-            show_feature_list(&feature_list, conf);
-        }
-        if let Some(lookup_list) = lookup_list {
-            show_lookup_list(&lookup_list, ctxt, conf);
-        }
+        show_script_list(&script_list, conf);
+        show_feature_list(&feature_list, conf);
+        show_lookup_list(&lookup_list, ctxt, conf);
     }
 }
 
@@ -2956,19 +3008,17 @@ fn show_script_list(script_list: &ScriptList, conf: &Config) {
         println!("\tScriptList");
         show_items_elided(
             script_list,
-            |ix, item| match &item.script {
-                None => println!("\t\t[{ix}]: {}", format_magic(item.script_tag)),
-                Some(ScriptTable {
+            |ix, item| {
+                let ScriptTable {
                     default_lang_sys,
                     lang_sys_records,
-                }) => {
-                    println!("\t\t[{ix}]: {}", format_magic(item.script_tag));
-                    if let Some(langsys) = default_lang_sys {
-                        print!("\t\t    [Default LangSys]: ");
-                        show_langsys(langsys, conf);
-                    }
-                    show_lang_sys_records(lang_sys_records, conf)
+                } = &item.script;
+                println!("\t\t[{ix}]: {}", format_magic(item.script_tag));
+                if let Some(langsys) = default_lang_sys {
+                    print!("\t\t    [Default LangSys]: ");
+                    show_langsys(langsys, conf);
                 }
+                show_lang_sys_records(lang_sys_records, conf)
             },
             conf.bookend_size,
             |start, stop| format!("skipping ScriptRecords {}..{}", start, stop),
@@ -2984,11 +3034,8 @@ fn show_lang_sys_records(lang_sys_records: &[LangSysRecord], conf: &Config) {
         show_items_elided(
             lang_sys_records,
             |ix, item| {
-                print!("\t\t\t[{ix}]: {}", format_magic(item.lang_sys_tag));
-                if let Some(langsys) = &item.lang_sys {
-                    print!("; ");
-                    show_langsys(langsys, conf);
-                }
+                print!("\t\t\t[{ix}]: {}; ", format_magic(item.lang_sys_tag));
+                show_langsys(&item.lang_sys, conf);
             },
             conf.bookend_size,
             |start, stop| format!("\t\t    (skipping LangSysRecords {}..{})", start, stop),
@@ -3027,13 +3074,8 @@ fn show_feature_list(feature_list: &FeatureList, conf: &Config) {
                     feature_tag,
                     feature,
                 } = item;
-                match feature {
-                    None => println!("\t\t[{ix}]: {} (<none>)", format_magic(*feature_tag)),
-                    Some(feature_table) => {
-                        print!("\t\t[{ix}]: {}", format_magic(*feature_tag));
-                        show_feature_table(feature_table, conf);
-                    }
-                }
+                print!("\t\t[{ix}]: {}", format_magic(*feature_tag));
+                show_feature_table(feature, conf);
             },
             conf.bookend_size,
             |start, stop| format!("\t    (skipping FeatureIndices {}..{})", start, stop),
@@ -3062,12 +3104,9 @@ fn show_lookup_list(lookup_list: &LookupList, ctxt: Ctxt, conf: &Config) {
     println!("\tLookupList:");
     show_items_elided(
         lookup_list,
-        move |ix, item| match item {
-            None => println!("\t\t[{ix}]: <none>"),
-            Some(table) => {
-                print!("\t\t[{ix}]: ");
-                show_lookup_table(table, ctxt, conf);
-            }
+        move |ix, table| {
+            print!("\t\t[{ix}]: ");
+            show_lookup_table(table, ctxt, conf);
         },
         conf.bookend_size,
         |start, stop| format!("\t    (skipping LookupTables {}..{})", start, stop),
@@ -3096,291 +3135,209 @@ fn show_lookup_table(table: &LookupTable, ctxt: Ctxt, conf: &Config) {
 
 // ANCHOR[format-lookup-subtable]
 fn format_lookup_subtable(
-    subtable: &Option<LookupSubtable>,
+    subtable: &LookupSubtable,
     show_lookup_type: bool,
     _conf: &Config,
 ) -> String {
     // STUB - because the subtables are both partial (more variants exist) and abridged (existing variants are missing details), reimplement as necessary
-    if let Some(subtable) = subtable {
-        let (label, contents) = match subtable {
-            LookupSubtable::SinglePos(single_pos) => {
-                let contents = {
-                    match single_pos {
-                        SinglePos::Format1(SinglePosFormat1 { value_record, .. }) => {
-                            // REVIEW - when there is a single value, show it instead of the Coverage
-                            format!("single({})", format_value_record(value_record))
-                        }
-                        SinglePos::Format2(SinglePosFormat2 {
-                            coverage,
-                            value_records,
-                        }) => {
-                            // REVIEW - when there are multiple values, show the Coverage instead of the value
-                            if let Some(coverage_table) = coverage {
-                                format!("array({})", format_coverage_table(coverage_table))
-                            } else {
-                                assert!(value_records.is_empty(), "value_records is non-empty but has no coverage-table to correspond to");
-                                format!("array[0]")
-                            }
-                        }
+    let (label, contents) = match subtable {
+        LookupSubtable::SinglePos(single_pos) => {
+            let contents = {
+                match single_pos {
+                    SinglePos::Format1(SinglePosFormat1 { value_record, .. }) => {
+                        format!("single({})", format_value_record(value_record))
                     }
-                };
-                ("SinglePos", contents)
-            }
-            LookupSubtable::PairPos(pair_pos) => {
-                let contents = {
-                    match pair_pos {
-                        PairPos::Format1(PairPosFormat1 {
-                            coverage,
-                            pair_sets,
-                        }) => {
-                            if let Some(coverage_table) = coverage {
-                                format!("byGlyph({})", format_coverage_table(coverage_table))
-                            } else {
-                                assert!(pair_sets.is_empty(), "pair_sets is non-empty but has no coverage-table to correspond to");
-                                format!("byGlyph[0]")
-                            }
-                        }
-                        PairPos::Format2(PairPosFormat2 {
-                            coverage,
-                            class_def1,
-                            class_def2,
-                            class1_records,
-                        }) => {
-                            let rows = class1_records.rows();
-                            let cols = class1_records.width();
-
-                            validate_class_count(class_def1, rows);
-                            validate_class_count(class_def2, cols);
-
-                            if let Some(coverage_table) = coverage {
-                                // REVIEW - if not too verbose, we might want a compact overview of the Class1Record array, specifically which index-pairs constitute actual adjustments
-                                let _populated_class_pairs: Vec<(usize, usize)> = {
-                                    Iterator::zip(0..rows, 0..cols)
-                                        .filter(|ixpair| {
-                                            let it = &class1_records[*ixpair];
-                                            it.value_record1.is_some() || it.value_record2.is_some()
-                                        })
-                                        .collect()
-                                };
-                                // maximum number of index-pairs we are willing to display inline (chosen arbitrarily)
-                                // TODO - should this be a more general parameter in the Config type?
-                                const MAX_POPULATION: usize = 3;
-                                if _populated_class_pairs.len() <= MAX_POPULATION {
-                                    format!(
-                                        "byClass{:?}({})",
-                                        _populated_class_pairs,
-                                        format_coverage_table(coverage_table)
-                                    )
-                                } else {
-                                    format!(
-                                        "byClass[{} ∈ {rows} x {cols}]({})",
-                                        _populated_class_pairs.len(),
-                                        format_coverage_table(coverage_table)
-                                    )
-                                }
-                            } else {
-                                assert!(class1_records.is_empty(), "class1_records is non-empty but has no coverage-table to correspond to");
-                                format!("byClass[0 x 0]")
-                            }
-                        }
+                    SinglePos::Format2(SinglePosFormat2 { coverage, .. }) => {
+                        format!("array({})", format_coverage_table(coverage))
                     }
-                };
-                ("PairPos", contents)
-            }
-            LookupSubtable::CursivePos(cursive_pos) => {
-                let contents = {
-                    match cursive_pos {
-                        CursivePos::Format1(CursivePosFormat1 {
-                            coverage,
-                            entry_exit_records,
-                        }) => {
-                            if let Some(coverage_table) = coverage {
-                                format!("entryExit({})", format_coverage_table(coverage_table))
-                            } else {
-                                assert!(entry_exit_records.is_empty(), "non-empty entry_exit_records array has no coverage table to correspond to");
-                                format!("entryExit[0]")
-                            }
-                        }
-                    }
-                };
-                ("CursivePos", contents)
-            }
-            LookupSubtable::MarkBasePos => ("MarkBasePos", format!("(..)")),
-            LookupSubtable::MarkLigPos => ("MarkLigPos", format!("(..)")),
-            LookupSubtable::MarkMarkPos => ("MarkMarkPos", format!("(..)")),
-            LookupSubtable::PosExtension => ("PosExt", format!("(..)")),
-
-            LookupSubtable::SingleSubst => ("SingleSubst", format!("(..)")),
-            LookupSubtable::MultipleSubst => ("MultipleSubst", format!("(..)")),
-            LookupSubtable::AlternateSubst => ("AlternateSubst", format!("(..)")),
-            LookupSubtable::LigatureSubst => ("LigatureSubst", format!("(..)")),
-            LookupSubtable::SubstExtension => ("SubstExt", format!("(..)")),
-            LookupSubtable::ReverseChainSingleSubst => ("RevChainSingleSubst", format!("(..)")),
-
-            LookupSubtable::SequenceContext(seq_ctx) => {
-                let contents = match seq_ctx {
-                    SequenceContext::Format1(SequenceContextFormat1 {
-                        coverage,
-                        seq_rule_sets,
-                    }) => {
-                        if let Some(coverage_table) = coverage {
-                            format!("Glyphs({})", format_coverage_table(coverage_table))
-                        } else {
-                            assert!(
-                                seq_rule_sets.is_empty(),
-                                "non-empty seq_rule_sets has no coverage table to correspond to"
-                            );
-                            format!("Glyphs[0]")
-                        }
-                    }
-                    SequenceContext::Format2(SequenceContextFormat2 {
-                        coverage,
-                        class_seq_rule_sets,
-                        ..
-                    }) => {
-                        if let Some(coverage_table) = coverage {
-                            format!("Classes({})", format_coverage_table(coverage_table))
-                        } else {
-                            assert!(class_seq_rule_sets.is_empty(), "non-empty class_seq_rule_sets has no coverage table to correspond to");
-                            format!("Classes[0]")
-                        }
-                    }
-                    SequenceContext::Format3(SequenceContextFormat3 {
-                        coverage_tables,
-                        seq_lookup_records,
-                        ..
-                    }) => {
-                        // REVIEW - since we are already within an inline elision context, try to avoid taking up too much space per item, but this might not want to be a hardcoded value
-                        const INLINE_INLINE_BOOKEND: usize = 1;
-                        // FIXME - show_lookup_table calls this function through show_items_inline already, so we might want to reduce how many values we are willing to show proportionally
-                        let input_pattern = format_items_inline(
-                            coverage_tables,
-                            |cov| {
-                                if let Some(coverage_table) = cov {
-                                    format_coverage_table(coverage_table)
-                                } else {
-                                    String::from("[]")
-                                }
-                            },
-                            INLINE_INLINE_BOOKEND,
-                            |n| format!("(..{n}..)"),
-                        );
-                        let seq_lookups = format_items_inline(
-                            seq_lookup_records,
-                            |seq_lookup| format_sequence_lookup(seq_lookup),
-                            INLINE_INLINE_BOOKEND,
-                            |n| format!("(..{n}..)"),
-                        );
-                        format!("{input_pattern}=>{seq_lookups}")
-                    }
-                };
-                ("SeqCtx", contents)
-            }
-            LookupSubtable::ChainedSequenceContext(chain_ctx) => {
-                let contents = match chain_ctx {
-                    ChainedSequenceContext::Format1(ChainedSequenceContextFormat1 {
-                        coverage,
-                        chained_seq_rule_sets,
-                    }) => {
-                        if let Some(coverage_table) = coverage {
-                            // TODO - even if it means overly verbose output, this might be too little info to be useful compared to discriminant-only display
-                            format!("ChainedGlyphs({})", format_coverage_table(coverage_table))
-                        } else {
-                            assert!(chained_seq_rule_sets.is_empty(), "non-empty chained_seq_rule_sets has no coverage table to correspond to");
-                            format!("ChainedGlyphs[0]")
-                        }
-                    }
-                    ChainedSequenceContext::Format2(ChainedSequenceContextFormat2 {
-                        coverage,
-                        chained_class_seq_rule_sets,
-                        ..
-                    }) => {
-                        if let Some(coverage_table) = coverage {
-                            // TODO - even if it means overly verbose output, this might be too little info to be useful compared to discriminant-only display
-                            // REVIEW - consider what other details (e.g. class-def summary metrics) to show in implicitly- or explictly-verbose display format
-                            format!("ChainedClasses({})", format_coverage_table(coverage_table))
-                        } else {
-                            assert!(chained_class_seq_rule_sets.is_empty(), "non-empty chained_class_seq_rule_sets has no coverage table to correspond to");
-                            format!("ChainedClases[0]")
-                        }
-                    }
-                    ChainedSequenceContext::Format3(ChainedSequenceContextFormat3 {
-                        backtrack_coverages,
-                        input_coverages,
-                        lookahead_coverages,
-                        seq_lookup_records,
-                        ..
-                    }) => {
-                        // REVIEW - since we are already within an inline elision context, try to avoid taking up too much space per item, but this might not want to be a hardcoded value
-                        const INLINE_INLINE_BOOKEND: usize = 1;
-                        // FIXME - show_lookup_table calls this function through show_items_inline already, so we might want to reduce how many values we are willing to show proportionally
-                        let backtrack_pattern = if backtrack_coverages.is_empty() {
-                            String::new()
-                        } else {
-                            let tmp = format_items_inline(
-                                backtrack_coverages,
-                                |cov| {
-                                    if let Some(coverage_table) = cov {
-                                        format_coverage_table(coverage_table)
-                                    } else {
-                                        String::from("[]")
-                                    }
-                                },
-                                INLINE_INLINE_BOOKEND,
-                                |n| format!("(..{n}..)"),
-                            );
-                            format!("(?<={tmp})")
-                        };
-                        let input_pattern = format_items_inline(
-                            input_coverages,
-                            |cov| {
-                                if let Some(coverage_table) = cov {
-                                    format_coverage_table(coverage_table)
-                                } else {
-                                    String::from("[]")
-                                }
-                            },
-                            INLINE_INLINE_BOOKEND,
-                            |n| format!("(..{n}..)"),
-                        );
-                        let lookahead_pattern = if lookahead_coverages.is_empty() {
-                            String::new()
-                        } else {
-                            let tmp = format_items_inline(
-                                lookahead_coverages,
-                                |cov| {
-                                    if let Some(coverage_table) = cov {
-                                        format_coverage_table(coverage_table)
-                                    } else {
-                                        String::from("[]")
-                                    }
-                                },
-                                INLINE_INLINE_BOOKEND,
-                                |n| format!("(..{n}..)"),
-                            );
-                            format!("(?={tmp})")
-                        };
-                        let seq_lookups = format_items_inline(
-                            seq_lookup_records,
-                            |seq_lookup| format_sequence_lookup(seq_lookup),
-                            INLINE_INLINE_BOOKEND,
-                            |n| format!("(..{n}..)"),
-                        );
-                        format!(
-                            "{backtrack_pattern}{input_pattern}{lookahead_pattern}=>{seq_lookups}"
-                        )
-                    }
-                };
-                ("ChainSeqCtx", contents)
-            }
-        };
-        if show_lookup_type {
-            format!("{label}{contents}")
-        } else {
-            contents
+                }
+            };
+            ("SinglePos", contents)
         }
+        LookupSubtable::PairPos(pair_pos) => {
+            let contents = {
+                match pair_pos {
+                    PairPos::Format1(PairPosFormat1 { coverage, .. }) => {
+                        format!("byGlyph({})", format_coverage_table(coverage))
+                    }
+                    PairPos::Format2(PairPosFormat2 {
+                        coverage,
+                        class_def1,
+                        class_def2,
+                        class1_records,
+                    }) => {
+                        let rows = class1_records.rows();
+                        let cols = class1_records.width();
+
+                        validate_class_count(class_def1, rows);
+                        validate_class_count(class_def2, cols);
+
+                        // REVIEW - if not too verbose, we might want a compact overview of the Class1Record array, specifically which index-pairs constitute actual adjustments
+                        let _populated_class_pairs: Vec<(usize, usize)> = {
+                            Iterator::zip(0..rows, 0..cols)
+                                .filter(|ixpair| {
+                                    let it = &class1_records[*ixpair];
+                                    it.value_record1.is_some() || it.value_record2.is_some()
+                                })
+                                .collect()
+                        };
+                        // maximum number of index-pairs we are willing to display inline (chosen arbitrarily)
+                        // TODO - should this be a more general parameter in the Config type?
+                        const MAX_POPULATION: usize = 3;
+                        if _populated_class_pairs.len() <= MAX_POPULATION {
+                            format!(
+                                "byClass{:?}({})",
+                                _populated_class_pairs,
+                                format_coverage_table(coverage)
+                            )
+                        } else {
+                            format!(
+                                "byClass[{} ∈ {rows} x {cols}]({})",
+                                _populated_class_pairs.len(),
+                                format_coverage_table(coverage)
+                            )
+                        }
+                    }
+                }
+            };
+            ("PairPos", contents)
+        }
+        LookupSubtable::CursivePos(cursive_pos) => {
+            let contents = {
+                match cursive_pos {
+                    CursivePos::Format1(CursivePosFormat1 { coverage, .. }) => {
+                        format!("entryExit({})", format_coverage_table(coverage))
+                    }
+                }
+            };
+            ("CursivePos", contents)
+        }
+        LookupSubtable::MarkBasePos => ("MarkBasePos", format!("(..)")),
+        LookupSubtable::MarkLigPos => ("MarkLigPos", format!("(..)")),
+        LookupSubtable::MarkMarkPos => ("MarkMarkPos", format!("(..)")),
+        LookupSubtable::PosExtension => ("PosExt", format!("(..)")),
+
+        LookupSubtable::SingleSubst(single_subst) => {
+            let contents = match single_subst {
+                // STUB[placeholder]
+                _ => format!("(..)"),
+            };
+            ("SingleSubst", contents)
+        }
+        LookupSubtable::MultipleSubst => ("MultipleSubst", format!("(..)")),
+        LookupSubtable::AlternateSubst => ("AlternateSubst", format!("(..)")),
+        LookupSubtable::LigatureSubst => ("LigatureSubst", format!("(..)")),
+        LookupSubtable::SubstExtension => ("SubstExt", format!("(..)")),
+        LookupSubtable::ReverseChainSingleSubst => ("RevChainSingleSubst", format!("(..)")),
+
+        LookupSubtable::SequenceContext(seq_ctx) => {
+            let contents = match seq_ctx {
+                SequenceContext::Format1(SequenceContextFormat1 {
+                    coverage,
+                    seq_rule_sets,
+                }) => format!("Glyphs({})", format_coverage_table(coverage)),
+                SequenceContext::Format2(SequenceContextFormat2 {
+                    coverage,
+                    class_seq_rule_sets,
+                    ..
+                }) => format!("Classes({})", format_coverage_table(coverage)),
+                SequenceContext::Format3(SequenceContextFormat3 {
+                    coverage_tables,
+                    seq_lookup_records,
+                    ..
+                }) => {
+                    // REVIEW - since we are already within an inline elision context, try to avoid taking up too much space per item, but this might not want to be a hardcoded value
+                    const INLINE_INLINE_BOOKEND: usize = 1;
+                    // FIXME - show_lookup_table calls this function through show_items_inline already, so we might want to reduce how many values we are willing to show proportionally
+                    let input_pattern = format_items_inline(
+                        coverage_tables,
+                        |cov| format_coverage_table(cov),
+                        INLINE_INLINE_BOOKEND,
+                        |n| format!("(..{n}..)"),
+                    );
+                    let seq_lookups = format_items_inline(
+                        seq_lookup_records,
+                        |seq_lookup| format_sequence_lookup(seq_lookup),
+                        INLINE_INLINE_BOOKEND,
+                        |n| format!("(..{n}..)"),
+                    );
+                    format!("{input_pattern}=>{seq_lookups}")
+                }
+            };
+            ("SeqCtx", contents)
+        }
+        LookupSubtable::ChainedSequenceContext(chain_ctx) => {
+            let contents = match chain_ctx {
+                ChainedSequenceContext::Format1(ChainedSequenceContextFormat1 {
+                    coverage,
+                    chained_seq_rule_sets,
+                }) => {
+                    // TODO - even if it means overly verbose output, this might be too little info to be useful compared to discriminant-only display
+                    format!("ChainedGlyphs({})", format_coverage_table(coverage))
+                }
+                ChainedSequenceContext::Format2(ChainedSequenceContextFormat2 {
+                    coverage,
+                    chained_class_seq_rule_sets,
+                    ..
+                }) => {
+                    // TODO - even if it means overly verbose output, this might be too little info to be useful compared to discriminant-only display
+                    // REVIEW - consider what other details (e.g. class-def summary metrics) to show in implicitly- or explictly-verbose display format
+                    format!("ChainedClasses({})", format_coverage_table(coverage))
+                }
+                ChainedSequenceContext::Format3(ChainedSequenceContextFormat3 {
+                    backtrack_coverages,
+                    input_coverages,
+                    lookahead_coverages,
+                    seq_lookup_records,
+                    ..
+                }) => {
+                    // REVIEW - since we are already within an inline elision context, try to avoid taking up too much space per item, but this might not want to be a hardcoded value
+                    const INLINE_INLINE_BOOKEND: usize = 1;
+                    // FIXME - show_lookup_table calls this function through show_items_inline already, so we might want to reduce how many values we are willing to show proportionally
+                    let backtrack_pattern = if backtrack_coverages.is_empty() {
+                        String::new()
+                    } else {
+                        let tmp = format_items_inline(
+                            backtrack_coverages,
+                            format_coverage_table,
+                            INLINE_INLINE_BOOKEND,
+                            |n| format!("(..{n}..)"),
+                        );
+                        format!("(?<={tmp})")
+                    };
+                    let input_pattern = format_items_inline(
+                        input_coverages,
+                        format_coverage_table,
+                        INLINE_INLINE_BOOKEND,
+                        |n| format!("(..{n}..)"),
+                    );
+                    let lookahead_pattern = if lookahead_coverages.is_empty() {
+                        String::new()
+                    } else {
+                        let tmp = format_items_inline(
+                            lookahead_coverages,
+                            format_coverage_table,
+                            INLINE_INLINE_BOOKEND,
+                            |n| format!("(..{n}..)"),
+                        );
+                        format!("(?={tmp})")
+                    };
+                    let seq_lookups = format_items_inline(
+                        seq_lookup_records,
+                        |seq_lookup| format_sequence_lookup(seq_lookup),
+                        INLINE_INLINE_BOOKEND,
+                        |n| format!("(..{n}..)"),
+                    );
+                    format!("{backtrack_pattern}{input_pattern}{lookahead_pattern}=>{seq_lookups}")
+                }
+            };
+            ("ChainSeqCtx", contents)
+        }
+    };
+    if show_lookup_type {
+        format!("{label}{contents}")
     } else {
-        format!("<none>")
+        contents
     }
 }
 
@@ -3393,12 +3350,7 @@ fn format_sequence_lookup(sl: &SequenceLookup) -> String {
 /// Checks that the given ClassDef (assumed to be Some) contains the expected number of classes.
 ///
 /// Panics if opt_classdef is None.
-fn validate_class_count(opt_classdef: &Option<ClassDef>, expected_classes: usize) {
-    let Some(class_def) = opt_classdef else {
-        unreachable!(
-            "validate_class_count: expecting {expected_classes}-class ClassDef, found None instead"
-        )
-    };
+fn validate_class_count(class_def: &ClassDef, expected_classes: usize) {
     match class_def {
         ClassDef::Format1 {
             class_value_array,
@@ -3461,13 +3413,7 @@ fn format_value_record(record: &ValueRecord) -> String {
     let mut buf = Vec::<String>::with_capacity(NUM_FRAGMENTS);
 
     // helper to indicate whether a field exists
-    let elide = |opt_val: &Option<Option<_>>| -> Option<&'static str> {
-        match opt_val {
-            None => None,
-            Some(None) => Some("none"),
-            Some(Some(_)) => Some("some(..)"),
-        }
-    };
+    let elide = |opt_val: &Option<_>| -> Option<&'static str> { opt_val.as_ref().map(|_| "(..)") };
 
     buf.extend(format_opt_xy("placement", *x_placement, *y_placement));
     buf.extend(format_opt_xy("advance", *x_advance, *y_advance));
@@ -3600,27 +3546,19 @@ fn show_item_variation_store(ivs: &ItemVariationStore) {
 
 fn show_lig_caret_list(lig_caret_list: &LigCaretList, conf: &Config) {
     println!("\tLigCaretList:");
-    if let Some(ref coverage) = lig_caret_list.coverage {
-        // NOTE - since coverage tables are used in MarkGlyphSet, we don't want to force-indent within the `show_coverage_table` function, so we do it before instead.
-        print!("\t\t");
-        show_coverage_table(coverage, conf);
-    }
+    // NOTE - since coverage tables are used in MarkGlyphSet, we don't want to force-indent within the `show_coverage_table` function, so we do it before instead.
+    print!("\t\t");
+    show_coverage_table(&lig_caret_list.coverage, conf);
     show_items_elided(
         &lig_caret_list.lig_glyphs,
-        |ix, opt_lig_glyph| match opt_lig_glyph {
-            Some(lig_glyph) => {
-                print!("\t\t[{ix}]: ");
-                show_items_inline(
-                    &lig_glyph.caret_values,
-                    |opt_caret_value| match opt_caret_value {
-                        Some(cv) => format_caret_value(cv),
-                        None => format!("<none>"),
-                    },
-                    conf.inline_bookend,
-                    |num_skipped| format!("...({num_skipped})..."),
-                )
-            }
-            None => println!("\t\t[{ix}]: <no lig glyphs>"),
+        |ix, lig_glyph| {
+            print!("\t\t[{ix}]: ");
+            show_items_inline(
+                &lig_glyph.caret_values,
+                format_caret_value,
+                conf.inline_bookend,
+                |num_skipped| format!("...({num_skipped})..."),
+            )
         },
         conf.bookend_size,
         |start, stop| format!("\t    (skipping LigGlyphs {}..{})", start, stop),
@@ -3633,19 +3571,16 @@ fn format_caret_value(cv: &CaretValue) -> String {
         CaretValue::DesignUnits(du) => format!("{du}du"),
         CaretValue::ContourPoint(ix) => format!("#{ix}"),
         CaretValue::DesignUnitsWithTable { coordinate, device } => match device {
-            None => format!("{}du", coordinate),
-            Some(dev) => match dev {
-                DeviceOrVariationIndexTable::DeviceTable(dev_table) => {
-                    format!("{}du+[{}]", coordinate, format_device_table(dev_table))
-                }
-                DeviceOrVariationIndexTable::VariationIndexTable(var_ix_table) => {
-                    format!(
-                        "{}du+[{}]",
-                        coordinate,
-                        format_variation_index_table(var_ix_table)
-                    )
-                }
-            },
+            DeviceOrVariationIndexTable::DeviceTable(dev_table) => {
+                format!("{}du+[{}]", coordinate, format_device_table(dev_table))
+            }
+            DeviceOrVariationIndexTable::VariationIndexTable(var_ix_table) => {
+                format!(
+                    "{}du+[{}]",
+                    coordinate,
+                    format_variation_index_table(var_ix_table)
+                )
+            }
         },
     }
 }
@@ -3664,24 +3599,19 @@ fn format_variation_index_table(var_ix_table: &VariationIndexTable) -> String {
 
 fn show_attach_list(attach_list: &AttachList, conf: &Config) {
     println!("\tAttachList:");
-    if let Some(ref coverage) = attach_list.coverage {
-        // NOTE - since coverage tables are used in MarkGlyphSet, we don't want to force-indent within the `show_coverage_table` function, so we do it before instead.
-        print!("\t\t");
-        show_coverage_table(coverage, conf);
-    }
+    // NOTE - since coverage tables are used in MarkGlyphSet, we don't want to force-indent within the `show_coverage_table` function, so we do it before instead.
+    print!("\t\t");
+    show_coverage_table(&attach_list.coverage, conf);
     show_items_elided(
         &attach_list.attach_points,
-        |ix, item| match item {
-            Some(AttachPoint { point_indices }) => {
-                print!("\t\t[{ix}]:");
-                show_items_inline(
-                    point_indices,
-                    |point_ix| format!("{}", point_ix),
-                    conf.inline_bookend,
-                    |num_skipped| format!("...({num_skipped})..."),
-                );
-            }
-            None => println!("\t\t[{ix}]: <no attach points>"),
+        |ix, AttachPoint { point_indices }| {
+            print!("\t\t[{ix}]:");
+            show_items_inline(
+                point_indices,
+                |point_ix| format!("{}", point_ix),
+                conf.inline_bookend,
+                |num_skipped| format!("...({num_skipped})..."),
+            );
         },
         conf.bookend_size,
         |start, stop| {
@@ -4082,7 +4012,7 @@ fn show_name_metrics(name: &NameMetrics, _conf: &Config) {
             &NameRecord {
                 name_id: NameId::FULL_FONT_NAME,
                 plat_encoding_lang,
-                buf: Some(ref buf),
+                ref buf,
             } => {
                 if no_name_yet && plat_encoding_lang.matches_locale(buf) {
                     println!("\tFull Font Name: {}", buf);
