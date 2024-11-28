@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::ops::{Bound, RangeBounds};
+use num_traits::{One, one};
 
 pub use crate::byte_set::ByteSet;
 pub use crate::parser::{
@@ -20,6 +21,32 @@ macro_rules! try_sub {
             }
         })
     };
+}
+
+/// Computes the predecessor `x - 1`.
+///
+/// When called on `x := 0`, will behave identically to `x - 1`.
+#[inline]
+// REVIEW - should we handle 0 explicitly/differently?
+// NOTE - this impl (and that of `succ`) require the `num-traits` crate to be a novel dependency, whereas a macro-based approach would not
+pub fn pred<T>(x: T) -> T
+where
+    T: One + std::ops::Sub<Output = T>,
+{
+    x - one()
+}
+
+/// Computes the successor `x + 1`.
+///
+/// When called on `x := T::MAX`, will behave identically to `x + 1`.
+#[inline]
+// REVIEW - should we handle T::MAX explicitly/differently?
+// NOTE - this impl (and that of `pred`) require the `num-traits` crate to be a novel dependency, whereas a macro-based approach would not
+pub fn succ<T>(x: T) -> T
+where
+    T: One + std::ops::Add<Output = T>,
+{
+    x + one()
 }
 
 /// Performs a flat-map operation taking an iterator over `T` and returning a vector over `U`.

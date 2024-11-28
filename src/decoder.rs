@@ -400,6 +400,20 @@ impl Expr {
                 Value::Bool(x) => Value::Bool(!x),
                 x => panic!("unexpected operand: expecting boolean, found `{x:?}`"),
             }),
+            Expr::Unary(UnaryOp::IntSucc, x) => Cow::Owned(match x.eval_value(scope) {
+                Value::U8(x) => Value::U8(x.checked_add(1).unwrap_or_else(|| panic!("IntSucc(u8::MAX) overflowed"))),
+                Value::U16(x) => Value::U16(x.checked_add(1).unwrap_or_else(|| panic!("IntSucc(u16::MAX) overflowed"))),
+                Value::U32(x) => Value::U32(x.checked_add(1).unwrap_or_else(|| panic!("IntSucc(u32::MAX) overflowed"))),
+                Value::U64(x) => Value::U64(x.checked_add(1).unwrap_or_else(|| panic!("IntSucc(u64::MAX) overflowed"))),
+                x => panic!("unexpected operand: expected integral value, found `{x:?}`"),
+            }),
+            Expr::Unary(UnaryOp::IntPred, x) => Cow::Owned(match x.eval_value(scope) {
+                Value::U8(x) => Value::U8(x.checked_sub(1).unwrap_or_else(|| panic!("IntPred(0u8) underflowed"))),
+                Value::U16(x) => Value::U16(x.checked_sub(1).unwrap_or_else(|| panic!("IntPred(0u16) underflowed"))),
+                Value::U32(x) => Value::U32(x.checked_sub(1).unwrap_or_else(|| panic!("IntPred(0u32) underflowed"))),
+                Value::U64(x) => Value::U64(x.checked_sub(1).unwrap_or_else(|| panic!("IntPred(0u64) underflowed"))),
+                x => panic!("unexpected operand: expected integral value, found `{x:?}`"),
+            }),
 
             Expr::AsU8(x) => {
                 Cow::Owned(match x.eval_value(scope) {

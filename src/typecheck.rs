@@ -1410,17 +1410,15 @@ impl TypeChecker {
 
     /// Unifies a UType against a BaseSet, updating any variable constraints in the process.
     ///
-    /// Returns a copy of the novel constraint implied by the unification
+    /// Returns a copy of the novel Constraint implied by the unification
     /// if `ut` is `Base`, `Var`, or `Hole` (in the case of `Hole`, no additional inference is performed
     /// and the constraint is directly returned without any further unification).
     ///
-    /// Otherwise, returns an `Err` indicating thtat the unification was not possible.
+    /// Otherwise, returns an `Err` indicating that the unification was not possible.
     fn unify_utype_baseset(&mut self, ut: Rc<UType>, bs: BaseSet) -> TCResult<Constraint> {
         match ut.as_ref() {
             UType::Var(uv) => {
-                let constraint = bs.to_constraint();
-                let ret = self.unify_var_constraint(*uv, constraint)?;
-                Ok(ret)
+                self.unify_var_baseset(*uv, bs)
             }
             UType::Base(b) => {
                 let ret = bs.unify(&BaseSet::Single(*b))?.to_constraint();
@@ -1433,6 +1431,15 @@ impl TypeChecker {
             )
             .into()),
         }
+    }
+
+    /// Unifies a UVar against a BaseSet, updating any aliased-variable constraints in the process.
+    ///
+    /// Returns a copy of the novel Constraint implied by the unification if it was sound.
+    /// Otherwise, returns an `Err` indicating that the unification was not possible.
+    fn unify_var_baseset(&mut self, uv: UVar, bs: BaseSet) -> TCResult<Constraint> {
+        let constraint = bs.to_constraint();
+        self.unify_var_constraint(uv, constraint)
     }
 
     /// Attempt to unify a [`UVar`] with a [`ValueType`], primarily for use with `Expr::FlatMapAccum`.
@@ -1773,12 +1780,10 @@ impl TypeChecker {
                 let zvar = self.get_new_uvar();
 
                 let xvar = self.infer_var_expr(x.as_ref(), scope)?;
-                let tx = Rc::new(UType::Var(xvar));
-                let _cx = self.unify_utype_baseset(tx, BaseSet::Single(BaseType::Bool))?;
+                let _cx = self.unify_var_baseset(xvar, BaseSet::Single(BaseType::Bool))?;
 
                 let yvar = self.infer_var_expr(y.as_ref(), scope)?;
-                let ty = Rc::new(UType::Var(yvar));
-                let _cy = self.unify_utype_baseset(ty, BaseSet::Single(BaseType::Bool))?;
+                let _cy = self.unify_var_baseset(yvar, BaseSet::Single(BaseType::Bool))?;
 
                 self.unify_var_constraint(zvar, BaseSet::Single(BaseType::Bool).to_constraint())?;
                 zvar
@@ -1791,16 +1796,23 @@ impl TypeChecker {
                 self.unify_var_constraint(newvar, BaseSet::Single(BaseType::Bool).to_constraint())?;
                 newvar
             }
+            Expr::Unary(UnaryOp::IntSucc | UnaryOp::IntPred, x) => {
+                let outvar = self.get_new_uvar();
+
+                let xvar = self.infer_var_expr(x.as_ref(), scope)?;
+                let _cx = self.unify_var_baseset(xvar, BaseSet::UAny)?;
+
+                self.unify_var_pair(outvar, xvar)?;
+                outvar
+            }
             Expr::Arith(_, x, y) => {
                 let zvar = self.get_new_uvar();
 
                 let xvar = self.infer_var_expr(x.as_ref(), scope)?;
-                let tx = Rc::new(UType::Var(xvar));
-                let _cx = self.unify_utype_baseset(tx, BaseSet::UAny)?;
+                let _cx = self.unify_var_baseset(xvar, BaseSet::UAny)?;
 
                 let yvar = self.infer_var_expr(y.as_ref(), scope)?;
-                let ty = Rc::new(UType::Var(yvar));
-                let _cy = self.unify_utype_baseset(ty, BaseSet::UAny)?;
+                let _cy = self.unify_var_baseset(yvar, BaseSet::UAny)?;
 
                 self.unify_var_pair(zvar, xvar)?;
                 self.unify_var_pair(zvar, yvar)?;
@@ -1810,14 +1822,12 @@ impl TypeChecker {
                 let zvar = self.get_new_uvar();
 
                 let xvar = self.infer_var_expr(x.as_ref(), scope)?;
-                let tx = Rc::new(UType::Var(xvar));
-                let _cx = self.unify_utype_baseset(tx, BaseSet::UAny)?;
+                let _cx = self.unify_var_baseset(xvar, BaseSet::UAny)?;
 
                 let yvar = self.infer_var_expr(y.as_ref(), scope)?;
-                let ty = Rc::new(UType::Var(yvar));
-                let _cy = self.unify_utype_baseset(ty, BaseSet::UAny)?;
+                let _cy = self.unify_var_baseset(yvar, BaseSet::UAny)?;
 
-                self.unify_var_pair(xvar, yvar)?;
+                let _cxy = self.unify_var_pair(xvar, yvar)?;
 
                 let cz = Constraint::Elem(BaseSet::Single(BaseType::Bool));
                 self.unify_var_constraint(zvar, cz)?;
@@ -1826,32 +1836,32 @@ impl TypeChecker {
             }
             Expr::AsU8(x) => {
                 let newvar = self.init_var_simple(UType::Base(BaseType::U8))?.0;
-                let ut = self.infer_utype_expr(x.as_ref(), scope)?;
-                self.unify_utype_baseset(ut, BaseSet::UAny)?;
+                let xvar = self.infer_var_expr(x.as_ref(), scope)?;
+                let _cx = self.unify_var_baseset(xvar, BaseSet::UAny)?;
                 newvar
             }
             Expr::AsU16(x) => {
                 let newvar = self.init_var_simple(UType::Base(BaseType::U16))?.0;
-                let ut = self.infer_utype_expr(x.as_ref(), scope)?;
-                self.unify_utype_baseset(ut, BaseSet::UAny)?;
+                let xvar = self.infer_var_expr(x.as_ref(), scope)?;
+                let _cx = self.unify_var_baseset(xvar, BaseSet::UAny)?;
                 newvar
             }
             Expr::AsU32(x) => {
                 let newvar = self.init_var_simple(UType::Base(BaseType::U32))?.0;
-                let ut = self.infer_utype_expr(x.as_ref(), scope)?;
-                self.unify_utype_baseset(ut, BaseSet::UAny)?;
+                let xvar = self.infer_var_expr(x.as_ref(), scope)?;
+                let _cx = self.unify_var_baseset(xvar, BaseSet::UAny)?;
                 newvar
             }
             Expr::AsU64(x) => {
                 let newvar = self.init_var_simple(UType::Base(BaseType::U64))?.0;
-                let ut = self.infer_utype_expr(x.as_ref(), scope)?;
-                self.unify_utype_baseset(ut, BaseSet::UAny)?;
+                let xvar = self.infer_var_expr(x.as_ref(), scope)?;
+                let _cx = self.unify_var_baseset(xvar, BaseSet::UAny)?;
                 newvar
             }
             Expr::AsChar(x) => {
                 let newvar = self.init_var_simple(UType::Base(BaseType::Char))?.0;
-                let ut = self.infer_utype_expr(x.as_ref(), scope)?;
-                self.unify_utype_baseset(ut, BaseSet::UAny)?;
+                let xvar = self.infer_var_expr(x.as_ref(), scope)?;
+                let _cx = self.unify_var_baseset(xvar, BaseSet::UAny)?;
                 newvar
             }
 
@@ -1874,7 +1884,7 @@ impl TypeChecker {
                 newvar
             }
             Expr::SeqLength(seq_expr) => {
-                // REVIEW - does this always have to be U32?
+                // REVIEW[hardcoded] - does this always have to be U32?
                 let newvar = self.init_var_simple(UType::Base(BaseType::U32))?.0;
                 let seq_var = self.infer_var_expr(seq_expr.as_ref(), scope)?;
                 let elem_var = self.get_new_uvar();
