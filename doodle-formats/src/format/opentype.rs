@@ -9,8 +9,11 @@ fn shadow_check(x: &Expr, name: &'static str) {
     }
 }
 
+/// Extracts the final element of a sequence-Expr if it is not empty
+///
+/// If the sequence is empty, the behavior is unspecified
 fn last_elem(seq_var: &'static str) -> Expr {
-    let last_ix = sub(seq_length(var(seq_var)), Expr::U32(1));
+    let last_ix = pred(seq_length(var(seq_var)));
     index_unchecked(var(seq_var), last_ix)
 }
 
@@ -56,7 +59,7 @@ fn loca_offset_pairs(loca: Expr) -> Expr {
 
 /// Converts a `u8` value to an `i16` value within the `Expr` model
 /// according to a bit-flag for signedness `pos_bit` (`1` for positive, `0` for negative).
-// FIXME - this currently uses the two's-complement u16 value that maps to the proper i16 value
+// FIXME - this currently yields the u16 value with the same machine-rep as the nominal i16 value we want
 fn u8_to_i16(x: Expr, is_positive: Expr) -> Expr {
     expr_if_else(
         is_positive,
@@ -67,10 +70,7 @@ fn u8_to_i16(x: Expr, is_positive: Expr) -> Expr {
                 (Pattern::U8(0), Expr::U16(0)),
                 (
                     bind("n"),
-                    sub(
-                        Expr::U16(u16::MAX),
-                        sub(Expr::AsU16(Box::new(var("n"))), Expr::U16(1)),
-                    ),
+                    sub(Expr::U16(u16::MAX), pred(Expr::AsU16(Box::new(var("n"))))),
                 ),
             ],
         ),
@@ -326,21 +326,45 @@ fn link(abs_offset: Expr, format: Format) -> Format {
 /// parses a u16be as a positive delta from `base_offset` and returns the linked content parsed according
 /// to `format` at that location.
 ///
+/// Returns a record `{ offset: u16, link := format }`
+///
+/// Additionally takes argument `base` of type `BaseModule` to parse u16be values without code duplication.
+///
+/// Only to be used when an `offset` value of `0` (which normally results in `link: None`) is
+/// not considered legal, in which case the local parse will produce an error.
+///
+/// If this guarantee cannot be made, use [`offset_nullable`] instead to allow Null offsets.
+fn offset16_mandatory(base_offset: Expr, format: Format, base: &BaseModule) -> Format {
+    shadow_check(&base_offset, "offset");
+    // REVIEW - there is an argument to be made that we should use `chain` instead of `record` to elide the offset and flatten the link
+    record([
+        ("offset", where_nonzero(base.u16be())),
+        (
+            "link",
+            link(pos_add_u16(base_offset, var("offset")), format),
+        ),
+    ])
+}
+
+/// Given a value of `base_offset` (the absolute stream-position relative to which offsets are to be interpreted),
+/// parses a u16be as a positive delta from `base_offset` and returns the linked content parsed according
+/// to `format` at that location.
+///
 /// Returns a record `{ offset: u16, link := (offset > 0) ? Some(format) : None }`
 ///
 /// (Implicitly includes a semantic shortcut whereby an offset-value (parsed) of `0` signals
 /// that there is no associated data, in which case `None` is yielded for the `link`.)
 ///
 /// Additionally takes argument `base` of type `BaseModule` to parse u16be values without code duplication.
-fn offset16(base_offset: Expr, format: Format, base: &BaseModule) -> Format {
+fn offset16_nullable(base_offset: Expr, format: Format, base: &BaseModule) -> Format {
     shadow_check(&base_offset, "offset");
-    // FIXME - should we use `chain` instead of `record` to elide the offset and flatten the link?
+    // REVIEW - there is an argument to be made that we should use `chain` instead of `record` to elide the offset and flatten the link
     record([
         ("offset", base.u16be()),
         (
             "link",
             if_then_else(
-                is_nonzero_u16(var("offset")),
+                is_nonzero(var("offset")),
                 link(pos_add_u16(base_offset, var("offset")), format_some(format)),
                 format_none(),
             ),
@@ -366,7 +390,7 @@ fn offset32(base_offset: Expr, format: Format, base: &BaseModule) -> Format {
         (
             "link",
             cond_maybe(
-                is_nonzero_u32(var("offset")),
+                is_nonzero(var("offset")),
                 linked_offset32(base_offset, var("offset"), format),
             ),
         ),
@@ -548,10 +572,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         ),
                         (
                             "sub_headers",
-                            repeat_count(
-                                add(Expr::U16(1), subheader_index(var("sub_header_keys"))),
-                                subheader,
-                            ),
+                            repeat_count(succ(subheader_index(var("sub_header_keys"))), subheader),
                         ),
                         ("glyph_array", repeat(base.u16be())),
                     ],
@@ -1081,7 +1102,11 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ("length", base.u16be()),
                     (
                         "offset",
-                        offset16(storage_start, repeat_count(var("length"), base.u8()), base),
+                        offset16_mandatory(
+                            storage_start,
+                            repeat_count(var("length"), base.u8()),
+                            base,
+                        ),
                     ),
                 ])
             };
@@ -1092,7 +1117,11 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         ("length", base.u16be()),
                         (
                             "offset",
-                            offset16(storage_start, repeat_count(var("length"), base.u8()), base),
+                            offset16_mandatory(
+                                storage_start,
+                                repeat_count(var("length"), base.u8()),
+                                base,
+                            ),
                         ),
                     ])
                 };
@@ -1161,7 +1190,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 const V0_MIN_LENGTH: u32 = 78;
                 cond_maybe(
                     or(
-                        is_nonzero_u16(var(version_ident)),
+                        is_nonzero(var(version_ident)),
                         expr_gte(table_length, Expr::U32(V0_MIN_LENGTH)),
                     ),
                     record([
@@ -1173,14 +1202,14 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         (
                             "extra_fields_v1",
                             cond_maybe(
-                                expr_gte(var(version_ident), Expr::U16(1)),
+                                is_within(var(version_ident), Bounds::at_least(1)),
                                 record([
                                     ("ul_code_page_range_1", base.u32be()),
                                     ("ul_code_page_range_2", base.u32be()),
                                     (
                                         "extra_fields_v2",
                                         cond_maybe(
-                                            expr_gte(var(version_ident), Expr::U16(2)),
+                                            is_within(var(version_ident), Bounds::at_least(2)),
                                             record([
                                                 ("sx_height", s16be(base)),
                                                 ("s_cap_height", s16be(base)),
@@ -1190,7 +1219,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                                 (
                                                     "extra_fields_v5",
                                                     cond_maybe(
-                                                        expr_gte(var(version_ident), Expr::U16(5)),
+                                                        is_within(
+                                                            var(version_ident),
+                                                            Bounds::at_least(5),
+                                                        ),
                                                         record([
                                                             (
                                                                 "us_lower_optical_point_size",
@@ -1499,7 +1531,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         ),
                         (
                             "number_of_coordinates",
-                            compute(add(Expr::U16(1), last_elem("end_points_of_contour"))),
+                            compute(succ(last_elem("end_points_of_contour"))),
                         ),
                         ("flags", glyf_flags_simple(var("number_of_coordinates"))),
                         (
@@ -1596,7 +1628,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     expr_option_map_or(
                         Expr::Bool(false),
                         |elt| expr_not(record_projs(elt, &["flags", "more_components"])),
-                        seq_opt_last(var("seq")),
+                        seq_last_checked(var("seq")),
                     ),
                 );
                 let update_any_instructions = lambda_tuple(
@@ -1901,7 +1933,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     let quotient = div(numerator.clone(), denominator.clone());
                     expr_if_else(
                         expr_lt(mul(quotient.clone(), denominator), numerator),
-                        add(quotient.clone(), Expr::U16(1)),
+                        succ(quotient.clone()),
                         quotient,
                     )
                 };
@@ -1921,7 +1953,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     )
                 };
 
-                let num_sizes = |start: Expr, end: Expr| add(sub(end, start), Expr::U16(1));
+                let num_sizes = |start: Expr, end: Expr| succ(sub(end, start));
 
                 record([
                     ("start_size", base.u16be()),
@@ -1992,7 +2024,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             let gdef_header_version_1_2 = |gdef_start_pos: Expr| {
                 record([(
                     "mark_glyph_sets_def",
-                    offset16(gdef_start_pos, mark_glyph_set.call(), base),
+                    offset16_nullable(gdef_start_pos, mark_glyph_set.call(), base),
                 )])
             };
 
@@ -2017,14 +2049,14 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ("table_start", pos32()),
                     (
                         "coverage",
-                        offset16(var("table_start"), coverage_table.call(), base),
+                        offset16_mandatory(var("table_start"), coverage_table.call(), base),
                     ),
                     ("glyph_count", base.u16be()),
                     (
                         "attach_point_offsets",
                         repeat_count(
                             var("glyph_count"),
-                            offset16(var("table_start"), attach_point_table, base),
+                            offset16_mandatory(var("table_start"), attach_point_table, base),
                         ),
                     ),
                 ])
@@ -2040,7 +2072,11 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                             ("coordinate", s16be(base)),
                             (
                                 "table",
-                                offset16(table_start, device_or_variation_index_table.call(), base),
+                                offset16_mandatory(
+                                    table_start,
+                                    device_or_variation_index_table.call(),
+                                    base,
+                                ),
                             ),
                         ])
                     };
@@ -2075,7 +2111,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         "caret_values",
                         repeat_count(
                             var("caret_count"),
-                            offset16(var("table_start"), caret_value, base),
+                            offset16_mandatory(var("table_start"), caret_value, base),
                         ),
                     ),
                 ]);
@@ -2084,14 +2120,14 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ("table_start", pos32()),
                     (
                         "coverage",
-                        offset16(var("table_start"), coverage_table.call(), base),
+                        offset16_mandatory(var("table_start"), coverage_table.call(), base),
                     ),
                     ("lig_glyph_count", base.u16be()),
                     (
                         "lig_glyph_offsets",
                         repeat_count(
                             var("lig_glyph_count"),
-                            offset16(var("table_start"), lig_glyph, base),
+                            offset16_mandatory(var("table_start"), lig_glyph, base),
                         ),
                     ),
                 ])
@@ -2109,22 +2145,22 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     // Class definition table for glyph type (may be NULL)
                     (
                         "glyph_class_def",
-                        offset16(var("table_start"), class_def.call(), base),
+                        offset16_nullable(var("table_start"), class_def.call(), base),
                     ),
                     // Attachment point list table (may be NULL)
                     (
                         "attach_list",
-                        offset16(var("table_start"), attach_list, base),
+                        offset16_nullable(var("table_start"), attach_list, base),
                     ),
                     // Ligature caret list table (may be NULL)
                     (
                         "lig_caret_list",
-                        offset16(var("table_start"), lig_caret_list, base),
+                        offset16_nullable(var("table_start"), lig_caret_list, base),
                     ),
                     // Class definition table for mark attachment type (may be NULL)
                     (
                         "mark_attach_class_def",
-                        offset16(var("table_start"), class_def.call(), base),
+                        offset16_nullable(var("table_start"), class_def.call(), base),
                     ),
                     // Version-specific data, if > 1.0
                     // REVIEW - do we want to flatten this variant abstraction into two Option<...> fields instead?
@@ -2209,7 +2245,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     opt_field("y_advance", s16be(base)),
                     opt_field(
                         "x_placement_device",
-                        offset16(
+                        offset16_mandatory(
                             var("table_start"),
                             device_or_variation_index_table.call(),
                             base,
@@ -2217,7 +2253,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ),
                     opt_field(
                         "y_placement_device",
-                        offset16(
+                        offset16_mandatory(
                             var("table_start"),
                             device_or_variation_index_table.call(),
                             base,
@@ -2225,7 +2261,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ),
                     opt_field(
                         "x_advance_device",
-                        offset16(
+                        offset16_mandatory(
                             var("table_start"),
                             device_or_variation_index_table.call(),
                             base,
@@ -2233,7 +2269,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ),
                     opt_field(
                         "y_advance_device",
-                        offset16(
+                        offset16_mandatory(
                             var("table_start"),
                             device_or_variation_index_table.call(),
                             base,
@@ -2244,28 +2280,26 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         };
 
         let optional_value_record = {
+            // REVIEW - does this merit a generic helper function that builds a balanced binary AST over `BoolOr` (or any Fn(Expr, Expr) -> Expr, more generically)?
             fn any_set(flags: Expr) -> Expr {
-                or(
-                    or(
-                        or(
-                            record_proj(flags.clone(), "x_placement"),
-                            record_proj(flags.clone(), "y_placement"),
-                        ),
-                        or(
-                            record_proj(flags.clone(), "x_advance"),
-                            record_proj(flags.clone(), "y_advance"),
-                        ),
-                    ),
-                    or(
-                        or(
-                            record_proj(flags.clone(), "x_placement_device"),
-                            record_proj(flags.clone(), "y_placement_device"),
-                        ),
-                        or(
-                            record_proj(flags.clone(), "x_advance_device"),
-                            record_proj(flags, "y_advance_device"),
-                        ),
-                    ),
+                balance_merge(
+                    [
+                        "x_placement",
+                        "y_placement",
+                        "x_advance",
+                        "y_advance",
+                        "x_placement_device",
+                        "y_placement_device",
+                        "x_advance_device",
+                        "y_advance_device",
+                    ],
+                    |fields| {
+                        fields
+                            .into_iter()
+                            .map(|field| record_proj(flags.clone(), field))
+                            .collect()
+                    },
+                    or,
                 )
             }
 
@@ -2288,9 +2322,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 record([
                     ("x_coordinate", s16be(base)),
                     ("y_coordinate", s16be(base)),
+                    // REVIEW - each offset below is individually nullable if the other is set, but it may be invalid for them to both be null simultaneously...?
                     (
                         "x_device_offset",
-                        offset16(
+                        offset16_nullable(
                             table_start.clone(),
                             device_or_variation_index_table.call(),
                             base,
@@ -2298,7 +2333,11 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ),
                     (
                         "y_device_offset",
-                        offset16(table_start, device_or_variation_index_table.call(), base),
+                        offset16_nullable(
+                            table_start,
+                            device_or_variation_index_table.call(),
+                            base,
+                        ),
                     ),
                 ])
             };
@@ -2348,7 +2387,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         let lang_sys_record = |script_start: Expr| {
             record([
                 ("lang_sys_tag", tag.call()),
-                ("lang_sys", offset16(script_start, lang_sys.call(), base)),
+                (
+                    "lang_sys",
+                    offset16_mandatory(script_start, lang_sys.call(), base),
+                ),
             ])
         };
         let script_table = {
@@ -2358,7 +2400,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ("table_start", pos32()),
                     (
                         "default_lang_sys",
-                        offset16(var("table_start"), lang_sys.call(), base),
+                        offset16_nullable(var("table_start"), lang_sys.call(), base),
                     ),
                     ("lang_sys_count", base.u16be()),
                     (
@@ -2374,7 +2416,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ("script_tag", tag.call()),
                     (
                         "script",
-                        offset16(script_list_start, script_table.call(), base),
+                        offset16_mandatory(script_list_start, script_table.call(), base),
                     ),
                 ])
             };
@@ -2412,7 +2454,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ("feature_tag", tag.call()),
                     (
                         "feature",
-                        offset16(feature_list_start, feature_table.call(), base),
+                        offset16_mandatory(feature_list_start, feature_table.call(), base),
                     ),
                 ])
             };
@@ -2441,14 +2483,11 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         let sequence_context = {
             let rule_set = {
                 let rule = record([
-                    (
-                        "glyph_count",
-                        where_lambda(base.u16be(), "count", is_nonzero_u16(var("count"))),
-                    ),
+                    ("glyph_count", where_nonzero(base.u16be())),
                     ("seq_lookup_count", base.u16be()),
                     (
                         "input_sequence",
-                        repeat_count(sub(var("glyph_count"), Expr::U16(1)), base.u16be()),
+                        repeat_count(pred(var("glyph_count")), base.u16be()),
                     ),
                     (
                         "seq_lookup_records",
@@ -2460,7 +2499,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ("rule_count", base.u16be()),
                     (
                         "rules",
-                        repeat_count(var("rule_count"), offset16(var("table_start"), rule, base)),
+                        repeat_count(
+                            var("rule_count"),
+                            offset16_mandatory(var("table_start"), rule, base),
+                        ),
                     ),
                 ])
             };
@@ -2468,14 +2510,14 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 record([
                     (
                         "coverage",
-                        offset16(table_start.clone(), coverage_table.call(), base),
+                        offset16_mandatory(table_start.clone(), coverage_table.call(), base),
                     ),
                     ("seq_rule_set_count", base.u16be()),
                     (
                         "seq_rule_sets",
                         repeat_count(
                             var("seq_rule_set_count"),
-                            offset16(table_start, rule_set.clone(), base),
+                            offset16_nullable(table_start, rule_set.clone(), base),
                         ),
                     ),
                 ])
@@ -2484,18 +2526,18 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 record([
                     (
                         "coverage",
-                        offset16(table_start.clone(), coverage_table.call(), base),
+                        offset16_mandatory(table_start.clone(), coverage_table.call(), base),
                     ),
                     (
                         "class_def",
-                        offset16(table_start.clone(), class_def.call(), base),
+                        offset16_mandatory(table_start.clone(), class_def.call(), base),
                     ),
                     ("class_seq_rule_set_count", base.u16be()),
                     (
                         "class_seq_rule_sets",
                         repeat_count(
                             var("class_seq_rule_set_count"),
-                            offset16(table_start, rule_set.clone(), base),
+                            offset16_nullable(table_start, rule_set.clone(), base),
                         ),
                     ),
                 ])
@@ -2508,7 +2550,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         "coverage_tables",
                         repeat_count(
                             var("glyph_count"),
-                            offset16(table_start, coverage_table.call(), base),
+                            offset16_mandatory(table_start, coverage_table.call(), base),
                         ),
                     ),
                     (
@@ -2560,7 +2602,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ("input_glyph_count", base.u16be()),
                     (
                         "input_sequence",
-                        repeat_count(sub(var("input_glyph_count"), Expr::U16(1)), base.u16be()),
+                        repeat_count(pred(var("input_glyph_count")), base.u16be()),
                     ),
                     ("lookahead_glyph_count", base.u16be()),
                     (
@@ -2586,14 +2628,14 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 record([
                     (
                         "coverage",
-                        offset16(table_start.clone(), coverage_table.call(), base),
+                        offset16_mandatory(table_start.clone(), coverage_table.call(), base),
                     ),
                     ("chained_seq_rule_set_count", base.u16be()),
                     (
                         "chained_seq_rule_sets",
                         repeat_count(
                             var("chained_seq_rule_set_count"),
-                            offset16(table_start, rule_set.clone(), base),
+                            offset16_nullable(table_start, rule_set.clone(), base),
                         ),
                     ),
                 ])
@@ -2602,26 +2644,26 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 record([
                     (
                         "coverage",
-                        offset16(table_start.clone(), coverage_table.call(), base),
+                        offset16_mandatory(table_start.clone(), coverage_table.call(), base),
                     ),
                     (
                         "backtrack_class_def",
-                        offset16(table_start.clone(), class_def.call(), base),
+                        offset16_mandatory(table_start.clone(), class_def.call(), base),
                     ),
                     (
                         "input_class_def",
-                        offset16(table_start.clone(), class_def.call(), base),
+                        offset16_mandatory(table_start.clone(), class_def.call(), base),
                     ),
                     (
                         "lookahead_class_def",
-                        offset16(table_start.clone(), class_def.call(), base),
+                        offset16_mandatory(table_start.clone(), class_def.call(), base),
                     ),
                     ("chained_class_seq_rule_set_count", base.u16be()),
                     (
                         "chained_class_seq_rule_sets",
                         repeat_count(
                             var("chained_class_seq_rule_set_count"),
-                            offset16(table_start, rule_set.clone(), base),
+                            offset16_nullable(table_start, rule_set.clone(), base),
                         ),
                     ),
                 ])
@@ -2633,7 +2675,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         "backtrack_coverages",
                         repeat_count(
                             var("backtrack_glyph_count"),
-                            offset16(table_start.clone(), coverage_table.call(), base),
+                            offset16_mandatory(table_start.clone(), coverage_table.call(), base),
                         ),
                     ),
                     ("input_glyph_count", base.u16be()),
@@ -2641,7 +2683,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         "input_coverages",
                         repeat_count(
                             var("input_glyph_count"),
-                            offset16(table_start.clone(), coverage_table.call(), base),
+                            offset16_mandatory(table_start.clone(), coverage_table.call(), base),
                         ),
                     ),
                     ("lookahead_glyph_count", base.u16be()),
@@ -2649,7 +2691,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         "lookahead_coverages",
                         repeat_count(
                             var("lookahead_glyph_count"),
-                            offset16(table_start, coverage_table.call(), base),
+                            offset16_mandatory(table_start, coverage_table.call(), base),
                         ),
                     ),
                     ("seq_lookup_count", base.u16be()),
@@ -2694,7 +2736,55 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         };
 
         let layout_table = |tag: u32| {
-            let single_subst = /* STUB */ Format::EMPTY;
+            let single_subst = {
+                record([
+                    ("table_start", pos32()),
+                    ("subst_format", base.u16be()),
+                    (
+                        "subst",
+                        match_variant(
+                            var("subst_format"),
+                            [
+                                (
+                                    Pattern::U16(1),
+                                    "Format1",
+                                    record([
+                                        (
+                                            "coverage",
+                                            offset16_mandatory(
+                                                var("table_start"),
+                                                coverage_table.call(),
+                                                base,
+                                            ),
+                                        ),
+                                        ("delta_glyph_id", s16be(base)),
+                                    ]),
+                                ),
+                                (
+                                    Pattern::U16(2),
+                                    "Format2",
+                                    record([
+                                        (
+                                            "coverage",
+                                            offset16_mandatory(
+                                                var("table_start"),
+                                                coverage_table.call(),
+                                                base,
+                                            ),
+                                        ),
+                                        ("glyph_count", base.u16be()),
+                                        (
+                                            "substitute_glyph_ids",
+                                            repeat_count(var("glyph_count"), base.u16be()),
+                                        ),
+                                    ]),
+                                ),
+                                (Pattern::Wildcard, "BadFormat", Format::Fail),
+                            ],
+                        ),
+                    ),
+                ])
+            };
             let multiple_subst = /* STUB */ Format::EMPTY;
             let alternate_subst = /* STUB */ Format::EMPTY;
             let ligature_subst = /* STUB */ Format::EMPTY;
@@ -2706,7 +2796,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     record([
                         (
                             "coverage_offset",
-                            offset16(table_start.clone(), coverage_table.call(), base),
+                            offset16_mandatory(table_start.clone(), coverage_table.call(), base),
                         ),
                         ("value_format", value_format_flags.call()),
                         (
@@ -2719,7 +2809,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     record([
                         (
                             "coverage_offset",
-                            offset16(table_start.clone(), coverage_table.call(), base),
+                            offset16_mandatory(table_start.clone(), coverage_table.call(), base),
                         ),
                         ("value_format", value_format_flags.call()),
                         ("value_count", base.u16be()),
@@ -2790,7 +2880,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     record([
                         (
                             "coverage",
-                            offset16(table_start, coverage_table.call(), base),
+                            offset16_mandatory(table_start, coverage_table.call(), base),
                         ),
                         ("value_format1", value_format_flags.call()),
                         ("value_format2", value_format_flags.call()),
@@ -2799,7 +2889,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                             "pair_sets",
                             repeat_count(
                                 var("pair_set_count"),
-                                offset16(
+                                offset16_mandatory(
                                     var("table_start"),
                                     pair_set(var("value_format1"), var("value_format2")),
                                     base,
@@ -2837,17 +2927,17 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     record([
                         (
                             "coverage",
-                            offset16(pair_pos_start.clone(), coverage_table.call(), base),
+                            offset16_mandatory(pair_pos_start.clone(), coverage_table.call(), base),
                         ),
                         ("value_format1", value_format_flags.call()),
                         ("value_format2", value_format_flags.call()),
                         (
                             "class_def1",
-                            offset16(pair_pos_start.clone(), class_def.call(), base),
+                            offset16_mandatory(pair_pos_start.clone(), class_def.call(), base),
                         ),
                         (
                             "class_def2",
-                            offset16(pair_pos_start.clone(), class_def.call(), base),
+                            offset16_mandatory(pair_pos_start.clone(), class_def.call(), base),
                         ),
                         ("class1_count", base.u16be()),
                         ("class2_count", base.u16be()),
@@ -2895,11 +2985,11 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     record([
                         (
                             "entry_anchor",
-                            offset16(table_start.clone(), anchor_table.call(), base),
+                            offset16_nullable(table_start.clone(), anchor_table.call(), base),
                         ),
                         (
                             "exit_anchor",
-                            offset16(table_start, anchor_table.call(), base),
+                            offset16_nullable(table_start, anchor_table.call(), base),
                         ),
                     ])
                 };
@@ -2907,7 +2997,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     record([
                         (
                             "coverage",
-                            offset16(table_start.clone(), coverage_table.call(), base),
+                            offset16_mandatory(table_start.clone(), coverage_table.call(), base),
                         ),
                         ("entry_exit_count", base.u16be()),
                         (
@@ -3056,7 +3146,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                             "subtables",
                             repeat_count(
                                 var("sub_table_count"),
-                                offset16(
+                                offset16_mandatory(
                                     var("table_start"),
                                     lookup_subtable(tag, var("lookup_type")),
                                     base,
@@ -3080,7 +3170,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         "lookups",
                         repeat_count(
                             var("lookup_count"),
-                            offset16(var("table_start"), lookup_table(tag), base),
+                            offset16_mandatory(var("table_start"), lookup_table(tag), base),
                         ),
                     ),
                 ])
@@ -3092,15 +3182,15 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ("minor_version", base.u16be()),
                 (
                     "script_list",
-                    offset16(var("table_start"), script_list.call(), base),
+                    offset16_mandatory(var("table_start"), script_list.call(), base),
                 ),
                 (
                     "feature_list",
-                    offset16(var("table_start"), feature_list.call(), base),
+                    offset16_mandatory(var("table_start"), feature_list.call(), base),
                 ),
                 (
                     "lookup_list",
-                    offset16(var("table_start"), lookup_list(tag), base),
+                    offset16_mandatory(var("table_start"), lookup_list(tag), base),
                 ),
             ])
         };

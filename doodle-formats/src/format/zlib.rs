@@ -13,7 +13,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, deflate: FormatRef) ->
     );
 
     // helper for checking whether a dictionary is present according to the flags
-    let has_dict = |flags: Expr| is_nonzero_u8(record_proj(flags, "fdict"));
+    let has_dict = |flags: Expr| is_nonzero(record_proj(flags, "fdict"));
 
     module.define_format(
         "zlib.main",
