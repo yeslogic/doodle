@@ -44,8 +44,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
                     where_between(base.u8(), Expr::U8(2), Expr::U8(16)),
                 ), // 8 in Sequential DCT (extended allows 12), 8 or 12 in Progressive DCT, 2-16 lossless
                 ("num-lines", base.u16be()),
-                ("num-samples-per-line", where_nonzero_u16(base.u16be())),
-                ("num-image-components", where_nonzero_u8(base.u8())), // 1..=4 if progressive DCT, 1..=255 otherwise
+                ("num-samples-per-line", where_nonzero(base.u16be())),
+                ("num-image-components", where_nonzero(base.u8())), // 1..=4 if progressive DCT, 1..=255 otherwise
                 (
                     "image-components",
                     repeat_count(var("num-image-components"), sof_image_component.call()),
@@ -201,7 +201,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
     // DNL: Define number of lines (See ITU T.81 Section B.2.5)
     let dnl_data = module.define_format(
         "jpeg.dnl-data",
-        record([("num-lines", where_nonzero_u16(base.u16be()))]),
+        record([("num-lines", where_nonzero(base.u16be()))]),
     );
 
     // DRI: Define restart interval (See ITU T.81 Section B.2.4.4)
@@ -230,8 +230,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
             record([
                 ("sample-precision", base.u8()),
                 ("num-lines", base.u16be()),
-                ("num-samples-per-line", where_nonzero_u16(base.u16be())), // != 0
-                ("num-image-components", where_nonzero_u8(base.u8())),     // != 0
+                ("num-samples-per-line", where_nonzero(base.u16be())), // != 0
+                ("num-image-components", where_nonzero(base.u8())),    // != 0
                 (
                     "image-components",
                     repeat_count(var("num-image-components"), dhp_image_component.call()),
@@ -274,8 +274,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
                     "density-units",
                     where_lambda(base.u8(), "x", expr_lte(var("x"), Expr::U8(2))),
                 ), // 0 | 1 | 2
-                ("density-x", where_nonzero_u16(base.u16be())), // != 0
-                ("density-y", where_nonzero_u16(base.u16be())), // != 0
+                ("density-x", where_nonzero(base.u16be())), // != 0
+                ("density-y", where_nonzero(base.u16be())), // != 0
                 ("thumbnail-width", base.u8()),
                 ("thumbnail-height", base.u8()),
                 (
