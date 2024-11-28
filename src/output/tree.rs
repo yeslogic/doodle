@@ -1570,6 +1570,16 @@ impl<'module> MonoidalPrinter<'module> {
                 prec,
                 Precedence::LOGNEGATE,
             ),
+            Expr::Unary(UnaryOp::IntPred, expr) => cond_paren(
+                self.compile_prefix("pred", None, expr),
+                prec,
+                Precedence::NUMPREFIX,
+            ),
+            Expr::Unary(UnaryOp::IntSucc, expr) => cond_paren(
+                self.compile_prefix("succ", None, expr),
+                prec,
+                Precedence::NUMPREFIX,
+            ),
             Expr::AsU8(expr) => cond_paren(
                 self.compile_prefix("as-u8", None, expr),
                 prec,

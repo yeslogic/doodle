@@ -113,7 +113,12 @@ pub enum Arith {
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub enum UnaryOp {
+    /// BoolNot models the Rust-native operation `!`
     BoolNot,
+    /// The successor function over any integral type (behavior unspecified when applied to max_val)
+    IntSucc,
+    /// The predecessor function over any integral type (behavior unspecified when applied to min_val)
+    IntPred,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
@@ -152,20 +157,20 @@ pub enum Expr {
     U64Le(Box<Expr>),
 
     SeqLength(Box<Expr>),
-    /// SubSeq :: [T] -> start:U32 -> length:U32 -> [T] (start >= 0, length >= 0, start + length <= length of sequence)
+    /// SubSeq :: \[T\] -> start:U32 -> length:U32 -> \[T\] (start >= 0, length >= 0, start + length <= length of sequence)
     SubSeq(Box<Expr>, Box<Expr>, Box<Expr>),
-    /// SeqIx :: [T] -> ix:U32 -> T [panic on unguarded OOB index]
+    /// SeqIx :: \[T\] -> ix:U32 -> T (panic on unguarded OOB index)
     SeqIx(Box<Expr>, Box<Expr>),
-    /// SubSeqInflate :: [T] -> start:U32 -> length:U32 -> [T] (start >= 0, length >= 0)
+    /// SubSeqInflate :: \[T\] -> start:U32 -> length:U32 -> \[T\] (start >= 0, length >= 0)
     SubSeqInflate(Box<Expr>, Box<Expr>, Box<Expr>),
-    /// FlatMap :: (T -> [U]) -> [T] -> [U]
+    /// FlatMap :: (T -> \[U\]) -> \[T\] -> \[U\]
     FlatMap(Box<Expr>, Box<Expr>),
-    /// FlatMapAccum :: ((V, T) -> (V, [U])) -> V -> TypeRep V -> [T] -> [U]
+    /// FlatMapAccum :: ((Acc, T) -> (Acc, \[U\])) -> Acc -> TypeRep Acc -> \[T\] -> \[U\]
     FlatMapAccum(Box<Expr>, Box<Expr>, TypeHint, Box<Expr>),
-    /// FlatMapList :: (([U], T) -> [U]) -> TypeRep U -> [T] -> [U]
+    /// FlatMapList :: ((\[U\], T) -> \[U\]) -> TypeRep U -> \[T\] -> \[U\] (lambda call yields a run of values to append to the final list)
     FlatMapList(Box<Expr>, TypeHint, Box<Expr>),
 
-    /// LeftFold :: ((U, T) -> U) -> U -> [T} -> U
+    /// LeftFold :: ((Acc, T) -> Acc) -> Acc -> \[T\] -> Acc
     LeftFold(Box<Expr>, Box<Expr>, TypeHint, Box<Expr>),
 
     /// Dup :: U32 -> T -> [T]
@@ -280,9 +285,13 @@ impl Expr {
                     "mismatched operand types for {_arith:?}: {x:?}, {y:?}"
                 )),
             },
-            Expr::Unary(_arith @ UnaryOp::BoolNot, x) => match x.infer_type(scope)? {
+            Expr::Unary(_op @ UnaryOp::BoolNot, x) => match x.infer_type(scope)? {
                 ValueType::Base(BaseType::Bool) => Ok(ValueType::Base(BaseType::Bool)),
-                x => Err(anyhow!("unexpected operand type for {_arith:?}: {x:?}")),
+                x => Err(anyhow!("unexpected operand type for {_op:?}: {x:?}")),
+            },
+            Expr::Unary(_op @ (UnaryOp::IntSucc | UnaryOp::IntPred), x) => match x.infer_type(scope)? {
+                ValueType::Base(b) if b.is_numeric() => Ok(ValueType::Base(b)),
+                x => Err(anyhow!("unexpected operand type for {_op:?}: {x:?}")),
             },
 
             Expr::AsU8(x) => match x.infer_type(scope)? {

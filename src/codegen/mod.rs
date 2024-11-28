@@ -878,10 +878,18 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
         TypedExpr::Unary(_, op, inner) => {
             // NOTE - because Unary only deals with Copy types, we oughtn't need any embedded clones
             let x = embed_expr_dft(inner);
-            let op = match op {
-                UnaryOp::BoolNot => PrefixOperator::BoolNot,
-            };
-            RustExpr::Operation(RustOp::PrefixOp(op, Box::new(x)))
+            match op {
+                UnaryOp::BoolNot => {
+                    let op = PrefixOperator::BoolNot;
+                    RustExpr::Operation(RustOp::PrefixOp(op, Box::new(x)))
+                }
+                UnaryOp::IntPred => {
+                    RustExpr::FunctionCall(Box::new(RustExpr::local("pred")), vec![x])
+                }
+                UnaryOp::IntSucc => {
+                    RustExpr::FunctionCall(Box::new(RustExpr::local("succ")), vec![x])
+                }
+            }
         }
         TypedExpr::AsU8(x) =>
             RustExpr::Operation(RustOp::AsCast(Box::new(embed_expr_dft(x)), PrimType::U8.into())),
@@ -2676,6 +2684,7 @@ impl ToAst for DerivedLogic<GTExpr> {
     }
 }
 
+// ANCHOR[main-fn] - `generate_code` function
 pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragment {
     let mut items = Vec::new();
 
@@ -3838,6 +3847,13 @@ mod tests {
         );
     }
 
+    fn blit_gencode(module: &FormatModule, f: &Format) -> String {
+        let prefrag = generate_code(module, f);
+        let frag = prefrag.to_fragment();
+        let oput = frag.to_string();
+        oput
+    }
+
     fn run_popcheck(fs: &[(&'static str, Format)]) {
         let mut module = FormatModule::new();
         for (name, f) in fs.iter() {
@@ -3938,5 +3954,14 @@ mod tests {
 
         let f = Format::Record(vec![("xs".into(), xs), ("fxs".into(), fxs)]);
         run_popcheck(&[("test.compute_complex", f)]);
+    }
+
+    #[test]
+    fn test_codegen_oput() {
+        let f = Format::Compute(Box::new(Expr::Unary(UnaryOp::IntPred, Box::new(Expr::U32(43)))));
+        let mut module = FormatModule::new();
+        module.define_format("test.oput", f.clone());
+        let oput = blit_gencode(&module, &f);
+        println!("{}", oput);
     }
 }
