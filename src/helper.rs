@@ -72,8 +72,15 @@ pub fn flags_bits8(field_names: [Option<&'static str>; 8]) -> Format {
     )
 }
 
-/// Selects `nbits` bits starting from the highest unused bit in an 8-bit packed-field value, returning a U8-typed Expr
-fn mask_bits(x: Expr, high_bits_used: u8, nbits: u8) -> Expr {
+/// Selects `nbits` bits starting from the highest unused bit in an 8-bit packed-field value, returning a U8-typed Expr.
+///
+/// Will panic if `nbits + high_bits_used > 8`.
+pub fn mask_bits(x: Expr, high_bits_used: u8, nbits: u8) -> Expr {
+    assert!(
+        nbits + high_bits_used <= 8,
+        "mask_bits cannot create mask {nbits} bits out of available {}",
+        8 - high_bits_used
+    );
     let shift = 8 - high_bits_used - nbits;
     let mask = (1 << nbits) - 1;
     bit_and(shr(x, Expr::U8(shift)), Expr::U8(mask))
