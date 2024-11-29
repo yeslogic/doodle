@@ -3232,15 +3232,12 @@ fn format_lookup_subtable(
 
         LookupSubtable::SequenceContext(seq_ctx) => {
             let contents = match seq_ctx {
-                SequenceContext::Format1(SequenceContextFormat1 {
-                    coverage,
-                    seq_rule_sets,
-                }) => format!("Glyphs({})", format_coverage_table(coverage)),
-                SequenceContext::Format2(SequenceContextFormat2 {
-                    coverage,
-                    class_seq_rule_sets,
-                    ..
-                }) => format!("Classes({})", format_coverage_table(coverage)),
+                SequenceContext::Format1(SequenceContextFormat1 { coverage, .. }) => {
+                    format!("Glyphs({})", format_coverage_table(coverage))
+                }
+                SequenceContext::Format2(SequenceContextFormat2 { coverage, .. }) => {
+                    format!("Classes({})", format_coverage_table(coverage))
+                }
                 SequenceContext::Format3(SequenceContextFormat3 {
                     coverage_tables,
                     seq_lookup_records,
@@ -3269,16 +3266,13 @@ fn format_lookup_subtable(
         LookupSubtable::ChainedSequenceContext(chain_ctx) => {
             let contents = match chain_ctx {
                 ChainedSequenceContext::Format1(ChainedSequenceContextFormat1 {
-                    coverage,
-                    chained_seq_rule_sets,
+                    coverage, ..
                 }) => {
                     // TODO - even if it means overly verbose output, this might be too little info to be useful compared to discriminant-only display
                     format!("ChainedGlyphs({})", format_coverage_table(coverage))
                 }
                 ChainedSequenceContext::Format2(ChainedSequenceContextFormat2 {
-                    coverage,
-                    chained_class_seq_rule_sets,
-                    ..
+                    coverage, ..
                 }) => {
                     // TODO - even if it means overly verbose output, this might be too little info to be useful compared to discriminant-only display
                     // REVIEW - consider what other details (e.g. class-def summary metrics) to show in implicitly- or explictly-verbose display format
@@ -3344,6 +3338,7 @@ fn format_lookup_subtable(
 fn format_sequence_lookup(sl: &SequenceLookup) -> String {
     let s_ix = sl.sequence_index;
     let ll_ix = sl.lookup_list_index;
+    // NOTE - the number in `\[_\]` is meant to mimic the index display of the show_items_elided formatting of LookupList, so it is the lookup index. The number after `@` is the positional index to apply the lookup to
     format!("[{}]@{}", ll_ix, s_ix)
 }
 
@@ -3356,7 +3351,6 @@ fn validate_class_count(class_def: &ClassDef, expected_classes: usize) {
             class_value_array,
             start_glyph_id: _start_id,
         } => {
-            // REVIEW - this is a bit low-level, but there might be slightly better structures than BTreeSet (e.g. Vec<bool>)
             let max = expected_classes as u16;
             let mut actual_set = U16Set::new();
             actual_set.insert(0);
@@ -3488,11 +3482,11 @@ fn format_lookup_flag(flags: &LookupFlag) -> String {
     };
 
     let str_macf = match flags.mark_attachment_class_filter {
-        0 => String::from("∅"),
-        n => format!("Class=={n}"),
+        0 => String::new(),
+        n => format!("; mark_attachment_class_filter = {n}"),
     };
 
-    format!("LookupFlag ({str_bitflags} ; mark_attachment_class_filter = {str_macf})")
+    format!("LookupFlag ({str_bitflags}{str_macf})")
 }
 
 fn format_lookup_type(ctxt: Ctxt, ltype: u16) -> &'static str {

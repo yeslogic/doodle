@@ -2103,11 +2103,11 @@ link: opentype_common_feature_list
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_gsub_table_lookup_list_link_lookups_link_lookup_flag {
 mark_attachment_class_filter: u8,
-right_to_left: bool,
-ignore_base_glyphs: bool,
-ignore_ligatures: bool,
+use_mark_filtering_set: bool,
 ignore_marks: bool,
-use_mark_filtering_set: bool
+ignore_ligatures: bool,
+ignore_base_glyphs: bool,
+right_to_left: bool
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -3000,15 +3000,6 @@ on_curve_point: bool
 pub struct opentype_common_device_or_variation_index_table_raw_raw {
 __skipped0: u16,
 __skipped1: u16
-}
-
-#[derive(Debug, Copy, Clone)]
-pub struct opentype_gsub_table_lookup_list_link_lookups_link_lookup_flag {
-use_mark_filtering_set: bool,
-ignore_marks: bool,
-ignore_ligatures: bool,
-ignore_base_glyphs: bool,
-right_to_left: bool
 }
 
 #[derive(Debug, Clone)]
@@ -7174,14 +7165,12 @@ let inner = _input.get_offset_u64();
 }))())?;
 let lookup_type = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let lookup_flag = ((|| PResult::Ok({
-let inner = {
-let field0 = ((|| PResult::Ok((Decoder25(_input))?))())?;
-let field1 = ((|| PResult::Ok({
+let mark_attachment_class_filter = (Decoder25(_input))?;
 let inner = {
 let b = _input.read_byte()?;
 b
 };
-((|flagbits: u8| PResult::Ok(opentype_gsub_table_lookup_list_link_lookups_link_lookup_flag { use_mark_filtering_set: match flagbits >> 4u8 & 1u8 {
+((|flagbyte: u8| PResult::Ok(opentype_gsub_table_lookup_list_link_lookups_link_lookup_flag { mark_attachment_class_filter: mark_attachment_class_filter, use_mark_filtering_set: match flagbyte >> 4u8 & 1u8 {
 0 => {
 true
 },
@@ -7189,7 +7178,7 @@ true
 _ => {
 false
 }
-}, ignore_marks: match flagbits >> 3u8 & 1u8 {
+}, ignore_marks: match flagbyte >> 3u8 & 1u8 {
 0 => {
 true
 },
@@ -7197,7 +7186,7 @@ true
 _ => {
 false
 }
-}, ignore_ligatures: match flagbits >> 2u8 & 1u8 {
+}, ignore_ligatures: match flagbyte >> 2u8 & 1u8 {
 0 => {
 true
 },
@@ -7205,7 +7194,7 @@ true
 _ => {
 false
 }
-}, ignore_base_glyphs: match flagbits >> 1u8 & 1u8 {
+}, ignore_base_glyphs: match flagbyte >> 1u8 & 1u8 {
 0 => {
 true
 },
@@ -7213,7 +7202,7 @@ true
 _ => {
 false
 }
-}, right_to_left: match flagbits >> 0u8 & 1u8 {
+}, right_to_left: match flagbyte >> 0u8 & 1u8 {
 0 => {
 true
 },
@@ -7222,14 +7211,6 @@ _ => {
 false
 }
 } }))(inner))?
-}))())?;
-(field0, field1)
-};
-((|tuple_var: (u8, opentype_gsub_table_lookup_list_link_lookups_link_lookup_flag)| PResult::Ok(match tuple_var {
-(macf, lo) => {
-opentype_gsub_table_lookup_list_link_lookups_link_lookup_flag { mark_attachment_class_filter: macf, right_to_left: lo.right_to_left.clone(), ignore_base_glyphs: lo.ignore_base_glyphs.clone(), ignore_ligatures: lo.ignore_ligatures.clone(), ignore_marks: lo.ignore_marks.clone(), use_mark_filtering_set: lo.use_mark_filtering_set.clone() }
-}
-}))(inner))?
 }))())?;
 let sub_table_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let subtables = ((|| PResult::Ok({
@@ -7945,14 +7926,12 @@ let inner = _input.get_offset_u64();
 }))())?;
 let lookup_type = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let lookup_flag = ((|| PResult::Ok({
-let inner = {
-let field0 = ((|| PResult::Ok((Decoder25(_input))?))())?;
-let field1 = ((|| PResult::Ok({
+let mark_attachment_class_filter = (Decoder25(_input))?;
 let inner = {
 let b = _input.read_byte()?;
 b
 };
-((|flagbits: u8| PResult::Ok(opentype_gsub_table_lookup_list_link_lookups_link_lookup_flag { use_mark_filtering_set: match flagbits >> 4u8 & 1u8 {
+((|flagbyte: u8| PResult::Ok(opentype_gsub_table_lookup_list_link_lookups_link_lookup_flag { mark_attachment_class_filter: mark_attachment_class_filter, use_mark_filtering_set: match flagbyte >> 4u8 & 1u8 {
 0 => {
 true
 },
@@ -7960,7 +7939,7 @@ true
 _ => {
 false
 }
-}, ignore_marks: match flagbits >> 3u8 & 1u8 {
+}, ignore_marks: match flagbyte >> 3u8 & 1u8 {
 0 => {
 true
 },
@@ -7968,7 +7947,7 @@ true
 _ => {
 false
 }
-}, ignore_ligatures: match flagbits >> 2u8 & 1u8 {
+}, ignore_ligatures: match flagbyte >> 2u8 & 1u8 {
 0 => {
 true
 },
@@ -7976,7 +7955,7 @@ true
 _ => {
 false
 }
-}, ignore_base_glyphs: match flagbits >> 1u8 & 1u8 {
+}, ignore_base_glyphs: match flagbyte >> 1u8 & 1u8 {
 0 => {
 true
 },
@@ -7984,7 +7963,7 @@ true
 _ => {
 false
 }
-}, right_to_left: match flagbits >> 0u8 & 1u8 {
+}, right_to_left: match flagbyte >> 0u8 & 1u8 {
 0 => {
 true
 },
@@ -7993,14 +7972,6 @@ _ => {
 false
 }
 } }))(inner))?
-}))())?;
-(field0, field1)
-};
-((|tuple_var: (u8, opentype_gsub_table_lookup_list_link_lookups_link_lookup_flag)| PResult::Ok(match tuple_var {
-(macf, lo) => {
-opentype_gsub_table_lookup_list_link_lookups_link_lookup_flag { mark_attachment_class_filter: macf, right_to_left: lo.right_to_left.clone(), ignore_base_glyphs: lo.ignore_base_glyphs.clone(), ignore_ligatures: lo.ignore_ligatures.clone(), ignore_marks: lo.ignore_marks.clone(), use_mark_filtering_set: lo.use_mark_filtering_set.clone() }
-}
-}))(inner))?
 }))())?;
 let sub_table_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let subtables = ((|| PResult::Ok({
@@ -29722,3 +29693,4 @@ PResult::Ok(((|tuple_var: (Vec<u8>, u8)| PResult::Ok(match tuple_var {
 }
 }))(inner))?)
 }
+
