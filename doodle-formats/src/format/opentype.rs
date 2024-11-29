@@ -39,13 +39,9 @@ fn prepend_field_flags_bits8(
     }
 
     // parse a single value of `pre_format`, then the flags, and combine them in a single pass with no intermediate records
-    chain(
-        pre_format,
-        pre_field,
-        map(
-            Format::Byte(ByteSet::full()),
-            lambda(BINDING_NAME, Expr::Record(record_fields)),
-        ),
+    map(
+        tuple([pre_format, Format::Byte(ByteSet::full())]),
+        lambda_tuple([pre_field, BINDING_NAME], Expr::Record(record_fields)),
     )
 }
 
