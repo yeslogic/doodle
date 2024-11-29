@@ -1,12 +1,52 @@
 use crate::format::BaseModule;
 use doodle::bounds::Bounds;
-use doodle::{helper::*, Expr, IntoLabel, Label};
+use doodle::{byte_set::ByteSet, helper::*, Expr, IntoLabel, Label};
 use doodle::{BaseType, Format, FormatModule, FormatRef, Pattern, ValueType};
 
 fn shadow_check(x: &Expr, name: &'static str) {
     if x.is_shadowed_by(name) {
         panic!("Shadow! Variable-name {name} already occurs in Expr {x:?}!");
     }
+}
+
+fn prepend_field_flags_bits8(
+    pre_field: &'static str,
+    pre_format: Format,
+    flags: [Option<&'static str>; 8],
+) -> Format {
+    const BINDING_NAME: &str = "flagbyte";
+
+    assert_ne!(
+        pre_field, BINDING_NAME,
+        "map lambda binding `{BINDING_NAME}` shadows chain binding of same name"
+    );
+    let n_flags = flags.iter().flatten().count();
+
+    // allocate a vector of fields with enough room for our first non-flag field and all of the flag-fields
+    let mut record_fields = Vec::with_capacity(n_flags + 1);
+
+    // pre-push the initial field for the incoming chain-binding
+    record_fields.push((Label::Borrowed(pre_field), var(pre_field)));
+
+    // subsequently push the respective flag-bit-checks of all occupied bit-positions
+    for (ix, field_name) in flags.into_iter().enumerate() {
+        if let Some(name) = field_name {
+            record_fields.push((
+                Label::Borrowed(name),
+                is_nonzero(mask_bits(var(BINDING_NAME), ix as u8, 1)),
+            ));
+        }
+    }
+
+    // parse a single value of `pre_format`, then the flags, and combine them in a single pass with no intermediate records
+    chain(
+        pre_format,
+        pre_field,
+        map(
+            Format::Byte(ByteSet::full()),
+            lambda(BINDING_NAME, Expr::Record(record_fields)),
+        ),
+    )
 }
 
 /// Extracts the final element of a sequence-Expr if it is not empty
@@ -3102,37 +3142,19 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         }
                     };
                     let lookup_flag = {
-                        // NOTE - we currently have no good way to group together multiple adjacent bits with flags_bits16 so we will instead parse as a single U8 for the first byte (0xFF00) and then as a series of flags in the second byte (0xFF)
-                        let macf = base.u8();
-                        let lo_bits = flags_bits8([
-                            None,                           // Bit 7 (0x80) - reserved
-                            None,                           // Bit 6 (0x40) - reserved
-                            None,                           // Bit 5 (0x20) - reserved
-                            Some("use_mark_filtering_set"), // Bit 4 (0x10) - indicator flag for presence of markFilteringSet field in Lookup table structure
-                            Some("ignore_marks"), // Bit 3 (0x8) - if set, skips  over combining marks
-                            Some("ignore_ligatures"), // Bit 2 (0x4) - if set, skips over ligatures
-                            Some("ignore_base_glyphs"), // Bit 1 (0x2) - if set, skips over base glyphs
-                            Some("right_to_left"), // Bit 0 (0x1) - [GPOS type 3 only] when set, last glyph matched input will be positioned on baseline
-                        ]);
-                        map(
-                            tuple([macf, lo_bits]),
-                            lambda_tuple(
-                                ["macf", "lo"],
-                                prepend_field(
-                                    // present the fields in the order listed from LSB-to-MSB in [https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#lookup-table], though it mostly doesn't matter
-                                    ("mark_attachment_class_filter", var("macf")),
-                                    (
-                                        var("lo"),
-                                        [
-                                            "right_to_left",
-                                            "ignore_base_glyphs",
-                                            "ignore_ligatures",
-                                            "ignore_marks",
-                                            "use_mark_filtering_set",
-                                        ],
-                                    ),
-                                ),
-                            ),
+                        prepend_field_flags_bits8(
+                            "mark_attachment_class_filter",
+                            base.u8(),
+                            [
+                                None,                           // Bit 7 (0x80) - reserved
+                                None,                           // Bit 6 (0x40) - reserved
+                                None,                           // Bit 5 (0x20) - reserved
+                                Some("use_mark_filtering_set"), // Bit 4 (0x10) - indicator flag for presence of markFilteringSet field in Lookup table structure
+                                Some("ignore_marks"), // Bit 3 (0x8) - if set, skips  over combining marks
+                                Some("ignore_ligatures"), // Bit 2 (0x4) - if set, skips over ligatures
+                                Some("ignore_base_glyphs"), // Bit 1 (0x2) - if set, skips over base glyphs
+                                Some("right_to_left"), // Bit 0 (0x1) - [GPOS type 3 only] when set, last glyph matched input will be positioned on baseline
+                            ],
                         )
                     };
                     // STUB - initial pass to merely provide a structure without gaps (but not full-featured coverage of each sub-component)
