@@ -505,8 +505,8 @@ impl Expr {
     pub fn is_shadowed_by(&self, name: &str) -> bool {
         match self {
             Expr::Var(vname) => vname == name,
-            Expr::Lambda(hvar, body) => {
-                if hvar == name {
+            Expr::Lambda(head_var, body) => {
+                if head_var == name {
                     false
                 } else {
                     body.is_shadowed_by(name)
@@ -521,8 +521,8 @@ impl Expr {
             Expr::Tuple(ts) => ts.iter().any(|x| x.is_shadowed_by(name)),
             Expr::TupleProj(tup, _) => tup.is_shadowed_by(name),
             Expr::Record(fs) => {
-                for (fname, fexpr) in fs.iter() {
-                    if fexpr.is_shadowed_by(name) {
+                for (fname, fld) in fs.iter() {
+                    if fld.is_shadowed_by(name) {
                         // NOTE - the first field-expr that is shadowed by `name` wins
                         return true;
                     } else if fname == name {
@@ -2385,8 +2385,8 @@ mod test {
             )),
         );
         let mut module = FormatModule::new();
-        let fref = module.define_format("test", fmt);
-        let prog = super::decoder::Compiler::compile_program(&module, &fref.call()).unwrap();
+        let ref_fmt = module.define_format("test", fmt);
+        let prog = super::decoder::Compiler::compile_program(&module, &ref_fmt.call()).unwrap();
         let buf = ReadCtxt::new(&[]);
         let (ret, _) = prog.run(buf).unwrap();
         let expected = Value::Record(vec![

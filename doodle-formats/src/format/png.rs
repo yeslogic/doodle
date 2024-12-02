@@ -144,7 +144,7 @@ pub fn main(
         zlib.call(),
         "zlib",
         Format::DecodeBytes(
-            Box::new(record_projs(var("zlib"), &["data", "inflate"])),
+            Box::new(record_lens(var("zlib"), &["data", "inflate"])),
             Box::new(utf8text_nz.call()),
         ),
     );
@@ -257,7 +257,7 @@ pub fn main(
         zlib.call(),
         "zlib",
         Format::DecodeBytes(
-            Box::new(record_projs(var("zlib"), &["data", "inflate"])),
+            Box::new(record_lens(var("zlib"), &["data", "inflate"])),
             // TODO - we need to define a new format for latin1 without a null terminal (viz. why asciiz_string won't work)
             Box::new(utf8text.call()),
         ),

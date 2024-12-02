@@ -25,11 +25,11 @@ pub fn packed_bits_u8<const N: usize>(
     field_bit_lengths: [u8; N],
     field_names: [&'static str; N],
 ) -> Format {
-    const BINDING_NAME: &str = "packedbits";
-    let _totlen: u8 = field_bit_lengths.iter().sum();
+    const BINDING_NAME: &str = "packed_bits";
+    let _len: u8 = field_bit_lengths.iter().sum();
     assert_eq!(
-        _totlen, 8,
-        "bad packed-bits field-lengths: total length {_totlen} of {field_bit_lengths:?} != 8"
+        _len, 8,
+        "bad packed-bits field-lengths: total length {_len} of {field_bit_lengths:?} != 8"
     );
     let mut fields = Vec::new();
     let mut high_bits_used = 0;
@@ -53,7 +53,7 @@ pub fn packed_bits_u8<const N: usize>(
 /// extracted from the appropriate bit-position. None indicates that the bit is unused (at least
 /// one name should be `Some`, or else the operation is perfunctory).
 pub fn flags_bits8(field_names: [Option<&'static str>; 8]) -> Format {
-    const BINDING_NAME: &str = "flagbits";
+    const BINDING_NAME: &str = "flagbyte";
 
     let mut flags = Vec::new();
 
@@ -109,11 +109,11 @@ pub fn packed_bits_u16<const N: usize>(
     field_bit_lengths: [u8; N],
     field_names: [&'static str; N],
 ) -> Format {
-    const BINDING_NAME: &str = "packedbits";
-    let _totlen: u8 = field_bit_lengths.iter().sum();
+    const BINDING_NAME: &str = "packed_bits";
+    let _total_len: u8 = field_bit_lengths.iter().sum();
     assert_eq!(
-        _totlen, 16,
-        "bad packed-bits field-lengths: total length {_totlen} of {field_bit_lengths:?} != 16"
+        _total_len, 16,
+        "bad packed-bits field-lengths: total length {_total_len} of {field_bit_lengths:?} != 16"
     );
     let mut fields = Vec::new();
     let mut high_bits_used = 0;
@@ -140,7 +140,7 @@ pub fn packed_bits_u16<const N: usize>(
 /// extracted from the appropriate bit-position. None indicates that the bit is unused (at least
 /// one name should be `Some`, or else the operation is perfunctory).
 pub fn flags_bits16(field_names: [Option<&'static str>; 16]) -> Format {
-    const BINDING_NAME: &str = "flagbits";
+    const BINDING_NAME: &str = "flag_bits";
 
     let mut flags = Vec::new();
 
@@ -446,11 +446,11 @@ pub fn record_proj(head: Expr, label: impl IntoLabel) -> Expr {
 /// If the list of labels is empty, will simply return `head`.
 ///
 /// Otherwise, will return `(((head->label0)->label1)->...)->labelN`.
-pub fn record_projs(head: Expr, labels: &[&'static str]) -> Expr {
+pub fn record_lens(head: Expr, labels: &[&'static str]) -> Expr {
     if labels.is_empty() {
         head
     } else {
-        record_projs(record_proj(head, labels[0]), &labels[1..])
+        record_lens(record_proj(head, labels[0]), &labels[1..])
     }
 }
 

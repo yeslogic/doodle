@@ -51,7 +51,7 @@ impl fmt::Debug for Fragment {
         match self {
             Self::Empty => write!(f, "Empty"),
             Self::Char(c) => f.debug_tuple("Char").field(c).finish(),
-            Self::Symbol(symb) => f.debug_tuple("Symbol").field(symb).finish(),
+            Self::Symbol(symbol) => f.debug_tuple("Symbol").field(symbol).finish(),
             Self::String(s) => f.debug_tuple("String").field(s).finish(),
             Self::DebugAtom(at) => f
                 .debug_tuple("DebugAtom")
@@ -112,46 +112,6 @@ impl Fragment {
         }
     }
 
-    /// Joins two fragments with appropriate whitespace:
-    ///   - If `other` fits on a single line with no trailing newline, joins with `' '`, with a newline at the very end
-    ///   - Otherwise, joins with `'\n'`
-    fn join_with_wsp(self, other: Self) -> Self {
-        if other.fits_inline() {
-            self.cat(Self::Char(' ')).cat(other).cat_break()
-        } else {
-            self.cat_break().cat(other)
-        }
-    }
-
-    /// Returns `true` if this fragment can be appended to another inline, i.e. without
-    /// introducing any line-breaks or potentially misaligned diagram glyphs
-    ///
-    /// In order to pass, the Display form of the Fragment in question cannot contain any newlines, even
-    /// just one at the very end. Symbols are also rejected, as they implicitly require that nothing comes
-    /// before them on the same line.
-    fn fits_inline(&self) -> bool {
-        match self {
-            Fragment::Empty => true,
-            Fragment::Char(c) => *c != '\n',
-            Fragment::String(s) => !s.contains('\n'),
-            Fragment::Symbol(_) => false,
-            Fragment::DisplayAtom(_) | Fragment::DebugAtom(_) => true,
-            Fragment::Group(frag) => frag.fits_inline(),
-            Fragment::Cat(lhs, rhs) => lhs.fits_inline() && rhs.fits_inline(),
-            Fragment::Sequence { sep, items } => {
-                match sep {
-                    None => (),
-                    Some(join) => {
-                        if !items.is_empty() && !join.fits_inline() {
-                            return false;
-                        }
-                    }
-                }
-                items.iter().all(Self::fits_inline)
-            }
-        }
-    }
-
     /// Forms a compound fragment from a Fragment-valued iterable, with
     /// an optional Fragment separating each element in the output sequence.
     ///
@@ -178,14 +138,14 @@ impl Fragment {
         }
     }
 
-    /// Returns a new Fragment circumfixed by two other Fragments
+    /// Returns a new Fragment surrounded by two other Fragments
     ///
-    /// Useful for parentheses, quoted strings, and other such cases.
+    /// Useful for parenthesizing function argument-lists, quoting string contents, and other such cases.
     pub fn delimit(self, before: Self, after: Self) -> Self {
         Self::cat(before, self).cat(after)
     }
 
-    /// Shorthand for [`Fragment::String`] usable on `String` and `&'static str`.
+    /// Shorthand for [`Fragment::String`] that can be called on `String` and `&'static str` as well as `Label`.
     pub fn string(s: impl Into<Label>) -> Self {
         Self::String(s.into())
     }
@@ -201,7 +161,8 @@ impl Fragment {
 
     /// Adds an intervening fragment between two others, but only if both the left and right halves are non-vacuous.
     ///
-    /// This avoids situations where an empty fragment might otherwise enforce a separator to appear unnecessarily.
+    /// This avoids situations where a separator is injected at the beginning or end of a string, or where multiple
+    /// separators appear in turn with nothing in between them.
     ///
     /// # Examples
     ///
@@ -237,19 +198,25 @@ impl Fragment {
     ///
     /// Returns the same mutable reference as was passed in, to allow chaining of similar operations.
     #[inline]
-    pub fn encat(&mut self, other: Self) -> &mut Self {
+    pub fn append(&mut self, other: Self) -> &mut Self {
         let this = std::mem::take(self);
         *self = Self::cat(this, other);
         self
     }
 
     /// Wraps the current fragment in a [`Fragment::Group`] and returns the result.
-    fn group(self) -> Self {
+    ///
+    /// # Note
+    ///
+    /// There are currently no display rules that differentiate [`Fragment::Group`](x) from `x` itself, but
+    /// it is defined anyway and supported with this helper to allow for cleaner adoption of a more nuanced
+    /// model in which logically-grouped fragments have their own display rules.
+    pub(crate) fn group(self) -> Self {
         Self::Group(Box::new(self))
     }
 
     /// Like [Fragment::group], except that it modifies a mutable reference in-place and passes it back to the caller
-    fn engroup(&mut self) -> &mut Self {
+    pub(crate) fn enclose(&mut self) -> &mut Self {
         let this = Box::new(std::mem::take(self));
         *self = Self::Group(this);
         self
@@ -265,8 +232,8 @@ impl Fragment {
     ///
     /// Returns the same mutable reference as was passed in, to allow chaining of similar operations.
     #[inline]
-    fn encat_break(&mut self) -> &mut Self {
-        self.encat(Fragment::Char('\n'))
+    fn append_break(&mut self) -> &mut Self {
+        self.append(Fragment::Char('\n'))
     }
 
     /// Returns an empty fragment
@@ -274,12 +241,13 @@ impl Fragment {
         Self::Empty
     }
 
-    /// Similar to `fits_inline`, but determines whether more than one line is displayed
+    /// Returns `true` if the printable representation of `self` fits on a single line.
+    ///
+    /// Similar to [`Fragment::fits_inline`], but determines whether more than one line is displayed
     /// rather than whether inline concatenations are possible.
     ///
-    /// Importantly, newline characters are permitted if only one appears at the very end,
-    /// and Symbols are permitted in any position
-    fn is_single_line(&self, is_final: bool) -> bool {
+    /// Importantly, a single trailing newline character is permitted, and `Symbols` care allowed to appear anywhere
+    pub(crate) fn is_single_line(&self, is_final: bool) -> bool {
         match self {
             Fragment::Empty => true,
             Fragment::Char('\n') => is_final,
@@ -314,8 +282,51 @@ impl Fragment {
         }
     }
 
-    // FIXME - this is hacky because we want to avoid buffer-traces breaking the gutter
+    /// Returns `true` if this fragment can be appended to another as an inline continuation,
+    /// without inadvertently adding linebreaks or mis-aligning leading `Symbol`s.
+    ///
+    /// Returns `false` if any of the following are true:
+    ///   - The Display form of `self` contains any newline characters
+    ///   - `self` contains any `Symbol` sub-fragments
+    fn fits_inline(&self) -> bool {
+        match self {
+            Fragment::Empty => true,
+            Fragment::Char(c) => *c != '\n',
+            Fragment::String(s) => !s.contains('\n'),
+            Fragment::Symbol(_) => false,
+            Fragment::DisplayAtom(_) | Fragment::DebugAtom(_) => true,
+            Fragment::Group(frag) => frag.fits_inline(),
+            Fragment::Cat(lhs, rhs) => lhs.fits_inline() && rhs.fits_inline(),
+            Fragment::Sequence { sep, items } => {
+                match sep {
+                    None => (),
+                    Some(join) => {
+                        if !items.is_empty() && !join.fits_inline() {
+                            return false;
+                        }
+                    }
+                }
+                items.iter().all(Self::fits_inline)
+            }
+        }
+    }
+
+    /// Joins two fragments with appropriate whitespace:
+    ///   - If `other` fits on a single line with no trailing newline, joins with `' '`, with a newline at the very end
+    ///   - Otherwise, joins with `'\n'`
+    pub(crate) fn join_with_wsp(self, other: Self) -> Self {
+        if other.fits_inline() {
+            self.cat(Self::Char(' ')).cat(other).cat_break()
+        } else {
+            self.cat_break().cat(other)
+        }
+    }
+
+    /// Joins two fragments with the appropriate whitespace and a conditional line-ending `trailer`:
+    ///    - If `other` does not require more than one line to print, joins with `' '`, with a newline at the very end (and without `trailer`).
+    ///    - Otherwise, joins `self` and `trailer` with no separation, followed by `other` on the following line
     pub(crate) fn join_with_wsp_eol(self, other: Self, trailer: Self) -> Self {
+        // FIXME - As currently implemented, if `other` contains Symbols, calling this method may break them
         if other.fits_inline() {
             self.cat(Self::Char(' ')).cat(other).cat_break()
         } else {
@@ -384,7 +395,7 @@ impl fmt::Display for Fragment {
         match self {
             Fragment::Empty => Ok(()),
             Fragment::Char(c) => f.write_char(*c),
-            Fragment::Symbol(symb) => symb.fmt(f),
+            Fragment::Symbol(symbol) => symbol.fmt(f),
             Fragment::String(s) => f.write_str(s.as_ref()),
             Fragment::DebugAtom(atom) => fmt::Debug::fmt(&atom, f),
             Fragment::DisplayAtom(atom) => fmt::Display::fmt(&atom, f),

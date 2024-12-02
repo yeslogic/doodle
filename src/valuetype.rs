@@ -40,14 +40,8 @@ impl From<BaseType> for ValueType {
 }
 
 impl ValueType {
-    pub const BOOL: Self = ValueType::Base(BaseType::Bool);
+    pub const BOOL: ValueType = ValueType::Base(BaseType::Bool);
 
-    // NOTE - should be updated if we ever add new integer types
-    /// Alias for the widest (unsigned) integer type we support as a ValueType
-    pub const UMAX: Self = ValueType::Base(BaseType::U64);
-}
-
-impl ValueType {
     pub const UNIT: ValueType = ValueType::Tuple(Vec::new());
 
     pub(crate) fn record_proj(&self, label: &str) -> ValueType {

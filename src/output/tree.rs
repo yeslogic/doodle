@@ -20,7 +20,7 @@ fn atomic_value_to_string(value: &Value) -> String {
 
 pub fn print_decoded_value(module: &FormatModule, value: &Value, format: &Format) {
     use std::io::Write;
-    let frag = MonoidalPrinter::new(module).compile_decoded_value(value, format);
+    let frag = TreePrinter::new(module).compile_decoded_value(value, format);
     let mut lock = io::stdout().lock();
     match write!(&mut lock, "{}", frag) {
         Ok(_) => (),
@@ -30,7 +30,7 @@ pub fn print_decoded_value(module: &FormatModule, value: &Value, format: &Format
 
 pub fn print_parsed_decoded_value(module: &FormatModule, p_value: &ParsedValue, format: &Format) {
     use std::io::Write;
-    let frag = MonoidalPrinter::new(module).compile_parsed_decoded_value(p_value, format);
+    let frag = TreePrinter::new(module).compile_parsed_decoded_value(p_value, format);
     let mut lock = io::stdout().lock();
     match write!(&mut lock, "{}", frag) {
         Ok(_) => (),
@@ -59,7 +59,7 @@ fn name_is_ascii_string(name: &str) -> bool {
     name.contains("ascii") && name.contains("string")
 }
 
-pub struct MonoidalPrinter<'module> {
+pub struct TreePrinter<'module> {
     gutter: Vec<Column>,
     preview_len: Option<usize>,
     flags: Flags,
@@ -71,7 +71,7 @@ type FieldFormat = Field<Format>;
 type FieldPValue = Field<ParsedValue>;
 type FieldValue = Field<Value>;
 
-impl<'module> MonoidalPrinter<'module> {
+impl<'module> TreePrinter<'module> {
     fn is_implied_value_format(&self, format: &Format) -> bool {
         match format {
             Format::ItemVar(level, _args) => {
@@ -192,7 +192,7 @@ impl<'module> MonoidalPrinter<'module> {
 
     fn unwrap_itemvars<'a>(&'a self, format: &'a Format) -> &'a Format {
         match format {
-            Format::ItemVar(level, _args) => self.unwrap_itemvars(self.module.get_format(*level)),
+            &Format::ItemVar(level, ..) => self.unwrap_itemvars(self.module.get_format(level)),
             _ => format,
         }
     }
@@ -218,7 +218,7 @@ impl<'module> MonoidalPrinter<'module> {
     fn compile_parsed_value(&mut self, value: &ParsedValue) -> Fragment {
         match value {
             ParsedValue::Flat(Parsed { loc, inner }) => {
-                let symb = match inner {
+                let symbol = match inner {
                     Value::Bool(true) => Fragment::String("true".into()),
                     Value::Bool(false) => Fragment::String("false".into()),
                     Value::U8(i) => Fragment::DisplayAtom(Rc::new(*i)),
@@ -228,7 +228,7 @@ impl<'module> MonoidalPrinter<'module> {
                     Value::Char(c) => Fragment::DebugAtom(Rc::new(*c)),
                     _ => unreachable!("found non-flat Value in ParsedValue::Flat: {inner:?}"),
                 };
-                self.compile_with_location(symb, *loc)
+                self.compile_with_location(symbol, *loc)
             }
             ParsedValue::Tuple(vals) => self.compile_parsed_tuple(vals, None),
             ParsedValue::Seq(vals) => self.compile_parsed_seq(vals, None),
@@ -248,8 +248,8 @@ impl<'module> MonoidalPrinter<'module> {
     }
 }
 
-impl<'module> MonoidalPrinter<'module> {
-    pub fn new(module: &'module FormatModule) -> MonoidalPrinter<'module> {
+impl<'module> TreePrinter<'module> {
+    pub fn new(module: &'module FormatModule) -> TreePrinter<'module> {
         let flags = Flags {
             collapse_mapped_values: true,
             omit_implied_values: true,
@@ -260,7 +260,7 @@ impl<'module> MonoidalPrinter<'module> {
             show_redundant_formats: false,
             summarize_boolean_record_set_fields: true,
         };
-        MonoidalPrinter {
+        TreePrinter {
             gutter: Vec::new(),
             preview_len: Some(10),
             flags,
@@ -281,9 +281,9 @@ impl<'module> MonoidalPrinter<'module> {
                     self.compile_parsed_ascii_string(value)
                 } else if self.flags.pretty_ascii_strings && fmt_name.starts_with("base.ascii-char")
                 {
-                    frag.encat(Fragment::Char('\''));
-                    frag.encat(self.compile_parsed_ascii_char(value));
-                    frag.encat(Fragment::Char('\''));
+                    frag.append(Fragment::Char('\''));
+                    frag.append(self.compile_parsed_ascii_char(value));
+                    frag.append(Fragment::Char('\''));
                     frag
                 } else {
                     self.compile_parsed_decoded_value(value, self.module.get_format(*level))
@@ -372,9 +372,9 @@ impl<'module> MonoidalPrinter<'module> {
                             _ => panic!("expected sequence, found {vs:?}"),
                         };
                         // FIXME - this will probably break often, so adjust as necessary
-                        frag.encat(accum);
-                        frag.encat(Fragment::string(", "));
-                        frag.encat(vs);
+                        frag.append(accum);
+                        frag.append(Fragment::string(", "));
+                        frag.append(vs);
                         frag.delimit(Fragment::Char('('), Fragment::Char(')'))
                     }
                     _ => panic!("expected 2-tuple, found {values:#?}"),
@@ -417,7 +417,7 @@ impl<'module> MonoidalPrinter<'module> {
             Format::Match(_head, branches) => match value {
                 ParsedValue::Branch(index, value) => {
                     let (_pattern, format) = &branches[*index];
-                    frag.encat(self.compile_parsed_decoded_value(value, format));
+                    frag.append(self.compile_parsed_decoded_value(value, format));
                     frag
                 }
                 _ => panic!("expected branch, found {value:?}"),
@@ -443,9 +443,9 @@ impl<'module> MonoidalPrinter<'module> {
                     self.compile_ascii_string(value)
                 } else if self.flags.pretty_ascii_strings && fmt_name.starts_with("base.ascii-char")
                 {
-                    frag.encat(Fragment::Char('\''));
-                    frag.encat(self.compile_ascii_char(value));
-                    frag.encat(Fragment::Char('\''));
+                    frag.append(Fragment::Char('\''));
+                    frag.append(self.compile_ascii_char(value));
+                    frag.append(Fragment::Char('\''));
                     frag
                 } else {
                     self.compile_decoded_value(value, self.module.get_format(*level))
@@ -533,9 +533,9 @@ impl<'module> MonoidalPrinter<'module> {
                             _ => panic!("expected sequence, found {seq:?}"),
                         };
                         // FIXME - this may be easily-broken formatting and need some tweaking
-                        frag.encat(accum);
-                        frag.encat(Fragment::string(", "));
-                        frag.encat(seq);
+                        frag.append(accum);
+                        frag.append(Fragment::string(", "));
+                        frag.append(seq);
                         frag.delimit(Fragment::Char('('), Fragment::Char(')'))
                     }
                     _ => panic!("expected 2-tuple, found {values:#?}"),
@@ -570,7 +570,7 @@ impl<'module> MonoidalPrinter<'module> {
             Format::Match(_head, branches) => match value {
                 Value::Branch(index, value) => {
                     let (_pattern, format) = &branches[*index];
-                    frag.encat(self.compile_decoded_value(value, format));
+                    frag.append(self.compile_decoded_value(value, format));
                     frag
                 }
                 _ => panic!("expected branch, found {value:?}"),
@@ -687,11 +687,11 @@ impl<'module> MonoidalPrinter<'module> {
 
     fn compile_parsed_char_seq(&self, vals: &Parsed<SeqKind<ParsedValue>>) -> Fragment {
         let mut frag = Fragment::new();
-        frag.encat(Fragment::Char('"'));
+        frag.append(Fragment::Char('"'));
         for v in vals.inner.iter() {
-            frag.encat(self.compile_parsed_char(v));
+            frag.append(self.compile_parsed_char(v));
         }
-        frag.encat(Fragment::Char('"'));
+        frag.append(Fragment::Char('"'));
         self.compile_with_location(frag.group(), vals.loc)
     }
 
@@ -701,11 +701,11 @@ impl<'module> MonoidalPrinter<'module> {
         &'a S: IntoIterator<Item = &'a Value>,
     {
         let mut frag = Fragment::new();
-        frag.encat(Fragment::Char('"'));
+        frag.append(Fragment::Char('"'));
         for v in vals {
-            frag.encat(self.compile_char(v));
+            frag.append(self.compile_char(v));
         }
-        frag.encat(Fragment::Char('"'));
+        frag.append(Fragment::Char('"'));
         frag.group()
     }
 
@@ -715,11 +715,11 @@ impl<'module> MonoidalPrinter<'module> {
         S: Clone,
     {
         let mut frag = Fragment::new();
-        frag.encat(Fragment::Char('"'));
+        frag.append(Fragment::Char('"'));
         for v in &vals.inner {
-            frag.encat(self.compile_parsed_ascii_char(v));
+            frag.append(self.compile_parsed_ascii_char(v));
         }
-        frag.encat(Fragment::Char('"'));
+        frag.append(Fragment::Char('"'));
         self.compile_with_location(frag.group(), vals.loc)
     }
 
@@ -729,11 +729,11 @@ impl<'module> MonoidalPrinter<'module> {
         &'a S: IntoIterator<Item = &'a Value>,
     {
         let mut frag = Fragment::new();
-        frag.encat(Fragment::Char('"'));
+        frag.append(Fragment::Char('"'));
         for v in vals {
-            frag.encat(self.compile_ascii_char(v));
+            frag.append(self.compile_ascii_char(v));
         }
-        frag.encat(Fragment::Char('"'));
+        frag.append(Fragment::Char('"'));
         frag.group()
     }
 
@@ -806,14 +806,14 @@ impl<'module> MonoidalPrinter<'module> {
             let mut frag = Fragment::new();
             let last_index = vals.len() - 1;
             for index in 0..last_index {
-                frag.encat(self.compile_field_value_continue(
+                frag.append(self.compile_field_value_continue(
                     index,
                     &vals[index],
                     formats.map(|fs| &fs[index]),
                     true,
                 ));
             }
-            frag.encat(self.compile_field_value_last(
+            frag.append(self.compile_field_value_last(
                 last_index,
                 &vals[last_index],
                 formats.map(|fs| &fs[last_index]),
@@ -829,20 +829,20 @@ impl<'module> MonoidalPrinter<'module> {
         formats: Option<&[Format]>,
     ) -> Fragment {
         let Parsed { inner, .. } = vals;
-        let symb = if inner.is_empty() {
+        let frag_value = if inner.is_empty() {
             Fragment::String("()".into())
         } else {
             let mut frag = Fragment::new();
             let last_index = inner.len() - 1;
             for index in 0..last_index {
-                frag.encat(self.compile_parsed_field_value_continue(
+                frag.append(self.compile_parsed_field_value_continue(
                     index,
                     &inner[index],
                     formats.map(|fs| &fs[index]),
                     true,
                 ));
             }
-            frag.encat(self.compile_parsed_field_value_last(
+            frag.append(self.compile_parsed_field_value_last(
                 last_index,
                 &inner[last_index],
                 formats.map(|fs| &fs[last_index]),
@@ -851,8 +851,8 @@ impl<'module> MonoidalPrinter<'module> {
             frag
         };
         // FIXME - does location information for the overall tuple give us anything notable?
-        // self.compile_with_location(symb, *loc)
-        symb
+        // self.compile_with_location(symbol, *loc)
+        frag_value
     }
 
     fn compile_parsed_seq(
@@ -874,12 +874,12 @@ impl<'module> MonoidalPrinter<'module> {
             };
             for ix in 0..upper_bound {
                 let val = &inner[ix];
-                frag.encat(self.compile_parsed_field_value_continue(ix, val, format, false));
+                frag.append(self.compile_parsed_field_value_continue(ix, val, format, false));
             }
             if any_skipped {
-                frag.encat(self.compile_field_skipped());
+                frag.append(self.compile_field_skipped());
             }
-            frag.encat(self.compile_parsed_field_value_last(
+            frag.append(self.compile_parsed_field_value_last(
                 last_index,
                 &inner[last_index],
                 format,
@@ -903,12 +903,17 @@ impl<'module> MonoidalPrinter<'module> {
             };
             for index in 0..upper_bound {
                 let val = &vals[index];
-                frag.encat(self.compile_field_value_continue(index, val, format, false));
+                frag.append(self.compile_field_value_continue(index, val, format, false));
             }
             if any_skipped {
-                frag.encat(self.compile_field_skipped());
+                frag.append(self.compile_field_skipped());
             }
-            frag.encat(self.compile_field_value_last(last_index, &vals[last_index], format, false));
+            frag.append(self.compile_field_value_last(
+                last_index,
+                &vals[last_index],
+                format,
+                false,
+            ));
             frag
         }
     }
@@ -982,30 +987,30 @@ impl<'module> MonoidalPrinter<'module> {
     ) -> Fragment {
         let mut frags = FragmentBuilder::new();
         let frag = frags.active_mut();
-        frag.encat(self.compile_gutter());
-        frag.encat(Fragment::Symbol(Symbol::Elbow));
+        frag.append(self.compile_gutter());
+        frag.append(Fragment::Symbol(Symbol::Elbow));
         for (i, th) in header.iter().enumerate() {
-            frag.encat(Fragment::String(
+            frag.append(Fragment::String(
                 format!(" {:>width$}", th, width = cols[i]).into(),
             ));
         }
-        frag.engroup().encat_break();
+        frag.enclose().append_break();
         let mut frag = frags.renew();
         self.gutter.push(Column::Space);
         for (tr, loc) in Iterator::zip(rows.iter(), locs.iter()) {
-            frag.encat(self.compile_gutter());
+            frag.append(self.compile_gutter());
             for (i, td) in tr.iter().enumerate() {
-                frag.encat(Fragment::String(
+                frag.append(Fragment::String(
                     format!(" {:>width$}", td, width = cols[i]).into(),
                 ));
             }
-            frag.engroup()
-                .encat(Fragment::string(" \t"))
-                .encat(
+            frag.enclose()
+                .append(Fragment::string(" \t"))
+                .append(
                     self.compile_location(*loc)
                         .delimit(Fragment::Char('['), Fragment::Char(']')),
                 )
-                .encat_break();
+                .append_break();
             frag = frags.renew();
         }
         self.gutter.pop();
@@ -1020,24 +1025,24 @@ impl<'module> MonoidalPrinter<'module> {
     ) -> Fragment {
         let mut frags = FragmentBuilder::new();
         let frag = frags.active_mut();
-        frag.encat(self.compile_gutter());
-        frag.encat(Fragment::Symbol(Symbol::Elbow));
+        frag.append(self.compile_gutter());
+        frag.append(Fragment::Symbol(Symbol::Elbow));
         for (i, th) in header.iter().enumerate() {
-            frag.encat(Fragment::String(
+            frag.append(Fragment::String(
                 format!(" {:>width$}", th, width = cols[i]).into(),
             ));
         }
-        frag.engroup().encat_break();
+        frag.enclose().append_break();
         let mut frag = frags.renew();
         self.gutter.push(Column::Space);
         for tr in rows {
-            frag.encat(self.compile_gutter());
+            frag.append(self.compile_gutter());
             for (i, td) in tr.iter().enumerate() {
-                frag.encat(Fragment::String(
+                frag.append(Fragment::String(
                     format!(" {:>width$}", td, width = cols[i]).into(),
                 ));
             }
-            frag.engroup().encat_break();
+            frag.enclose().append_break();
             frag = frags.renew();
         }
         self.gutter.pop();
@@ -1053,20 +1058,20 @@ impl<'module> MonoidalPrinter<'module> {
             inner: value_fields,
             ..
         } = p_value_fields;
-        let mut value_fields_filt = Vec::new();
-        let mut format_fields_filt = format_fields.map(|_| Vec::new());
+        let mut value_fields_keep = Vec::new();
+        let mut format_fields_keep = format_fields.map(|_| Vec::new());
 
         let (value_fields, format_fields) = if self.flags.hide_double_underscore_fields
             && value_fields.iter().any(|(lab, _)| lab.starts_with("__"))
         {
-            value_fields_filt.extend(
+            value_fields_keep.extend(
                 value_fields
                     .iter()
                     .filter(|(lab, _)| !lab.starts_with("__"))
                     .cloned(),
             );
-            // we can unwrap below because format_fields_filt is only Some (and the closure will only be called) if format_fields is Some
-            if let Some(v) = format_fields_filt.as_mut() {
+            // we can unwrap below because format_fields_keep is only Some (and the closure will only be called) if format_fields is Some
+            if let Some(v) = format_fields_keep.as_mut() {
                 v.extend(
                     format_fields
                         .unwrap()
@@ -1075,7 +1080,7 @@ impl<'module> MonoidalPrinter<'module> {
                         .cloned(),
                 )
             }
-            (&value_fields_filt, format_fields_filt.as_deref())
+            (&value_fields_keep, format_fields_keep.as_deref())
         } else {
             (value_fields, format_fields)
         };
@@ -1085,22 +1090,22 @@ impl<'module> MonoidalPrinter<'module> {
         } else if value_fields.iter().all(|(_, v)| v.is_boolean())
             && self.flags.summarize_boolean_record_set_fields
         {
-            self.compile_parsed_boolflags(value_fields)
+            self.compile_parsed_bool_flags(value_fields)
         } else {
             let mut frag = Fragment::new();
             let last_index = value_fields.len() - 1;
             for (index, (label, value)) in value_fields[..last_index].iter().enumerate() {
                 let format = format_fields.map(|fs| &fs[index].1);
-                frag.encat(self.compile_parsed_field_value_continue(label, value, format, true));
+                frag.append(self.compile_parsed_field_value_continue(label, value, format, true));
             }
             let (label, value) = &value_fields[last_index];
             let format = format_fields.map(|fs| &fs[last_index].1);
-            frag.encat(self.compile_parsed_field_value_last(label, value, format, true));
+            frag.append(self.compile_parsed_field_value_last(label, value, format, true));
             frag
         }
     }
 
-    fn compile_parsed_boolflags(&mut self, value_fields: &[FieldPValue]) -> Fragment {
+    fn compile_parsed_bool_flags(&mut self, value_fields: &[FieldPValue]) -> Fragment {
         let mut set_fields = Vec::with_capacity(value_fields.len());
 
         for (label, value) in value_fields {
@@ -1119,20 +1124,20 @@ impl<'module> MonoidalPrinter<'module> {
         value_fields: &[FieldValue],
         format_fields: Option<&[FieldFormat]>,
     ) -> Fragment {
-        let mut value_fields_filt = Vec::new();
-        let mut format_fields_filt = format_fields.map(|_| Vec::new());
+        let mut value_fields_keep = Vec::new();
+        let mut format_fields_keep = format_fields.map(|_| Vec::new());
 
         let (value_fields, format_fields) = if self.flags.hide_double_underscore_fields
             && value_fields.iter().any(|(lab, _)| lab.starts_with("__"))
         {
-            value_fields_filt.extend(
+            value_fields_keep.extend(
                 value_fields
                     .iter()
                     .filter(|(lab, _)| !lab.starts_with("__"))
                     .cloned(),
             );
-            // we can unwrap below because format_fields_filt is only Some (and the closure will only be called) if format_fields is Some
-            if let Some(v) = format_fields_filt.as_mut() {
+            // we can unwrap below because format_fields_keep is only Some (and the closure will only be called) if format_fields is Some
+            if let Some(v) = format_fields_keep.as_mut() {
                 v.extend(
                     format_fields
                         .unwrap()
@@ -1141,7 +1146,7 @@ impl<'module> MonoidalPrinter<'module> {
                         .cloned(),
                 )
             }
-            (value_fields_filt.deref(), format_fields_filt.as_deref())
+            (value_fields_keep.deref(), format_fields_keep.as_deref())
         } else {
             (value_fields, format_fields)
         };
@@ -1150,22 +1155,22 @@ impl<'module> MonoidalPrinter<'module> {
         } else if value_fields.iter().all(|(_, v)| v.is_boolean())
             && self.flags.summarize_boolean_record_set_fields
         {
-            self.compile_boolflags(value_fields)
+            self.compile_bool_flags(value_fields)
         } else {
             let mut frag = Fragment::new();
             let last_index = value_fields.len() - 1;
             for (index, (label, value)) in value_fields[..last_index].iter().enumerate() {
                 let format = format_fields.map(|fs| &fs[index].1);
-                frag.encat(self.compile_field_value_continue(label, value, format, true));
+                frag.append(self.compile_field_value_continue(label, value, format, true));
             }
             let (label, value) = &value_fields[last_index];
             let format = format_fields.map(|fs| &fs[last_index].1);
-            frag.encat(self.compile_field_value_last(label, value, format, true));
+            frag.append(self.compile_field_value_last(label, value, format, true));
             frag
         }
     }
 
-    fn compile_boolflags(&mut self, value_fields: &[FieldValue]) -> Fragment {
+    fn compile_bool_flags(&mut self, value_fields: &[FieldValue]) -> Fragment {
         let mut set_fields = Vec::with_capacity(value_fields.len());
 
         for (label, value) in value_fields {
@@ -1191,14 +1196,14 @@ impl<'module> MonoidalPrinter<'module> {
             Fragment::string(label.to_string())
         } else if self.is_atomic_parsed_value(value, format) {
             let mut frag = Fragment::new();
-            frag.encat(Fragment::String(format!("{{ {label} := ").into()));
+            frag.append(Fragment::String(format!("{{ {label} := ").into()));
             if let Some(format) = format {
-                frag.encat(self.compile_parsed_decoded_value(value, format));
+                frag.append(self.compile_parsed_decoded_value(value, format));
             } else {
-                frag.encat(self.compile_parsed_value(value));
+                frag.append(self.compile_parsed_value(value));
             }
-            frag.encat(Fragment::String(" }".into()));
-            frag.engroup();
+            frag.append(Fragment::String(" }".into()));
+            frag.enclose();
             frag
         } else {
             self.compile_parsed_field_value_last(label, value, format, true)
@@ -1212,14 +1217,14 @@ impl<'module> MonoidalPrinter<'module> {
             Fragment::string(label.to_string())
         } else if self.is_atomic_value(value, format) {
             let mut frag = Fragment::new();
-            frag.encat(Fragment::String(format!("{{ {label} := ").into()));
+            frag.append(Fragment::String(format!("{{ {label} := ").into()));
             if let Some(format) = format {
-                frag.encat(self.compile_decoded_value(value, format));
+                frag.append(self.compile_decoded_value(value, format));
             } else {
-                frag.encat(self.compile_value(value));
+                frag.append(self.compile_value(value));
             }
-            frag.encat(Fragment::String(" }".into()));
-            frag.engroup();
+            frag.append(Fragment::String(" }".into()));
+            frag.enclose();
             frag
         } else {
             self.compile_field_value_last(label, value, format, true)
@@ -1436,8 +1441,7 @@ impl<'module> MonoidalPrinter<'module> {
             .group()
     }
 
-    #[inline]
-    fn compile_binop(
+    fn binary_op(
         &mut self,
         op: &'static str,
         lhs: &Expr,
@@ -1453,13 +1457,7 @@ impl<'module> MonoidalPrinter<'module> {
 
     /// Renders an Expr as a prefix-operator (with optional auxiliary arguments in parentheses)
     /// applied to a nested Expr.
-    #[inline]
-    fn compile_prefix(
-        &mut self,
-        op: &'static str,
-        args: Option<&[&Expr]>,
-        operand: &Expr,
-    ) -> Fragment {
+    fn prefix_op(&mut self, op: &'static str, args: Option<&[&Expr]>, operand: &Expr) -> Fragment {
         let mut frags = FragmentBuilder::new();
 
         frags.push(Fragment::String(op.into()));
@@ -1467,14 +1465,14 @@ impl<'module> MonoidalPrinter<'module> {
             None => (),
             Some(args) => {
                 let frag = frags.active_mut();
-                frag.encat(Fragment::Char('('));
-                frag.encat(Fragment::seq(
+                frag.append(Fragment::Char('('));
+                frag.append(Fragment::seq(
                     args.iter()
                         .map(|arg| self.compile_expr(arg, Precedence::default()))
                         .collect::<Vec<_>>(),
                     Some(Fragment::String(", ".into())),
                 ));
-                frag.encat(Fragment::Char(')'));
+                frag.append(Fragment::Char(')'));
             }
         }
         frags.push(self.compile_expr(operand, Precedence::ATOM));
@@ -1500,209 +1498,221 @@ impl<'module> MonoidalPrinter<'module> {
                 Precedence::ARROW,
             ),
             Expr::IntRel(IntRel::Eq, lhs, rhs) => cond_paren(
-                self.compile_binop(" == ", lhs, rhs, Precedence::EQUALITY, Precedence::EQUALITY),
+                self.binary_op(" == ", lhs, rhs, Precedence::EQUALITY, Precedence::EQUALITY),
                 prec,
                 Precedence::COMPARE,
             ),
             Expr::IntRel(IntRel::Ne, lhs, rhs) => cond_paren(
-                self.compile_binop(" != ", lhs, rhs, Precedence::EQUALITY, Precedence::EQUALITY),
+                self.binary_op(" != ", lhs, rhs, Precedence::EQUALITY, Precedence::EQUALITY),
                 prec,
                 Precedence::COMPARE,
             ),
             Expr::IntRel(IntRel::Lt, lhs, rhs) => cond_paren(
-                self.compile_binop(" < ", lhs, rhs, Precedence::COMPARE, Precedence::COMPARE),
+                self.binary_op(" < ", lhs, rhs, Precedence::COMPARE, Precedence::COMPARE),
                 prec,
                 Precedence::COMPARE,
             ),
             Expr::IntRel(IntRel::Gt, lhs, rhs) => cond_paren(
-                self.compile_binop(" > ", lhs, rhs, Precedence::COMPARE, Precedence::COMPARE),
+                self.binary_op(" > ", lhs, rhs, Precedence::COMPARE, Precedence::COMPARE),
                 prec,
                 Precedence::COMPARE,
             ),
             Expr::IntRel(IntRel::Lte, lhs, rhs) => cond_paren(
-                self.compile_binop(" <= ", lhs, rhs, Precedence::COMPARE, Precedence::COMPARE),
+                self.binary_op(" <= ", lhs, rhs, Precedence::COMPARE, Precedence::COMPARE),
                 prec,
                 Precedence::COMPARE,
             ),
             Expr::IntRel(IntRel::Gte, lhs, rhs) => cond_paren(
-                self.compile_binop(" >= ", lhs, rhs, Precedence::COMPARE, Precedence::COMPARE),
+                self.binary_op(" >= ", lhs, rhs, Precedence::COMPARE, Precedence::COMPARE),
                 prec,
                 Precedence::COMPARE,
             ),
             Expr::Arith(Arith::Add, lhs, rhs) => cond_paren(
-                self.compile_binop(" + ", lhs, rhs, Precedence::ADDSUB, Precedence::ADDSUB),
+                self.binary_op(" + ", lhs, rhs, Precedence::ADD_SUB, Precedence::ADD_SUB),
                 prec,
-                Precedence::ADDSUB,
+                Precedence::ADD_SUB,
             ),
             Expr::Arith(Arith::Sub, lhs, rhs) => cond_paren(
-                self.compile_binop(" - ", lhs, rhs, Precedence::ADDSUB, Precedence::ADDSUB),
+                self.binary_op(" - ", lhs, rhs, Precedence::ADD_SUB, Precedence::ADD_SUB),
                 prec,
-                Precedence::ADDSUB,
+                Precedence::ADD_SUB,
             ),
             Expr::Arith(Arith::Mul, lhs, rhs) => cond_paren(
-                self.compile_binop(" * ", lhs, rhs, Precedence::MUL, Precedence::MUL),
+                self.binary_op(" * ", lhs, rhs, Precedence::MUL, Precedence::MUL),
                 prec,
                 Precedence::MUL,
             ),
             Expr::Arith(Arith::Div, lhs, rhs) => cond_paren(
-                self.compile_binop(" / ", lhs, rhs, Precedence::DIVREM, Precedence::DIVREM),
+                self.binary_op(" / ", lhs, rhs, Precedence::DIV_REM, Precedence::DIV_REM),
                 prec,
-                Precedence::DIVREM,
+                Precedence::DIV_REM,
             ),
             Expr::Arith(Arith::Rem, lhs, rhs) => cond_paren(
-                self.compile_binop(" % ", lhs, rhs, Precedence::DIVREM, Precedence::DIVREM),
+                self.binary_op(" % ", lhs, rhs, Precedence::DIV_REM, Precedence::DIV_REM),
                 prec,
-                Precedence::DIVREM,
+                Precedence::DIV_REM,
             ),
             Expr::Arith(Arith::BitAnd, lhs, rhs) => cond_paren(
-                self.compile_binop(" & ", lhs, rhs, Precedence::BITAND, Precedence::BITAND),
+                self.binary_op(" & ", lhs, rhs, Precedence::BITAND, Precedence::BITAND),
                 prec,
                 Precedence::BITAND,
             ),
             Expr::Arith(Arith::BitOr, lhs, rhs) => cond_paren(
-                self.compile_binop(" | ", lhs, rhs, Precedence::BITOR, Precedence::BITOR),
+                self.binary_op(" | ", lhs, rhs, Precedence::BITOR, Precedence::BITOR),
                 prec,
                 Precedence::BITOR,
             ),
             Expr::Arith(Arith::BoolAnd, lhs, rhs) => cond_paren(
-                self.compile_binop(" && ", lhs, rhs, Precedence::BITAND, Precedence::BITAND),
+                self.binary_op(" && ", lhs, rhs, Precedence::BITAND, Precedence::BITAND),
                 prec,
-                Precedence::LOGAND,
+                Precedence::LOGICAL_AND,
             ),
             Expr::Arith(Arith::BoolOr, lhs, rhs) => cond_paren(
-                self.compile_binop(" || ", lhs, rhs, Precedence::BITOR, Precedence::BITOR),
+                self.binary_op(" || ", lhs, rhs, Precedence::BITOR, Precedence::BITOR),
                 prec,
-                Precedence::LOGOR,
+                Precedence::LOGICAL_OR,
             ),
             Expr::Arith(Arith::Shl, lhs, rhs) => cond_paren(
-                self.compile_binop(" << ", lhs, rhs, Precedence::BITSHIFT, Precedence::BITSHIFT),
+                self.binary_op(
+                    " << ",
+                    lhs,
+                    rhs,
+                    Precedence::BIT_SHIFT,
+                    Precedence::BIT_SHIFT,
+                ),
                 prec,
-                Precedence::BITSHIFT,
+                Precedence::BIT_SHIFT,
             ),
             Expr::Arith(Arith::Shr, lhs, rhs) => cond_paren(
-                self.compile_binop(" >> ", lhs, rhs, Precedence::BITSHIFT, Precedence::BITSHIFT),
+                self.binary_op(
+                    " >> ",
+                    lhs,
+                    rhs,
+                    Precedence::BIT_SHIFT,
+                    Precedence::BIT_SHIFT,
+                ),
                 prec,
-                Precedence::BITSHIFT,
+                Precedence::BIT_SHIFT,
             ),
             Expr::Unary(UnaryOp::BoolNot, expr) => cond_paren(
-                self.compile_prefix("!", None, expr),
+                self.prefix_op("!", None, expr),
                 prec,
-                Precedence::LOGNEGATE,
+                Precedence::LOGICAL_NEGATE,
             ),
             Expr::Unary(UnaryOp::IntPred, expr) => cond_paren(
-                self.compile_prefix("pred", None, expr),
+                self.prefix_op("pred", None, expr),
                 prec,
-                Precedence::NUMPREFIX,
+                Precedence::NUMERIC_PREFIX,
             ),
             Expr::Unary(UnaryOp::IntSucc, expr) => cond_paren(
-                self.compile_prefix("succ", None, expr),
+                self.prefix_op("succ", None, expr),
                 prec,
-                Precedence::NUMPREFIX,
+                Precedence::NUMERIC_PREFIX,
             ),
             Expr::AsU8(expr) => cond_paren(
-                self.compile_prefix("as-u8", None, expr),
+                self.prefix_op("as-u8", None, expr),
                 prec,
                 Precedence::CAST_PREFIX,
             ),
             Expr::AsU16(expr) => cond_paren(
-                self.compile_prefix("as-u16", None, expr),
+                self.prefix_op("as-u16", None, expr),
                 prec,
                 Precedence::CAST_PREFIX,
             ),
             Expr::AsU32(expr) => cond_paren(
-                self.compile_prefix("as-u32", None, expr),
+                self.prefix_op("as-u32", None, expr),
                 prec,
                 Precedence::CAST_PREFIX,
             ),
             Expr::AsU64(expr) => cond_paren(
-                self.compile_prefix("as-u64", None, expr),
+                self.prefix_op("as-u64", None, expr),
                 prec,
                 Precedence::CAST_PREFIX,
             ),
             Expr::AsChar(expr) => cond_paren(
-                self.compile_prefix("as-char", None, expr),
+                self.prefix_op("as-char", None, expr),
                 prec,
                 Precedence::CAST_PREFIX,
             ),
             Expr::U16Be(bytes) => cond_paren(
-                self.compile_prefix("u16be", None, bytes),
+                self.prefix_op("u16be", None, bytes),
                 prec,
                 Precedence::CAST_PREFIX,
             ),
             Expr::U16Le(bytes) => cond_paren(
-                self.compile_prefix("u16le", None, bytes),
+                self.prefix_op("u16le", None, bytes),
                 prec,
                 Precedence::CAST_PREFIX,
             ),
             Expr::U32Be(bytes) => cond_paren(
-                self.compile_prefix("u32be", None, bytes),
+                self.prefix_op("u32be", None, bytes),
                 prec,
                 Precedence::CAST_PREFIX,
             ),
             Expr::U32Le(bytes) => cond_paren(
-                self.compile_prefix("u32le", None, bytes),
+                self.prefix_op("u32le", None, bytes),
                 prec,
                 Precedence::CAST_PREFIX,
             ),
             Expr::U64Be(bytes) => cond_paren(
-                self.compile_prefix("u64be", None, bytes),
+                self.prefix_op("u64be", None, bytes),
                 prec,
                 Precedence::CAST_PREFIX,
             ),
             Expr::U64Le(bytes) => cond_paren(
-                self.compile_prefix("u64le", None, bytes),
+                self.prefix_op("u64le", None, bytes),
                 prec,
                 Precedence::CAST_PREFIX,
             ),
             Expr::SeqLength(seq) => cond_paren(
-                self.compile_prefix("seq-length", None, seq),
+                self.prefix_op("seq-length", None, seq),
                 prec,
-                Precedence::FUNAPP,
+                Precedence::FUN_APPLICATION,
             ),
             Expr::SeqIx(seq, index) => cond_paren(
-                self.compile_prefix("seq-ix", Some(&[index]), seq),
+                self.prefix_op("seq-ix", Some(&[index]), seq),
                 prec,
-                Precedence::FUNAPP,
+                Precedence::FUN_APPLICATION,
             ),
             Expr::SubSeq(seq, start, length) => cond_paren(
-                self.compile_prefix("sub-seq", Some(&[start, length]), seq),
+                self.prefix_op("sub-seq", Some(&[start, length]), seq),
                 prec,
-                Precedence::FUNAPP,
+                Precedence::FUN_APPLICATION,
             ),
             Expr::SubSeqInflate(seq, start, length) => cond_paren(
-                self.compile_prefix("sub-seq-inflate", Some(&[start, length]), seq),
+                self.prefix_op("sub-seq-inflate", Some(&[start, length]), seq),
                 prec,
-                Precedence::FUNAPP,
+                Precedence::FUN_APPLICATION,
             ),
             Expr::FlatMap(expr, seq) => cond_paren(
-                self.compile_prefix("flat-map", Some(&[expr]), seq),
+                self.prefix_op("flat-map", Some(&[expr]), seq),
                 prec,
-                Precedence::FUNAPP,
+                Precedence::FUN_APPLICATION,
             ),
             Expr::FlatMapAccum(expr, accum, _accum_type, seq) => cond_paren(
-                self.compile_prefix("flat-map-accum", Some(&[expr, accum]), seq),
+                self.prefix_op("flat-map-accum", Some(&[expr, accum]), seq),
                 prec,
-                Precedence::FUNAPP,
+                Precedence::FUN_APPLICATION,
             ),
             Expr::LeftFold(expr, accum, _accum_type, seq) => cond_paren(
-                self.compile_prefix("left-fold", Some(&[expr, accum]), seq),
+                self.prefix_op("left-fold", Some(&[expr, accum]), seq),
                 prec,
-                Precedence::FUNAPP,
+                Precedence::FUN_APPLICATION,
             ),
             Expr::FlatMapList(expr, _ret_type, seq) => cond_paren(
-                self.compile_prefix("flat-map-list", Some(&[expr]), seq),
+                self.prefix_op("flat-map-list", Some(&[expr]), seq),
                 prec,
-                Precedence::FUNAPP,
+                Precedence::FUN_APPLICATION,
             ),
             Expr::Dup(count, expr) => cond_paren(
-                self.compile_prefix("dup", Some(&[count]), expr),
+                self.prefix_op("dup", Some(&[count]), expr),
                 prec,
-                Precedence::FUNAPP,
+                Precedence::FUN_APPLICATION,
             ),
             Expr::LiftOption(Some(expr)) => cond_paren(
-                self.compile_prefix("some", None, expr),
+                self.prefix_op("some", None, expr),
                 prec,
-                Precedence::FUNAPP,
+                Precedence::FUN_APPLICATION,
             ),
             Expr::LiftOption(None) => Fragment::string("none"),
             Expr::TupleProj(head, index) => cond_paren(
@@ -1989,11 +1999,11 @@ impl<'module> MonoidalPrinter<'module> {
 
             Format::ItemVar(var, args) => {
                 let mut frag = Fragment::new();
-                frag.encat(Fragment::String(
+                frag.append(Fragment::String(
                     self.module.get_name(*var).to_string().into(),
                 ));
                 if !args.is_empty() {
-                    frag.encat(Fragment::String("(...)".into()));
+                    frag.append(Fragment::String("(...)".into()));
                 }
                 frag
             }

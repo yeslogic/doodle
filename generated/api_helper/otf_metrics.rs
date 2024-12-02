@@ -124,6 +124,13 @@ pub type OpentypeGpos = opentype_gpos_table;
 // !SECTION
 
 // SECTION - Helper traits for consistent-style conversion from generated types to the types we use to represent them in the API Helper
+
+/// Helper trait for converting from a borrowed value of type `Original` into an owned value of type `Self`,
+/// as a short-cut to avoid the need to clone fields we would ultimately either discard, simplify, or unpack
+/// if we were to implement `From<Original>`  instead.
+///
+/// Avoids the need for lifetimes in the signature of the trait or its associated impls, relying on the fact
+/// that the lifetime of the borrowed source-object has no bearing on the target object's longevity.
 trait Promote<Original>: Sized {
     /// Convert from `Original` into `Self`.
     ///
@@ -133,21 +140,27 @@ trait Promote<Original>: Sized {
     fn promote(orig: &Original) -> Self;
 }
 
+/// Variant of [`Promote`] for cases where the conversion from `&Original` may have failure-cases.
 trait TryPromote<Original>: Sized {
+    /// The error-type returned when a given conversion cannot succeed.
     type Error: std::error::Error;
 
     /// Fallibly convert from the `Original` into `Self`.
     fn try_promote(orig: &Original) -> Result<Self, Self::Error>;
 }
 
+/// Custom trait that facilitates conversion from partially-borrowed non-atomic types
+/// without needing explicit lifetimes in the trait signature itself.
 trait TryFromRef<Original: _Ref>: Sized {
     type Error: std::error::Error;
 
-    /// Fallibly convert from the GAT `Ref<'a>` defined on Original, into `Self`.
+    /// Fallibly convert from the GAT `Ref<'a>` defined on `Original` (via the `_Ref` trait), into `Self`.
     fn try_from_ref<'a>(orig: <Original as _Ref>::Ref<'a>) -> Result<Self, Self::Error>;
 }
 
+/// Helper trait for implementing custom partial-borrow-semantics for non-atomic types
 trait _Ref {
+    /// A partial borrow of `Self` that lives at least as long as `'a`.
     type Ref<'a>;
 }
 
@@ -202,14 +215,18 @@ where
     }
 }
 
+// NOTE - this is generally helpful to have, though the linter and compiler return different error messages with and without this impl, when an implied Promote instance is not defined
 impl<T: Clone> Promote<T> for T {
     fn promote(orig: &T) -> T {
         orig.clone()
     }
 }
 
-/// Type-agnostic macro for dereferencing machine-generated Offset16 abstactions
+/// Type-agnostic macro for dereferencing machine-generated Offset16 abstractions
 /// into Option<T> of the promotable dereference-value
+///
+/// This may become an identity function we refactor to eliminate intermediate Offset16 records
+/// by using LetFormat or other forgetful chaining formats.
 macro_rules! promote_link {
     () => {
         (|offset| promote_opt(&offset.link))
@@ -219,6 +236,11 @@ macro_rules! promote_link {
 // !SECTION
 
 // SECTION - Generic (but niche-use-case) helper definitions
+
+/// Vector of values with representation `T` that have a nominal semantic interpretation specified by `Sem`.
+///
+/// Though generic, the practical usages of this type are for distinguishing `ClassId := u16` and `GlyphId := u16`
+/// semantics in GSUB/GPOS Lookup tables.
 #[derive(Clone)]
 #[repr(transparent)]
 struct SemVec<Sem, T> {
@@ -291,15 +313,15 @@ impl<Sem, T> std::ops::Deref for SemVec<Sem, T> {
     }
 }
 
-/// Marker type for indicating a SemVec (or any types above it) holds GlyphId-semantics u16 values
+/// Marker type for SemVec (or any types above it) holding GlyphId-semantics u16 values
 #[derive(Clone)]
 struct GlyphId;
-/// Marker type for indicating a SemVec (or any types above it) holds ClassId-semantics u16 values
+/// Marker type for SemVec (or any types above it) holding ClassId-semantics u16 values
 #[derive(Clone)]
 struct ClassId;
 
 // !SECTION
-/// Crate-private mirco-module for compile-time same-type assertions that can be chained
+/// Crate-private micro-module for compile-time 'same-type' assertions that can be chained
 pub(crate) mod refl {
     pub(crate) trait Refl<T> {
         type Solution;
@@ -313,6 +335,8 @@ pub(crate) mod refl {
     ///
     /// If Refl is too heavy-handed we can drop the forced unification and use this to merely document
     /// our expectations about what should be equal without rejecting parameters that are different.
+    ///
+    /// E.g. `ReflType<A, B> = A` (which the compiler might not like, perhaps?)
     pub(crate) type ReflType<A, B> = <A as Refl<B>>::Solution;
 }
 use refl::ReflType;
@@ -323,7 +347,7 @@ type TPErr<Src, Tgt> = <Tgt as TryPromote<Src>>::Error;
 /// Shorthand for qualifying a TryFromRef::Error item in the same style as `TPErr`
 type TFRErr<Src, Tgt> = <Tgt as TryFromRef<Src>>::Error;
 
-/// Hint to remind us that an error is being produced locally
+/// Hint to remind us that a given error-type has strictly local provenance
 type Local<T> = T;
 
 // SECTION - *Metrics and mid- to low-level API-enrichment analogues for raw gencode types
@@ -1077,15 +1101,44 @@ enum DeltaValues {
     Bits8(Vec<i8>),
 }
 
+/// Re-interprets a value with machine type `u8` as an `N`-bit signed integer
+/// using the expected two's-complement representation (with machine type `i8`).
+///
+/// If `N == 8`, operationally equivalent to casting `raw as i8`.
+///
+/// # Panics
+///
+/// Due to the limited use of this function, `N` must be in the range `[2, 8]`,
+/// and though it not necessarily checked, `raw` should contain no more than `N`
+/// significant bits.
+///
+/// # Examples
+///
+/// ```no_run
+/// // bits::<8>(raw) is the same as `raw as i8` so we omit those cases
+///
+/// // We only show the significant endpoints of the positive and negative ranges
+/// assert_eq!(bits::<4>(0x0), 0x0);
+/// assert_eq!(bits::<4>(0x7), 0x7);
+/// assert_eq!(bits::<4>(0x8), -0x8);
+/// assert_eq!(bits::<4>(0xF), -1);
+///
+/// // There are only four 2-bit values so we can list them all
+/// assert_eq!(bits::<2>(0b00), 0);
+/// assert_eq!(bits::<2>(0b01), 1);
+/// assert_eq!(bits::<2>(0b10), -2);
+/// assert_eq!(bits::<2>(0b11), -1);
+/// ```
 fn bits<const N: usize>(raw: u8) -> i8 {
+    // Shortcut for when we have exactly 8 bits
     if N == 8 {
         return raw as i8;
     }
     assert!(N > 1 && N < 8);
-    let rangemax: i8 = 1 << N;
+    let range_max: i8 = 1 << N;
     let i_raw = raw as i8;
-    if i_raw >= rangemax / 2 {
-        return i_raw - rangemax;
+    if i_raw >= range_max / 2 {
+        return i_raw - range_max;
     } else {
         i_raw
     }
@@ -1805,7 +1858,7 @@ struct SequenceContextFormat3 {
 
 pub type OpentypeRuleSet = opentype_common_sequence_context_subst_Format1_seq_rule_sets_link;
 
-// REVIEW - if RuleSet becomes an alias instead of a newtype, remove this definition and rename the following impl on Vec<Option<Rule>>
+// REVIEW - if RuleSet becomes an alias instead of a new-type, remove this definition and rename the following impl on Vec<Rule>
 impl Promote<OpentypeRuleSet> for RuleSet {
     fn promote(orig: &OpentypeRuleSet) -> Self {
         Self(<Vec<Rule>>::promote(orig))
@@ -3275,7 +3328,7 @@ fn format_lookup_subtable(
                     coverage, ..
                 }) => {
                     // TODO - even if it means overly verbose output, this might be too little info to be useful compared to discriminant-only display
-                    // REVIEW - consider what other details (e.g. class-def summary metrics) to show in implicitly- or explictly-verbose display format
+                    // REVIEW - consider what other details (e.g. class-def summary metrics) to show in implicitly- or explicitly-verbose display format
                     format!("ChainedClasses({})", format_coverage_table(coverage))
                 }
                 ChainedSequenceContext::Format3(ChainedSequenceContextFormat3 {
@@ -3466,7 +3519,7 @@ fn format_lookup_flag(flags: &LookupFlag) -> String {
         set_flags.push("IGNORE_BASE_GLYPHS");
     }
     if flags.ignore_ligatures {
-        set_flags.push("IGNORE_LIGATURES)");
+        set_flags.push("IGNORE_LIGATURES");
     }
     if flags.ignore_marks {
         set_flags.push("IGNORE_MARKS");
@@ -3475,18 +3528,20 @@ fn format_lookup_flag(flags: &LookupFlag) -> String {
         set_flags.push("USE_MARK_FILTERING_SET");
     }
 
-    let str_bitflags = if set_flags.is_empty() {
+    let str_flags = if set_flags.is_empty() {
         String::from("∅")
     } else {
         set_flags.join(" | ")
     };
 
     let str_macf = match flags.mark_attachment_class_filter {
+        // NOTE - If we are not filtering by mark attachment class, we don't need to print anything for that field
         0 => String::new(),
+        // REVIEW - if horizontal space is at a premium, we may want to shorten or partially elide the label-string
         n => format!("; mark_attachment_class_filter = {n}"),
     };
 
-    format!("LookupFlag ({str_bitflags}{str_macf})")
+    format!("LookupFlag ({str_flags}{str_macf})")
 }
 
 fn format_lookup_type(ctxt: Ctxt, ltype: u16) -> &'static str {

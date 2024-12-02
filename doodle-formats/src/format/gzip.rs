@@ -41,10 +41,10 @@ pub fn main(module: &mut FormatModule, deflate: FormatRef, base: &BaseModule) ->
         record([("crc", base.u32le()), ("length", base.u32le())]),
     );
 
-    let fname_flag = record_projs(var("header"), &["file-flags", "fname"]);
+    let fname_flag = record_lens(var("header"), &["file-flags", "fname"]);
     let fname = module.define_format("gzip.fname", base.asciiz_string());
 
-    let fextra_flag = record_projs(var("header"), &["file-flags", "fextra"]);
+    let fextra_flag = record_lens(var("header"), &["file-flags", "fextra"]);
     let fextra_subfield = module.define_format(
         "gzip.fextra.subfield",
         record([
@@ -68,7 +68,7 @@ pub fn main(module: &mut FormatModule, deflate: FormatRef, base: &BaseModule) ->
         ]),
     );
 
-    let fcomment_flag = record_projs(var("header"), &["file-flags", "fcomment"]);
+    let fcomment_flag = record_lens(var("header"), &["file-flags", "fcomment"]);
 
     let fcomment = module.define_format(
         "gzip.fcomment",
@@ -77,7 +77,7 @@ pub fn main(module: &mut FormatModule, deflate: FormatRef, base: &BaseModule) ->
         ]),
     );
 
-    let fhcrc_flag = record_projs(var("header"), &["file-flags", "fhcrc"]);
+    let fhcrc_flag = record_lens(var("header"), &["file-flags", "fhcrc"]);
     let fhcrc = module.define_format(
         "gzip.fhcrc",
         record([
