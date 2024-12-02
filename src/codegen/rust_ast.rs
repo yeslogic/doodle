@@ -370,10 +370,10 @@ impl RustDecl {
 impl ToFragment for RustDecl {
     fn to_fragment(&self) -> Fragment {
         match self {
-            RustDecl::TypeDef(name, tdef) => {
-                let frag_key = Fragment::string(tdef.keyword_for());
-                Fragment::intervene(frag_key, Fragment::Char(' '), name.to_fragment())
-                    .intervene(Fragment::Char(' '), tdef.to_fragment())
+            RustDecl::TypeDef(name, type_def) => {
+                let keyword = Fragment::string(type_def.keyword_for());
+                Fragment::intervene(keyword, Fragment::Char(' '), name.to_fragment())
+                    .intervene(Fragment::Char(' '), type_def.to_fragment())
             }
             RustDecl::Function(fn_def) => fn_def.to_fragment(),
         }
@@ -516,7 +516,8 @@ pub(crate) enum RustTypeDef {
 }
 
 impl RustTypeDef {
-    pub fn keyword_for(&self) -> &'static str {
+    /// Determines the Rust keyword associated with a particular type-definition, being one of `enum` or `struct`.
+    pub const fn keyword_for(&self) -> &'static str {
         match self {
             Self::Enum(..) => "enum",
             Self::Struct(..) => "struct",
@@ -598,7 +599,7 @@ impl RustType {
         )))
     }
 
-    fn try_as_primtype(&self) -> Option<PrimType> {
+    fn try_as_prim(&self) -> Option<PrimType> {
         match self {
             RustType::Atom(AtomType::Prim(pt)) => Some(*pt),
             _ => None,
@@ -606,9 +607,22 @@ impl RustType {
     }
 
     /// Returns `true` if `self` is a known-`Copy` `RustType`.
+    ///
+    /// # Note
+    ///
+    /// Though superficially similar to [`can_be_copy`], these methods serve starkly different purposes.
+    ///
+    /// The in-crate use-case for `RustType::is_copy` is as a direct heuristic on pattern-introspection on
+    /// `Some` (or similar) should be destructive (when `true`) or referential (when `false`) to allow for
+    /// the more natural type of the bound value to be available in the rhs block without having to explicitly
+    /// dereference, clone, or otherwise perturb the usage-sites of the bound variables.
+    ///
+    /// In contrast, the in-crate use-case for `RustType::can_be_copy` is to determine whether the presence
+    /// of a `RustType` (i.e. the received `self`) as a recursive element within the body of some abstract
+    /// `RustTypeDef` would preclude a `Copy` implementation on that definition.
     pub(crate) fn is_copy(&self) -> bool {
-        match self.try_as_primtype() {
-            // NOTE - all PrimTypes are Copy, and only PrimTypes are statically determinable to be Copy
+        match self.try_as_prim() {
+            // NOTE - all PrimTypes are Copy, and only PrimTypes care specifically about being owned or referenced in terms of what operations we perform on them in the RHS
             Some(_pt) => true,
             _ => false,
         }
@@ -626,6 +640,7 @@ impl RustType {
         match self {
             RustType::Atom(at) => match at {
                 AtomType::Prim(..) => true,
+                // Without passing around high-level type-maps, we can't check any externally-defined or local ad-hoc types for Copy-safety
                 AtomType::TypeRef(..) => false,
                 AtomType::Comp(ct) => match ct {
                     CompType::Vec(_) => false,
@@ -635,6 +650,7 @@ impl RustType {
                 },
             },
             RustType::AnonTuple(args) => args.iter().all(|t| t.can_be_copy()),
+            // Without lexical analysis rules, we have no good way to determine whether a verbatim-injected type-name is Copy-safe or not
             RustType::Verbatim(..) => false,
         }
     }
@@ -649,7 +665,7 @@ impl ToFragment for RustType {
                 let mut elems = Fragment::seq(inner, Some(Fragment::string(", ")));
                 // NOTE - Rust 1-tuples need an explicit ',' after the sole element
                 if args.len() == 1 {
-                    elems.encat(Fragment::Char(','));
+                    elems.append(Fragment::Char(','));
                 }
                 elems.delimit(Fragment::Char('('), Fragment::Char(')'))
             }
@@ -830,7 +846,7 @@ where
 {
     fn to_fragment(&self) -> Fragment {
         match self {
-            AtomType::TypeRef(ltype) => ltype.to_fragment(),
+            AtomType::TypeRef(local_type) => local_type.to_fragment(),
             AtomType::Prim(pt) => pt.to_fragment(),
             AtomType::Comp(ct) => ct.to_fragment(),
         }
@@ -1213,7 +1229,7 @@ pub(crate) enum RustExpr {
     Entity(RustEntity),
     PrimitiveLit(RustPrimLit),
     ArrayLit(Vec<RustExpr>),
-    MethodCall(Box<RustExpr>, MethodSpecifier, Vec<RustExpr>), // used for specifically calling methods to assign a constant precedence to avoid parenthetical nesting
+    MethodCall(Box<RustExpr>, MethodSpecifier, Vec<RustExpr>), // NOTE - to avoid nesting parentheses, we avoid chaining `FieldAccess` and `FunctionCall` and instead use a distinguished variant
     FieldAccess(Box<RustExpr>, SubIdent), // can be used for receiver methods as well, with FunctionCall
     FunctionCall(Box<RustExpr>, Vec<RustExpr>), // can be used for tuple constructors as well
     Tuple(Vec<RustExpr>),
@@ -1376,7 +1392,7 @@ pub(crate) enum PrefixOperator {
 impl PrefixOperator {
     fn precedence(&self) -> Precedence {
         match self {
-            PrefixOperator::BoolNot => Precedence::LOGNEGATE,
+            PrefixOperator::BoolNot => Precedence::LOGICAL_NEGATE,
         }
     }
 
@@ -1397,14 +1413,14 @@ impl InfixOperator {
             InfixOperator::Lt | InfixOperator::Lte | InfixOperator::Gt | InfixOperator::Gte => {
                 Precedence::COMPARE
             }
-            InfixOperator::Div | InfixOperator::Rem => Precedence::DIVREM,
-            InfixOperator::Add | InfixOperator::Sub => Precedence::ADDSUB,
+            InfixOperator::Div | InfixOperator::Rem => Precedence::DIV_REM,
+            InfixOperator::Add | InfixOperator::Sub => Precedence::ADD_SUB,
             InfixOperator::Mul => Precedence::MUL,
-            InfixOperator::Shl | InfixOperator::Shr => Precedence::BITSHIFT,
+            InfixOperator::Shl | InfixOperator::Shr => Precedence::BIT_SHIFT,
             InfixOperator::BitOr => Precedence::BITOR,
             InfixOperator::BitAnd => Precedence::BITAND,
-            InfixOperator::BoolAnd => Precedence::LOGAND,
-            InfixOperator::BoolOr => Precedence::LOGOR,
+            InfixOperator::BoolAnd => Precedence::LOGICAL_AND,
+            InfixOperator::BoolOr => Precedence::LOGICAL_OR,
         }
     }
 
@@ -1511,14 +1527,20 @@ impl RustOp {
         match self {
             RustOp::InfixOp(op, lhs, rhs) => {
                 match (op, lhs.try_get_primtype(), rhs.try_get_primtype()) {
-                    (InfixOperator::Eq | InfixOperator::Neq, Some(ltype), Some(rtype)) => {
-                        ltype == rtype
+                    (InfixOperator::Eq | InfixOperator::Neq, Some(lhs_type), Some(rhs_type)) => {
+                        lhs_type == rhs_type
                     }
                     // NOTE - we need to filter out BoolAnd and BoolOr from the next catchall branch, so we can't merely match on the literal PrimType::Bool in the case-pattern
-                    (InfixOperator::BoolAnd | InfixOperator::BoolOr, Some(ltype), Some(rtype)) => {
-                        matches!((ltype, rtype), (PrimType::Bool, PrimType::Bool))
+                    (
+                        InfixOperator::BoolAnd | InfixOperator::BoolOr,
+                        Some(lhs_type),
+                        Some(rhs_type),
+                    ) => {
+                        matches!((lhs_type, rhs_type), (PrimType::Bool, PrimType::Bool))
                     }
-                    (_, Some(ltype), Some(rtype)) => ltype == rtype && ltype.is_numeric(),
+                    (_, Some(lhs_type), Some(rhs_type)) => {
+                        lhs_type == rhs_type && lhs_type.is_numeric()
+                    }
                     (_, None, _) | (_, _, None) => false,
                 }
             }
@@ -1526,7 +1548,7 @@ impl RustOp {
                 (PrefixOperator::BoolNot, Some(PrimType::Bool)) => true,
                 (PrefixOperator::BoolNot, _) => false,
             },
-            RustOp::AsCast(expr, typ) => match (expr.try_get_primtype(), typ.try_as_primtype()) {
+            RustOp::AsCast(expr, typ) => match (expr.try_get_primtype(), typ.try_as_prim()) {
                 (Some(pt0), Some(pt1)) => !matches!(
                     PrimType::compare_width(pt0, pt1),
                     None | Some(Ordering::Greater)
@@ -1620,8 +1642,8 @@ impl RustExpr {
         path: impl IntoIterator<Item = Name>,
         name: impl Into<Label>,
     ) -> Self {
-        let lpath = path.into_iter().map(|x| x.into()).collect::<Vec<Label>>();
-        Self::Entity(RustEntity::Scoped(lpath, name.into()))
+        let labels = path.into_iter().map(|x| x.into()).collect::<Vec<Label>>();
+        Self::Entity(RustEntity::Scoped(labels, name.into()))
     }
 
     pub fn borrow_of(self) -> Self {
@@ -1733,24 +1755,81 @@ impl RustExpr {
                 RustPrimLit::String(..) => None,
             },
             RustExpr::ArrayLit(..) => None,
-            RustExpr::MethodCall(_obj, _method, _vars) => {
+            RustExpr::MethodCall(_recv, _method, _args) => {
                 match _method {
-                    // REVIEW - the current only CommonMethod, Len, is not well-defined over non-empty argument lists but we don't check this
-                    MethodSpecifier::Common(cm) => cm.try_get_return_primtype(),
+                    MethodSpecifier::Common(cm) => {
+                        // REVIEW - the current only CommonMethod, Len, is not well-defined over non-empty argument lists, but we don't check this
+                        cm.try_get_return_primtype()
+                    }
                     MethodSpecifier::Arbitrary(SubIdent::ByIndex(_)) => {
-                        unreachable!("unexpected method call using numeric subident")
+                        unreachable!("unexpected method call using numeric SubIdent")
                     }
                     MethodSpecifier::Arbitrary(SubIdent::ByName(name)) => {
-                        if name.as_ref() == "len" && _vars.is_empty() {
+                        if name.as_ref() == "len" && _args.is_empty() {
+                            if cfg!(debug_assertions) {
+                                // REVIEW - is this worth warning about or should it be an acceptable invocation?
+                                eprintln!("WARNING: `.len()` method should be specified as a `MethodSpecifier::Common`, but was called via `Arbitrary(SubIdent::ByName)` instead...");
+                            }
+                            // REVIEW - we don't really check anything about `_recv`, and really just assume that a `.len()` method will always return `usize`
                             Some(PrimType::Usize)
                         } else {
+                            // REVIEW - we might want to log the number of times we hit this branch, and with what values, to see if there are any obvious cases to handle
                             None
                         }
                     }
                 }
             }
-            // FIXME - this is complicated enough we won't bother implementing anything for this for now
-            RustExpr::FieldAccess(..) => None,
+            RustExpr::FieldAccess(obj, ident) => {
+                match ident {
+                    &SubIdent::ByIndex(ix) => match &**obj {
+                        RustExpr::Tuple(tuple)
+                        | RustExpr::Struct(_, StructExpr::TupleExpr(tuple)) => {
+                            if tuple.len() <= ix {
+                                unreachable!(
+                                    "bad tuple-index `_.{ix}` on {}-tuple {:?}",
+                                    tuple.len(),
+                                    tuple
+                                );
+                            }
+                            tuple[ix].try_get_primtype()
+                        }
+                        _ => {
+                            // REVIEW - at least notionally, it is hard to come up with any other cases that aren't invariably dead-ends
+                            None
+                        }
+                    },
+                    SubIdent::ByName(name) => match &**obj {
+                        RustExpr::Struct(_con, StructExpr::RecordExpr(fields)) => {
+                            for (field, val) in fields {
+                                if field == name {
+                                    if let Some(val) = val {
+                                        return val.try_get_primtype();
+                                    } else {
+                                        // NOTE - solving a named-field pun requires non-local reasoning equivalent to solving `RustExpr::Entity`
+                                        return None;
+                                    }
+                                }
+                            }
+                            unreachable!(
+                                "missing struct-field `_.{name}` on struct expression: {obj:?}"
+                            );
+                        }
+                        RustExpr::Struct(..) => unreachable!(
+                            "bad indexing {ident:?} on non-record struct expression: {obj:?}"
+                        ),
+                        _ => {
+                            // REVIEW - at least notionally, it is hard to come up with any other cases that aren't invariably dead-ends
+                            None
+                        }
+                    },
+                }
+            }
+            RustExpr::Struct(..) => None,
+            RustExpr::Tuple(tuple) => match &tuple[..] {
+                [] => Some(PrimType::Unit),
+                [x] => x.try_get_primtype(),
+                [_, ..] => None,
+            },
             RustExpr::Index(seq, index) => {
                 match &**seq {
                     RustExpr::ArrayLit(lits) => {
@@ -1760,18 +1839,18 @@ impl RustExpr {
                             None
                         }
                     }
-                    // FIXME - Anything more complex than an array literal may not be worth sinking excess effort for a minor QoL improvement
-                    _ => None,
+                    _ => {
+                        // REVIEW - It is unclear whether adding logic to support anything more complex than an array literal would be worth it
+                        // TODO - we might want to log the number of times we hit this branch, and with what values, to see if there are any obvious cases to handle
+                        None
+                    }
                 }
             }
-            // FIXME - there may be some functions we can predict the return values of, but for now we can leave this alone
-            RustExpr::FunctionCall(..) => None,
-            RustExpr::Tuple(tuple) => match &tuple[..] {
-                [] => Some(PrimType::Unit),
-                [x] => x.try_get_primtype(),
-                [_, ..] => None,
-            },
-            RustExpr::Struct(..) => None,
+            RustExpr::FunctionCall(..) => {
+                // FIXME - there may be some functions we can predict the return values of, but for now we can leave this alone
+                // REVIEW - we might want to log the number of times we hit this branch, and with what values, to see if there are any obvious cases to handle
+                None
+            }
             RustExpr::CloneOf(x) | RustExpr::Deref(x) => match &**x {
                 RustExpr::Borrow(y) | RustExpr::BorrowMut(y) => y.try_get_primtype(),
                 other => other.try_get_primtype(),
@@ -1789,7 +1868,7 @@ impl RustExpr {
                     op.out_type(expr_type)
                 }
                 RustOp::AsCast(expr, typ) => {
-                    let out_typ = typ.try_as_primtype()?;
+                    let out_typ = typ.try_as_prim()?;
                     if expr
                         .try_get_primtype()
                         .as_ref()
@@ -1802,7 +1881,10 @@ impl RustExpr {
                     }
                 }
             },
-            RustExpr::BlockScope(_stmts, ret) => ret.try_get_primtype(),
+            RustExpr::BlockScope(_stmts, ret) => {
+                // REVIEW - consider whether it is worthwhile to bother scanning `_stmts` for local definitions that `ret` might then refer to...
+                ret.try_get_primtype()
+            }
             RustExpr::Control(..)
             | RustExpr::Closure(..)
             | RustExpr::Slice(..)
@@ -1873,7 +1955,7 @@ impl RustExpr {
     pub(crate) fn make_persistent(&self) -> Cow<'_, Self> {
         match self {
             RustExpr::Entity(..) => Cow::Borrowed(self),
-            // REVIEW - consider which non-entity cases are already 'peristent'
+            // REVIEW - consider which non-entity cases are already 'persistent'
             _ => Cow::Owned(RustExpr::BlockScope(
                 vec![RustStmt::assign("tmp", self.clone())],
                 Box::new(RustExpr::local("tmp")),

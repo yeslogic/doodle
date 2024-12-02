@@ -7,7 +7,7 @@ use std::{
 /// Returns the number of significant bits in `x`
 ///
 /// If `x` is `0`, returns `0`.
-fn sigbits(x: usize) -> usize {
+fn sig_bits(x: usize) -> usize {
     match x {
         0 => 0,
         _ => (x.ilog2() + 1) as usize,
@@ -72,7 +72,7 @@ impl Bounds {
         };
 
         // Highest significant bit not in the common prefix
-        let mbits = sigbits(max ^ self.min);
+        let mbits = sig_bits(max ^ self.min);
 
         // length, in bits, of the common prefix
         let set_bits = nbits
@@ -84,9 +84,9 @@ impl Bounds {
             return (0, *self);
         }
 
-        // bitmask over x that constitutes k
+        // bit-mask over x that constitutes k
         let hi_mask = ((1 << set_bits) - 1) << mbits;
-        // bitmask over x that constitutes y
+        // bit-mask over x that constitutes y
         let lo_mask = (1 << mbits) - 1;
 
         let k = hi_mask & max;
@@ -100,8 +100,8 @@ impl Bounds {
     /// `self` over the range `min..=max`.
     pub(crate) fn significant_bits(&self) -> Bounds {
         Self {
-            min: sigbits(self.min),
-            max: self.max.map(sigbits),
+            min: sig_bits(self.min),
+            max: self.max.map(sig_bits),
         }
     }
 

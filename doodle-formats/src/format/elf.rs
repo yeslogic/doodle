@@ -645,8 +645,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let elf_ph = eoh_offset_none0(
         record_proj(var("header"), "phoff"),
         elf_phdr_table.call_args(vec![
-            is_be(record_projs(var("header"), &["ident", "data"])),
-            record_projs(var("header"), &["ident", "class"]),
+            is_be(record_lens(var("header"), &["ident", "data"])),
+            record_lens(var("header"), &["ident", "class"]),
             record_proj(var("header"), "phnum"),
         ]),
     );
@@ -654,8 +654,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let elf_sh = eoh_offset_none0(
         record_proj(var("header"), "shoff"),
         elf_shdr_table.call_args(vec![
-            is_be(record_projs(var("header"), &["ident", "data"])),
-            record_projs(var("header"), &["ident", "class"]),
+            is_be(record_lens(var("header"), &["ident", "data"])),
+            record_lens(var("header"), &["ident", "class"]),
             record_proj(var("header"), "shnum"),
         ]),
     );

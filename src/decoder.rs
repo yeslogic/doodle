@@ -444,19 +444,19 @@ impl Expr {
             Expr::Unary(UnaryOp::IntPred, x) => Cow::Owned(match x.eval_value(scope) {
                 Value::U8(x) => Value::U8(
                     x.checked_sub(1)
-                        .unwrap_or_else(|| panic!("IntPred(0u8) underflowed")),
+                        .unwrap_or_else(|| panic!("IntPred(0u8) underflow")),
                 ),
                 Value::U16(x) => Value::U16(
                     x.checked_sub(1)
-                        .unwrap_or_else(|| panic!("IntPred(0u16) underflowed")),
+                        .unwrap_or_else(|| panic!("IntPred(0u16) underflow")),
                 ),
                 Value::U32(x) => Value::U32(
                     x.checked_sub(1)
-                        .unwrap_or_else(|| panic!("IntPred(0u32) underflowed")),
+                        .unwrap_or_else(|| panic!("IntPred(0u32) underflow")),
                 ),
                 Value::U64(x) => Value::U64(
                     x.checked_sub(1)
-                        .unwrap_or_else(|| panic!("IntPred(0u64) underflowed")),
+                        .unwrap_or_else(|| panic!("IntPred(0u64) underflow")),
                 ),
                 x => panic!("unexpected operand: expected integral value, found `{x:?}`"),
             }),
@@ -677,7 +677,7 @@ impl Expr {
 
     fn eval_value_ref<'a, 'b: 'a>(&'b self, scope: &'a Scope<'a>) -> Cow<'a, Value> {
         match self.eval(scope) {
-            Cow::Borrowed(vref) => Cow::Borrowed(vref.coerce_mapped_value()),
+            Cow::Borrowed(value) => Cow::Borrowed(value.coerce_mapped_value()),
             Cow::Owned(v) => Cow::Owned(v.extract_mapped_value()),
         }
     }
@@ -857,21 +857,21 @@ impl<'a> Compiler<'a> {
                 }
                 Ok(Decoder::Parallel(ds))
             }
-            Format::Tuple(fields) => {
-                let mut dfields = Vec::with_capacity(fields.len());
-                let mut fields = fields.iter();
+            Format::Tuple(elems) => {
+                let mut decs = Vec::with_capacity(elems.len());
+                let mut fields = elems.iter();
                 while let Some(f) = fields.next() {
                     let next = Rc::new(Next::Tuple(
                         MaybeTyped::Untyped(fields.as_slice()),
                         next.clone(),
                     ));
                     let df = self.compile_format(f, next)?;
-                    dfields.push(df);
+                    decs.push(df);
                 }
-                Ok(Decoder::Tuple(dfields))
+                Ok(Decoder::Tuple(decs))
             }
             Format::Record(fields) => {
-                let mut dfields = Vec::with_capacity(fields.len());
+                let mut decs = Vec::with_capacity(fields.len());
                 let mut fields = fields.iter();
                 while let Some((name, f)) = fields.next() {
                     let next = Rc::new(Next::Record(
@@ -879,9 +879,9 @@ impl<'a> Compiler<'a> {
                         next.clone(),
                     ));
                     let df = self.compile_format(f, next)?;
-                    dfields.push((name.clone(), df));
+                    decs.push((name.clone(), df));
                 }
-                Ok(Decoder::Record(dfields))
+                Ok(Decoder::Record(decs))
             }
             Format::Repeat(a) => {
                 if a.is_nullable(self.module) {

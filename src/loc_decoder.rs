@@ -712,19 +712,19 @@ impl Expr {
                 match x.eval_value_with_loc(scope) {
                     Value::U8(x) => Value::U8(
                         x.checked_add(1)
-                            .unwrap_or_else(|| panic!("IntSucc(u8::MAX) overflowed")),
+                            .unwrap_or_else(|| panic!("IntSucc(u8::MAX) overflow")),
                     ),
                     Value::U16(x) => Value::U16(
                         x.checked_add(1)
-                            .unwrap_or_else(|| panic!("IntSucc(u16::MAX) overflowed")),
+                            .unwrap_or_else(|| panic!("IntSucc(u16::MAX) overflow")),
                     ),
                     Value::U32(x) => Value::U32(
                         x.checked_add(1)
-                            .unwrap_or_else(|| panic!("IntSucc(u32::MAX) overflowed")),
+                            .unwrap_or_else(|| panic!("IntSucc(u32::MAX) overflow")),
                     ),
                     Value::U64(x) => Value::U64(
                         x.checked_add(1)
-                            .unwrap_or_else(|| panic!("IntSucc(u64::MAX) overflowed")),
+                            .unwrap_or_else(|| panic!("IntSucc(u64::MAX) overflow")),
                     ),
                     x => panic!("unexpected operand: expected integral value, found `{x:?}`"),
                 },
@@ -733,19 +733,19 @@ impl Expr {
                 match x.eval_value_with_loc(scope) {
                     Value::U8(x) => Value::U8(
                         x.checked_sub(1)
-                            .unwrap_or_else(|| panic!("IntPred(0u8) underflowed")),
+                            .unwrap_or_else(|| panic!("IntPred(0u8) underflow")),
                     ),
                     Value::U16(x) => Value::U16(
                         x.checked_sub(1)
-                            .unwrap_or_else(|| panic!("IntPred(0u16) underflowed")),
+                            .unwrap_or_else(|| panic!("IntPred(0u16) underflow")),
                     ),
                     Value::U32(x) => Value::U32(
                         x.checked_sub(1)
-                            .unwrap_or_else(|| panic!("IntPred(0u32) underflowed")),
+                            .unwrap_or_else(|| panic!("IntPred(0u32) underflow")),
                     ),
                     Value::U64(x) => Value::U64(
                         x.checked_sub(1)
-                            .unwrap_or_else(|| panic!("IntPred(0u64) underflowed")),
+                            .unwrap_or_else(|| panic!("IntPred(0u64) underflow")),
                     ),
                     x => panic!("unexpected operand: expected integral value, found `{x:?}`"),
                 },
@@ -1241,8 +1241,8 @@ impl Decoder {
                     v.push(va);
                     input = next_input;
                 }
-                let totlen = input.offset - start_offset;
-                Ok((ParsedValue::new_seq(v, start_offset, totlen), input))
+                let total_len = input.offset - start_offset;
+                Ok((ParsedValue::new_seq(v, start_offset, total_len), input))
             }
             Decoder::DecodeBytes(bytes, a) => {
                 let bytes = {
@@ -1302,8 +1302,8 @@ impl Decoder {
                     input = next_input;
                     v.push(vf.clone());
                 }
-                let totlen = input.offset - start_offset;
-                Ok((ParsedValue::new_tuple(v, start_offset, totlen), input))
+                let total_len = input.offset - start_offset;
+                Ok((ParsedValue::new_tuple(v, start_offset, total_len), input))
             }
             Decoder::Record(fields) => {
                 let mut input = input;
@@ -1327,8 +1327,8 @@ impl Decoder {
                     input = next_input;
                     v.push(va);
                 }
-                let totlen = input.offset - start_offset;
-                Ok((ParsedValue::new_seq(v, start_offset, totlen), input))
+                let total_len = input.offset - start_offset;
+                Ok((ParsedValue::new_seq(v, start_offset, total_len), input))
             }
             Decoder::Until(tree, a) => {
                 let mut input = input;
@@ -1344,8 +1344,8 @@ impl Decoder {
                         break;
                     }
                 }
-                let totlen = input.offset - start_offset;
-                Ok((ParsedValue::new_seq(v, start_offset, totlen), input))
+                let total_len = input.offset - start_offset;
+                Ok((ParsedValue::new_seq(v, start_offset, total_len), input))
             }
             Decoder::RepeatCount(expr, a) => {
                 let mut input = input;
@@ -1356,8 +1356,8 @@ impl Decoder {
                     input = next_input;
                     v.push(va);
                 }
-                let totlen = input.offset - start_offset;
-                Ok((ParsedValue::new_seq(v, start_offset, totlen), input))
+                let total_len = input.offset - start_offset;
+                Ok((ParsedValue::new_seq(v, start_offset, total_len), input))
             }
             Decoder::RepeatBetween(tree, min, max, a) => {
                 let mut input = input;
@@ -1379,8 +1379,8 @@ impl Decoder {
                     input = next_input;
                     v.push(va);
                 }
-                let totlen = input.offset - start_offset;
-                Ok((ParsedValue::new_seq(v, start_offset, totlen), input))
+                let total_len = input.offset - start_offset;
+                Ok((ParsedValue::new_seq(v, start_offset, total_len), input))
             }
             Decoder::RepeatUntilLast(expr, a) => {
                 let mut input = input;
@@ -1394,8 +1394,8 @@ impl Decoder {
                         break;
                     }
                 }
-                let totlen = input.offset - start_offset;
-                Ok((ParsedValue::new_seq(v, start_offset, totlen), input))
+                let total_len = input.offset - start_offset;
+                Ok((ParsedValue::new_seq(v, start_offset, total_len), input))
             }
             Decoder::RepeatUntilSeq(expr, a) => {
                 let mut input = input;
@@ -1414,8 +1414,8 @@ impl Decoder {
                         break;
                     }
                 }
-                let totlen = input.offset - start_offset;
-                Ok((ParsedValue::new_seq(v, start_offset, totlen), input))
+                let total_len = input.offset - start_offset;
+                Ok((ParsedValue::new_seq(v, start_offset, total_len), input))
             }
             Decoder::AccumUntil(f_done, f_update, init, _vt, a) => {
                 let mut input = input;
@@ -1441,15 +1441,15 @@ impl Decoder {
                     accum = next_accum;
                     input = next_input;
                 }
-                let totlen = input.offset - start_offset;
+                let total_len = input.offset - start_offset;
                 Ok((
                     ParsedValue::new_tuple(
                         vec![
                             ParsedValue::from_evaluated(accum),
-                            ParsedValue::new_seq(v, start_offset, totlen),
+                            ParsedValue::new_seq(v, start_offset, total_len),
                         ],
                         start_offset,
-                        totlen,
+                        total_len,
                     ),
                     input,
                 ))
