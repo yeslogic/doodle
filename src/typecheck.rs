@@ -185,7 +185,7 @@ pub(crate) struct USingleScope<'a> {
 pub(crate) struct Ctxt<'a> {
     pub(crate) module: &'a FormatModule,
     pub(crate) scope: &'a UScope<'a>,
-    pub(crate) dyns: DynScope<'a>,
+    pub(crate) dyn_s: DynScope<'a>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -234,18 +234,18 @@ impl<'a> DynSingleScope<'a> {
 
 impl<'a> Ctxt<'a> {
     /// Returns a copy of `self` with the given `UScope` instead of `self.scope`.
-    pub(crate) fn with_scope(&'a self, newscope: &'a UScope<'a>) -> Ctxt<'a> {
+    pub(crate) fn with_scope(&'a self, scope: &'a UScope<'a>) -> Ctxt<'a> {
         Self {
             module: self.module,
-            dyns: self.dyns,
-            scope: newscope,
+            dyn_s: self.dyn_s,
+            scope,
         }
     }
 
     pub(crate) fn with_dyn_binding(&'a self, name: &'a str, dynf_var: UVar) -> Ctxt<'a> {
         Self {
             module: self.module,
-            dyns: DynScope::Single(DynSingleScope::new(&self.dyns, name, dynf_var)),
+            dyn_s: DynScope::Single(DynSingleScope::new(&self.dyn_s, name, dynf_var)),
             scope: self.scope,
         }
     }
@@ -254,7 +254,7 @@ impl<'a> Ctxt<'a> {
         Self {
             module,
             scope,
-            dyns: DynScope::new(),
+            dyn_s: DynScope::new(),
         }
     }
 }
@@ -313,13 +313,13 @@ pub(crate) enum VType {
 #[derive(Debug)]
 pub struct TypeChecker {
     constraints: Vec<Constraints>,
-    aliases: Vec<Alias>, // set of non-identity metavariables that are aliased to ?ix
-    varmaps: VarMapMap, // logically separate table of metacontext variant-maps for indirect aliasing
+    aliases: Vec<Alias>, // set of non-identity meta-variables that are aliased to ?ix
+    varmaps: VarMapMap, // logically separate table of meta-context variant-maps for indirect aliasing
     level_vars: HashMap<usize, UVar>,
 }
 
 /// Association type that identifies the relationship between a metavariable and the possibly-empty set
-/// of other metavariables that must agree in order for the tree to be well-typed.
+/// of other meta-variables that must agree in order for the tree to be well-typed.
 #[derive(Clone, Debug, Default)]
 enum Alias {
     #[default]
@@ -361,8 +361,8 @@ impl Alias {
                 let _ = std::mem::replace(self, Alias::Canonical(HashSet::from([tgt])));
             }
             Alias::BackRef(_) => panic!("cannot add forward-ref to Alias::BackRef"),
-            Alias::Canonical(fwds) => {
-                fwds.insert(tgt);
+            Alias::Canonical(fwd_refs) => {
+                fwd_refs.insert(tgt);
             }
         }
     }
@@ -377,7 +377,7 @@ impl Alias {
     fn iter_fwd_refs<'a>(&'a self) -> Box<dyn Iterator<Item = usize> + 'a> {
         match self {
             Alias::Ground | Alias::BackRef(_) => Box::new(std::iter::empty()),
-            Alias::Canonical(fwds) => Box::new(fwds.iter().copied()),
+            Alias::Canonical(fwd_refs) => Box::new(fwd_refs.iter().copied()),
         }
     }
 
@@ -385,7 +385,7 @@ impl Alias {
     fn contains_fwd_ref(&self, tgt: usize) -> bool {
         match self {
             Alias::Ground | Alias::BackRef(_) => false,
-            Alias::Canonical(fwds) => fwds.contains(&tgt),
+            Alias::Canonical(fwd_refs) => fwd_refs.contains(&tgt),
         }
     }
 }
@@ -439,8 +439,8 @@ pub struct VMId(usize);
 pub enum Constraints {
     #[default]
     Indefinite, // default value before union-type distinction is made
-    Variant(VMId), // indirect index into typechecker metacontext 'varmap' hashmap
-    Invariant(Constraint), // for all type metavariables, inferred non-variant constraint
+    Variant(VMId), // indirect index into typechecker meta-context 'varmap' hashmap
+    Invariant(Constraint), // for all type meta-variables, inferred non-variant constraint
 }
 
 impl Constraints {
@@ -470,8 +470,8 @@ impl Constraint {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ProjShape {
-    TupleWith(BTreeMap<usize, UVar>), // required associations of metavars at given indices of an uncertain tuple
-    RecordWith(BTreeMap<Label, UVar>), // required associations of metavars at given fields of an uncertain record
+    TupleWith(BTreeMap<usize, UVar>), // required associations of meta-variables at given indices of an uncertain tuple
+    RecordWith(BTreeMap<Label, UVar>), // required associations of meta-variables at given fields of an uncertain record
     SeqOf(UVar),                       // simple sequence element-type projection
 }
 
@@ -506,9 +506,9 @@ impl ProjShape {
 /// Abstraction over explicit collections of BaseType values that could be in any order
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub enum BaseSet {
-    /// singleton set of any basetype, even non-integral ones
+    /// Singleton set of any BaseType, even non-integral ones
     Single(BaseType),
-    /// Some subset of U8, U16, U32 (or any future types like U64)
+    /// Some subset of U8, U16, U32, U64
     U(UintSet),
 }
 
@@ -562,7 +562,7 @@ impl BaseType {
             BaseType::U16 => IntWidth::Bits16,
             BaseType::U32 => IntWidth::Bits32,
             BaseType::U64 => IntWidth::Bits64,
-            _ => unreachable!("cannot measure int-width of non-integral basetype {self:?}"),
+            _ => unreachable!("cannot measure int-width of non-integral BaseType {self:?}"),
         }
     }
 }
@@ -663,9 +663,9 @@ impl std::fmt::Display for BaseSet {
 
 type VarMap = HashMap<Label, Rc<UType>>;
 
-// SECTION - Construction and instantiation in the metacontext
+// SECTION - Construction and instantiation in the meta-context
 impl TypeChecker {
-    /// Constructs a typechecker with initially 0 metavariables.
+    /// Constructs a typechecker with initially 0 meta-variables.
     pub fn new() -> Self {
         Self {
             constraints: Vec::new(),
@@ -676,16 +676,18 @@ impl TypeChecker {
     }
 
     #[cfg_attr(not(test), allow(dead_code))]
+    /// Returns the number of individual `UVar`s in the meta-context of `self`.
+    ///
+    /// May panic in debug builds if, for any reason, the internal state has diverged
+    /// (i.e. different numbers of aliases and constraints).
     pub fn size(&self) -> usize {
-        let csize = self.constraints.len();
         if cfg!(debug_assertions) {
-            let asize = self.aliases.len();
-            debug_assert_eq!(asize, csize);
+            self.check_uvar_sanity();
         }
-        csize
+        self.constraints.len()
     }
 
-    /// Instantiates a new [`VarMap`] object in the typechecker metacontext and returns an identifier pointing to it.
+    /// Instantiates a new [`VarMap`] object in the typechecker meta-context and returns an identifier pointing to it.
     fn init_varmap(&mut self) -> VMId {
         self.varmaps.get_new_id()
     }
@@ -702,7 +704,7 @@ impl TypeChecker {
         let rc = Rc::new(typ);
         let constr = Constraint::Equiv(rc.clone());
         self.unify_var_constraint(newvar, constr)?;
-        // FIMXE - not sure whether to return rc or newvar
+        // FIXME - not sure whether to return rc or newvar
         Ok((newvar, rc))
     }
 
@@ -770,10 +772,10 @@ impl TypeChecker {
                 Ok(tuple_var)
             }
             Pattern::Variant(vname, inner) => {
-                let topvar = self.get_new_uvar();
+                let newvar = self.get_new_uvar();
                 let inner_var = self.infer_var_scope_pattern(inner.as_ref(), scope)?;
-                self.add_uvar_variant(topvar, vname.clone(), Rc::new(UType::Var(inner_var)))?;
-                Ok(topvar)
+                self.add_uvar_variant(newvar, vname.clone(), Rc::new(UType::Var(inner_var)))?;
+                Ok(newvar)
             }
             Pattern::Seq(elts) => {
                 let seq_uvar = self.get_new_uvar();
@@ -815,9 +817,9 @@ impl TypeChecker {
         let mut child = UMultiScope::new(ctxt.scope);
         let pvar = self.infer_var_scope_pattern(pat, &mut child)?;
         let tmp = child.clone();
-        let newscope = UScope::Multi(&tmp);
-        let newctxt = ctxt.with_scope(&newscope);
-        let local_rhs_var = self.infer_var_format(rhs_format, newctxt)?;
+        let new_scope = UScope::Multi(&tmp);
+        let new_ctxt = ctxt.with_scope(&new_scope);
+        let local_rhs_var = self.infer_var_format(rhs_format, new_ctxt)?;
         self.unify_var_utype(pvar, head_t)?;
         self.unify_var_pair(rhs_var, local_rhs_var)?;
         Ok(())
@@ -834,14 +836,14 @@ impl TypeChecker {
         let mut child = UMultiScope::new(scope);
         let pvar = self.infer_var_scope_pattern(pat, &mut child)?;
         let tmp = child.clone();
-        let newscope = UScope::Multi(&tmp);
-        let local_rhs_var = self.infer_var_expr(rhs_expr, &newscope)?;
+        let new_scope = UScope::Multi(&tmp);
+        let local_rhs_var = self.infer_var_expr(rhs_expr, &new_scope)?;
         self.unify_var_utype(pvar, head_t)?;
         self.unify_var_pair(rhs_var, local_rhs_var)?;
         Ok(())
     }
 
-    /// Converts a `UType` to Weak Head-Normal Form `VType` by unchaining as many metavariables as required, after performing
+    /// Converts a `UType` to Weak Head-Normal Form `VType` by unchaining as many meta-variables as required, after performing
     /// a sanity check to eliminate potential infinite types from consideration.
     ///
     /// Will avoid panicking at all costs, even if it requires returning a non-WHNF variable.
@@ -924,7 +926,7 @@ impl TypeChecker {
 }
 // !SECTION
 
-// SECTION - checks and maintenance of invariants of the metacontext
+// SECTION - checks and maintenance of invariants of the meta-context
 impl TypeChecker {
     /// Performs a runtime assertion that the number of known UVars is agreed upon by all fields that track
     /// their expected properties.
@@ -967,14 +969,14 @@ impl TypeChecker {
                 Constraint::Elem(_) => Ok(()),
                 Constraint::Equiv(t) => self.occurs_in(v, t),
                 Constraint::Proj(p) => match p {
-                    ProjShape::TupleWith(ixvars) => {
-                        for (_ix, var) in ixvars.iter() {
+                    ProjShape::TupleWith(ix_vars) => {
+                        for (_ix, var) in ix_vars.iter() {
                             self.occurs_in(v, Rc::<UType>::from(*var))?;
                         }
                         Ok(())
                     }
-                    ProjShape::RecordWith(fldvars) => {
-                        for (_lbl, var) in fldvars.iter() {
+                    ProjShape::RecordWith(fld_vars) => {
+                        for (_lbl, var) in fld_vars.iter() {
                             self.occurs_in(v, Rc::<UType>::from(*var))?;
                         }
                         Ok(())
@@ -1029,16 +1031,16 @@ impl TypeChecker {
         let cv = self.get_canonical_uvar(v);
 
         // update the canonical uvar constraints
-        let cnstrs = &self.constraints[cv.0];
-        match cnstrs {
+        let constraints = &self.constraints[cv.0];
+        match constraints {
             Constraints::Indefinite => {
                 let id = self.init_varmap();
                 let vm = self.varmaps.as_inner_mut().entry(id.0).or_default();
                 vm.insert(cname, inner);
                 self.set_uvar_vmid(cv, id)?;
                 // update all forward-references to point to the same varmap
-                let fwds = self.aliases[cv.0].iter_fwd_refs().collect::<Vec<usize>>();
-                for ix in fwds.into_iter() {
+                let fwd_refs = self.aliases[cv.0].iter_fwd_refs().collect::<Vec<usize>>();
+                for ix in fwd_refs.into_iter() {
                     self.set_uvar_vmid(UVar(ix), id)?;
                 }
                 Ok(())
@@ -1068,8 +1070,8 @@ impl TypeChecker {
             self.varmaps.as_inner().contains_key(&vmid.0),
             "set_uvar_vmid called on missing VMId {vmid}"
         );
-        let constrs = &mut self.constraints[uvar.0];
-        match constrs {
+        let constraints = &mut self.constraints[uvar.0];
+        match constraints {
             Constraints::Variant(other) => {
                 let old = *other;
 
@@ -1097,11 +1099,11 @@ impl TypeChecker {
                 vmid,
                 self.varmaps.get_varmap(vmid).clone(),
                 orig.clone(),
-                Polarity::Contravariant,
+                Polarity::PriorVariant,
             )
             .into()),
             Constraints::Indefinite => {
-                *constrs = Constraints::Variant(vmid);
+                *constraints = Constraints::Variant(vmid);
                 Ok(())
             }
         }
@@ -1130,7 +1132,7 @@ impl TypeChecker {
                 *vmid,
                 self.varmaps.get_varmap(*vmid).clone(),
                 constraint,
-                Polarity::Provariant,
+                Polarity::PriorInvariant,
             )
             .into()),
             Constraints::Invariant(prior) => {
@@ -1151,7 +1153,7 @@ impl TypeChecker {
     }
 
     /// Unifies according to `?i ~ Tuple(..., ?j, ...?)`, with `tuple_var` on the lhs and `ix_var` on the rhs
-    /// of the metavariable equation, with `ix_var` occuring at index `ix` of the tuple being projected.
+    /// of the metavariable equation, with `ix_var` occurring at index `ix` of the tuple being projected.
     fn unify_var_proj_index(&mut self, tuple_var: UVar, ix: usize, ix_var: UVar) -> TCResult<()> {
         let can_v = self.get_canonical_uvar(tuple_var);
         match &mut self.constraints[can_v.0] {
@@ -1558,11 +1560,11 @@ impl TypeChecker {
                 Ok(Constraint::Proj(ProjShape::RecordWith(r0)))
             }
             (
-                Constraint::Proj(ProjShape::SeqOf(elvar1)),
-                Constraint::Proj(ProjShape::SeqOf(elvar2)),
+                Constraint::Proj(ProjShape::SeqOf(elt_var1)),
+                Constraint::Proj(ProjShape::SeqOf(elt_var2)),
             ) => {
-                self.unify_var_pair(elvar1, elvar2)?;
-                Ok(Constraint::Proj(ProjShape::SeqOf(elvar1)))
+                self.unify_var_pair(elt_var1, elt_var2)?;
+                Ok(Constraint::Proj(ProjShape::SeqOf(elt_var1)))
             }
             (ref c1 @ Constraint::Proj(ref p), ref c2 @ Constraint::Equiv(ref ut))
             | (ref c1 @ Constraint::Equiv(ref ut), ref c2 @ Constraint::Proj(ref p)) => {
@@ -1694,7 +1696,7 @@ impl TypeChecker {
     }
 
     fn infer_var_expr<'a>(&mut self, e: &Expr, scope: &'a UScope<'a>) -> TCResult<UVar> {
-        let topvar = match e {
+        Ok(match e {
             Expr::Var(lbl) => {
                 let occ_var = self.get_new_uvar();
                 match scope.get_uvar_by_name(lbl) {
@@ -1731,9 +1733,9 @@ impl TypeChecker {
                 let mut child = UMultiScope::with_capacity(scope, fs.len());
                 for (lbl, f) in fs {
                     let scope = UScope::Multi(&child);
-                    let fvar = self.infer_var_expr(f, &scope)?;
-                    child.push(lbl.clone(), fvar);
-                    fields.push((lbl.clone(), fvar.into()));
+                    let f_var = self.infer_var_expr(f, &scope)?;
+                    child.push(lbl.clone(), f_var);
+                    fields.push((lbl.clone(), f_var.into()));
                 }
                 self.unify_var_utype(newvar, Rc::new(UType::Record(fields)))?;
                 newvar
@@ -1795,13 +1797,13 @@ impl TypeChecker {
                 newvar
             }
             Expr::Unary(UnaryOp::IntSucc | UnaryOp::IntPred, x) => {
-                let outvar = self.get_new_uvar();
+                let newvar = self.get_new_uvar();
 
                 let xvar = self.infer_var_expr(x.as_ref(), scope)?;
                 let _cx = self.unify_var_baseset(xvar, BaseSet::UAny)?;
 
-                self.unify_var_pair(outvar, xvar)?;
-                outvar
+                self.unify_var_pair(newvar, xvar)?;
+                newvar
             }
             Expr::Arith(_, x, y) => {
                 let zvar = self.get_new_uvar();
@@ -2042,8 +2044,7 @@ impl TypeChecker {
 
                 newvar
             }
-        };
-        Ok(topvar)
+        })
     }
 
     fn infer_utype_expr(&mut self, e: &Expr, scope: &'_ UScope<'_>) -> TCResult<Rc<UType>> {
@@ -2071,15 +2072,14 @@ impl TypeChecker {
     /// Attempt to substitute a variable for a VType with at least one more level of refinement
     ///
     /// If there is no possible direct substitution for a VType (i.e. no known constraints),
-    /// or multiple possible non-base solutions that cannot be easily tiebroken, returns Ok(None).
+    /// or multiple possible non-base solutions that cannot be easily tie-broken, returns Ok(None).
     ///
     /// If the only possible refinement would be the identity transformation modulo aliasing, likewise returns
     /// Ok(None).
     ///
     /// If an occurs check fails, returns the corresponding `Err(_)` value.
     ///
-    /// Otherwise, returns `Ok(Some(t))` where `t` is a UType other than UType::Var(v) or UType::Var(v1) where
-    /// v1 is an isomorphic alias to v.
+    /// Otherwise, returns `Ok(Some(t))` where `t` is a UType other than UType::Var(_) on `v` or an alias thereof
     pub(crate) fn substitute_uvar_vtype(&self, v: UVar) -> Result<Option<VType>, TCError> {
         self.occurs(v)?;
         Ok(match &self.constraints[self.get_canonical_uvar(v).0] {
@@ -2097,8 +2097,8 @@ impl TypeChecker {
 
 // SECTION - low-level methods dealing with UVar aliasing concerns
 impl TypeChecker {
-    /// Performs re-aliasing, recanonicalization, constraint propogation, and constraint unification
-    /// to establish direct equality requirements between two metavariables.
+    /// Performs re-aliasing, recanonicalization, constraint propagation, and constraint unification
+    /// to establish direct equality requirements between two meta-variables.
     fn unify_var_pair(&mut self, v1: UVar, v2: UVar) -> TCResult<&Constraints> {
         if v1 == v2 {
             return Ok(&self.constraints[v1.0]);
@@ -2202,8 +2202,8 @@ impl TypeChecker {
                 );
                 Ok(&self.constraints[ix])
             }
-            (a1 @ Alias::BackRef(tgt), a2 @ Alias::Canonical(fwds)) => {
-                let left = fwds.contains(&v1.0);
+            (a1 @ Alias::BackRef(tgt), a2 @ Alias::Canonical(fwd_refs)) => {
+                let left = fwd_refs.contains(&v1.0);
                 let right = *tgt == v2.0;
 
                 match (left, right) {
@@ -2227,8 +2227,8 @@ impl TypeChecker {
                     unsafe { self.recanonicalize(ix2, ix1) }
                 }
             }
-            (a1 @ Alias::Canonical(fwds), a2 @ Alias::BackRef(tgt)) => {
-                let left = fwds.contains(&v2.0);
+            (a1 @ Alias::Canonical(fwd_refs), a2 @ Alias::BackRef(tgt)) => {
+                let left = fwd_refs.contains(&v2.0);
                 let right = *tgt == v1.0;
 
                 match (left, right) {
@@ -2297,14 +2297,14 @@ impl TypeChecker {
     /// # Safety
     ///
     /// Like [`Self::recanonicalize`], this method is niche enough to not be suitable for calls in a neutral context,
-    /// and may be marked safe after code stablizes. Otherwise it is not known to lead to any UB.
+    /// and may be marked safe after code stabilizes. Otherwise it is not known to lead to any UB.
     /// guards are enforced in advance.
     unsafe fn repoint(&mut self, lo: usize, hi: usize) {
         self.aliases[hi].set_backref(lo);
         self.aliases[lo].add_forward_ref(hi);
     }
 
-    /// Ensure that all constraints on `a2` are inherited by `a1`, with the reverse occuring as a side-effect.
+    /// Ensure that all constraints on `a2` are inherited by `a1`, with the reverse occurring as a side-effect.
     unsafe fn transfer_constraints(&mut self, a1: usize, a2: usize) -> TCResult<&Constraints> {
         let v1 = UVar(a1);
         let v2 = UVar(a2);
@@ -2329,7 +2329,7 @@ impl TypeChecker {
                         *vmid,
                         self.varmaps.get_varmap(*vmid).clone(),
                         c.clone(),
-                        Polarity::Contravariant,
+                        Polarity::PriorVariant,
                     )
                     .into())
                 }
@@ -2343,7 +2343,7 @@ impl TypeChecker {
                         *vmid,
                         self.varmaps.get_varmap(*vmid).clone(),
                         c.clone(),
-                        Polarity::Provariant,
+                        Polarity::PriorInvariant,
                     )
                     .into())
                 }
@@ -2428,23 +2428,22 @@ impl TypeChecker {
         Ok(newvar)
     }
 
-    /// Assigns new metavariables and simple constraints for a format, and returns the novel toplevel UVar
-    ///
+    /// Assigns new meta-variables and simple constraints for a format, and returns the novel toplevel UVar
     pub(crate) fn infer_var_format(&mut self, f: &Format, ctxt: Ctxt<'_>) -> TCResult<UVar> {
         match f {
             Format::ItemVar(level, args) => {
                 let newvar = self.get_new_uvar();
                 let level_var = if !args.is_empty() {
-                    let mut argscope = UMultiScope::new(ctxt.scope);
+                    let mut arg_scope = UMultiScope::new(ctxt.scope);
                     let expected = ctxt.module.get_args(*level);
                     for ((lbl, vt), arg) in Iterator::zip(expected.iter(), args.iter()) {
                         let v_arg = self.infer_var_expr(arg, ctxt.scope)?;
-                        argscope.push(lbl.clone(), v_arg);
+                        arg_scope.push(lbl.clone(), v_arg);
                         self.unify_var_valuetype(v_arg, vt)?;
                     }
-                    let newscope = UScope::Multi(&argscope);
-                    let newctxt = ctxt.with_scope(&newscope);
-                    self.infer_var_format_level(*level, newctxt)?
+                    let new_scope = UScope::Multi(&arg_scope);
+                    let new_ctxt = ctxt.with_scope(&new_scope);
+                    self.infer_var_format_level(*level, new_ctxt)?
                 } else {
                     self.infer_var_format_level(*level, ctxt)?
                 };
@@ -2456,9 +2455,9 @@ impl TypeChecker {
                 let v_expr = self.infer_var_expr(expr, ctxt.scope)?;
                 let v_elem = self.get_new_uvar();
                 self.unify_var_proj_elem(v_expr, v_elem)?;
-                let newscope = UScope::Single(USingleScope::new(ctxt.scope, lbl, v_elem));
-                let newctxt = ctxt.with_scope(&newscope);
-                let t_inner = self.infer_utype_format(inner.as_ref(), newctxt)?;
+                let new_scope = UScope::Single(USingleScope::new(ctxt.scope, lbl, v_elem));
+                let new_ctxt = ctxt.with_scope(&new_scope);
+                let t_inner = self.infer_utype_format(inner.as_ref(), new_ctxt)?;
                 self.unify_var_utype(newvar, Rc::new(UType::Seq(t_inner)))?;
                 Ok(newvar)
             }
@@ -2673,8 +2672,8 @@ impl TypeChecker {
             Format::Let(lab, x, inner) => {
                 let newvar = self.get_new_uvar();
                 let xvar = self.infer_var_expr(x, ctxt.scope)?;
-                let newscope = UScope::Single(USingleScope::new(ctxt.scope, lab, xvar));
-                let new_ctxt = ctxt.with_scope(&newscope);
+                let new_scope = UScope::Single(USingleScope::new(ctxt.scope, lab, xvar));
+                let new_ctxt = ctxt.with_scope(&new_scope);
                 let inner_t = self.infer_utype_format(inner, new_ctxt)?;
                 self.unify_var_utype(newvar, inner_t)?;
                 Ok(newvar)
@@ -2690,15 +2689,15 @@ impl TypeChecker {
             Format::Dynamic(lbl, dynf, inner) => {
                 let newvar = self.get_new_uvar();
                 let uv_dynf = self.infer_var_dyn_format(dynf, ctxt)?;
-                let newctxt = ctxt.with_dyn_binding(lbl, uv_dynf);
-                let inner_t = self.infer_utype_format(inner, newctxt)?;
+                let new_ctxt = ctxt.with_dyn_binding(lbl, uv_dynf);
+                let inner_t = self.infer_utype_format(inner, new_ctxt)?;
                 self.unify_var_utype(newvar, inner_t)?;
                 Ok(newvar)
             }
             Format::Apply(label) => {
                 let newvar = self.get_new_uvar();
                 let uv_dynf = ctxt
-                    .dyns
+                    .dyn_s
                     .get_dynf_var_by_name(label)
                     .unwrap_or_else(|| panic!("missing dynformat {label}"));
                 self.unify_var_pair(newvar, uv_dynf)?;
@@ -2710,8 +2709,8 @@ impl TypeChecker {
                 let newvar = self.get_new_uvar();
                 let f0_v = self.infer_var_format(f0, ctxt)?;
                 let scope = UScope::Single(USingleScope::new(ctxt.scope, name, f0_v));
-                let newctxt = ctxt.with_scope(&scope);
-                let f_v = self.infer_var_format(f, newctxt)?;
+                let new_ctxt = ctxt.with_scope(&scope);
+                let f_v = self.infer_var_format(f, new_ctxt)?;
                 self.unify_var_pair(newvar, f_v)?;
                 Ok(newvar)
             }
@@ -2735,9 +2734,9 @@ impl TypeChecker {
         }
     }
 
-    /// Attempt to fully solve a `UType` until all free metavariables are replaced with concrete type-assignments
+    /// Attempt to fully solve a `UType` until all free meta-variables are replaced with concrete type-assignments
     ///
-    /// Returns None if at least one metavariable cannot be reduced without more information, or if any unification
+    /// Returns None if at least one meta-variable cannot be reduced without more information, or if any unification
     /// is insoluble.
     ///
     /// # Panics
@@ -2757,7 +2756,7 @@ impl TypeChecker {
                             VType::Base(bs) =>
                                 match bs.get_unique_solution(uv).as_deref() {
                                     Ok(UType::Base(b)) => Some(ValueType::Base(*b)),
-                                    Ok(other) => unreachable!("unexpected solution {other:?}"),
+                                    Ok(other) => unreachable!("base-set {bs:?} yielded unexpected solution {other:?}"),
                                     Err(_) => None,
                                 }
                             VType::Abstract(ut) => self.reify(ut),
@@ -2803,11 +2802,10 @@ impl TypeChecker {
         let mut branches = BTreeMap::new();
         for (label, ut) in vm.iter() {
             let variant_type = self.reify(ut.clone())?;
-            // NOTE - if the variant's inner type is unconstructable, the variant in question can be pruned safely
-            if matches!(variant_type, ValueType::Empty) {
-                continue;
+            // NOTE - only add a variant to the union-type if its inner type is inhabitable
+            if !matches!(variant_type, ValueType::Empty) {
+                branches.insert(label.clone(), variant_type);
             }
-            branches.insert(label.clone(), variant_type);
         }
         Some(ValueType::Union(branches))
     }
@@ -2844,10 +2842,10 @@ pub enum UnificationError<T: std::fmt::Debug> {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 /// Marker enum to track which of an invariant and variant constraints came first
 pub enum Polarity {
-    /// Attempting to add variants onto an invariant metavar
-    Provariant,
-    /// Attempting to enforce invariant constraints on a Variant metavar
-    Contravariant,
+    /// Attempting to add variants onto an invariant metavariable
+    PriorInvariant,
+    /// Attempting to enforce invariant constraints on a Variant metavariable
+    PriorVariant,
 }
 
 #[derive(Debug)]
@@ -2935,12 +2933,12 @@ impl std::fmt::Display for TCErrorKind {
         match self {
             Self::VarianceMismatch(uv, vmid, vm, constraint, pol) =>
                 match pol {
-                    Polarity::Provariant =>
+                    Polarity::PriorInvariant =>
                         write!(
                             f,
                             "prior constraint `{uv} {constraint}` precludes attempted unification `{uv} ⊇ {vmid} (:= {vm:?})`"
                         ),
-                    Polarity::Contravariant =>
+                    Polarity::PriorVariant =>
                         write!(
                             f,
                             "attempted unification `{uv} {constraint}` precluded by prior constraint `{uv} ⊇ {vmid} (:= {vm:?})`"
@@ -3026,7 +3024,7 @@ pub fn typecheck(module: &FormatModule, f: &Format) -> TCResult<Option<ValueType
 
 pub type TCResult<T> = Result<T, TCError>;
 
-mod __impls {
+mod __impl {
     use crate::FormatModule;
 
     use super::{Constraint, Ctxt, ProjShape, UScope, UVar, VMId};
@@ -3141,14 +3139,14 @@ mod tests {
         let ut = tc.infer_utype_format(&format, Ctxt::new(&module, &scope))?;
         println!("ut: {ut:?}");
         println!("tc: {tc:?}");
-        let oput = tc
+        let output = tc
             .reify(ut)
             .unwrap_or_else(|| panic!("reify returned None"));
         let expected = ValueType::Union(BTreeMap::from([
             ("A".into(), ValueType::Base(BaseType::U8)),
             ("B".into(), ValueType::Tuple(vec![])),
         ]));
-        assert_eq!(oput, expected);
+        assert_eq!(output, expected);
         Ok(())
     }
 
@@ -3178,14 +3176,14 @@ mod tests {
         let ut = tc.infer_utype_format(&format, Ctxt::new(&module, &scope))?;
         println!("ut: {ut:?}");
         println!("tc: {tc:?}");
-        let oput = tc
+        let output = tc
             .reify(ut)
             .unwrap_or_else(|| panic!("reify returned None"));
         let expected = ValueType::Record(vec![
             ("number".into(), ValueType::Base(BaseType::U8)),
             ("isEven".into(), ValueType::Base(BaseType::Bool)),
         ]);
-        assert_eq!(oput, expected);
+        assert_eq!(output, expected);
         Ok(())
     }
 
@@ -3221,7 +3219,7 @@ mod tests {
         let ut = tc.infer_utype_format(&format, Ctxt::new(&module, &scope))?;
         println!("ut: {ut:?}");
         println!("tc: {tc:?}");
-        let oput = tc
+        let output = tc
             .reify(ut)
             .unwrap_or_else(|| panic!("reify returned None"));
         let expected = ValueType::Record(vec![
@@ -3234,7 +3232,7 @@ mod tests {
                 ])),
             ),
         ]);
-        assert_eq!(oput, expected);
+        assert_eq!(output, expected);
         Ok(())
     }
 
@@ -3292,11 +3290,11 @@ mod tests {
         let scope = UScope::new();
         let ut = tc.infer_utype_format(&format, Ctxt::new(&module, &scope))?;
         let _trace = format!("ut: {ut:?}\ntc: {tc:?}");
-        let oput = tc
+        let output = tc
             .reify(ut)
             .unwrap_or_else(|| panic!("reify returned None"));
         let expected = ValueType::Seq(Box::new(ValueType::Base(BaseType::U32)));
-        assert_eq!(oput, expected);
+        assert_eq!(output, expected);
         Ok(())
     }
 }

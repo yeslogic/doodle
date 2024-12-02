@@ -194,7 +194,7 @@ type ParseFn<'f, T> = Box<dyn 'f + for<'a> Fn(&mut Parser<'a>) -> PResult<T>>;
 
 /// Monad-joins `PResult<impl Fn(&mut Parser) -> PResult<u16>>` into either the exact closure passed in,
 /// or a closure that always returns the error passed in.
-// NOTE - this is monomorphized to u16, but could be polymorphic if necessary
+// NOTE - this is hardcoded to only work for `u16`-parsers, but could be polymorphic if necessary
 fn join_fallible<'f, F>(rf: PResult<F>) -> ParseFn<'f, u16>
 where
     F: 'f + for<'a> Fn(&mut Parser<'a>) -> PResult<u16>,
@@ -375,8 +375,8 @@ fn bit_as_u8(b: bool) -> u8 {
 
 pub fn extend_from_within_ext(vs: &mut Vec<u8>, range: std::ops::Range<usize>) {
     match range.end_bound() {
-        Bound::Excluded(&rangemax) if rangemax <= vs.len() => vs.extend_from_within(range),
-        Bound::Included(&lastix) if lastix < vs.len() => vs.extend_from_within(range),
+        Bound::Excluded(&range_max) if range_max <= vs.len() => vs.extend_from_within(range),
+        Bound::Included(&last_ix) if last_ix < vs.len() => vs.extend_from_within(range),
         Bound::Unbounded => panic!("cannot extend indefinitely"),
         _ => {
             for i in range {
@@ -388,8 +388,8 @@ pub fn extend_from_within_ext(vs: &mut Vec<u8>, range: std::ops::Range<usize>) {
 
 pub fn slice_ext<T: Copy>(vs: &[T], range: std::ops::Range<usize>) -> Cow<'_, [T]> {
     match range.end_bound() {
-        Bound::Excluded(&rangemax) if rangemax <= vs.len() => Cow::Borrowed(&vs[range]),
-        Bound::Included(&lastix) if lastix < vs.len() => Cow::Borrowed(&vs[range]),
+        Bound::Excluded(&range_max) if range_max <= vs.len() => Cow::Borrowed(&vs[range]),
+        Bound::Included(&last_ix) if last_ix < vs.len() => Cow::Borrowed(&vs[range]),
         Bound::Unbounded => panic!("cannot extend indefinitely"),
         _ => {
             let mut ret = Vec::with_capacity(range.len());

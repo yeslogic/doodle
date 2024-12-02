@@ -170,7 +170,7 @@ pub mod png_metrics {
                     false => buf.push_str("❌\t"),
                 };
 
-            let show_count_optzlib = |buf: &mut String, metrics: &Vec<OptZlibMetrics>| {
+            let show_count_opt_zlib = |buf: &mut String, metrics: &Vec<OptZlibMetrics>| {
                 let mut all = true;
                 let mut any = false;
                 for m in metrics {
@@ -190,7 +190,7 @@ pub mod png_metrics {
             show_count(buf, &metrics.gAMA);
             show_count(buf, &metrics.hIST);
             show_single_zlib(buf, &metrics.iCCP);
-            show_count_optzlib(buf, &metrics.iTXt);
+            show_count_opt_zlib(buf, &metrics.iTXt);
             show_count(buf, &metrics.pHYs);
             show_count(buf, &metrics.sBIT);
             show_count(buf, &metrics.sPLT);

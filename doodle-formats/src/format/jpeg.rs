@@ -54,7 +54,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
         )
     };
 
-    // NOTE - bit data (common bit-packed record between DHT and DAC, up to and including numeric osntraints)
+    // NOTE - bit data (common bit-packed record between DHT and DAC, up to and including numeric constraints)
     // class <- u4 = 0 | 1;
     // table-id <- u4 = 0 |..| 3;
     let class_table_id = where_lambda(

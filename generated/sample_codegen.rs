@@ -327,7 +327,7 @@ distance: u16
 }
 
 #[derive(Debug, Clone)]
-pub enum deflate_main_codes__dupX1 { literal(u8), reference(deflate_main_codes_reference) }
+pub enum deflate_main_codes { literal(u8), reference(deflate_main_codes_reference) }
 
 #[derive(Debug, Clone)]
 pub struct deflate_dynamic_huffman {
@@ -340,7 +340,7 @@ literal_length_distance_alphabet_code_lengths_value: Vec<u8>,
 literal_length_alphabet_code_lengths_value: Vec<u8>,
 distance_alphabet_code_lengths_value: Vec<u8>,
 codes: Vec<deflate_dynamic_huffman_codes>,
-codes_values: Vec<deflate_main_codes__dupX1>
+codes_values: Vec<deflate_main_codes>
 }
 
 #[derive(Debug, Clone)]
@@ -360,7 +360,7 @@ extra: Option<deflate_fixed_huffman_codes_values>
 #[derive(Debug, Clone)]
 pub struct deflate_fixed_huffman {
 codes: Vec<deflate_fixed_huffman_codes>,
-codes_values: Vec<deflate_main_codes__dupX1>
+codes_values: Vec<deflate_main_codes>
 }
 
 #[derive(Debug, Clone)]
@@ -369,23 +369,23 @@ align: (),
 len: u16,
 nlen: u16,
 bytes: Vec<u8>,
-codes_values: Vec<deflate_main_codes__dupX1>
+codes_values: Vec<deflate_main_codes>
 }
 
 #[derive(Debug, Clone)]
-pub enum deflate_main_codes { dynamic_huffman(deflate_dynamic_huffman), fixed_huffman(deflate_fixed_huffman), uncompressed(deflate_uncompressed) }
+pub enum deflate_main_codes__dupX1 { dynamic_huffman(deflate_dynamic_huffman), fixed_huffman(deflate_fixed_huffman), uncompressed(deflate_uncompressed) }
 
 #[derive(Debug, Clone)]
 pub struct deflate_block {
 r#final: u8,
 r#type: u8,
-data: deflate_main_codes
+data: deflate_main_codes__dupX1
 }
 
 #[derive(Debug, Clone)]
 pub struct deflate_main {
 blocks: Vec<deflate_block>,
-codes: Vec<deflate_main_codes__dupX1>,
+codes: Vec<deflate_main_codes>,
 inflate: Vec<u8>
 }
 
@@ -5928,7 +5928,7 @@ b
 };
 ((|x: (u8, u8)| PResult::Ok(u16be(x)))(inner))?
 };
-((|flagbits: u16| PResult::Ok(opentype_head_table_mac_style { extended: match flagbits >> 6u16 & 1u16 {
+((|flag_bits: u16| PResult::Ok(opentype_head_table_mac_style { extended: match flag_bits >> 6u16 & 1u16 {
 0 => {
 true
 },
@@ -5936,7 +5936,7 @@ true
 _ => {
 false
 }
-}, condensed: match flagbits >> 5u16 & 1u16 {
+}, condensed: match flag_bits >> 5u16 & 1u16 {
 0 => {
 true
 },
@@ -5944,7 +5944,7 @@ true
 _ => {
 false
 }
-}, shadow: match flagbits >> 4u16 & 1u16 {
+}, shadow: match flag_bits >> 4u16 & 1u16 {
 0 => {
 true
 },
@@ -5952,7 +5952,7 @@ true
 _ => {
 false
 }
-}, outline: match flagbits >> 3u16 & 1u16 {
+}, outline: match flag_bits >> 3u16 & 1u16 {
 0 => {
 true
 },
@@ -5960,7 +5960,7 @@ true
 _ => {
 false
 }
-}, underline: match flagbits >> 2u16 & 1u16 {
+}, underline: match flag_bits >> 2u16 & 1u16 {
 0 => {
 true
 },
@@ -5968,7 +5968,7 @@ true
 _ => {
 false
 }
-}, italic: match flagbits >> 1u16 & 1u16 {
+}, italic: match flag_bits >> 1u16 & 1u16 {
 0 => {
 true
 },
@@ -5976,7 +5976,7 @@ true
 _ => {
 false
 }
-}, bold: match flagbits >> 0u16 & 1u16 {
+}, bold: match flag_bits >> 0u16 & 1u16 {
 0 => {
 true
 },
@@ -6463,7 +6463,7 @@ b
 };
 ((|x: (u8, u8)| PResult::Ok(u16be(x)))(inner))?
 };
-((|flagbits: u16| PResult::Ok(opentype_gasp_table_gasp_ranges_range_gasp_behavior_Version0 { dogray: match flagbits >> 1u16 & 1u16 {
+((|flag_bits: u16| PResult::Ok(opentype_gasp_table_gasp_ranges_range_gasp_behavior_Version0 { dogray: match flag_bits >> 1u16 & 1u16 {
 0 => {
 true
 },
@@ -6471,7 +6471,7 @@ true
 _ => {
 false
 }
-}, gridfit: match flagbits >> 0u16 & 1u16 {
+}, gridfit: match flag_bits >> 0u16 & 1u16 {
 0 => {
 true
 },
@@ -6500,7 +6500,7 @@ b
 };
 ((|x: (u8, u8)| PResult::Ok(u16be(x)))(inner))?
 };
-((|flagbits: u16| PResult::Ok(opentype_gasp_table_gasp_ranges_range_gasp_behavior_Version1 { symmetric_smoothing: match flagbits >> 3u16 & 1u16 {
+((|flag_bits: u16| PResult::Ok(opentype_gasp_table_gasp_ranges_range_gasp_behavior_Version1 { symmetric_smoothing: match flag_bits >> 3u16 & 1u16 {
 0 => {
 true
 },
@@ -6508,7 +6508,7 @@ true
 _ => {
 false
 }
-}, symmetric_gridfit: match flagbits >> 2u16 & 1u16 {
+}, symmetric_gridfit: match flag_bits >> 2u16 & 1u16 {
 0 => {
 true
 },
@@ -6516,7 +6516,7 @@ true
 _ => {
 false
 }
-}, dogray: match flagbits >> 1u16 & 1u16 {
+}, dogray: match flag_bits >> 1u16 & 1u16 {
 0 => {
 true
 },
@@ -6524,7 +6524,7 @@ true
 _ => {
 false
 }
-}, gridfit: match flagbits >> 0u16 & 1u16 {
+}, gridfit: match flag_bits >> 0u16 & 1u16 {
 0 => {
 true
 },
@@ -9399,7 +9399,7 @@ b
 };
 ((|x: (u8, u8)| PResult::Ok(u16be(x)))(inner))?
 };
-PResult::Ok(((|flagbits: u16| PResult::Ok(opentype_common_value_format_flags { y_advance_device: match flagbits >> 7u16 & 1u16 {
+PResult::Ok(((|flag_bits: u16| PResult::Ok(opentype_common_value_format_flags { y_advance_device: match flag_bits >> 7u16 & 1u16 {
 0 => {
 true
 },
@@ -9407,7 +9407,7 @@ true
 _ => {
 false
 }
-}, x_advance_device: match flagbits >> 6u16 & 1u16 {
+}, x_advance_device: match flag_bits >> 6u16 & 1u16 {
 0 => {
 true
 },
@@ -9415,7 +9415,7 @@ true
 _ => {
 false
 }
-}, y_placement_device: match flagbits >> 5u16 & 1u16 {
+}, y_placement_device: match flag_bits >> 5u16 & 1u16 {
 0 => {
 true
 },
@@ -9423,7 +9423,7 @@ true
 _ => {
 false
 }
-}, x_placement_device: match flagbits >> 4u16 & 1u16 {
+}, x_placement_device: match flag_bits >> 4u16 & 1u16 {
 0 => {
 true
 },
@@ -9431,7 +9431,7 @@ true
 _ => {
 false
 }
-}, y_advance: match flagbits >> 3u16 & 1u16 {
+}, y_advance: match flag_bits >> 3u16 & 1u16 {
 0 => {
 true
 },
@@ -9439,7 +9439,7 @@ true
 _ => {
 false
 }
-}, x_advance: match flagbits >> 2u16 & 1u16 {
+}, x_advance: match flag_bits >> 2u16 & 1u16 {
 0 => {
 true
 },
@@ -9447,7 +9447,7 @@ true
 _ => {
 false
 }
-}, y_placement: match flagbits >> 1u16 & 1u16 {
+}, y_placement: match flag_bits >> 1u16 & 1u16 {
 0 => {
 true
 },
@@ -9455,7 +9455,7 @@ true
 _ => {
 false
 }
-}, x_placement: match flagbits >> 0u16 & 1u16 {
+}, x_placement: match flag_bits >> 0u16 & 1u16 {
 0 => {
 true
 },
@@ -10548,7 +10548,7 @@ b
 };
 ((|x: (u8, u8)| PResult::Ok(u16be(x)))(inner))?
 };
-((|flagbits: u16| PResult::Ok(opentype_glyf_composite_raw_flags { unscaled_component_offset: match flagbits >> 12u16 & 1u16 {
+((|flag_bits: u16| PResult::Ok(opentype_glyf_composite_raw_flags { unscaled_component_offset: match flag_bits >> 12u16 & 1u16 {
 0 => {
 true
 },
@@ -10556,7 +10556,7 @@ true
 _ => {
 false
 }
-}, scaled_component_offset: match flagbits >> 11u16 & 1u16 {
+}, scaled_component_offset: match flag_bits >> 11u16 & 1u16 {
 0 => {
 true
 },
@@ -10564,7 +10564,7 @@ true
 _ => {
 false
 }
-}, overlap_compound: match flagbits >> 10u16 & 1u16 {
+}, overlap_compound: match flag_bits >> 10u16 & 1u16 {
 0 => {
 true
 },
@@ -10572,7 +10572,7 @@ true
 _ => {
 false
 }
-}, use_my_metrics: match flagbits >> 9u16 & 1u16 {
+}, use_my_metrics: match flag_bits >> 9u16 & 1u16 {
 0 => {
 true
 },
@@ -10580,7 +10580,7 @@ true
 _ => {
 false
 }
-}, we_have_instructions: match flagbits >> 8u16 & 1u16 {
+}, we_have_instructions: match flag_bits >> 8u16 & 1u16 {
 0 => {
 true
 },
@@ -10588,7 +10588,7 @@ true
 _ => {
 false
 }
-}, we_have_a_two_by_two: match flagbits >> 7u16 & 1u16 {
+}, we_have_a_two_by_two: match flag_bits >> 7u16 & 1u16 {
 0 => {
 true
 },
@@ -10596,7 +10596,7 @@ true
 _ => {
 false
 }
-}, we_have_an_x_and_y_scale: match flagbits >> 6u16 & 1u16 {
+}, we_have_an_x_and_y_scale: match flag_bits >> 6u16 & 1u16 {
 0 => {
 true
 },
@@ -10604,7 +10604,7 @@ true
 _ => {
 false
 }
-}, more_components: match flagbits >> 5u16 & 1u16 {
+}, more_components: match flag_bits >> 5u16 & 1u16 {
 0 => {
 true
 },
@@ -10612,7 +10612,7 @@ true
 _ => {
 false
 }
-}, __reserved_bit4: match flagbits >> 4u16 & 1u16 {
+}, __reserved_bit4: match flag_bits >> 4u16 & 1u16 {
 0 => {
 true
 },
@@ -10620,7 +10620,7 @@ true
 _ => {
 false
 }
-}, we_have_a_scale: match flagbits >> 3u16 & 1u16 {
+}, we_have_a_scale: match flag_bits >> 3u16 & 1u16 {
 0 => {
 true
 },
@@ -10628,7 +10628,7 @@ true
 _ => {
 false
 }
-}, round_xy_to_grid: match flagbits >> 2u16 & 1u16 {
+}, round_xy_to_grid: match flag_bits >> 2u16 & 1u16 {
 0 => {
 true
 },
@@ -10636,7 +10636,7 @@ true
 _ => {
 false
 }
-}, args_are_xy_values: match flagbits >> 1u16 & 1u16 {
+}, args_are_xy_values: match flag_bits >> 1u16 & 1u16 {
 0 => {
 true
 },
@@ -10644,7 +10644,7 @@ true
 _ => {
 false
 }
-}, arg_1_and_2_are_words: match flagbits >> 0u16 & 1u16 {
+}, arg_1_and_2_are_words: match flag_bits >> 0u16 & 1u16 {
 0 => {
 true
 },
@@ -10818,7 +10818,7 @@ let inner = {
 let b = _input.read_byte()?;
 b
 };
-PResult::Ok(((|flagbits: u8| PResult::Ok(opentype_glyph_description_simple_flags_raw { overlap_simple: match flagbits >> 6u8 & 1u8 {
+PResult::Ok(((|flagbyte: u8| PResult::Ok(opentype_glyph_description_simple_flags_raw { overlap_simple: match flagbyte >> 6u8 & 1u8 {
 0 => {
 true
 },
@@ -10826,7 +10826,7 @@ true
 _ => {
 false
 }
-}, y_is_same_or_positive_y_short_vector: match flagbits >> 5u8 & 1u8 {
+}, y_is_same_or_positive_y_short_vector: match flagbyte >> 5u8 & 1u8 {
 0 => {
 true
 },
@@ -10834,7 +10834,7 @@ true
 _ => {
 false
 }
-}, x_is_same_or_positive_x_short_vector: match flagbits >> 4u8 & 1u8 {
+}, x_is_same_or_positive_x_short_vector: match flagbyte >> 4u8 & 1u8 {
 0 => {
 true
 },
@@ -10842,7 +10842,7 @@ true
 _ => {
 false
 }
-}, repeat_flag: match flagbits >> 3u8 & 1u8 {
+}, repeat_flag: match flagbyte >> 3u8 & 1u8 {
 0 => {
 true
 },
@@ -10850,7 +10850,7 @@ true
 _ => {
 false
 }
-}, y_short_vector: match flagbits >> 2u8 & 1u8 {
+}, y_short_vector: match flagbyte >> 2u8 & 1u8 {
 0 => {
 true
 },
@@ -10858,7 +10858,7 @@ true
 _ => {
 false
 }
-}, x_short_vector: match flagbits >> 1u8 & 1u8 {
+}, x_short_vector: match flagbyte >> 1u8 & 1u8 {
 0 => {
 true
 },
@@ -10866,7 +10866,7 @@ true
 _ => {
 false
 }
-}, on_curve_point: match flagbits >> 0u8 & 1u8 {
+}, on_curve_point: match flagbyte >> 0u8 & 1u8 {
 0 => {
 true
 },
@@ -13569,7 +13569,7 @@ let inner = {
 let b = _input.read_byte()?;
 b
 };
-((|packedbits: u8| PResult::Ok(zlib_main_compression_method_flags { compression_info: packedbits >> 4u8 & 15u8, compression_method: packedbits >> 0u8 & 15u8 }))(inner))?
+((|packed_bits: u8| PResult::Ok(zlib_main_compression_method_flags { compression_info: packed_bits >> 4u8 & 15u8, compression_method: packed_bits >> 0u8 & 15u8 }))(inner))?
 };
 if ((|method_info: zlib_main_compression_method_flags| PResult::Ok(method_info.compression_method.clone() == 8u8))(inner.clone()))? {
 inner
@@ -13582,7 +13582,7 @@ let inner = {
 let b = _input.read_byte()?;
 b
 };
-((|packedbits: u8| PResult::Ok(zlib_main_flags { flevel: packedbits >> 6u8 & 3u8, fdict: packedbits >> 5u8 & 1u8, fcheck: packedbits >> 0u8 & 31u8 }))(inner))?
+((|packed_bits: u8| PResult::Ok(zlib_main_flags { flevel: packed_bits >> 6u8 & 3u8, fdict: packed_bits >> 5u8 & 1u8, fcheck: packed_bits >> 0u8 & 31u8 }))(inner))?
 }))())?;
 let dict_id = ((|| PResult::Ok(if match flags.fdict.clone() {
 0 => {
@@ -13683,26 +13683,26 @@ accum.push(elem);
 accum
 }))())?;
 let codes = ((|| PResult::Ok((try_flat_map_vec(blocks.iter().cloned(), |x: deflate_block| PResult::Ok(match x.data.clone() {
-deflate_main_codes::uncompressed(y) => {
+deflate_main_codes__dupX1::uncompressed(y) => {
 y.codes_values.clone()
 },
 
-deflate_main_codes::fixed_huffman(y) => {
+deflate_main_codes__dupX1::fixed_huffman(y) => {
 y.codes_values.clone()
 },
 
-deflate_main_codes::dynamic_huffman(y) => {
+deflate_main_codes__dupX1::dynamic_huffman(y) => {
 y.codes_values.clone()
 }
 })))?))())?;
-let inflate = ((|| PResult::Ok((try_flat_map_append_vec(codes.iter().cloned(), |tuple_var: (&Vec<u8>, deflate_main_codes__dupX1)| PResult::Ok(match tuple_var {
+let inflate = ((|| PResult::Ok((try_flat_map_append_vec(codes.iter().cloned(), |tuple_var: (&Vec<u8>, deflate_main_codes)| PResult::Ok(match tuple_var {
 (buffer, symbol) => {
 match symbol {
-deflate_main_codes__dupX1::literal(b) => {
+deflate_main_codes::literal(b) => {
 [b].to_vec()
 },
 
-deflate_main_codes__dupX1::reference(r) => {
+deflate_main_codes::reference(r) => {
 {
 let ix = (try_sub!((buffer.len()) as u32, (r.distance.clone()) as u32)) as usize;
 (slice_ext(&buffer, ix..ix + (((r.length.clone()) as u32) as usize))).to_vec()
@@ -13727,17 +13727,17 @@ let field1 = ((|| PResult::Ok((Decoder136(_input))?))())?;
 let data = ((|| PResult::Ok(match r#type {
 0u8 => {
 let inner = (Decoder_deflate_uncompressed(_input))?;
-deflate_main_codes::uncompressed(inner)
+deflate_main_codes__dupX1::uncompressed(inner)
 },
 
 1u8 => {
 let inner = (Decoder_deflate_fixed_huffman(_input))?;
-deflate_main_codes::fixed_huffman(inner)
+deflate_main_codes__dupX1::fixed_huffman(inner)
 },
 
 2u8 => {
 let inner = (Decoder_deflate_dynamic_huffman(_input))?;
-deflate_main_codes::dynamic_huffman(inner)
+deflate_main_codes__dupX1::dynamic_huffman(inner)
 },
 
 _other => {
@@ -13818,7 +13818,7 @@ let field7 = ((|| PResult::Ok((Decoder136(_input))?))())?;
 }
 accum
 }))())?;
-let codes_values = ((|| PResult::Ok((try_flat_map_vec(bytes.iter().cloned(), |x: u8| PResult::Ok([deflate_main_codes__dupX1::literal(x)].to_vec())))?))())?;
+let codes_values = ((|| PResult::Ok((try_flat_map_vec(bytes.iter().cloned(), |x: u8| PResult::Ok([deflate_main_codes::literal(x)].to_vec())))?))())?;
 PResult::Ok(deflate_uncompressed { align, len, nlen, bytes, codes_values })
 }
 
@@ -14597,7 +14597,7 @@ let codes_values = ((|| PResult::Ok((try_flat_map_vec(codes.iter().cloned(), |x:
 257u16..=285u16 => {
 match x.extra.clone() {
 Some(ref rec) => {
-[deflate_main_codes__dupX1::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
+[deflate_main_codes::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
 },
 
 _ => {
@@ -14611,7 +14611,7 @@ return Err(ParseError::ExcludedBranch(4350808036978594792u64));
 },
 
 _ => {
-[deflate_main_codes__dupX1::literal((x.code.clone()) as u8)].to_vec()
+[deflate_main_codes::literal((x.code.clone()) as u8)].to_vec()
 }
 })))?))())?;
 PResult::Ok(deflate_fixed_huffman { codes, codes_values })
@@ -15297,7 +15297,7 @@ let codes_values = ((|| PResult::Ok((try_flat_map_vec(codes.iter().cloned(), |x:
 257u16..=285u16 => {
 match x.extra.clone() {
 Some(ref rec) => {
-[deflate_main_codes__dupX1::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
+[deflate_main_codes::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
 },
 
 _ => {
@@ -15311,7 +15311,7 @@ return Err(ParseError::ExcludedBranch(4350808036978594792u64));
 },
 
 _ => {
-[deflate_main_codes__dupX1::literal((x.code.clone()) as u8)].to_vec()
+[deflate_main_codes::literal((x.code.clone()) as u8)].to_vec()
 }
 })))?))())?;
 PResult::Ok(deflate_dynamic_huffman { hlit, hdist, hclen, code_length_alphabet_code_lengths, literal_length_distance_alphabet_code_lengths, literal_length_distance_alphabet_code_lengths_value, literal_length_alphabet_code_lengths_value, distance_alphabet_code_lengths_value, codes, codes_values })
@@ -18436,7 +18436,7 @@ let inner = {
 let b = _input.read_byte()?;
 b
 };
-((|packedbits: u8| PResult::Ok(zlib_main_compression_method_flags { compression_info: packedbits >> 4u8 & 15u8, compression_method: packedbits >> 0u8 & 15u8 }))(inner))?
+((|packed_bits: u8| PResult::Ok(zlib_main_compression_method_flags { compression_info: packed_bits >> 4u8 & 15u8, compression_method: packed_bits >> 0u8 & 15u8 }))(inner))?
 };
 if ((|method_info: zlib_main_compression_method_flags| PResult::Ok(method_info.compression_method.clone() == 8u8))(inner.clone()))? {
 inner
@@ -18449,7 +18449,7 @@ let inner = {
 let b = _input.read_byte()?;
 b
 };
-((|packedbits: u8| PResult::Ok(zlib_main_flags { flevel: packedbits >> 6u8 & 3u8, fdict: packedbits >> 5u8 & 1u8, fcheck: packedbits >> 0u8 & 31u8 }))(inner))?
+((|packed_bits: u8| PResult::Ok(zlib_main_flags { flevel: packed_bits >> 6u8 & 3u8, fdict: packed_bits >> 5u8 & 1u8, fcheck: packed_bits >> 0u8 & 31u8 }))(inner))?
 }))())?;
 let dict_id = ((|| PResult::Ok(if match flags.fdict.clone() {
 0 => {
@@ -20779,7 +20779,7 @@ let inner = {
 let b = _input.read_byte()?;
 b
 };
-((|packedbits: u8| PResult::Ok(zlib_main_compression_method_flags { compression_info: packedbits >> 4u8 & 15u8, compression_method: packedbits >> 0u8 & 15u8 }))(inner))?
+((|packed_bits: u8| PResult::Ok(zlib_main_compression_method_flags { compression_info: packed_bits >> 4u8 & 15u8, compression_method: packed_bits >> 0u8 & 15u8 }))(inner))?
 };
 if ((|method_info: zlib_main_compression_method_flags| PResult::Ok(method_info.compression_method.clone() == 8u8))(inner.clone()))? {
 inner
@@ -20792,7 +20792,7 @@ let inner = {
 let b = _input.read_byte()?;
 b
 };
-((|packedbits: u8| PResult::Ok(zlib_main_flags { flevel: packedbits >> 6u8 & 3u8, fdict: packedbits >> 5u8 & 1u8, fcheck: packedbits >> 0u8 & 31u8 }))(inner))?
+((|packed_bits: u8| PResult::Ok(zlib_main_flags { flevel: packed_bits >> 6u8 & 3u8, fdict: packed_bits >> 5u8 & 1u8, fcheck: packed_bits >> 0u8 & 31u8 }))(inner))?
 }))())?;
 let dict_id = ((|| PResult::Ok(if match flags.fdict.clone() {
 0 => {
@@ -21941,7 +21941,7 @@ let inner = {
 let b = _input.read_byte()?;
 b
 };
-((|packedbits: u8| PResult::Ok(zlib_main_compression_method_flags { compression_info: packedbits >> 4u8 & 15u8, compression_method: packedbits >> 0u8 & 15u8 }))(inner))?
+((|packed_bits: u8| PResult::Ok(zlib_main_compression_method_flags { compression_info: packed_bits >> 4u8 & 15u8, compression_method: packed_bits >> 0u8 & 15u8 }))(inner))?
 };
 if ((|method_info: zlib_main_compression_method_flags| PResult::Ok(method_info.compression_method.clone() == 8u8))(inner.clone()))? {
 inner
@@ -21954,7 +21954,7 @@ let inner = {
 let b = _input.read_byte()?;
 b
 };
-((|packedbits: u8| PResult::Ok(zlib_main_flags { flevel: packedbits >> 6u8 & 3u8, fdict: packedbits >> 5u8 & 1u8, fcheck: packedbits >> 0u8 & 31u8 }))(inner))?
+((|packed_bits: u8| PResult::Ok(zlib_main_flags { flevel: packed_bits >> 6u8 & 3u8, fdict: packed_bits >> 5u8 & 1u8, fcheck: packed_bits >> 0u8 & 31u8 }))(inner))?
 }))())?;
 let dict_id = ((|| PResult::Ok(if match flags.fdict.clone() {
 0 => {
@@ -26335,7 +26335,7 @@ let inner = {
 let b = _input.read_byte()?;
 b
 };
-((|packedbits: u8| PResult::Ok(jpeg_sos_data_approximation_bit_position { high: packedbits >> 4u8 & 15u8, low: packedbits >> 0u8 & 15u8 }))(inner))?
+((|packed_bits: u8| PResult::Ok(jpeg_sos_data_approximation_bit_position { high: packed_bits >> 4u8 & 15u8, low: packed_bits >> 0u8 & 15u8 }))(inner))?
 }))())?;
 PResult::Ok(jpeg_sos_data { num_image_components, image_components, start_spectral_selection, end_spectral_selection, approximation_bit_position })
 }
@@ -26348,7 +26348,7 @@ let inner = {
 let b = _input.read_byte()?;
 b
 };
-((|packedbits: u8| PResult::Ok(jpeg_sos_image_component_entropy_coding_table_ids { dc_entropy_coding_table_id: packedbits >> 4u8 & 15u8, ac_entropy_coding_table_id: packedbits >> 0u8 & 15u8 }))(inner))?
+((|packed_bits: u8| PResult::Ok(jpeg_sos_image_component_entropy_coding_table_ids { dc_entropy_coding_table_id: packed_bits >> 4u8 & 15u8, ac_entropy_coding_table_id: packed_bits >> 0u8 & 15u8 }))(inner))?
 };
 if ((|entropy_coding_table_ids: jpeg_sos_image_component_entropy_coding_table_ids| PResult::Ok((entropy_coding_table_ids.dc_entropy_coding_table_id.clone() <= 3u8) && (entropy_coding_table_ids.ac_entropy_coding_table_id.clone() <= 3u8)))(inner.clone()))? {
 inner
@@ -27165,7 +27165,7 @@ let inner = {
 let b = _input.read_byte()?;
 b
 };
-((|packedbits: u8| PResult::Ok(jpeg_sof_image_component_sampling_factor { horizontal: packedbits >> 4u8 & 15u8, vertical: packedbits >> 0u8 & 15u8 }))(inner))?
+((|packed_bits: u8| PResult::Ok(jpeg_sof_image_component_sampling_factor { horizontal: packed_bits >> 4u8 & 15u8, vertical: packed_bits >> 0u8 & 15u8 }))(inner))?
 }))())?;
 let quantization_table_id = ((|| PResult::Ok({
 let inner = (Decoder25(_input))?;
@@ -28103,7 +28103,7 @@ let inner = {
 let b = _input.read_byte()?;
 b
 };
-((|packedbits: u8| PResult::Ok(jpeg_dac_data_class_table_id { class: packedbits >> 4u8 & 15u8, table_id: packedbits >> 0u8 & 15u8 }))(inner))?
+((|packed_bits: u8| PResult::Ok(jpeg_dac_data_class_table_id { class: packed_bits >> 4u8 & 15u8, table_id: packed_bits >> 0u8 & 15u8 }))(inner))?
 };
 if ((|class_table_id: jpeg_dac_data_class_table_id| PResult::Ok((class_table_id.class.clone() < 2u8) && (class_table_id.table_id.clone() < 4u8)))(inner.clone()))? {
 inner
@@ -28122,7 +28122,7 @@ let inner = {
 let b = _input.read_byte()?;
 b
 };
-((|packedbits: u8| PResult::Ok(jpeg_dac_data_class_table_id { class: packedbits >> 4u8 & 15u8, table_id: packedbits >> 0u8 & 15u8 }))(inner))?
+((|packed_bits: u8| PResult::Ok(jpeg_dac_data_class_table_id { class: packed_bits >> 4u8 & 15u8, table_id: packed_bits >> 0u8 & 15u8 }))(inner))?
 };
 if ((|class_table_id: jpeg_dac_data_class_table_id| PResult::Ok((class_table_id.class.clone() < 2u8) && (class_table_id.table_id.clone() < 4u8)))(inner.clone()))? {
 inner
@@ -28160,7 +28160,7 @@ let inner = {
 let b = _input.read_byte()?;
 b
 };
-((|packedbits: u8| PResult::Ok(jpeg_dqt_data_precision_table_id { precision: packedbits >> 4u8 & 15u8, table_id: packedbits >> 0u8 & 15u8 }))(inner))?
+((|packed_bits: u8| PResult::Ok(jpeg_dqt_data_precision_table_id { precision: packed_bits >> 4u8 & 15u8, table_id: packed_bits >> 0u8 & 15u8 }))(inner))?
 };
 if ((|precision_table_id: jpeg_dqt_data_precision_table_id| PResult::Ok((precision_table_id.precision.clone() <= 1u8) && (precision_table_id.table_id.clone() <= 3u8)))(inner.clone()))? {
 inner
@@ -28511,7 +28511,7 @@ let inner = {
 let b = _input.read_byte()?;
 b
 };
-((|flagbits: u8| PResult::Ok(gzip_header_file_flags { fcomment: match flagbits >> 4u8 & 1u8 {
+((|flagbyte: u8| PResult::Ok(gzip_header_file_flags { fcomment: match flagbyte >> 4u8 & 1u8 {
 0 => {
 true
 },
@@ -28519,7 +28519,7 @@ true
 _ => {
 false
 }
-}, fname: match flagbits >> 3u8 & 1u8 {
+}, fname: match flagbyte >> 3u8 & 1u8 {
 0 => {
 true
 },
@@ -28527,7 +28527,7 @@ true
 _ => {
 false
 }
-}, fextra: match flagbits >> 2u8 & 1u8 {
+}, fextra: match flagbyte >> 2u8 & 1u8 {
 0 => {
 true
 },
@@ -28535,7 +28535,7 @@ true
 _ => {
 false
 }
-}, fhcrc: match flagbits >> 1u8 & 1u8 {
+}, fhcrc: match flagbyte >> 1u8 & 1u8 {
 0 => {
 true
 },
@@ -28543,7 +28543,7 @@ true
 _ => {
 false
 }
-}, ftext: match flagbits >> 0u8 & 1u8 {
+}, ftext: match flagbyte >> 0u8 & 1u8 {
 0 => {
 true
 },
@@ -29321,7 +29321,7 @@ let inner = {
 let b = _input.read_byte()?;
 b
 };
-((|packedbits: u8| PResult::Ok(gif_graphic_control_extension_flags { reserved: packedbits >> 5u8 & 7u8, disposal_method: packedbits >> 2u8 & 7u8, user_input_flag: packedbits >> 1u8 & 1u8, transparent_color_flag: packedbits >> 0u8 & 1u8 }))(inner))?
+((|packed_bits: u8| PResult::Ok(gif_graphic_control_extension_flags { reserved: packed_bits >> 5u8 & 7u8, disposal_method: packed_bits >> 2u8 & 7u8, user_input_flag: packed_bits >> 1u8 & 1u8, transparent_color_flag: packed_bits >> 0u8 & 1u8 }))(inner))?
 }))())?;
 let delay_time = ((|| PResult::Ok((Decoder109(_input))?))())?;
 let transparent_color_index = ((|| PResult::Ok((Decoder25(_input))?))())?;
@@ -29479,7 +29479,7 @@ let inner = {
 let b = _input.read_byte()?;
 b
 };
-((|packedbits: u8| PResult::Ok(gif_image_descriptor_flags { table_flag: packedbits >> 7u8 & 1u8, interlace_flag: packedbits >> 6u8 & 1u8, sort_flag: packedbits >> 5u8 & 1u8, reserved: packedbits >> 3u8 & 3u8, table_size: packedbits >> 0u8 & 7u8 }))(inner))?
+((|packed_bits: u8| PResult::Ok(gif_image_descriptor_flags { table_flag: packed_bits >> 7u8 & 1u8, interlace_flag: packed_bits >> 6u8 & 1u8, sort_flag: packed_bits >> 5u8 & 1u8, reserved: packed_bits >> 3u8 & 3u8, table_size: packed_bits >> 0u8 & 7u8 }))(inner))?
 }))())?;
 PResult::Ok(gif_image_descriptor { separator, image_left_position, image_top_position, image_width, image_height, flags })
 }
@@ -29538,7 +29538,7 @@ let inner = {
 let b = _input.read_byte()?;
 b
 };
-((|packedbits: u8| PResult::Ok(gif_logical_screen_descriptor_flags { table_flag: packedbits >> 7u8 & 1u8, color_resolution: packedbits >> 4u8 & 7u8, sort_flag: packedbits >> 3u8 & 1u8, table_size: packedbits >> 0u8 & 7u8 }))(inner))?
+((|packed_bits: u8| PResult::Ok(gif_logical_screen_descriptor_flags { table_flag: packed_bits >> 7u8 & 1u8, color_resolution: packed_bits >> 4u8 & 7u8, sort_flag: packed_bits >> 3u8 & 1u8, table_size: packed_bits >> 0u8 & 7u8 }))(inner))?
 }))())?;
 let bg_color_index = ((|| PResult::Ok((Decoder25(_input))?))())?;
 let pixel_aspect_ratio = ((|| PResult::Ok((Decoder25(_input))?))())?;

@@ -2,7 +2,7 @@
 
 ```rust
 /// Returns whichever of two pair-typed values has a larger first element, left-biased if equal
-pub fn expr_max_keyval(a: Expr, b: Expr) -> Expr {
+pub fn expr_max_key_val(a: Expr, b: Expr) -> Expr {
     expr_if_else(
         expr_gte(tuple_proj(a.clone(), 0), tuple_proj(b.clone(), 0)),
         a,
@@ -53,7 +53,7 @@ pub fn expr_maximum_by(
                 [
                     (
                         pat_some(bind("x")),
-                        expr_some(expr_max_keyval(var("x"), var("y"))),
+                        expr_some(expr_max_key_val(var("x"), var("y"))),
                     ),
                     (pat_none(), expr_some(var("y"))),
                 ],
@@ -84,13 +84,14 @@ pub fn expr_sum_as_u64(seq: Expr) -> Expr {
             add(var("acc"), Expr::AsU64(Box::new(var("y")))),
         ),
         Expr::U64(0),
-        ValueType::UMAX,
+        ValueType::Base(BaseType::U64),
         seq,
     )
 }
 
 /// Evaluates to `true` if any element of `haystack` equals `needle`, otherwise `false`.
 pub fn is_elem(needle: Expr, haystack: Expr) -> Expr {
+    // REVIEW - we have no mechanism for early-short-circuiting in Expr::LeftFold processing, which may be required to achieve the desired performance
     left_fold(
         lambda_tuple(
             ["acc", "stalk"],
@@ -103,7 +104,7 @@ pub fn is_elem(needle: Expr, haystack: Expr) -> Expr {
 }
 
 /// Returns a copied sequence with only the first occurrence of any given element modulo integer equality.
-pub fn dedup(seq: Expr, vt_elem: ValueType) -> Expr {
+pub fn int_seq_unique(seq: Expr, vt_elem: ValueType) -> Expr {
     flat_map_list(
         lambda_tuple(
             ["prefix", "x"],
@@ -168,13 +169,13 @@ pub fn fmt_unwrap(expr: Expr) -> Format {
 
 /// Performs a table lookup operation over a sequence of entries `seq` of type `elem_type`.
 ///
-/// Uses `f_getkey` to map from each entry to its key, and `query_key` as the query key.
+/// Uses `f_get_key` to map from each entry to its key, and `query_key` as the query key.
 ///
-/// Even if mulitple matching entries exist, only the first one is returned, as an Option.
+/// Even if multiple matching entries exist, only the first one is returned, as an Option.
 pub fn table_find(
     seq: Expr,
     elem_type: ValueType,
-    f_getkey: impl Fn(Expr) -> Expr,
+    f_get_key: impl Fn(Expr) -> Expr,
     query_key: Expr,
 ) -> Expr {
     let match0_or1 = flat_map_list(
@@ -187,7 +188,7 @@ pub fn table_find(
                     (
                         Pattern::Wildcard,
                         expr_match(
-                            expr_eq(f_getkey(tuple_proj(var("list-entry"), 1)), query_key),
+                            expr_eq(f_get_key(tuple_proj(var("list-entry"), 1)), query_key),
                             [
                                 (Pattern::Bool(true), Expr::Seq(vec![var("entry")])),
                                 (Pattern::Bool(false), Expr::Seq(Vec::new())),
@@ -220,8 +221,9 @@ pub fn seq_to_opt(empty_or_singleton: Expr) -> Expr {
 
 
 
-/// Shortcut for discarding a Format's return value but perserving its effect on the overall parse
+/// Shortcut for discarding a Format's return value but preserving its effect on the overall parse
 pub fn void(f: Format) -> Format {
+    // REVIEW - the need for a dummy capture-variable suggests the utility of a `LetFormat` variation without a capture
     chain(f, "_", Format::EMPTY)
 }
 
@@ -247,12 +249,12 @@ pub fn binary_fallback(f: Format) -> Format {
 }
 
 /// Shortcut for computing a standalone `Format::Pos` that we immediately consume without ever needing to reuse,
-/// which discards the `Format::Pos` token via `map`
+/// which discards the `Format::Pos` token via `LetFormat`
 ///
-/// The `pos_varname` parameter is the verbatim name of the variable that `f` internally uses to refer to the parsed `Format::Pos`.
+/// The `pos_var` parameter is the verbatim name of the variable that `f` internally uses to refer to the parsed `Format::Pos`.
 #[inline]
-pub fn with_pos(pos_varname: &'static str, f: Format) -> Format {
-    chain(Format::Pos, pos_varname, f)
+pub fn with_pos(pos_var: &'static str, f: Format) -> Format {
+    chain(Format::Pos, pos_var, f)
 }
 
 /// Helper for parsing `(f, suffix)` where we only want to see the `f` component
@@ -281,7 +283,7 @@ pub fn keep_first(f: Format, f1: Format) -> Format {
     chain(f, "x", keep_last(f1, compute(var("x"))))
 }
 
-/// Helper function for splicing together two seperate records, with the option to filter the fields included from each
+/// Helper function for splicing together two separate records, with the option to filter the fields included from each
 /// or reorder them internally, but not across the record as a whole (i.e. all fields from the first will strictly precede those of the second).
 pub fn merge_record_subsets<const N: usize, const M: usize>(first: (Expr, [&'static str; N]), second: (Expr, [&'static str; M])) -> Expr {
     let (first_expr, first_fields) = first;

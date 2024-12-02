@@ -128,7 +128,7 @@ fn fixed32be(base: &BaseModule) -> Format {
     map(base.u32be(), lambda("x", variant("Fixed32", var("x"))))
 }
 
-// Custom type for fixed-point values that are interpreted as (2sigbits, 14sigbits) within a u16be raw-parse
+// Custom type for fixed-point values that are interpreted as (2bits . 14bits) within a u16be raw-parse
 fn f2dot14(base: &BaseModule) -> Format {
     map(base.u16be(), lambda("x", variant("F2Dot14", var("x"))))
 }
@@ -635,7 +635,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         ("search_range", base.u16be()), // := 2x the maximum power of 2 <= seg_count
                         ("entry_selector", base.u16be()), // := ilog2(seg_count)
                         ("range_shift", base.u16be()),  // := seg_count * 2 - search_range
-                        ("end_code", repeat_count(var("seg_count"), base.u16be())), // end charcode for each seg, last is 0xFFFF
+                        ("end_code", repeat_count(var("seg_count"), base.u16be())), // end character-code for each seg, last is 0xFFFF
                         ("__reserved_pad", expect_u16be(base, 0)),
                         ("start_code", repeat_count(var("seg_count"), base.u16be())),
                         ("id_delta", repeat_count(var("seg_count"), base.u16be())), // ought to be signed but will work if we perform as unsigned addition mod-0xFFFF
@@ -1663,7 +1663,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ["_has_instructions", "seq"],
                     expr_option_map_or(
                         Expr::Bool(false),
-                        |elt| expr_not(record_projs(elt, &["flags", "more_components"])),
+                        |elt| expr_not(record_lens(elt, &["flags", "more_components"])),
                         seq_last_checked(var("seq")),
                     ),
                 );
@@ -1671,7 +1671,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ["acc", "glyph"],
                     or(
                         var("acc"),
-                        record_projs(var("glyph"), &["flags", "we_have_instructions"]),
+                        record_lens(var("glyph"), &["flags", "we_have_instructions"]),
                     ),
                 );
 
