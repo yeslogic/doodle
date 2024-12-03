@@ -362,22 +362,35 @@ fn link(abs_offset: Expr, format: Format) -> Format {
 /// parses a u16be as a positive delta from `base_offset` and returns the linked content parsed according
 /// to `format` at that location.
 ///
-/// Returns a record `{ offset: u16, link := format }`
+/// Returns a record `{ offset: u16, link := (offset > 0) ?Some(format) : None }`
 ///
 /// Additionally takes argument `base` of type `BaseModule` to parse u16be values without code duplication.
 ///
-/// Only to be used when an `offset` value of `0` (which normally results in `link: None`) is
-/// not considered legal, in which case the local parse will produce an error.
+/// # Note
 ///
-/// If this guarantee cannot be made, use [`offset_nullable`] instead to allow Null offsets.
+/// Despite a valid offset being 'mandatory', there is no practical way to avoid constructing
+/// some form of `Option`-like container to reluctantly avoid erroring out; the OpenType specification
+/// itself says that parsers of OpenType data should "anticipate non-conformant font data that has a
+/// NULL subtable offset where only a non-NULL value is expected."
+///
+/// Thus, we have to be prepared to parse a zero-length offset and return an empty format of some kind.
+///
+/// In future iterations, a distinct option-like type may be constructed to distinguish nullable offset-links
+/// from non-nullable offset-links, but for now, behavior is identical to [`offset16_nullable`].
+///
+/// See [https://learn.microsoft.com/en-us/typography/opentype/spec/otff#data-types] for more info.
 fn offset16_mandatory(base_offset: Expr, format: Format, base: &BaseModule) -> Format {
     shadow_check(&base_offset, "offset");
     // REVIEW - there is an argument to be made that we should use `chain` instead of `record` to elide the offset and flatten the link
     record([
-        ("offset", where_nonzero(base.u16be())),
+        ("offset", base.u16be()),
         (
             "link",
-            link(pos_add_u16(base_offset, var("offset")), format),
+            if_then_else(
+                is_nonzero(var("offset")),
+                link(pos_add_u16(base_offset, var("offset")), format_some(format)),
+                format_none(),
+            ),
         ),
     ])
 }
@@ -2821,7 +2834,51 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ),
                 ])
             };
-            let multiple_subst = /* STUB */ Format::EMPTY;
+            let multiple_subst = {
+                let sequence_table = record([
+                    ("glyph_count", where_nonzero(base.u16be())),
+                    (
+                        "substitute_glyph_ids",
+                        repeat_count(var("glyph_count"), base.u16be()),
+                    ),
+                ]);
+
+                record([
+                    ("table_start", pos32()),
+                    ("subst_format", base.u16be()),
+                    (
+                        "coverage",
+                        offset16_mandatory(var("table_start"), coverage_table.call(), base),
+                    ),
+                    (
+                        "subst",
+                        match_variant(
+                            var("subst_format"),
+                            [
+                                (
+                                    Pattern::U16(1),
+                                    "Format1",
+                                    record([
+                                        ("sequence_count", base.u16be()),
+                                        (
+                                            "sequences",
+                                            repeat_count(
+                                                var("sequence_count"),
+                                                offset16_mandatory(
+                                                    var("table_start"),
+                                                    sequence_table,
+                                                    base,
+                                                ),
+                                            ),
+                                        ),
+                                    ]),
+                                ),
+                                (Pattern::Wildcard, "BadFormat", Format::Fail),
+                            ],
+                        ),
+                    ),
+                ])
+            };
             let alternate_subst = /* STUB */ Format::EMPTY;
             let ligature_subst = /* STUB */ Format::EMPTY;
             let subst_extension = /* STUB */ Format::EMPTY;

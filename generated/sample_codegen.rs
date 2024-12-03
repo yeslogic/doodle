@@ -327,7 +327,7 @@ distance: u16
 }
 
 #[derive(Debug, Clone)]
-pub enum deflate_main_codes { literal(u8), reference(deflate_main_codes_reference) }
+pub enum deflate_main_codes__dupX1 { literal(u8), reference(deflate_main_codes_reference) }
 
 #[derive(Debug, Clone)]
 pub struct deflate_dynamic_huffman {
@@ -340,7 +340,7 @@ literal_length_distance_alphabet_code_lengths_value: Vec<u8>,
 literal_length_alphabet_code_lengths_value: Vec<u8>,
 distance_alphabet_code_lengths_value: Vec<u8>,
 codes: Vec<deflate_dynamic_huffman_codes>,
-codes_values: Vec<deflate_main_codes>
+codes_values: Vec<deflate_main_codes__dupX1>
 }
 
 #[derive(Debug, Clone)]
@@ -360,7 +360,7 @@ extra: Option<deflate_fixed_huffman_codes_values>
 #[derive(Debug, Clone)]
 pub struct deflate_fixed_huffman {
 codes: Vec<deflate_fixed_huffman_codes>,
-codes_values: Vec<deflate_main_codes>
+codes_values: Vec<deflate_main_codes__dupX1>
 }
 
 #[derive(Debug, Clone)]
@@ -369,23 +369,23 @@ align: (),
 len: u16,
 nlen: u16,
 bytes: Vec<u8>,
-codes_values: Vec<deflate_main_codes>
+codes_values: Vec<deflate_main_codes__dupX1>
 }
 
 #[derive(Debug, Clone)]
-pub enum deflate_main_codes__dupX1 { dynamic_huffman(deflate_dynamic_huffman), fixed_huffman(deflate_fixed_huffman), uncompressed(deflate_uncompressed) }
+pub enum deflate_main_codes { dynamic_huffman(deflate_dynamic_huffman), fixed_huffman(deflate_fixed_huffman), uncompressed(deflate_uncompressed) }
 
 #[derive(Debug, Clone)]
 pub struct deflate_block {
 r#final: u8,
 r#type: u8,
-data: deflate_main_codes__dupX1
+data: deflate_main_codes
 }
 
 #[derive(Debug, Clone)]
 pub struct deflate_main {
 blocks: Vec<deflate_block>,
-codes: Vec<deflate_main_codes>,
+codes: Vec<deflate_main_codes__dupX1>,
 inflate: Vec<u8>
 }
 
@@ -1532,7 +1532,7 @@ left_side_bearings: Vec<u16>
 #[derive(Debug, Clone)]
 pub struct opentype_name_table_name_records_offset {
 offset: u16,
-link: Vec<u8>
+link: Option<Vec<u8>>
 }
 
 #[derive(Debug, Clone)]
@@ -1851,7 +1851,7 @@ data: opentype_coverage_table_data
 #[derive(Debug, Clone)]
 pub struct opentype_common_chained_sequence_context_subst_Format1_coverage {
 offset: u16,
-link: opentype_coverage_table
+link: Option<opentype_coverage_table>
 }
 
 #[derive(Debug, Clone)]
@@ -1863,7 +1863,7 @@ point_indices: Vec<u16>
 #[derive(Debug, Clone)]
 pub struct opentype_gdef_table_attach_list_link_attach_point_offsets {
 offset: u16,
-link: opentype_gdef_table_attach_list_link_attach_point_offsets_link
+link: Option<opentype_gdef_table_attach_list_link_attach_point_offsets_link>
 }
 
 #[derive(Debug, Clone)]
@@ -1911,7 +1911,7 @@ pub enum opentype_common_device_or_variation_index_table { DeviceTable(opentype_
 #[derive(Debug, Clone)]
 pub struct opentype_common_value_record_x_advance_device {
 offset: u16,
-link: opentype_common_device_or_variation_index_table
+link: Option<opentype_common_device_or_variation_index_table>
 }
 
 #[derive(Debug, Clone)]
@@ -1933,7 +1933,7 @@ data: opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_value
 #[derive(Debug, Clone)]
 pub struct opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values {
 offset: u16,
-link: opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link
+link: Option<opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link>
 }
 
 #[derive(Debug, Clone)]
@@ -1946,7 +1946,7 @@ caret_values: Vec<opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link
 #[derive(Debug, Clone)]
 pub struct opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets {
 offset: u16,
-link: opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link
+link: Option<opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link>
 }
 
 #[derive(Debug, Clone)]
@@ -2023,15 +2023,9 @@ link: Option<opentype_common_langsys>
 }
 
 #[derive(Debug, Clone)]
-pub struct opentype_common_script_table_lang_sys_records_lang_sys {
-offset: u16,
-link: opentype_common_langsys
-}
-
-#[derive(Debug, Clone)]
 pub struct opentype_common_script_table_lang_sys_records {
 lang_sys_tag: u32,
-lang_sys: opentype_common_script_table_lang_sys_records_lang_sys
+lang_sys: opentype_common_script_table_default_lang_sys
 }
 
 #[derive(Debug, Clone)]
@@ -2045,7 +2039,7 @@ lang_sys_records: Vec<opentype_common_script_table_lang_sys_records>
 #[derive(Debug, Clone)]
 pub struct opentype_common_script_list_script_records_script {
 offset: u16,
-link: opentype_common_script_table
+link: Option<opentype_common_script_table>
 }
 
 #[derive(Debug, Clone)]
@@ -2064,7 +2058,7 @@ script_records: Vec<opentype_common_script_list_script_records>
 #[derive(Debug, Clone)]
 pub struct opentype_gsub_table_script_list {
 offset: u16,
-link: opentype_common_script_list
+link: Option<opentype_common_script_list>
 }
 
 #[derive(Debug, Clone)]
@@ -2078,7 +2072,7 @@ lookup_list_indices: Vec<u16>
 #[derive(Debug, Clone)]
 pub struct opentype_common_feature_list_feature_records_feature {
 offset: u16,
-link: opentype_common_feature_table
+link: Option<opentype_common_feature_table>
 }
 
 #[derive(Debug, Clone)]
@@ -2097,7 +2091,7 @@ feature_records: Vec<opentype_common_feature_list_feature_records>
 #[derive(Debug, Clone)]
 pub struct opentype_gsub_table_feature_list {
 offset: u16,
-link: opentype_common_feature_list
+link: Option<opentype_common_feature_list>
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -2149,17 +2143,11 @@ chained_seq_rule_sets: Vec<opentype_common_chained_sequence_context_subst_Format
 }
 
 #[derive(Debug, Clone)]
-pub struct opentype_common_chained_sequence_context_subst_Format2_input_class_def {
-offset: u16,
-link: opentype_class_def
-}
-
-#[derive(Debug, Clone)]
 pub struct opentype_common_chained_sequence_context_subst_Format2 {
 coverage: opentype_common_chained_sequence_context_subst_Format1_coverage,
-backtrack_class_def: opentype_common_chained_sequence_context_subst_Format2_input_class_def,
-input_class_def: opentype_common_chained_sequence_context_subst_Format2_input_class_def,
-lookahead_class_def: opentype_common_chained_sequence_context_subst_Format2_input_class_def,
+backtrack_class_def: opentype_gdef_table_glyph_class_def,
+input_class_def: opentype_gdef_table_glyph_class_def,
+lookahead_class_def: opentype_gdef_table_glyph_class_def,
 chained_class_seq_rule_set_count: u16,
 chained_class_seq_rule_sets: Vec<opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets>
 }
@@ -2200,17 +2188,11 @@ anchor_point: u16
 }
 
 #[derive(Debug, Clone)]
-pub struct opentype_common_anchor_table_table_Format3_x_device_offset {
-offset: u16,
-link: Option<opentype_common_device_or_variation_index_table>
-}
-
-#[derive(Debug, Clone)]
 pub struct opentype_common_anchor_table_table_Format3 {
 x_coordinate: u16,
 y_coordinate: u16,
-x_device_offset: opentype_common_anchor_table_table_Format3_x_device_offset,
-y_device_offset: opentype_common_anchor_table_table_Format3_x_device_offset
+x_device_offset: opentype_common_value_record_x_advance_device,
+y_device_offset: opentype_common_value_record_x_advance_device
 }
 
 #[derive(Debug, Clone)]
@@ -2293,7 +2275,7 @@ pair_value_records: Vec<opentype_gpos_table_lookup_list_link_lookups_link_subtab
 #[derive(Debug, Clone)]
 pub struct opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairPos_subtable_Format1_pair_sets {
 offset: u16,
-link: opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairPos_subtable_Format1_pair_sets_link
+link: Option<opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairPos_subtable_Format1_pair_sets_link>
 }
 
 #[derive(Debug, Clone)]
@@ -2321,8 +2303,8 @@ pub struct opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_Pair
 coverage: opentype_common_chained_sequence_context_subst_Format1_coverage,
 value_format1: opentype_common_value_format_flags,
 value_format2: opentype_common_value_format_flags,
-class_def1: opentype_common_chained_sequence_context_subst_Format2_input_class_def,
-class_def2: opentype_common_chained_sequence_context_subst_Format2_input_class_def,
+class_def1: opentype_gdef_table_glyph_class_def,
+class_def2: opentype_gdef_table_glyph_class_def,
 class1_count: u16,
 class2_count: u16,
 class1_records: Vec<opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairPos_subtable_Format2_class1_records>
@@ -2349,7 +2331,7 @@ seq_lookup_records: Vec<opentype_common_sequence_lookup>
 #[derive(Debug, Clone)]
 pub struct opentype_common_sequence_context_subst_Format1_seq_rule_sets_link_rules {
 offset: u16,
-link: opentype_common_sequence_context_subst_Format1_seq_rule_sets_link_rules_link
+link: Option<opentype_common_sequence_context_subst_Format1_seq_rule_sets_link_rules_link>
 }
 
 #[derive(Debug, Clone)]
@@ -2375,7 +2357,7 @@ seq_rule_sets: Vec<opentype_common_sequence_context_subst_Format1_seq_rule_sets>
 #[derive(Debug, Clone)]
 pub struct opentype_common_sequence_context_subst_Format2 {
 coverage: opentype_common_chained_sequence_context_subst_Format1_coverage,
-class_def: opentype_common_chained_sequence_context_subst_Format2_input_class_def,
+class_def: opentype_gdef_table_glyph_class_def,
 class_seq_rule_set_count: u16,
 class_seq_rule_sets: Vec<opentype_common_sequence_context_subst_Format1_seq_rule_sets>
 }
@@ -2429,7 +2411,7 @@ pub enum opentype_gpos_table_lookup_list_link_lookups_link_subtables_link { Chai
 #[derive(Debug, Clone)]
 pub struct opentype_gpos_table_lookup_list_link_lookups_link_subtables {
 offset: u16,
-link: opentype_gpos_table_lookup_list_link_lookups_link_subtables_link
+link: Option<opentype_gpos_table_lookup_list_link_lookups_link_subtables_link>
 }
 
 #[derive(Debug, Clone)]
@@ -2445,7 +2427,7 @@ mark_filtering_set: Option<u16>
 #[derive(Debug, Clone)]
 pub struct opentype_gpos_table_lookup_list_link_lookups {
 offset: u16,
-link: opentype_gpos_table_lookup_list_link_lookups_link
+link: Option<opentype_gpos_table_lookup_list_link_lookups_link>
 }
 
 #[derive(Debug, Clone)]
@@ -2458,7 +2440,7 @@ lookups: Vec<opentype_gpos_table_lookup_list_link_lookups>
 #[derive(Debug, Clone)]
 pub struct opentype_gpos_table_lookup_list {
 offset: u16,
-link: opentype_gpos_table_lookup_list_link
+link: Option<opentype_gpos_table_lookup_list_link>
 }
 
 #[derive(Debug, Clone)]
@@ -2469,6 +2451,35 @@ minor_version: u16,
 script_list: opentype_gsub_table_script_list,
 feature_list: opentype_gsub_table_feature_list,
 lookup_list: opentype_gpos_table_lookup_list
+}
+
+#[derive(Debug, Clone)]
+pub struct opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_MultipleSubst_subst_Format1_sequences_link {
+glyph_count: u16,
+substitute_glyph_ids: Vec<u16>
+}
+
+#[derive(Debug, Clone)]
+pub struct opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_MultipleSubst_subst_Format1_sequences {
+offset: u16,
+link: Option<opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_MultipleSubst_subst_Format1_sequences_link>
+}
+
+#[derive(Debug, Clone)]
+pub struct opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_MultipleSubst_subst_Format1 {
+sequence_count: u16,
+sequences: Vec<opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_MultipleSubst_subst_Format1_sequences>
+}
+
+#[derive(Debug, Clone)]
+pub enum opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_MultipleSubst_subst { Format1(opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_MultipleSubst_subst_Format1) }
+
+#[derive(Debug, Clone)]
+pub struct opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_MultipleSubst {
+table_start: u32,
+subst_format: u16,
+coverage: opentype_common_chained_sequence_context_subst_Format1_coverage,
+subst: opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_MultipleSubst_subst
 }
 
 #[derive(Debug, Clone)]
@@ -2495,12 +2506,12 @@ subst: opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_SingleSu
 }
 
 #[derive(Debug, Clone)]
-pub enum opentype_gsub_table_lookup_list_link_lookups_link_subtables_link { AlternateSubst, ChainedSequenceContext(opentype_common_chained_sequence_context), LigatureSubst, MultipleSubst, ReverseChainSingleSubst, SequenceContext(opentype_common_sequence_context), SingleSubst(opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_SingleSubst), SubstExtension }
+pub enum opentype_gsub_table_lookup_list_link_lookups_link_subtables_link { AlternateSubst, ChainedSequenceContext(opentype_common_chained_sequence_context), LigatureSubst, MultipleSubst(opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_MultipleSubst), ReverseChainSingleSubst, SequenceContext(opentype_common_sequence_context), SingleSubst(opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_SingleSubst), SubstExtension }
 
 #[derive(Debug, Clone)]
 pub struct opentype_gsub_table_lookup_list_link_lookups_link_subtables {
 offset: u16,
-link: opentype_gsub_table_lookup_list_link_lookups_link_subtables_link
+link: Option<opentype_gsub_table_lookup_list_link_lookups_link_subtables_link>
 }
 
 #[derive(Debug, Clone)]
@@ -2516,7 +2527,7 @@ mark_filtering_set: Option<u16>
 #[derive(Debug, Clone)]
 pub struct opentype_gsub_table_lookup_list_link_lookups {
 offset: u16,
-link: opentype_gsub_table_lookup_list_link_lookups_link
+link: Option<opentype_gsub_table_lookup_list_link_lookups_link>
 }
 
 #[derive(Debug, Clone)]
@@ -2529,7 +2540,7 @@ lookups: Vec<opentype_gsub_table_lookup_list_link_lookups>
 #[derive(Debug, Clone)]
 pub struct opentype_gsub_table_lookup_list {
 offset: u16,
-link: opentype_gsub_table_lookup_list_link
+link: Option<opentype_gsub_table_lookup_list_link>
 }
 
 #[derive(Debug, Clone)]
@@ -4694,7 +4705,7 @@ let mut accum = Vec::new();
 for _ in 0..num_fonts {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder21(_input))?))())?;
-let link = ((|| PResult::Ok(if match offset {
+let link = ((|| PResult::Ok(if !match offset {
 0 => {
 true
 },
@@ -4733,7 +4744,7 @@ let mut accum = Vec::new();
 for _ in 0..num_fonts {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder21(_input))?))())?;
-let link = ((|| PResult::Ok(if match offset {
+let link = ((|| PResult::Ok(if !match offset {
 0 => {
 true
 },
@@ -5928,7 +5939,7 @@ b
 };
 ((|x: (u8, u8)| PResult::Ok(u16be(x)))(inner))?
 };
-((|flag_bits: u16| PResult::Ok(opentype_head_table_mac_style { extended: match flag_bits >> 6u16 & 1u16 {
+((|flag_bits: u16| PResult::Ok(opentype_head_table_mac_style { extended: !match flag_bits >> 6u16 & 1u16 {
 0 => {
 true
 },
@@ -5936,7 +5947,7 @@ true
 _ => {
 false
 }
-}, condensed: match flag_bits >> 5u16 & 1u16 {
+}, condensed: !match flag_bits >> 5u16 & 1u16 {
 0 => {
 true
 },
@@ -5944,7 +5955,7 @@ true
 _ => {
 false
 }
-}, shadow: match flag_bits >> 4u16 & 1u16 {
+}, shadow: !match flag_bits >> 4u16 & 1u16 {
 0 => {
 true
 },
@@ -5952,7 +5963,7 @@ true
 _ => {
 false
 }
-}, outline: match flag_bits >> 3u16 & 1u16 {
+}, outline: !match flag_bits >> 3u16 & 1u16 {
 0 => {
 true
 },
@@ -5960,7 +5971,7 @@ true
 _ => {
 false
 }
-}, underline: match flag_bits >> 2u16 & 1u16 {
+}, underline: !match flag_bits >> 2u16 & 1u16 {
 0 => {
 true
 },
@@ -5968,7 +5979,7 @@ true
 _ => {
 false
 }
-}, italic: match flag_bits >> 1u16 & 1u16 {
+}, italic: !match flag_bits >> 1u16 & 1u16 {
 0 => {
 true
 },
@@ -5976,7 +5987,7 @@ true
 _ => {
 false
 }
-}, bold: match flag_bits >> 0u16 & 1u16 {
+}, bold: !match flag_bits >> 0u16 & 1u16 {
 0 => {
 true
 },
@@ -6145,9 +6156,8 @@ let language = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let name_id = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let length = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let offset = ((|| PResult::Ok({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -6155,13 +6165,8 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
@@ -6169,14 +6174,22 @@ let inner = _input.get_offset_u64();
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (storage_offset as u32) + (offset as u32), __here))?;
 let ret = ((|| PResult::Ok({
+let inner = {
 let mut accum = Vec::new();
 for _ in 0..length {
 accum.push((Decoder25(_input))?);
 }
 accum
+};
+((|val: Vec<u8>| PResult::Ok(Some(val)))(inner))?
 }))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 opentype_name_table_name_records_offset { offset, link }
 }))())?;
@@ -6235,7 +6248,7 @@ let ach_vend_id = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let fs_selection = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let us_first_char_index = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let us_last_char_index = ((|| PResult::Ok((Decoder24(_input))?))())?;
-let data = ((|| PResult::Ok(if match version {
+let data = ((|| PResult::Ok(if !match version {
 0 => {
 true
 },
@@ -6463,7 +6476,7 @@ b
 };
 ((|x: (u8, u8)| PResult::Ok(u16be(x)))(inner))?
 };
-((|flag_bits: u16| PResult::Ok(opentype_gasp_table_gasp_ranges_range_gasp_behavior_Version0 { dogray: match flag_bits >> 1u16 & 1u16 {
+((|flag_bits: u16| PResult::Ok(opentype_gasp_table_gasp_ranges_range_gasp_behavior_Version0 { dogray: !match flag_bits >> 1u16 & 1u16 {
 0 => {
 true
 },
@@ -6471,7 +6484,7 @@ true
 _ => {
 false
 }
-}, gridfit: match flag_bits >> 0u16 & 1u16 {
+}, gridfit: !match flag_bits >> 0u16 & 1u16 {
 0 => {
 true
 },
@@ -6500,7 +6513,7 @@ b
 };
 ((|x: (u8, u8)| PResult::Ok(u16be(x)))(inner))?
 };
-((|flag_bits: u16| PResult::Ok(opentype_gasp_table_gasp_ranges_range_gasp_behavior_Version1 { symmetric_smoothing: match flag_bits >> 3u16 & 1u16 {
+((|flag_bits: u16| PResult::Ok(opentype_gasp_table_gasp_ranges_range_gasp_behavior_Version1 { symmetric_smoothing: !match flag_bits >> 3u16 & 1u16 {
 0 => {
 true
 },
@@ -6508,7 +6521,7 @@ true
 _ => {
 false
 }
-}, symmetric_gridfit: match flag_bits >> 2u16 & 1u16 {
+}, symmetric_gridfit: !match flag_bits >> 2u16 & 1u16 {
 0 => {
 true
 },
@@ -6516,7 +6529,7 @@ true
 _ => {
 false
 }
-}, dogray: match flag_bits >> 1u16 & 1u16 {
+}, dogray: !match flag_bits >> 1u16 & 1u16 {
 0 => {
 true
 },
@@ -6524,7 +6537,7 @@ true
 _ => {
 false
 }
-}, gridfit: match flag_bits >> 0u16 & 1u16 {
+}, gridfit: !match flag_bits >> 0u16 & 1u16 {
 0 => {
 true
 },
@@ -6569,7 +6582,7 @@ return Err(ParseError::FalsifiedWhere);
 let minor_version = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let glyph_class_def = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
-let link = ((|| PResult::Ok(match match offset {
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -6601,7 +6614,7 @@ opentype_gdef_table_glyph_class_def { offset, link }
 }))())?;
 let attach_list = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
-let link = ((|| PResult::Ok(match match offset {
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -6624,9 +6637,8 @@ let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 }))())?;
 let coverage = ((|| PResult::Ok({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -6634,22 +6646,25 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_coverage_table(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_coverage_table(_input))?;
+((|val: opentype_coverage_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 opentype_common_chained_sequence_context_subst_Format1_coverage { offset, link }
 }))())?;
@@ -6658,9 +6673,8 @@ let attach_point_offsets = ((|| PResult::Ok({
 let mut accum = Vec::new();
 for _ in 0..glyph_count {
 accum.push({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -6668,13 +6682,8 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
@@ -6682,6 +6691,7 @@ let inner = _input.get_offset_u64();
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
 let ret = ((|| PResult::Ok({
+let inner = {
 let point_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let point_indices = ((|| PResult::Ok({
 let mut accum = Vec::new();
@@ -6691,9 +6701,16 @@ accum.push((Decoder24(_input))?);
 accum
 }))())?;
 opentype_gdef_table_attach_list_link_attach_point_offsets_link { point_count, point_indices }
+};
+((|val: opentype_gdef_table_attach_list_link_attach_point_offsets_link| PResult::Ok(Some(val)))(inner))?
 }))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 opentype_gdef_table_attach_list_link_attach_point_offsets { offset, link }
 });
@@ -6716,7 +6733,7 @@ opentype_gdef_table_attach_list { offset, link }
 }))())?;
 let lig_caret_list = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
-let link = ((|| PResult::Ok(match match offset {
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -6739,9 +6756,8 @@ let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 }))())?;
 let coverage = ((|| PResult::Ok({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -6749,22 +6765,25 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_coverage_table(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_coverage_table(_input))?;
+((|val: opentype_coverage_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 opentype_common_chained_sequence_context_subst_Format1_coverage { offset, link }
 }))())?;
@@ -6773,9 +6792,8 @@ let lig_glyph_offsets = ((|| PResult::Ok({
 let mut accum = Vec::new();
 for _ in 0..lig_glyph_count {
 accum.push({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -6783,13 +6801,8 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
@@ -6797,6 +6810,7 @@ let inner = _input.get_offset_u64();
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
 let ret = ((|| PResult::Ok({
+let inner = {
 let table_start = ((|| PResult::Ok({
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
@@ -6806,9 +6820,8 @@ let caret_values = ((|| PResult::Ok({
 let mut accum = Vec::new();
 for _ in 0..caret_count {
 accum.push({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -6816,13 +6829,8 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
@@ -6830,6 +6838,7 @@ let inner = _input.get_offset_u64();
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
 let ret = ((|| PResult::Ok({
+let inner = {
 let table_start = ((|| PResult::Ok({
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
@@ -6856,9 +6865,8 @@ opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link
 let inner = {
 let coordinate = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let table = ((|| PResult::Ok({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -6866,22 +6874,25 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_common_device_or_variation_index_table(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
+((|val: opentype_common_device_or_variation_index_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 opentype_common_value_record_x_advance_device { offset, link }
 }))())?;
@@ -6895,9 +6906,16 @@ return Err(ParseError::FailToken);
 }
 }))())?;
 opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link { table_start, caret_value_format, data }
+};
+((|val: opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link| PResult::Ok(Some(val)))(inner))?
 }))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values { offset, link }
 });
@@ -6905,9 +6923,16 @@ opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values { of
 accum
 }))())?;
 opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link { table_start, caret_count, caret_values }
+};
+((|val: opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link| PResult::Ok(Some(val)))(inner))?
 }))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets { offset, link }
 });
@@ -6930,7 +6955,7 @@ opentype_gdef_table_lig_caret_list { offset, link }
 }))())?;
 let mark_attach_class_def = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
-let link = ((|| PResult::Ok(match match offset {
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -6973,7 +6998,7 @@ return Err(ParseError::FailToken);
 let inner = {
 let mark_glyph_sets_def = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
-let link = ((|| PResult::Ok(match match offset {
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -7042,9 +7067,8 @@ return Err(ParseError::FalsifiedWhere);
 }))())?;
 let minor_version = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let script_list = ((|| PResult::Ok({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -7052,73 +7076,8 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
-let __here = {
-let inner = _input.get_offset_u64();
-((|x: u64| PResult::Ok(x as u32))(inner))?
-};
-_input.open_peek_context();
-_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_common_script_list(_input))?))())?;
-_input.close_peek_context()?;
-ret
-}))())?;
-opentype_gsub_table_script_list { offset, link }
-}))())?;
-let feature_list = ((|| PResult::Ok({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
-0 => {
-true
-},
-
-_ => {
-false
-}
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
-let __here = {
-let inner = _input.get_offset_u64();
-((|x: u64| PResult::Ok(x as u32))(inner))?
-};
-_input.open_peek_context();
-_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_common_feature_list(_input))?))())?;
-_input.close_peek_context()?;
-ret
-}))())?;
-opentype_gsub_table_feature_list { offset, link }
-}))())?;
-let lookup_list = ((|| PResult::Ok({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
-0 => {
-true
-},
-
-_ => {
-false
-}
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
@@ -7126,6 +7085,71 @@ let inner = _input.get_offset_u64();
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
 let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_common_script_list(_input))?;
+((|val: opentype_common_script_list| PResult::Ok(Some(val)))(inner))?
+}))())?;
+_input.close_peek_context()?;
+ret
+},
+
+false => {
+None
+}
+}))())?;
+opentype_gsub_table_script_list { offset, link }
+}))())?;
+let feature_list = ((|| PResult::Ok({
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
+0 => {
+true
+},
+
+_ => {
+false
+}
+} {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_common_feature_list(_input))?;
+((|val: opentype_common_feature_list| PResult::Ok(Some(val)))(inner))?
+}))())?;
+_input.close_peek_context()?;
+ret
+},
+
+false => {
+None
+}
+}))())?;
+opentype_gsub_table_feature_list { offset, link }
+}))())?;
+let lookup_list = ((|| PResult::Ok({
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
+0 => {
+true
+},
+
+_ => {
+false
+}
+} {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
+let ret = ((|| PResult::Ok({
+let inner = {
 let table_start = ((|| PResult::Ok({
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
@@ -7135,9 +7159,8 @@ let lookups = ((|| PResult::Ok({
 let mut accum = Vec::new();
 for _ in 0..lookup_count {
 accum.push({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -7145,13 +7168,8 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
@@ -7159,6 +7177,7 @@ let inner = _input.get_offset_u64();
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
 let ret = ((|| PResult::Ok({
+let inner = {
 let table_start = ((|| PResult::Ok({
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
@@ -7175,7 +7194,7 @@ b
 };
 ((|tuple_var: (u8, u8)| PResult::Ok(match tuple_var {
 (mark_attachment_class_filter, flagbyte) => {
-opentype_gsub_table_lookup_list_link_lookups_link_lookup_flag { mark_attachment_class_filter: mark_attachment_class_filter, use_mark_filtering_set: match flagbyte >> 4u8 & 1u8 {
+opentype_gsub_table_lookup_list_link_lookups_link_lookup_flag { mark_attachment_class_filter: mark_attachment_class_filter, use_mark_filtering_set: !match flagbyte >> 4u8 & 1u8 {
 0 => {
 true
 },
@@ -7183,7 +7202,7 @@ true
 _ => {
 false
 }
-}, ignore_marks: match flagbyte >> 3u8 & 1u8 {
+}, ignore_marks: !match flagbyte >> 3u8 & 1u8 {
 0 => {
 true
 },
@@ -7191,7 +7210,7 @@ true
 _ => {
 false
 }
-}, ignore_ligatures: match flagbyte >> 2u8 & 1u8 {
+}, ignore_ligatures: !match flagbyte >> 2u8 & 1u8 {
 0 => {
 true
 },
@@ -7199,7 +7218,7 @@ true
 _ => {
 false
 }
-}, ignore_base_glyphs: match flagbyte >> 1u8 & 1u8 {
+}, ignore_base_glyphs: !match flagbyte >> 1u8 & 1u8 {
 0 => {
 true
 },
@@ -7207,7 +7226,7 @@ true
 _ => {
 false
 }
-}, right_to_left: match flagbyte >> 0u8 & 1u8 {
+}, right_to_left: !match flagbyte >> 0u8 & 1u8 {
 0 => {
 true
 },
@@ -7224,9 +7243,8 @@ let subtables = ((|| PResult::Ok({
 let mut accum = Vec::new();
 for _ in 0..sub_table_count {
 accum.push({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -7234,20 +7252,16 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok(match lookup_type {
+let ret = ((|| PResult::Ok({
+let inner = match lookup_type {
 1u16 => {
 let inner = {
 let table_start = ((|| PResult::Ok({
@@ -7259,9 +7273,8 @@ let subtable = ((|| PResult::Ok(match pos_format {
 1u16 => {
 let inner = {
 let coverage_offset = ((|| PResult::Ok({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -7269,22 +7282,25 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_coverage_table(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_coverage_table(_input))?;
+((|val: opentype_coverage_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 opentype_common_chained_sequence_context_subst_Format1_coverage { offset, link }
 }))())?;
@@ -7298,9 +7314,8 @@ opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_SinglePos_subta
 2u16 => {
 let inner = {
 let coverage_offset = ((|| PResult::Ok({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -7308,22 +7323,25 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_coverage_table(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_coverage_table(_input))?;
+((|val: opentype_coverage_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 opentype_common_chained_sequence_context_subst_Format1_coverage { offset, link }
 }))())?;
@@ -7361,9 +7379,8 @@ let subtable = ((|| PResult::Ok(match pos_format {
 1u16 => {
 let inner = {
 let coverage = ((|| PResult::Ok({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -7371,22 +7388,25 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_coverage_table(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_coverage_table(_input))?;
+((|val: opentype_coverage_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 opentype_common_chained_sequence_context_subst_Format1_coverage { offset, link }
 }))())?;
@@ -7397,9 +7417,8 @@ let pair_sets = ((|| PResult::Ok({
 let mut accum = Vec::new();
 for _ in 0..pair_set_count {
 accum.push({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -7407,13 +7426,8 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
@@ -7421,6 +7435,7 @@ let inner = _input.get_offset_u64();
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
 let ret = ((|| PResult::Ok({
+let inner = {
 let table_start = ((|| PResult::Ok({
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
@@ -7447,9 +7462,16 @@ opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairPos_subtabl
 accum
 }))())?;
 opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairPos_subtable_Format1_pair_sets_link { table_start, pair_value_count, pair_value_records }
+};
+((|val: opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairPos_subtable_Format1_pair_sets_link| PResult::Ok(Some(val)))(inner))?
 }))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairPos_subtable_Format1_pair_sets { offset, link }
 });
@@ -7464,9 +7486,8 @@ opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairPos_subtabl
 2u16 => {
 let inner = {
 let coverage = ((|| PResult::Ok({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -7474,31 +7495,33 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_coverage_table(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_coverage_table(_input))?;
+((|val: opentype_coverage_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 opentype_common_chained_sequence_context_subst_Format1_coverage { offset, link }
 }))())?;
 let value_format1 = ((|| PResult::Ok((Decoder_opentype_common_value_format_flags(_input))?))())?;
 let value_format2 = ((|| PResult::Ok((Decoder_opentype_common_value_format_flags(_input))?))())?;
 let class_def1 = ((|| PResult::Ok({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -7506,29 +7529,31 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_class_def(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_class_def(_input))?;
+((|val: opentype_class_def| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
-opentype_common_chained_sequence_context_subst_Format2_input_class_def { offset, link }
+opentype_gdef_table_glyph_class_def { offset, link }
 }))())?;
 let class_def2 = ((|| PResult::Ok({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -7536,24 +7561,27 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_class_def(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_class_def(_input))?;
+((|val: opentype_class_def| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
-opentype_common_chained_sequence_context_subst_Format2_input_class_def { offset, link }
+opentype_gdef_table_glyph_class_def { offset, link }
 }))())?;
 let class1_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let class2_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
@@ -7610,9 +7638,8 @@ let subtable = ((|| PResult::Ok(match pos_format {
 1u16 => {
 let inner = {
 let coverage = ((|| PResult::Ok({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -7620,22 +7647,25 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_coverage_table(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_coverage_table(_input))?;
+((|val: opentype_coverage_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 opentype_common_chained_sequence_context_subst_Format1_coverage { offset, link }
 }))())?;
@@ -7646,7 +7676,7 @@ for _ in 0..entry_exit_count {
 accum.push({
 let entry_anchor = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
-let link = ((|| PResult::Ok(match match offset {
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -7678,7 +7708,7 @@ opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_CursivePos_subt
 }))())?;
 let exit_anchor = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
-let link = ((|| PResult::Ok(match match offset {
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -7756,9 +7786,16 @@ opentype_gpos_table_lookup_list_link_lookups_link_subtables_link::PosExtension
 _ => {
 return Err(ParseError::FailToken);
 }
+};
+((|val: opentype_gpos_table_lookup_list_link_lookups_link_subtables_link| PResult::Ok(Some(val)))(inner))?
 }))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 opentype_gpos_table_lookup_list_link_lookups_link_subtables { offset, link }
 });
@@ -7776,9 +7813,16 @@ None
 }
 }))())?;
 opentype_gpos_table_lookup_list_link_lookups_link { table_start, lookup_type, lookup_flag, sub_table_count, subtables, mark_filtering_set }
+};
+((|val: opentype_gpos_table_lookup_list_link_lookups_link| PResult::Ok(Some(val)))(inner))?
 }))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 opentype_gpos_table_lookup_list_link_lookups { offset, link }
 });
@@ -7786,9 +7830,16 @@ opentype_gpos_table_lookup_list_link_lookups { offset, link }
 accum
 }))())?;
 opentype_gpos_table_lookup_list_link { table_start, lookup_count, lookups }
+};
+((|val: opentype_gpos_table_lookup_list_link| PResult::Ok(Some(val)))(inner))?
 }))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 opentype_gpos_table_lookup_list { offset, link }
 }))())?;
@@ -7810,9 +7861,8 @@ return Err(ParseError::FalsifiedWhere);
 }))())?;
 let minor_version = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let script_list = ((|| PResult::Ok({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -7820,73 +7870,8 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
-let __here = {
-let inner = _input.get_offset_u64();
-((|x: u64| PResult::Ok(x as u32))(inner))?
-};
-_input.open_peek_context();
-_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_common_script_list(_input))?))())?;
-_input.close_peek_context()?;
-ret
-}))())?;
-opentype_gsub_table_script_list { offset, link }
-}))())?;
-let feature_list = ((|| PResult::Ok({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
-0 => {
-true
-},
-
-_ => {
-false
-}
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
-let __here = {
-let inner = _input.get_offset_u64();
-((|x: u64| PResult::Ok(x as u32))(inner))?
-};
-_input.open_peek_context();
-_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_common_feature_list(_input))?))())?;
-_input.close_peek_context()?;
-ret
-}))())?;
-opentype_gsub_table_feature_list { offset, link }
-}))())?;
-let lookup_list = ((|| PResult::Ok({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
-0 => {
-true
-},
-
-_ => {
-false
-}
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
@@ -7894,6 +7879,71 @@ let inner = _input.get_offset_u64();
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
 let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_common_script_list(_input))?;
+((|val: opentype_common_script_list| PResult::Ok(Some(val)))(inner))?
+}))())?;
+_input.close_peek_context()?;
+ret
+},
+
+false => {
+None
+}
+}))())?;
+opentype_gsub_table_script_list { offset, link }
+}))())?;
+let feature_list = ((|| PResult::Ok({
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
+0 => {
+true
+},
+
+_ => {
+false
+}
+} {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_common_feature_list(_input))?;
+((|val: opentype_common_feature_list| PResult::Ok(Some(val)))(inner))?
+}))())?;
+_input.close_peek_context()?;
+ret
+},
+
+false => {
+None
+}
+}))())?;
+opentype_gsub_table_feature_list { offset, link }
+}))())?;
+let lookup_list = ((|| PResult::Ok({
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
+0 => {
+true
+},
+
+_ => {
+false
+}
+} {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
+let ret = ((|| PResult::Ok({
+let inner = {
 let table_start = ((|| PResult::Ok({
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
@@ -7903,9 +7953,8 @@ let lookups = ((|| PResult::Ok({
 let mut accum = Vec::new();
 for _ in 0..lookup_count {
 accum.push({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -7913,13 +7962,8 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
@@ -7927,6 +7971,7 @@ let inner = _input.get_offset_u64();
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
 let ret = ((|| PResult::Ok({
+let inner = {
 let table_start = ((|| PResult::Ok({
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
@@ -7943,7 +7988,7 @@ b
 };
 ((|tuple_var: (u8, u8)| PResult::Ok(match tuple_var {
 (mark_attachment_class_filter, flagbyte) => {
-opentype_gsub_table_lookup_list_link_lookups_link_lookup_flag { mark_attachment_class_filter: mark_attachment_class_filter, use_mark_filtering_set: match flagbyte >> 4u8 & 1u8 {
+opentype_gsub_table_lookup_list_link_lookups_link_lookup_flag { mark_attachment_class_filter: mark_attachment_class_filter, use_mark_filtering_set: !match flagbyte >> 4u8 & 1u8 {
 0 => {
 true
 },
@@ -7951,7 +7996,7 @@ true
 _ => {
 false
 }
-}, ignore_marks: match flagbyte >> 3u8 & 1u8 {
+}, ignore_marks: !match flagbyte >> 3u8 & 1u8 {
 0 => {
 true
 },
@@ -7959,7 +8004,7 @@ true
 _ => {
 false
 }
-}, ignore_ligatures: match flagbyte >> 2u8 & 1u8 {
+}, ignore_ligatures: !match flagbyte >> 2u8 & 1u8 {
 0 => {
 true
 },
@@ -7967,7 +8012,7 @@ true
 _ => {
 false
 }
-}, ignore_base_glyphs: match flagbyte >> 1u8 & 1u8 {
+}, ignore_base_glyphs: !match flagbyte >> 1u8 & 1u8 {
 0 => {
 true
 },
@@ -7975,7 +8020,7 @@ true
 _ => {
 false
 }
-}, right_to_left: match flagbyte >> 0u8 & 1u8 {
+}, right_to_left: !match flagbyte >> 0u8 & 1u8 {
 0 => {
 true
 },
@@ -7992,9 +8037,8 @@ let subtables = ((|| PResult::Ok({
 let mut accum = Vec::new();
 for _ in 0..sub_table_count {
 accum.push({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -8002,20 +8046,16 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok(match lookup_type {
+let ret = ((|| PResult::Ok({
+let inner = match lookup_type {
 1u16 => {
 let inner = {
 let table_start = ((|| PResult::Ok({
@@ -8027,9 +8067,8 @@ let subst = ((|| PResult::Ok(match subst_format {
 1u16 => {
 let inner = {
 let coverage = ((|| PResult::Ok({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -8037,22 +8076,25 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_coverage_table(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_coverage_table(_input))?;
+((|val: opentype_coverage_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 opentype_common_chained_sequence_context_subst_Format1_coverage { offset, link }
 }))())?;
@@ -8065,9 +8107,8 @@ opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_SingleSubst_sub
 2u16 => {
 let inner = {
 let coverage = ((|| PResult::Ok({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -8075,22 +8116,25 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_coverage_table(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_coverage_table(_input))?;
+((|val: opentype_coverage_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 opentype_common_chained_sequence_context_subst_Format1_coverage { offset, link }
 }))())?;
@@ -8117,7 +8161,123 @@ opentype_gsub_table_lookup_list_link_lookups_link_subtables_link::SingleSubst(in
 },
 
 2u16 => {
-opentype_gsub_table_lookup_list_link_lookups_link_subtables_link::MultipleSubst
+let inner = {
+let table_start = ((|| PResult::Ok({
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+}))())?;
+let subst_format = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let coverage = ((|| PResult::Ok({
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
+0 => {
+true
+},
+
+_ => {
+false
+}
+} {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_coverage_table(_input))?;
+((|val: opentype_coverage_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
+_input.close_peek_context()?;
+ret
+},
+
+false => {
+None
+}
+}))())?;
+opentype_common_chained_sequence_context_subst_Format1_coverage { offset, link }
+}))())?;
+let subst = ((|| PResult::Ok(match subst_format {
+1u16 => {
+let inner = {
+let sequence_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let sequences = ((|| PResult::Ok({
+let mut accum = Vec::new();
+for _ in 0..sequence_count {
+accum.push({
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
+0 => {
+true
+},
+
+_ => {
+false
+}
+} {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
+let ret = ((|| PResult::Ok({
+let inner = {
+let glyph_count = ((|| PResult::Ok({
+let inner = (Decoder24(_input))?;
+if ((|x: u16| PResult::Ok(!match x {
+0 => {
+true
+},
+
+_ => {
+false
+}
+}))(inner.clone()))? {
+inner
+} else {
+return Err(ParseError::FalsifiedWhere);
+}
+}))())?;
+let substitute_glyph_ids = ((|| PResult::Ok({
+let mut accum = Vec::new();
+for _ in 0..glyph_count {
+accum.push((Decoder24(_input))?);
+}
+accum
+}))())?;
+opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_MultipleSubst_subst_Format1_sequences_link { glyph_count, substitute_glyph_ids }
+};
+((|val: opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_MultipleSubst_subst_Format1_sequences_link| PResult::Ok(Some(val)))(inner))?
+}))())?;
+_input.close_peek_context()?;
+ret
+},
+
+false => {
+None
+}
+}))())?;
+opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_MultipleSubst_subst_Format1_sequences { offset, link }
+});
+}
+accum
+}))())?;
+opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_MultipleSubst_subst_Format1 { sequence_count, sequences }
+};
+opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_MultipleSubst_subst::Format1(inner)
+},
+
+_ => {
+return Err(ParseError::FailToken);
+}
+}))())?;
+opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_MultipleSubst { table_start, subst_format, coverage, subst }
+};
+opentype_gsub_table_lookup_list_link_lookups_link_subtables_link::MultipleSubst(inner)
 },
 
 3u16 => {
@@ -8149,9 +8309,16 @@ opentype_gsub_table_lookup_list_link_lookups_link_subtables_link::ReverseChainSi
 _ => {
 return Err(ParseError::FailToken);
 }
+};
+((|val: opentype_gsub_table_lookup_list_link_lookups_link_subtables_link| PResult::Ok(Some(val)))(inner))?
 }))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 opentype_gsub_table_lookup_list_link_lookups_link_subtables { offset, link }
 });
@@ -8169,9 +8336,16 @@ None
 }
 }))())?;
 opentype_gsub_table_lookup_list_link_lookups_link { table_start, lookup_type, lookup_flag, sub_table_count, subtables, mark_filtering_set }
+};
+((|val: opentype_gsub_table_lookup_list_link_lookups_link| PResult::Ok(Some(val)))(inner))?
 }))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 opentype_gsub_table_lookup_list_link_lookups { offset, link }
 });
@@ -8179,9 +8353,16 @@ opentype_gsub_table_lookup_list_link_lookups { offset, link }
 accum
 }))())?;
 opentype_gsub_table_lookup_list_link { table_start, lookup_count, lookups }
+};
+((|val: opentype_gsub_table_lookup_list_link| PResult::Ok(Some(val)))(inner))?
 }))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 opentype_gsub_table_lookup_list { offset, link }
 }))())?;
@@ -8200,9 +8381,8 @@ for _ in 0..script_count {
 accum.push({
 let script_tag = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let script = ((|| PResult::Ok({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -8210,22 +8390,25 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_common_script_table(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_common_script_table(_input))?;
+((|val: opentype_common_script_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 opentype_common_script_list_script_records_script { offset, link }
 }))())?;
@@ -8249,9 +8432,8 @@ for _ in 0..feature_count {
 accum.push({
 let feature_tag = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let feature = ((|| PResult::Ok({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -8259,22 +8441,25 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_common_feature_table(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_common_feature_table(_input))?;
+((|val: opentype_common_feature_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 opentype_common_feature_list_feature_records_feature { offset, link }
 }))())?;
@@ -8341,9 +8526,8 @@ let subst = ((|| PResult::Ok(match format {
 1u16 => {
 let inner = {
 let coverage = ((|| PResult::Ok({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -8351,22 +8535,25 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_coverage_table(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_coverage_table(_input))?;
+((|val: opentype_coverage_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 opentype_common_chained_sequence_context_subst_Format1_coverage { offset, link }
 }))())?;
@@ -8376,7 +8563,7 @@ let mut accum = Vec::new();
 for _ in 0..seq_rule_set_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
-let link = ((|| PResult::Ok(match match offset {
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -8403,9 +8590,8 @@ let rules = ((|| PResult::Ok({
 let mut accum = Vec::new();
 for _ in 0..rule_count {
 accum.push({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -8413,13 +8599,8 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
@@ -8427,9 +8608,10 @@ let inner = _input.get_offset_u64();
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
 let ret = ((|| PResult::Ok({
+let inner = {
 let glyph_count = ((|| PResult::Ok({
 let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+if ((|x: u16| PResult::Ok(!match x {
 0 => {
 true
 },
@@ -8459,9 +8641,16 @@ accum.push((Decoder_opentype_common_sequence_lookup(_input))?);
 accum
 }))())?;
 opentype_common_sequence_context_subst_Format1_seq_rule_sets_link_rules_link { glyph_count, seq_lookup_count, input_sequence, seq_lookup_records }
+};
+((|val: opentype_common_sequence_context_subst_Format1_seq_rule_sets_link_rules_link| PResult::Ok(Some(val)))(inner))?
 }))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 opentype_common_sequence_context_subst_Format1_seq_rule_sets_link_rules { offset, link }
 });
@@ -8493,9 +8682,8 @@ opentype_common_sequence_context_subst::Format1(inner)
 2u16 => {
 let inner = {
 let coverage = ((|| PResult::Ok({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -8503,29 +8691,31 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_coverage_table(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_coverage_table(_input))?;
+((|val: opentype_coverage_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 opentype_common_chained_sequence_context_subst_Format1_coverage { offset, link }
 }))())?;
 let class_def = ((|| PResult::Ok({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -8533,24 +8723,27 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_class_def(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_class_def(_input))?;
+((|val: opentype_class_def| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
-opentype_common_chained_sequence_context_subst_Format2_input_class_def { offset, link }
+opentype_gdef_table_glyph_class_def { offset, link }
 }))())?;
 let class_seq_rule_set_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let class_seq_rule_sets = ((|| PResult::Ok({
@@ -8558,7 +8751,7 @@ let mut accum = Vec::new();
 for _ in 0..class_seq_rule_set_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
-let link = ((|| PResult::Ok(match match offset {
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -8585,9 +8778,8 @@ let rules = ((|| PResult::Ok({
 let mut accum = Vec::new();
 for _ in 0..rule_count {
 accum.push({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -8595,13 +8787,8 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
@@ -8609,9 +8796,10 @@ let inner = _input.get_offset_u64();
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
 let ret = ((|| PResult::Ok({
+let inner = {
 let glyph_count = ((|| PResult::Ok({
 let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+if ((|x: u16| PResult::Ok(!match x {
 0 => {
 true
 },
@@ -8641,9 +8829,16 @@ accum.push((Decoder_opentype_common_sequence_lookup(_input))?);
 accum
 }))())?;
 opentype_common_sequence_context_subst_Format1_seq_rule_sets_link_rules_link { glyph_count, seq_lookup_count, input_sequence, seq_lookup_records }
+};
+((|val: opentype_common_sequence_context_subst_Format1_seq_rule_sets_link_rules_link| PResult::Ok(Some(val)))(inner))?
 }))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 opentype_common_sequence_context_subst_Format1_seq_rule_sets_link_rules { offset, link }
 });
@@ -8680,9 +8875,8 @@ let coverage_tables = ((|| PResult::Ok({
 let mut accum = Vec::new();
 for _ in 0..glyph_count {
 accum.push({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -8690,22 +8884,25 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_coverage_table(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_coverage_table(_input))?;
+((|val: opentype_coverage_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 opentype_common_chained_sequence_context_subst_Format1_coverage { offset, link }
 });
@@ -8741,9 +8938,8 @@ let subst = ((|| PResult::Ok(match format {
 1u16 => {
 let inner = {
 let coverage = ((|| PResult::Ok({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -8751,22 +8947,25 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_coverage_table(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_coverage_table(_input))?;
+((|val: opentype_coverage_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 opentype_common_chained_sequence_context_subst_Format1_coverage { offset, link }
 }))())?;
@@ -8776,7 +8975,7 @@ let mut accum = Vec::new();
 for _ in 0..chained_seq_rule_set_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
-let link = ((|| PResult::Ok(match match offset {
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -8865,9 +9064,8 @@ opentype_common_chained_sequence_context_subst::Format1(inner)
 2u16 => {
 let inner = {
 let coverage = ((|| PResult::Ok({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -8875,29 +9073,31 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_coverage_table(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_coverage_table(_input))?;
+((|val: opentype_coverage_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 opentype_common_chained_sequence_context_subst_Format1_coverage { offset, link }
 }))())?;
 let backtrack_class_def = ((|| PResult::Ok({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -8905,29 +9105,31 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_class_def(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_class_def(_input))?;
+((|val: opentype_class_def| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
-opentype_common_chained_sequence_context_subst_Format2_input_class_def { offset, link }
+opentype_gdef_table_glyph_class_def { offset, link }
 }))())?;
 let input_class_def = ((|| PResult::Ok({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -8935,29 +9137,31 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_class_def(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_class_def(_input))?;
+((|val: opentype_class_def| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
-opentype_common_chained_sequence_context_subst_Format2_input_class_def { offset, link }
+opentype_gdef_table_glyph_class_def { offset, link }
 }))())?;
 let lookahead_class_def = ((|| PResult::Ok({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -8965,24 +9169,27 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_class_def(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_class_def(_input))?;
+((|val: opentype_class_def| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
-opentype_common_chained_sequence_context_subst_Format2_input_class_def { offset, link }
+opentype_gdef_table_glyph_class_def { offset, link }
 }))())?;
 let chained_class_seq_rule_set_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let chained_class_seq_rule_sets = ((|| PResult::Ok({
@@ -8990,7 +9197,7 @@ let mut accum = Vec::new();
 for _ in 0..chained_class_seq_rule_set_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
-let link = ((|| PResult::Ok(match match offset {
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -9083,9 +9290,8 @@ let backtrack_coverages = ((|| PResult::Ok({
 let mut accum = Vec::new();
 for _ in 0..backtrack_glyph_count {
 accum.push({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -9093,22 +9299,25 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_coverage_table(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_coverage_table(_input))?;
+((|val: opentype_coverage_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 opentype_common_chained_sequence_context_subst_Format1_coverage { offset, link }
 });
@@ -9120,9 +9329,8 @@ let input_coverages = ((|| PResult::Ok({
 let mut accum = Vec::new();
 for _ in 0..input_glyph_count {
 accum.push({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -9130,22 +9338,25 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_coverage_table(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_coverage_table(_input))?;
+((|val: opentype_coverage_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 opentype_common_chained_sequence_context_subst_Format1_coverage { offset, link }
 });
@@ -9157,9 +9368,8 @@ let lookahead_coverages = ((|| PResult::Ok({
 let mut accum = Vec::new();
 for _ in 0..lookahead_glyph_count {
 accum.push({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -9167,22 +9377,25 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_coverage_table(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_coverage_table(_input))?;
+((|val: opentype_coverage_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 opentype_common_chained_sequence_context_subst_Format1_coverage { offset, link }
 });
@@ -9289,7 +9502,7 @@ let inner = _input.get_offset_u64();
 }))())?;
 let default_lang_sys = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
-let link = ((|| PResult::Ok(match match offset {
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -9326,9 +9539,8 @@ for _ in 0..lang_sys_count {
 accum.push({
 let lang_sys_tag = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let lang_sys = ((|| PResult::Ok({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -9336,24 +9548,27 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_common_langsys(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_common_langsys(_input))?;
+((|val: opentype_common_langsys| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
-opentype_common_script_table_lang_sys_records_lang_sys { offset, link }
+opentype_common_script_table_default_lang_sys { offset, link }
 }))())?;
 opentype_common_script_table_lang_sys_records { lang_sys_tag, lang_sys }
 });
@@ -9399,7 +9614,7 @@ b
 };
 ((|x: (u8, u8)| PResult::Ok(u16be(x)))(inner))?
 };
-PResult::Ok(((|flag_bits: u16| PResult::Ok(opentype_common_value_format_flags { y_advance_device: match flag_bits >> 7u16 & 1u16 {
+PResult::Ok(((|flag_bits: u16| PResult::Ok(opentype_common_value_format_flags { y_advance_device: !match flag_bits >> 7u16 & 1u16 {
 0 => {
 true
 },
@@ -9407,7 +9622,7 @@ true
 _ => {
 false
 }
-}, x_advance_device: match flag_bits >> 6u16 & 1u16 {
+}, x_advance_device: !match flag_bits >> 6u16 & 1u16 {
 0 => {
 true
 },
@@ -9415,7 +9630,7 @@ true
 _ => {
 false
 }
-}, y_placement_device: match flag_bits >> 5u16 & 1u16 {
+}, y_placement_device: !match flag_bits >> 5u16 & 1u16 {
 0 => {
 true
 },
@@ -9423,7 +9638,7 @@ true
 _ => {
 false
 }
-}, x_placement_device: match flag_bits >> 4u16 & 1u16 {
+}, x_placement_device: !match flag_bits >> 4u16 & 1u16 {
 0 => {
 true
 },
@@ -9431,7 +9646,7 @@ true
 _ => {
 false
 }
-}, y_advance: match flag_bits >> 3u16 & 1u16 {
+}, y_advance: !match flag_bits >> 3u16 & 1u16 {
 0 => {
 true
 },
@@ -9439,7 +9654,7 @@ true
 _ => {
 false
 }
-}, x_advance: match flag_bits >> 2u16 & 1u16 {
+}, x_advance: !match flag_bits >> 2u16 & 1u16 {
 0 => {
 true
 },
@@ -9447,7 +9662,7 @@ true
 _ => {
 false
 }
-}, y_placement: match flag_bits >> 1u16 & 1u16 {
+}, y_placement: !match flag_bits >> 1u16 & 1u16 {
 0 => {
 true
 },
@@ -9455,7 +9670,7 @@ true
 _ => {
 false
 }
-}, x_placement: match flag_bits >> 0u16 & 1u16 {
+}, x_placement: !match flag_bits >> 0u16 & 1u16 {
 0 => {
 true
 },
@@ -9488,9 +9703,8 @@ Some((Decoder24(_input))?)
 None
 }))())?;
 let x_placement_device = ((|| PResult::Ok(if flags.x_placement_device.clone() {
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -9498,31 +9712,33 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_common_device_or_variation_index_table(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
+((|val: opentype_common_device_or_variation_index_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
 }))())?;
 let y_placement_device = ((|| PResult::Ok(if flags.y_placement_device.clone() {
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -9530,31 +9746,33 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_common_device_or_variation_index_table(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
+((|val: opentype_common_device_or_variation_index_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
 }))())?;
 let x_advance_device = ((|| PResult::Ok(if flags.x_advance_device.clone() {
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -9562,31 +9780,33 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_common_device_or_variation_index_table(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
+((|val: opentype_common_device_or_variation_index_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
 }))())?;
 let y_advance_device = ((|| PResult::Ok(if flags.y_advance_device.clone() {
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -9594,22 +9814,25 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_common_device_or_variation_index_table(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
+((|val: opentype_common_device_or_variation_index_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
@@ -9640,9 +9863,8 @@ Some((Decoder24(_input))?)
 None
 }))())?;
 let x_placement_device = ((|| PResult::Ok(if flags.x_placement_device.clone() {
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -9650,31 +9872,33 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_common_device_or_variation_index_table(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
+((|val: opentype_common_device_or_variation_index_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
 }))())?;
 let y_placement_device = ((|| PResult::Ok(if flags.y_placement_device.clone() {
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -9682,31 +9906,33 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_common_device_or_variation_index_table(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
+((|val: opentype_common_device_or_variation_index_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
 }))())?;
 let x_advance_device = ((|| PResult::Ok(if flags.x_advance_device.clone() {
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -9714,31 +9940,33 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_common_device_or_variation_index_table(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
+((|val: opentype_common_device_or_variation_index_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
 }))())?;
 let y_advance_device = ((|| PResult::Ok(if flags.y_advance_device.clone() {
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -9746,22 +9974,25 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_common_device_or_variation_index_table(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
+((|val: opentype_common_device_or_variation_index_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
@@ -9792,9 +10023,8 @@ Some((Decoder24(_input))?)
 None
 }))())?;
 let x_placement_device = ((|| PResult::Ok(if flags.x_placement_device.clone() {
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -9802,31 +10032,33 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_common_device_or_variation_index_table(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
+((|val: opentype_common_device_or_variation_index_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
 }))())?;
 let y_placement_device = ((|| PResult::Ok(if flags.y_placement_device.clone() {
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -9834,31 +10066,33 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_common_device_or_variation_index_table(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
+((|val: opentype_common_device_or_variation_index_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
 }))())?;
 let x_advance_device = ((|| PResult::Ok(if flags.x_advance_device.clone() {
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -9866,31 +10100,33 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_common_device_or_variation_index_table(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
+((|val: opentype_common_device_or_variation_index_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
 }))())?;
 let y_advance_device = ((|| PResult::Ok(if flags.y_advance_device.clone() {
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -9898,22 +10134,25 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_common_device_or_variation_index_table(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
+((|val: opentype_common_device_or_variation_index_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
@@ -9944,9 +10183,8 @@ Some((Decoder24(_input))?)
 None
 }))())?;
 let x_placement_device = ((|| PResult::Ok(if flags.x_placement_device.clone() {
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -9954,31 +10192,33 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_common_device_or_variation_index_table(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
+((|val: opentype_common_device_or_variation_index_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
 }))())?;
 let y_placement_device = ((|| PResult::Ok(if flags.y_placement_device.clone() {
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -9986,31 +10226,33 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_common_device_or_variation_index_table(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
+((|val: opentype_common_device_or_variation_index_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
 }))())?;
 let x_advance_device = ((|| PResult::Ok(if flags.x_advance_device.clone() {
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -10018,31 +10260,33 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_common_device_or_variation_index_table(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
+((|val: opentype_common_device_or_variation_index_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
 }))())?;
 let y_advance_device = ((|| PResult::Ok(if flags.y_advance_device.clone() {
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -10050,22 +10294,25 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
 _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
-let ret = ((|| PResult::Ok((Decoder_opentype_common_device_or_variation_index_table(_input))?))())?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
+((|val: opentype_common_device_or_variation_index_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
@@ -10106,7 +10353,7 @@ let x_coordinate = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let y_coordinate = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let x_device_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
-let link = ((|| PResult::Ok(match match offset {
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -10134,11 +10381,11 @@ false => {
 None
 }
 }))())?;
-opentype_common_anchor_table_table_Format3_x_device_offset { offset, link }
+opentype_common_value_record_x_advance_device { offset, link }
 }))())?;
 let y_device_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
-let link = ((|| PResult::Ok(match match offset {
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -10166,7 +10413,7 @@ false => {
 None
 }
 }))())?;
-opentype_common_anchor_table_table_Format3_x_device_offset { offset, link }
+opentype_common_value_record_x_advance_device { offset, link }
 }))())?;
 opentype_common_anchor_table_table_Format3 { x_coordinate, y_coordinate, x_device_offset, y_device_offset }
 };
@@ -10305,7 +10552,7 @@ let mut accum = Vec::new();
 for _ in 0..mark_glyph_set_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder21(_input))?))())?;
-let link = ((|| PResult::Ok(if match offset {
+let link = ((|| PResult::Ok(if !match offset {
 0 => {
 true
 },
@@ -10548,7 +10795,7 @@ b
 };
 ((|x: (u8, u8)| PResult::Ok(u16be(x)))(inner))?
 };
-((|flag_bits: u16| PResult::Ok(opentype_glyf_composite_raw_flags { unscaled_component_offset: match flag_bits >> 12u16 & 1u16 {
+((|flag_bits: u16| PResult::Ok(opentype_glyf_composite_raw_flags { unscaled_component_offset: !match flag_bits >> 12u16 & 1u16 {
 0 => {
 true
 },
@@ -10556,7 +10803,7 @@ true
 _ => {
 false
 }
-}, scaled_component_offset: match flag_bits >> 11u16 & 1u16 {
+}, scaled_component_offset: !match flag_bits >> 11u16 & 1u16 {
 0 => {
 true
 },
@@ -10564,7 +10811,7 @@ true
 _ => {
 false
 }
-}, overlap_compound: match flag_bits >> 10u16 & 1u16 {
+}, overlap_compound: !match flag_bits >> 10u16 & 1u16 {
 0 => {
 true
 },
@@ -10572,7 +10819,7 @@ true
 _ => {
 false
 }
-}, use_my_metrics: match flag_bits >> 9u16 & 1u16 {
+}, use_my_metrics: !match flag_bits >> 9u16 & 1u16 {
 0 => {
 true
 },
@@ -10580,7 +10827,7 @@ true
 _ => {
 false
 }
-}, we_have_instructions: match flag_bits >> 8u16 & 1u16 {
+}, we_have_instructions: !match flag_bits >> 8u16 & 1u16 {
 0 => {
 true
 },
@@ -10588,7 +10835,7 @@ true
 _ => {
 false
 }
-}, we_have_a_two_by_two: match flag_bits >> 7u16 & 1u16 {
+}, we_have_a_two_by_two: !match flag_bits >> 7u16 & 1u16 {
 0 => {
 true
 },
@@ -10596,7 +10843,7 @@ true
 _ => {
 false
 }
-}, we_have_an_x_and_y_scale: match flag_bits >> 6u16 & 1u16 {
+}, we_have_an_x_and_y_scale: !match flag_bits >> 6u16 & 1u16 {
 0 => {
 true
 },
@@ -10604,7 +10851,7 @@ true
 _ => {
 false
 }
-}, more_components: match flag_bits >> 5u16 & 1u16 {
+}, more_components: !match flag_bits >> 5u16 & 1u16 {
 0 => {
 true
 },
@@ -10612,7 +10859,7 @@ true
 _ => {
 false
 }
-}, __reserved_bit4: match flag_bits >> 4u16 & 1u16 {
+}, __reserved_bit4: !match flag_bits >> 4u16 & 1u16 {
 0 => {
 true
 },
@@ -10620,7 +10867,7 @@ true
 _ => {
 false
 }
-}, we_have_a_scale: match flag_bits >> 3u16 & 1u16 {
+}, we_have_a_scale: !match flag_bits >> 3u16 & 1u16 {
 0 => {
 true
 },
@@ -10628,7 +10875,7 @@ true
 _ => {
 false
 }
-}, round_xy_to_grid: match flag_bits >> 2u16 & 1u16 {
+}, round_xy_to_grid: !match flag_bits >> 2u16 & 1u16 {
 0 => {
 true
 },
@@ -10636,7 +10883,7 @@ true
 _ => {
 false
 }
-}, args_are_xy_values: match flag_bits >> 1u16 & 1u16 {
+}, args_are_xy_values: !match flag_bits >> 1u16 & 1u16 {
 0 => {
 true
 },
@@ -10644,7 +10891,7 @@ true
 _ => {
 false
 }
-}, arg_1_and_2_are_words: match flag_bits >> 0u16 & 1u16 {
+}, arg_1_and_2_are_words: !match flag_bits >> 0u16 & 1u16 {
 0 => {
 true
 },
@@ -10818,7 +11065,7 @@ let inner = {
 let b = _input.read_byte()?;
 b
 };
-PResult::Ok(((|flagbyte: u8| PResult::Ok(opentype_glyph_description_simple_flags_raw { overlap_simple: match flagbyte >> 6u8 & 1u8 {
+PResult::Ok(((|flagbyte: u8| PResult::Ok(opentype_glyph_description_simple_flags_raw { overlap_simple: !match flagbyte >> 6u8 & 1u8 {
 0 => {
 true
 },
@@ -10826,7 +11073,7 @@ true
 _ => {
 false
 }
-}, y_is_same_or_positive_y_short_vector: match flagbyte >> 5u8 & 1u8 {
+}, y_is_same_or_positive_y_short_vector: !match flagbyte >> 5u8 & 1u8 {
 0 => {
 true
 },
@@ -10834,7 +11081,7 @@ true
 _ => {
 false
 }
-}, x_is_same_or_positive_x_short_vector: match flagbyte >> 4u8 & 1u8 {
+}, x_is_same_or_positive_x_short_vector: !match flagbyte >> 4u8 & 1u8 {
 0 => {
 true
 },
@@ -10842,7 +11089,7 @@ true
 _ => {
 false
 }
-}, repeat_flag: match flagbyte >> 3u8 & 1u8 {
+}, repeat_flag: !match flagbyte >> 3u8 & 1u8 {
 0 => {
 true
 },
@@ -10850,7 +11097,7 @@ true
 _ => {
 false
 }
-}, y_short_vector: match flagbyte >> 2u8 & 1u8 {
+}, y_short_vector: !match flagbyte >> 2u8 & 1u8 {
 0 => {
 true
 },
@@ -10858,7 +11105,7 @@ true
 _ => {
 false
 }
-}, x_short_vector: match flagbyte >> 1u8 & 1u8 {
+}, x_short_vector: !match flagbyte >> 1u8 & 1u8 {
 0 => {
 true
 },
@@ -10866,7 +11113,7 @@ true
 _ => {
 false
 }
-}, on_curve_point: match flagbyte >> 0u8 & 1u8 {
+}, on_curve_point: !match flagbyte >> 0u8 & 1u8 {
 0 => {
 true
 },
@@ -10885,9 +11132,8 @@ for _ in 0..lang_tag_count {
 accum.push({
 let length = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let offset = ((|| PResult::Ok({
-let offset = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
 0 => {
 true
 },
@@ -10895,13 +11141,8 @@ true
 _ => {
 false
 }
-}))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere);
-}
-}))())?;
-let link = ((|| PResult::Ok({
+} {
+true => {
 let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
@@ -10909,14 +11150,22 @@ let inner = _input.get_offset_u64();
 _input.open_peek_context();
 _input.advance_by(try_sub!(storage_start + (offset as u32), __here))?;
 let ret = ((|| PResult::Ok({
+let inner = {
 let mut accum = Vec::new();
 for _ in 0..length {
 accum.push((Decoder25(_input))?);
 }
 accum
+};
+((|val: Vec<u8>| PResult::Ok(Some(val)))(inner))?
 }))())?;
 _input.close_peek_context()?;
 ret
+},
+
+false => {
+None
+}
 }))())?;
 opentype_name_table_name_records_offset { offset, link }
 }))())?;
@@ -10983,7 +11232,7 @@ let platform = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let encoding = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let subtable_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder21(_input))?))())?;
-let link = ((|| PResult::Ok(if match offset {
+let link = ((|| PResult::Ok(if !match offset {
 0 => {
 true
 },
@@ -11695,7 +11944,7 @@ let field3 = ((|| PResult::Ok((Decoder25(_input))?))())?;
 }))())?;
 let default_uvs_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder21(_input))?))())?;
-let link = ((|| PResult::Ok(if match offset {
+let link = ((|| PResult::Ok(if !match offset {
 0 => {
 true
 },
@@ -11743,7 +11992,7 @@ opentype_variation_selector_default_uvs_offset { offset, link }
 }))())?;
 let non_default_uvs_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder21(_input))?))())?;
-let link = ((|| PResult::Ok(if match offset {
+let link = ((|| PResult::Ok(if !match offset {
 0 => {
 true
 },
@@ -13584,7 +13833,7 @@ b
 };
 ((|packed_bits: u8| PResult::Ok(zlib_main_flags { flevel: packed_bits >> 6u8 & 3u8, fdict: packed_bits >> 5u8 & 1u8, fcheck: packed_bits >> 0u8 & 31u8 }))(inner))?
 }))())?;
-let dict_id = ((|| PResult::Ok(if match flags.fdict.clone() {
+let dict_id = ((|| PResult::Ok(if !match flags.fdict.clone() {
 0 => {
 true
 },
@@ -13683,26 +13932,26 @@ accum.push(elem);
 accum
 }))())?;
 let codes = ((|| PResult::Ok((try_flat_map_vec(blocks.iter().cloned(), |x: deflate_block| PResult::Ok(match x.data.clone() {
-deflate_main_codes__dupX1::uncompressed(y) => {
+deflate_main_codes::uncompressed(y) => {
 y.codes_values.clone()
 },
 
-deflate_main_codes__dupX1::fixed_huffman(y) => {
+deflate_main_codes::fixed_huffman(y) => {
 y.codes_values.clone()
 },
 
-deflate_main_codes__dupX1::dynamic_huffman(y) => {
+deflate_main_codes::dynamic_huffman(y) => {
 y.codes_values.clone()
 }
 })))?))())?;
-let inflate = ((|| PResult::Ok((try_flat_map_append_vec(codes.iter().cloned(), |tuple_var: (&Vec<u8>, deflate_main_codes)| PResult::Ok(match tuple_var {
+let inflate = ((|| PResult::Ok((try_flat_map_append_vec(codes.iter().cloned(), |tuple_var: (&Vec<u8>, deflate_main_codes__dupX1)| PResult::Ok(match tuple_var {
 (buffer, symbol) => {
 match symbol {
-deflate_main_codes::literal(b) => {
+deflate_main_codes__dupX1::literal(b) => {
 [b].to_vec()
 },
 
-deflate_main_codes::reference(r) => {
+deflate_main_codes__dupX1::reference(r) => {
 {
 let ix = (try_sub!((buffer.len()) as u32, (r.distance.clone()) as u32)) as usize;
 (slice_ext(&buffer, ix..ix + (((r.length.clone()) as u32) as usize))).to_vec()
@@ -13727,17 +13976,17 @@ let field1 = ((|| PResult::Ok((Decoder136(_input))?))())?;
 let data = ((|| PResult::Ok(match r#type {
 0u8 => {
 let inner = (Decoder_deflate_uncompressed(_input))?;
-deflate_main_codes__dupX1::uncompressed(inner)
+deflate_main_codes::uncompressed(inner)
 },
 
 1u8 => {
 let inner = (Decoder_deflate_fixed_huffman(_input))?;
-deflate_main_codes__dupX1::fixed_huffman(inner)
+deflate_main_codes::fixed_huffman(inner)
 },
 
 2u8 => {
 let inner = (Decoder_deflate_dynamic_huffman(_input))?;
-deflate_main_codes__dupX1::dynamic_huffman(inner)
+deflate_main_codes::dynamic_huffman(inner)
 },
 
 _other => {
@@ -13818,7 +14067,7 @@ let field7 = ((|| PResult::Ok((Decoder136(_input))?))())?;
 }
 accum
 }))())?;
-let codes_values = ((|| PResult::Ok((try_flat_map_vec(bytes.iter().cloned(), |x: u8| PResult::Ok([deflate_main_codes::literal(x)].to_vec())))?))())?;
+let codes_values = ((|| PResult::Ok((try_flat_map_vec(bytes.iter().cloned(), |x: u8| PResult::Ok([deflate_main_codes__dupX1::literal(x)].to_vec())))?))())?;
 PResult::Ok(deflate_uncompressed { align, len, nlen, bytes, codes_values })
 }
 
@@ -14597,7 +14846,7 @@ let codes_values = ((|| PResult::Ok((try_flat_map_vec(codes.iter().cloned(), |x:
 257u16..=285u16 => {
 match x.extra.clone() {
 Some(ref rec) => {
-[deflate_main_codes::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
+[deflate_main_codes__dupX1::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
 },
 
 _ => {
@@ -14611,7 +14860,7 @@ return Err(ParseError::ExcludedBranch(4350808036978594792u64));
 },
 
 _ => {
-[deflate_main_codes::literal((x.code.clone()) as u8)].to_vec()
+[deflate_main_codes__dupX1::literal((x.code.clone()) as u8)].to_vec()
 }
 })))?))())?;
 PResult::Ok(deflate_fixed_huffman { codes, codes_values })
@@ -15297,7 +15546,7 @@ let codes_values = ((|| PResult::Ok((try_flat_map_vec(codes.iter().cloned(), |x:
 257u16..=285u16 => {
 match x.extra.clone() {
 Some(ref rec) => {
-[deflate_main_codes::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
+[deflate_main_codes__dupX1::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
 },
 
 _ => {
@@ -15311,7 +15560,7 @@ return Err(ParseError::ExcludedBranch(4350808036978594792u64));
 },
 
 _ => {
-[deflate_main_codes::literal((x.code.clone()) as u8)].to_vec()
+[deflate_main_codes__dupX1::literal((x.code.clone()) as u8)].to_vec()
 }
 })))?))())?;
 PResult::Ok(deflate_dynamic_huffman { hlit, hdist, hclen, code_length_alphabet_code_lengths, literal_length_distance_alphabet_code_lengths, literal_length_distance_alphabet_code_lengths_value, literal_length_alphabet_code_lengths_value, distance_alphabet_code_lengths_value, codes, codes_values })
@@ -18451,7 +18700,7 @@ b
 };
 ((|packed_bits: u8| PResult::Ok(zlib_main_flags { flevel: packed_bits >> 6u8 & 3u8, fdict: packed_bits >> 5u8 & 1u8, fcheck: packed_bits >> 0u8 & 31u8 }))(inner))?
 }))())?;
-let dict_id = ((|| PResult::Ok(if match flags.fdict.clone() {
+let dict_id = ((|| PResult::Ok(if !match flags.fdict.clone() {
 0 => {
 true
 },
@@ -20794,7 +21043,7 @@ b
 };
 ((|packed_bits: u8| PResult::Ok(zlib_main_flags { flevel: packed_bits >> 6u8 & 3u8, fdict: packed_bits >> 5u8 & 1u8, fcheck: packed_bits >> 0u8 & 31u8 }))(inner))?
 }))())?;
-let dict_id = ((|| PResult::Ok(if match flags.fdict.clone() {
+let dict_id = ((|| PResult::Ok(if !match flags.fdict.clone() {
 0 => {
 true
 },
@@ -21956,7 +22205,7 @@ b
 };
 ((|packed_bits: u8| PResult::Ok(zlib_main_flags { flevel: packed_bits >> 6u8 & 3u8, fdict: packed_bits >> 5u8 & 1u8, fcheck: packed_bits >> 0u8 & 31u8 }))(inner))?
 }))())?;
-let dict_id = ((|| PResult::Ok(if match flags.fdict.clone() {
+let dict_id = ((|| PResult::Ok(if !match flags.fdict.clone() {
 0 => {
 true
 },
@@ -26362,7 +26611,7 @@ PResult::Ok(jpeg_sos_image_component { component_selector, entropy_coding_table_
 fn Decoder_jpeg_dnl_data<'input>(_input: &mut Parser<'input>) -> Result<jpeg_dnl_data, ParseError> {
 let num_lines = ((|| PResult::Ok({
 let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+if ((|x: u16| PResult::Ok(!match x {
 0 => {
 true
 },
@@ -27118,7 +27367,7 @@ return Err(ParseError::FalsifiedWhere);
 let num_lines = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let num_samples_per_line = ((|| PResult::Ok({
 let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+if ((|x: u16| PResult::Ok(!match x {
 0 => {
 true
 },
@@ -27134,7 +27383,7 @@ return Err(ParseError::FalsifiedWhere);
 }))())?;
 let num_image_components = ((|| PResult::Ok({
 let inner = (Decoder25(_input))?;
-if ((|x: u8| PResult::Ok(match x {
+if ((|x: u8| PResult::Ok(!match x {
 0 => {
 true
 },
@@ -28430,7 +28679,7 @@ return Err(ParseError::FalsifiedWhere);
 }))())?;
 let density_x = ((|| PResult::Ok({
 let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+if ((|x: u16| PResult::Ok(!match x {
 0 => {
 true
 },
@@ -28446,7 +28695,7 @@ return Err(ParseError::FalsifiedWhere);
 }))())?;
 let density_y = ((|| PResult::Ok({
 let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(match x {
+if ((|x: u16| PResult::Ok(!match x {
 0 => {
 true
 },
@@ -28511,7 +28760,7 @@ let inner = {
 let b = _input.read_byte()?;
 b
 };
-((|flagbyte: u8| PResult::Ok(gzip_header_file_flags { fcomment: match flagbyte >> 4u8 & 1u8 {
+((|flagbyte: u8| PResult::Ok(gzip_header_file_flags { fcomment: !match flagbyte >> 4u8 & 1u8 {
 0 => {
 true
 },
@@ -28519,7 +28768,7 @@ true
 _ => {
 false
 }
-}, fname: match flagbyte >> 3u8 & 1u8 {
+}, fname: !match flagbyte >> 3u8 & 1u8 {
 0 => {
 true
 },
@@ -28527,7 +28776,7 @@ true
 _ => {
 false
 }
-}, fextra: match flagbyte >> 2u8 & 1u8 {
+}, fextra: !match flagbyte >> 2u8 & 1u8 {
 0 => {
 true
 },
@@ -28535,7 +28784,7 @@ true
 _ => {
 false
 }
-}, fhcrc: match flagbyte >> 1u8 & 1u8 {
+}, fhcrc: !match flagbyte >> 1u8 & 1u8 {
 0 => {
 true
 },
@@ -28543,7 +28792,7 @@ true
 _ => {
 false
 }
-}, ftext: match flagbyte >> 0u8 & 1u8 {
+}, ftext: !match flagbyte >> 0u8 & 1u8 {
 0 => {
 true
 },
@@ -28942,7 +29191,7 @@ PResult::Ok(gif_header { signature, version })
 
 fn Decoder_gif_logical_screen<'input>(_input: &mut Parser<'input>) -> Result<gif_logical_screen, ParseError> {
 let descriptor = ((|| PResult::Ok((Decoder_gif_logical_screen_descriptor(_input))?))())?;
-let global_color_table = ((|| PResult::Ok(if match descriptor.flags.table_flag.clone() {
+let global_color_table = ((|| PResult::Ok(if !match descriptor.flags.table_flag.clone() {
 0 => {
 true
 },
@@ -29370,7 +29619,7 @@ return Err(ParseError::ExcludedBranch(14120387546690436687u64));
 
 fn Decoder_gif_table_based_image<'input>(_input: &mut Parser<'input>) -> Result<gif_table_based_image, ParseError> {
 let descriptor = ((|| PResult::Ok((Decoder_gif_image_descriptor(_input))?))())?;
-let local_color_table = ((|| PResult::Ok(if match descriptor.flags.table_flag.clone() {
+let local_color_table = ((|| PResult::Ok(if !match descriptor.flags.table_flag.clone() {
 0 => {
 true
 },
