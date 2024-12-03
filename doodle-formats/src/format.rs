@@ -51,7 +51,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                     var("gzip-raw"),
                     "item",
                     Format::DecodeBytes(
-                        Box::new(record_projs(var("item"), &["data", "inflate"])),
+                        Box::new(record_lens(var("item"), &["data", "inflate"])),
                         Box::new(tar.call()),
                     ),
                 ),
