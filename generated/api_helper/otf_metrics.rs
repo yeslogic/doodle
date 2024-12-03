@@ -125,6 +125,39 @@ pub type OpentypeGpos = opentype_gpos_table;
 
 // SECTION - Helper traits for consistent-style conversion from generated types to the types we use to represent them in the API Helper
 
+/// Helper trait for promoting unexpectedly-null Offset-Options into non-Option values of the target type.
+trait FromNull: Sized {
+    /// Constructs the logically 'null' value of type `Self`.
+    fn from_null() -> Self;
+
+    /// Returns `value` if `opt` is `Some(value)`, else returns `Self::from_null()`.
+    fn renew(opt: Option<Self>) -> Self {
+        opt.unwrap_or_else(Self::from_null)
+    }
+}
+
+impl<T> FromNull for T
+where
+    T: std::default::Default
+{
+    fn from_null() -> Self {
+        T::default()
+    }
+
+    fn renew(opt: Option<Self>) -> Self {
+        opt.unwrap_or_default()
+    }
+}
+
+impl<T, Original> Promote<Option<Original>> for T
+where
+    T: FromNull + Promote<Original>
+{
+    fn promote(orig: &Option<Original>) -> Self {
+        Self::renew(orig.as_ref().map(T::promote))
+    }
+}
+
 /// Helper trait for converting from a borrowed value of type `Original` into an owned value of type `Self`,
 /// as a short-cut to avoid the need to clone fields we would ultimately either discard, simplify, or unpack
 /// if we were to implement `From<Original>`  instead.
@@ -172,6 +205,20 @@ where
     type Ref<'a> = (T, &'a U);
 }
 
+fn promote_from_null<O, T>(orig_opt: &Option<O>) -> T
+where
+    T: FromNull + Promote<O>,
+{
+    T::renew(orig_opt.as_ref().map(T::promote))
+}
+
+fn try_promote_from_null<O, T>(orig_opt: &Option<O>) -> Result<T, T::Error>
+where
+    T: FromNull + TryPromote<O>,
+{
+    Ok(T::renew(orig_opt.as_ref().map(T::try_promote).transpose()?))
+}
+
 fn promote_vec<O, T>(orig_slice: &[O]) -> Vec<T>
 where
     T: Promote<O>,
@@ -197,6 +244,13 @@ where
     orig_opt.as_ref().map(T::promote)
 }
 
+fn promote_link<O, T>(orig_link: &Link<O>) -> Link<T>
+where
+    T: Promote<O>,
+{
+    orig_link.as_ref().map(T::promote)
+}
+
 fn try_promote_opt<O, T>(orig: &Option<O>) -> Result<Option<T>, T::Error>
 where
     T: TryPromote<O>,
@@ -204,22 +258,11 @@ where
     orig.as_ref().map(T::try_promote).transpose()
 }
 
-impl<T, Original> TryPromote<Original> for T
+fn try_promote_link<O, T>(orig: &Link<O>) -> Result<Link<T>, T::Error>
 where
-    T: Promote<Original>,
+    T: TryPromote<O>,
 {
-    type Error = std::convert::Infallible;
-
-    fn try_promote(orig: &Original) -> Result<Self, Self::Error> {
-        Ok(<T as Promote<Original>>::promote(orig))
-    }
-}
-
-// NOTE - this is generally helpful to have, though the linter and compiler return different error messages with and without this impl, when an implied Promote instance is not defined
-impl<T: Clone> Promote<T> for T {
-    fn promote(orig: &T) -> T {
-        orig.clone()
-    }
+    orig.as_ref().map(T::try_promote).transpose()
 }
 
 /// Type-agnostic macro for dereferencing machine-generated Offset16 abstractions
@@ -227,21 +270,29 @@ impl<T: Clone> Promote<T> for T {
 ///
 /// This may become an identity function we refactor to eliminate intermediate Offset16 records
 /// by using LetFormat or other forgetful chaining formats.
-macro_rules! promote_link {
-    () => {
+macro_rules! follow_link {
+    ( opt ) => {
         (|offset| promote_opt(&offset.link))
     };
+    ( req ) => {
+        (|offset| promote_link(&offset.link))
+    };
+    ( req, $t:ty $(as $t2:ty)? ) => {
+        (|offset| <$t $(as Promote<$t2>)?>::promote(&offset.link))
+    }
 }
 
 // !SECTION
 
 // SECTION - Generic (but niche-use-case) helper definitions
+/// Lexically distinct Option for values that are theoretically non-Nullable and have no FromNull instance.
+type Link<T> = Option<T>;
 
 /// Vector of values with representation `T` that have a nominal semantic interpretation specified by `Sem`.
 ///
 /// Though generic, the practical usages of this type are for distinguishing `ClassId := u16` and `GlyphId := u16`
 /// semantics in GSUB/GPOS Lookup tables.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 #[repr(transparent)]
 struct SemVec<Sem, T> {
     inner: Vec<T>,
@@ -841,6 +892,15 @@ enum CoverageTable {
     }, // Range of glyphs
 }
 
+impl FromNull for CoverageTable {
+    fn from_null() -> Self {
+        // REVIEW - in practice, we could also pick Format2 instead, but Format1 is simpler...
+        CoverageTable::Format1 {
+            glyph_array: Vec::new(),
+        }
+    }
+}
+
 impl Promote<OpentypeCoverageTable> for CoverageTable {
     fn promote(orig: &OpentypeCoverageTable) -> Self {
         Self::promote(&orig.data)
@@ -960,6 +1020,15 @@ enum ClassDef {
     },
 }
 
+impl FromNull for ClassDef {
+    fn from_null() -> Self {
+        ClassDef::Format1 {
+            start_glyph_id: 0,
+            class_value_array: Vec::new(),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 struct RangeRecord<T> {
     start_glyph_id: u16,
@@ -1011,6 +1080,14 @@ struct AttachPoint {
     point_indices: Vec<u16>,
 }
 
+impl FromNull for AttachPoint {
+    fn from_null() -> Self {
+        AttachPoint {
+            point_indices: Vec::new(),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 struct AttachList {
     coverage: CoverageTable,
@@ -1034,7 +1111,7 @@ impl Promote<OpentypeAttachList> for AttachList {
             attach_points: orig
                 .attach_point_offsets
                 .iter()
-                .map(|offset| AttachPoint::promote(&offset.link))
+                .map(follow_link!(req, AttachPoint))
                 .collect(),
         }
     }
@@ -1054,7 +1131,7 @@ impl TryPromote<OpentypeLigCaretList> for LigCaretList {
     fn try_promote(orig: &OpentypeLigCaretList) -> Result<Self, Self::Error> {
         let mut lig_glyphs = Vec::with_capacity(orig.lig_glyph_offsets.len());
         for offset in orig.lig_glyph_offsets.iter() {
-            lig_glyphs.push(LigGlyph::try_promote(&offset.link)?);
+            lig_glyphs.push(try_promote_from_null(&offset.link)?);
         }
         Ok(LigCaretList {
             coverage: CoverageTable::promote(&orig.coverage.link),
@@ -1063,12 +1140,12 @@ impl TryPromote<OpentypeLigCaretList> for LigCaretList {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 struct LigGlyph {
-    caret_values: Vec<CaretValue>,
+    caret_values: Vec<Link<CaretValue>>,
 }
 
-type OpentypeLigGlyph = opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link;
+pub type OpentypeLigGlyph = opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link;
 
 impl TryPromote<OpentypeLigGlyph> for LigGlyph {
     type Error = ReflType<TPErr<OpentypeCaretValue, CaretValue>, UnknownValueError<u16>>;
@@ -1076,7 +1153,7 @@ impl TryPromote<OpentypeLigGlyph> for LigGlyph {
     fn try_promote(orig: &OpentypeLigGlyph) -> Result<Self, Self::Error> {
         let mut caret_values = Vec::with_capacity(orig.caret_values.len());
         for offset in orig.caret_values.iter() {
-            caret_values.push(CaretValue::try_promote(&offset.link)?); // &caret_value.data
+            caret_values.push(try_promote_link(&offset.link)?); // &caret_value.data
         }
         Ok(LigGlyph { caret_values })
     }
@@ -1230,7 +1307,7 @@ enum CaretValue {
     ContourPoint(u16), // Format2
     DesignUnitsWithTable {
         coordinate: u16,
-        device: DeviceOrVariationIndexTable,
+        device: Link<DeviceOrVariationIndexTable>,
     }, // Format3
 }
 
@@ -1306,7 +1383,7 @@ impl TryPromote<OpentypeCaretValue> for CaretValue {
             OpentypeCaretValue::Format3(OpentypeCaretValueFormat3 { coordinate, table }) => {
                 Ok(CaretValue::DesignUnitsWithTable {
                     coordinate: *coordinate,
-                    device: DeviceOrVariationIndexTable::try_promote(&table.link)?,
+                    device: try_promote_link(&table.link)?,
                 })
             }
         }
@@ -1349,7 +1426,7 @@ impl Promote<OpentypeLangSysRecord> for LangSysRecord {
     fn promote(orig: &OpentypeLangSysRecord) -> Self {
         LangSysRecord {
             lang_sys_tag: orig.lang_sys_tag,
-            lang_sys: LangSys::promote(&orig.lang_sys.link),
+            lang_sys: promote_link(&orig.lang_sys.link),
         }
     }
 }
@@ -1357,7 +1434,7 @@ impl Promote<OpentypeLangSysRecord> for LangSysRecord {
 #[derive(Clone, Debug)]
 struct LangSysRecord {
     lang_sys_tag: u32,
-    lang_sys: LangSys,
+    lang_sys: Link<LangSys>,
 }
 
 pub type OpentypeScriptTable = opentype_common_script_table;
@@ -1365,7 +1442,7 @@ pub type OpentypeScriptTable = opentype_common_script_table;
 impl Promote<OpentypeScriptTable> for ScriptTable {
     fn promote(orig: &OpentypeScriptTable) -> Self {
         ScriptTable {
-            default_lang_sys: promote_opt(&orig.default_lang_sys.link),
+            default_lang_sys: promote_link(&orig.default_lang_sys.link),
             lang_sys_records: promote_vec(&orig.lang_sys_records),
         }
     }
@@ -1383,7 +1460,7 @@ impl Promote<OpentypeScriptRecord> for ScriptRecord {
     fn promote(orig: &OpentypeScriptRecord) -> Self {
         ScriptRecord {
             script_tag: orig.script_tag,
-            script: ScriptTable::promote(&orig.script.link),
+            script: promote_link(&orig.script.link),
         }
     }
 }
@@ -1391,7 +1468,7 @@ impl Promote<OpentypeScriptRecord> for ScriptRecord {
 #[derive(Clone, Debug)]
 struct ScriptRecord {
     script_tag: u32,
-    script: ScriptTable,
+    script: Link<ScriptTable>,
 }
 
 pub type OpentypeFeatureTable = opentype_common_feature_table;
@@ -1417,7 +1494,7 @@ impl Promote<OpentypeFeatureRecord> for FeatureRecord {
     fn promote(orig: &OpentypeFeatureRecord) -> Self {
         FeatureRecord {
             feature_tag: orig.feature_tag,
-            feature: FeatureTable::promote(&orig.feature.link),
+            feature: promote_link(&orig.feature.link),
         }
     }
 }
@@ -1425,7 +1502,7 @@ impl Promote<OpentypeFeatureRecord> for FeatureRecord {
 #[derive(Clone, Debug)]
 struct FeatureRecord {
     feature_tag: u32,
-    feature: FeatureTable,
+    feature: Link<FeatureTable>,
 }
 
 pub type OpentypeGposLookupSubtable =
@@ -1441,7 +1518,9 @@ impl TryPromote<OpentypeGsubLookupSubtable> for LookupSubtable {
             OpentypeGsubLookupSubtable::SingleSubst(single_subst) => {
                 LookupSubtable::SingleSubst(SingleSubst::promote(single_subst))
             }
-            OpentypeGsubLookupSubtable::MultipleSubst => LookupSubtable::MultipleSubst,
+            OpentypeGsubLookupSubtable::MultipleSubst(multi_subst) => {
+                LookupSubtable::MultipleSubst(MultipleSubst::promote(multi_subst))
+            }
             OpentypeGsubLookupSubtable::AlternateSubst => LookupSubtable::AlternateSubst,
             OpentypeGsubLookupSubtable::LigatureSubst => LookupSubtable::LigatureSubst,
             OpentypeGsubLookupSubtable::SequenceContext(seq_ctx) => {
@@ -1503,11 +1582,75 @@ enum LookupSubtable {
     ChainedSequenceContext(ChainedSequenceContext),
 
     SingleSubst(SingleSubst),
-    MultipleSubst,
+    MultipleSubst(MultipleSubst),
     AlternateSubst,
     LigatureSubst,
     SubstExtension,
     ReverseChainSingleSubst,
+}
+
+pub type OpentypeMultipleSubst =
+    opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_MultipleSubst;
+pub type OpentypeMultipleSubstInner =
+    opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_MultipleSubst_subst;
+pub type OpentypeMultipleSubstFormat1 =
+    opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_MultipleSubst_subst_Format1;
+
+impl Promote<OpentypeMultipleSubst> for MultipleSubst {
+    fn promote(orig: &OpentypeMultipleSubst) -> Self {
+        MultipleSubst {
+            coverage: CoverageTable::promote(&orig.coverage.link),
+            subst: MultipleSubstInner::promote(&orig.subst),
+        }
+    }
+}
+
+impl Promote<OpentypeMultipleSubstInner> for MultipleSubstInner {
+    fn promote(orig: &OpentypeMultipleSubstInner) -> Self {
+        match orig {
+            OpentypeMultipleSubstInner::Format1(f1) => MultipleSubstFormat1::promote(f1),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct MultipleSubst {
+    coverage: CoverageTable,
+    subst: MultipleSubstInner,
+}
+
+type MultipleSubstInner = MultipleSubstFormat1; // FIXME - nominally an enum but only one variant so we inline
+
+impl Promote<OpentypeMultipleSubstFormat1> for MultipleSubstFormat1 {
+    fn promote(orig: &OpentypeMultipleSubstFormat1) -> Self {
+        MultipleSubstFormat1 {
+            sequences: orig
+                .sequences
+                .iter()
+                .map(follow_link!(req, SequenceTable))
+                .collect(),
+        }
+    }
+}
+
+pub type OpentypeSequenceTable = opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_MultipleSubst_subst_Format1_sequences_link;
+
+impl Promote<OpentypeSequenceTable> for SequenceTable {
+    fn promote(orig: &OpentypeSequenceTable) -> Self {
+        Self {
+            substitute_glyph_ids: orig.substitute_glyph_ids.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+struct SequenceTable {
+    substitute_glyph_ids: Vec<u16>,
+}
+
+#[derive(Debug, Clone)]
+struct MultipleSubstFormat1 {
+    sequences: Vec<SequenceTable>,
 }
 
 pub type OpentypeSingleSubst =
@@ -1605,7 +1748,7 @@ impl<Sem> Promote<OpentypeChainedRule> for ChainedRule<Sem> {
             input_sequence: orig.input_sequence.clone().into(),
             lookahead_glyph_count: orig.lookahead_glyph_count,
             lookahead_sequence: orig.lookahead_sequence.clone().into(),
-            seq_lookup_records: promote_vec(&orig.seq_lookup_records),
+            seq_lookup_records: orig.seq_lookup_records.clone(),
         }
     }
 }
@@ -1689,7 +1832,7 @@ impl Promote<OpentypeChainedSequenceContextFormat1> for ChainedSequenceContextFo
             chained_seq_rule_sets: orig
                 .chained_seq_rule_sets
                 .iter()
-                .map(promote_link!())
+                .map(follow_link!(req, ChainedRuleSet<GlyphId>))
                 .collect(),
         }
     }
@@ -1698,7 +1841,7 @@ impl Promote<OpentypeChainedSequenceContextFormat1> for ChainedSequenceContextFo
 #[derive(Debug, Clone)]
 struct ChainedSequenceContextFormat1 {
     coverage: CoverageTable,
-    chained_seq_rule_sets: Vec<Option<ChainedRuleSet<GlyphId>>>,
+    chained_seq_rule_sets: Vec<ChainedRuleSet<GlyphId>>,
 }
 
 impl Promote<OpentypeChainedSequenceContextFormat2> for ChainedSequenceContextFormat2 {
@@ -1711,7 +1854,7 @@ impl Promote<OpentypeChainedSequenceContextFormat2> for ChainedSequenceContextFo
             chained_class_seq_rule_sets: orig
                 .chained_class_seq_rule_sets
                 .iter()
-                .map(promote_link!())
+                .map(follow_link!(req, ChainedRuleSet<ClassId>))
                 .collect(),
         }
     }
@@ -1723,7 +1866,7 @@ struct ChainedSequenceContextFormat2 {
     backtrack_class_def: ClassDef,
     input_class_def: ClassDef,
     lookahead_class_def: ClassDef,
-    chained_class_seq_rule_sets: Vec<Option<ChainedRuleSet<ClassId>>>,
+    chained_class_seq_rule_sets: Vec<ChainedRuleSet<ClassId>>,
 }
 
 impl Promote<OpentypeChainedSequenceContextFormat3> for ChainedSequenceContextFormat3 {
@@ -1742,7 +1885,7 @@ impl Promote<OpentypeChainedSequenceContextFormat3> for ChainedSequenceContextFo
             input_coverages: follow(&orig.input_coverages),
             lookahead_glyph_count: orig.lookahead_glyph_count,
             lookahead_coverages: follow(&orig.lookahead_coverages),
-            seq_lookup_records: promote_vec(&orig.seq_lookup_records),
+            seq_lookup_records: orig.seq_lookup_records.clone(),
         }
     }
 }
@@ -1801,7 +1944,7 @@ impl Promote<OpentypeSequenceContextFormat1> for SequenceContextFormat1 {
     fn promote(orig: &OpentypeSequenceContextFormat1) -> Self {
         Self {
             coverage: CoverageTable::promote(&orig.coverage.link),
-            seq_rule_sets: orig.seq_rule_sets.iter().map(promote_link!()).collect(),
+            seq_rule_sets: orig.seq_rule_sets.iter().map(follow_link!(req)).collect(),
         }
     }
 }
@@ -1820,7 +1963,7 @@ impl Promote<OpentypeSequenceContextFormat2> for SequenceContextFormat2 {
             class_seq_rule_sets: orig
                 .class_seq_rule_sets
                 .iter()
-                .map(promote_link!())
+                .map(follow_link!(opt))
                 .collect(),
         }
     }
@@ -1843,7 +1986,6 @@ impl Promote<OpentypeSequenceContextFormat3> for SequenceContextFormat3 {
                 .map(|offset| CoverageTable::promote(&offset.link))
                 .collect(),
             // NOTE - can only clone here (instead of calling promote) because SequenceLookup := OpentypeSequenceLookup
-            // REVIEW - given that Clone => Promote<Self>, do we want to abstract this to avoid the need to refactor if SequenceLookup is redefined (with a manual Promote impl)?
             seq_lookup_records: orig.seq_lookup_records.clone(),
         }
     }
@@ -1861,23 +2003,23 @@ pub type OpentypeRuleSet = opentype_common_sequence_context_subst_Format1_seq_ru
 // REVIEW - if RuleSet becomes an alias instead of a new-type, remove this definition and rename the following impl on Vec<Rule>
 impl Promote<OpentypeRuleSet> for RuleSet {
     fn promote(orig: &OpentypeRuleSet) -> Self {
-        Self(<Vec<Rule>>::promote(orig))
+        Self(<Vec<Link<Rule>>>::promote(orig))
     }
 }
 
-impl Promote<OpentypeRuleSet> for Vec<Rule> {
+impl Promote<OpentypeRuleSet> for Vec<Link<Rule>> {
     fn promote(orig: &OpentypeRuleSet) -> Self {
         orig.rules
             .iter()
-            .map(|offset| Rule::promote(&offset.link))
+            .map(|offset| promote_link(&offset.link))
             .collect()
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 #[repr(transparent)]
 // REVIEW - should this be a simple type alias instead?
-struct RuleSet(Vec<Rule>);
+struct RuleSet(Vec<Link<Rule>>);
 
 pub type OpentypeRule =
     opentype_common_sequence_context_subst_Format1_seq_rule_sets_link_rules_link;
@@ -2123,7 +2265,7 @@ impl TryPromote<OpentypePairPosFormat1> for PairPosFormat1 {
     fn try_promote(orig: &OpentypePairPosFormat1) -> Result<Self, Self::Error> {
         let mut pair_sets = Vec::with_capacity(orig.pair_sets.len());
         for offset in orig.pair_sets.iter() {
-            let pair_set = PairSet::try_promote(&offset.link)?;
+            let pair_set = try_promote_from_null(&offset.link)?;
             pair_sets.push(pair_set)
         }
 
@@ -2319,31 +2461,21 @@ impl TryPromote<OpentypeValueRecord> for ValueRecord {
     >;
 
     fn try_promote(orig: &OpentypeValueRecord) -> Result<Self, Self::Error> {
+        let follow = |device: &Option<opentype_common_value_record_x_advance_device>| {
+            match device {
+                Some(dev) => try_promote_opt(&dev.link),
+                None => Ok(None),
+            }
+        };
         Ok(ValueRecord {
             x_placement: orig.x_placement.map(as_s16),
             y_placement: orig.y_placement.map(as_s16),
             x_advance: orig.x_advance.map(as_s16),
             y_advance: orig.y_advance.map(as_s16),
-            x_placement_device: orig
-                .x_placement_device
-                .as_ref()
-                .map(|offset| DeviceOrVariationIndexTable::try_promote(&offset.link))
-                .transpose()?,
-            y_placement_device: orig
-                .y_placement_device
-                .as_ref()
-                .map(|offset| DeviceOrVariationIndexTable::try_promote(&offset.link))
-                .transpose()?,
-            x_advance_device: orig
-                .x_advance_device
-                .as_ref()
-                .map(|offset| DeviceOrVariationIndexTable::try_promote(&offset.link))
-                .transpose()?,
-            y_advance_device: orig
-                .y_advance_device
-                .as_ref()
-                .map(|offset| DeviceOrVariationIndexTable::try_promote(&offset.link))
-                .transpose()?,
+            x_placement_device: follow(&orig.x_placement_device)?,
+            y_placement_device: follow(&orig.y_placement_device)?,
+            x_advance_device: follow(&orig.x_advance_device)?,
+            y_advance_device: follow(&orig.y_advance_device)?,
         })
     }
 }
@@ -2371,8 +2503,13 @@ impl TryPromote<OpentypeGposLookupTable> for LookupTable {
 
     fn try_promote(orig: &OpentypeGposLookupTable) -> Result<Self, Self::Error> {
         let mut subtables = Vec::with_capacity(orig.subtables.len());
-        for offset in orig.subtables.iter() {
-            subtables.push(LookupSubtable::try_promote(&offset.link)?);
+        for (_ix, offset) in orig.subtables.iter().enumerate() {
+            if let Some(subtable) = try_promote_link(&offset.link)? {
+                subtables.push(subtable);
+            } else {
+                // REVIEW - this is not necessary but helps us track whether this case happens
+                eprintln!("empty subtable at lookup {_ix}");
+            }
         }
 
         Ok(LookupTable {
@@ -2393,8 +2530,13 @@ impl TryPromote<OpentypeGsubLookupTable> for LookupTable {
 
     fn try_promote(orig: &OpentypeGsubLookupTable) -> Result<Self, Self::Error> {
         let mut subtables = Vec::with_capacity(orig.subtables.len());
-        for offset in orig.subtables.iter() {
-            subtables.push(LookupSubtable::try_promote(&offset.link)?);
+        for (_ix, offset) in orig.subtables.iter().enumerate() {
+            if let Some(subtable) = try_promote_link(&offset.link)? {
+                subtables.push(subtable);
+            } else {
+                // REVIEW - this is not necessary but helps us track whether this case happens
+                eprintln!("empty subtable at lookup {_ix}");
+            }
         }
 
         Ok(LookupTable {
@@ -2416,7 +2558,7 @@ struct LookupTable {
 
 type ScriptList = Vec<ScriptRecord>;
 type FeatureList = Vec<FeatureRecord>;
-type LookupList = Vec<LookupTable>;
+type LookupList = Vec<Link<LookupTable>>;
 
 pub type OpentypeScriptList = opentype_common_script_list;
 pub type OpentypeFeatureList = opentype_common_feature_list;
@@ -2442,7 +2584,7 @@ impl TryPromote<OpentypeGposLookupList> for LookupList {
     fn try_promote(orig: &OpentypeGposLookupList) -> Result<Self, Self::Error> {
         let mut accum = Vec::with_capacity(orig.lookups.len());
         for offset in orig.lookups.iter() {
-            accum.push(LookupTable::try_promote(&offset.link)?);
+            accum.push(try_promote_link(&offset.link)?);
         }
         Ok(accum)
     }
@@ -2454,7 +2596,7 @@ impl TryPromote<OpentypeGsubLookupList> for LookupList {
     fn try_promote(orig: &OpentypeGsubLookupList) -> Result<Self, Self::Error> {
         let mut accum = Vec::with_capacity(orig.lookups.len());
         for offset in orig.lookups.iter() {
-            accum.push(LookupTable::try_promote(&offset.link)?);
+            accum.push(try_promote_link(&offset.link)?);
         }
         Ok(accum)
     }
@@ -2653,7 +2795,11 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
                         record.encoding,
                         record.language,
                     ))?;
-                    let buf = plat_encoding_lang.convert(&record.offset.link);
+                    let buf = if let Some(buf) = &record.offset.link {
+                        plat_encoding_lang.convert(buf)
+                    } else {
+                        String::new()
+                    };
                     tmp.push(NameRecord {
                         plat_encoding_lang,
                         name_id: NameId(record.name_id),
@@ -2667,8 +2813,15 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
                     opentype_name_table_data::NameVersion0 => None,
                     opentype_name_table_data::NameVersion1(v1data) => {
                         let mut tmp = Vec::with_capacity(v1data.lang_tag_records.len());
-                        for record in v1data.lang_tag_records.iter() {
-                            let lang_tag = utf16be_convert(&record.offset.link);
+                        for (_ix, record) in v1data.lang_tag_records.iter().enumerate() {
+                            let lang_tag = if let Some(tag) = &record.offset.link {
+                                utf16be_convert(tag)
+                            } else {
+                                if cfg!(debug_assertions) {
+                                    eprintln!("lang_tag record offset is 0 at index {_ix}");
+                                }
+                                String::new()
+                            };
                             tmp.push(LangTagRecord { lang_tag })
                         }
                         Some(tmp)
@@ -2793,10 +2946,10 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
                     TestResult::Ok(GdefMetrics {
                         major_version: gdef.major_version,
                         minor_version: gdef.minor_version,
-                        glyph_class_def: try_promote_opt(&gdef.glyph_class_def.link)?,
-                        attach_list: try_promote_opt(&gdef.attach_list.link)?,
+                        glyph_class_def: promote_opt(&gdef.glyph_class_def.link),
+                        attach_list: promote_opt(&gdef.attach_list.link),
                         lig_caret_list: try_promote_opt(&gdef.lig_caret_list.link)?,
-                        mark_attach_class_def: try_promote_opt(&gdef.mark_attach_class_def.link)?,
+                        mark_attach_class_def: promote_opt(&gdef.mark_attach_class_def.link),
                         data: GdefTableDataMetrics::try_promote(&gdef.data)?,
                     })
                 })
@@ -2809,9 +2962,9 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
                     TestResult::Ok(LayoutMetrics {
                         major_version: gpos.major_version,
                         minor_version: gpos.minor_version,
-                        script_list: ScriptList::try_promote(&gpos.script_list.link)?,
-                        feature_list: FeatureList::try_promote(&gpos.feature_list.link)?,
-                        lookup_list: LookupList::try_promote(&gpos.lookup_list.link)?,
+                        script_list: ScriptList::promote(&gpos.script_list.link),
+                        feature_list: FeatureList::promote(&gpos.feature_list.link),
+                        lookup_list: try_promote_from_null(&gpos.lookup_list.link)?,
                     })
                 })
                 .transpose()?
@@ -2823,9 +2976,9 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
                     TestResult::Ok(LayoutMetrics {
                         major_version: gsub.major_version,
                         minor_version: gsub.minor_version,
-                        script_list: ScriptList::try_promote(&gsub.script_list.link)?,
-                        feature_list: FeatureList::try_promote(&gsub.feature_list.link)?,
-                        lookup_list: LookupList::try_promote(&gsub.lookup_list.link)?,
+                        script_list: ScriptList::promote(&gsub.script_list.link),
+                        feature_list: FeatureList::promote(&gsub.feature_list.link),
+                        lookup_list: try_promote_from_null(&gsub.lookup_list.link)?,
                     })
                 })
                 .transpose()?
@@ -3062,14 +3215,19 @@ fn show_script_list(script_list: &ScriptList, conf: &Config) {
         show_items_elided(
             script_list,
             |ix, item| {
-                let ScriptTable {
+                let Some(ScriptTable {
                     default_lang_sys,
                     lang_sys_records,
-                } = &item.script;
+                }) = &item.script else {
+                    unreachable!("missing ScriptTable at index {ix} in ScriptList");
+                };
                 println!("\t\t[{ix}]: {}", format_magic(item.script_tag));
-                if let Some(langsys) = default_lang_sys {
-                    print!("\t\t    [Default LangSys]: ");
-                    show_langsys(langsys, conf);
+                match default_lang_sys {
+                    None => (),
+                    langsys @ Some(..) => {
+                        print!("\t\t    [Default LangSys]: ");
+                        show_langsys(langsys, conf);
+                    }
                 }
                 show_lang_sys_records(lang_sys_records, conf)
             },
@@ -3096,12 +3254,14 @@ fn show_lang_sys_records(lang_sys_records: &[LangSysRecord], conf: &Config) {
     }
 }
 
-fn show_langsys(lang_sys: &LangSys, conf: &Config) {
-    let LangSys {
+fn show_langsys(lang_sys: &Link<LangSys>, conf: &Config) {
+    let Some(LangSys {
         lookup_order_offset,
         required_feature_index,
         feature_indices,
-    } = lang_sys;
+    }) = lang_sys else {
+        unreachable!("missing langsys");
+    };
     debug_assert_eq!(*lookup_order_offset, 0);
     match required_feature_index {
         0xFFFF => print!("feature-indices: "),
@@ -3128,6 +3288,9 @@ fn show_feature_list(feature_list: &FeatureList, conf: &Config) {
                     feature,
                 } = item;
                 print!("\t\t[{ix}]: {}", format_magic(*feature_tag));
+                let feature = feature.as_ref().unwrap_or_else(|| {
+                    unreachable!("bad feature link (tag: {})", format_magic(*feature_tag));
+                });
                 show_feature_table(feature, conf);
             },
             conf.bookend_size,
@@ -3159,7 +3322,10 @@ fn show_lookup_list(lookup_list: &LookupList, ctxt: Ctxt, conf: &Config) {
         lookup_list,
         move |ix, table| {
             print!("\t\t[{ix}]: ");
-            show_lookup_table(table, ctxt, conf);
+            match table {
+                Some(table) => show_lookup_table(table, ctxt, conf),
+                None => unreachable!("None lookup-table at index {ix}"),
+            }
         },
         conf.bookend_size,
         |start, stop| format!("\t    (skipping LookupTables {}..{})", start, stop),
@@ -3277,7 +3443,21 @@ fn format_lookup_subtable(
             };
             ("SingleSubst", contents)
         }
-        LookupSubtable::MultipleSubst => ("MultipleSubst", format!("(..)")),
+        LookupSubtable::MultipleSubst(multi_subst) => {
+            let contents = {
+                let MultipleSubst {
+                    coverage,
+                    subst: MultipleSubstFormat1 { sequences },
+                } = &multi_subst;
+                // REVIEW - is this the right balance of specificity and brevity?
+                format!(
+                    "{}=>SequenceTable[{}]",
+                    format_coverage_table(coverage),
+                    sequences.len()
+                )
+            };
+            ("MultipleSubst", contents)
+        }
         LookupSubtable::AlternateSubst => ("AlternateSubst", format!("(..)")),
         LookupSubtable::LigatureSubst => ("LigatureSubst", format!("(..)")),
         LookupSubtable::SubstExtension => ("SubstExt", format!("(..)")),
@@ -3614,23 +3794,29 @@ fn show_lig_caret_list(lig_caret_list: &LigCaretList, conf: &Config) {
     )
 }
 
-fn format_caret_value(cv: &CaretValue) -> String {
+fn format_caret_value(cv: &Link<CaretValue>) -> String {
     match cv {
-        // REVIEW - this isn't really a canonical abbreviation, so we might adjust what we show for Design Units (Format 1)
-        CaretValue::DesignUnits(du) => format!("{du}du"),
-        CaretValue::ContourPoint(ix) => format!("#{ix}"),
-        CaretValue::DesignUnitsWithTable { coordinate, device } => match device {
-            DeviceOrVariationIndexTable::DeviceTable(dev_table) => {
-                format!("{}du+[{}]", coordinate, format_device_table(dev_table))
-            }
-            DeviceOrVariationIndexTable::VariationIndexTable(var_ix_table) => {
-                format!(
-                    "{}du+[{}]",
-                    coordinate,
-                    format_variation_index_table(var_ix_table)
-                )
-            }
-        },
+        None => unreachable!("caret value null link"),
+        Some(cv) => match cv {
+            // REVIEW - this isn't really a canonical abbreviation, so we might adjust what we show for Design Units (Format 1)
+            CaretValue::DesignUnits(du) => format!("{du}du"),
+            CaretValue::ContourPoint(ix) => format!("#{ix}"),
+            CaretValue::DesignUnitsWithTable { coordinate, device } => match device {
+                None => unreachable!("dev-table in caret value format 3 with null offset"),
+                Some(table) => match table {
+                    DeviceOrVariationIndexTable::DeviceTable(dev_table) => {
+                        format!("{}du+[{}]", coordinate, format_device_table(dev_table))
+                    }
+                    DeviceOrVariationIndexTable::VariationIndexTable(var_ix_table) => {
+                        format!(
+                            "{}du+[{}]",
+                            coordinate,
+                            format_variation_index_table(var_ix_table)
+                        )
+                    }
+                }
+            },
+        }
     }
 }
 

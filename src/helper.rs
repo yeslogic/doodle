@@ -663,7 +663,7 @@ pub fn record_repeat<const N: usize>(field_names: [&'static str; N], format: For
 
 /// Returns an Expr that evaluates to `true` if the given expression (of an arbitrary Uint type) is non-zero
 pub fn is_nonzero(expr: Expr) -> Expr {
-    is_within(expr, Bounds::exact(0))
+    expr_not(is_within(expr, Bounds::exact(0)))
 }
 
 /// Helper for constructing `Option::None` within the Expr model-language.
