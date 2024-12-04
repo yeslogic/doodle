@@ -2669,7 +2669,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ("chained_seq_rule_count", base.u16be()),
                     (
                         "chained_seq_rules",
-                        repeat_count(var("chained_seq_rule_count"), chained_sequence_rule),
+                        repeat_count(
+                            var("chained_seq_rule_count"),
+                            offset16_mandatory(var("table_start"), chained_sequence_rule, base),
+                        ),
                     ),
                 ])
             };

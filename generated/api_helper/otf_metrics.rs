@@ -138,7 +138,7 @@ trait FromNull: Sized {
 
 impl<T> FromNull for T
 where
-    T: std::default::Default
+    T: std::default::Default,
 {
     fn from_null() -> Self {
         T::default()
@@ -151,7 +151,7 @@ where
 
 impl<T, Original> Promote<Option<Original>> for T
 where
-    T: FromNull + Promote<Original>
+    T: FromNull + Promote<Original>,
 {
     fn promote(orig: &Option<Original>) -> Self {
         Self::renew(orig.as_ref().map(T::promote))
@@ -1728,14 +1728,17 @@ pub type OpentypeChainedSequenceContextFormat3 =
 
 pub type OpentypeChainedRuleSet =
     opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link;
-pub type OpentypeChainedRule = opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link_chained_seq_rules;
+pub type OpentypeChainedRule = opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link_chained_seq_rules_link;
 
 impl<Sem> Promote<OpentypeChainedRuleSet> for ChainedRuleSet<Sem>
 where
     ChainedRule<Sem>: Promote<OpentypeChainedRule>,
 {
     fn promote(orig: &OpentypeChainedRuleSet) -> Self {
-        promote_vec(&orig.chained_seq_rules)
+        orig.chained_seq_rules
+            .iter()
+            .map(|offset| promote_link(&offset.link))
+            .collect()
     }
 }
 
@@ -1753,7 +1756,7 @@ impl<Sem> Promote<OpentypeChainedRule> for ChainedRule<Sem> {
     }
 }
 
-type ChainedRuleSet<Sem> = Vec<ChainedRule<Sem>>;
+type ChainedRuleSet<Sem> = Vec<Link<ChainedRule<Sem>>>;
 
 #[derive(Clone)]
 struct ChainedRule<Sem> {
@@ -2461,11 +2464,9 @@ impl TryPromote<OpentypeValueRecord> for ValueRecord {
     >;
 
     fn try_promote(orig: &OpentypeValueRecord) -> Result<Self, Self::Error> {
-        let follow = |device: &Option<opentype_common_value_record_x_advance_device>| {
-            match device {
-                Some(dev) => try_promote_opt(&dev.link),
-                None => Ok(None),
-            }
+        let follow = |device: &Option<opentype_common_value_record_x_advance_device>| match device {
+            Some(dev) => try_promote_opt(&dev.link),
+            None => Ok(None),
         };
         Ok(ValueRecord {
             x_placement: orig.x_placement.map(as_s16),
@@ -3218,7 +3219,8 @@ fn show_script_list(script_list: &ScriptList, conf: &Config) {
                 let Some(ScriptTable {
                     default_lang_sys,
                     lang_sys_records,
-                }) = &item.script else {
+                }) = &item.script
+                else {
                     unreachable!("missing ScriptTable at index {ix} in ScriptList");
                 };
                 println!("\t\t[{ix}]: {}", format_magic(item.script_tag));
@@ -3259,7 +3261,8 @@ fn show_langsys(lang_sys: &Link<LangSys>, conf: &Config) {
         lookup_order_offset,
         required_feature_index,
         feature_indices,
-    }) = lang_sys else {
+    }) = lang_sys
+    else {
         unreachable!("missing langsys");
     };
     debug_assert_eq!(*lookup_order_offset, 0);
@@ -3814,9 +3817,9 @@ fn format_caret_value(cv: &Link<CaretValue>) -> String {
                             format_variation_index_table(var_ix_table)
                         )
                     }
-                }
+                },
             },
-        }
+        },
     }
 }
 
