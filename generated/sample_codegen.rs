@@ -327,7 +327,7 @@ distance: u16
 }
 
 #[derive(Debug, Clone)]
-pub enum deflate_main_codes__dupX1 { literal(u8), reference(deflate_main_codes_reference) }
+pub enum deflate_main_codes { literal(u8), reference(deflate_main_codes_reference) }
 
 #[derive(Debug, Clone)]
 pub struct deflate_dynamic_huffman {
@@ -340,7 +340,7 @@ literal_length_distance_alphabet_code_lengths_value: Vec<u8>,
 literal_length_alphabet_code_lengths_value: Vec<u8>,
 distance_alphabet_code_lengths_value: Vec<u8>,
 codes: Vec<deflate_dynamic_huffman_codes>,
-codes_values: Vec<deflate_main_codes__dupX1>
+codes_values: Vec<deflate_main_codes>
 }
 
 #[derive(Debug, Clone)]
@@ -360,7 +360,7 @@ extra: Option<deflate_fixed_huffman_codes_values>
 #[derive(Debug, Clone)]
 pub struct deflate_fixed_huffman {
 codes: Vec<deflate_fixed_huffman_codes>,
-codes_values: Vec<deflate_main_codes__dupX1>
+codes_values: Vec<deflate_main_codes>
 }
 
 #[derive(Debug, Clone)]
@@ -369,23 +369,23 @@ align: (),
 len: u16,
 nlen: u16,
 bytes: Vec<u8>,
-codes_values: Vec<deflate_main_codes__dupX1>
+codes_values: Vec<deflate_main_codes>
 }
 
 #[derive(Debug, Clone)]
-pub enum deflate_main_codes { dynamic_huffman(deflate_dynamic_huffman), fixed_huffman(deflate_fixed_huffman), uncompressed(deflate_uncompressed) }
+pub enum deflate_main_codes__dupX1 { dynamic_huffman(deflate_dynamic_huffman), fixed_huffman(deflate_fixed_huffman), uncompressed(deflate_uncompressed) }
 
 #[derive(Debug, Clone)]
 pub struct deflate_block {
 r#final: u8,
 r#type: u8,
-data: deflate_main_codes
+data: deflate_main_codes__dupX1
 }
 
 #[derive(Debug, Clone)]
 pub struct deflate_main {
 blocks: Vec<deflate_block>,
-codes: Vec<deflate_main_codes__dupX1>,
+codes: Vec<deflate_main_codes>,
 inflate: Vec<u8>
 }
 
@@ -2111,7 +2111,7 @@ lookup_list_index: u16
 }
 
 #[derive(Debug, Clone)]
-pub struct opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link_chained_seq_rules {
+pub struct opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link_chained_seq_rules_link {
 backtrack_glyph_count: u16,
 backtrack_sequence: Vec<u16>,
 input_glyph_count: u16,
@@ -2120,6 +2120,12 @@ lookahead_glyph_count: u16,
 lookahead_sequence: Vec<u16>,
 seq_lookup_count: u16,
 seq_lookup_records: Vec<opentype_common_sequence_lookup>
+}
+
+#[derive(Debug, Clone)]
+pub struct opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link_chained_seq_rules {
+offset: u16,
+link: Option<opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link_chained_seq_rules_link>
 }
 
 #[derive(Debug, Clone)]
@@ -9002,6 +9008,25 @@ let chained_seq_rules = ((|| PResult::Ok({
 let mut accum = Vec::new();
 for _ in 0..chained_seq_rule_count {
 accum.push({
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
+0 => {
+true
+},
+
+_ => {
+false
+}
+} {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
+let ret = ((|| PResult::Ok({
+let inner = {
 let backtrack_glyph_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let backtrack_sequence = ((|| PResult::Ok({
 let mut accum = Vec::new();
@@ -9034,7 +9059,19 @@ accum.push((Decoder_opentype_common_sequence_lookup(_input))?);
 }
 accum
 }))())?;
-opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link_chained_seq_rules { backtrack_glyph_count, backtrack_sequence, input_glyph_count, input_sequence, lookahead_glyph_count, lookahead_sequence, seq_lookup_count, seq_lookup_records }
+opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link_chained_seq_rules_link { backtrack_glyph_count, backtrack_sequence, input_glyph_count, input_sequence, lookahead_glyph_count, lookahead_sequence, seq_lookup_count, seq_lookup_records }
+};
+((|val: opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link_chained_seq_rules_link| PResult::Ok(Some(val)))(inner))?
+}))())?;
+_input.close_peek_context()?;
+ret
+},
+
+false => {
+None
+}
+}))())?;
+opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link_chained_seq_rules { offset, link }
 });
 }
 accum
@@ -9224,6 +9261,25 @@ let chained_seq_rules = ((|| PResult::Ok({
 let mut accum = Vec::new();
 for _ in 0..chained_seq_rule_count {
 accum.push({
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
+0 => {
+true
+},
+
+_ => {
+false
+}
+} {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
+let ret = ((|| PResult::Ok({
+let inner = {
 let backtrack_glyph_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let backtrack_sequence = ((|| PResult::Ok({
 let mut accum = Vec::new();
@@ -9256,7 +9312,19 @@ accum.push((Decoder_opentype_common_sequence_lookup(_input))?);
 }
 accum
 }))())?;
-opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link_chained_seq_rules { backtrack_glyph_count, backtrack_sequence, input_glyph_count, input_sequence, lookahead_glyph_count, lookahead_sequence, seq_lookup_count, seq_lookup_records }
+opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link_chained_seq_rules_link { backtrack_glyph_count, backtrack_sequence, input_glyph_count, input_sequence, lookahead_glyph_count, lookahead_sequence, seq_lookup_count, seq_lookup_records }
+};
+((|val: opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link_chained_seq_rules_link| PResult::Ok(Some(val)))(inner))?
+}))())?;
+_input.close_peek_context()?;
+ret
+},
+
+false => {
+None
+}
+}))())?;
+opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link_chained_seq_rules { offset, link }
 });
 }
 accum
@@ -13932,26 +14000,26 @@ accum.push(elem);
 accum
 }))())?;
 let codes = ((|| PResult::Ok((try_flat_map_vec(blocks.iter().cloned(), |x: deflate_block| PResult::Ok(match x.data.clone() {
-deflate_main_codes::uncompressed(y) => {
+deflate_main_codes__dupX1::uncompressed(y) => {
 y.codes_values.clone()
 },
 
-deflate_main_codes::fixed_huffman(y) => {
+deflate_main_codes__dupX1::fixed_huffman(y) => {
 y.codes_values.clone()
 },
 
-deflate_main_codes::dynamic_huffman(y) => {
+deflate_main_codes__dupX1::dynamic_huffman(y) => {
 y.codes_values.clone()
 }
 })))?))())?;
-let inflate = ((|| PResult::Ok((try_flat_map_append_vec(codes.iter().cloned(), |tuple_var: (&Vec<u8>, deflate_main_codes__dupX1)| PResult::Ok(match tuple_var {
+let inflate = ((|| PResult::Ok((try_flat_map_append_vec(codes.iter().cloned(), |tuple_var: (&Vec<u8>, deflate_main_codes)| PResult::Ok(match tuple_var {
 (buffer, symbol) => {
 match symbol {
-deflate_main_codes__dupX1::literal(b) => {
+deflate_main_codes::literal(b) => {
 [b].to_vec()
 },
 
-deflate_main_codes__dupX1::reference(r) => {
+deflate_main_codes::reference(r) => {
 {
 let ix = (try_sub!((buffer.len()) as u32, (r.distance.clone()) as u32)) as usize;
 (slice_ext(&buffer, ix..ix + (((r.length.clone()) as u32) as usize))).to_vec()
@@ -13976,17 +14044,17 @@ let field1 = ((|| PResult::Ok((Decoder136(_input))?))())?;
 let data = ((|| PResult::Ok(match r#type {
 0u8 => {
 let inner = (Decoder_deflate_uncompressed(_input))?;
-deflate_main_codes::uncompressed(inner)
+deflate_main_codes__dupX1::uncompressed(inner)
 },
 
 1u8 => {
 let inner = (Decoder_deflate_fixed_huffman(_input))?;
-deflate_main_codes::fixed_huffman(inner)
+deflate_main_codes__dupX1::fixed_huffman(inner)
 },
 
 2u8 => {
 let inner = (Decoder_deflate_dynamic_huffman(_input))?;
-deflate_main_codes::dynamic_huffman(inner)
+deflate_main_codes__dupX1::dynamic_huffman(inner)
 },
 
 _other => {
@@ -14067,7 +14135,7 @@ let field7 = ((|| PResult::Ok((Decoder136(_input))?))())?;
 }
 accum
 }))())?;
-let codes_values = ((|| PResult::Ok((try_flat_map_vec(bytes.iter().cloned(), |x: u8| PResult::Ok([deflate_main_codes__dupX1::literal(x)].to_vec())))?))())?;
+let codes_values = ((|| PResult::Ok((try_flat_map_vec(bytes.iter().cloned(), |x: u8| PResult::Ok([deflate_main_codes::literal(x)].to_vec())))?))())?;
 PResult::Ok(deflate_uncompressed { align, len, nlen, bytes, codes_values })
 }
 
@@ -14846,7 +14914,7 @@ let codes_values = ((|| PResult::Ok((try_flat_map_vec(codes.iter().cloned(), |x:
 257u16..=285u16 => {
 match x.extra.clone() {
 Some(ref rec) => {
-[deflate_main_codes__dupX1::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
+[deflate_main_codes::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
 },
 
 _ => {
@@ -14860,7 +14928,7 @@ return Err(ParseError::ExcludedBranch(4350808036978594792u64));
 },
 
 _ => {
-[deflate_main_codes__dupX1::literal((x.code.clone()) as u8)].to_vec()
+[deflate_main_codes::literal((x.code.clone()) as u8)].to_vec()
 }
 })))?))())?;
 PResult::Ok(deflate_fixed_huffman { codes, codes_values })
@@ -15546,7 +15614,7 @@ let codes_values = ((|| PResult::Ok((try_flat_map_vec(codes.iter().cloned(), |x:
 257u16..=285u16 => {
 match x.extra.clone() {
 Some(ref rec) => {
-[deflate_main_codes__dupX1::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
+[deflate_main_codes::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
 },
 
 _ => {
@@ -15560,7 +15628,7 @@ return Err(ParseError::ExcludedBranch(4350808036978594792u64));
 },
 
 _ => {
-[deflate_main_codes__dupX1::literal((x.code.clone()) as u8)].to_vec()
+[deflate_main_codes::literal((x.code.clone()) as u8)].to_vec()
 }
 })))?))())?;
 PResult::Ok(deflate_dynamic_huffman { hlit, hdist, hclen, code_length_alphabet_code_lengths, literal_length_distance_alphabet_code_lengths, literal_length_distance_alphabet_code_lengths_value, literal_length_alphabet_code_lengths_value, distance_alphabet_code_lengths_value, codes, codes_values })
