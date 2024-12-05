@@ -1,13 +1,17 @@
 mod name;
-mod trace;
 pub(crate) mod rust_ast;
+mod trace;
 pub(crate) mod typed_decoder;
 pub(crate) mod typed_format;
 use rebind::Rebindable;
 pub use rust_ast::ToFragment;
 
 use crate::{
-    byte_set::ByteSet, parser::error::TraceHash, typecheck::{TypeChecker, UScope, UVar}, Arith, BaseType, DynFormat, Expr, Format, FormatModule, IntRel, Label, MatchTree, Pattern, UnaryOp, ValueType
+    byte_set::ByteSet,
+    parser::error::TraceHash,
+    typecheck::{TypeChecker, UScope, UVar},
+    Arith, BaseType, DynFormat, Expr, Format, FormatModule, IntRel, Label, MatchTree, Pattern,
+    UnaryOp, ValueType,
 };
 
 use std::{
@@ -1396,7 +1400,7 @@ impl SimpleLogic<GTExpr> {
                     ReturnKind::Keyword,
                     RustExpr::err(
                         RustExpr::scoped(["ParseError"], "FailToken")
-                            .call_with([RustExpr::u64lit(get_trace(&()))])
+                            .call_with([RustExpr::u64lit(get_trace(&()))]),
                     ),
                 )],
                 None,
@@ -2675,7 +2679,7 @@ impl ToAst for DerivedLogic<GTExpr> {
                         ReturnKind::Keyword,
                         RustExpr::err(
                             RustExpr::scoped(["ParseError"], "FalsifiedWhere")
-                                .call_with([RustExpr::u64lit(get_trace(&()))])
+                                .call_with([RustExpr::u64lit(get_trace(&()))]),
                         ),
                     )];
                     RustExpr::Control(Box::new(RustControl::If(

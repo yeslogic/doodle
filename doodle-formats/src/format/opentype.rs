@@ -56,23 +56,30 @@ fn embedded_singleton_alternation<const OUTER: usize, const INNER: usize>(
                 has_discriminant = has_discriminant || name == disc_field;
                 accum.push((Label::Borrowed(name), format));
             }
-            accum.push(
-                (Label::Borrowed(intermediate), match_variant(
+            accum.push((
+                Label::Borrowed(intermediate),
+                match_variant(
                     var(disc_field),
                     [
                         (Pattern::U16(disc_value), variant_name, record_inner),
                         // REVIEW - we could technically add an explicit catch-all but it might be simpler to leave it as an implicit unhandled case
-                    ]
-                ))
+                    ],
+                ),
+            ));
+            assert!(
+                has_discriminant,
+                "missing discriminant field `{disc_field}` in outer-field set"
             );
-            assert!(has_discriminant, "missing discriminant field `{disc_field}` in outer-field set");
             accum
         }
         NestingKind::FlattenInner => {
             let mut accum = Vec::with_capacity(OUTER + INNER);
             for (name, format) in outer_fields {
                 if name == disc_field {
-                    accum.push((Label::Borrowed(name), where_lambda(format, name, expr_eq(var(name), Expr::U16(disc_value)))));
+                    accum.push((
+                        Label::Borrowed(name),
+                        where_lambda(format, name, expr_eq(var(name), Expr::U16(disc_value))),
+                    ));
                 } else {
                     accum.push((Label::Borrowed(name), format));
                 }
@@ -85,7 +92,6 @@ fn embedded_singleton_alternation<const OUTER: usize, const INNER: usize>(
     };
     Format::Record(accum)
 }
-
 
 fn prepend_field_flags_bits8(
     pre_field: &'static str,
@@ -457,8 +463,7 @@ fn link_checked(abs_offset: Expr, format: Format) -> Format {
                 Box::new(relativize_offset(abs_offset, var("__here"))),
                 Box::new(format),
             ),
-        )
-
+        ),
     )
 }
 
@@ -2968,23 +2973,25 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ]);
 
                 embedded_singleton_alternation(
-                    [("table_start", pos32()),
-                    ("subst_format", base.u16be()),
-                    (
-                        "coverage",
-                        offset16_mandatory(var("table_start"), coverage_table.call(), base),
-                    )],
+                    [
+                        ("table_start", pos32()),
+                        ("subst_format", base.u16be()),
+                        (
+                            "coverage",
+                            offset16_mandatory(var("table_start"), coverage_table.call(), base),
+                        ),
+                    ],
                     ("subst_format", 1),
-                    [("sequence_count", base.u16be()),
-                     ("sequences", repeat_count(
-                        var("sequence_count"),
-                            offset16_mandatory(
-                                var("table_start"),
-                                sequence_table,
-                                base,
+                    [
+                        ("sequence_count", base.u16be()),
+                        (
+                            "sequences",
+                            repeat_count(
+                                var("sequence_count"),
+                                offset16_mandatory(var("table_start"), sequence_table, base),
                             ),
                         ),
-                    )],
+                    ],
                     "subst",
                     "Format1",
                     NestingKind::SingletonADT,
@@ -2993,19 +3000,31 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             let alternate_subst = {
                 let alternate_set = record([
                     ("glyph_count", base.u16be()),
-                    ("alternate_glyph_ids", repeat_count(var("glyph_count"), base.u16be())),
+                    (
+                        "alternate_glyph_ids",
+                        repeat_count(var("glyph_count"), base.u16be()),
+                    ),
                 ]);
 
                 embedded_singleton_alternation(
                     [
                         ("table_start", pos32()),
                         ("subst_format", base.u16be()),
-                        ("coverage", offset16_mandatory(var("table_start"), coverage_table.call(), base)),
+                        (
+                            "coverage",
+                            offset16_mandatory(var("table_start"), coverage_table.call(), base),
+                        ),
                     ],
                     ("subst_format", 1),
                     [
                         ("alternate_set_count", base.u16be()),
-                        ("alternate_sets", repeat_count(var("alternate_set_count"), offset16_mandatory(var("table_start"), alternate_set, base)))
+                        (
+                            "alternate_sets",
+                            repeat_count(
+                                var("alternate_set_count"),
+                                offset16_mandatory(var("table_start"), alternate_set, base),
+                            ),
+                        ),
                     ],
                     "subst",
                     "Format1",
