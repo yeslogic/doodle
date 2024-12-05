@@ -15,9 +15,10 @@ macro_rules! try_sub {
         (match $x.checked_sub($y) {
             Some(z) => z,
             None => {
-                return Err(ParseError::UnsoundOperation(Some(
-                    "underflow on subtraction",
-                ), $trace))
+                return Err(ParseError::UnsoundOperation(
+                    Some("underflow on subtraction"),
+                    $trace,
+                ))
             }
         })
     };
@@ -278,7 +279,10 @@ pub(crate) mod huffman {
                 }
                 (this, []) | (this @ HuffmanNode::Leaf(..), &[_, ..]) => {
                     let trace = crate::parser::error::mk_trace(&(this, suffix, value));
-                    Err(ParseError::UnsoundOperation(Some("huffman code collision"), trace))
+                    Err(ParseError::UnsoundOperation(
+                        Some("huffman code collision"),
+                        trace,
+                    ))
                 }
                 (this @ &mut HuffmanNode::Empty, &[b @ (0 | 1), ..]) => {
                     let mut children = [Box::new(HuffmanNode::Empty), Box::new(HuffmanNode::Empty)];
