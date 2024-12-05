@@ -11,13 +11,13 @@ pub use crate::parser::{
 /// Performs a checked_sub operation, returning an error if the result would be negative
 #[macro_export]
 macro_rules! try_sub {
-    ( $x:expr, $y:expr ) => {
+    ( $x:expr, $y:expr, $trace:expr ) => {
         (match $x.checked_sub($y) {
             Some(z) => z,
             None => {
                 return Err(ParseError::UnsoundOperation(Some(
                     "underflow on subtraction",
-                )))
+                ), $trace))
             }
         })
     };
@@ -248,7 +248,7 @@ pub(crate) mod huffman {
         tree_root: HuffmanNode,
     }
 
-    #[derive(Clone, Debug, Default)]
+    #[derive(Clone, Debug, Default, Hash)]
     pub(super) enum HuffmanNode {
         #[default]
         Empty,
@@ -276,8 +276,9 @@ pub(crate) mod huffman {
                     *this = HuffmanNode::Leaf(value);
                     Ok(())
                 }
-                (_, []) | (HuffmanNode::Leaf(..), &[_, ..]) => {
-                    Err(ParseError::UnsoundOperation(Some("huffman code collision")))
+                (this, []) | (this @ HuffmanNode::Leaf(..), &[_, ..]) => {
+                    let trace = crate::parser::error::mk_trace(&(this, suffix, value));
+                    Err(ParseError::UnsoundOperation(Some("huffman code collision"), trace))
                 }
                 (this @ &mut HuffmanNode::Empty, &[b @ (0 | 1), ..]) => {
                     let mut children = [Box::new(HuffmanNode::Empty), Box::new(HuffmanNode::Empty)];

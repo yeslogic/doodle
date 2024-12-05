@@ -1,9 +1,12 @@
 use clap::Parser;
 use doodle_gencode::api_helper::otf_metrics::{Config, ConfigBuilder};
 use doodle_gencode::api_helper::*;
+use lookup_subtable::{analyze_font_lookups, collate_lookups_table};
 
 #[derive(Parser)]
 struct Params {
+    #[arg(long, default_value_t = false)]
+    tabulate_lookups: bool,
     #[arg(long, default_value_t = false)]
     extra_only: bool,
     paths: Vec<String>,
@@ -28,10 +31,26 @@ pub fn main() -> std::io::Result<()> {
                 .map(|entry| format!("test-fonts/{}", entry.file_name().to_string_lossy())),
         )
     };
-    do_work(iter, conf)
+    do_work(iter, conf, params.tabulate_lookups)
 }
 
-fn do_work(iter: impl Iterator<Item = String>, conf: Config) -> std::io::Result<()> {
+fn do_work(iter: impl Iterator<Item = String>, conf: Config, tabulate_lookups: bool) -> std::io::Result<()> {
+    if tabulate_lookups {
+        let mut samples = Vec::new();
+        for name in iter {
+            match analyze_font_lookups(name.as_str()) {
+                Ok(lookups) => {
+                    eprintln!("Success!");
+                    samples.push((name.to_string(), lookups))
+                }
+                Err(e) => {
+                    eprintln!("Failed! ({e})")
+                }
+            }
+        }
+        collate_lookups_table(&samples);
+        return Ok(());
+    }
     let mut accum = Vec::new();
     for name in iter {
         eprint!("[{name}]: ...");
