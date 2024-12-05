@@ -1,4 +1,3 @@
-
 thread_local! {
     pub(crate) static TRACE_SEED: std::cell::RefCell<u64> = const { std::cell::RefCell::new(0) };
 }
