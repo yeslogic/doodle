@@ -1521,7 +1521,9 @@ impl TryPromote<OpentypeGsubLookupSubtable> for LookupSubtable {
             OpentypeGsubLookupSubtable::MultipleSubst(multi_subst) => {
                 LookupSubtable::MultipleSubst(MultipleSubst::promote(multi_subst))
             }
-            OpentypeGsubLookupSubtable::AlternateSubst => LookupSubtable::AlternateSubst,
+            OpentypeGsubLookupSubtable::AlternateSubst(alt_subst) => {
+                LookupSubtable::AlternateSubst(AlternateSubst::promote(alt_subst))
+            }
             OpentypeGsubLookupSubtable::LigatureSubst => LookupSubtable::LigatureSubst,
             OpentypeGsubLookupSubtable::SequenceContext(seq_ctx) => {
                 LookupSubtable::SequenceContext(SequenceContext::promote(seq_ctx))
@@ -1583,10 +1585,46 @@ enum LookupSubtable {
 
     SingleSubst(SingleSubst),
     MultipleSubst(MultipleSubst),
-    AlternateSubst,
+    AlternateSubst(AlternateSubst),
     LigatureSubst,
     SubstExtension,
     ReverseChainSingleSubst,
+}
+
+pub type OpentypeAlternateSubst =
+    opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_AlternateSubst;
+
+
+impl Promote<OpentypeAlternateSubst> for AlternateSubst {
+    fn promote(orig: &OpentypeAlternateSubst) -> Self {
+        AlternateSubst {
+            coverage: CoverageTable::promote(&orig.coverage.link),
+            alternate_sets: orig.alternate_sets.iter().map(|offset| promote_link(&offset.link)).collect(),
+        }
+    }
+}
+
+pub type OpentypeAlternateSet =
+    opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_AlternateSubst_alternate_sets_link;
+
+impl Promote<OpentypeAlternateSet> for AlternateSet {
+    fn promote(orig: &OpentypeAlternateSet) -> Self {
+        AlternateSet {
+            alternate_glyph_ids: orig.alternate_glyph_ids.clone(),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+struct AlternateSet {
+    alternate_glyph_ids: Vec<u16>,
+}
+
+
+#[derive(Clone, Debug)]
+struct AlternateSubst {
+    coverage: CoverageTable,
+    alternate_sets: Vec<Link<AlternateSet>>,
 }
 
 pub type OpentypeMultipleSubst =
@@ -3461,7 +3499,14 @@ fn format_lookup_subtable(
             };
             ("MultipleSubst", contents)
         }
-        LookupSubtable::AlternateSubst => ("AlternateSubst", format!("(..)")),
+        LookupSubtable::AlternateSubst(alt_subst) => {
+            let contents = match alt_subst {
+                AlternateSubst { coverage, alternate_sets } => {
+                    format!("{}=>{}", format_coverage_table(coverage), format_alternate_sets(alternate_sets))
+                }
+            };
+            ("AlternateSubst", contents)
+        },
         LookupSubtable::LigatureSubst => ("LigatureSubst", format!("(..)")),
         LookupSubtable::SubstExtension => ("SubstExt", format!("(..)")),
         LookupSubtable::ReverseChainSingleSubst => ("RevChainSingleSubst", format!("(..)")),
@@ -3568,6 +3613,34 @@ fn format_lookup_subtable(
         format!("{label}{contents}")
     } else {
         contents
+    }
+}
+
+fn format_alternate_sets(alt_sets: &[Option<AlternateSet>]) -> String {
+    fn format_alternate_set(alt_set: &AlternateSet) -> String {
+        const ALT_GLYPH_BOOKEND: usize = 2;
+        format_items_inline(
+            &alt_set.alternate_glyph_ids,
+            |glyph_id| format!("{}", glyph_id),
+            ALT_GLYPH_BOOKEND,
+            |_| "..".to_string(),
+        )
+    }
+    match alt_sets {
+        [] => unreachable!("bad AlternateSet[]: empty"),
+        [None] => unreachable!("bad AlternateSet[1]: none"),
+        [Some(ref set)] => {
+            format_alternate_set(set)
+        }
+        more => {
+            const ALT_SET_BOOKEND:usize = 1;
+            format_items_inline(
+                more,
+                |link| if let Some(set) = link { format_alternate_set(set) } else { unreachable!("missing link") },
+                ALT_SET_BOOKEND,
+                |count| format!("...({count} skipped)..."),
+            )
+        }
     }
 }
 
@@ -4316,4 +4389,191 @@ fn show_glyph_metric(ix: usize, glyf: &GlyphMetric) {
             );
         }
     }
+}
+
+pub mod lookup_subtable {
+    use super::{OpentypeGposLookupSubtable, OpentypeGsubLookupSubtable, Parser, TestResult, UnknownValueError};
+    use crate::{Decoder_opentype_main, opentype_font_directory, opentype_ttc_header_header};
+
+    #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Default)]
+    struct Both {
+        gsub: bool,
+        gpos: bool,
+    }
+
+    #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Default)]
+    pub struct LookupSet {
+        single_pos: bool,
+        pair_pos: bool,
+        cursive_pos: bool,
+        mark_base_pos: bool,
+        mark_lig_pos: bool,
+        mark_mark_pos: bool,
+        pos_extension: bool,
+
+        sequence_context: Both,
+        chained_sequence_context: Both,
+
+        single_subst: bool,
+        multiple_subst: bool,
+        alternate_subst: bool,
+        ligature_subst: bool,
+        subst_extension: bool,
+        reverse_chain_single_subst: bool,
+    }
+
+    pub enum SingleOrMulti<T> {
+        Single(T),
+        Multi(Vec<Option<T>>),
+    }
+
+    pub fn analyze_font_lookups(test_file: &str) -> TestResult<SingleOrMulti<LookupSet>> {
+        let buffer = std::fs::read(std::path::Path::new(test_file))?;
+        let mut input = Parser::new(&buffer);
+        let dat = Decoder_opentype_main(&mut input)?;
+        match dat.font.directory {
+            opentype_font_directory::TTCHeader(multi) => {
+                let ret = match multi.header {
+                    opentype_ttc_header_header::UnknownVersion(n) => {
+                        return Err(Box::new(UnknownValueError {
+                            what: format!("ttc header version"),
+                            bad_value: n,
+                        }));
+                    }
+                    opentype_ttc_header_header::Version1(v1header) => {
+                        let mut lookup_metrics = Vec::with_capacity(v1header.table_directories.len());
+                        for font in v1header.table_directories.iter() {
+                            let tmp = match &font.link {
+                                Some(dir) => Some(analyze_table_directory_lookups(dir)),
+                                None => None,
+                            };
+                            lookup_metrics.push(tmp);
+                        }
+                        lookup_metrics
+                    }
+                    opentype_ttc_header_header::Version2(v2header) => {
+                        let mut lookup_metrics = Vec::with_capacity(v2header.table_directories.len());
+                        for font in v2header.table_directories.iter() {
+                            let tmp = match &font.link {
+                                Some(dir) => Some(analyze_table_directory_lookups(dir)),
+                                None => None,
+                            };
+                            lookup_metrics.push(tmp);
+                        }
+                        lookup_metrics
+                    }
+                };
+                Ok(SingleOrMulti::Multi(ret))
+            }
+            opentype_font_directory::TableDirectory(single) => Ok(
+                SingleOrMulti::Single(analyze_table_directory_lookups(&single)),
+            ),
+        }
+    }
+
+    fn analyze_table_directory_lookups(dir: &super::opentype_table_directory) -> LookupSet {
+        let mut ret = LookupSet::default();
+        if let Some(lookup_list) = dir.table_links.gpos.as_ref().and_then(|gpos| gpos.lookup_list.link.as_ref()) {
+            for entry in lookup_list.lookups.iter() {
+                if let Some(subtable) = entry.link.as_ref().and_then(|lookup| lookup.subtables.first().and_then(|subtable| subtable.link.as_ref())) {
+                    match subtable {
+                        OpentypeGposLookupSubtable::SinglePos(..) => ret.single_pos = true,
+                        OpentypeGposLookupSubtable::PairPos(..) => ret.pair_pos = true,
+                        OpentypeGposLookupSubtable::CursivePos(..) => ret.cursive_pos = true,
+                        OpentypeGposLookupSubtable::MarkBasePos => ret.mark_base_pos = true,
+                        OpentypeGposLookupSubtable::MarkLigPos => ret.mark_lig_pos = true,
+                        OpentypeGposLookupSubtable::MarkMarkPos => ret.mark_mark_pos = true,
+                        OpentypeGposLookupSubtable::PosExtension => ret.pos_extension = true,
+                        OpentypeGposLookupSubtable::SequenceContext(..) => ret.sequence_context.gpos = true,
+                        OpentypeGposLookupSubtable::ChainedSequenceContext(..) => ret.chained_sequence_context.gpos = true,
+                    }
+                }
+            }
+        }
+        if let Some(lookup_list) = dir.table_links.gsub.as_ref().and_then(|gsub| gsub.lookup_list.link.as_ref()) {
+            for entry in lookup_list.lookups.iter() {
+                if let Some(subtable) = entry.link.as_ref().and_then(|lookup| lookup.subtables.first().and_then(|subtable| subtable.link.as_ref())) {
+                    match subtable {
+                        OpentypeGsubLookupSubtable::SingleSubst(..) => ret.single_subst = true,
+                        OpentypeGsubLookupSubtable::MultipleSubst(..) => ret.multiple_subst = true,
+                        OpentypeGsubLookupSubtable::AlternateSubst(..) => ret.alternate_subst = true,
+                        OpentypeGsubLookupSubtable::LigatureSubst => ret.ligature_subst = true,
+                        OpentypeGsubLookupSubtable::SubstExtension => ret.subst_extension = true,
+                        OpentypeGsubLookupSubtable::ReverseChainSingleSubst => ret.reverse_chain_single_subst = true,
+                        OpentypeGsubLookupSubtable::SequenceContext(..) => ret.sequence_context.gsub = true,
+                        OpentypeGsubLookupSubtable::ChainedSequenceContext(..) => ret.chained_sequence_context.gsub = true,
+                    }
+                }
+            }
+        }
+        ret
+    }
+
+    pub fn collate_lookups_table<S: std::fmt::Display>(samples: &[(S, SingleOrMulti<LookupSet>)]) {
+        let header = [
+            "Pos1",
+            "Pos2",
+            "Pos3",
+            "Pos4",
+            "Pos5",
+            "Pos6",
+            "Pos7",
+            "Pos8",
+            "Pos9",
+            "Sub1",
+            "Sub2",
+            "Sub3",
+            "Sub4",
+            "Sub5",
+            "Sub6",
+            "Sub7",
+            "Sub8",
+            "Location",
+        ];
+        let header_line = header.join("\t");
+
+        fn write_lookups(buf: &mut String, lookups: LookupSet) {
+            let show_bool = |buf: &mut String, value: bool| if value { buf.push_str("✅\t") } else { buf.push_str("❌\t") };
+
+            show_bool(buf, lookups.single_pos);
+            show_bool(buf, lookups.pair_pos);
+            show_bool(buf, lookups.cursive_pos);
+            show_bool(buf, lookups.mark_base_pos);
+            show_bool(buf, lookups.mark_lig_pos);
+            show_bool(buf, lookups.mark_mark_pos);
+            show_bool(buf, lookups.pos_extension);
+            show_bool(buf, lookups.sequence_context.gpos);
+            show_bool(buf, lookups.chained_sequence_context.gpos);
+            show_bool(buf, lookups.single_subst);
+            show_bool(buf, lookups.multiple_subst);
+            show_bool(buf, lookups.alternate_subst);
+            show_bool(buf, lookups.ligature_subst);
+            show_bool(buf, lookups.subst_extension);
+            show_bool(buf, lookups.reverse_chain_single_subst);
+            show_bool(buf, lookups.sequence_context.gsub);
+            show_bool(buf, lookups.chained_sequence_context.gsub);
+        }
+
+        println!("{header_line}");
+        for (sample, lookups) in samples.iter() {
+            match lookups {
+                SingleOrMulti::Single(lookups) => {
+                    let mut line = String::new();
+                    write_lookups(&mut line, *lookups);
+                    println!("{line}{sample}")
+                }
+                SingleOrMulti::Multi(font_lookups) => {
+                    for (ix, opt_lookups) in font_lookups.iter().enumerate() {
+                        if let Some(lookups) = opt_lookups {
+                            let mut line = String::new();
+                            write_lookups(&mut line, *lookups);
+                            println!("{line}{sample}[{ix}]")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+
 }

@@ -1,4 +1,5 @@
 mod name;
+mod trace;
 pub(crate) mod rust_ast;
 pub(crate) mod typed_decoder;
 pub(crate) mod typed_format;
@@ -6,10 +7,7 @@ use rebind::Rebindable;
 pub use rust_ast::ToFragment;
 
 use crate::{
-    byte_set::ByteSet,
-    typecheck::{TypeChecker, UScope, UVar},
-    Arith, BaseType, DynFormat, Expr, Format, FormatModule, IntRel, Label, MatchTree, Pattern,
-    UnaryOp, ValueType,
+    byte_set::ByteSet, parser::error::TraceHash, typecheck::{TypeChecker, UScope, UVar}, Arith, BaseType, DynFormat, Expr, Format, FormatModule, IntRel, Label, MatchTree, Pattern, UnaryOp, ValueType
 };
 
 use std::{
@@ -28,13 +26,26 @@ use self::{
     typed_decoder::{GTCompiler, GTDecoder, TypedDecoder},
     typed_format::TypedDynFormat,
 };
+use trace::get_and_increment_seed;
 
 pub(crate) mod ixlabel;
 pub(crate) use ixlabel::IxLabel;
 
-fn get_trace(state: &impl std::hash::Hash) -> u64 {
+/// Produces a probabilistically unique TraceHash based on the value of a thread-local counter-state
+/// (and post-increments the counter).
+///
+/// In order to produce output values that are more lexically distinct than the initially small
+/// seed-values, performs a hashing operation over the raw seed.
+fn get_trace(_salt: &impl std::hash::Hash) -> TraceHash {
     let mut hasher = std::hash::DefaultHasher::new();
-    state.hash(&mut hasher);
+    let seed = get_and_increment_seed();
+
+    // Because the seed will always be unique, salting is unnecessary in the current model
+    // In a context where we want the seed to remain small, we might re-use it with different
+    // locally-distinct salt values
+
+    // _salt.hash(&mut hasher);
+    seed.hash(&mut hasher);
 
     hasher.finish()
 }
@@ -840,7 +851,7 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                 Arith::BoolOr => InfixOperator::BoolOr,
                 Arith::Add => InfixOperator::Add,
                 Arith::Sub => {
-                    alt.replace(RustExpr::local("try_sub!").call_with([x.clone(), y.clone()]));
+                    alt.replace(RustExpr::local("try_sub!").call_with([x.clone(), y.clone(), RustExpr::u64lit(get_trace(&()))]));
                     InfixOperator::Sub
                 }
                 Arith::Mul => InfixOperator::Mul,
@@ -1383,7 +1394,10 @@ impl SimpleLogic<GTExpr> {
             SimpleLogic::Fail => (
                 vec![RustStmt::Return(
                     ReturnKind::Keyword,
-                    RustExpr::err(RustExpr::scoped(["ParseError"], "FailToken")),
+                    RustExpr::err(
+                        RustExpr::scoped(["ParseError"], "FailToken")
+                            .call_with([RustExpr::u64lit(get_trace(&()))])
+                    ),
                 )],
                 None,
             ),
@@ -2659,7 +2673,10 @@ impl ToAst for DerivedLogic<GTExpr> {
                     )];
                     let b_invalid = vec![RustStmt::Return(
                         ReturnKind::Keyword,
-                        RustExpr::err(RustExpr::scoped(["ParseError"], "FalsifiedWhere")),
+                        RustExpr::err(
+                            RustExpr::scoped(["ParseError"], "FalsifiedWhere")
+                                .call_with([RustExpr::u64lit(get_trace(&()))])
+                        ),
                     )];
                     RustExpr::Control(Box::new(RustControl::If(
                         cond_valid,

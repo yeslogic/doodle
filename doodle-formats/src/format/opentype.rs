@@ -9,6 +9,84 @@ fn shadow_check(x: &Expr, name: &'static str) {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+enum NestingKind {
+    #[default]
+    SingletonADT,
+    FlattenInner,
+}
+
+/// Helper function for generically constructing a Format that consists of a
+/// set of invariant fields, a discriminant field, and an alternation over
+/// exactly one inhabited sub-format based on the value of the discriminant.
+///
+/// - `outer_fields` is a list of the `(name, format)` pairs that are invariant and precede
+/// the dependent field-set.
+/// - `discriminant` consists of the name of the discriminant field and its sole value.
+/// The field-name in question must be present in `outer_fields`, and this function
+/// will panic if it is missing.
+/// - `inner_fields` is the list of fields that belong to the sub-format dependent on `discriminant`.
+/// - `intermediate` is the name of the field that will be used to hold the `inner_fields` ADT when
+/// not flattened (see `nesting kind`)
+/// - `variant_name` is the constructor-name for the sole variant of the enum that holds the `inner_fields` record
+/// - `nesting_kind` is a template-selector that determines how to construct the return-value from the given arguments.
+/// We have two choices: `SingletonADT`, which constructs an embedded ADT using `intermediate` and `variant_name`; and `FlattenInner`,
+/// which ignores those fields and instead constructs a single flattened record, concatenating `outer_fields` and `inner_fields`
+/// in the expected order, and wrapping the discriminant-field in a `Format::Where` context that ensures that the
+/// field in question has the appropriate value.
+///
+/// # Panics
+///
+/// Will panic if `discriminant` specifies a field-name that is not present in `outer_fields`.
+fn embedded_singleton_alternation<const OUTER: usize, const INNER: usize>(
+    outer_fields: [(&'static str, Format); OUTER],
+    discriminant: (&'static str, u16),
+    inner_fields: [(&'static str, Format); INNER],
+    intermediate: &'static str,
+    variant_name: &'static str,
+    nesting_kind: NestingKind,
+) -> Format {
+    let (disc_field, disc_value) = discriminant;
+    let accum = match nesting_kind {
+        NestingKind::SingletonADT => {
+            let mut has_discriminant = false;
+            let record_inner = record(inner_fields);
+            let mut accum = Vec::with_capacity(OUTER + 1);
+            for (name, format) in outer_fields {
+                has_discriminant = has_discriminant || name == disc_field;
+                accum.push((Label::Borrowed(name), format));
+            }
+            accum.push(
+                (Label::Borrowed(intermediate), match_variant(
+                    var(disc_field),
+                    [
+                        (Pattern::U16(disc_value), variant_name, record_inner),
+                        // REVIEW - we could technically add an explicit catch-all but it might be simpler to leave it as an implicit unhandled case
+                    ]
+                ))
+            );
+            assert!(has_discriminant, "missing discriminant field `{disc_field}` in outer-field set");
+            accum
+        }
+        NestingKind::FlattenInner => {
+            let mut accum = Vec::with_capacity(OUTER + INNER);
+            for (name, format) in outer_fields {
+                if name == disc_field {
+                    accum.push((Label::Borrowed(name), where_lambda(format, name, expr_eq(var(name), Expr::U16(disc_value)))));
+                } else {
+                    accum.push((Label::Borrowed(name), format));
+                }
+            }
+            for (name, format) in inner_fields {
+                accum.push((Label::Borrowed(name), format));
+            }
+            accum
+        }
+    };
+    Format::Record(accum)
+}
+
+
 fn prepend_field_flags_bits8(
     pre_field: &'static str,
     pre_format: Format,
@@ -342,11 +420,16 @@ fn link_offset(sof_offset: Expr, target_offset: Expr, format: Format) -> Format 
 /// Converts an absolute offset (or, an offset relative to SOF) into a non-negative
 /// delta-value relative to `here`, an expression representing the immediate
 /// position in the stream we are parsing from (i.e. as the variable in `chain(Format::Pos, <var>, ...)`).
+///
+/// If the actual difference is negative, will produce a ParseError at runtime upon
+/// evalutation.
 fn relativize_offset(abs_offset: Expr, here: Expr) -> Expr {
     sub(abs_offset, here)
 }
 
 /// Parse a format at a given (absolute) file offset
+///
+/// Will fail if the offset specified has been exceeded.
 fn link(abs_offset: Expr, format: Format) -> Format {
     chain(
         pos32(),
@@ -355,6 +438,27 @@ fn link(abs_offset: Expr, format: Format) -> Format {
             Box::new(relativize_offset(abs_offset, var("__here"))),
             Box::new(format),
         ),
+    )
+}
+
+/// Given a raw Format `format` and an absolute buffer-offset `abs_offset`,
+/// attempts to parse `format` at `abs_offset`, wrapping it in `format_some`
+/// if this is a sound operation.
+///
+/// If the offset specified has already been exceeded, will return `format_none()`
+/// instead.
+fn link_checked(abs_offset: Expr, format: Format) -> Format {
+    chain(
+        pos32(),
+        "__here",
+        cond_maybe(
+            expr_gte(abs_offset.clone(), var("__here")),
+            Format::WithRelativeOffset(
+                Box::new(relativize_offset(abs_offset, var("__here"))),
+                Box::new(format),
+            ),
+        )
+
     )
 }
 
@@ -379,6 +483,10 @@ fn link(abs_offset: Expr, format: Format) -> Format {
 /// from non-nullable offset-links, but for now, behavior is identical to [`offset16_nullable`].
 ///
 /// See [https://learn.microsoft.com/en-us/typography/opentype/spec/otff#data-types] for more info.
+///
+/// Furthermore, to handle irregular inputs that would otherwise require moving *backwards* to reach the
+/// desired offset, `None` is returned in any case where the relative-delta to reach the target offset is
+/// non-positive.
 fn offset16_mandatory(base_offset: Expr, format: Format, base: &BaseModule) -> Format {
     shadow_check(&base_offset, "offset");
     // REVIEW - there is an argument to be made that we should use `chain` instead of `record` to elide the offset and flatten the link
@@ -388,7 +496,8 @@ fn offset16_mandatory(base_offset: Expr, format: Format, base: &BaseModule) -> F
             "link",
             if_then_else(
                 is_nonzero(var("offset")),
-                link(pos_add_u16(base_offset, var("offset")), format_some(format)),
+                // because link-checked can also return format_none, it has to be the one to wrap format_some around the parse
+                link_checked(pos_add_u16(base_offset, var("offset")), format),
                 format_none(),
             ),
         ),
@@ -405,6 +514,11 @@ fn offset16_mandatory(base_offset: Expr, format: Format, base: &BaseModule) -> F
 /// that there is no associated data, in which case `None` is yielded for the `link`.)
 ///
 /// Additionally takes argument `base` of type `BaseModule` to parse u16be values without code duplication.
+///
+/// # Notes
+///
+/// To handle irregular inputs that would otherwise require moving *backwards* to reach the desired offset,
+/// `None` is returned in any case where the relative-delta to reach the target offset is non-positive.
 fn offset16_nullable(base_offset: Expr, format: Format, base: &BaseModule) -> Format {
     shadow_check(&base_offset, "offset");
     // REVIEW - there is an argument to be made that we should use `chain` instead of `record` to elide the offset and flatten the link
@@ -414,7 +528,8 @@ fn offset16_nullable(base_offset: Expr, format: Format, base: &BaseModule) -> Fo
             "link",
             if_then_else(
                 is_nonzero(var("offset")),
-                link(pos_add_u16(base_offset, var("offset")), format_some(format)),
+                // because link-checked can also return format_none, it has to be the one to wrap format_some around the parse
+                link_checked(pos_add_u16(base_offset, var("offset")), format),
                 format_none(),
             ),
         ),
@@ -431,6 +546,11 @@ fn offset16_nullable(base_offset: Expr, format: Format, base: &BaseModule) -> Fo
 /// that there is no associated data, in which case `None` is yielded for the `link`.)
 ///
 /// Additionally takes argument `base` of type `BaseModule` to parse u32be values without code duplication.
+///
+/// # Notes
+///
+/// To handle irregular inputs that would otherwise require moving *backwards* to reach the desired offset,
+/// `None` is returned in any case where the relative-delta to reach the target offset is non-positive.
 fn offset32(base_offset: Expr, format: Format, base: &BaseModule) -> Format {
     shadow_check(&base_offset, "offset");
     // FIXME - should we use `chain` instead of `record` to elide the offset and flatten the link?
@@ -438,9 +558,10 @@ fn offset32(base_offset: Expr, format: Format, base: &BaseModule) -> Format {
         ("offset", base.u32be()),
         (
             "link",
-            cond_maybe(
+            if_then_else(
                 is_nonzero(var("offset")),
-                linked_offset32(base_offset, var("offset"), format),
+                linked_offset32(base_offset, var("offset"), format_some(format)),
+                format_none(),
             ),
         ),
     ])
@@ -2846,43 +2967,52 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ),
                 ]);
 
-                record([
-                    ("table_start", pos32()),
+                embedded_singleton_alternation(
+                    [("table_start", pos32()),
                     ("subst_format", base.u16be()),
                     (
                         "coverage",
                         offset16_mandatory(var("table_start"), coverage_table.call(), base),
-                    ),
-                    (
-                        "subst",
-                        match_variant(
-                            var("subst_format"),
-                            [
-                                (
-                                    Pattern::U16(1),
-                                    "Format1",
-                                    record([
-                                        ("sequence_count", base.u16be()),
-                                        (
-                                            "sequences",
-                                            repeat_count(
-                                                var("sequence_count"),
-                                                offset16_mandatory(
-                                                    var("table_start"),
-                                                    sequence_table,
-                                                    base,
-                                                ),
-                                            ),
-                                        ),
-                                    ]),
-                                ),
-                                (Pattern::Wildcard, "BadFormat", Format::Fail),
-                            ],
+                    )],
+                    ("subst_format", 1),
+                    [("sequence_count", base.u16be()),
+                     ("sequences", repeat_count(
+                        var("sequence_count"),
+                            offset16_mandatory(
+                                var("table_start"),
+                                sequence_table,
+                                base,
+                            ),
                         ),
-                    ),
-                ])
+                    )],
+                    "subst",
+                    "Format1",
+                    NestingKind::SingletonADT,
+                )
             };
-            let alternate_subst = /* STUB */ Format::EMPTY;
+            let alternate_subst = {
+                let alternate_set = record([
+                    ("glyph_count", base.u16be()),
+                    ("alternate_glyph_ids", repeat_count(var("glyph_count"), base.u16be())),
+                ]);
+
+                embedded_singleton_alternation(
+                    [
+                        ("table_start", pos32()),
+                        ("subst_format", base.u16be()),
+                        ("coverage", offset16_mandatory(var("table_start"), coverage_table.call(), base)),
+                    ],
+                    ("subst_format", 1),
+                    [
+                        ("alternate_set_count", base.u16be()),
+                        ("alternate_sets", repeat_count(var("alternate_set_count"), offset16_mandatory(var("table_start"), alternate_set, base)))
+                    ],
+                    "subst",
+                    "Format1",
+                    // REVIEW - we are using a different approach from multiple_subst not because we want to treat the two cases differently, but to ensure both cases work properly and generate sensible codegen and interpreter output
+                    NestingKind::FlattenInner,
+                )
+            };
             let ligature_subst = /* STUB */ Format::EMPTY;
             let subst_extension = /* STUB */ Format::EMPTY;
             let reverse_chain_single_subst = /* STUB */ Format::EMPTY;
@@ -3270,6 +3400,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     "lookup_list",
                     offset16_mandatory(var("table_start"), lookup_list(tag), base),
                 ),
+                // FIXME - add Version 1.1-specific fields as cond_maybe on minor-version
             ])
         };
         // !SECTION
