@@ -2731,10 +2731,10 @@ pub fn analyze_font_fast(test_file: &str) -> TestResult<()> {
 pub fn analyze_font(test_file: &str) -> TestResult<OpentypeMetrics> {
     let buffer = std::fs::read(std::path::Path::new(test_file))?;
     let mut input = Parser::new(&buffer);
-    let dat = Decoder_opentype_main(&mut input)?;
+    let font = Decoder_opentype_main(&mut input)?;
     // TODO: do we want to collect (and return) any metrics here?
-    match dat.font.directory {
-        opentype_font_directory::TTCHeader(multi) => {
+    match font.directory {
+        opentype_main_directory::TTCHeader(multi) => {
             let version = (multi.major_version, multi.minor_version);
             let (num_fonts, font_metrics) = match multi.header {
                 opentype_ttc_header_header::UnknownVersion(n) => {
@@ -2773,7 +2773,7 @@ pub fn analyze_font(test_file: &str) -> TestResult<OpentypeMetrics> {
             };
             Ok(OpentypeMetrics::MultiFont(ret))
         }
-        opentype_font_directory::TableDirectory(single) => Ok(OpentypeMetrics::SingleFont(
+        opentype_main_directory::TableDirectory(single) => Ok(OpentypeMetrics::SingleFont(
             analyze_table_directory(&single)?,
         )),
     }
@@ -4421,7 +4421,7 @@ pub mod lookup_subtable {
         OpentypeGposLookupSubtable, OpentypeGsubLookupSubtable, Parser, TestResult,
         UnknownValueError,
     };
-    use crate::{opentype_font_directory, opentype_ttc_header_header, Decoder_opentype_main};
+    use crate::{opentype_main_directory, opentype_ttc_header_header, Decoder_opentype_main};
 
     #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Default)]
     struct Both {
@@ -4458,9 +4458,9 @@ pub mod lookup_subtable {
     pub fn analyze_font_lookups(test_file: &str) -> TestResult<SingleOrMulti<LookupSet>> {
         let buffer = std::fs::read(std::path::Path::new(test_file))?;
         let mut input = Parser::new(&buffer);
-        let dat = Decoder_opentype_main(&mut input)?;
-        match dat.font.directory {
-            opentype_font_directory::TTCHeader(multi) => {
+        let font = Decoder_opentype_main(&mut input)?;
+        match font.directory {
+            opentype_main_directory::TTCHeader(multi) => {
                 let ret = match multi.header {
                     opentype_ttc_header_header::UnknownVersion(n) => {
                         return Err(Box::new(UnknownValueError {
@@ -4495,7 +4495,7 @@ pub mod lookup_subtable {
                 };
                 Ok(SingleOrMulti::Multi(ret))
             }
-            opentype_font_directory::TableDirectory(single) => Ok(SingleOrMulti::Single(
+            opentype_main_directory::TableDirectory(single) => Ok(SingleOrMulti::Single(
                 analyze_table_directory_lookups(&single),
             )),
         }
