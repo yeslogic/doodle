@@ -314,15 +314,6 @@ where
         &prefix[..],
         Format::Slice(Box::new(var(length_field)), Box::new(record(full))),
     )
-
-    // chain(
-    //     Format::Peek(Box::new(record(prefix))),
-    //     "x",
-    //     Format::Slice(
-    //         Box::new(record_proj(var("x"), length_field)),
-    //         Box::new(record(full)),
-    //     ),
-    // )
 }
 
 /// Computes the maximum value of `x / 8` for `x: U16` in seq (return value wrapped in Option to handle empty list)
@@ -390,39 +381,6 @@ fn find_table(table_records: Expr, query_table_id: u32) -> Expr {
     index_checked(matching_tables, Expr::U32(0))
 }
 
-/// Given the appropriate Start-of-Frame absolute-stream-offset (`sof_offset`) and
-/// an SOF-relative `target_offset`, produce a relative-lookahead format that
-/// seeks to the appropriate stream-location and parses `format`.
-///
-/// # Notes
-///
-/// Though not directly stated, the assumed type of `sof_offset` and `target_offset` is
-/// `U32`, and if this is not satisfied, the invocation of this function will produce a
-/// type-error when expanded.
-fn link_offset(sof_offset: Expr, target_offset: Expr, format: Format) -> Format {
-    let rel_offset = |sof_offset: Expr, here_offset: Expr, target_offset: Expr| -> Expr {
-        /*
-         * Here := here_offset (abs)
-         * SOF  := sof_offset (abs)
-         * Tgt  := target_offset (rel)
-         *
-         * We want to return X such that
-         *   Here (abs) + X (rel) == SOF (abs) + Tgt (rel)
-         * so we compute
-         *   X (rel) := SOF + Tgt - Here
-         */
-        relativize_offset(add(sof_offset, target_offset), here_offset)
-    };
-    chain(
-        pos32(),
-        "offset",
-        Format::WithRelativeOffset(
-            Box::new(rel_offset(sof_offset, var("offset"), target_offset)),
-            Box::new(format),
-        ),
-    )
-}
-
 /// Converts an absolute offset (or, an offset relative to SOF) into a non-negative
 /// delta-value relative to `here`, an expression representing the immediate
 /// position in the stream we are parsing from (i.e. as the variable in `chain(Format::Pos, <var>, ...)`).
@@ -435,7 +393,8 @@ fn relativize_offset(abs_offset: Expr, here: Expr) -> Expr {
 
 /// Parse a format at a given (absolute) file offset
 ///
-/// Will fail if the offset specified has been exceeded.
+/// Will fail if the current stream-offset of our Parse-context
+/// is strictly greater than the absolute offset we are trying to seek to.
 fn link(abs_offset: Expr, format: Format) -> Format {
     chain(
         pos32(),
@@ -572,6 +531,18 @@ fn offset32(base_offset: Expr, format: Format, base: &BaseModule) -> Format {
     ])
 }
 
+/// Given the appropriate Start-of-Frame absolute-stream-offset (`base_offset`) and
+/// an SOF-relative `rel_offset`, produce a relative-lookahead format that
+/// seeks to the appropriate stream-location and parses `format`.
+///
+/// # Notes
+///
+/// Though not directly stated, the assumed type of `sof_offset` and `target_offset` is
+/// `U32`, and if this is not satisfied, the invocation of this function will produce a
+/// type-error when expanded.
+///
+/// Will fail at time-of-parse in any case where the stream-offset we are expanding this
+/// format from is greater than the absolute target offset we would be attempting to seek to.
 fn linked_offset32(base_offset: Expr, rel_offset: Expr, format: Format) -> Format {
     link(add(base_offset, rel_offset), format)
 }
@@ -607,7 +578,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             Format::Let(
                 Label::Borrowed("matching_table"),
                 Box::new(expr_unwrap(find_table(var(table_records_var), id))),
-                Box::new(link_offset(
+                Box::new(linked_offset32(
                     var(sof_offset32_vname),
                     record_proj(var("matching_table"), "offset"),
                     Format::Slice(
@@ -627,7 +598,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             Format::Let(
                 Label::Borrowed("matching_table"),
                 Box::new(expr_unwrap(find_table(var(table_records_var), id))),
-                Box::new(link_offset(
+                Box::new(linked_offset32(
                     var(sof_offset_var),
                     record_proj(var("matching_table"), "offset"),
                     Format::Slice(
@@ -655,7 +626,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     vec![
                         (
                             pat_some(bind("table")),
-                            format_some(link_offset(
+                            format_some(linked_offset32(
                                 var(sof_offset_var),
                                 record_proj(var("table"), "offset"),
                                 Format::Slice(
@@ -710,11 +681,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ),
             );
 
-            // FIXME - this is actually a signed 16-bit value but we don't support that; it can be unsigned as long as we do the right wrapping addition
-
             let subheader = record([
                 ("first_code", base.u16be()),
                 ("entry_count", base.u16be()),
+                // FIXME - this is actually a signed 16-bit value but we don't support that; it can be unsigned as long as we do the right wrapping addition
                 ("id_delta", s16be(base)),
                 ("id_range_offset", base.u16be()),
             ]);
@@ -790,20 +760,21 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             let cmap_subtable_format6 = module.define_format_args(
                 "opentype.cmap_subtable.format6",
                 vec![(Label::Borrowed("_platform"), ValueType::Base(BaseType::U16))],
-                slice_record(
-                    "length",
-                    [
-                        ("format", expect_u16be(base, 6)),
-                        ("length", base.u16be()),
-                        ("language", cmap_language_id(var("_platform"))),
-                        ("first_code", base.u16be()),
-                        ("entry_count", base.u16be()),
-                        (
-                            "glyph_id_array",
-                            repeat_count(var("entry_count"), base.u16be()),
-                        ),
-                    ],
-                ),
+                /* Previously defined as a slice_record but sufficiently large `entry_count` values
+                 * could cause length to wrap around mod 65536 and lead to slice boundary violation
+                 * while reading `glyph_id_array`
+                 */
+                record([
+                    ("format", expect_u16be(base, 6)),
+                    ("length", base.u16be()),
+                    ("language", cmap_language_id(var("_platform"))),
+                    ("first_code", base.u16be()),
+                    ("entry_count", base.u16be()),
+                    (
+                        "glyph_id_array",
+                        repeat_count(var("entry_count"), base.u16be()),
+                    ),
+                ]),
             );
 
             let sequential_map_group = module.define_format(
@@ -2549,7 +2520,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             module.define_format(
                 "opentype.common.langsys",
                 record([
-                    ("lookup_order_offset", expect_u16be(base, 0x0000)), // RESERVED - set to NULL
+                    ("lookup_order_offset", expect_u16be(base, 0x0000)), // RESERVED - set to NULL [Offset16 type but it doesn't point to anything]
                     ("required_feature_index", base.u16be()), // 0xFFFF if no features required
                     ("feature_index_count", base.u16be()),
                     (

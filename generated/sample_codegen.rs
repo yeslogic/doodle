@@ -4885,12 +4885,12 @@ _ => {
 return Err(ParseError::ExcludedBranch(2404222719611925354u64));
 }
 };
-let offset = {
+let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
-_input.advance_by(try_sub!(start + matching_table.offset.clone(), offset, 7364705619221056123u64))?;
+_input.advance_by(try_sub!(start + matching_table.offset.clone(), __here, 7364705619221056123u64))?;
 let ret = ((|| PResult::Ok({
 let sz = (matching_table.length.clone()) as usize<>;
 _input.start_slice(sz)?;
@@ -4935,12 +4935,12 @@ _ => {
 return Err(ParseError::ExcludedBranch(17170585774888887431u64));
 }
 };
-let offset = {
+let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
-_input.advance_by(try_sub!(start + matching_table.offset.clone(), offset, 13091357170910775568u64))?;
+_input.advance_by(try_sub!(start + matching_table.offset.clone(), __here, 13091357170910775568u64))?;
 let ret = ((|| PResult::Ok({
 let sz = (matching_table.length.clone()) as usize<>;
 _input.start_slice(sz)?;
@@ -4985,12 +4985,12 @@ _ => {
 return Err(ParseError::ExcludedBranch(9339905250237811640u64));
 }
 };
-let offset = {
+let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
-_input.advance_by(try_sub!(start + matching_table.offset.clone(), offset, 1548601315919054830u64))?;
+_input.advance_by(try_sub!(start + matching_table.offset.clone(), __here, 1548601315919054830u64))?;
 let ret = ((|| PResult::Ok({
 let sz = (matching_table.length.clone()) as usize<>;
 _input.start_slice(sz)?;
@@ -5035,12 +5035,12 @@ _ => {
 return Err(ParseError::ExcludedBranch(1654541969082323602u64));
 }
 };
-let offset = {
+let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
-_input.advance_by(try_sub!(start + matching_table.offset.clone(), offset, 6039633234730737119u64))?;
+_input.advance_by(try_sub!(start + matching_table.offset.clone(), __here, 6039633234730737119u64))?;
 let ret = ((|| PResult::Ok({
 let sz = (matching_table.length.clone()) as usize<>;
 _input.start_slice(sz)?;
@@ -5085,12 +5085,12 @@ _ => {
 return Err(ParseError::ExcludedBranch(7000022209644146403u64));
 }
 };
-let offset = {
+let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
-_input.advance_by(try_sub!(start + matching_table.offset.clone(), offset, 1272171534487716374u64))?;
+_input.advance_by(try_sub!(start + matching_table.offset.clone(), __here, 1272171534487716374u64))?;
 let ret = ((|| PResult::Ok({
 let sz = (matching_table.length.clone()) as usize<>;
 _input.start_slice(sz)?;
@@ -5135,12 +5135,12 @@ _ => {
 return Err(ParseError::ExcludedBranch(7283163102885684771u64));
 }
 };
-let offset = {
+let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
-_input.advance_by(try_sub!(start + matching_table.offset.clone(), offset, 8451221290566481190u64))?;
+_input.advance_by(try_sub!(start + matching_table.offset.clone(), __here, 8451221290566481190u64))?;
 let ret = ((|| PResult::Ok({
 let sz = (matching_table.length.clone()) as usize<>;
 _input.start_slice(sz)?;
@@ -5185,12 +5185,12 @@ _ => {
 return Err(ParseError::ExcludedBranch(16200207902741715318u64));
 }
 };
-let offset = {
+let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
-_input.advance_by(try_sub!(start + matching_table.offset.clone(), offset, 5100077783044507986u64))?;
+_input.advance_by(try_sub!(start + matching_table.offset.clone(), __here, 5100077783044507986u64))?;
 let ret = ((|| PResult::Ok({
 let sz = (matching_table.length.clone()) as usize<>;
 _input.start_slice(sz)?;
@@ -5235,12 +5235,12 @@ _ => {
 return Err(ParseError::ExcludedBranch(4672672775256824980u64));
 }
 };
-let offset = {
+let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
-_input.advance_by(try_sub!(start + matching_table.offset.clone(), offset, 5576343694315527798u64))?;
+_input.advance_by(try_sub!(start + matching_table.offset.clone(), __here, 5576343694315527798u64))?;
 let ret = ((|| PResult::Ok({
 let sz = (matching_table.length.clone()) as usize<>;
 _input.start_slice(sz)?;
@@ -5280,12 +5280,12 @@ None
 match matching_table {
 Some(ref table) => {
 let inner = {
-let offset = {
+let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
-_input.advance_by(try_sub!(start + table.offset.clone(), offset, 98102193810481173u64))?;
+_input.advance_by(try_sub!(start + table.offset.clone(), __here, 98102193810481173u64))?;
 let ret = ((|| PResult::Ok({
 let sz = (table.length.clone()) as usize<>;
 _input.start_slice(sz)?;
@@ -5353,12 +5353,12 @@ None
 match matching_table {
 Some(ref table) => {
 let inner = {
-let offset = {
+let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
-_input.advance_by(try_sub!(start + table.offset.clone(), offset, 734991270787736827u64))?;
+_input.advance_by(try_sub!(start + table.offset.clone(), __here, 734991270787736827u64))?;
 let ret = ((|| PResult::Ok({
 let sz = (table.length.clone()) as usize<>;
 _input.start_slice(sz)?;
@@ -5426,12 +5426,12 @@ None
 match matching_table {
 Some(ref table) => {
 let inner = {
-let offset = {
+let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
-_input.advance_by(try_sub!(start + table.offset.clone(), offset, 18167425999583150549u64))?;
+_input.advance_by(try_sub!(start + table.offset.clone(), __here, 18167425999583150549u64))?;
 let ret = ((|| PResult::Ok({
 let sz = (table.length.clone()) as usize<>;
 _input.start_slice(sz)?;
@@ -5479,12 +5479,12 @@ None
 match matching_table {
 Some(ref table) => {
 let inner = {
-let offset = {
+let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
-_input.advance_by(try_sub!(start + table.offset.clone(), offset, 1644793874183523166u64))?;
+_input.advance_by(try_sub!(start + table.offset.clone(), __here, 1644793874183523166u64))?;
 let ret = ((|| PResult::Ok({
 let sz = (table.length.clone()) as usize<>;
 _input.start_slice(sz)?;
@@ -5560,12 +5560,12 @@ None
 match matching_table {
 Some(ref table) => {
 let inner = {
-let offset = {
+let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
-_input.advance_by(try_sub!(start + table.offset.clone(), offset, 16396082708135795071u64))?;
+_input.advance_by(try_sub!(start + table.offset.clone(), __here, 16396082708135795071u64))?;
 let ret = ((|| PResult::Ok({
 let sz = (table.length.clone()) as usize<>;
 _input.start_slice(sz)?;
@@ -5633,12 +5633,12 @@ None
 match matching_table {
 Some(ref table) => {
 let inner = {
-let offset = {
+let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
-_input.advance_by(try_sub!(start + table.offset.clone(), offset, 5546123200965512193u64))?;
+_input.advance_by(try_sub!(start + table.offset.clone(), __here, 5546123200965512193u64))?;
 let ret = ((|| PResult::Ok({
 let sz = (table.length.clone()) as usize<>;
 _input.start_slice(sz)?;
@@ -5686,12 +5686,12 @@ None
 match matching_table {
 Some(ref table) => {
 let inner = {
-let offset = {
+let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
-_input.advance_by(try_sub!(start + table.offset.clone(), offset, 9403121491749669432u64))?;
+_input.advance_by(try_sub!(start + table.offset.clone(), __here, 9403121491749669432u64))?;
 let ret = ((|| PResult::Ok({
 let sz = (table.length.clone()) as usize<>;
 _input.start_slice(sz)?;
@@ -5739,12 +5739,12 @@ None
 match matching_table {
 Some(ref table) => {
 let inner = {
-let offset = {
+let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
-_input.advance_by(try_sub!(start + table.offset.clone(), offset, 7981520858864097140u64))?;
+_input.advance_by(try_sub!(start + table.offset.clone(), __here, 7981520858864097140u64))?;
 let ret = ((|| PResult::Ok({
 let sz = (table.length.clone()) as usize<>;
 _input.start_slice(sz)?;
@@ -5792,12 +5792,12 @@ None
 match matching_table {
 Some(ref table) => {
 let inner = {
-let offset = {
+let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
-_input.advance_by(try_sub!(start + table.offset.clone(), offset, 17948395312093823900u64))?;
+_input.advance_by(try_sub!(start + table.offset.clone(), __here, 17948395312093823900u64))?;
 let ret = ((|| PResult::Ok({
 let sz = (table.length.clone()) as usize<>;
 _input.start_slice(sz)?;
@@ -5845,12 +5845,12 @@ None
 match matching_table {
 Some(ref table) => {
 let inner = {
-let offset = {
+let __here = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 _input.open_peek_context();
-_input.advance_by(try_sub!(start + table.offset.clone(), offset, 7370180348639650351u64))?;
+_input.advance_by(try_sub!(start + table.offset.clone(), __here, 7370180348639650351u64))?;
 let ret = ((|| PResult::Ok({
 let sz = (table.length.clone()) as usize<>;
 _input.start_slice(sz)?;
@@ -11872,34 +11872,12 @@ PResult::Ok(ret)
 }
 
 fn Decoder_opentype_cmap_subtable_format6<'input>(_input: &mut Parser<'input>, _platform: u16) -> Result<opentype_cmap_subtable_format6, ParseError> {
-let length = {
-_input.open_peek_context();
-let ret = ((|| PResult::Ok({
-let _ = {
 let format = ((|| PResult::Ok({
 let inner = (Decoder24(_input))?;
 if ((|x: u16| PResult::Ok(x == 6u16))(inner.clone()))? {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(1479153625485860551u64));
-}
-}))())?;
-opentype_cmap_subtable_format14_raw_raw { format }
-};
-(Decoder24(_input))?
-}))())?;
-_input.close_peek_context()?;
-ret
-};
-let sz = length as usize<>;
-_input.start_slice(sz)?;
-let ret = ((|| PResult::Ok({
-let format = ((|| PResult::Ok({
-let inner = (Decoder24(_input))?;
-if ((|x: u16| PResult::Ok(x == 6u16))(inner.clone()))? {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere(12668500753644823654u64));
 }
 }))())?;
 let length = ((|| PResult::Ok((Decoder24(_input))?))())?;
@@ -11913,10 +11891,7 @@ accum.push((Decoder24(_input))?);
 }
 accum
 }))())?;
-opentype_cmap_subtable_format6 { format, length, language, first_code, entry_count, glyph_id_array }
-}))())?;
-_input.end_slice()?;
-PResult::Ok(ret)
+PResult::Ok(opentype_cmap_subtable_format6 { format, length, language, first_code, entry_count, glyph_id_array })
 }
 
 fn Decoder_opentype_cmap_subtable_format8<'input>(_input: &mut Parser<'input>, _platform: u16) -> Result<opentype_cmap_subtable_format8, ParseError> {
@@ -11929,7 +11904,7 @@ let inner = (Decoder24(_input))?;
 if ((|x: u16| PResult::Ok(x == 8u16))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(8094248233631264621u64));
+return Err(ParseError::FalsifiedWhere(12668500753644823654u64));
 }
 }))())?;
 let __reserved = ((|| PResult::Ok({
@@ -11937,7 +11912,7 @@ let inner = (Decoder24(_input))?;
 if ((|x: u16| PResult::Ok(x == 0u16))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(1844274570107701975u64));
+return Err(ParseError::FalsifiedWhere(8094248233631264621u64));
 }
 }))())?;
 opentype_cmap_subtable_format13_raw_raw { format, __reserved }
@@ -11955,7 +11930,7 @@ let inner = (Decoder24(_input))?;
 if ((|x: u16| PResult::Ok(x == 8u16))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(4839194687019048322u64));
+return Err(ParseError::FalsifiedWhere(1844274570107701975u64));
 }
 }))())?;
 let __reserved = ((|| PResult::Ok({
@@ -11963,7 +11938,7 @@ let inner = (Decoder24(_input))?;
 if ((|x: u16| PResult::Ok(x == 0u16))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(7230273548678969972u64));
+return Err(ParseError::FalsifiedWhere(4839194687019048322u64));
 }
 }))())?;
 let length = ((|| PResult::Ok((Decoder21(_input))?))())?;
@@ -11999,7 +11974,7 @@ let inner = (Decoder24(_input))?;
 if ((|x: u16| PResult::Ok(x == 10u16))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(14903563845775542749u64));
+return Err(ParseError::FalsifiedWhere(7230273548678969972u64));
 }
 }))())?;
 let __reserved = ((|| PResult::Ok({
@@ -12007,7 +11982,7 @@ let inner = (Decoder24(_input))?;
 if ((|x: u16| PResult::Ok(x == 0u16))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(1969670610881234889u64));
+return Err(ParseError::FalsifiedWhere(14903563845775542749u64));
 }
 }))())?;
 opentype_cmap_subtable_format13_raw_raw { format, __reserved }
@@ -12025,7 +12000,7 @@ let inner = (Decoder24(_input))?;
 if ((|x: u16| PResult::Ok(x == 10u16))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(9038350950373664822u64));
+return Err(ParseError::FalsifiedWhere(1969670610881234889u64));
 }
 }))())?;
 let __reserved = ((|| PResult::Ok({
@@ -12033,7 +12008,7 @@ let inner = (Decoder24(_input))?;
 if ((|x: u16| PResult::Ok(x == 0u16))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(7281717462557989541u64));
+return Err(ParseError::FalsifiedWhere(9038350950373664822u64));
 }
 }))())?;
 let length = ((|| PResult::Ok((Decoder21(_input))?))())?;
@@ -12063,7 +12038,7 @@ let inner = (Decoder24(_input))?;
 if ((|x: u16| PResult::Ok(x == 12u16))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(15510952803379905659u64));
+return Err(ParseError::FalsifiedWhere(7281717462557989541u64));
 }
 }))())?;
 let __reserved = ((|| PResult::Ok({
@@ -12071,7 +12046,7 @@ let inner = (Decoder24(_input))?;
 if ((|x: u16| PResult::Ok(x == 0u16))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(14681668243282477517u64));
+return Err(ParseError::FalsifiedWhere(15510952803379905659u64));
 }
 }))())?;
 opentype_cmap_subtable_format13_raw_raw { format, __reserved }
@@ -12089,7 +12064,7 @@ let inner = (Decoder24(_input))?;
 if ((|x: u16| PResult::Ok(x == 12u16))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(6209434968043366837u64));
+return Err(ParseError::FalsifiedWhere(14681668243282477517u64));
 }
 }))())?;
 let __reserved = ((|| PResult::Ok({
@@ -12097,7 +12072,7 @@ let inner = (Decoder24(_input))?;
 if ((|x: u16| PResult::Ok(x == 0u16))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(16474038368490899078u64));
+return Err(ParseError::FalsifiedWhere(6209434968043366837u64));
 }
 }))())?;
 let length = ((|| PResult::Ok((Decoder21(_input))?))())?;
@@ -12126,7 +12101,7 @@ let inner = (Decoder24(_input))?;
 if ((|x: u16| PResult::Ok(x == 13u16))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(12217686503432178884u64));
+return Err(ParseError::FalsifiedWhere(16474038368490899078u64));
 }
 }))())?;
 let __reserved = ((|| PResult::Ok({
@@ -12134,7 +12109,7 @@ let inner = (Decoder24(_input))?;
 if ((|x: u16| PResult::Ok(x == 0u16))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(8399572043096922156u64));
+return Err(ParseError::FalsifiedWhere(12217686503432178884u64));
 }
 }))())?;
 opentype_cmap_subtable_format13_raw_raw { format, __reserved }
@@ -12152,7 +12127,7 @@ let inner = (Decoder24(_input))?;
 if ((|x: u16| PResult::Ok(x == 13u16))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(7832192330748800109u64));
+return Err(ParseError::FalsifiedWhere(8399572043096922156u64));
 }
 }))())?;
 let __reserved = ((|| PResult::Ok({
@@ -12160,7 +12135,7 @@ let inner = (Decoder24(_input))?;
 if ((|x: u16| PResult::Ok(x == 0u16))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(9815657591077818003u64));
+return Err(ParseError::FalsifiedWhere(7832192330748800109u64));
 }
 }))())?;
 let length = ((|| PResult::Ok((Decoder21(_input))?))())?;
@@ -12189,7 +12164,7 @@ let inner = (Decoder24(_input))?;
 if ((|x: u16| PResult::Ok(x == 14u16))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(2197379665604321609u64));
+return Err(ParseError::FalsifiedWhere(9815657591077818003u64));
 }
 }))())?;
 opentype_cmap_subtable_format14_raw_raw { format }
@@ -12207,7 +12182,7 @@ let inner = (Decoder24(_input))?;
 if ((|x: u16| PResult::Ok(x == 14u16))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(16624020278885696461u64));
+return Err(ParseError::FalsifiedWhere(2197379665604321609u64));
 }
 }))())?;
 let length = ((|| PResult::Ok((Decoder21(_input))?))())?;
@@ -12456,7 +12431,7 @@ false
 }))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(14485842416732585139u64));
+return Err(ParseError::FalsifiedWhere(16624020278885696461u64));
 })
 }
 
@@ -12645,7 +12620,7 @@ let b = _input.read_byte()?;
 if b == 127 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(8179432974518885725u64));
+return Err(ParseError::ExcludedBranch(14485842416732585139u64));
 }
 }))())?;
 let field1 = ((|| PResult::Ok({
@@ -12653,7 +12628,7 @@ let b = _input.read_byte()?;
 if b == 69 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(5152282179373241998u64));
+return Err(ParseError::ExcludedBranch(8179432974518885725u64));
 }
 }))())?;
 let field2 = ((|| PResult::Ok({
@@ -12661,7 +12636,7 @@ let b = _input.read_byte()?;
 if b == 76 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(13780055874544357936u64));
+return Err(ParseError::ExcludedBranch(5152282179373241998u64));
 }
 }))())?;
 let field3 = ((|| PResult::Ok({
@@ -12669,7 +12644,7 @@ let b = _input.read_byte()?;
 if b == 70 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(16909208071962620789u64));
+return Err(ParseError::ExcludedBranch(13780055874544357936u64));
 }
 }))())?;
 (field0, field1, field2, field3)
@@ -12701,7 +12676,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(7933266403838225878u64));
+return Err(ParseError::ExcludedBranch(16909208071962620789u64));
 }
 };
 accum.push(next_elem);
@@ -12735,7 +12710,7 @@ false
 }))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(12100308281236296642u64));
+return Err(ParseError::FalsifiedWhere(7933266403838225878u64));
 })
 }
 
@@ -12748,7 +12723,7 @@ let inner = (Decoder88(_input, is_be.clone()))?;
 PResult::Ok(if ((|x: u32| PResult::Ok(x <= 1u32))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(9041056097467752267u64));
+return Err(ParseError::FalsifiedWhere(12100308281236296642u64));
 })
 }
 
@@ -12779,7 +12754,7 @@ let inner = (Decoder25(_input))?;
 PResult::Ok(if ((|x: u8| PResult::Ok(x <= 2u8))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(5025197102194587315u64));
+return Err(ParseError::FalsifiedWhere(9041056097467752267u64));
 })
 }
 
@@ -12788,7 +12763,7 @@ let inner = (Decoder25(_input))?;
 PResult::Ok(if ((|x: u8| PResult::Ok(x <= 2u8))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(3810055094392728880u64));
+return Err(ParseError::FalsifiedWhere(5025197102194587315u64));
 })
 }
 
@@ -12797,7 +12772,7 @@ let inner = (Decoder25(_input))?;
 PResult::Ok(if ((|x: u8| PResult::Ok(x <= 1u8))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(15252450768049745444u64));
+return Err(ParseError::FalsifiedWhere(3810055094392728880u64));
 })
 }
 
@@ -12854,7 +12829,7 @@ tmp if ((ByteSet::from_bits([4294967297, 0, 0, 0])).contains(tmp)) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(5599331855309773603u64));
+return Err(ParseError::ExcludedBranch(15252450768049745444u64));
 }
 };
 _input.close_peek_context()?;
@@ -12893,7 +12868,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(16437491640759399344u64));
+return Err(ParseError::ExcludedBranch(5599331855309773603u64));
 }
 };
 accum.push(next_elem);
@@ -12929,7 +12904,7 @@ tmp if ((ByteSet::from_bits([4294967297, 0, 0, 0])).contains(tmp)) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(2988545765690796708u64));
+return Err(ParseError::ExcludedBranch(16437491640759399344u64));
 }
 };
 _input.close_peek_context()?;
@@ -12968,7 +12943,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(6215067399528787845u64));
+return Err(ParseError::ExcludedBranch(2988545765690796708u64));
 }
 };
 accum.push(next_elem);
@@ -13004,7 +12979,7 @@ tmp if ((ByteSet::from_bits([4294967297, 0, 0, 0])).contains(tmp)) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(17176374570344757031u64));
+return Err(ParseError::ExcludedBranch(6215067399528787845u64));
 }
 };
 _input.close_peek_context()?;
@@ -13043,7 +13018,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(3566920116549027235u64));
+return Err(ParseError::ExcludedBranch(17176374570344757031u64));
 }
 };
 accum.push(next_elem);
@@ -13131,7 +13106,7 @@ tmp if ((ByteSet::from_bits([4294967297, 0, 0, 0])).contains(tmp)) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(7979287392867129207u64));
+return Err(ParseError::ExcludedBranch(3566920116549027235u64));
 }
 };
 _input.close_peek_context()?;
@@ -13170,7 +13145,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(3653195934333285574u64));
+return Err(ParseError::ExcludedBranch(7979287392867129207u64));
 }
 };
 accum.push(next_elem);
@@ -13206,7 +13181,7 @@ tmp if ((ByteSet::from_bits([4294967297, 0, 0, 0])).contains(tmp)) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(16671136947067655757u64));
+return Err(ParseError::ExcludedBranch(3653195934333285574u64));
 }
 };
 _input.close_peek_context()?;
@@ -13245,7 +13220,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(10721249873135158334u64));
+return Err(ParseError::ExcludedBranch(16671136947067655757u64));
 }
 };
 accum.push(next_elem);
@@ -13274,7 +13249,7 @@ let b = _input.read_byte()?;
 if b == 117 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(8898504689444561451u64));
+return Err(ParseError::ExcludedBranch(10721249873135158334u64));
 }
 }))())?;
 let field1 = ((|| PResult::Ok({
@@ -13282,7 +13257,7 @@ let b = _input.read_byte()?;
 if b == 115 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(441240706992005484u64));
+return Err(ParseError::ExcludedBranch(8898504689444561451u64));
 }
 }))())?;
 let field2 = ((|| PResult::Ok({
@@ -13290,7 +13265,7 @@ let b = _input.read_byte()?;
 if b == 116 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(3950014938140253048u64));
+return Err(ParseError::ExcludedBranch(441240706992005484u64));
 }
 }))())?;
 let field3 = ((|| PResult::Ok({
@@ -13298,7 +13273,7 @@ let b = _input.read_byte()?;
 if b == 97 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(10046433636842398056u64));
+return Err(ParseError::ExcludedBranch(3950014938140253048u64));
 }
 }))())?;
 let field4 = ((|| PResult::Ok({
@@ -13306,7 +13281,7 @@ let b = _input.read_byte()?;
 if b == 114 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(11079395374415646537u64));
+return Err(ParseError::ExcludedBranch(10046433636842398056u64));
 }
 }))())?;
 let field5 = ((|| PResult::Ok({
@@ -13314,7 +13289,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(757122060916971772u64));
+return Err(ParseError::ExcludedBranch(11079395374415646537u64));
 }
 }))())?;
 (field0, field1, field2, field3, field4, field5)
@@ -13325,7 +13300,7 @@ let b = _input.read_byte()?;
 if b == 48 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(5986772336072340665u64));
+return Err(ParseError::ExcludedBranch(757122060916971772u64));
 }
 }))())?;
 let field1 = ((|| PResult::Ok({
@@ -13333,7 +13308,7 @@ let b = _input.read_byte()?;
 if b == 48 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(8812292064350598352u64));
+return Err(ParseError::ExcludedBranch(5986772336072340665u64));
 }
 }))())?;
 (field0, field1)
@@ -13373,7 +13348,7 @@ tmp if ((ByteSet::from_bits([4294967297, 0, 0, 0])).contains(tmp)) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10645729856418057640u64));
+return Err(ParseError::ExcludedBranch(8812292064350598352u64));
 }
 };
 _input.close_peek_context()?;
@@ -13412,7 +13387,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(2908689796368760670u64));
+return Err(ParseError::ExcludedBranch(10645729856418057640u64));
 }
 };
 accum.push(next_elem);
@@ -13448,7 +13423,7 @@ tmp if ((ByteSet::from_bits([4294967297, 0, 0, 0])).contains(tmp)) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(4316175446384649956u64));
+return Err(ParseError::ExcludedBranch(2908689796368760670u64));
 }
 };
 _input.close_peek_context()?;
@@ -13487,7 +13462,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(13311790038092155306u64));
+return Err(ParseError::ExcludedBranch(4316175446384649956u64));
 }
 };
 accum.push(next_elem);
@@ -13517,7 +13492,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(4598583460226006268u64));
+return Err(ParseError::ExcludedBranch(13311790038092155306u64));
 }
 });
 }
@@ -13547,7 +13522,7 @@ tmp if (tmp != 0) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11490274700962832028u64));
+return Err(ParseError::ExcludedBranch(275550262640764009u64));
 }
 };
 _input.close_peek_context()?;
@@ -13566,7 +13541,7 @@ let b = _input.read_byte()?;
 if b != 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(275550262640764009u64));
+return Err(ParseError::ExcludedBranch(4598583460226006268u64));
 }
 };
 accum.push(next_elem);
@@ -13596,7 +13571,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(15680765559661576738u64));
+return Err(ParseError::ExcludedBranch(11490274700962832028u64));
 }
 };
 accum.push(next_elem);
@@ -13614,7 +13589,7 @@ let b = _input.read_byte()?;
 PResult::Ok(if (ByteSet::from_bits([71776119061217280, 0, 0, 0])).contains(b) {
 b
 } else {
-return Err(ParseError::ExcludedBranch(1587806253186841834u64));
+return Err(ParseError::ExcludedBranch(15680765559661576738u64));
 })
 }
 
@@ -13623,7 +13598,7 @@ let b = _input.read_byte()?;
 PResult::Ok(if (ByteSet::from_bits([4294967297, 0, 0, 0])).contains(b) {
 b
 } else {
-return Err(ParseError::ExcludedBranch(11297314001547702431u64));
+return Err(ParseError::ExcludedBranch(1587806253186841834u64));
 })
 }
 
@@ -13650,7 +13625,7 @@ tmp if (tmp != 0) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(30874382969105279u64));
+return Err(ParseError::ExcludedBranch(18399269270080151498u64));
 }
 };
 _input.close_peek_context()?;
@@ -13663,7 +13638,7 @@ let b = _input.read_byte()?;
 if b != 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(18399269270080151498u64));
+return Err(ParseError::ExcludedBranch(11297314001547702431u64));
 }
 };
 accum.push(next_elem);
@@ -13695,7 +13670,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9791114990321288281u64));
+return Err(ParseError::ExcludedBranch(30874382969105279u64));
 }
 };
 accum.push(next_elem);
@@ -13726,7 +13701,7 @@ tmp if (tmp != 0) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(2481175643332430741u64));
+return Err(ParseError::ExcludedBranch(1595897747104696027u64));
 }
 };
 _input.close_peek_context()?;
@@ -13739,7 +13714,7 @@ let b = _input.read_byte()?;
 if b != 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(1595897747104696027u64));
+return Err(ParseError::ExcludedBranch(9791114990321288281u64));
 }
 };
 accum.push(next_elem);
@@ -13777,7 +13752,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(15702070659753069395u64));
+return Err(ParseError::ExcludedBranch(2481175643332430741u64));
 }
 };
 accum.push(next_elem);
@@ -13857,7 +13832,7 @@ let b = _input.read_byte()?;
 Some(if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(4338497647520366709u64));
+return Err(ParseError::ExcludedBranch(15702070659753069395u64));
 })
 } else {
 None
@@ -13871,7 +13846,7 @@ let b = _input.read_byte()?;
 if b == 137 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(14600508952542130472u64));
+return Err(ParseError::ExcludedBranch(4338497647520366709u64));
 }
 }))())?;
 let field1 = ((|| PResult::Ok({
@@ -13879,7 +13854,7 @@ let b = _input.read_byte()?;
 if b == 80 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(460669108121189046u64));
+return Err(ParseError::ExcludedBranch(14600508952542130472u64));
 }
 }))())?;
 let field2 = ((|| PResult::Ok({
@@ -13887,7 +13862,7 @@ let b = _input.read_byte()?;
 if b == 78 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(8971553008180040990u64));
+return Err(ParseError::ExcludedBranch(460669108121189046u64));
 }
 }))())?;
 let field3 = ((|| PResult::Ok({
@@ -13895,7 +13870,7 @@ let b = _input.read_byte()?;
 if b == 71 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(1310624491311340594u64));
+return Err(ParseError::ExcludedBranch(8971553008180040990u64));
 }
 }))())?;
 let field4 = ((|| PResult::Ok({
@@ -13903,7 +13878,7 @@ let b = _input.read_byte()?;
 if b == 13 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(11225936372640404826u64));
+return Err(ParseError::ExcludedBranch(1310624491311340594u64));
 }
 }))())?;
 let field5 = ((|| PResult::Ok({
@@ -13911,7 +13886,7 @@ let b = _input.read_byte()?;
 if b == 10 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(1029952099207838423u64));
+return Err(ParseError::ExcludedBranch(11225936372640404826u64));
 }
 }))())?;
 let field6 = ((|| PResult::Ok({
@@ -13919,7 +13894,7 @@ let b = _input.read_byte()?;
 if b == 26 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(17327099206515189757u64));
+return Err(ParseError::ExcludedBranch(1029952099207838423u64));
 }
 }))())?;
 let field7 = ((|| PResult::Ok({
@@ -13927,7 +13902,7 @@ let b = _input.read_byte()?;
 if b == 10 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(14652068248613900169u64));
+return Err(ParseError::ExcludedBranch(17327099206515189757u64));
 }
 }))())?;
 PResult::Ok((field0, field1, field2, field3, field4, field5, field6, field7))
@@ -13939,7 +13914,7 @@ let inner = (Decoder21(_input))?;
 if ((|length: u32| PResult::Ok(length <= 2147483647u32))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(3089242474000390105u64));
+return Err(ParseError::FalsifiedWhere(14652068248613900169u64));
 }
 }))())?;
 let tag = ((|| PResult::Ok((Decoder173(_input))?))())?;
@@ -13960,7 +13935,7 @@ let inner = (Decoder21(_input))?;
 if ((|length: u32| PResult::Ok(length <= 2147483647u32))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(8785324329127396734u64));
+return Err(ParseError::FalsifiedWhere(3089242474000390105u64));
 }
 }))())?;
 let tag = ((|| PResult::Ok({
@@ -13971,7 +13946,7 @@ let b = _input.read_byte()?;
 if b == 73 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(14646838598150249928u64));
+return Err(ParseError::ExcludedBranch(8785324329127396734u64));
 }
 }))();
 if _res.is_err() {
@@ -14104,7 +14079,7 @@ let inner = (Decoder21(_input))?;
 if ((|length: u32| PResult::Ok(length <= 2147483647u32))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(14949659785259585833u64));
+return Err(ParseError::FalsifiedWhere(14646838598150249928u64));
 }
 }))())?;
 let tag = ((|| PResult::Ok((Decoder142(_input))?))())?;
@@ -14131,7 +14106,7 @@ b
 if ((|method_info: zlib_main_compression_method_flags| PResult::Ok(method_info.compression_method.clone() == 8u8))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(562280208679883345u64));
+return Err(ParseError::FalsifiedWhere(14949659785259585833u64));
 }
 }))())?;
 let flags = ((|| PResult::Ok({
@@ -14170,7 +14145,7 @@ let inner = (Decoder21(_input))?;
 if ((|length: u32| PResult::Ok(length <= 2147483647u32))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(1426091679331900812u64));
+return Err(ParseError::FalsifiedWhere(562280208679883345u64));
 }
 }))())?;
 let tag = ((|| PResult::Ok((Decoder132(_input))?))())?;
@@ -14191,7 +14166,7 @@ let b = _input.read_byte()?;
 if b == 73 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(5775567136742802567u64));
+return Err(ParseError::ExcludedBranch(1426091679331900812u64));
 }
 }))())?;
 let field1 = ((|| PResult::Ok({
@@ -14199,7 +14174,7 @@ let b = _input.read_byte()?;
 if b == 69 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(12616585043782016404u64));
+return Err(ParseError::ExcludedBranch(5775567136742802567u64));
 }
 }))())?;
 let field2 = ((|| PResult::Ok({
@@ -14207,7 +14182,7 @@ let b = _input.read_byte()?;
 if b == 78 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(13260893460097040029u64));
+return Err(ParseError::ExcludedBranch(12616585043782016404u64));
 }
 }))())?;
 let field3 = ((|| PResult::Ok({
@@ -14215,7 +14190,7 @@ let b = _input.read_byte()?;
 if b == 68 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(5931637197703965434u64));
+return Err(ParseError::ExcludedBranch(13260893460097040029u64));
 }
 }))())?;
 PResult::Ok((field0, field1, field2, field3))
@@ -15997,7 +15972,7 @@ PResult::Ok(match distance_code as u8 {
 },
 
 30u8..=31u8 => {
-return Err(ParseError::FailToken(144820728017547457u64));
+return Err(ParseError::FailToken(5931637197703965434u64));
 },
 
 _other => {
@@ -16208,7 +16183,7 @@ let b = _input.read_byte()?;
 if b == 73 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(17376845638706524656u64));
+return Err(ParseError::ExcludedBranch(144820728017547457u64));
 }
 }))())?;
 let field1 = ((|| PResult::Ok({
@@ -16216,7 +16191,7 @@ let b = _input.read_byte()?;
 if b == 68 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9452754313802575046u64));
+return Err(ParseError::ExcludedBranch(17376845638706524656u64));
 }
 }))())?;
 let field2 = ((|| PResult::Ok({
@@ -16224,7 +16199,7 @@ let b = _input.read_byte()?;
 if b == 65 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(15362228896620571409u64));
+return Err(ParseError::ExcludedBranch(9452754313802575046u64));
 }
 }))())?;
 let field3 = ((|| PResult::Ok({
@@ -16232,7 +16207,7 @@ let b = _input.read_byte()?;
 if b == 84 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(17715157964684782708u64));
+return Err(ParseError::ExcludedBranch(15362228896620571409u64));
 }
 }))())?;
 PResult::Ok((field0, field1, field2, field3))
@@ -16265,7 +16240,7 @@ let b = _input.read_byte()?;
 PResult::Ok(if (ByteSet::from_bits([18446744069414594048, 18446744073709551615, 0, 0])).contains(b) {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9465826900165497155u64));
+return Err(ParseError::ExcludedBranch(17715157964684782708u64));
 })
 }
 
@@ -16380,7 +16355,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(14571733789425208869u64));
+return Err(ParseError::ExcludedBranch(9465826900165497155u64));
 }
 }))())?;
 (field0, field1)
@@ -16396,7 +16371,7 @@ let inner = (Decoder25(_input))?;
 if ((|x: u8| PResult::Ok(x == 0u8))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(6611121695530188940u64));
+return Err(ParseError::FalsifiedWhere(14571733789425208869u64));
 }
 }))())?;
 let compressed_profile = ((|| PResult::Ok((Decoder172(_input))?))())?;
@@ -16465,7 +16440,7 @@ let inner = (Decoder25(_input))?;
 if ((|x: u8| PResult::Ok(x <= 3u8))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(9660375186237087060u64));
+return Err(ParseError::FalsifiedWhere(6611121695530188940u64));
 }
 }))())?;
 PResult::Ok(png_srgb { rendering_intent })
@@ -16480,7 +16455,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(11684704871632490773u64));
+return Err(ParseError::ExcludedBranch(9660375186237087060u64));
 }
 }))())?;
 (field0, field1)
@@ -16496,7 +16471,7 @@ let b = _input.read_byte()?;
 if (ByteSet::from_bits([3, 0, 0, 0])).contains(b) {
 b
 } else {
-return Err(ParseError::ExcludedBranch(17081364943144677526u64));
+return Err(ParseError::ExcludedBranch(11684704871632490773u64));
 }
 }))())?;
 let compression_method = ((|| PResult::Ok({
@@ -16504,7 +16479,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9710347097769530785u64));
+return Err(ParseError::ExcludedBranch(17081364943144677526u64));
 }
 }))())?;
 let language_tag = ((|| PResult::Ok((Decoder_base_asciiz_string(_input))?))())?;
@@ -16516,7 +16491,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(2466404913032252300u64));
+return Err(ParseError::ExcludedBranch(9710347097769530785u64));
 }
 }))())?;
 (field0, field1)
@@ -16610,7 +16585,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(4149374297771033461u64));
+return Err(ParseError::ExcludedBranch(2466404913032252300u64));
 }
 }))())?;
 (field0, field1)
@@ -16654,7 +16629,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(5869833854865239916u64));
+return Err(ParseError::ExcludedBranch(4149374297771033461u64));
 }
 }))())?;
 (field0, field1)
@@ -16670,7 +16645,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(13372240079418200167u64));
+return Err(ParseError::ExcludedBranch(5869833854865239916u64));
 }
 }))())?;
 let compressed_text = ((|| PResult::Ok({
@@ -16775,7 +16750,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(10504805981668764726u64));
+return Err(ParseError::ExcludedBranch(13372240079418200167u64));
 }
 }))())?;
 (field0, field1)
@@ -16791,7 +16766,7 @@ let inner = (Decoder25(_input))?;
 if ((|x: u8| PResult::Ok((x == 8u8) || (x == 16u8)))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(5250529337043320049u64));
+return Err(ParseError::FalsifiedWhere(10504805981668764726u64));
 }
 }))())?;
 let pallette = ((|| PResult::Ok(match sample_depth {
@@ -17439,6 +17414,12 @@ tmp if ((ByteSet::from_bits([18446744069414584320, 9223372036854775807, 18446744
 },
 
 _ => {
+return Err(ParseError::ExcludedBranch(4159150678276994707u64));
+}
+}
+},
+
+_ => {
 return Err(ParseError::ExcludedBranch(5633181162991720115u64));
 }
 }
@@ -17903,12 +17884,6 @@ return Err(ParseError::ExcludedBranch(6850311165997710199u64));
 _ => {
 return Err(ParseError::ExcludedBranch(2310756498479603065u64));
 }
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5816243344835903905u64));
-}
 };
 _input.close_peek_context()?;
 ret
@@ -17922,7 +17897,7 @@ let b = _input.read_byte()?;
 if (ByteSet::from_bits([18446744069414584320, 9223372036854775807, 18446744065119617024, 18446744073709551615])).contains(b) {
 b
 } else {
-return Err(ParseError::ExcludedBranch(4159150678276994707u64));
+return Err(ParseError::ExcludedBranch(5250529337043320049u64));
 }
 };
 accum.push(next_elem);
@@ -18494,6 +18469,12 @@ tmp if ((ByteSet::from_bits([18446744069414584320, 9223372036854775807, 18446744
 },
 
 _ => {
+return Err(ParseError::ExcludedBranch(16915030153566842158u64));
+}
+}
+},
+
+_ => {
 return Err(ParseError::ExcludedBranch(5877293982949196624u64));
 }
 }
@@ -18958,12 +18939,6 @@ return Err(ParseError::ExcludedBranch(9730514595131843432u64));
 _ => {
 return Err(ParseError::ExcludedBranch(11851311358763079517u64));
 }
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(4195586632355556000u64));
-}
 };
 _input.close_peek_context()?;
 ret
@@ -18977,7 +18952,7 @@ let b = _input.read_byte()?;
 if (ByteSet::from_bits([18446744069414584320, 9223372036854775807, 18446744065119617024, 18446744073709551615])).contains(b) {
 b
 } else {
-return Err(ParseError::ExcludedBranch(16915030153566842158u64));
+return Err(ParseError::ExcludedBranch(5816243344835903905u64));
 }
 };
 accum.push(next_elem);
@@ -18998,7 +18973,7 @@ b
 if ((|method_info: zlib_main_compression_method_flags| PResult::Ok(method_info.compression_method.clone() == 8u8))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(3595083506735372973u64));
+return Err(ParseError::FalsifiedWhere(4195586632355556000u64));
 }
 }))())?;
 let flags = ((|| PResult::Ok({
@@ -19084,7 +19059,7 @@ tmp if ((ByteSet::from_bits([0, 0, 0, 3940649673949184])).contains(tmp)) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(7160308966995483862u64));
+return Err(ParseError::ExcludedBranch(3595083506735372973u64));
 }
 };
 _input.close_peek_context()?;
@@ -19664,6 +19639,12 @@ tmp if ((ByteSet::from_bits([18446744069414584320, 9223372036854775807, 18446744
 },
 
 _ => {
+return Err(ParseError::ExcludedBranch(10995965655495216468u64));
+}
+}
+},
+
+_ => {
 return Err(ParseError::ExcludedBranch(329678914966083835u64));
 }
 }
@@ -20128,12 +20109,6 @@ return Err(ParseError::ExcludedBranch(1995664400520545068u64));
 _ => {
 return Err(ParseError::ExcludedBranch(14904826071154862403u64));
 }
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9819888267966403254u64));
-}
 };
 _input.close_peek_context()?;
 ret
@@ -20147,7 +20122,7 @@ let b = _input.read_byte()?;
 if (ByteSet::from_bits([18446744069414584320, 9223372036854775807, 18446744065119617024, 18446744073709551615])).contains(b) {
 b
 } else {
-return Err(ParseError::ExcludedBranch(10995965655495216468u64));
+return Err(ParseError::ExcludedBranch(7160308966995483862u64));
 }
 };
 accum.push(next_elem);
@@ -20719,6 +20694,12 @@ tmp if ((ByteSet::from_bits([18446744069414584320, 9223372036854775807, 18446744
 },
 
 _ => {
+return Err(ParseError::ExcludedBranch(9848248130448711783u64));
+}
+}
+},
+
+_ => {
 return Err(ParseError::ExcludedBranch(13072404838946064765u64));
 }
 }
@@ -21183,12 +21164,6 @@ return Err(ParseError::ExcludedBranch(14148913971033431093u64));
 _ => {
 return Err(ParseError::ExcludedBranch(17190949120592669315u64));
 }
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(8699787504309122591u64));
-}
 };
 _input.close_peek_context()?;
 ret
@@ -21202,7 +21177,7 @@ let b = _input.read_byte()?;
 if (ByteSet::from_bits([18446744069414584320, 9223372036854775807, 18446744065119617024, 18446744073709551615])).contains(b) {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9848248130448711783u64));
+return Err(ParseError::ExcludedBranch(9819888267966403254u64));
 }
 };
 accum.push(next_elem);
@@ -21229,7 +21204,7 @@ tmp if (tmp != 0) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(5364461768558038471u64));
+return Err(ParseError::ExcludedBranch(78099073500381561u64));
 }
 };
 _input.close_peek_context()?;
@@ -21242,7 +21217,7 @@ let b = _input.read_byte()?;
 if b != 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(78099073500381561u64));
+return Err(ParseError::ExcludedBranch(8699787504309122591u64));
 }
 };
 accum.push(next_elem);
@@ -21257,7 +21232,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(7135191863324865081u64));
+return Err(ParseError::ExcludedBranch(5364461768558038471u64));
 }
 }))())?;
 PResult::Ok(base_asciiz_string { string, null })
@@ -21312,7 +21287,7 @@ tmp if ((ByteSet::from_bits([0, 0, 0, 3940649673949184])).contains(tmp)) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(5733684513012333041u64));
+return Err(ParseError::ExcludedBranch(7135191863324865081u64));
 }
 };
 _input.close_peek_context()?;
@@ -21341,7 +21316,7 @@ b
 if ((|method_info: zlib_main_compression_method_flags| PResult::Ok(method_info.compression_method.clone() == 8u8))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(3269600573864009399u64));
+return Err(ParseError::FalsifiedWhere(5733684513012333041u64));
 }
 }))())?;
 let flags = ((|| PResult::Ok({
@@ -21419,7 +21394,7 @@ tmp if ((ByteSet::from_bits([0, 0, 0, 3940649673949184])).contains(tmp)) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(16604650314446872341u64));
+return Err(ParseError::ExcludedBranch(3269600573864009399u64));
 }
 };
 _input.close_peek_context()?;
@@ -21999,6 +21974,12 @@ tmp if ((ByteSet::from_bits([18446744069414584320, 9223372036854775807, 18446744
 },
 
 _ => {
+return Err(ParseError::ExcludedBranch(14275129881911283147u64));
+}
+}
+},
+
+_ => {
 return Err(ParseError::ExcludedBranch(8473763373531540844u64));
 }
 }
@@ -22463,12 +22444,6 @@ return Err(ParseError::ExcludedBranch(12550558264664848853u64));
 _ => {
 return Err(ParseError::ExcludedBranch(16954835414833850385u64));
 }
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(1891774877762105457u64));
-}
 };
 _input.close_peek_context()?;
 ret
@@ -22482,7 +22457,7 @@ let b = _input.read_byte()?;
 if (ByteSet::from_bits([18446744069414584320, 9223372036854775807, 18446744065119617024, 18446744073709551615])).contains(b) {
 b
 } else {
-return Err(ParseError::ExcludedBranch(14275129881911283147u64));
+return Err(ParseError::ExcludedBranch(16604650314446872341u64));
 }
 };
 accum.push(next_elem);
@@ -22503,7 +22478,7 @@ b
 if ((|method_info: zlib_main_compression_method_flags| PResult::Ok(method_info.compression_method.clone() == 8u8))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(13705211812356460160u64));
+return Err(ParseError::FalsifiedWhere(1891774877762105457u64));
 }
 }))())?;
 let flags = ((|| PResult::Ok({
@@ -22542,7 +22517,7 @@ let b = _input.read_byte()?;
 if b == 73 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(5515497093089591991u64));
+return Err(ParseError::ExcludedBranch(13705211812356460160u64));
 }
 }))())?;
 let field1 = ((|| PResult::Ok({
@@ -22550,7 +22525,7 @@ let b = _input.read_byte()?;
 if b == 72 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(1328880024623199753u64));
+return Err(ParseError::ExcludedBranch(5515497093089591991u64));
 }
 }))())?;
 let field2 = ((|| PResult::Ok({
@@ -22558,7 +22533,7 @@ let b = _input.read_byte()?;
 if b == 68 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(6882184431082022206u64));
+return Err(ParseError::ExcludedBranch(1328880024623199753u64));
 }
 }))())?;
 let field3 = ((|| PResult::Ok({
@@ -22566,7 +22541,7 @@ let b = _input.read_byte()?;
 if b == 82 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(3998072683184925592u64));
+return Err(ParseError::ExcludedBranch(6882184431082022206u64));
 }
 }))())?;
 PResult::Ok((field0, field1, field2, field3))
@@ -23868,7 +23843,7 @@ tmp if (tmp != 0) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(7279615132236188739u64));
+return Err(ParseError::ExcludedBranch(29850628954056690u64));
 }
 };
 _input.close_peek_context()?;
@@ -23881,7 +23856,7 @@ let b = _input.read_byte()?;
 if b != 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(29850628954056690u64));
+return Err(ParseError::ExcludedBranch(3998072683184925592u64));
 }
 };
 accum.push(next_elem);
@@ -23896,7 +23871,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(17636172564439370608u64));
+return Err(ParseError::ExcludedBranch(7279615132236188739u64));
 }
 }))())?;
 PResult::Ok(base_asciiz_string { string, null })
@@ -24835,7 +24810,7 @@ tmp if (tmp != 0) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(16714498072262546943u64));
+return Err(ParseError::ExcludedBranch(13863787293436782080u64));
 }
 };
 _input.close_peek_context()?;
@@ -24848,7 +24823,7 @@ let b = _input.read_byte()?;
 if b != 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(13863787293436782080u64));
+return Err(ParseError::ExcludedBranch(17636172564439370608u64));
 }
 };
 accum.push(next_elem);
@@ -24863,7 +24838,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(2157707350523277837u64));
+return Err(ParseError::ExcludedBranch(16714498072262546943u64));
 }
 }))())?;
 PResult::Ok(base_asciiz_string { string, null })
@@ -24887,7 +24862,7 @@ tmp if (tmp != 0) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14950271805613481359u64));
+return Err(ParseError::ExcludedBranch(15134222038433106385u64));
 }
 };
 _input.close_peek_context()?;
@@ -24900,7 +24875,7 @@ let b = _input.read_byte()?;
 if b != 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(15134222038433106385u64));
+return Err(ParseError::ExcludedBranch(2157707350523277837u64));
 }
 };
 accum.push(next_elem);
@@ -24915,7 +24890,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(5499566165243611472u64));
+return Err(ParseError::ExcludedBranch(14950271805613481359u64));
 }
 }))())?;
 PResult::Ok(base_asciiz_string { string, null })
@@ -24939,7 +24914,7 @@ tmp if (tmp != 0) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14916894554939814670u64));
+return Err(ParseError::ExcludedBranch(11265176092564100083u64));
 }
 };
 _input.close_peek_context()?;
@@ -24952,7 +24927,7 @@ let b = _input.read_byte()?;
 if b != 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(11265176092564100083u64));
+return Err(ParseError::ExcludedBranch(5499566165243611472u64));
 }
 };
 accum.push(next_elem);
@@ -24967,7 +24942,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(10473830801714814973u64));
+return Err(ParseError::ExcludedBranch(14916894554939814670u64));
 }
 }))())?;
 PResult::Ok(base_asciiz_string { string, null })
@@ -24991,7 +24966,7 @@ tmp if (tmp != 0) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(16975008930446149745u64));
+return Err(ParseError::ExcludedBranch(5334325531610156978u64));
 }
 };
 _input.close_peek_context()?;
@@ -25004,7 +24979,7 @@ let b = _input.read_byte()?;
 if b != 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(5334325531610156978u64));
+return Err(ParseError::ExcludedBranch(10473830801714814973u64));
 }
 };
 accum.push(next_elem);
@@ -25019,7 +24994,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(760820951392925727u64));
+return Err(ParseError::ExcludedBranch(16975008930446149745u64));
 }
 }))())?;
 PResult::Ok(base_asciiz_string { string, null })
@@ -25043,7 +25018,7 @@ tmp if (tmp != 0) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(4600414761378562541u64));
+return Err(ParseError::ExcludedBranch(14363790737598139216u64));
 }
 };
 _input.close_peek_context()?;
@@ -25056,7 +25031,7 @@ let b = _input.read_byte()?;
 if b != 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(14363790737598139216u64));
+return Err(ParseError::ExcludedBranch(760820951392925727u64));
 }
 };
 accum.push(next_elem);
@@ -25071,7 +25046,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(18313399323903636110u64));
+return Err(ParseError::ExcludedBranch(4600414761378562541u64));
 }
 }))())?;
 PResult::Ok(base_asciiz_string { string, null })
@@ -25083,7 +25058,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(15786118691017431738u64));
+return Err(ParseError::ExcludedBranch(18313399323903636110u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -25091,7 +25066,7 @@ let b = _input.read_byte()?;
 if b == 216 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(16165934354425559621u64));
+return Err(ParseError::ExcludedBranch(15786118691017431738u64));
 }
 }))())?;
 PResult::Ok(jpeg_eoi { ff, marker })
@@ -25115,11 +25090,11 @@ match b {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(16399036514137665776u64));
+return Err(ParseError::ExcludedBranch(16165934354425559621u64));
 }
 }
 } else {
-return Err(ParseError::ExcludedBranch(7931358881575056193u64));
+return Err(ParseError::ExcludedBranch(16399036514137665776u64));
 };
 _input.close_peek_context()?;
 ret
@@ -25137,7 +25112,7 @@ jpeg_frame_initial_segment::app1(inner)
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(17863486658382945784u64));
+return Err(ParseError::ExcludedBranch(7931358881575056193u64));
 }
 }
 }))())?;
@@ -25288,11 +25263,11 @@ match b {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11515797873012483658u64));
+return Err(ParseError::ExcludedBranch(17863486658382945784u64));
 }
 }
 } else {
-return Err(ParseError::ExcludedBranch(8584109755265226714u64));
+return Err(ParseError::ExcludedBranch(11515797873012483658u64));
 };
 _input.close_peek_context()?;
 ret
@@ -25414,11 +25389,11 @@ match b {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(8076978189295213982u64));
+return Err(ParseError::ExcludedBranch(8584109755265226714u64));
 }
 }
 } else {
-return Err(ParseError::ExcludedBranch(11570281271401624317u64));
+return Err(ParseError::ExcludedBranch(8076978189295213982u64));
 };
 _input.close_peek_context()?;
 ret
@@ -25435,7 +25410,7 @@ jpeg_frame_dnl::none
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14687724984806605719u64));
+return Err(ParseError::ExcludedBranch(11570281271401624317u64));
 }
 }
 }))())?;
@@ -25542,11 +25517,11 @@ match b {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(1378805635639824117u64));
+return Err(ParseError::ExcludedBranch(14687724984806605719u64));
 }
 }
 } else {
-return Err(ParseError::ExcludedBranch(8385173961957899741u64));
+return Err(ParseError::ExcludedBranch(1378805635639824117u64));
 };
 _input.close_peek_context()?;
 ret
@@ -25570,7 +25545,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(8407356061009412694u64));
+return Err(ParseError::ExcludedBranch(8385173961957899741u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -25578,7 +25553,7 @@ let b = _input.read_byte()?;
 if b == 217 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(6881565717664829242u64));
+return Err(ParseError::ExcludedBranch(8407356061009412694u64));
 }
 }))())?;
 PResult::Ok(jpeg_eoi { ff, marker })
@@ -25591,7 +25566,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(13752480002470540422u64));
+return Err(ParseError::ExcludedBranch(6881565717664829242u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -25599,7 +25574,7 @@ let b = _input.read_byte()?;
 if b == 224 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(17107648091243309207u64));
+return Err(ParseError::ExcludedBranch(13752480002470540422u64));
 }
 }))())?;
 jpeg_eoi { ff, marker }
@@ -25622,7 +25597,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(5534609128357633386u64));
+return Err(ParseError::ExcludedBranch(17107648091243309207u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -25630,7 +25605,7 @@ let b = _input.read_byte()?;
 if b == 225 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(14539762430836305896u64));
+return Err(ParseError::ExcludedBranch(5534609128357633386u64));
 }
 }))())?;
 jpeg_eoi { ff, marker }
@@ -25739,11 +25714,11 @@ match b {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(16625761205375889740u64));
+return Err(ParseError::ExcludedBranch(14539762430836305896u64));
 }
 }
 } else {
-return Err(ParseError::ExcludedBranch(2662265345698212949u64));
+return Err(ParseError::ExcludedBranch(16625761205375889740u64));
 };
 _input.close_peek_context()?;
 ret
@@ -25856,7 +25831,7 @@ jpeg_table_or_misc::com(inner)
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(3344648651879382526u64));
+return Err(ParseError::ExcludedBranch(2662265345698212949u64));
 }
 })
 }
@@ -25922,11 +25897,11 @@ match b {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(8599210436172030522u64));
+return Err(ParseError::ExcludedBranch(3344648651879382526u64));
 }
 }
 } else {
-return Err(ParseError::ExcludedBranch(3484767027554133518u64));
+return Err(ParseError::ExcludedBranch(8599210436172030522u64));
 };
 _input.close_peek_context()?;
 ret
@@ -25999,7 +25974,7 @@ jpeg_frame_header::sof15(inner)
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(15403934492100194569u64));
+return Err(ParseError::ExcludedBranch(3484767027554133518u64));
 }
 })
 }
@@ -26104,11 +26079,11 @@ match b {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(12041148194529633639u64));
+return Err(ParseError::ExcludedBranch(15403934492100194569u64));
 }
 }
 } else {
-return Err(ParseError::ExcludedBranch(2288772415159374970u64));
+return Err(ParseError::ExcludedBranch(12041148194529633639u64));
 };
 _input.close_peek_context()?;
 ret
@@ -26135,7 +26110,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(17888323854924040413u64));
+return Err(ParseError::ExcludedBranch(2288772415159374970u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -26143,7 +26118,7 @@ let b = _input.read_byte()?;
 if b == 220 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(6279087434444973374u64));
+return Err(ParseError::ExcludedBranch(17888323854924040413u64));
 }
 }))())?;
 jpeg_eoi { ff, marker }
@@ -26259,11 +26234,11 @@ match b {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11074951631636946051u64));
+return Err(ParseError::ExcludedBranch(6279087434444973374u64));
 }
 }
 } else {
-return Err(ParseError::ExcludedBranch(15601622509425384091u64));
+return Err(ParseError::ExcludedBranch(11074951631636946051u64));
 };
 _input.close_peek_context()?;
 ret
@@ -26290,7 +26265,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(13675295148592556047u64));
+return Err(ParseError::ExcludedBranch(15601622509425384091u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -26298,7 +26273,7 @@ let b = _input.read_byte()?;
 if b == 218 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(4569970360394099475u64));
+return Err(ParseError::ExcludedBranch(13675295148592556047u64));
 }
 }))())?;
 jpeg_eoi { ff, marker }
@@ -26459,13 +26434,13 @@ match b {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(8403192837054512577u64));
+return Err(ParseError::ExcludedBranch(15433822888775103886u64));
 }
 }
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(17073037115051226650u64));
+return Err(ParseError::ExcludedBranch(8403192837054512577u64));
 }
 };
 _input.close_peek_context()?;
@@ -26523,13 +26498,13 @@ match b {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(9110520999974091875u64));
+return Err(ParseError::ExcludedBranch(4569970360394099475u64));
 }
 }
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(15293691521783146694u64));
+return Err(ParseError::ExcludedBranch(9110520999974091875u64));
 }
 };
 _input.close_peek_context()?;
@@ -26583,7 +26558,7 @@ jpeg_scan_data_scan_data::rst7(inner)
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(15433822888775103886u64));
+return Err(ParseError::ExcludedBranch(15293691521783146694u64));
 }
 }
 };
@@ -26649,7 +26624,7 @@ tmp if (tmp != 255) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(12017601628070515145u64));
+return Err(ParseError::ExcludedBranch(16112061863928357291u64));
 }
 };
 _input.close_peek_context()?;
@@ -26662,7 +26637,7 @@ let b = _input.read_byte()?;
 if b != 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(3975307768385535064u64));
+return Err(ParseError::ExcludedBranch(17073037115051226650u64));
 }
 },
 
@@ -26673,7 +26648,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(10599514554463239458u64));
+return Err(ParseError::ExcludedBranch(3975307768385535064u64));
 }
 }))())?;
 let field1 = ((|| PResult::Ok({
@@ -26681,7 +26656,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(16112061863928357291u64));
+return Err(ParseError::ExcludedBranch(10599514554463239458u64));
 }
 }))())?;
 (field0, field1)
@@ -26690,7 +26665,7 @@ return Err(ParseError::ExcludedBranch(16112061863928357291u64));
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(1872233699568519226u64));
+return Err(ParseError::ExcludedBranch(12017601628070515145u64));
 }
 })
 }
@@ -26701,7 +26676,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(10708294527730390829u64));
+return Err(ParseError::ExcludedBranch(1872233699568519226u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -26709,7 +26684,7 @@ let b = _input.read_byte()?;
 if b == 208 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(7432469293302627017u64));
+return Err(ParseError::ExcludedBranch(10708294527730390829u64));
 }
 }))())?;
 PResult::Ok(jpeg_eoi { ff, marker })
@@ -26721,7 +26696,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(13181260675040079306u64));
+return Err(ParseError::ExcludedBranch(7432469293302627017u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -26729,7 +26704,7 @@ let b = _input.read_byte()?;
 if b == 209 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9159119361499271180u64));
+return Err(ParseError::ExcludedBranch(13181260675040079306u64));
 }
 }))())?;
 PResult::Ok(jpeg_eoi { ff, marker })
@@ -26741,7 +26716,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(7795160901559545235u64));
+return Err(ParseError::ExcludedBranch(9159119361499271180u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -26749,7 +26724,7 @@ let b = _input.read_byte()?;
 if b == 210 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(3490919313637905107u64));
+return Err(ParseError::ExcludedBranch(7795160901559545235u64));
 }
 }))())?;
 PResult::Ok(jpeg_eoi { ff, marker })
@@ -26761,7 +26736,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9331389203258424019u64));
+return Err(ParseError::ExcludedBranch(3490919313637905107u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -26769,7 +26744,7 @@ let b = _input.read_byte()?;
 if b == 211 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(16679512278832019969u64));
+return Err(ParseError::ExcludedBranch(9331389203258424019u64));
 }
 }))())?;
 PResult::Ok(jpeg_eoi { ff, marker })
@@ -26781,7 +26756,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(15311158871930328757u64));
+return Err(ParseError::ExcludedBranch(16679512278832019969u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -26789,7 +26764,7 @@ let b = _input.read_byte()?;
 if b == 212 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9892894478446917378u64));
+return Err(ParseError::ExcludedBranch(15311158871930328757u64));
 }
 }))())?;
 PResult::Ok(jpeg_eoi { ff, marker })
@@ -26801,7 +26776,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(3585635225240718191u64));
+return Err(ParseError::ExcludedBranch(9892894478446917378u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -26809,7 +26784,7 @@ let b = _input.read_byte()?;
 if b == 213 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(5208404121666294786u64));
+return Err(ParseError::ExcludedBranch(3585635225240718191u64));
 }
 }))())?;
 PResult::Ok(jpeg_eoi { ff, marker })
@@ -26821,7 +26796,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(237665900562449517u64));
+return Err(ParseError::ExcludedBranch(5208404121666294786u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -26829,7 +26804,7 @@ let b = _input.read_byte()?;
 if b == 214 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(13751590285972774894u64));
+return Err(ParseError::ExcludedBranch(237665900562449517u64));
 }
 }))())?;
 PResult::Ok(jpeg_eoi { ff, marker })
@@ -26841,7 +26816,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(12552648416444111338u64));
+return Err(ParseError::ExcludedBranch(13751590285972774894u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -26849,7 +26824,7 @@ let b = _input.read_byte()?;
 if b == 215 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9201081899504003615u64));
+return Err(ParseError::ExcludedBranch(12552648416444111338u64));
 }
 }))())?;
 PResult::Ok(jpeg_eoi { ff, marker })
@@ -26861,7 +26836,7 @@ let inner = (Decoder25(_input))?;
 if ((|x: u8| PResult::Ok((x >= 1u8) && (x <= 4u8)))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(10776065777346510440u64));
+return Err(ParseError::FalsifiedWhere(9201081899504003615u64));
 }
 }))())?;
 let image_components = ((|| PResult::Ok({
@@ -26876,7 +26851,7 @@ let inner = (Decoder25(_input))?;
 if ((|x: u8| PResult::Ok(x <= 63u8))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(1821331332215525359u64));
+return Err(ParseError::FalsifiedWhere(10776065777346510440u64));
 }
 }))())?;
 let end_spectral_selection = ((|| PResult::Ok({
@@ -26884,7 +26859,7 @@ let inner = (Decoder25(_input))?;
 if ((|x: u8| PResult::Ok(x <= 63u8))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(1550574349011231204u64));
+return Err(ParseError::FalsifiedWhere(1821331332215525359u64));
 }
 }))())?;
 let approximation_bit_position = ((|| PResult::Ok({
@@ -26910,7 +26885,7 @@ b
 if ((|entropy_coding_table_ids: jpeg_sos_image_component_entropy_coding_table_ids| PResult::Ok((entropy_coding_table_ids.dc_entropy_coding_table_id.clone() <= 3u8) && (entropy_coding_table_ids.ac_entropy_coding_table_id.clone() <= 3u8)))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(6867774794241173436u64));
+return Err(ParseError::FalsifiedWhere(1550574349011231204u64));
 }
 }))())?;
 PResult::Ok(jpeg_sos_image_component { component_selector, entropy_coding_table_ids })
@@ -26930,7 +26905,7 @@ false
 }))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(3475686103639625566u64));
+return Err(ParseError::FalsifiedWhere(6867774794241173436u64));
 }
 }))())?;
 PResult::Ok(jpeg_dnl_data { num_lines })
@@ -27085,13 +27060,13 @@ match b {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(2184161105566707760u64));
+return Err(ParseError::ExcludedBranch(7228157205966134869u64));
 }
 }
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(9924059786910440358u64));
+return Err(ParseError::ExcludedBranch(2184161105566707760u64));
 }
 };
 _input.close_peek_context()?;
@@ -27149,13 +27124,13 @@ match b {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(4130856500275801127u64));
+return Err(ParseError::ExcludedBranch(3475686103639625566u64));
 }
 }
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11582380281701370059u64));
+return Err(ParseError::ExcludedBranch(4130856500275801127u64));
 }
 };
 _input.close_peek_context()?;
@@ -27209,7 +27184,7 @@ jpeg_scan_data_scan_data::rst7(inner)
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(7228157205966134869u64));
+return Err(ParseError::ExcludedBranch(11582380281701370059u64));
 }
 }
 };
@@ -27267,7 +27242,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(7274029685341305701u64));
+return Err(ParseError::ExcludedBranch(9924059786910440358u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -27275,7 +27250,7 @@ let b = _input.read_byte()?;
 if b == 192 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(16051783775494465147u64));
+return Err(ParseError::ExcludedBranch(7274029685341305701u64));
 }
 }))())?;
 jpeg_eoi { ff, marker }
@@ -27298,7 +27273,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(13744164271564421708u64));
+return Err(ParseError::ExcludedBranch(16051783775494465147u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -27306,7 +27281,7 @@ let b = _input.read_byte()?;
 if b == 193 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(5892114170581446733u64));
+return Err(ParseError::ExcludedBranch(13744164271564421708u64));
 }
 }))())?;
 jpeg_eoi { ff, marker }
@@ -27329,7 +27304,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(11821813774070801620u64));
+return Err(ParseError::ExcludedBranch(5892114170581446733u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -27337,7 +27312,7 @@ let b = _input.read_byte()?;
 if b == 194 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(14520503729026832983u64));
+return Err(ParseError::ExcludedBranch(11821813774070801620u64));
 }
 }))())?;
 jpeg_eoi { ff, marker }
@@ -27360,7 +27335,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(5309491469191307378u64));
+return Err(ParseError::ExcludedBranch(14520503729026832983u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -27368,7 +27343,7 @@ let b = _input.read_byte()?;
 if b == 195 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(17983075411320920965u64));
+return Err(ParseError::ExcludedBranch(5309491469191307378u64));
 }
 }))())?;
 jpeg_eoi { ff, marker }
@@ -27391,7 +27366,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(7023661717588102849u64));
+return Err(ParseError::ExcludedBranch(17983075411320920965u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -27399,7 +27374,7 @@ let b = _input.read_byte()?;
 if b == 197 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(3448575031819686448u64));
+return Err(ParseError::ExcludedBranch(7023661717588102849u64));
 }
 }))())?;
 jpeg_eoi { ff, marker }
@@ -27422,7 +27397,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9960855096836829935u64));
+return Err(ParseError::ExcludedBranch(3448575031819686448u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -27430,7 +27405,7 @@ let b = _input.read_byte()?;
 if b == 198 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(218475477370319322u64));
+return Err(ParseError::ExcludedBranch(9960855096836829935u64));
 }
 }))())?;
 jpeg_eoi { ff, marker }
@@ -27453,7 +27428,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(18357658168615546095u64));
+return Err(ParseError::ExcludedBranch(218475477370319322u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -27461,7 +27436,7 @@ let b = _input.read_byte()?;
 if b == 199 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(10650412753233146525u64));
+return Err(ParseError::ExcludedBranch(18357658168615546095u64));
 }
 }))())?;
 jpeg_eoi { ff, marker }
@@ -27484,7 +27459,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(15859964085544252343u64));
+return Err(ParseError::ExcludedBranch(10650412753233146525u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -27492,7 +27467,7 @@ let b = _input.read_byte()?;
 if b == 201 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(653325817133119558u64));
+return Err(ParseError::ExcludedBranch(15859964085544252343u64));
 }
 }))())?;
 jpeg_eoi { ff, marker }
@@ -27515,7 +27490,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(3349032559334020401u64));
+return Err(ParseError::ExcludedBranch(653325817133119558u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -27523,7 +27498,7 @@ let b = _input.read_byte()?;
 if b == 202 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(14115009527471272688u64));
+return Err(ParseError::ExcludedBranch(3349032559334020401u64));
 }
 }))())?;
 jpeg_eoi { ff, marker }
@@ -27546,7 +27521,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(8350850950759220429u64));
+return Err(ParseError::ExcludedBranch(14115009527471272688u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -27554,7 +27529,7 @@ let b = _input.read_byte()?;
 if b == 203 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(15412400192383838763u64));
+return Err(ParseError::ExcludedBranch(8350850950759220429u64));
 }
 }))())?;
 jpeg_eoi { ff, marker }
@@ -27577,7 +27552,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(16334217566159141080u64));
+return Err(ParseError::ExcludedBranch(15412400192383838763u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -27585,7 +27560,7 @@ let b = _input.read_byte()?;
 if b == 205 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(15032955882314050195u64));
+return Err(ParseError::ExcludedBranch(16334217566159141080u64));
 }
 }))())?;
 jpeg_eoi { ff, marker }
@@ -27608,7 +27583,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(12522857579864693834u64));
+return Err(ParseError::ExcludedBranch(15032955882314050195u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -27616,7 +27591,7 @@ let b = _input.read_byte()?;
 if b == 206 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(15286713778088114821u64));
+return Err(ParseError::ExcludedBranch(12522857579864693834u64));
 }
 }))())?;
 jpeg_eoi { ff, marker }
@@ -27639,7 +27614,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(17055268834995250246u64));
+return Err(ParseError::ExcludedBranch(15286713778088114821u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -27647,7 +27622,7 @@ let b = _input.read_byte()?;
 if b == 207 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(15014773733126201031u64));
+return Err(ParseError::ExcludedBranch(17055268834995250246u64));
 }
 }))())?;
 jpeg_eoi { ff, marker }
@@ -27669,7 +27644,7 @@ let inner = (Decoder25(_input))?;
 if ((|x: u8| PResult::Ok((x >= 2u8) && (x <= 16u8)))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(9895655502210650925u64));
+return Err(ParseError::FalsifiedWhere(15014773733126201031u64));
 }
 }))())?;
 let num_lines = ((|| PResult::Ok((Decoder24(_input))?))())?;
@@ -27686,7 +27661,7 @@ false
 }))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(3344835778759068560u64));
+return Err(ParseError::FalsifiedWhere(9895655502210650925u64));
 }
 }))())?;
 let num_image_components = ((|| PResult::Ok({
@@ -27702,7 +27677,7 @@ false
 }))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(2014773054382805425u64));
+return Err(ParseError::FalsifiedWhere(3344835778759068560u64));
 }
 }))())?;
 let image_components = ((|| PResult::Ok({
@@ -27729,7 +27704,7 @@ let inner = (Decoder25(_input))?;
 if ((|x: u8| PResult::Ok(x <= 3u8))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(3011460078285478248u64));
+return Err(ParseError::FalsifiedWhere(2014773054382805425u64));
 }
 }))())?;
 PResult::Ok(jpeg_sof_image_component { id, sampling_factor, quantization_table_id })
@@ -27742,7 +27717,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(5117297982688264891u64));
+return Err(ParseError::ExcludedBranch(3011460078285478248u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -27750,7 +27725,7 @@ let b = _input.read_byte()?;
 if b == 219 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(4614223265245060097u64));
+return Err(ParseError::ExcludedBranch(5117297982688264891u64));
 }
 }))())?;
 jpeg_eoi { ff, marker }
@@ -27797,7 +27772,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(2858990937242709991u64));
+return Err(ParseError::ExcludedBranch(4614223265245060097u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -27805,7 +27780,7 @@ let b = _input.read_byte()?;
 if b == 196 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(13162270726566423196u64));
+return Err(ParseError::ExcludedBranch(2858990937242709991u64));
 }
 }))())?;
 jpeg_eoi { ff, marker }
@@ -27828,7 +27803,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(6766897041260485978u64));
+return Err(ParseError::ExcludedBranch(13162270726566423196u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -27836,7 +27811,7 @@ let b = _input.read_byte()?;
 if b == 204 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(7359082011512182682u64));
+return Err(ParseError::ExcludedBranch(6766897041260485978u64));
 }
 }))())?;
 jpeg_eoi { ff, marker }
@@ -27859,7 +27834,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(4005260763079064488u64));
+return Err(ParseError::ExcludedBranch(7359082011512182682u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -27867,7 +27842,7 @@ let b = _input.read_byte()?;
 if b == 221 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9895427541506148364u64));
+return Err(ParseError::ExcludedBranch(4005260763079064488u64));
 }
 }))())?;
 jpeg_eoi { ff, marker }
@@ -27890,7 +27865,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(15241527188218394569u64));
+return Err(ParseError::ExcludedBranch(9895427541506148364u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -27898,7 +27873,7 @@ let b = _input.read_byte()?;
 if b == 226 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(5019692195244899787u64));
+return Err(ParseError::ExcludedBranch(15241527188218394569u64));
 }
 }))())?;
 jpeg_eoi { ff, marker }
@@ -27941,7 +27916,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(663652071640520941u64));
+return Err(ParseError::ExcludedBranch(5019692195244899787u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -27949,7 +27924,7 @@ let b = _input.read_byte()?;
 if b == 227 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(16835260701216065402u64));
+return Err(ParseError::ExcludedBranch(663652071640520941u64));
 }
 }))())?;
 jpeg_eoi { ff, marker }
@@ -27992,7 +27967,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(4248622096514297129u64));
+return Err(ParseError::ExcludedBranch(16835260701216065402u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -28000,7 +27975,7 @@ let b = _input.read_byte()?;
 if b == 228 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(18304605036866855350u64));
+return Err(ParseError::ExcludedBranch(4248622096514297129u64));
 }
 }))())?;
 jpeg_eoi { ff, marker }
@@ -28043,7 +28018,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(49400955721755355u64));
+return Err(ParseError::ExcludedBranch(18304605036866855350u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -28051,7 +28026,7 @@ let b = _input.read_byte()?;
 if b == 229 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(8882217996184815919u64));
+return Err(ParseError::ExcludedBranch(49400955721755355u64));
 }
 }))())?;
 jpeg_eoi { ff, marker }
@@ -28094,7 +28069,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(11885930557202460461u64));
+return Err(ParseError::ExcludedBranch(8882217996184815919u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -28102,7 +28077,7 @@ let b = _input.read_byte()?;
 if b == 230 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9841369023026740320u64));
+return Err(ParseError::ExcludedBranch(11885930557202460461u64));
 }
 }))())?;
 jpeg_eoi { ff, marker }
@@ -28145,7 +28120,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(15065685669539080124u64));
+return Err(ParseError::ExcludedBranch(9841369023026740320u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -28153,7 +28128,7 @@ let b = _input.read_byte()?;
 if b == 231 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(4896351207164742422u64));
+return Err(ParseError::ExcludedBranch(15065685669539080124u64));
 }
 }))())?;
 jpeg_eoi { ff, marker }
@@ -28196,7 +28171,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(12845528861092334564u64));
+return Err(ParseError::ExcludedBranch(4896351207164742422u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -28204,7 +28179,7 @@ let b = _input.read_byte()?;
 if b == 232 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(8497774971318424699u64));
+return Err(ParseError::ExcludedBranch(12845528861092334564u64));
 }
 }))())?;
 jpeg_eoi { ff, marker }
@@ -28247,7 +28222,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(13677998342346693652u64));
+return Err(ParseError::ExcludedBranch(8497774971318424699u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -28255,7 +28230,7 @@ let b = _input.read_byte()?;
 if b == 233 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(18442161777584514946u64));
+return Err(ParseError::ExcludedBranch(13677998342346693652u64));
 }
 }))())?;
 jpeg_eoi { ff, marker }
@@ -28298,7 +28273,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(2668737607901180946u64));
+return Err(ParseError::ExcludedBranch(18442161777584514946u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -28306,7 +28281,7 @@ let b = _input.read_byte()?;
 if b == 234 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(12828788577937869717u64));
+return Err(ParseError::ExcludedBranch(2668737607901180946u64));
 }
 }))())?;
 jpeg_eoi { ff, marker }
@@ -28349,7 +28324,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(4528919599938425798u64));
+return Err(ParseError::ExcludedBranch(12828788577937869717u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -28357,7 +28332,7 @@ let b = _input.read_byte()?;
 if b == 235 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(12955185663715491460u64));
+return Err(ParseError::ExcludedBranch(4528919599938425798u64));
 }
 }))())?;
 jpeg_eoi { ff, marker }
@@ -28400,7 +28375,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(6221053009072016381u64));
+return Err(ParseError::ExcludedBranch(12955185663715491460u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -28408,7 +28383,7 @@ let b = _input.read_byte()?;
 if b == 236 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(4825757476091239776u64));
+return Err(ParseError::ExcludedBranch(6221053009072016381u64));
 }
 }))())?;
 jpeg_eoi { ff, marker }
@@ -28451,7 +28426,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(13877876706306354357u64));
+return Err(ParseError::ExcludedBranch(4825757476091239776u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -28459,7 +28434,7 @@ let b = _input.read_byte()?;
 if b == 237 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(12525311251009778949u64));
+return Err(ParseError::ExcludedBranch(13877876706306354357u64));
 }
 }))())?;
 jpeg_eoi { ff, marker }
@@ -28502,7 +28477,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(14962551735998681614u64));
+return Err(ParseError::ExcludedBranch(12525311251009778949u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -28510,7 +28485,7 @@ let b = _input.read_byte()?;
 if b == 238 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(2007599397777734421u64));
+return Err(ParseError::ExcludedBranch(14962551735998681614u64));
 }
 }))())?;
 jpeg_eoi { ff, marker }
@@ -28553,7 +28528,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(18069850277258932991u64));
+return Err(ParseError::ExcludedBranch(2007599397777734421u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -28561,7 +28536,7 @@ let b = _input.read_byte()?;
 if b == 239 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(180881308211696508u64));
+return Err(ParseError::ExcludedBranch(18069850277258932991u64));
 }
 }))())?;
 jpeg_eoi { ff, marker }
@@ -28604,7 +28579,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(17753230141940491005u64));
+return Err(ParseError::ExcludedBranch(180881308211696508u64));
 }
 }))())?;
 let marker = ((|| PResult::Ok({
@@ -28612,7 +28587,7 @@ let b = _input.read_byte()?;
 if b == 254 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(6110942357212830202u64));
+return Err(ParseError::ExcludedBranch(17753230141940491005u64));
 }
 }))())?;
 jpeg_eoi { ff, marker }
@@ -28665,7 +28640,7 @@ b
 if ((|class_table_id: jpeg_dac_data_class_table_id| PResult::Ok((class_table_id.class.clone() < 2u8) && (class_table_id.table_id.clone() < 4u8)))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(6596410053543851077u64));
+return Err(ParseError::FalsifiedWhere(6110942357212830202u64));
 }
 }))())?;
 let value = ((|| PResult::Ok((Decoder25(_input))?))())?;
@@ -28684,7 +28659,7 @@ b
 if ((|class_table_id: jpeg_dac_data_class_table_id| PResult::Ok((class_table_id.class.clone() < 2u8) && (class_table_id.table_id.clone() < 4u8)))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(16339654162669176472u64));
+return Err(ParseError::FalsifiedWhere(6596410053543851077u64));
 }
 }))())?;
 let num_codes = ((|| PResult::Ok({
@@ -28722,7 +28697,7 @@ b
 if ((|precision_table_id: jpeg_dqt_data_precision_table_id| PResult::Ok((precision_table_id.precision.clone() <= 1u8) && (precision_table_id.table_id.clone() <= 3u8)))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(1886358831178290550u64));
+return Err(ParseError::FalsifiedWhere(16339654162669176472u64));
 }
 }))())?;
 let elements = ((|| PResult::Ok(match precision_table_id.precision.clone() {
@@ -28814,7 +28789,7 @@ tmp if (tmp != 0) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(3168197157646945762u64));
+return Err(ParseError::ExcludedBranch(17004441093219507547u64));
 }
 };
 _input.close_peek_context()?;
@@ -28827,7 +28802,7 @@ let b = _input.read_byte()?;
 if b != 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(17004441093219507547u64));
+return Err(ParseError::ExcludedBranch(1886358831178290550u64));
 }
 };
 accum.push(next_elem);
@@ -28842,7 +28817,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(360138127928998237u64));
+return Err(ParseError::ExcludedBranch(3168197157646945762u64));
 }
 }))())?;
 PResult::Ok(base_asciiz_string { string, null })
@@ -28854,7 +28829,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9092411637461100444u64));
+return Err(ParseError::ExcludedBranch(360138127928998237u64));
 }
 }))())?;
 let exif = ((|| PResult::Ok((Decoder_tiff_main(_input))?))())?;
@@ -28940,7 +28915,7 @@ tmp if (tmp != 0) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11247369915737850258u64));
+return Err(ParseError::ExcludedBranch(15117497265985508077u64));
 }
 };
 _input.close_peek_context()?;
@@ -28953,7 +28928,7 @@ let b = _input.read_byte()?;
 if b != 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(15117497265985508077u64));
+return Err(ParseError::ExcludedBranch(9092411637461100444u64));
 }
 };
 accum.push(next_elem);
@@ -28968,7 +28943,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(7546547171508918509u64));
+return Err(ParseError::ExcludedBranch(11247369915737850258u64));
 }
 }))())?;
 PResult::Ok(base_asciiz_string { string, null })
@@ -28982,7 +28957,7 @@ let inner = (Decoder25(_input))?;
 if ((|x: u8| PResult::Ok(x <= 2u8))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(14304129837244038526u64));
+return Err(ParseError::FalsifiedWhere(7546547171508918509u64));
 }
 }))())?;
 let density_x = ((|| PResult::Ok({
@@ -28998,7 +28973,7 @@ false
 }))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(15347994581840044382u64));
+return Err(ParseError::FalsifiedWhere(14304129837244038526u64));
 }
 }))())?;
 let density_y = ((|| PResult::Ok({
@@ -29014,7 +28989,7 @@ false
 }))(inner.clone()))? {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(18237415135895269790u64));
+return Err(ParseError::FalsifiedWhere(15347994581840044382u64));
 }
 }))())?;
 let thumbnail_width = ((|| PResult::Ok((Decoder25(_input))?))())?;
@@ -29049,7 +29024,7 @@ let b = _input.read_byte()?;
 if b == 31 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(4706601668945989307u64));
+return Err(ParseError::ExcludedBranch(18237415135895269790u64));
 }
 }))())?;
 let field1 = ((|| PResult::Ok({
@@ -29057,7 +29032,7 @@ let b = _input.read_byte()?;
 if b == 139 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(1678201523848816632u64));
+return Err(ParseError::ExcludedBranch(4706601668945989307u64));
 }
 }))())?;
 (field0, field1)
@@ -29186,7 +29161,7 @@ tmp if (tmp != 0) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(8414108255387456730u64));
+return Err(ParseError::ExcludedBranch(13246474195614162055u64));
 }
 };
 _input.close_peek_context()?;
@@ -29199,7 +29174,7 @@ let b = _input.read_byte()?;
 if b != 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(13246474195614162055u64));
+return Err(ParseError::ExcludedBranch(1678201523848816632u64));
 }
 };
 accum.push(next_elem);
@@ -29214,7 +29189,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(1432698095084823598u64));
+return Err(ParseError::ExcludedBranch(8414108255387456730u64));
 }
 }))())?;
 PResult::Ok(base_asciiz_string { string, null })
@@ -29238,7 +29213,7 @@ tmp if (tmp != 0) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(8473414866110322269u64));
+return Err(ParseError::ExcludedBranch(9372987348964131232u64));
 }
 };
 _input.close_peek_context()?;
@@ -29251,7 +29226,7 @@ let b = _input.read_byte()?;
 if b != 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9372987348964131232u64));
+return Err(ParseError::ExcludedBranch(1432698095084823598u64));
 }
 };
 accum.push(next_elem);
@@ -29266,7 +29241,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(671785503440284610u64));
+return Err(ParseError::ExcludedBranch(8473414866110322269u64));
 }
 }))())?;
 PResult::Ok(base_asciiz_string { string, null })
@@ -29373,7 +29348,7 @@ tmp if (tmp != 0) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(8284996377131534070u64));
+return Err(ParseError::ExcludedBranch(2651182070283403637u64));
 }
 };
 _input.close_peek_context()?;
@@ -29386,7 +29361,7 @@ let b = _input.read_byte()?;
 if b != 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(2651182070283403637u64));
+return Err(ParseError::ExcludedBranch(671785503440284610u64));
 }
 };
 accum.push(next_elem);
@@ -29401,7 +29376,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(16948595091237008543u64));
+return Err(ParseError::ExcludedBranch(8284996377131534070u64));
 }
 }))())?;
 PResult::Ok(base_asciiz_string { string, null })
@@ -29425,7 +29400,7 @@ tmp if (tmp != 0) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(7834223795690054720u64));
+return Err(ParseError::ExcludedBranch(108256050843388088u64));
 }
 };
 _input.close_peek_context()?;
@@ -29438,7 +29413,7 @@ let b = _input.read_byte()?;
 if b != 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(108256050843388088u64));
+return Err(ParseError::ExcludedBranch(16948595091237008543u64));
 }
 };
 accum.push(next_elem);
@@ -29453,7 +29428,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(787921071240225899u64));
+return Err(ParseError::ExcludedBranch(7834223795690054720u64));
 }
 }))())?;
 PResult::Ok(base_asciiz_string { string, null })
@@ -29466,7 +29441,7 @@ let b = _input.read_byte()?;
 if b == 71 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(11557974043504662535u64));
+return Err(ParseError::ExcludedBranch(787921071240225899u64));
 }
 }))())?;
 let field1 = ((|| PResult::Ok({
@@ -29474,7 +29449,7 @@ let b = _input.read_byte()?;
 if b == 73 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(14238499412440345954u64));
+return Err(ParseError::ExcludedBranch(11557974043504662535u64));
 }
 }))())?;
 let field2 = ((|| PResult::Ok({
@@ -29482,7 +29457,7 @@ let b = _input.read_byte()?;
 if b == 70 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(14703397633096852322u64));
+return Err(ParseError::ExcludedBranch(14238499412440345954u64));
 }
 }))())?;
 (field0, field1, field2)
@@ -29545,7 +29520,7 @@ match b {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(268478239438800266u64));
+return Err(ParseError::ExcludedBranch(14703397633096852322u64));
 }
 }
 },
@@ -29555,7 +29530,7 @@ return Err(ParseError::ExcludedBranch(268478239438800266u64));
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6301432137385173939u64));
+return Err(ParseError::ExcludedBranch(268478239438800266u64));
 }
 };
 _input.close_peek_context()?;
@@ -29574,7 +29549,7 @@ gif_block::special_purpose_block(inner)
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(17762152702085771435u64));
+return Err(ParseError::ExcludedBranch(6301432137385173939u64));
 }
 })
 }
@@ -29585,7 +29560,7 @@ let b = _input.read_byte()?;
 if b == 59 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(6803443871185192093u64));
+return Err(ParseError::ExcludedBranch(17762152702085771435u64));
 }
 }))())?;
 PResult::Ok(gif_trailer { separator })
@@ -29610,7 +29585,7 @@ match b {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(204361505388532862u64));
+return Err(ParseError::ExcludedBranch(6803443871185192093u64));
 }
 }
 },
@@ -29620,7 +29595,7 @@ return Err(ParseError::ExcludedBranch(204361505388532862u64));
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11161970641928094938u64));
+return Err(ParseError::ExcludedBranch(204361505388532862u64));
 }
 };
 _input.close_peek_context()?;
@@ -29638,7 +29613,7 @@ gif_graphic_block_graphic_control_extension::none
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(8787536656121914522u64));
+return Err(ParseError::ExcludedBranch(11161970641928094938u64));
 }
 }
 }))())?;
@@ -29663,11 +29638,11 @@ match b {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(18210277358428599455u64));
+return Err(ParseError::ExcludedBranch(8787536656121914522u64));
 }
 }
 } else {
-return Err(ParseError::ExcludedBranch(9453259036882642818u64));
+return Err(ParseError::ExcludedBranch(18210277358428599455u64));
 };
 _input.close_peek_context()?;
 ret
@@ -29685,7 +29660,7 @@ gif_special_purpose_block::comment_extension(inner)
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(16811847696882257499u64));
+return Err(ParseError::ExcludedBranch(9453259036882642818u64));
 }
 })
 }
@@ -29696,7 +29671,7 @@ let b = _input.read_byte()?;
 if b == 33 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(11078254580983048780u64));
+return Err(ParseError::ExcludedBranch(16811847696882257499u64));
 }
 }))())?;
 let label = ((|| PResult::Ok({
@@ -29704,7 +29679,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(1845850007550452160u64));
+return Err(ParseError::ExcludedBranch(11078254580983048780u64));
 }
 }))())?;
 let block_size = ((|| PResult::Ok({
@@ -29712,7 +29687,7 @@ let b = _input.read_byte()?;
 if b == 11 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(7779176190297216638u64));
+return Err(ParseError::ExcludedBranch(1845850007550452160u64));
 }
 }))())?;
 let identifier = ((|| PResult::Ok({
@@ -29746,7 +29721,7 @@ tmp if (tmp != 0) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(1016564408906296566u64));
+return Err(ParseError::ExcludedBranch(7779176190297216638u64));
 }
 };
 _input.close_peek_context()?;
@@ -29772,7 +29747,7 @@ let b = _input.read_byte()?;
 if b == 33 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(1591903561633999639u64));
+return Err(ParseError::ExcludedBranch(1016564408906296566u64));
 }
 }))())?;
 let label = ((|| PResult::Ok({
@@ -29780,7 +29755,7 @@ let b = _input.read_byte()?;
 if b == 254 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9590821821210520154u64));
+return Err(ParseError::ExcludedBranch(1591903561633999639u64));
 }
 }))())?;
 let comment_data = ((|| PResult::Ok({
@@ -29800,7 +29775,7 @@ tmp if (tmp != 0) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6175893723851407495u64));
+return Err(ParseError::ExcludedBranch(9590821821210520154u64));
 }
 };
 _input.close_peek_context()?;
@@ -29826,7 +29801,7 @@ let b = _input.read_byte()?;
 if b != 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(4491050975676636472u64));
+return Err(ParseError::ExcludedBranch(6175893723851407495u64));
 }
 }))())?;
 let data = ((|| PResult::Ok({
@@ -29844,7 +29819,7 @@ let b = _input.read_byte()?;
 PResult::Ok(if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9933460716242958610u64));
+return Err(ParseError::ExcludedBranch(4491050975676636472u64));
 })
 }
 
@@ -29854,7 +29829,7 @@ let b = _input.read_byte()?;
 if b == 33 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(10865781264025109219u64));
+return Err(ParseError::ExcludedBranch(9933460716242958610u64));
 }
 }))())?;
 let label = ((|| PResult::Ok({
@@ -29862,7 +29837,7 @@ let b = _input.read_byte()?;
 if b == 249 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(1125515999835788388u64));
+return Err(ParseError::ExcludedBranch(10865781264025109219u64));
 }
 }))())?;
 let block_size = ((|| PResult::Ok({
@@ -29870,7 +29845,7 @@ let b = _input.read_byte()?;
 if b == 4 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(6928743980636918648u64));
+return Err(ParseError::ExcludedBranch(1125515999835788388u64));
 }
 }))())?;
 let flags = ((|| PResult::Ok({
@@ -29901,7 +29876,7 @@ let ret = match b {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10349067556055585673u64));
+return Err(ParseError::ExcludedBranch(6928743980636918648u64));
 }
 };
 _input.close_peek_context()?;
@@ -29920,7 +29895,7 @@ gif_graphic_rendering_block::plain_text_extension(inner)
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(9276145871181842621u64));
+return Err(ParseError::ExcludedBranch(10349067556055585673u64));
 }
 })
 }
@@ -29954,7 +29929,7 @@ let b = _input.read_byte()?;
 if b == 33 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(16224083238566163922u64));
+return Err(ParseError::ExcludedBranch(9276145871181842621u64));
 }
 }))())?;
 let label = ((|| PResult::Ok({
@@ -29962,7 +29937,7 @@ let b = _input.read_byte()?;
 if b == 1 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9651999844283402729u64));
+return Err(ParseError::ExcludedBranch(16224083238566163922u64));
 }
 }))())?;
 let block_size = ((|| PResult::Ok({
@@ -29970,7 +29945,7 @@ let b = _input.read_byte()?;
 if b == 12 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(4150962867603307131u64));
+return Err(ParseError::ExcludedBranch(9651999844283402729u64));
 }
 }))())?;
 let text_grid_left_position = ((|| PResult::Ok((Decoder109(_input))?))())?;
@@ -29998,7 +29973,7 @@ tmp if (tmp != 0) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(1180075112413234847u64));
+return Err(ParseError::ExcludedBranch(4150962867603307131u64));
 }
 };
 _input.close_peek_context()?;
@@ -30024,7 +29999,7 @@ let b = _input.read_byte()?;
 if b == 44 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(4914981965961925407u64));
+return Err(ParseError::ExcludedBranch(1180075112413234847u64));
 }
 }))())?;
 let image_left_position = ((|| PResult::Ok((Decoder109(_input))?))())?;
@@ -30067,7 +30042,7 @@ tmp if (tmp != 0) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(4792114144900142999u64));
+return Err(ParseError::ExcludedBranch(4914981965961925407u64));
 }
 };
 _input.close_peek_context()?;
@@ -30177,6 +30152,12 @@ match b {
 },
 
 _ => {
+return Err(ParseError::ExcludedBranch(6091354260726402337u64));
+}
+}
+},
+
+_ => {
 return Err(ParseError::ExcludedBranch(16173518488310098141u64));
 }
 }
@@ -30221,12 +30202,6 @@ return Err(ParseError::ExcludedBranch(4851501206534868925u64));
 _ => {
 return Err(ParseError::ExcludedBranch(4255480819017852249u64));
 }
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(17733863216727871551u64));
-}
 };
 _input.close_peek_context()?;
 ret
@@ -30240,7 +30215,7 @@ let b = _input.read_byte()?;
 if b == 83 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(6091354260726402337u64));
+return Err(ParseError::ExcludedBranch(4792114144900142999u64));
 }
 };
 accum.push(next_elem);
@@ -30253,7 +30228,7 @@ let b = _input.read_byte()?;
 if b == 90 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(389354767835086292u64));
+return Err(ParseError::ExcludedBranch(17733863216727871551u64));
 }
 }))())?;
 (field0, field1)
