@@ -339,7 +339,8 @@ fn subheader_index(seq: Expr) -> Expr {
     ))
 }
 
-const START_VAR: Expr = Expr::Var(Label::Borrowed("start"));
+const START_VARNAME: &str = "start";
+const START_VAR: Expr = Expr::Var(Label::Borrowed(START_VARNAME));
 const START_ARG: (Label, ValueType) = (Label::Borrowed("start"), ValueType::Base(BaseType::U32));
 
 /// Given `Expr`s `table_records` and a `query_table_id` of the appropriate type,
@@ -570,16 +571,16 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
     let table_links = {
         fn required_table(
-            sof_offset32_vname: &'static str,
-            table_records_var: &'static str,
+            sof_offset: Expr,
+            table_records: Expr,
             id: u32,
             table_format: Format,
         ) -> Format {
             Format::Let(
                 Label::Borrowed("matching_table"),
-                Box::new(expr_unwrap(find_table(var(table_records_var), id))),
+                Box::new(expr_unwrap(find_table(table_records, id))),
                 Box::new(linked_offset32(
-                    var(sof_offset32_vname),
+                    sof_offset,
                     record_proj(var("matching_table"), "offset"),
                     Format::Slice(
                         Box::new(record_proj(var("matching_table"), "length")),
@@ -590,16 +591,16 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         }
 
         fn required_table_with_len(
-            sof_offset_var: &'static str,
-            table_records_var: &'static str,
+            sof_offset: Expr,
+            table_records: Expr,
             id: u32,
             table_format_ref: FormatRef,
         ) -> Format {
             Format::Let(
                 Label::Borrowed("matching_table"),
-                Box::new(expr_unwrap(find_table(var(table_records_var), id))),
+                Box::new(expr_unwrap(find_table(table_records, id))),
                 Box::new(linked_offset32(
-                    var(sof_offset_var),
+                    sof_offset,
                     record_proj(var("matching_table"), "offset"),
                     Format::Slice(
                         Box::new(record_proj(var("matching_table"), "length")),
@@ -613,21 +614,21 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         }
 
         fn optional_table(
-            sof_offset_var: &'static str,
-            table_records_var: &'static str,
+            sof_offset: Expr,
+            table_records: Expr,
             id: u32,
             table_format: Format,
         ) -> Format {
             Format::Let(
                 Label::Borrowed("matching_table"),
-                Box::new(find_table(var(table_records_var), id)),
+                Box::new(find_table(table_records, id)),
                 Box::new(Format::Match(
                     Box::new(var("matching_table")),
                     vec![
                         (
                             pat_some(bind("table")),
                             format_some(linked_offset32(
-                                var(sof_offset_var),
+                                sof_offset,
                                 record_proj(var("table"), "offset"),
                                 Format::Slice(
                                     Box::new(record_proj(var("table"), "length")),
@@ -3409,25 +3410,25 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             record([
                 (
                     "cmap",
-                    required_table("start", "tables", magic(b"cmap"), cmap_table.call()),
+                    required_table(START_VAR, var("tables"), magic(b"cmap"), cmap_table.call()),
                 ),
                 (
                     "head",
-                    required_table("start", "tables", magic(b"head"), head_table.call()),
+                    required_table(START_VAR, var("tables"), magic(b"head"), head_table.call()),
                 ),
                 (
                     "hhea",
-                    required_table("start", "tables", magic(b"hhea"), hhea_table.call()),
+                    required_table(START_VAR, var("tables"), magic(b"hhea"), hhea_table.call()),
                 ),
                 (
                     "maxp",
-                    required_table("start", "tables", magic(b"maxp"), maxp_table.call()),
+                    required_table(START_VAR, var("tables"), magic(b"maxp"), maxp_table.call()),
                 ),
                 (
                     "hmtx",
                     required_table(
-                        "start",
-                        "tables",
+                        START_VAR,
+                        var("tables"),
                         magic(b"hmtx"),
                         hmtx_table.call_args(vec![
                             record_proj(var("hhea"), "number_of_long_horizontal_metrics"),
@@ -3437,30 +3438,30 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ),
                 (
                     "name",
-                    required_table("start", "tables", magic(b"name"), name_table.call()),
+                    required_table(START_VAR, var("tables"), magic(b"name"), name_table.call()),
                 ),
                 (
                     "os2",
-                    required_table_with_len("start", "tables", magic(b"OS/2"), os2_table),
+                    required_table_with_len(START_VAR, var("tables"), magic(b"OS/2"), os2_table),
                 ),
                 (
                     "post",
-                    required_table("start", "tables", magic(b"post"), post_table.call()),
+                    required_table(START_VAR, var("tables"), magic(b"post"), post_table.call()),
                 ),
                 // SECTION - TrueType Outline
                 (
                     "cvt",
-                    optional_table("start", "tables", magic(b"cvt "), cvt_table),
+                    optional_table(START_VAR, var("tables"), magic(b"cvt "), cvt_table),
                 ),
                 (
                     "fpgm",
-                    optional_table("start", "tables", magic(b"fpgm"), fpgm_table),
+                    optional_table(START_VAR, var("tables"), magic(b"fpgm"), fpgm_table),
                 ),
                 (
                     "loca",
                     optional_table(
-                        "start",
-                        "tables",
+                        START_VAR,
+                        var("tables"),
                         magic(b"loca"),
                         loca_table.call_args(vec![
                             record_proj(var("maxp"), "num_glyphs"),
@@ -3471,19 +3472,19 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 (
                     "glyf",
                     optional_table(
-                        "start",
-                        "tables",
+                        START_VAR,
+                        var("tables"),
                         magic(b"glyf"),
                         glyf_table.call_args(vec![loca_offset_pairs(var("loca"))]),
                     ),
                 ),
                 (
                     "prep",
-                    optional_table("start", "tables", magic(b"prep"), prep_table),
+                    optional_table(START_VAR, var("tables"), magic(b"prep"), prep_table),
                 ),
                 (
                     "gasp",
-                    optional_table("start", "tables", magic(b"gasp"), gasp_table.call()),
+                    optional_table(START_VAR, var("tables"), magic(b"gasp"), gasp_table.call()),
                 ),
                 // !SECTION
                 // SECTION - CFF Outline
@@ -3505,19 +3506,19 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 // SECTION - Advanced Typography
                 (
                     "base",
-                    optional_table("start", "tables", magic(b"BASE"), base_table.call()),
+                    optional_table(START_VAR, var("tables"), magic(b"BASE"), base_table.call()),
                 ),
                 (
                     "gdef",
-                    optional_table("start", "tables", magic(b"GDEF"), gdef_table.call()),
+                    optional_table(START_VAR, var("tables"), magic(b"GDEF"), gdef_table.call()),
                 ),
                 (
                     "gpos",
-                    optional_table("start", "tables", magic(b"GPOS"), gpos_table.call()),
+                    optional_table(START_VAR, var("tables"), magic(b"GPOS"), gpos_table.call()),
                 ),
                 (
                     "gsub",
-                    optional_table("start", "tables", magic(b"GSUB"), gsub_table.call()),
+                    optional_table(START_VAR, var("tables"), magic(b"GSUB"), gsub_table.call()),
                 ),
                 // !SECTION
                 // STUB - add more tables
@@ -3526,10 +3527,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         )
     };
 
-    let table_directory = module.define_format_args(
+    let table_directory = module.define_format(
         "opentype.table_directory",
-        vec![START_ARG],
         record([
+            ("font_start", pos32()),
             (
                 "sfnt_version",
                 where_lambda(
@@ -3551,7 +3552,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ),
             (
                 "table_links",
-                table_links.call_args(vec![START_VAR, var("table_records")]),
+                table_links.call_args(vec![var("font_start"), var("table_records")]),
             ),
         ]),
     );
@@ -3565,7 +3566,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     "table_directories",
                     repeat_count(
                         var("num_fonts"),
-                        offset32(start, table_directory.call_args(vec![var("start")]), base),
+                        offset32(start, table_directory.call(), base),
                     ),
                 ),
             ])
@@ -3579,7 +3580,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     "table_directories",
                     repeat_count(
                         var("num_fonts"),
-                        offset32(start, table_directory.call_args(vec![var("start")]), base),
+                        offset32(start, table_directory.call(), base),
                     ),
                 ),
                 ("dsig_tag", base.u32be()), // either b"DSIG" or 0 if none
@@ -3588,10 +3589,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ])
         };
 
-        module.define_format_args(
+        module.define_format(
             "opentype.ttc_header",
-            vec![START_ARG],
             record([
+                ("start", pos32()),
                 (
                     "ttc_tag",
                     where_lambda(
@@ -3609,6 +3610,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         [
                             (Pattern::U16(1), "Version1", ttc_header1(var("start"))),
                             (Pattern::U16(2), "Version2", ttc_header2(var("start"))),
+                            // REVIEW - is this the preferred pattern (i.e. apply broadly) or do we want to fail here as well?
                             (bind("unknown"), "UnknownVersion", compute(var("unknown"))),
                         ],
                     ),
@@ -3621,9 +3623,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     // NOTE - we have to fail to let text have its chance to parse
     let unknown_table = Format::Fail;
 
-    let opentype_font = module.define_format_args(
-        "opentype.font",
-        vec![START_ARG],
+    module.define_format(
+        "opentype.main",
         record([
             ("magic", Format::Peek(Box::new(base.u32be()))),
             (
@@ -3634,30 +3635,18 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         (
                             Pattern::U32(0x00010000),
                             "TableDirectory",
-                            table_directory.call_args(vec![var("start")]),
+                            table_directory.call(),
                         ),
                         (
                             Pattern::U32(magic(b"OTTO")),
                             "TableDirectory",
-                            table_directory.call_args(vec![var("start")]),
+                            table_directory.call(),
                         ),
-                        (
-                            Pattern::U32(magic(b"ttcf")),
-                            "TTCHeader",
-                            ttc_header.call_args(vec![var("start")]),
-                        ),
+                        (Pattern::U32(magic(b"ttcf")), "TTCHeader", ttc_header.call()),
                         (Pattern::Wildcard, "UnknownTable", unknown_table),
                     ],
                 ),
             ),
-        ]),
-    );
-
-    module.define_format(
-        "opentype.main",
-        record([
-            ("start", pos32()),
-            ("font", opentype_font.call_args(vec![var("start")])),
         ]),
     )
 }

@@ -5,7 +5,7 @@ edition = "2021"
 
 [lib]
 bench = false
-path = "sample_codegen.rs"
+path = "gencode.rs"
 
 [[bin]]
 path = "bin/pnginfo.rs"

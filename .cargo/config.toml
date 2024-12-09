@@ -1,5 +1,5 @@
 [alias]
-cg = "run --bin doodle -- format --output rust --dest generated/sample_codegen.rs"
+cg = "run --bin doodle -- format --output rust --dest generated/gencode.rs"
 
 [profile.profiling]
 inherits = "release"
