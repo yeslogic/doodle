@@ -142,7 +142,7 @@ fn print_generated_code(
                 || (path.is_file()
                     && path
                         .file_name()
-                        .is_some_and(|s| s.to_string_lossy().contains("codegen.rs")))
+                        .is_some_and(|s| s.to_string_lossy().contains("gencode.rs")))
             {
                 let f = std::fs::File::create(path).unwrap_or_else(|err| panic!("error: {err}"));
                 write_to(f, content).expect("failed to write");
