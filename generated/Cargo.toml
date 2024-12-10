@@ -5,7 +5,7 @@ edition = "2021"
 
 [lib]
 bench = false
-path = "sample_codegen.rs"
+path = "gencode.rs"
 
 [[bin]]
 path = "bin/pnginfo.rs"
@@ -26,3 +26,5 @@ criterion = "0.5"
 [dependencies]
 doodle = { path = "../", version = "0.1.0" }
 encoding = "0.2"
+clap = { version = "4.2", features = ["derive"] }
+derive_builder = "0.20.2"
