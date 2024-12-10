@@ -217,7 +217,7 @@ pub(crate) enum TraitSet {
     Clone = 2,
     #[default]
     DebugClone = 3,
-    Copy = 6,
+    Copy = 6, // 4 for Copy itself, BitOr'd with 2 for the implied Clone
     DebugCopy = 7,
 }
 
