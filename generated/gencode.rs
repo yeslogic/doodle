@@ -2605,7 +2605,6 @@ __skip: ()
 
 #[derive(Debug, Clone)]
 pub struct opentype_table_directory {
-font_start: u32,
 sfnt_version: u32,
 num_tables: u16,
 search_range: u16,
@@ -2641,7 +2640,6 @@ pub enum opentype_ttc_header_header { UnknownVersion(u16), Version1(opentype_ttc
 
 #[derive(Debug, Clone)]
 pub struct opentype_ttc_header {
-start: u32,
 ttc_tag: u32,
 major_version: u16,
 minor_version: u16,
@@ -2654,6 +2652,7 @@ pub enum opentype_main_directory { TTCHeader(opentype_ttc_header), TableDirector
 
 #[derive(Debug, Clone)]
 pub struct opentype_main {
+file_start: u32,
 magic: u32,
 directory: opentype_main_directory
 }
@@ -4135,6 +4134,10 @@ PResult::Ok(elf_main { header, __eoh, program_headers, section_headers, sections
 }
 
 fn Decoder_opentype_main<'input>(_input: &mut Parser<'input>) -> Result<opentype_main, ParseError> {
+let file_start = ((|| PResult::Ok({
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+}))())?;
 let magic = ((|| PResult::Ok({
 _input.open_peek_context();
 let ret = ((|| PResult::Ok((Decoder20(_input))?))())?;
@@ -4143,17 +4146,17 @@ ret
 }))())?;
 let directory = ((|| PResult::Ok(match magic {
 65536u32 => {
-let inner = (Decoder_opentype_table_directory(_input))?;
+let inner = (Decoder_opentype_table_directory(_input, file_start.clone()))?;
 opentype_main_directory::TableDirectory(inner)
 },
 
 1330926671u32 => {
-let inner = (Decoder_opentype_table_directory(_input))?;
+let inner = (Decoder_opentype_table_directory(_input, file_start.clone()))?;
 opentype_main_directory::TableDirectory(inner)
 },
 
 1953784678u32 => {
-let inner = (Decoder_opentype_ttc_header(_input))?;
+let inner = (Decoder_opentype_ttc_header(_input, file_start.clone()))?;
 opentype_main_directory::TTCHeader(inner)
 },
 
@@ -4161,7 +4164,7 @@ _ => {
 return Err(ParseError::FailToken(16771529512960957239u64));
 }
 }))())?;
-PResult::Ok(opentype_main { magic, directory })
+PResult::Ok(opentype_main { file_start, magic, directory })
 }
 
 fn Decoder15<'input>(_input: &mut Parser<'input>) -> Result<Vec<char>, ParseError> {
@@ -4675,11 +4678,7 @@ let field3 = ((|| PResult::Ok((Decoder24(_input))?))())?;
 PResult::Ok(((|x: (u8, u8, u8, u8)| PResult::Ok(u32be(x)))(inner))?)
 }
 
-fn Decoder_opentype_table_directory<'input>(_input: &mut Parser<'input>) -> Result<opentype_table_directory, ParseError> {
-let font_start = ((|| PResult::Ok({
-let inner = _input.get_offset_u64();
-((|x: u64| PResult::Ok(x as u32))(inner))?
-}))())?;
+fn Decoder_opentype_table_directory<'input>(_input: &mut Parser<'input>, font_start: u32) -> Result<opentype_table_directory, ParseError> {
 let sfnt_version = ((|| PResult::Ok({
 let inner = (Decoder20(_input))?;
 if ((|v: u32| PResult::Ok((v == 65536u32) || (v == 1330926671u32)))(inner.clone()))? {
@@ -4700,14 +4699,10 @@ accum.push((Decoder_opentype_table_record(_input))?);
 accum
 }))())?;
 let table_links = ((|| PResult::Ok((Decoder_opentype_table_directory_table_links(_input, font_start.clone(), table_records.clone()))?))())?;
-PResult::Ok(opentype_table_directory { font_start, sfnt_version, num_tables, search_range, entry_selector, range_shift, table_records, table_links })
+PResult::Ok(opentype_table_directory { sfnt_version, num_tables, search_range, entry_selector, range_shift, table_records, table_links })
 }
 
-fn Decoder_opentype_ttc_header<'input>(_input: &mut Parser<'input>) -> Result<opentype_ttc_header, ParseError> {
-let start = ((|| PResult::Ok({
-let inner = _input.get_offset_u64();
-((|x: u64| PResult::Ok(x as u32))(inner))?
-}))())?;
+fn Decoder_opentype_ttc_header<'input>(_input: &mut Parser<'input>, start: u32) -> Result<opentype_ttc_header, ParseError> {
 let ttc_tag = ((|| PResult::Ok({
 let inner = (Decoder20(_input))?;
 if ((|tag: u32| PResult::Ok(tag == 1953784678u32))(inner.clone()))? {
@@ -4744,7 +4739,7 @@ let inner = _input.get_offset_u64();
 _input.open_peek_context();
 _input.advance_by(try_sub!(start + offset, __here, 15794382300316794652u64))?;
 let ret = ((|| PResult::Ok({
-let inner = (Decoder_opentype_table_directory(_input))?;
+let inner = (Decoder_opentype_table_directory(_input, start.clone()))?;
 ((|val: opentype_table_directory| PResult::Ok(Some(val)))(inner))?
 }))())?;
 _input.close_peek_context()?;
@@ -4790,7 +4785,7 @@ let inner = _input.get_offset_u64();
 _input.open_peek_context();
 _input.advance_by(try_sub!(start + offset, __here, 18147521187885925800u64))?;
 let ret = ((|| PResult::Ok({
-let inner = (Decoder_opentype_table_directory(_input))?;
+let inner = (Decoder_opentype_table_directory(_input, start.clone()))?;
 ((|val: opentype_table_directory| PResult::Ok(Some(val)))(inner))?
 }))())?;
 _input.close_peek_context()?;
@@ -4820,7 +4815,7 @@ opentype_ttc_header_header::UnknownVersion(inner)
 }
 }))())?;
 let __skip = ((|| PResult::Ok(_input.skip_remainder()))())?;
-PResult::Ok(opentype_ttc_header { start, ttc_tag, major_version, minor_version, header, __skip })
+PResult::Ok(opentype_ttc_header { ttc_tag, major_version, minor_version, header, __skip })
 }
 
 fn Decoder23<'input>(_input: &mut Parser<'input>) -> Result<u16, ParseError> {
