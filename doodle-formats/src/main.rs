@@ -87,7 +87,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
         } => {
             let mut module = FormatModule::new();
             let format = match as_format {
-                None =>  format::main(&mut module).call(),
+                None => format::main(&mut module).call(),
                 Some(selector) => {
                     let base = format::base::main(&mut module);
                     match selector.to_lowercase().as_str() {
@@ -97,7 +97,9 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
                             format::zlib::main(&mut module, &base, deflate).call()
                         }
                         "tiff" => format::tiff::main(&mut module, &base).call(),
-                        "text" | "txt" | "utf8" | "utf" | "unicode" => format::text::main(&mut module, &base).0.call(),
+                        "text" | "txt" | "utf8" | "utf" | "unicode" => {
+                            format::text::main(&mut module, &base).0.call()
+                        }
                         "gif" => format::gif::main(&mut module, &base).call(),
                         "gzip" => {
                             let deflate = format::deflate::main(&mut module, &base);
@@ -122,25 +124,32 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
                             let gzip = format::gzip::main(&mut module, deflate, &base);
                             let tar = format::tar::main(&mut module, &base);
                             use doodle::helper::*;
-                            module.define_format(
-                                "tgz.main",
-                                chain(
-                                    gzip.call(),
-                                    "gzip-raw",
-                                    for_each(
-                                        var("gzip-raw"),
-                                        "item",
-                                        Format::DecodeBytes(
-                                            Box::new(record_lens(var("item"), &["data", "inflate"])),
-                                            Box::new(tar.call()),
+                            module
+                                .define_format(
+                                    "tgz.main",
+                                    chain(
+                                        gzip.call(),
+                                        "gzip-raw",
+                                        for_each(
+                                            var("gzip-raw"),
+                                            "item",
+                                            Format::DecodeBytes(
+                                                Box::new(record_lens(
+                                                    var("item"),
+                                                    &["data", "inflate"],
+                                                )),
+                                                Box::new(tar.call()),
+                                            ),
                                         ),
                                     ),
-                                ),
-                            ).call()
+                                )
+                                .call()
                         }
                         "elf" => format::elf::main(&mut module, &base).call(),
                         "waldo" => format::waldo::main(&mut module, &base).call(),
-                        "opentype" | "font" | "otf" | "ttf" | "ttc" => format::opentype::main(&mut module, &base).call(),
+                        "opentype" | "font" | "otf" | "ttf" | "ttc" => {
+                            format::opentype::main(&mut module, &base).call()
+                        }
                         _other => Err(anyhow!("Unknown format specifier `{_other}`"))?,
                     }
                 }
