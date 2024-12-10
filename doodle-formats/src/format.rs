@@ -20,8 +20,6 @@ pub mod tiff;
 pub mod waldo;
 pub mod zlib;
 
-
-
 pub fn main(module: &mut FormatModule) -> FormatRef {
     let base = base::main(module);
 

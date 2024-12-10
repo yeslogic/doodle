@@ -3526,10 +3526,13 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         )
     };
 
-    let table_directory = module.define_format(
+    let table_directory = module.define_format_args(
         "opentype.table_directory",
+        vec![(
+            Label::Borrowed("font_start"),
+            ValueType::Base(BaseType::U32),
+        )],
         record([
-            ("font_start", pos32()),
             (
                 "sfnt_version",
                 where_lambda(
@@ -3565,7 +3568,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     "table_directories",
                     repeat_count(
                         var("num_fonts"),
-                        offset32(start, table_directory.call(), base),
+                        offset32(start.clone(), table_directory.call_args(vec![start]), base),
                     ),
                 ),
             ])
@@ -3579,7 +3582,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     "table_directories",
                     repeat_count(
                         var("num_fonts"),
-                        offset32(start, table_directory.call(), base),
+                        offset32(start.clone(), table_directory.call_args(vec![start]), base),
                     ),
                 ),
                 ("dsig_tag", base.u32be()), // either b"DSIG" or 0 if none
@@ -3588,10 +3591,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ])
         };
 
-        module.define_format(
+        module.define_format_args(
             "opentype.ttc_header",
+            vec![START_ARG],
             record([
-                ("start", pos32()),
                 (
                     "ttc_tag",
                     where_lambda(
@@ -3607,8 +3610,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     match_variant(
                         var("major_version"),
                         [
-                            (Pattern::U16(1), "Version1", ttc_header1(var("start"))),
-                            (Pattern::U16(2), "Version2", ttc_header2(var("start"))),
+                            (Pattern::U16(1), "Version1", ttc_header1(START_VAR)),
+                            (Pattern::U16(2), "Version2", ttc_header2(START_VAR)),
                             // REVIEW - is this the preferred pattern (i.e. apply broadly) or do we want to fail here as well?
                             (bind("unknown"), "UnknownVersion", compute(var("unknown"))),
                         ],
@@ -3625,6 +3628,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     module.define_format(
         "opentype.main",
         record([
+            ("file_start", pos32()),
             ("magic", Format::Peek(Box::new(base.u32be()))),
             (
                 "directory",
@@ -3634,14 +3638,18 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         (
                             Pattern::U32(0x00010000),
                             "TableDirectory",
-                            table_directory.call(),
+                            table_directory.call_args(vec![var("file_start")]),
                         ),
                         (
                             Pattern::U32(magic(b"OTTO")),
                             "TableDirectory",
-                            table_directory.call(),
+                            table_directory.call_args(vec![var("file_start")]),
                         ),
-                        (Pattern::U32(magic(b"ttcf")), "TTCHeader", ttc_header.call()),
+                        (
+                            Pattern::U32(magic(b"ttcf")),
+                            "TTCHeader",
+                            ttc_header.call_args(vec![var("file_start")]),
+                        ),
                         (Pattern::Wildcard, "UnknownTable", unknown_table),
                     ],
                 ),
