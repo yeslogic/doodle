@@ -1,5 +1,6 @@
 use super::util::{U16Set, Wec};
 use super::*;
+use derive_builder::Builder;
 use doodle::Label;
 use encoding::{
     all::{MAC_ROMAN, UTF_16BE},
@@ -8,15 +9,44 @@ use encoding::{
 
 // SECTION - Command-line configurable options for what to show
 
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Default)]
+#[repr(u8)]
+pub enum VerboseLevel {
+    #[default]
+    Baseline = 0, // Default verbose level: show at least the presence and version of each table, perhaps more for larger or more detailed tables
+    Detailed = 1, // Show at least as much as necessary to sanity-check specific values at a debugger level
+}
+
+impl VerboseLevel {
+    pub const MIN_LEVEL: Self = VerboseLevel::Baseline;
+    pub const MAX_LEVEL: Self = VerboseLevel::Detailed;
+}
+
+impl From<u8> for VerboseLevel {
+    fn from(value: u8) -> Self {
+        let clamped = value.clamp(VerboseLevel::MIN_LEVEL as u8, VerboseLevel::MAX_LEVEL as u8);
+        unsafe { std::mem::transmute(clamped) }
+    }
+}
+
 /// Set of configurable values that control which metrics are shown, and in how much detail
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Builder)]
+#[builder(setter(into))]
+#[builder(build_fn(error = "std::convert::Infallible"))]
 pub struct Config {
     // STUB - Currently only controls bookending, and whether to dump only uncovered tables
+    #[builder(default = "8")]
     bookend_size: usize,
+
+    #[builder(default = "3")]
     inline_bookend: usize,
 
     /// Set to true when we only care about dumping the list of tables that are present in the font but aren't handled yet
+    #[builder(default = "false")]
     extra_only: bool,
+
+    #[builder(default)]
+    verbose_level: VerboseLevel,
 }
 
 impl Config {
@@ -26,69 +56,7 @@ impl Config {
 
 impl std::default::Default for Config {
     fn default() -> Self {
-        Self {
-            bookend_size: Self::DEFAULT_BOOKEND_SIZE,
-            inline_bookend: Self::DEFAULT_INLINE_BOOKEND,
-            extra_only: false,
-        }
-    }
-}
-
-/// Builder-pattern for [`Config`]
-pub struct ConfigBuilder {
-    bookend_size: Option<usize>,
-    inline_bookend: Option<usize>,
-    extra_only: Option<bool>,
-}
-
-impl ConfigBuilder {
-    /// Returns a new `ConfigBuilder` object.
-    pub fn new() -> Self {
-        Self {
-            bookend_size: None,
-            inline_bookend: None,
-            extra_only: None,
-        }
-    }
-
-    /// Overwrites the default value of `bookend_size`, which determines how long a prefix and suffix are shown
-    /// around the elided middle of a long array.
-    ///
-    /// Currently controls all such array-elisions across the entire output, without any mechanism for different
-    /// bookending sizes per table or section.
-    pub fn bookend_size(mut self, size: usize) -> Self {
-        self.bookend_size = Some(size);
-        self
-    }
-
-    /// Overwrites the default value of `inline_bookend`, which determines how long a prefix and suffix are shown
-    /// around the elided middle of a long array to be displayed inline.
-    ///
-    /// Currently controls all such inline-array-elisions across the entire output, without any mechanism for different
-    /// inline-bookending sizes per table or section.
-    pub fn inline_bookend(mut self, size: usize) -> Self {
-        self.inline_bookend = Some(size);
-        self
-    }
-
-    /// Overwrites the default value of `extra_only`, which is normally `false` but which can be set to `true` to
-    /// suppress the output of all recognized metrics, and only prints the list of table-ids that are not given
-    /// table links by the current definition of the OpenType format model.
-    pub fn extra_only(mut self, extra_only: bool) -> Self {
-        self.extra_only = Some(extra_only);
-        self
-    }
-
-    /// Finalizes a [`ConfigBuilder`] and produces a [`Config`] according to the default- or user-overridden values for
-    /// each configurable property.
-    pub fn build(self) -> Config {
-        Config {
-            bookend_size: self.bookend_size.unwrap_or(Config::DEFAULT_BOOKEND_SIZE),
-            inline_bookend: self
-                .inline_bookend
-                .unwrap_or(Config::DEFAULT_INLINE_BOOKEND),
-            extra_only: self.extra_only.unwrap_or_default(),
-        }
+        ConfigBuilder::default().build().unwrap()
     }
 }
 // !SECTION
@@ -426,11 +394,53 @@ pub struct SingleFontMetrics {
     extraMagic: Vec<u32>,
 }
 
-#[derive(Clone, Copy, Debug)]
+pub type OpentypeCmapSubtable = opentype_cmap_subtable;
+
+impl Promote<OpentypeCmapSubtable> for CmapSubtable {
+    fn promote(orig: &OpentypeCmapSubtable) -> Self {
+        CmapSubtable::AnyFormat(orig.format)
+    }
+}
+
+#[derive(Debug, Clone)]
+enum CmapSubtable {
+    // STUB[scaffolding] - this is intentionally underimplemented to make encoding-record construction happen sooner for debugging
+    AnyFormat(u16),
+}
+
+pub type OpentypeEncodingRecord = opentype_encoding_record;
+
+#[derive(Debug, Clone)]
+struct EncodingRecord {
+    platform: u16,
+    encoding: u16,
+    subtable: Link<CmapSubtable>,
+}
+
+impl Promote<OpentypeEncodingRecord> for EncodingRecord {
+    fn promote(orig: &OpentypeEncodingRecord) -> Self {
+        EncodingRecord {
+            platform: orig.platform,
+            encoding: orig.encoding,
+            subtable: promote_link(&orig.subtable_offset.link),
+        }
+    }
+}
+
+impl Promote<OpentypeCmap> for Cmap {
+    fn promote(orig: &OpentypeCmap) -> Self {
+        Cmap {
+            version: orig.version,
+            encoding_records: promote_vec(&orig.encoding_records),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 // STUB - enrich with any further details we care about presenting
-struct CmapMetrics {
+struct Cmap {
     version: u16,
-    num_tables: usize,
+    encoding_records: Vec<EncodingRecord>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -793,7 +803,7 @@ struct PostMetrics {
 
 #[derive(Clone, Debug)]
 pub struct RequiredTableMetrics {
-    cmap: CmapMetrics,
+    cmap: Cmap,
     head: HeadMetrics,
     hhea: HheaMetrics,
     maxp: MaxpMetrics,
@@ -2790,10 +2800,7 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
     let required = {
         let cmap = {
             let cmap = &dir.table_links.cmap;
-            CmapMetrics {
-                version: cmap.version,
-                num_tables: cmap.num_tables as usize,
-            }
+            Cmap::promote(cmap)
         };
         let head = {
             let head = &dir.table_links.head;
@@ -4230,11 +4237,28 @@ fn format_version_major_minor(major: u16, minor: u16) -> String {
     format!("{}.{}", major, minor)
 }
 
-fn show_cmap_metrics(cmap: &CmapMetrics, _conf: &Config) {
-    println!(
-        "cmap: version {}, {} encoding tables",
-        cmap.version, cmap.num_tables
-    );
+fn show_cmap_metrics(cmap: &Cmap, conf: &Config) {
+    print!("cmap: version {}", cmap.version);
+    if conf.verbose_level < VerboseLevel::Detailed {
+        println!(", {} encoding tables", cmap.encoding_records.len());
+    } else {
+        println!();
+        let show_record = |ix: usize, record: &EncodingRecord| {
+            // TODO[enrichment]: if we implement subtables and more verbosity levels, show subtable details
+            let EncodingRecord {
+                platform,
+                encoding,
+                subtable: _subtable,
+            } = record;
+            println!("\t[{ix}]: platform={}, encoding={}", platform, encoding);
+        };
+        show_items_elided(
+            &cmap.encoding_records,
+            show_record,
+            conf.bookend_size,
+            |start, stop| format!("\t(skipping encoding records {start}..{stop})"),
+        )
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
