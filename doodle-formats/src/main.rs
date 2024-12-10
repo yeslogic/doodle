@@ -56,6 +56,8 @@ enum Command {
         filename: PathBuf,
         #[arg(long)]
         trace: bool,
+        #[arg(long, default_value = None)]
+        as_format: Option<String>,
     },
     /// Typecheck the main FormatModule
     TypeCheck,
@@ -81,9 +83,68 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
             output,
             filename,
             trace,
+            as_format,
         } => {
             let mut module = FormatModule::new();
-            let format = format::main(&mut module).call();
+            let format = match as_format {
+                None =>  format::main(&mut module).call(),
+                Some(selector) => {
+                    let base = format::base::main(&mut module);
+                    match selector.to_lowercase().as_str() {
+                        "deflate" => format::deflate::main(&mut module, &base).call(),
+                        "zlib" => {
+                            let deflate = format::deflate::main(&mut module, &base);
+                            format::zlib::main(&mut module, &base, deflate).call()
+                        }
+                        "tiff" => format::tiff::main(&mut module, &base).call(),
+                        "text" | "txt" | "utf8" | "utf" | "unicode" => format::text::main(&mut module, &base).0.call(),
+                        "gif" => format::gif::main(&mut module, &base).call(),
+                        "gzip" => {
+                            let deflate = format::deflate::main(&mut module, &base);
+                            format::gzip::main(&mut module, deflate, &base).call()
+                        }
+                        "jpeg" | "jpg" => {
+                            let tiff = format::tiff::main(&mut module, &base);
+                            format::jpeg::main(&mut module, &base, &tiff).call()
+                        }
+                        "mp4" | "mpeg4" => format::mpeg4::main(&mut module, &base).call(),
+                        "peano" => format::peano::main(&mut module).call(),
+                        "png" => {
+                            let deflate = format::deflate::main(&mut module, &base);
+                            let zlib = format::zlib::main(&mut module, &base, deflate);
+                            let (text, utf8nz) = format::text::main(&mut module, &base);
+                            format::png::main(&mut module, zlib, text, utf8nz, &base).call()
+                        }
+                        "riff" => format::riff::main(&mut module, &base).call(),
+                        "ustar" | "tar" => format::tar::main(&mut module, &base).call(),
+                        "targz" | "tgz" => {
+                            let deflate = format::deflate::main(&mut module, &base);
+                            let gzip = format::gzip::main(&mut module, deflate, &base);
+                            let tar = format::tar::main(&mut module, &base);
+                            use doodle::helper::*;
+                            module.define_format(
+                                "tgz.main",
+                                chain(
+                                    gzip.call(),
+                                    "gzip-raw",
+                                    for_each(
+                                        var("gzip-raw"),
+                                        "item",
+                                        Format::DecodeBytes(
+                                            Box::new(record_lens(var("item"), &["data", "inflate"])),
+                                            Box::new(tar.call()),
+                                        ),
+                                    ),
+                                ),
+                            ).call()
+                        }
+                        "elf" => format::elf::main(&mut module, &base).call(),
+                        "waldo" => format::waldo::main(&mut module, &base).call(),
+                        "opentype" | "font" | "otf" | "ttf" | "ttc" => format::opentype::main(&mut module, &base).call(),
+                        _other => Err(anyhow!("Unknown format specifier `{_other}`"))?,
+                    }
+                }
+            };
             let program = Compiler::compile_program(&module, &format)?;
 
             let input = fs::read(filename)?;

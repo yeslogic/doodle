@@ -27,3 +27,4 @@ criterion = "0.5"
 doodle = { path = "../", version = "0.1.0" }
 encoding = "0.2"
 clap = { version = "4.2", features = ["derive"] }
+derive_builder = "0.20.2"

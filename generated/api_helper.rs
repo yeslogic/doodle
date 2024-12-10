@@ -213,5 +213,4 @@ pub mod png_metrics {
 pub mod otf_metrics;
 pub(crate) mod util;
 
-pub use otf_metrics::*;
 pub use png_metrics::*;

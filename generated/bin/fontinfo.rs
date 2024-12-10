@@ -13,6 +13,8 @@ struct Params {
     extra_only: bool,
     #[arg(long, default_value_t = false)]
     fast: bool,
+    #[arg(long, short = 'v', action = clap::ArgAction::Count)]
+    verbose_level: u8,
     paths: Vec<String>,
 }
 
@@ -22,13 +24,15 @@ struct CliFlags {
     fast: bool,
 }
 
-pub fn main() -> std::io::Result<()> {
-    let mut conf_builder = ConfigBuilder::new();
+type RunError = Box<dyn std::error::Error + Sync + Send + 'static>;
+type RunResult<T> = Result<T, RunError>;
+
+pub fn main() -> RunResult<()> {
+    let mut conf_builder = ConfigBuilder::default();
     let params = Params::parse();
-    if params.extra_only {
-        conf_builder = conf_builder.extra_only(true);
-    }
-    let conf = conf_builder.build();
+    conf_builder.extra_only(params.extra_only);
+    conf_builder.verbose_level(params.verbose_level);
+    let conf = conf_builder.build()?;
     let flags = CliFlags {
         tabulate_lookups: params.tabulate_lookups,
         fast: params.fast,
@@ -45,14 +49,11 @@ pub fn main() -> std::io::Result<()> {
                 .map(|entry| format!("test-fonts/{}", entry.file_name().to_string_lossy())),
         )
     };
-    do_work(iter, conf, flags)
+    do_work(iter, conf, flags);
+    Ok(())
 }
 
-fn do_work(
-    iter: impl Iterator<Item = String>,
-    conf: Config,
-    flags: CliFlags,
-) -> std::io::Result<()> {
+fn do_work(iter: impl Iterator<Item = String>, conf: Config, flags: CliFlags) {
     if flags.fast {
         for name in iter {
             eprint!("[{name}]: ...");
@@ -99,5 +100,4 @@ fn do_work(
             println!("====== END OF FONT FILE ======\n\n");
         }
     }
-    Ok(())
 }
