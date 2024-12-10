@@ -339,8 +339,7 @@ fn subheader_index(seq: Expr) -> Expr {
     ))
 }
 
-const START_VARNAME: &str = "start";
-const START_VAR: Expr = Expr::Var(Label::Borrowed(START_VARNAME));
+const START_VAR: Expr = Expr::Var(Label::Borrowed("start"));
 const START_ARG: (Label, ValueType) = (Label::Borrowed("start"), ValueType::Base(BaseType::U32));
 
 /// Given `Expr`s `table_records` and a `query_table_id` of the appropriate type,
@@ -1018,7 +1017,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 "opentype.cmap_table",
                 record([
                     ("table_start", pos32()),     // start of character mapping table
-                    ("version", base.u16be()),    // version of the the character
+                    ("version", base.u16be()),    // table version number
                     ("num_tables", base.u16be()), // number of subsequent encoding tables
                     (
                         "encoding_records",
