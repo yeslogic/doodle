@@ -2636,10 +2636,13 @@ impl TypeChecker {
                 self.unify_var_utype(newvar, inner_t)?;
                 Ok(newvar)
             }
-            Format::WithRelativeOffset(ofs, inner) => {
+            Format::WithRelativeOffset(addr, offs, inner) => {
                 let newvar = self.get_new_uvar();
-                let sz_t = self.infer_utype_expr(ofs, ctxt.scope)?;
-                self.unify_utype_baseset(sz_t, BaseSet::USome)?;
+                let addr_var = self.infer_var_expr(addr, ctxt.scope)?;
+                let offs_var = self.infer_var_expr(offs, ctxt.scope)?;
+                self.unify_var_baseset(addr_var, BaseSet::USome)?;
+                // REVIEW - addr_var and offs_var only need to be compatible, not identical, but in our current model it is hard to support heterogenous typings
+                self.unify_var_pair(addr_var, offs_var)?;
                 let inner_t = self.infer_utype_format(inner, ctxt)?;
                 self.unify_var_utype(newvar, inner_t)?;
                 Ok(newvar)

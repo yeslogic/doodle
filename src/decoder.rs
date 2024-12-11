@@ -721,7 +721,7 @@ pub enum Decoder {
     PeekNot(Box<Decoder>),
     Slice(Box<Expr>, Box<Decoder>),
     Bits(Box<Decoder>),
-    WithRelativeOffset(Box<Expr>, Box<Decoder>),
+    WithRelativeOffset(Box<Expr>, Box<Expr>, Box<Decoder>),
     Map(Box<Decoder>, Box<Expr>),
     Where(Box<Decoder>, Box<Expr>),
     Compute(Box<Expr>),
@@ -1017,9 +1017,9 @@ impl<'a> Compiler<'a> {
                 let da = Box::new(self.compile_format(a, Rc::new(Next::Empty))?);
                 Ok(Decoder::Bits(da))
             }
-            Format::WithRelativeOffset(expr, a) => {
+            Format::WithRelativeOffset(addr, expr, a) => {
                 let da = Box::new(self.compile_format(a, Rc::new(Next::Empty))?);
-                Ok(Decoder::WithRelativeOffset(expr.clone(), da))
+                Ok(Decoder::WithRelativeOffset(addr.clone(), expr.clone(), da))
             }
             Format::Map(a, expr) => {
                 let da = Box::new(self.compile_format(a, next.clone())?);
@@ -1500,12 +1500,14 @@ impl Decoder {
                     .ok_or(DecodeError::overrun(bytes_read, input.offset))?;
                 Ok((v, input))
             }
-            Decoder::WithRelativeOffset(expr, a) => {
+            Decoder::WithRelativeOffset(base_addr, expr, a) => {
+                let base = base_addr.eval_value(scope).unwrap_usize();
                 let offset = expr.eval_value(scope).unwrap_usize();
-                let (_, slice) = input
-                    .split_at(offset)
-                    .ok_or(DecodeError::overrun(offset, input.offset))?;
-                let (v, _) = a.parse(program, scope, slice)?;
+                let abs_offset = base + offset;
+                let seek_input = input
+                    .seek_to(abs_offset)
+                    .ok_or(DecodeError::bad_seek(abs_offset, input.input.len()))?;
+                let (v, _) = a.parse(program, scope, seek_input)?;
                 Ok((v, input))
             }
             Decoder::Map(d, expr) => {

@@ -14,6 +14,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             (
                 "waldo",
                 Format::WithRelativeOffset(
+                    Box::new(var("here")),
                     Box::new(sub(var("where"), var("here"))),
                     Box::new(is_bytes(b"Waldo")),
                 ),

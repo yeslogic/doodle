@@ -1,11 +1,11 @@
 use super::util::{U16Set, Wec};
 use super::*;
-use derive_builder::Builder;
 use doodle::Label;
 use encoding::{
     all::{MAC_ROMAN, UTF_16BE},
     DecoderTrap, Encoding,
 };
+use derive_builder::Builder;
 
 // SECTION - Command-line configurable options for what to show
 
@@ -15,6 +15,24 @@ pub enum VerboseLevel {
     #[default]
     Baseline = 0, // Default verbose level: show at least the presence and version of each table, perhaps more for larger or more detailed tables
     Detailed = 1, // Show at least as much as necessary to sanity-check specific values at a debugger level
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash)]
+pub enum Verbosity {
+    Minimal,
+    VerboseLevel(VerboseLevel),
+}
+
+impl std::default::Default for Verbosity {
+    fn default() -> Self {
+        Verbosity::VerboseLevel(VerboseLevel::default())
+    }
+}
+
+impl Verbosity {
+    fn is_at_least(&self, other: impl Into<Self>) -> bool {
+        self >= &other.into()
+    }
 }
 
 impl VerboseLevel {
@@ -29,8 +47,15 @@ impl From<u8> for VerboseLevel {
     }
 }
 
+impl From<VerboseLevel> for Verbosity {
+    fn from(value: VerboseLevel) -> Self {
+        Self::VerboseLevel(value)
+    }
+}
+
 /// Set of configurable values that control which metrics are shown, and in how much detail
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Builder)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Builder)]
 #[builder(setter(into))]
 #[builder(build_fn(error = "std::convert::Infallible"))]
 pub struct Config {
@@ -46,7 +71,7 @@ pub struct Config {
     extra_only: bool,
 
     #[builder(default)]
-    verbose_level: VerboseLevel,
+    verbosity: Verbosity,
 }
 
 impl Config {
@@ -427,6 +452,10 @@ impl Promote<OpentypeEncodingRecord> for EncodingRecord {
     }
 }
 
+
+
+
+
 impl Promote<OpentypeCmap> for Cmap {
     fn promote(orig: &OpentypeCmap) -> Self {
         Cmap {
@@ -442,6 +471,9 @@ struct Cmap {
     version: u16,
     encoding_records: Vec<EncodingRecord>,
 }
+
+
+
 
 #[derive(Clone, Copy, Debug)]
 // STUB - enrich with any further details we care about presenting
@@ -534,6 +566,7 @@ pub enum PlatformEncodingLanguageId {
 }
 
 impl PlatformEncodingLanguageId {
+    // NOTE - implicitly hardcoded to assume 'our locale' is English
     fn matches_locale(&self, buf: &str) -> bool {
         match self {
             PlatformEncodingLanguageId::Unicode(_) => buf.is_ascii(),
@@ -3117,7 +3150,7 @@ pub fn show_opentype_stats(metrics: &OpentypeMetrics, conf: &Config) {
 }
 
 fn show_magic(magic: u32) {
-    println!("Magic: {}", format_magic(magic));
+    println!("(sfntVersion: {})", format_magic(magic));
 }
 
 fn format_magic(magic: u32) -> String {
@@ -3149,7 +3182,7 @@ fn show_font_metrics(font: &SingleFontMetrics, conf: &Config) {
 
 fn show_extra_magic(table_ids: &[u32]) {
     for id in table_ids.iter() {
-        println!("[MISSING IMPL]: `{}`", format_magic(*id));
+        println!("{}: [MISSING IMPL]", format_magic(*id));
     }
 }
 
@@ -3157,7 +3190,7 @@ fn show_required_metrics(required: &RequiredTableMetrics, conf: &Config) {
     show_cmap_metrics(&required.cmap, conf);
     show_head_metrics(&required.head, conf);
     show_hhea_metrics(&required.hhea, conf);
-    show_htmx_metrics(&required.hmtx, conf);
+    show_hmtx_metrics(&required.hmtx, conf);
     show_maxp_metrics(&required.maxp, conf);
     show_name_metrics(&required.name, conf);
     show_os2_metrics(&required.os2, conf);
@@ -3217,25 +3250,27 @@ fn show_gdef_metrics(gdef: &Option<GdefMetrics>, conf: &Config) {
             "GDEF: version {}",
             format_version_major_minor(*major_version, *minor_version)
         );
-        if let Some(glyph_class_def) = glyph_class_def {
-            show_glyph_class_def(glyph_class_def, conf);
-        }
-        if let Some(attach_list) = attach_list {
-            show_attach_list(attach_list, conf);
-        }
-        if let Some(lig_caret_list) = lig_caret_list {
-            show_lig_caret_list(lig_caret_list, conf);
-        }
-        if let Some(mark_attach_class_def) = mark_attach_class_def {
-            show_mark_attach_class_def(mark_attach_class_def, conf);
-        }
-        match data {
-            GdefTableDataMetrics::NoData => {}
-            GdefTableDataMetrics::MarkGlyphSetsDef(mark_glyph_set) => match mark_glyph_set {
-                None => println!("\tMarkGlyphSet: <none>"),
-                Some(mgs) => show_mark_glyph_set(mgs, conf),
-            },
-            GdefTableDataMetrics::ItemVarStore(ivs) => show_item_variation_store(ivs),
+        if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
+            if let Some(glyph_class_def) = glyph_class_def {
+                show_glyph_class_def(glyph_class_def, conf);
+            }
+            if let Some(attach_list) = attach_list {
+                show_attach_list(attach_list, conf);
+            }
+            if let Some(lig_caret_list) = lig_caret_list {
+                show_lig_caret_list(lig_caret_list, conf);
+            }
+            if let Some(mark_attach_class_def) = mark_attach_class_def {
+                show_mark_attach_class_def(mark_attach_class_def, conf);
+            }
+            match data {
+                GdefTableDataMetrics::NoData => {}
+                GdefTableDataMetrics::MarkGlyphSetsDef(mark_glyph_set) => match mark_glyph_set {
+                    None => println!("\tMarkGlyphSet: <none>"),
+                    Some(mgs) => show_mark_glyph_set(mgs, conf),
+                },
+                GdefTableDataMetrics::ItemVarStore(ivs) => show_item_variation_store(ivs),
+            }
         }
     }
 }
@@ -3261,9 +3296,11 @@ fn show_layout_metrics(gpos: &Option<LayoutMetrics>, ctxt: Ctxt, conf: &Config) 
             format_table_disc(ctxt.get_disc().expect("Ctxt missing TableDiscriminator")),
             format_version_major_minor(*major_version, *minor_version)
         );
-        show_script_list(&script_list, conf);
-        show_feature_list(&feature_list, conf);
-        show_lookup_list(&lookup_list, ctxt, conf);
+        if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
+            show_script_list(&script_list, conf);
+            show_feature_list(&feature_list, conf);
+            show_lookup_list(&lookup_list, ctxt, conf);
+        }
     }
 }
 
@@ -4149,18 +4186,20 @@ fn show_gasp_metrics(gasp: &Option<GaspMetrics>, conf: &Config) {
             }
         };
         println!("gasp: version {version}, {num_ranges} ranges");
-        show_items_elided(
-            &ranges,
-            show_gasp_range,
-            conf.bookend_size,
-            |start, stop| {
-                format!(
-                    "    skipping gasp ranges for max_ppem values {}..={}",
-                    &ranges[start].range_max_ppem,
-                    &ranges[stop - 1].range_max_ppem
-                )
-            },
-        );
+        if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
+            show_items_elided(
+                &ranges,
+                show_gasp_range,
+                conf.bookend_size,
+                |start, stop| {
+                    format!(
+                        "    skipping gasp ranges for max_ppem values {}..={}",
+                        &ranges[start].range_max_ppem,
+                        &ranges[stop - 1].range_max_ppem
+                    )
+                },
+            );
+        }
     }
 }
 
@@ -4239,25 +4278,22 @@ fn format_version_major_minor(major: u16, minor: u16) -> String {
 
 fn show_cmap_metrics(cmap: &Cmap, conf: &Config) {
     print!("cmap: version {}", cmap.version);
-    if conf.verbose_level < VerboseLevel::Detailed {
-        println!(", {} encoding tables", cmap.encoding_records.len());
-    } else {
+    if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
         println!();
         let show_record = |ix: usize, record: &EncodingRecord| {
             // TODO[enrichment]: if we implement subtables and more verbosity levels, show subtable details
-            let EncodingRecord {
-                platform,
-                encoding,
-                subtable: _subtable,
-            } = record;
+            let EncodingRecord { platform, encoding, subtable: _subtable } = record;
             println!("\t[{ix}]: platform={}, encoding={}", platform, encoding);
         };
         show_items_elided(
             &cmap.encoding_records,
             show_record,
             conf.bookend_size,
-            |start, stop| format!("\t(skipping encoding records {start}..{stop})"),
+            |start, stop| format!("\t(skipping encoding records {start}..{stop})")
         )
+    } else {
+        println!(", {} encoding tables", cmap.encoding_records.len());
+
     }
 }
 
@@ -4317,7 +4353,7 @@ fn show_hhea_metrics(hhea: &HheaMetrics, _conf: &Config) {
     );
 }
 
-fn show_htmx_metrics(hmtx: &HmtxMetrics, conf: &Config) {
+fn show_hmtx_metrics(hmtx: &HmtxMetrics, conf: &Config) {
     let show_unified = |ix: usize, hmet: &UnifiedHmtxMetric| match &hmet.advance_width {
         Some(width) => println!(
             "\tGlyph ID [{ix}]: advanceWidth={width}, lsb={}",
@@ -4325,10 +4361,13 @@ fn show_htmx_metrics(hmtx: &HmtxMetrics, conf: &Config) {
         ),
         None => println!("\tGlyph ID [{ix}]: lsb={}", hmet.left_side_bearing),
     };
-
-    show_items_elided(&hmtx.0, show_unified, conf.bookend_size, |start, stop| {
-        format!("    (skipping hmetrics {start}..{stop})")
-    });
+    if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
+        show_items_elided(&hmtx.0, show_unified, conf.bookend_size, |start, stop| {
+            format!("    (skipping hmetrics {start}..{stop})")
+        });
+    } else {
+        println!("hmtx: {} hmetrics", hmtx.0.len())
+    }
 }
 
 fn show_maxp_metrics(maxp: &MaxpMetrics, _conf: &Config) {
@@ -4349,7 +4388,7 @@ fn show_maxp_metrics(maxp: &MaxpMetrics, _conf: &Config) {
     }
 }
 
-fn show_name_metrics(name: &NameMetrics, _conf: &Config) {
+fn show_name_metrics(name: &NameMetrics, conf: &Config) {
     // STUB - add more details if appropriate
     match &name.lang_tag_records {
         Some(records) => {
@@ -4365,21 +4404,23 @@ fn show_name_metrics(name: &NameMetrics, _conf: &Config) {
             name.version, name.name_count
         ),
     }
-    let mut no_name_yet = true;
-    for record in name.name_records.iter() {
-        match record {
-            // STUB - if there are any more name records we care about, add them here
-            &NameRecord {
-                name_id: NameId::FULL_FONT_NAME,
-                plat_encoding_lang,
-                ref buf,
-            } => {
-                if no_name_yet && plat_encoding_lang.matches_locale(buf) {
-                    println!("\tFull Font Name: {}", buf);
-                    no_name_yet = false;
+    if conf.verbosity.is_at_least(VerboseLevel::Baseline) {
+        let mut no_name_yet = true;
+        for record in name.name_records.iter() {
+            match record {
+                // STUB - if there are any more name records we care about, add them here
+                &NameRecord {
+                    name_id: NameId::FULL_FONT_NAME,
+                    plat_encoding_lang,
+                    ref buf,
+                } => {
+                    if no_name_yet && plat_encoding_lang.matches_locale(buf) {
+                        println!("\tFull Font Name: {}", buf);
+                        no_name_yet = false;
+                    }
                 }
+                _ => continue,
             }
-            _ => continue,
         }
     }
 }
@@ -4410,12 +4451,14 @@ const fn as_s16(v: u16) -> i16 {
 fn show_glyf_metrics(glyf: &Option<GlyfMetrics>, conf: &Config) {
     if let Some(glyf) = glyf.as_ref() {
         println!("glyf: {} glyphs", glyf.num_glyphs);
-        show_items_elided(
-            glyf.glyphs.as_slice(),
-            show_glyph_metric,
-            conf.bookend_size,
-            |start, stop| format!("    (skipping glyphs {start}..{stop})"),
-        )
+        if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
+            show_items_elided(
+                glyf.glyphs.as_slice(),
+                show_glyph_metric,
+                conf.bookend_size,
+                |start, stop| format!("    (skipping glyphs {start}..{stop})"),
+            )
+        }
     } else {
         println!("glyf: <not present>")
     }

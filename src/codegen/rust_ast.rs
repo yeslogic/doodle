@@ -1236,11 +1236,9 @@ pub(crate) enum RustExpr {
     Struct(Constructor, StructExpr),
     CloneOf(Box<RustExpr>),
     // FIXME: this variant is unused
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     Deref(Box<RustExpr>),
     Borrow(Box<RustExpr>),
-    // FIXME: this variant is unused
-    #[allow(dead_code)]
     BorrowMut(Box<RustExpr>),
     Try(Box<RustExpr>),
     Operation(RustOp),
