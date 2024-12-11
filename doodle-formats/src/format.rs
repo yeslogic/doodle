@@ -109,6 +109,7 @@ mod test {
             (
                 "mask",
                 Format::WithRelativeOffset(
+                    None,
                     Box::new(var("len")),
                     Box::new(Format::Byte(mask_bytes)),
                 ),

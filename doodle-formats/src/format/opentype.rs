@@ -202,11 +202,6 @@ fn pos_add_u16(pos32: Expr, offset16: Expr) -> Expr {
     add(pos32, Expr::AsU32(Box::new(offset16)))
 }
 
-/// Gets the current stream-position and casts down from U64->U32
-fn pos32() -> Format {
-    map(Format::Pos, lambda("x", Expr::AsU32(Box::new(var("x")))))
-}
-
 /// Parses a u32 serving as the de-facto representation of a signed, 16.16 bit fixed-point number
 fn fixed32be(base: &BaseModule) -> Format {
     map(base.u32be(), lambda("x", variant("Fixed32", var("x"))))
@@ -217,17 +212,17 @@ fn f2dot14(base: &BaseModule) -> Format {
     map(base.u16be(), lambda("x", variant("F2Dot14", var("x"))))
 }
 
-/// FIXME - scaffolding to signal intent to use i8 format before it is implemented
+/// FIXME[signedness-hack] - scaffolding to signal intent to use i8 format before it is implemented
 fn s8(base: &BaseModule) -> Format {
     base.u8()
 }
 
-/// FIXME - scaffolding to signal intent to use i16 format before it is implemented
+/// FIXME[signedness-hack] - scaffolding to signal intent to use i16 format before it is implemented
 fn s16be(base: &BaseModule) -> Format {
     base.u16be()
 }
 
-/// FIXME - scaffolding to signal intent to use i64 format before it is implemented
+/// FIXME[signedness-hack] - scaffolding to signal intent to use i64 format before it is implemented
 fn s64be(base: &BaseModule) -> Format {
     base.u64be()
 }
@@ -252,6 +247,7 @@ const fn magic(tag: &'static [u8; 4]) -> u32 {
 
 /// Parses a `U16Be` value that is expected to be equal to `val`
 fn expect_u16be(base: &BaseModule, val: u16) -> Format {
+    // REVIEW - if we cared to do it, we could use `chain(is_bytes(val.to_be_bytes()), "_", compute(Expr::U16(val)))` (at the cost of worsening error reporting)
     where_lambda(base.u16be(), "x", expr_eq(var("x"), Expr::U16(val)))
 }
 
@@ -381,47 +377,19 @@ fn find_table(table_records: Expr, query_table_id: u32) -> Expr {
     index_checked(matching_tables, Expr::U32(0))
 }
 
-/// Converts an absolute offset (or, an offset relative to SOF) into a non-negative
-/// delta-value relative to `here`, an expression representing the immediate
-/// position in the stream we are parsing from (i.e. as the variable in `chain(Format::Pos, <var>, ...)`).
-///
-/// If the actual difference is negative, will produce a ParseError at runtime upon
-/// evalutation.
-fn relativize_offset(abs_offset: Expr, here: Expr) -> Expr {
-    sub(abs_offset, here)
-}
-
-/// Parse a format at a given (absolute) file offset
-///
-/// Will fail if the current stream-offset of our Parse-context
-/// is strictly greater than the absolute offset we are trying to seek to.
-fn link(abs_offset: Expr, format: Format) -> Format {
-    chain(
-        pos32(),
-        "__here",
-        Format::WithRelativeOffset(
-            Box::new(relativize_offset(abs_offset, var("__here"))),
-            Box::new(format),
-        ),
-    )
-}
-
 /// Given a raw Format `format` and an absolute buffer-offset `abs_offset`,
 /// attempts to parse `format` at `abs_offset`, wrapping it in `format_some`
 /// if this is a sound operation.
 ///
 /// If the offset specified has already been exceeded, will return `format_none()`
 /// instead.
-fn link_checked(abs_offset: Expr, format: Format) -> Format {
+fn link_forward_checked(abs_offset: Expr, format: Format) -> Format {
     chain(
         pos32(),
         "__here",
         cond_maybe(
             expr_gte(abs_offset.clone(), var("__here")),
-            Format::WithRelativeOffset(
-                Box::new(relativize_offset(abs_offset, var("__here"))),
-                Box::new(format),
-            ),
+            with_relative_offset(Some(Expr::U32(0)), abs_offset, format),
         ),
     )
 }
@@ -461,7 +429,7 @@ fn offset16_mandatory(base_offset: Expr, format: Format, base: &BaseModule) -> F
             if_then_else(
                 is_nonzero(var("offset")),
                 // because link-checked can also return format_none, it has to be the one to wrap format_some around the parse
-                link_checked(pos_add_u16(base_offset, var("offset")), format),
+                link_forward_checked(pos_add_u16(base_offset, var("offset")), format),
                 format_none(),
             ),
         ),
@@ -493,7 +461,7 @@ fn offset16_nullable(base_offset: Expr, format: Format, base: &BaseModule) -> Fo
             if_then_else(
                 is_nonzero(var("offset")),
                 // because link-checked can also return format_none, it has to be the one to wrap format_some around the parse
-                link_checked(pos_add_u16(base_offset, var("offset")), format),
+                link_forward_checked(pos_add_u16(base_offset, var("offset")), format),
                 format_none(),
             ),
         ),
@@ -532,7 +500,7 @@ fn offset32(base_offset: Expr, format: Format, base: &BaseModule) -> Format {
 }
 
 /// Given the appropriate Start-of-Frame absolute-stream-offset (`base_offset`) and
-/// an SOF-relative `rel_offset`, produce a relative-lookahead format that
+/// an SOF-relative `rel_offset`, produce a relative-seek format that
 /// seeks to the appropriate stream-location and parses `format`.
 ///
 /// # Notes
@@ -544,7 +512,7 @@ fn offset32(base_offset: Expr, format: Format, base: &BaseModule) -> Format {
 /// Will fail at time-of-parse in any case where the stream-offset we are expanding this
 /// format from is greater than the absolute target offset we would be attempting to seek to.
 fn linked_offset32(base_offset: Expr, rel_offset: Expr, format: Format) -> Format {
-    link(add(base_offset, rel_offset), format)
+    with_relative_offset(Some(base_offset), rel_offset, format)
 }
 
 pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {

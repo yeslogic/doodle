@@ -636,7 +636,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ],
             ),
             Format::WithRelativeOffset(
-                Box::new(sub(off_as_64(offset_file), var("__eoh"))),
+                Box::new(Expr::U64(0)),
+                Box::new(off_as_64(offset_file)),
                 Box::new(f),
             ),
         )
@@ -690,10 +691,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         ),
                                     ),
                                     Format::WithRelativeOffset(
-                                        Box::new(sub(
-                                            off_as_64(record_proj(var("shdr"), "offset")),
-                                            var("__eoh"),
-                                        )),
+                                        Box::new(Expr::U64(0)),
+                                        Box::new(off_as_64(record_proj(var("shdr"), "offset"))),
                                         Box::new(elf_section.call_args(vec![
                                             record_proj(var("shdr"), "type"),
                                             full_as_64(record_proj(var("shdr"), "size")),

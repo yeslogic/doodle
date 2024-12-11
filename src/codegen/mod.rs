@@ -605,10 +605,11 @@ impl CodeGen {
                 let cl_inner = self.translate(inner.get_dec());
                 CaseLogic::Engine(EngineLogic::Bits(Box::new(cl_inner)))
             }
-            TypedDecoder::WithRelativeOffset(_t, offset, inner) => {
+            TypedDecoder::WithRelativeOffset(_t, base_addr, offset, inner) => {
+                let re_base_addr = embed_expr(base_addr, ExprInfo::Natural);
                 let re_offset = embed_expr(offset, ExprInfo::Natural);
                 let cl_inner = self.translate(inner.get_dec());
-                CaseLogic::Engine(EngineLogic::OffsetPeek(re_offset, Box::new(cl_inner)))
+                CaseLogic::Engine(EngineLogic::OffsetPeek(re_base_addr, re_offset, Box::new(cl_inner)))
             }
         }
     }
@@ -1752,7 +1753,8 @@ enum EngineLogic<ExprT> {
     Peek(Box<CaseLogic<ExprT>>),
     Bits(Box<CaseLogic<ExprT>>),
     PeekNot(Box<CaseLogic<ExprT>>),
-    OffsetPeek(RustExpr, Box<CaseLogic<ExprT>>),
+    /// OffsetPeek(BaseAddr, RelOffset, InnerLogic)
+    OffsetPeek(RustExpr, RustExpr, Box<CaseLogic<ExprT>>),
 }
 
 impl<ExprT> ToAst for EngineLogic<ExprT>
@@ -1830,15 +1832,16 @@ where
                 Some(RustExpr::local("ret")),
             ),
 
-            EngineLogic::OffsetPeek(offs, cl_inner) => (
+            EngineLogic::OffsetPeek(base_addr, offs, cl_inner) => (
                 vec![
-                    RustStmt::Expr(
-                        RustExpr::local(ctxt.input_varname.clone())
-                            .call_method("open_peek_context"),
+                    RustStmt::assign(
+                        "tgt_offset",
+                        RustExpr::infix(base_addr.clone(), InfixOperator::Add, offs.clone()),
                     ),
-                    RustStmt::Expr(
+                    RustStmt::assign(
+                        "_is_advance",
                         RustExpr::local(ctxt.input_varname.clone())
-                            .call_method_with("advance_by", [offs.clone()])
+                            .call_method_with("advance_or_seek", [RustExpr::local("tgt_offset")])
                             .wrap_try(),
                     ),
                     RustStmt::assign(
@@ -3338,12 +3341,18 @@ impl<'a> Elaborator<'a> {
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::Bits(gt, Box::new(t_inner))
             }
-            Format::WithRelativeOffset(expr, inner) => {
+            Format::WithRelativeOffset(base_addr, expr, inner) => {
                 let index = self.get_and_increment_index();
+                let t_base_addr = self.elaborate_expr(base_addr);
                 let t_expr = self.elaborate_expr(expr);
                 let t_inner = self.elaborate_format(inner, dyn_scope);
                 let gt = self.get_gt_from_index(index);
-                TypedFormat::WithRelativeOffset(gt, Box::new(t_expr), Box::new(t_inner))
+                TypedFormat::WithRelativeOffset(
+                    gt,
+                    Box::new(t_base_addr),
+                    Box::new(t_expr),
+                    Box::new(t_inner),
+                )
             }
             Format::Map(inner, lambda) => {
                 // FIXME - adhoc types introduced by Map are not properly path-named

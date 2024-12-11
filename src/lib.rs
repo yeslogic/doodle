@@ -683,8 +683,8 @@ pub enum Format {
     Slice(Box<Expr>, Box<Format>),
     /// Parse bitstream
     Bits(Box<Format>),
-    /// Matches a format at a byte offset relative to the current stream position
-    WithRelativeOffset(Box<Expr>, Box<Format>),
+    /// Matches a format at a byte offset relative to the given base address
+    WithRelativeOffset(Box<Expr>, Box<Expr>, Box<Format>),
     /// Map a value with a lambda expression
     Map(Box<Format>, Box<Expr>),
     /// Assert that a boolean condition holds on a value
@@ -771,7 +771,7 @@ impl Format {
             Format::PeekNot(_) => Bounds::exact(0),
             Format::Slice(expr, _) => expr.bounds(),
             Format::Bits(f) => f.match_bounds(module).bits_to_bytes(),
-            Format::WithRelativeOffset(_, _) => Bounds::exact(0),
+            Format::WithRelativeOffset(..) => Bounds::exact(0),
             Format::Map(f, _expr) => f.match_bounds(module),
             Format::Where(f, _expr) => f.match_bounds(module),
             Format::Compute(_) | Format::Pos => Bounds::exact(0),
@@ -836,7 +836,8 @@ impl Format {
             Format::PeekNot(f) => f.lookahead_bounds(module),
             Format::Slice(expr, _) => expr.bounds(),
             Format::Bits(f) => f.lookahead_bounds(module).bits_to_bytes(),
-            Format::WithRelativeOffset(expr, f) => expr.bounds() + f.lookahead_bounds(module),
+            // REVIEW - do we have a way of approximating this better?
+            Format::WithRelativeOffset(..) => Bounds::any(),
             Format::Map(f, _expr) => f.lookahead_bounds(module),
             Format::Where(f, _expr) => f.lookahead_bounds(module),
             Format::Compute(_) | Format::Pos => Bounds::exact(0),
@@ -1201,7 +1202,7 @@ impl FormatModule {
             Format::PeekNot(_a) => Ok(ValueType::Tuple(vec![])),
             Format::Slice(_expr, a) => self.infer_format_type(scope, a),
             Format::Bits(a) => self.infer_format_type(scope, a),
-            Format::WithRelativeOffset(_expr, a) => self.infer_format_type(scope, a),
+            Format::WithRelativeOffset(_base_addr, _offset, a) => self.infer_format_type(scope, a),
             Format::Map(a, expr) => {
                 let arg_type = self.infer_format_type(scope, a)?;
                 match expr.as_ref() {
@@ -1915,28 +1916,8 @@ impl<'a> MatchTreeStep<'a> {
             TypedFormat::Bits(_, _a) => {
                 Self::accept() // FIXME
             }
-            TypedFormat::WithRelativeOffset(_, expr, a) => {
-                // REVIEW - this is a bit hackish but it is at least somewhat better than before
-                let tree = Self::from_next(module, next.clone());
-                let bounds = expr.bounds();
-                match bounds.is_exact() {
-                    None => tree, // if the lookahead is indeterminate, ignore it
-                    Some(n) => {
-                        let peek = match n {
-                            0 => Self::from_gt_format(module, a, Rc::new(Next::Empty)),
-                            _ => Self::from_slice(
-                                module,
-                                n,
-                                Rc::new(Next::Empty),
-                                Rc::new(Next::Tuple(
-                                    MaybeTyped::Typed(std::slice::from_ref(a.as_ref())),
-                                    next,
-                                )),
-                            ),
-                        };
-                        tree.peek(peek)
-                    }
-                }
+            TypedFormat::WithRelativeOffset(_, _base_addr, _offset, _a) => {
+                Self::accept() // FIXME
             }
             TypedFormat::Map(_, f, _expr) | TypedFormat::Where(_, f, _expr) => {
                 Self::from_gt_format(module, f, next)
@@ -2088,28 +2069,8 @@ impl<'a> MatchTreeStep<'a> {
             Format::Bits(_a) => {
                 Self::accept() // FIXME
             }
-            Format::WithRelativeOffset(expr, a) => {
-                // REVIEW - this is a bit hackish but it is at least somewhat better than before
-                let tree = Self::from_next(module, next.clone());
-                let bounds = expr.bounds();
-                match bounds.is_exact() {
-                    None => tree, // if the lookahead is indeterminate, ignore it
-                    Some(n) => {
-                        let peek = match n {
-                            0 => Self::from_format(module, a, Rc::new(Next::Empty)),
-                            _ => Self::from_slice(
-                                module,
-                                n,
-                                Rc::new(Next::Empty),
-                                Rc::new(Next::Tuple(
-                                    MaybeTyped::Untyped(std::slice::from_ref(a.as_ref())),
-                                    next,
-                                )),
-                            ),
-                        };
-                        tree.peek(peek)
-                    }
-                }
+            Format::WithRelativeOffset(_addr, _offset, _a) => {
+                Self::accept() // FIXME
             }
             Format::Map(f, _expr) => Self::from_format(module, f, next),
             Format::Where(f, _expr) => Self::from_format(module, f, next),

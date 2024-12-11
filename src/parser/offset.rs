@@ -30,6 +30,18 @@ impl ByteOffset {
         Self::Bytes(nbytes)
     }
 
+    /// Calculates the increment value required for self to reach `other`,
+    /// or returns `None` if the operation would constitute a decrement.
+    pub(crate) fn checked_delta(self, other: Self) -> Option<usize> {
+        if self.is_bit_mode() {
+            other.abs_bit_offset().checked_sub(self.abs_bit_offset())
+        } else if other.is_bit_mode() {
+            unreachable!("cannot calculate delta-value from Byte-mode {self} to bit-mode {other}");
+        } else {
+            other.as_bytes().0.checked_sub(self.as_bytes().0)
+        }
+    }
+
     // Calculates the increment value required for self to reach `other`
     pub(crate) fn delta(self, other: Self) -> usize {
         if self.is_bit_mode() {
@@ -69,6 +81,8 @@ impl ByteOffset {
         }
     }
 
+    /// Increments `self` by `delta` unconditionally, returning the old value
+    /// of `self` before the offset.
     pub(crate) fn increment_assign_by(&mut self, delta: usize) -> Self {
         let ret = *self;
         match self {
@@ -177,7 +191,7 @@ pub(crate) struct BufferOffset {
 }
 
 /// Wrapper for a `Vec`-based FILO stack of [`Lens`]es
-#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct ViewStack {
     stack: Vec<Lens>,
 }
@@ -199,8 +213,15 @@ impl ViewStack {
     ///
     /// If the slice is in non-LIFO order, the result returned by this method will be biased
     /// to the rightmost `Lens` that imposes an upper-bound, and may be inaccurate.
-    fn get_limit_from_slice(slice: &[Lens]) -> Option<ByteOffset> {
-        let (lens, rest) = slice.split_last()?;
+    fn get_limit_from_slice(slice: &[Lens]) -> Answer<ByteOffset> {
+        let (lens, rest) = match slice.split_last() {
+            Some(it) => it,
+            None => {
+                return Answer {
+                    val_or_keep_going: Err(true),
+                }
+            }
+        };
         // NOTE - because slices must nest, if we find one at any point, nothing further down will occur earlier in the buffer, so we can short-circuit
         lens.get_endpoint()
             .or_else(|| Self::get_limit_from_slice(rest))
@@ -210,7 +231,7 @@ impl ViewStack {
     pub(crate) fn get_limit(&self) -> Option<ByteOffset> {
         let ret = Self::get_limit_from_slice(self.stack.as_slice());
         // FIXME - introduce caching mechanic
-        ret
+        ret.as_option()
     }
 
     /// Performs a stack-pop operation on an owned `ViewStack`, returning the
@@ -279,13 +300,51 @@ impl ViewStack {
 }
 
 /// Enumeration over the (four) format-combinators that require special handling,
-/// both for limited-view (Slice) and speculative (Peek, PeekNot, UnionNondet) parsing.
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+/// both for limited-view (Slice) and speculative (Peek, PeekNot, UnionNondet) parsing,
+/// as well as free-context speculative random access (Seek).
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum Lens {
-    PeekNot { checkpoint: ByteOffset },
-    Peek { checkpoint: ByteOffset },
-    Slice { endpoint: ByteOffset },
-    Alts { checkpoint: ByteOffset },
+    Alts {
+        checkpoint: ByteOffset,
+    },
+    Peek {
+        checkpoint: ByteOffset,
+    },
+    PeekNot {
+        checkpoint: ByteOffset,
+    },
+    /// Random-access Seek with a restore-point offset of where we were before, and a control parameter for whether the seek is transparent with respect to subordinate Slices
+    Seek {
+        is_transparent: bool,
+        checkpoint: ByteOffset,
+    },
+    Slice {
+        endpoint: ByteOffset,
+    },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[repr(transparent)]
+pub(crate) struct Answer<T> {
+    val_or_keep_going: Result<T, bool>,
+}
+
+impl<T> Answer<T> {
+    fn or_else(self, f: impl FnOnce() -> Answer<T>) -> Answer<T> {
+        match self.val_or_keep_going {
+            Err(false) => Self {
+                val_or_keep_going: Err(false),
+            },
+            Err(true) => f(),
+            Ok(val) => Self {
+                val_or_keep_going: Ok(val),
+            },
+        }
+    }
+
+    fn as_option(self) -> Option<T> {
+        self.val_or_keep_going.ok()
+    }
 }
 
 impl Lens {
@@ -296,7 +355,7 @@ impl Lens {
     pub(crate) fn recover(&self) -> Option<ByteOffset> {
         match self {
             Lens::Alts { checkpoint } | Lens::PeekNot { checkpoint } => Some(*checkpoint),
-            Lens::Peek { .. } | Lens::Slice { .. } => None,
+            Lens::Peek { .. } | Lens::Slice { .. } | Lens::Seek { .. } => None,
         }
     }
 
@@ -306,7 +365,7 @@ impl Lens {
     /// to outer contexts that may permit restoration.
     pub(crate) fn restore(&self) -> Option<ByteOffset> {
         match self {
-            Lens::Peek { checkpoint } => Some(*checkpoint),
+            Lens::Peek { checkpoint } | Lens::Seek { checkpoint, .. } => Some(*checkpoint),
             Lens::Slice { .. } => None,
             // NOTE - despite having starting-offsets, Alts and PeekNot are return-on-fail rather than return-on-success
             Lens::Alts { .. } | Lens::PeekNot { .. } => None,
@@ -317,10 +376,17 @@ impl Lens {
     ///
     /// If the current Lens does not enforce such a limit, returns `None` instead, to allow back-propagation down the ViewStack
     /// until one is found or the ViewStack is exhausted.
-    pub(crate) fn get_endpoint(&self) -> Option<ByteOffset> {
+    pub(crate) fn get_endpoint(&self) -> Answer<ByteOffset> {
         match self {
-            Lens::Slice { endpoint } => Some(*endpoint),
-            _ => None,
+            Lens::Slice { endpoint } => Answer {
+                val_or_keep_going: Ok(*endpoint),
+            },
+            Lens::Seek { is_transparent, .. } => Answer {
+                val_or_keep_going: Err(*is_transparent),
+            },
+            _ => Answer {
+                val_or_keep_going: Err(true),
+            },
         }
     }
 }
@@ -341,8 +407,46 @@ impl BufferOffset {
         self.current_offset
     }
 
-    /// Increments the current offset by `delta` if it is legal to do so (determined in part by whether or not we are intending to read,
-    /// as flagged by `will_read`.
+    /// Performs a seek operation, and returns the checkpoint offset if successful, or `Err` if the seek is not allowed.
+    ///
+    /// # Note
+    ///
+    /// This operation is fragile and may lead to unexpected conditions under normal parsing. If the seek-to offset
+    /// is statically known to be ahead of the current offset, use [`try_increment`] instead.
+    pub(crate) fn seek_to_offset(
+        &mut self,
+        abs_offset: usize,
+        _is_transparent: bool,
+    ) -> PResult<ByteOffset> {
+        let destination = ByteOffset::from_bytes(abs_offset);
+
+        if destination > self.max_offset {
+            return Err(ParseError::Overrun(OverrunKind::EndOfStream {
+                offset: destination,
+                max_offset: self.max_offset,
+            }));
+        }
+
+        let checkpoint = self.current_offset;
+        if checkpoint.is_bit_mode() {
+            // NOTE - this panic is a placeholder until we have a case where Seek and bit-mode parsing coincide, to inform the approach that fits this edge-case
+            unreachable!("cannot perform random byte-access while in bit-parsing mode");
+        }
+
+        let is_transparent = match self.view_stack.get_limit() {
+            Some(max_offset) => destination < max_offset && _is_transparent,
+            None => _is_transparent,
+        };
+
+        self.current_offset = destination;
+        self.view_stack.push_lens(Lens::Seek {
+            is_transparent,
+            checkpoint,
+        });
+        Ok(checkpoint)
+    }
+
+    /// Increments the current offset by `delta` if it is legal to do so.
     ///
     /// Returns the old offset if successful, or `Err` if the increment is not allowed.
     ///
@@ -473,6 +577,19 @@ impl BufferOffset {
                     self.current_offset, checkpoint
                 );
             }
+            (
+                _,
+                Some(Lens::Seek {
+                    is_transparent,
+                    checkpoint,
+                }),
+            ) => {
+                // NOTE - this panic is here for the same reason as the Peek/PeekNot cases above, but may be removed if this case naturally crops up
+                unreachable!(
+                    "[STATE]: close-slice @{}: unexpected Seek[is_transparent: {}] <-@{}",
+                    self.current_offset, is_transparent, checkpoint
+                )
+            }
         }
     }
 
@@ -503,6 +620,11 @@ impl BufferOffset {
     /// If the `restore` operation returns an `Err`, will instead return the same error instead;
     /// if such an `Err` value is returned, `self` will be left in a semi-indeterminate state,
     /// and recovery from such an error is not possible.
+    ///
+    /// # Note
+    ///
+    /// Though the method is called `close_peek`, it is also applicable for closing `Seek` Lenses as well.
+    /// As a result, it may need to be called more than once to close the `Peek`` below a `Seek`.
     pub(crate) fn close_peek(&mut self) -> Result<(), StateError> {
         let mut stack = ViewStack::new();
         std::mem::swap(&mut stack, &mut self.view_stack);

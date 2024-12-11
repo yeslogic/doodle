@@ -395,7 +395,7 @@ impl<'module> TreePrinter<'module> {
             Format::PeekNot(_format) => self.compile_parsed_value(value),
             Format::Slice(_, format) => self.compile_parsed_decoded_value(value, format),
             Format::Bits(format) => self.compile_parsed_decoded_value(value, format),
-            Format::WithRelativeOffset(_, format) => {
+            Format::WithRelativeOffset(_, _, format) => {
                 self.compile_parsed_decoded_value(value, format)
             }
             Format::Map(format, _expr) => {
@@ -552,7 +552,9 @@ impl<'module> TreePrinter<'module> {
             Format::PeekNot(_format) => self.compile_value(value),
             Format::Slice(_, format) => self.compile_decoded_value(value, format),
             Format::Bits(format) => self.compile_decoded_value(value, format),
-            Format::WithRelativeOffset(_, format) => self.compile_decoded_value(value, format),
+            Format::WithRelativeOffset(_base_addr, _offset, format) => {
+                self.compile_decoded_value(value, format)
+            }
             Format::Map(format, _expr) => {
                 if self.flags.collapse_mapped_values {
                     self.compile_value(value)
@@ -1889,12 +1891,13 @@ impl<'module> TreePrinter<'module> {
                 prec,
                 Precedence::FORMAT_COMPOUND,
             ),
-            Format::WithRelativeOffset(offset, format) => {
-                let expr_frag = self.compile_expr(offset, Precedence::ATOM);
+            Format::WithRelativeOffset(base_addr, offset, format) => {
+                let base_frag = self.compile_expr(base_addr, Precedence::ATOM);
+                let offs_frag = self.compile_expr(offset, Precedence::ATOM);
                 cond_paren(
                     self.compile_nested_format(
                         "with-relative-offset",
-                        Some(&[expr_frag]),
+                        Some(&[base_frag, offs_frag]),
                         format,
                         prec,
                     ),
