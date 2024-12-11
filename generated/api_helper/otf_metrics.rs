@@ -1,11 +1,11 @@
 use super::util::{U16Set, Wec};
 use super::*;
+use derive_builder::Builder;
 use doodle::Label;
 use encoding::{
     all::{MAC_ROMAN, UTF_16BE},
     DecoderTrap, Encoding,
 };
-use derive_builder::Builder;
 
 // SECTION - Command-line configurable options for what to show
 
@@ -54,8 +54,7 @@ impl From<VerboseLevel> for Verbosity {
 }
 
 /// Set of configurable values that control which metrics are shown, and in how much detail
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[derive(Builder)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Builder)]
 #[builder(setter(into))]
 #[builder(build_fn(error = "std::convert::Infallible"))]
 pub struct Config {
@@ -452,10 +451,6 @@ impl Promote<OpentypeEncodingRecord> for EncodingRecord {
     }
 }
 
-
-
-
-
 impl Promote<OpentypeCmap> for Cmap {
     fn promote(orig: &OpentypeCmap) -> Self {
         Cmap {
@@ -471,9 +466,6 @@ struct Cmap {
     version: u16,
     encoding_records: Vec<EncodingRecord>,
 }
-
-
-
 
 #[derive(Clone, Copy, Debug)]
 // STUB - enrich with any further details we care about presenting
@@ -4282,18 +4274,21 @@ fn show_cmap_metrics(cmap: &Cmap, conf: &Config) {
         println!();
         let show_record = |ix: usize, record: &EncodingRecord| {
             // TODO[enrichment]: if we implement subtables and more verbosity levels, show subtable details
-            let EncodingRecord { platform, encoding, subtable: _subtable } = record;
+            let EncodingRecord {
+                platform,
+                encoding,
+                subtable: _subtable,
+            } = record;
             println!("\t[{ix}]: platform={}, encoding={}", platform, encoding);
         };
         show_items_elided(
             &cmap.encoding_records,
             show_record,
             conf.bookend_size,
-            |start, stop| format!("\t(skipping encoding records {start}..{stop})")
+            |start, stop| format!("\t(skipping encoding records {start}..{stop})"),
         )
     } else {
         println!(", {} encoding tables", cmap.encoding_records.len());
-
     }
 }
 

@@ -2904,7 +2904,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             };
             let multiple_subst = {
                 let sequence_table = record([
-                    ("glyph_count", where_nonzero(base.u16be())),
+                    // NOTE - formally (according to the spec) this must never be 0, but some fonts ignore this so we don't enforce it as a mandate
+                    ("glyph_count", base.u16be()),
                     (
                         "substitute_glyph_ids",
                         repeat_count(var("glyph_count"), base.u16be()),
