@@ -1050,3 +1050,22 @@ pub fn is_within(x: Expr, bounds: Bounds) -> Expr {
         ],
     )
 }
+
+pub fn with_relative_offset(base_address: Option<Expr>, offset: Expr, format: Format) -> Format {
+    match base_address {
+        Some(addr) => {
+            Format::WithRelativeOffset(Box::new(addr), Box::new(offset), Box::new(format))
+        }
+        None => chain(
+            Format::Pos,
+            "__here",
+            Format::WithRelativeOffset(Box::new(var("__here")), Box::new(offset), Box::new(format)),
+        ),
+    }
+}
+
+/// Gets the current stream-position and casts down from U64->U32
+// TODO: implement a semi-auto type for Format::Pos in typechecker instead of hard-coding to U64?
+pub fn pos32() -> Format {
+    map(Format::Pos, lambda("x", Expr::AsU32(Box::new(var("x")))))
+}

@@ -140,6 +140,7 @@ pub(crate) enum TypedDecoder<TypeRep> {
     WithRelativeOffset(
         TypeRep,
         Box<TypedExpr<TypeRep>>,
+        Box<TypedExpr<TypeRep>>,
         Box<TypedDecoderExt<TypeRep>>,
     ),
     Map(
@@ -537,11 +538,12 @@ impl<'a> GTCompiler<'a> {
                 let da = Box::new(self.compile_gt_format(a, None, Rc::new(Next::Empty))?);
                 Ok(TypedDecoder::Bits(gt.clone(), da))
             }
-            GTFormat::WithRelativeOffset(gt, expr, a) => {
+            GTFormat::WithRelativeOffset(gt, base_addr, offset, a) => {
                 let da = Box::new(self.compile_gt_format(a, None, Rc::new(Next::Empty))?);
                 Ok(TypedDecoder::WithRelativeOffset(
                     gt.clone(),
-                    expr.clone(),
+                    base_addr.clone(),
+                    offset.clone(),
                     da,
                 ))
             }

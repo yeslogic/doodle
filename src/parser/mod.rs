@@ -40,6 +40,38 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
+    /// Performs the simplest offset-modifying operation required to reach the specified `dest_offset`,
+    /// treated as an absolute byte-offset (or relative to the start of stream). Returns `Ok(true)` if
+    /// the operation performed was a simple advance, `Ok(false)` if the operation performed was a
+    /// random-access seek, and `Err` if an error occurred.
+    ///
+    /// Will default to a simple advance if possible, and fall back to random-access seek only when
+    /// strictly necessary.
+    ///
+    /// # Note
+    ///
+    /// To avoid forcing conditional branches in generated code, an implicit peek-context is opened
+    /// just before the advance-operation when not seeking. This means that the caller will not have
+    /// to manually open a peek context, as well as not having to conditionally recover an extra time
+    /// as a result if a seek is performed.
+    pub fn advance_or_seek<N>(&mut self, dest_offset: N) -> Result<bool, ParseError>
+    where
+        N: TryInto<usize, Error: std::fmt::Debug> + Copy,
+    {
+        let dest = dest_offset.try_into().unwrap();
+        let dest_offset = ByteOffset::from_bytes(dest);
+        let is_advance =
+            if let Some(delta) = self.offset.get_current_offset().checked_delta(dest_offset) {
+                self.offset.open_peek();
+                self.offset.try_increment(delta)?;
+                true
+            } else {
+                self.offset.seek_to_offset(dest, false)?;
+                false
+            };
+        Ok(is_advance)
+    }
+
     pub fn skip_remainder(&mut self) {
         let after_skip = self.offset.current_limit();
         unsafe {

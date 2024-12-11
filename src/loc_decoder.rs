@@ -1502,12 +1502,14 @@ impl Decoder {
                     .ok_or(DecodeError::overrun(bytes_read, input.offset))?;
                 Ok((v, input))
             }
-            Decoder::WithRelativeOffset(expr, a) => {
+            Decoder::WithRelativeOffset(base_addr, expr, a) => {
+                let base_addr = base_addr.eval_value_with_loc(scope).unwrap_usize();
                 let offset = expr.eval_value_with_loc(scope).unwrap_usize();
-                let (_, slice) = input
-                    .split_at(offset)
-                    .ok_or(DecodeError::overrun(offset, input.offset))?;
-                let (v, _) = a.parse_with_loc(program, scope, slice)?;
+                let abs_offset = base_addr + offset;
+                let seek_input = input
+                    .seek_to(abs_offset)
+                    .ok_or(DecodeError::bad_seek(abs_offset, input.input.len()))?;
+                let (v, _) = a.parse_with_loc(program, scope, seek_input)?;
                 Ok((v, input))
             }
             Decoder::Map(d, expr) => {
