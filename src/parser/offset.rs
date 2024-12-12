@@ -147,7 +147,7 @@ impl ByteOffset {
         }
     }
 
-    pub(crate) fn as_bytes(&self) -> (usize, Option<usize>) {
+    pub fn as_bytes(&self) -> (usize, Option<usize>) {
         match *self {
             ByteOffset::Bytes(n) => (n, None),
             ByteOffset::Bits {
