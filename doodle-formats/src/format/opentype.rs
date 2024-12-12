@@ -251,10 +251,11 @@ fn expect_u16be(base: &BaseModule, val: u16) -> Format {
     where_lambda(base.u16be(), "x", expr_eq(var("x"), Expr::U16(val)))
 }
 
-/// Constructs a format that peeks the value of a single field in a record (or the common prefix of a union of related records),
-/// discarding the values of all fields that come before it; the result of this speculative parse is then
-/// fed back under the original field-name (in `field_prefix`) to the format `dep_format` that depends on it,
-/// via `LetFormat`.
+/// Constructs a format that peeks the value of a specific field in a given
+/// record (or the common prefix of a union of related records), discarding the
+/// values of all fields that come before it; the result of this speculative
+/// parse is then associated to the original field-name (in `field_prefix`) before
+/// finally parsing the format `dep_format` that depends on its value.
 fn peek_field_then<Name>(field_prefix: &[(Name, Format)], dep_format: Format) -> Format
 where
     Name: IntoLabel + Clone + AsRef<str>,
@@ -268,8 +269,10 @@ where
             // Process all the fields before the one we care about and discard their cumulative value
             record(init.into_iter().cloned()),
             "_",
+            // Process the field we *do* care about, while still in the peek context, and yield its value as the result of the entire parse
             field_format.clone(),
         ))),
+        // Scope-capture the final field of `field_prefix` under the identifier it is paired
         field_name.clone(),
         dep_format,
     )
@@ -2092,6 +2095,15 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ("delta_format", is_bytes(&(0x8000u16).to_be_bytes())),
             ]);
 
+            let other_table = |delta_format: Expr| {
+                record([
+                    // FIXME - placeholder names `field0` and `field1`, rename as appropriate or remove this comment
+                    ("field0", base.u16be()),
+                    ("field1", base.u16be()),
+                    ("delta_format", compute(delta_format)),
+                ])
+            };
+
             module.define_format(
                 "opentype.common.device_or_variation_index_table",
                 peek_field_then(
@@ -2109,8 +2121,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 "VariationIndexTable",
                                 variation_index_table,
                             ),
-                            // NOTE - the name of this variant is arbitrary since it won't actually appear anywhere" )
-                            (Pattern::Wildcard, "BadFormat", Format::Fail),
+                            // Construct a raw variant for nonce-values without any further interpretation
+                            (bind("other"), "OtherTable", other_table(var("other"))),
                         ],
                     ),
                 ),

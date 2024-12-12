@@ -504,7 +504,7 @@ impl ProjShape {
 }
 
 /// Abstraction over explicit collections of BaseType values that could be in any order
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum BaseSet {
     /// Singleton set of any BaseType, even non-integral ones
     Single(BaseType),
@@ -514,26 +514,18 @@ pub enum BaseSet {
 
 impl BaseSet {
     #[allow(non_upper_case_globals)]
-    pub const UAny: Self = Self::U(UintSet::Any);
+    pub const UAny: Self = Self::U(UintSet::ANY);
 
     #[allow(non_upper_case_globals)]
-    pub const USome: Self = Self::U(UintSet::Any32);
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
-pub enum UintSet {
-    Any,               // unrestricted and non-defaulting if more than one solution
-    Any32,             // like Any,  but defaults to U32 if multiple solutions
-    Short8,            // U8 or U16, default solution is U8
-    AtLeast(IntWidth), // Some member of the restricted set of any whose width is no less than the given IntWidth
+    pub const USome: Self = Self::U(UintSet::ANY32);
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub enum IntWidth {
-    Bits8,
-    Bits16,
-    Bits32,
-    Bits64,
+    Bits8 = 0,
+    Bits16 = 1,
+    Bits32 = 2,
+    Bits64 = 3,
 }
 
 impl IntWidth {
@@ -541,6 +533,15 @@ impl IntWidth {
     pub const MAX16: usize = u16::MAX as usize;
     pub const MAX32: usize = u32::MAX as usize;
     pub const MAX64: usize = u64::MAX as usize;
+
+    pub fn to_base_type(self) -> BaseType {
+        match self {
+            IntWidth::Bits8 => BaseType::U8,
+            IntWidth::Bits16 => BaseType::U16,
+            IntWidth::Bits32 => BaseType::U32,
+            IntWidth::Bits64 => BaseType::U64,
+        }
+    }
 }
 
 impl crate::Bounds {
@@ -553,6 +554,210 @@ impl crate::Bounds {
             _ => IntWidth::Bits64,
         }
     }
+}
+
+/// Abstraction over rankings of candidate values in a set, where the least-value `Rank` is the default
+/// unless it is tied with anything else.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Rank {
+    Excluded,
+    At(u8),
+}
+
+impl Rank {
+    pub const fn is_excluded(self) -> bool {
+        matches!(self, Rank::Excluded)
+    }
+}
+
+impl PartialOrd for Rank {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Rank {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match (self, other) {
+            (Rank::At(n), Rank::At(m)) => {
+                // NOTE -  we call reverse this because we want lower numbers to be the maximum rank
+                n.cmp(m).reverse()
+            }
+            (Rank::At(_), Rank::Excluded) => std::cmp::Ordering::Greater,
+            (Rank::Excluded, Rank::At(_)) => std::cmp::Ordering::Less,
+            (Rank::Excluded, Rank::Excluded) => std::cmp::Ordering::Equal,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Hash, PartialEq, Eq)]
+pub struct UintSet {
+    // Array with ranks for U8, U16, U32, U64 in that order
+    ranks: [Rank; 4],
+}
+
+impl std::fmt::Debug for UintSet {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RankedUintSet")
+            .field("ranks", &self.ranks)
+            .finish()
+    }
+}
+
+impl std::fmt::Display for UintSet {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let this = self.normalize();
+        if this.is_empty() {
+            return write!(f, "{{}}");
+        } else {
+            write!(f, "{{ ")?;
+            let labels = ["U8", "U16", "U32", "U64"];
+            let mut ix_ranks = this
+                .ranks
+                .into_iter()
+                .enumerate()
+                .collect::<Vec<(usize, Rank)>>();
+            ix_ranks.sort_by(|(_, r1), (_, r2)| r1.cmp(r2).reverse());
+            let mut last_rank = None;
+            for (ix, r) in ix_ranks {
+                if r.is_excluded() {
+                    break;
+                }
+                match last_rank {
+                    None => {
+                        write!(f, "{}", labels[ix])?;
+                    }
+                    Some(r0) => {
+                        if r < r0 {
+                            write!(f, " > {}", labels[ix])?;
+                        } else {
+                            write!(f, ", {}", labels[ix])?;
+                        }
+                    }
+                }
+                last_rank = Some(r);
+            }
+            write!(f, " }}")
+        }
+    }
+}
+
+impl UintSet {
+    pub const ANY_DEFAULT_U32: Self = Self {
+        ranks: [Rank::At(1), Rank::At(1), Rank::At(0), Rank::At(1)],
+    };
+    pub const ANY_DEFAULT_U64: Self = Self {
+        ranks: [Rank::At(1), Rank::At(1), Rank::At(1), Rank::At(0)],
+    };
+
+    pub fn contains(&self, b: BaseType) -> bool {
+        self.ranks[b.int_width() as usize] != Rank::Excluded
+    }
+
+    pub fn normalize(self) -> Self {
+        let mut ranks = self.ranks;
+        for ix in 0..4 {
+            if self.ranks[ix] == Rank::Excluded {
+                continue;
+            }
+            let orig_val = self.ranks[ix];
+            let count_gte = (self.ranks.iter().filter(|r| **r >= orig_val).count() - 1) as u8;
+            ranks[ix] = Rank::At(count_gte);
+        }
+        Self { ranks }
+    }
+
+    pub fn intersection(self, other: Self) -> Self {
+        let mut ranks = [Rank::Excluded; 4];
+        let this = self.normalize();
+        let other = other.normalize();
+        for (ix, (r1, r2)) in Iterator::zip(this.ranks.iter(), other.ranks.iter()).enumerate() {
+            if matches!(r1, Rank::Excluded) || matches!(r2, Rank::Excluded) {
+                continue;
+            }
+            ranks[ix] = Ord::max(*r1, *r2);
+        }
+        Self { ranks }.normalize()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.ranks == [Rank::Excluded; 4]
+    }
+
+    pub fn get_unique_solution(self) -> Option<BaseType> {
+        let this = self.normalize();
+        let mut candidate = None;
+        let mut max_rank = Rank::Excluded;
+        let mut is_unique = true;
+        for (ix, r) in this.ranks.into_iter().enumerate() {
+            match r {
+                Rank::Excluded => continue,
+                Rank::At(_n) => match r.cmp(&max_rank) {
+                    std::cmp::Ordering::Greater => {
+                        max_rank = r;
+                        candidate = Some(ix);
+                        is_unique = true;
+                    }
+                    std::cmp::Ordering::Less => continue,
+                    std::cmp::Ordering::Equal => {
+                        is_unique = false;
+                    }
+                },
+            }
+        }
+        if let Some(ix) = candidate {
+            if is_unique {
+                Some(match ix {
+                    0 => BaseType::U8,
+                    1 => BaseType::U16,
+                    2 => BaseType::U32,
+                    3 => BaseType::U64,
+                    _ => unreachable!(),
+                })
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+}
+
+impl UintSet {
+    // unrestricted and non-defaulting if more than one solution
+    pub const ANY: UintSet = UintSet {
+        ranks: [Rank::At(3); 4],
+    };
+    // U8 or U16, default solution is U8
+    pub const SHORT8: UintSet = UintSet {
+        ranks: [Rank::At(0), Rank::At(1), Rank::Excluded, Rank::Excluded],
+    };
+
+    // Some member of the restricted set of any whose width is no less than the given IntWidth
+    pub const fn at_least(val: IntWidth) -> Self {
+        let ranks = match val {
+            IntWidth::Bits8 => [Rank::At(3), Rank::At(3), Rank::At(3), Rank::At(3)],
+            IntWidth::Bits16 => [Rank::Excluded, Rank::At(2), Rank::At(2), Rank::At(2)],
+            IntWidth::Bits32 => [Rank::Excluded, Rank::Excluded, Rank::At(1), Rank::At(1)],
+            IntWidth::Bits64 => [Rank::Excluded, Rank::Excluded, Rank::Excluded, Rank::At(0)],
+        };
+        UintSet { ranks }
+    }
+
+    // unrestricted but resolves if ambiguous to the given IntWidth, unless precluded
+    pub const fn any_default(val: IntWidth) -> Self {
+        let ranks = match val {
+            IntWidth::Bits8 => [Rank::At(0), Rank::At(3), Rank::At(3), Rank::At(3)],
+            IntWidth::Bits16 => [Rank::At(3), Rank::At(0), Rank::At(3), Rank::At(3)],
+            IntWidth::Bits32 => [Rank::At(3), Rank::At(3), Rank::At(0), Rank::At(0)],
+            IntWidth::Bits64 => [Rank::At(3), Rank::At(3), Rank::At(3), Rank::At(0)],
+        };
+        UintSet { ranks }
+    }
+}
+
+impl UintSet {
+    pub const ANY32: Self = Self::any_default(IntWidth::Bits32);
 }
 
 impl BaseType {
@@ -568,33 +773,29 @@ impl BaseType {
 }
 
 impl UintSet {
-    pub fn contains(&self, b: BaseType) -> bool {
-        match self {
-            UintSet::Any | UintSet::Any32 => b.is_numeric(),
-            UintSet::Short8 => b == BaseType::U8 || b == BaseType::U16,
-            UintSet::AtLeast(w) => b.int_width() >= *w,
-        }
-    }
+    // pub fn intersection(self, other: Self) -> Self {
+    //     match (self, other) {
+    //         (x, y) if x == y => x,
+    //         (UintSet::ANY, x) | (x, UintSet::ANY) => x, // Any is the identity under intersection
+    //         (UintSet::SHORT8, _) | (_, UintSet::SHORT8) => Self::SHORT8,
+    //         (UintSet::at_least(w1), UintSet::at_least(w2)) => Self::at_least(Ord::max(w1, w2)),
+    //         // Technically ambiguous cases
+    //         (UintSet::any_default(w1), UintSet::any_default(w2)) => Self::any_default(Ord::max(w1, w2)),
+    //         (UintSet::any_default(w_dft), UintSet::at_least(w_min)) | (UintSet::at_least(w_min), UintSet::any_default(w_dft)) => {
+    //             panic!("unresolvable UintSet intersection: AnyDefault({w_dft:?}) & AtLeast({w_min:?})")
+    //         }
+    //     }
+    // }
 
-    pub fn intersection(self, other: Self) -> Self {
-        match (self, other) {
-            (x, y) if x == y => x,
-            (UintSet::Any, x) | (x, UintSet::Any) => x,
-            (UintSet::Short8, _) | (_, UintSet::Short8) => Self::Short8,
-            (UintSet::AtLeast(w1), UintSet::AtLeast(w2)) => Self::AtLeast(Ord::max(w1, w2)),
-            _ => unreachable!("exhaustive cases covered"),
-        }
-    }
-
-    pub fn get_unique_solution(self) -> Option<BaseType> {
-        match self {
-            UintSet::Any => None,
-            UintSet::Any32 => Some(BaseType::U32),
-            UintSet::Short8 => Some(BaseType::U8),
-            UintSet::AtLeast(IntWidth::Bits64) => Some(BaseType::U64),
-            UintSet::AtLeast(_) => None,
-        }
-    }
+    // pub fn get_unique_solution(self) -> Option<BaseType> {
+    //     match self {
+    //         UintSet::Any => None,
+    //         UintSet::AnyDefault(width) => Some(width.to_base_type()),
+    //         UintSet::Short8 => Some(BaseType::U8),
+    //         UintSet::AtLeast(IntWidth::Bits64) => Some(BaseType::U64),
+    //         UintSet::AtLeast(_) => None,
+    //     }
+    // }
 }
 
 impl BaseSet {
@@ -636,10 +837,15 @@ impl BaseSet {
     fn get_unique_solution(&self, v: UVar) -> TCResult<Rc<UType>> {
         match self {
             BaseSet::Single(b) => Ok(Rc::new(UType::Base(*b))),
-            BaseSet::U(u) => match u.get_unique_solution() {
-                Some(b) => Ok(Rc::new(UType::Base(b))),
-                None => Err(TCErrorKind::MultipleSolutions(v, *self).into()),
-            },
+            BaseSet::U(u) => {
+                if u.is_empty() {
+                    return Err(TCErrorKind::NoSolution(v).into());
+                }
+                match u.get_unique_solution() {
+                    Some(b) => Ok(Rc::new(UType::Base(b))),
+                    None => Err(TCErrorKind::MultipleSolutions(v, *self).into()),
+                }
+            }
         }
     }
 }
@@ -648,15 +854,7 @@ impl std::fmt::Display for BaseSet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             BaseSet::Single(t) => write!(f, "{{ {t:?} }}"),
-            BaseSet::U(UintSet::Any) => write!(f, "{{ U8, U16, U32, U64 }}"),
-            BaseSet::U(UintSet::Any32) => write!(f, "{{ U8, U16, [U32], U64 }}"),
-            BaseSet::U(UintSet::Short8) => write!(f, "{{ [U8], U16 }}"),
-            BaseSet::U(UintSet::AtLeast(w)) => match w {
-                IntWidth::Bits8 => write!(f, "{{ U8, U16, U32, U64 }}"),
-                IntWidth::Bits16 => write!(f, "{{ U16, U32, U64 }}"),
-                IntWidth::Bits32 => write!(f, "{{ U32, U64 }}"),
-                IntWidth::Bits64 => write!(f, "{{ U64 }}"),
-            },
+            BaseSet::U(ranked_set) => ranked_set.fmt(f),
         }
     }
 }
@@ -754,7 +952,7 @@ impl TypeChecker {
             Pattern::Int(bounds) => {
                 let var = self.get_new_uvar();
                 let width = bounds.min_required_width();
-                self.unify_utype_baseset(var.into(), BaseSet::U(UintSet::AtLeast(width)))?;
+                self.unify_utype_baseset(var.into(), BaseSet::U(UintSet::at_least(width)))?;
                 Ok(var)
             }
             Pattern::Char(_) => {
@@ -901,7 +1099,7 @@ impl TypeChecker {
 
                 // unify on expected type of Seq<u8> | Seq<u16>
                 self.unify_var_proj_elem(codes_var, code_var)?;
-                self.unify_var_constraint(code_var, Constraint::Elem(BaseSet::U(UintSet::Short8)))?;
+                self.unify_var_constraint(code_var, Constraint::Elem(BaseSet::U(UintSet::SHORT8)))?;
 
                 if let Some(values_expr) = opt_values_expr {
                     let values_var = self.infer_var_expr(values_expr, ctxt.scope)?;
@@ -910,14 +1108,13 @@ impl TypeChecker {
                     self.unify_var_proj_elem(values_var, value_var)?;
                     self.unify_var_constraint(
                         value_var,
-                        Constraint::Elem(BaseSet::U(UintSet::Short8)),
+                        Constraint::Elem(BaseSet::U(UintSet::SHORT8)),
                     )?;
                 }
 
-                // FIXME - this is a best-guess based on decoder::make_huffman_codes, which maps each code to U16
                 self.unify_var_constraint(
                     newvar,
-                    Constraint::Elem(BaseSet::Single(BaseType::U16)),
+                    Constraint::Elem(BaseSet::U(UintSet::any_default(IntWidth::Bits16))),
                 )?;
                 Ok(newvar)
             }
@@ -1884,8 +2081,9 @@ impl TypeChecker {
                 newvar
             }
             Expr::SeqLength(seq_expr) => {
-                // REVIEW[hardcoded] - does this always have to be U32?
-                let newvar = self.init_var_simple(UType::Base(BaseType::U32))?.0;
+                let newvar = self.get_new_uvar();
+                // NOTE - we can't use `UintSet::any_default(Bits32)` because it causes a multiple-solution error when unified against Format::Pos.
+                self.unify_var_baseset(newvar, BaseSet::Single(BaseType::U32))?;
                 let seq_var = self.infer_var_expr(seq_expr.as_ref(), scope)?;
                 let elem_var = self.get_new_uvar();
                 self.unify_var_proj_elem(seq_var, elem_var)?;
@@ -2706,8 +2904,11 @@ impl TypeChecker {
                 self.unify_var_pair(newvar, uv_dynf)?;
                 Ok(newvar)
             }
-            // REVIEW - currently forcing Pos to be U64
-            Format::Pos => Ok(self.init_var_simple(UType::Base(BaseType::U64))?.0),
+            Format::Pos => {
+                let newvar = self.get_new_uvar();
+                self.unify_var_baseset(newvar, BaseSet::U(UintSet::any_default(IntWidth::Bits64)))?;
+                Ok(newvar)
+            }
             Format::LetFormat(f0, name, f) => {
                 let newvar = self.get_new_uvar();
                 let f0_v = self.infer_var_format(f0, ctxt)?;
@@ -2760,7 +2961,7 @@ impl TypeChecker {
                                 match bs.get_unique_solution(uv).as_deref() {
                                     Ok(UType::Base(b)) => Some(ValueType::Base(*b)),
                                     Ok(other) => unreachable!("base-set {bs:?} yielded unexpected solution {other:?}"),
-                                    Err(_) => None,
+                                    Err(_e) => None,
                                 }
                             VType::Abstract(ut) => self.reify(ut),
                             VType::IndefiniteUnion(vmid) => self.reify_union(vmid),
@@ -2893,6 +3094,7 @@ pub enum TCErrorKind {
     Unification(ConstraintError),
     InfiniteType(UVar, Constraints),
     MultipleSolutions(UVar, BaseSet),
+    NoSolution(UVar),
 }
 
 impl From<TypeError> for TCErrorKind {
@@ -2973,6 +3175,8 @@ impl std::fmt::Display for TCErrorKind {
                 }
             Self::MultipleSolutions(uv, bs) =>
                 write!(f, "no unique solution for `{uv} {}`", bs.to_constraint()),
+            Self::NoSolution(uv) =>
+                write!(f, "no valid solutions for `{uv}`"),
         }
     }
 }

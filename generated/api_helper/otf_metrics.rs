@@ -1339,6 +1339,7 @@ struct VariationIndexTable {
 enum DeviceOrVariationIndexTable {
     DeviceTable(DeviceTable),
     VariationIndexTable(VariationIndexTable),
+    OtherTable { delta_format: u16 },
 }
 
 #[derive(Clone, Debug)]
@@ -1366,6 +1367,7 @@ type OpentypeDeviceOrVariationIndexTable = opentype_common_device_or_variation_i
 type OpentypeDeviceTable = opentype_common_device_or_variation_index_table_DeviceTable;
 type OpentypeVariationIndexTable =
     opentype_common_device_or_variation_index_table_VariationIndexTable;
+type OpentypeDVIOtherTable = opentype_common_device_or_variation_index_table_OtherTable;
 
 impl TryPromote<OpentypeDeviceOrVariationIndexTable> for DeviceOrVariationIndexTable {
     type Error = ReflType<TFRErr<(u16, Vec<u16>), DeltaValues>, UnknownValueError<u16>>;
@@ -1394,6 +1396,10 @@ impl TryPromote<OpentypeDeviceOrVariationIndexTable> for DeviceOrVariationIndexT
                     delta_set_inner_index,
                 },
             )),
+            &OpentypeDeviceOrVariationIndexTable::OtherTable(OpentypeDVIOtherTable {
+                delta_format,
+                ..
+            }) => Ok(DeviceOrVariationIndexTable::OtherTable { delta_format }),
         }
     }
 }
@@ -3950,6 +3956,9 @@ fn format_caret_value(cv: &Link<CaretValue>) -> String {
                             coordinate,
                             format_variation_index_table(var_ix_table)
                         )
+                    }
+                    DeviceOrVariationIndexTable::OtherTable { delta_format } => {
+                        format!("{}du+[<DeltaFormat {delta_format}>]", coordinate)
                     }
                 },
             },
