@@ -3518,10 +3518,15 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 "sfnt_version",
                 where_lambda(
                     base.u32be(),
-                    "v",
-                    or(
-                        expr_eq(var("v"), Expr::U32(0x00010000)),
-                        expr_eq(var("v"), Expr::U32(magic(b"OTTO"))),
+                    "version",
+                    expr_match(
+                        var("version"),
+                        [
+                            (Pattern::U32(0x0001_0000), Expr::Bool(true)),
+                            (Pattern::U32(magic(b"OTTO")), Expr::Bool(true)),
+                            (Pattern::U32(magic(b"true")), Expr::Bool(true)),
+                            (Pattern::Wildcard, Expr::Bool(false)),
+                        ],
                     ),
                 ),
             ),
@@ -3630,6 +3635,12 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                             Pattern::U32(magic(b"ttcf")),
                             "TTCHeader",
                             ttc_header.call_args(vec![var("file_start")]),
+                        ),
+                        // TODO - not yet sure if TrueType fonts will parse correctly under our current table_directory implementation...
+                        (
+                            Pattern::U32(magic(b"true")),
+                            "TableDirectory",
+                            table_directory.call_args(vec![var("file_start")]),
                         ),
                         (Pattern::Wildcard, "UnknownTable", unknown_table),
                     ],
