@@ -932,6 +932,17 @@ enum CoverageTable {
     }, // Range of glyphs
 }
 
+impl CoverageTable {
+    fn iter(&self) -> Box<dyn Iterator<Item = u16> + '_> {
+        match self {
+            &CoverageTable::Format1 { ref glyph_array } => Box::new(glyph_array.iter().copied()),
+            &CoverageTable::Format2 { ref range_records } => {
+                Box::new(range_records.iter().flat_map(|rr| rr.start_glyph_id..=rr.end_glyph_id))
+            }
+        }
+    }
+}
+
 impl FromNull for CoverageTable {
     fn from_null() -> Self {
         // REVIEW - in practice, we could also pick Format2 instead, but Format1 is simpler...
@@ -1115,17 +1126,9 @@ impl Promote<opentype_class_def_data> for ClassDef {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 struct AttachPoint {
     point_indices: Vec<u16>,
-}
-
-impl FromNull for AttachPoint {
-    fn from_null() -> Self {
-        AttachPoint {
-            point_indices: Vec::new(),
-        }
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -1570,7 +1573,9 @@ impl TryPromote<OpentypeGsubLookupSubtable> for LookupSubtable {
             OpentypeGsubLookupSubtable::AlternateSubst(alt_subst) => {
                 LookupSubtable::AlternateSubst(AlternateSubst::promote(alt_subst))
             }
-            OpentypeGsubLookupSubtable::LigatureSubst => LookupSubtable::LigatureSubst,
+            OpentypeGsubLookupSubtable::LigatureSubst(ligature_subst) => {
+                LookupSubtable::LigatureSubst(LigatureSubst::promote(ligature_subst))
+            }
             OpentypeGsubLookupSubtable::SequenceContext(seq_ctx) => {
                 LookupSubtable::SequenceContext(SequenceContext::promote(seq_ctx))
             }
@@ -1632,10 +1637,73 @@ enum LookupSubtable {
     SingleSubst(SingleSubst),
     MultipleSubst(MultipleSubst),
     AlternateSubst(AlternateSubst),
-    LigatureSubst,
+    LigatureSubst(LigatureSubst),
     SubstExtension,
     ReverseChainSingleSubst,
 }
+
+pub type OpentypeLigatureSubst =
+    opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_LigatureSubst;
+
+impl Promote<OpentypeLigatureSubst> for LigatureSubst {
+    fn promote(orig: &OpentypeLigatureSubst) -> Self {
+        LigatureSubst {
+            coverage: CoverageTable::promote(&orig.coverage.link),
+            ligature_sets: orig
+                .ligature_sets
+                .iter()
+                .map(|offset| LigatureSet::promote(&offset.link))
+                .collect(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct LigatureSubst {
+    coverage: CoverageTable,
+    ligature_sets: Vec<LigatureSet>,
+}
+
+pub type OpentypeLigatureSet = opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_LigatureSubst_ligature_sets_link;
+
+#[derive(Debug, Clone, Default)]
+struct LigatureSet {
+    ligatures: Vec<Link<Ligature>>,
+}
+
+
+pub type OpentypeLigature = opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_LigatureSubst_ligature_sets_link_ligatures_link;
+
+#[derive(Debug, Clone)]
+struct Ligature {
+    ligature_glyph: u16,
+    component_count: u16,
+    component_glyph_ids: Vec<u16>,
+}
+
+impl Promote<OpentypeLigature> for Ligature {
+    fn promote(orig: &OpentypeLigature) -> Self {
+        Ligature {
+            ligature_glyph: orig.ligature_glyph,
+            component_count: orig.component_count,
+            component_glyph_ids: orig.component_glyph_ids.clone(),
+        }
+    }
+}
+
+impl Promote<OpentypeLigatureSet> for LigatureSet {
+    fn promote(orig: &OpentypeLigatureSet) -> Self {
+        LigatureSet {
+            ligatures: orig
+                .ligatures
+                .iter()
+                .map(|offset| promote_link(&offset.link))
+                .collect(),
+        }
+    }
+}
+
+
 
 pub type OpentypeAlternateSubst =
     opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_AlternateSubst;
@@ -1647,7 +1715,7 @@ impl Promote<OpentypeAlternateSubst> for AlternateSubst {
             alternate_sets: orig
                 .alternate_sets
                 .iter()
-                .map(|offset| promote_link(&offset.link))
+                .map(|offset| AlternateSet::promote(&offset.link))
                 .collect(),
         }
     }
@@ -1664,15 +1732,16 @@ impl Promote<OpentypeAlternateSet> for AlternateSet {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 struct AlternateSet {
+    // REVIEW - we can implement FromNull for AlternateSet perhaps
     alternate_glyph_ids: Vec<u16>,
 }
 
 #[derive(Clone, Debug)]
 struct AlternateSubst {
     coverage: CoverageTable,
-    alternate_sets: Vec<Link<AlternateSet>>,
+    alternate_sets: Vec<AlternateSet>,
 }
 
 pub type OpentypeMultipleSubst =
@@ -3570,7 +3639,18 @@ fn format_lookup_subtable(
             };
             ("AlternateSubst", contents)
         }
-        LookupSubtable::LigatureSubst => ("LigatureSubst", format!("(..)")),
+        LookupSubtable::LigatureSubst(lig_subst) => {
+            let contents = match lig_subst {
+                LigatureSubst {
+                    coverage,
+                    ligature_sets,
+                } => {
+                    let mut iter = coverage.iter();
+                    format_ligature_sets(ligature_sets, &mut iter)
+                }
+            };
+            ("LigatureSubst", contents)
+        }
         LookupSubtable::SubstExtension => ("SubstExt", format!("(..)")),
         LookupSubtable::ReverseChainSingleSubst => ("RevChainSingleSubst", format!("(..)")),
 
@@ -3679,7 +3759,39 @@ fn format_lookup_subtable(
     }
 }
 
-fn format_alternate_sets(alt_sets: &[Option<AlternateSet>]) -> String {
+
+fn format_ligature_sets(lig_sets: &[LigatureSet], coverage: &mut impl Iterator<Item = u16>) -> String {
+    fn format_ligature_set(lig_set: &LigatureSet, cov: u16) -> String {
+        fn format_ligature(lig: &Ligature, cov: u16) -> String {
+            format!(
+                "({cov}+{} => {})",
+                format_items_inline(&lig.component_glyph_ids, u16::to_string, 3, |_| "..".to_string()),
+                lig.ligature_glyph,
+            )
+        }
+        const LIG_BOOKEND: usize = 2;
+        format_items_inline(
+            &lig_set.ligatures,
+            |lig| match lig { Some(lig) => format_ligature(lig, cov), None => unreachable!("missing (None) ligature") },
+            LIG_BOOKEND,
+            |n_skipped| format!("...({n_skipped} skipped)..."),
+        )
+    }
+    match lig_sets {
+        [ref set] => format_ligature_set(set, coverage.next().expect("missing coverage")),
+        more => {
+            const LIG_SET_BOOKEND: usize = 1;
+            format_items_inline(
+                more,
+                |lig_set| format_ligature_set(lig_set, coverage.next().expect("missing coverage")),
+                LIG_SET_BOOKEND,
+                |_| String::from(".."),
+            )
+        }
+    }
+}
+
+fn format_alternate_sets(alt_sets: &[AlternateSet]) -> String {
     fn format_alternate_set(alt_set: &AlternateSet) -> String {
         const ALT_GLYPH_BOOKEND: usize = 2;
         format_items_inline(
@@ -3690,20 +3802,12 @@ fn format_alternate_sets(alt_sets: &[Option<AlternateSet>]) -> String {
         )
     }
     match alt_sets {
-        [] => unreachable!("bad AlternateSet[]: empty"),
-        [None] => unreachable!("bad AlternateSet[1]: none"),
-        [Some(ref set)] => format_alternate_set(set),
+        [ref set] => format_alternate_set(set),
         more => {
             const ALT_SET_BOOKEND: usize = 1;
             format_items_inline(
                 more,
-                |link| {
-                    if let Some(set) = link {
-                        format_alternate_set(set)
-                    } else {
-                        unreachable!("missing link")
-                    }
-                },
+                format_alternate_set,
                 ALT_SET_BOOKEND,
                 |count| format!("...({count} skipped)..."),
             )
@@ -4207,7 +4311,7 @@ fn show_gasp_metrics(gasp: &Option<GaspMetrics>, conf: &Config) {
 // REVIEW - this construction suggests we may really want a Write-generic or Fragment-like output model to avoid duplication between I/O show and String formatting functions
 fn show_items_inline<T>(
     items: &[T],
-    show_fn: impl Fn(&T) -> String,
+    show_fn: impl FnMut(&T) -> String,
     bookend: usize,
     ellipsis: impl Fn(usize) -> String,
 ) {
@@ -4217,7 +4321,7 @@ fn show_items_inline<T>(
 
 fn format_items_inline<T>(
     items: &[T],
-    show_fn: impl Fn(&T) -> String,
+    mut show_fn: impl FnMut(&T) -> String,
     bookend: usize,
     ellipsis: impl Fn(usize) -> String,
 ) -> String {
@@ -4624,7 +4728,7 @@ pub mod lookup_subtable {
                         OpentypeGsubLookupSubtable::AlternateSubst(..) => {
                             ret.alternate_subst = true
                         }
-                        OpentypeGsubLookupSubtable::LigatureSubst => ret.ligature_subst = true,
+                        OpentypeGsubLookupSubtable::LigatureSubst(..) => ret.ligature_subst = true,
                         OpentypeGsubLookupSubtable::SubstExtension => ret.subst_extension = true,
                         OpentypeGsubLookupSubtable::ReverseChainSingleSubst => {
                             ret.reverse_chain_single_subst = true
