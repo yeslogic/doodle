@@ -2946,6 +2946,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ],
                     "subst",
                     "Format1",
+                    // REVIEW - Consider what style we want to adopt more generally for MultipleSubst, AlternateSubst, LigatureSubst
                     NestingKind::SingletonADT,
                 )
             };
@@ -2980,11 +2981,57 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ],
                     "subst",
                     "Format1",
-                    // REVIEW - we are using a different approach from multiple_subst not because we want to treat the two cases differently, but to ensure both cases work properly and generate sensible codegen and interpreter output
+                    // REVIEW - Consider what style we want to adopt more generally for MultipleSubst, AlternateSubst, LigatureSubst
                     NestingKind::FlattenInner,
                 )
             };
-            let ligature_subst = /* STUB */ Format::EMPTY;
+            let ligature_subst = {
+                let ligature_table = record([
+                    ("ligature_glyph", base.u16be()),
+                    ("component_count", base.u16be()),
+                    (
+                        "component_glyph_ids",
+                        repeat_count(pred(var("component_count")), base.u16be()),
+                    ),
+                ]);
+                let ligature_set = record([
+                    ("table_start", pos32()),
+                    ("ligature_count", base.u16be()),
+                    (
+                        "ligatures",
+                        repeat_count(
+                            var("ligature_count"),
+                            offset16_mandatory(var("table_start"), ligature_table, base),
+                        ),
+                    ),
+                ]);
+
+                embedded_singleton_alternation(
+                    [
+                        ("table_start", pos32()),
+                        ("subst_format", base.u16be()),
+                        (
+                            "coverage",
+                            offset16_mandatory(var("table_start"), coverage_table.call(), base),
+                        ),
+                    ],
+                    ("subst_format", 1),
+                    [
+                        ("ligature_set_count", base.u16be()),
+                        (
+                            "ligature_sets",
+                            repeat_count(
+                                var("ligature_set_count"),
+                                offset16_mandatory(var("table_start"), ligature_set, base),
+                            ),
+                        ),
+                    ],
+                    "subst",
+                    "Format1",
+                    // REVIEW - Consider what style we want to adopt more generally for MultipleSubst, AlternateSubst, LigatureSubst
+                    NestingKind::FlattenInner,
+                )
+            };
             let subst_extension = /* STUB */ Format::EMPTY;
             let reverse_chain_single_subst = /* STUB */ Format::EMPTY;
 
