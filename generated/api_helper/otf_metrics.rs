@@ -936,9 +936,11 @@ impl CoverageTable {
     fn iter(&self) -> Box<dyn Iterator<Item = u16> + '_> {
         match self {
             &CoverageTable::Format1 { ref glyph_array } => Box::new(glyph_array.iter().copied()),
-            &CoverageTable::Format2 { ref range_records } => {
-                Box::new(range_records.iter().flat_map(|rr| rr.start_glyph_id..=rr.end_glyph_id))
-            }
+            &CoverageTable::Format2 { ref range_records } => Box::new(
+                range_records
+                    .iter()
+                    .flat_map(|rr| rr.start_glyph_id..=rr.end_glyph_id),
+            ),
         }
     }
 }
@@ -1583,8 +1585,8 @@ impl TryPromote<OpentypeGsubLookupSubtable> for LookupSubtable {
                 LookupSubtable::ChainedSequenceContext(ChainedSequenceContext::promote(chain_ctx))
             }
             OpentypeGsubLookupSubtable::SubstExtension => LookupSubtable::SubstExtension,
-            OpentypeGsubLookupSubtable::ReverseChainSingleSubst => {
-                LookupSubtable::ReverseChainSingleSubst
+            OpentypeGsubLookupSubtable::ReverseChainSingleSubst(rev_chain_single_subst) => {
+                LookupSubtable::ReverseChainSingleSubst(ReverseChainSingleSubst::promote(rev_chain_single_subst))
             }
         })
     }
@@ -1639,7 +1641,36 @@ enum LookupSubtable {
     AlternateSubst(AlternateSubst),
     LigatureSubst(LigatureSubst),
     SubstExtension,
-    ReverseChainSingleSubst,
+    ReverseChainSingleSubst(ReverseChainSingleSubst),
+}
+
+pub type OpentypeReverseChainSingleSubst =
+    opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_ReverseChainSingleSubst;
+
+impl Promote<OpentypeReverseChainSingleSubst> for ReverseChainSingleSubst {
+    fn promote(orig: &OpentypeReverseChainSingleSubst) -> Self {
+        fn promote_coverages(offsets: &'_ Vec<opentype_common_chained_sequence_context_subst_Format1_coverage>) -> Vec<CoverageTable> {
+            offsets.iter()
+                .map(|offset| CoverageTable::promote(&offset.link))
+                .collect()
+        }
+        ReverseChainSingleSubst {
+            coverage: CoverageTable::promote(&orig.coverage.link),
+            backtrack_coverages: promote_coverages(&orig.backtrack_coverage_tables),
+            lookahead_coverages: promote_coverages(&orig.lookahead_coverage_tables),
+            glyph_count: orig.glyph_count,
+            substitute_glyph_ids: orig.substitute_glyph_ids.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ReverseChainSingleSubst {
+    coverage: CoverageTable,
+    backtrack_coverages: Vec<CoverageTable>,
+    lookahead_coverages: Vec<CoverageTable>,
+    glyph_count: u16, // NOTE - this field is technically extraneous due to being equal to `substitute_glyph_ids.len() as u16`
+    substitute_glyph_ids: Vec<u16>,
 }
 
 pub type OpentypeLigatureSubst =
@@ -1671,7 +1702,6 @@ struct LigatureSet {
     ligatures: Vec<Link<Ligature>>,
 }
 
-
 pub type OpentypeLigature = opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_LigatureSubst_ligature_sets_link_ligatures_link;
 
 #[derive(Debug, Clone)]
@@ -1702,8 +1732,6 @@ impl Promote<OpentypeLigatureSet> for LigatureSet {
         }
     }
 }
-
-
 
 pub type OpentypeAlternateSubst =
     opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_AlternateSubst;
@@ -3652,8 +3680,47 @@ fn format_lookup_subtable(
             ("LigatureSubst", contents)
         }
         LookupSubtable::SubstExtension => ("SubstExt", format!("(..)")),
-        LookupSubtable::ReverseChainSingleSubst => ("RevChainSingleSubst", format!("(..)")),
-
+        LookupSubtable::ReverseChainSingleSubst(rev_subst) => {
+            let contents = match rev_subst {
+                ReverseChainSingleSubst { coverage, backtrack_coverages, lookahead_coverages, substitute_glyph_ids, .. } => {
+                    // REVIEW - since we are already within an inline elision context, try to avoid taking up too much space per item, but this might not want to be a hardcoded value
+                    const INLINE_INLINE_BOOKEND: usize = 1;
+                    // FIXME - show_lookup_table calls this function through show_items_inline already, so we might want to reduce how many values we are willing to show proportionally
+                    let backtrack_pattern = if backtrack_coverages.is_empty() {
+                        String::new()
+                    } else {
+                        let tmp = format_items_inline(
+                            backtrack_coverages,
+                            format_coverage_table,
+                            INLINE_INLINE_BOOKEND,
+                            |n| format!("(..{n}..)"),
+                        );
+                        format!("(?<={tmp})")
+                    };
+                    let input_pattern = format_coverage_table(coverage);
+                    let lookahead_pattern = if lookahead_coverages.is_empty() {
+                        String::new()
+                    } else {
+                        let tmp = format_items_inline(
+                            lookahead_coverages,
+                            format_coverage_table,
+                            INLINE_INLINE_BOOKEND,
+                            |n| format!("(..{n}..)"),
+                        );
+                        format!("(?={tmp})")
+                    };
+                    let substitute_ids =
+                        format_items_inline(
+                            substitute_glyph_ids,
+                            u16::to_string,
+                            2, // NOTE[magic-number] - more generous limit for glyph ids
+                            |_| format!(".."),
+                        );
+                    format!("{backtrack_pattern}{input_pattern}{lookahead_pattern}=>{substitute_ids}")
+                }
+            };
+            ("RevChainSingleSubst", contents)
+        }
         LookupSubtable::SequenceContext(seq_ctx) => {
             let contents = match seq_ctx {
                 SequenceContext::Format1(SequenceContextFormat1 { coverage, .. }) => {
@@ -3759,20 +3826,26 @@ fn format_lookup_subtable(
     }
 }
 
-
-fn format_ligature_sets(lig_sets: &[LigatureSet], coverage: &mut impl Iterator<Item = u16>) -> String {
+fn format_ligature_sets(
+    lig_sets: &[LigatureSet],
+    coverage: &mut impl Iterator<Item = u16>,
+) -> String {
     fn format_ligature_set(lig_set: &LigatureSet, cov: u16) -> String {
         fn format_ligature(lig: &Ligature, cov: u16) -> String {
             format!(
                 "({cov}+{} => {})",
-                format_items_inline(&lig.component_glyph_ids, u16::to_string, 3, |_| "..".to_string()),
+                format_items_inline(&lig.component_glyph_ids, u16::to_string, 3, |_| ".."
+                    .to_string()),
                 lig.ligature_glyph,
             )
         }
         const LIG_BOOKEND: usize = 2;
         format_items_inline(
             &lig_set.ligatures,
-            |lig| match lig { Some(lig) => format_ligature(lig, cov), None => unreachable!("missing (None) ligature") },
+            |lig| match lig {
+                Some(lig) => format_ligature(lig, cov),
+                None => unreachable!("missing (None) ligature"),
+            },
             LIG_BOOKEND,
             |n_skipped| format!("...({n_skipped} skipped)..."),
         )
@@ -3805,12 +3878,9 @@ fn format_alternate_sets(alt_sets: &[AlternateSet]) -> String {
         [ref set] => format_alternate_set(set),
         more => {
             const ALT_SET_BOOKEND: usize = 1;
-            format_items_inline(
-                more,
-                format_alternate_set,
-                ALT_SET_BOOKEND,
-                |count| format!("...({count} skipped)..."),
-            )
+            format_items_inline(more, format_alternate_set, ALT_SET_BOOKEND, |count| {
+                format!("...({count} skipped)...")
+            })
         }
     }
 }
@@ -4115,7 +4185,7 @@ fn format_coverage_table(cov: &CoverageTable) -> String {
             let num_glyphs = glyph_array.len();
             match glyph_array.as_slice() {
                 &[] => format!("∅"),
-                &[id] => format!("[glyphId={id}]"),
+                &[id] => format!("[{id}]"),
                 &[first, .., last] => format!("[{num_glyphs} ∈ [{first},{last}]]"),
             }
         }
@@ -4730,7 +4800,7 @@ pub mod lookup_subtable {
                         }
                         OpentypeGsubLookupSubtable::LigatureSubst(..) => ret.ligature_subst = true,
                         OpentypeGsubLookupSubtable::SubstExtension => ret.subst_extension = true,
-                        OpentypeGsubLookupSubtable::ReverseChainSingleSubst => {
+                        OpentypeGsubLookupSubtable::ReverseChainSingleSubst(..) => {
                             ret.reverse_chain_single_subst = true
                         }
                         OpentypeGsubLookupSubtable::SequenceContext(..) => {

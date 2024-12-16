@@ -3032,8 +3032,47 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     NestingKind::FlattenInner,
                 )
             };
-            let subst_extension = /* STUB */ Format::EMPTY;
-            let reverse_chain_single_subst = /* STUB */ Format::EMPTY;
+            let reverse_chain_single_subst = {
+                /* STUB */
+                embedded_singleton_alternation(
+                    [("table_start", pos32()), ("subst_format", base.u16be())],
+                    ("subst_format", 1),
+                    [
+                        (
+                            "coverage",
+                            offset16_mandatory(var("table_start"), coverage_table.call(), base),
+                        ),
+                        ("backtrack_glyph_count", base.u16be()),
+                        (
+                            "backtrack_coverage_tables",
+                            repeat_count(
+                                var("backtrack_glyph_count"),
+                                offset16_mandatory(var("table_start"), coverage_table.call(), base),
+                            ),
+                        ),
+                        ("lookahead_glyph_count", base.u16be()),
+                        (
+                            "lookahead_coverage_tables",
+                            repeat_count(
+                                var("lookahead_glyph_count"),
+                                offset16_mandatory(var("table_start"), coverage_table.call(), base),
+                            ),
+                        ),
+                        ("glyph_count", base.u16be()),
+                        (
+                            "substitute_glyph_ids",
+                            repeat_count(var("glyph_count"), base.u16be()),
+                        ),
+                    ],
+                    "subst",
+                    "Format1",
+                    NestingKind::FlattenInner,
+                )
+            };
+            let subst_extension = {
+                /* STUB */
+                Format::EMPTY
+            };
 
             let single_pos = {
                 let single_pos_format1 = |table_start: Expr| {
