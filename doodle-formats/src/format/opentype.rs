@@ -49,6 +49,7 @@ fn embedded_singleton_alternation<const OUTER: usize, const INNER: usize>(
     let (disc_field, disc_value) = discriminant;
     let accum = match nesting_kind {
         NestingKind::SingletonADT => {
+            // REVIEW - it is not necessarily obvious that all FlatternInner defs can be changed to SingletonADT versions if they refer to variables in the outer record, but it seems plausible at least
             let mut has_discriminant = false;
             let record_inner = record(inner_fields);
             let mut accum = Vec::with_capacity(OUTER + 1);
@@ -2864,8 +2865,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             )
         };
 
-        let layout_table = |tag: u32| {
-            let single_subst = {
+        let single_subst = {
+            module.define_format(
+                "opentype.layout.single_subst",
                 record([
                     ("table_start", pos32()),
                     ("subst_format", base.u16be()),
@@ -2912,18 +2914,21 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                             ],
                         ),
                     ),
-                ])
-            };
-            let multiple_subst = {
-                let sequence_table = record([
-                    // NOTE - formally (according to the spec) this must never be 0, but some fonts ignore this so we don't enforce it as a mandate
-                    ("glyph_count", base.u16be()),
-                    (
-                        "substitute_glyph_ids",
-                        repeat_count(var("glyph_count"), base.u16be()),
-                    ),
-                ]);
+                ]),
+            )
+        };
+        let multiple_subst = {
+            let sequence_table = record([
+                // NOTE - formally (according to the spec) this must never be 0, but some fonts ignore this so we don't enforce it as a mandate
+                ("glyph_count", base.u16be()),
+                (
+                    "substitute_glyph_ids",
+                    repeat_count(var("glyph_count"), base.u16be()),
+                ),
+            ]);
 
+            module.define_format(
+                "opentype.layout.multiple_subst",
                 embedded_singleton_alternation(
                     [
                         ("table_start", pos32()),
@@ -2948,17 +2953,20 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     "Format1",
                     // REVIEW - Consider what style we want to adopt more generally for MultipleSubst, AlternateSubst, LigatureSubst
                     NestingKind::SingletonADT,
-                )
-            };
-            let alternate_subst = {
-                let alternate_set = record([
-                    ("glyph_count", base.u16be()),
-                    (
-                        "alternate_glyph_ids",
-                        repeat_count(var("glyph_count"), base.u16be()),
-                    ),
-                ]);
+                ),
+            )
+        };
+        let alternate_subst = {
+            let alternate_set = record([
+                ("glyph_count", base.u16be()),
+                (
+                    "alternate_glyph_ids",
+                    repeat_count(var("glyph_count"), base.u16be()),
+                ),
+            ]);
 
+            module.define_format(
+                "opentype.layout.alternate_subst",
                 embedded_singleton_alternation(
                     [
                         ("table_start", pos32()),
@@ -2983,29 +2991,32 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     "Format1",
                     // REVIEW - Consider what style we want to adopt more generally for MultipleSubst, AlternateSubst, LigatureSubst
                     NestingKind::FlattenInner,
-                )
-            };
-            let ligature_subst = {
-                let ligature_table = record([
-                    ("ligature_glyph", base.u16be()),
-                    ("component_count", base.u16be()),
-                    (
-                        "component_glyph_ids",
-                        repeat_count(pred(var("component_count")), base.u16be()),
+                ),
+            )
+        };
+        let ligature_subst = {
+            let ligature_table = record([
+                ("ligature_glyph", base.u16be()),
+                ("component_count", base.u16be()),
+                (
+                    "component_glyph_ids",
+                    repeat_count(pred(var("component_count")), base.u16be()),
+                ),
+            ]);
+            let ligature_set = record([
+                ("table_start", pos32()),
+                ("ligature_count", base.u16be()),
+                (
+                    "ligatures",
+                    repeat_count(
+                        var("ligature_count"),
+                        offset16_mandatory(var("table_start"), ligature_table, base),
                     ),
-                ]);
-                let ligature_set = record([
-                    ("table_start", pos32()),
-                    ("ligature_count", base.u16be()),
-                    (
-                        "ligatures",
-                        repeat_count(
-                            var("ligature_count"),
-                            offset16_mandatory(var("table_start"), ligature_table, base),
-                        ),
-                    ),
-                ]);
+                ),
+            ]);
 
+            module.define_format(
+                "opentype.layout.ligature_subst",
                 embedded_singleton_alternation(
                     [
                         ("table_start", pos32()),
@@ -3030,10 +3041,13 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     "Format1",
                     // REVIEW - Consider what style we want to adopt more generally for MultipleSubst, AlternateSubst, LigatureSubst
                     NestingKind::FlattenInner,
-                )
-            };
-            let reverse_chain_single_subst = {
-                /* STUB */
+                ),
+            )
+        };
+        let reverse_chain_single_subst = {
+            /* STUB */
+            module.define_format(
+                "opentype.layout.reverse_chain_single_subst",
                 embedded_singleton_alternation(
                     [("table_start", pos32()), ("subst_format", base.u16be())],
                     ("subst_format", 1),
@@ -3067,44 +3081,43 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     "subst",
                     "Format1",
                     NestingKind::FlattenInner,
-                )
-            };
-            let subst_extension = {
-                /* STUB */
-                Format::EMPTY
-            };
+                ),
+            )
+        };
 
-            let single_pos = {
-                let single_pos_format1 = |table_start: Expr| {
-                    record([
-                        (
-                            "coverage_offset",
-                            offset16_mandatory(table_start.clone(), coverage_table.call(), base),
-                        ),
-                        ("value_format", value_format_flags.call()),
-                        (
-                            "value_record",
+        let single_pos = {
+            let single_pos_format1 = |table_start: Expr| {
+                record([
+                    (
+                        "coverage_offset",
+                        offset16_mandatory(table_start.clone(), coverage_table.call(), base),
+                    ),
+                    ("value_format", value_format_flags.call()),
+                    (
+                        "value_record",
+                        value_record.call_args(vec![table_start, var("value_format")]),
+                    ),
+                ])
+            };
+            let single_pos_format2 = |table_start: Expr| {
+                record([
+                    (
+                        "coverage_offset",
+                        offset16_mandatory(table_start.clone(), coverage_table.call(), base),
+                    ),
+                    ("value_format", value_format_flags.call()),
+                    ("value_count", base.u16be()),
+                    (
+                        "value_records",
+                        repeat_count(
+                            var("value_count"),
                             value_record.call_args(vec![table_start, var("value_format")]),
                         ),
-                    ])
-                };
-                let single_pos_format2 = |table_start: Expr| {
-                    record([
-                        (
-                            "coverage_offset",
-                            offset16_mandatory(table_start.clone(), coverage_table.call(), base),
-                        ),
-                        ("value_format", value_format_flags.call()),
-                        ("value_count", base.u16be()),
-                        (
-                            "value_records",
-                            repeat_count(
-                                var("value_count"),
-                                value_record.call_args(vec![table_start, var("value_format")]),
-                            ),
-                        ),
-                    ])
-                };
+                    ),
+                ])
+            };
+            module.define_format(
+                "opentype.layout.single_pos",
                 record([
                     ("table_start", pos32()),
                     ("pos_format", base.u16be()),
@@ -3128,116 +3141,119 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                             ],
                         ),
                     ),
+                ]),
+            )
+        };
+        let pair_pos = {
+            let pair_value_record =
+                |table_start: Expr, value_format1: Expr, value_format2: Expr| {
+                    record([
+                        // NOTE - first glyph id is listed in the Coverage table
+                        ("second_glyph", base.u16be()),
+                        (
+                            "value_record1",
+                            optional_value_record(table_start.clone(), value_format1),
+                        ),
+                        (
+                            "value_record2",
+                            optional_value_record(table_start, value_format2),
+                        ),
+                    ])
+                };
+            let pair_set = |value_format1: Expr, value_format2: Expr| {
+                record([
+                    ("table_start", pos32()),
+                    ("pair_value_count", base.u16be()),
+                    (
+                        "pair_value_records",
+                        repeat_count(
+                            var("pair_value_count"),
+                            pair_value_record(var("table_start"), value_format1, value_format2),
+                        ),
+                    ),
                 ])
             };
-            let pair_pos = {
-                let pair_value_record =
-                    |table_start: Expr, value_format1: Expr, value_format2: Expr| {
-                        record([
-                            // NOTE - first glyph id is listed in the Coverage table
-                            ("second_glyph", base.u16be()),
-                            (
-                                "value_record1",
-                                optional_value_record(table_start.clone(), value_format1),
-                            ),
-                            (
-                                "value_record2",
-                                optional_value_record(table_start, value_format2),
-                            ),
-                        ])
-                    };
-                let pair_set = |value_format1: Expr, value_format2: Expr| {
-                    record([
-                        ("table_start", pos32()),
-                        ("pair_value_count", base.u16be()),
-                        (
-                            "pair_value_records",
-                            repeat_count(
-                                var("pair_value_count"),
-                                pair_value_record(var("table_start"), value_format1, value_format2),
-                            ),
-                        ),
-                    ])
-                };
-                let pair_pos_format1 = |table_start: Expr| {
-                    record([
-                        (
-                            "coverage",
-                            offset16_mandatory(table_start, coverage_table.call(), base),
-                        ),
-                        ("value_format1", value_format_flags.call()),
-                        ("value_format2", value_format_flags.call()),
-                        ("pair_set_count", base.u16be()),
-                        (
-                            "pair_sets",
-                            repeat_count(
-                                var("pair_set_count"),
-                                offset16_mandatory(
-                                    var("table_start"),
-                                    pair_set(var("value_format1"), var("value_format2")),
-                                    base,
-                                ),
-                            ),
-                        ),
-                    ])
-                };
-                let class2_record =
-                    |table_start: Expr, value_format1: Expr, value_format2: Expr| {
-                        record([
-                            (
-                                "value_record1",
-                                optional_value_record(table_start.clone(), value_format1),
-                            ),
-                            (
-                                "value_record2",
-                                optional_value_record(table_start, value_format2),
-                            ),
-                        ])
-                    };
-                let class1_record = |table_start: Expr,
-                                     class2_count: Expr,
-                                     value_format1: Expr,
-                                     value_format2: Expr| {
-                    record([(
-                        "class2_records",
+            let pair_pos_format1 = |table_start: Expr| {
+                record([
+                    (
+                        "coverage",
+                        offset16_mandatory(table_start, coverage_table.call(), base),
+                    ),
+                    ("value_format1", value_format_flags.call()),
+                    ("value_format2", value_format_flags.call()),
+                    ("pair_set_count", base.u16be()),
+                    (
+                        "pair_sets",
                         repeat_count(
-                            class2_count,
-                            class2_record(table_start, value_format1, value_format2),
-                        ),
-                    )])
-                };
-                let pair_pos_format2 = |pair_pos_start: Expr| {
-                    record([
-                        (
-                            "coverage",
-                            offset16_mandatory(pair_pos_start.clone(), coverage_table.call(), base),
-                        ),
-                        ("value_format1", value_format_flags.call()),
-                        ("value_format2", value_format_flags.call()),
-                        (
-                            "class_def1",
-                            offset16_mandatory(pair_pos_start.clone(), class_def.call(), base),
-                        ),
-                        (
-                            "class_def2",
-                            offset16_mandatory(pair_pos_start.clone(), class_def.call(), base),
-                        ),
-                        ("class1_count", base.u16be()),
-                        ("class2_count", base.u16be()),
-                        (
-                            "class1_records",
-                            repeat_count(
-                                var("class1_count"),
-                                class1_record(
-                                    pair_pos_start,
-                                    var("class2_count"),
-                                    var("value_format1"),
-                                    var("value_format2"),
-                                ),
+                            var("pair_set_count"),
+                            offset16_mandatory(
+                                var("table_start"),
+                                pair_set(var("value_format1"), var("value_format2")),
+                                base,
                             ),
                         ),
-                    ])
-                };
+                    ),
+                ])
+            };
+            let class2_record = |table_start: Expr, value_format1: Expr, value_format2: Expr| {
+                record([
+                    (
+                        "value_record1",
+                        optional_value_record(table_start.clone(), value_format1),
+                    ),
+                    (
+                        "value_record2",
+                        optional_value_record(table_start, value_format2),
+                    ),
+                ])
+            };
+            let class1_record = |table_start: Expr,
+                                 class2_count: Expr,
+                                 value_format1: Expr,
+                                 value_format2: Expr| {
+                record([(
+                    "class2_records",
+                    repeat_count(
+                        class2_count,
+                        class2_record(table_start, value_format1, value_format2),
+                    ),
+                )])
+            };
+            let pair_pos_format2 = |pair_pos_start: Expr| {
+                record([
+                    (
+                        "coverage",
+                        offset16_mandatory(pair_pos_start.clone(), coverage_table.call(), base),
+                    ),
+                    ("value_format1", value_format_flags.call()),
+                    ("value_format2", value_format_flags.call()),
+                    (
+                        "class_def1",
+                        offset16_mandatory(pair_pos_start.clone(), class_def.call(), base),
+                    ),
+                    (
+                        "class_def2",
+                        offset16_mandatory(pair_pos_start.clone(), class_def.call(), base),
+                    ),
+                    ("class1_count", base.u16be()),
+                    ("class2_count", base.u16be()),
+                    (
+                        "class1_records",
+                        repeat_count(
+                            var("class1_count"),
+                            class1_record(
+                                pair_pos_start,
+                                var("class2_count"),
+                                var("value_format1"),
+                                var("value_format2"),
+                            ),
+                        ),
+                    ),
+                ])
+            };
+
+            module.define_format(
+                "opentype.layout.pair_pos",
                 record([
                     ("table_start", pos32()),
                     ("pos_format", base.u16be()),
@@ -3261,54 +3277,53 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                             ],
                         ),
                     ),
+                ]),
+            )
+        };
+        let cursive_pos = {
+            let entry_exit_record = |table_start: Expr| {
+                record([
+                    (
+                        "entry_anchor",
+                        offset16_nullable(table_start.clone(), anchor_table.call(), base),
+                    ),
+                    (
+                        "exit_anchor",
+                        offset16_nullable(table_start, anchor_table.call(), base),
+                    ),
                 ])
             };
-            let cursive_pos = {
-                let entry_exit_record = |table_start: Expr| {
-                    record([
-                        (
-                            "entry_anchor",
-                            offset16_nullable(table_start.clone(), anchor_table.call(), base),
-                        ),
-                        (
-                            "exit_anchor",
-                            offset16_nullable(table_start, anchor_table.call(), base),
-                        ),
-                    ])
-                };
-                let cursive_pos_format1 = |table_start: Expr| {
-                    record([
+            module.define_format(
+                "opentype.layout.cursive_pos",
+                embedded_singleton_alternation(
+                    [("table_start", pos32()), ("pos_format", base.u16be())],
+                    ("pos_format", 1),
+                    [
                         (
                             "coverage",
-                            offset16_mandatory(table_start.clone(), coverage_table.call(), base),
+                            offset16_mandatory(var("table_start"), coverage_table.call(), base),
                         ),
                         ("entry_exit_count", base.u16be()),
                         (
                             "entry_exit_records",
-                            repeat_count(var("entry_exit_count"), entry_exit_record(table_start)),
+                            repeat_count(
+                                var("entry_exit_count"),
+                                entry_exit_record(var("table_start")),
+                            ),
                         ),
-                    ])
-                };
-                record([
-                    ("table_start", pos32()),
-                    ("pos_format", base.u16be()),
-                    (
-                        "subtable",
-                        match_variant(
-                            var("pos_format"),
-                            [
-                                // NOTE - even though there is only one variant in the ad-hoc type, the current implementation preserves it as an enum rather than inline the single possible format
-                                // REVIEW - consider the implications of either avoiding the `Format1` variant-enum wrapper type by aliasing this format against format1, versus keeping things the way they are right now
-                                (
-                                    Pattern::U16(1),
-                                    "Format1",
-                                    cursive_pos_format1(var("table_start")),
-                                ),
-                                (Pattern::Wildcard, "BadFormat", Format::Fail),
-                            ],
-                        ),
-                    ),
-                ])
+                    ],
+                    "subtable",
+                    "Format1",
+                    NestingKind::FlattenInner,
+                ),
+            )
+        };
+
+        let layout_table = |tag: u32| {
+            // FIXME - this belongs above but because it is a Format and not yet FormatRef, it is not Copy and so has to be defined in the closure body
+            let subst_extension = {
+                /* STUB */
+                Format::EMPTY
             };
             let mark_base_pos = /* STUB */ Format::EMPTY;
             let mark_lig_pos = /* STUB */ Format::EMPTY;
@@ -3329,10 +3344,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                     lookup_type,
                                     [
                                         // REVIEW - are these variant names too concise?
-                                        (Pattern::U16(1), "SingleSubst", single_subst),
-                                        (Pattern::U16(2), "MultipleSubst", multiple_subst),
-                                        (Pattern::U16(3), "AlternateSubst", alternate_subst),
-                                        (Pattern::U16(4), "LigatureSubst", ligature_subst),
+                                        (Pattern::U16(1), "SingleSubst", single_subst.call()),
+                                        (Pattern::U16(2), "MultipleSubst", multiple_subst.call()),
+                                        (Pattern::U16(3), "AlternateSubst", alternate_subst.call()),
+                                        (Pattern::U16(4), "LigatureSubst", ligature_subst.call()),
                                         (
                                             Pattern::U16(5),
                                             "SequenceContext",
@@ -3347,7 +3362,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         (
                                             Pattern::U16(8),
                                             "ReverseChainSingleSubst",
-                                            reverse_chain_single_subst,
+                                            reverse_chain_single_subst.call(),
                                         ),
                                         // REVIEW - should this be a hard-fail, or do we want to produce a dummy object instead (possibly with a trace of the value of lookup_type)?
                                         (Pattern::Wildcard, "UnknownLookupSubtable", Format::Fail),
@@ -3359,9 +3374,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 match_variant(
                                     lookup_type,
                                     [
-                                        (Pattern::U16(1), "SinglePos", single_pos),
-                                        (Pattern::U16(2), "PairPos", pair_pos),
-                                        (Pattern::U16(3), "CursivePos", cursive_pos),
+                                        (Pattern::U16(1), "SinglePos", single_pos.call()),
+                                        (Pattern::U16(2), "PairPos", pair_pos.call()),
+                                        (Pattern::U16(3), "CursivePos", cursive_pos.call()),
                                         (Pattern::U16(4), "MarkBasePos", mark_base_pos),
                                         (Pattern::U16(5), "MarkLigPos", mark_lig_pos),
                                         (Pattern::U16(6), "MarkMarkPos", mark_mark_pos),
