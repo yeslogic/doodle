@@ -1586,7 +1586,9 @@ impl TryPromote<OpentypeGsubLookupSubtable> for LookupSubtable {
             }
             OpentypeGsubLookupSubtable::SubstExtension => LookupSubtable::SubstExtension,
             OpentypeGsubLookupSubtable::ReverseChainSingleSubst(rev_chain_single_subst) => {
-                LookupSubtable::ReverseChainSingleSubst(ReverseChainSingleSubst::promote(rev_chain_single_subst))
+                LookupSubtable::ReverseChainSingleSubst(ReverseChainSingleSubst::promote(
+                    rev_chain_single_subst,
+                ))
             }
         })
     }
@@ -1644,13 +1646,15 @@ enum LookupSubtable {
     ReverseChainSingleSubst(ReverseChainSingleSubst),
 }
 
-pub type OpentypeReverseChainSingleSubst =
-    opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_ReverseChainSingleSubst;
+pub type OpentypeReverseChainSingleSubst = opentype_layout_reverse_chain_single_subst;
 
 impl Promote<OpentypeReverseChainSingleSubst> for ReverseChainSingleSubst {
     fn promote(orig: &OpentypeReverseChainSingleSubst) -> Self {
-        fn promote_coverages(offsets: &'_ Vec<opentype_common_chained_sequence_context_subst_Format1_coverage>) -> Vec<CoverageTable> {
-            offsets.iter()
+        fn promote_coverages(
+            offsets: &'_ Vec<opentype_layout_reverse_chain_single_subst_coverage>,
+        ) -> Vec<CoverageTable> {
+            offsets
+                .iter()
                 .map(|offset| CoverageTable::promote(&offset.link))
                 .collect()
         }
@@ -1673,8 +1677,7 @@ struct ReverseChainSingleSubst {
     substitute_glyph_ids: Vec<u16>,
 }
 
-pub type OpentypeLigatureSubst =
-    opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_LigatureSubst;
+pub type OpentypeLigatureSubst = opentype_layout_ligature_subst;
 
 impl Promote<OpentypeLigatureSubst> for LigatureSubst {
     fn promote(orig: &OpentypeLigatureSubst) -> Self {
@@ -1695,14 +1698,14 @@ struct LigatureSubst {
     ligature_sets: Vec<LigatureSet>,
 }
 
-pub type OpentypeLigatureSet = opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_LigatureSubst_ligature_sets_link;
+pub type OpentypeLigatureSet = opentype_layout_ligature_subst_ligature_sets_link;
 
 #[derive(Debug, Clone, Default)]
 struct LigatureSet {
     ligatures: Vec<Link<Ligature>>,
 }
 
-pub type OpentypeLigature = opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_LigatureSubst_ligature_sets_link_ligatures_link;
+pub type OpentypeLigature = opentype_layout_ligature_subst_ligature_sets_link_ligatures_link;
 
 #[derive(Debug, Clone)]
 struct Ligature {
@@ -1733,8 +1736,7 @@ impl Promote<OpentypeLigatureSet> for LigatureSet {
     }
 }
 
-pub type OpentypeAlternateSubst =
-    opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_AlternateSubst;
+pub type OpentypeAlternateSubst = opentype_layout_alternate_subst;
 
 impl Promote<OpentypeAlternateSubst> for AlternateSubst {
     fn promote(orig: &OpentypeAlternateSubst) -> Self {
@@ -1749,8 +1751,7 @@ impl Promote<OpentypeAlternateSubst> for AlternateSubst {
     }
 }
 
-pub type OpentypeAlternateSet =
-    opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_AlternateSubst_alternate_sets_link;
+pub type OpentypeAlternateSet = opentype_layout_alternate_subst_alternate_sets_link;
 
 impl Promote<OpentypeAlternateSet> for AlternateSet {
     fn promote(orig: &OpentypeAlternateSet) -> Self {
@@ -1772,12 +1773,9 @@ struct AlternateSubst {
     alternate_sets: Vec<AlternateSet>,
 }
 
-pub type OpentypeMultipleSubst =
-    opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_MultipleSubst;
-pub type OpentypeMultipleSubstInner =
-    opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_MultipleSubst_subst;
-pub type OpentypeMultipleSubstFormat1 =
-    opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_MultipleSubst_subst_Format1;
+pub type OpentypeMultipleSubst = opentype_layout_multiple_subst;
+pub type OpentypeMultipleSubstInner = opentype_layout_multiple_subst_subst;
+pub type OpentypeMultipleSubstFormat1 = opentype_layout_multiple_subst_subst_Format1;
 
 impl Promote<OpentypeMultipleSubst> for MultipleSubst {
     fn promote(orig: &OpentypeMultipleSubst) -> Self {
@@ -1816,7 +1814,7 @@ impl Promote<OpentypeMultipleSubstFormat1> for MultipleSubstFormat1 {
     }
 }
 
-pub type OpentypeSequenceTable = opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_MultipleSubst_subst_Format1_sequences_link;
+pub type OpentypeSequenceTable = opentype_layout_multiple_subst_subst_Format1_sequences_link;
 
 impl Promote<OpentypeSequenceTable> for SequenceTable {
     fn promote(orig: &OpentypeSequenceTable) -> Self {
@@ -1836,14 +1834,10 @@ struct MultipleSubstFormat1 {
     sequences: Vec<SequenceTable>,
 }
 
-pub type OpentypeSingleSubst =
-    opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_SingleSubst;
-pub type OpentypeSingleSubstInner =
-    opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_SingleSubst_subst;
-pub type OpentypeSingleSubstFormat1 =
-    opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_SingleSubst_subst_Format1;
-pub type OpentypeSingleSubstFormat2 =
-    opentype_gsub_table_lookup_list_link_lookups_link_subtables_link_SingleSubst_subst_Format2;
+pub type OpentypeSingleSubst = opentype_layout_single_subst;
+pub type OpentypeSingleSubstInner = opentype_layout_single_subst_subst;
+pub type OpentypeSingleSubstFormat1 = opentype_layout_single_subst_subst_Format1;
+pub type OpentypeSingleSubstFormat2 = opentype_layout_single_subst_subst_Format2;
 
 impl Promote<OpentypeSingleSubst> for SingleSubst {
     fn promote(orig: &OpentypeSingleSubst) -> Self {
@@ -2057,8 +2051,7 @@ struct ChainedSequenceContextFormat2 {
 
 impl Promote<OpentypeChainedSequenceContextFormat3> for ChainedSequenceContextFormat3 {
     fn promote(orig: &OpentypeChainedSequenceContextFormat3) -> Self {
-        type OpentypeCoverageTableLink =
-            opentype_common_chained_sequence_context_subst_Format1_coverage;
+        type OpentypeCoverageTableLink = opentype_layout_reverse_chain_single_subst_coverage;
         let follow = |covs: &Vec<OpentypeCoverageTableLink>| -> Vec<CoverageTable> {
             covs.iter()
                 .map(|offset| CoverageTable::promote(&offset.link))
@@ -2228,46 +2221,13 @@ struct Rule {
     seq_lookup_records: Vec<SequenceLookup>,
 }
 
-// NOTE - forgoing a type-analogue as it would be a carbon copy of the machine-generated type
-
-pub type OpentypeCursivePos =
-    opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_CursivePos;
-pub type OpentypeCursivePosSubtable =
-    opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_CursivePos_subtable;
-pub type OpentypeCursivePosFormat1 =
-    opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_CursivePos_subtable_Format1;
+pub type OpentypeCursivePos = opentype_layout_cursive_pos;
 
 impl TryPromote<OpentypeCursivePos> for CursivePos {
-    type Error = ReflType<TPErr<OpentypeCursivePosSubtable, CursivePos>, UnknownValueError<u16>>;
-
-    fn try_promote(orig: &OpentypeCursivePos) -> Result<Self, Self::Error> {
-        CursivePos::try_promote(&orig.subtable)
-    }
-}
-
-impl TryPromote<OpentypeCursivePosSubtable> for CursivePos {
-    type Error =
-        ReflType<TPErr<OpentypeCursivePosFormat1, CursivePosFormat1>, UnknownValueError<u16>>;
-
-    fn try_promote(orig: &OpentypeCursivePosSubtable) -> Result<Self, Self::Error> {
-        match orig {
-            OpentypeCursivePosSubtable::Format1(f1) => {
-                Ok(CursivePos::Format1(CursivePosFormat1::try_promote(f1)?))
-            }
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-enum CursivePos {
-    Format1(CursivePosFormat1),
-}
-
-impl TryPromote<OpentypeCursivePosFormat1> for CursivePosFormat1 {
     type Error = ReflType<TPErr<OpentypeEntryExitRecord, EntryExitRecord>, UnknownValueError<u16>>;
 
-    fn try_promote(orig: &OpentypeCursivePosFormat1) -> Result<Self, Self::Error> {
-        Ok(CursivePosFormat1 {
+    fn try_promote(orig: &OpentypeCursivePos) -> Result<Self, Self::Error> {
+        Ok(CursivePos {
             coverage: CoverageTable::promote(&orig.coverage.link),
             entry_exit_records: try_promote_vec(&orig.entry_exit_records)?,
         })
@@ -2275,12 +2235,12 @@ impl TryPromote<OpentypeCursivePosFormat1> for CursivePosFormat1 {
 }
 
 #[derive(Debug, Clone)]
-struct CursivePosFormat1 {
+struct CursivePos {
     coverage: CoverageTable,
     entry_exit_records: Vec<EntryExitRecord>,
 }
 
-pub type OpentypeEntryExitRecord = opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_CursivePos_subtable_Format1_entry_exit_records;
+pub type OpentypeEntryExitRecord = opentype_layout_cursive_pos_entry_exit_records;
 
 impl TryPromote<OpentypeEntryExitRecord> for EntryExitRecord {
     type Error = ReflType<TPErr<OpentypeAnchorTable, AnchorTable>, UnknownValueError<u16>>;
@@ -2401,14 +2361,11 @@ struct AnchorTableFormat3 {
     y_device: Option<DeviceOrVariationIndexTable>,
 }
 
-pub type OpentypePairPos = opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairPos;
+pub type OpentypePairPos = opentype_layout_pair_pos;
 
-pub type OpentypePairPosSubtable =
-    opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairPos_subtable;
-pub type OpentypePairPosFormat1 =
-    opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairPos_subtable_Format1;
-pub type OpentypePairPosFormat2 =
-    opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairPos_subtable_Format2;
+pub type OpentypePairPosSubtable = opentype_layout_pair_pos_subtable;
+pub type OpentypePairPosFormat1 = opentype_layout_pair_pos_subtable_Format1;
+pub type OpentypePairPosFormat2 = opentype_layout_pair_pos_subtable_Format2;
 
 impl TryPromote<OpentypePairPos> for PairPos {
     type Error = ReflType<TPErr<OpentypePairPosSubtable, PairPos>, UnknownValueError<u16>>;
@@ -2500,7 +2457,8 @@ struct PairPosFormat2 {
 
 type Class1RecordList = Wec<Class2Record>;
 
-pub type OpentypeClass2Record = opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairPos_subtable_Format2_class1_records_class2_records;
+pub type OpentypeClass2Record =
+    opentype_layout_pair_pos_subtable_Format2_class1_records_class2_records;
 
 impl TryPromote<OpentypeClass2Record> for Class2Record {
     type Error = ReflType<TPErr<OpentypeValueRecord, ValueRecord>, UnknownValueError<u16>>;
@@ -2519,8 +2477,9 @@ struct Class2Record {
     value_record2: Option<ValueRecord>,
 }
 
-pub type OpentypePairSet = opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairPos_subtable_Format1_pair_sets_link;
-pub type OpentypePairValueRecord = opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairPos_subtable_Format1_pair_sets_link_pair_value_records;
+pub type OpentypePairSet = opentype_layout_pair_pos_subtable_Format1_pair_sets_link;
+pub type OpentypePairValueRecord =
+    opentype_layout_pair_pos_subtable_Format1_pair_sets_link_pair_value_records;
 
 type PairSet = Vec<PairValueRecord>;
 
@@ -2555,15 +2514,10 @@ struct PairValueRecord {
     value_record2: Option<ValueRecord>,
 }
 
-pub type OpentypeSinglePos =
-    opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_SinglePos;
-pub type OpentypeSinglePosSubtable =
-    opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_SinglePos_subtable;
-
-pub type OpentypeSinglePosFormat1 =
-    opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_SinglePos_subtable_Format1;
-pub type OpentypeSinglePosFormat2 =
-    opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_SinglePos_subtable_Format2;
+pub type OpentypeSinglePos = opentype_layout_single_pos;
+pub type OpentypeSinglePosSubtable = opentype_layout_single_pos_subtable;
+pub type OpentypeSinglePosFormat1 = opentype_layout_single_pos_subtable_Format1;
+pub type OpentypeSinglePosFormat2 = opentype_layout_single_pos_subtable_Format2;
 
 impl TryPromote<OpentypeSinglePos> for SinglePos {
     type Error = ReflType<TPErr<OpentypeSinglePosSubtable, SinglePos>, UnknownValueError<u16>>;
@@ -3618,7 +3572,7 @@ fn format_lookup_subtable(
         LookupSubtable::CursivePos(cursive_pos) => {
             let contents = {
                 match cursive_pos {
-                    CursivePos::Format1(CursivePosFormat1 { coverage, .. }) => {
+                    CursivePos { coverage, .. } => {
                         format!("entryExit({})", format_coverage_table(coverage))
                     }
                 }
@@ -3682,7 +3636,13 @@ fn format_lookup_subtable(
         LookupSubtable::SubstExtension => ("SubstExt", format!("(..)")),
         LookupSubtable::ReverseChainSingleSubst(rev_subst) => {
             let contents = match rev_subst {
-                ReverseChainSingleSubst { coverage, backtrack_coverages, lookahead_coverages, substitute_glyph_ids, .. } => {
+                ReverseChainSingleSubst {
+                    coverage,
+                    backtrack_coverages,
+                    lookahead_coverages,
+                    substitute_glyph_ids,
+                    ..
+                } => {
                     // REVIEW - since we are already within an inline elision context, try to avoid taking up too much space per item, but this might not want to be a hardcoded value
                     const INLINE_INLINE_BOOKEND: usize = 1;
                     // FIXME - show_lookup_table calls this function through show_items_inline already, so we might want to reduce how many values we are willing to show proportionally
@@ -3709,14 +3669,10 @@ fn format_lookup_subtable(
                         );
                         format!("(?={tmp})")
                     };
-                    let substitute_ids =
-                        format_items_inline(
-                            substitute_glyph_ids,
-                            u16::to_string,
-                            2, // NOTE[magic-number] - more generous limit for glyph ids
-                            |_| format!(".."),
-                        );
-                    format!("{backtrack_pattern}{input_pattern}{lookahead_pattern}=>{substitute_ids}")
+                    let substitute_ids = format_glyphid_array_hex(substitute_glyph_ids, true);
+                    format!(
+                        "{backtrack_pattern}{input_pattern}{lookahead_pattern}=>{substitute_ids}"
+                    )
                 }
             };
             ("RevChainSingleSubst", contents)
@@ -3832,10 +3788,10 @@ fn format_ligature_sets(
 ) -> String {
     fn format_ligature_set(lig_set: &LigatureSet, cov: u16) -> String {
         fn format_ligature(lig: &Ligature, cov: u16) -> String {
+            // NOTE - bec
             format!(
-                "({cov}+{} => {})",
-                format_items_inline(&lig.component_glyph_ids, u16::to_string, 3, |_| ".."
-                    .to_string()),
+                "(#{cov:04x}.{} => {})",
+                format_glyphid_array_hex(&lig.component_glyph_ids, false),
                 lig.ligature_glyph,
             )
         }
@@ -4178,6 +4134,56 @@ fn show_attach_list(attach_list: &AttachList, conf: &Config) {
     )
 }
 
+/// Compact inline display of an array representing a sequence (rather than a set) of glyphIds
+// REVIEW - we have no cap on how long a glyphId sequence we are willing to show unabridged and we might want one in theory
+fn format_glyphid_array_hex(glyphs: &impl AsRef<[u16]>, is_standalone: bool) -> String {
+    let glyph_array = glyphs.as_ref();
+
+    const BYTES_PER_GLYPH: usize = 2;
+
+    // Display prefix and associated overhead in bytes
+    const PREFIX: &str = "#";
+    const BYTE_OVERHEAD_PREFIX: usize = PREFIX.len();
+
+    // how many extra String-bytes we use per glyph, not counting the glyph itself
+    const GLUE: &str = ".";
+    const BYTE_OVERHEAD_PER_GLYPH: usize = GLUE.len();
+
+    // If the number of GLUE-strings we need is less than N (viz. the number of glyphs), this is the difference between N and the actual number we use
+    const PER_GLYPH_OVERCOUNT: usize = 1;
+
+    if glyph_array.is_empty() {
+        // Short-circuit for empty-glyph array
+        return String::from("ε");
+    }
+    let nglyphs = glyph_array.len();
+
+    // We would use saturating-sub instead of raw `-` on nglyphs and PER_GLYPH_OVERCOUNT but nglyphs is not zero if we are here.
+    let nbytes = (if is_standalone {
+        BYTE_OVERHEAD_PREFIX
+    } else {
+        0
+    }) + (nglyphs * BYTES_PER_GLYPH)
+        + (BYTE_OVERHEAD_PER_GLYPH * (nglyphs - PER_GLYPH_OVERCOUNT));
+
+    // Initialize a buffer with enough capacity it ought not need to reallocate or grow
+    let mut buffer = String::with_capacity(nbytes);
+
+    // Fill the buffer
+    if is_standalone {
+        buffer.push_str(PREFIX);
+    }
+
+    for (ix, glyph) in glyph_array.iter().enumerate() {
+        if ix > 0 {
+            buffer.push_str(GLUE);
+        }
+        // REVIEW - do we want to eliminate zero-padding for compactness, or keep it for consistency/legibility?
+        buffer.push_str(&format!("{:04x}", glyph));
+    }
+    buffer
+}
+
 // FIXME - we might want a more flexible model where the `show_XYZZY`/`format_XYZZY` dichotomy is erased, such as a generic Writer or Fragment-producer...
 fn format_coverage_table(cov: &CoverageTable) -> String {
     match cov {
@@ -4191,7 +4197,7 @@ fn format_coverage_table(cov: &CoverageTable) -> String {
         }
         CoverageTable::Format2 { ref range_records } => match range_records.as_slice() {
             &[] => format!("∅"),
-            &[rr] => format!("[∀ glyphId ∈ [{},{}]]", rr.start_glyph_id, rr.end_glyph_id),
+            &[rr] => format!("[∀: {}..={}]", rr.start_glyph_id, rr.end_glyph_id),
             &[first, .., last] => {
                 let num_glyphs: u16 = range_records
                     .iter()
