@@ -1,6 +1,6 @@
 use crate::format::BaseModule;
 use doodle::helper::*;
-use doodle::{Expr, Format, FormatModule, FormatRef, Pattern};
+use doodle::{Format, FormatModule, FormatRef, Pattern};
 
 /// TIFF Image file header
 ///
@@ -42,6 +42,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     module.define_format(
         "tiff.main",
         record([
+            ("start_of_header", pos32()),
             (
                 "byte-order",
                 alts([("le", is_bytes(b"II")), ("be", is_bytes(b"MM"))]),
@@ -68,16 +69,16 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ),
             (
                 "ifd",
-                Format::WithRelativeOffset(
-                    // TODO: Offset from start of the TIFF header
-                    Box::new(sub(var("offset"), Expr::U32(8))),
-                    Box::new(Format::Match(
+                with_relative_offset(
+                    Some(var("start_of_header")),
+                    var("offset"),
+                    Format::Match(
                         Box::new(var("byte-order")),
                         vec![
                             (Pattern::variant("le", Pattern::Wildcard), ifd(false)),
                             (Pattern::variant("be", Pattern::Wildcard), ifd(true)),
                         ],
-                    )),
+                    ),
                 ),
             ),
         ]),

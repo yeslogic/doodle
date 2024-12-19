@@ -1,6 +1,6 @@
-use core::panic;
 use std::collections::BTreeSet;
 
+use crate::bounds::Bounds;
 use crate::byte_set::ByteSet;
 use crate::{
     Arith, BaseType, Expr, Format, IntRel, IntoLabel, Label, Pattern, TypeHint, UnaryOp, ValueType,
@@ -25,11 +25,11 @@ pub fn packed_bits_u8<const N: usize>(
     field_bit_lengths: [u8; N],
     field_names: [&'static str; N],
 ) -> Format {
-    const BINDING_NAME: &str = "packedbits";
-    let _totlen: u8 = field_bit_lengths.iter().sum();
+    const BINDING_NAME: &str = "packed_bits";
+    let _len: u8 = field_bit_lengths.iter().sum();
     assert_eq!(
-        _totlen, 8,
-        "bad packed-bits field-lengths: total length {_totlen} of {field_bit_lengths:?} != 8"
+        _len, 8,
+        "bad packed-bits field-lengths: total length {_len} of {field_bit_lengths:?} != 8"
     );
     let mut fields = Vec::new();
     let mut high_bits_used = 0;
@@ -53,7 +53,7 @@ pub fn packed_bits_u8<const N: usize>(
 /// extracted from the appropriate bit-position. None indicates that the bit is unused (at least
 /// one name should be `Some`, or else the operation is perfunctory).
 pub fn flags_bits8(field_names: [Option<&'static str>; 8]) -> Format {
-    const BINDING_NAME: &str = "flagbits";
+    const BINDING_NAME: &str = "flagbyte";
 
     let mut flags = Vec::new();
 
@@ -61,7 +61,7 @@ pub fn flags_bits8(field_names: [Option<&'static str>; 8]) -> Format {
         if let Some(name) = field_name {
             flags.push((
                 Label::Borrowed(name),
-                is_nonzero_u8(mask_bits(var(BINDING_NAME), ix as u8, 1)),
+                is_nonzero(mask_bits(var(BINDING_NAME), ix as u8, 1)),
             ));
         }
     }
@@ -72,8 +72,15 @@ pub fn flags_bits8(field_names: [Option<&'static str>; 8]) -> Format {
     )
 }
 
-/// Selects `nbits` bits starting from the highest unused bit in an 8-bit packed-field value, returning a U8-typed Expr
-fn mask_bits(x: Expr, high_bits_used: u8, nbits: u8) -> Expr {
+/// Selects `nbits` bits starting from the highest unused bit in an 8-bit packed-field value, returning a U8-typed Expr.
+///
+/// Will panic if `nbits + high_bits_used > 8`.
+pub fn mask_bits(x: Expr, high_bits_used: u8, nbits: u8) -> Expr {
+    assert!(
+        nbits + high_bits_used <= 8,
+        "mask_bits cannot create mask {nbits} bits out of available {}",
+        8 - high_bits_used
+    );
     let shift = 8 - high_bits_used - nbits;
     let mask = (1 << nbits) - 1;
     bit_and(shr(x, Expr::U8(shift)), Expr::U8(mask))
@@ -102,11 +109,11 @@ pub fn packed_bits_u16<const N: usize>(
     field_bit_lengths: [u8; N],
     field_names: [&'static str; N],
 ) -> Format {
-    const BINDING_NAME: &str = "packedbits";
-    let _totlen: u8 = field_bit_lengths.iter().sum();
+    const BINDING_NAME: &str = "packed_bits";
+    let _total_len: u8 = field_bit_lengths.iter().sum();
     assert_eq!(
-        _totlen, 16,
-        "bad packed-bits field-lengths: total length {_totlen} of {field_bit_lengths:?} != 16"
+        _total_len, 16,
+        "bad packed-bits field-lengths: total length {_total_len} of {field_bit_lengths:?} != 16"
     );
     let mut fields = Vec::new();
     let mut high_bits_used = 0;
@@ -133,7 +140,7 @@ pub fn packed_bits_u16<const N: usize>(
 /// extracted from the appropriate bit-position. None indicates that the bit is unused (at least
 /// one name should be `Some`, or else the operation is perfunctory).
 pub fn flags_bits16(field_names: [Option<&'static str>; 16]) -> Format {
-    const BINDING_NAME: &str = "flagbits";
+    const BINDING_NAME: &str = "flag_bits";
 
     let mut flags = Vec::new();
 
@@ -141,7 +148,7 @@ pub fn flags_bits16(field_names: [Option<&'static str>; 16]) -> Format {
         if let Some(name) = field_name {
             flags.push((
                 Label::Borrowed(name),
-                is_nonzero_u16(mask_bits16(var(BINDING_NAME), ix as u8, 1)),
+                is_nonzero(mask_bits16(var(BINDING_NAME), ix as u8, 1)),
             ));
         }
     }
@@ -439,11 +446,11 @@ pub fn record_proj(head: Expr, label: impl IntoLabel) -> Expr {
 /// If the list of labels is empty, will simply return `head`.
 ///
 /// Otherwise, will return `(((head->label0)->label1)->...)->labelN`.
-pub fn record_projs(head: Expr, labels: &[&'static str]) -> Expr {
+pub fn record_lens(head: Expr, labels: &[&'static str]) -> Expr {
     if labels.is_empty() {
         head
     } else {
-        record_projs(record_proj(head, labels[0]), &labels[1..])
+        record_lens(record_proj(head, labels[0]), &labels[1..])
     }
 }
 
@@ -495,6 +502,14 @@ pub fn as_u64(x: Expr) -> Expr {
 
 pub fn as_char(x: Expr) -> Expr {
     Expr::AsChar(Box::new(x))
+}
+
+pub fn pred(x: Expr) -> Expr {
+    Expr::Unary(UnaryOp::IntPred, Box::new(x))
+}
+
+pub fn succ(x: Expr) -> Expr {
+    Expr::Unary(UnaryOp::IntSucc, Box::new(x))
 }
 
 pub fn add(x: Expr, y: Expr) -> Expr {
@@ -646,20 +661,11 @@ pub fn record_repeat<const N: usize>(field_names: [&'static str; N], format: For
     Format::Record(iter.collect())
 }
 
-/// Returns an Expr that evaluates to `true` if the given U8-typed expression is non-zero
-pub fn is_nonzero_u8(expr: Expr) -> Expr {
-    expr_ne(expr, Expr::U8(0))
+/// Returns an Expr that evaluates to `true` if the given expression (of an arbitrary Uint type) is non-zero
+pub fn is_nonzero(expr: Expr) -> Expr {
+    expr_not(is_within(expr, Bounds::exact(0)))
 }
 
-/// Returns an Expr that evaluates to `true` if the given U16-typed expression is non-zero
-pub fn is_nonzero_u16(expr: Expr) -> Expr {
-    expr_ne(expr, Expr::U16(0))
-}
-
-/// Returns an Expr that evaluates to `true` if the given U32-typed expression is non-zero
-pub fn is_nonzero_u32(expr: Expr) -> Expr {
-    expr_ne(expr, Expr::U32(0))
-}
 /// Helper for constructing `Option::None` within the Expr model-language.
 pub const fn expr_none() -> Expr {
     Expr::LiftOption(None)
@@ -693,14 +699,9 @@ pub fn format_none() -> Format {
     compute(expr_none())
 }
 
-/// Shortcut for `where_lambda` applied over the simple predicate [`is_nonzero_u8`]
-pub fn where_nonzero_u8(format: Format) -> Format {
-    where_lambda(format, "x", is_nonzero_u8(var("x")))
-}
-
-/// Shortcut for `where_lambda` applied over the simple predicate [`is_nonzero_u16`]
-pub fn where_nonzero_u16(format: Format) -> Format {
-    where_lambda(format, "x", is_nonzero_u16(var("x")))
+/// Shortcut for `where_lambda` applied over the simple predicate [`is_nonzero`]
+pub fn where_nonzero(format: Format) -> Format {
+    where_lambda(format, "x", is_nonzero(var("x")))
 }
 
 /// Helper for constructing `Format::ForEach`
@@ -844,6 +845,31 @@ pub fn subset_fields<const N: usize>(original: Expr, field_set: [&'static str; N
     Expr::Record(accum_fields)
 }
 
+pub fn prepend_field<const N: usize>(
+    field: (&'static str, Expr),
+    original: (Expr, [&'static str; N]),
+) -> Expr {
+    let (field_name, field_expr) = field;
+    let (original_expr, original_fields) = original;
+
+    let mut accum_fields = Vec::with_capacity(N + 1);
+    let mut included_fields = BTreeSet::new();
+
+    accum_fields.push((field_name.into(), field_expr));
+    let _ = included_fields.insert(field_name);
+
+    for field_name in original_fields.into_iter() {
+        if !included_fields.insert(field_name) {
+            unreachable!("duplicated field in prepend_field: `{field_name}`");
+        }
+        accum_fields.push((
+            Label::Borrowed(field_name),
+            record_proj(original_expr.clone(), field_name),
+        ));
+    }
+    Expr::Record(accum_fields)
+}
+
 /// Given an expression of type `Seq(Seq(T))`, return an expression of type `Seq(T)` corresponding to the concatenation
 /// of each sub-list in turn.
 #[inline]
@@ -856,6 +882,9 @@ pub fn f_concat() -> Expr {
     lambda("xs", concat(var("xs")))
 }
 
+/// Given a sequence `seq` of type `Seq(T)`, return an expression of type `Bool`
+/// that is `true` if any element of `seq` yields `true` when `f` is called over it,
+/// and `false` otherwise (including when the sequence is empty).
 pub fn seq_any<F>(f: F, seq: Expr) -> Expr
 where
     F: FnOnce(Expr) -> Expr,
@@ -889,11 +918,12 @@ pub fn slice(len: Expr, inner: Format) -> Format {
     Format::Slice(Box::new(len), Box::new(inner))
 }
 
-/// Constructs a balanced (i.e. minimiazed max depth) tree of `bitor`-joined
-/// nodes of type Expr (U8 or U16).
+/// Constructs a balanced (i.e. minimized max depth) tree of `bitor`-joined
+/// nodes of type Expr.
 ///
-/// Does not work if there are more than 16 elements in `nodes`
-pub fn balanced_bitor_max16(mut nodes: Vec<Expr>) -> Expr {
+/// Will yield an unbalanced AST if there are more than 16 elements in `nodes`
+pub fn balanced_bitor_max16(nodes: Vec<Expr>) -> Expr {
+    /*
     let n = nodes.len();
 
     let (l, r) = match () {
@@ -923,6 +953,56 @@ pub fn balanced_bitor_max16(mut nodes: Vec<Expr>) -> Expr {
         }
     };
     bit_or(l, r)
+    */
+    balance_merge((), move |_| nodes, bit_or)
+}
+
+/// Generic function for computing an N-way binary operation using a generic seed-value
+/// and generation-function.
+///
+/// The `combine` operation should ideally be invariant under reordering and regrouping
+/// (i.e. commutative and associative) as the internal tree structure of the Expr is not
+/// specified.
+///
+/// Relies on the guarantee that the given seed and initialization function will together
+/// produce a non-empty Vector, and will panic if the resulting vector is empty.
+pub fn balance_merge<Seed, MkNodes, Combine>(
+    seed: Seed,
+    mk_nodes: MkNodes,
+    combine: Combine,
+) -> Expr
+where
+    MkNodes: FnOnce(Seed) -> Vec<Expr>,
+    Combine: Fn(Expr, Expr) -> Expr,
+{
+    let nodes = mk_nodes(seed);
+
+    if nodes.is_empty() {
+        unreachable!("balance_merge: mk_nodes(seed) yielded empty vector");
+    }
+
+    let mut stratum = nodes;
+    loop {
+        match stratum.len() {
+            0 => unreachable!("stratum cannot be empty"),
+            1 => return stratum.drain(..).next().unwrap(),
+            _ => {
+                let mut tmp = Vec::with_capacity(stratum.len().div_ceil(2));
+                let mut it = stratum.drain(..);
+                while let Some(l) = it.next() {
+                    if let Some(r) = it.next() {
+                        tmp.push(combine(l, r));
+                        continue;
+                    } else {
+                        tmp.push(l);
+                        break;
+                    }
+                }
+                std::mem::drop(it);
+                stratum = tmp;
+            }
+        }
+    }
 }
 
 /// Helper function for `Format::AccumUntil`
@@ -943,9 +1023,49 @@ pub fn accum_until(
 }
 
 /// Computes the final element of a sequence-typed Expr, evaluating to None if it is empty
-pub fn seq_opt_last(seq: Expr) -> Expr {
+pub fn seq_last_checked(seq: Expr) -> Expr {
     expr_opt_if(
-        expr_gt(seq_length(seq.clone()), Expr::U32(0)),
-        index_unchecked(seq.clone(), sub(seq_length(seq.clone()), Expr::U32(1))),
+        is_within(seq_length(seq.clone()), Bounds::at_least(1)),
+        index_unchecked(seq.clone(), pred(seq_length(seq))),
     )
+}
+
+/// Computes the final element of a sequence-typed Expr provided that it is guaranteed to be non-empty.
+///
+/// Will result in a runtime panic if called on an empty sequence.
+pub fn seq_last_unchecked(seq: Expr) -> Expr {
+    index_unchecked(seq.clone(), pred(seq_length(seq)))
+}
+
+/// Returns `true` if the value of `x` is contained by `bounds` and false if it lies outside.
+///
+/// If `x` is not an integral-typed value, will cause a runtime error
+/// when encountered by the interpreter or compiler.
+pub fn is_within(x: Expr, bounds: Bounds) -> Expr {
+    expr_match(
+        x,
+        [
+            (Pattern::Int(bounds), Expr::Bool(true)),
+            (Pattern::Wildcard, Expr::Bool(false)),
+        ],
+    )
+}
+
+pub fn with_relative_offset(base_address: Option<Expr>, offset: Expr, format: Format) -> Format {
+    match base_address {
+        Some(addr) => {
+            Format::WithRelativeOffset(Box::new(addr), Box::new(offset), Box::new(format))
+        }
+        None => chain(
+            Format::Pos,
+            "__here",
+            Format::WithRelativeOffset(Box::new(var("__here")), Box::new(offset), Box::new(format)),
+        ),
+    }
+}
+
+/// Gets the current stream-position and casts down from U64->U32
+// TODO: implement a semi-auto type for Format::Pos in typechecker instead of hard-coding to U64?
+pub fn pos32() -> Format {
+    map(Format::Pos, lambda("x", Expr::AsU32(Box::new(var("x")))))
 }

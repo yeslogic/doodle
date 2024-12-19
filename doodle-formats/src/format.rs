@@ -4,21 +4,21 @@ use doodle::{Format, FormatModule, FormatRef};
 
 pub mod base;
 
-mod deflate;
-mod elf;
-mod gif;
-mod gzip;
-mod jpeg;
-mod mpeg4;
-mod opentype;
-mod peano;
-mod png;
-mod riff;
-mod tar;
-mod text;
-mod tiff;
-mod waldo;
-mod zlib;
+pub mod deflate;
+pub mod elf;
+pub mod gif;
+pub mod gzip;
+pub mod jpeg;
+pub mod mpeg4;
+pub mod opentype;
+pub mod peano;
+pub mod png;
+pub mod riff;
+pub mod tar;
+pub mod text;
+pub mod tiff;
+pub mod waldo;
+pub mod zlib;
 
 pub fn main(module: &mut FormatModule) -> FormatRef {
     let base = base::main(module);
@@ -51,7 +51,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                     var("gzip-raw"),
                     "item",
                     Format::DecodeBytes(
-                        Box::new(record_projs(var("item"), &["data", "inflate"])),
+                        Box::new(record_lens(var("item"), &["data", "inflate"])),
                         Box::new(tar.call()),
                     ),
                 ),
@@ -109,6 +109,7 @@ mod test {
             (
                 "mask",
                 Format::WithRelativeOffset(
+                    None,
                     Box::new(var("len")),
                     Box::new(Format::Byte(mask_bytes)),
                 ),
