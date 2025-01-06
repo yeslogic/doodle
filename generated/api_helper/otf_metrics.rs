@@ -1611,8 +1611,12 @@ impl TryPromote<OpentypeGposLookupSubtable> for LookupSubtable {
             OpentypeGposLookupSubtable::CursivePos(cursive_pos) => {
                 LookupSubtable::CursivePos(CursivePos::try_promote(cursive_pos)?)
             }
-            OpentypeGposLookupSubtable::MarkBasePos => LookupSubtable::MarkBasePos,
-            OpentypeGposLookupSubtable::MarkLigPos => LookupSubtable::MarkLigPos,
+            OpentypeGposLookupSubtable::MarkBasePos(mb_pos) => {
+                LookupSubtable::MarkBasePos(MarkBasePos::try_promote(mb_pos)?)
+            }
+            OpentypeGposLookupSubtable::MarkLigPos(ml_pos) => {
+                LookupSubtable::MarkLigPos(MarkLigPos::try_promote(ml_pos)?)
+            }
             OpentypeGposLookupSubtable::MarkMarkPos => LookupSubtable::MarkMarkPos,
             OpentypeGposLookupSubtable::SequenceContext(seq_ctx) => {
                 LookupSubtable::SequenceContext(SequenceContext::promote(seq_ctx))
@@ -1630,8 +1634,8 @@ enum LookupSubtable {
     SinglePos(SinglePos),
     PairPos(PairPos),
     CursivePos(CursivePos),
-    MarkBasePos,
-    MarkLigPos,
+    MarkBasePos(MarkBasePos),
+    MarkLigPos(MarkLigPos),
     MarkMarkPos,
     PosExtension,
 
@@ -1644,6 +1648,194 @@ enum LookupSubtable {
     LigatureSubst(LigatureSubst),
     SubstExtension,
     ReverseChainSingleSubst(ReverseChainSingleSubst),
+}
+
+pub type OpentypeMarkLigPos = opentype_layout_mark_lig_pos;
+
+impl TryPromote<OpentypeMarkLigPos> for MarkLigPos {
+    type Error = ReflType<
+        ReflType<TPErr<OpentypeLigatureArray, LigatureArray>, TPErr<OpentypeMarkArray, MarkArray>>,
+        UnknownValueError<u16>,
+    >;
+
+    fn try_promote(orig: &OpentypeMarkLigPos) -> Result<Self, Self::Error> {
+        Ok(MarkLigPos {
+            mark_coverage: CoverageTable::promote(&orig.mark_coverage_offset.link),
+            ligature_coverage: CoverageTable::promote(&orig.ligature_coverage_offset.link),
+            mark_array: try_promote_from_null(&orig.mark_array_offset.link)?,
+            ligature_array: try_promote_from_null(&orig.ligature_array_offset.link)?,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+struct MarkLigPos {
+    mark_coverage: CoverageTable,
+    ligature_coverage: CoverageTable,
+    mark_array: MarkArray,
+    ligature_array: LigatureArray,
+}
+
+pub type OpentypeLigatureArray = opentype_layout_mark_lig_pos_ligature_array_offset_link;
+
+impl TryPromote<OpentypeLigatureArray> for LigatureArray {
+    type Error = ReflType<TPErr<OpentypeLigatureAttach, LigatureAttach>, UnknownValueError<u16>>;
+
+    fn try_promote(orig: &OpentypeLigatureArray) -> Result<Self, Self::Error> {
+        let mut ligature_attach = Vec::with_capacity(orig.ligature_attach_offsets.len());
+        for offset in orig.ligature_attach_offsets.iter() {
+            ligature_attach.push(
+                try_promote_from_null(&offset.link)?
+            );
+        }
+        Ok(LigatureArray { ligature_attach })
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+#[repr(transparent)]
+struct LigatureArray {
+    ligature_attach: Vec<LigatureAttach>,
+}
+
+pub type OpentypeLigatureAttach = opentype_layout_mark_lig_pos_ligature_array_offset_link_ligature_attach_offsets_link;
+
+impl TryPromote<OpentypeLigatureAttach> for LigatureAttach {
+    type Error = ReflType<TPErr<OpentypeComponentRecord, ComponentRecord>, UnknownValueError<u16>>;
+
+    fn try_promote(orig: &OpentypeLigatureAttach) -> Result<Self, Self::Error> {
+        Ok(LigatureAttach { component_records: try_promote_vec(&orig.component_records)? })
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+#[repr(transparent)]
+struct LigatureAttach {
+    component_records: Vec<ComponentRecord>,
+}
+
+pub type OpentypeComponentRecord = opentype_layout_mark_lig_pos_ligature_array_offset_link_ligature_attach_offsets_link_component_records;
+
+impl TryPromote<OpentypeComponentRecord> for ComponentRecord {
+    type Error = ReflType<
+        TPErr<OpentypeAnchorTable, AnchorTable>,
+        UnknownValueError<u16>,
+    >;
+
+    fn try_promote(orig: &OpentypeComponentRecord) -> Result<Self, Self::Error> {
+        let mut ligature_anchors = Vec::with_capacity(orig.ligature_anchor_offsets.len());
+        for offset in orig.ligature_anchor_offsets.iter() {
+            ligature_anchors.push(try_promote_opt(&offset.link)?);
+        }
+
+        Ok(ComponentRecord { ligature_anchors })
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+#[repr(transparent)]
+struct ComponentRecord {
+    ligature_anchors: Vec<Option<AnchorTable>>,
+}
+
+pub type OpentypeMarkBasePos = opentype_layout_mark_base_pos;
+
+impl TryPromote<OpentypeMarkBasePos> for MarkBasePos {
+    type Error = ReflType<
+        ReflType<TPErr<OpentypeBaseArray, BaseArray>, TPErr<OpentypeMarkArray, MarkArray>>,
+        UnknownValueError<u16>,
+    >;
+
+    fn try_promote(orig: &OpentypeMarkBasePos) -> Result<Self, Self::Error> {
+        Ok(MarkBasePos {
+            mark_coverage: CoverageTable::promote(&orig.mark_coverage_offset.link),
+            base_coverage: CoverageTable::promote(&orig.base_coverage_offset.link),
+            mark_array: try_promote_from_null(&orig.mark_array_offset.link)?,
+            base_array: try_promote_from_null(&orig.base_array_offset.link)?,
+        })
+    }
+}
+
+pub type OpentypeMarkArray = opentype_layout_mark_array;
+
+impl TryPromote<OpentypeMarkArray> for MarkArray {
+    type Error = ReflType<TPErr<OpentypeMarkRecord, MarkRecord>, UnknownValueError<u16>>;
+
+    fn try_promote(orig: &OpentypeMarkArray) -> Result<Self, Self::Error> {
+        Ok(MarkArray {
+            mark_records: try_promote_vec(&orig.mark_records)?,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+#[repr(transparent)]
+struct MarkArray {
+    mark_records: Vec<MarkRecord>,
+}
+
+pub type OpentypeMarkRecord = opentype_layout_mark_array_mark_records;
+
+impl TryPromote<OpentypeMarkRecord> for MarkRecord {
+    type Error = ReflType<TPErr<OpentypeAnchorTable, AnchorTable>, UnknownValueError<u16>>;
+
+    fn try_promote(orig: &OpentypeMarkRecord) -> Result<Self, Self::Error> {
+        Ok(MarkRecord {
+            mark_class: orig.mark_class,
+            mark_anchor: try_promote_link(&orig.mark_anchor_offset.link)?,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+struct MarkRecord {
+    mark_class: u16,
+    mark_anchor: Link<AnchorTable>,
+}
+
+pub type OpentypeBaseArray = opentype_layout_mark_base_pos_base_array_offset_link;
+
+impl TryPromote<OpentypeBaseArray> for BaseArray {
+    type Error = ReflType<TPErr<OpentypeBaseRecord, BaseRecord>, UnknownValueError<u16>>;
+
+    fn try_promote(orig: &OpentypeBaseArray) -> Result<Self, Self::Error> {
+        Ok(BaseArray {
+            base_records: try_promote_vec(&orig.base_records)?,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+#[repr(transparent)]
+struct BaseArray {
+    base_records: Vec<BaseRecord>,
+}
+
+pub type OpentypeBaseRecord = opentype_layout_mark_base_pos_base_array_offset_link_base_records;
+
+impl TryPromote<OpentypeBaseRecord> for BaseRecord {
+    type Error = ReflType<TPErr<OpentypeAnchorTable, AnchorTable>, UnknownValueError<u16>>;
+
+    fn try_promote(orig: &OpentypeBaseRecord) -> Result<Self, Self::Error> {
+        let mut base_anchors = Vec::with_capacity(orig.base_anchor_offsets.len());
+        for offset in orig.base_anchor_offsets.iter() {
+            base_anchors.push(try_promote_opt(&offset.link)?);
+        }
+
+        Ok(BaseRecord { base_anchors })
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+struct BaseRecord {
+    base_anchors: Vec<Option<AnchorTable>>,
+}
+#[derive(Debug, Clone)]
+struct MarkBasePos {
+    mark_coverage: CoverageTable,
+    base_coverage: CoverageTable,
+    mark_array: MarkArray,
+    base_array: BaseArray,
 }
 
 pub type OpentypeReverseChainSingleSubst = opentype_layout_reverse_chain_single_subst;
@@ -3579,8 +3771,47 @@ fn format_lookup_subtable(
             };
             ("CursivePos", contents)
         }
-        LookupSubtable::MarkBasePos => ("MarkBasePos", format!("(..)")),
-        LookupSubtable::MarkLigPos => ("MarkLigPos", format!("(..)")),
+        LookupSubtable::MarkBasePos(mb_pos) => {
+            let contents = {
+                match mb_pos {
+                    MarkBasePos {
+                        mark_coverage,
+                        base_coverage,
+                        mark_array,
+                        base_array,
+                    } => {
+                        let mut mark_iter = mark_coverage.iter();
+                        let mut base_iter = base_coverage.iter();
+                        format!(
+                            "Mark({})+Base({})=>MarkArray[{}]+BaseArray[{}]",
+                            format_coverage_table(mark_coverage),
+                            format_coverage_table(base_coverage),
+                            format_mark_array(mark_array, &mut mark_iter),
+                            format_base_array(base_array, &mut base_iter),
+                        )
+                    }
+                }
+            };
+            ("MarkBasePos", contents)
+        }
+        LookupSubtable::MarkLigPos(ml_pos) => {
+            let contents = {
+                match ml_pos {
+                    MarkLigPos { mark_coverage, ligature_coverage, mark_array, ligature_array } => {
+                        let mut mark_iter = mark_coverage.iter();
+                        let mut ligature_iter = ligature_coverage.iter();
+                        format!(
+                            "Mark({})+Ligature({})=>MarkArray[{}]+LigatureArray[{}]",
+                            format_coverage_table(mark_coverage),
+                            format_coverage_table(ligature_coverage),
+                            format_mark_array(mark_array, &mut mark_iter),
+                            format_ligature_array(ligature_array, &mut ligature_iter),
+                        )
+                    }
+                }
+            };
+            ("MarkLigPos", contents)
+        }
         LookupSubtable::MarkMarkPos => ("MarkMarkPos", format!("(..)")),
         LookupSubtable::PosExtension => ("PosExt", format!("(..)")),
 
@@ -3782,6 +4013,164 @@ fn format_lookup_subtable(
     }
 }
 
+fn format_indexed_nullable<T>(
+    opt_items: &[Option<T>],
+    mut show_fn: impl FnMut(usize, &T) -> String,
+    bookend: usize,
+    ellipsis: impl Fn(usize, (usize, usize)) -> String,
+) -> String {
+    let items: Vec<(usize, &T)> = opt_items
+        .iter()
+        .enumerate()
+        .filter_map(|(ix, opt)| opt.as_ref().map(|v| (ix, v)))
+        .collect();
+    let mut buffer = Vec::<String>::with_capacity(Ord::min(items.len(), bookend * 2 + 1));
+
+    let count = items.len();
+
+    if count > bookend * 2 {
+        for _ix in 0..bookend {
+            let (ix, it) = items[_ix];
+            buffer.push(show_fn(ix, it));
+        }
+        buffer.push(ellipsis(
+            count - bookend * 2,
+            (items[bookend].0, items[count - bookend - 1].0),
+        ));
+        for _ix in (count - bookend)..count {
+            let (ix, it) = items[_ix];
+            buffer.push(show_fn(ix, it));
+        }
+    } else {
+        for (ix, it) in items.into_iter() {
+            buffer.push(show_fn(ix, it));
+        }
+    }
+    format!("[{}]", buffer.join(", "))
+}
+
+fn format_ligature_array(ligature_array: &LigatureArray, coverage: &mut impl Iterator<Item = u16>) -> String {
+    fn format_ligature_attach(ligature_attach: &LigatureAttach, cov: u16) -> String {
+        fn format_component_record(component_record: &ComponentRecord) -> String {
+            const CLASS_ANCHOR_BOOKEND: usize = 2;
+            format_indexed_nullable(
+                &component_record.ligature_anchors,
+                |ix, anchor| format!("[{ix}]=>{}", format_anchor_table(anchor)),
+                CLASS_ANCHOR_BOOKEND,
+                |n_skipped, (first, last)| format!(
+                    "...(skipping {n_skipped} indices from {first} to {last})..."
+                )
+            )
+        }
+
+        const COMPONENTS_BOOKEND: usize = 1;
+        format!("{cov:04x}={}",
+            format_items_inline(
+                &ligature_attach.component_records,
+                format_component_record,
+                COMPONENTS_BOOKEND,
+                |_| format!("..."),
+            )
+        )
+    }
+
+    const ATTACHES_INLINE: usize = 2;
+    format_items_inline(
+        &ligature_array.ligature_attach,
+        |attach| format_ligature_attach(attach, coverage.next().expect("missing coverage")),
+        ATTACHES_INLINE,
+        |n_skipped| format!("...(skipping {n_skipped})..."),
+    )
+}
+
+fn format_base_array(base_array: &BaseArray, coverage: &mut impl Iterator<Item = u16>) -> String {
+    fn format_base_record(base_record: &BaseRecord, cov: u16) -> String {
+        const CLASS_ANCHOR_BOOKEND: usize = 2;
+        format!(
+            "{cov:04x}: {}",
+            format_indexed_nullable(
+                &base_record.base_anchors,
+                |ix, anchor| format!("[{ix}]=>{}", format_anchor_table(anchor)),
+                CLASS_ANCHOR_BOOKEND,
+                |n_skipped, (first, last)| format!(
+                    "...(skipping {n_skipped} indices from {first} to {last})..."
+                )
+            )
+        )
+    }
+
+    const BASE_ARRAY_BOOKEND: usize = 2;
+    format_items_inline(
+        &base_array.base_records,
+        |base_record| format_base_record(base_record, coverage.next().expect("missing coverage")),
+        BASE_ARRAY_BOOKEND,
+        |n_skipped| format!("...({n_skipped} skipped)..."),
+    )
+}
+
+fn format_mark_array(mark_array: &MarkArray, coverage: &mut impl Iterator<Item = u16>) -> String {
+    fn format_mark_record(mark_record: &MarkRecord, cov: u16) -> String {
+        format!(
+            "{cov:04x}=({}, {})",
+            mark_record.mark_class,
+            format_anchor_table(mark_record.mark_anchor.as_ref().expect("broken link"))
+        )
+    }
+
+    // FIXME[magic] - arbitrary local bookending const
+    const MARK_ARRAY_BOOKEND: usize = 2;
+    format_items_inline(
+        &mark_array.mark_records,
+        |mark_record| format_mark_record(mark_record, coverage.next().expect("missing coverage")),
+        MARK_ARRAY_BOOKEND,
+        |n_skipped| format!("...({n_skipped} skipped)..."),
+    )
+}
+
+fn format_anchor_table(anchor: &AnchorTable) -> String {
+    match anchor {
+        AnchorTable::Format1(AnchorTableFormat1 {
+            x_coordinate,
+            y_coordinate,
+        }) => {
+            format!("({}, {})", as_s16(*x_coordinate), as_s16(*y_coordinate))
+        }
+        AnchorTable::Format2(f2) => {
+            format!(
+                "({}, {})@[{}]",
+                as_s16(f2.x_coordinate),
+                as_s16(f2.y_coordinate),
+                f2.anchor_point
+            )
+        }
+        AnchorTable::Format3(AnchorTableFormat3 {
+            x_coordinate,
+            y_coordinate,
+            x_device,
+            y_device,
+        }) => {
+            let extra = match (x_device, y_device) {
+                (None, None) => unreachable!("unexpected both-Null DeviceOrVariationIndexTable-offsets in AnchorTable::Format3"),
+                (Some(ref x), Some(ref y)) => {
+                    format!("×({}, {})", format_device_or_variation_index_table(x), format_device_or_variation_index_table(y))
+                }
+                (Some(ref x), None) => {
+                    format!("×({}, ⅈ)", format_device_or_variation_index_table(x))
+                }
+                (None, Some(ref y)) => {
+                    format!("×(ⅈ, {})", format_device_or_variation_index_table(y))
+                }
+            };
+            format!(
+                "({}, {}){}",
+                as_s16(*x_coordinate),
+                as_s16(*y_coordinate),
+                extra
+            )
+        }
+    }
+}
+
 fn format_ligature_sets(
     lig_sets: &[LigatureSet],
     coverage: &mut impl Iterator<Item = u16>,
@@ -3795,6 +4184,7 @@ fn format_ligature_sets(
                 lig.ligature_glyph,
             )
         }
+        // FIXME[magic] - arbitrary local bookending const
         const LIG_BOOKEND: usize = 2;
         format_items_inline(
             &lig_set.ligatures,
@@ -4076,23 +4466,27 @@ fn format_caret_value(cv: &Link<CaretValue>) -> String {
             CaretValue::ContourPoint(ix) => format!("#{ix}"),
             CaretValue::DesignUnitsWithTable { coordinate, device } => match device {
                 None => unreachable!("dev-table in caret value format 3 with null offset"),
-                Some(table) => match table {
-                    DeviceOrVariationIndexTable::DeviceTable(dev_table) => {
-                        format!("{}du+[{}]", coordinate, format_device_table(dev_table))
-                    }
-                    DeviceOrVariationIndexTable::VariationIndexTable(var_ix_table) => {
-                        format!(
-                            "{}du+[{}]",
-                            coordinate,
-                            format_variation_index_table(var_ix_table)
-                        )
-                    }
-                    DeviceOrVariationIndexTable::OtherTable { delta_format } => {
-                        format!("{}du+[<DeltaFormat {delta_format}>]", coordinate)
-                    }
-                },
+                Some(table) => {
+                    format!(
+                        "{}du+{}",
+                        coordinate,
+                        format_device_or_variation_index_table(table)
+                    )
+                }
             },
         },
+    }
+}
+
+fn format_device_or_variation_index_table(table: &DeviceOrVariationIndexTable) -> String {
+    match table {
+        DeviceOrVariationIndexTable::DeviceTable(dev_table) => format_device_table(dev_table),
+        DeviceOrVariationIndexTable::VariationIndexTable(var_ix_table) => {
+            format_variation_index_table(var_ix_table)
+        }
+        DeviceOrVariationIndexTable::OtherTable { delta_format } => {
+            format!("[<DeltaFormat {delta_format}>]")
+        }
     }
 }
 
@@ -4771,8 +5165,8 @@ pub mod lookup_subtable {
                         OpentypeGposLookupSubtable::SinglePos(..) => ret.single_pos = true,
                         OpentypeGposLookupSubtable::PairPos(..) => ret.pair_pos = true,
                         OpentypeGposLookupSubtable::CursivePos(..) => ret.cursive_pos = true,
-                        OpentypeGposLookupSubtable::MarkBasePos => ret.mark_base_pos = true,
-                        OpentypeGposLookupSubtable::MarkLigPos => ret.mark_lig_pos = true,
+                        OpentypeGposLookupSubtable::MarkBasePos(..) => ret.mark_base_pos = true,
+                        OpentypeGposLookupSubtable::MarkLigPos(..) => ret.mark_lig_pos = true,
                         OpentypeGposLookupSubtable::MarkMarkPos => ret.mark_mark_pos = true,
                         OpentypeGposLookupSubtable::PosExtension => ret.pos_extension = true,
                         OpentypeGposLookupSubtable::SequenceContext(..) => {

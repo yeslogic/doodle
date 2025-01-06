@@ -3318,16 +3318,166 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ),
             )
         };
+        let mark_array = {
+            let mark_record = |table_start: Expr| {
+                record([
+                    ("mark_class", base.u16be()),
+                    (
+                        "mark_anchor_offset",
+                        offset16_mandatory(table_start, anchor_table.call(), base),
+                    ),
+                ])
+            };
+            module.define_format(
+                "opentype.layout.mark_array",
+                record([
+                    ("table_start", pos32()),
+                    ("mark_count", base.u16be()),
+                    (
+                        "mark_records",
+                        repeat_count(var("mark_count"), mark_record(var("table_start"))),
+                    ),
+                ]),
+            )
+        };
+        let mark_base_pos = {
+            let base_record = |mark_class_count: Expr, table_start: Expr| {
+                record([(
+                    "base_anchor_offsets",
+                    repeat_count(
+                        mark_class_count,
+                        offset16_nullable(table_start, anchor_table.call(), base),
+                    ),
+                )])
+            };
+            let base_array = |mark_class_count: Expr| {
+                record([
+                    ("table_start", pos32()),
+                    ("base_count", base.u16be()),
+                    (
+                        "base_records",
+                        repeat_count(
+                            var("base_count"),
+                            base_record(mark_class_count, var("table_start")),
+                        ),
+                    ),
+                ])
+            };
+            module.define_format(
+                "opentype.layout.mark_base_pos",
+                embedded_singleton_alternation(
+                    [("table_start", pos32()), ("format", base.u16be())],
+                    ("format", 1),
+                    [
+                        (
+                            "mark_coverage_offset",
+                            offset16_mandatory(var("table_start"), coverage_table.call(), base),
+                        ),
+                        (
+                            "base_coverage_offset",
+                            offset16_mandatory(var("table_start"), coverage_table.call(), base),
+                        ),
+                        ("mark_class_count", base.u16be()),
+                        (
+                            "mark_array_offset",
+                            offset16_mandatory(var("table_start"), mark_array.call(), base),
+                        ),
+                        (
+                            "base_array_offset",
+                            offset16_mandatory(
+                                var("table_start"),
+                                base_array(var("mark_class_count")),
+                                base,
+                            ),
+                        ),
+                    ],
+                    "pos",
+                    "Format1",
+                    NestingKind::FlattenInner,
+                ),
+            )
+        };
+        let mark_lig_pos = {
+            let component_record = |mark_class_count: Expr, table_start: Expr| {
+                record([(
+                    "ligature_anchor_offsets",
+                    repeat_count(
+                        mark_class_count,
+                        offset16_nullable(table_start, anchor_table.call(), base),
+                    ),
+                )])
+            };
+            let ligature_attach = |mark_class_count: Expr, table_start: Expr| {
+                record([
+                    ("component_count", base.u16be()),
+                    (
+                        "component_records",
+                        repeat_count(
+                            var("component_count"),
+                            component_record(mark_class_count, table_start),
+                        ),
+                    ),
+                ])
+            };
+            let ligature_array = |mark_class_count: Expr| {
+                record([
+                    ("table_start", pos32()),
+                    ("ligature_count", base.u16be()),
+                    (
+                        "ligature_attach_offsets",
+                        repeat_count(
+                            var("ligature_count"),
+                            offset16_mandatory(
+                                var("table_start"),
+                                ligature_attach(mark_class_count, var("table_start")),
+                                base,
+                            ),
+                        ),
+                    ),
+                ])
+            };
+            module.define_format(
+                "opentype.layout.mark_lig_pos",
+                embedded_singleton_alternation(
+                    [("table_start", pos32()), ("format", base.u16be())],
+                    ("format", 1),
+                    [
+                        (
+                            "mark_coverage_offset",
+                            offset16_mandatory(var("table_start"), coverage_table.call(), base),
+                        ),
+                        (
+                            "ligature_coverage_offset",
+                            offset16_mandatory(var("table_start"), coverage_table.call(), base),
+                        ),
+                        ("mark_class_count", base.u16be()),
+                        (
+                            "mark_array_offset",
+                            offset16_mandatory(var("table_start"), mark_array.call(), base),
+                        ),
+                        (
+                            "ligature_array_offset",
+                            offset16_mandatory(
+                                var("table_start"),
+                                ligature_array(var("mark_class_count")),
+                                base,
+                            ),
+                        ),
+                    ],
+                    "pos",
+                    "Format1",
+                    NestingKind::FlattenInner,
+                ),
+            )
+        };
 
         let layout_table = |tag: u32| {
+            let mark_mark_pos = /* STUB */ Format::EMPTY;
             // FIXME - this belongs above but because it is a Format and not yet FormatRef, it is not Copy and so has to be defined in the closure body
             let subst_extension = {
                 /* STUB */
                 Format::EMPTY
             };
-            let mark_base_pos = /* STUB */ Format::EMPTY;
-            let mark_lig_pos = /* STUB */ Format::EMPTY;
-            let mark_mark_pos = /* STUB */ Format::EMPTY;
             let pos_extension = /* STUB */ Format::EMPTY;
 
             let lookup_list = |tag: u32| {
@@ -3377,8 +3527,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         (Pattern::U16(1), "SinglePos", single_pos.call()),
                                         (Pattern::U16(2), "PairPos", pair_pos.call()),
                                         (Pattern::U16(3), "CursivePos", cursive_pos.call()),
-                                        (Pattern::U16(4), "MarkBasePos", mark_base_pos),
-                                        (Pattern::U16(5), "MarkLigPos", mark_lig_pos),
+                                        (Pattern::U16(4), "MarkBasePos", mark_base_pos.call()),
+                                        (Pattern::U16(5), "MarkLigPos", mark_lig_pos.call()),
                                         (Pattern::U16(6), "MarkMarkPos", mark_mark_pos),
                                         (
                                             Pattern::U16(7),
