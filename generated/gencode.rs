@@ -2254,7 +2254,7 @@ mark_records: Vec<opentype_layout_mark_array_mark_records>
 }
 
 #[derive(Debug, Clone)]
-pub struct opentype_layout_mark_lig_pos_mark_array_offset {
+pub struct opentype_layout_mark_mark_pos_mark1_array_offset {
 offset: u16,
 link: Option<opentype_layout_mark_array>
 }
@@ -2284,7 +2284,7 @@ format: u16,
 mark_coverage_offset: opentype_layout_reverse_chain_single_subst_coverage,
 base_coverage_offset: opentype_layout_reverse_chain_single_subst_coverage,
 mark_class_count: u16,
-mark_array_offset: opentype_layout_mark_lig_pos_mark_array_offset,
+mark_array_offset: opentype_layout_mark_mark_pos_mark1_array_offset,
 base_array_offset: opentype_layout_mark_base_pos_base_array_offset
 }
 
@@ -2326,20 +2326,26 @@ format: u16,
 mark_coverage_offset: opentype_layout_reverse_chain_single_subst_coverage,
 ligature_coverage_offset: opentype_layout_reverse_chain_single_subst_coverage,
 mark_class_count: u16,
-mark_array_offset: opentype_layout_mark_lig_pos_mark_array_offset,
+mark_array_offset: opentype_layout_mark_mark_pos_mark1_array_offset,
 ligature_array_offset: opentype_layout_mark_lig_pos_ligature_array_offset
 }
 
 #[derive(Debug, Clone)]
-pub struct opentype_layout_mark_mark_pos_mark2_array_offset_mark2_records {
+pub struct opentype_layout_mark_mark_pos_mark2_array_offset_link_mark2_records {
 mark2_anchor_offsets: Vec<opentype_layout_mark_array_mark_records_mark_anchor_offset>
 }
 
 #[derive(Debug, Clone)]
-pub struct opentype_layout_mark_mark_pos_mark2_array_offset {
+pub struct opentype_layout_mark_mark_pos_mark2_array_offset_link {
 table_start: u32,
 mark2_count: u16,
-mark2_records: Vec<opentype_layout_mark_mark_pos_mark2_array_offset_mark2_records>
+mark2_records: Vec<opentype_layout_mark_mark_pos_mark2_array_offset_link_mark2_records>
+}
+
+#[derive(Debug, Clone)]
+pub struct opentype_layout_mark_mark_pos_mark2_array_offset {
+offset: u16,
+link: Option<opentype_layout_mark_mark_pos_mark2_array_offset_link>
 }
 
 #[derive(Debug, Clone)]
@@ -2349,7 +2355,7 @@ format: u16,
 mark1_coverage_offset: opentype_layout_reverse_chain_single_subst_coverage,
 mark2_coverage_offset: opentype_layout_reverse_chain_single_subst_coverage,
 mark_class_count: u16,
-mark1_array_offset: opentype_layout_mark_array,
+mark1_array_offset: opentype_layout_mark_mark_pos_mark1_array_offset,
 mark2_array_offset: opentype_layout_mark_mark_pos_mark2_array_offset
 }
 
@@ -10343,7 +10349,7 @@ false => {
 None
 }
 }))())?;
-opentype_layout_mark_lig_pos_mark_array_offset { offset, link }
+opentype_layout_mark_mark_pos_mark1_array_offset { offset, link }
 }))())?;
 let base_array_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
@@ -10547,7 +10553,7 @@ false => {
 None
 }
 }))())?;
-opentype_layout_mark_lig_pos_mark_array_offset { offset, link }
+opentype_layout_mark_mark_pos_mark1_array_offset { offset, link }
 }))())?;
 let ligature_array_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
@@ -10766,8 +10772,59 @@ None
 opentype_layout_reverse_chain_single_subst_coverage { offset, link }
 }))())?;
 let mark_class_count = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let mark1_array_offset = ((|| PResult::Ok((Decoder_opentype_layout_mark_array(_input))?))())?;
+let mark1_array_offset = ((|| PResult::Ok({
+let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
+0 => {
+true
+},
+
+_ => {
+false
+}
+} {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+if table_start + (offset as u32) >= __here {
+let tgt_offset = 0u32 + table_start + (offset as u32);
+let _is_advance = _input.advance_or_seek(tgt_offset)?;
+let ret = ((|| PResult::Ok((Decoder_opentype_layout_mark_array(_input))?))())?;
+_input.close_peek_context()?;
+Some(ret)
+} else {
+None
+}
+},
+
+false => {
+None
+}
+}))())?;
+opentype_layout_mark_mark_pos_mark1_array_offset { offset, link }
+}))())?;
 let mark2_array_offset = ((|| PResult::Ok({
+let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
+let link = ((|| PResult::Ok(match !match offset {
+0 => {
+true
+},
+
+_ => {
+false
+}
+} {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+if table_start + (offset as u32) >= __here {
+let tgt_offset = 0u32 + table_start + (offset as u32);
+let _is_advance = _input.advance_or_seek(tgt_offset)?;
+let ret = ((|| PResult::Ok({
 let table_start = ((|| PResult::Ok({
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
@@ -10816,12 +10873,25 @@ opentype_layout_mark_array_mark_records_mark_anchor_offset { offset, link }
 }
 accum
 }))())?;
-opentype_layout_mark_mark_pos_mark2_array_offset_mark2_records { mark2_anchor_offsets }
+opentype_layout_mark_mark_pos_mark2_array_offset_link_mark2_records { mark2_anchor_offsets }
 });
 }
 accum
 }))())?;
-opentype_layout_mark_mark_pos_mark2_array_offset { table_start, mark2_count, mark2_records }
+opentype_layout_mark_mark_pos_mark2_array_offset_link { table_start, mark2_count, mark2_records }
+}))())?;
+_input.close_peek_context()?;
+Some(ret)
+} else {
+None
+}
+},
+
+false => {
+None
+}
+}))())?;
+opentype_layout_mark_mark_pos_mark2_array_offset { offset, link }
 }))())?;
 PResult::Ok(opentype_layout_mark_mark_pos { table_start, format, mark1_coverage_offset, mark2_coverage_offset, mark_class_count, mark1_array_offset, mark2_array_offset })
 }
