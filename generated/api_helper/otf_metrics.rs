@@ -1684,9 +1684,7 @@ impl TryPromote<OpentypeLigatureArray> for LigatureArray {
     fn try_promote(orig: &OpentypeLigatureArray) -> Result<Self, Self::Error> {
         let mut ligature_attach = Vec::with_capacity(orig.ligature_attach_offsets.len());
         for offset in orig.ligature_attach_offsets.iter() {
-            ligature_attach.push(
-                try_promote_from_null(&offset.link)?
-            );
+            ligature_attach.push(try_promote_from_null(&offset.link)?);
         }
         Ok(LigatureArray { ligature_attach })
     }
@@ -1698,13 +1696,16 @@ struct LigatureArray {
     ligature_attach: Vec<LigatureAttach>,
 }
 
-pub type OpentypeLigatureAttach = opentype_layout_mark_lig_pos_ligature_array_offset_link_ligature_attach_offsets_link;
+pub type OpentypeLigatureAttach =
+    opentype_layout_mark_lig_pos_ligature_array_offset_link_ligature_attach_offsets_link;
 
 impl TryPromote<OpentypeLigatureAttach> for LigatureAttach {
     type Error = ReflType<TPErr<OpentypeComponentRecord, ComponentRecord>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeLigatureAttach) -> Result<Self, Self::Error> {
-        Ok(LigatureAttach { component_records: try_promote_vec(&orig.component_records)? })
+        Ok(LigatureAttach {
+            component_records: try_promote_vec(&orig.component_records)?,
+        })
     }
 }
 
@@ -1717,10 +1718,7 @@ struct LigatureAttach {
 pub type OpentypeComponentRecord = opentype_layout_mark_lig_pos_ligature_array_offset_link_ligature_attach_offsets_link_component_records;
 
 impl TryPromote<OpentypeComponentRecord> for ComponentRecord {
-    type Error = ReflType<
-        TPErr<OpentypeAnchorTable, AnchorTable>,
-        UnknownValueError<u16>,
-    >;
+    type Error = ReflType<TPErr<OpentypeAnchorTable, AnchorTable>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeComponentRecord) -> Result<Self, Self::Error> {
         let mut ligature_anchors = Vec::with_capacity(orig.ligature_anchor_offsets.len());
@@ -3797,7 +3795,12 @@ fn format_lookup_subtable(
         LookupSubtable::MarkLigPos(ml_pos) => {
             let contents = {
                 match ml_pos {
-                    MarkLigPos { mark_coverage, ligature_coverage, mark_array, ligature_array } => {
+                    MarkLigPos {
+                        mark_coverage,
+                        ligature_coverage,
+                        mark_array,
+                        ligature_array,
+                    } => {
                         let mut mark_iter = mark_coverage.iter();
                         let mut ligature_iter = ligature_coverage.iter();
                         format!(
@@ -4049,7 +4052,10 @@ fn format_indexed_nullable<T>(
     format!("[{}]", buffer.join(", "))
 }
 
-fn format_ligature_array(ligature_array: &LigatureArray, coverage: &mut impl Iterator<Item = u16>) -> String {
+fn format_ligature_array(
+    ligature_array: &LigatureArray,
+    coverage: &mut impl Iterator<Item = u16>,
+) -> String {
     fn format_ligature_attach(ligature_attach: &LigatureAttach, cov: u16) -> String {
         fn format_component_record(component_record: &ComponentRecord) -> String {
             const CLASS_ANCHOR_BOOKEND: usize = 2;
@@ -4057,14 +4063,15 @@ fn format_ligature_array(ligature_array: &LigatureArray, coverage: &mut impl Ite
                 &component_record.ligature_anchors,
                 |ix, anchor| format!("[{ix}]=>{}", format_anchor_table(anchor)),
                 CLASS_ANCHOR_BOOKEND,
-                |n_skipped, (first, last)| format!(
-                    "...(skipping {n_skipped} indices from {first} to {last})..."
-                )
+                |n_skipped, (first, last)| {
+                    format!("...(skipping {n_skipped} indices from {first} to {last})...")
+                },
             )
         }
 
         const COMPONENTS_BOOKEND: usize = 1;
-        format!("{cov:04x}={}",
+        format!(
+            "{cov:04x}={}",
             format_items_inline(
                 &ligature_attach.component_records,
                 format_component_record,
