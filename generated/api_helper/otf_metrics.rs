@@ -1617,7 +1617,9 @@ impl TryPromote<OpentypeGposLookupSubtable> for LookupSubtable {
             OpentypeGposLookupSubtable::MarkLigPos(ml_pos) => {
                 LookupSubtable::MarkLigPos(MarkLigPos::try_promote(ml_pos)?)
             }
-            OpentypeGposLookupSubtable::MarkMarkPos => LookupSubtable::MarkMarkPos,
+            OpentypeGposLookupSubtable::MarkMarkPos(mm_pos) => {
+                LookupSubtable::MarkMarkPos(MarkMarkPos::try_promote(mm_pos)?)
+            }
             OpentypeGposLookupSubtable::SequenceContext(seq_ctx) => {
                 LookupSubtable::SequenceContext(SequenceContext::promote(seq_ctx))
             }
@@ -1636,7 +1638,7 @@ enum LookupSubtable {
     CursivePos(CursivePos),
     MarkBasePos(MarkBasePos),
     MarkLigPos(MarkLigPos),
-    MarkMarkPos,
+    MarkMarkPos(MarkMarkPos),
     PosExtension,
 
     SequenceContext(SequenceContext),
@@ -1648,6 +1650,70 @@ enum LookupSubtable {
     LigatureSubst(LigatureSubst),
     SubstExtension,
     ReverseChainSingleSubst(ReverseChainSingleSubst),
+}
+
+pub type OpentypeMarkMarkPos = opentype_layout_mark_mark_pos;
+
+impl TryPromote<OpentypeMarkMarkPos> for MarkMarkPos {
+    type Error = ReflType<
+        ReflType<TPErr<OpentypeMarkArray, MarkArray>, TPErr<OpentypeMark2Array, Mark2Array>>,
+        UnknownValueError<u16>,
+    >;
+
+    fn try_promote(orig: &OpentypeMarkMarkPos) -> Result<Self, Self::Error> {
+        Ok(MarkMarkPos {
+            mark1_coverage: CoverageTable::promote(&orig.mark1_coverage_offset.link),
+            mark2_coverage: CoverageTable::promote(&orig.mark2_coverage_offset.link),
+            mark1_array: try_promote_from_null(&orig.mark1_array_offset.link)?,
+            mark2_array: try_promote_from_null(&orig.mark2_array_offset.link)?,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+struct MarkMarkPos {
+    mark1_coverage: CoverageTable,
+    mark2_coverage: CoverageTable,
+    mark1_array: MarkArray,
+    mark2_array: Mark2Array,
+}
+
+pub type OpentypeMark2Array = opentype_layout_mark_mark_pos_mark2_array_offset_link;
+
+impl TryPromote<OpentypeMark2Array> for Mark2Array {
+    type Error = ReflType<TPErr<OpentypeMark2Record, Mark2Record>, UnknownValueError<u16>>;
+
+    fn try_promote(orig: &OpentypeMark2Array) -> Result<Self, Self::Error> {
+        Ok(Mark2Array {
+            mark2_records: try_promote_vec(&orig.mark2_records)?,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+#[repr(transparent)]
+struct Mark2Array {
+    mark2_records: Vec<Mark2Record>,
+}
+
+pub type OpentypeMark2Record = opentype_layout_mark_mark_pos_mark2_array_offset_link_mark2_records;
+
+impl TryPromote<OpentypeMark2Record> for Mark2Record {
+    type Error = ReflType<TPErr<OpentypeAnchorTable, AnchorTable>, UnknownValueError<u16>>;
+
+    fn try_promote(orig: &OpentypeMark2Record) -> Result<Self, Self::Error> {
+        let mut mark2_anchors = Vec::with_capacity(orig.mark2_anchor_offsets.len());
+        for offset in orig.mark2_anchor_offsets.iter() {
+            mark2_anchors.push(try_promote_opt(&offset.link)?);
+        }
+        Ok(Mark2Record { mark2_anchors })
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+#[repr(transparent)]
+struct Mark2Record {
+    mark2_anchors: Vec<Option<AnchorTable>>,
 }
 
 pub type OpentypeMarkLigPos = opentype_layout_mark_lig_pos;
@@ -3815,7 +3881,24 @@ fn format_lookup_subtable(
             };
             ("MarkLigPos", contents)
         }
-        LookupSubtable::MarkMarkPos => ("MarkMarkPos", format!("(..)")),
+        LookupSubtable::MarkMarkPos(mm_pos) => {
+            let contents = {
+                match mm_pos {
+                    MarkMarkPos { mark1_coverage, mark2_coverage, mark1_array, mark2_array } => {
+                        let mut mark1_iter = mark1_coverage.iter();
+                        let mut mark2_iter = mark2_coverage.iter();
+                        format!(
+                            "Mark({})+Mark({})=>MarkArray[{}]+Mark2Array[{}]",
+                            format_coverage_table(mark1_coverage),
+                            format_coverage_table(mark2_coverage),
+                            format_mark_array(mark1_array, &mut mark1_iter),
+                            format_mark2_array(mark2_array, &mut mark2_iter),
+                        )
+                    }
+                }
+            };
+            ("MarkMarkPos", contents)
+        }
         LookupSubtable::PosExtension => ("PosExt", format!("(..)")),
 
         LookupSubtable::SingleSubst(single_subst) => {
@@ -4014,6 +4097,26 @@ fn format_lookup_subtable(
     } else {
         contents
     }
+}
+
+fn format_mark2_array(arr: &Mark2Array, coverage: &mut impl Iterator<Item = u16>) -> String {
+    fn format_mark2_record(mark2_record: &Mark2Record, cov: u16) -> String {
+        const CLASS_ANCHORS: usize = 2;
+        format!("{cov:04x}: {}", format_indexed_nullable(
+            &mark2_record.mark2_anchors,
+            |ix, anchor| format!("[{ix}]=>{}", format_anchor_table(anchor)),
+            CLASS_ANCHORS,
+            |n, (start, end)| format!("...(skipping {n} indices spanning {start}..={end})...",),
+        ))
+    }
+
+    const MARK2_ARRAY_BOOKEND: usize = 2;
+    format_items_inline(
+        &arr.mark2_records,
+        |mark2_record| format_mark2_record(mark2_record, coverage.next().expect("missing coverage")),
+        MARK2_ARRAY_BOOKEND,
+        |n| format!("...(skipping {n} Mark2Records)..."),
+    )
 }
 
 fn format_indexed_nullable<T>(
@@ -5174,7 +5277,7 @@ pub mod lookup_subtable {
                         OpentypeGposLookupSubtable::CursivePos(..) => ret.cursive_pos = true,
                         OpentypeGposLookupSubtable::MarkBasePos(..) => ret.mark_base_pos = true,
                         OpentypeGposLookupSubtable::MarkLigPos(..) => ret.mark_lig_pos = true,
-                        OpentypeGposLookupSubtable::MarkMarkPos => ret.mark_mark_pos = true,
+                        OpentypeGposLookupSubtable::MarkMarkPos(..) => ret.mark_mark_pos = true,
                         OpentypeGposLookupSubtable::PosExtension => ret.pos_extension = true,
                         OpentypeGposLookupSubtable::SequenceContext(..) => {
                             ret.sequence_context.gpos = true
