@@ -3407,14 +3407,15 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ),
                 )])
             };
-            let ligature_attach = |mark_class_count: Expr, table_start: Expr| {
+            let ligature_attach = |mark_class_count: Expr| {
                 record([
+                    ("table_start", pos32()),
                     ("component_count", base.u16be()),
                     (
                         "component_records",
                         repeat_count(
                             var("component_count"),
-                            component_record(mark_class_count, table_start),
+                            component_record(mark_class_count, var("table_start")),
                         ),
                     ),
                 ])
@@ -3429,7 +3430,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                             var("ligature_count"),
                             offset16_mandatory(
                                 var("table_start"),
-                                ligature_attach(mark_class_count, var("table_start")),
+                                ligature_attach(mark_class_count),
                                 base,
                             ),
                         ),
@@ -3470,9 +3471,55 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ),
             )
         };
+        let mark_mark_pos = {
+            let mark2_record = |mark_class_count: Expr, table_start: Expr| {
+                record([(
+                    "mark2_anchor_offsets",
+                    repeat_count(
+                        mark_class_count,
+                        offset16_nullable(table_start, anchor_table.call(), base),
+                    ),
+                )])
+            };
+            let mark2_array = |mark_class_count: Expr| {
+                record([
+                    ("table_start", pos32()),
+                    ("mark2_count", base.u16be()),
+                    (
+                        "mark2_records",
+                        repeat_count(
+                            var("mark2_count"),
+                            mark2_record(mark_class_count, var("table_start")),
+                        ),
+                    ),
+                ])
+            };
+            module.define_format(
+                "opentype.layout.mark_mark_pos",
+                embedded_singleton_alternation(
+                    [("table_start", pos32()), ("format", base.u16be())],
+                    ("format", 1),
+                    [
+                        (
+                            "mark1_coverage_offset",
+                            offset16_mandatory(var("table_start"), coverage_table.call(), base),
+                        ),
+                        (
+                            "mark2_coverage_offset",
+                            offset16_mandatory(var("table_start"), coverage_table.call(), base),
+                        ),
+                        ("mark_class_count", base.u16be()),
+                        ("mark1_array_offset", mark_array.call()),
+                        ("mark2_array_offset", mark2_array(var("mark_class_count"))),
+                    ],
+                    "pos",
+                    "Format1",
+                    NestingKind::FlattenInner,
+                ),
+            )
+        };
 
         let layout_table = |tag: u32| {
-            let mark_mark_pos = /* STUB */ Format::EMPTY;
             // FIXME - this belongs above but because it is a Format and not yet FormatRef, it is not Copy and so has to be defined in the closure body
             let subst_extension = {
                 /* STUB */
@@ -3529,7 +3576,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         (Pattern::U16(3), "CursivePos", cursive_pos.call()),
                                         (Pattern::U16(4), "MarkBasePos", mark_base_pos.call()),
                                         (Pattern::U16(5), "MarkLigPos", mark_lig_pos.call()),
-                                        (Pattern::U16(6), "MarkMarkPos", mark_mark_pos),
+                                        (Pattern::U16(6), "MarkMarkPos", mark_mark_pos.call()),
                                         (
                                             Pattern::U16(7),
                                             "SequenceContext",
