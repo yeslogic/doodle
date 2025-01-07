@@ -3509,8 +3509,18 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                             offset16_mandatory(var("table_start"), coverage_table.call(), base),
                         ),
                         ("mark_class_count", base.u16be()),
-                        ("mark1_array_offset", mark_array.call()),
-                        ("mark2_array_offset", mark2_array(var("mark_class_count"))),
+                        (
+                            "mark1_array_offset",
+                            offset16_mandatory(var("table_start"), mark_array.call(), base),
+                        ),
+                        (
+                            "mark2_array_offset",
+                            offset16_mandatory(
+                                var("table_start"),
+                                mark2_array(var("mark_class_count")),
+                                base,
+                            ),
+                        ),
                     ],
                     "pos",
                     "Format1",
