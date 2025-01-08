@@ -2978,43 +2978,49 @@ impl TryPromote<OpentypeGposLookupTable> for LookupTable {
         let mut subtables = Vec::with_capacity(orig.subtables.len());
         const POS_EXTENSION_LOOKUP_TYPE: u16 = 9;
 
-        if orig.lookup_type == POS_EXTENSION_LOOKUP_TYPE {
-            let mut extension_lookup_type: Option<u16> = None;
-            for (_ix, offset) in orig.subtables.iter().enumerate() {
-                match &offset.link {
-                    None => eprintln!("empty subtable at lookup {_ix}"),
-                    Some(subtable @ OpentypeGposLookupSubtableExt::PosExtension(ext)) => {
-                        if let Some(tmp) = extension_lookup_type.replace(ext.extension_lookup_type)
-                        {
-                            if tmp != ext.extension_lookup_type {
-                                // FIXME - we don't have an error type that makes this easy to fold into the returned error, so we panic for now
-                                let _err = BadExtensionError::InconsistentLookup(
-                                    tmp,
-                                    ext.extension_lookup_type,
-                                );
-                                panic!("{_err}");
+        let lookup_type = match orig.lookup_type {
+            POS_EXTENSION_LOOKUP_TYPE => {
+                let mut extension_lookup_type: Option<u16> = None;
+                for (_ix, offset) in orig.subtables.iter().enumerate() {
+                    match &offset.link {
+                        None => eprintln!("empty subtable at lookup {_ix}"),
+                        Some(subtable @ OpentypeGposLookupSubtableExt::PosExtension(ext)) => {
+                            if let Some(tmp) = extension_lookup_type.replace(ext.extension_lookup_type)
+                            {
+                                if tmp != ext.extension_lookup_type {
+                                    // FIXME - we don't have an error type that makes this easy to fold into the returned error, so we panic for now
+                                    let _err = BadExtensionError::InconsistentLookup(
+                                        tmp,
+                                        ext.extension_lookup_type,
+                                    );
+                                    panic!("{_err}");
+                                }
                             }
+                            subtables.push(LookupSubtable::try_promote(subtable)?);
                         }
-                        subtables.push(LookupSubtable::try_promote(subtable)?);
+                        Some(_other) => unreachable!(
+                            "lookup type is PosExtension, found non-PosExtension subtable: {_other:?}"
+                        ),
                     }
-                    Some(_other) => unreachable!(
-                        "lookup type is PosExtension, found non-PosExtension subtable: {_other:?}"
-                    ),
                 }
-            }
-        } else {
-            for (_ix, offset) in orig.subtables.iter().enumerate() {
-                if let Some(subtable) = try_promote_link(&offset.link)? {
-                    subtables.push(subtable);
-                } else {
-                    // REVIEW - this is not necessary but helps us track whether this case happens
-                    eprintln!("empty subtable at lookup {_ix}");
+                extension_lookup_type.unwrap_or(POS_EXTENSION_LOOKUP_TYPE)
+            },
+            ground_type => {
+                for (_ix, offset) in orig.subtables.iter().enumerate() {
+                    if let Some(subtable) = try_promote_link(&offset.link)? {
+                        subtables.push(subtable);
+                    } else {
+                        // REVIEW - this is not necessary but helps us track whether this case happens
+                        eprintln!("empty subtable at lookup {_ix}");
+                    }
                 }
+                ground_type
             }
-        }
+        };
 
+        // NOTE - the fact that a LookupTable had an Extension lookup type originally is erased
         Ok(LookupTable {
-            lookup_type: orig.lookup_type,
+            lookup_type,
             lookup_flag: orig.lookup_flag,
             subtables,
             mark_filtering_set: orig.mark_filtering_set,
@@ -3032,43 +3038,49 @@ impl TryPromote<OpentypeGsubLookupTable> for LookupTable {
         let mut subtables = Vec::with_capacity(orig.subtables.len());
         const SUBST_EXTENSION_LOOKUP_TYPE: u16 = 7;
 
-        if orig.lookup_type == SUBST_EXTENSION_LOOKUP_TYPE {
-            let mut extension_lookup_type: Option<u16> = None;
-            for (_ix, offset) in orig.subtables.iter().enumerate() {
-                match &offset.link {
-                    None => eprintln!("empty subtable at lookup {_ix}"),
-                    Some(subtable @ OpentypeGsubLookupSubtableExt::SubstExtension(ext)) => {
-                        if let Some(tmp) = extension_lookup_type.replace(ext.extension_lookup_type)
-                        {
-                            if tmp != ext.extension_lookup_type {
-                                // FIXME - we don't have an error type that makes this easy to fold into the returned error, so we panic for now
-                                let _err = BadExtensionError::InconsistentLookup(
-                                    tmp,
-                                    ext.extension_lookup_type,
-                                );
-                                panic!("{_err}");
+        let lookup_type = match orig.lookup_type {
+            SUBST_EXTENSION_LOOKUP_TYPE => {
+                let mut extension_lookup_type: Option<u16> = None;
+                for (_ix, offset) in orig.subtables.iter().enumerate() {
+                    match &offset.link {
+                        None => eprintln!("empty subtable at lookup {_ix}"),
+                        Some(subtable @ OpentypeGsubLookupSubtableExt::SubstExtension(ext)) => {
+                            if let Some(tmp) = extension_lookup_type.replace(ext.extension_lookup_type)
+                            {
+                                if tmp != ext.extension_lookup_type {
+                                    // FIXME - we don't have an error type that makes this easy to fold into the returned error, so we panic for now
+                                    let _err = BadExtensionError::InconsistentLookup(
+                                        tmp,
+                                        ext.extension_lookup_type,
+                                    );
+                                    panic!("{_err}");
+                                }
                             }
+                            subtables.push(LookupSubtable::try_promote(subtable)?);
                         }
-                        subtables.push(LookupSubtable::try_promote(subtable)?);
+                        Some(_other) => unreachable!(
+                            "lookup type is SubstExtension, found non-SubstExtension subtable: {_other:?}"
+                        ),
                     }
-                    Some(_other) => unreachable!(
-                        "lookup type is PosExtension, found non-PosExtension subtable: {_other:?}"
-                    ),
                 }
-            }
-        } else {
-            for (_ix, offset) in orig.subtables.iter().enumerate() {
-                if let Some(subtable) = try_promote_link(&offset.link)? {
-                    subtables.push(subtable);
-                } else {
-                    // REVIEW - this is not necessary but helps us track whether this case happens
-                    eprintln!("empty subtable at lookup {_ix}");
+                extension_lookup_type.unwrap_or(SUBST_EXTENSION_LOOKUP_TYPE)
+            },
+            ground_type => {
+                for (_ix, offset) in orig.subtables.iter().enumerate() {
+                    if let Some(subtable) = try_promote_link(&offset.link)? {
+                        subtables.push(subtable);
+                    } else {
+                        // REVIEW - this is not necessary but helps us track whether this case happens
+                        eprintln!("empty subtable at lookup {_ix}");
+                    }
                 }
+                ground_type
             }
-        }
+        };
 
+        // NOTE - the fact that a LookupTable had an Extension lookup type originally is erased
         Ok(LookupTable {
-            lookup_type: orig.lookup_type,
+            lookup_type,
             lookup_flag: orig.lookup_flag,
             subtables,
             mark_filtering_set: orig.mark_filtering_set,
