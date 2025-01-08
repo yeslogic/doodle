@@ -3004,7 +3004,7 @@ impl TryPromote<OpentypeGposLookupTable> for LookupTable {
                     }
                 }
                 extension_lookup_type.unwrap_or(POS_EXTENSION_LOOKUP_TYPE)
-            },
+            }
             ground_type => {
                 for (_ix, offset) in orig.subtables.iter().enumerate() {
                     if let Some(subtable) = try_promote_link(&offset.link)? {
@@ -3064,7 +3064,7 @@ impl TryPromote<OpentypeGsubLookupTable> for LookupTable {
                     }
                 }
                 extension_lookup_type.unwrap_or(SUBST_EXTENSION_LOOKUP_TYPE)
-            },
+            }
             ground_type => {
                 for (_ix, offset) in orig.subtables.iter().enumerate() {
                     if let Some(subtable) = try_promote_link(&offset.link)? {
@@ -3142,6 +3142,18 @@ impl TryPromote<OpentypeGsubLookupList> for LookupList {
     }
 }
 
+pub type OpentypeFeatureVariations = opentype_layout_feature_variations;
+
+impl Promote<OpentypeFeatureVariations> for FeatureVariations {
+    fn promote(_orig: &OpentypeFeatureVariations) -> FeatureVariations {
+        // STUB - implement proper promotion rules once feature variation type is refined
+        ()
+    }
+}
+
+// STUB - implement proper model-type for FeatureVariations values
+type FeatureVariations = ();
+
 #[derive(Clone, Debug)]
 /// Common API type for summarizing GPOS and GSUB
 struct LayoutMetrics {
@@ -3150,6 +3162,7 @@ struct LayoutMetrics {
     script_list: ScriptList,
     feature_list: FeatureList,
     lookup_list: LookupList,
+    feature_variations: Option<FeatureVariations>,
 }
 
 #[derive(Clone, Debug)]
@@ -3509,6 +3522,11 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
                         script_list: ScriptList::promote(&gpos.script_list.link),
                         feature_list: FeatureList::promote(&gpos.feature_list.link),
                         lookup_list: try_promote_from_null(&gpos.lookup_list.link)?,
+                        feature_variations: gpos
+                            .feature_variations_offset
+                            .as_ref()
+                            .map(|offset| promote_link(&offset.link))
+                            .flatten(),
                     })
                 })
                 .transpose()?
@@ -3523,6 +3541,11 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
                         script_list: ScriptList::promote(&gsub.script_list.link),
                         feature_list: FeatureList::promote(&gsub.feature_list.link),
                         lookup_list: try_promote_from_null(&gsub.lookup_list.link)?,
+                        feature_variations: gsub
+                            .feature_variations_offset
+                            .as_ref()
+                            .map(|offset| promote_link(&offset.link))
+                            .flatten(),
                     })
                 })
                 .transpose()?
@@ -3733,14 +3756,15 @@ fn format_table_disc(disc: TableDiscriminator) -> &'static str {
     }
 }
 
-fn show_layout_metrics(gpos: &Option<LayoutMetrics>, ctxt: Ctxt, conf: &Config) {
+fn show_layout_metrics(layout: &Option<LayoutMetrics>, ctxt: Ctxt, conf: &Config) {
     if let Some(LayoutMetrics {
         major_version,
         minor_version,
         script_list,
         feature_list,
         lookup_list,
-    }) = gpos
+        feature_variations: _feature_variations,
+    }) = layout
     {
         println!(
             "{}: version {}",
