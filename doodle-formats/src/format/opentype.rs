@@ -3635,6 +3635,81 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ),
             )
         };
+        let feature_variations = {
+            let condition_table = embedded_singleton_alternation(
+                [("format", base.u16be())],
+                ("format", 1),
+                [
+                    ("axis_index", base.u16be()),
+                    ("filter_range_min_value", f2dot14(base)),
+                    ("filter_range_max_value", f2dot14(base)),
+                ],
+                "cond",
+                "Format1",
+                NestingKind::FlattenInner,
+            );
+            let condition_set = record([
+                ("table_start", pos32()),
+                ("condition_count", base.u16be()),
+                (
+                    "condition_offsets",
+                    repeat_count(
+                        var("condition_count"),
+                        offset32(var("table_start"), condition_table, base),
+                    ),
+                ),
+            ]);
+            let feature_table_substitution_record = |table_start: Expr| {
+                record([
+                    ("feature_index", base.u16be()),
+                    (
+                        "alternate_feature_offset",
+                        offset32(table_start, feature_table.call(), base),
+                    ),
+                ])
+            };
+            let feature_table_substitution = record([
+                ("table_start", pos32()),
+                ("major_version", expect_u16be(base, 1)),
+                ("minor_version", expect_u16be(base, 0)),
+                ("substitution_count", base.u16be()),
+                (
+                    "substitutions",
+                    repeat_count(
+                        var("substitution_count"),
+                        feature_table_substitution_record(var("table_start")),
+                    ),
+                ),
+            ]);
+            let feature_variation_record = |table_start: Expr| {
+                record([
+                    (
+                        "condition_set_offset",
+                        offset32(table_start.clone(), condition_set, base),
+                    ),
+                    (
+                        "feature_table_substitution_offset",
+                        offset32(table_start, feature_table_substitution, base),
+                    ),
+                ])
+            };
+            module.define_format(
+                "opentype.layout.feature_variations",
+                record([
+                    ("table_start", pos32()),
+                    ("major_version", expect_u16be(base, 1)),
+                    ("minor_version", expect_u16be(base, 0)),
+                    ("feature_variation_record_count", base.u32be()),
+                    (
+                        "feature_variation_records",
+                        repeat_count(
+                            var("feature_variation_record_count"),
+                            feature_variation_record(var("table_start")),
+                        ),
+                    ),
+                ]),
+            )
+        };
 
         let layout_table = |tag: u32| {
             // FIXME - this belongs above but because it is a Format and not yet FormatRef, it is not Copy and so has to be defined in the closure body
@@ -3751,6 +3826,13 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     offset16_mandatory(var("table_start"), lookup_list(tag), base),
                 ),
                 // FIXME - add Version 1.1-specific fields as cond_maybe on minor-version
+                (
+                    "feature_variations_offset",
+                    cond_maybe(
+                        expr_gt(var("minor_version"), Expr::U16(0)), // Since Major == 1 by assertion, minor > 0 implies v1.1 or (as yet unimplemented) greater
+                        offset32(var("table_start"), feature_variations.call(), base),
+                    ),
+                ),
             ])
         };
         // !SECTION
