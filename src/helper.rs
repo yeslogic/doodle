@@ -647,6 +647,30 @@ pub fn where_between(format: Format, lower: Expr, upper: Expr) -> Format {
     where_lambda(format, "x", cond)
 }
 
+/// Numeric validation helper that constrains a given format to yield a value that falls in an abstract range,
+/// represented by a value `range` that a `Bounds` value can be constructed from via an `.into()` call.
+///
+/// Unlike [`where_between`], the range in question need not be closed (i.e. bounded both above and below).
+/// In return, there is a loss of flexibility, as the range must be specified via numeric consts, rather than
+/// arbitrary `Expr` values that are not required to be constants.
+///
+/// However, the complexity of the test will typically be higher for this helper than for [`where_between`];
+/// this is doubly true for closed ranges whose minimum is `0`, in which case [`where_between`] tests a single
+/// integer comparison.
+pub fn where_within<R>(format: Format, range: R) -> Format
+where
+    R: Into<Bounds>,
+{
+    where_lambda(format, "x", is_within(var("x"), range.into()))
+}
+
+pub fn where_within_any<R>(format: Format, ranges: impl IntoIterator<Item = R>) -> Format
+where
+    R: Into<Bounds>,
+{
+    where_lambda(format, "x", is_within_any(var("x"), ranges))
+}
+
 /// Homogenous-format tuple whose elements are all `format`, repeating `count` times
 pub fn tuple_repeat(count: usize, format: Format) -> Format {
     let iter = std::iter::repeat(format).take(count);
@@ -1049,6 +1073,31 @@ pub fn is_within(x: Expr, bounds: Bounds) -> Expr {
             (Pattern::Wildcard, Expr::Bool(false)),
         ],
     )
+}
+
+/// Returns `true` if the value of `x` falls within any of the `Bounds` values constructed from
+/// the items within an iterable container `ranges`.
+///
+/// If `x` is not an integral-typed value, will cause a runtime error when encountered
+/// by the interpreter or compiler.
+///
+/// # Notes
+///
+/// `ranges` may be empty, but this will yield a trivially always-false conditional.
+///
+/// The items within `ranges` may overlap without issue, but typically should be disjoint.
+///
+/// The order in which the items in `ranges` are iterated through does not affect the
+/// semantics, but may affect performance.
+pub fn is_within_any<R>(x: Expr, ranges: impl IntoIterator<Item = R>) -> Expr
+where
+    R: Into<Bounds>,
+{
+    let branches = ranges
+        .into_iter()
+        .map(|r| (Pattern::Int(r.into()), Expr::Bool(true)))
+        .chain(std::iter::once((Pattern::Wildcard, Expr::Bool(false))));
+    expr_match(x, branches)
 }
 
 pub fn with_relative_offset(base_address: Option<Expr>, offset: Expr, format: Format) -> Format {

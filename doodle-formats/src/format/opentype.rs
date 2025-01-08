@@ -3528,15 +3528,116 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ),
             )
         };
+        let ground_pos = {
+            module.define_format_args(
+                "opentype.layout.ground_pos",
+                vec![(Label::from("lookup_type"), ValueType::Base(BaseType::U16))],
+                match_variant(
+                    var("lookup_type"),
+                    [
+                        (Pattern::U16(1), "SinglePos", single_pos.call()),
+                        (Pattern::U16(2), "PairPos", pair_pos.call()),
+                        (Pattern::U16(3), "CursivePos", cursive_pos.call()),
+                        (Pattern::U16(4), "MarkBasePos", mark_base_pos.call()),
+                        (Pattern::U16(5), "MarkLigPos", mark_lig_pos.call()),
+                        (Pattern::U16(6), "MarkMarkPos", mark_mark_pos.call()),
+                        (Pattern::U16(7), "SequenceContext", sequence_context.call()),
+                        (
+                            Pattern::U16(8),
+                            "ChainedSequenceContext",
+                            chained_sequence_context.call(),
+                        ),
+                        (Pattern::U16(9), "NestedExtensionSubtable", Format::Fail),
+                        (Pattern::Wildcard, "UnknownLookupSubtable", Format::Fail),
+                        // NOTE - we omit any catch-alls because they only make belong in the outermost LookupSubtable alternation
+                    ],
+                ),
+            )
+        };
+        let ground_subst = {
+            module.define_format_args(
+                "opentype.layout.ground_subst",
+                vec![(Label::from("lookup_type"), ValueType::Base(BaseType::U16))],
+                match_variant(
+                    var("lookup_type"),
+                    [
+                        (Pattern::U16(1), "SingleSubst", single_subst.call()),
+                        (Pattern::U16(2), "MultipleSubst", multiple_subst.call()),
+                        (Pattern::U16(3), "AlternateSubst", alternate_subst.call()),
+                        (Pattern::U16(4), "LigatureSubst", ligature_subst.call()),
+                        (Pattern::U16(5), "SequenceContext", sequence_context.call()),
+                        (
+                            Pattern::U16(6),
+                            "ChainedSequenceContext",
+                            chained_sequence_context.call(),
+                        ),
+                        (
+                            Pattern::U16(8),
+                            "ReverseChainSingleSubst",
+                            reverse_chain_single_subst.call(),
+                        ),
+                        (Pattern::U16(7), "NestedExtensionSubtable", Format::Fail),
+                        (Pattern::Wildcard, "UnknownLookupSubtable", Format::Fail),
+                    ],
+                ),
+            )
+        };
+
+        let subst_extension = {
+            module.define_format(
+                "opentype.layout.subst_extension",
+                embedded_singleton_alternation(
+                    [("table_start", pos32()), ("format", base.u16be())],
+                    ("format", 1),
+                    [
+                        (
+                            "extension_lookup_type",
+                            where_within_any(base.u16be(), [Bounds::new(1, 6), Bounds::exact(8)]),
+                        ),
+                        (
+                            "extension_offset",
+                            offset32(
+                                var("table_start"),
+                                ground_subst.call_args(vec![var("extension_lookup_type")]),
+                                base,
+                            ),
+                        ),
+                    ],
+                    "subst",
+                    "Format1",
+                    NestingKind::FlattenInner,
+                ),
+            )
+        };
+        let pos_extension = {
+            module.define_format(
+                "opentype.layout.pos_extension",
+                embedded_singleton_alternation(
+                    [("table_start", pos32()), ("format", base.u16be())],
+                    ("format", 1),
+                    [
+                        (
+                            "extension_lookup_type",
+                            where_within(base.u16be(), Bounds::new(1, 8)),
+                        ),
+                        (
+                            "extension_offset",
+                            offset32(
+                                var("table_start"),
+                                ground_pos.call_args(vec![var("extension_lookup_type")]),
+                                base,
+                            ),
+                        ),
+                    ],
+                    "pos",
+                    "Format1",
+                    NestingKind::FlattenInner,
+                ),
+            )
+        };
 
         let layout_table = |tag: u32| {
             // FIXME - this belongs above but because it is a Format and not yet FormatRef, it is not Copy and so has to be defined in the closure body
-            let subst_extension = {
-                /* STUB */
-                Format::EMPTY
-            };
-            let pos_extension = /* STUB */ Format::EMPTY;
-
             let lookup_list = |tag: u32| {
                 let lookup_table = |tag: u32| {
                     // NOTE - tag is a model-external value, lookup-type is model-internal.
@@ -3550,29 +3651,12 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 match_variant(
                                     lookup_type,
                                     [
-                                        // REVIEW - are these variant names too concise?
-                                        (Pattern::U16(1), "SingleSubst", single_subst.call()),
-                                        (Pattern::U16(2), "MultipleSubst", multiple_subst.call()),
-                                        (Pattern::U16(3), "AlternateSubst", alternate_subst.call()),
-                                        (Pattern::U16(4), "LigatureSubst", ligature_subst.call()),
+                                        (Pattern::U16(7), "SubstExtension", subst_extension.call()),
                                         (
-                                            Pattern::U16(5),
-                                            "SequenceContext",
-                                            sequence_context.call(),
+                                            Pattern::Wildcard,
+                                            "GroundSubst",
+                                            ground_subst.call_args(vec![var("lookup_type")]),
                                         ),
-                                        (
-                                            Pattern::U16(6),
-                                            "ChainedSequenceContext",
-                                            chained_sequence_context.call(),
-                                        ),
-                                        (Pattern::U16(7), "SubstExtension", subst_extension),
-                                        (
-                                            Pattern::U16(8),
-                                            "ReverseChainSingleSubst",
-                                            reverse_chain_single_subst.call(),
-                                        ),
-                                        // REVIEW - should this be a hard-fail, or do we want to produce a dummy object instead (possibly with a trace of the value of lookup_type)?
-                                        (Pattern::Wildcard, "UnknownLookupSubtable", Format::Fail),
                                     ],
                                 )
                             }
@@ -3581,25 +3665,12 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 match_variant(
                                     lookup_type,
                                     [
-                                        (Pattern::U16(1), "SinglePos", single_pos.call()),
-                                        (Pattern::U16(2), "PairPos", pair_pos.call()),
-                                        (Pattern::U16(3), "CursivePos", cursive_pos.call()),
-                                        (Pattern::U16(4), "MarkBasePos", mark_base_pos.call()),
-                                        (Pattern::U16(5), "MarkLigPos", mark_lig_pos.call()),
-                                        (Pattern::U16(6), "MarkMarkPos", mark_mark_pos.call()),
+                                        (Pattern::U16(9), "PosExtension", pos_extension.call()),
                                         (
-                                            Pattern::U16(7),
-                                            "SequenceContext",
-                                            sequence_context.call(),
+                                            Pattern::Wildcard,
+                                            "GroundPos",
+                                            ground_pos.call_args(vec![var("lookup_type")]),
                                         ),
-                                        (
-                                            Pattern::U16(8),
-                                            "ChainedSequenceContext",
-                                            chained_sequence_context.call(),
-                                        ),
-                                        (Pattern::U16(9), "PosExtension", pos_extension),
-                                        // REVIEW - should this be a hard-fail, or do we want to produce a dummy object instead (possibly with a trace of the value of lookup_type)?
-                                        (Pattern::Wildcard, "UnknownLookupSubtable", Format::Fail),
                                     ],
                                 )
                             }
