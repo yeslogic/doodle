@@ -1556,13 +1556,67 @@ struct FeatureRecord {
     feature: Link<FeatureTable>,
 }
 
-pub type OpentypeGposLookupSubtable =
+pub type OpentypeGposLookupSubtableExt =
     opentype_gpos_table_lookup_list_link_lookups_link_subtables_link;
-pub type OpentypeGsubLookupSubtable =
+pub type OpentypeGsubLookupSubtableExt =
     opentype_gsub_table_lookup_list_link_lookups_link_subtables_link;
 
+pub type OpentypeSubstExtension = opentype_layout_subst_extension;
+pub type OpentypePosExtension = opentype_layout_pos_extension;
+
+pub type OpentypeGposLookupSubtable = opentype_layout_ground_pos;
+pub type OpentypeGsubLookupSubtable = opentype_layout_ground_subst;
+
+#[derive(Debug)]
+pub enum BadExtensionError {
+    InconsistentLookup(u16, u16),
+}
+
+impl std::fmt::Display for BadExtensionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BadExtensionError::InconsistentLookup(expected, actual) => {
+                write!(f, "layout extension subtable has inconsistent extension_lookup_type (expecting {expected}, found {actual})")
+            }
+        }
+    }
+}
+
+impl std::error::Error for BadExtensionError {}
+
+impl TryPromote<OpentypeGsubLookupSubtableExt> for LookupSubtable {
+    type Error = ReflType<
+        ReflType<
+            TPErr<OpentypeSubstExtension, LookupSubtable>,
+            TPErr<OpentypeGsubLookupSubtable, LookupSubtable>,
+        >,
+        std::convert::Infallible,
+    >;
+
+    fn try_promote(orig: &OpentypeGsubLookupSubtableExt) -> Result<Self, Self::Error> {
+        match orig {
+            OpentypeGsubLookupSubtableExt::GroundSubst(ground) => {
+                LookupSubtable::try_promote(ground)
+            }
+            OpentypeGsubLookupSubtableExt::SubstExtension(ext) => LookupSubtable::try_promote(ext),
+        }
+    }
+}
+
+impl TryPromote<OpentypeSubstExtension> for LookupSubtable {
+    type Error =
+        ReflType<TPErr<OpentypeGsubLookupSubtable, LookupSubtable>, std::convert::Infallible>;
+
+    fn try_promote(orig: &OpentypeSubstExtension) -> Result<Self, Self::Error> {
+        match &orig.extension_offset.link {
+            None => unreachable!("SubstExtension Offset should not be Null"),
+            Some(ground) => LookupSubtable::try_promote(ground),
+        }
+    }
+}
+
 impl TryPromote<OpentypeGsubLookupSubtable> for LookupSubtable {
-    type Error = std::convert::Infallible; // this is only temporarily the case, as we are almost certainly going to have errors in at least on lookup subtable format
+    type Error = Local<std::convert::Infallible>; // this is only temporarily the case, as we are almost certainly going to have errors in at least on lookup subtable format
 
     fn try_promote(orig: &OpentypeGsubLookupSubtable) -> Result<Self, Self::Error> {
         Ok(match orig {
@@ -1584,13 +1638,41 @@ impl TryPromote<OpentypeGsubLookupSubtable> for LookupSubtable {
             OpentypeGsubLookupSubtable::ChainedSequenceContext(chain_ctx) => {
                 LookupSubtable::ChainedSequenceContext(ChainedSequenceContext::promote(chain_ctx))
             }
-            OpentypeGsubLookupSubtable::SubstExtension => LookupSubtable::SubstExtension,
             OpentypeGsubLookupSubtable::ReverseChainSingleSubst(rev_chain_single_subst) => {
                 LookupSubtable::ReverseChainSingleSubst(ReverseChainSingleSubst::promote(
                     rev_chain_single_subst,
                 ))
             }
         })
+    }
+}
+
+impl TryPromote<OpentypeGposLookupSubtableExt> for LookupSubtable {
+    type Error = ReflType<
+        ReflType<
+            TPErr<OpentypeGposLookupSubtable, LookupSubtable>,
+            TPErr<OpentypePosExtension, LookupSubtable>,
+        >,
+        UnknownValueError<u16>,
+    >;
+
+    fn try_promote(orig: &OpentypeGposLookupSubtableExt) -> Result<Self, Self::Error> {
+        match orig {
+            OpentypeGposLookupSubtableExt::PosExtension(ext) => LookupSubtable::try_promote(ext),
+            OpentypeGposLookupSubtableExt::GroundPos(ground) => LookupSubtable::try_promote(ground),
+        }
+    }
+}
+
+impl TryPromote<OpentypePosExtension> for LookupSubtable {
+    type Error =
+        ReflType<TPErr<OpentypeGposLookupSubtable, LookupSubtable>, UnknownValueError<u16>>;
+
+    fn try_promote(orig: &OpentypePosExtension) -> Result<Self, Self::Error> {
+        match &orig.extension_offset.link {
+            None => unreachable!("PosExtension Offset should not be Null"),
+            Some(ground) => LookupSubtable::try_promote(ground),
+        }
     }
 }
 
@@ -1626,7 +1708,6 @@ impl TryPromote<OpentypeGposLookupSubtable> for LookupSubtable {
             OpentypeGposLookupSubtable::ChainedSequenceContext(chain_ctx) => {
                 LookupSubtable::ChainedSequenceContext(ChainedSequenceContext::promote(chain_ctx))
             }
-            OpentypeGposLookupSubtable::PosExtension => LookupSubtable::PosExtension,
         })
     }
 }
@@ -1639,7 +1720,6 @@ enum LookupSubtable {
     MarkBasePos(MarkBasePos),
     MarkLigPos(MarkLigPos),
     MarkMarkPos(MarkMarkPos),
-    PosExtension,
 
     SequenceContext(SequenceContext),
     ChainedSequenceContext(ChainedSequenceContext),
@@ -1648,7 +1728,6 @@ enum LookupSubtable {
     MultipleSubst(MultipleSubst),
     AlternateSubst(AlternateSubst),
     LigatureSubst(LigatureSubst),
-    SubstExtension,
     ReverseChainSingleSubst(ReverseChainSingleSubst),
 }
 
@@ -2897,12 +2976,40 @@ impl TryPromote<OpentypeGposLookupTable> for LookupTable {
 
     fn try_promote(orig: &OpentypeGposLookupTable) -> Result<Self, Self::Error> {
         let mut subtables = Vec::with_capacity(orig.subtables.len());
-        for (_ix, offset) in orig.subtables.iter().enumerate() {
-            if let Some(subtable) = try_promote_link(&offset.link)? {
-                subtables.push(subtable);
-            } else {
-                // REVIEW - this is not necessary but helps us track whether this case happens
-                eprintln!("empty subtable at lookup {_ix}");
+        const POS_EXTENSION_LOOKUP_TYPE: u16 = 9;
+
+        if orig.lookup_type == POS_EXTENSION_LOOKUP_TYPE {
+            let mut extension_lookup_type: Option<u16> = None;
+            for (_ix, offset) in orig.subtables.iter().enumerate() {
+                match &offset.link {
+                    None => eprintln!("empty subtable at lookup {_ix}"),
+                    Some(subtable @ OpentypeGposLookupSubtableExt::PosExtension(ext)) => {
+                        if let Some(tmp) = extension_lookup_type.replace(ext.extension_lookup_type)
+                        {
+                            if tmp != ext.extension_lookup_type {
+                                // FIXME - we don't have an error type that makes this easy to fold into the returned error, so we panic for now
+                                let _err = BadExtensionError::InconsistentLookup(
+                                    tmp,
+                                    ext.extension_lookup_type,
+                                );
+                                panic!("{_err}");
+                            }
+                        }
+                        subtables.push(LookupSubtable::try_promote(subtable)?);
+                    }
+                    Some(_other) => unreachable!(
+                        "lookup type is PosExtension, found non-PosExtension subtable: {_other:?}"
+                    ),
+                }
+            }
+        } else {
+            for (_ix, offset) in orig.subtables.iter().enumerate() {
+                if let Some(subtable) = try_promote_link(&offset.link)? {
+                    subtables.push(subtable);
+                } else {
+                    // REVIEW - this is not necessary but helps us track whether this case happens
+                    eprintln!("empty subtable at lookup {_ix}");
+                }
             }
         }
 
@@ -2918,18 +3025,45 @@ impl TryPromote<OpentypeGposLookupTable> for LookupTable {
 impl TryPromote<OpentypeGsubLookupTable> for LookupTable {
     type Error = ReflType<
         TPErr<OpentypeGsubLookupSubtable, LookupSubtable>,
-        std::convert::Infallible,
-        // may easily become `UnknownValueError<u16>` but infallible for now
+        std::convert::Infallible, // for compatibility with GPOS promotion, can't use BadExtensionError as the error types woudl collide
     >;
 
     fn try_promote(orig: &OpentypeGsubLookupTable) -> Result<Self, Self::Error> {
         let mut subtables = Vec::with_capacity(orig.subtables.len());
-        for (_ix, offset) in orig.subtables.iter().enumerate() {
-            if let Some(subtable) = try_promote_link(&offset.link)? {
-                subtables.push(subtable);
-            } else {
-                // REVIEW - this is not necessary but helps us track whether this case happens
-                eprintln!("empty subtable at lookup {_ix}");
+        const SUBST_EXTENSION_LOOKUP_TYPE: u16 = 7;
+
+        if orig.lookup_type == SUBST_EXTENSION_LOOKUP_TYPE {
+            let mut extension_lookup_type: Option<u16> = None;
+            for (_ix, offset) in orig.subtables.iter().enumerate() {
+                match &offset.link {
+                    None => eprintln!("empty subtable at lookup {_ix}"),
+                    Some(subtable @ OpentypeGsubLookupSubtableExt::SubstExtension(ext)) => {
+                        if let Some(tmp) = extension_lookup_type.replace(ext.extension_lookup_type)
+                        {
+                            if tmp != ext.extension_lookup_type {
+                                // FIXME - we don't have an error type that makes this easy to fold into the returned error, so we panic for now
+                                let _err = BadExtensionError::InconsistentLookup(
+                                    tmp,
+                                    ext.extension_lookup_type,
+                                );
+                                panic!("{_err}");
+                            }
+                        }
+                        subtables.push(LookupSubtable::try_promote(subtable)?);
+                    }
+                    Some(_other) => unreachable!(
+                        "lookup type is PosExtension, found non-PosExtension subtable: {_other:?}"
+                    ),
+                }
+            }
+        } else {
+            for (_ix, offset) in orig.subtables.iter().enumerate() {
+                if let Some(subtable) = try_promote_link(&offset.link)? {
+                    subtables.push(subtable);
+                } else {
+                    // REVIEW - this is not necessary but helps us track whether this case happens
+                    eprintln!("empty subtable at lookup {_ix}");
+                }
             }
         }
 
@@ -3884,7 +4018,12 @@ fn format_lookup_subtable(
         LookupSubtable::MarkMarkPos(mm_pos) => {
             let contents = {
                 match mm_pos {
-                    MarkMarkPos { mark1_coverage, mark2_coverage, mark1_array, mark2_array } => {
+                    MarkMarkPos {
+                        mark1_coverage,
+                        mark2_coverage,
+                        mark1_array,
+                        mark2_array,
+                    } => {
                         let mut mark1_iter = mark1_coverage.iter();
                         let mut mark2_iter = mark2_coverage.iter();
                         format!(
@@ -3899,7 +4038,6 @@ fn format_lookup_subtable(
             };
             ("MarkMarkPos", contents)
         }
-        LookupSubtable::PosExtension => ("PosExt", format!("(..)")),
 
         LookupSubtable::SingleSubst(single_subst) => {
             let contents = match single_subst {
@@ -3950,7 +4088,6 @@ fn format_lookup_subtable(
             };
             ("LigatureSubst", contents)
         }
-        LookupSubtable::SubstExtension => ("SubstExt", format!("(..)")),
         LookupSubtable::ReverseChainSingleSubst(rev_subst) => {
             let contents = match rev_subst {
                 ReverseChainSingleSubst {
@@ -4102,18 +4239,23 @@ fn format_lookup_subtable(
 fn format_mark2_array(arr: &Mark2Array, coverage: &mut impl Iterator<Item = u16>) -> String {
     fn format_mark2_record(mark2_record: &Mark2Record, cov: u16) -> String {
         const CLASS_ANCHORS: usize = 2;
-        format!("{cov:04x}: {}", format_indexed_nullable(
-            &mark2_record.mark2_anchors,
-            |ix, anchor| format!("[{ix}]=>{}", format_anchor_table(anchor)),
-            CLASS_ANCHORS,
-            |n, (start, end)| format!("...(skipping {n} indices spanning {start}..={end})...",),
-        ))
+        format!(
+            "{cov:04x}: {}",
+            format_indexed_nullable(
+                &mark2_record.mark2_anchors,
+                |ix, anchor| format!("[{ix}]=>{}", format_anchor_table(anchor)),
+                CLASS_ANCHORS,
+                |n, (start, end)| format!("...(skipping {n} indices spanning {start}..={end})...",),
+            )
+        )
     }
 
     const MARK2_ARRAY_BOOKEND: usize = 2;
     format_items_inline(
         &arr.mark2_records,
-        |mark2_record| format_mark2_record(mark2_record, coverage.next().expect("missing coverage")),
+        |mark2_record| {
+            format_mark2_record(mark2_record, coverage.next().expect("missing coverage"))
+        },
         MARK2_ARRAY_BOOKEND,
         |n| format!("...(skipping {n} Mark2Records)..."),
     )
@@ -5173,8 +5315,8 @@ fn show_glyph_metric(ix: usize, glyf: &GlyphMetric) {
 
 pub mod lookup_subtable {
     use super::{
-        OpentypeGposLookupSubtable, OpentypeGsubLookupSubtable, Parser, TestResult,
-        UnknownValueError,
+        OpentypeGposLookupSubtable, OpentypeGposLookupSubtableExt, OpentypeGsubLookupSubtable,
+        OpentypeGsubLookupSubtableExt, Parser, TestResult, UnknownValueError,
     };
     use crate::{opentype_main_directory, opentype_ttc_header_header, Decoder_opentype_main};
 
@@ -5271,14 +5413,23 @@ pub mod lookup_subtable {
                         .first()
                         .and_then(|subtable| subtable.link.as_ref())
                 }) {
-                    match subtable {
+                    let ground = match subtable {
+                        OpentypeGposLookupSubtableExt::PosExtension(ext) => {
+                            ret.pos_extension = true;
+                            match &ext.extension_offset.link {
+                                None => unreachable!("missing link"),
+                                Some(ground) => ground,
+                            }
+                        }
+                        OpentypeGposLookupSubtableExt::GroundPos(ground) => ground,
+                    };
+                    match ground {
                         OpentypeGposLookupSubtable::SinglePos(..) => ret.single_pos = true,
                         OpentypeGposLookupSubtable::PairPos(..) => ret.pair_pos = true,
                         OpentypeGposLookupSubtable::CursivePos(..) => ret.cursive_pos = true,
                         OpentypeGposLookupSubtable::MarkBasePos(..) => ret.mark_base_pos = true,
                         OpentypeGposLookupSubtable::MarkLigPos(..) => ret.mark_lig_pos = true,
                         OpentypeGposLookupSubtable::MarkMarkPos(..) => ret.mark_mark_pos = true,
-                        OpentypeGposLookupSubtable::PosExtension => ret.pos_extension = true,
                         OpentypeGposLookupSubtable::SequenceContext(..) => {
                             ret.sequence_context.gpos = true
                         }
@@ -5302,14 +5453,23 @@ pub mod lookup_subtable {
                         .first()
                         .and_then(|subtable| subtable.link.as_ref())
                 }) {
-                    match subtable {
+                    let ground = match subtable {
+                        OpentypeGsubLookupSubtableExt::SubstExtension(ext) => {
+                            ret.subst_extension = true;
+                            match &ext.extension_offset.link {
+                                None => unreachable!("missing link"),
+                                Some(ground) => ground,
+                            }
+                        }
+                        OpentypeGsubLookupSubtableExt::GroundSubst(ground) => ground,
+                    };
+                    match ground {
                         OpentypeGsubLookupSubtable::SingleSubst(..) => ret.single_subst = true,
                         OpentypeGsubLookupSubtable::MultipleSubst(..) => ret.multiple_subst = true,
                         OpentypeGsubLookupSubtable::AlternateSubst(..) => {
                             ret.alternate_subst = true
                         }
                         OpentypeGsubLookupSubtable::LigatureSubst(..) => ret.ligature_subst = true,
-                        OpentypeGsubLookupSubtable::SubstExtension => ret.subst_extension = true,
                         OpentypeGsubLookupSubtable::ReverseChainSingleSubst(..) => {
                             ret.reverse_chain_single_subst = true
                         }
