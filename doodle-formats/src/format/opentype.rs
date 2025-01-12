@@ -1927,13 +1927,6 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ]),
             )
         };
-        let base_table = {
-            module.define_format(
-                "opentype.base_table",
-                // STUB - implement base table
-                Format::EMPTY,
-            )
-        };
 
         // Class Definition Table - https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#class-definition-table
         let class_def = {
@@ -3839,6 +3832,187 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         let gpos_table = module.define_format("opentype.gpos_table", layout_table(magic(b"GPOS")));
         let gsub_table = module.define_format("opentype.gsub_table", layout_table(magic(b"GSUB")));
 
+        let base_table = {
+            let base_coord = module.define_format(
+                "opentype.layout.base_coord",
+                record([
+                    ("table_start", pos32()),
+                    ("format", base.u16be()),
+                    ("coordinate", s16be(base)),
+                    // REVIEW - is "hint" an appropriate name for this extra-fields field?
+                    (
+                        "hint",
+                        match_variant(
+                            var("format"),
+                            [
+                                (Pattern::U16(1), "NoHint", Format::EMPTY),
+                                (
+                                    Pattern::U16(2),
+                                    "GlyphHint",
+                                    record([
+                                        ("reference_glyph", base.u16be()),
+                                        ("base_coord_point", base.u16be()),
+                                    ]),
+                                ),
+                                (
+                                    Pattern::U16(3),
+                                    "DeviceHint",
+                                    record([(
+                                        "device_offset",
+                                        offset16_nullable(
+                                            var("table_start"),
+                                            device_or_variation_index_table.call(),
+                                            base,
+                                        ),
+                                    )]),
+                                ),
+                                (Pattern::Wildcard, "UnknownFormat", Format::Fail),
+                            ],
+                        ),
+                    ),
+                ]),
+            );
+            let feat_min_max = |table_start: Expr| {
+                record([
+                    ("feature_tag", tag.call()),
+                    (
+                        "min_coord_offset",
+                        offset16_nullable(table_start.clone(), base_coord.call(), base),
+                    ),
+                    (
+                        "max_coord_offset",
+                        offset16_nullable(table_start.clone(), base_coord.call(), base),
+                    ),
+                ])
+            };
+            let min_max = module.define_format(
+                "opentype.layout.min_max",
+                record([
+                    ("table_start", pos32()),
+                    (
+                        "min_coord_offset",
+                        offset16_nullable(var("table_start"), base_coord.call(), base),
+                    ),
+                    (
+                        "max_coord_offset",
+                        offset16_nullable(var("table_start"), base_coord.call(), base),
+                    ),
+                    ("feat_min_max_count", base.u16be()),
+                    (
+                        "feat_min_max_records",
+                        repeat_count(var("feat_min_max_count"), feat_min_max(var("table_start"))),
+                    ),
+                ]),
+            );
+            let base_values = module.define_format(
+                "opentype.layout.base_values",
+                record([
+                    ("table_start", pos32()),
+                    ("default_baseline_index", base.u16be()),
+                    ("base_coord_count", base.u16be()), // NOTE - should be equal to baseTagCount in BaseTagList
+                    (
+                        "base_coord_offsets",
+                        repeat_count(
+                            var("base_coord_count"),
+                            offset16_mandatory(var("table_start"), base_coord.call(), base),
+                        ),
+                    ),
+                ]),
+            );
+            let base_lang_sys = |table_start: Expr| {
+                record([
+                    ("base_lang_sys_tag", tag.call()),
+                    (
+                        "min_max_offset",
+                        offset16_mandatory(table_start, min_max.call(), base),
+                    ),
+                ])
+            };
+            let base_script = module.define_format(
+                "opentype.layout.base_script",
+                record([
+                    ("table_start", pos32()),
+                    (
+                        "base_values_offset",
+                        offset16_nullable(var("table_start"), base_values.call(), base),
+                    ),
+                    (
+                        "default_min_max_offset",
+                        offset16_nullable(var("table_start"), min_max.call(), base),
+                    ),
+                    ("base_lang_sys_count", base.u16be()),
+                    (
+                        "base_lang_sys_records",
+                        repeat_count(
+                            var("base_lang_sys_count"),
+                            base_lang_sys(var("table_start")),
+                        ),
+                    ),
+                ]),
+            );
+            let base_script_record = |table_start: Expr| {
+                record([
+                    ("base_script_tag", tag.call()),
+                    (
+                        "base_script_offset",
+                        offset16_mandatory(table_start, base_script.call(), base),
+                    ),
+                ])
+            };
+            let base_script_list = record([
+                ("table_start", pos32()),
+                ("base_script_count", base.u16be()),
+                (
+                    "base_script_records",
+                    repeat_count(
+                        var("base_script_count"),
+                        base_script_record(var("table_start")),
+                    ),
+                ),
+            ]);
+            let base_tag_list = record([
+                ("base_tag_count", base.u16be()),
+                (
+                    "baseline_tags",
+                    repeat_count(var("base_tag_count"), tag.call()),
+                ), // must appear in alphabetical order (not enforced locally)
+            ]);
+            let axis_table = module.define_format(
+                "opentype.layout.axis_table",
+                record([
+                    ("table_start", pos32()),
+                    (
+                        "base_tag_list_offset",
+                        offset16_nullable(var("table_start"), base_tag_list, base),
+                    ),
+                    (
+                        "base_script_list_offset",
+                        offset16_mandatory(var("table_start"), base_script_list, base),
+                    ),
+                ]),
+            );
+            module.define_format(
+                "opentype.base_table",
+                // STUB - implement base table
+                record([
+                    ("table_start", pos32()),
+                    ("major_version", expect_u16be(base, 1)),
+                    (
+                        "minor_version",
+                        where_between(base.u16be(), Expr::U16(0), Expr::U16(1)),
+                    ), // v1.0 and v1.1
+                    (
+                        "horiz_axis_offset",
+                        offset16_nullable(var("table_start"), axis_table.call(), base),
+                    ),
+                    (
+                        "vert_axis_offset",
+                        offset16_nullable(var("table_start"), axis_table.call(), base),
+                    ),
+                    // TODO - add support for v1.1 ItemVariationStore Offset field
+                ]),
+            )
+        };
         module.define_format_args(
             "opentype.table_directory.table_links",
             vec![
