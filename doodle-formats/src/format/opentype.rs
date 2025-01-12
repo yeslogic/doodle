@@ -2122,6 +2122,13 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ),
             )
         };
+        let item_variation_store = {
+            module.define_format(
+                "opentype.common.item_variation_store",
+                // STUB - implement proper format definition for Item Variation Store - [https://learn.microsoft.com/en-us/typography/opentype/spec/otvarcommonformats#item-variation-store]
+                Format::EMPTY,
+            )
+        };
         let gdef_table = {
             // REVIEW - should this be a module definition (to shorten type-name)?
 
@@ -2148,11 +2155,14 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 )])
             };
 
-            let gdef_header_version_1_3 = |_gdef_start_pos: Expr| {
+            let gdef_header_version_1_3 = |gdef_start_pos: Expr| {
                 // TODO - implement Item Variation Store
                 record([
                     // STUB - no implementation for Item Variation Store, so this offset is currently recorded but uninterpreted and unused
-                    ("item_var_store", base.u32be()),
+                    (
+                        "item_var_store",
+                        offset32(gdef_start_pos, item_variation_store.call(), base),
+                    ),
                 ])
             };
 
@@ -4009,7 +4019,13 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         "vert_axis_offset",
                         offset16_nullable(var("table_start"), axis_table.call(), base),
                     ),
-                    // TODO - add support for v1.1 ItemVariationStore Offset field
+                    (
+                        "item_var_store_offset",
+                        cond_maybe(
+                            expr_gt(var("minor_version"), Expr::U16(0)),
+                            offset32(var("table_start"), item_variation_store.call(), base),
+                        ),
+                    ), // TODO - add support for v1.1 ItemVariationStore Offset field
                 ]),
             )
         };
