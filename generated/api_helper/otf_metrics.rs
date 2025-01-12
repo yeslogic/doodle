@@ -1014,7 +1014,15 @@ impl TryPromote<OpentypeMarkGlyphSet> for MarkGlyphSet {
 }
 
 // STUB - this represents the fact that we only record but do not interpret the offset for the ItemVariationStore in the current OpenType implementation
-type ItemVariationStore = u32;
+type ItemVariationStore = ();
+
+// pub type OpentypeItemVariationStore = opentype_common_item_variation_store;
+pub type OpentypeItemVariationStoreOffset = opentype_base_table_item_var_store_offset;
+
+// TODO - Scaffolding to be replaced when ItemVariationStore gets proper implementation
+impl Promote<()> for () {
+    fn promote(_orig: &()) {}
+}
 
 impl TryPromote<OpentypeGdefTableData> for GdefTableDataMetrics {
     type Error = ReflType<TPErr<OpentypeMarkGlyphSet, MarkGlyphSet>, UnknownValueError<u16>>;
@@ -1029,7 +1037,7 @@ impl TryPromote<OpentypeGdefTableData> for GdefTableDataMetrics {
             }
             OpentypeGdefTableData::Version1_3(opentype_gdef_table_data_Version1_3 {
                 item_var_store,
-            }) => GdefTableDataMetrics::ItemVarStore(*item_var_store),
+            }) => GdefTableDataMetrics::ItemVarStore(promote_opt(&item_var_store.link)),
         })
     }
 }
@@ -1038,7 +1046,7 @@ impl TryPromote<OpentypeGdefTableData> for GdefTableDataMetrics {
 enum GdefTableDataMetrics {
     NoData,
     MarkGlyphSetsDef(Option<MarkGlyphSet>),
-    ItemVarStore(ItemVariationStore),
+    ItemVarStore(Option<ItemVariationStore>),
 }
 
 /**
@@ -3776,7 +3784,7 @@ fn show_gdef_metrics(gdef: &Option<GdefMetrics>, conf: &Config) {
     }
 }
 
-fn show_base_metrics(base: &Option<BaseMetrics>, conf: &Config) {
+fn show_base_metrics(base: &Option<BaseMetrics>, _conf: &Config) {
     if let Some(BaseMetrics {
         major_version,
         minor_version,
@@ -4761,8 +4769,11 @@ fn show_mark_glyph_set(mgs: &MarkGlyphSet, conf: &Config) {
     )
 }
 
-fn show_item_variation_store(ivs: &ItemVariationStore) {
-    println!("(UNINTERPRETED: ItemVariationStore @GDEF+{:#0x})", *ivs);
+fn show_item_variation_store(ivs: &Option<ItemVariationStore>) {
+    match ivs {
+        None => println!("<none>"),
+        Some(..) => println!("(ItemVariationStore: <unintepreted>)"),
+    }
 }
 
 fn show_lig_caret_list(lig_caret_list: &LigCaretList, conf: &Config) {
