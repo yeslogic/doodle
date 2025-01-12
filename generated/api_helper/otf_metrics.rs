@@ -1091,8 +1091,10 @@ struct RangeRecord<T> {
 
 type ClassRangeRecord = RangeRecord<GlyphClass>;
 
-impl Promote<opentype_class_def_data_Format2_class_range_records> for ClassRangeRecord {
-    fn promote(orig: &opentype_class_def_data_Format2_class_range_records) -> Self {
+pub type OpentypeClassRangeRecord = opentype_class_def_data_Format2_class_range_records;
+
+impl Promote<OpentypeClassRangeRecord> for ClassRangeRecord {
+    fn promote(orig: &OpentypeClassRangeRecord) -> Self {
         RangeRecord {
             start_glyph_id: orig.start_glyph_id,
             end_glyph_id: orig.end_glyph_id,
@@ -1101,27 +1103,32 @@ impl Promote<opentype_class_def_data_Format2_class_range_records> for ClassRange
     }
 }
 
-impl Promote<opentype_class_def> for ClassDef {
-    fn promote(orig: &opentype_class_def) -> Self {
+pub type OpentypeClassDef = opentype_class_def;
+pub type OpentypeClassDefData = opentype_class_def_data;
+pub type OpentypeClassDefFormat1 = opentype_class_def_data_Format1;
+pub type OpentypeClassDefFormat2 = opentype_class_def_data_Format2;
+
+impl Promote<OpentypeClassDef> for ClassDef {
+    fn promote(orig: &OpentypeClassDef) -> Self {
         Self::promote(&orig.data)
     }
 }
 
-impl Promote<opentype_class_def_data> for ClassDef {
-    fn promote(orig: &opentype_class_def_data) -> Self {
+impl Promote<OpentypeClassDefData> for ClassDef {
+    fn promote(orig: &OpentypeClassDefData) -> Self {
         match orig {
-            &opentype_class_def_data::Format1(opentype_class_def_data_Format1 {
+            &OpentypeClassDefData::Format1(OpentypeClassDefFormat1 {
                 start_glyph_id,
                 ref class_value_array,
                 ..
-            }) => Self::Format1 {
+            }) => ClassDef::Format1 {
                 start_glyph_id,
                 class_value_array: class_value_array.clone(),
             },
-            &opentype_class_def_data::Format2(opentype_class_def_data_Format2 {
+            &OpentypeClassDefData::Format2(OpentypeClassDefFormat2 {
                 ref class_range_records,
                 ..
-            }) => Self::Format2 {
+            }) => ClassDef::Format2 {
                 class_range_records: promote_vec(class_range_records),
             },
         }
@@ -3166,6 +3173,13 @@ struct LayoutMetrics {
 }
 
 #[derive(Clone, Debug)]
+struct BaseMetrics {
+    major_version: u16,
+    minor_version: u16,
+    // STUB - add more fields as desired
+}
+
+#[derive(Clone, Debug)]
 pub struct OptionalTableMetrics {
     cvt: Option<CvtMetrics>,
     fpgm: Option<FpgmMetrics>,
@@ -3174,12 +3188,12 @@ pub struct OptionalTableMetrics {
     prep: Option<PrepMetrics>,
     gasp: Option<GaspMetrics>,
     // STUB - more tables may end up in between these fields as we add support for them in the order in which microsoft lists them
+    base: Option<BaseMetrics>,
     gdef: Option<GdefMetrics>,
     gpos: Option<LayoutMetrics>,
     gsub: Option<LayoutMetrics>,
     // STUB - add more tables as we expand opentype definition
 }
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum TableDiscriminator {
     Gpos,
@@ -3496,6 +3510,17 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
             })
         };
         // STUB - anything before GDEF goes here
+        let base = {
+            let base = &dir.table_links.base;
+            base.as_ref()
+                .map(|base| {
+                    TestResult::Ok(BaseMetrics {
+                        major_version: base.major_version,
+                        minor_version: base.minor_version,
+                    })
+                })
+                .transpose()?
+        };
         let gdef = {
             let gdef = &dir.table_links.gdef;
             gdef.as_ref()
@@ -3558,6 +3583,7 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
             prep,
             gasp,
             // TODO - add more optional tables as they are added to the spec
+            base,
             gdef,
             gpos,
             gsub,
@@ -3584,7 +3610,7 @@ fn is_extra(table_id: &u32) -> bool {
     match &bytes {
         b"cmap" | b"head" | b"hhea" | b"hmtx" | b"maxp" | b"name" | b"OS/2" | b"post" => false,
         b"cvt " | b"fpgm" | b"loca" | b"glyf" | b"prep" | b"gasp" => false,
-        b"GDEF" | b"GPOS" | b"GSUB" => false,
+        b"GDEF" | b"GPOS" | b"GSUB" | b"BASE" => false,
         // FIXME - update with more cases as we handle more table records
         _ => true,
     }
@@ -3679,6 +3705,7 @@ fn show_optional_metrics(optional: &OptionalTableMetrics, conf: &Config) {
     show_prep_metrics(&optional.prep, conf);
     show_gasp_metrics(&optional.gasp, conf);
     // STUB - anything between gasp and gdef go here
+    show_base_metrics(&optional.base, conf);
     show_gdef_metrics(&optional.gdef, conf);
 
     show_layout_metrics(&optional.gpos, Ctxt::from(TableDiscriminator::Gpos), conf);
@@ -3746,6 +3773,20 @@ fn show_gdef_metrics(gdef: &Option<GdefMetrics>, conf: &Config) {
                 GdefTableDataMetrics::ItemVarStore(ivs) => show_item_variation_store(ivs),
             }
         }
+    }
+}
+
+fn show_base_metrics(base: &Option<BaseMetrics>, conf: &Config) {
+    if let Some(BaseMetrics {
+        major_version,
+        minor_version,
+    }) = base
+    {
+        println!(
+            "BASE: version {}",
+            format_version_major_minor(*major_version, *minor_version)
+        )
+        // STUB - add print methods (possibly gated by verbosity levels) as BaseMetrics gets more fields
     }
 }
 
