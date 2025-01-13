@@ -94,6 +94,28 @@ fn embedded_singleton_alternation<const OUTER: usize, const INNER: usize>(
     Format::Record(accum)
 }
 
+/// Local helper for parsing out a 0x8000 flagged u16 value with a value mask of 0x7fff,
+/// into a record with a 'flag' and 'value' field.
+fn hi_flag_u15be(flag_name: &'static str, value_name: &'static str) -> Format {
+    const TMP_NAME: &str = "raw_fields";
+    map(
+        packed_bits_u16([1, 15], [flag_name, value_name]),
+        lambda(
+            TMP_NAME,
+            Expr::Record(vec![
+                (
+                    Label::Borrowed(flag_name),
+                    is_nonzero(record_proj(var(TMP_NAME), flag_name)),
+                ),
+                (
+                    Label::Borrowed(value_name),
+                    record_proj(var(TMP_NAME), value_name),
+                ),
+            ]),
+        ),
+    )
+}
+
 fn prepend_field_flags_bits8(
     pre_field: &'static str,
     pre_format: Format,
@@ -221,6 +243,11 @@ fn s8(base: &BaseModule) -> Format {
 /// FIXME[signedness-hack] - scaffolding to signal intent to use i16 format before it is implemented
 fn s16be(base: &BaseModule) -> Format {
     base.u16be()
+}
+
+/// FIXME[signedness-hack] - scaffolding to signal intent to use i32 format before it is implemented
+fn s32be(base: &BaseModule) -> Format {
+    base.u32be()
 }
 
 /// FIXME[signedness-hack] - scaffolding to signal intent to use i64 format before it is implemented
@@ -2123,10 +2150,97 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             )
         };
         let item_variation_store = {
+            let variation_region_list = {
+                // NOTE - all coordinates should be in range [-1.0, +1.0], and start <= peak <= end; must either all be non-positive or non-negative, or else peak must be 0 for negative start and non-negative end.
+                let region_axis_coordinates =
+                    record_repeat(["start_coord", "peak_coord", "end_coord"], f2dot14(base));
+                let variation_region = |axis_count: Expr| {
+                    record([(
+                        "region_axes",
+                        repeat_count(axis_count, region_axis_coordinates),
+                    )])
+                };
+                record([
+                    ("axis_count", base.u16be()), // NOTE - number of variation axes; should be the same as `axis_cout` in `'fvar'` table
+                    (
+                        "region_count",
+                        where_within(base.u16be(), Bounds::at_most(i16::MAX as usize)),
+                    ),
+                    (
+                        "variation_regions",
+                        repeat_count(var("region_count"), variation_region(var("axis_count"))),
+                    ),
+                ])
+            };
+            let item_variation_data = {
+                let delta_set = |word_delta_count: Expr, region_index_count: Expr| {
+                    record([
+                        // FIXME - due to implementation limits, currently broken into two separate arrays rather than fused together
+                        (
+                            "delta_data_full_word",
+                            repeat_count(
+                                record_proj(word_delta_count.clone(), "word_count"),
+                                if_then_else(
+                                    record_proj(word_delta_count.clone(), "long_words"),
+                                    fmt_variant("Delta32", s32be(base)),
+                                    fmt_variant("Delta16", s16be(base)),
+                                ),
+                            ),
+                        ),
+                        (
+                            "delta_data_half_word",
+                            repeat_count(
+                                sub(
+                                    region_index_count,
+                                    record_proj(word_delta_count.clone(), "word_count"),
+                                ),
+                                if_then_else(
+                                    record_proj(word_delta_count, "long_words"),
+                                    fmt_variant("Delta16", s16be(base)),
+                                    fmt_variant("Delta8", s8(base)),
+                                ),
+                            ),
+                        ),
+                    ])
+                };
+                record([
+                    ("item_count", base.u16be()),
+                    (
+                        "word_delta_count",
+                        hi_flag_u15be("long_words", "word_count"),
+                    ),
+                    ("region_index_count", base.u16be()),
+                    (
+                        "region_indices",
+                        repeat_count(var("region_index_count"), base.u16be()),
+                    ),
+                    (
+                        "delta_sets",
+                        repeat_count(
+                            var("item_count"),
+                            delta_set(var("word_delta_count"), var("region_index_count")),
+                        ),
+                    ),
+                ])
+            };
             module.define_format(
                 "opentype.common.item_variation_store",
-                // STUB - implement proper format definition for Item Variation Store - [https://learn.microsoft.com/en-us/typography/opentype/spec/otvarcommonformats#item-variation-store]
-                Format::EMPTY,
+                record([
+                    ("table_start", pos32()),
+                    ("format", expect_u16be(base, 1)),
+                    (
+                        "variation_region_list_offset",
+                        offset32(var("table_start"), variation_region_list, base),
+                    ),
+                    ("item_variation_data_count", base.u16be()),
+                    (
+                        "item_variation_data_offsets",
+                        repeat_count(
+                            var("item_variation_data_count"),
+                            offset32(var("table_start"), item_variation_data, base),
+                        ),
+                    ),
+                ]),
             )
         };
         let gdef_table = {

@@ -119,6 +119,13 @@ impl Bounds {
         }
     }
 
+    // Returns a `Bounds` value covering all values from `0` to `max_val`.
+    pub const fn at_most(max_val: usize) -> Bounds {
+        let min = 0;
+        let max = Some(max_val);
+        Bounds { min, max }
+    }
+
     /// Returns a `Bounds` whose minimum is the given `min` and with no upper limit.
     pub const fn at_least(min: usize) -> Bounds {
         Bounds { min, max: None }
