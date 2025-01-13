@@ -110,7 +110,8 @@ impl<TypeRep> std::hash::Hash for TypedFormat<TypeRep> {
                 sz.hash(state);
                 inner.hash(state);
             }
-            TypedFormat::WithRelativeOffset(_, ofs, inner) => {
+            TypedFormat::WithRelativeOffset(_, base_addr, ofs, inner) => {
+                base_addr.hash(state);
                 ofs.hash(state);
                 inner.hash(state);
             }
@@ -182,7 +183,12 @@ pub enum TypedFormat<TypeRep> {
     PeekNot(TypeRep, Box<TypedFormat<TypeRep>>),
     Slice(TypeRep, Box<TypedExpr<TypeRep>>, Box<TypedFormat<TypeRep>>),
     Bits(TypeRep, Box<TypedFormat<TypeRep>>),
-    WithRelativeOffset(TypeRep, Box<TypedExpr<TypeRep>>, Box<TypedFormat<TypeRep>>),
+    WithRelativeOffset(
+        TypeRep,
+        Box<TypedExpr<TypeRep>>,
+        Box<TypedExpr<TypeRep>>,
+        Box<TypedFormat<TypeRep>>,
+    ),
     Map(TypeRep, Box<TypedFormat<TypeRep>>, Box<TypedExpr<TypeRep>>),
     Where(TypeRep, Box<TypedFormat<TypeRep>>, Box<TypedExpr<TypeRep>>),
     Compute(TypeRep, Box<TypedExpr<TypeRep>>),
@@ -280,8 +286,8 @@ impl TypedFormat<GenType> {
 
             TypedFormat::Bits(_, f) => f.lookahead_bounds().bits_to_bytes(),
 
-            TypedFormat::WithRelativeOffset(_, offset_expr, inner) => {
-                offset_expr.bounds() + inner.lookahead_bounds()
+            TypedFormat::WithRelativeOffset(_, _base_addr_expr, _offset_expr, _inner) => {
+                Bounds::any()
             }
 
             TypedFormat::Map(_, f, _)
@@ -356,7 +362,7 @@ impl TypedFormat<GenType> {
 
             TypedFormat::Bits(_, f) => f.match_bounds().bits_to_bytes(),
 
-            TypedFormat::WithRelativeOffset(_, _, _) => Bounds::exact(0),
+            TypedFormat::WithRelativeOffset(_, _, _, _) => Bounds::exact(0),
 
             TypedFormat::Map(_, f, _)
             | TypedFormat::Where(_, f, _)
@@ -902,8 +908,8 @@ mod __impls {
                 TypedFormat::PeekNot(_, inner) => Format::PeekNot(rebox(inner)),
                 TypedFormat::Slice(_, sz, inner) => Format::Slice(rebox(sz), rebox(inner)),
                 TypedFormat::Bits(_, inner) => Format::Bits(rebox(inner)),
-                TypedFormat::WithRelativeOffset(_, ofs, inner) => {
-                    Format::WithRelativeOffset(rebox(ofs), rebox(inner))
+                TypedFormat::WithRelativeOffset(_, base_addr, ofs, inner) => {
+                    Format::WithRelativeOffset(rebox(base_addr), rebox(ofs), rebox(inner))
                 }
                 TypedFormat::Map(_, inner, lambda) => Format::Map(rebox(inner), rebox(lambda)),
                 TypedFormat::Where(_, inner, lambda) => Format::Where(rebox(inner), rebox(lambda)),

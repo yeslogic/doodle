@@ -1,5 +1,6 @@
 mod name;
 pub(crate) mod rust_ast;
+mod trace;
 pub(crate) mod typed_decoder;
 pub(crate) mod typed_format;
 use rebind::Rebindable;
@@ -7,6 +8,7 @@ pub use rust_ast::ToFragment;
 
 use crate::{
     byte_set::ByteSet,
+    parser::error::TraceHash,
     typecheck::{TypeChecker, UScope, UVar},
     Arith, BaseType, DynFormat, Expr, Format, FormatModule, IntRel, Label, MatchTree, Pattern,
     UnaryOp, ValueType,
@@ -28,13 +30,26 @@ use self::{
     typed_decoder::{GTCompiler, GTDecoder, TypedDecoder},
     typed_format::TypedDynFormat,
 };
+use trace::get_and_increment_seed;
 
 pub(crate) mod ixlabel;
 pub(crate) use ixlabel::IxLabel;
 
-fn get_trace(state: &impl std::hash::Hash) -> u64 {
+/// Produces a probabilistically unique TraceHash based on the value of a thread-local counter-state
+/// (and post-increments the counter).
+///
+/// In order to produce output values that are more lexically distinct than the initially small
+/// seed-values, performs a hashing operation over the raw seed.
+fn get_trace(_salt: &impl std::hash::Hash) -> TraceHash {
     let mut hasher = std::hash::DefaultHasher::new();
-    state.hash(&mut hasher);
+    let seed = get_and_increment_seed();
+
+    // Because the seed will always be unique, salting is unnecessary in the current model
+    // In a context where we want the seed to remain small, we might re-use it with different
+    // locally-distinct salt values
+
+    // _salt.hash(&mut hasher);
+    seed.hash(&mut hasher);
 
     hasher.finish()
 }
@@ -255,12 +270,12 @@ impl CodeGen {
                     // FIXME - hardcoded path_names version
                     self.name_gen.ctxt.escape();
                 }
-                let rtdef = RustTypeDef::Enum(rt_vars);
-                let (tname, (ix, is_new)) = self.name_gen.get_name(&rtdef);
+                let rt_def = RustTypeDef::Enum(rt_vars);
+                let (tname, (ix, is_new)) = self.name_gen.get_name(&rt_def);
                 if is_new {
-                    self.defined_types.push(rtdef.clone());
+                    self.defined_types.push(rt_def.clone());
                 }
-                GenType::Def((ix, tname), rtdef)
+                GenType::Def((ix, tname), rt_def)
             }
         }
     }
@@ -590,10 +605,11 @@ impl CodeGen {
                 let cl_inner = self.translate(inner.get_dec());
                 CaseLogic::Engine(EngineLogic::Bits(Box::new(cl_inner)))
             }
-            TypedDecoder::WithRelativeOffset(_t, offset, inner) => {
+            TypedDecoder::WithRelativeOffset(_t, base_addr, offset, inner) => {
+                let re_base_addr = embed_expr(base_addr, ExprInfo::Natural);
                 let re_offset = embed_expr(offset, ExprInfo::Natural);
                 let cl_inner = self.translate(inner.get_dec());
-                CaseLogic::Engine(EngineLogic::OffsetPeek(re_offset, Box::new(cl_inner)))
+                CaseLogic::Engine(EngineLogic::OffsetPeek(re_base_addr, re_offset, Box::new(cl_inner)))
             }
         }
     }
@@ -615,7 +631,7 @@ fn embed_pattern_t(pat: &GTPattern) -> RustPattern {
                 RustPattern::Variant(constr, Box::new(inner_pat))
             }
             other => {
-                unreachable!("cannot inline TypedPattern::Variant with abstract gentype: {other:?}")
+                unreachable!("cannot inline TypedPattern::Variant with abstract GenType: {other:?}")
             }
         },
         TypedPattern::Option(gt, inner) => match gt {
@@ -636,7 +652,7 @@ fn embed_pattern_t(pat: &GTPattern) -> RustPattern {
                     None => RustPattern::Option(None),
                 }
             }
-            _ => unreachable!("cannot inline TypedPattern::Option with non-Option gentype: {gt:?}"),
+            _ => unreachable!("cannot inline TypedPattern::Option with non-Option GenType: {gt:?}"),
         },
         TypedPattern::Seq(_t, elts) => {
             RustPattern::ArrayLiteral(elts.iter().map(embed_pattern_t).collect())
@@ -840,7 +856,7 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                 Arith::BoolOr => InfixOperator::BoolOr,
                 Arith::Add => InfixOperator::Add,
                 Arith::Sub => {
-                    alt.replace(RustExpr::local("try_sub!").call_with([x.clone(), y.clone()]));
+                    alt.replace(RustExpr::local("try_sub!").call_with([x.clone(), y.clone(), RustExpr::u64lit(get_trace(&()))]));
                     InfixOperator::Sub
                 }
                 Arith::Mul => InfixOperator::Mul,
@@ -1234,10 +1250,13 @@ pub(crate) enum ClosureKind {
     PairOwnedBorrow,
 }
 
-/// Transcribes a lambda-kinded `GTExpr` into a RustExpr value.
+/// Transcribes `GTExpr::Lambda` instances into RustExpr values.
 ///
-/// When `kind` is `ClosureKind::Predicate`, the resulting RustExpr will be a closure that operates on a reference to its associated argument-type
-/// When `kind` is `ClosureKind::Transform`, the resulting RustExpr will be a closure that operates on an owned value of its associated argument-type
+/// When `kind` is `ClosureKind::Predicate`, the resulting RustExpr will be a closure that operates on a reference to its associated argument-type.
+///
+/// When `kind` is `ClosureKind::Transform`, the resulting RustExpr will be a closure that operates on an owned value of its associated argument-type.
+///
+/// For hybrid `kind`s `PairBorrowOwned` and `PairOwnedBorrow`, the closure in question operates on a tuple with one borrowed and one owned value.
 ///
 /// The `needs_ok` argument controls whether the overall body of the closure expression will be wrapped in `Ok` or not, which depends on whether
 /// there are any short-circuiting code-paths within the embedded lambda body. If `true`, an `Ok(...)` will be produced. Otherwise, the body will be
@@ -1321,14 +1340,7 @@ fn embed_lambda(expr: &GTExpr, kind: ClosureKind, needs_ok: bool, info: ExprInfo
     }
 }
 
-/// Transcribes a lambda-kinded `GTExpr` into a RustExpr value.
-///
-/// When `kind` is `ClosureKind::Predicate`, the resulting RustExpr will be a closure that operates on a reference to its associated argument-type
-/// When `kind` is `ClosureKind::Transform`, the resulting RustExpr will be a closure that operates on an owned value of its associated argument-type
-///
-/// The `needs_ok` argument controls whether the overall body of the closure expression will be wrapped in `Ok` or not, which depends on whether
-/// there are any short-circuiting code-paths within the embedded lambda body. If `true`, an `Ok(...)` will be produced. Otherwise, the body will be
-/// transcribed as-is.
+/// Version of [`embed_lambda`] that uses the implied-default `ExprInfo` argument.
 fn embed_lambda_dft(expr: &GTExpr, kind: ClosureKind, needs_ok: bool) -> RustExpr {
     embed_lambda(expr, kind, needs_ok, ExprInfo::Natural)
 }
@@ -1387,7 +1399,10 @@ impl SimpleLogic<GTExpr> {
             SimpleLogic::Fail => (
                 vec![RustStmt::Return(
                     ReturnKind::Keyword,
-                    RustExpr::err(RustExpr::scoped(["ParseError"], "FailToken")),
+                    RustExpr::err(
+                        RustExpr::scoped(["ParseError"], "FailToken")
+                            .call_with([RustExpr::u64lit(get_trace(&()))]),
+                    ),
                 )],
                 None,
             ),
@@ -1738,7 +1753,8 @@ enum EngineLogic<ExprT> {
     Peek(Box<CaseLogic<ExprT>>),
     Bits(Box<CaseLogic<ExprT>>),
     PeekNot(Box<CaseLogic<ExprT>>),
-    OffsetPeek(RustExpr, Box<CaseLogic<ExprT>>),
+    /// OffsetPeek(BaseAddr, RelOffset, InnerLogic)
+    OffsetPeek(RustExpr, RustExpr, Box<CaseLogic<ExprT>>),
 }
 
 impl<ExprT> ToAst for EngineLogic<ExprT>
@@ -1816,15 +1832,16 @@ where
                 Some(RustExpr::local("ret")),
             ),
 
-            EngineLogic::OffsetPeek(offs, cl_inner) => (
+            EngineLogic::OffsetPeek(base_addr, offs, cl_inner) => (
                 vec![
-                    RustStmt::Expr(
-                        RustExpr::local(ctxt.input_varname.clone())
-                            .call_method("open_peek_context"),
+                    RustStmt::assign(
+                        "tgt_offset",
+                        RustExpr::infix(base_addr.clone(), InfixOperator::Add, offs.clone()),
                     ),
-                    RustStmt::Expr(
+                    RustStmt::assign(
+                        "_is_advance",
                         RustExpr::local(ctxt.input_varname.clone())
-                            .call_method_with("advance_by", [offs.clone()])
+                            .call_method_with("advance_or_seek", [RustExpr::local("tgt_offset")])
                             .wrap_try(),
                     ),
                     RustStmt::assign(
@@ -2119,7 +2136,7 @@ where
 
                 (stmts, Some(RustExpr::local("accum")))
             }
-            RepeatLogic::ConditionTerminal(tpred, elt) => {
+            RepeatLogic::ConditionTerminal(pred_last, elt) => {
                 let mut stmts = Vec::new();
                 let elt_expr = elt.to_ast(ctxt).into();
 
@@ -2131,7 +2148,7 @@ where
                 ));
                 let ctrl = {
                     let elt_bind = RustStmt::assign("elem", elt_expr);
-                    let cond = tpred
+                    let cond = pred_last
                         .clone()
                         .call_with([RustExpr::Borrow(Box::new(RustExpr::local("elem")))])
                         .wrap_try();
@@ -2157,7 +2174,7 @@ where
                 stmts.push(ctrl);
                 (stmts, Some(RustExpr::local("accum")))
             }
-            RepeatLogic::ConditionComplete(cpred, elt) => {
+            RepeatLogic::ConditionComplete(pred_full, elt) => {
                 let mut stmts = Vec::new();
                 let elt_expr = elt.to_ast(ctxt).into();
 
@@ -2171,7 +2188,7 @@ where
                         RustExpr::local("accum")
                             .call_method_with("push", [RustExpr::local("elem")]),
                     );
-                    let cond = cpred
+                    let cond = pred_full
                         .clone()
                         .call_with([RustExpr::Borrow(Box::new(RustExpr::local("accum")))])
                         .wrap_try();
@@ -2561,10 +2578,10 @@ impl ToAst for DerivedLogic<GTExpr> {
 
     fn to_ast(&self, ctxt: ProdCtxt<'_>) -> RustBlock {
         match self {
-            DerivedLogic::Dynamic(dynl, inner_cl) => {
+            DerivedLogic::Dynamic(dyn_logic, inner_cl) => {
                 let (init, last) = inner_cl.to_ast(ctxt);
                 (
-                    Iterator::chain(std::iter::once(dynl.to_ast(ctxt)), init).collect(),
+                    Iterator::chain(std::iter::once(dyn_logic.to_ast(ctxt)), init).collect(),
                     last,
                 )
             }
@@ -2663,7 +2680,10 @@ impl ToAst for DerivedLogic<GTExpr> {
                     )];
                     let b_invalid = vec![RustStmt::Return(
                         ReturnKind::Keyword,
-                        RustExpr::err(RustExpr::scoped(["ParseError"], "FalsifiedWhere")),
+                        RustExpr::err(
+                            RustExpr::scoped(["ParseError"], "FalsifiedWhere")
+                                .call_with([RustExpr::u64lit(get_trace(&()))]),
+                        ),
                     )];
                     RustExpr::Control(Box::new(RustControl::If(
                         cond_valid,
@@ -2676,9 +2696,9 @@ impl ToAst for DerivedLogic<GTExpr> {
             DerivedLogic::Let(name, expr, inner) => {
                 let mut stmts = Vec::new();
                 stmts.push(RustStmt::assign(name.clone(), expr.clone()));
-                let (mut after, retval) = inner.to_ast(ctxt);
+                let (mut after, ret) = inner.to_ast(ctxt);
                 stmts.append(&mut after);
-                (stmts, retval)
+                (stmts, ret)
             }
         }
     }
@@ -2693,49 +2713,52 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
         mut elaborator,
     } = Generator::compile(module, top_format);
     let mut table = elaborator.codegen.name_gen.manifest_renaming_table();
+    // Set of identifiers we have picked as bespoke names for decoder functions based on the type they are parsing (rather than sequentially enumerated)
     let mut fn_renames = BTreeSet::<Label>::new();
-    let mut tdefs = Vec::from_iter(elaborator.codegen.defined_types.iter().map(|tdef| {
+    let mut type_defs = Vec::from_iter(elaborator.codegen.defined_types.iter().map(|type_def| {
         elaborator
             .codegen
             .name_gen
             .rev_map
-            .get_key_value(tdef)
+            .get_key_value(type_def)
             .unwrap()
     }));
-    tdefs.sort_by_key(|(_, (ix, _))| ix);
+    type_defs.sort_by_key(|(_, (ix, _))| ix);
 
-    for (tdef, (_ix, path)) in tdefs.into_iter() {
+    for (type_def, (_ix, path)) in type_defs.into_iter() {
         let name = elaborator
             .codegen
             .name_gen
             .ctxt
             .find_name_for(path)
             .expect("no name found");
-        let traits = if tdef.can_be_copy() {
+        let traits = if type_def.can_be_copy() {
+            // Derive `Copy` if we can statically infer the definition to be compatible with `Copy`
+            // TODO - it might be possible to track which LocalDef items have already been marked Copy, but even that isn't perfect if the def follows its first reference
             TraitSet::DebugCopy
         } else {
             TraitSet::DebugClone
         };
-        let it = RustItem::pub_decl_with_traits(RustDecl::type_def(name, tdef.clone()), traits);
+        let it = RustItem::pub_decl_with_traits(RustDecl::type_def(name, type_def.clone()), traits);
         items.push(it);
     }
 
-    for mut decfn in sourcemap.decoder_skels {
-        decfn.rebind(&table);
-        match &decfn.adhoc_name {
+    for mut decoder_fn in sourcemap.decoder_skels {
+        decoder_fn.rebind(&table);
+        match &decoder_fn.adhoc_name {
             Some(name) => {
                 let replacement_name = Label::from(format!("Decoder_{}", sanitize_label(name)));
                 // If the ideal name already exists, prevent it from being reused
                 if fn_renames.contains(&replacement_name) {
-                    let _ = decfn.adhoc_name.take();
+                    let _ = decoder_fn.adhoc_name.take();
                 } else {
                     fn_renames.insert(replacement_name.clone());
-                    table.insert(decoder_fname(decfn.ixlabel), replacement_name);
+                    table.insert(decoder_fname(decoder_fn.ixlabel), replacement_name);
                 }
             }
             None => (),
         };
-        let func = decfn.to_ast(ProdCtxt::default());
+        let func = decoder_fn.to_ast(ProdCtxt::default());
         items.push(RustItem::from_decl(RustDecl::Function(func)));
     }
 
@@ -2751,6 +2774,7 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
     for attr_string in ["non_camel_case_types", "non_snake_case", "dead_code"].into_iter() {
         content.add_module_attr(ModuleAttr::Allow(AllowAttr::from(Label::from(attr_string))));
     }
+    content.add_module_attr(ModuleAttr::RustFmtSkip);
     content.add_submodule(RustSubmodule::new("codegen_tests"));
     content.add_submodule(RustSubmodule::new_pub("api_helper"));
     content.rebind(&table);
@@ -3024,7 +3048,7 @@ impl<'a> Elaborator<'a> {
     fn elaborate_format_union(
         &mut self,
         branches: &[Format],
-        dyns: &TypedDynScope<'_>,
+        dyn_scope: &TypedDynScope<'_>,
         is_det: bool,
     ) -> GTFormat {
         let index = self.get_and_increment_index();
@@ -3038,7 +3062,7 @@ impl<'a> Elaborator<'a> {
                         .name_gen
                         .ctxt
                         .push_atom(NameAtom::Variant(name.clone()));
-                    let t_inner = self.elaborate_format(inner, dyns);
+                    let t_inner = self.elaborate_format(inner, dyn_scope);
                     self.codegen.name_gen.ctxt.escape();
                     if t_inner.get_type().is_none() {
                         continue;
@@ -3048,7 +3072,7 @@ impl<'a> Elaborator<'a> {
                     t_branches.push(t_branch);
                 }
                 _ => {
-                    let t_branch = self.elaborate_format(branch, dyns);
+                    let t_branch = self.elaborate_format(branch, dyn_scope);
                     t_branches.push(t_branch);
                 }
             }
@@ -3061,7 +3085,7 @@ impl<'a> Elaborator<'a> {
         }
     }
 
-    fn elaborate_format(&mut self, format: &Format, dyns: &TypedDynScope<'_>) -> GTFormat {
+    fn elaborate_format(&mut self, format: &Format, dyn_scope: &TypedDynScope<'_>) -> GTFormat {
         match format {
             Format::ItemVar(level, args) => {
                 self.codegen
@@ -3098,7 +3122,7 @@ impl<'a> Elaborator<'a> {
                 let index = self.get_and_increment_index();
                 let t_expr = self.elaborate_expr(expr);
                 self.increment_index();
-                let t_inner = self.elaborate_format(inner, dyns);
+                let t_inner = self.elaborate_format(inner, dyn_scope);
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::ForEach(gt, Box::new(t_expr), lbl.clone(), Box::new(t_inner))
             }
@@ -3113,7 +3137,7 @@ impl<'a> Elaborator<'a> {
                 let t_expr = self.elaborate_expr(expr);
                 self.codegen.name_gen.ctxt.escape();
 
-                let t_inner = self.elaborate_format(inner, dyns);
+                let t_inner = self.elaborate_format(inner, dyn_scope);
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::DecodeBytes(gt, Box::new(t_expr), Box::new(t_inner))
             }
@@ -3147,7 +3171,7 @@ impl<'a> Elaborator<'a> {
                     .name_gen
                     .ctxt
                     .push_atom(NameAtom::Variant(label.clone()));
-                let t_inner = self.elaborate_format(inner, dyns);
+                let t_inner = self.elaborate_format(inner, dyn_scope);
                 self.codegen.name_gen.ctxt.escape();
                 let gt = self.get_gt_from_index(index);
                 match gt.try_as_adhoc() {
@@ -3164,13 +3188,15 @@ impl<'a> Elaborator<'a> {
                 }
                 TypedFormat::Variant(gt, label.clone(), Box::new(t_inner))
             }
-            Format::Union(branches) => self.elaborate_format_union(branches, dyns, true),
-            Format::UnionNondet(branches) => self.elaborate_format_union(branches, dyns, false),
+            Format::Union(branches) => self.elaborate_format_union(branches, dyn_scope, true),
+            Format::UnionNondet(branches) => {
+                self.elaborate_format_union(branches, dyn_scope, false)
+            }
             Format::Tuple(elts) => {
                 let index = self.get_and_increment_index();
                 let t_elts = match &elts[..] {
                     [] => Vec::new(),
-                    [v] => vec![self.elaborate_format(v, dyns)],
+                    [v] => vec![self.elaborate_format(v, dyn_scope)],
                     elts => {
                         let mut t_elts = Vec::with_capacity(elts.len());
                         self.codegen
@@ -3178,7 +3204,7 @@ impl<'a> Elaborator<'a> {
                             .ctxt
                             .push_atom(NameAtom::Positional(0));
                         for t in elts {
-                            let t_elt = self.elaborate_format(t, dyns);
+                            let t_elt = self.elaborate_format(t, dyn_scope);
                             t_elts.push(t_elt);
                             self.codegen.name_gen.ctxt.increment_index();
                         }
@@ -3197,7 +3223,7 @@ impl<'a> Elaborator<'a> {
                         .name_gen
                         .ctxt
                         .push_atom(NameAtom::RecordField(lbl.clone()));
-                    let t_fld = self.elaborate_format(t, dyns);
+                    let t_fld = self.elaborate_format(t, dyn_scope);
                     t_flds.push((lbl.clone(), t_fld));
                     self.codegen.name_gen.ctxt.escape();
                 }
@@ -3218,20 +3244,20 @@ impl<'a> Elaborator<'a> {
             }
             Format::Repeat(inner) => {
                 let index = self.get_and_increment_index();
-                let t_inner = self.elaborate_format(inner, dyns);
+                let t_inner = self.elaborate_format(inner, dyn_scope);
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::Repeat(gt, Box::new(t_inner))
             }
             Format::Repeat1(inner) => {
                 let index = self.get_and_increment_index();
-                let t_inner = self.elaborate_format(inner, dyns);
+                let t_inner = self.elaborate_format(inner, dyn_scope);
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::Repeat1(gt, Box::new(t_inner))
             }
             Format::RepeatCount(expr, inner) => {
                 let index = self.get_and_increment_index();
                 let t_expr = self.elaborate_expr(expr);
-                let t_inner = self.elaborate_format(inner, dyns);
+                let t_inner = self.elaborate_format(inner, dyn_scope);
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::RepeatCount(gt, Box::new(t_expr), Box::new(t_inner))
             }
@@ -3239,7 +3265,7 @@ impl<'a> Elaborator<'a> {
                 let index = self.get_and_increment_index();
                 let t_min_expr = self.elaborate_expr(min_expr);
                 let t_max_expr = self.elaborate_expr(max_expr);
-                let t_inner = self.elaborate_format(inner, dyns);
+                let t_inner = self.elaborate_format(inner, dyn_scope);
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::RepeatBetween(
                     gt,
@@ -3251,14 +3277,14 @@ impl<'a> Elaborator<'a> {
             Format::RepeatUntilLast(lambda, inner) => {
                 let index = self.get_and_increment_index();
                 let t_lambda = self.elaborate_expr_lambda(lambda);
-                let t_inner = self.elaborate_format(inner, dyns);
+                let t_inner = self.elaborate_format(inner, dyn_scope);
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::RepeatUntilLast(gt, Box::new(t_lambda), Box::new(t_inner))
             }
             Format::RepeatUntilSeq(lambda, inner) => {
                 let index = self.get_and_increment_index();
                 let t_lambda = self.elaborate_expr_lambda(lambda);
-                let t_inner = self.elaborate_format(inner, dyns);
+                let t_inner = self.elaborate_format(inner, dyn_scope);
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::RepeatUntilSeq(gt, Box::new(t_lambda), Box::new(t_inner))
             }
@@ -3267,7 +3293,7 @@ impl<'a> Elaborator<'a> {
                 let t_cond = self.elaborate_expr_lambda(cond);
                 let t_update = self.elaborate_expr_lambda(update);
                 let t_init = self.elaborate_expr(init);
-                let t_inner = self.elaborate_format(inner, dyns);
+                let t_inner = self.elaborate_format(inner, dyn_scope);
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::AccumUntil(
                     gt,
@@ -3285,42 +3311,48 @@ impl<'a> Elaborator<'a> {
                     .name_gen
                     .ctxt
                     .push_atom(NameAtom::Derived(Derivation::Yes));
-                let t_inner = self.elaborate_format(inner, dyns);
+                let t_inner = self.elaborate_format(inner, dyn_scope);
                 self.codegen.name_gen.ctxt.escape();
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::Maybe(gt, Box::new(t_cond), Box::new(t_inner))
             }
             Format::Peek(inner) => {
                 let index = self.get_and_increment_index();
-                let t_inner = self.elaborate_format(inner, dyns);
+                let t_inner = self.elaborate_format(inner, dyn_scope);
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::Peek(gt, Box::new(t_inner))
             }
             Format::PeekNot(inner) => {
                 let index = self.get_and_increment_index();
-                let t_inner = self.elaborate_format(inner, dyns);
+                let t_inner = self.elaborate_format(inner, dyn_scope);
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::PeekNot(gt, Box::new(t_inner))
             }
             Format::Slice(expr, inner) => {
                 let index = self.get_and_increment_index();
                 let t_expr = self.elaborate_expr(expr);
-                let t_inner = self.elaborate_format(inner, dyns);
+                let t_inner = self.elaborate_format(inner, dyn_scope);
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::Slice(gt, Box::new(t_expr), Box::new(t_inner))
             }
             Format::Bits(inner) => {
                 let index = self.get_and_increment_index();
-                let t_inner = self.elaborate_format(inner, dyns);
+                let t_inner = self.elaborate_format(inner, dyn_scope);
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::Bits(gt, Box::new(t_inner))
             }
-            Format::WithRelativeOffset(expr, inner) => {
+            Format::WithRelativeOffset(base_addr, expr, inner) => {
                 let index = self.get_and_increment_index();
+                let t_base_addr = self.elaborate_expr(base_addr);
                 let t_expr = self.elaborate_expr(expr);
-                let t_inner = self.elaborate_format(inner, dyns);
+                let t_inner = self.elaborate_format(inner, dyn_scope);
                 let gt = self.get_gt_from_index(index);
-                TypedFormat::WithRelativeOffset(gt, Box::new(t_expr), Box::new(t_inner))
+                TypedFormat::WithRelativeOffset(
+                    gt,
+                    Box::new(t_base_addr),
+                    Box::new(t_expr),
+                    Box::new(t_inner),
+                )
             }
             Format::Map(inner, lambda) => {
                 // FIXME - adhoc types introduced by Map are not properly path-named
@@ -3329,7 +3361,7 @@ impl<'a> Elaborator<'a> {
                     .name_gen
                     .ctxt
                     .push_atom(NameAtom::Derived(Derivation::Preimage));
-                let t_inner = self.elaborate_format(inner, dyns);
+                let t_inner = self.elaborate_format(inner, dyn_scope);
                 self.codegen.name_gen.ctxt.escape();
                 let t_lambda = self.elaborate_expr_lambda(lambda);
                 let gt = self.get_gt_from_index(index);
@@ -3337,7 +3369,7 @@ impl<'a> Elaborator<'a> {
             }
             Format::Where(inner, lambda) => {
                 let index = self.get_and_increment_index();
-                let t_inner = self.elaborate_format(inner, dyns);
+                let t_inner = self.elaborate_format(inner, dyn_scope);
                 let t_lambda = self.elaborate_expr_lambda(lambda);
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::Where(gt, Box::new(t_inner), Box::new(t_lambda))
@@ -3352,7 +3384,7 @@ impl<'a> Elaborator<'a> {
             Format::Let(lbl, expr, inner) => {
                 let index = self.get_and_increment_index();
                 let t_expr = self.elaborate_expr(expr);
-                let t_inner = self.elaborate_format(inner, dyns);
+                let t_inner = self.elaborate_format(inner, dyn_scope);
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::Let(gt, lbl.clone(), Box::new(t_expr), Box::new(t_inner))
             }
@@ -3369,7 +3401,7 @@ impl<'a> Elaborator<'a> {
                     let t_pat = self.elaborate_pattern(pat);
                     self.codegen.name_gen.ctxt.escape();
 
-                    let t_rhs = self.elaborate_format(rhs, dyns);
+                    let t_rhs = self.elaborate_format(rhs, dyn_scope);
                     t_branches.push((t_pat, t_rhs));
                 }
                 let gt = self.get_gt_from_index(index);
@@ -3378,32 +3410,33 @@ impl<'a> Elaborator<'a> {
             Format::Dynamic(lbl, dynf, inner) => {
                 let index = self.get_and_increment_index();
                 let t_dynf = self.elaborate_dynamic_format(dynf);
-                let newdyns = TypedDynScope::Binding(TypedDynBinding::new(
-                    dyns,
+                let new_dyn_scope = TypedDynScope::Binding(TypedDynBinding::new(
+                    dyn_scope,
                     lbl,
                     Rc::new(t_dynf.clone()),
                 ));
-                let t_inner = self.elaborate_format(inner, &newdyns);
+                let t_inner = self.elaborate_format(inner, &new_dyn_scope);
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::Dynamic(gt, lbl.clone(), t_dynf, Box::new(t_inner))
             }
             Format::Apply(lbl) => {
                 let index = self.get_and_increment_index();
-                let t_dynf = dyns
+                let t_dynf = dyn_scope
                     .get_typed_dynf_by_name(lbl)
                     .unwrap_or_else(|| panic!("missing dynformat {lbl}"));
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::Apply(gt, lbl.clone(), t_dynf)
             }
             Format::LetFormat(f0, name, f) => {
+                // FIXME - adhoc types introduced in LetFormat are not properly path-named
                 let index = self.get_and_increment_index();
                 self.codegen
                     .name_gen
                     .ctxt
                     .push_atom(NameAtom::Derived(Derivation::Preimage));
-                let t_f0 = self.elaborate_format(f0, dyns);
+                let t_f0 = self.elaborate_format(f0, dyn_scope);
                 self.codegen.name_gen.ctxt.escape();
-                let t_f = self.elaborate_format(f, dyns);
+                let t_f = self.elaborate_format(f, dyn_scope);
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::LetFormat(gt, Box::new(t_f0), name.clone(), Box::new(t_f))
             }
@@ -3411,9 +3444,9 @@ impl<'a> Elaborator<'a> {
     }
 
     fn get_gt_from_index(&mut self, index: usize) -> GenType {
-        let uvar = UVar::new(index);
-        let Some(vt) = self.tc.reify(uvar.into()) else {
-            unreachable!("unable to reify {uvar}")
+        let var = UVar::new(index);
+        let Some(vt) = self.tc.reify(var.into()) else {
+            unreachable!("unable to reify {var}")
         };
         self.codegen.lift_type(&vt)
     }
@@ -3812,6 +3845,7 @@ impl<'a> TypedDynScope<'a> {
 mod tests {
     use super::*;
     use crate::helper::compute;
+    use crate::output;
     use crate::{typecheck::Ctxt, TypeHint};
 
     fn population_check(module: &FormatModule, f: &Format, label: Option<&'static str>) {
@@ -3841,20 +3875,18 @@ mod tests {
             "failed population check {} ({} TC vs {} TV)", // on {:?}\n{}\n{}",
             label.unwrap_or_default(),
             tc_pop,
-            tv_pop // dec_f,
-                   // serde_json::ser::to_string(&re_f).unwrap(),
-                   // serde_json::ser::to_string(&f).unwrap()
+            tv_pop,
+            // dec_f,
+            // serde_json::ser::to_string(&re_f).unwrap(),
+            // serde_json::ser::to_string(&f).unwrap()
         );
     }
 
-    fn blit_gencode(module: &FormatModule, f: &Format) -> String {
-        let prefrag = generate_code(module, f);
-        let frag = prefrag.to_fragment();
-        let oput = frag.to_string();
-        oput
+    fn produce_string_gencode(module: &FormatModule, f: &Format) -> String {
+        generate_code(module, f).to_fragment().to_string()
     }
 
-    fn run_popcheck(fs: &[(&'static str, Format)]) {
+    fn run_headcount(fs: &[(&'static str, Format)]) {
         let mut module = FormatModule::new();
         for (name, f) in fs.iter() {
             module.define_format(*name, f.clone());
@@ -3863,49 +3895,49 @@ mod tests {
     }
 
     #[test]
-    fn test_popcheck_simple() {
+    fn test_headcount_simple() {
         let formats = vec![
             ("test.fail", Format::Fail),
             ("test.eoi", Format::EndOfInput),
             ("test.align64", Format::Align(64)),
             ("test.any_byte", Format::Byte(ByteSet::full())),
         ];
-        run_popcheck(&formats);
+        run_headcount(&formats);
     }
 
     #[test]
-    fn test_popcheck_record_simple() {
+    fn test_headcount_record_simple() {
         let f = Format::Record(vec![
             ("any_byte".into(), Format::Byte(ByteSet::full())),
             ("align64".into(), Format::Align(64)),
             ("eoi".into(), Format::EndOfInput),
         ]);
 
-        run_popcheck(&[("record_simple", f)]);
+        run_headcount(&[("record_simple", f)]);
     }
 
     #[test]
-    fn test_popcheck_adt_simple() {
+    fn test_headcount_adt_simple() {
         let f = Format::Union(vec![
             Format::Variant("some".into(), Box::new(Format::Byte(ByteSet::full()))),
             Format::Variant("none".into(), Box::new(Format::EMPTY)),
         ]);
 
-        run_popcheck(&[("adt_simple", f)]);
+        run_headcount(&[("adt_simple", f)]);
     }
 
     #[test]
-    fn test_popcheck_itemvar() {
+    fn test_headcount_item_var() {
         let sub_f = Format::Byte(ByteSet::full());
         let mut module = FormatModule::new();
-        let sub_ref = module.define_format("test.anybyte", sub_f);
+        let sub_ref = module.define_format("test.any_byte", sub_f);
         let f = sub_ref.call();
-        module.define_format("test.call_anybyte", f.clone());
+        module.define_format("test.call_any_byte", f.clone());
         population_check(&module, &f, None);
     }
 
     #[test]
-    fn test_popcheck_compute_simple() {
+    fn test_headcount_compute_simple() {
         let x = Format::Byte(ByteSet::full());
         let fx = compute(Expr::Var("x".into()));
         let gx = compute(Expr::Arith(
@@ -3915,11 +3947,11 @@ mod tests {
         ));
 
         let f = Format::Record(vec![("x".into(), x), ("fx".into(), fx), ("gx".into(), gx)]);
-        run_popcheck(&[("test.compute_simple", f)]);
+        run_headcount(&[("test.compute_simple", f)]);
     }
 
     #[test]
-    fn test_popcheck_compute_complex() {
+    fn test_headcount_compute_complex() {
         let is_null = Expr::Lambda(
             "x".into(),
             Box::new(Expr::IntRel(
@@ -3928,7 +3960,7 @@ mod tests {
                 Box::new(Expr::Var("x".into())),
             )),
         );
-        let ixdup = Expr::Lambda(
+        let ix_dup = Expr::Lambda(
             "acc_x".into(),
             Box::new(Expr::Tuple(vec![
                 Expr::Arith(
@@ -3946,22 +3978,25 @@ mod tests {
         let xs =
             Format::RepeatUntilLast(Box::new(is_null), Box::new(Format::Byte(ByteSet::full())));
         let fxs = compute(Expr::FlatMapAccum(
-            Box::new(ixdup),
+            Box::new(ix_dup),
             Box::new(Expr::U32(1)),
             TypeHint::from(ValueType::Base(BaseType::U32)),
             Box::new(Expr::Var("xs".into())),
         ));
 
         let f = Format::Record(vec![("xs".into(), xs), ("fxs".into(), fxs)]);
-        run_popcheck(&[("test.compute_complex", f)]);
+        run_headcount(&[("test.compute_complex", f)]);
     }
 
     #[test]
-    fn test_codegen_oput() {
-        let f = Format::Compute(Box::new(Expr::Unary(UnaryOp::IntPred, Box::new(Expr::U32(43)))));
+    fn test_codegen_output() {
+        let f = Format::Compute(Box::new(Expr::Unary(
+            UnaryOp::IntPred,
+            Box::new(Expr::U32(43)),
+        )));
         let mut module = FormatModule::new();
-        module.define_format("test.oput", f.clone());
-        let oput = blit_gencode(&module, &f);
-        println!("{}", oput);
+        module.define_format("test.output", f.clone());
+        let output = produce_string_gencode(&module, &f);
+        println!("{}", output);
     }
 }

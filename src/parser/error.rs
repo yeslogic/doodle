@@ -1,20 +1,31 @@
+use std::hash::Hasher as _;
+
 use super::offset::ByteOffset;
 
 pub type PResult<T> = Result<T, ParseError>;
+
+/// Type used to associate an error with a particular source-code location
+pub type TraceHash = u64;
+
+pub(crate) fn mk_trace(value: &impl std::hash::Hash) -> TraceHash {
+    let mut hasher = std::hash::DefaultHasher::new();
+    value.hash(&mut hasher);
+    hasher.finish()
+}
 
 /// General error type for both recoverable and unrecoverable errors encountered during parsing operations
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ParseError {
     /// Explicit `Format::Fail` or any of its derived equivalents
-    FailToken,
+    FailToken(TraceHash),
     /// Validation failure for a Format::Where
-    FalsifiedWhere,
+    FalsifiedWhere(TraceHash),
     /// For Repeat1, RepeatCount, or RepeatUntil*, indicates that an inadequate number of values were read before encountering end-of-buffer or end-of-slice.
     InsufficientRepeats,
     /// Indicates a successful parse within a negated context, as in the case of PeekNot
     NegatedSuccess,
     /// Used for any logical branch without a handler, such as a refuted Expr::Match or MatchTree descent; u64 value is a trace mechanic for determining which error was triggered
-    ExcludedBranch(u64),
+    ExcludedBranch(TraceHash),
     /// Attempted offset-increment would run past the last legal offset of either the overall buffer, or a context-local `Format::Slice`.
     Overrun(OverrunKind),
     /// A `Format::EndOfInput` token occurring anywhere except the final offset of a Slice or the overall buffer.
@@ -22,7 +33,7 @@ pub enum ParseError {
     /// Any unrecoverable error in the state of the Parser itself.
     InternalError(StateError),
     /// An operation performed on values derived via parsing is not sound, mostly due to a bad assumption of the format for what is being parsed
-    UnsoundOperation(Option<&'static str>),
+    UnsoundOperation(Option<&'static str>, TraceHash),
 }
 
 /// Error-kind indicator that distinguishes between different Overrun errors.
@@ -43,10 +54,10 @@ pub enum OverrunKind {
 impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ParseError::FailToken => write!(f, "reached Fail token"),
-            ParseError::UnsoundOperation(Some(mesg)) => write!(f, "attempted unsound operation: {mesg}"),
-            ParseError::UnsoundOperation(None) => write!(f, "attempted unsound operation"),
-            ParseError::FalsifiedWhere => write!(f, "parsed value deemed invalid by Where lambda"),
+            ParseError::FailToken(trace) => write!(f, "reached Fail token (trace-hash: {trace})"),
+            ParseError::UnsoundOperation(Some(mesg), trace) => write!(f, "attempted unsound operation: {mesg} (trace-hash: {trace})"),
+            ParseError::UnsoundOperation(None, trace) => write!(f, "attempted unsound operation (trace-hash: {trace})"),
+            ParseError::FalsifiedWhere(trace) => write!(f, "parsed value deemed invalid by Where lambda (trace-hash: {trace})"),
             ParseError::InsufficientRepeats => write!(
                 f,
                 "failed to find enough format repeats to satisfy requirement"

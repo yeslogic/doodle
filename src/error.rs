@@ -30,6 +30,10 @@ pub enum DecodeError<V: Clone = Value> {
     Overbyte {
         offset: usize,
     },
+    SeekPastEnd {
+        seek_offset: usize,
+        buffer_len: usize,
+    },
     Unexpected {
         found: u8,
         expected: ByteSet,
@@ -73,6 +77,15 @@ impl<V: std::fmt::Debug + Clone> std::fmt::Display for DecodeError<V> {
                 write!(
                     f,
                     "attempt to split {nbytes} bytes ahead at offset {offset} would overrun buffer"
+                )
+            }
+            Self::SeekPastEnd {
+                seek_offset,
+                buffer_len,
+            } => {
+                write!(
+                    f,
+                    "attempt to seek to buffer offset {seek_offset} would overrun buffer (len: {buffer_len})"
                 )
             }
             Self::Overbyte { offset } => {
@@ -158,6 +171,13 @@ impl DecodeError<ParsedValue> {
 impl<V: Clone> DecodeError<V> {
     pub fn trailing(byte: u8, offset: usize) -> Self {
         Self::Trailing { byte, offset }
+    }
+
+    pub fn bad_seek(seek_offset: usize, buffer_len: usize) -> Self {
+        DecodeError::SeekPastEnd {
+            seek_offset,
+            buffer_len,
+        }
     }
 
     pub fn overrun(skip: usize, offset: usize) -> Self {
