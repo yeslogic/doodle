@@ -2158,7 +2158,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             let gdef_header_version_1_3 = |gdef_start_pos: Expr| {
                 // TODO - implement Item Variation Store
                 record([
-                    // STUB - no implementation for Item Variation Store, so this offset is currently recorded but uninterpreted and unused
+                    (
+                        "mark_glyph_sets_def",
+                        offset16_nullable(gdef_start_pos.clone(), mark_glyph_set.call(), base),
+                    ),
                     (
                         "item_var_store",
                         offset32(gdef_start_pos, item_variation_store.call(), base),
@@ -4025,7 +4028,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                             expr_gt(var("minor_version"), Expr::U16(0)),
                             offset32(var("table_start"), item_variation_store.call(), base),
                         ),
-                    ), // TODO - add support for v1.1 ItemVariationStore Offset field
+                    ),
                 ]),
             )
         };
