@@ -1029,24 +1029,35 @@ impl TryPromote<OpentypeGdefTableData> for GdefTableDataMetrics {
 
     fn try_promote(orig: &OpentypeGdefTableData) -> Result<Self, Self::Error> {
         Ok(match orig {
-            OpentypeGdefTableData::Version1_0 => Self::NoData,
+            OpentypeGdefTableData::Version1_0 => Self::default(),
             OpentypeGdefTableData::Version1_2(opentype_gdef_table_data_Version1_2 {
                 mark_glyph_sets_def,
             }) => {
-                GdefTableDataMetrics::MarkGlyphSetsDef(try_promote_opt(&mark_glyph_sets_def.link)?)
+                let mark_glyph_sets_def = try_promote_opt(&mark_glyph_sets_def.link)?;
+                GdefTableDataMetrics {
+                    mark_glyph_sets_def,
+                    item_var_store: None,
+                }
             }
             OpentypeGdefTableData::Version1_3(opentype_gdef_table_data_Version1_3 {
+                mark_glyph_sets_def,
                 item_var_store,
-            }) => GdefTableDataMetrics::ItemVarStore(promote_opt(&item_var_store.link)),
+            }) => {
+                let mark_glyph_sets_def = try_promote_opt(&mark_glyph_sets_def.link)?;
+                let item_var_store = promote_opt(&item_var_store.link);
+                GdefTableDataMetrics {
+                    mark_glyph_sets_def,
+                    item_var_store,
+                }
+            }
         })
     }
 }
 
-#[derive(Clone, Debug)]
-enum GdefTableDataMetrics {
-    NoData,
-    MarkGlyphSetsDef(Option<MarkGlyphSet>),
-    ItemVarStore(Option<ItemVariationStore>),
+#[derive(Clone, Debug, Default)]
+struct GdefTableDataMetrics {
+    mark_glyph_sets_def: Option<MarkGlyphSet>,
+    item_var_store: Option<ItemVariationStore>,
 }
 
 /**
@@ -3772,14 +3783,11 @@ fn show_gdef_metrics(gdef: &Option<GdefMetrics>, conf: &Config) {
             if let Some(mark_attach_class_def) = mark_attach_class_def {
                 show_mark_attach_class_def(mark_attach_class_def, conf);
             }
-            match data {
-                GdefTableDataMetrics::NoData => {}
-                GdefTableDataMetrics::MarkGlyphSetsDef(mark_glyph_set) => match mark_glyph_set {
-                    None => println!("\tMarkGlyphSet: <none>"),
-                    Some(mgs) => show_mark_glyph_set(mgs, conf),
-                },
-                GdefTableDataMetrics::ItemVarStore(ivs) => show_item_variation_store(ivs),
+            match &data.mark_glyph_sets_def {
+                None => println!("\tMarkGlyphSet: <none>"),
+                Some(mgs) => show_mark_glyph_set(mgs, conf),
             }
+            show_item_variation_store(&data.item_var_store)
         }
     }
 }
