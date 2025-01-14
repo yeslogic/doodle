@@ -3787,7 +3787,10 @@ fn show_gdef_metrics(gdef: &Option<GdefMetrics>, conf: &Config) {
                 None => println!("\tMarkGlyphSet: <none>"),
                 Some(mgs) => show_mark_glyph_set(mgs, conf),
             }
-            show_item_variation_store(&data.item_var_store)
+            match &data.item_var_store {
+                None => println!("\tItemVariationStore: <none>"),
+                Some(ivs) => show_item_variation_store(ivs),
+            }
         }
     }
 }
@@ -4777,10 +4780,9 @@ fn show_mark_glyph_set(mgs: &MarkGlyphSet, conf: &Config) {
     )
 }
 
-fn show_item_variation_store(ivs: &Option<ItemVariationStore>) {
+fn show_item_variation_store(ivs: &ItemVariationStore) {
     match ivs {
-        None => println!("<none>"),
-        Some(..) => println!("(ItemVariationStore: <unintepreted>)"),
+        _ => println!("\tItemVariationStore: <unimplemented>"),
     }
 }
 
