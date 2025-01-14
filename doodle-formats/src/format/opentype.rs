@@ -138,6 +138,12 @@ fn last_elem(seq_var: &'static str) -> Expr {
     index_unchecked(var(seq_var), last_ix)
 }
 
+/// Helper function to handle the fact that though vmtx only appears alongside vhea, both are optional tables
+/// so direct record projection is not possible (as vhea will be an option-wrapped record)
+fn vhea_long_metrics(vhea: Expr) -> Expr {
+    record_proj(expr_unwrap(vhea), "number_of_long_metrics")
+}
+
 fn loca_offset_pairs(loca: Expr) -> Expr {
     let f = |loca_table: Expr| {
         flat_map_accum(
@@ -251,6 +257,13 @@ fn expect_u16be(base: &BaseModule, val: u16) -> Format {
     // REVIEW - if we cared to do it, we could use `chain(is_bytes(val.to_be_bytes()), "_", compute(Expr::U16(val)))` (at the cost of worsening error reporting)
     where_lambda(base.u16be(), "x", expr_eq(var("x"), Expr::U16(val)))
 }
+
+/// Parses a `U16Be` value that is expected to be equal to one of `N` values in `vals`
+fn expects_u16be<const N: usize>(base: &BaseModule, vals: [u16; N]) -> Format {
+    where_lambda(base.u16be(), "x", expr_match(var("x"), vals.into_iter().map(|v| (Pattern::U16(v), Expr::Bool(true))).chain(std::iter::once((Pattern::Wildcard, Expr::Bool(false))))))
+}
+
+
 
 /// Constructs a format that peeks the value of a specific field in a given
 /// record (or the common prefix of a union of related records), discarding the
@@ -1077,7 +1090,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 "opentype.hhea_table",
                 record([
                     ("major_version", expect_u16be(base, 1)),
-                    ("minor_version", expect_u16be(base, 0)),
+                    (
+                        "minor_version",
+                        expects_u16be(base, [0x0000, 0x1000]), // NOTE - due to how versions are encoded for hhea/vhea tables v1.1 is `00 01 . 10 00`
+                    ), // FIXME - hhea only has 1.0, but vhea has 1.1 as well, so we compromise by allowing it in both to re-use it properly
                     ("ascent", s16be(base)), // distance from baseline to highest ascender, in font design units
                     ("descent", s16be(base)), // distance from baseline to lowest descender, in font design units
                     ("line_gap", s16be(base)), // intended gap between baselines, in font design units
@@ -1091,10 +1107,13 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ("__reservedX4", tuple_repeat(4, expect_u16be(base, 0))), // NOTE: 4 separate isolated fields in fathom
                     ("metric_data_format", expect_u16be(base, 0)),
                     // number of `long_horizontal_metric` records in the `htmx_table`
-                    ("number_of_long_horizontal_metrics", base.u16be()),
+                    ("number_of_long_metrics", base.u16be()),
                 ]),
             )
         };
+
+        // STUB[horizontal-for-vertical] - this technically works as-is, but certain fields might want to be named differently
+        let vhea_table = hhea_table;
 
         let maxp_table = {
             const NO_Z0: u16 = 1;
@@ -1155,7 +1174,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 "opentype.hmtx_table",
                 vec![
                     (
-                        Label::Borrowed("num_h_metrics"),
+                        Label::Borrowed("num_long_metrics"),
                         ValueType::Base(BaseType::U16),
                     ),
                     (
@@ -1165,16 +1184,19 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ],
                 record([
                     (
-                        "h_metrics",
-                        repeat_count(var("num_h_metrics"), long_horizontal_metric),
+                        "long_metrics",
+                        repeat_count(var("num_long_metrics"), long_horizontal_metric),
                     ),
                     (
-                        "left_side_bearings",
-                        repeat_count(sub(var("num_glyphs"), var("num_h_metrics")), s16be(base)),
+                        "left_side_bearings", // REVIEW - 'top_side_bearings' in vmtx
+                        repeat_count(sub(var("num_glyphs"), var("num_long_metrics")), s16be(base)),
                     ),
                 ]),
             )
         };
+
+        // STUB[horizontal-for-vertical] - this technically works as-is, but certain fields might want to be named differently
+        let vmtx_table = hmtx_table;
 
         let name_table = {
             #[allow(dead_code)]
@@ -4065,7 +4087,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         var("tables"),
                         magic(b"hmtx"),
                         hmtx_table.call_args(vec![
-                            record_proj(var("hhea"), "number_of_long_horizontal_metrics"),
+                            record_proj(var("hhea"), "number_of_long_metrics"),
                             record_proj(var("maxp"), "num_glyphs"),
                         ]),
                     ),
@@ -4155,7 +4177,26 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     optional_table(START_VAR, var("tables"), magic(b"GSUB"), gsub_table.call()),
                 ),
                 // !SECTION
+                // STUB - add more table sections
+                // SECTION - other tables
                 // STUB - add more tables
+                (
+                    "vhea",
+                    optional_table(START_VAR, var("tables"), magic(b"vhea"), vhea_table.call()),
+                ),
+                (
+                    "vmtx",
+                    optional_table(
+                        START_VAR,
+                        var("tables"),
+                        magic(b"vmtx"),
+                        vmtx_table.call_args(vec![
+                            vhea_long_metrics(var("vhea")),
+                            record_proj(var("maxp"), "num_glyphs"),
+                        ]),
+                    ),
+                ),
+                // !SECTION
                 ("__skip", Format::SkipRemainder),
             ]),
         )
