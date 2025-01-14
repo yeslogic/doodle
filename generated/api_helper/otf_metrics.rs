@@ -96,7 +96,13 @@ pub type OpentypeHead = opentype_head_table;
 pub type OpentypeHhea = opentype_hhea_table;
 
 pub type OpentypeHmtx = opentype_hmtx_table;
-pub type OpentypeHmtxHmetric = opentype_hmtx_table_h_metrics;
+pub type OpentypeHmtxLongMetric = opentype_hmtx_table_long_metrics;
+
+// STUB[horizontal-as-vertical] - change to distinguished type names once we have them
+pub type OpentypeVhea = opentype_hhea_table;
+pub type OpentypeVmtx = opentype_hmtx_table;
+pub type OpentypeVmtxLongMetric = opentype_hmtx_table_long_metrics;
+
 
 pub type OpentypeMaxp = opentype_maxp_table;
 pub type OpentypeName = opentype_name_table;
@@ -476,6 +482,14 @@ struct HeadMetrics {
 }
 
 #[derive(Clone, Copy, Debug)]
+enum MaxpMetrics {
+    Postscript { version: u32 }, // version 0.5
+    // STUB - enrich with any further details we care about presenting
+    Version1 { version: u32 },       // version 1.0
+    UnknownVersion { version: u32 }, // anything else
+}
+
+#[derive(Clone, Copy, Debug)]
 // STUB - enrich with any further details we care about presenting
 struct HheaMetrics {
     major_version: u16,
@@ -484,20 +498,24 @@ struct HheaMetrics {
 }
 
 #[derive(Clone, Copy, Debug)]
-enum MaxpMetrics {
-    Postscript { version: u32 }, // version 0.5
-    // STUB - enrich with any further details we care about presenting
-    Version1 { version: u32 },       // version 1.0
-    UnknownVersion { version: u32 }, // anything else
+// STUB - enrich with any further details we care about presenting
+struct VheaMetrics {
+    major_version: u16,
+    minor_version: u16,
+    num_lvm: usize,
 }
 
 #[derive(Clone, Debug)]
-struct HmtxMetrics(Vec<UnifiedHmtxMetric>);
+struct HmtxMetrics(Vec<UnifiedBearing>);
+
+
+#[derive(Clone, Debug)]
+struct VmtxMetrics(Vec<UnifiedBearing>);
 
 #[derive(Copy, Clone, Debug)]
-struct UnifiedHmtxMetric {
-    advance_width: Option<u16>,
-    left_side_bearing: i16,
+struct UnifiedBearing {
+    advance_width: Option<u16>, // FIXME - name is misleading as this also reperesnts 'advance_height' for vmtx
+    left_side_bearing: i16, // FIXME - name is misleading as this also represents 'top_side_bearing' for vmtx
 }
 
 #[derive(Clone, Debug)]
@@ -3212,6 +3230,8 @@ pub struct OptionalTableMetrics {
     gpos: Option<LayoutMetrics>,
     gsub: Option<LayoutMetrics>,
     // STUB - add more tables as we expand opentype definition
+    vhea: Option<VheaMetrics>,
+    vmtx: Option<VmtxMetrics>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum TableDiscriminator {
@@ -3345,7 +3365,7 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
             HheaMetrics {
                 major_version: hhea.major_version,
                 minor_version: hhea.minor_version,
-                num_lhm: hhea.number_of_long_horizontal_metrics as usize,
+                num_lhm: hhea.number_of_long_metrics as usize,
             }
         };
         let maxp = {
@@ -3360,15 +3380,15 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
         let hmtx = {
             let hmtx = &dir.table_links.hmtx;
             let mut accum =
-                Vec::with_capacity(hmtx.h_metrics.len() + hmtx.left_side_bearings.len());
-            for hmet in hmtx.h_metrics.iter() {
-                accum.push(UnifiedHmtxMetric {
+                Vec::with_capacity(hmtx.long_metrics.len() + hmtx.left_side_bearings.len());
+            for hmet in hmtx.long_metrics.iter() {
+                accum.push(UnifiedBearing {
                     advance_width: Some(hmet.advance_width),
                     left_side_bearing: as_s16(hmet.left_side_bearing),
                 });
             }
             for lsb in hmtx.left_side_bearings.iter() {
-                accum.push(UnifiedHmtxMetric {
+                accum.push(UnifiedBearing {
                     advance_width: None,
                     left_side_bearing: as_s16(*lsb),
                 });
@@ -3594,6 +3614,42 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
                 })
                 .transpose()?
         };
+        let vhea = {
+            let vhea = &dir.table_links.vhea;
+            vhea.as_ref()
+                .map(|vhea|
+                    VheaMetrics {
+                        major_version: vhea.major_version,
+                        minor_version: vhea.minor_version >> 12, // we only care about 0 vs 0x1000, so
+                        num_lvm: vhea.number_of_long_metrics as usize,
+                })
+        };
+        let vmtx = {
+            let vmtx = &dir.table_links.vmtx;
+            vmtx.as_ref()
+                .map(|vmtx| {
+                    // FIXME - if name gets changed to top_side_bearings, correct accordingly
+                let mut accum =
+                    Vec::with_capacity(vmtx.long_metrics.len() + vmtx.left_side_bearings.len());
+                for vmet in vmtx.long_metrics.iter() {
+                    accum.push(UnifiedBearing {
+                        advance_width: Some(vmet.advance_width),
+                        // FIXME - if name gets changed to top_side_bearing, correct accordingly
+                        left_side_bearing: as_s16(vmet.left_side_bearing),
+                    });
+                }
+                    // FIXME - if name gets changed to top_side_bearings, correct accordingly
+                for tsb in vmtx.left_side_bearings.iter() {
+                    accum.push(UnifiedBearing {
+                        advance_width: None,
+                        // FIXME - if name gets changed to top_side_bearing, correct accordingly
+                        left_side_bearing: as_s16(*tsb),
+                    });
+                }
+                VmtxMetrics(accum)
+            })
+
+        };
         OptionalTableMetrics {
             cvt,
             fpgm,
@@ -3606,6 +3662,9 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
             gdef,
             gpos,
             gsub,
+            // TODO - add more optional tables as they are added to the spec
+            vhea,
+            vmtx,
         }
     };
     let extraMagic = dir
@@ -3729,6 +3788,9 @@ fn show_optional_metrics(optional: &OptionalTableMetrics, conf: &Config) {
 
     show_layout_metrics(&optional.gpos, Ctxt::from(TableDiscriminator::Gpos), conf);
     show_layout_metrics(&optional.gsub, Ctxt::from(TableDiscriminator::Gsub), conf);
+
+    show_vhea_metrics(&optional.vhea, conf);
+    show_vmtx_metrics(&optional.vmtx, conf)
 }
 
 fn show_cvt_metrics(cvt: &Option<CvtMetrics>, _conf: &Config) {
@@ -5281,8 +5343,18 @@ fn show_hhea_metrics(hhea: &HheaMetrics, _conf: &Config) {
     );
 }
 
+fn show_vhea_metrics(vhea: &Option<VheaMetrics>, _conf: &Config) {
+    if let Some(vhea) = vhea {
+        println!(
+            "vhea: table version {}, {} vertical long metrics",
+            format_version_major_minor(vhea.major_version, vhea.minor_version),
+            vhea.num_lvm,
+        )
+    }
+}
+
 fn show_hmtx_metrics(hmtx: &HmtxMetrics, conf: &Config) {
-    let show_unified = |ix: usize, hmet: &UnifiedHmtxMetric| match &hmet.advance_width {
+    let show_unified = |ix: usize, hmet: &UnifiedBearing| match &hmet.advance_width {
         Some(width) => println!(
             "\tGlyph ID [{ix}]: advanceWidth={width}, lsb={}",
             hmet.left_side_bearing
@@ -5290,11 +5362,32 @@ fn show_hmtx_metrics(hmtx: &HmtxMetrics, conf: &Config) {
         None => println!("\tGlyph ID [{ix}]: lsb={}", hmet.left_side_bearing),
     };
     if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
+        println!("hmtx");
         show_items_elided(&hmtx.0, show_unified, conf.bookend_size, |start, stop| {
             format!("    (skipping hmetrics {start}..{stop})")
         });
     } else {
         println!("hmtx: {} hmetrics", hmtx.0.len())
+    }
+}
+
+fn show_vmtx_metrics(vmtx: &Option<VmtxMetrics>, conf: &Config) {
+    let show_unified = |ix: usize, vmet: &UnifiedBearing| match &vmet.advance_width { // FIXME - `_width` is a misnomer, should be `_height`
+        Some(height) => println!(
+            "\tGlyph ID [{ix}]: advanceHeight={height}, tsb={}",
+            vmet.left_side_bearing // FIXME - `left` is a misnomer, should be `top`
+        ),
+        None => println!("\tGlyph ID [{ix}]: tsb={}", vmet.left_side_bearing), // FIXME - `left` is a misnomer, should be `top`
+    };
+    if let Some(vmtx) = vmtx {
+        if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
+            println!("vmtx");
+            show_items_elided(&vmtx.0, show_unified, conf.bookend_size, |start, stop| {
+                format!("    (skipping vmetrics {start}..{stop})")
+            });
+        } else {
+            println!("vmtx: {} vmetrics", vmtx.0.len())
+        }
     }
 }
 
