@@ -4149,26 +4149,27 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ])
                 };
                 // !SECTION
-                slice_record(
-                    "length",
-                    [
-                        ("version", expect_u16be(base, 0)),
-                        ("length", base.u16be()),
-                        ("coverage", kern_cov_flags),
-                        (
-                            "data",
-                            match_variant(
-                                record_proj(var("coverage"), "format"),
-                                [
-                                    (Pattern::U8(0), "Format0", kern_subtable_format0),
-                                    (Pattern::U8(2), "Format2", kern_subtable_format2),
-                                    // REVIEW - do we even want to bother with an explicit catch-all failure branch?
-                                    (Pattern::Wildcard, "UnknownFormat", Format::Fail),
-                                ],
-                            ),
+                /* Previously defined as a slice_record but sufficiently large `n_pairs` values for Format0
+                 * could cause length to wrap around mod 65536 and lead to slice boundary violation
+                 * while reading `kern_pairs`
+                 */
+                record([
+                    ("version", expect_u16be(base, 0)),
+                    ("length", base.u16be()), // NOTE - Cannot be trusted as overflow exists in the wild
+                    ("coverage", kern_cov_flags),
+                    (
+                        "data",
+                        match_variant(
+                            record_proj(var("coverage"), "format"),
+                            [
+                                (Pattern::U8(0), "Format0", kern_subtable_format0),
+                                (Pattern::U8(2), "Format2", kern_subtable_format2),
+                                // REVIEW - do we even want to bother with an explicit catch-all failure branch?
+                                (Pattern::Wildcard, "UnknownFormat", Format::Fail),
+                            ],
                         ),
-                    ],
-                )
+                    ),
+                ])
             };
             module.define_format(
                 "opentype.kern_table",

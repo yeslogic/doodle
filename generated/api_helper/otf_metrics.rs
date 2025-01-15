@@ -3214,6 +3214,187 @@ struct BaseMetrics {
     // STUB - add more fields as desired
 }
 
+pub type OpentypeKernCoverage = opentype_kern_table_subtables_coverage;
+
+impl Promote<OpentypeKernCoverage> for KernFlags {
+    fn promote(orig: &OpentypeKernCoverage) -> Self {
+        KernFlags {
+            r#override: orig.r#override,
+            cross_stream: orig.cross_stream,
+            minimum: orig.minimum,
+            horizontal: orig.horizontal,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct KernFlags {
+    r#override: bool,
+    cross_stream: bool,
+    minimum: bool,
+    horizontal: bool,
+}
+
+pub type OpentypeKernSubtable = opentype_kern_table_subtables;
+
+impl Promote<OpentypeKernSubtable> for KernSubtable {
+    fn promote(orig: &OpentypeKernSubtable) -> Self {
+        let flags = KernFlags::promote(&orig.coverage);
+        let data = KernSubtableData::promote(&orig.data);
+        KernSubtable { flags, data }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct KernSubtable {
+    flags: KernFlags,
+    data: KernSubtableData,
+}
+
+pub type OpentypeKernPair = opentype_kern_table_subtables_data_Format0_kern_pairs;
+
+impl Promote<OpentypeKernPair> for KernPair {
+    fn promote(orig: &OpentypeKernPair) -> Self {
+        KernPair {
+            left: orig.left,
+            right: orig.right,
+            value: as_s16(orig.value),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Copy)]
+struct KernPair {
+    left: u16,
+    right: u16,
+    value: i16,
+}
+
+impl PartialEq for KernPair {
+    fn eq(&self, other: &Self) -> bool {
+        self.left == other.left && self.right == other.right
+    }
+}
+
+impl Eq for KernPair {}
+
+impl PartialOrd for KernPair {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        let this_key = ((self.left as u32) << 16) & (self.right as u32);
+        let other_key = ((other.left as u32) << 16) & (other.right as u32);
+        this_key.partial_cmp(&other_key)
+    }
+}
+
+impl Ord for KernPair {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        let this_key = ((self.left as u32) << 16) & (self.right as u32);
+        let other_key = ((other.left as u32) << 16) & (other.right as u32);
+        this_key.cmp(&other_key)
+    }
+}
+
+pub type OpentypeKernSubtableFormat0 = opentype_kern_table_subtables_data_Format0;
+
+impl Promote<OpentypeKernSubtableFormat0> for KernSubtableFormat0 {
+    fn promote(orig: &OpentypeKernSubtableFormat0) -> Self {
+        KernSubtableFormat0 {
+            kern_pairs: promote_vec(&orig.kern_pairs),
+        }
+    }
+}
+#[derive(Clone, Debug)]
+#[repr(transparent)]
+struct KernSubtableFormat0 {
+    // REVIEW - is Vec the most apt container-type given that we know the array is sorted by left-right key?
+    kern_pairs: Vec<KernPair>,
+}
+
+pub type OpentypeKernSubtableFormat2 = opentype_kern_table_subtables_data_Format2;
+
+impl Promote<OpentypeKernSubtableFormat2> for KernSubtableFormat2 {
+    fn promote(orig: &OpentypeKernSubtableFormat2) -> Self {
+        KernSubtableFormat2 {
+            left_class: promote_link(&orig.left_class_offset.link),
+            right_class: promote_link(&orig.right_class_offset.link),
+            kerning_array: promote_link(&orig.kerning_array_offset.link),
+        }
+    }
+}
+
+impl Promote<Vec<Vec<u16>>> for KerningArray {
+    fn promote(orig: &Vec<Vec<u16>>) -> Self {
+        KerningArray(promote_vec(orig))
+    }
+}
+
+#[derive(Clone, Debug)]
+#[repr(transparent)]
+struct KerningArray(Vec<KerningRow>);
+
+impl Promote<Vec<u16>> for KerningRow {
+    fn promote(orig: &Vec<u16>) -> Self {
+        KerningRow(orig.iter().map(|u| as_s16(*u)).collect())
+    }
+}
+
+#[derive(Clone, Debug)]
+#[repr(transparent)]
+struct KerningRow(Vec<i16>);
+
+#[derive(Debug, Clone)]
+struct KernSubtableFormat2 {
+    left_class: Link<KernClassTable>,
+    right_class: Link<KernClassTable>,
+    kerning_array: Link<KerningArray>,
+}
+
+pub type OpentypeKernClassTable = opentype_kern_table_subtables_data_Format2_left_class_offset_link;
+
+impl Promote<OpentypeKernClassTable> for KernClassTable {
+    fn promote(orig: &OpentypeKernClassTable) -> Self {
+        KernClassTable {
+            first_glyph: orig.first_glyph,
+            n_glyphs: orig.n_glyphs,
+            class_values: orig.class_values.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct KernClassTable {
+    first_glyph: u16,
+    n_glyphs: u16,
+    class_values: Vec<u16>,
+}
+
+pub type OpentypeKernSubtableData = opentype_kern_table_subtables_data;
+
+impl Promote<OpentypeKernSubtableData> for KernSubtableData {
+    fn promote(orig: &OpentypeKernSubtableData) -> Self {
+        match orig {
+            OpentypeKernSubtableData::Format0(f0) => {
+                KernSubtableData::Format0(KernSubtableFormat0::promote(f0))
+            }
+            OpentypeKernSubtableData::Format2(f2) => {
+                KernSubtableData::Format2(KernSubtableFormat2::promote(f2))
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+enum KernSubtableData {
+    Format0(KernSubtableFormat0),
+    Format2(KernSubtableFormat2),
+}
+
+#[derive(Debug, Clone, Default)]
+#[repr(transparent)]
+struct KernMetrics {
+    subtables: Vec<KernSubtable>,
+}
+
 #[derive(Clone, Debug)]
 pub struct OptionalTableMetrics {
     cvt: Option<CvtMetrics>,
@@ -3228,9 +3409,11 @@ pub struct OptionalTableMetrics {
     gpos: Option<LayoutMetrics>,
     gsub: Option<LayoutMetrics>,
     // STUB - add more tables as we expand opentype definition
+    kern: Option<KernMetrics>,
     vhea: Option<VheaMetrics>,
     vmtx: Option<VmtxMetrics>,
 }
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum TableDiscriminator {
     Gpos,
@@ -3612,6 +3795,12 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
                 })
                 .transpose()?
         };
+        let kern = {
+            let kern = &dir.table_links.kern;
+            kern.as_ref().map(|kern| KernMetrics {
+                subtables: promote_vec(&kern.subtables),
+            })
+        };
         let vhea = {
             let vhea = &dir.table_links.vhea;
             vhea.as_ref().map(|vhea| VheaMetrics {
@@ -3657,6 +3846,7 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
             gpos,
             gsub,
             // TODO - add more optional tables as they are added to the spec
+            kern,
             vhea,
             vmtx,
         }
@@ -3683,6 +3873,7 @@ fn is_extra(table_id: &u32) -> bool {
         b"cmap" | b"head" | b"hhea" | b"hmtx" | b"maxp" | b"name" | b"OS/2" | b"post" => false,
         b"cvt " | b"fpgm" | b"loca" | b"glyf" | b"prep" | b"gasp" => false,
         b"GDEF" | b"GPOS" | b"GSUB" | b"BASE" => false,
+        b"kern" | b"vhea" | b"vmtx" => false,
         // FIXME - update with more cases as we handle more table records
         _ => true,
     }
@@ -3783,8 +3974,10 @@ fn show_optional_metrics(optional: &OptionalTableMetrics, conf: &Config) {
     show_layout_metrics(&optional.gpos, Ctxt::from(TableDiscriminator::Gpos), conf);
     show_layout_metrics(&optional.gsub, Ctxt::from(TableDiscriminator::Gsub), conf);
 
+    show_kern_metrics(&optional.kern, conf);
+
     show_vhea_metrics(&optional.vhea, conf);
-    show_vmtx_metrics(&optional.vmtx, conf)
+    show_vmtx_metrics(&optional.vmtx, conf);
 }
 
 fn show_cvt_metrics(cvt: &Option<CvtMetrics>, _conf: &Config) {
@@ -4388,6 +4581,113 @@ fn format_lookup_subtable(
     }
 }
 
+fn show_kern_metrics(kern: &Option<KernMetrics>, conf: &Config) {
+    fn show_kern_subtable(subtable: &KernSubtable, conf: &Config) {
+        fn format_kern_flags(flags: KernFlags) -> String {
+            let mut params = Vec::new();
+            if flags.r#override {
+                params.push("override");
+            }
+            if flags.cross_stream {
+                params.push("x-stream")
+            }
+            if flags.minimum {
+                params.push("min")
+            } else {
+                params.push("kern")
+            }
+            if flags.horizontal {
+                params.push("h")
+            } else {
+                params.push("v")
+            }
+
+            let str_flags = params.join(" | ");
+            str_flags
+        }
+        print!("KernSubtable ({}):", format_kern_flags(subtable.flags));
+        match &subtable.data {
+            KernSubtableData::Format0(KernSubtableFormat0 { kern_pairs }) => show_items_inline(
+                kern_pairs,
+                |kern_pair| {
+                    format!(
+                        "({},{}) {:+}",
+                        format_glyphid_hex(kern_pair.left, true),
+                        format_glyphid_hex(kern_pair.right, true),
+                        kern_pair.value
+                    )
+                },
+                conf.inline_bookend,
+                |n| format!("(..{n}..)"),
+            ),
+            KernSubtableData::Format2(KernSubtableFormat2 {
+                left_class,
+                right_class,
+                kerning_array,
+            }) => {
+                fn format_kern_class_table(table: &KernClassTable, conf: &Config) -> String {
+                    format!(
+                        "Classes[first={}, nGlyphs={}]: {}",
+                        format_glyphid_hex(table.first_glyph, true),
+                        table.n_glyphs,
+                        format_items_inline(
+                            &table.class_values,
+                            u16::to_string,
+                            conf.inline_bookend,
+                            |n| format!("(..{n}..)"),
+                        )
+                    )
+                }
+                fn show_kerning_array(array: &KerningArray, conf: &Config) {
+                    show_items_elided(
+                        &array.0,
+                        |ix, row| {
+                            print!("\t\t[{ix}]: ");
+                            show_items_inline(
+                                &row.0,
+                                |kern_val| format!("{:+}", kern_val),
+                                conf.inline_bookend,
+                                |n| format!("(..{n}..)"),
+                            )
+                        },
+                        conf.bookend_size / 2, // FIXME - magic constant adjustment
+                        |start, stop| format!("\t\t(skipping kerning array rows {start}..{stop})"),
+                    )
+                }
+                print!(
+                    "LeftClass={}\tRightClass={}\tKerningArray:",
+                    format_kern_class_table(
+                        left_class.as_ref().expect("missing left class table"),
+                        conf
+                    ),
+                    format_kern_class_table(
+                        right_class.as_ref().expect("missing left class table"),
+                        conf
+                    ),
+                );
+                show_kerning_array(kerning_array.as_ref().expect("missing kerning array"), conf)
+            }
+        };
+    }
+
+    if let Some(kern) = kern {
+        if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
+            println!("kern");
+            show_items_elided(
+                &kern.subtables,
+                |ix, subtable| {
+                    print!("\t[{ix}]: ");
+                    show_kern_subtable(subtable, conf);
+                },
+                conf.bookend_size,
+                |start, stop| format!("\t(skipping kern subtables {start}..{stop})"),
+            )
+        } else {
+            println!("kern: {} kerning subtables", kern.subtables.len());
+        }
+    }
+}
+
 fn format_mark2_array(arr: &Mark2Array, coverage: &mut impl Iterator<Item = u16>) -> String {
     fn format_mark2_record(mark2_record: &Mark2Record, cov: u16) -> String {
         const CLASS_ANCHORS: usize = 2;
@@ -4934,6 +5234,14 @@ fn show_attach_list(attach_list: &AttachList, conf: &Config) {
     )
 }
 
+fn format_glyphid_hex(glyph: u16, is_standalone: bool) -> String {
+    if is_standalone {
+        format!("#{:04x}", glyph)
+    } else {
+        format!("{:04x}", glyph)
+    }
+}
+
 /// Compact inline display of an array representing a sequence (rather than a set) of glyphIds
 // REVIEW - we have no cap on how long a glyphId sequence we are willing to show unabridged and we might want one in theory
 fn format_glyphid_array_hex(glyphs: &impl AsRef<[u16]>, is_standalone: bool) -> String {
@@ -4979,7 +5287,7 @@ fn format_glyphid_array_hex(glyphs: &impl AsRef<[u16]>, is_standalone: bool) -> 
             buffer.push_str(GLUE);
         }
         // REVIEW - do we want to eliminate zero-padding for compactness, or keep it for consistency/legibility?
-        buffer.push_str(&format!("{:04x}", glyph));
+        buffer.push_str(&format_glyphid_hex(*glyph, false));
     }
     buffer
 }
@@ -5460,6 +5768,7 @@ fn show_post_metrics(post: &PostMetrics, _conf: &Config) {
 }
 
 // NOTE - scaffolding to mark the values we currently parse into u16 but which are logically i16, to flag changes to the gencode API as they crop up
+#[inline(always)]
 const fn as_s16(v: u16) -> i16 {
     v as i16
 }
