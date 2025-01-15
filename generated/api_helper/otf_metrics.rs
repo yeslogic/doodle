@@ -98,11 +98,10 @@ pub type OpentypeHhea = opentype_hhea_table;
 pub type OpentypeHmtx = opentype_hmtx_table;
 pub type OpentypeHmtxLongMetric = opentype_hmtx_table_long_metrics;
 
-// STUB[horizontal-as-vertical] - change to distinguished type names once we have them
+// STUB[epic=horizontal-for-vertical] - change to distinguished type names once we have them
 pub type OpentypeVhea = opentype_hhea_table;
 pub type OpentypeVmtx = opentype_hmtx_table;
 pub type OpentypeVmtxLongMetric = opentype_hmtx_table_long_metrics;
-
 
 pub type OpentypeMaxp = opentype_maxp_table;
 pub type OpentypeName = opentype_name_table;
@@ -507,7 +506,6 @@ struct VheaMetrics {
 
 #[derive(Clone, Debug)]
 struct HmtxMetrics(Vec<UnifiedBearing>);
-
 
 #[derive(Clone, Debug)]
 struct VmtxMetrics(Vec<UnifiedBearing>);
@@ -3616,19 +3614,16 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
         };
         let vhea = {
             let vhea = &dir.table_links.vhea;
-            vhea.as_ref()
-                .map(|vhea|
-                    VheaMetrics {
-                        major_version: vhea.major_version,
-                        minor_version: vhea.minor_version >> 12, // we only care about 0 vs 0x1000, so
-                        num_lvm: vhea.number_of_long_metrics as usize,
-                })
+            vhea.as_ref().map(|vhea| VheaMetrics {
+                major_version: vhea.major_version,
+                minor_version: vhea.minor_version >> 12, // we only care about 0 vs 0x1000, so
+                num_lvm: vhea.number_of_long_metrics as usize,
+            })
         };
         let vmtx = {
             let vmtx = &dir.table_links.vmtx;
-            vmtx.as_ref()
-                .map(|vmtx| {
-                    // FIXME - if name gets changed to top_side_bearings, correct accordingly
+            vmtx.as_ref().map(|vmtx| {
+                // FIXME - if name gets changed to top_side_bearings, correct accordingly
                 let mut accum =
                     Vec::with_capacity(vmtx.long_metrics.len() + vmtx.left_side_bearings.len());
                 for vmet in vmtx.long_metrics.iter() {
@@ -3638,7 +3633,7 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
                         left_side_bearing: as_s16(vmet.left_side_bearing),
                     });
                 }
-                    // FIXME - if name gets changed to top_side_bearings, correct accordingly
+                // FIXME - if name gets changed to top_side_bearings, correct accordingly
                 for tsb in vmtx.left_side_bearings.iter() {
                     accum.push(UnifiedBearing {
                         advance_width: None,
@@ -3648,7 +3643,6 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
                 }
                 VmtxMetrics(accum)
             })
-
         };
         OptionalTableMetrics {
             cvt,
@@ -5372,7 +5366,8 @@ fn show_hmtx_metrics(hmtx: &HmtxMetrics, conf: &Config) {
 }
 
 fn show_vmtx_metrics(vmtx: &Option<VmtxMetrics>, conf: &Config) {
-    let show_unified = |ix: usize, vmet: &UnifiedBearing| match &vmet.advance_width { // FIXME - `_width` is a misnomer, should be `_height`
+    let show_unified = |ix: usize, vmet: &UnifiedBearing| match &vmet.advance_width {
+        // FIXME - `_width` is a misnomer, should be `_height`
         Some(height) => println!(
             "\tGlyph ID [{ix}]: advanceHeight={height}, tsb={}",
             vmet.left_side_bearing // FIXME - `left` is a misnomer, should be `top`
