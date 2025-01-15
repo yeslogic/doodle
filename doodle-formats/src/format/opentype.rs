@@ -94,6 +94,17 @@ fn embedded_singleton_alternation<const OUTER: usize, const INNER: usize>(
     Format::Record(accum)
 }
 
+/// Helper function for constructing a record whose first field is a non-boolean value
+/// that is parsed first, followed by a series of up to 8 flag-bits that fit into a
+/// single byte.
+///
+/// Useful for GPOS/GSUB LookupTable lookup flags, as well as 'kern' subtable coverage-fields
+///
+/// While more widely applicable to other usage-patterns, the most common shape of a format that
+/// this facilitates is:
+/// ```ignore
+///     u16be ~> (u8[hi] ~ unsigned integer value) (u8[lo] ~ N x (boolean flag))
+/// ```
 fn prepend_field_flags_bits8(
     pre_field: &'static str,
     pre_format: Format,
@@ -260,10 +271,17 @@ fn expect_u16be(base: &BaseModule, val: u16) -> Format {
 
 /// Parses a `U16Be` value that is expected to be equal to one of `N` values in `vals`
 fn expects_u16be<const N: usize>(base: &BaseModule, vals: [u16; N]) -> Format {
-    where_lambda(base.u16be(), "x", expr_match(var("x"), vals.into_iter().map(|v| (Pattern::U16(v), Expr::Bool(true))).chain(std::iter::once((Pattern::Wildcard, Expr::Bool(false))))))
+    where_lambda(
+        base.u16be(),
+        "x",
+        expr_match(
+            var("x"),
+            vals.into_iter()
+                .map(|v| (Pattern::U16(v), Expr::Bool(true)))
+                .chain(std::iter::once((Pattern::Wildcard, Expr::Bool(false)))),
+        ),
+    )
 }
-
-
 
 /// Constructs a format that peeks the value of a specific field in a given
 /// record (or the common prefix of a union of related records), discarding the
@@ -292,7 +310,7 @@ where
     )
 }
 
-/// Specialized format-construction designed for supporting `cmap` sub-tables.
+/// Specialized format-construction designed for supporting `cmap` and `kern` sub-tables.
 ///
 /// Speculatively peeks the shortest prefix of fields required to witness a field with the
 /// indicated label (`length_field`), which is interpreted as a positive integer byte-length
@@ -369,8 +387,8 @@ const START_ARG: (Label, ValueType) = (Label::Borrowed("start"), ValueType::Base
 /// we have on hand only allow for linear search without short-circuiting for
 /// `Θ(N)` performance regardless of where the match is in the list.
 fn find_table(table_records: Expr, query_table_id: u32) -> Expr {
-    // FIXME - this is a naive algorithm that could be improved with the right primitives in-hand
-    // TODO: accelerate using binary search
+    // FIXME[epic=perf] - this is a naive algorithm that could be improved with the right primitives in-hand
+    // TODO[epic=binary-search]: accelerate using binary search
     // TODO: make use of `search_range` etc.
     let matches_query = |table_record: Expr| {
         expr_eq(
@@ -1106,13 +1124,13 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ("caret_offset", s16be(base)), // 0 for non-slanted fonts
                     ("__reservedX4", tuple_repeat(4, expect_u16be(base, 0))), // NOTE: 4 separate isolated fields in fathom
                     ("metric_data_format", expect_u16be(base, 0)),
-                    // number of `long_horizontal_metric` records in the `htmx_table`
+                    // number of `long_horizontal_metric` records in the `htmx_table`, `long_vertical_metrics` in `vmtx_table`
                     ("number_of_long_metrics", base.u16be()),
                 ]),
             )
         };
 
-        // STUB[horizontal-for-vertical] - this technically works as-is, but certain fields might want to be named differently
+        // STUB[epic=horizontal-for-vertical] - this technically works as-is, but certain fields might want to be named differently
         let vhea_table = hhea_table;
 
         let maxp_table = {
@@ -1195,7 +1213,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             )
         };
 
-        // STUB[horizontal-for-vertical] - this technically works as-is, but certain fields might want to be named differently
+        // STUB[epic=horizontal-for-vertical] - this technically works as-is, but certain fields might want to be named differently
         let vmtx_table = hmtx_table;
 
         let name_table = {
@@ -4054,6 +4072,113 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ]),
             )
         };
+
+        // `kern` table [https://learn.microsoft.com/en-us/typography/opentype/spec/kern]
+        let kern_table = {
+            let kern_subtable = {
+                let kern_cov_flags = prepend_field_flags_bits8(
+                    "format",
+                    base.u8(),
+                    [
+                        None,                 // Bit 7 - reserved
+                        None,                 // Bit 6 - reserved
+                        None,                 // Bit 5 - reserved
+                        None,                 // Bit 4 - reserved
+                        Some("override"), // Bit 3 - when true, value in this table replaces the current accumulator value
+                        Some("cross_stream"), // Bit 2 - when true, kerning is perpendicular to text-flow (reset by 0x8000 in kerning data)
+                        Some("minimum"), // Bit 1 - when true, table contains minimum values, otherwise the table has kerning values
+                        Some("horizontal"), // Bit 0 - when true, table has horizontal data, otherwise vertical
+                    ],
+                );
+                let kern_pair = record([
+                    ("left", base.u16be()),  // glyph index for left-hand glyph in kerning pair
+                    ("right", base.u16be()), // glyph index for right-hand glyph in kerning pair
+                    ("value", s16be(base)), // kerning value for given pair, in design-units. Positive values move characters apart, negative values move characters closer together.
+                ]);
+                // SECTION - `kern` subtable record-formats
+                let kern_subtable_format0 = record([
+                    ("n_pairs", base.u16be()),
+                    ("search_range", base.u16be()), // sizeof(table_entry) * (2^(ilog2(n_pairs)))
+                    ("entry_selector", base.u16be()), // ilog2(n_pairs) [number of iterations of binary search algo to find a query]
+                    ("range_shift", base.u16be()), // (nPairs - 2^(ilog2(nPairs))) * sizeof(table_entry)
+                    // NOTE - kern-pairs array is sorted by the value of the packed Word32 consisting of the bytes of `left` and `right` in that order (big-endian).
+                    ("kern_pairs", repeat_count(var("n_pairs"), kern_pair)),
+                ]);
+                let kern_subtable_format2 = {
+                    fn glyph_count(class_table_offset: Expr) -> Expr {
+                        record_proj(
+                            expr_unwrap(record_proj(class_table_offset, "link")),
+                            "n_glyphs",
+                        )
+                    }
+                    let class_table = record([
+                        ("first_glyph", base.u16be()), // first glyph in class range
+                        ("n_glyphs", base.u16be()),    // number of glyphs in class range
+                        ("class_values", repeat_count(var("n_glyphs"), base.u16be())), // class values for each glyph in class range
+                    ]);
+
+                    // Simultaneously 2D/1D array: indices in ClassTables are scaled (J = 2 x j ; I = 2 x M x i) to facilitate offset-arithmetic for random access (TargetOffset(i,j) = BaseOffset + I + J)
+                    let kerning_array = |left_class_offset: Expr, right_class_offset: Expr| {
+                        repeat_count(
+                            glyph_count(left_class_offset), // N rows where there are N left-hand classes
+                            repeat_count(
+                                glyph_count(right_class_offset), // M columns
+                                s16be(base),                     // FWORD value at index (i, j)
+                            ),
+                        )
+                    };
+                    record([
+                        ("table_start", pos32()),
+                        ("row_width", base.u16be()), // width (in bytes) of a table row
+                        (
+                            "left_class_offset",
+                            offset16_mandatory(var("table_start"), class_table.clone(), base),
+                        ),
+                        (
+                            "right_class_offset",
+                            offset16_mandatory(var("table_start"), class_table, base),
+                        ),
+                        (
+                            "kerning_array_offset",
+                            offset16_mandatory(
+                                var("table_start"),
+                                kerning_array(var("left_class_offset"), var("right_class_offset")),
+                                base,
+                            ),
+                        ),
+                    ])
+                };
+                // !SECTION
+                slice_record(
+                    "length",
+                    [
+                        ("version", expect_u16be(base, 0)),
+                        ("length", base.u16be()),
+                        ("coverage", kern_cov_flags),
+                        (
+                            "data",
+                            match_variant(
+                                record_proj(var("coverage"), "format"),
+                                [
+                                    (Pattern::U8(0), "Format0", kern_subtable_format0),
+                                    (Pattern::U8(2), "Format2", kern_subtable_format2),
+                                    // REVIEW - do we even want to bother with an explicit catch-all failure branch?
+                                    (Pattern::Wildcard, "UnknownFormat", Format::Fail),
+                                ],
+                            ),
+                        ),
+                    ],
+                )
+            };
+            module.define_format(
+                "opentype.kern_table",
+                record([
+                    ("version", expect_u16be(base, 0)), // Table version number (KernHeader)
+                    ("n_tables", base.u16be()),
+                    ("subtables", repeat_count(var("n_tables"), kern_subtable)),
+                ]),
+            )
+        };
         module.define_format_args(
             "opentype.table_directory.table_links",
             vec![
@@ -4180,6 +4305,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 // STUB - add more table sections
                 // SECTION - other tables
                 // STUB - add more tables
+                (
+                    "kern",
+                    optional_table(START_VAR, var("tables"), magic(b"kern"), kern_table.call()),
+                ),
                 (
                     "vhea",
                     optional_table(START_VAR, var("tables"), magic(b"vhea"), vhea_table.call()),
