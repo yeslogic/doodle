@@ -9,11 +9,14 @@ fn shadow_check(x: &Expr, name: &'static str) {
     }
 }
 
+/// Marker-type for controlling how records-with-alternation are composed
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 enum NestingKind {
     #[default]
-    SingletonADT,
-    FlattenInner,
+    /// `MinimalVariation`: Fields that may alternate are extracted into their own enum
+    MinimalVariation,
+    /// `UnifiedRecord`: Common fields and non-common fields are distributively unified into a single record, for each possible variant
+    UnifiedRecord,
 }
 
 /// Helper function for generically constructing a Format that consists of a
@@ -48,7 +51,7 @@ fn embedded_singleton_alternation<const OUTER: usize, const INNER: usize>(
 ) -> Format {
     let (disc_field, disc_value) = discriminant;
     let accum = match nesting_kind {
-        NestingKind::SingletonADT => {
+        NestingKind::MinimalVariation => {
             // REVIEW - it is not necessarily obvious that all FlatternInner defs can be changed to SingletonADT versions if they refer to variables in the outer record, but it seems plausible at least
             let mut has_discriminant = false;
             let record_inner = record(inner_fields);
@@ -73,7 +76,7 @@ fn embedded_singleton_alternation<const OUTER: usize, const INNER: usize>(
             );
             accum
         }
-        NestingKind::FlattenInner => {
+        NestingKind::UnifiedRecord => {
             let mut accum = Vec::with_capacity(OUTER + INNER);
             for (name, format) in outer_fields {
                 if name == disc_field {
@@ -92,6 +95,66 @@ fn embedded_singleton_alternation<const OUTER: usize, const INNER: usize>(
         }
     };
     Format::Record(accum)
+}
+
+fn embedded_variadic_alternation<C, const OUTER: usize, const BRANCHES: usize>(
+    shared_fields: [(&'static str, Format); OUTER],
+    discriminant: &'static str,
+    branches: [(u16, &'static str, C); BRANCHES],
+    intermediate: &'static str,
+    nesting_kind: NestingKind,
+) -> Format
+where
+    C: IntoIterator<Item = (&'static str, Format)>,
+{
+    match nesting_kind {
+        NestingKind::MinimalVariation => {
+            let mut pat_branches = Vec::with_capacity(BRANCHES);
+            for (value, vname, c) in branches.into_iter() {
+                let record_inner = record(c);
+                pat_branches.push((Pattern::U16(value), vname, record_inner));
+            }
+            let final_field = (intermediate, match_variant(var(discriminant), pat_branches));
+            let mut has_discriminant = false;
+            let mut accum = Vec::with_capacity(OUTER + 1);
+            for (name, format) in shared_fields {
+                has_discriminant = has_discriminant || name == discriminant;
+                accum.push((name, format));
+            }
+            accum.push(final_field);
+            assert!(
+                has_discriminant,
+                "missing discriminant field `{discriminant}` in outer-field set"
+            );
+            record(accum)
+        }
+        NestingKind::UnifiedRecord => {
+            let mut field_prefix = Vec::with_capacity(OUTER);
+            let mut has_discriminant = false;
+            for (name, format) in shared_fields.iter() {
+                field_prefix.push((Label::Borrowed(name), format.clone()));
+                if *name == discriminant {
+                    has_discriminant = true;
+                    break;
+                }
+            }
+            assert!(
+                has_discriminant,
+                "missing discriminant field `{discriminant}` in outer-field set"
+            );
+            let mut pat_branches = Vec::with_capacity(BRANCHES);
+            for (value, vname, c) in branches {
+                let unified = Iterator::chain(shared_fields.iter().cloned(), c.into_iter())
+                    .collect::<Vec<(&'static str, Format)>>();
+                let record_inner = record(unified);
+                pat_branches.push((Pattern::U16(value), vname, record_inner));
+            }
+            peek_field_then(
+                field_prefix.as_slice(),
+                match_variant(var(discriminant), pat_branches),
+            )
+        }
+    }
 }
 
 /// Helper function for constructing a record whose first field is a non-boolean value
@@ -2998,7 +3061,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     "subst",
                     "Format1",
                     // REVIEW - Consider what style we want to adopt more generally for MultipleSubst, AlternateSubst, LigatureSubst
-                    NestingKind::SingletonADT,
+                    NestingKind::MinimalVariation,
                 ),
             )
         };
@@ -3036,7 +3099,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     "subst",
                     "Format1",
                     // REVIEW - Consider what style we want to adopt more generally for MultipleSubst, AlternateSubst, LigatureSubst
-                    NestingKind::FlattenInner,
+                    NestingKind::UnifiedRecord,
                 ),
             )
         };
@@ -3086,7 +3149,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     "subst",
                     "Format1",
                     // REVIEW - Consider what style we want to adopt more generally for MultipleSubst, AlternateSubst, LigatureSubst
-                    NestingKind::FlattenInner,
+                    NestingKind::UnifiedRecord,
                 ),
             )
         };
@@ -3126,7 +3189,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ],
                     "subst",
                     "Format1",
-                    NestingKind::FlattenInner,
+                    NestingKind::UnifiedRecord,
                 ),
             )
         };
@@ -3360,7 +3423,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ],
                     "subtable",
                     "Format1",
-                    NestingKind::FlattenInner,
+                    NestingKind::UnifiedRecord,
                 ),
             )
         };
@@ -3439,7 +3502,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ],
                     "pos",
                     "Format1",
-                    NestingKind::FlattenInner,
+                    NestingKind::UnifiedRecord,
                 ),
             )
         };
@@ -3513,7 +3576,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ],
                     "pos",
                     "Format1",
-                    NestingKind::FlattenInner,
+                    NestingKind::UnifiedRecord,
                 ),
             )
         };
@@ -3570,7 +3633,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ],
                     "pos",
                     "Format1",
-                    NestingKind::FlattenInner,
+                    NestingKind::UnifiedRecord,
                 ),
             )
         };
@@ -3651,7 +3714,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ],
                     "subst",
                     "Format1",
-                    NestingKind::FlattenInner,
+                    NestingKind::UnifiedRecord,
                 ),
             )
         };
@@ -3677,7 +3740,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ],
                     "pos",
                     "Format1",
-                    NestingKind::FlattenInner,
+                    NestingKind::UnifiedRecord,
                 ),
             )
         };
@@ -3692,7 +3755,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ],
                 "cond",
                 "Format1",
-                NestingKind::FlattenInner,
+                NestingKind::UnifiedRecord,
             );
             let condition_set = record([
                 ("table_start", pos32()),
@@ -4180,6 +4243,120 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ]),
             )
         };
+        // C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/stat#style-attributes-header
+        let stat_table = {
+            let axis_record = {
+                record([
+                    ("axis_tag", tag.call()),
+                    ("axis_name_id", base.u16be()),
+                    ("axis_ordering", base.u16be()),
+                ])
+            };
+            let axis_value_table = {
+                let axis_flags = flags_bits16([
+                    None,                                 // Bit 15 - Reserved
+                    None,                                 // Bit 14 - Reserved
+                    None,                                 // Bit 13 - Reserved
+                    None,                                 // Bit 12 - Reserved
+                    None,                                 // Bit 11 - Reserved
+                    None,                                 // Bit 10 - Reserved
+                    None,                                 // Bit 9 - Reserved
+                    None,                                 // Bit 8 - Reserved
+                    None,                                 // Bit 7 - Reserved
+                    None,                                 // Bit 6 - Reserved
+                    None,                                 // Bit 5 - Reserved
+                    None,                                 // Bit 4 - Reserved
+                    None,                                 // Bit 3 - Reserved
+                    None,                                 // Bit 2 - Reserved
+                    Some("elidable_axis_value_name"), // Bit 1 - When set, indicates the 'normal' value for this axis and implies it may be omitted when composing name-strings
+                    Some("older_sibling_font_attribute"), // Bit 0 - When set, indicates that the axis information applies to previously released fonts in the same font-family
+                ]);
+                let axis_value = record([("axis_index", base.u16be()), ("value", fixed32be(base))]);
+                let f1_fields = vec![
+                    ("axis_index", base.u16be()),
+                    ("flags", axis_flags.clone()),
+                    ("value_name_id", base.u16be()), // NameId for entries in 'name' table that provide display-string for this attribute value
+                    ("value", fixed32be(base)),
+                ];
+                let f2_fields = vec![
+                    ("axis_index", base.u16be()),
+                    ("flags", axis_flags.clone()),
+                    ("value_name_id", base.u16be()), // NameId for entries in 'name' table that provide display-string for this attribute value
+                    ("nominal_value", fixed32be(base)),
+                    ("range_min_value", fixed32be(base)),
+                    ("range_max_value", fixed32be(base)),
+                ];
+                let f3_fields = vec![
+                    ("axis_index", base.u16be()),
+                    ("flags", axis_flags.clone()),
+                    ("value_name_id", base.u16be()), // NameId for entries in 'name' table that provide display-string for this attribute value
+                    ("value", fixed32be(base)),
+                    ("linked_value", fixed32be(base)),
+                ];
+                let f4_fields = vec![
+                    ("axis_count", base.u16be()),
+                    ("flags", axis_flags.clone()),
+                    ("value_name_id", base.u16be()), // NameId for entries in 'name' table that provide display-string for this combination of axis values
+                    ("axis_values", repeat_count(var("axis_count"), axis_value)),
+                ];
+                embedded_variadic_alternation(
+                    [("format", expects_u16be(base, [1, 2, 3, 4]))],
+                    "format",
+                    [
+                        (1, "Format1", f1_fields),
+                        (2, "Format2", f2_fields),
+                        (3, "Format3", f3_fields),
+                        (4, "Format4", f4_fields),
+                    ],
+                    "data",
+                    NestingKind::MinimalVariation,
+                )
+            };
+            let design_axes_array = |design_axis_count: Expr| {
+                record([("design_axes", repeat_count(design_axis_count, axis_record))])
+            };
+            let axis_value_offsets_array = |axis_value_count: Expr| {
+                record([
+                    ("table_start", pos32()),
+                    (
+                        "axis_value_offsets",
+                        repeat_count(
+                            axis_value_count,
+                            offset16_mandatory(var("table_start"), axis_value_table, base),
+                        ),
+                    ),
+                ])
+            };
+            module.define_format(
+                "opentype.stat_table",
+                record([
+                    ("table_start", pos32()),
+                    ("major_version", expect_u16be(base, 1)),
+                    ("minor_version", expects_u16be(base, [1, 2])), // Version 1.0 is deprecated
+                    ("design_axis_size", base.u16be()), // size (in bytes) of each axis record
+                    ("design_axis_count", base.u16be()), // number of axis records
+                    (
+                        "design_axes_offset",
+                        offset32(
+                            var("table_start"),
+                            design_axes_array(var("design_axis_count")),
+                            base,
+                        ),
+                    ), // offset is 0 iff design_axis_count is 0
+                    ("axis_value_count", base.u16be()),
+                    (
+                        "offset_to_axis_value_offsets",
+                        offset32(
+                            var("table_start"),
+                            axis_value_offsets_array(var("axis_value_count")),
+                            base,
+                        ),
+                    ), // offset is 0 iff axis_value_count is 0
+                    ("elided_fallback_name_id", base.u16be()), // omitted in version 1.0, but said version is deprecated
+                ]),
+            )
+        };
+
         module.define_format_args(
             "opentype.table_directory.table_links",
             vec![
@@ -4309,6 +4486,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 (
                     "kern",
                     optional_table(START_VAR, var("tables"), magic(b"kern"), kern_table.call()),
+                ),
+                (
+                    "stat",
+                    optional_table(START_VAR, var("tables"), magic(b"STAT"), stat_table.call()),
                 ),
                 (
                     "vhea",
