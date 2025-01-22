@@ -107,7 +107,7 @@ impl Promote<OpentypeTag> for Tag {
 }
 
 // REVIEW - no module-level definition so the name is the semi-arbitrary 'first' one the code-generator sees
-pub type OpentypeFixed = opentype_post_table_italic_angle;
+pub type OpentypeFixed = opentype_var_user_tuple_coordinates;
 
 impl Promote<OpentypeFixed> for Fixed {
     fn promote(orig: &OpentypeFixed) -> Self {
@@ -153,7 +153,6 @@ pub type OpentypeHhea = opentype_hhea_table;
 
 pub type OpentypeHmtx = opentype_hmtx_table;
 pub type OpentypeHmtxLongMetric = opentype_hmtx_table_long_metrics;
-
 
 pub type OpentypeMaxp = opentype_maxp_table;
 pub type OpentypeName = opentype_name_table;
@@ -567,7 +566,7 @@ struct VheaMetrics {
 
 fn promote_count_array_link<O, T>(count: u16, (offset, link): (u32, Option<&Vec<O>>)) -> Vec<T>
 where
-    T: Promote<O>
+    T: Promote<O>,
 {
     let mut result = Vec::with_capacity(count as usize);
     if count == 0 {
@@ -575,7 +574,10 @@ where
         // debug_assert_eq!(offset, 0, "count=0 requires offset=0, but found offset={offset} instead");
         assert!(link.is_none() || link.is_some_and(Vec::is_empty));
     } else {
-        assert_ne!(offset, 0, "count>0 requires offset>0, but found offset=0 instead");
+        assert_ne!(
+            offset, 0,
+            "count>0 requires offset>0, but found offset=0 instead"
+        );
         let Some(origs) = link else {
             unreachable!("offset>0 but link is None");
         };
@@ -588,6 +590,105 @@ where
     return result;
 }
 
+pub type OpentypeFvar = opentype_fvar_table;
+
+impl Promote<OpentypeFvar> for FvarMetrics {
+    fn promote(orig: &OpentypeFvar) -> Self {
+        FvarMetrics {
+            major_version: orig.major_version,
+            minor_version: orig.minor_version,
+            axes: promote_vec(&orig.axes),
+            instances: promote_vec(&orig.instances),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct FvarMetrics {
+    major_version: u16,
+    minor_version: u16,
+    axes: Vec<VariationAxisRecord>,
+    instances: Vec<InstanceRecord>,
+}
+
+
+
+pub type OpentypeUserTuple = opentype_var_user_tuple;
+
+impl Promote<OpentypeUserTuple> for UserTuple {
+    fn promote(orig: &OpentypeUserTuple) -> Self {
+        promote_vec(&orig.coordinates)
+    }
+}
+
+type UserTuple = Vec<Fixed>;
+
+pub type OpentypeInstanceRecord = opentype_fvar_table_instances;
+
+// REVIEW - currently not implemented in the Opentype spec
+type InstanceFlags = ();
+
+
+impl Promote<OpentypeInstanceRecord> for InstanceRecord {
+    fn promote(orig: &OpentypeInstanceRecord) -> InstanceRecord {
+        InstanceRecord {
+            subfamily_nameid: NameId::from(orig.subfamily_nameid),
+            flags: InstanceFlags::promote(&orig.flags),
+            coordinates: UserTuple::promote(&orig.coordinates),
+            postscript_nameid: promote_opt(&orig.postscript_nameid),
+        }
+    }
+}
+
+
+#[derive(Debug, Clone)]
+struct InstanceRecord {
+    subfamily_nameid: NameId,
+    flags: InstanceFlags,
+    coordinates: UserTuple,
+    postscript_nameid: Option<NameId>,
+}
+
+pub type OpentypeVariationAxisRecord = opentype_var_variation_axis_record;
+
+pub type OpentypeVariationAxisRecordFlags = opentype_var_variation_axis_record_flags;
+
+impl Promote<OpentypeVariationAxisRecord> for VariationAxisRecord {
+    fn promote(orig: &OpentypeVariationAxisRecord) -> Self {
+        VariationAxisRecord {
+            axis_tag: Tag::promote(&orig.axis_tag),
+            min_value: Fixed::promote(&orig.min_value),
+            default_value: Fixed::promote(&orig.default_value),
+            max_value: Fixed::promote(&orig.max_value),
+            flags: VariationAxisRecordFlags::promote(&orig.flags),
+            axis_name_id: NameId::from(orig.axis_name_id),
+        }
+    }
+}
+
+impl Promote<OpentypeVariationAxisRecordFlags> for VariationAxisRecordFlags {
+    fn promote(orig: &OpentypeVariationAxisRecordFlags) -> VariationAxisRecordFlags {
+        VariationAxisRecordFlags {
+            hidden_axis: orig.hidden_axis,
+        }
+    }
+}
+#[derive(Clone, Copy, Debug)]
+struct VariationAxisRecordFlags {
+    hidden_axis: bool
+}
+
+#[derive(Debug, Clone, Copy)]
+struct VariationAxisRecord {
+    axis_tag: Tag,
+    min_value: Fixed,
+    default_value: Fixed,
+    max_value: Fixed,
+    flags: VariationAxisRecordFlags,
+    axis_name_id: NameId,
+}
+
+
 #[derive(Debug, Clone)]
 struct StatMetrics {
     major_version: u16,
@@ -597,15 +698,21 @@ struct StatMetrics {
     elided_fallback_name_id: NameId,
 }
 
-pub type OpentypeAxisValueOffset = opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets;
-pub type OpentypeAxisValue = opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link;
-pub type OpentypeAxisValueData = opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data;
+pub type OpentypeAxisValueOffset =
+    opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets;
+pub type OpentypeAxisValue =
+    opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link;
+pub type OpentypeAxisValueData =
+    opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data;
 
-pub type OpentypeAxisValueFormat1 = opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1;
-pub type OpentypeAxisValueFormat2 = opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format2;
-pub type OpentypeAxisValueFormat3 = opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format3;
-pub type OpentypeAxisValueFormat4 = opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format4;
-
+pub type OpentypeAxisValueFormat1 =
+    opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1;
+pub type OpentypeAxisValueFormat2 =
+    opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format2;
+pub type OpentypeAxisValueFormat3 =
+    opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format3;
+pub type OpentypeAxisValueFormat4 =
+    opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format4;
 
 pub type OpentypeAxisValueFlags = opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1_flags;
 
@@ -686,7 +793,6 @@ struct AxisValueFormat3 {
     linked_value: Fixed,
 }
 
-
 pub type OpentypeAxisValueRecord = opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format4_axis_values;
 
 impl Promote<OpentypeAxisValueRecord> for AxisValueRecord {
@@ -726,7 +832,11 @@ struct AxisValueFormat4 {
 impl Promote<OpentypeAxisValueOffset> for AxisValue {
     fn promote(orig: &OpentypeAxisValueOffset) -> Self {
         let Some(raw) = &orig.link else {
-            assert_eq!(orig.offset, 0, "empty link with non-zero offset (={})", orig.offset);
+            assert_eq!(
+                orig.offset, 0,
+                "empty link with non-zero offset (={})",
+                orig.offset
+            );
             panic!("[HACK] encountered bad link (offset=0) when promoting OpentypeAxisValueOffset to AxisValue");
         };
         AxisValue::promote(raw)
@@ -781,8 +891,26 @@ impl Promote<OpentypeStat> for StatMetrics {
         StatMetrics {
             major_version: orig.major_version,
             minor_version: orig.minor_version,
-            design_axes: promote_count_array_link(orig.design_axis_count, (orig.design_axes_offset.offset, orig.design_axes_offset.link.as_ref().map(|x| &x.design_axes))),
-            axis_values: promote_count_array_link(orig.axis_value_count, (orig.offset_to_axis_value_offsets.offset, orig.offset_to_axis_value_offsets.link.as_ref().map(|x| &x.axis_value_offsets))),
+            design_axes: promote_count_array_link(
+                orig.design_axis_count,
+                (
+                    orig.design_axes_offset.offset,
+                    orig.design_axes_offset
+                        .link
+                        .as_ref()
+                        .map(|x| &x.design_axes),
+                ),
+            ),
+            axis_values: promote_count_array_link(
+                orig.axis_value_count,
+                (
+                    orig.offset_to_axis_value_offsets.offset,
+                    orig.offset_to_axis_value_offsets
+                        .link
+                        .as_ref()
+                        .map(|x| &x.axis_value_offsets),
+                ),
+            ),
             elided_fallback_name_id: NameId::from(orig.elided_fallback_name_id),
         }
     }
@@ -825,6 +953,12 @@ struct NameId(u16);
 impl From<u16> for NameId {
     fn from(value: u16) -> Self {
         Self(value)
+    }
+}
+
+impl Promote<u16> for NameId {
+    fn promote(value: &u16) -> Self {
+        Self(*value)
     }
 }
 
@@ -1326,9 +1460,22 @@ type ItemVariationStore = ();
 pub type OpentypeItemVariationStoreOffset = opentype_base_table_item_var_store_offset;
 
 // TODO - Scaffolding to be replaced when ItemVariationStore gets proper implementation
-impl Promote<()> for () {
-    fn promote(_orig: &()) {}
+
+// Helper for dummy promotions for unit model-types from arbitrary fixed preimage-types
+// NOTE - we can't implement generically (e.g. over all `T`) since those might clash with derived instances
+macro_rules! promote_to_unit {
+    ( $( $x:ty ),+ $(,)? ) => {
+        $(
+            impl Promote<$x> for () { fn promote(_orig: &$x) {} }
+        )*
+    };
 }
+
+promote_to_unit! {
+    (),
+    u16,
+}
+
 
 impl TryPromote<OpentypeGdefTableData> for GdefTableDataMetrics {
     type Error = ReflType<TPErr<OpentypeMarkGlyphSet, MarkGlyphSet>, UnknownValueError<u16>>;
@@ -3612,25 +3759,26 @@ impl Promote<OpentypeKernSubtableFormat2> for KernSubtableFormat2 {
     }
 }
 
+#[derive(Clone, Debug)]
+#[repr(transparent)]
+struct KerningArray(Wec<i16>);
+
 impl Promote<Vec<Vec<u16>>> for KerningArray {
     fn promote(orig: &Vec<Vec<u16>>) -> Self {
-        KerningArray(promote_vec(orig))
+        let Some(row0) = orig.get(0) else {
+            unreachable!("Cannot initialize KerningArray without at least one row");
+        };
+
+        let size = orig.len() * row0.len();
+        let mut accum = Wec::with_capacity(row0.len(), size);
+
+        for row in orig.iter() {
+            accum.extend(row.iter().map(|u| as_s16(*u)));
+        }
+
+        KerningArray(accum)
     }
 }
-
-#[derive(Clone, Debug)]
-#[repr(transparent)]
-struct KerningArray(Vec<KerningRow>);
-
-impl Promote<Vec<u16>> for KerningRow {
-    fn promote(orig: &Vec<u16>) -> Self {
-        KerningRow(orig.iter().map(|u| as_s16(*u)).collect())
-    }
-}
-
-#[derive(Clone, Debug)]
-#[repr(transparent)]
-struct KerningRow(Vec<i16>);
 
 #[derive(Debug, Clone)]
 struct KernSubtableFormat2 {
@@ -3698,6 +3846,8 @@ pub struct OptionalTableMetrics {
     gdef: Option<GdefMetrics>,
     gpos: Option<LayoutMetrics>,
     gsub: Option<LayoutMetrics>,
+    // STUB - add more tables as we expand opentype definition
+    fvar: Option<FvarMetrics>,
     // STUB - add more tables as we expand opentype definition
     kern: Option<KernMetrics>,
     stat: Option<StatMetrics>,
@@ -4086,6 +4236,7 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
                 })
                 .transpose()?
         };
+        let fvar = promote_opt(&dir.table_links.fvar);
         let kern = {
             let kern = &dir.table_links.kern;
             kern.as_ref().map(|kern| KernMetrics {
@@ -4137,6 +4288,8 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
             gdef,
             gpos,
             gsub,
+            // TODO - add more variation tables as they are added to the spec
+            fvar,
             // TODO - add more optional tables as they are added to the spec
             kern,
             stat,
@@ -4166,6 +4319,7 @@ fn is_extra(table_id: &u32) -> bool {
         b"cmap" | b"head" | b"hhea" | b"hmtx" | b"maxp" | b"name" | b"OS/2" | b"post" => false,
         b"cvt " | b"fpgm" | b"loca" | b"glyf" | b"prep" | b"gasp" => false,
         b"GDEF" | b"GPOS" | b"GSUB" | b"BASE" => false,
+        b"fvar" => false,
         b"kern" | b"STAT" | b"vhea" | b"vmtx" => false,
         // FIXME - update with more cases as we handle more table records
         _ => true,
@@ -4261,24 +4415,77 @@ fn show_optional_metrics(optional: &OptionalTableMetrics, conf: &Config) {
     show_glyf_metrics(&optional.glyf, conf);
     show_prep_metrics(&optional.prep, conf);
     show_gasp_metrics(&optional.gasp, conf);
+
     // STUB - anything between gasp and gdef go here
+
     show_base_metrics(&optional.base, conf);
     show_gdef_metrics(&optional.gdef, conf);
-
     show_layout_metrics(&optional.gpos, Ctxt::from(TableDiscriminator::Gpos), conf);
     show_layout_metrics(&optional.gsub, Ctxt::from(TableDiscriminator::Gsub), conf);
 
+    show_fvar_metrics(&optional.fvar, conf);
+
     show_kern_metrics(&optional.kern, conf);
     show_stat_metrics(&optional.stat, conf);
-
     show_vhea_metrics(&optional.vhea, conf);
     show_vmtx_metrics(&optional.vmtx, conf);
 }
 
-fn show_cvt_metrics(cvt: &Option<CvtMetrics>, _conf: &Config) {
-    if let Some(RawArrayMetrics(count)) = cvt {
-        println!("cvt: FWORD[{count}]")
+fn show_fvar_metrics(fvar: &Option<FvarMetrics>, conf: &Config) {
+    let Some(fvar) = fvar else { return };
+    if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
+        println!("fvar: version {}", format_version_major_minor(fvar.major_version, fvar.minor_version));
+        println!("\tAxes:");
+        fn format_variation_axis_record(axis: &VariationAxisRecord) -> String {
+            format!(
+                "'{}' axis: [{}, {}] (default: {}){}{:?}",
+                axis.axis_tag,
+                axis.min_value,
+                axis.max_value,
+                axis.default_value,
+                if axis.flags.hidden_axis { " (hidden) " } else { " " },
+                axis.axis_name_id,
+            )
+        }
+        fn format_instance_record(instance: &InstanceRecord, conf: &Config) -> String {
+            format!(
+                "Subfamily={:?};{} {}",
+                instance.subfamily_nameid,
+                match instance.postscript_nameid {
+                    None => String::new(),
+                    Some(name_id) => format!(" Postscript={:?};", name_id)
+                },
+                format_items_inline(
+                    &instance.coordinates,
+                    |coord| format!("{:+}", coord),
+                    conf.inline_bookend,
+                    |n_skipped| format!("..(skipping {} coordinates)..", n_skipped),
+                )
+            )
+        }
+        show_items_elided(
+            &fvar.axes,
+            |ix, axis| println!("\t\t[{ix}]: {}", format_variation_axis_record(axis)),
+            conf.bookend_size,
+            |start, stop| format!("\t(skipping axis records {start}..{stop})")
+        );
+        println!("\tInstances:");
+        show_items_elided(
+            &fvar.instances,
+            |ix, instance| println!("\t\t[{ix}]: {}", format_instance_record(instance, conf)),
+            conf.bookend_size,
+            |start, stop| format!("\t(skipping instance records {start}..{stop})")
+        );
+    } else {
+        print!("fvar: version {}", format_version_major_minor(fvar.major_version, fvar.minor_version));
+        println!("; {} axes, {} instances", fvar.axes.len(), fvar.instances.len());
     }
+}
+
+fn show_cvt_metrics(cvt: &Option<CvtMetrics>, _conf: &Config) {
+    let Some(RawArrayMetrics(count)) = cvt else { return };
+
+    println!("cvt: FWORD[{count}]")
 }
 
 fn show_fpgm_metrics(fpgm: &Option<FpgmMetrics>, _conf: &Config) {
@@ -4878,7 +5085,10 @@ fn format_lookup_subtable(
 
 fn show_stat_metrics(stat: &Option<StatMetrics>, conf: &Config) {
     fn format_design_axis(axis: &DesignAxis, _conf: &Config) -> String {
-        format!("Tag={} ; Axis NameID={} ; Ordering={}", axis.axis_tag, axis.axis_name_id.0, axis.axis_ordering)
+        format!(
+            "Tag={} ; Axis NameID={} ; Ordering={}",
+            axis.axis_tag, axis.axis_name_id.0, axis.axis_ordering
+        )
     }
     fn format_axis_value(value: &AxisValue, conf: &Config) -> String {
         fn format_axis_value_flags(flags: &AxisValueFlags) -> String {
@@ -4898,22 +5108,69 @@ fn show_stat_metrics(stat: &Option<StatMetrics>, conf: &Config) {
             }
         }
         match value {
-            AxisValue::Format1(AxisValueFormat1 { axis_index, flags, value_name_id, value }) => {
-                format!("Axis[{}]{}: {:?} = {}", axis_index, format_axis_value_flags(flags), value_name_id, value)
+            AxisValue::Format1(AxisValueFormat1 {
+                axis_index,
+                flags,
+                value_name_id,
+                value,
+            }) => {
+                format!(
+                    "Axis[{}]{}: {:?} = {}",
+                    axis_index,
+                    format_axis_value_flags(flags),
+                    value_name_id,
+                    value
+                )
             }
-            AxisValue::Format2(AxisValueFormat2 { axis_index, flags, value_name_id, nominal_value, range_min_value, range_max_value }) => {
-                format!("Axis[{}]{}: {:?} = {} ∈ [{}, {}]", axis_index, format_axis_value_flags(flags), value_name_id, nominal_value, range_min_value, range_max_value)
+            AxisValue::Format2(AxisValueFormat2 {
+                axis_index,
+                flags,
+                value_name_id,
+                nominal_value,
+                range_min_value,
+                range_max_value,
+            }) => {
+                format!(
+                    "Axis[{}]{}: {:?} = {} ∈ [{}, {}]",
+                    axis_index,
+                    format_axis_value_flags(flags),
+                    value_name_id,
+                    nominal_value,
+                    range_min_value,
+                    range_max_value
+                )
             }
-            AxisValue::Format3(AxisValueFormat3 { axis_index, flags, value_name_id, value, linked_value }) => {
-                format!("Axis[{}]{}: {:?} = {} (-> {})", axis_index, format_axis_value_flags(flags), value_name_id, value, linked_value)
+            AxisValue::Format3(AxisValueFormat3 {
+                axis_index,
+                flags,
+                value_name_id,
+                value,
+                linked_value,
+            }) => {
+                format!(
+                    "Axis[{}]{}: {:?} = {} (-> {})",
+                    axis_index,
+                    format_axis_value_flags(flags),
+                    value_name_id,
+                    value,
+                    linked_value
+                )
             }
-            AxisValue::Format4(AxisValueFormat4 { flags, value_name_id, axis_values }) => {
-                format!("{:?}{}: {}",
+            AxisValue::Format4(AxisValueFormat4 {
+                flags,
+                value_name_id,
+                axis_values,
+            }) => {
+                format!(
+                    "{:?}{}: {}",
                     value_name_id,
                     format_axis_value_flags(flags),
                     format_items_inline(
                         axis_values,
-                        |axis_value| format!("Axis[{}] = {}", axis_value.axis_index, axis_value.value),
+                        |axis_value| format!(
+                            "Axis[{}] = {}",
+                            axis_value.axis_index, axis_value.value
+                        ),
                         conf.inline_bookend,
                         |n_skipped| format!("..(skipping {n_skipped} AxisValue records).."),
                     )
@@ -4922,7 +5179,11 @@ fn show_stat_metrics(stat: &Option<StatMetrics>, conf: &Config) {
         }
     }
     if let Some(stat) = stat {
-        println!("STAT: version {} (elidedFallbackName: name[id={}])", format_version_major_minor(stat.major_version, stat.minor_version), stat.elided_fallback_name_id.0);
+        println!(
+            "STAT: version {} (elidedFallbackName: name[id={}])",
+            format_version_major_minor(stat.major_version, stat.minor_version),
+            stat.elided_fallback_name_id.0
+        );
         if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
             match stat.design_axes.len() {
                 0 => (),
@@ -4932,7 +5193,9 @@ fn show_stat_metrics(stat: &Option<StatMetrics>, conf: &Config) {
                         &stat.design_axes,
                         |ix, d_axis| println!("\t\t[{ix}]: {}", format_design_axis(d_axis, conf)),
                         conf.bookend_size,
-                        |start, stop| format!("\t(skipping design-axes from index {start}..{stop})"),
+                        |start, stop| {
+                            format!("\t(skipping design-axes from index {start}..{stop})")
+                        },
                     )
                 }
             }
@@ -4944,7 +5207,9 @@ fn show_stat_metrics(stat: &Option<StatMetrics>, conf: &Config) {
                         &stat.axis_values,
                         |ix, a_value| println!("\t\t[{ix}]: {}", format_axis_value(a_value, conf)),
                         conf.bookend_size,
-                        |start, stop| format!("\t(skipping design-axes from index {start}..{stop})"),
+                        |start, stop| {
+                            format!("\t(skipping design-axes from index {start}..{stop})")
+                        },
                     )
                 }
             }
@@ -5010,12 +5275,12 @@ fn show_kern_metrics(kern: &Option<KernMetrics>, conf: &Config) {
                     )
                 }
                 fn show_kerning_array(array: &KerningArray, conf: &Config) {
-                    show_items_elided(
+                    show_wec_rows_elided(
                         &array.0,
                         |ix, row| {
                             print!("\t\t[{ix}]: ");
                             show_items_inline(
-                                &row.0,
+                                &row,
                                 |kern_val| format!("{:+}", kern_val),
                                 conf.inline_bookend,
                                 |n| format!("(..{n}..)"),
@@ -5898,6 +6163,32 @@ fn format_items_inline<T>(
         }
     }
     format!("[{}]", buffer.join(", "))
+}
+
+// Enumerates the contents of a Wec<T>, showing only the first and last `bookend` rows if the Wec is tall enough.
+///
+/// Each row is shown with `show_fn`, and the `elision_message` is printed (along with the range of indices skipped)
+/// if the slice length exceeds than 2 * `bookend`, in between the initial and terminal span of `bookend` items.
+fn show_wec_rows_elided<T>(
+    matrix: &Wec<T>,
+    show_fn: impl Fn(usize, &[T]),
+    bookend: usize,
+    fn_message: impl Fn(usize, usize) -> String,
+) {
+    let count = matrix.rows();
+    if count > bookend * 2 {
+        for ix in 0..bookend {
+            show_fn(ix, &matrix[ix]);
+        }
+        println!("{}", fn_message(bookend, count - bookend));
+        for ix in (count - bookend)..count {
+            show_fn(ix, &matrix[ix]);
+        }
+    } else {
+        for (ix, row) in matrix.iter_rows().enumerate() {
+            show_fn(ix, row);
+        }
+    }
 }
 
 /// Enumerates the contents of a slice, showing only the first and last `bookend` items if the slice is long enough.

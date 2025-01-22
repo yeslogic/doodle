@@ -869,6 +869,14 @@ pub fn subset_fields<const N: usize>(original: Expr, field_set: [&'static str; N
     Expr::Record(accum_fields)
 }
 
+/// Given a single label-`Expr` pair and a record-kinded `Expr` with a list of field-labels,
+/// constructs a unified record-kinded `Expr` whose first field is `field` and whose remaining
+/// fields are the given list of `original` fields via record-projection.
+///
+/// Note that the list of field-labels given in `original.1` must not contain any field-labels
+/// that are absent from `original.0`, but otherwise, may represent an arbitrary subset-permutation
+/// of the actual record-field labels in `original.0`. It should not include any field more than once,
+/// as this is not typically supported in the record model and may lead to breakage.
 pub fn prepend_field<const N: usize>(
     field: (&'static str, Expr),
     original: (Expr, [&'static str; N]),
@@ -895,7 +903,7 @@ pub fn prepend_field<const N: usize>(
 }
 
 /// Given an expression of type `Seq(Seq(T))`, return an expression of type `Seq(T)` corresponding to the concatenation
-/// of each sub-list in turn.
+/// of each sub-list into a contiguous array whose elements appear in the natural order (e.g. `[[1,2,3],[4,5],[6]] -> [1,2,3,4,5,6]`)
 #[inline]
 pub fn concat(xs: Expr) -> Expr {
     flat_map(f_id(), xs)
@@ -923,7 +931,7 @@ where
 
 /// Analogue of [`std::option::Option::map_or`] expressed within the Expr model.
 ///
-/// Given a default value `dft` of type `Expr@T`, and a callable `f` mapping `Expr@T -> Expr@U`,
+/// Given a default value `dft` of type `Expr@U`, and a callable `f` mapping `Expr@T -> Expr@U`,
 /// as well as a value `x` of type `Expr@Option(T)`, computes the value of type `Expr@U`
 /// corresponding to `f` applied to the `Some(_)` case, or dft if `x` is `None`.
 pub fn expr_option_map_or(dft: Expr, f: impl FnOnce(Expr) -> Expr, x: Expr) -> Expr {
@@ -1100,6 +1108,12 @@ where
     expr_match(x, branches)
 }
 
+/// Helper function for constructing [`Format::WithRelativeOffset`] relative to the specified `base_address`, or defaulting
+/// to the immediate buffer-position when `base_address` is `None`.
+///
+/// The offset `offset` is the position, relative to `base_address`, where the parse of `format` is performed.
+///
+/// For absolute addressing, `base_address` can be set to `Some(Expr::U32(0))` (or any other integer-kinded `Expr` variant over `0`).
 pub fn with_relative_offset(base_address: Option<Expr>, offset: Expr, format: Format) -> Format {
     match base_address {
         Some(addr) => {
@@ -1114,7 +1128,7 @@ pub fn with_relative_offset(base_address: Option<Expr>, offset: Expr, format: Fo
 }
 
 /// Gets the current stream-position and casts down from U64->U32
-// TODO: implement a semi-auto type for Format::Pos in typechecker instead of hard-coding to U64?
+// REVIEW - Since the typechecker now infers a semi-auto type for Format::Pos rather than forcing U64, the cast may be extraneous...
 pub fn pos32() -> Format {
     map(Format::Pos, lambda("x", Expr::AsU32(Box::new(var("x")))))
 }

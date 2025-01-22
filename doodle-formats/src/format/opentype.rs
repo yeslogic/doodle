@@ -492,6 +492,24 @@ fn link_forward_checked(abs_offset: Expr, format: Format) -> Format {
     )
 }
 
+/// Given a raw Format `format` and an absolute buffer-offset `abs_offset`,
+/// attempts to parse `format` at `abs_offset`.
+///
+/// If the offset specified has already been exceeded, will fail the local parse instead.
+fn link_forward_unchecked(abs_offset: Expr, format: Format) -> Format {
+    // FIXME - forgetful chaining candidate
+    chain(
+        // NOTE - rather than construct a fallible value in an infallible parse, fail the parse if the desired invariant does not hold
+        where_lambda(
+            pos32(),
+            "__here",
+            expr_gte(abs_offset.clone(), var("__here")),
+        ),
+        "_",
+        with_relative_offset(Some(Expr::U32(0)), abs_offset, format),
+    )
+}
+
 /// Given a value of `base_offset` (the absolute stream-position relative to which offsets are to be interpreted),
 /// parses a u16be as a positive delta from `base_offset` and returns the linked content parsed according
 /// to `format` at that location.
@@ -4356,6 +4374,110 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ]),
             )
         };
+        let fvar_table = {
+            let axis_qual_flags = {
+                let flags = {
+                    let mut tmp: [Option<&'static str>; 16] = [None; 16];
+                    tmp[15].replace("hidden_axis"); // Bit 0 - If set, axis should not be exposed directly in user interfaces
+                    tmp
+                };
+                flags_bits16(flags)
+            };
+            let variation_axis_record = module.define_format(
+                "opentype.var.variation_axis_record", // REVIEW - is there a better name to ascribe this?
+                record([
+                    ("axis_tag", tag.call()),
+                    ("min_value", fixed32be(base)),
+                    ("default_value", fixed32be(base)),
+                    ("max_value", fixed32be(base)),
+                    ("flags", axis_qual_flags),
+                    ("axis_name_id", base.u16be()),
+                ]),
+            );
+            let user_tuple = module.define_format_args(
+                "opentype.var.user_tuple",
+                vec![(
+                    Label::Borrowed("axis_count"),
+                    ValueType::Base(BaseType::U16),
+                )],
+                record([(
+                    "coordinates",
+                    repeat_count(var("axis_count"), fixed32be(base)),
+                )]),
+            );
+            module.define_format(
+                "opentype.fvar_table",
+                record([
+                    ("table_start", pos32()),
+                    ("major_version", expect_u16be(base, 1)),
+                    ("minor_version", expect_u16be(base, 0)),
+                    (
+                        "__offset_axes",
+                        where_lambda(base.u16be(), "raw", is_nonzero(var("raw"))),
+                    ),
+                    ("__reserved", expect_u16be(base, 2)),
+                    ("axis_count", base.u16be()),
+                    ("axis_size", expect_u16be(base, 20)), // For fvar version 1.0, axis record are fixed-size == 20 (0x0014) bytes
+                    ("instance_count", base.u16be()),
+                    ("instance_size", base.u16be()), // not yet enforced, but should be axisCount * sizeOf(Fixed32Be) + (4 or 6)
+                    // NOTE - We use our current record scope to avoid the need to pass in the relevant variables from above, and to avoid nested record structures
+                    (
+                        "__axes_length",
+                        compute(mul(var("axis_count"), var("axis_size"))),
+                    ),
+                    (
+                        "axes",
+                        // NOTE - because we delay interpretation of the offset above to collect additional fields, we inline and specialize offset16 based on the captured value
+                        link_forward_unchecked(
+                            pos_add_u16(var("table_start"), var("__offset_axes")),
+                            slice(
+                                var("__axes_length"),
+                                repeat_count(
+                                    var("axis_count"),
+                                    slice(var("axis_size"), variation_axis_record.call()),
+                                ),
+                            ),
+                        ),
+                    ),
+                    (
+                        "instances",
+                        // NOTE - because we delay interpretation of the offset above to collect additional fields, we inline and specialize offset16 based on the captured value
+                        link_forward_unchecked(
+                            pos_add_u16(
+                                var("table_start"),
+                                // use the length of the axes array as a second-order correction to the original offset
+                                add(var("__offset_axes"), var("__axes_length")),
+                            ),
+                            repeat_count(
+                                var("instance_count"),
+                                slice(
+                                    var("instance_size"),
+                                    record([
+                                        ("subfamily_nameid", base.u16be()),
+                                        ("flags", expect_u16be(base, 0)), // reserved for future use, should be set to 0,
+                                        (
+                                            "coordinates",
+                                            user_tuple.call_args(vec![var("axis_count")]),
+                                        ),
+                                        (
+                                            "postscript_nameid",
+                                            cond_maybe(
+                                                // Only included if the extra 2 bytes are implied by `instance_size`, which is otherwise divisible by 4
+                                                expr_eq(
+                                                    rem(var("instance_size"), Expr::U16(4)),
+                                                    Expr::U16(2),
+                                                ),
+                                                base.u16be(),
+                                            ),
+                                        ),
+                                    ]),
+                                ),
+                            ),
+                        ),
+                    ),
+                ]),
+            )
+        };
 
         module.define_format_args(
             "opentype.table_directory.table_links",
@@ -4478,6 +4600,14 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 (
                     "gsub",
                     optional_table(START_VAR, var("tables"), magic(b"GSUB"), gsub_table.call()),
+                ),
+                // !SECTION
+                // STUB - add more table sections
+                // SECTION - Font Variations
+                // STUB - add more tables
+                (
+                    "fvar",
+                    optional_table(START_VAR, var("tables"), magic(b"fvar"), fvar_table.call()),
                 ),
                 // !SECTION
                 // STUB - add more table sections
