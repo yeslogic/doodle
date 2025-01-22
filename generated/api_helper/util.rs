@@ -1,5 +1,10 @@
 use std::{collections::BTreeSet, ops::Index};
 
+/// Simulated two-dimensional array using a single vector allocation
+///
+/// All filled 'rows' must have the same width, but the final row may be under-populated (during construction at least)
+///
+/// (`Wec` because 'W' is visually similar to 'VV', for "V[ec]Vec")
 #[derive(Clone)]
 pub struct Wec<T> {
     _store: Vec<T>,
@@ -54,6 +59,14 @@ impl<T> Wec<T> {
         }
     }
 
+    pub fn with_capacity(width: usize, capacity: usize) -> Self {
+        assert_eq!(capacity % width, 0, "capacity must be a multiple of width: {capacity} % {width} != 0");
+        Self {
+            _store: Vec::with_capacity(capacity),
+            width,
+        }
+    }
+
     pub fn rows(&self) -> usize {
         self._store.len() / self.width
     }
@@ -78,10 +91,12 @@ impl<T> Wec<T> {
         self._store.is_empty()
     }
 
+    /// Returns dimensions of array, in `(rows, cols)` order.
     pub fn dims(&self) -> (usize, usize) {
         (self._store.len() / self.width, self.width)
     }
 
+    /// Pushes a single row to the end of the Wec.
     pub fn push_row(&mut self, row: &mut Vec<T>) {
         assert_eq!(row.len(), self.width);
         self._store.append(row)
@@ -91,7 +106,7 @@ impl<T> Wec<T> {
     where
         T: Clone,
     {
-        assert_eq!(row.len(), self.width);
+        debug_assert_eq!(self.width, row.len(), "mismatched column count for Wec::extend_full_row: width={} but row has length {}", self.width, row.len());
         self._store.extend_from_slice(row)
     }
 
@@ -107,12 +122,37 @@ impl<T> Wec<T> {
         }
     }
 
+    /// Attempts to index into a Wec using a pre-computed `i * width + j` index, as if the `Wec`
+    /// were a one-dimensional `Vec` with the same elements.
+    pub fn index_raw(&self, raw_index: usize) -> Option<&T> {
+        self._store.get(raw_index)
+    }
+
     pub fn iter_rows(&self) -> impl Iterator<Item = &[T]> {
         (0..self.rows()).map(|ix| &self[ix])
     }
 }
 
+impl<T> Extend<Vec<T>> for Wec<T> {
+    fn extend<I: IntoIterator<Item = Vec<T>>>(&mut self, iter: I) {
+        for mut row in iter {
+            debug_assert_eq!(row.len(), self.width);
+            self._store.append(&mut row);
+        }
+    }
+}
+
+impl<T> Extend<T> for Wec<T> {
+    fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
+        let mut tmp = iter.into_iter().collect::<Vec<T>>();
+        debug_assert_eq!(tmp.len() % self.width, 0);
+        self._store.append(&mut tmp);
+    }
+}
+
 /// Abstraction over a set of `u16`-valued elements.
+///
+/// Might be replaced with a raw bit-array of 1024 64-bit words, but not a bottleneck so even if this is an upgrade, it isn't very high-priority.
 #[derive(Clone)]
 pub struct U16Set {
     _store: BTreeSet<u16>,
