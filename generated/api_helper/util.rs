@@ -60,7 +60,11 @@ impl<T> Wec<T> {
     }
 
     pub fn with_capacity(width: usize, capacity: usize) -> Self {
-        assert_eq!(capacity % width, 0, "capacity must be a multiple of width: {capacity} % {width} != 0");
+        assert_eq!(
+            capacity % width,
+            0,
+            "capacity must be a multiple of width: {capacity} % {width} != 0"
+        );
         Self {
             _store: Vec::with_capacity(capacity),
             width,
@@ -106,7 +110,13 @@ impl<T> Wec<T> {
     where
         T: Clone,
     {
-        debug_assert_eq!(self.width, row.len(), "mismatched column count for Wec::extend_full_row: width={} but row has length {}", self.width, row.len());
+        debug_assert_eq!(
+            self.width,
+            row.len(),
+            "mismatched column count for Wec::extend_full_row: width={} but row has length {}",
+            self.width,
+            row.len()
+        );
         self._store.extend_from_slice(row)
     }
 
