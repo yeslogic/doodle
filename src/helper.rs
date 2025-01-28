@@ -6,6 +6,48 @@ use crate::{
     Arith, BaseType, Expr, Format, IntRel, IntoLabel, Label, Pattern, TypeHint, UnaryOp, ValueType,
 };
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum BitFieldKind {
+    FlagBit(&'static str),
+    BitsField {
+        field_name: &'static str,
+        bit_width: u8,
+    },
+    Reserved {
+        bit_width: u8,
+        check_zero: bool,
+    },
+}
+
+impl BitFieldKind {
+    pub const fn bit_width(&self) -> u8 {
+        match self {
+            BitFieldKind::FlagBit(..) => 1,
+            BitFieldKind::BitsField { bit_width, .. }
+            | BitFieldKind::Reserved { bit_width, .. } => *bit_width,
+        }
+    }
+
+    pub const fn is_flag(&self) -> bool {
+        matches!(self, BitFieldKind::FlagBit(..))
+    }
+
+    pub const fn field_name(&self) -> Option<&'static str> {
+        match self {
+            BitFieldKind::FlagBit(lab) => Some(*lab),
+            BitFieldKind::BitsField { field_name, .. } => Some(*field_name),
+            BitFieldKind::Reserved { .. } => None,
+        }
+    }
+
+    pub const fn check_zero(&self) -> bool {
+        match self {
+            BitFieldKind::Reserved { check_zero, .. } => *check_zero,
+            _ => false,
+        }
+    }
+}
+
 /// Constructs a Format that expands a single parsed byte into a multi-field record whose elements
 /// are `u8`-valued sub-masks of the original byte.
 ///
@@ -26,24 +68,81 @@ pub fn packed_bits_u8<const N: usize>(
     field_names: [&'static str; N],
 ) -> Format {
     const BINDING_NAME: &str = "packed_bits";
-    let _len: u8 = field_bit_lengths.iter().sum();
-    assert_eq!(
-        _len, 8,
-        "bad packed-bits field-lengths: total length {_len} of {field_bit_lengths:?} != 8"
-    );
+    #[cfg(debug_assertions)]
+    {
+        let _len: u8 = field_bit_lengths.iter().sum();
+        debug_assert_eq!(
+            _len, 8,
+            "bad packed-bits field-lengths: total length {_len} of {field_bit_lengths:?} != 8"
+        );
+    }
     let mut fields = Vec::new();
     let mut high_bits_used = 0;
     for (nbits, name) in Iterator::zip(field_bit_lengths.into_iter(), field_names.into_iter()) {
         fields.push((
             Label::Borrowed(name),
-            mask_bits(var(BINDING_NAME), high_bits_used, nbits),
+            mask_bits_u8(var(BINDING_NAME), high_bits_used, nbits),
         ));
         high_bits_used += nbits;
     }
-    map(
-        Format::Byte(ByteSet::full()),
-        lambda(BINDING_NAME, Expr::Record(fields)),
-    )
+    map(ANY_BYTE, lambda(BINDING_NAME, Expr::Record(fields)))
+}
+
+/// Ergonomic helper for parsing a 8-bit packed value into a multi-field record with more
+/// context-awareness for determining the interpretation (and semantics) of the various
+/// segments of contiguous bits.
+///
+/// Can be used to to simulate both [`packed_bits_u8`] and [`flags_bits8`], as well as anything between the two,
+/// with more flexibility than either of those functions offer for hybrid interpretations and reserved-bit elision,
+/// at the cost of some extra boilerplate in the argument type.
+pub fn bit_fields_u8<const N: usize>(bit_fields: [BitFieldKind; N]) -> Format {
+    const BINDING_NAME: &str = "packed_bits";
+    #[cfg(debug_assertions)]
+    {
+        let _len: u8 = bit_fields.iter().map(BitFieldKind::bit_width).sum();
+        debug_assert_eq!(
+            _len, 8,
+            "bad packed-bits field-lengths: total width {_len} of {bit_fields:?} != 8"
+        );
+    }
+    let mut fields = Vec::new();
+
+    // mask value that should yield `0` when `&`-ed with the original u16
+    // NOTE - currently, we set this value but don't directly use it
+    let mut _zero_mask: u8 = 0;
+
+    let mut high_bits_used = 0;
+    for bit_field in bit_fields.into_iter() {
+        let nbits = bit_field.bit_width();
+        if let Some(name) = bit_field.field_name() {
+            let raw = mask_bits_u8(var(BINDING_NAME), high_bits_used, nbits);
+            let field_value = if bit_field.is_flag() {
+                is_nonzero_u8(raw)
+            } else {
+                raw
+            };
+            fields.push((Label::Borrowed(name), field_value));
+        } else {
+            if bit_field.check_zero() {
+                _zero_mask &= ((1u8 << nbits) - 1) << (8 - (high_bits_used + nbits));
+            }
+        }
+        high_bits_used += nbits;
+    }
+
+    let packed = if _zero_mask != 0 {
+        const PREPACKED: &str = "packed";
+        // NOTE - only bother using where-lambda if zero_mask is non-vacuous
+        where_lambda(
+            ANY_BYTE,
+            PREPACKED,
+            expr_eq(bit_and(var(PREPACKED), Expr::U8(_zero_mask)), Expr::U8(0)),
+        )
+    } else {
+        ANY_BYTE
+    };
+
+    map(packed, lambda(BINDING_NAME, Expr::Record(fields)))
 }
 
 /// Like [`packed_bits_u8`], except all fields are 1-bit and implied to be flags,
@@ -61,7 +160,7 @@ pub fn flags_bits8(field_names: [Option<&'static str>; 8]) -> Format {
         if let Some(name) = field_name {
             flags.push((
                 Label::Borrowed(name),
-                is_nonzero(mask_bits(var(BINDING_NAME), ix as u8, 1)),
+                is_nonzero_u8(mask_bits_u8(var(BINDING_NAME), ix as u8, 1)),
             ));
         }
     }
@@ -75,7 +174,7 @@ pub fn flags_bits8(field_names: [Option<&'static str>; 8]) -> Format {
 /// Selects `nbits` bits starting from the highest unused bit in an 8-bit packed-field value, returning a U8-typed Expr.
 ///
 /// Will panic if `nbits + high_bits_used > 8`.
-pub fn mask_bits(x: Expr, high_bits_used: u8, nbits: u8) -> Expr {
+pub fn mask_bits_u8(x: Expr, high_bits_used: u8, nbits: u8) -> Expr {
     assert!(
         nbits + high_bits_used <= 8,
         "mask_bits cannot create mask {nbits} bits out of available {}",
@@ -86,7 +185,7 @@ pub fn mask_bits(x: Expr, high_bits_used: u8, nbits: u8) -> Expr {
     bit_and(shr(x, Expr::U8(shift)), Expr::U8(mask))
 }
 
-fn mask_bits16(x: Expr, high_bits_used: u8, nbits: u8) -> Expr {
+fn mask_bits_u16(x: Expr, high_bits_used: u8, nbits: u8) -> Expr {
     let shift = 16 - (high_bits_used + nbits) as u16;
     let mask = (1u16 << nbits) - 1;
     bit_and(shr(x, Expr::U16(shift)), Expr::U16(mask))
@@ -110,17 +209,20 @@ pub fn packed_bits_u16<const N: usize>(
     field_names: [&'static str; N],
 ) -> Format {
     const BINDING_NAME: &str = "packed_bits";
-    let _total_len: u8 = field_bit_lengths.iter().sum();
-    assert_eq!(
-        _total_len, 16,
-        "bad packed-bits field-lengths: total length {_total_len} of {field_bit_lengths:?} != 16"
-    );
+    #[cfg(debug_assertions)]
+    {
+        let _sz: u8 = field_bit_lengths.iter().sum();
+        debug_assert_eq!(
+            _sz, 16,
+            "bad packed-bits field-lengths: total bits-width {_sz} of {field_bit_lengths:?} != 16"
+        );
+    }
     let mut fields = Vec::new();
     let mut high_bits_used = 0;
     for (nbits, name) in Iterator::zip(field_bit_lengths.into_iter(), field_names.into_iter()) {
         fields.push((
             Label::Borrowed(name),
-            mask_bits16(var(BINDING_NAME), high_bits_used, nbits),
+            mask_bits_u16(var(BINDING_NAME), high_bits_used, nbits),
         ));
         high_bits_used += nbits;
     }
@@ -148,7 +250,7 @@ pub fn flags_bits16(field_names: [Option<&'static str>; 16]) -> Format {
         if let Some(name) = field_name {
             flags.push((
                 Label::Borrowed(name),
-                is_nonzero(mask_bits16(var(BINDING_NAME), ix as u8, 1)),
+                is_nonzero_u16(mask_bits_u16(var(BINDING_NAME), ix as u8, 1)),
             ));
         }
     }
@@ -160,6 +262,68 @@ pub fn flags_bits16(field_names: [Option<&'static str>; 16]) -> Format {
         ),
         lambda(BINDING_NAME, Expr::Record(flags)),
     )
+}
+
+/// Ergonomic helper for parsing a 16-bit packed value into a multi-field record with more
+/// context-awareness for determining the interpretation (and semantics) of the various
+/// segments of contiguous bits.
+///
+/// Can be used to to simulate both [`packed_bits_u16`] and [`flags_bits16`], as well as anything between the two,
+/// with more flexibility than either of those functions offer for hybrid interpretations and reserved-bit elision,
+/// at the cost of some extra boilerplate in the argument type.
+pub fn bit_fields_u16<const N: usize>(bit_fields: [BitFieldKind; N]) -> Format {
+    const BINDING_NAME: &str = "packed_bits";
+    #[cfg(debug_assertions)]
+    {
+        let _len: u8 = bit_fields.iter().map(BitFieldKind::bit_width).sum();
+        debug_assert_eq!(
+            _len, 16,
+            "bad packed-bits field-lengths: total width {_len} of {bit_fields:?} != 16"
+        );
+    }
+    let mut fields = Vec::new();
+
+    // mask value that should yield `0` when `&`-ed with the original u16
+    // NOTE - currently, we set this value but don't directly use it
+    let mut _zero_mask: u16 = 0;
+
+    let mut high_bits_used = 0;
+    for bit_field in bit_fields.into_iter() {
+        let nbits = bit_field.bit_width();
+        if let Some(name) = bit_field.field_name() {
+            let raw = mask_bits_u16(var(BINDING_NAME), high_bits_used, nbits);
+            let field_value = if bit_field.is_flag() {
+                is_nonzero_u16(raw)
+            } else {
+                raw
+            };
+            fields.push((Label::Borrowed(name), field_value));
+        } else {
+            if bit_field.check_zero() {
+                _zero_mask &= ((1u16 << nbits) - 1) << (16 - (high_bits_used + nbits));
+            }
+        }
+        high_bits_used += nbits;
+    }
+
+    let u16be = map(
+        tuple_repeat(2, Format::Byte(ByteSet::full())),
+        lambda("x", Expr::U16Be(Box::new(var("x")))),
+    );
+
+    let packed = if _zero_mask != 0 {
+        const PREPACKED: &str = "packed";
+        // NOTE - only bother using where-lambda if zero_mask is non-vacuous
+        where_lambda(
+            u16be,
+            PREPACKED,
+            expr_eq(bit_and(var(PREPACKED), Expr::U16(_zero_mask)), Expr::U16(0)),
+        )
+    } else {
+        u16be
+    };
+
+    map(packed, lambda(BINDING_NAME, Expr::Record(fields)))
 }
 
 /// Returns an [`Expr`] that refers to a (hopefully) in-scope variable by name.
@@ -433,6 +597,9 @@ pub fn is_bytes(bytes: &[u8]) -> Format {
     tuple(bytes.iter().copied().map(is_byte))
 }
 
+/// Helper const for a format that matches every byte.
+pub const ANY_BYTE: Format = Format::Byte(ByteSet::full());
+
 /// Helper-function for [`Expr::RecordProj`].
 ///
 /// Provided that `label` is a valid field within the record (whether natural, or mapped) `head`, will evaluate to the value of the corresponding field.
@@ -685,9 +852,57 @@ pub fn record_repeat<const N: usize>(field_names: [&'static str; N], format: For
     Format::Record(iter.collect())
 }
 
+pub trait ZeroMarker {
+    fn mk_zero() -> Expr;
+}
+
+/// Marker type for [`Expr::U8`]-based generic trait impls
+pub struct U8;
+/// Marker type for [`Expr::U16`]-specific generic trait impls
+pub struct U16;
+
+macro_rules! impl_zeromarker {
+    ( $( $t:ident ),+ $(,)? ) => {
+        $(
+            impl ZeroMarker for $t {
+                fn mk_zero() -> Expr {
+                    Expr::$t(0)
+                }
+            }
+        )*
+    };
+}
+
+impl_zeromarker!(U8, U16);
+
+/// Given the appropriate Marker-type, returns an Expr that evaluates to `true` if the expression `expr` (of the apprpriate type for the Marker passed in)
+/// is non-zero.
+///
+/// # Notes
+///
+/// Generates slightly more ergonomic code-fragments during generation than the standard [`is_nonzero`] that works generically,
+/// as well as being theoretically applicable to more broad machine-kinds (e.g. signed integers as well).
+pub fn is_nonzero_parametric<T: ZeroMarker>(expr: Expr) -> Expr {
+    expr_ne(expr, T::mk_zero())
+}
+
 /// Returns an Expr that evaluates to `true` if the given expression (of an arbitrary Uint type) is non-zero
+///
+/// # Notes
+///
+/// Though simpler to invoke in Format definitions, the code generated by this method is mildly tangled compared
+/// to [`is_nonzero_parametric`] and [`is_nonzero_u8`] (etc.), but this function has the upside of not requiring
+/// as much hunting for the exact machine-kind of non-obvious input expressions.
 pub fn is_nonzero(expr: Expr) -> Expr {
     expr_not(is_within(expr, Bounds::exact(0)))
+}
+
+pub fn is_nonzero_u8(expr: Expr) -> Expr {
+    expr_gt(expr, Expr::U8(0))
+}
+
+pub fn is_nonzero_u16(expr: Expr) -> Expr {
+    expr_gt(expr, Expr::U16(0))
 }
 
 /// Helper for constructing `Option::None` within the Expr model-language.
@@ -735,13 +950,45 @@ pub fn for_each(seq: Expr, name: impl IntoLabel, inner: Format) -> Format {
 
 /// Helper for specifying a byte-aligned Format with a given byte-multiple `align`
 pub fn aligned(f: Format, align: usize) -> Format {
-    chain(Format::Align(align), "_", f)
+    monad_seq(Format::Align(align), f)
 }
 
 /// Helper method for [`Format::LetFormat`]
 #[inline]
 pub fn chain(f0: Format, name: impl IntoLabel, f: Format) -> Format {
     Format::LetFormat(Box::new(f0), name.into(), Box::new(f))
+}
+
+/// Helper method for [`Format::LefFormat`] for raw sequencing-without-capture, to avoid open-coding [`chain`] with the non-name "_".
+#[inline]
+pub fn monad_seq(f0: Format, f: Format) -> Format {
+    Format::LetFormat(Box::new(f0), Label::Borrowed("_"), Box::new(f))
+}
+
+/// Helper for destructuring an `Expr`-level tuple-value into a set of locally bound variables.
+///
+/// # Notes
+///
+/// The entire tuple does not have to be enumerated, but there must not be more labels than the arity of the tuple allows for.
+pub fn with_tuple<const N: usize>(
+    tuple: Expr,
+    labels: [&'static str; N],
+    format: Format,
+) -> Format {
+    let mut inner = format;
+    const TUPLE_VARNAME: &str = "bound_tuple";
+    for (ix, label) in labels.into_iter().enumerate() {
+        inner = Format::Let(
+            Label::Borrowed(label),
+            Box::new(tuple_proj(var(TUPLE_VARNAME), ix)),
+            Box::new(inner),
+        )
+    }
+    Format::Let(
+        Label::Borrowed(TUPLE_VARNAME),
+        Box::new(tuple),
+        Box::new(inner),
+    )
 }
 
 /// Shortcut for matching an explicit pattern of bytes wrapped in a sequence.
@@ -936,6 +1183,24 @@ where
 /// corresponding to `f` applied to the `Some(_)` case, or dft if `x` is `None`.
 pub fn expr_option_map_or(dft: Expr, f: impl FnOnce(Expr) -> Expr, x: Expr) -> Expr {
     expr_match(x, [(pat_some(bind("x")), f(var("x"))), (pat_none(), dft)])
+}
+
+/// Fused [`std::option::Option::or`] and [`std::option::Option::unwrap`], which takes two `Option@T`-kinded `Expr` values,
+/// `a` and `b`, and returns the `T` value of the first one of them (left-to-right) that has a value.
+///
+/// If both are `Some(_)`, the value of `a` will be returned over the value of `b`.
+///
+/// # Notes
+///
+/// Will produce runtime parse-error if both are `None`.
+pub fn expr_option_unwrap_first(a: Expr, b: Expr) -> Expr {
+    expr_match(
+        a,
+        [
+            (pat_some(bind("x")), var("x")),
+            (pat_none(), expr_unwrap(b)),
+        ],
+    )
 }
 
 /// Helper function for [`Format::Compute`].

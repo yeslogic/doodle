@@ -611,8 +611,6 @@ struct FvarMetrics {
     instances: Vec<InstanceRecord>,
 }
 
-
-
 pub type OpentypeUserTuple = opentype_var_user_tuple;
 
 impl Promote<OpentypeUserTuple> for UserTuple {
@@ -628,7 +626,6 @@ pub type OpentypeInstanceRecord = opentype_fvar_table_instances;
 // REVIEW - currently not implemented in the Opentype spec
 type InstanceFlags = ();
 
-
 impl Promote<OpentypeInstanceRecord> for InstanceRecord {
     fn promote(orig: &OpentypeInstanceRecord) -> InstanceRecord {
         InstanceRecord {
@@ -639,7 +636,6 @@ impl Promote<OpentypeInstanceRecord> for InstanceRecord {
         }
     }
 }
-
 
 #[derive(Debug, Clone)]
 struct InstanceRecord {
@@ -675,7 +671,7 @@ impl Promote<OpentypeVariationAxisRecordFlags> for VariationAxisRecordFlags {
 }
 #[derive(Clone, Copy, Debug)]
 struct VariationAxisRecordFlags {
-    hidden_axis: bool
+    hidden_axis: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -687,7 +683,6 @@ struct VariationAxisRecord {
     flags: VariationAxisRecordFlags,
     axis_name_id: NameId,
 }
-
 
 #[derive(Debug, Clone)]
 struct StatMetrics {
@@ -1475,7 +1470,6 @@ promote_to_unit! {
     (),
     u16,
 }
-
 
 impl TryPromote<OpentypeGdefTableData> for GdefTableDataMetrics {
     type Error = ReflType<TPErr<OpentypeMarkGlyphSet, MarkGlyphSet>, UnknownValueError<u16>>;
@@ -4113,7 +4107,7 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
             let num_glyphs = glyf.len();
             let glyphs = glyf
                 .iter()
-                .map(|g| match g {
+                .map(|g| match &g {
                     opentype_glyf_table::EmptyGlyph => GlyphMetric::Empty,
                     opentype_glyf_table::Glyph(gl) => match &gl.description {
                         GlyphDescription::HeaderOnly => GlyphMetric::Empty,
@@ -4434,7 +4428,10 @@ fn show_optional_metrics(optional: &OptionalTableMetrics, conf: &Config) {
 fn show_fvar_metrics(fvar: &Option<FvarMetrics>, conf: &Config) {
     let Some(fvar) = fvar else { return };
     if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
-        println!("fvar: version {}", format_version_major_minor(fvar.major_version, fvar.minor_version));
+        println!(
+            "fvar: version {}",
+            format_version_major_minor(fvar.major_version, fvar.minor_version)
+        );
         println!("\tAxes:");
         fn format_variation_axis_record(axis: &VariationAxisRecord) -> String {
             format!(
@@ -4443,7 +4440,11 @@ fn show_fvar_metrics(fvar: &Option<FvarMetrics>, conf: &Config) {
                 axis.min_value,
                 axis.max_value,
                 axis.default_value,
-                if axis.flags.hidden_axis { " (hidden) " } else { " " },
+                if axis.flags.hidden_axis {
+                    " (hidden) "
+                } else {
+                    " "
+                },
                 axis.axis_name_id,
             )
         }
@@ -4453,7 +4454,7 @@ fn show_fvar_metrics(fvar: &Option<FvarMetrics>, conf: &Config) {
                 instance.subfamily_nameid,
                 match instance.postscript_nameid {
                     None => String::new(),
-                    Some(name_id) => format!(" Postscript={:?};", name_id)
+                    Some(name_id) => format!(" Postscript={:?};", name_id),
                 },
                 format_items_inline(
                     &instance.coordinates,
@@ -4467,23 +4468,32 @@ fn show_fvar_metrics(fvar: &Option<FvarMetrics>, conf: &Config) {
             &fvar.axes,
             |ix, axis| println!("\t\t[{ix}]: {}", format_variation_axis_record(axis)),
             conf.bookend_size,
-            |start, stop| format!("\t(skipping axis records {start}..{stop})")
+            |start, stop| format!("\t(skipping axis records {start}..{stop})"),
         );
         println!("\tInstances:");
         show_items_elided(
             &fvar.instances,
             |ix, instance| println!("\t\t[{ix}]: {}", format_instance_record(instance, conf)),
             conf.bookend_size,
-            |start, stop| format!("\t(skipping instance records {start}..{stop})")
+            |start, stop| format!("\t(skipping instance records {start}..{stop})"),
         );
     } else {
-        print!("fvar: version {}", format_version_major_minor(fvar.major_version, fvar.minor_version));
-        println!("; {} axes, {} instances", fvar.axes.len(), fvar.instances.len());
+        print!(
+            "fvar: version {}",
+            format_version_major_minor(fvar.major_version, fvar.minor_version)
+        );
+        println!(
+            "; {} axes, {} instances",
+            fvar.axes.len(),
+            fvar.instances.len()
+        );
     }
 }
 
 fn show_cvt_metrics(cvt: &Option<CvtMetrics>, _conf: &Config) {
-    let Some(RawArrayMetrics(count)) = cvt else { return };
+    let Some(RawArrayMetrics(count)) = cvt else {
+        return;
+    };
 
     println!("cvt: FWORD[{count}]")
 }
@@ -6570,7 +6580,7 @@ pub mod lookup_subtable {
                         .first()
                         .and_then(|subtable| subtable.link.as_ref())
                 }) {
-                    let ground = match subtable {
+                    let ground = match &subtable {
                         OpentypeGposLookupSubtableExt::PosExtension(ext) => {
                             ret.pos_extension = true;
                             match &ext.extension_offset.link {
