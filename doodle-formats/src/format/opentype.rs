@@ -1,6 +1,6 @@
 use crate::format::BaseModule;
 use doodle::bounds::Bounds;
-use doodle::{byte_set::ByteSet, helper::*, Expr, IntoLabel, Label};
+use doodle::{helper::*, Expr, IntoLabel, Label};
 use doodle::{BaseType, Format, FormatModule, FormatRef, Pattern, ValueType};
 
 fn shadow_check(x: &Expr, name: &'static str) {
@@ -157,53 +157,6 @@ where
     }
 }
 
-/// Helper function for constructing a record whose first field is a non-boolean value
-/// that is parsed first, followed by a series of up to 8 flag-bits that fit into a
-/// single byte.
-///
-/// Useful for GPOS/GSUB LookupTable lookup flags, as well as 'kern' subtable coverage-fields
-///
-/// While more widely applicable to other usage-patterns, the most common shape of a format that
-/// this facilitates is:
-/// ```ignore
-///     u16be ~> (u8[hi] ~ unsigned integer value) (u8[lo] ~ N x (boolean flag))
-/// ```
-fn prepend_field_flags_bits8(
-    pre_field: &'static str,
-    pre_format: Format,
-    flags: [Option<&'static str>; 8],
-) -> Format {
-    const BINDING_NAME: &str = "flagbyte";
-
-    assert_ne!(
-        pre_field, BINDING_NAME,
-        "map lambda binding `{BINDING_NAME}` shadows chain binding of same name"
-    );
-    let n_flags = flags.iter().flatten().count();
-
-    // allocate a vector of fields with enough room for our first non-flag field and all of the flag-fields
-    let mut record_fields = Vec::with_capacity(n_flags + 1);
-
-    // pre-push the initial field for the incoming chain-binding
-    record_fields.push((Label::Borrowed(pre_field), var(pre_field)));
-
-    // subsequently push the respective flag-bit-checks of all occupied bit-positions
-    for (ix, field_name) in flags.into_iter().enumerate() {
-        if let Some(name) = field_name {
-            record_fields.push((
-                Label::Borrowed(name),
-                is_nonzero(mask_bits_u8(var(BINDING_NAME), ix as u8, 1)),
-            ));
-        }
-    }
-
-    // parse a single value of `pre_format`, then the flags, and combine them in a single pass with no intermediate records
-    map(
-        tuple([pre_format, Format::Byte(ByteSet::full())]),
-        lambda_tuple([pre_field, BINDING_NAME], Expr::Record(record_fields)),
-    )
-}
-
 /// Extracts the final element of a sequence-Expr if it is not empty
 ///
 /// If the sequence is empty, the behavior is unspecified
@@ -238,6 +191,7 @@ fn loca_offset_pairs(loca: Expr) -> Expr {
 /// The first element in the array will be the pair `(offsets[0], offsets[1])`, and the final will be `(offsets[N-1], offsets[N])`,
 /// where the original offset-sequence contains `N + 1` raw elements.
 fn offsets_to_offset_pairs(offsets: Expr) -> Expr {
+    // REVIEW - as-is, this doubles the needed size of the output sequence (when u16) by requiring it to exist as u32-pairs in memory all at once; consider spontaneous generation of pairs from the u16-based array
     flat_map_accum(
         lambda_tuple(
             ["last_value", "value"],
@@ -306,17 +260,17 @@ fn f2dot14(base: &BaseModule) -> Format {
     map(base.u16be(), lambda("x", variant("F2Dot14", var("x"))))
 }
 
-/// FIXME[signedness-hack] - scaffolding to signal intent to use i8 format before it is implemented
+/// FIXME[epic=signedness-hack] - scaffolding to signal intent to use i8 format before it is implemented
 fn s8(base: &BaseModule) -> Format {
     base.u8()
 }
 
-/// FIXME[signedness-hack] - scaffolding to signal intent to use i16 format before it is implemented
+/// FIXME[epic=signedness-hack] - scaffolding to signal intent to use i16 format before it is implemented
 fn s16be(base: &BaseModule) -> Format {
     base.u16be()
 }
 
-/// FIXME[signedness-hack] - scaffolding to signal intent to use i64 format before it is implemented
+/// FIXME[epic=signedness-hack] - scaffolding to signal intent to use i64 format before it is implemented
 fn s64be(base: &BaseModule) -> Format {
     base.u64be()
 }
@@ -373,10 +327,9 @@ where
     };
 
     chain(
-        Format::Peek(Box::new(chain(
+        Format::Peek(Box::new(monad_seq(
             // Process all the fields before the one we care about and discard their cumulative value
             record(init.into_iter().cloned()),
-            "_",
             // Process the field we *do* care about, while still in the peek context, and yield its value as the result of the entire parse
             field_format.clone(),
         ))),
@@ -511,14 +464,14 @@ fn link_forward_checked(abs_offset: Expr, format: Format) -> Format {
 /// If the offset specified has already been exceeded, will fail the local parse instead.
 fn link_forward_unchecked(abs_offset: Expr, format: Format) -> Format {
     // FIXME - forgetful chaining candidate
-    chain(
+    monad_seq(
         // NOTE - rather than construct a fallible value in an infallible parse, fail the parse if the desired invariant does not hold
+        // REVIEW - is it worth it to forgo this validation if we are confident it won't be called with bad values?
         where_lambda(
             pos32(),
             "__here",
             expr_gte(abs_offset.clone(), var("__here")),
         ),
-        "_",
         with_relative_offset(Some(Expr::U32(0)), abs_offset, format),
     )
 }
@@ -556,7 +509,7 @@ fn offset16_mandatory(base_offset: Expr, format: Format, base: &BaseModule) -> F
         (
             "link",
             if_then_else(
-                is_nonzero(var("offset")),
+                is_nonzero_u16(var("offset")),
                 // because link-checked can also return format_none, it has to be the one to wrap format_some around the parse
                 link_forward_checked(pos_add_u16(base_offset, var("offset")), format),
                 format_none(),
@@ -588,7 +541,7 @@ fn offset16_nullable(base_offset: Expr, format: Format, base: &BaseModule) -> Fo
         (
             "link",
             if_then_else(
-                is_nonzero(var("offset")),
+                is_nonzero_u16(var("offset")),
                 // because link-checked can also return format_none, it has to be the one to wrap format_some around the parse
                 link_forward_checked(pos_add_u16(base_offset, var("offset")), format),
                 format_none(),
@@ -620,7 +573,7 @@ fn offset32(base_offset: Expr, format: Format, base: &BaseModule) -> Format {
         (
             "link",
             if_then_else(
-                is_nonzero(var("offset")),
+                is_nonzero_u32(var("offset")),
                 linked_offset32(base_offset, var("offset"), format_some(format)),
                 format_none(),
             ),
@@ -1128,30 +1081,28 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         };
 
         let head_table = {
-            // FIXME - replace with packed_bits_u16 of fields if appropriate
+            // FIXME - replace with bit_fields_u16 if appropriate
             let head_table_flags = base.u16be();
 
             let long_date_time = module.define_format("opentype.types.long_date_time", s64be(base));
 
             let xy_min_max = record_repeat(["x_min", "y_min", "x_max", "y_max"], s16be(base));
 
-            let head_table_style_flags = flags_bits16([
-                None, // Bit 15 (MSB)
-                None, // Bit 14
-                None, // Bit 13
-                None, // Bit 12
-                None, // Bit 11
-                None, // Bit 10
-                None, // Bit 9
-                None, // Bit 8
-                None, // Bit 7
-                Some("extended"),
-                Some("condensed"),
-                Some("shadow"),
-                Some("outline"),
-                Some("underline"),
-                Some("italic"),
-                Some("bold"),
+            // REVIEW[epic=check-zero] - determine whether we should check for zeroing of reserved bit-fields positions
+            const SHOULD_CHECK_ZERO: bool = false;
+
+            let head_table_style_flags = bit_fields_u16([
+                BitFieldKind::Reserved {
+                    bit_width: 9,
+                    check_zero: SHOULD_CHECK_ZERO,
+                },
+                BitFieldKind::FlagBit("extended"),
+                BitFieldKind::FlagBit("condensed"),
+                BitFieldKind::FlagBit("shadow"),
+                BitFieldKind::FlagBit("outline"),
+                BitFieldKind::FlagBit("underline"),
+                BitFieldKind::FlagBit("italic"),
+                BitFieldKind::FlagBit("bold"),
             ]);
 
             // NOTE - Should be 2 for modern fonts but we shouldn't enforce that too strongly
@@ -1442,7 +1393,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 const V0_MIN_LENGTH: u32 = 78;
                 cond_maybe(
                     or(
-                        is_nonzero(var(version_ident)),
+                        is_nonzero_u16(var(version_ident)),
                         expr_gte(table_length, Expr::U32(V0_MIN_LENGTH)),
                     ),
                     record([
@@ -1615,17 +1566,23 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             )
         };
         let glyf_table = {
+            use BitFieldKind::*;
+            const SHOULD_CHECK_ZERO: bool = false;
+
             let simple_flags_raw = module.define_format(
                 "opentype.glyph-description.simple.flags-raw",
-                flags_bits8([
-                    None,
-                    Some("overlap_simple"),
-                    Some("y_is_same_or_positive_y_short_vector"),
-                    Some("x_is_same_or_positive_x_short_vector"),
-                    Some("repeat_flag"),
-                    Some("y_short_vector"),
-                    Some("x_short_vector"),
-                    Some("on_curve_point"),
+                bit_fields_u8([
+                    Reserved {
+                        bit_width: 1,
+                        check_zero: SHOULD_CHECK_ZERO,
+                    },
+                    FlagBit("overlap_simple"),
+                    FlagBit("y_is_same_or_positive_y_short_vector"),
+                    FlagBit("x_is_same_or_positive_x_short_vector"),
+                    FlagBit("repeat_flag"),
+                    FlagBit("y_short_vector"),
+                    FlagBit("x_short_vector"),
+                    FlagBit("on_curve_point"),
                 ]),
             );
 
@@ -1811,23 +1768,27 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         ),
                     )
                 };
-                let glyf_flags_composite = flags_bits16([
-                    None,                              // bit 15 - reserved (0 implied but not enforced)
-                    None, // bit 14 - reserved (0 implied but not enforced)
-                    None, // bit 13 - reserved (0 implied but not enforced)
-                    Some("unscaled_component_offset"), // bit 12 - set if component offset is not to be scaled
-                    Some("scaled_component_offset"), // bit 11 - set if component offset is to be scaled
-                    Some("overlap_compound"), // bit 10 - hint for whether the component overlap
-                    Some("use_my_metrics"), // bit 9 - when set, composite glyph inherits aw, lsb, rsb of current component glyph
-                    Some("we_have_instructions"), // bit 8 - instructions present after final component
-                    Some("we_have_a_two_by_two"), // bit 7 - we have a two by two transformation that will be used to scale the glyph
-                    Some("we_have_an_x_and_y_scale"), // bit 6 - when set, x has a different scale from y
-                    Some("more_components"), // bit 5 - continuation bit (1 when more follow, 0 if final)
-                    Some("__reserved_bit4"), // bit 4 - reserved, should be 0
-                    Some("we_have_a_scale"), // bit 3 - when 1, component has simple scale; otherwise scale is 1.0
-                    Some("round_xy_to_grid"), // bit 2 - when set (and when `args_are_xy_values` is set), xy values are rounded to nearest grid line
-                    Some("args_are_xy_values"), // bit 1 - when set, args are signed xy values; otherwise, they are unsigned point numbers
-                    Some("arg_1_and_2_are_words"), // bit 0 - set for args of type u16 or i16; clear for args of type u8 or i8
+                let glyf_flags_composite = bit_fields_u16([
+                    Reserved {
+                        bit_width: 3,
+                        check_zero: false,
+                    },
+                    FlagBit("unscaled_component_offset"), // bit 12 - set if component offset is not to be scaled
+                    FlagBit("scaled_component_offset"), // bit 11 - set if component offset is to be scaled
+                    FlagBit("overlap_compound"), // bit 10 - hint for whether the component overlap
+                    FlagBit("use_my_metrics"), // bit 9 - when set, composite glyph inherits aw, lsb, rsb of current component glyph
+                    FlagBit("we_have_instructions"), // bit 8 - instructions present after final component
+                    FlagBit("we_have_a_two_by_two"), // bit 7 - we have a two by two transformation that will be used to scale the glyph
+                    FlagBit("we_have_an_x_and_y_scale"), // bit 6 - when set, x has a different scale from y
+                    FlagBit("more_components"), // bit 5 - continuation bit (1 when more follow, 0 if final)
+                    Reserved {
+                        bit_width: 1,
+                        check_zero: false,
+                    }, // bit 4 - reserved, should be 0
+                    FlagBit("we_have_a_scale"), // bit 3 - when 1, component has simple scale; otherwise scale is 1.0
+                    FlagBit("round_xy_to_grid"), // bit 2 - when set (and when `args_are_xy_values` is set), xy values are rounded to nearest grid line
+                    FlagBit("args_are_xy_values"), // bit 1 - when set, args are signed xy values; otherwise, they are unsigned point numbers
+                    FlagBit("arg_1_and_2_are_words"), // bit 0 - set for args of type u16 or i16; clear for args of type u8 or i8
                 ]);
 
                 let glyf_scale = |flags: Expr| -> Format {
@@ -1991,42 +1952,30 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         let prep_table = repeat(base.u8());
         // REVIEW - the generated names for gasp subtypes can be run-on, consider pruning name tokens or module.define_format(_args) for brevity
         let gasp_table = {
-            let ver0flags = flags_bits16([
-                None, // Bit 15 - Reserved
-                None, // Bit 14 - Reserved
-                None, // Bit 13 - Reserved
-                None, // Bit 12 - Reserved
-                None, // Bit 11 - Reserved
-                None, // Bit 10 - Reserved
-                None, // Bit 9 - Reserved
-                None, // Bit 8 - Reserved
-                None, // Bit 7 - Reserved
-                None, // Bit 6 - Reserved
-                None, // Bit 5 - Reserved
-                None, // Bit 4 - Reserved
-                None, // Bit 3 - Version 1 Only
-                None, // Bit 2 - Version 1 Only
-                Some("dogray"),
-                Some("gridfit"),
+            use BitFieldKind::*;
+
+            let ver0flags = bit_fields_u16([
+                Reserved {
+                    bit_width: 12,
+                    check_zero: false,
+                }, // Reserved in all versions
+                Reserved {
+                    bit_width: 2,
+                    check_zero: false,
+                }, // Version 1 only, but not actually reserved
+                FlagBit("dogray"),
+                FlagBit("gridfit"),
             ]);
 
-            let ver1flags = flags_bits16([
-                None, // Bit 15 - Reserved
-                None, // Bit 14 - Reserved
-                None, // Bit 13 - Reserved
-                None, // Bit 12 - Reserved
-                None, // Bit 11 - Reserved
-                None, // Bit 10 - Reserved
-                None, // Bit 9 - Reserved
-                None, // Bit 8 - Reserved
-                None, // Bit 7 - Reserved
-                None, // Bit 6 - Reserved
-                None, // Bit 5 - Reserved
-                None, // Bit 4 - Reserved
-                Some("symmetric_smoothing"),
-                Some("symmetric_gridfit"),
-                Some("dogray"),
-                Some("gridfit"),
+            let ver1flags = bit_fields_u16([
+                Reserved {
+                    bit_width: 12,
+                    check_zero: false,
+                }, // Reserved in all versions
+                FlagBit("symmetric_smoothing"),
+                FlagBit("symmetric_gridfit"),
+                FlagBit("dogray"),
+                FlagBit("gridfit"),
             ]);
 
             let gasp_record = |ver: Expr| -> Format {
@@ -2460,25 +2409,23 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         };
         // SECTION - bulk common definitions for GSUB and GPOS
         let value_format_flags = {
+            use BitFieldKind::*;
+
             module.define_format(
                 "opentype.common.value-format-flags",
-                flags_bits16([
-                    None,
-                    None,
-                    None,
-                    None, // 0xF000 - Reserved (set to 0)
-                    None,
-                    None,
-                    None,
-                    None, // 0xF00  - Reserved (set to 0)
-                    Some("y_advance_device"),
-                    Some("x_advance_device"),
-                    Some("y_placement_device"),
-                    Some("x_placement_device"),
-                    Some("y_advance"),
-                    Some("x_advance"),
-                    Some("y_placement"),
-                    Some("x_placement"),
+                bit_fields_u16([
+                    Reserved {
+                        bit_width: 8,
+                        check_zero: true,
+                    },
+                    FlagBit("y_advance_device"),
+                    FlagBit("x_advance_device"),
+                    FlagBit("y_placement_device"),
+                    FlagBit("x_placement_device"),
+                    FlagBit("y_advance"),
+                    FlagBit("x_advance"),
+                    FlagBit("y_placement"),
+                    FlagBit("x_placement"),
                 ]),
             )
         };
@@ -2747,7 +2694,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         let sequence_context = {
             let rule_set = {
                 let rule = record([
-                    ("glyph_count", where_nonzero(base.u16be())),
+                    ("glyph_count", where_nonzero::<U16>(base.u16be())),
                     ("seq_lookup_count", base.u16be()),
                     (
                         "input_sequence",
@@ -3890,20 +3837,24 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         }
                     };
                     let lookup_flag = {
-                        prepend_field_flags_bits8(
-                            "mark_attachment_class_filter",
-                            base.u8(),
-                            [
-                                None,                           // Bit 7 (0x80) - reserved
-                                None,                           // Bit 6 (0x40) - reserved
-                                None,                           // Bit 5 (0x20) - reserved
-                                Some("use_mark_filtering_set"), // Bit 4 (0x10) - indicator flag for presence of markFilteringSet field in Lookup table structure
-                                Some("ignore_marks"), // Bit 3 (0x8) - if set, skips  over combining marks
-                                Some("ignore_ligatures"), // Bit 2 (0x4) - if set, skips over ligatures
-                                Some("ignore_base_glyphs"), // Bit 1 (0x2) - if set, skips over base glyphs
-                                Some("right_to_left"), // Bit 0 (0x1) - [GPOS type 3 only] when set, last glyph matched input will be positioned on baseline
-                            ],
-                        )
+                        use BitFieldKind::*;
+                        // REVIEW[epic=check-zero] - consider whether this should be set to true
+                        const SHOULD_CHECK_ZERO: bool = false;
+                        bit_fields_u16([
+                            BitsField {
+                                bit_width: 8,
+                                field_name: "mark_attachment_class_filter",
+                            },
+                            Reserved {
+                                bit_width: 3,
+                                check_zero: SHOULD_CHECK_ZERO,
+                            },
+                            FlagBit("use_mark_filtering_set"), // Bit 4 (0x10) - indicator flag for presence of markFilteringSet field in Lookup table structure
+                            FlagBit("ignore_marks"), // Bit 3 (0x8) - if set, skips  over combining marks
+                            FlagBit("ignore_ligatures"), // Bit 2 (0x4) - if set, skips over ligatures
+                            FlagBit("ignore_base_glyphs"), // Bit 1 (0x2) - if set, skips over base glyphs
+                            FlagBit("right_to_left"), // Bit 0 (0x1) - [GPOS type 3 only] when set, last glyph matched input will be positioned on baseline
+                        ])
                     };
                     // STUB - initial pass to merely provide a structure without gaps (but not full-featured coverage of each sub-component)
                     // FIXME - refine and enrich this
@@ -4167,20 +4118,23 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         // `kern` table [https://learn.microsoft.com/en-us/typography/opentype/spec/kern]
         let kern_table = {
             let kern_subtable = {
-                let kern_cov_flags = prepend_field_flags_bits8(
-                    "format",
-                    base.u8(),
-                    [
-                        None,                 // Bit 7 - reserved
-                        None,                 // Bit 6 - reserved
-                        None,                 // Bit 5 - reserved
-                        None,                 // Bit 4 - reserved
-                        Some("override"), // Bit 3 - when true, value in this table replaces the current accumulator value
-                        Some("cross_stream"), // Bit 2 - when true, kerning is perpendicular to text-flow (reset by 0x8000 in kerning data)
-                        Some("minimum"), // Bit 1 - when true, table contains minimum values, otherwise the table has kerning values
-                        Some("horizontal"), // Bit 0 - when true, table has horizontal data, otherwise vertical
-                    ],
-                );
+                use BitFieldKind::*;
+                // REVIEW[epic=check-zero] - should we consider changing this constant to `true`
+                const SHOULD_CHECK_ZERO: bool = false;
+                let kern_cov_flags = bit_fields_u16([
+                    BitsField {
+                        bit_width: 8,
+                        field_name: "format",
+                    },
+                    Reserved {
+                        bit_width: 4,
+                        check_zero: SHOULD_CHECK_ZERO,
+                    },
+                    FlagBit("override"), // Bit 3 - when true, value in this table replaces the current accumulator value
+                    FlagBit("cross_stream"), // Bit 2 - when true, kerning is perpendicular to text-flow (reset by 0x8000 in kerning data)
+                    FlagBit("minimum"), // Bit 1 - when true, table contains minimum values, otherwise the table has kerning values
+                    FlagBit("horizontal"), // Bit 0 - when true, table has horizontal data, otherwise vertical
+                ]);
                 let kern_pair = record([
                     ("left", base.u16be()),  // glyph index for left-hand glyph in kerning pair
                     ("right", base.u16be()), // glyph index for right-hand glyph in kerning pair
@@ -4253,8 +4207,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         match_variant(
                             record_proj(var("coverage"), "format"),
                             [
-                                (Pattern::U8(0), "Format0", kern_subtable_format0),
-                                (Pattern::U8(2), "Format2", kern_subtable_format2),
+                                (Pattern::U16(0), "Format0", kern_subtable_format0),
+                                (Pattern::U16(2), "Format2", kern_subtable_format2),
                                 // REVIEW - do we even want to bother with an explicit catch-all failure branch?
                                 (Pattern::Wildcard, "UnknownFormat", Format::Fail),
                             ],
@@ -4281,23 +4235,14 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ])
             };
             let axis_value_table = {
-                let axis_flags = flags_bits16([
-                    None,                                 // Bit 15 - Reserved
-                    None,                                 // Bit 14 - Reserved
-                    None,                                 // Bit 13 - Reserved
-                    None,                                 // Bit 12 - Reserved
-                    None,                                 // Bit 11 - Reserved
-                    None,                                 // Bit 10 - Reserved
-                    None,                                 // Bit 9 - Reserved
-                    None,                                 // Bit 8 - Reserved
-                    None,                                 // Bit 7 - Reserved
-                    None,                                 // Bit 6 - Reserved
-                    None,                                 // Bit 5 - Reserved
-                    None,                                 // Bit 4 - Reserved
-                    None,                                 // Bit 3 - Reserved
-                    None,                                 // Bit 2 - Reserved
-                    Some("elidable_axis_value_name"), // Bit 1 - When set, indicates the 'normal' value for this axis and implies it may be omitted when composing name-strings
-                    Some("older_sibling_font_attribute"), // Bit 0 - When set, indicates that the axis information applies to previously released fonts in the same font-family
+                use BitFieldKind::*;
+                let axis_flags = bit_fields_u16([
+                    Reserved {
+                        bit_width: 14,
+                        check_zero: false,
+                    },
+                    FlagBit("elidable_axis_value_name"), // Bit 1 - When set, indicates the 'normal' value for this axis and implies it may be omitted when composing name-strings
+                    FlagBit("older_sibling_font_attribute"), // Bit 0 - When set, indicates that the axis information applies to previously released fonts in the same font-family
                 ]);
                 let axis_value = record([("axis_index", base.u16be()), ("value", fixed32be(base))]);
                 let f1_fields = vec![
@@ -4385,14 +4330,14 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             )
         };
         let fvar_table = {
-            let axis_qual_flags = {
-                let flags = {
-                    let mut tmp: [Option<&'static str>; 16] = [None; 16];
-                    tmp[15].replace("hidden_axis"); // Bit 0 - If set, axis should not be exposed directly in user interfaces
-                    tmp
-                };
-                flags_bits16(flags)
-            };
+            use BitFieldKind::*;
+            let axis_qual_flags = bit_fields_u16([
+                Reserved {
+                    bit_width: 15,
+                    check_zero: false,
+                },
+                FlagBit("hidden_axis"),
+            ]);
             let variation_axis_record = module.define_format(
                 "opentype.var.variation_axis_record", // REVIEW - is there a better name to ascribe this?
                 record([

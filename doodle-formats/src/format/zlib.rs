@@ -4,6 +4,7 @@ use crate::format::BaseModule;
 
 pub fn main(module: &mut FormatModule, base: &BaseModule, deflate: FormatRef) -> FormatRef {
     let method_and_flags = where_lambda(
+        // FIXME[epic=refactor] - replace with bit_fields_u8
         packed_bits_u8([4, 4], ["compression-info", "compression-method"]),
         "method-info",
         expr_eq(
@@ -13,7 +14,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, deflate: FormatRef) ->
     );
 
     // helper for checking whether a dictionary is present according to the flags
-    let has_dict = |flags: Expr| is_nonzero(record_proj(flags, "fdict"));
+    let has_dict = |flags: Expr| record_proj(flags, "fdict");
+
+    use BitFieldKind::*;
 
     module.define_format(
         "zlib.main",
@@ -22,7 +25,17 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, deflate: FormatRef) ->
             // REVIEW - fcheck is chosen such that the first 16 bits of the zlib block as a u16be is 0 mod 31
             (
                 "flags",
-                packed_bits_u8([2, 1, 5], ["flevel", "fdict", "fcheck"]),
+                bit_fields_u8([
+                    BitsField {
+                        bit_width: 2,
+                        field_name: "flevel",
+                    },
+                    FlagBit("fdict"),
+                    BitsField {
+                        bit_width: 5,
+                        field_name: "fcheck",
+                    },
+                ]),
             ),
             // TODO - this should be a 'known' dictionary if it appears, but that is domain-specific and hard to get a handle on
             ("dict-id", cond_maybe(has_dict(var("flags")), base.u32be())),

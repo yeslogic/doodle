@@ -327,7 +327,7 @@ distance: u16
 }
 
 #[derive(Debug, Clone)]
-pub enum deflate_main_codes { literal(u8), reference(deflate_main_codes_reference) }
+pub enum deflate_main_codes__dupX1 { literal(u8), reference(deflate_main_codes_reference) }
 
 #[derive(Debug, Clone)]
 pub struct deflate_dynamic_huffman {
@@ -340,7 +340,7 @@ literal_length_distance_alphabet_code_lengths_value: Vec<u8>,
 literal_length_alphabet_code_lengths_value: Vec<u8>,
 distance_alphabet_code_lengths_value: Vec<u8>,
 codes: Vec<deflate_dynamic_huffman_codes>,
-codes_values: Vec<deflate_main_codes>
+codes_values: Vec<deflate_main_codes__dupX1>
 }
 
 #[derive(Debug, Clone)]
@@ -360,7 +360,7 @@ extra: Option<deflate_fixed_huffman_codes_values>
 #[derive(Debug, Clone)]
 pub struct deflate_fixed_huffman {
 codes: Vec<deflate_fixed_huffman_codes>,
-codes_values: Vec<deflate_main_codes>
+codes_values: Vec<deflate_main_codes__dupX1>
 }
 
 #[derive(Debug, Clone)]
@@ -369,23 +369,23 @@ align: (),
 len: u16,
 nlen: u16,
 bytes: Vec<u8>,
-codes_values: Vec<deflate_main_codes>
+codes_values: Vec<deflate_main_codes__dupX1>
 }
 
 #[derive(Debug, Clone)]
-pub enum deflate_main_codes__dupX1 { dynamic_huffman(deflate_dynamic_huffman), fixed_huffman(deflate_fixed_huffman), uncompressed(deflate_uncompressed) }
+pub enum deflate_main_codes { dynamic_huffman(deflate_dynamic_huffman), fixed_huffman(deflate_fixed_huffman), uncompressed(deflate_uncompressed) }
 
 #[derive(Debug, Clone)]
 pub struct deflate_block {
 r#final: u8,
 r#type: u8,
-data: deflate_main_codes__dupX1
+data: deflate_main_codes
 }
 
 #[derive(Debug, Clone)]
 pub struct deflate_main {
 blocks: Vec<deflate_block>,
-codes: Vec<deflate_main_codes>,
+codes: Vec<deflate_main_codes__dupX1>,
 inflate: Vec<u8>
 }
 
@@ -1682,7 +1682,6 @@ we_have_instructions: bool,
 we_have_a_two_by_two: bool,
 we_have_an_x_and_y_scale: bool,
 more_components: bool,
-__reserved_bit4: bool,
 we_have_a_scale: bool,
 round_xy_to_grid: bool,
 args_are_xy_values: bool,
@@ -2250,7 +2249,7 @@ link: Option<opentype_common_feature_list>
 
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_gsub_table_lookup_list_link_lookups_link_lookup_flag {
-mark_attachment_class_filter: u8,
+mark_attachment_class_filter: u16,
 use_mark_filtering_set: bool,
 ignore_marks: bool,
 ignore_ligatures: bool,
@@ -3166,7 +3165,7 @@ glyph_variation_data_array: opentype_gvar_table_glyph_variation_data_array
 
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_kern_table_subtables_coverage {
-format: u8,
+format: u16,
 r#override: bool,
 cross_stream: bool,
 minimum: bool,
@@ -3493,7 +3492,7 @@ compression_method: u8
 #[derive(Debug, Copy, Clone)]
 pub struct zlib_main_flags {
 flevel: u8,
-fdict: u8,
+fdict: bool,
 fcheck: u8
 }
 
@@ -5513,15 +5512,7 @@ let mut accum = Vec::new();
 for _ in 0..num_fonts {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder20(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u32 {
 true => {
 let tgt_offset = start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -5555,15 +5546,7 @@ let mut accum = Vec::new();
 for _ in 0..num_fonts {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder20(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u32 {
 true => {
 let tgt_offset = start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6983,7 +6966,7 @@ b
 };
 ((|x: (u8, u8)| PResult::Ok(u16be(x)))(inner))?
 };
-((|flag_bits: u16| PResult::Ok(opentype_head_table_mac_style { extended: flag_bits >> 6u16 & 1u16 > 0u16, condensed: flag_bits >> 5u16 & 1u16 > 0u16, shadow: flag_bits >> 4u16 & 1u16 > 0u16, outline: flag_bits >> 3u16 & 1u16 > 0u16, underline: flag_bits >> 2u16 & 1u16 > 0u16, italic: flag_bits >> 1u16 & 1u16 > 0u16, bold: flag_bits >> 0u16 & 1u16 > 0u16 }))(inner))?
+((|packed_bits: u16| PResult::Ok(opentype_head_table_mac_style { extended: packed_bits >> 6u16 & 1u16 > 0u16, condensed: packed_bits >> 5u16 & 1u16 > 0u16, shadow: packed_bits >> 4u16 & 1u16 > 0u16, outline: packed_bits >> 3u16 & 1u16 > 0u16, underline: packed_bits >> 2u16 & 1u16 > 0u16, italic: packed_bits >> 1u16 & 1u16 > 0u16, bold: packed_bits >> 0u16 & 1u16 > 0u16 }))(inner))?
 }))())?;
 let lowest_rec_ppem = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let font_direction_hint = ((|| PResult::Ok((Decoder23(_input))?))())?;
@@ -7157,15 +7140,7 @@ let name_id = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -7249,15 +7224,7 @@ let ach_vend_id = ((|| PResult::Ok((Decoder46(_input))?))())?;
 let fs_selection = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let us_first_char_index = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let us_last_char_index = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let data = ((|| PResult::Ok(if !match version {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} || (table_length >= 78u32) {
+let data = ((|| PResult::Ok(if (version > 0u16) || (table_length >= 78u32) {
 let s_typo_ascender = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let s_typo_descender = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let s_typo_line_gap = ((|| PResult::Ok((Decoder23(_input))?))())?;
@@ -7473,7 +7440,7 @@ b
 };
 ((|x: (u8, u8)| PResult::Ok(u16be(x)))(inner))?
 };
-((|flag_bits: u16| PResult::Ok(opentype_gasp_table_gasp_ranges_range_gasp_behavior_Version0 { dogray: flag_bits >> 1u16 & 1u16 > 0u16, gridfit: flag_bits >> 0u16 & 1u16 > 0u16 }))(inner))?
+((|packed_bits: u16| PResult::Ok(opentype_gasp_table_gasp_ranges_range_gasp_behavior_Version0 { dogray: packed_bits >> 1u16 & 1u16 > 0u16, gridfit: packed_bits >> 0u16 & 1u16 > 0u16 }))(inner))?
 };
 opentype_gasp_table_gasp_ranges_range_gasp_behavior::Version0(inner)
 },
@@ -7494,7 +7461,7 @@ b
 };
 ((|x: (u8, u8)| PResult::Ok(u16be(x)))(inner))?
 };
-((|flag_bits: u16| PResult::Ok(opentype_gasp_table_gasp_ranges_range_gasp_behavior_Version1 { symmetric_smoothing: flag_bits >> 3u16 & 1u16 > 0u16, symmetric_gridfit: flag_bits >> 2u16 & 1u16 > 0u16, dogray: flag_bits >> 1u16 & 1u16 > 0u16, gridfit: flag_bits >> 0u16 & 1u16 > 0u16 }))(inner))?
+((|packed_bits: u16| PResult::Ok(opentype_gasp_table_gasp_ranges_range_gasp_behavior_Version1 { symmetric_smoothing: packed_bits >> 3u16 & 1u16 > 0u16, symmetric_gridfit: packed_bits >> 2u16 & 1u16 > 0u16, dogray: packed_bits >> 1u16 & 1u16 > 0u16, gridfit: packed_bits >> 0u16 & 1u16 > 0u16 }))(inner))?
 };
 opentype_gasp_table_gasp_ranges_range_gasp_behavior::Version1(inner)
 },
@@ -7534,15 +7501,7 @@ return Err(ParseError::FalsifiedWhere(9011855507994367971u64));
 }))())?;
 let horiz_axis_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -7567,15 +7526,7 @@ opentype_base_table_vert_axis_offset { offset, link }
 }))())?;
 let vert_axis_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -7600,15 +7551,7 @@ opentype_base_table_vert_axis_offset { offset, link }
 }))())?;
 let item_var_store_offset = ((|| PResult::Ok(if minor_version > 0u16 {
 let offset = ((|| PResult::Ok((Decoder20(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -7647,15 +7590,7 @@ return Err(ParseError::FalsifiedWhere(14796083725261108356u64));
 let minor_version = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let glyph_class_def = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -7680,15 +7615,7 @@ opentype_gdef_table_glyph_class_def { offset, link }
 }))())?;
 let attach_list = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -7704,15 +7631,7 @@ let inner = _input.get_offset_u64();
 }))())?;
 let coverage = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -7741,15 +7660,7 @@ let mut accum = Vec::new();
 for _ in 0..glyph_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -7802,15 +7713,7 @@ opentype_gdef_table_attach_list { offset, link }
 }))())?;
 let lig_caret_list = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -7826,15 +7729,7 @@ let inner = _input.get_offset_u64();
 }))())?;
 let coverage = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -7863,15 +7758,7 @@ let mut accum = Vec::new();
 for _ in 0..lig_glyph_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -7891,15 +7778,7 @@ let mut accum = Vec::new();
 for _ in 0..caret_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -7936,15 +7815,7 @@ let inner = {
 let coordinate = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let table = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -8029,15 +7900,7 @@ opentype_gdef_table_lig_caret_list { offset, link }
 }))())?;
 let mark_attach_class_def = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -8073,15 +7936,7 @@ return Err(ParseError::FailToken(14009314771729697611u64));
 let inner = {
 let mark_glyph_sets_def = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -8113,15 +7968,7 @@ opentype_gdef_table_data::Version1_2(inner)
 let inner = {
 let mark_glyph_sets_def = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -8146,15 +7993,7 @@ opentype_gdef_table_data_Version1_2_mark_glyph_sets_def { offset, link }
 }))())?;
 let item_var_store = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder20(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -8181,15 +8020,7 @@ _ => {
 let inner = {
 let mark_glyph_sets_def = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -8214,15 +8045,7 @@ opentype_gdef_table_data_Version1_2_mark_glyph_sets_def { offset, link }
 }))())?;
 let item_var_store = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder20(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -8264,15 +8087,7 @@ return Err(ParseError::FalsifiedWhere(10973085168168570837u64));
 let minor_version = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let script_list = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -8297,15 +8112,7 @@ opentype_gsub_table_script_list { offset, link }
 }))())?;
 let feature_list = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -8330,15 +8137,7 @@ opentype_gsub_table_feature_list { offset, link }
 }))())?;
 let lookup_list = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -8358,15 +8157,7 @@ let mut accum = Vec::new();
 for _ in 0..lookup_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -8383,58 +8174,20 @@ let inner = _input.get_offset_u64();
 let lookup_type = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let lookup_flag = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let inner = {
+let field0 = ((|| PResult::Ok({
+let b = _input.read_byte()?;
+b
+}))())?;
 let field1 = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 b
 }))())?;
 (field0, field1)
 };
-((|tuple_var: (u8, u8)| PResult::Ok(match tuple_var {
-(mark_attachment_class_filter, flagbyte) => {
-opentype_gsub_table_lookup_list_link_lookups_link_lookup_flag { mark_attachment_class_filter: mark_attachment_class_filter, use_mark_filtering_set: !match flagbyte >> 4u8 & 1u8 {
-0 => {
-true
-},
-
-_ => {
-false
-}
-}, ignore_marks: !match flagbyte >> 3u8 & 1u8 {
-0 => {
-true
-},
-
-_ => {
-false
-}
-}, ignore_ligatures: !match flagbyte >> 2u8 & 1u8 {
-0 => {
-true
-},
-
-_ => {
-false
-}
-}, ignore_base_glyphs: !match flagbyte >> 1u8 & 1u8 {
-0 => {
-true
-},
-
-_ => {
-false
-}
-}, right_to_left: !match flagbyte >> 0u8 & 1u8 {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} }
-}
-}))(inner))?
+((|x: (u8, u8)| PResult::Ok(u16be(x)))(inner))?
+};
+((|packed_bits: u16| PResult::Ok(opentype_gsub_table_lookup_list_link_lookups_link_lookup_flag { mark_attachment_class_filter: packed_bits >> 8u16 & 255u16, use_mark_filtering_set: packed_bits >> 4u16 & 1u16 > 0u16, ignore_marks: packed_bits >> 3u16 & 1u16 > 0u16, ignore_ligatures: packed_bits >> 2u16 & 1u16 > 0u16, ignore_base_glyphs: packed_bits >> 1u16 & 1u16 > 0u16, right_to_left: packed_bits >> 0u16 & 1u16 > 0u16 }))(inner))?
 }))())?;
 let sub_table_count = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let subtables = ((|| PResult::Ok({
@@ -8442,15 +8195,7 @@ let mut accum = Vec::new();
 for _ in 0..sub_table_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -8531,15 +8276,7 @@ opentype_gpos_table_lookup_list { offset, link }
 }))())?;
 let feature_variations_offset = ((|| PResult::Ok(if minor_version > 0u16 {
 let offset = ((|| PResult::Ok((Decoder20(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -8578,15 +8315,7 @@ return Err(ParseError::FalsifiedWhere(10603707580403307601u64));
 let minor_version = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let script_list = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -8611,15 +8340,7 @@ opentype_gsub_table_script_list { offset, link }
 }))())?;
 let feature_list = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -8644,15 +8365,7 @@ opentype_gsub_table_feature_list { offset, link }
 }))())?;
 let lookup_list = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -8672,15 +8385,7 @@ let mut accum = Vec::new();
 for _ in 0..lookup_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -8697,58 +8402,20 @@ let inner = _input.get_offset_u64();
 let lookup_type = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let lookup_flag = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let inner = {
+let field0 = ((|| PResult::Ok({
+let b = _input.read_byte()?;
+b
+}))())?;
 let field1 = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 b
 }))())?;
 (field0, field1)
 };
-((|tuple_var: (u8, u8)| PResult::Ok(match tuple_var {
-(mark_attachment_class_filter, flagbyte) => {
-opentype_gsub_table_lookup_list_link_lookups_link_lookup_flag { mark_attachment_class_filter: mark_attachment_class_filter, use_mark_filtering_set: !match flagbyte >> 4u8 & 1u8 {
-0 => {
-true
-},
-
-_ => {
-false
-}
-}, ignore_marks: !match flagbyte >> 3u8 & 1u8 {
-0 => {
-true
-},
-
-_ => {
-false
-}
-}, ignore_ligatures: !match flagbyte >> 2u8 & 1u8 {
-0 => {
-true
-},
-
-_ => {
-false
-}
-}, ignore_base_glyphs: !match flagbyte >> 1u8 & 1u8 {
-0 => {
-true
-},
-
-_ => {
-false
-}
-}, right_to_left: !match flagbyte >> 0u8 & 1u8 {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} }
-}
-}))(inner))?
+((|x: (u8, u8)| PResult::Ok(u16be(x)))(inner))?
+};
+((|packed_bits: u16| PResult::Ok(opentype_gsub_table_lookup_list_link_lookups_link_lookup_flag { mark_attachment_class_filter: packed_bits >> 8u16 & 255u16, use_mark_filtering_set: packed_bits >> 4u16 & 1u16 > 0u16, ignore_marks: packed_bits >> 3u16 & 1u16 > 0u16, ignore_ligatures: packed_bits >> 2u16 & 1u16 > 0u16, ignore_base_glyphs: packed_bits >> 1u16 & 1u16 > 0u16, right_to_left: packed_bits >> 0u16 & 1u16 > 0u16 }))(inner))?
 }))())?;
 let sub_table_count = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let subtables = ((|| PResult::Ok({
@@ -8756,15 +8423,7 @@ let mut accum = Vec::new();
 for _ in 0..sub_table_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -8845,15 +8504,7 @@ opentype_gsub_table_lookup_list { offset, link }
 }))())?;
 let feature_variations_offset = ((|| PResult::Ok(if minor_version > 0u16 {
 let offset = ((|| PResult::Ok((Decoder20(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -9036,15 +8687,7 @@ let axis_count = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let shared_tuple_count = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let shared_tuples_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder20(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -9732,53 +9375,23 @@ return Err(ParseError::FalsifiedWhere(5322124757500927073u64));
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let coverage = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let inner = {
+let field0 = ((|| PResult::Ok({
+let b = _input.read_byte()?;
+b
+}))())?;
 let field1 = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 b
 }))())?;
 (field0, field1)
 };
-((|tuple_var: (u8, u8)| PResult::Ok(match tuple_var {
-(format, flagbyte) => {
-opentype_kern_table_subtables_coverage { format: format, r#override: !match flagbyte >> 3u8 & 1u8 {
-0 => {
-true
-},
-
-_ => {
-false
-}
-}, cross_stream: !match flagbyte >> 2u8 & 1u8 {
-0 => {
-true
-},
-
-_ => {
-false
-}
-}, minimum: !match flagbyte >> 1u8 & 1u8 {
-0 => {
-true
-},
-
-_ => {
-false
-}
-}, horizontal: !match flagbyte >> 0u8 & 1u8 {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} }
-}
-}))(inner))?
+((|x: (u8, u8)| PResult::Ok(u16be(x)))(inner))?
+};
+((|packed_bits: u16| PResult::Ok(opentype_kern_table_subtables_coverage { format: packed_bits >> 8u16 & 255u16, r#override: packed_bits >> 3u16 & 1u16 > 0u16, cross_stream: packed_bits >> 2u16 & 1u16 > 0u16, minimum: packed_bits >> 1u16 & 1u16 > 0u16, horizontal: packed_bits >> 0u16 & 1u16 > 0u16 }))(inner))?
 }))())?;
 let data = ((|| PResult::Ok(match coverage.format.clone() {
-0u8 => {
+0u16 => {
 let inner = {
 let n_pairs = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let search_range = ((|| PResult::Ok((Decoder23(_input))?))())?;
@@ -9801,7 +9414,7 @@ opentype_kern_table_subtables_data_Format0 { n_pairs, search_range, entry_select
 opentype_kern_table_subtables_data::Format0(inner)
 },
 
-2u8 => {
+2u16 => {
 let inner = {
 let table_start = ((|| PResult::Ok({
 let inner = _input.get_offset_u64();
@@ -9810,15 +9423,7 @@ let inner = _input.get_offset_u64();
 let row_width = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let left_class_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -9854,15 +9459,7 @@ opentype_kern_table_subtables_data_Format2_left_class_offset { offset, link }
 }))())?;
 let right_class_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -9898,15 +9495,7 @@ opentype_kern_table_subtables_data_Format2_left_class_offset { offset, link }
 }))())?;
 let kerning_array_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -10011,15 +9600,7 @@ let design_axis_size = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let design_axis_count = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let design_axes_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder20(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -10054,15 +9635,7 @@ opentype_stat_table_design_axes_offset { offset, link }
 let axis_value_count = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let offset_to_axis_value_offsets = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder20(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -10077,15 +9650,7 @@ let mut accum = Vec::new();
 for _ in 0..axis_value_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -10142,7 +9707,7 @@ b
 };
 ((|x: (u8, u8)| PResult::Ok(u16be(x)))(inner))?
 };
-((|flag_bits: u16| PResult::Ok(opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1_flags { elidable_axis_value_name: flag_bits >> 1u16 & 1u16 > 0u16, older_sibling_font_attribute: flag_bits >> 0u16 & 1u16 > 0u16 }))(inner))?
+((|packed_bits: u16| PResult::Ok(opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1_flags { elidable_axis_value_name: packed_bits >> 1u16 & 1u16 > 0u16, older_sibling_font_attribute: packed_bits >> 0u16 & 1u16 > 0u16 }))(inner))?
 }))())?;
 let value_name_id = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let value = ((|| PResult::Ok({
@@ -10172,7 +9737,7 @@ b
 };
 ((|x: (u8, u8)| PResult::Ok(u16be(x)))(inner))?
 };
-((|flag_bits: u16| PResult::Ok(opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1_flags { elidable_axis_value_name: flag_bits >> 1u16 & 1u16 > 0u16, older_sibling_font_attribute: flag_bits >> 0u16 & 1u16 > 0u16 }))(inner))?
+((|packed_bits: u16| PResult::Ok(opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1_flags { elidable_axis_value_name: packed_bits >> 1u16 & 1u16 > 0u16, older_sibling_font_attribute: packed_bits >> 0u16 & 1u16 > 0u16 }))(inner))?
 }))())?;
 let value_name_id = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let nominal_value = ((|| PResult::Ok({
@@ -10210,7 +9775,7 @@ b
 };
 ((|x: (u8, u8)| PResult::Ok(u16be(x)))(inner))?
 };
-((|flag_bits: u16| PResult::Ok(opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1_flags { elidable_axis_value_name: flag_bits >> 1u16 & 1u16 > 0u16, older_sibling_font_attribute: flag_bits >> 0u16 & 1u16 > 0u16 }))(inner))?
+((|packed_bits: u16| PResult::Ok(opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1_flags { elidable_axis_value_name: packed_bits >> 1u16 & 1u16 > 0u16, older_sibling_font_attribute: packed_bits >> 0u16 & 1u16 > 0u16 }))(inner))?
 }))())?;
 let value_name_id = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let value = ((|| PResult::Ok({
@@ -10244,7 +9809,7 @@ b
 };
 ((|x: (u8, u8)| PResult::Ok(u16be(x)))(inner))?
 };
-((|flag_bits: u16| PResult::Ok(opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1_flags { elidable_axis_value_name: flag_bits >> 1u16 & 1u16 > 0u16, older_sibling_font_attribute: flag_bits >> 0u16 & 1u16 > 0u16 }))(inner))?
+((|packed_bits: u16| PResult::Ok(opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1_flags { elidable_axis_value_name: packed_bits >> 1u16 & 1u16 > 0u16, older_sibling_font_attribute: packed_bits >> 0u16 & 1u16 > 0u16 }))(inner))?
 }))())?;
 let value_name_id = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let axis_values = ((|| PResult::Ok({
@@ -10353,7 +9918,7 @@ b
 };
 ((|x: (u8, u8)| PResult::Ok(u16be(x)))(inner))?
 };
-((|flag_bits: u16| PResult::Ok(opentype_var_variation_axis_record_flags { hidden_axis: flag_bits >> 0u16 & 1u16 > 0u16 }))(inner))?
+((|packed_bits: u16| PResult::Ok(opentype_var_variation_axis_record_flags { hidden_axis: packed_bits >> 0u16 & 1u16 > 0u16 }))(inner))?
 }))())?;
 let axis_name_id = ((|| PResult::Ok((Decoder23(_input))?))())?;
 PResult::Ok(opentype_var_variation_axis_record { axis_tag, min_value, default_value, max_value, flags, axis_name_id })
@@ -10386,15 +9951,7 @@ accum.push({
 let script_tag = ((|| PResult::Ok((Decoder46(_input))?))())?;
 let script = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -10438,15 +9995,7 @@ accum.push({
 let feature_tag = ((|| PResult::Ok((Decoder46(_input))?))())?;
 let feature = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -10512,15 +10061,7 @@ return Err(ParseError::FalsifiedWhere(5733880678136728614u64));
 }))())?;
 let extension_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder20(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -10616,15 +10157,7 @@ for _ in 0..feature_variation_record_count {
 accum.push({
 let condition_set_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder20(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -10640,15 +10173,7 @@ let mut accum = Vec::new();
 for _ in 0..condition_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder20(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -10704,15 +10229,7 @@ opentype_layout_feature_variations_feature_variation_records_condition_set_offse
 }))())?;
 let feature_table_substitution_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder20(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -10746,15 +10263,7 @@ accum.push({
 let feature_index = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let alternate_feature_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder20(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -10827,15 +10336,7 @@ let subst = ((|| PResult::Ok(match subst_format {
 let inner = {
 let coverage = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -10868,15 +10369,7 @@ opentype_layout_single_subst_subst::Format1(inner)
 let inner = {
 let coverage = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -10927,15 +10420,7 @@ let inner = _input.get_offset_u64();
 let subst_format = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let coverage = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -10967,15 +10452,7 @@ let mut accum = Vec::new();
 for _ in 0..sequence_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -11038,15 +10515,7 @@ return Err(ParseError::FalsifiedWhere(6347242493551283856u64));
 }))())?;
 let coverage = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -11075,15 +10544,7 @@ let mut accum = Vec::new();
 for _ in 0..alternate_set_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -11137,15 +10598,7 @@ return Err(ParseError::FalsifiedWhere(4251627061094365437u64));
 }))())?;
 let coverage = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -11174,15 +10627,7 @@ let mut accum = Vec::new();
 for _ in 0..ligature_set_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -11202,15 +10647,7 @@ let mut accum = Vec::new();
 for _ in 0..ligature_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -11279,15 +10716,7 @@ let subst = ((|| PResult::Ok(match format {
 let inner = {
 let coverage = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -11316,15 +10745,7 @@ let mut accum = Vec::new();
 for _ in 0..seq_rule_set_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -11344,15 +10765,7 @@ let mut accum = Vec::new();
 for _ in 0..rule_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -11364,15 +10777,7 @@ let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| PResult::Ok({
 let glyph_count = ((|| PResult::Ok({
 let inner = (Decoder23(_input))?;
-if ((|x: u16| PResult::Ok(!match x {
-0 => {
-true
-},
-
-_ => {
-false
-}
-}))(inner.clone()))? {
+if ((|x: u16| PResult::Ok(x != 0u16))(inner.clone()))? {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(11915580511665106140u64));
@@ -11438,15 +10843,7 @@ opentype_common_sequence_context_subst::Format1(inner)
 let inner = {
 let coverage = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -11471,15 +10868,7 @@ opentype_layout_reverse_chain_single_subst_coverage { offset, link }
 }))())?;
 let class_def = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -11508,15 +10897,7 @@ let mut accum = Vec::new();
 for _ in 0..class_seq_rule_set_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -11536,15 +10917,7 @@ let mut accum = Vec::new();
 for _ in 0..rule_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -11556,15 +10929,7 @@ let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| PResult::Ok({
 let glyph_count = ((|| PResult::Ok({
 let inner = (Decoder23(_input))?;
-if ((|x: u16| PResult::Ok(!match x {
-0 => {
-true
-},
-
-_ => {
-false
-}
-}))(inner.clone()))? {
+if ((|x: u16| PResult::Ok(x != 0u16))(inner.clone()))? {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(17324980155911269375u64));
@@ -11635,15 +11000,7 @@ let mut accum = Vec::new();
 for _ in 0..glyph_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -11699,15 +11056,7 @@ let subst = ((|| PResult::Ok(match format {
 let inner = {
 let coverage = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -11736,15 +11085,7 @@ let mut accum = Vec::new();
 for _ in 0..chained_seq_rule_set_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -11764,15 +11105,7 @@ let mut accum = Vec::new();
 for _ in 0..chained_seq_rule_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -11859,15 +11192,7 @@ opentype_common_chained_sequence_context_subst::Format1(inner)
 let inner = {
 let coverage = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -11892,15 +11217,7 @@ opentype_layout_reverse_chain_single_subst_coverage { offset, link }
 }))())?;
 let backtrack_class_def = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -11925,15 +11242,7 @@ opentype_gdef_table_glyph_class_def { offset, link }
 }))())?;
 let input_class_def = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -11958,15 +11267,7 @@ opentype_gdef_table_glyph_class_def { offset, link }
 }))())?;
 let lookahead_class_def = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -11995,15 +11296,7 @@ let mut accum = Vec::new();
 for _ in 0..chained_class_seq_rule_set_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -12023,15 +11316,7 @@ let mut accum = Vec::new();
 for _ in 0..chained_seq_rule_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -12122,15 +11407,7 @@ let mut accum = Vec::new();
 for _ in 0..backtrack_glyph_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -12162,15 +11439,7 @@ let mut accum = Vec::new();
 for _ in 0..input_glyph_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -12202,15 +11471,7 @@ let mut accum = Vec::new();
 for _ in 0..lookahead_glyph_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -12271,15 +11532,7 @@ return Err(ParseError::FalsifiedWhere(1278184758971178969u64));
 }))())?;
 let coverage = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -12308,15 +11561,7 @@ let mut accum = Vec::new();
 for _ in 0..backtrack_glyph_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -12348,15 +11593,7 @@ let mut accum = Vec::new();
 for _ in 0..lookahead_glyph_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -12497,15 +11734,7 @@ let inner = _input.get_offset_u64();
 }))())?;
 let default_lang_sys = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -12536,15 +11765,7 @@ accum.push({
 let lang_sys_tag = ((|| PResult::Ok((Decoder46(_input))?))())?;
 let lang_sys = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -12627,15 +11848,7 @@ return Err(ParseError::FalsifiedWhere(17349123374714965876u64));
 }))())?;
 let extension_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder20(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -12719,15 +11932,7 @@ let subtable = ((|| PResult::Ok(match pos_format {
 let inner = {
 let coverage_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -12761,15 +11966,7 @@ opentype_layout_single_pos_subtable::Format1(inner)
 let inner = {
 let coverage_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -12824,15 +12021,7 @@ let subtable = ((|| PResult::Ok(match pos_format {
 let inner = {
 let coverage = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -12863,15 +12052,7 @@ let mut accum = Vec::new();
 for _ in 0..pair_set_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -12933,15 +12114,7 @@ opentype_layout_pair_pos_subtable::Format1(inner)
 let inner = {
 let coverage = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -12968,15 +12141,7 @@ let value_format1 = ((|| PResult::Ok((Decoder_opentype_common_value_format_flags
 let value_format2 = ((|| PResult::Ok((Decoder_opentype_common_value_format_flags(_input))?))())?;
 let class_def1 = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -13001,15 +12166,7 @@ opentype_gdef_table_glyph_class_def { offset, link }
 }))())?;
 let class_def2 = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -13089,15 +12246,7 @@ return Err(ParseError::FalsifiedWhere(8700288293163706751u64));
 }))())?;
 let coverage = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -13127,15 +12276,7 @@ for _ in 0..entry_exit_count {
 accum.push({
 let entry_anchor = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -13160,15 +12301,7 @@ opentype_layout_mark_array_mark_records_mark_anchor_offset { offset, link }
 }))())?;
 let exit_anchor = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -13214,15 +12347,7 @@ return Err(ParseError::FalsifiedWhere(16771529512960957239u64));
 }))())?;
 let mark_coverage_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -13247,15 +12372,7 @@ opentype_layout_reverse_chain_single_subst_coverage { offset, link }
 }))())?;
 let base_coverage_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -13281,15 +12398,7 @@ opentype_layout_reverse_chain_single_subst_coverage { offset, link }
 let mark_class_count = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let mark_array_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -13314,15 +12423,7 @@ opentype_layout_mark_mark_pos_mark1_array_offset { offset, link }
 }))())?;
 let base_array_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -13346,15 +12447,7 @@ let mut accum = Vec::new();
 for _ in 0..mark_class_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -13418,15 +12511,7 @@ return Err(ParseError::FalsifiedWhere(13846498452079501214u64));
 }))())?;
 let mark_coverage_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -13451,15 +12536,7 @@ opentype_layout_reverse_chain_single_subst_coverage { offset, link }
 }))())?;
 let ligature_coverage_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -13485,15 +12562,7 @@ opentype_layout_reverse_chain_single_subst_coverage { offset, link }
 let mark_class_count = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let mark_array_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -13518,15 +12587,7 @@ opentype_layout_mark_mark_pos_mark1_array_offset { offset, link }
 }))())?;
 let ligature_array_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -13546,15 +12607,7 @@ let mut accum = Vec::new();
 for _ in 0..ligature_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -13578,15 +12631,7 @@ let mut accum = Vec::new();
 for _ in 0..mark_class_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -13668,15 +12713,7 @@ return Err(ParseError::FalsifiedWhere(9798710097031164942u64));
 }))())?;
 let mark1_coverage_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -13701,15 +12738,7 @@ opentype_layout_reverse_chain_single_subst_coverage { offset, link }
 }))())?;
 let mark2_coverage_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -13735,15 +12764,7 @@ opentype_layout_reverse_chain_single_subst_coverage { offset, link }
 let mark_class_count = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let mark1_array_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -13768,15 +12789,7 @@ opentype_layout_mark_mark_pos_mark1_array_offset { offset, link }
 }))())?;
 let mark2_array_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -13800,15 +12813,7 @@ let mut accum = Vec::new();
 for _ in 0..mark_class_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -13870,15 +12875,7 @@ accum.push({
 let mark_class = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let mark_anchor_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -13941,15 +12938,7 @@ let x_coordinate = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let y_coordinate = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let x_device_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -13974,15 +12963,7 @@ opentype_common_value_record_x_advance_device { offset, link }
 }))())?;
 let y_device_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -14144,7 +13125,7 @@ b
 };
 ((|x: (u8, u8)| PResult::Ok(u16be(x)))(inner))?
 };
-PResult::Ok(((|flag_bits: u16| PResult::Ok(opentype_common_value_format_flags { y_advance_device: flag_bits >> 7u16 & 1u16 > 0u16, x_advance_device: flag_bits >> 6u16 & 1u16 > 0u16, y_placement_device: flag_bits >> 5u16 & 1u16 > 0u16, x_placement_device: flag_bits >> 4u16 & 1u16 > 0u16, y_advance: flag_bits >> 3u16 & 1u16 > 0u16, x_advance: flag_bits >> 2u16 & 1u16 > 0u16, y_placement: flag_bits >> 1u16 & 1u16 > 0u16, x_placement: flag_bits >> 0u16 & 1u16 > 0u16 }))(inner))?)
+PResult::Ok(((|packed_bits: u16| PResult::Ok(opentype_common_value_format_flags { y_advance_device: packed_bits >> 7u16 & 1u16 > 0u16, x_advance_device: packed_bits >> 6u16 & 1u16 > 0u16, y_placement_device: packed_bits >> 5u16 & 1u16 > 0u16, x_placement_device: packed_bits >> 4u16 & 1u16 > 0u16, y_advance: packed_bits >> 3u16 & 1u16 > 0u16, x_advance: packed_bits >> 2u16 & 1u16 > 0u16, y_placement: packed_bits >> 1u16 & 1u16 > 0u16, x_placement: packed_bits >> 0u16 & 1u16 > 0u16 }))(inner))?)
 }
 
 fn Decoder_opentype_common_value_record<'input>(_input: &mut Parser<'input>, table_start: u32, flags: opentype_common_value_format_flags) -> Result<opentype_common_value_record, ParseError> {
@@ -14170,15 +13151,7 @@ None
 }))())?;
 let x_placement_device = ((|| PResult::Ok(if flags.x_placement_device.clone() {
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -14205,15 +13178,7 @@ None
 }))())?;
 let y_placement_device = ((|| PResult::Ok(if flags.y_placement_device.clone() {
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -14240,15 +13205,7 @@ None
 }))())?;
 let x_advance_device = ((|| PResult::Ok(if flags.x_advance_device.clone() {
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -14275,15 +13232,7 @@ None
 }))())?;
 let y_advance_device = ((|| PResult::Ok(if flags.y_advance_device.clone() {
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -14334,15 +13283,7 @@ None
 }))())?;
 let x_placement_device = ((|| PResult::Ok(if flags.x_placement_device.clone() {
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -14369,15 +13310,7 @@ None
 }))())?;
 let y_placement_device = ((|| PResult::Ok(if flags.y_placement_device.clone() {
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -14404,15 +13337,7 @@ None
 }))())?;
 let x_advance_device = ((|| PResult::Ok(if flags.x_advance_device.clone() {
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -14439,15 +13364,7 @@ None
 }))())?;
 let y_advance_device = ((|| PResult::Ok(if flags.y_advance_device.clone() {
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -14498,15 +13415,7 @@ None
 }))())?;
 let x_placement_device = ((|| PResult::Ok(if flags.x_placement_device.clone() {
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -14533,15 +13442,7 @@ None
 }))())?;
 let y_placement_device = ((|| PResult::Ok(if flags.y_placement_device.clone() {
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -14568,15 +13469,7 @@ None
 }))())?;
 let x_advance_device = ((|| PResult::Ok(if flags.x_advance_device.clone() {
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -14603,15 +13496,7 @@ None
 }))())?;
 let y_advance_device = ((|| PResult::Ok(if flags.y_advance_device.clone() {
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -14662,15 +13547,7 @@ None
 }))())?;
 let x_placement_device = ((|| PResult::Ok(if flags.x_placement_device.clone() {
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -14697,15 +13574,7 @@ None
 }))())?;
 let y_placement_device = ((|| PResult::Ok(if flags.y_placement_device.clone() {
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -14732,15 +13601,7 @@ None
 }))())?;
 let x_advance_device = ((|| PResult::Ok(if flags.x_advance_device.clone() {
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -14767,15 +13628,7 @@ None
 }))())?;
 let y_advance_device = ((|| PResult::Ok(if flags.y_advance_device.clone() {
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -14822,15 +13675,7 @@ let mut accum = Vec::new();
 for _ in 0..mark_glyph_set_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder20(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -14865,15 +13710,7 @@ let inner = _input.get_offset_u64();
 }))())?;
 let base_tag_list_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -14908,15 +13745,7 @@ opentype_layout_axis_table_base_tag_list_offset { offset, link }
 }))())?;
 let base_script_list_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -14938,15 +13767,7 @@ accum.push({
 let base_script_tag = ((|| PResult::Ok((Decoder46(_input))?))())?;
 let base_script_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -14999,15 +13820,7 @@ let inner = _input.get_offset_u64();
 }))())?;
 let base_values_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -15032,15 +13845,7 @@ opentype_layout_base_script_base_values_offset { offset, link }
 }))())?;
 let default_min_max_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -15071,15 +13876,7 @@ accum.push({
 let base_lang_sys_tag = ((|| PResult::Ok((Decoder46(_input))?))())?;
 let min_max_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -15122,15 +13919,7 @@ let mut accum = Vec::new();
 for _ in 0..base_coord_count {
 accum.push({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -15166,15 +13955,7 @@ let inner = _input.get_offset_u64();
 }))())?;
 let min_coord_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -15199,15 +13980,7 @@ opentype_layout_min_max_min_coord_offset { offset, link }
 }))())?;
 let max_coord_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -15238,15 +14011,7 @@ accum.push({
 let feature_tag = ((|| PResult::Ok((Decoder46(_input))?))())?;
 let min_coord_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -15271,15 +14036,7 @@ opentype_layout_min_max_min_coord_offset { offset, link }
 }))())?;
 let max_coord_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -15335,15 +14092,7 @@ opentype_layout_base_coord_hint::GlyphHint(inner)
 let inner = {
 let device_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -15592,7 +14341,7 @@ b
 };
 ((|x: (u8, u8)| PResult::Ok(u16be(x)))(inner))?
 };
-((|flag_bits: u16| PResult::Ok(opentype_glyf_composite_raw_flags { unscaled_component_offset: flag_bits >> 12u16 & 1u16 > 0u16, scaled_component_offset: flag_bits >> 11u16 & 1u16 > 0u16, overlap_compound: flag_bits >> 10u16 & 1u16 > 0u16, use_my_metrics: flag_bits >> 9u16 & 1u16 > 0u16, we_have_instructions: flag_bits >> 8u16 & 1u16 > 0u16, we_have_a_two_by_two: flag_bits >> 7u16 & 1u16 > 0u16, we_have_an_x_and_y_scale: flag_bits >> 6u16 & 1u16 > 0u16, more_components: flag_bits >> 5u16 & 1u16 > 0u16, __reserved_bit4: flag_bits >> 4u16 & 1u16 > 0u16, we_have_a_scale: flag_bits >> 3u16 & 1u16 > 0u16, round_xy_to_grid: flag_bits >> 2u16 & 1u16 > 0u16, args_are_xy_values: flag_bits >> 1u16 & 1u16 > 0u16, arg_1_and_2_are_words: flag_bits >> 0u16 & 1u16 > 0u16 }))(inner))?
+((|packed_bits: u16| PResult::Ok(opentype_glyf_composite_raw_flags { unscaled_component_offset: packed_bits >> 12u16 & 1u16 > 0u16, scaled_component_offset: packed_bits >> 11u16 & 1u16 > 0u16, overlap_compound: packed_bits >> 10u16 & 1u16 > 0u16, use_my_metrics: packed_bits >> 9u16 & 1u16 > 0u16, we_have_instructions: packed_bits >> 8u16 & 1u16 > 0u16, we_have_a_two_by_two: packed_bits >> 7u16 & 1u16 > 0u16, we_have_an_x_and_y_scale: packed_bits >> 6u16 & 1u16 > 0u16, more_components: packed_bits >> 5u16 & 1u16 > 0u16, we_have_a_scale: packed_bits >> 3u16 & 1u16 > 0u16, round_xy_to_grid: packed_bits >> 2u16 & 1u16 > 0u16, args_are_xy_values: packed_bits >> 1u16 & 1u16 > 0u16, arg_1_and_2_are_words: packed_bits >> 0u16 & 1u16 > 0u16 }))(inner))?
 }))())?;
 let glyph_index = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let argument1 = ((|| PResult::Ok(match flags.arg_1_and_2_are_words.clone() {
@@ -15758,7 +14507,7 @@ let inner = {
 let b = _input.read_byte()?;
 b
 };
-PResult::Ok(((|flagbyte: u8| PResult::Ok(opentype_glyph_description_simple_flags_raw { overlap_simple: flagbyte >> 6u8 & 1u8 > 0u8, y_is_same_or_positive_y_short_vector: flagbyte >> 5u8 & 1u8 > 0u8, x_is_same_or_positive_x_short_vector: flagbyte >> 4u8 & 1u8 > 0u8, repeat_flag: flagbyte >> 3u8 & 1u8 > 0u8, y_short_vector: flagbyte >> 2u8 & 1u8 > 0u8, x_short_vector: flagbyte >> 1u8 & 1u8 > 0u8, on_curve_point: flagbyte >> 0u8 & 1u8 > 0u8 }))(inner))?)
+PResult::Ok(((|packed_bits: u8| PResult::Ok(opentype_glyph_description_simple_flags_raw { overlap_simple: packed_bits >> 6u8 & 1u8 > 0u8, y_is_same_or_positive_y_short_vector: packed_bits >> 5u8 & 1u8 > 0u8, x_is_same_or_positive_x_short_vector: packed_bits >> 4u8 & 1u8 > 0u8, repeat_flag: packed_bits >> 3u8 & 1u8 > 0u8, y_short_vector: packed_bits >> 2u8 & 1u8 > 0u8, x_short_vector: packed_bits >> 1u8 & 1u8 > 0u8, on_curve_point: packed_bits >> 0u8 & 1u8 > 0u8 }))(inner))?)
 }
 
 fn Decoder_opentype_name_table_name_version_1<'input>(_input: &mut Parser<'input>, storage_start: u32) -> Result<opentype_name_table_name_version_1, ParseError> {
@@ -15770,15 +14519,7 @@ accum.push({
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder23(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u16 {
 true => {
 let __here = {
 let inner = _input.get_offset_u64();
@@ -15870,15 +14611,7 @@ let platform = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let encoding = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let subtable_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder20(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u32 {
 true => {
 let tgt_offset = start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -16560,15 +15293,7 @@ let field3 = ((|| PResult::Ok((Decoder24(_input))?))())?;
 }))())?;
 let default_uvs_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder20(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -16611,15 +15336,7 @@ opentype_variation_selector_default_uvs_offset { offset, link }
 }))())?;
 let non_default_uvs_offset = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder20(_input))?))())?;
-let link = ((|| PResult::Ok(match !match offset {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let link = ((|| PResult::Ok(match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -18453,17 +17170,9 @@ let inner = {
 let b = _input.read_byte()?;
 b
 };
-((|packed_bits: u8| PResult::Ok(zlib_main_flags { flevel: packed_bits >> 6u8 & 3u8, fdict: packed_bits >> 5u8 & 1u8, fcheck: packed_bits >> 0u8 & 31u8 }))(inner))?
+((|packed_bits: u8| PResult::Ok(zlib_main_flags { flevel: packed_bits >> 6u8 & 3u8, fdict: packed_bits >> 5u8 & 1u8 > 0u8, fcheck: packed_bits >> 0u8 & 31u8 }))(inner))?
 }))())?;
-let dict_id = ((|| PResult::Ok(if !match flags.fdict.clone() {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let dict_id = ((|| PResult::Ok(if flags.fdict.clone() {
 Some((Decoder20(_input))?)
 } else {
 None
@@ -18554,26 +17263,26 @@ accum.push(elem);
 accum
 }))())?;
 let codes = ((|| PResult::Ok((try_flat_map_vec(blocks.iter().cloned(), |x: deflate_block| PResult::Ok(match x.data.clone() {
-deflate_main_codes__dupX1::uncompressed(y) => {
+deflate_main_codes::uncompressed(y) => {
 y.codes_values.clone()
 },
 
-deflate_main_codes__dupX1::fixed_huffman(y) => {
+deflate_main_codes::fixed_huffman(y) => {
 y.codes_values.clone()
 },
 
-deflate_main_codes__dupX1::dynamic_huffman(y) => {
+deflate_main_codes::dynamic_huffman(y) => {
 y.codes_values.clone()
 }
 })))?))())?;
-let inflate = ((|| PResult::Ok((try_flat_map_append_vec(codes.iter().cloned(), |tuple_var: (&Vec<u8>, deflate_main_codes)| PResult::Ok(match tuple_var {
+let inflate = ((|| PResult::Ok((try_flat_map_append_vec(codes.iter().cloned(), |tuple_var: (&Vec<u8>, deflate_main_codes__dupX1)| PResult::Ok(match tuple_var {
 (buffer, symbol) => {
 match symbol {
-deflate_main_codes::literal(b) => {
+deflate_main_codes__dupX1::literal(b) => {
 [b].to_vec()
 },
 
-deflate_main_codes::reference(r) => {
+deflate_main_codes__dupX1::reference(r) => {
 {
 let ix = (try_sub!((buffer.len()) as u32, (r.distance.clone()) as u32, 17089130856162883194u64)) as usize;
 (slice_ext(&buffer, ix..ix + (((r.length.clone()) as u32) as usize))).to_vec()
@@ -18598,17 +17307,17 @@ let field1 = ((|| PResult::Ok((Decoder165(_input))?))())?;
 let data = ((|| PResult::Ok(match r#type {
 0u8 => {
 let inner = (Decoder_deflate_uncompressed(_input))?;
-deflate_main_codes__dupX1::uncompressed(inner)
+deflate_main_codes::uncompressed(inner)
 },
 
 1u8 => {
 let inner = (Decoder_deflate_fixed_huffman(_input))?;
-deflate_main_codes__dupX1::fixed_huffman(inner)
+deflate_main_codes::fixed_huffman(inner)
 },
 
 2u8 => {
 let inner = (Decoder_deflate_dynamic_huffman(_input))?;
-deflate_main_codes__dupX1::dynamic_huffman(inner)
+deflate_main_codes::dynamic_huffman(inner)
 },
 
 _other => {
@@ -18689,7 +17398,7 @@ let field7 = ((|| PResult::Ok((Decoder165(_input))?))())?;
 }
 accum
 }))())?;
-let codes_values = ((|| PResult::Ok((try_flat_map_vec(bytes.iter().cloned(), |x: u8| PResult::Ok([deflate_main_codes::literal(x)].to_vec())))?))())?;
+let codes_values = ((|| PResult::Ok((try_flat_map_vec(bytes.iter().cloned(), |x: u8| PResult::Ok([deflate_main_codes__dupX1::literal(x)].to_vec())))?))())?;
 PResult::Ok(deflate_uncompressed { align, len, nlen, bytes, codes_values })
 }
 
@@ -19468,7 +18177,7 @@ let codes_values = ((|| PResult::Ok((try_flat_map_vec(codes.iter().cloned(), |x:
 257u16..=285u16 => {
 match x.extra.clone() {
 Some(ref rec) => {
-[deflate_main_codes::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
+[deflate_main_codes__dupX1::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
 },
 
 _ => {
@@ -19482,7 +18191,7 @@ return Err(ParseError::ExcludedBranch(13537165373980795457u64));
 },
 
 _ => {
-[deflate_main_codes::literal((x.code.clone()) as u8)].to_vec()
+[deflate_main_codes__dupX1::literal((x.code.clone()) as u8)].to_vec()
 }
 })))?))())?;
 PResult::Ok(deflate_fixed_huffman { codes, codes_values })
@@ -20168,7 +18877,7 @@ let codes_values = ((|| PResult::Ok((try_flat_map_vec(codes.iter().cloned(), |x:
 257u16..=285u16 => {
 match x.extra.clone() {
 Some(ref rec) => {
-[deflate_main_codes::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
+[deflate_main_codes__dupX1::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
 },
 
 _ => {
@@ -20182,7 +18891,7 @@ return Err(ParseError::ExcludedBranch(691490157317212239u64));
 },
 
 _ => {
-[deflate_main_codes::literal((x.code.clone()) as u8)].to_vec()
+[deflate_main_codes__dupX1::literal((x.code.clone()) as u8)].to_vec()
 }
 })))?))())?;
 PResult::Ok(deflate_dynamic_huffman { hlit, hdist, hclen, code_length_alphabet_code_lengths, literal_length_distance_alphabet_code_lengths, literal_length_distance_alphabet_code_lengths_value, literal_length_alphabet_code_lengths_value, distance_alphabet_code_lengths_value, codes, codes_values })
@@ -23320,17 +22029,9 @@ let inner = {
 let b = _input.read_byte()?;
 b
 };
-((|packed_bits: u8| PResult::Ok(zlib_main_flags { flevel: packed_bits >> 6u8 & 3u8, fdict: packed_bits >> 5u8 & 1u8, fcheck: packed_bits >> 0u8 & 31u8 }))(inner))?
+((|packed_bits: u8| PResult::Ok(zlib_main_flags { flevel: packed_bits >> 6u8 & 3u8, fdict: packed_bits >> 5u8 & 1u8 > 0u8, fcheck: packed_bits >> 0u8 & 31u8 }))(inner))?
 }))())?;
-let dict_id = ((|| PResult::Ok(if !match flags.fdict.clone() {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let dict_id = ((|| PResult::Ok(if flags.fdict.clone() {
 Some((Decoder20(_input))?)
 } else {
 None
@@ -25663,17 +24364,9 @@ let inner = {
 let b = _input.read_byte()?;
 b
 };
-((|packed_bits: u8| PResult::Ok(zlib_main_flags { flevel: packed_bits >> 6u8 & 3u8, fdict: packed_bits >> 5u8 & 1u8, fcheck: packed_bits >> 0u8 & 31u8 }))(inner))?
+((|packed_bits: u8| PResult::Ok(zlib_main_flags { flevel: packed_bits >> 6u8 & 3u8, fdict: packed_bits >> 5u8 & 1u8 > 0u8, fcheck: packed_bits >> 0u8 & 31u8 }))(inner))?
 }))())?;
-let dict_id = ((|| PResult::Ok(if !match flags.fdict.clone() {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let dict_id = ((|| PResult::Ok(if flags.fdict.clone() {
 Some((Decoder20(_input))?)
 } else {
 None
@@ -26825,17 +25518,9 @@ let inner = {
 let b = _input.read_byte()?;
 b
 };
-((|packed_bits: u8| PResult::Ok(zlib_main_flags { flevel: packed_bits >> 6u8 & 3u8, fdict: packed_bits >> 5u8 & 1u8, fcheck: packed_bits >> 0u8 & 31u8 }))(inner))?
+((|packed_bits: u8| PResult::Ok(zlib_main_flags { flevel: packed_bits >> 6u8 & 3u8, fdict: packed_bits >> 5u8 & 1u8 > 0u8, fcheck: packed_bits >> 0u8 & 31u8 }))(inner))?
 }))())?;
-let dict_id = ((|| PResult::Ok(if !match flags.fdict.clone() {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let dict_id = ((|| PResult::Ok(if flags.fdict.clone() {
 Some((Decoder20(_input))?)
 } else {
 None
@@ -31233,15 +29918,7 @@ PResult::Ok(jpeg_sos_image_component { component_selector, entropy_coding_table_
 fn Decoder_jpeg_dnl_data<'input>(_input: &mut Parser<'input>) -> Result<jpeg_dnl_data, ParseError> {
 let num_lines = ((|| PResult::Ok({
 let inner = (Decoder23(_input))?;
-if ((|x: u16| PResult::Ok(!match x {
-0 => {
-true
-},
-
-_ => {
-false
-}
-}))(inner.clone()))? {
+if ((|x: u16| PResult::Ok(x != 0u16))(inner.clone()))? {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(15786118691017431738u64));
@@ -31989,15 +30666,7 @@ return Err(ParseError::FalsifiedWhere(9110520999974091875u64));
 let num_lines = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let num_samples_per_line = ((|| PResult::Ok({
 let inner = (Decoder23(_input))?;
-if ((|x: u16| PResult::Ok(!match x {
-0 => {
-true
-},
-
-_ => {
-false
-}
-}))(inner.clone()))? {
+if ((|x: u16| PResult::Ok(x != 0u16))(inner.clone()))? {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(15293691521783146694u64));
@@ -32005,15 +30674,7 @@ return Err(ParseError::FalsifiedWhere(15293691521783146694u64));
 }))())?;
 let num_image_components = ((|| PResult::Ok({
 let inner = (Decoder24(_input))?;
-if ((|x: u8| PResult::Ok(!match x {
-0 => {
-true
-},
-
-_ => {
-false
-}
-}))(inner.clone()))? {
+if ((|x: u8| PResult::Ok(x != 0u8))(inner.clone()))? {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(15433822888775103886u64));
@@ -33301,15 +31962,7 @@ return Err(ParseError::FalsifiedWhere(3349032559334020401u64));
 }))())?;
 let density_x = ((|| PResult::Ok({
 let inner = (Decoder23(_input))?;
-if ((|x: u16| PResult::Ok(!match x {
-0 => {
-true
-},
-
-_ => {
-false
-}
-}))(inner.clone()))? {
+if ((|x: u16| PResult::Ok(x != 0u16))(inner.clone()))? {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(14115009527471272688u64));
@@ -33317,15 +31970,7 @@ return Err(ParseError::FalsifiedWhere(14115009527471272688u64));
 }))())?;
 let density_y = ((|| PResult::Ok({
 let inner = (Decoder23(_input))?;
-if ((|x: u16| PResult::Ok(!match x {
-0 => {
-true
-},
-
-_ => {
-false
-}
-}))(inner.clone()))? {
+if ((|x: u16| PResult::Ok(x != 0u16))(inner.clone()))? {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(8350850950759220429u64));
@@ -33382,7 +32027,7 @@ let inner = {
 let b = _input.read_byte()?;
 b
 };
-((|flagbyte: u8| PResult::Ok(gzip_header_file_flags { fcomment: flagbyte >> 4u8 & 1u8 > 0u8, fname: flagbyte >> 3u8 & 1u8 > 0u8, fextra: flagbyte >> 2u8 & 1u8 > 0u8, fhcrc: flagbyte >> 1u8 & 1u8 > 0u8, ftext: flagbyte >> 0u8 & 1u8 > 0u8 }))(inner))?
+((|packed_bits: u8| PResult::Ok(gzip_header_file_flags { fcomment: packed_bits >> 4u8 & 1u8 > 0u8, fname: packed_bits >> 3u8 & 1u8 > 0u8, fextra: packed_bits >> 2u8 & 1u8 > 0u8, fhcrc: packed_bits >> 1u8 & 1u8 > 0u8, ftext: packed_bits >> 0u8 & 1u8 > 0u8 }))(inner))?
 }))())?;
 let timestamp = ((|| PResult::Ok((Decoder126(_input))?))())?;
 let compression_flags = ((|| PResult::Ok((Decoder24(_input))?))())?;
@@ -33773,15 +32418,7 @@ PResult::Ok(gif_header { signature, version })
 
 fn Decoder_gif_logical_screen<'input>(_input: &mut Parser<'input>) -> Result<gif_logical_screen, ParseError> {
 let descriptor = ((|| PResult::Ok((Decoder_gif_logical_screen_descriptor(_input))?))())?;
-let global_color_table = ((|| PResult::Ok(if !match descriptor.flags.table_flag.clone() {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let global_color_table = ((|| PResult::Ok(if descriptor.flags.table_flag.clone() > 0u8 {
 let mut accum = Vec::new();
 for _ in 0..2u16 << ((descriptor.flags.table_size.clone()) as u16) {
 accum.push((Decoder324(_input))?);
@@ -34201,15 +32838,7 @@ return Err(ParseError::ExcludedBranch(4825757476091239776u64));
 
 fn Decoder_gif_table_based_image<'input>(_input: &mut Parser<'input>) -> Result<gif_table_based_image, ParseError> {
 let descriptor = ((|| PResult::Ok((Decoder_gif_image_descriptor(_input))?))())?;
-let local_color_table = ((|| PResult::Ok(if !match descriptor.flags.table_flag.clone() {
-0 => {
-true
-},
-
-_ => {
-false
-}
-} {
+let local_color_table = ((|| PResult::Ok(if descriptor.flags.table_flag.clone() > 0u8 {
 let mut accum = Vec::new();
 for _ in 0..2u16 << ((descriptor.flags.table_size.clone()) as u16) {
 accum.push((Decoder324(_input))?);

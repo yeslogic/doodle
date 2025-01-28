@@ -9,7 +9,7 @@ use doodle::{Expr, FormatModule, FormatRef};
 pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     fn has_color_table(flags: Expr) -> Expr {
         // (flags->table-flag) != 0
-        is_nonzero(record_proj(flags, "table-flag"))
+        is_nonzero_u8(record_proj(flags, "table-flag"))
     }
 
     fn color_table_len(flags: Expr) -> Expr {
@@ -58,6 +58,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     // NOTE: Global and local Color Tables have to have the same field-names for
     // common fields in order to ensure that the helpers that extract those values
     // are applicable to both cases without any extra work.
+    // FIXME[epic=refactor] - replace with bit_fields_u8
     let logical_screen_descriptor_flags = packed_bits_u8(
         [1, 3, 1, 3],
         ["table-flag", "color-resolution", "sort-flag", "table-size"],
@@ -87,6 +88,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     // NOTE: Global and local Color Tables have to have the same field-names for
     // common fields in order to ensure that the helpers that extract those values
     // are applicable to both cases without any extra work.
+    // FIXME[epic=refactor] - replace with bit_fields_u8
     let image_descriptor_flags = packed_bits_u8(
         [1, 1, 1, 2, 3],
         [
@@ -129,6 +131,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     //                        Disposal Method               3 Bits
     //                        User Input Flag               1 Bit
     //                        Transparent Color Flag        1 Bit
+    // FIXME[epic=refactor] - replace with bit_fields_u8
     let graphic_control_extension_flags = packed_bits_u8(
         [3, 3, 1, 1],
         [

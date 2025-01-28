@@ -1,5 +1,5 @@
 use crate::format::BaseModule;
-use doodle::helper::*;
+use doodle::helper::{BitFieldKind::*, *};
 use doodle::{Format, FormatModule, FormatRef};
 
 /// gzip
@@ -13,15 +13,16 @@ pub fn main(module: &mut FormatModule, deflate: FormatRef, base: &BaseModule) ->
     //             ^ | |   FEXTRA
     //               ^ |   FHCRC
     //                 ^   FTEXT
-    let flg = flags_bits8([
-        None,
-        None,
-        None,
-        Some("fcomment"),
-        Some("fname"),
-        Some("fextra"),
-        Some("fhcrc"),
-        Some("ftext"),
+    let flg = bit_fields_u8([
+        Reserved {
+            bit_width: 3,
+            check_zero: true,
+        },
+        FlagBit("fcomment"),
+        FlagBit("fname"),
+        FlagBit("fextra"),
+        FlagBit("fhcrc"),
+        FlagBit("ftext"),
     ]);
 
     let header = module.define_format(
