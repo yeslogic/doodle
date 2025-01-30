@@ -4759,17 +4759,17 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         ),
                     )
                 };
+                let array_from_offsets = |offsets: Expr| -> Format {
+                    linked_offset32(
+                        gvar_table_start,
+                        var("array_start_offset"),
+                        gvar_table_array(offsets_to_offset_pairs(offsets)),
+                    )
+                };
                 record([
                     ("array_start_offset", base.u32be()),
                     ("offsets", offsets_array),
-                    (
-                        "array",
-                        linked_offset32(
-                            gvar_table_start,
-                            var("array_start_offset"),
-                            gvar_table_array(offsets_to_offset_pairs(var("offsets"))),
-                        ),
-                    ),
+                    ("array", clone_hack("offsets", "offs", array_from_offsets)),
                 ])
             }
             let shared_tuples = |shared_tuple_count: Expr, axis_count: Expr| {

@@ -170,6 +170,7 @@ pub enum Expr {
     /// FlatMapList :: ((\[U\], T) -> \[U\]) -> TypeRep U -> \[T\] -> \[U\] (lambda call yields a run of values to append to the final list)
     FlatMapList(Box<Expr>, TypeHint, Box<Expr>),
 
+    // EnumFromTo(Box<Expr>, Box<Expr>),
     /// LeftFold :: ((Acc, T) -> Acc) -> Acc -> \[T\] -> Acc
     LeftFold(Box<Expr>, Box<Expr>, TypeHint, Box<Expr>),
 
@@ -485,6 +486,18 @@ impl Expr {
                 },
                 other => Err(anyhow!("FlatMapList: expected Lambda, found {other:?}")),
             },
+            // Expr::EnumFromTo(start, end) => {
+            //     let start_type = start.infer_type(scope)?;
+            //     let end_type = end.infer_type(scope)?;
+
+            //     if !matches!(start_type, ValueType::Base(b) if b.is_numeric()) {
+            //         return Err(anyhow!("EnumFromTo: start is not numeric: {start_type:?}"));
+            //     } else if start_type != end_type {
+            //         return Err(anyhow!("EnumFromTo: start and end do not agree: {start_type:?} != {end_type:?}"));
+            //     }
+
+            //     Ok(ValueType::Seq(Box::new(start_type)))
+            // }
             Expr::Dup(count, expr) => {
                 if count.infer_type(scope)? != ValueType::Base(BaseType::U32) {
                     return Err(anyhow!("Dup: count is not U32: {count:?}"));
@@ -553,6 +566,9 @@ impl Expr {
             | Expr::U64Be(x)
             | Expr::U64Le(x)
             | Expr::SeqLength(x) => x.is_shadowed_by(name),
+            // Expr::EnumFromTo(s, e) => {
+            //     s.is_shadowed_by(name) || e.is_shadowed_by(name)
+            // }
             Expr::SubSeq(x, s, l) | Expr::SubSeqInflate(x, s, l) => {
                 x.is_shadowed_by(name) || s.is_shadowed_by(name) || l.is_shadowed_by(name)
             }

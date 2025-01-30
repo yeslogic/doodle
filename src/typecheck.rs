@@ -2216,12 +2216,21 @@ impl TypeChecker {
 
                 ys_var
             }
+            // Expr::EnumFromTo(begin, end) => {
+            //     let newvar = self.get_new_uvar();
+            //     let begin_var = self.infer_var_expr(begin, scope)?;
+            //     let end_var = self.infer_var_expr(end, scope)?;
+            //     self.unify_var_baseset(begin_var, BaseSet::USome)?;
+            //     self.unify_var_pair(begin_var, end_var)?;
+            //     self.unify_var_proj_elem(newvar, begin_var)?;
+            //     newvar
+            // }
             Expr::Dup(count, x) => {
                 let newvar = self.get_new_uvar();
-                let count_t = self.infer_utype_expr(count, scope)?;
+                let count_var = self.infer_var_expr(count, scope)?;
                 let x_var = self.infer_var_expr(x, scope)?;
 
-                self.unify_utype_baseset(count_t, BaseSet::USome)?;
+                self.unify_var_baseset(count_var, BaseSet::USome)?;
                 self.unify_var_proj_elem(newvar, x_var)?;
 
                 newvar
