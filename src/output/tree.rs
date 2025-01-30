@@ -1711,6 +1711,18 @@ impl<'module> TreePrinter<'module> {
                 prec,
                 Precedence::FUN_APPLICATION,
             ),
+            // Expr::EnumFromTo(start, stop) => cond_paren(
+            //     self.binary_op(
+            //         " .. ",
+            //         start,
+            //         stop,
+            //         Precedence::FUN_APPLICATION, // REVIEW - determine whether this precedence is proper
+            //         Precedence::FUN_APPLICATION,
+            //     ),
+            //     prec,
+            //     // REVIEW - determine whether this precedence is proper
+            //     Precedence::FUN_APPLICATION,
+            // ),
             Expr::LiftOption(Some(expr)) => cond_paren(
                 self.prefix_op("some", None, expr),
                 prec,

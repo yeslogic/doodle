@@ -63,6 +63,7 @@ impl BitFieldKind {
 /// Requires that the total length of all fields is 8 bits, and panics otherwise.
 ///
 /// Due to implementation details, will break if there is a single 8-bit field.
+// TODO - phase out
 pub fn packed_bits_u8<const N: usize>(
     field_bit_lengths: [u8; N],
     field_names: [&'static str; N],
@@ -92,9 +93,8 @@ pub fn packed_bits_u8<const N: usize>(
 /// context-awareness for determining the interpretation (and semantics) of the various
 /// segments of contiguous bits.
 ///
-/// Can be used to to simulate both [`packed_bits_u8`] and [`flags_bits8`], as well as anything between the two,
-/// with more flexibility than either of those functions offer for hybrid interpretations and reserved-bit elision,
-/// at the cost of some extra boilerplate in the argument type.
+/// Can be used to to simulate [`packed_bits_u8`], as well as handle flag-bits and explicitly mark reserved (non-recorded)
+/// bits with optional zero-checking.
 pub fn bit_fields_u8<const N: usize>(bit_fields: [BitFieldKind; N]) -> Format {
     const BINDING_NAME: &str = "packed_bits";
     #[cfg(debug_assertions)]
@@ -145,32 +145,6 @@ pub fn bit_fields_u8<const N: usize>(bit_fields: [BitFieldKind; N]) -> Format {
     map(packed, lambda(BINDING_NAME, Expr::Record(fields)))
 }
 
-/// Like [`packed_bits_u8`], except all fields are 1-bit and implied to be flags,
-/// with fields of type `Bool` rather than `U8`.
-///
-/// The `field_names` parameter specifies, in MSB-to-LSB order, the name of each flag to be
-/// extracted from the appropriate bit-position. None indicates that the bit is unused (at least
-/// one name should be `Some`, or else the operation is perfunctory).
-pub fn flags_bits8(field_names: [Option<&'static str>; 8]) -> Format {
-    const BINDING_NAME: &str = "flagbyte";
-
-    let mut flags = Vec::new();
-
-    for (ix, field_name) in field_names.into_iter().enumerate() {
-        if let Some(name) = field_name {
-            flags.push((
-                Label::Borrowed(name),
-                is_nonzero_u8(mask_bits_u8(var(BINDING_NAME), ix as u8, 1)),
-            ));
-        }
-    }
-
-    map(
-        Format::Byte(ByteSet::full()),
-        lambda(BINDING_NAME, Expr::Record(flags)),
-    )
-}
-
 /// Selects `nbits` bits starting from the highest unused bit in an 8-bit packed-field value, returning a U8-typed Expr.
 ///
 /// Will panic if `nbits + high_bits_used > 8`.
@@ -191,86 +165,9 @@ fn mask_bits_u16(x: Expr, high_bits_used: u8, nbits: u8) -> Expr {
     bit_and(shr(x, Expr::U16(shift)), Expr::U16(mask))
 }
 
-/// Constructs a Format that expands a parsed 2-byte value into a multi-field record whose elements
-/// are `u16`-valued sub-masks of the original u16 (big-endian) order.
-///
-/// Currently supports only static-string names for the sub-fields.
-///
-/// The order in which the fields are listed, both in the `field_bit_lengths` and `field_names` parameters,
-/// is to be understood as a MSB-to-LSB order partition of the 16-bit big-endian value.
-///
-/// Zero-bit field-lengths are not explicitly supported, but 'just work' as implemented.
-///
-/// # Notes
-///
-/// Requires that the total length of all fields is 16 (bits), and panics otherwise.
-pub fn packed_bits_u16<const N: usize>(
-    field_bit_lengths: [u8; N],
-    field_names: [&'static str; N],
-) -> Format {
-    const BINDING_NAME: &str = "packed_bits";
-    #[cfg(debug_assertions)]
-    {
-        let _sz: u8 = field_bit_lengths.iter().sum();
-        debug_assert_eq!(
-            _sz, 16,
-            "bad packed-bits field-lengths: total bits-width {_sz} of {field_bit_lengths:?} != 16"
-        );
-    }
-    let mut fields = Vec::new();
-    let mut high_bits_used = 0;
-    for (nbits, name) in Iterator::zip(field_bit_lengths.into_iter(), field_names.into_iter()) {
-        fields.push((
-            Label::Borrowed(name),
-            mask_bits_u16(var(BINDING_NAME), high_bits_used, nbits),
-        ));
-        high_bits_used += nbits;
-    }
-    map(
-        map(
-            tuple_repeat(2, Format::Byte(ByteSet::full())),
-            lambda("x", Expr::U16Be(Box::new(var("x")))),
-        ),
-        lambda(BINDING_NAME, Expr::Record(fields)),
-    )
-}
-
-/// Like [`packed_bits_u16`], except all fields are 1-bit and implied to be flags,
-/// with fields of type `Bool` rather than `U16`.
-///
-/// The `field_names` parameter specifies, in MSB-to-LSB order, the name of each flag to be
-/// extracted from the appropriate bit-position. None indicates that the bit is unused (at least
-/// one name should be `Some`, or else the operation is perfunctory).
-pub fn flags_bits16(field_names: [Option<&'static str>; 16]) -> Format {
-    const BINDING_NAME: &str = "flag_bits";
-
-    let mut flags = Vec::new();
-
-    for (ix, field_name) in field_names.into_iter().enumerate() {
-        if let Some(name) = field_name {
-            flags.push((
-                Label::Borrowed(name),
-                is_nonzero_u16(mask_bits_u16(var(BINDING_NAME), ix as u8, 1)),
-            ));
-        }
-    }
-
-    map(
-        map(
-            tuple_repeat(2, Format::Byte(ByteSet::full())),
-            lambda("x", Expr::U16Be(Box::new(var("x")))),
-        ),
-        lambda(BINDING_NAME, Expr::Record(flags)),
-    )
-}
-
 /// Ergonomic helper for parsing a 16-bit packed value into a multi-field record with more
 /// context-awareness for determining the interpretation (and semantics) of the various
 /// segments of contiguous bits.
-///
-/// Can be used to to simulate both [`packed_bits_u16`] and [`flags_bits16`], as well as anything between the two,
-/// with more flexibility than either of those functions offer for hybrid interpretations and reserved-bit elision,
-/// at the cost of some extra boilerplate in the argument type.
 pub fn bit_fields_u16<const N: usize>(bit_fields: [BitFieldKind; N]) -> Format {
     const BINDING_NAME: &str = "packed_bits";
     #[cfg(debug_assertions)]
@@ -861,6 +758,9 @@ pub struct U8;
 /// Marker type for [`Expr::U16`]-specific generic trait impls
 pub struct U16;
 
+/// Marker type for [`Expr::U32`]-specific generic trait impls
+pub struct U32;
+
 macro_rules! impl_zeromarker {
     ( $( $t:ident ),+ $(,)? ) => {
         $(
@@ -873,28 +773,12 @@ macro_rules! impl_zeromarker {
     };
 }
 
-impl_zeromarker!(U8, U16);
+impl_zeromarker!(U8, U16, U32);
 
-/// Given the appropriate Marker-type, returns an Expr that evaluates to `true` if the expression `expr` (of the apprpriate type for the Marker passed in)
+/// Given the appropriate Marker-type, returns an Expr that evaluates to `true` if the expression `expr` (of the appropriate type for the Marker passed in)
 /// is non-zero.
-///
-/// # Notes
-///
-/// Generates slightly more ergonomic code-fragments during generation than the standard [`is_nonzero`] that works generically,
-/// as well as being theoretically applicable to more broad machine-kinds (e.g. signed integers as well).
-pub fn is_nonzero_parametric<T: ZeroMarker>(expr: Expr) -> Expr {
+pub fn is_nonzero<T: ZeroMarker>(expr: Expr) -> Expr {
     expr_ne(expr, T::mk_zero())
-}
-
-/// Returns an Expr that evaluates to `true` if the given expression (of an arbitrary Uint type) is non-zero
-///
-/// # Notes
-///
-/// Though simpler to invoke in Format definitions, the code generated by this method is mildly tangled compared
-/// to [`is_nonzero_parametric`] and [`is_nonzero_u8`] (etc.), but this function has the upside of not requiring
-/// as much hunting for the exact machine-kind of non-obvious input expressions.
-pub fn is_nonzero(expr: Expr) -> Expr {
-    expr_not(is_within(expr, Bounds::exact(0)))
 }
 
 pub fn is_nonzero_u8(expr: Expr) -> Expr {
@@ -903,6 +787,10 @@ pub fn is_nonzero_u8(expr: Expr) -> Expr {
 
 pub fn is_nonzero_u16(expr: Expr) -> Expr {
     expr_gt(expr, Expr::U16(0))
+}
+
+pub fn is_nonzero_u32(expr: Expr) -> Expr {
+    expr_gt(expr, Expr::U32(0))
 }
 
 /// Helper for constructing `Option::None` within the Expr model-language.
@@ -939,8 +827,8 @@ pub fn format_none() -> Format {
 }
 
 /// Shortcut for `where_lambda` applied over the simple predicate [`is_nonzero`]
-pub fn where_nonzero(format: Format) -> Format {
-    where_lambda(format, "x", is_nonzero(var("x")))
+pub fn where_nonzero<T: ZeroMarker>(format: Format) -> Format {
+    where_lambda(format, "x", is_nonzero::<T>(var("x")))
 }
 
 /// Helper for constructing `Format::ForEach`
@@ -1396,4 +1284,22 @@ pub fn with_relative_offset(base_address: Option<Expr>, offset: Expr, format: Fo
 // REVIEW - Since the typechecker now infers a semi-auto type for Format::Pos rather than forcing U64, the cast may be extraneous...
 pub fn pos32() -> Format {
     map(Format::Pos, lambda("x", Expr::AsU32(Box::new(var("x")))))
+}
+
+/// Hack to get around gvar codegen issues where we need to persist a variable after
+/// it is moved (rather than cloned or referenced) in the current model of the codegen
+/// and the implementation of the Opentype Format-tree.
+pub fn clone_hack<F>(
+    orig_varname: &'static str,
+    clone_varname: &'static str,
+    dep_format: F,
+) -> Format
+where
+    F: FnOnce(Expr) -> Format,
+{
+    Format::Let(
+        Label::Borrowed(clone_varname),
+        Box::new(Expr::Var(Label::Borrowed(orig_varname))),
+        Box::new(dep_format(Expr::Var(Label::Borrowed(clone_varname)))),
+    )
 }

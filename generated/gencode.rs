@@ -8755,6 +8755,7 @@ opentype_loca_table_offsets::Offsets32(inner)
 }
 }))())?;
 let array = ((|| PResult::Ok({
+let offs = offsets.clone();
 let tgt_offset = table_start + array_start_offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| PResult::Ok({
@@ -8763,7 +8764,7 @@ let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
 let mut accum = Vec::new();
-for offset_pair in (try_fold_map_curried(match offsets {
+for offset_pair in (try_fold_map_curried(match offs {
 opentype_loca_table_offsets::Offsets16(half16s) => {
 (try_flat_map_vec(half16s.iter().cloned(), |half16: u16| PResult::Ok([(half16 as u32) * 2u32].to_vec())))?
 },
