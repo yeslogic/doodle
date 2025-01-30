@@ -137,7 +137,7 @@ impl Value {
         }
     }
 
-    pub(crate) fn get_sequence(&self) -> Option<&seq_kind::SeqKind<Self>> {
+    pub(crate) fn get_sequence(&self) -> Option<&SeqKind<Self>> {
         match self {
             Value::Seq(elts) => Some(elts),
             _ => None,
@@ -670,7 +670,7 @@ impl Expr {
             Expr::Dup(count, expr) => {
                 let count = count.eval_value(scope).unwrap_usize();
                 let v = expr.eval_value(scope);
-                Cow::Owned(Value::Seq(seq_kind::SeqKind::Dup(count, Box::new(v))))
+                Cow::Owned(Value::Seq(SeqKind::Dup(count, Box::new(v))))
             }
             Expr::LiftOption(opt) => match opt {
                 Some(expr) => Cow::Owned(Value::Option(Some(Box::new(expr.eval_value(scope))))),
