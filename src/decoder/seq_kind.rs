@@ -3,12 +3,18 @@ use std::{fmt::Debug, ops::Index};
 use serde::Serialize;
 
 #[derive(Clone, PartialEq, Debug, Serialize, Hash, Eq)]
-pub enum SeqKind<T> {
+// NOTE - T must be clone in order for `Dup` to be well-founded, as non-Clone values cannot be duped
+pub enum SeqKind<T: Clone> {
     Strict(Vec<T>),
     Dup(usize, Box<T>),
 }
 
-impl<T> SeqKind<T> {
+impl<T: Clone> SeqKind<T> {
+    /// Constructs an empty (strict) `SeqKind` value.
+    pub const fn new() -> Self {
+        SeqKind::Strict(Vec::new())
+    }
+
     pub fn len(&self) -> usize {
         match self {
             SeqKind::Strict(vs) => vs.len(),
@@ -20,6 +26,7 @@ impl<T> SeqKind<T> {
         matches!(self, SeqKind::Strict(_))
     }
 
+    /// Returns `true` if the sequence contains no elements.
     pub fn is_empty(&self) -> bool {
         match self {
             SeqKind::Strict(vs) => vs.is_empty(),
@@ -27,10 +34,8 @@ impl<T> SeqKind<T> {
         }
     }
 
-    /// Forcibly return a strict vector, erasing any laziness that may be present.
-    pub(crate) fn manifest(self) -> Vec<T>
-    where
-        T: Clone,
+    /// Forcibly convert and return a strict vector, erasing any laziness that may be present.
+    pub fn into_vec(self) -> Vec<T>
     {
         match self {
             SeqKind::Strict(vs) => vs,
@@ -38,6 +43,8 @@ impl<T> SeqKind<T> {
         }
     }
 
+    /// Return a reference to the value at index `ix` in the sequence, if it is in-bounds, or
+    /// `None` if it is out-of-bounds.
     pub fn get(&self, ix: usize) -> Option<&T> {
         match self {
             SeqKind::Strict(vs) => vs.get(ix),
@@ -51,10 +58,9 @@ impl<T> SeqKind<T> {
         }
     }
 
-    pub fn sub_seq(&self, start: usize, len: usize) -> Self
-    where
-        T: Clone,
-    {
+    /// Specialized method for getting a sub-sequence starting at index `start` and with length `len`,
+    /// that preserves laziness.
+    pub fn sub_seq(&self, start: usize, len: usize) -> Self {
         match self {
             SeqKind::Strict(vs) => {
                 let tmp = &vs[start..];
@@ -65,7 +71,8 @@ impl<T> SeqKind<T> {
                 if start + len <= *n {
                     SeqKind::Dup(len, v.clone())
                 } else {
-                    panic!("sub-seq out of bounds")
+                    // REVIEW - we can either enforce `T: Debug` above, to add in the T-param, or keep it abstract
+                    panic!("sub-seq out of bounds: {start}, {len} on SeqKind::Dup({n}, _)")
                 }
             }
         }
@@ -150,13 +157,13 @@ impl<'a, T: Clone> IntoIterator for &'a SeqKind<T> {
     }
 }
 
-impl<T> FromIterator<T> for SeqKind<T> {
+impl<T: Clone> FromIterator<T> for SeqKind<T> {
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
         SeqKind::Strict(Vec::from_iter(iter))
     }
 }
 
-impl<T> From<Vec<T>> for SeqKind<T> {
+impl<T: Clone> From<Vec<T>> for SeqKind<T> {
     fn from(v: Vec<T>) -> Self {
         SeqKind::Strict(v)
     }
