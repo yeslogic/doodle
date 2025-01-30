@@ -289,10 +289,12 @@ impl Expr {
                 ValueType::Base(BaseType::Bool) => Ok(ValueType::Base(BaseType::Bool)),
                 x => Err(anyhow!("unexpected operand type for {_op:?}: {x:?}")),
             },
-            Expr::Unary(_op @ (UnaryOp::IntSucc | UnaryOp::IntPred), x) => match x.infer_type(scope)? {
-                ValueType::Base(b) if b.is_numeric() => Ok(ValueType::Base(b)),
-                x => Err(anyhow!("unexpected operand type for {_op:?}: {x:?}")),
-            },
+            Expr::Unary(_op @ (UnaryOp::IntSucc | UnaryOp::IntPred), x) => {
+                match x.infer_type(scope)? {
+                    ValueType::Base(b) if b.is_numeric() => Ok(ValueType::Base(b)),
+                    x => Err(anyhow!("unexpected operand type for {_op:?}: {x:?}")),
+                }
+            }
 
             Expr::AsU8(x) => match x.infer_type(scope)? {
                 ValueType::Base(b) if b.is_numeric() => Ok(ValueType::Base(BaseType::U8)),

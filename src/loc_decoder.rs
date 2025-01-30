@@ -1,5 +1,5 @@
 use crate::byte_set::ByteSet;
-use crate::decoder::{Compiler, ScopeEntry};
+use crate::decoder::{extract_pair, Compiler, ScopeEntry, SeqKind};
 use crate::error::{DecodeError, LocDecodeError};
 use crate::read::ReadCtxt;
 use crate::UnaryOp;
@@ -147,7 +147,7 @@ pub enum ParsedValue {
     Tuple(Parsed<Vec<ParsedValue>>),
     Record(Parsed<Vec<(Label, ParsedValue)>>),
     Variant(Label, Box<ParsedValue>),
-    Seq(Parsed<Vec<ParsedValue>>),
+    Seq(Parsed<SeqKind<ParsedValue>>),
     Mapped(Box<ParsedValue>, Box<ParsedValue>),
     Branch(usize, Box<ParsedValue>),
     Option(Option<Box<ParsedValue>>),
@@ -208,7 +208,7 @@ impl ParsedValue {
     fn new_seq(v: Vec<ParsedValue>, offset: usize, length: usize) -> ParsedValue {
         ParsedValue::Seq(Parsed {
             loc: ParseLoc::InBuffer { offset, length },
-            inner: v,
+            inner: SeqKind::Strict(v),
         })
     }
 
@@ -253,7 +253,7 @@ impl From<ParsedValue> for Value {
                 Value::Tuple(Vec::from_iter(ts.inner.into_iter().map(Value::from)))
             }
             ParsedValue::Seq(elts) => {
-                Value::Seq(Vec::from_iter(elts.inner.into_iter().map(Value::from)))
+                Value::Seq(SeqKind::from_iter(elts.inner.into_iter().map(Value::from)))
             }
             ParsedValue::Record(fs) => Value::Record(Vec::from_iter(
                 fs.inner.into_iter().map(|(lab, f)| (lab, f.into())),
@@ -294,9 +294,9 @@ impl ParsedValue {
             ParsedValue::Tuple(ts) => {
                 Value::Tuple(Vec::from_iter(ts.inner.iter().cloned().map(Value::from)))
             }
-            ParsedValue::Seq(elts) => {
-                Value::Seq(Vec::from_iter(elts.inner.iter().cloned().map(Value::from)))
-            }
+            ParsedValue::Seq(elts) => Value::Seq(SeqKind::from_iter(
+                elts.inner.iter().cloned().map(Value::from),
+            )),
             ParsedValue::Record(fs) => Value::Record(Vec::from_iter(
                 fs.inner.iter().cloned().map(|(lab, f)| (lab, f.into())),
             )),
@@ -365,10 +365,15 @@ impl ParsedValue {
                     ..
                 }),
             ) => c0 == c1,
-            (Pattern::Tuple(ps), ParsedValue::Tuple(vs))
-            | (Pattern::Seq(ps), ParsedValue::Seq(vs))
-                if ps.len() == vs.inner.len() =>
-            {
+            (Pattern::Tuple(ps), ParsedValue::Tuple(vs)) if ps.len() == vs.inner.len() => {
+                for (p, v) in Iterator::zip(ps.iter(), vs.inner.iter()) {
+                    if !v.matches_inner(scope, p) {
+                        return false;
+                    }
+                }
+                true
+            }
+            (Pattern::Seq(ps), ParsedValue::Seq(vs)) if ps.len() == vs.inner.len() => {
                 for (p, v) in Iterator::zip(ps.iter(), vs.inner.iter()) {
                     if !v.matches_inner(scope, p) {
                         return false;
@@ -447,7 +452,7 @@ impl ParsedValue {
                 }
                 ParsedValue::Seq(Parsed {
                     loc: ParseLoc::Synthesized,
-                    inner: p_elts,
+                    inner: p_elts.into(),
                 })
             }
             Value::Variant(lab, inner) => {
@@ -468,14 +473,14 @@ impl ParsedValue {
         }
     }
 
-    fn from_evaluated_seq(elts: Vec<Self>) -> Self {
+    fn from_evaluated_seq<S: Into<SeqKind<Self>>>(elts: S) -> Self {
         ParsedValue::Seq(Parsed {
             loc: ParseLoc::Synthesized,
-            inner: elts,
+            inner: elts.into(),
         })
     }
 
-    fn get_sequence(&self) -> Option<&Vec<Self>> {
+    fn get_sequence(&self) -> Option<&SeqKind<Self>> {
         match self {
             ParsedValue::Seq(parsed) => Some(&parsed.inner),
             _ => None,
@@ -705,21 +710,45 @@ impl Expr {
             )),
             Expr::Unary(UnaryOp::IntSucc, x) => Cow::Owned(ParsedValue::from_evaluated(
                 match x.eval_value_with_loc(scope) {
-                    Value::U8(x) => Value::U8(x.checked_add(1).unwrap_or_else(|| panic!("IntSucc(u8::MAX) overflowed"))),
-                    Value::U16(x) => Value::U16(x.checked_add(1).unwrap_or_else(|| panic!("IntSucc(u16::MAX) overflowed"))),
-                    Value::U32(x) => Value::U32(x.checked_add(1).unwrap_or_else(|| panic!("IntSucc(u32::MAX) overflowed"))),
-                    Value::U64(x) => Value::U64(x.checked_add(1).unwrap_or_else(|| panic!("IntSucc(u64::MAX) overflowed"))),
+                    Value::U8(x) => Value::U8(
+                        x.checked_add(1)
+                            .unwrap_or_else(|| panic!("IntSucc(u8::MAX) overflowed")),
+                    ),
+                    Value::U16(x) => Value::U16(
+                        x.checked_add(1)
+                            .unwrap_or_else(|| panic!("IntSucc(u16::MAX) overflowed")),
+                    ),
+                    Value::U32(x) => Value::U32(
+                        x.checked_add(1)
+                            .unwrap_or_else(|| panic!("IntSucc(u32::MAX) overflowed")),
+                    ),
+                    Value::U64(x) => Value::U64(
+                        x.checked_add(1)
+                            .unwrap_or_else(|| panic!("IntSucc(u64::MAX) overflowed")),
+                    ),
                     x => panic!("unexpected operand: expected integral value, found `{x:?}`"),
-                }
+                },
             )),
             Expr::Unary(UnaryOp::IntPred, x) => Cow::Owned(ParsedValue::from_evaluated(
                 match x.eval_value_with_loc(scope) {
-                    Value::U8(x) => Value::U8(x.checked_sub(1).unwrap_or_else(|| panic!("IntPred(0u8) underflowed"))),
-                    Value::U16(x) => Value::U16(x.checked_sub(1).unwrap_or_else(|| panic!("IntPred(0u16) underflowed"))),
-                    Value::U32(x) => Value::U32(x.checked_sub(1).unwrap_or_else(|| panic!("IntPred(0u32) underflowed"))),
-                    Value::U64(x) => Value::U64(x.checked_sub(1).unwrap_or_else(|| panic!("IntPred(0u64) underflowed"))),
+                    Value::U8(x) => Value::U8(
+                        x.checked_sub(1)
+                            .unwrap_or_else(|| panic!("IntPred(0u8) underflowed")),
+                    ),
+                    Value::U16(x) => Value::U16(
+                        x.checked_sub(1)
+                            .unwrap_or_else(|| panic!("IntPred(0u16) underflowed")),
+                    ),
+                    Value::U32(x) => Value::U32(
+                        x.checked_sub(1)
+                            .unwrap_or_else(|| panic!("IntPred(0u32) underflowed")),
+                    ),
+                    Value::U64(x) => Value::U64(
+                        x.checked_sub(1)
+                            .unwrap_or_else(|| panic!("IntPred(0u64) underflowed")),
+                    ),
                     x => panic!("unexpected operand: expected integral value, found `{x:?}`"),
-                }
+                },
             )),
             Expr::AsU8(x) => Cow::Owned(ParsedValue::from_evaluated(
                 match x.eval_value_with_loc(scope) {
@@ -859,9 +888,9 @@ impl Expr {
                     Some(values) => {
                         let start = start.eval_value_with_loc(scope).unwrap_usize();
                         let length = length.eval_value_with_loc(scope).unwrap_usize();
-                        let values = &values[start..];
-                        let values = &values[..length];
-                        Cow::Owned(ParsedValue::from_evaluated_seq(values.to_vec()))
+                        Cow::Owned(ParsedValue::from_evaluated_seq(
+                            values.sub_seq(start, length),
+                        ))
                     }
                     _ => panic!("SubSeq: expected Seq"),
                 }
@@ -895,15 +924,15 @@ impl Expr {
                     .get_sequence()
                 {
                     Some(values) => {
-                        let mut vs = Vec::new();
-                        for v in values {
+                        let mut vs: Vec<Value> = Vec::new();
+                        for v in values.iter() {
                             if let Value::Seq(vn) = expr.eval_lambda_with_loc(scope, v) {
                                 vs.extend(vn);
                             } else {
                                 panic!("FlatMap: expected Seq");
                             }
                         }
-                        Cow::Owned(ParsedValue::from_evaluated(Value::Seq(vs)))
+                        Cow::Owned(ParsedValue::from_evaluated(Value::Seq(vs.into())))
                     }
                     _ => panic!("FlatMap: expected Seq"),
                 }
@@ -918,15 +947,15 @@ impl Expr {
                                 scope,
                                 &ParsedValue::from_evaluated(Value::Tuple(vec![accum, v])),
                             );
-                            accum = match ret.unwrap_tuple().as_mut_slice() {
-                                [accum, Value::Seq(vn)] => {
-                                    vs.extend_from_slice(vn);
-                                    accum.clone()
+                            accum = match extract_pair(ret.unwrap_tuple()) {
+                                (accum, Value::Seq(vn)) => {
+                                    vs.extend(vn);
+                                    accum
                                 }
                                 _ => panic!("FlatMapAccum: expected two values"),
                             };
                         }
-                        Cow::Owned(ParsedValue::from_evaluated(Value::Seq(vs)))
+                        Cow::Owned(ParsedValue::from_evaluated(Value::Seq(vs.into())))
                     }
                     _ => panic!("FlatMapAccum: expected Seq"),
                 }
@@ -949,14 +978,14 @@ impl Expr {
                 Value::Seq(values) => {
                     let mut vs = Vec::new();
                     for v in values {
-                        let arg = Value::Tuple(vec![Value::Seq(vs), v]);
+                        let arg = Value::Tuple(vec![Value::Seq(vs.into()), v]);
                         // TODO can we avoid cloning arg here?
                         if let Value::Seq(vn) = expr
                             .eval_lambda_with_loc(scope, &ParsedValue::from_evaluated(arg.clone()))
                         {
                             vs = match arg {
                                 Value::Tuple(mut args) => match args.remove(0) {
-                                    Value::Seq(vs) => vs,
+                                    Value::Seq(vs) => vs.manifest(),
                                     _ => unreachable!(),
                                 },
                                 _ => unreachable!(),
@@ -966,18 +995,17 @@ impl Expr {
                             panic!("FlatMapList: expected Seq");
                         }
                     }
-                    Cow::Owned(ParsedValue::from_evaluated(Value::Seq(vs)))
+                    Cow::Owned(ParsedValue::from_evaluated(Value::Seq(vs.into())))
                 }
                 _ => panic!("FlatMapList: expected Seq"),
             },
             Expr::Dup(count, expr) => {
                 let count = count.eval_value_with_loc(scope).unwrap_usize();
                 let v = expr.eval_value_with_loc(scope);
-                let mut vs = Vec::new();
-                for _ in 0..count {
-                    vs.push(v.clone());
-                }
-                Cow::Owned(ParsedValue::from_evaluated(Value::Seq(vs)))
+                Cow::Owned(ParsedValue::from_evaluated(Value::Seq(SeqKind::Dup(
+                    count,
+                    Box::new(v),
+                ))))
             }
             Expr::LiftOption(opt) => Cow::Owned(ParsedValue::from_evaluated(Value::Option(
                 opt.as_ref()
@@ -1379,7 +1407,7 @@ impl Decoder {
                     let vs = ParsedValue::from_evaluated_seq(v);
                     let done = expr.eval_lambda_with_loc(scope, &vs).unwrap_bool();
                     v = match vs {
-                        ParsedValue::Seq(v) => v.inner,
+                        ParsedValue::Seq(v) => v.inner.manifest(),
                         _ => unreachable!(),
                     };
                     if done {

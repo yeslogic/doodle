@@ -3958,7 +3958,10 @@ mod tests {
 
     #[test]
     fn test_codegen_oput() {
-        let f = Format::Compute(Box::new(Expr::Unary(UnaryOp::IntPred, Box::new(Expr::U32(43)))));
+        let f = Format::Compute(Box::new(Expr::Unary(
+            UnaryOp::IntPred,
+            Box::new(Expr::U32(43)),
+        )));
         let mut module = FormatModule::new();
         module.define_format("test.oput", f.clone());
         let oput = blit_gencode(&module, &f);
