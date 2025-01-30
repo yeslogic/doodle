@@ -12,6 +12,21 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+pub mod seq_kind;
+pub use seq_kind::SeqKind;
+
+pub(crate) fn extract_pair<T>(mut vec: Vec<T>) -> (T, T) {
+    if vec.len() != 2 {
+        panic!("expected pair");
+    }
+    unsafe {
+        // Safe because we checked the length above
+        let second = vec.pop().unwrap_unchecked();
+        let first = vec.pop().unwrap_unchecked();
+        (first, second)
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 #[serde(tag = "tag", content = "data")]
 pub enum Value {
@@ -25,7 +40,7 @@ pub enum Value {
     Tuple(Vec<Value>),
     Record(Vec<(Label, Value)>),
     Variant(Label, Box<Value>),
-    Seq(Vec<Value>),
+    Seq(SeqKind<Value>),
     Mapped(Box<Value>, Box<Value>),
     Branch(usize, Box<Value>),
 }
@@ -55,9 +70,7 @@ impl Value {
             (Pattern::Int(bounds), Value::U32(n)) => bounds.contains(usize::try_from(*n).unwrap()),
             (Pattern::Int(bounds), Value::U64(n)) => bounds.contains(usize::try_from(*n).unwrap()),
             (Pattern::Char(c0), Value::Char(c1)) => c0 == c1,
-            (Pattern::Tuple(ps), Value::Tuple(vs)) | (Pattern::Seq(ps), Value::Seq(vs))
-                if ps.len() == vs.len() =>
-            {
+            (Pattern::Tuple(ps), Value::Tuple(vs)) if ps.len() == vs.len() => {
                 for (p, v) in Iterator::zip(ps.iter(), vs.iter()) {
                     if !v.matches_inner(scope, p) {
                         return false;
@@ -65,6 +78,15 @@ impl Value {
                 }
                 true
             }
+            (Pattern::Seq(ps), Value::Seq(vs)) if ps.len() == vs.len() => {
+                for (p, v) in Iterator::zip(ps.iter(), vs.iter()) {
+                    if !v.matches_inner(scope, p) {
+                        return false;
+                    }
+                }
+                true
+            }
+
             (Pattern::Variant(label0, p), Value::Variant(label1, v)) if label0 == label1 => {
                 v.matches_inner(scope, p)
             }
@@ -115,7 +137,7 @@ impl Value {
         }
     }
 
-    pub(crate) fn get_sequence(&self) -> Option<&Vec<Self>> {
+    pub(crate) fn get_sequence(&self) -> Option<&seq_kind::SeqKind<Self>> {
         match self {
             Value::Seq(elts) => Some(elts),
             _ => None,
@@ -401,17 +423,41 @@ impl Expr {
                 x => panic!("unexpected operand: expecting boolean, found `{x:?}`"),
             }),
             Expr::Unary(UnaryOp::IntSucc, x) => Cow::Owned(match x.eval_value(scope) {
-                Value::U8(x) => Value::U8(x.checked_add(1).unwrap_or_else(|| panic!("IntSucc(u8::MAX) overflowed"))),
-                Value::U16(x) => Value::U16(x.checked_add(1).unwrap_or_else(|| panic!("IntSucc(u16::MAX) overflowed"))),
-                Value::U32(x) => Value::U32(x.checked_add(1).unwrap_or_else(|| panic!("IntSucc(u32::MAX) overflowed"))),
-                Value::U64(x) => Value::U64(x.checked_add(1).unwrap_or_else(|| panic!("IntSucc(u64::MAX) overflowed"))),
+                Value::U8(x) => Value::U8(
+                    x.checked_add(1)
+                        .unwrap_or_else(|| panic!("IntSucc(u8::MAX) overflowed")),
+                ),
+                Value::U16(x) => Value::U16(
+                    x.checked_add(1)
+                        .unwrap_or_else(|| panic!("IntSucc(u16::MAX) overflowed")),
+                ),
+                Value::U32(x) => Value::U32(
+                    x.checked_add(1)
+                        .unwrap_or_else(|| panic!("IntSucc(u32::MAX) overflowed")),
+                ),
+                Value::U64(x) => Value::U64(
+                    x.checked_add(1)
+                        .unwrap_or_else(|| panic!("IntSucc(u64::MAX) overflowed")),
+                ),
                 x => panic!("unexpected operand: expected integral value, found `{x:?}`"),
             }),
             Expr::Unary(UnaryOp::IntPred, x) => Cow::Owned(match x.eval_value(scope) {
-                Value::U8(x) => Value::U8(x.checked_sub(1).unwrap_or_else(|| panic!("IntPred(0u8) underflowed"))),
-                Value::U16(x) => Value::U16(x.checked_sub(1).unwrap_or_else(|| panic!("IntPred(0u16) underflowed"))),
-                Value::U32(x) => Value::U32(x.checked_sub(1).unwrap_or_else(|| panic!("IntPred(0u32) underflowed"))),
-                Value::U64(x) => Value::U64(x.checked_sub(1).unwrap_or_else(|| panic!("IntPred(0u64) underflowed"))),
+                Value::U8(x) => Value::U8(
+                    x.checked_sub(1)
+                        .unwrap_or_else(|| panic!("IntPred(0u8) underflowed")),
+                ),
+                Value::U16(x) => Value::U16(
+                    x.checked_sub(1)
+                        .unwrap_or_else(|| panic!("IntPred(0u16) underflowed")),
+                ),
+                Value::U32(x) => Value::U32(
+                    x.checked_sub(1)
+                        .unwrap_or_else(|| panic!("IntPred(0u32) underflowed")),
+                ),
+                Value::U64(x) => Value::U64(
+                    x.checked_sub(1)
+                        .unwrap_or_else(|| panic!("IntPred(0u64) underflowed")),
+                ),
                 x => panic!("unexpected operand: expected integral value, found `{x:?}`"),
             }),
 
@@ -517,7 +563,7 @@ impl Expr {
                 match v.coerce_mapped_value().get_sequence() {
                     Some(values) => {
                         let index = index.eval_value(scope).unwrap_usize();
-                        &values[index]
+                        values.get(index).expect("out-of-bounds Seq access")
                     }
                     _ => panic!("SeqIx: expected Seq"),
                 }
@@ -527,12 +573,7 @@ impl Expr {
                     Some(values) => {
                         let start = start.eval_value(scope).unwrap_usize();
                         let length = length.eval_value(scope).unwrap_usize();
-                        let values = &values[start..];
-                        let values = &values[..length];
-                        Cow::Owned({
-                            let elts = values.to_vec();
-                            Value::Seq(elts)
-                        })
+                        Cow::Owned(Value::Seq(values.sub_seq(start, length)))
                     }
                     _ => panic!("SubSeq: expected Seq"),
                 }
@@ -545,12 +586,16 @@ impl Expr {
                         let mut vs = Vec::new();
                         for i in 0..length {
                             if i + start < vs0.len() {
-                                vs.push(vs0[i + start].clone());
+                                vs.push(vs0.get(i + start).expect("out-of-bounds access").clone());
                             } else {
-                                vs.push(vs[i + start - vs0.len()].clone());
+                                vs.push(
+                                    vs.get(i + start - vs0.len())
+                                        .expect("out-of-bounds access")
+                                        .clone(),
+                                );
                             }
                         }
-                        Cow::Owned(Value::Seq(vs))
+                        Cow::Owned(Value::Seq(vs.into()))
                     }
                     _ => panic!("SubSeqInflate: expected Seq"),
                 }
@@ -558,15 +603,15 @@ impl Expr {
             Expr::FlatMap(expr, seq) => {
                 match seq.eval(scope).coerce_mapped_value().get_sequence() {
                     Some(values) => {
-                        let mut vs = Vec::new();
-                        for v in values {
+                        let mut vs: Vec<Value> = Vec::new();
+                        for v in values.iter() {
                             if let Value::Seq(vn) = expr.eval_lambda(scope, v) {
                                 vs.extend(vn);
                             } else {
                                 panic!("FlatMap: expected Seq");
                             }
                         }
-                        Cow::Owned(Value::Seq(vs))
+                        Cow::Owned(Value::Seq(vs.into()))
                     }
                     _ => panic!("FlatMap: expected Seq"),
                 }
@@ -574,18 +619,18 @@ impl Expr {
             Expr::FlatMapAccum(expr, accum, _accum_type, seq) => match seq.eval_value(scope) {
                 Value::Seq(values) => {
                     let mut accum = accum.eval_value(scope);
-                    let mut vs = Vec::new();
+                    let mut vs: Vec<Value> = Vec::new();
                     for v in values {
                         let ret = expr.eval_lambda(scope, &Value::Tuple(vec![accum, v]));
-                        accum = match ret.unwrap_tuple().as_mut_slice() {
-                            [accum, Value::Seq(vn)] => {
-                                vs.extend_from_slice(vn);
-                                accum.clone()
+                        accum = match extract_pair(ret.unwrap_tuple()) {
+                            (accum, Value::Seq(vn)) => {
+                                vs.extend(vn);
+                                accum
                             }
                             _ => panic!("FlatMapAccum: expected two values"),
                         };
                     }
-                    Cow::Owned(Value::Seq(vs))
+                    Cow::Owned(Value::Seq(vs.into()))
                 }
                 _ => panic!("FlatMapAccum: expected Seq"),
             },
@@ -604,11 +649,11 @@ impl Expr {
                 Value::Seq(values) => {
                     let mut vs = Vec::new();
                     for v in values {
-                        let arg = Value::Tuple(vec![Value::Seq(vs), v]);
+                        let arg = Value::Tuple(vec![Value::Seq(SeqKind::Strict(vs)), v]);
                         if let Value::Seq(vn) = expr.eval_lambda(scope, &arg) {
                             vs = match arg {
                                 Value::Tuple(mut args) => match args.remove(0) {
-                                    Value::Seq(vs) => vs,
+                                    Value::Seq(vs) => vs.manifest(),
                                     _ => unreachable!(),
                                 },
                                 _ => unreachable!(),
@@ -618,18 +663,14 @@ impl Expr {
                             panic!("FlatMapList: expected Seq");
                         }
                     }
-                    Cow::Owned(Value::Seq(vs))
+                    Cow::Owned(Value::Seq(vs.into()))
                 }
                 _ => panic!("FlatMapList: expected Seq"),
             },
             Expr::Dup(count, expr) => {
                 let count = count.eval_value(scope).unwrap_usize();
                 let v = expr.eval_value(scope);
-                let mut vs = Vec::new();
-                for _ in 0..count {
-                    vs.push(v.clone());
-                }
-                Cow::Owned(Value::Seq(vs))
+                Cow::Owned(Value::Seq(seq_kind::SeqKind::Dup(count, Box::new(v))))
             }
             Expr::LiftOption(opt) => match opt {
                 Some(expr) => Cow::Owned(Value::Option(Some(Box::new(expr.eval_value(scope))))),
@@ -1279,7 +1320,7 @@ impl Decoder {
                     input = next_input;
                     v.push(va);
                 }
-                Ok((Value::Seq(v), input))
+                Ok((Value::Seq(v.into()), input))
             }
             Decoder::Until(tree, a) => {
                 let mut input = input;
@@ -1295,7 +1336,7 @@ impl Decoder {
                         break;
                     }
                 }
-                Ok((Value::Seq(v), input))
+                Ok((Value::Seq(v.into()), input))
             }
             Decoder::DecodeBytes(bytes, a) => {
                 let bytes = {
@@ -1333,7 +1374,7 @@ impl Decoder {
                     v.push(va);
                     input = next_input;
                 }
-                Ok((Value::Seq(v), input))
+                Ok((Value::Seq(v.into()), input))
             }
             Decoder::RepeatCount(expr, a) => {
                 let mut input = input;
@@ -1344,7 +1385,7 @@ impl Decoder {
                     input = next_input;
                     v.push(va);
                 }
-                Ok((Value::Seq(v), input))
+                Ok((Value::Seq(v.into()), input))
             }
             Decoder::RepeatBetween(tree, min, max, a) => {
                 let mut input = input;
@@ -1366,7 +1407,7 @@ impl Decoder {
                     input = next_input;
                     v.push(va);
                 }
-                Ok((Value::Seq(v), input))
+                Ok((Value::Seq(v.into()), input))
             }
             Decoder::Maybe(expr, a) => {
                 let is_present = expr.eval_value(scope).unwrap_bool();
@@ -1389,7 +1430,7 @@ impl Decoder {
                         break;
                     }
                 }
-                Ok((Value::Seq(v), input))
+                Ok((Value::Seq(v.into()), input))
             }
             Decoder::RepeatUntilSeq(expr, a) => {
                 let mut input = input;
@@ -1398,24 +1439,24 @@ impl Decoder {
                     let (va, next_input) = a.parse(program, scope, input)?;
                     input = next_input;
                     v.push(va);
-                    let vs = Value::Seq(v);
+                    let vs = Value::Seq(v.into());
                     let done = expr.eval_lambda(scope, &vs).unwrap_bool();
                     v = match vs {
-                        Value::Seq(v) => v,
+                        Value::Seq(v) => v.manifest(),
                         _ => unreachable!(),
                     };
                     if done {
                         break;
                     }
                 }
-                Ok((Value::Seq(v), input))
+                Ok((Value::Seq(v.into()), input))
             }
             Decoder::AccumUntil(f_done, f_update, init, _vt, a) => {
                 let mut input = input;
                 let mut v = Vec::new();
                 let mut accum = init.eval_value(scope);
                 loop {
-                    let done_arg = Value::Tuple(vec![accum.clone(), Value::Seq(v.clone())]);
+                    let done_arg = Value::Tuple(vec![accum.clone(), Value::Seq(v.clone().into())]);
                     let is_done = f_done.eval_lambda(&scope, &done_arg).unwrap_bool();
                     if is_done {
                         break;
@@ -1427,7 +1468,7 @@ impl Decoder {
                     accum = next_accum;
                     input = next_input;
                 }
-                Ok((Value::Tuple(vec![accum, Value::Seq(v)]), input))
+                Ok((Value::Tuple(vec![accum, Value::Seq(v.into())]), input))
             }
             Decoder::Peek(a) => {
                 let (v, _next_input) = a.parse(program, scope, input)?;
@@ -1955,14 +1996,14 @@ mod tests {
     fn compile_repeat() {
         let f = repeat(is_byte(0x00));
         let d = Compiler::compile_one(&f).unwrap();
-        accepts(&d, &[], &[], Value::Seq(vec![]));
-        accepts(&d, &[0xFF], &[0xFF], Value::Seq(vec![]));
-        accepts(&d, &[0x00], &[], Value::Seq(vec![Value::U8(0x00)]));
+        accepts(&d, &[], &[], Value::Seq(vec![].into()));
+        accepts(&d, &[0xFF], &[0xFF], Value::Seq(vec![].into()));
+        accepts(&d, &[0x00], &[], Value::Seq(vec![Value::U8(0x00)].into()));
         accepts(
             &d,
             &[0x00, 0x00],
             &[],
-            Value::Seq(vec![Value::U8(0x00), Value::U8(0x00)]),
+            Value::Seq(vec![Value::U8(0x00), Value::U8(0x00)].into()),
         );
     }
 
@@ -1980,27 +2021,27 @@ mod tests {
             &d,
             &[],
             &[],
-            Value::Tuple(vec![Value::Seq(vec![]), Value::Seq(vec![])]),
+            Value::Tuple(vec![Value::Seq(vec![].into()), Value::Seq(vec![].into())]),
         );
         accepts(
             &d,
             &[0x00],
             &[],
-            Value::Tuple(vec![Value::Seq(vec![Value::U8(0x00)]), Value::Seq(vec![])]),
+            Value::Tuple(vec![Value::Seq(vec![Value::U8(0x00)].into()), Value::Seq(vec![].into())]),
         );
         accepts(
             &d,
             &[0xFF],
             &[],
-            Value::Tuple(vec![Value::Seq(vec![]), Value::Seq(vec![Value::U8(0xFF)])]),
+            Value::Tuple(vec![Value::Seq(vec![].into()), Value::Seq(vec![Value::U8(0xFF)].into())]),
         );
         accepts(
             &d,
             &[0x00, 0xFF],
             &[],
             Value::Tuple(vec![
-                Value::Seq(vec![Value::U8(0x00)]),
-                Value::Seq(vec![Value::U8(0xFF)]),
+                Value::Seq(vec![Value::U8(0x00)].into()),
+                Value::Seq(vec![Value::U8(0xFF)].into()),
             ]),
         );
         accepts(
@@ -2008,15 +2049,15 @@ mod tests {
             &[0x00, 0xFF, 0x00],
             &[0x00],
             Value::Tuple(vec![
-                Value::Seq(vec![Value::U8(0x00)]),
-                Value::Seq(vec![Value::U8(0xFF)]),
+                Value::Seq(vec![Value::U8(0x00)].into()),
+                Value::Seq(vec![Value::U8(0xFF)].into()),
             ]),
         );
         accepts(
             &d,
             &[0x7F],
             &[0x7F],
-            Value::Tuple(vec![Value::Seq(vec![]), Value::Seq(vec![])]),
+            Value::Tuple(vec![Value::Seq(vec![].into()), Value::Seq(vec![].into())]),
         );
     }
 
@@ -2042,14 +2083,14 @@ mod tests {
             &d,
             &[],
             &[],
-            Value::Tuple(vec![Value::Seq(vec![]), Value::UNIT]),
+            Value::Tuple(vec![Value::Seq(vec![].into()), Value::UNIT]),
         );
         accepts(
             &d,
             &[0x00, 0x00, 0x00],
             &[],
             Value::Tuple(vec![
-                Value::Seq(vec![Value::U8(0x00), Value::U8(0x00), Value::U8(0x00)]),
+                Value::Seq(vec![Value::U8(0x00), Value::U8(0x00), Value::U8(0x00)].into()),
                 Value::UNIT,
             ]),
         );
@@ -2103,7 +2144,7 @@ mod tests {
             &[],
             &[],
             Value::record([
-                ("first", Value::Seq(vec![])),
+                ("first", Value::Seq(vec![].into())),
                 (
                     "second-and-third",
                     Value::Branch(1, Box::new(Value::variant("none", Value::UNIT))),
@@ -2115,7 +2156,7 @@ mod tests {
             &[0x00],
             &[],
             Value::record([
-                ("first", Value::Seq(vec![Value::U8(0x00)])),
+                ("first", Value::Seq(vec![Value::U8(0x00)].into())),
                 (
                     "second-and-third",
                     Value::Branch(1, Box::new(Value::variant("none", Value::UNIT))),
@@ -2127,7 +2168,7 @@ mod tests {
             &[0x00, 0xFF],
             &[],
             Value::record([
-                ("first", Value::Seq(vec![Value::U8(0x00)])),
+                ("first", Value::Seq(vec![Value::U8(0x00)].into())),
                 (
                     "second-and-third",
                     Value::Branch(
@@ -2137,9 +2178,9 @@ mod tests {
                             Value::record([
                                 (
                                     "second",
-                                    Value::Tuple(vec![Value::U8(0xFF), Value::Seq(vec![])]),
+                                    Value::Tuple(vec![Value::U8(0xFF), Value::Seq(vec![].into())]),
                                 ),
-                                ("third", Value::Seq(vec![])),
+                                ("third", Value::Seq(vec![].into())),
                             ]),
                         )),
                     ),
@@ -2151,7 +2192,7 @@ mod tests {
             &[0x00, 0xFF, 0x00],
             &[],
             Value::record(vec![
-                ("first", Value::Seq(vec![Value::U8(0x00)])),
+                ("first", Value::Seq(vec![Value::U8(0x00)].into())),
                 (
                     "second-and-third",
                     Value::Branch(
@@ -2161,9 +2202,9 @@ mod tests {
                             Value::record(vec![
                                 (
                                     "second",
-                                    Value::Tuple(vec![Value::U8(0xFF), Value::Seq(vec![])]),
+                                    Value::Tuple(vec![Value::U8(0xFF), Value::Seq(vec![].into())]),
                                 ),
-                                ("third", Value::Seq(vec![Value::U8(0x00)])),
+                                ("third", Value::Seq(vec![Value::U8(0x00)].into())),
                             ]),
                         )),
                     ),
@@ -2175,7 +2216,7 @@ mod tests {
             &[0x00, 0x7F],
             &[0x7F],
             Value::record(vec![
-                ("first", Value::Seq(vec![Value::U8(0x00)])),
+                ("first", Value::Seq(vec![Value::U8(0x00)].into())),
                 (
                     "second-and-third",
                     Value::Branch(1, Box::new(Value::variant("none", Value::UNIT))),
@@ -2190,18 +2231,18 @@ mod tests {
         let d = Compiler::compile_one(&f).unwrap();
         rejects(&d, &[]);
         rejects(&d, &[0xFF]);
-        accepts(&d, &[0x00], &[], Value::Seq(vec![Value::U8(0x00)]));
+        accepts(&d, &[0x00], &[], Value::Seq(vec![Value::U8(0x00)].into()));
         accepts(
             &d,
             &[0x00, 0xFF],
             &[0xFF],
-            Value::Seq(vec![Value::U8(0x00)]),
+            Value::Seq(vec![Value::U8(0x00)].into()),
         );
         accepts(
             &d,
             &[0x00, 0x00],
             &[],
-            Value::Seq(vec![Value::U8(0x00), Value::U8(0x00)]),
+            Value::Seq(vec![Value::U8(0x00), Value::U8(0x00)].into()),
         );
     }
 
@@ -2271,7 +2312,7 @@ mod tests {
                 0,
                 Box::new(Value::Variant(
                     "a".into(),
-                    Box::new(Value::Tuple(vec![Value::Tuple(vec![]), Value::Seq(vec![])])),
+                    Box::new(Value::Tuple(vec![Value::Tuple(vec![]), Value::Seq(vec![].into())])),
                 )),
             ),
         );
@@ -2285,7 +2326,7 @@ mod tests {
                     "a".into(),
                     Box::new(Value::Tuple(vec![
                         Value::Tuple(vec![]),
-                        Value::Seq(vec![Value::U8(0xFF)]),
+                        Value::Seq(vec![Value::U8(0xFF)].into()),
                     ])),
                 )),
             ),
@@ -2300,7 +2341,7 @@ mod tests {
                     "a".into(),
                     Box::new(Value::Tuple(vec![
                         Value::Tuple(vec![]),
-                        Value::Seq(vec![Value::U8(0x00), Value::U8(0xFF)]),
+                        Value::Seq(vec![Value::U8(0x00), Value::U8(0xFF)].into()),
                     ])),
                 )),
             ),
@@ -2315,7 +2356,7 @@ mod tests {
                     "a".into(),
                     Box::new(Value::Tuple(vec![
                         Value::Tuple(vec![]),
-                        Value::Seq(vec![Value::U8(0xFF), Value::U8(0x00)]),
+                        Value::Seq(vec![Value::U8(0xFF), Value::U8(0x00)].into()),
                     ])),
                 )),
             ),

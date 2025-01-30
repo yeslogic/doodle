@@ -271,7 +271,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             | Format::RepeatUntilLast(_, format)
             | Format::RepeatUntilSeq(_, format) => match value {
                 Value::Seq(values) => {
-                    for v in values {
+                    for v in values.iter() {
                         self.write_flat(v, format)?;
                     }
                     Ok(())
@@ -283,7 +283,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                 Value::Tuple(vs) => match vs.as_slice() {
                     [_, v] => match &v {
                         Value::Seq(values) => {
-                            for v in values {
+                            for v in values.iter() {
                                 self.write_flat(v, format)?;
                             }
                             Ok(())

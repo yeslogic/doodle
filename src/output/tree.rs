@@ -1,5 +1,6 @@
 use std::{borrow::Cow, fmt, io, ops::Deref, rc::Rc};
 
+use crate::decoder::SeqKind;
 use crate::precedence::{cond_paren, Precedence};
 use crate::{
     decoder::Value,
@@ -684,7 +685,7 @@ impl<'module> MonoidalPrinter<'module> {
         self.compile_ascii_seq(vs)
     }
 
-    fn compile_parsed_char_seq(&self, vals: &Parsed<Vec<ParsedValue>>) -> Fragment {
+    fn compile_parsed_char_seq(&self, vals: &Parsed<SeqKind<ParsedValue>>) -> Fragment {
         let mut frag = Fragment::new();
         frag.encat(Fragment::Char('"'));
         for v in vals.inner.iter() {
@@ -694,7 +695,11 @@ impl<'module> MonoidalPrinter<'module> {
         self.compile_with_location(frag.group(), vals.loc)
     }
 
-    fn compile_char_seq(&self, vals: &[Value]) -> Fragment {
+    fn compile_char_seq<'a, S>(&self, vals: &'a S) -> Fragment
+    where
+        S: Clone,
+        &'a S: IntoIterator<Item = &'a Value>,
+    {
         let mut frag = Fragment::new();
         frag.encat(Fragment::Char('"'));
         for v in vals {
@@ -704,17 +709,25 @@ impl<'module> MonoidalPrinter<'module> {
         frag.group()
     }
 
-    fn compile_parsed_ascii_seq(&self, vals: &Parsed<Vec<ParsedValue>>) -> Fragment {
+    fn compile_parsed_ascii_seq<'a, S>(&self, vals: &'a Parsed<S>) -> Fragment
+    where
+        &'a S: IntoIterator<Item = &'a ParsedValue>,
+        S: Clone,
+    {
         let mut frag = Fragment::new();
         frag.encat(Fragment::Char('"'));
-        for v in vals.inner.iter() {
+        for v in &vals.inner {
             frag.encat(self.compile_parsed_ascii_char(v));
         }
         frag.encat(Fragment::Char('"'));
         self.compile_with_location(frag.group(), vals.loc)
     }
 
-    fn compile_ascii_seq(&self, vals: &[Value]) -> Fragment {
+    fn compile_ascii_seq<'a, S>(&self, vals: &'a S) -> Fragment
+    where
+        S: Clone,
+        &'a S: IntoIterator<Item = &'a Value>,
+    {
         let mut frag = Fragment::new();
         frag.encat(Fragment::Char('"'));
         for v in vals {
@@ -844,7 +857,7 @@ impl<'module> MonoidalPrinter<'module> {
 
     fn compile_parsed_seq(
         &mut self,
-        vals: &Parsed<Vec<ParsedValue>>,
+        vals: &Parsed<SeqKind<ParsedValue>>,
         format: Option<&Format>,
     ) -> Fragment {
         let Parsed { inner, .. } = vals;
@@ -859,8 +872,9 @@ impl<'module> MonoidalPrinter<'module> {
                 }
                 Some(_) | None => (last_index, false),
             };
-            for (index, val) in inner[0..upper_bound].iter().enumerate() {
-                frag.encat(self.compile_parsed_field_value_continue(index, val, format, false));
+            for ix in 0..upper_bound {
+                let val = &inner[ix];
+                frag.encat(self.compile_parsed_field_value_continue(ix, val, format, false));
             }
             if any_skipped {
                 frag.encat(self.compile_field_skipped());
@@ -875,7 +889,7 @@ impl<'module> MonoidalPrinter<'module> {
         }
     }
 
-    fn compile_seq(&mut self, vals: &[Value], format: Option<&Format>) -> Fragment {
+    fn compile_seq(&mut self, vals: &SeqKind<Value>, format: Option<&Format>) -> Fragment {
         if vals.is_empty() {
             Fragment::String("[]".into())
         } else {
@@ -887,7 +901,8 @@ impl<'module> MonoidalPrinter<'module> {
                 }
                 Some(_) | None => (last_index, false),
             };
-            for (index, val) in vals[0..upper_bound].iter().enumerate() {
+            for index in 0..upper_bound {
+                let val = &vals[index];
                 frag.encat(self.compile_field_value_continue(index, val, format, false));
             }
             if any_skipped {
@@ -900,7 +915,7 @@ impl<'module> MonoidalPrinter<'module> {
 
     fn compile_parsed_seq_records(
         &mut self,
-        vals: &Parsed<Vec<ParsedValue>>,
+        vals: &Parsed<SeqKind<ParsedValue>>,
         format: &Format,
     ) -> Fragment {
         let fields = self.try_as_record_with_atomic_fields(format).unwrap();
@@ -929,7 +944,11 @@ impl<'module> MonoidalPrinter<'module> {
         self.compile_parsed_table(&cols, &header, &rows, &locs)
     }
 
-    fn compile_seq_records(&mut self, vals: &[Value], format: &Format) -> Fragment {
+    fn compile_seq_records<'a, S>(&mut self, vals: &'a S, format: &Format) -> Fragment
+    where
+        S: Clone,
+        &'a S: IntoIterator<Item = &'a Value>,
+    {
         let fields = self.try_as_record_with_atomic_fields(format).unwrap();
         let mut cols = Vec::new();
         let mut header = Vec::new();
