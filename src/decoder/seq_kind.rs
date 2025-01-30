@@ -35,8 +35,7 @@ impl<T: Clone> SeqKind<T> {
     }
 
     /// Forcibly convert and return a strict vector, erasing any laziness that may be present.
-    pub fn into_vec(self) -> Vec<T>
-    {
+    pub fn into_vec(self) -> Vec<T> {
         match self {
             SeqKind::Strict(vs) => vs,
             SeqKind::Dup(n, v) => vec![*v; n],
