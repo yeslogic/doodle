@@ -563,7 +563,7 @@ impl Expr {
                 match v.coerce_mapped_value().get_sequence() {
                     Some(values) => {
                         let index = index.eval_value(scope).unwrap_usize();
-                        values.get(index).expect("out-of-bounds Seq access")
+                        &values[index]
                     }
                     _ => panic!("SeqIx: expected Seq"),
                 }
@@ -586,12 +586,10 @@ impl Expr {
                         let mut vs = Vec::new();
                         for i in 0..length {
                             if i + start < vs0.len() {
-                                vs.push(vs0.get(i + start).expect("out-of-bounds access").clone());
+                                vs.push(vs0[i + start].clone());
                             } else {
                                 vs.push(
-                                    vs.get(i + start - vs0.len())
-                                        .expect("out-of-bounds access")
-                                        .clone(),
+                                    vs[i + start - vs0.len()] .clone(),
                                 );
                             }
                         }
@@ -603,8 +601,8 @@ impl Expr {
             Expr::FlatMap(expr, seq) => {
                 match seq.eval(scope).coerce_mapped_value().get_sequence() {
                     Some(values) => {
-                        let mut vs: Vec<Value> = Vec::new();
-                        for v in values.iter() {
+                        let mut vs = Vec::new();
+                        for v in values {
                             if let Value::Seq(vn) = expr.eval_lambda(scope, v) {
                                 vs.extend(vn);
                             } else {
@@ -619,7 +617,7 @@ impl Expr {
             Expr::FlatMapAccum(expr, accum, _accum_type, seq) => match seq.eval_value(scope) {
                 Value::Seq(values) => {
                     let mut accum = accum.eval_value(scope);
-                    let mut vs: Vec<Value> = Vec::new();
+                    let mut vs = Vec::new();
                     for v in values {
                         let ret = expr.eval_lambda(scope, &Value::Tuple(vec![accum, v]));
                         accum = match extract_pair(ret.unwrap_tuple()) {
@@ -653,7 +651,7 @@ impl Expr {
                         if let Value::Seq(vn) = expr.eval_lambda(scope, &arg) {
                             vs = match arg {
                                 Value::Tuple(mut args) => match args.remove(0) {
-                                    Value::Seq(vs) => vs.manifest(),
+                                    Value::Seq(vs) => vs.into_vec(),
                                     _ => unreachable!(),
                                 },
                                 _ => unreachable!(),
@@ -1442,7 +1440,7 @@ impl Decoder {
                     let vs = Value::Seq(v.into());
                     let done = expr.eval_lambda(scope, &vs).unwrap_bool();
                     v = match vs {
-                        Value::Seq(v) => v.manifest(),
+                        Value::Seq(v) => v.into_vec(),
                         _ => unreachable!(),
                     };
                     if done {

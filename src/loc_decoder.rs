@@ -985,7 +985,7 @@ impl Expr {
                         {
                             vs = match arg {
                                 Value::Tuple(mut args) => match args.remove(0) {
-                                    Value::Seq(vs) => vs.manifest(),
+                                    Value::Seq(vs) => vs.into_vec(),
                                     _ => unreachable!(),
                                 },
                                 _ => unreachable!(),
@@ -1407,7 +1407,7 @@ impl Decoder {
                     let vs = ParsedValue::from_evaluated_seq(v);
                     let done = expr.eval_lambda_with_loc(scope, &vs).unwrap_bool();
                     v = match vs {
-                        ParsedValue::Seq(v) => v.inner.manifest(),
+                        ParsedValue::Seq(v) => v.inner.into_vec(),
                         _ => unreachable!(),
                     };
                     if done {
