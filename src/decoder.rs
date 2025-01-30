@@ -588,9 +588,7 @@ impl Expr {
                             if i + start < vs0.len() {
                                 vs.push(vs0[i + start].clone());
                             } else {
-                                vs.push(
-                                    vs[i + start - vs0.len()] .clone(),
-                                );
+                                vs.push(vs[i + start - vs0.len()].clone());
                             }
                         }
                         Cow::Owned(Value::Seq(vs.into()))
@@ -2025,13 +2023,19 @@ mod tests {
             &d,
             &[0x00],
             &[],
-            Value::Tuple(vec![Value::Seq(vec![Value::U8(0x00)].into()), Value::Seq(vec![].into())]),
+            Value::Tuple(vec![
+                Value::Seq(vec![Value::U8(0x00)].into()),
+                Value::Seq(vec![].into()),
+            ]),
         );
         accepts(
             &d,
             &[0xFF],
             &[],
-            Value::Tuple(vec![Value::Seq(vec![].into()), Value::Seq(vec![Value::U8(0xFF)].into())]),
+            Value::Tuple(vec![
+                Value::Seq(vec![].into()),
+                Value::Seq(vec![Value::U8(0xFF)].into()),
+            ]),
         );
         accepts(
             &d,
@@ -2310,7 +2314,10 @@ mod tests {
                 0,
                 Box::new(Value::Variant(
                     "a".into(),
-                    Box::new(Value::Tuple(vec![Value::Tuple(vec![]), Value::Seq(vec![].into())])),
+                    Box::new(Value::Tuple(vec![
+                        Value::Tuple(vec![]),
+                        Value::Seq(vec![].into()),
+                    ])),
                 )),
             ),
         );
