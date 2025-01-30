@@ -89,12 +89,16 @@ impl std::error::Error for ParseError {
 /// Sub-class of errors that only occur when an illegal operation is attempted,
 /// due to incoherent usage or improperly nesting of various state-manipulation methods
 /// within the [`BufferOffset`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum StateError {
     /// Failed attempt to return to a fail-safe 'recovery-point', such as the starting offset of a `PeekNot` or `UnionNondet`.
     NoRecovery,
     /// Failed attempt to open a slice whose final offset overruns either an existing slice, or the buffer itself
-    UnstackableSlices,
+    UnstackableSlices {
+        current_offset: ByteOffset,
+        current_limit: ByteOffset,
+        new_slice_end: ByteOffset,
+    },
     /// Failed attempt to return to a neutral 'restoration-point', such as the starting offset of a `Peek` or `WithRelativeOffset`
     NoRestore,
     /// Attempt to enter bits-mode while already in bits-mode, or escape bits-mode while not in bits-mode
@@ -114,9 +118,13 @@ impl std::fmt::Display for StateError {
         match self {
             StateError::NoRecovery => write!(f, "unable to recover from parse failure"),
             StateError::NoRestore => write!(f, "unable to restore to a parsing checkpoint"),
-            StateError::UnstackableSlices => write!(
+            StateError::UnstackableSlices {
+                current_offset,
+                current_limit,
+                new_slice_end,
+            } => write!(
                 f,
-                "unable to open slice that violates existing slice (or stream) boundary"
+                "unable to open slice due to limit-violation: to-be-constructed slice endpoint {new_slice_end} exceeds existing limit (slice or stream) of {current_limit} (current offset: {current_offset})",
             ),
             StateError::BinaryModeError => write!(f, "illegal binary-mode switch operation"),
             StateError::MissingSlice => write!(f, "missing slice cannot be closed"),

@@ -685,7 +685,7 @@ pub enum Format {
     /// Repeat a format until a condition is satisfied by the sequence
     RepeatUntilSeq(Box<Expr>, Box<Format>),
     /// Repeat a format until a condition is satisfied by a tuple constructed from a left-fold accumulator and the sequence, returning both
-    /// AccumUntil :: ((A, [T]) -> bool) -> ((A, T) -> A) -> A -> Vt(A) -> T -> (acc, [T])
+    /// AccumUntil :: ((A, [T]) -> bool) -> ((A, T) -> A) -> A -> Vt(A) -> T -> (A, [T])
     AccumUntil(Box<Expr>, Box<Expr>, Box<Expr>, TypeHint, Box<Format>),
     /// Apply a parametric format for each element of a sequence-typed Expr using a fused lambda binding
     ForEach(Box<Expr>, Label, Box<Format>),

@@ -184,10 +184,15 @@ impl<'a> Parser<'a> {
     /// Will fail with an appropriate `Err` value if the size of the slice is too large
     /// to fit into an existing slice-context, or would run past the end of the buffer itself.
     pub fn start_slice(&mut self, size: usize) -> Result<(), ParseError> {
-        let end = self.offset.get_current_offset().increment_by(size);
+        let _current_offset = self.offset.get_current_offset();
+        let end = _current_offset.increment_by(size);
         let current_limit = self.offset.current_limit();
         if end > current_limit {
-            return Err(ParseError::InternalError(StateError::UnstackableSlices));
+            return Err(ParseError::InternalError(StateError::UnstackableSlices {
+                current_offset: _current_offset,
+                current_limit,
+                new_slice_end: end,
+            }));
         }
         unsafe {
             self.offset.open_slice_unchecked(size);
