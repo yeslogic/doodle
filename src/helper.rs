@@ -863,19 +863,12 @@ pub fn with_tuple<const N: usize>(
     labels: [&'static str; N],
     format: Format,
 ) -> Format {
-    let mut inner = format;
-    const TUPLE_VARNAME: &str = "bound_tuple";
-    for (ix, label) in labels.into_iter().enumerate() {
-        inner = Format::Let(
-            Label::Borrowed(label),
-            Box::new(tuple_proj(var(TUPLE_VARNAME), ix)),
-            Box::new(inner),
-        )
-    }
-    Format::Let(
-        Label::Borrowed(TUPLE_VARNAME),
+    Format::Match(
         Box::new(tuple),
-        Box::new(inner),
+        vec![(
+            Pattern::Tuple(labels.into_iter().map(bind).collect()),
+            format,
+        )],
     )
 }
 
@@ -1289,17 +1282,13 @@ pub fn pos32() -> Format {
 /// Hack to get around gvar codegen issues where we need to persist a variable after
 /// it is moved (rather than cloned or referenced) in the current model of the codegen
 /// and the implementation of the Opentype Format-tree.
-pub fn clone_hack<F>(
-    orig_varname: &'static str,
-    clone_varname: &'static str,
-    dep_format: F,
-) -> Format
+pub fn clone_hack<F>(orig: Expr, clone_varname: &'static str, dep_format: F) -> Format
 where
     F: FnOnce(Expr) -> Format,
 {
     Format::Let(
         Label::Borrowed(clone_varname),
-        Box::new(Expr::Var(Label::Borrowed(orig_varname))),
+        Box::new(orig),
         Box::new(dep_format(Expr::Var(Label::Borrowed(clone_varname)))),
     )
 }
