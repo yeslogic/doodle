@@ -1292,3 +1292,9 @@ where
         Box::new(dep_format(Expr::Var(Label::Borrowed(clone_varname)))),
     )
 }
+
+
+/// Helper for [`Expr::EnumFromTo`].
+pub fn enum_from_to(start: Expr, end: Expr) -> Expr {
+    Expr::EnumFromTo(Box::new(start), Box::new(end))
+}
