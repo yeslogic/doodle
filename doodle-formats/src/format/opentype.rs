@@ -4857,10 +4857,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 if_then_else(
                     is_long_offsets,
                     fmt_variant(
-                        "Offsets16",
-                        repeat_count(succ(glyph_count.clone()), base.u16be()),
+                        "Offsets32",
+                        repeat_count(succ(glyph_count.clone()), base.u32be()),
                     ),
-                    fmt_variant("Offsets32", repeat_count(succ(glyph_count), base.u32be())),
+                    fmt_variant("Offsets16", repeat_count(succ(glyph_count), base.u16be())),
                 )
             };
             // NOTE - can only appear in font files with fvar and glyf tables also present
