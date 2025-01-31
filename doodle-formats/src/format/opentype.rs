@@ -176,7 +176,29 @@ fn vhea_long_metrics(vhea: Expr) -> Expr {
 /// Helper function to handle the fact that though loca only appears alongside glyf, both are optional tables
 fn loca_offset_pairs(loca: Expr) -> Expr {
     let f = |loca_table: Expr| offsets_to_offset_pairs(record_proj(loca_table, "offsets"));
-    expr_option_map_or(seq_empty(), f, loca)
+    let loca_empty = variant("Offset32Pairs", seq_empty());
+    expr_option_map_or(loca_empty, f, loca)
+}
+
+/// Generic self-zip that returns `(values->[i], values->[i+1])` at index `i` in the result,
+/// for `i` from `0` to `N - 1` (where `values` has `N + 1` total elements).
+fn values_to_pairs(values: Expr, elem_type: ValueType) -> Expr {
+    flat_map_accum(
+        lambda_tuple(
+            ["last_value", "value"],
+            pair(
+                expr_some(var("value")),
+                expr_option_map_or(
+                    seq_empty(),
+                    |last| singleton(pair(last, var("value"))),
+                    var("last_value"),
+                ),
+            ),
+        ),
+        expr_none(),
+        ValueType::Option(Box::new(elem_type)),
+        values,
+    )
 }
 
 /// Specialized transformation that converts a Variant-wrapped array of the structural type
@@ -191,41 +213,30 @@ fn loca_offset_pairs(loca: Expr) -> Expr {
 /// The first element in the array will be the pair `(offsets[0], offsets[1])`, and the final will be `(offsets[N-1], offsets[N])`,
 /// where the original offset-sequence contains `N + 1` raw elements.
 fn offsets_to_offset_pairs(offsets: Expr) -> Expr {
-    // REVIEW - as-is, this doubles the needed size of the output sequence (when u16) by requiring it to exist as u32-pairs in memory all at once; consider spontaneous generation of pairs from the u16-based array
-    flat_map_accum(
-        lambda_tuple(
-            ["last_value", "value"],
-            pair(
-                expr_some(var("value")),
-                expr_option_map_or(
-                    seq_empty(),
-                    |last| singleton(pair(last, var("value"))),
-                    var("last_value"),
+    expr_match(
+        offsets,
+        [
+            (
+                Pattern::Variant(Label::Borrowed("Offsets16"), Box::new(bind("half16s"))),
+                variant(
+                    "Offset16Pairs",
+                    values_to_pairs(var("half16s"), ValueType::Base(BaseType::U16)),
                 ),
             ),
-        ),
-        expr_none(),
-        ValueType::Option(Box::new(ValueType::Base(BaseType::U32))),
-        expr_match(
-            offsets,
-            [
-                (
-                    Pattern::Variant(Label::Borrowed("Offsets16"), Box::new(bind("half16s"))),
-                    flat_map(
-                        lambda(
-                            "half16",
-                            singleton(mul(Expr::AsU32(Box::new(var("half16"))), Expr::U32(2))),
-                        ),
-                        var("half16s"),
-                    ),
+            (
+                Pattern::Variant(Label::Borrowed("Offsets32"), Box::new(bind("off32s"))),
+                variant(
+                    "Offset32Pairs",
+                    values_to_pairs(var("off32s"), ValueType::Base(BaseType::U32)),
                 ),
-                (
-                    Pattern::Variant(Label::Borrowed("Offsets32"), Box::new(bind("off32s"))),
-                    var("off32s"),
-                ),
-            ],
-        ),
+            ),
+        ],
     )
+}
+
+/// Doubles a `U16`-kinded Expr into a `U32`-kinded output.
+fn scale2(half: Expr) -> Expr {
+    mul(as_u32(half), Expr::U32(2))
 }
 
 /// Converts a `u8` value to an `i16` value within the `Expr` model
@@ -1896,51 +1907,98 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ),
             );
 
-            let glyf_table_entry = |start_offset: Expr, offset_pair: Expr| {
-                if_then_else(
-                    // NOTE - checks that the glyph is non-vacuous
-                    expr_gt(
-                        tuple_proj(offset_pair.clone(), 1),
-                        tuple_proj(offset_pair.clone(), 0),
-                    ),
-                    linked_offset32(
-                        start_offset,
-                        tuple_proj(offset_pair, 0),
-                        fmt_variant(
-                            "Glyph",
-                            record([
-                                ("number_of_contours", s16be(base)),
-                                ("x_min", s16be(base)),
-                                ("y_min", s16be(base)),
-                                ("x_max", s16be(base)),
-                                ("y_max", s16be(base)),
-                                (
-                                    "description",
-                                    glyf_description.call_args(vec![var("number_of_contours")]),
-                                ),
-                            ]),
+            let glyf_table_entry =
+                |start_offset: Expr, this_offset32: Expr, next_offset32: Expr| {
+                    if_then_else(
+                        // NOTE - checks that the glyph is non-vacuous
+                        expr_gt(next_offset32, this_offset32.clone()),
+                        linked_offset32(
+                            start_offset,
+                            this_offset32,
+                            fmt_variant(
+                                "Glyph",
+                                record([
+                                    ("number_of_contours", s16be(base)),
+                                    ("x_min", s16be(base)),
+                                    ("y_min", s16be(base)),
+                                    ("x_max", s16be(base)),
+                                    ("y_max", s16be(base)),
+                                    (
+                                        "description",
+                                        glyf_description.call_args(vec![var("number_of_contours")]),
+                                    ),
+                                ]),
+                            ),
                         ),
-                    ),
-                    fmt_variant("EmptyGlyph", Format::EMPTY),
-                )
+                        fmt_variant("EmptyGlyph", Format::EMPTY),
+                    )
+                };
+
+            let offset_pairs_type = {
+                let mk_branch = |elem_t: ValueType| {
+                    ValueType::Seq(Box::new(ValueType::Tuple(vec![elem_t.clone(), elem_t])))
+                };
+                let mut branches = std::collections::BTreeMap::new();
+                // NOTE - at this layer, the u16-valued offsets are still half-value
+                branches.insert(
+                    Label::Borrowed("Offset16Pairs"),
+                    mk_branch(ValueType::Base(BaseType::U16)),
+                );
+                branches.insert(
+                    Label::Borrowed("Offset32Pairs"),
+                    mk_branch(ValueType::Base(BaseType::U32)),
+                );
+                ValueType::Union(branches)
             };
 
             module.define_format_args(
                 "opentype.glyf_table",
-                vec![(
-                    Label::Borrowed("offset_pairs"),
-                    ValueType::Seq(Box::new(ValueType::Tuple(vec![
-                        ValueType::Base(BaseType::U32),
-                        ValueType::Base(BaseType::U32),
-                    ]))),
-                )],
+                vec![(Label::Borrowed("offset_pairs"), offset_pairs_type)],
                 chain(
                     pos32(),
                     "start_offset",
-                    for_each(
-                        var("offset_pairs"),
-                        "offset_pair",
-                        glyf_table_entry(var("start_offset"), var("offset_pair")),
+                    Format::Match(
+                        Box::new(var("offset_pairs")),
+                        vec![
+                            (
+                                Pattern::Variant(
+                                    Label::Borrowed("Offset16Pairs"),
+                                    Box::new(bind("half16_pairs")),
+                                ),
+                                for_each(
+                                    var("half16_pairs"),
+                                    "half16_pair",
+                                    with_tuple(
+                                        var("half16_pair"),
+                                        ["this_half16", "next_half16"],
+                                        glyf_table_entry(
+                                            var("start_offset"),
+                                            scale2(var("this_half16")),
+                                            scale2(var("next_half16")),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                            (
+                                Pattern::Variant(
+                                    Label::Borrowed("Offset32Pairs"),
+                                    Box::new(bind("offs32_pairs")),
+                                ),
+                                for_each(
+                                    var("offs32_pairs"),
+                                    "offs32_pair",
+                                    with_tuple(
+                                        var("offs32_pair"),
+                                        ["this_offs32", "next_offs32"],
+                                        glyf_table_entry(
+                                            var("start_offset"),
+                                            var("this_offs32"),
+                                            var("next_offs32"),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        ],
                     ),
                 ),
             )
@@ -4432,15 +4490,18 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             )
         };
         let gvar_table = {
+            use BitFieldKind::*;
+
             // NOTE - controls whether or not a ParseError is raised if reserved bits of a packed-word are not all cleared
             // REVIEW - do we consider it sensible to set this to `true`?
             const SHOULD_CHECK_ZERO: bool = false;
+
             let gvar_flags = bit_fields_u16([
-                BitFieldKind::Reserved {
+                Reserved {
                     bit_width: 15,
                     check_zero: SHOULD_CHECK_ZERO,
                 },
-                BitFieldKind::FlagBit("is_long_offset"),
+                FlagBit("is_long_offset"),
             ]);
             let tuple_record = module.define_format_args(
                 "opentype.var.tuple_record",
@@ -4454,322 +4515,341 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 )]),
             );
 
-            let glyph_variation_data_array =
-                |gvar_table_start: Expr,
-                 axis_count: Expr,
-                 glyph_variation_data_array_offset: Expr,
-                 table_offsets_array: Expr| {
-                    use BitFieldKind::*;
-
-                    // NOTE - controls whether or not a ParseError is raised if reserved bits of a packed-word are not all cleared
-                    // REVIEW - do we consider it sensible to set this to `true`?
-                    const SHOULD_CHECK_ZERO: bool = false;
-
-                    let tuple_variation_header = {
-                        let tuple_index = bit_fields_u16([
-                            FlagBit("embedded_peak_tuple"), // if set, includes an embedded peak tuple record, immediately after tupleIndex, and that the low 12 bits (field `tuple_index`) are to be ignored
-                            FlagBit("intermediate_region"), // if set, header includes a start- and end-tuple-record (2 tuple records total) immediately after peak-tuple-record logical position (whether present or not)
-                            FlagBit("private_point_numbers"), // if set, serialized data includes packed "point" number data; when not set, the shared number data at the start of serialized data is used by default
-                            Reserved {
-                                bit_width: 1,
-                                check_zero: SHOULD_CHECK_ZERO,
-                            },
-                            BitsField {
-                                bit_width: 12,
-                                field_name: "tuple_index",
-                            },
-                        ]);
-                        record([
-                            ("variation_data_size", base.u16be()), // size, in bytes, of serialized data for this tuple variation table
-                            ("tuple_index", tuple_index),
-                            (
-                                "peak_tuple",
-                                cond_maybe(
-                                    record_proj(var("tuple_index"), "embedded_peak_tuple"),
-                                    tuple_record.call_args(vec![axis_count.clone()]),
-                                ),
+            let tuple_variation_header = |axis_count: Expr| {
+                let tuple_index = bit_fields_u16([
+                    FlagBit("embedded_peak_tuple"), // if set, includes an embedded peak tuple record, immediately after tupleIndex, and that the low 12 bits (field `tuple_index`) are to be ignored
+                    FlagBit("intermediate_region"), // if set, header includes a start- and end-tuple-record (2 tuple records total) immediately after peak-tuple-record logical position (whether present or not)
+                    FlagBit("private_point_numbers"), // if set, serialized data includes packed "point" number data; when not set, the shared number data at the start of serialized data is used by default
+                    Reserved {
+                        bit_width: 1,
+                        check_zero: SHOULD_CHECK_ZERO,
+                    },
+                    BitsField {
+                        bit_width: 12,
+                        field_name: "tuple_index",
+                    },
+                ]);
+                record([
+                    ("variation_data_size", base.u16be()), // size, in bytes, of serialized data for this tuple variation table
+                    ("tuple_index", tuple_index),
+                    (
+                        "peak_tuple",
+                        cond_maybe(
+                            record_proj(var("tuple_index"), "embedded_peak_tuple"),
+                            tuple_record.call_args(vec![axis_count.clone()]),
+                        ),
+                    ),
+                    (
+                        "intermediate_tuples",
+                        cond_maybe(
+                            record_proj(var("tuple_index"), "intermediate_region"),
+                            record_repeat(
+                                ["start_tuple", "end_tuple"],
+                                tuple_record.call_args(vec![axis_count]),
                             ),
-                            (
-                                "intermediate_tuples",
-                                cond_maybe(
-                                    record_proj(var("tuple_index"), "intermediate_region"),
-                                    record_repeat(
-                                        ["start_tuple", "end_tuple"],
-                                        tuple_record.call_args(vec![axis_count]),
-                                    ),
-                                ),
-                            ),
-                        ])
-                    };
-                    let u15be = |hi: Expr, lo: Expr| -> Expr {
-                        bit_or(
-                            shl(bit_and(as_u16(hi), Expr::U16(0x7f)), Expr::U16(8)),
-                            as_u16(lo),
-                        )
-                    };
-                    let packed_point_numbers = {
-                        let runs = |point_count: Expr| {
-                            let control_byte = bit_fields_u8([
-                                FlagBit("points_are_words"), // If set, each point is a u16-based delta; u8 otherwise
-                                BitsField {
-                                    bit_width: 7,
-                                    field_name: "point_run_count",
-                                }, // 7-bit run-length
-                            ]);
-                            let run = record([
-                                ("control", control_byte),
-                                // Values after first element in first run are non-negative deltas, so they are provided in logically ascending value-order by necessity
-                                (
-                                    "points",
-                                    Format::Let(
-                                        Label::Borrowed("run_length"),
-                                        // Value stored in low 7 bits of control-byte is one less than the run-length, since no runs are vacuous
-                                        Box::new(succ(record_proj(
-                                            var("control"),
-                                            "point_run_count",
-                                        ))),
-                                        Box::new(if_then_else(
-                                            record_proj(var("control"), "points_are_words"),
-                                            fmt_variant(
-                                                "Points16",
-                                                repeat_count(var("run_length"), base.u16be()),
-                                            ),
-                                            fmt_variant(
-                                                "Points8",
-                                                repeat_count(var("run_length"), base.u8()),
-                                            ),
-                                        )),
-                                    ),
-                                ),
-                            ]);
-                            let is_finished = lambda_tuple(
-                                ["totlen", "_seq"],
-                                expr_gte(var("totlen"), point_count),
-                            );
-                            let update_totlen = lambda_tuple(
-                                ["acc", "run"],
-                                add(
-                                    var("acc"),
-                                    succ(as_u16(record_lens(
-                                        var("run"),
-                                        &["control", "point_run_count"],
-                                    ))),
-                                ),
-                            );
-                            accum_until(
-                                is_finished,
-                                update_totlen,
-                                Expr::U16(0),
-                                ValueType::Base(BaseType::U16),
-                                run,
-                            )
-                        };
-                        // Variable-precision count-field that is one-byte if it fits in 7 bits, or 15-bit if it doesn't (U16Be ignoring MSB in first byte read)
-                        union([
-                            map(
-                                is_byte(0),
-                                lambda("_", Expr::Tuple(vec![Expr::U16(0), seq_empty()])),
-                            ),
-                            chain(
-                                byte_in(1..=127),
-                                "point_count",
-                                runs(as_u16(var("point_count"))),
-                            ),
-                            chain(
-                                byte_in(128..=255),
-                                "hi",
-                                chain(base.u8(), "lo", runs(u15be(var("hi"), var("lo")))),
-                            ),
-                        ])
-                    };
-                    let packed_deltas = |total_deltas: Expr| {
-                        let control_byte = bit_fields_u8([
-                            FlagBit("deltas_are_zero"), // If set, no values are stored but the logical count is incremented as if explicit all-zeroes were listed
-                            FlagBit("deltas_are_words"), // If set, each delta is i16-based; i8 otherwise
-                            BitsField {
-                                bit_width: 6,
-                                field_name: "delta_run_count",
-                            }, // 6-bit run-length
-                        ]);
-                        let run = record([
-                            ("control", control_byte),
-                            (
-                                "deltas",
-                                Format::Let(
-                                    Label::Borrowed("run_length"),
-                                    Box::new(succ(record_proj(var("control"), "delta_run_count"))),
-                                    Box::new(if_then_else(
-                                        record_proj(var("control"), "deltas_are_zero"),
-                                        fmt_variant("Delta0", compute(var("run_length"))),
-                                        if_then_else(
-                                            record_proj(var("control"), "deltas_are_words"),
-                                            fmt_variant(
-                                                "Delta16",
-                                                repeat_count(var("run_length"), s16be(base)),
-                                            ),
-                                            fmt_variant(
-                                                "Delta8",
-                                                repeat_count(var("run_length"), s8(base)),
-                                            ),
-                                        ),
-                                    )),
-                                ),
-                            ),
-                        ]);
-                        let is_finished =
-                            lambda_tuple(["totlen", "_seq"], expr_gte(var("totlen"), total_deltas));
-                        let update_totlen = lambda_tuple(
-                            ["acc", "run"],
-                            add(
-                                var("acc"),
-                                succ(as_u16(record_lens(
-                                    var("run"),
-                                    &["control", "delta_run_count"],
-                                ))),
-                            ),
-                        );
-                        accum_until(
-                            is_finished,
-                            update_totlen,
-                            Expr::U16(0),
-                            ValueType::Base(BaseType::U16),
-                            run,
-                        )
-                    };
-                    let serialized_data = |shared_point_numbers: Expr, tuple_var_headers: Expr| {
-                        record([
-                            (
-                                "shared_point_numbers",
-                                cond_maybe(shared_point_numbers, packed_point_numbers.clone()),
-                            ),
-                            (
-                                "per_tuple_variation_data",
-                                for_each(
-                                    tuple_var_headers,
-                                    "header",
-                                    slice(
-                                        record_proj(var("header"), "variation_data_size"),
-                                        record([
-                                            (
-                                                "private_point_numbers",
-                                                cond_maybe(
-                                                    record_lens(
-                                                        var("header"),
-                                                        &["tuple_index", "private_point_numbers"],
-                                                    ),
-                                                    packed_point_numbers.clone(),
-                                                ),
-                                            ),
-                                            (
-                                                "x_and_y_coordinate_deltas",
-                                                Format::Let(
-                                                    Label::Borrowed("point_count"),
-                                                    Box::new(tuple_proj(
-                                                        expr_option_unwrap_first(
-                                                            var("private_point_numbers"),
-                                                            var("shared_point_numbers"),
-                                                        ),
-                                                        0,
-                                                    )),
-                                                    Box::new(packed_deltas(mul(
-                                                        var("point_count"),
-                                                        Expr::U16(2),
-                                                    ))),
-                                                ),
-                                            ),
-                                        ]),
-                                    ),
-                                ),
-                            ),
-                        ])
-                    };
-                    // REVIEW - because this is inside a block-scoped function (and not a closure or directly in-scope), we can't define this as a FormatRef locally, and have to either pass it in from outside or take a &mut FormatModule parameter
-                    let tuple_variation_count = bit_fields_u16([
-                        FlagBit("shared_point_numbers"),
-                        Reserved {
-                            bit_width: 3,
-                            check_zero: SHOULD_CHECK_ZERO,
-                        },
+                        ),
+                    ),
+                ])
+            };
+            let u15be = |hi: Expr, lo: Expr| -> Expr {
+                bit_or(
+                    shl(bit_and(as_u16(hi), Expr::U16(0x7f)), Expr::U16(8)),
+                    as_u16(lo),
+                )
+            };
+            let packed_point_numbers = {
+                let runs = |point_count: Expr| {
+                    let control_byte = bit_fields_u8([
+                        FlagBit("points_are_words"), // If set, each point is a u16-based delta; u8 otherwise
                         BitsField {
-                            bit_width: 12,
-                            field_name: "tuple_count",
-                        },
+                            bit_width: 7,
+                            field_name: "point_run_count",
+                        }, // 7-bit run-length
                     ]);
-                    let glyph_variation_data_table = {
-                        record([
-                            ("table_start", pos32()),
-                            ("tuple_variation_count", tuple_variation_count),
-                            // REVIEW[epic=retrograde-dependency] - consider alternate approaches to avoid constructing dummy offset-field
-                            ("__data_offset", where_nonzero::<U16>(base.u16be())),
-                            (
-                                "tuple_variation_headers",
-                                repeat_count(
-                                    record_proj(var("tuple_variation_count"), "tuple_count"),
-                                    tuple_variation_header,
-                                ),
-                            ),
-                            (
-                                "data",
-                                link_forward_unchecked(
-                                    pos_add_u16(var("table_start"), var("__data_offset")),
-                                    serialized_data(
-                                        record_proj(
-                                            var("tuple_variation_count"),
-                                            "shared_point_numbers",
-                                        ),
-                                        var("tuple_variation_headers"),
+                    let run = record([
+                        ("control", control_byte),
+                        (
+                            "points",
+                            Format::Let(
+                                // REVIEW - should this be a synthetic field of the record, to make AccumUntil loop easier to specify?
+                                Label::Borrowed("run_length"),
+                                // Value stored in low 7 bits of control-byte is one less than the actual run-length
+                                Box::new(succ(record_proj(var("control"), "point_run_count"))),
+                                Box::new(if_then_else(
+                                    record_proj(var("control"), "points_are_words"),
+                                    fmt_variant(
+                                        "Points16",
+                                        repeat_count(var("run_length"), base.u16be()),
                                     ),
-                                ),
-                            ),
-                        ])
-                    };
-                    let offset_linked_gvar_data_table = |array_start: Expr, offset_pair: Expr| {
-                        with_tuple(
-                            offset_pair,
-                            ["this_offset", "next_offset"],
-                            cond_maybe(
-                                // NOTE - checks that the GlyphVariationData table is non-zero length
-                                expr_gt(var("next_offset"), var("this_offset")),
-                                linked_offset32(
-                                    array_start,
-                                    var("this_offset"),
-                                    slice(
-                                        sub(var("next_offset"), var("this_offset")),
-                                        glyph_variation_data_table,
+                                    fmt_variant(
+                                        "Points8",
+                                        repeat_count(var("run_length"), base.u8()),
                                     ),
-                                ),
+                                )),
                             ),
-                        )
-                    };
-                    let glyph_variation_data_table_array = |offset_pairs: Expr| {
-                        chain(
-                            pos32(),
-                            "array_start",
-                            for_each(
-                                offset_pairs,
-                                "offset_pair",
-                                offset_linked_gvar_data_table(
-                                    var("array_start"),
-                                    var("offset_pair"),
-                                ),
-                            ),
-                        )
-                    };
-                    let array_from_offsets = |glyph_variation_data_array_offset: Expr| {
-                        |offsets: Expr| -> Format {
-                            linked_offset32(
-                                gvar_table_start,
-                                glyph_variation_data_array_offset,
-                                glyph_variation_data_table_array(offsets_to_offset_pairs(offsets)),
-                            )
-                        }
-                    };
-                    clone_hack(
-                        table_offsets_array,
-                        "offs",
-                        array_from_offsets(glyph_variation_data_array_offset),
+                        ),
+                    ]);
+                    let is_finished =
+                        lambda_tuple(["totlen", "_seq"], expr_gte(var("totlen"), point_count));
+                    let update_totlen = lambda_tuple(
+                        ["acc", "run"],
+                        add(
+                            var("acc"),
+                            succ(as_u16(record_lens(
+                                var("run"),
+                                &["control", "point_run_count"],
+                            ))),
+                        ),
+                    );
+                    accum_until(
+                        is_finished,
+                        update_totlen,
+                        Expr::U16(0),
+                        ValueType::Base(BaseType::U16),
+                        run,
                     )
                 };
+                // Variable-precision count-field that is one-byte if it fits in 7 bits, or 15-bit if it doesn't (U16Be ignoring MSB in first byte read)
+                union([
+                    map(
+                        is_byte(0),
+                        lambda("_", Expr::Tuple(vec![Expr::U16(0), seq_empty()])),
+                    ),
+                    chain(
+                        byte_in(1..=127),
+                        "point_count",
+                        runs(as_u16(var("point_count"))),
+                    ),
+                    chain(
+                        byte_in(128..=255),
+                        "hi",
+                        chain(base.u8(), "lo", runs(u15be(var("hi"), var("lo")))),
+                    ),
+                ])
+            };
+            let packed_deltas = |total_deltas: Expr| {
+                let control_byte = bit_fields_u8([
+                    FlagBit("deltas_are_zero"), // If set, no values are stored but the logical count is incremented as if explicit all-zeroes were listed
+                    FlagBit("deltas_are_words"), // If set, each delta is i16-based; i8 otherwise
+                    BitsField {
+                        bit_width: 6,
+                        field_name: "delta_run_count",
+                    }, // 6-bit run-length
+                ]);
+                let run = record([
+                    ("control", control_byte),
+                    (
+                        "deltas",
+                        Format::Let(
+                            Label::Borrowed("run_length"),
+                            Box::new(succ(record_proj(var("control"), "delta_run_count"))),
+                            Box::new(if_then_else(
+                                record_proj(var("control"), "deltas_are_zero"),
+                                fmt_variant("Delta0", compute(var("run_length"))),
+                                if_then_else(
+                                    record_proj(var("control"), "deltas_are_words"),
+                                    fmt_variant(
+                                        "Delta16",
+                                        repeat_count(var("run_length"), s16be(base)),
+                                    ),
+                                    fmt_variant(
+                                        "Delta8",
+                                        repeat_count(var("run_length"), s8(base)),
+                                    ),
+                                ),
+                            )),
+                        ),
+                    ),
+                ]);
+                let is_finished =
+                    lambda_tuple(["totlen", "_seq"], expr_gte(var("totlen"), total_deltas));
+                let update_totlen = lambda_tuple(
+                    ["acc", "run"],
+                    add(
+                        var("acc"),
+                        succ(as_u16(record_lens(
+                            var("run"),
+                            &["control", "delta_run_count"],
+                        ))),
+                    ),
+                );
+                accum_until(
+                    is_finished,
+                    update_totlen,
+                    Expr::U16(0),
+                    ValueType::Base(BaseType::U16),
+                    run,
+                )
+            };
+            let serialized_data = |shared_point_numbers: Expr, tuple_var_headers: Expr| {
+                record([
+                    (
+                        "shared_point_numbers",
+                        cond_maybe(shared_point_numbers, packed_point_numbers.clone()),
+                    ),
+                    (
+                        "per_tuple_variation_data",
+                        for_each(
+                            tuple_var_headers,
+                            "header",
+                            slice(
+                                record_proj(var("header"), "variation_data_size"),
+                                record([
+                                    (
+                                        "private_point_numbers",
+                                        cond_maybe(
+                                            record_lens(
+                                                var("header"),
+                                                &["tuple_index", "private_point_numbers"],
+                                            ),
+                                            packed_point_numbers.clone(),
+                                        ),
+                                    ),
+                                    (
+                                        "x_and_y_coordinate_deltas",
+                                        Format::Let(
+                                            Label::Borrowed("point_count"),
+                                            Box::new(tuple_proj(
+                                                expr_option_unwrap_first(
+                                                    var("private_point_numbers"),
+                                                    var("shared_point_numbers"),
+                                                ),
+                                                0,
+                                            )),
+                                            Box::new(packed_deltas(mul(
+                                                var("point_count"),
+                                                Expr::U16(2),
+                                            ))),
+                                        ),
+                                    ),
+                                ]),
+                            ),
+                        ),
+                    ),
+                ])
+            };
+            let tuple_variation_count = bit_fields_u16([
+                FlagBit("shared_point_numbers"),
+                Reserved {
+                    bit_width: 3,
+                    check_zero: SHOULD_CHECK_ZERO,
+                },
+                BitsField {
+                    bit_width: 12,
+                    field_name: "tuple_count",
+                },
+            ]);
+            let glyph_variation_data_table = module.define_format_args(
+                "opentype.var.glyph_variation_data_table",
+                vec![(
+                    Label::Borrowed("axis_count"),
+                    ValueType::Base(BaseType::U16),
+                )],
+                record([
+                    ("table_start", pos32()),
+                    ("tuple_variation_count", tuple_variation_count),
+                    // REVIEW[epic=retrograde-dependency] - consider alternate approaches to avoid constructing dummy offset-field
+                    ("__data_offset", where_nonzero::<U16>(base.u16be())),
+                    (
+                        "tuple_variation_headers",
+                        repeat_count(
+                            record_proj(var("tuple_variation_count"), "tuple_count"),
+                            tuple_variation_header(var("axis_count")),
+                        ),
+                    ),
+                    (
+                        "data",
+                        link_forward_unchecked(
+                            pos_add_u16(var("table_start"), var("__data_offset")),
+                            serialized_data(
+                                record_proj(var("tuple_variation_count"), "shared_point_numbers"),
+                                var("tuple_variation_headers"),
+                            ),
+                        ),
+                    ),
+                ]),
+            );
+            let offset_linked_gvar_data_table =
+                |axis_count: Expr, array_start: Expr, this_offset32: Expr, next_offset32: Expr| {
+                    cond_maybe(
+                        // NOTE - checks that the GlyphVariationData table is non-zero length
+                        expr_gt(next_offset32.clone(), this_offset32.clone()),
+                        linked_offset32(
+                            array_start,
+                            this_offset32.clone(),
+                            slice(
+                                sub(next_offset32, this_offset32),
+                                glyph_variation_data_table.call_args(vec![axis_count]),
+                            ),
+                        ),
+                    )
+                };
+            let glyph_variation_data_table_array = |axis_count: Expr| {
+                |offset_pairs: Expr| {
+                    chain(
+                        pos32(),
+                        "array_start",
+                        Format::Match(
+                            Box::new(offset_pairs),
+                            vec![
+                                (
+                                    Pattern::Variant(
+                                        Label::Borrowed("Offset16Pairs"),
+                                        Box::new(bind("half16_pairs")),
+                                    ),
+                                    for_each(
+                                        var("half16_pairs"),
+                                        "half16_pair",
+                                        with_tuple(
+                                            var("half16_pair"),
+                                            ["this_half16", "next_half16"],
+                                            offset_linked_gvar_data_table(
+                                                axis_count.clone(),
+                                                var("array_start"),
+                                                scale2(var("this_half16")),
+                                                scale2(var("next_half16")),
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                                (
+                                    Pattern::Variant(
+                                        Label::Borrowed("Offset32Pairs"),
+                                        Box::new(bind("offs32_pairs")),
+                                    ),
+                                    for_each(
+                                        var("offs32_pairs"),
+                                        "offs32_pair",
+                                        with_tuple(
+                                            var("offs32_pair"),
+                                            ["this_offs32", "next_offs32"],
+                                            offset_linked_gvar_data_table(
+                                                axis_count,
+                                                var("array_start"),
+                                                var("this_offs32"),
+                                                var("next_offs32"),
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                            ],
+                        ),
+                    )
+                }
+            };
+            let array_from_offsets = |gvar_table_start: Expr,
+                                      glyph_variation_data_array_offset: Expr,
+                                      axis_count: Expr| {
+                |offsets: Expr| -> Format {
+                    linked_offset32(
+                        gvar_table_start,
+                        glyph_variation_data_array_offset,
+                        glyph_variation_data_table_array(axis_count)(offsets_to_offset_pairs(
+                            offsets,
+                        )),
+                    )
+                }
+            };
             let shared_tuples = |shared_tuple_count: Expr, axis_count: Expr| {
                 repeat_count(shared_tuple_count, tuple_record.call_args(vec![axis_count]))
             };
@@ -4812,11 +4892,14 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ),
                     (
                         "glyph_variation_data_array",
-                        glyph_variation_data_array(
-                            var("gvar_table_start"),
-                            var("axis_count"),
-                            var("glyph_variation_data_array_offset"),
+                        clone_hack(
                             var("glyph_variation_data_offsets"),
+                            "offs",
+                            array_from_offsets(
+                                var("gvar_table_start"),
+                                var("glyph_variation_data_array_offset"),
+                                var("axis_count"),
+                            ),
                         ),
                     ),
                 ]),
