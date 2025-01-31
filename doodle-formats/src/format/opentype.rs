@@ -3,6 +3,10 @@ use doodle::bounds::Bounds;
 use doodle::{helper::*, Expr, IntoLabel, Label};
 use doodle::{BaseType, Format, FormatModule, FormatRef, Pattern, ValueType};
 
+fn id<T>(x: T) -> T {
+    x
+}
+
 fn shadow_check(x: &Expr, name: &'static str) {
     if x.is_shadowed_by(name) {
         panic!("Shadow! Variable-name {name} already occurs in Expr {x:?}!");
@@ -97,6 +101,30 @@ fn embedded_singleton_alternation<const OUTER: usize, const INNER: usize>(
     Format::Record(accum)
 }
 
+fn for_each_pair(
+    seq: Expr,
+    premap: (impl FnOnce(Expr) -> Expr, impl FnOnce(Expr) -> Expr),
+    labels: [&'static str; 2],
+    dep_format: Format,
+) -> Format {
+    Format::Let(
+        Label::Borrowed("len"),
+        Box::new(pred(seq_length(seq.clone()))),
+        Box::new(for_each(
+            enum_from_to(Expr::U32(0), var("len")),
+            "ix",
+            with_tuple(
+                Expr::Tuple(vec![
+                    premap.0(index_unchecked(seq.clone(), var("ix"))),
+                    premap.1(index_unchecked(seq.clone(), succ(var("ix")))),
+                ]),
+                labels,
+                dep_format,
+            ),
+        )),
+    )
+}
+
 fn embedded_variadic_alternation<C, const OUTER: usize, const BRANCHES: usize>(
     shared_fields: [(&'static str, Format); OUTER],
     discriminant: &'static str,
@@ -171,67 +199,13 @@ fn vhea_long_metrics(vhea: Expr) -> Expr {
     record_proj(expr_unwrap(vhea), "number_of_long_metrics")
 }
 
-/// attempting to index on its `.offsets` key through an option-unpacking indirection.
+/// Attemptis to index on the `offsets` key of `loca` through an option-unpacking indirection.
 ///
 /// Helper function to handle the fact that though loca only appears alongside glyf, both are optional tables
-fn loca_offset_pairs(loca: Expr) -> Expr {
-    let f = |loca_table: Expr| offsets_to_offset_pairs(record_proj(loca_table, "offsets"));
-    let loca_empty = variant("Offset32Pairs", seq_empty());
+fn loca_offsets(loca: Expr) -> Expr {
+    let f = |loca_table: Expr| record_proj(loca_table, "offsets");
+    let loca_empty = variant("Offsets32", seq_empty());
     expr_option_map_or(loca_empty, f, loca)
-}
-
-/// Generic self-zip that returns `(values->[i], values->[i+1])` at index `i` in the result,
-/// for `i` from `0` to `N - 1` (where `values` has `N + 1` total elements).
-fn values_to_pairs(values: Expr, elem_type: ValueType) -> Expr {
-    flat_map_accum(
-        lambda_tuple(
-            ["last_value", "value"],
-            pair(
-                expr_some(var("value")),
-                expr_option_map_or(
-                    seq_empty(),
-                    |last| singleton(pair(last, var("value"))),
-                    var("last_value"),
-                ),
-            ),
-        ),
-        expr_none(),
-        ValueType::Option(Box::new(elem_type)),
-        values,
-    )
-}
-
-/// Specialized transformation that converts a Variant-wrapped array of the structural type
-///
-/// ```ignore
-/// { Offsets16( seq(u16) ) | Offsets32( seq(u32) ) }
-/// ```
-///
-/// into a sequence of normalized U32-kinded offset pairs, scaling `u16` values by 2x as is implicitly
-/// demanded by the format of `loca` and `gvar`.
-///
-/// The first element in the array will be the pair `(offsets[0], offsets[1])`, and the final will be `(offsets[N-1], offsets[N])`,
-/// where the original offset-sequence contains `N + 1` raw elements.
-fn offsets_to_offset_pairs(offsets: Expr) -> Expr {
-    expr_match(
-        offsets,
-        [
-            (
-                Pattern::Variant(Label::Borrowed("Offsets16"), Box::new(bind("half16s"))),
-                variant(
-                    "Offset16Pairs",
-                    values_to_pairs(var("half16s"), ValueType::Base(BaseType::U16)),
-                ),
-            ),
-            (
-                Pattern::Variant(Label::Borrowed("Offsets32"), Box::new(bind("off32s"))),
-                variant(
-                    "Offset32Pairs",
-                    values_to_pairs(var("off32s"), ValueType::Base(BaseType::U32)),
-                ),
-            ),
-        ],
-    )
 }
 
 /// Doubles a `U16`-kinded Expr into a `U32`-kinded output.
@@ -1934,18 +1908,16 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     )
                 };
 
-            let offset_pairs_type = {
-                let mk_branch = |elem_t: ValueType| {
-                    ValueType::Seq(Box::new(ValueType::Tuple(vec![elem_t.clone(), elem_t])))
-                };
+            let offsets_type = {
+                let mk_branch = |elem_t: ValueType| ValueType::Seq(Box::new(elem_t));
                 let mut branches = std::collections::BTreeMap::new();
                 // NOTE - at this layer, the u16-valued offsets are still half-value
                 branches.insert(
-                    Label::Borrowed("Offset16Pairs"),
+                    Label::Borrowed("Offsets16"),
                     mk_branch(ValueType::Base(BaseType::U16)),
                 );
                 branches.insert(
-                    Label::Borrowed("Offset32Pairs"),
+                    Label::Borrowed("Offsets32"),
                     mk_branch(ValueType::Base(BaseType::U32)),
                 );
                 ValueType::Union(branches)
@@ -1953,48 +1925,42 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
             module.define_format_args(
                 "opentype.glyf_table",
-                vec![(Label::Borrowed("offset_pairs"), offset_pairs_type)],
+                vec![(Label::Borrowed("offsets"), offsets_type)],
                 chain(
                     pos32(),
                     "start_offset",
                     Format::Match(
-                        Box::new(var("offset_pairs")),
+                        Box::new(var("offsets")),
                         vec![
                             (
                                 Pattern::Variant(
-                                    Label::Borrowed("Offset16Pairs"),
-                                    Box::new(bind("half16_pairs")),
+                                    Label::Borrowed("Offsets16"),
+                                    Box::new(bind("half16s")),
                                 ),
-                                for_each(
-                                    var("half16_pairs"),
-                                    "half16_pair",
-                                    with_tuple(
-                                        var("half16_pair"),
-                                        ["this_half16", "next_half16"],
-                                        glyf_table_entry(
-                                            var("start_offset"),
-                                            scale2(var("this_half16")),
-                                            scale2(var("next_half16")),
-                                        ),
+                                for_each_pair(
+                                    var("half16s"),
+                                    (scale2, scale2),
+                                    ["this_offs", "next_offs"],
+                                    glyf_table_entry(
+                                        var("start_offset"),
+                                        var("this_offs"),
+                                        var("next_offs"),
                                     ),
                                 ),
                             ),
                             (
                                 Pattern::Variant(
-                                    Label::Borrowed("Offset32Pairs"),
-                                    Box::new(bind("offs32_pairs")),
+                                    Label::Borrowed("Offsets32"),
+                                    Box::new(bind("off32s")),
                                 ),
-                                for_each(
-                                    var("offs32_pairs"),
-                                    "offs32_pair",
-                                    with_tuple(
-                                        var("offs32_pair"),
-                                        ["this_offs32", "next_offs32"],
-                                        glyf_table_entry(
-                                            var("start_offset"),
-                                            var("this_offs32"),
-                                            var("next_offs32"),
-                                        ),
+                                for_each_pair(
+                                    var("off32s"),
+                                    (id, id),
+                                    ["this_offs", "next_offs"],
+                                    glyf_table_entry(
+                                        var("start_offset"),
+                                        var("this_offs"),
+                                        var("next_offs"),
                                     ),
                                 ),
                             ),
@@ -4784,71 +4750,50 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         ),
                     )
                 };
-            let glyph_variation_data_table_array = |axis_count: Expr| {
-                |offset_pairs: Expr| {
-                    chain(
-                        pos32(),
-                        "array_start",
-                        Format::Match(
-                            Box::new(offset_pairs),
-                            vec![
-                                (
-                                    Pattern::Variant(
-                                        Label::Borrowed("Offset16Pairs"),
-                                        Box::new(bind("half16_pairs")),
-                                    ),
-                                    for_each(
-                                        var("half16_pairs"),
-                                        "half16_pair",
-                                        with_tuple(
-                                            var("half16_pair"),
-                                            ["this_half16", "next_half16"],
-                                            offset_linked_gvar_data_table(
-                                                axis_count.clone(),
-                                                var("array_start"),
-                                                scale2(var("this_half16")),
-                                                scale2(var("next_half16")),
-                                            ),
-                                        ),
+            let glyph_variation_data_table_array = |axis_count: Expr, offsets: Expr| {
+                chain(
+                    pos32(),
+                    "array_start",
+                    Format::Match(
+                        Box::new(offsets),
+                        vec![
+                            (
+                                Pattern::Variant(
+                                    Label::Borrowed("Offsets16"),
+                                    Box::new(bind("half16s")),
+                                ),
+                                for_each_pair(
+                                    var("half16s"),
+                                    (scale2, scale2),
+                                    ["this_offs", "next_offs"],
+                                    offset_linked_gvar_data_table(
+                                        axis_count.clone(),
+                                        var("array_start"),
+                                        var("this_offs"),
+                                        var("next_offs"),
                                     ),
                                 ),
-                                (
-                                    Pattern::Variant(
-                                        Label::Borrowed("Offset32Pairs"),
-                                        Box::new(bind("offs32_pairs")),
-                                    ),
-                                    for_each(
-                                        var("offs32_pairs"),
-                                        "offs32_pair",
-                                        with_tuple(
-                                            var("offs32_pair"),
-                                            ["this_offs32", "next_offs32"],
-                                            offset_linked_gvar_data_table(
-                                                axis_count,
-                                                var("array_start"),
-                                                var("this_offs32"),
-                                                var("next_offs32"),
-                                            ),
-                                        ),
+                            ),
+                            (
+                                Pattern::Variant(
+                                    Label::Borrowed("Offsets32"),
+                                    Box::new(bind("off32s")),
+                                ),
+                                for_each_pair(
+                                    var("off32s"),
+                                    (id, id),
+                                    ["this_offs", "next_offs"],
+                                    offset_linked_gvar_data_table(
+                                        axis_count,
+                                        var("array_start"),
+                                        var("this_offs"),
+                                        var("next_offs"),
                                     ),
                                 ),
-                            ],
-                        ),
-                    )
-                }
-            };
-            let array_from_offsets = |gvar_table_start: Expr,
-                                      glyph_variation_data_array_offset: Expr,
-                                      axis_count: Expr| {
-                |offsets: Expr| -> Format {
-                    linked_offset32(
-                        gvar_table_start,
-                        glyph_variation_data_array_offset,
-                        glyph_variation_data_table_array(axis_count)(offsets_to_offset_pairs(
-                            offsets,
-                        )),
-                    )
-                }
+                            ),
+                        ],
+                    ),
+                )
             };
             let shared_tuples = |shared_tuple_count: Expr, axis_count: Expr| {
                 repeat_count(shared_tuple_count, tuple_record.call_args(vec![axis_count]))
@@ -4892,13 +4837,14 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ),
                     (
                         "glyph_variation_data_array",
-                        clone_hack(
+                        // FIXME - this is a hack to force a clone to avoid use-after-move
+                        fmt_let(
                             var("glyph_variation_data_offsets"),
-                            "offs",
-                            array_from_offsets(
+                            "offsets",
+                            linked_offset32(
                                 var("gvar_table_start"),
                                 var("glyph_variation_data_array_offset"),
-                                var("axis_count"),
+                                glyph_variation_data_table_array(var("axis_count"), var("offsets")),
                             ),
                         ),
                     ),
@@ -4983,7 +4929,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         START_VAR,
                         var("tables"),
                         magic(b"glyf"),
-                        glyf_table.call_args(vec![loca_offset_pairs(var("loca"))]),
+                        glyf_table.call_args(vec![loca_offsets(var("loca"))]),
                     ),
                 ),
                 (

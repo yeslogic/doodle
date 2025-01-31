@@ -3773,9 +3773,6 @@ __reserved: u16
 }
 
 #[derive(Debug, Clone)]
-pub enum opentype_gvar_table_glyph_variation_data_array_POISON { Offset16Pairs(Vec<(u16, u16)>), Offset32Pairs(Vec<(u32, u32)>) }
-
-#[derive(Debug, Clone)]
 pub struct opentype_glyf_simple_flags_raw {
 repeats: u8,
 field_set: opentype_glyf_simple_flags
@@ -6196,43 +6193,11 @@ let sz = (table.length.clone()) as usize<>;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder36(_input, match loca {
 Some(ref x) => {
-match x.offsets.clone() {
-opentype_gvar_table_glyph_variation_data_offsets::Offsets16(half16s) => {
-opentype_gvar_table_glyph_variation_data_array_POISON::Offset16Pairs((try_fold_map_curried(half16s.iter().cloned(), None, |tuple_var: (Option<u16>, u16)| PResult::Ok(match tuple_var {
-(last_value, value) => {
-(Some(value.clone()), match last_value {
-Some(x) => {
-[(x.clone(), value.clone())].to_vec()
+x.offsets.clone()
 },
 
 None => {
-[].to_vec()
-}
-})
-}
-})))?)
-},
-
-opentype_gvar_table_glyph_variation_data_offsets::Offsets32(off32s) => {
-opentype_gvar_table_glyph_variation_data_array_POISON::Offset32Pairs((try_fold_map_curried(off32s.iter().cloned(), None, |tuple_var: (Option<u32>, u32)| PResult::Ok(match tuple_var {
-(last_value, value) => {
-(Some(value.clone()), match last_value {
-Some(x) => {
-[(x.clone(), value.clone())].to_vec()
-},
-
-None => {
-[].to_vec()
-}
-})
-}
-})))?)
-}
-}
-},
-
-None => {
-opentype_gvar_table_glyph_variation_data_array_POISON::Offset32Pairs([].to_vec())
+opentype_gvar_table_glyph_variation_data_offsets::Offsets32([].to_vec())
 }
 }))?))())?;
 _input.end_slice()?;
@@ -7390,20 +7355,21 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 PResult::Ok(opentype_loca_table { offsets })
 }
 
-fn Decoder36<'input>(_input: &mut Parser<'input>, offset_pairs: opentype_gvar_table_glyph_variation_data_array_POISON) -> Result<Vec<opentype_glyf_table>, ParseError> {
+fn Decoder36<'input>(_input: &mut Parser<'input>, offsets: opentype_gvar_table_glyph_variation_data_offsets) -> Result<Vec<opentype_glyf_table>, ParseError> {
 let start_offset = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
-PResult::Ok(match offset_pairs {
-opentype_gvar_table_glyph_variation_data_array_POISON::Offset16Pairs(half16_pairs) => {
+PResult::Ok(match offsets {
+opentype_gvar_table_glyph_variation_data_offsets::Offsets16(half16s) => {
+let len = pred((half16s.len()) as u32);
 let mut accum = Vec::new();
-for half16_pair in half16_pairs.clone() {
-accum.push(match half16_pair {
-(this_half16, next_half16) => {
-match (next_half16 as u32) * 2u32 > (this_half16 as u32) * 2u32 {
+for ix in 0u32..len {
+accum.push(match (((half16s[ix as usize].clone()) as u32) * 2u32, ((half16s[(succ(ix)) as usize].clone()) as u32) * 2u32) {
+(this_offs, next_offs) => {
+match next_offs > this_offs {
 true => {
-let tgt_offset = start_offset + (this_half16 as u32) * 2u32;
+let tgt_offset = start_offset + this_offs;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| PResult::Ok({
 let inner = {
@@ -7431,14 +7397,15 @@ opentype_glyf_table::EmptyGlyph
 accum
 },
 
-opentype_gvar_table_glyph_variation_data_array_POISON::Offset32Pairs(offs32_pairs) => {
+opentype_gvar_table_glyph_variation_data_offsets::Offsets32(off32s) => {
+let len = pred((off32s.len()) as u32);
 let mut accum = Vec::new();
-for offs32_pair in offs32_pairs.clone() {
-accum.push(match offs32_pair {
-(this_offs32, next_offs32) => {
-match next_offs32 > this_offs32 {
+for ix in 0u32..len {
+accum.push(match (off32s[ix as usize].clone(), off32s[(succ(ix)) as usize].clone()) {
+(this_offs, next_offs) => {
+match next_offs > this_offs {
 true => {
-let tgt_offset = start_offset + this_offs32;
+let tgt_offset = start_offset + this_offs;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| PResult::Ok({
 let inner = {
@@ -8807,7 +8774,7 @@ opentype_gvar_table_glyph_variation_data_offsets::Offsets16(inner)
 }
 }))())?;
 let glyph_variation_data_array = ((|| PResult::Ok({
-let offs = glyph_variation_data_offsets.clone();
+let offsets = glyph_variation_data_offsets.clone();
 let tgt_offset = gvar_table_start + glyph_variation_data_array_offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| PResult::Ok({
@@ -8815,49 +8782,18 @@ let array_start = {
 let inner = _input.get_offset_u64();
 ((|x: u64| PResult::Ok(x as u32))(inner))?
 };
-match match offs {
+match offsets {
 opentype_gvar_table_glyph_variation_data_offsets::Offsets16(half16s) => {
-opentype_gvar_table_glyph_variation_data_array_POISON::Offset16Pairs((try_fold_map_curried(half16s.iter().cloned(), None, |tuple_var: (Option<u16>, u16)| PResult::Ok(match tuple_var {
-(last_value, value) => {
-(Some(value.clone()), match last_value {
-Some(x) => {
-[(x.clone(), value.clone())].to_vec()
-},
-
-None => {
-[].to_vec()
-}
-})
-}
-})))?)
-},
-
-opentype_gvar_table_glyph_variation_data_offsets::Offsets32(off32s) => {
-opentype_gvar_table_glyph_variation_data_array_POISON::Offset32Pairs((try_fold_map_curried(off32s.iter().cloned(), None, |tuple_var: (Option<u32>, u32)| PResult::Ok(match tuple_var {
-(last_value, value) => {
-(Some(value.clone()), match last_value {
-Some(x) => {
-[(x.clone(), value.clone())].to_vec()
-},
-
-None => {
-[].to_vec()
-}
-})
-}
-})))?)
-}
-} {
-opentype_gvar_table_glyph_variation_data_array_POISON::Offset16Pairs(half16_pairs) => {
+let len = pred((half16s.len()) as u32);
 let mut accum = Vec::new();
-for half16_pair in half16_pairs.clone() {
-accum.push(match half16_pair {
-(this_half16, next_half16) => {
-if (next_half16 as u32) * 2u32 > (this_half16 as u32) * 2u32 {
-let tgt_offset = array_start + (this_half16 as u32) * 2u32;
+for ix in 0u32..len {
+accum.push(match (((half16s[ix as usize].clone()) as u32) * 2u32, ((half16s[(succ(ix)) as usize].clone()) as u32) * 2u32) {
+(this_offs, next_offs) => {
+if next_offs > this_offs {
+let tgt_offset = array_start + this_offs;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| PResult::Ok({
-let sz = (try_sub!((next_half16 as u32) * 2u32, (this_half16 as u32) * 2u32, 17170585774888887431u64)) as usize<>;
+let sz = (try_sub!(next_offs, this_offs, 17170585774888887431u64)) as usize<>;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_opentype_var_glyph_variation_data_table(_input, axis_count.clone()))?))())?;
 _input.end_slice()?;
@@ -8874,16 +8810,17 @@ None
 accum
 },
 
-opentype_gvar_table_glyph_variation_data_array_POISON::Offset32Pairs(offs32_pairs) => {
+opentype_gvar_table_glyph_variation_data_offsets::Offsets32(off32s) => {
+let len = pred((off32s.len()) as u32);
 let mut accum = Vec::new();
-for offs32_pair in offs32_pairs.clone() {
-accum.push(match offs32_pair {
-(this_offs32, next_offs32) => {
-if next_offs32 > this_offs32 {
-let tgt_offset = array_start + this_offs32;
+for ix in 0u32..len {
+accum.push(match (off32s[ix as usize].clone(), off32s[(succ(ix)) as usize].clone()) {
+(this_offs, next_offs) => {
+if next_offs > this_offs {
+let tgt_offset = array_start + this_offs;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| PResult::Ok({
-let sz = (try_sub!(next_offs32, this_offs32, 1548601315919054830u64)) as usize<>;
+let sz = (try_sub!(next_offs, this_offs, 1548601315919054830u64)) as usize<>;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_opentype_var_glyph_variation_data_table(_input, axis_count.clone()))?))())?;
 _input.end_slice()?;
@@ -33267,4 +33204,3 @@ PResult::Ok(((|tuple_var: (Vec<u8>, u8)| PResult::Ok(match tuple_var {
 }
 }))(inner))?)
 }
-

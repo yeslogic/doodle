@@ -494,7 +494,9 @@ impl Expr {
                 if !matches!(start_type, ValueType::Base(b) if b.is_numeric()) {
                     return Err(anyhow!("EnumFromTo: start is not numeric: {start_type:?}"));
                 } else if start_type != end_type {
-                    return Err(anyhow!("EnumFromTo: start and end do not agree: {start_type:?} != {end_type:?}"));
+                    return Err(anyhow!(
+                        "EnumFromTo: start and end do not agree: {start_type:?} != {end_type:?}"
+                    ));
                 }
 
                 Ok(ValueType::Seq(Box::new(start_type)))
@@ -567,9 +569,7 @@ impl Expr {
             | Expr::U64Be(x)
             | Expr::U64Le(x)
             | Expr::SeqLength(x) => x.is_shadowed_by(name),
-            Expr::EnumFromTo(s, e) => {
-                s.is_shadowed_by(name) || e.is_shadowed_by(name)
-            }
+            Expr::EnumFromTo(s, e) => s.is_shadowed_by(name) || e.is_shadowed_by(name),
             Expr::SubSeq(x, s, l) | Expr::SubSeqInflate(x, s, l) => {
                 x.is_shadowed_by(name) || s.is_shadowed_by(name) || l.is_shadowed_by(name)
             }

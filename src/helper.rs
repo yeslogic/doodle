@@ -1282,17 +1282,13 @@ pub fn pos32() -> Format {
 /// Hack to get around gvar codegen issues where we need to persist a variable after
 /// it is moved (rather than cloned or referenced) in the current model of the codegen
 /// and the implementation of the Opentype Format-tree.
-pub fn clone_hack<F>(orig: Expr, clone_varname: &'static str, dep_format: F) -> Format
-where
-    F: FnOnce(Expr) -> Format,
-{
+pub fn fmt_let(orig: Expr, clone_varname: &'static str, dep_format: Format) -> Format {
     Format::Let(
         Label::Borrowed(clone_varname),
         Box::new(orig),
-        Box::new(dep_format(Expr::Var(Label::Borrowed(clone_varname)))),
+        Box::new(dep_format),
     )
 }
-
 
 /// Helper for [`Expr::EnumFromTo`].
 pub fn enum_from_to(start: Expr, end: Expr) -> Expr {

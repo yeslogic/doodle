@@ -163,8 +163,6 @@ impl From<usize> for ParsedValue {
     }
 }
 
-
-
 impl ParsedValue {
     /// Returns the [`ParseLoc`] directly associated with this `ParsedValue`.
     pub fn get_loc(&self) -> ParseLoc {
@@ -497,7 +495,10 @@ impl ParsedValue {
     fn get_sequence(&self) -> Option<ValueSeq<'_, Self>> {
         match self {
             ParsedValue::Seq(parsed) => Some(ValueSeq::ValueSeq(&parsed.inner)),
-            ParsedValue::Flat(Parsed { inner: Value::EnumFromTo(range), .. }) => Some(ValueSeq::IntRange(range.clone())),
+            ParsedValue::Flat(Parsed {
+                inner: Value::EnumFromTo(range),
+                ..
+            }) => Some(ValueSeq::IntRange(range.clone())),
             _ => None,
         }
     }
@@ -890,13 +891,11 @@ impl Expr {
                     Some(values) => {
                         let index = index.eval_value_with_loc(scope).unwrap_usize();
                         match values {
-                            ValueSeq::ValueSeq(values) => {
-                                Cow::Borrowed(&values[index])
-                            }
+                            ValueSeq::ValueSeq(values) => Cow::Borrowed(&values[index]),
                             ValueSeq::IntRange(mut range) => {
-                                Cow::Owned(ParsedValue::from_evaluated(
-                                    Value::Usize(range.nth(index).unwrap())
-                                ))
+                                Cow::Owned(ParsedValue::from_evaluated(Value::Usize(
+                                    range.nth(index).unwrap(),
+                                )))
                             }
                         }
                     }
@@ -913,16 +912,12 @@ impl Expr {
                         let start = start.eval_value_with_loc(scope).unwrap_usize();
                         let length = length.eval_value_with_loc(scope).unwrap_usize();
                         match values {
-                            ValueSeq::ValueSeq(values) => {
-                                Cow::Owned(ParsedValue::from_evaluated_seq(
-                                    values.sub_seq(start, length),
-                                ))
-                            }
-                            ValueSeq::IntRange(range) => {
-                                Cow::Owned(ParsedValue::from_evaluated(
-                                    Value::EnumFromTo(sub_range(range, start, length))
-                                ))
-                            }
+                            ValueSeq::ValueSeq(values) => Cow::Owned(
+                                ParsedValue::from_evaluated_seq(values.sub_seq(start, length)),
+                            ),
+                            ValueSeq::IntRange(range) => Cow::Owned(ParsedValue::from_evaluated(
+                                Value::EnumFromTo(sub_range(range, start, length)),
+                            )),
                         }
                     }
                     _ => panic!("SubSeq: expected Seq"),
@@ -1302,7 +1297,10 @@ impl Decoder {
                 let bytes = {
                     let raw = bytes.eval_value_with_loc(scope);
                     let seq_vals = raw.get_sequence().expect("bad type for DecodeBytes input");
-                    seq_vals.into_iter().map(|v| v.get_as_u8()).collect::<Vec<u8>>()
+                    seq_vals
+                        .into_iter()
+                        .map(|v| v.get_as_u8())
+                        .collect::<Vec<u8>>()
                 };
                 let new_input = ReadCtxt::new(&bytes);
                 let (va, rem_input) = a.parse_with_loc(program, scope, new_input)?;
