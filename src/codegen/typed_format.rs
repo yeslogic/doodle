@@ -850,7 +850,9 @@ mod __impls {
                     Expr::FlatMapList(rebox(lambda), vt, rebox(seq))
                 }
                 TypedExpr::Dup(_, count, x) => Expr::Dup(rebox(count), rebox(x)),
-                TypedExpr::EnumFromTo(_, start, stop) => Expr::EnumFromTo(rebox(start), rebox(stop)),
+                TypedExpr::EnumFromTo(_, start, stop) => {
+                    Expr::EnumFromTo(rebox(start), rebox(stop))
+                }
                 TypedExpr::LiftOption(_, None) => Expr::LiftOption(None),
                 TypedExpr::LiftOption(_, Some(x)) => Expr::LiftOption(Some(rebox(x))),
             }

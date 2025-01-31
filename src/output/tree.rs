@@ -601,13 +601,12 @@ impl<'module> TreePrinter<'module> {
             Value::Char(c) => Fragment::DebugAtom(Rc::new(*c)),
             Value::Tuple(vals) => self.compile_tuple(vals, None),
             Value::Seq(vals) => self.compile_seq(vals, None),
-            Value::EnumFromTo(range) => {
-                Fragment::intervene(
-                    Fragment::DisplayAtom(Rc::new(range.start)),
-                    Fragment::string(".."),
-                    Fragment::DisplayAtom(Rc::new(range.end))
-                ).delimit(Fragment::Char('['), Fragment::Char(']'))
-            }
+            Value::EnumFromTo(range) => Fragment::intervene(
+                Fragment::DisplayAtom(Rc::new(range.start)),
+                Fragment::string(".."),
+                Fragment::DisplayAtom(Rc::new(range.end)),
+            )
+            .delimit(Fragment::Char('['), Fragment::Char(']')),
             Value::Record(fields) => self.compile_record(fields, None),
             Value::Variant(label, value) => self.compile_variant(label, value, None),
             Value::Mapped(orig, value) => {

@@ -24,8 +24,15 @@ impl<'a, V: Clone> ValueSeq<'a, V> {
     }
 }
 
-pub(crate) fn sub_range(range: std::ops::Range<usize>, start: usize, len: usize) -> std::ops::Range<usize> {
-    assert!(start + len < range.len(), "sub_range invalid: start={start} len={len} range={range:?}");
+pub(crate) fn sub_range(
+    range: std::ops::Range<usize>,
+    start: usize,
+    len: usize,
+) -> std::ops::Range<usize> {
+    assert!(
+        start + len < range.len(),
+        "sub_range invalid: start={start} len={len} range={range:?}"
+    );
     range.start + start..range.start + start + len
 }
 
@@ -50,7 +57,7 @@ where
 
 impl<'a, V: Clone> IntoIterator for ValueSeq<'a, V>
 where
-    V: From<usize>
+    V: From<usize>,
 {
     type Item = Cow<'a, V>;
 
@@ -99,8 +106,7 @@ impl<T: Clone> SeqKind<T> {
 
     /// Return a reference to the value at index `ix` in the sequence, if it is in-bounds, or
     /// `None` if it is out-of-bounds.
-    pub fn get(&self, ix: usize) -> Option<&T>
-    {
+    pub fn get(&self, ix: usize) -> Option<&T> {
         match self {
             SeqKind::Strict(vs) => vs.get(ix),
             SeqKind::Dup(n, v) => (ix < *n).then_some(&**v),
@@ -152,8 +158,7 @@ pub enum Iter<'a, T> {
     Dup(std::iter::RepeatN<&'a T>),
 }
 
-impl<'a, T> Iterator for Iter<'a, T>
-{
+impl<'a, T> Iterator for Iter<'a, T> {
     type Item = &'a T;
 
     fn next(&mut self) -> Option<Self::Item> {
