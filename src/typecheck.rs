@@ -749,7 +749,7 @@ impl UintSet {
         let ranks = match val {
             IntWidth::Bits8 => [Rank::At(0), Rank::At(3), Rank::At(3), Rank::At(3)],
             IntWidth::Bits16 => [Rank::At(3), Rank::At(0), Rank::At(3), Rank::At(3)],
-            IntWidth::Bits32 => [Rank::At(3), Rank::At(3), Rank::At(0), Rank::At(0)],
+            IntWidth::Bits32 => [Rank::At(3), Rank::At(3), Rank::At(0), Rank::At(3)],
             IntWidth::Bits64 => [Rank::At(3), Rank::At(3), Rank::At(3), Rank::At(0)],
         };
         UintSet { ranks }
@@ -2216,15 +2216,18 @@ impl TypeChecker {
 
                 ys_var
             }
-            // Expr::EnumFromTo(begin, end) => {
-            //     let newvar = self.get_new_uvar();
-            //     let begin_var = self.infer_var_expr(begin, scope)?;
-            //     let end_var = self.infer_var_expr(end, scope)?;
-            //     self.unify_var_baseset(begin_var, BaseSet::USome)?;
-            //     self.unify_var_pair(begin_var, end_var)?;
-            //     self.unify_var_proj_elem(newvar, begin_var)?;
-            //     newvar
-            // }
+            Expr::EnumFromTo(start, stop) => {
+                let newvar = self.get_new_uvar();
+                let start_var = self.infer_var_expr(start, scope)?;
+                let stop_var = self.infer_var_expr(stop, scope)?;
+
+                self.unify_var_baseset(start_var, BaseSet::USome)?;
+                self.unify_var_pair(start_var, stop_var)?;
+
+                self.unify_var_proj_elem(newvar, start_var)?;
+
+                newvar
+            }
             Expr::Dup(count, x) => {
                 let newvar = self.get_new_uvar();
                 let count_var = self.infer_var_expr(count, scope)?;
