@@ -327,7 +327,7 @@ distance: u16
 }
 
 #[derive(Debug, Clone)]
-pub enum deflate_main_codes { literal(u8), reference(deflate_main_codes_reference) }
+pub enum deflate_main_codes__dupX1 { literal(u8), reference(deflate_main_codes_reference) }
 
 #[derive(Debug, Clone)]
 pub struct deflate_dynamic_huffman {
@@ -340,7 +340,7 @@ literal_length_distance_alphabet_code_lengths_value: Vec<u8>,
 literal_length_alphabet_code_lengths_value: Vec<u8>,
 distance_alphabet_code_lengths_value: Vec<u8>,
 codes: Vec<deflate_dynamic_huffman_codes>,
-codes_values: Vec<deflate_main_codes>
+codes_values: Vec<deflate_main_codes__dupX1>
 }
 
 #[derive(Debug, Clone)]
@@ -360,7 +360,7 @@ extra: Option<deflate_fixed_huffman_codes_values>
 #[derive(Debug, Clone)]
 pub struct deflate_fixed_huffman {
 codes: Vec<deflate_fixed_huffman_codes>,
-codes_values: Vec<deflate_main_codes>
+codes_values: Vec<deflate_main_codes__dupX1>
 }
 
 #[derive(Debug, Clone)]
@@ -369,23 +369,23 @@ align: (),
 len: u16,
 nlen: u16,
 bytes: Vec<u8>,
-codes_values: Vec<deflate_main_codes>
+codes_values: Vec<deflate_main_codes__dupX1>
 }
 
 #[derive(Debug, Clone)]
-pub enum deflate_main_codes__dupX1 { dynamic_huffman(deflate_dynamic_huffman), fixed_huffman(deflate_fixed_huffman), uncompressed(deflate_uncompressed) }
+pub enum deflate_main_codes { dynamic_huffman(deflate_dynamic_huffman), fixed_huffman(deflate_fixed_huffman), uncompressed(deflate_uncompressed) }
 
 #[derive(Debug, Clone)]
 pub struct deflate_block {
 r#final: u8,
 r#type: u8,
-data: deflate_main_codes__dupX1
+data: deflate_main_codes
 }
 
 #[derive(Debug, Clone)]
 pub struct deflate_main {
 blocks: Vec<deflate_block>,
-codes: Vec<deflate_main_codes>,
+codes: Vec<deflate_main_codes__dupX1>,
 inflate: Vec<u8>
 }
 
@@ -5603,7 +5603,7 @@ PResult::Ok(opentype_table_record { table_id, checksum, offset, length })
 
 fn Decoder_opentype_table_directory_table_links<'input>(_input: &mut Parser<'input>, start: u32, tables: Vec<opentype_table_record>) -> Result<opentype_table_directory_table_links, ParseError> {
 let cmap = ((|| PResult::Ok({
-let matching_table = match match 0u32 < (((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1668112752u32 {
+let table_matches = (try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1668112752u32 {
 true => {
 [table.clone()].to_vec()
 },
@@ -5611,24 +5611,9 @@ true => {
 false => {
 [].to_vec()
 }
-})))?.len()) as u32) {
-true => {
-Some((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1668112752u32 {
-true => {
-[table.clone()].to_vec()
-},
-
-false => {
-[].to_vec()
-}
-})))?[0u32 as usize])
-},
-
-false => {
-None
-}
-} {
-Some(ref x) => {
+})))?;
+let matching_table = match table_matches.as_slice() {
+[x] => {
 x.clone()
 },
 
@@ -5649,7 +5634,7 @@ _input.close_peek_context()?;
 ret
 }))())?;
 let head = ((|| PResult::Ok({
-let matching_table = match match 0u32 < (((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1751474532u32 {
+let table_matches = (try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1751474532u32 {
 true => {
 [table.clone()].to_vec()
 },
@@ -5657,24 +5642,9 @@ true => {
 false => {
 [].to_vec()
 }
-})))?.len()) as u32) {
-true => {
-Some((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1751474532u32 {
-true => {
-[table.clone()].to_vec()
-},
-
-false => {
-[].to_vec()
-}
-})))?[0u32 as usize])
-},
-
-false => {
-None
-}
-} {
-Some(ref x) => {
+})))?;
+let matching_table = match table_matches.as_slice() {
+[x] => {
 x.clone()
 },
 
@@ -5695,7 +5665,7 @@ _input.close_peek_context()?;
 ret
 }))())?;
 let hhea = ((|| PResult::Ok({
-let matching_table = match match 0u32 < (((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1751672161u32 {
+let table_matches = (try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1751672161u32 {
 true => {
 [table.clone()].to_vec()
 },
@@ -5703,24 +5673,9 @@ true => {
 false => {
 [].to_vec()
 }
-})))?.len()) as u32) {
-true => {
-Some((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1751672161u32 {
-true => {
-[table.clone()].to_vec()
-},
-
-false => {
-[].to_vec()
-}
-})))?[0u32 as usize])
-},
-
-false => {
-None
-}
-} {
-Some(ref x) => {
+})))?;
+let matching_table = match table_matches.as_slice() {
+[x] => {
 x.clone()
 },
 
@@ -5741,7 +5696,7 @@ _input.close_peek_context()?;
 ret
 }))())?;
 let maxp = ((|| PResult::Ok({
-let matching_table = match match 0u32 < (((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1835104368u32 {
+let table_matches = (try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1835104368u32 {
 true => {
 [table.clone()].to_vec()
 },
@@ -5749,24 +5704,9 @@ true => {
 false => {
 [].to_vec()
 }
-})))?.len()) as u32) {
-true => {
-Some((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1835104368u32 {
-true => {
-[table.clone()].to_vec()
-},
-
-false => {
-[].to_vec()
-}
-})))?[0u32 as usize])
-},
-
-false => {
-None
-}
-} {
-Some(ref x) => {
+})))?;
+let matching_table = match table_matches.as_slice() {
+[x] => {
 x.clone()
 },
 
@@ -5787,7 +5727,7 @@ _input.close_peek_context()?;
 ret
 }))())?;
 let hmtx = ((|| PResult::Ok({
-let matching_table = match match 0u32 < (((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1752003704u32 {
+let table_matches = (try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1752003704u32 {
 true => {
 [table.clone()].to_vec()
 },
@@ -5795,24 +5735,9 @@ true => {
 false => {
 [].to_vec()
 }
-})))?.len()) as u32) {
-true => {
-Some((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1752003704u32 {
-true => {
-[table.clone()].to_vec()
-},
-
-false => {
-[].to_vec()
-}
-})))?[0u32 as usize])
-},
-
-false => {
-None
-}
-} {
-Some(ref x) => {
+})))?;
+let matching_table = match table_matches.as_slice() {
+[x] => {
 x.clone()
 },
 
@@ -5833,7 +5758,7 @@ _input.close_peek_context()?;
 ret
 }))())?;
 let name = ((|| PResult::Ok({
-let matching_table = match match 0u32 < (((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1851878757u32 {
+let table_matches = (try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1851878757u32 {
 true => {
 [table.clone()].to_vec()
 },
@@ -5841,24 +5766,9 @@ true => {
 false => {
 [].to_vec()
 }
-})))?.len()) as u32) {
-true => {
-Some((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1851878757u32 {
-true => {
-[table.clone()].to_vec()
-},
-
-false => {
-[].to_vec()
-}
-})))?[0u32 as usize])
-},
-
-false => {
-None
-}
-} {
-Some(ref x) => {
+})))?;
+let matching_table = match table_matches.as_slice() {
+[x] => {
 x.clone()
 },
 
@@ -5879,7 +5789,7 @@ _input.close_peek_context()?;
 ret
 }))())?;
 let os2 = ((|| PResult::Ok({
-let matching_table = match match 0u32 < (((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1330851634u32 {
+let table_matches = (try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1330851634u32 {
 true => {
 [table.clone()].to_vec()
 },
@@ -5887,24 +5797,9 @@ true => {
 false => {
 [].to_vec()
 }
-})))?.len()) as u32) {
-true => {
-Some((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1330851634u32 {
-true => {
-[table.clone()].to_vec()
-},
-
-false => {
-[].to_vec()
-}
-})))?[0u32 as usize])
-},
-
-false => {
-None
-}
-} {
-Some(ref x) => {
+})))?;
+let matching_table = match table_matches.as_slice() {
+[x] => {
 x.clone()
 },
 
@@ -5925,7 +5820,7 @@ _input.close_peek_context()?;
 ret
 }))())?;
 let post = ((|| PResult::Ok({
-let matching_table = match match 0u32 < (((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1886352244u32 {
+let table_matches = (try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1886352244u32 {
 true => {
 [table.clone()].to_vec()
 },
@@ -5933,24 +5828,9 @@ true => {
 false => {
 [].to_vec()
 }
-})))?.len()) as u32) {
-true => {
-Some((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1886352244u32 {
-true => {
-[table.clone()].to_vec()
-},
-
-false => {
-[].to_vec()
-}
-})))?[0u32 as usize])
-},
-
-false => {
-None
-}
-} {
-Some(ref x) => {
+})))?;
+let matching_table = match table_matches.as_slice() {
+[x] => {
 x.clone()
 },
 
@@ -5971,7 +5851,7 @@ _input.close_peek_context()?;
 ret
 }))())?;
 let cvt = ((|| PResult::Ok({
-let matching_table = match 0u32 < (((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1668707360u32 {
+let table_matches = (try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1668707360u32 {
 true => {
 [table.clone()].to_vec()
 },
@@ -5979,25 +5859,10 @@ true => {
 false => {
 [].to_vec()
 }
-})))?.len()) as u32) {
-true => {
-Some((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1668707360u32 {
-true => {
-[table.clone()].to_vec()
-},
-
-false => {
-[].to_vec()
-}
-})))?[0u32 as usize])
-},
-
-false => {
-None
-}
-};
-match matching_table {
-Some(ref table) => {
+})))?;
+match table_matches.as_slice() {
+[x] => {
+let table = x.clone();
 let inner = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6034,13 +5899,13 @@ ret
 ((|val: Vec<u16>| PResult::Ok(Some(val)))(inner))?
 },
 
-None => {
+_ => {
 None
 }
 }
 }))())?;
 let fpgm = ((|| PResult::Ok({
-let matching_table = match 0u32 < (((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1718642541u32 {
+let table_matches = (try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1718642541u32 {
 true => {
 [table.clone()].to_vec()
 },
@@ -6048,25 +5913,10 @@ true => {
 false => {
 [].to_vec()
 }
-})))?.len()) as u32) {
-true => {
-Some((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1718642541u32 {
-true => {
-[table.clone()].to_vec()
-},
-
-false => {
-[].to_vec()
-}
-})))?[0u32 as usize])
-},
-
-false => {
-None
-}
-};
-match matching_table {
-Some(ref table) => {
+})))?;
+match table_matches.as_slice() {
+[x] => {
+let table = x.clone();
 let inner = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6103,13 +5953,13 @@ ret
 ((|val: Vec<u8>| PResult::Ok(Some(val)))(inner))?
 },
 
-None => {
+_ => {
 None
 }
 }
 }))())?;
 let loca = ((|| PResult::Ok({
-let matching_table = match 0u32 < (((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1819239265u32 {
+let table_matches = (try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1819239265u32 {
 true => {
 [table.clone()].to_vec()
 },
@@ -6117,25 +5967,10 @@ true => {
 false => {
 [].to_vec()
 }
-})))?.len()) as u32) {
-true => {
-Some((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1819239265u32 {
-true => {
-[table.clone()].to_vec()
-},
-
-false => {
-[].to_vec()
-}
-})))?[0u32 as usize])
-},
-
-false => {
-None
-}
-};
-match matching_table {
-Some(ref table) => {
+})))?;
+match table_matches.as_slice() {
+[x] => {
+let table = x.clone();
 let inner = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6152,13 +5987,13 @@ ret
 ((|val: opentype_loca_table| PResult::Ok(Some(val)))(inner))?
 },
 
-None => {
+_ => {
 None
 }
 }
 }))())?;
 let glyf = ((|| PResult::Ok({
-let matching_table = match 0u32 < (((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1735162214u32 {
+let table_matches = (try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1735162214u32 {
 true => {
 [table.clone()].to_vec()
 },
@@ -6166,25 +6001,10 @@ true => {
 false => {
 [].to_vec()
 }
-})))?.len()) as u32) {
-true => {
-Some((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1735162214u32 {
-true => {
-[table.clone()].to_vec()
-},
-
-false => {
-[].to_vec()
-}
-})))?[0u32 as usize])
-},
-
-false => {
-None
-}
-};
-match matching_table {
-Some(ref table) => {
+})))?;
+match table_matches.as_slice() {
+[x] => {
+let table = x.clone();
 let inner = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6209,13 +6029,13 @@ ret
 ((|val: Vec<opentype_glyf_table>| PResult::Ok(Some(val)))(inner))?
 },
 
-None => {
+_ => {
 None
 }
 }
 }))())?;
 let prep = ((|| PResult::Ok({
-let matching_table = match 0u32 < (((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1886545264u32 {
+let table_matches = (try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1886545264u32 {
 true => {
 [table.clone()].to_vec()
 },
@@ -6223,25 +6043,10 @@ true => {
 false => {
 [].to_vec()
 }
-})))?.len()) as u32) {
-true => {
-Some((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1886545264u32 {
-true => {
-[table.clone()].to_vec()
-},
-
-false => {
-[].to_vec()
-}
-})))?[0u32 as usize])
-},
-
-false => {
-None
-}
-};
-match matching_table {
-Some(ref table) => {
+})))?;
+match table_matches.as_slice() {
+[x] => {
+let table = x.clone();
 let inner = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6278,13 +6083,13 @@ ret
 ((|val: Vec<u8>| PResult::Ok(Some(val)))(inner))?
 },
 
-None => {
+_ => {
 None
 }
 }
 }))())?;
 let gasp = ((|| PResult::Ok({
-let matching_table = match 0u32 < (((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1734439792u32 {
+let table_matches = (try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1734439792u32 {
 true => {
 [table.clone()].to_vec()
 },
@@ -6292,25 +6097,10 @@ true => {
 false => {
 [].to_vec()
 }
-})))?.len()) as u32) {
-true => {
-Some((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1734439792u32 {
-true => {
-[table.clone()].to_vec()
-},
-
-false => {
-[].to_vec()
-}
-})))?[0u32 as usize])
-},
-
-false => {
-None
-}
-};
-match matching_table {
-Some(ref table) => {
+})))?;
+match table_matches.as_slice() {
+[x] => {
+let table = x.clone();
 let inner = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6327,13 +6117,13 @@ ret
 ((|val: opentype_gasp_table| PResult::Ok(Some(val)))(inner))?
 },
 
-None => {
+_ => {
 None
 }
 }
 }))())?;
 let base = ((|| PResult::Ok({
-let matching_table = match 0u32 < (((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1111577413u32 {
+let table_matches = (try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1111577413u32 {
 true => {
 [table.clone()].to_vec()
 },
@@ -6341,25 +6131,10 @@ true => {
 false => {
 [].to_vec()
 }
-})))?.len()) as u32) {
-true => {
-Some((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1111577413u32 {
-true => {
-[table.clone()].to_vec()
-},
-
-false => {
-[].to_vec()
-}
-})))?[0u32 as usize])
-},
-
-false => {
-None
-}
-};
-match matching_table {
-Some(ref table) => {
+})))?;
+match table_matches.as_slice() {
+[x] => {
+let table = x.clone();
 let inner = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6376,13 +6151,13 @@ ret
 ((|val: opentype_base_table| PResult::Ok(Some(val)))(inner))?
 },
 
-None => {
+_ => {
 None
 }
 }
 }))())?;
 let gdef = ((|| PResult::Ok({
-let matching_table = match 0u32 < (((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1195656518u32 {
+let table_matches = (try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1195656518u32 {
 true => {
 [table.clone()].to_vec()
 },
@@ -6390,25 +6165,10 @@ true => {
 false => {
 [].to_vec()
 }
-})))?.len()) as u32) {
-true => {
-Some((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1195656518u32 {
-true => {
-[table.clone()].to_vec()
-},
-
-false => {
-[].to_vec()
-}
-})))?[0u32 as usize])
-},
-
-false => {
-None
-}
-};
-match matching_table {
-Some(ref table) => {
+})))?;
+match table_matches.as_slice() {
+[x] => {
+let table = x.clone();
 let inner = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6425,13 +6185,13 @@ ret
 ((|val: opentype_gdef_table| PResult::Ok(Some(val)))(inner))?
 },
 
-None => {
+_ => {
 None
 }
 }
 }))())?;
 let gpos = ((|| PResult::Ok({
-let matching_table = match 0u32 < (((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1196445523u32 {
+let table_matches = (try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1196445523u32 {
 true => {
 [table.clone()].to_vec()
 },
@@ -6439,25 +6199,10 @@ true => {
 false => {
 [].to_vec()
 }
-})))?.len()) as u32) {
-true => {
-Some((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1196445523u32 {
-true => {
-[table.clone()].to_vec()
-},
-
-false => {
-[].to_vec()
-}
-})))?[0u32 as usize])
-},
-
-false => {
-None
-}
-};
-match matching_table {
-Some(ref table) => {
+})))?;
+match table_matches.as_slice() {
+[x] => {
+let table = x.clone();
 let inner = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6474,13 +6219,13 @@ ret
 ((|val: opentype_gpos_table| PResult::Ok(Some(val)))(inner))?
 },
 
-None => {
+_ => {
 None
 }
 }
 }))())?;
 let gsub = ((|| PResult::Ok({
-let matching_table = match 0u32 < (((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1196643650u32 {
+let table_matches = (try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1196643650u32 {
 true => {
 [table.clone()].to_vec()
 },
@@ -6488,25 +6233,10 @@ true => {
 false => {
 [].to_vec()
 }
-})))?.len()) as u32) {
-true => {
-Some((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1196643650u32 {
-true => {
-[table.clone()].to_vec()
-},
-
-false => {
-[].to_vec()
-}
-})))?[0u32 as usize])
-},
-
-false => {
-None
-}
-};
-match matching_table {
-Some(ref table) => {
+})))?;
+match table_matches.as_slice() {
+[x] => {
+let table = x.clone();
 let inner = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6523,13 +6253,13 @@ ret
 ((|val: opentype_gsub_table| PResult::Ok(Some(val)))(inner))?
 },
 
-None => {
+_ => {
 None
 }
 }
 }))())?;
 let fvar = ((|| PResult::Ok({
-let matching_table = match 0u32 < (((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1719034226u32 {
+let table_matches = (try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1719034226u32 {
 true => {
 [table.clone()].to_vec()
 },
@@ -6537,25 +6267,10 @@ true => {
 false => {
 [].to_vec()
 }
-})))?.len()) as u32) {
-true => {
-Some((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1719034226u32 {
-true => {
-[table.clone()].to_vec()
-},
-
-false => {
-[].to_vec()
-}
-})))?[0u32 as usize])
-},
-
-false => {
-None
-}
-};
-match matching_table {
-Some(ref table) => {
+})))?;
+match table_matches.as_slice() {
+[x] => {
+let table = x.clone();
 let inner = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6572,13 +6287,13 @@ ret
 ((|val: opentype_fvar_table| PResult::Ok(Some(val)))(inner))?
 },
 
-None => {
+_ => {
 None
 }
 }
 }))())?;
 let gvar = ((|| PResult::Ok({
-let matching_table = match 0u32 < (((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1735811442u32 {
+let table_matches = (try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1735811442u32 {
 true => {
 [table.clone()].to_vec()
 },
@@ -6586,25 +6301,10 @@ true => {
 false => {
 [].to_vec()
 }
-})))?.len()) as u32) {
-true => {
-Some((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1735811442u32 {
-true => {
-[table.clone()].to_vec()
-},
-
-false => {
-[].to_vec()
-}
-})))?[0u32 as usize])
-},
-
-false => {
-None
-}
-};
-match matching_table {
-Some(ref table) => {
+})))?;
+match table_matches.as_slice() {
+[x] => {
+let table = x.clone();
 let inner = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6621,13 +6321,13 @@ ret
 ((|val: opentype_gvar_table| PResult::Ok(Some(val)))(inner))?
 },
 
-None => {
+_ => {
 None
 }
 }
 }))())?;
 let kern = ((|| PResult::Ok({
-let matching_table = match 0u32 < (((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1801810542u32 {
+let table_matches = (try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1801810542u32 {
 true => {
 [table.clone()].to_vec()
 },
@@ -6635,25 +6335,10 @@ true => {
 false => {
 [].to_vec()
 }
-})))?.len()) as u32) {
-true => {
-Some((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1801810542u32 {
-true => {
-[table.clone()].to_vec()
-},
-
-false => {
-[].to_vec()
-}
-})))?[0u32 as usize])
-},
-
-false => {
-None
-}
-};
-match matching_table {
-Some(ref table) => {
+})))?;
+match table_matches.as_slice() {
+[x] => {
+let table = x.clone();
 let inner = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6670,13 +6355,13 @@ ret
 ((|val: opentype_kern_table| PResult::Ok(Some(val)))(inner))?
 },
 
-None => {
+_ => {
 None
 }
 }
 }))())?;
 let stat = ((|| PResult::Ok({
-let matching_table = match 0u32 < (((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1398030676u32 {
+let table_matches = (try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1398030676u32 {
 true => {
 [table.clone()].to_vec()
 },
@@ -6684,25 +6369,10 @@ true => {
 false => {
 [].to_vec()
 }
-})))?.len()) as u32) {
-true => {
-Some((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1398030676u32 {
-true => {
-[table.clone()].to_vec()
-},
-
-false => {
-[].to_vec()
-}
-})))?[0u32 as usize])
-},
-
-false => {
-None
-}
-};
-match matching_table {
-Some(ref table) => {
+})))?;
+match table_matches.as_slice() {
+[x] => {
+let table = x.clone();
 let inner = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6719,13 +6389,13 @@ ret
 ((|val: opentype_stat_table| PResult::Ok(Some(val)))(inner))?
 },
 
-None => {
+_ => {
 None
 }
 }
 }))())?;
 let vhea = ((|| PResult::Ok({
-let matching_table = match 0u32 < (((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1986553185u32 {
+let table_matches = (try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1986553185u32 {
 true => {
 [table.clone()].to_vec()
 },
@@ -6733,25 +6403,10 @@ true => {
 false => {
 [].to_vec()
 }
-})))?.len()) as u32) {
-true => {
-Some((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1986553185u32 {
-true => {
-[table.clone()].to_vec()
-},
-
-false => {
-[].to_vec()
-}
-})))?[0u32 as usize])
-},
-
-false => {
-None
-}
-};
-match matching_table {
-Some(ref table) => {
+})))?;
+match table_matches.as_slice() {
+[x] => {
+let table = x.clone();
 let inner = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6768,13 +6423,13 @@ ret
 ((|val: opentype_hhea_table| PResult::Ok(Some(val)))(inner))?
 },
 
-None => {
+_ => {
 None
 }
 }
 }))())?;
 let vmtx = ((|| PResult::Ok({
-let matching_table = match 0u32 < (((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1986884728u32 {
+let table_matches = (try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1986884728u32 {
 true => {
 [table.clone()].to_vec()
 },
@@ -6782,25 +6437,10 @@ true => {
 false => {
 [].to_vec()
 }
-})))?.len()) as u32) {
-true => {
-Some((try_flat_map_vec(tables.iter().cloned(), |table: opentype_table_record| PResult::Ok(match table.table_id.clone() == 1986884728u32 {
-true => {
-[table.clone()].to_vec()
-},
-
-false => {
-[].to_vec()
-}
-})))?[0u32 as usize])
-},
-
-false => {
-None
-}
-};
-match matching_table {
-Some(ref table) => {
+})))?;
+match table_matches.as_slice() {
+[x] => {
+let table = x.clone();
 let inner = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6825,7 +6465,7 @@ ret
 ((|val: opentype_hmtx_table| PResult::Ok(Some(val)))(inner))?
 },
 
-None => {
+_ => {
 None
 }
 }
@@ -14332,15 +13972,7 @@ let mut acc = false;
 loop {
 if ((|tuple_var: (bool, &Vec<opentype_glyf_composite_raw>)| PResult::Ok(match tuple_var {
 (_has_instructions, seq) => {
-match match match (seq.len()) as u32 {
-1u32.. => {
-true
-},
-
-_ => {
-false
-}
-} {
+match match ((seq.len()) as u32) != 0u32 {
 true => {
 Some(seq[(pred((seq.len()) as u32)) as usize].clone())
 },
@@ -17299,26 +16931,26 @@ accum.push(elem);
 accum
 }))())?;
 let codes = ((|| PResult::Ok((try_flat_map_vec(blocks.iter().cloned(), |x: deflate_block| PResult::Ok(match x.data.clone() {
-deflate_main_codes__dupX1::uncompressed(ref y) => {
+deflate_main_codes::uncompressed(ref y) => {
 y.codes_values.clone()
 },
 
-deflate_main_codes__dupX1::fixed_huffman(ref y) => {
+deflate_main_codes::fixed_huffman(ref y) => {
 y.codes_values.clone()
 },
 
-deflate_main_codes__dupX1::dynamic_huffman(ref y) => {
+deflate_main_codes::dynamic_huffman(ref y) => {
 y.codes_values.clone()
 }
 })))?))())?;
-let inflate = ((|| PResult::Ok((try_flat_map_append_vec(codes.iter().cloned(), |tuple_var: (&Vec<u8>, deflate_main_codes)| PResult::Ok(match tuple_var {
+let inflate = ((|| PResult::Ok((try_flat_map_append_vec(codes.iter().cloned(), |tuple_var: (&Vec<u8>, deflate_main_codes__dupX1)| PResult::Ok(match tuple_var {
 (buffer, symbol) => {
 match symbol {
-deflate_main_codes::literal(b) => {
+deflate_main_codes__dupX1::literal(b) => {
 [b].to_vec()
 },
 
-deflate_main_codes::reference(r) => {
+deflate_main_codes__dupX1::reference(r) => {
 {
 let ix = (try_sub!((buffer.len()) as u32, (r.distance.clone()) as u32, 11669649807369914251u64)) as usize;
 (slice_ext(&buffer, ix..ix + (((r.length.clone()) as u32) as usize))).to_vec()
@@ -17343,17 +16975,17 @@ let field1 = ((|| PResult::Ok((Decoder166(_input))?))())?;
 let data = ((|| PResult::Ok(match r#type {
 0u8 => {
 let inner = (Decoder_deflate_uncompressed(_input))?;
-deflate_main_codes__dupX1::uncompressed(inner)
+deflate_main_codes::uncompressed(inner)
 },
 
 1u8 => {
 let inner = (Decoder_deflate_fixed_huffman(_input))?;
-deflate_main_codes__dupX1::fixed_huffman(inner)
+deflate_main_codes::fixed_huffman(inner)
 },
 
 2u8 => {
 let inner = (Decoder_deflate_dynamic_huffman(_input))?;
-deflate_main_codes__dupX1::dynamic_huffman(inner)
+deflate_main_codes::dynamic_huffman(inner)
 },
 
 _other => {
@@ -17434,7 +17066,7 @@ let field7 = ((|| PResult::Ok((Decoder166(_input))?))())?;
 }
 accum
 }))())?;
-let codes_values = ((|| PResult::Ok((try_flat_map_vec(bytes.iter().cloned(), |x: u8| PResult::Ok([deflate_main_codes::literal(x)].to_vec())))?))())?;
+let codes_values = ((|| PResult::Ok((try_flat_map_vec(bytes.iter().cloned(), |x: u8| PResult::Ok([deflate_main_codes__dupX1::literal(x)].to_vec())))?))())?;
 PResult::Ok(deflate_uncompressed { align, len, nlen, bytes, codes_values })
 }
 
@@ -18213,7 +17845,7 @@ let codes_values = ((|| PResult::Ok((try_flat_map_vec(codes.iter().cloned(), |x:
 257u16..=285u16 => {
 match x.extra.clone() {
 Some(ref rec) => {
-[deflate_main_codes::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
+[deflate_main_codes__dupX1::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
 },
 
 _ => {
@@ -18227,7 +17859,7 @@ return Err(ParseError::ExcludedBranch(8880661182590738257u64));
 },
 
 _ => {
-[deflate_main_codes::literal((x.code.clone()) as u8)].to_vec()
+[deflate_main_codes__dupX1::literal((x.code.clone()) as u8)].to_vec()
 }
 })))?))())?;
 PResult::Ok(deflate_fixed_huffman { codes, codes_values })
@@ -18913,7 +18545,7 @@ let codes_values = ((|| PResult::Ok((try_flat_map_vec(codes.iter().cloned(), |x:
 257u16..=285u16 => {
 match x.extra.clone() {
 Some(ref rec) => {
-[deflate_main_codes::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
+[deflate_main_codes__dupX1::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
 },
 
 _ => {
@@ -18927,7 +18559,7 @@ return Err(ParseError::ExcludedBranch(13685962128001446815u64));
 },
 
 _ => {
-[deflate_main_codes::literal((x.code.clone()) as u8)].to_vec()
+[deflate_main_codes__dupX1::literal((x.code.clone()) as u8)].to_vec()
 }
 })))?))())?;
 PResult::Ok(deflate_dynamic_huffman { hlit, hdist, hclen, code_length_alphabet_code_lengths, literal_length_distance_alphabet_code_lengths, literal_length_distance_alphabet_code_lengths_value, literal_length_alphabet_code_lengths_value, distance_alphabet_code_lengths_value, codes, codes_values })

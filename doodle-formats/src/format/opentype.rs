@@ -385,19 +385,23 @@ const START_VAR: Expr = Expr::Var(Label::Borrowed("start"));
 const START_ARG: (Label, ValueType) = (Label::Borrowed("start"), ValueType::Base(BaseType::U32));
 
 /// Given `Expr`s `table_records` and a `query_table_id` of the appropriate type,
-/// seeks through `table_records` and extracts the first one whose projected field `table_id`
-/// is a one-to-one match for `query_table_id`.
-///
+/// seeks through `table_records` and filters the elements whose projected field `table_id`
+/// is a one-to-one match for `query_table_id`; then, applies the dependent Format-closure
+/// `dep_format` to the expression representing this array computation.
+
 /// # Notes
 ///
-/// Currently, only existence (and not uniqueness) of a match is required for
-/// this construction to function correctly, but non-unique matches are not
-/// intentionally supported and may be an error in future.
+/// Callers should be aware that while not allowed by the standard, there is no type-level
+/// guarantee the Expr-Seq `dep_format` is applied to, is only ever singleton-or-empty.
 ///
 /// Also note that while in principle a binary search is ideal, the constructions
 /// we have on hand only allow for linear search without short-circuiting for
 /// `Θ(N)` performance regardless of where the match is in the list.
-fn find_table(table_records: Expr, query_table_id: u32) -> Expr {
+fn with_table(
+    table_records: Expr,
+    query_table_id: u32,
+    dep_format: impl FnOnce(Expr) -> Format,
+) -> Format {
     // FIXME[epic=perf] - this is a naive algorithm that could be improved with the right primitives in-hand
     // TODO[epic=binary-search]: accelerate using binary search
     // TODO: make use of `search_range` etc.
@@ -419,8 +423,7 @@ fn find_table(table_records: Expr, query_table_id: u32) -> Expr {
         ),
         table_records,
     );
-    // FIXME - we need either an Expr::Let or Expr::ListToOption primitive to distinguish no-match, 1-match, and multi-match
-    index_checked(matching_tables, Expr::U32(0))
+    dep_format(matching_tables)
 }
 
 /// Given a raw Format `format` and an absolute buffer-offset `abs_offset`,
@@ -607,18 +610,25 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             id: u32,
             table_format: Format,
         ) -> Format {
-            Format::Let(
-                Label::Borrowed("matching_table"),
-                Box::new(expr_unwrap(find_table(table_records, id))),
-                Box::new(linked_offset32(
-                    sof_offset,
-                    record_proj(var("matching_table"), "offset"),
-                    Format::Slice(
-                        Box::new(record_proj(var("matching_table"), "length")),
-                        Box::new(table_format),
+            let dep_format = |table_matches: Expr| -> Format {
+                fmt_let(
+                    "table_matches",
+                    table_matches,
+                    fmt_let(
+                        "matching_table",
+                        unwrap_singleton(var("table_matches")),
+                        linked_offset32(
+                            sof_offset,
+                            record_proj(var("matching_table"), "offset"),
+                            Format::Slice(
+                                Box::new(record_proj(var("matching_table"), "length")),
+                                Box::new(table_format),
+                            ),
+                        ),
                     ),
-                )),
-            )
+                )
+            };
+            with_table(table_records, id, dep_format)
         }
 
         fn required_table_with_len(
@@ -627,21 +637,29 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             id: u32,
             table_format_ref: FormatRef,
         ) -> Format {
-            Format::Let(
-                Label::Borrowed("matching_table"),
-                Box::new(expr_unwrap(find_table(table_records, id))),
-                Box::new(linked_offset32(
-                    sof_offset,
-                    record_proj(var("matching_table"), "offset"),
-                    Format::Slice(
-                        Box::new(record_proj(var("matching_table"), "length")),
-                        Box::new(
-                            table_format_ref
-                                .call_args(vec![record_proj(var("matching_table"), "length")]),
+            let dep_format =
+                |table_matches: Expr| -> Format {
+                    fmt_let(
+                        "table_matches",
+                        table_matches,
+                        fmt_let(
+                            "matching_table",
+                            unwrap_singleton(var("table_matches")),
+                            linked_offset32(
+                                sof_offset,
+                                record_proj(var("matching_table"), "offset"),
+                                Format::Slice(
+                                    Box::new(record_proj(var("matching_table"), "length")),
+                                    Box::new(table_format_ref.call_args(vec![record_proj(
+                                        var("matching_table"),
+                                        "length",
+                                    )])),
+                                ),
+                            ),
                         ),
-                    ),
-                )),
-            )
+                    )
+                };
+            with_table(table_records, id, dep_format)
         }
 
         fn optional_table(
@@ -650,27 +668,28 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             id: u32,
             table_format: Format,
         ) -> Format {
-            Format::Let(
-                Label::Borrowed("matching_table"),
-                Box::new(find_table(table_records, id)),
-                Box::new(Format::Match(
-                    Box::new(var("matching_table")),
-                    vec![
-                        (
-                            pat_some(bind("table")),
-                            format_some(linked_offset32(
-                                sof_offset,
-                                record_proj(var("table"), "offset"),
-                                Format::Slice(
-                                    Box::new(record_proj(var("table"), "length")),
-                                    Box::new(table_format),
-                                ),
-                            )),
+            let cond_fmt = |matching_table: Expr| -> Format {
+                fmt_let(
+                    "table",
+                    matching_table,
+                    format_some(linked_offset32(
+                        sof_offset,
+                        record_proj(var("table"), "offset"),
+                        Format::Slice(
+                            Box::new(record_proj(var("table"), "length")),
+                            Box::new(table_format),
                         ),
-                        (pat_none(), format_none()),
-                    ],
-                )),
-            )
+                    )),
+                )
+            };
+            let dep_format = move |table_matches: Expr| -> Format {
+                fmt_let(
+                    "table_matches",
+                    table_matches,
+                    maybe_singleton(var("table_matches"), cond_fmt),
+                )
+            };
+            with_table(table_records, id, dep_format)
         }
 
         let encoding_id = |_platform_id: Expr| base.u16be();
