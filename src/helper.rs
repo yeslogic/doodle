@@ -1287,7 +1287,6 @@ pub fn fmt_let(orig: Expr, clone_varname: &'static str, dep_format: Format) -> F
     )
 }
 
-
 /// Helper for [`Expr::EnumFromTo`].
 pub fn enum_from_to(start: Expr, end: Expr) -> Expr {
     Expr::EnumFromTo(Box::new(start), Box::new(end))

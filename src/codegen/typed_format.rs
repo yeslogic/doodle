@@ -8,6 +8,8 @@ use crate::bounds::Bounds;
 use crate::byte_set::ByteSet;
 use crate::{Arith, IntRel, Label, TypeHint, UnaryOp};
 
+pub(crate) mod variables;
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum GenType {
     Inline(RustType),
@@ -40,6 +42,15 @@ impl GenType {
                 Some((*ix, lbl))
             }
             _ => None,
+        }
+    }
+
+    /// Determines whether a given [`GenType`] implements the `Copy` trait.
+    pub(crate) fn is_copy(&self) -> bool {
+        match self {
+            GenType::Inline(rust_type) => rust_type.can_be_copy(),
+            // TODO - infer recursive Copy of local definitions, if possible
+            GenType::Def(_, rust_type_def) => rust_type_def.can_be_copy(),
         }
     }
 }
@@ -716,6 +727,27 @@ pub enum TypedPattern<TypeRep> {
     Variant(TypeRep, Label, Box<TypedPattern<TypeRep>>),
     Seq(TypeRep, Vec<TypedPattern<TypeRep>>),
     Option(TypeRep, Option<Box<TypedPattern<TypeRep>>>),
+}
+
+impl TypedPattern<GenType> {
+    pub(crate) fn get_type(&self) -> Cow<'_, GenType> {
+        match self {
+            TypedPattern::U8(..) => Cow::Owned(GenType::from(PrimType::U8)),
+            TypedPattern::U16(..) => Cow::Owned(GenType::from(PrimType::U16)),
+            TypedPattern::U32(..) => Cow::Owned(GenType::from(PrimType::U32)),
+            TypedPattern::U64(..) => Cow::Owned(GenType::from(PrimType::U64)),
+            TypedPattern::Char(..) => Cow::Owned(GenType::from(PrimType::Char)),
+            TypedPattern::Bool(..) => Cow::Owned(GenType::from(PrimType::Bool)),
+
+            TypedPattern::Wildcard(gt)
+            | TypedPattern::Binding(gt, ..)
+            | TypedPattern::Tuple(gt, ..)
+            | TypedPattern::Option(gt, ..)
+            | TypedPattern::Int(gt, ..)
+            | TypedPattern::Variant(gt, ..)
+            | TypedPattern::Seq(gt, ..) => Cow::Borrowed(gt),
+        }
+    }
 }
 
 impl<TypeRep> std::hash::Hash for TypedPattern<TypeRep> {
