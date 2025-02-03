@@ -4838,15 +4838,18 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     (
                         "glyph_variation_data_array",
                         // FIXME - this is a hack to force a clone to avoid use-after-move
-                        fmt_let(
-                            var("glyph_variation_data_offsets"),
-                            "offsets",
-                            linked_offset32(
-                                var("gvar_table_start"),
-                                var("glyph_variation_data_array_offset"),
-                                glyph_variation_data_table_array(var("axis_count"), var("offsets")),
+                        // fmt_let(
+                        //     var("glyph_variation_data_offsets"),
+                        //     "offsets",
+                        linked_offset32(
+                            var("gvar_table_start"),
+                            var("glyph_variation_data_array_offset"),
+                            glyph_variation_data_table_array(
+                                var("axis_count"),
+                                var("glyph_variation_data_offsets"),
                             ),
                         ),
+                        // ),
                     ),
                 ]),
             )

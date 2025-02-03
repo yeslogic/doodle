@@ -626,7 +626,15 @@ fn embed_pattern_t(pat: &GTPattern) -> RustPattern {
                 let constr = Constructor::Compound(tname.clone(), vname.clone());
                 let inner_pat = match inner.as_ref() {
                     TypedPattern::Wildcard(..) => RustPattern::Fill,
-                    _ => embed_pattern_t(inner),
+                    _ => {
+                        let inner_t = inner.get_type();
+                        let tmp = embed_pattern_t(inner);
+                        if inner_t.is_copy() {
+                            tmp
+                        } else {
+                            tmp.ref_hack()
+                        }
+                    }
                 };
                 RustPattern::Variant(constr, Box::new(inner_pat))
             }
@@ -1034,7 +1042,7 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
             // REVIEW - lexical scopes, shadowing, and variable-name sanitization may not be quite right in the current implementation
             let loc = RustExpr::local(vname.clone());
             match info {
-                ExprInfo::EmbedCloned => RustExpr::CloneOf(Box::new(loc)),
+                ExprInfo::EmbedCloned  => RustExpr::CloneOf(Box::new(loc)),
                 ExprInfo::Natural => loc,
             }
         }
