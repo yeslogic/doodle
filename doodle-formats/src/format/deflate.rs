@@ -37,7 +37,7 @@ fn bits_value_u8(name: &'static str, n: usize) -> Expr {
         nodes.push(shl_u8(tuple_proj(var(name), i), cast(i)));
     }
     // construct a balanced binary tree of bitor operations
-    balanced_bitor_max16(nodes)
+    balanced_bitor(nodes)
 }
 
 /// Maps an `Expr::Tuple` consisting of 5 bit-values into the `u8`-typed Expr
@@ -75,7 +75,7 @@ fn bits_value_u16(name: &'static str, n: usize) -> Expr {
     }
 
     // construct a balanced binary tree of bitor operations
-    balanced_bitor_max16(nodes)
+    balanced_bitor(nodes)
 }
 
 /// Parse a 5-bit Fixed Huffman distance-code and map it into its corresponding distance-symbol

@@ -907,9 +907,33 @@ pub fn expr_opt_if(scrutinee: Expr, if_true: Expr) -> Expr {
 
 /// Performs a fallible destructuring of the provided `expr` within the Expr layer,
 /// either extracting the contents of a `Some(_)` value, or resulting in an ExcludedBranch
-/// error at runtime due to a fallible pattern-match.
+/// error at runtime due to a failed pattern-match.
 pub fn expr_unwrap(expr: Expr) -> Expr {
     Expr::Match(Box::new(expr), vec![(pat_some(bind("x")), var("x"))])
+}
+
+/// Performs a fallible destructuring of the provided `expr` within the Expr layer,
+/// either extracting the single element of a length-1 array, or resulting in an
+/// ExcludedBranch error at runtime due to a failed pattern-match.
+pub fn unwrap_singleton(expr: Expr) -> Expr {
+    Expr::Match(
+        Box::new(expr),
+        vec![(Pattern::Seq(vec![bind("x")]), var("x"))],
+    )
+}
+
+/// Evaluates to `f(x)` where `x` is the sole element of `expr`,
+/// or `fmt_none` if `expr` is not a singleton
+///
+/// Implicitly relies on the ValueType of the output of `opt_f` being Option<_>.
+pub fn maybe_singleton(expr: Expr, opt_f: impl FnOnce(Expr) -> Format) -> Format {
+    Format::Match(
+        Box::new(expr),
+        vec![
+            (Pattern::Seq(vec![bind("x")]), opt_f(var("x"))),
+            (Pattern::Wildcard, format_none()),
+        ],
+    )
 }
 
 /// Performs an index operation on an expression `seq` with an index `index`, without checking for OOB array access.
@@ -1100,38 +1124,7 @@ pub fn slice(len: Expr, inner: Format) -> Format {
 /// nodes of type Expr.
 ///
 /// Will yield an unbalanced AST if there are more than 16 elements in `nodes`
-pub fn balanced_bitor_max16(nodes: Vec<Expr>) -> Expr {
-    /*
-    let n = nodes.len();
-
-    let (l, r) = match () {
-        _ if n > 8 => (
-            balanced_bitor_max16(nodes.drain(0..8).collect::<Vec<_>>()),
-            balanced_bitor_max16(nodes.drain(..).collect::<Vec<_>>()),
-        ),
-        _ if n > 4 => (
-            balanced_bitor_max16(nodes.drain(0..4).collect::<Vec<_>>()),
-            balanced_bitor_max16(nodes.drain(..).collect::<Vec<_>>()),
-        ),
-        _ if n > 2 => (
-            balanced_bitor_max16(nodes.drain(0..2).collect::<Vec<_>>()),
-            balanced_bitor_max16(nodes.drain(..).collect::<Vec<_>>()),
-        ),
-        _ if n == 2 => {
-            let mut two_shot = nodes.drain(..);
-            let l = two_shot.next().unwrap();
-            let r = two_shot.next().unwrap();
-            (l, r)
-        }
-        _ if n == 1 => {
-            return nodes.drain(..).next().unwrap();
-        }
-        _ => {
-            panic!("balanced_bitor_max16 called with n == 0")
-        }
-    };
-    bit_or(l, r)
-    */
+pub fn balanced_bitor(nodes: Vec<Expr>) -> Expr {
     balance_merge((), move |_| nodes, bit_or)
 }
 
@@ -1203,7 +1196,7 @@ pub fn accum_until(
 /// Computes the final element of a sequence-typed Expr, evaluating to None if it is empty
 pub fn seq_last_checked(seq: Expr) -> Expr {
     expr_opt_if(
-        is_within(seq_length(seq.clone()), Bounds::at_least(1)),
+        is_nonzero::<U32>(seq_length(seq.clone())),
         index_unchecked(seq.clone(), pred(seq_length(seq))),
     )
 }
@@ -1279,7 +1272,7 @@ pub fn pos32() -> Format {
     map(Format::Pos, lambda("x", Expr::AsU32(Box::new(var("x")))))
 }
 
-pub fn fmt_let(orig: Expr, clone_varname: &'static str, dep_format: Format) -> Format {
+pub fn fmt_let(clone_varname: &'static str, orig: Expr, dep_format: Format) -> Format {
     Format::Let(
         Label::Borrowed(clone_varname),
         Box::new(orig),
