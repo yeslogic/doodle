@@ -3,9 +3,13 @@ use doodle::bounds::Bounds;
 use doodle::{helper::*, Expr, IntoLabel, Label};
 use doodle::{BaseType, Format, FormatModule, FormatRef, Pattern, ValueType};
 
-fn shadow_check(x: &Expr, name: &'static str) {
-    if x.is_shadowed_by(name) {
-        panic!("Shadow! Variable-name {name} already occurs in Expr {x:?}!");
+const fn id<T>(x: T) -> T {
+    x
+}
+
+fn preclude_shadowing(x: &Expr, name: &'static str) {
+    if x.contains_unbound_reference(name) {
+        panic!("potential shadowing found: variable-name {name} already occurs in Expr {x:?}!");
     }
 }
 
@@ -97,6 +101,30 @@ fn embedded_singleton_alternation<const OUTER: usize, const INNER: usize>(
     Format::Record(accum)
 }
 
+fn for_each_pair(
+    seq: Expr,
+    premap: (impl FnOnce(Expr) -> Expr, impl FnOnce(Expr) -> Expr),
+    labels: [&'static str; 2],
+    dep_format: Format,
+) -> Format {
+    Format::Let(
+        Label::Borrowed("len"),
+        Box::new(pred(seq_length(seq.clone()))),
+        Box::new(for_each(
+            enum_from_to(Expr::U32(0), var("len")),
+            "ix",
+            with_tuple(
+                Expr::Tuple(vec![
+                    premap.0(index_unchecked(seq.clone(), var("ix"))),
+                    premap.1(index_unchecked(seq.clone(), succ(var("ix")))),
+                ]),
+                labels,
+                dep_format,
+            ),
+        )),
+    )
+}
+
 fn embedded_variadic_alternation<C, const OUTER: usize, const BRANCHES: usize>(
     shared_fields: [(&'static str, Format); OUTER],
     discriminant: &'static str,
@@ -171,67 +199,13 @@ fn vhea_long_metrics(vhea: Expr) -> Expr {
     record_proj(expr_unwrap(vhea), "number_of_long_metrics")
 }
 
-/// attempting to index on its `.offsets` key through an option-unpacking indirection.
+/// Attemptis to index on the `offsets` key of `loca` through an option-unpacking indirection.
 ///
 /// Helper function to handle the fact that though loca only appears alongside glyf, both are optional tables
-fn loca_offset_pairs(loca: Expr) -> Expr {
-    let f = |loca_table: Expr| offsets_to_offset_pairs(record_proj(loca_table, "offsets"));
-    let loca_empty = variant("Offset32Pairs", seq_empty());
+fn loca_offsets(loca: Expr) -> Expr {
+    let f = |loca_table: Expr| record_proj(loca_table, "offsets");
+    let loca_empty = variant("Offsets32", seq_empty());
     expr_option_map_or(loca_empty, f, loca)
-}
-
-/// Generic self-zip that returns `(values->[i], values->[i+1])` at index `i` in the result,
-/// for `i` from `0` to `N - 1` (where `values` has `N + 1` total elements).
-fn values_to_pairs(values: Expr, elem_type: ValueType) -> Expr {
-    flat_map_accum(
-        lambda_tuple(
-            ["last_value", "value"],
-            pair(
-                expr_some(var("value")),
-                expr_option_map_or(
-                    seq_empty(),
-                    |last| singleton(pair(last, var("value"))),
-                    var("last_value"),
-                ),
-            ),
-        ),
-        expr_none(),
-        ValueType::Option(Box::new(elem_type)),
-        values,
-    )
-}
-
-/// Specialized transformation that converts a Variant-wrapped array of the structural type
-///
-/// ```ignore
-/// { Offsets16( seq(u16) ) | Offsets32( seq(u32) ) }
-/// ```
-///
-/// into a sequence of normalized U32-kinded offset pairs, scaling `u16` values by 2x as is implicitly
-/// demanded by the format of `loca` and `gvar`.
-///
-/// The first element in the array will be the pair `(offsets[0], offsets[1])`, and the final will be `(offsets[N-1], offsets[N])`,
-/// where the original offset-sequence contains `N + 1` raw elements.
-fn offsets_to_offset_pairs(offsets: Expr) -> Expr {
-    expr_match(
-        offsets,
-        [
-            (
-                Pattern::Variant(Label::Borrowed("Offsets16"), Box::new(bind("half16s"))),
-                variant(
-                    "Offset16Pairs",
-                    values_to_pairs(var("half16s"), ValueType::Base(BaseType::U16)),
-                ),
-            ),
-            (
-                Pattern::Variant(Label::Borrowed("Offsets32"), Box::new(bind("off32s"))),
-                variant(
-                    "Offset32Pairs",
-                    values_to_pairs(var("off32s"), ValueType::Base(BaseType::U32)),
-                ),
-            ),
-        ],
-    )
 }
 
 /// Doubles a `U16`-kinded Expr into a `U32`-kinded output.
@@ -411,19 +385,23 @@ const START_VAR: Expr = Expr::Var(Label::Borrowed("start"));
 const START_ARG: (Label, ValueType) = (Label::Borrowed("start"), ValueType::Base(BaseType::U32));
 
 /// Given `Expr`s `table_records` and a `query_table_id` of the appropriate type,
-/// seeks through `table_records` and extracts the first one whose projected field `table_id`
-/// is a one-to-one match for `query_table_id`.
-///
+/// seeks through `table_records` and filters the elements whose projected field `table_id`
+/// is a one-to-one match for `query_table_id`; then, applies the dependent Format-closure
+/// `dep_format` to the expression representing this array computation.
+
 /// # Notes
 ///
-/// Currently, only existence (and not uniqueness) of a match is required for
-/// this construction to function correctly, but non-unique matches are not
-/// intentionally supported and may be an error in future.
+/// Callers should be aware that while not allowed by the standard, there is no type-level
+/// guarantee the Expr-Seq `dep_format` is applied to, is only ever singleton-or-empty.
 ///
 /// Also note that while in principle a binary search is ideal, the constructions
 /// we have on hand only allow for linear search without short-circuiting for
 /// `Θ(N)` performance regardless of where the match is in the list.
-fn find_table(table_records: Expr, query_table_id: u32) -> Expr {
+fn with_table(
+    table_records: Expr,
+    query_table_id: u32,
+    dep_format: impl FnOnce(Expr) -> Format,
+) -> Format {
     // FIXME[epic=perf] - this is a naive algorithm that could be improved with the right primitives in-hand
     // TODO[epic=binary-search]: accelerate using binary search
     // TODO: make use of `search_range` etc.
@@ -445,8 +423,7 @@ fn find_table(table_records: Expr, query_table_id: u32) -> Expr {
         ),
         table_records,
     );
-    // FIXME - we need either an Expr::Let or Expr::ListToOption primitive to distinguish no-match, 1-match, and multi-match
-    index_checked(matching_tables, Expr::U32(0))
+    dep_format(matching_tables)
 }
 
 /// Given a raw Format `format` and an absolute buffer-offset `abs_offset`,
@@ -510,14 +487,14 @@ fn link_forward_unchecked(abs_offset: Expr, format: Format) -> Format {
 /// desired offset, `None` is returned in any case where the relative-delta to reach the target offset is
 /// non-positive.
 fn offset16_mandatory(base_offset: Expr, format: Format, base: &BaseModule) -> Format {
-    shadow_check(&base_offset, "offset");
+    preclude_shadowing(&base_offset, "offset");
     // REVIEW - there is an argument to be made that we should use `chain` instead of `record` to elide the offset and flatten the link
     record([
         ("offset", base.u16be()),
         (
             "link",
             if_then_else(
-                is_nonzero_u16(var("offset")),
+                is_nonzero::<U16>(var("offset")),
                 // because link-checked can also return format_none, it has to be the one to wrap format_some around the parse
                 link_forward_checked(pos_add_u16(base_offset, var("offset")), format),
                 format_none(),
@@ -542,14 +519,14 @@ fn offset16_mandatory(base_offset: Expr, format: Format, base: &BaseModule) -> F
 /// To handle irregular inputs that would otherwise require moving *backwards* to reach the desired offset,
 /// `None` is returned in any case where the relative-delta to reach the target offset is non-positive.
 fn offset16_nullable(base_offset: Expr, format: Format, base: &BaseModule) -> Format {
-    shadow_check(&base_offset, "offset");
+    preclude_shadowing(&base_offset, "offset");
     // REVIEW - there is an argument to be made that we should use `chain` instead of `record` to elide the offset and flatten the link
     record([
         ("offset", base.u16be()),
         (
             "link",
             if_then_else(
-                is_nonzero_u16(var("offset")),
+                is_nonzero::<U16>(var("offset")),
                 // because link-checked can also return format_none, it has to be the one to wrap format_some around the parse
                 link_forward_checked(pos_add_u16(base_offset, var("offset")), format),
                 format_none(),
@@ -574,14 +551,14 @@ fn offset16_nullable(base_offset: Expr, format: Format, base: &BaseModule) -> Fo
 /// To handle irregular inputs that would otherwise require moving *backwards* to reach the desired offset,
 /// `None` is returned in any case where the relative-delta to reach the target offset is non-positive.
 fn offset32(base_offset: Expr, format: Format, base: &BaseModule) -> Format {
-    shadow_check(&base_offset, "offset");
+    preclude_shadowing(&base_offset, "offset");
     // FIXME - should we use `chain` instead of `record` to elide the offset and flatten the link?
     record([
         ("offset", base.u32be()),
         (
             "link",
             if_then_else(
-                is_nonzero_u32(var("offset")),
+                is_nonzero::<U32>(var("offset")),
                 linked_offset32(base_offset, var("offset"), format_some(format)),
                 format_none(),
             ),
@@ -633,18 +610,25 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             id: u32,
             table_format: Format,
         ) -> Format {
-            Format::Let(
-                Label::Borrowed("matching_table"),
-                Box::new(expr_unwrap(find_table(table_records, id))),
-                Box::new(linked_offset32(
-                    sof_offset,
-                    record_proj(var("matching_table"), "offset"),
-                    Format::Slice(
-                        Box::new(record_proj(var("matching_table"), "length")),
-                        Box::new(table_format),
+            let dep_format = |table_matches: Expr| -> Format {
+                fmt_let(
+                    "table_matches",
+                    table_matches,
+                    fmt_let(
+                        "matching_table",
+                        unwrap_singleton(var("table_matches")),
+                        linked_offset32(
+                            sof_offset,
+                            record_proj(var("matching_table"), "offset"),
+                            Format::Slice(
+                                Box::new(record_proj(var("matching_table"), "length")),
+                                Box::new(table_format),
+                            ),
+                        ),
                     ),
-                )),
-            )
+                )
+            };
+            with_table(table_records, id, dep_format)
         }
 
         fn required_table_with_len(
@@ -653,21 +637,29 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             id: u32,
             table_format_ref: FormatRef,
         ) -> Format {
-            Format::Let(
-                Label::Borrowed("matching_table"),
-                Box::new(expr_unwrap(find_table(table_records, id))),
-                Box::new(linked_offset32(
-                    sof_offset,
-                    record_proj(var("matching_table"), "offset"),
-                    Format::Slice(
-                        Box::new(record_proj(var("matching_table"), "length")),
-                        Box::new(
-                            table_format_ref
-                                .call_args(vec![record_proj(var("matching_table"), "length")]),
+            let dep_format =
+                |table_matches: Expr| -> Format {
+                    fmt_let(
+                        "table_matches",
+                        table_matches,
+                        fmt_let(
+                            "matching_table",
+                            unwrap_singleton(var("table_matches")),
+                            linked_offset32(
+                                sof_offset,
+                                record_proj(var("matching_table"), "offset"),
+                                Format::Slice(
+                                    Box::new(record_proj(var("matching_table"), "length")),
+                                    Box::new(table_format_ref.call_args(vec![record_proj(
+                                        var("matching_table"),
+                                        "length",
+                                    )])),
+                                ),
+                            ),
                         ),
-                    ),
-                )),
-            )
+                    )
+                };
+            with_table(table_records, id, dep_format)
         }
 
         fn optional_table(
@@ -676,27 +668,28 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             id: u32,
             table_format: Format,
         ) -> Format {
-            Format::Let(
-                Label::Borrowed("matching_table"),
-                Box::new(find_table(table_records, id)),
-                Box::new(Format::Match(
-                    Box::new(var("matching_table")),
-                    vec![
-                        (
-                            pat_some(bind("table")),
-                            format_some(linked_offset32(
-                                sof_offset,
-                                record_proj(var("table"), "offset"),
-                                Format::Slice(
-                                    Box::new(record_proj(var("table"), "length")),
-                                    Box::new(table_format),
-                                ),
-                            )),
+            let cond_fmt = |matching_table: Expr| -> Format {
+                fmt_let(
+                    "table",
+                    matching_table,
+                    format_some(linked_offset32(
+                        sof_offset,
+                        record_proj(var("table"), "offset"),
+                        Format::Slice(
+                            Box::new(record_proj(var("table"), "length")),
+                            Box::new(table_format),
                         ),
-                        (pat_none(), format_none()),
-                    ],
-                )),
-            )
+                    )),
+                )
+            };
+            let dep_format = move |table_matches: Expr| -> Format {
+                fmt_let(
+                    "table_matches",
+                    table_matches,
+                    maybe_singleton(var("table_matches"), cond_fmt),
+                )
+            };
+            with_table(table_records, id, dep_format)
         }
 
         let encoding_id = |_platform_id: Expr| base.u16be();
@@ -1934,18 +1927,16 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     )
                 };
 
-            let offset_pairs_type = {
-                let mk_branch = |elem_t: ValueType| {
-                    ValueType::Seq(Box::new(ValueType::Tuple(vec![elem_t.clone(), elem_t])))
-                };
+            let offsets_type = {
+                let mk_branch = |elem_t: ValueType| ValueType::Seq(Box::new(elem_t));
                 let mut branches = std::collections::BTreeMap::new();
                 // NOTE - at this layer, the u16-valued offsets are still half-value
                 branches.insert(
-                    Label::Borrowed("Offset16Pairs"),
+                    Label::Borrowed("Offsets16"),
                     mk_branch(ValueType::Base(BaseType::U16)),
                 );
                 branches.insert(
-                    Label::Borrowed("Offset32Pairs"),
+                    Label::Borrowed("Offsets32"),
                     mk_branch(ValueType::Base(BaseType::U32)),
                 );
                 ValueType::Union(branches)
@@ -1953,48 +1944,42 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
             module.define_format_args(
                 "opentype.glyf_table",
-                vec![(Label::Borrowed("offset_pairs"), offset_pairs_type)],
+                vec![(Label::Borrowed("offsets"), offsets_type)],
                 chain(
                     pos32(),
                     "start_offset",
                     Format::Match(
-                        Box::new(var("offset_pairs")),
+                        Box::new(var("offsets")),
                         vec![
                             (
                                 Pattern::Variant(
-                                    Label::Borrowed("Offset16Pairs"),
-                                    Box::new(bind("half16_pairs")),
+                                    Label::Borrowed("Offsets16"),
+                                    Box::new(bind("half16s")),
                                 ),
-                                for_each(
-                                    var("half16_pairs"),
-                                    "half16_pair",
-                                    with_tuple(
-                                        var("half16_pair"),
-                                        ["this_half16", "next_half16"],
-                                        glyf_table_entry(
-                                            var("start_offset"),
-                                            scale2(var("this_half16")),
-                                            scale2(var("next_half16")),
-                                        ),
+                                for_each_pair(
+                                    var("half16s"),
+                                    (scale2, scale2),
+                                    ["this_offs", "next_offs"],
+                                    glyf_table_entry(
+                                        var("start_offset"),
+                                        var("this_offs"),
+                                        var("next_offs"),
                                     ),
                                 ),
                             ),
                             (
                                 Pattern::Variant(
-                                    Label::Borrowed("Offset32Pairs"),
-                                    Box::new(bind("offs32_pairs")),
+                                    Label::Borrowed("Offsets32"),
+                                    Box::new(bind("off32s")),
                                 ),
-                                for_each(
-                                    var("offs32_pairs"),
-                                    "offs32_pair",
-                                    with_tuple(
-                                        var("offs32_pair"),
-                                        ["this_offs32", "next_offs32"],
-                                        glyf_table_entry(
-                                            var("start_offset"),
-                                            var("this_offs32"),
-                                            var("next_offs32"),
-                                        ),
+                                for_each_pair(
+                                    var("off32s"),
+                                    (id, id),
+                                    ["this_offs", "next_offs"],
+                                    glyf_table_entry(
+                                        var("start_offset"),
+                                        var("this_offs"),
+                                        var("next_offs"),
                                     ),
                                 ),
                             ),
@@ -4784,71 +4769,50 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         ),
                     )
                 };
-            let glyph_variation_data_table_array = |axis_count: Expr| {
-                |offset_pairs: Expr| {
-                    chain(
-                        pos32(),
-                        "array_start",
-                        Format::Match(
-                            Box::new(offset_pairs),
-                            vec![
-                                (
-                                    Pattern::Variant(
-                                        Label::Borrowed("Offset16Pairs"),
-                                        Box::new(bind("half16_pairs")),
-                                    ),
-                                    for_each(
-                                        var("half16_pairs"),
-                                        "half16_pair",
-                                        with_tuple(
-                                            var("half16_pair"),
-                                            ["this_half16", "next_half16"],
-                                            offset_linked_gvar_data_table(
-                                                axis_count.clone(),
-                                                var("array_start"),
-                                                scale2(var("this_half16")),
-                                                scale2(var("next_half16")),
-                                            ),
-                                        ),
+            let glyph_variation_data_table_array = |axis_count: Expr, offsets: Expr| {
+                chain(
+                    pos32(),
+                    "array_start",
+                    Format::Match(
+                        Box::new(offsets),
+                        vec![
+                            (
+                                Pattern::Variant(
+                                    Label::Borrowed("Offsets16"),
+                                    Box::new(bind("half16s")),
+                                ),
+                                for_each_pair(
+                                    var("half16s"),
+                                    (scale2, scale2),
+                                    ["this_offs", "next_offs"],
+                                    offset_linked_gvar_data_table(
+                                        axis_count.clone(),
+                                        var("array_start"),
+                                        var("this_offs"),
+                                        var("next_offs"),
                                     ),
                                 ),
-                                (
-                                    Pattern::Variant(
-                                        Label::Borrowed("Offset32Pairs"),
-                                        Box::new(bind("offs32_pairs")),
-                                    ),
-                                    for_each(
-                                        var("offs32_pairs"),
-                                        "offs32_pair",
-                                        with_tuple(
-                                            var("offs32_pair"),
-                                            ["this_offs32", "next_offs32"],
-                                            offset_linked_gvar_data_table(
-                                                axis_count,
-                                                var("array_start"),
-                                                var("this_offs32"),
-                                                var("next_offs32"),
-                                            ),
-                                        ),
+                            ),
+                            (
+                                Pattern::Variant(
+                                    Label::Borrowed("Offsets32"),
+                                    Box::new(bind("off32s")),
+                                ),
+                                for_each_pair(
+                                    var("off32s"),
+                                    (id, id),
+                                    ["this_offs", "next_offs"],
+                                    offset_linked_gvar_data_table(
+                                        axis_count,
+                                        var("array_start"),
+                                        var("this_offs"),
+                                        var("next_offs"),
                                     ),
                                 ),
-                            ],
-                        ),
-                    )
-                }
-            };
-            let array_from_offsets = |gvar_table_start: Expr,
-                                      glyph_variation_data_array_offset: Expr,
-                                      axis_count: Expr| {
-                |offsets: Expr| -> Format {
-                    linked_offset32(
-                        gvar_table_start,
-                        glyph_variation_data_array_offset,
-                        glyph_variation_data_table_array(axis_count)(offsets_to_offset_pairs(
-                            offsets,
-                        )),
-                    )
-                }
+                            ),
+                        ],
+                    ),
+                )
             };
             let shared_tuples = |shared_tuple_count: Expr, axis_count: Expr| {
                 repeat_count(shared_tuple_count, tuple_record.call_args(vec![axis_count]))
@@ -4892,15 +4856,19 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ),
                     (
                         "glyph_variation_data_array",
-                        clone_hack(
-                            var("glyph_variation_data_offsets"),
-                            "offs",
-                            array_from_offsets(
-                                var("gvar_table_start"),
-                                var("glyph_variation_data_array_offset"),
+                        // FIXME - this is a hack to force a clone to avoid use-after-move
+                        // fmt_let(
+                        //     var("glyph_variation_data_offsets"),
+                        //     "offsets",
+                        linked_offset32(
+                            var("gvar_table_start"),
+                            var("glyph_variation_data_array_offset"),
+                            glyph_variation_data_table_array(
                                 var("axis_count"),
+                                var("glyph_variation_data_offsets"),
                             ),
                         ),
+                        // ),
                     ),
                 ]),
             )
@@ -4983,7 +4951,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         START_VAR,
                         var("tables"),
                         magic(b"glyf"),
-                        glyf_table.call_args(vec![loca_offset_pairs(var("loca"))]),
+                        glyf_table.call_args(vec![loca_offsets(var("loca"))]),
                     ),
                 ),
                 (

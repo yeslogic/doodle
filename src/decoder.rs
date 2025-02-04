@@ -13,7 +13,8 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 pub mod seq_kind;
-pub use seq_kind::SeqKind;
+use seq_kind::sub_range;
+pub use seq_kind::{SeqKind, ValueSeq};
 
 pub(crate) fn extract_pair<T>(mut vec: Vec<T>) -> (T, T) {
     if vec.len() != 2 {
@@ -36,6 +37,8 @@ pub enum Value {
     U32(u32),
     U64(u64),
     Char(char),
+    Usize(usize),
+    EnumFromTo(std::ops::Range<usize>),
     Option(Option<Box<Value>>),
     Tuple(Vec<Value>),
     Record(Vec<(Label, Value)>),
@@ -43,6 +46,12 @@ pub enum Value {
     Seq(SeqKind<Value>),
     Mapped(Box<Value>, Box<Value>),
     Branch(usize, Box<Value>),
+}
+
+impl From<usize> for Value {
+    fn from(value: usize) -> Value {
+        Value::Usize(value)
+    }
 }
 
 impl Value {
@@ -137,9 +146,10 @@ impl Value {
         }
     }
 
-    pub(crate) fn get_sequence(&self) -> Option<&SeqKind<Self>> {
+    pub(crate) fn get_sequence(&self) -> Option<ValueSeq<'_, Self>> {
         match self {
-            Value::Seq(elts) => Some(elts),
+            Value::Seq(elts) => Some(ValueSeq::ValueSeq(elts)),
+            Value::EnumFromTo(range) => Some(ValueSeq::IntRange(range.clone())),
             _ => None,
         }
     }
@@ -179,6 +189,7 @@ impl Value {
             Value::U16(n) => usize::from(n),
             Value::U32(n) => usize::try_from(n).unwrap(),
             Value::U64(n) => usize::try_from(n).unwrap(),
+            Value::Usize(n) => n,
             _ => panic!("value is not a number"),
         }
     }
@@ -187,7 +198,7 @@ impl Value {
     pub(crate) fn get_as_u8(&self) -> u8 {
         match self {
             Value::U8(n) => *n,
-            Value::U16(..) | Value::U32(..) | Value::U64(..) => panic!("value is numeric but not u8 (this may be a soft error, or even success, in future)"),
+            Value::U16(..) | Value::U32(..) | Value::U64(..) | Value::Usize(..) => panic!("value is numeric but not u8 (this may be a soft error, or even success, in future)"),
             _ => panic!("value is not a number"),
         }
     }
@@ -559,36 +570,65 @@ impl Expr {
                 }
                 _ => panic!("SeqLength: expected Seq"),
             },
-            Expr::SeqIx(seq, index) => cow_map(seq.eval(scope), |v| {
+            Expr::SeqIx(seq, index) => cow_remap(seq.eval(scope), |v| {
                 match v.coerce_mapped_value().get_sequence() {
-                    Some(values) => {
-                        let index = index.eval_value(scope).unwrap_usize();
-                        &values[index]
-                    }
-                    _ => panic!("SeqIx: expected Seq"),
+                    Some(values) => match values {
+                        ValueSeq::ValueSeq(values) => {
+                            let index = index.eval_value(scope).unwrap_usize();
+                            Cow::Borrowed(&values[index])
+                        }
+                        ValueSeq::IntRange(mut range) => {
+                            let index = index.eval_value(scope).unwrap_usize();
+                            Cow::Owned(Value::from(range.nth(index).unwrap()))
+                        }
+                    },
+                    _ => panic!("SeqIx: expected Seq (or RangeFromTo)"),
                 }
             }),
             Expr::SubSeq(seq, start, length) => {
                 match seq.eval(scope).coerce_mapped_value().get_sequence() {
-                    Some(values) => {
-                        let start = start.eval_value(scope).unwrap_usize();
-                        let length = length.eval_value(scope).unwrap_usize();
-                        Cow::Owned(Value::Seq(values.sub_seq(start, length)))
-                    }
+                    Some(values) => match values {
+                        ValueSeq::ValueSeq(values) => {
+                            let start = start.eval_value(scope).unwrap_usize();
+                            let length = length.eval_value(scope).unwrap_usize();
+                            Cow::Owned(Value::Seq(values.sub_seq(start, length)))
+                        }
+                        ValueSeq::IntRange(range) => {
+                            let start = start.eval_value(scope).unwrap_usize();
+                            let length = length.eval_value(scope).unwrap_usize();
+                            Cow::Owned(Value::EnumFromTo(sub_range(range, start, length)))
+                        }
+                    },
                     _ => panic!("SubSeq: expected Seq"),
                 }
             }
             Expr::SubSeqInflate(seq, start, length) => {
                 match seq.eval(scope).coerce_mapped_value().get_sequence() {
-                    Some(vs0) => {
+                    Some(values) => {
                         let start = start.eval_value(scope).unwrap_usize();
                         let length = length.eval_value(scope).unwrap_usize();
                         let mut vs = Vec::new();
-                        for i in 0..length {
-                            if i + start < vs0.len() {
-                                vs.push(vs0[i + start].clone());
-                            } else {
-                                vs.push(vs[i + start - vs0.len()].clone());
+                        match values {
+                            ValueSeq::ValueSeq(vs0) => {
+                                for i in 0..length {
+                                    if i + start < vs0.len() {
+                                        vs.push(vs0[i + start].clone());
+                                    } else {
+                                        vs.push(vs[i + start - vs0.len()].clone());
+                                    }
+                                }
+                            }
+                            ValueSeq::IntRange(range) => {
+                                // REVIEW - double-check this logic
+                                let len = range.len();
+                                let mut iter = range.skip(start);
+                                for i in 0..length {
+                                    if let Some(val) = iter.next() {
+                                        vs.push(val.into());
+                                    } else {
+                                        vs.push(vs[i + start - len].clone());
+                                    }
+                                }
                             }
                         }
                         Cow::Owned(Value::Seq(vs.into()))
@@ -601,10 +641,16 @@ impl Expr {
                     Some(values) => {
                         let mut vs = Vec::new();
                         for v in values {
-                            if let Value::Seq(vn) = expr.eval_lambda(scope, v) {
-                                vs.extend(vn);
-                            } else {
-                                panic!("FlatMap: expected Seq");
+                            match expr.eval_lambda(scope, &v) {
+                                Value::Seq(vn) => {
+                                    vs.extend(vn);
+                                }
+                                Value::EnumFromTo(range) => {
+                                    vs.extend(range.map(Value::from));
+                                }
+                                _ => {
+                                    panic!("FlatMap: expected Seq (or EnumFromTo)");
+                                }
                             }
                         }
                         Cow::Owned(Value::Seq(vs.into()))
@@ -667,6 +713,11 @@ impl Expr {
                 let count = count.eval_value(scope).unwrap_usize();
                 let v = expr.eval_value(scope);
                 Cow::Owned(Value::Seq(SeqKind::Dup(count, Box::new(v))))
+            }
+            Expr::EnumFromTo(start, stop) => {
+                let start = start.eval_value(scope).unwrap_usize();
+                let stop = stop.eval_value(scope).unwrap_usize();
+                Cow::Owned(Value::EnumFromTo(start..stop))
             }
             Expr::LiftOption(opt) => match opt {
                 Some(expr) => Cow::Owned(Value::Option(Some(Box::new(expr.eval_value(scope))))),
@@ -1338,7 +1389,10 @@ impl Decoder {
                 let bytes = {
                     let raw = bytes.eval_value(scope);
                     let seq_vals = raw.get_sequence().expect("bad type for DecodeBytes input");
-                    seq_vals.iter().map(|v| v.get_as_u8()).collect::<Vec<u8>>()
+                    seq_vals
+                        .into_iter()
+                        .map(|v| v.get_as_u8())
+                        .collect::<Vec<u8>>()
                 };
                 let new_input = ReadCtxt::new(&bytes);
                 let (va, rem_input) = a.parse(program, scope, new_input)?;
@@ -1364,8 +1418,8 @@ impl Decoder {
                 let val = expr.eval_value(scope);
                 let seq = val.get_sequence().expect("bad type for ForEach input");
                 let mut v = Vec::with_capacity(seq.len());
-                for e in seq.iter() {
-                    let new_scope = Scope::Single(SingleScope::new(scope, lbl, e));
+                for e in seq {
+                    let new_scope = Scope::Single(SingleScope::new(scope, lbl, &e));
                     let (va, next_input) = a.parse(program, &new_scope, input)?;
                     v.push(va);
                     input = next_input;
@@ -1647,6 +1701,21 @@ where
     match x {
         Cow::Borrowed(x) => Cow::Borrowed(f(x)),
         Cow::Owned(x) => Cow::Owned(f(&x).to_owned()),
+    }
+}
+
+/// Like [`cow_map`], but applies a closure argument `f` that itself returns a `Cow<'i, U>` value (instead of a `&'i U` value)
+pub(crate) fn cow_remap<'a, T, U>(
+    x: Cow<'a, T>,
+    f: impl for<'i> Fn(&'i T) -> Cow<'i, U>,
+) -> Cow<'a, U>
+where
+    T: 'static + Clone,
+    U: 'static + Clone + ToOwned,
+{
+    match x {
+        Cow::Borrowed(x) => f(x),
+        Cow::Owned(x) => Cow::Owned(f(&x).into_owned()),
     }
 }
 

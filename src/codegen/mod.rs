@@ -626,7 +626,15 @@ fn embed_pattern_t(pat: &GTPattern) -> RustPattern {
                 let constr = Constructor::Compound(tname.clone(), vname.clone());
                 let inner_pat = match inner.as_ref() {
                     TypedPattern::Wildcard(..) => RustPattern::Fill,
-                    _ => embed_pattern_t(inner),
+                    _ => {
+                        let inner_t = inner.get_type();
+                        let tmp = embed_pattern_t(inner);
+                        if inner_t.is_copy() {
+                            tmp
+                        } else {
+                            tmp.ref_hack()
+                        }
+                    }
                 };
                 RustPattern::Variant(constr, Box::new(inner_pat))
             }
@@ -876,7 +884,12 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                 None => RustExpr::infix(x, op, y),
             }
         }
-
+        TypedExpr::EnumFromTo(_, from, to) => {
+            let start = embed_expr_dft(from);
+            let stop = embed_expr_dft(to);
+            // FIXME - currently, we have no optimization to pre-optimize SeqIx(EnumFromTo)...
+            RustExpr::RangeExclusive(Box::new(start), Box::new(stop))
+        }
         TypedExpr::IntRel(_, rel, lhs, rhs) => {
             // NOTE - because IntRel only deals with Copy types, we oughtn't need any embedded clones
             let x = embed_expr_dft(lhs);
@@ -1029,7 +1042,7 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
             // REVIEW - lexical scopes, shadowing, and variable-name sanitization may not be quite right in the current implementation
             let loc = RustExpr::local(vname.clone());
             match info {
-                ExprInfo::EmbedCloned => RustExpr::CloneOf(Box::new(loc)),
+                ExprInfo::EmbedCloned  => RustExpr::CloneOf(Box::new(loc)),
                 ExprInfo::Natural => loc,
             }
         }
@@ -3536,6 +3549,7 @@ impl<'a> Elaborator<'a> {
                 let gt = self.get_gt_from_index(index);
                 TypedExpr::Seq(gt, t_elts)
             }
+
             Expr::RecordProj(e, fld) => {
                 self.codegen.name_gen.ctxt.push_atom(NameAtom::DeadEnd);
                 let t_e = self.elaborate_expr(e);
@@ -3752,10 +3766,16 @@ impl<'a> Elaborator<'a> {
                 TypedExpr::FlatMapList(gt, Box::new(t_lambda), _ret_type.clone(), Box::new(t_seq))
             }
             Expr::Dup(count, x) => {
-                let count_t = self.elaborate_expr(count);
-                let x_t = self.elaborate_expr(x);
+                let t_count = self.elaborate_expr(count);
+                let t_x = self.elaborate_expr(x);
                 let gt = self.get_gt_from_index(index);
-                TypedExpr::Dup(gt, Box::new(count_t), Box::new(x_t))
+                TypedExpr::Dup(gt, Box::new(t_count), Box::new(t_x))
+            }
+            Expr::EnumFromTo(from, to) => {
+                let t_from = self.elaborate_expr(from);
+                let t_to = self.elaborate_expr(to);
+                let gt = self.get_gt_from_index(index);
+                TypedExpr::EnumFromTo(gt, Box::new(t_from), Box::new(t_to))
             }
             Expr::LiftOption(opt) => {
                 let t_expr = if let Some(expr) = opt {
@@ -3845,7 +3865,6 @@ impl<'a> TypedDynScope<'a> {
 mod tests {
     use super::*;
     use crate::helper::compute;
-    use crate::output;
     use crate::{typecheck::Ctxt, TypeHint};
 
     fn population_check(module: &FormatModule, f: &Format, label: Option<&'static str>) {

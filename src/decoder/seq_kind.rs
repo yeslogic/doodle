@@ -1,4 +1,4 @@
-use std::{fmt::Debug, ops::Index};
+use std::{borrow::Cow, fmt::Debug, ops::Index};
 
 use serde::Serialize;
 
@@ -7,6 +7,68 @@ use serde::Serialize;
 pub enum SeqKind<T: Clone> {
     Strict(Vec<T>),
     Dup(usize, Box<T>),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ValueSeq<'a, V: Clone = super::Value> {
+    ValueSeq(&'a SeqKind<V>),
+    IntRange(std::ops::Range<usize>),
+}
+
+impl<'a, V: Clone> ValueSeq<'a, V> {
+    pub fn len(&self) -> usize {
+        match self {
+            ValueSeq::ValueSeq(vs) => vs.len(),
+            ValueSeq::IntRange(r) => r.len(),
+        }
+    }
+}
+
+pub(crate) fn sub_range(
+    range: std::ops::Range<usize>,
+    start: usize,
+    len: usize,
+) -> std::ops::Range<usize> {
+    assert!(
+        start + len < range.len(),
+        "sub_range invalid: start={start} len={len} range={range:?}"
+    );
+    range.start + start..range.start + start + len
+}
+
+pub enum ValueIter<'a, V: Clone = super::Value> {
+    ValueIter(Iter<'a, V>),
+    IntRange(std::ops::Range<usize>),
+}
+
+impl<'a, V> Iterator for ValueIter<'a, V>
+where
+    V: Clone + From<usize>,
+{
+    type Item = Cow<'a, V>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            ValueIter::ValueIter(vs) => vs.next().map(Cow::Borrowed),
+            ValueIter::IntRange(r) => r.next().map(|i| Cow::Owned(V::from(i))),
+        }
+    }
+}
+
+impl<'a, V: Clone> IntoIterator for ValueSeq<'a, V>
+where
+    V: From<usize>,
+{
+    type Item = Cow<'a, V>;
+
+    type IntoIter = ValueIter<'a, V>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match self {
+            ValueSeq::ValueSeq(vs) => ValueIter::ValueIter(vs.into_iter()),
+            ValueSeq::IntRange(r) => ValueIter::IntRange(r),
+        }
+    }
 }
 
 impl<T: Clone> SeqKind<T> {
@@ -47,13 +109,7 @@ impl<T: Clone> SeqKind<T> {
     pub fn get(&self, ix: usize) -> Option<&T> {
         match self {
             SeqKind::Strict(vs) => vs.get(ix),
-            SeqKind::Dup(n, v) => {
-                if ix >= *n {
-                    None
-                } else {
-                    Some(v)
-                }
-            }
+            SeqKind::Dup(n, v) => (ix < *n).then_some(&**v),
         }
     }
 
@@ -71,7 +127,7 @@ impl<T: Clone> SeqKind<T> {
                     SeqKind::Dup(len, v.clone())
                 } else {
                     // REVIEW - we can either enforce `T: Debug` above, to add in the T-param, or keep it abstract
-                    panic!("sub-seq out of bounds: {start}, {len} on SeqKind::Dup({n}, _)")
+                    panic!("sub-seq out of bounds: start-index={start}, len={len} on SeqKind::Dup({n}, _)")
                 }
             }
         }

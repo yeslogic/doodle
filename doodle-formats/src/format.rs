@@ -108,11 +108,7 @@ mod test {
             ("len", base.u32be()),
             (
                 "mask",
-                Format::WithRelativeOffset(
-                    None,
-                    Box::new(var("len")),
-                    Box::new(Format::Byte(mask_bytes)),
-                ),
+                with_relative_offset(None, var("len"), Format::Byte(mask_bytes)),
             ),
             (
                 "data",

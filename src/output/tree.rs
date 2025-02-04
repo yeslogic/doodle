@@ -141,9 +141,11 @@ impl<'module> TreePrinter<'module> {
             Value::Char(_) => true,
             Value::Bool(_) => true,
             Value::U8(_) | Value::U16(_) | Value::U32(_) | Value::U64(_) => true,
+            Value::Usize(_) => true,
             Value::Tuple(values) => values.is_empty(),
             Value::Record(fields) => fields.is_empty(),
             Value::Seq(values) => values.is_empty(),
+            Value::EnumFromTo(range) => range.is_empty(), // since this nominally represents a Seq, apply Seq-style logic
             Value::Variant(label, value) => match format {
                 Some(Format::Variant(label2, format)) => {
                     assert_eq!(label, label2);
@@ -595,9 +597,16 @@ impl<'module> TreePrinter<'module> {
             Value::U16(i) => Fragment::DisplayAtom(Rc::new(*i)),
             Value::U32(i) => Fragment::DisplayAtom(Rc::new(*i)),
             Value::U64(i) => Fragment::DisplayAtom(Rc::new(*i)),
+            Value::Usize(i) => Fragment::DisplayAtom(Rc::new(*i)),
             Value::Char(c) => Fragment::DebugAtom(Rc::new(*c)),
             Value::Tuple(vals) => self.compile_tuple(vals, None),
             Value::Seq(vals) => self.compile_seq(vals, None),
+            Value::EnumFromTo(range) => Fragment::intervene(
+                Fragment::DisplayAtom(Rc::new(range.start)),
+                Fragment::string(".."),
+                Fragment::DisplayAtom(Rc::new(range.end)),
+            )
+            .delimit(Fragment::Char('['), Fragment::Char(']')),
             Value::Record(fields) => self.compile_record(fields, None),
             Value::Variant(label, value) => self.compile_variant(label, value, None),
             Value::Mapped(orig, value) => {
@@ -1711,18 +1720,18 @@ impl<'module> TreePrinter<'module> {
                 prec,
                 Precedence::FUN_APPLICATION,
             ),
-            // Expr::EnumFromTo(start, stop) => cond_paren(
-            //     self.binary_op(
-            //         " .. ",
-            //         start,
-            //         stop,
-            //         Precedence::FUN_APPLICATION, // REVIEW - determine whether this precedence is proper
-            //         Precedence::FUN_APPLICATION,
-            //     ),
-            //     prec,
-            //     // REVIEW - determine whether this precedence is proper
-            //     Precedence::FUN_APPLICATION,
-            // ),
+            Expr::EnumFromTo(start, stop) => cond_paren(
+                self.binary_op(
+                    " .. ",
+                    start,
+                    stop,
+                    Precedence::FUN_APPLICATION, // REVIEW - determine whether this precedence is proper
+                    Precedence::FUN_APPLICATION,
+                ),
+                prec,
+                // REVIEW - determine whether this precedence is proper
+                Precedence::FUN_APPLICATION,
+            ),
             Expr::LiftOption(Some(expr)) => cond_paren(
                 self.prefix_op("some", None, expr),
                 prec,

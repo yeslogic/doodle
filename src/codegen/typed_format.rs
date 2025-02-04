@@ -8,6 +8,8 @@ use crate::bounds::Bounds;
 use crate::byte_set::ByteSet;
 use crate::{Arith, IntRel, Label, TypeHint, UnaryOp};
 
+pub(crate) mod variables;
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum GenType {
     Inline(RustType),
@@ -40,6 +42,15 @@ impl GenType {
                 Some((*ix, lbl))
             }
             _ => None,
+        }
+    }
+
+    /// Determines whether a given [`GenType`] implements the `Copy` trait.
+    pub(crate) fn is_copy(&self) -> bool {
+        match self {
+            GenType::Inline(rust_type) => rust_type.can_be_copy(),
+            // TODO - infer recursive Copy of local definitions, if possible
+            GenType::Def(_, rust_type_def) => rust_type_def.can_be_copy(),
         }
     }
 }
@@ -539,6 +550,7 @@ pub enum TypedExpr<TypeRep> {
         Box<TypedExpr<TypeRep>>,
     ),
     Dup(TypeRep, Box<TypedExpr<TypeRep>>, Box<TypedExpr<TypeRep>>),
+    EnumFromTo(TypeRep, Box<TypedExpr<TypeRep>>, Box<TypedExpr<TypeRep>>),
     LiftOption(TypeRep, Option<Box<TypedExpr<TypeRep>>>),
     Unary(TypeRep, UnaryOp, Box<TypedExpr<TypeRep>>),
 }
@@ -633,6 +645,10 @@ impl<TypeRep> std::hash::Hash for TypedExpr<TypeRep> {
                 n.hash(state);
                 x.hash(state);
             }
+            TypedExpr::EnumFromTo(_, from, to) => {
+                from.hash(state);
+                to.hash(state);
+            }
             TypedExpr::LiftOption(_, opt) => opt.hash(state),
         }
     }
@@ -689,7 +705,8 @@ impl TypedExpr<GenType> {
             | TypedExpr::LeftFold(gt, ..)
             | TypedExpr::FlatMapList(gt, ..)
             | TypedExpr::LiftOption(gt, ..)
-            | TypedExpr::Dup(gt, ..) => Some(Cow::Borrowed(gt)),
+            | TypedExpr::Dup(gt, ..)
+            | TypedExpr::EnumFromTo(gt, ..) => Some(Cow::Borrowed(gt)),
         }
     }
 }
@@ -710,6 +727,27 @@ pub enum TypedPattern<TypeRep> {
     Variant(TypeRep, Label, Box<TypedPattern<TypeRep>>),
     Seq(TypeRep, Vec<TypedPattern<TypeRep>>),
     Option(TypeRep, Option<Box<TypedPattern<TypeRep>>>),
+}
+
+impl TypedPattern<GenType> {
+    pub(crate) fn get_type(&self) -> Cow<'_, GenType> {
+        match self {
+            TypedPattern::U8(..) => Cow::Owned(GenType::from(PrimType::U8)),
+            TypedPattern::U16(..) => Cow::Owned(GenType::from(PrimType::U16)),
+            TypedPattern::U32(..) => Cow::Owned(GenType::from(PrimType::U32)),
+            TypedPattern::U64(..) => Cow::Owned(GenType::from(PrimType::U64)),
+            TypedPattern::Char(..) => Cow::Owned(GenType::from(PrimType::Char)),
+            TypedPattern::Bool(..) => Cow::Owned(GenType::from(PrimType::Bool)),
+
+            TypedPattern::Wildcard(gt)
+            | TypedPattern::Binding(gt, ..)
+            | TypedPattern::Tuple(gt, ..)
+            | TypedPattern::Option(gt, ..)
+            | TypedPattern::Int(gt, ..)
+            | TypedPattern::Variant(gt, ..)
+            | TypedPattern::Seq(gt, ..) => Cow::Borrowed(gt),
+        }
+    }
 }
 
 impl<TypeRep> std::hash::Hash for TypedPattern<TypeRep> {
@@ -844,6 +882,9 @@ mod __impls {
                     Expr::FlatMapList(rebox(lambda), vt, rebox(seq))
                 }
                 TypedExpr::Dup(_, count, x) => Expr::Dup(rebox(count), rebox(x)),
+                TypedExpr::EnumFromTo(_, start, stop) => {
+                    Expr::EnumFromTo(rebox(start), rebox(stop))
+                }
                 TypedExpr::LiftOption(_, None) => Expr::LiftOption(None),
                 TypedExpr::LiftOption(_, Some(x)) => Expr::LiftOption(Some(rebox(x))),
             }
