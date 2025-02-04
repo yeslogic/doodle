@@ -3,13 +3,13 @@ use doodle::bounds::Bounds;
 use doodle::{helper::*, Expr, IntoLabel, Label};
 use doodle::{BaseType, Format, FormatModule, FormatRef, Pattern, ValueType};
 
-fn id<T>(x: T) -> T {
+const fn id<T>(x: T) -> T {
     x
 }
 
-fn shadow_check(x: &Expr, name: &'static str) {
-    if x.is_shadowed_by(name) {
-        panic!("Shadow! Variable-name {name} already occurs in Expr {x:?}!");
+fn preclude_shadowing(x: &Expr, name: &'static str) {
+    if x.contains_unbound_reference(name) {
+        panic!("potential shadowing found: variable-name {name} already occurs in Expr {x:?}!");
     }
 }
 
@@ -487,14 +487,14 @@ fn link_forward_unchecked(abs_offset: Expr, format: Format) -> Format {
 /// desired offset, `None` is returned in any case where the relative-delta to reach the target offset is
 /// non-positive.
 fn offset16_mandatory(base_offset: Expr, format: Format, base: &BaseModule) -> Format {
-    shadow_check(&base_offset, "offset");
+    preclude_shadowing(&base_offset, "offset");
     // REVIEW - there is an argument to be made that we should use `chain` instead of `record` to elide the offset and flatten the link
     record([
         ("offset", base.u16be()),
         (
             "link",
             if_then_else(
-                is_nonzero_u16(var("offset")),
+                is_nonzero::<U16>(var("offset")),
                 // because link-checked can also return format_none, it has to be the one to wrap format_some around the parse
                 link_forward_checked(pos_add_u16(base_offset, var("offset")), format),
                 format_none(),
@@ -519,14 +519,14 @@ fn offset16_mandatory(base_offset: Expr, format: Format, base: &BaseModule) -> F
 /// To handle irregular inputs that would otherwise require moving *backwards* to reach the desired offset,
 /// `None` is returned in any case where the relative-delta to reach the target offset is non-positive.
 fn offset16_nullable(base_offset: Expr, format: Format, base: &BaseModule) -> Format {
-    shadow_check(&base_offset, "offset");
+    preclude_shadowing(&base_offset, "offset");
     // REVIEW - there is an argument to be made that we should use `chain` instead of `record` to elide the offset and flatten the link
     record([
         ("offset", base.u16be()),
         (
             "link",
             if_then_else(
-                is_nonzero_u16(var("offset")),
+                is_nonzero::<U16>(var("offset")),
                 // because link-checked can also return format_none, it has to be the one to wrap format_some around the parse
                 link_forward_checked(pos_add_u16(base_offset, var("offset")), format),
                 format_none(),
@@ -551,14 +551,14 @@ fn offset16_nullable(base_offset: Expr, format: Format, base: &BaseModule) -> Fo
 /// To handle irregular inputs that would otherwise require moving *backwards* to reach the desired offset,
 /// `None` is returned in any case where the relative-delta to reach the target offset is non-positive.
 fn offset32(base_offset: Expr, format: Format, base: &BaseModule) -> Format {
-    shadow_check(&base_offset, "offset");
+    preclude_shadowing(&base_offset, "offset");
     // FIXME - should we use `chain` instead of `record` to elide the offset and flatten the link?
     record([
         ("offset", base.u32be()),
         (
             "link",
             if_then_else(
-                is_nonzero_u32(var("offset")),
+                is_nonzero::<U32>(var("offset")),
                 linked_offset32(base_offset, var("offset"), format_some(format)),
                 format_none(),
             ),

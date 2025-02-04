@@ -1,34 +1,93 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 
+use std::num::NonZeroUsize;
+
 use super::{GenType, TypedExpr};
 use crate::Label;
 
-impl TypedExpr<GenType> {
-    pub(crate) fn get_vars(&self) -> Variables {
-        let mut vars = Variables::new();
-        let ctxt = VarCtxt::new();
-        self.poll_vars(&mut vars, ctxt);
-        vars
-    }
+pub(crate) trait QueryExternVar {
+    fn query_extern_var(&self, var: &str, persistent: bool) -> VarInfo;
+}
 
-    /// Extends a collection with a list of all the variable-names used in an Expr, as well
-    /// as whether their provenance at site-of-use is internal or external, and how they are
-    /// accessed.
-    ///
-    /// If the expression is itself a raw `TypedExpr::Var`, returns the variable's verbatim identifier, otherwise None.
-    fn poll_vars<'a>(&'a self, _vars: &mut Variables, _ctxt: VarCtxt<'a>) -> Option<&'a Label> {
+// REVIEW - should we cache variables we see that aren't `var`, to avoid repeated traversal?
+impl<TypeRep> QueryExternVar for TypedExpr<TypeRep> {
+    fn query_extern_var(&self, var: &str, persistent: bool) -> VarInfo {
+        let mut ret = VarInfo::new();
         match self {
-            TypedExpr::U8(..)
-            | TypedExpr::U16(..)
-            | TypedExpr::U32(..)
-            | TypedExpr::U64(..)
-            | TypedExpr::Bool(..) => None,
+            TypedExpr::Var(_, lbl) => {
+                if *lbl == var {
+                    if persistent {
+                        ret.add_persist();
+                    } else {
+                        ret.add_reference();
+                    }
+                }
+            }
+            TypedExpr::IntRel(_, _, lhs, rhs)
+            | TypedExpr::Arith(_, _, lhs, rhs) => {
+                ret += lhs.query_extern_var(var, persistent);
+                ret += rhs.query_extern_var(var, persistent);
+            }
+            TypedExpr::AsU8(inner)
+            | TypedExpr::AsU16(inner)
+            | TypedExpr::AsU32(inner)
+            | TypedExpr::AsU64(inner)
+            | TypedExpr::AsChar(inner) => {
+                ret += inner.query_extern_var(var, persistent)
+            }
+            _ => todo!(),
+        }
+        ret
+    }
+}
 
-            _ => unimplemented!(),
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) struct VarInfo {
+    n_references: u32,
+    n_persists: u32,
+}
+
+impl std::ops::Add<VarInfo> for VarInfo {
+    type Output = VarInfo;
+
+    fn add(self, rhs: VarInfo) -> Self::Output {
+        VarInfo {
+            n_references: self.n_references + rhs.n_references,
+            n_persists: self.n_persists + rhs.n_persists,
         }
     }
 }
+
+impl std::ops::AddAssign<VarInfo> for VarInfo {
+    fn add_assign(&mut self, rhs: VarInfo) {
+        self.n_references += rhs.n_references;
+        self.n_persists += rhs.n_persists;
+    }
+}
+
+impl VarInfo {
+    pub fn new() -> Self {
+        VarInfo {
+            n_references: 0,
+            n_persists: 0,
+        }
+    }
+
+    pub const fn is_unused(&self) -> bool {
+        self.n_references == 0 && self.n_persists == 0
+    }
+
+    pub fn add_reference(&mut self) {
+        self.n_references += 1;
+    }
+
+    pub fn add_persist(&mut self) {
+        self.n_persists += 1;
+    }
+}
+
+
 
 // REVIEW - consider HashMap?
 type ScopeContainer<K, V> = std::collections::BTreeMap<K, V>;
