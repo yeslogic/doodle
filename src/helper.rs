@@ -270,6 +270,11 @@ pub fn alts<Name: IntoLabel>(branches: impl IntoIterator<Item = (Name, Format)>)
     )
 }
 
+/// Helper-function for [`Format::Match`] that accepts any iterable container `branches` of `(Pattern, Format)` pairs.
+pub fn fmt_match(head: Expr, branches: impl IntoIterator<Item = (Pattern, Format)>) -> Format {
+    Format::Match(Box::new(head), Vec::from_iter(branches))
+}
+
 /// Helper-function for [`Expr::Match`] that accepts any iterable container `branches` of `(Pattern, Expr)` pairs.
 pub fn expr_match(head: Expr, branches: impl IntoIterator<Item = (Pattern, Expr)>) -> Expr {
     Expr::Match(Box::new(head), Vec::from_iter(branches))
@@ -354,6 +359,7 @@ pub fn record<Name: IntoLabel>(fields: impl IntoIterator<Item = (Name, Format)>)
 /// The variant-name assigned to a positive match for the given format will be `"some"`,
 /// and the variant-name assigned to a negative match will be `"none"`.
 pub fn optional(format: Format) -> Format {
+    // REVIEW - do we want to use in-model Option-type here?
     alts([("some", format), ("none", Format::EMPTY)])
 }
 
@@ -814,7 +820,8 @@ pub fn pat_some(pat: Pattern) -> Pattern {
 }
 
 /// Helper for constructing `fmt -> Option::Some` within the Format model-language.
-pub fn format_some(f: Format) -> Format {
+pub fn fmt_some(f: Format) -> Format {
+    // REVIEW - do we want a more natural approach for synthesizing Option-kinded parse-values?
     map(
         f,
         lambda("val", Expr::LiftOption(Some(Box::new(var("val"))))),
@@ -822,7 +829,7 @@ pub fn format_some(f: Format) -> Format {
 }
 
 /// Helper for constructing `Option::None` within the Format model-language.
-pub fn format_none() -> Format {
+pub fn fmt_none() -> Format {
     compute(expr_none())
 }
 
@@ -922,18 +929,44 @@ pub fn unwrap_singleton(expr: Expr) -> Expr {
     )
 }
 
-/// Evaluates to `f(x)` where `x` is the sole element of `expr`,
-/// or `fmt_none` if `expr` is not a singleton
+/// Parses a dependent format `opt_f(x)` if `expr` evaluates to `Some(x)`,
+/// or `fmt_none` when `expr` evaluates to `None`.
 ///
-/// Implicitly relies on the ValueType of the output of `opt_f` being Option<_>.
-pub fn maybe_singleton(expr: Expr, opt_f: impl FnOnce(Expr) -> Format) -> Format {
+/// Implicitly relies on the ValueType of the output of `opt_f` being `Option<U>`,
+/// following the style of monadic bind operations in languages like Haskell.
+///
+/// # Notes
+///
+/// To offer more fine-tuning for the generated output, a `binding_name` parameter is required,
+/// and used as the pattern-binding of `Some(_)` against `expr`, as well as the variable passed
+/// into `opt_f`.
+pub fn bind_option(
+    expr: Expr,
+    binding_name: &'static str,
+    opt_f: impl FnOnce(Expr) -> Format,
+) -> Format {
     Format::Match(
         Box::new(expr),
         vec![
-            (Pattern::Seq(vec![bind("x")]), opt_f(var("x"))),
-            (Pattern::Wildcard, format_none()),
+            (pat_some(bind(binding_name)), opt_f(var(binding_name))),
+            (pat_none(), fmt_none()),
         ],
     )
+}
+
+/// Parses a dependent format `fmt_some(f(x))` if `expr` evaluates to `Some(x)`,
+/// or `fmt_none` when `expr` evaluates to `None`.
+///
+/// The output ValueType of `f` should be the parametric type `U` of whatever `Option<U>`
+/// the call should evaluate to; this following the style of functor-map operations in
+/// languages like Haskell.
+pub fn map_option(
+    expr: Expr,
+    binding_name: &'static str,
+    f: impl FnOnce(Expr) -> Format,
+) -> Format {
+    let opt_f = move |x: Expr| fmt_some(f(x));
+    bind_option(expr, binding_name, opt_f)
 }
 
 /// Performs an index operation on an expression `seq` with an index `index`, without checking for OOB array access.

@@ -1,4 +1,4 @@
-use crate::decoder::{Value, seq_kind::SeqKind};
+use crate::decoder::{seq_kind::SeqKind, Value};
 use crate::Expr;
 
 /// Helper trait to apply find_index_by_key_sorted to ParsedValue and Value generically
@@ -51,7 +51,12 @@ impl<T> KeyCache<T> {
     }
 }
 
-pub(crate) fn find_index_by_key_sorted<'a, V, V0, Eval>(f_get_key: &Expr, query: &V, values: &SeqKind<V0>, evaluate: Eval) -> Option<usize>
+pub(crate) fn find_index_by_key_sorted<'a, V, V0, Eval>(
+    f_get_key: &Expr,
+    query: &V,
+    values: &SeqKind<V0>,
+    evaluate: Eval,
+) -> Option<usize>
 where
     Eval: 'a + Fn(&Expr, &V0) -> V,
     V: AsKey,
@@ -68,9 +73,7 @@ where
     // cache to store keys we have seen after computing them once
     let cache = KeyCache::<V>::new(len);
     // helper closure to keep code below lightweight and more implementation-agnostic
-    let get_key_at_index = |ix: usize| {
-        cache.get_or_init(ix, || evaluate(f_get_key, &values[ix]))
-    };
+    let get_key_at_index = |ix: usize| cache.get_or_init(ix, || evaluate(f_get_key, &values[ix]));
 
     // check boundaries, once only, at very start
     let lower_bound = get_key_at_index(0);
@@ -96,7 +99,7 @@ where
         Ordering::Equal => return Some(last_ix),
         Ordering::Less => {
             // skip entire loop when there are no middle values
-            if len <= 2  {
+            if len <= 2 {
                 return None;
             }
         }
@@ -123,7 +126,12 @@ where
     None
 }
 
-pub(crate) fn find_index_by_key_unsorted<'a, V, V0, Eval>(f_get_key: &'a Expr, query: &V, values: &SeqKind<V0>, evaluate: Eval) -> Option<usize>
+pub(crate) fn find_index_by_key_unsorted<'a, V, V0, Eval>(
+    f_get_key: &'a Expr,
+    query: &V,
+    values: &SeqKind<V0>,
+    evaluate: Eval,
+) -> Option<usize>
 where
     Eval: 'a + Fn(&Expr, &V0) -> V,
     V: AsKey,

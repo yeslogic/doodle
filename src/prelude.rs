@@ -128,7 +128,7 @@ where
 /// instead.
 pub fn find_by_key_sorted<T, K>(f: impl FnMut(&T) -> K, query: K, slice: &[T]) -> Option<&T>
 where
-    K: Ord + Copy
+    K: Ord + Copy,
 {
     match slice.binary_search_by_key(&query, f) {
         Ok(ix) => Some(&slice[ix]),
@@ -144,7 +144,7 @@ where
 /// is encountered and returned.
 pub fn find_by_key_unsorted<T, K>(mut f: impl FnMut(&T) -> K, query: K, slice: &[T]) -> Option<&T>
 where
-    K: Eq + Copy
+    K: Eq + Copy,
 {
     slice.iter().find(|x| f(x) == query)
 }
