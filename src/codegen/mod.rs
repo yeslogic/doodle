@@ -1459,10 +1459,16 @@ impl SimpleLogic<GTExpr> {
                     } else {
                         base_args
                             .into_iter()
-                            .chain(
-                                args.iter()
-                                    .map(|(_lab, x)| embed_expr(x, ExprInfo::EmbedCloned)),
-                            )
+                            .chain(args.iter().map(|(_lab, x)| {
+                                let Some(t) = x.get_type() else {
+                                    panic!("unexpected lambda in arg-list of SimpleLogic::Invoke")
+                                };
+                                if t.to_rust_type().should_borrow_for_arg() {
+                                    RustExpr::borrow_of(embed_expr(x, ExprInfo::Natural))
+                                } else {
+                                    embed_expr(x, ExprInfo::EmbedCloned)
+                                }
+                            }))
                             .collect()
                     }
                 };
@@ -1803,7 +1809,7 @@ where
                         Label::from("sz"),
                         RustExpr::Operation(RustOp::AsCast(
                             Box::new(sz.clone()),
-                            RustType::verbatim("usize", None),
+                            RustType::from(PrimType::Usize),
                         )),
                     ),
                     // // FIXME - remove or gate this
@@ -2868,8 +2874,12 @@ where
                 if let Some(ref args) = self.extra_args {
                     Iterator::chain(
                         std::iter::once(arg0),
-                        args.iter()
-                            .map(|(lab, gt)| (lab.clone(), gt.to_rust_type())),
+                        args.iter().map(|(lab, gt)| {
+                            (
+                                lab.clone(),
+                                RustType::selective_borrow(None, Mut::Immutable, gt.to_rust_type()),
+                            )
+                        }),
                     )
                     .collect()
                 } else {

@@ -327,7 +327,7 @@ distance: u16
 }
 
 #[derive(Debug, Clone)]
-pub enum deflate_main_codes { literal(u8), reference(deflate_main_codes_reference) }
+pub enum deflate_main_codes__dupX1 { literal(u8), reference(deflate_main_codes_reference) }
 
 #[derive(Debug, Clone)]
 pub struct deflate_dynamic_huffman {
@@ -340,7 +340,7 @@ literal_length_distance_alphabet_code_lengths_value: Vec<u8>,
 literal_length_alphabet_code_lengths_value: Vec<u8>,
 distance_alphabet_code_lengths_value: Vec<u8>,
 codes: Vec<deflate_dynamic_huffman_codes>,
-codes_values: Vec<deflate_main_codes>
+codes_values: Vec<deflate_main_codes__dupX1>
 }
 
 #[derive(Debug, Clone)]
@@ -360,7 +360,7 @@ extra: Option<deflate_fixed_huffman_codes_values>
 #[derive(Debug, Clone)]
 pub struct deflate_fixed_huffman {
 codes: Vec<deflate_fixed_huffman_codes>,
-codes_values: Vec<deflate_main_codes>
+codes_values: Vec<deflate_main_codes__dupX1>
 }
 
 #[derive(Debug, Clone)]
@@ -369,23 +369,23 @@ align: (),
 len: u16,
 nlen: u16,
 bytes: Vec<u8>,
-codes_values: Vec<deflate_main_codes>
+codes_values: Vec<deflate_main_codes__dupX1>
 }
 
 #[derive(Debug, Clone)]
-pub enum deflate_main_codes__dupX1 { dynamic_huffman(deflate_dynamic_huffman), fixed_huffman(deflate_fixed_huffman), uncompressed(deflate_uncompressed) }
+pub enum deflate_main_codes { dynamic_huffman(deflate_dynamic_huffman), fixed_huffman(deflate_fixed_huffman), uncompressed(deflate_uncompressed) }
 
 #[derive(Debug, Clone)]
 pub struct deflate_block {
 r#final: u8,
 r#type: u8,
-data: deflate_main_codes__dupX1
+data: deflate_main_codes
 }
 
 #[derive(Debug, Clone)]
 pub struct deflate_main {
 blocks: Vec<deflate_block>,
-codes: Vec<deflate_main_codes>,
+codes: Vec<deflate_main_codes__dupX1>,
 inflate: Vec<u8>
 }
 
@@ -4505,7 +4505,7 @@ return Err(ParseError::ExcludedBranch(658824046370133753u64));
 }))())?;
 let length = ((|| PResult::Ok((Decoder127(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = length as usize<>;
+let sz = length as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_riff_subchunks(_input))?))())?;
 _input.end_slice()?;
@@ -5483,7 +5483,7 @@ accum.push((Decoder_opentype_table_record(_input))?);
 }
 accum
 }))())?;
-let table_links = ((|| PResult::Ok((Decoder_opentype_table_directory_table_links(_input, font_start.clone(), table_records.clone()))?))())?;
+let table_links = ((|| PResult::Ok((Decoder_opentype_table_directory_table_links(_input, font_start.clone(), &table_records))?))())?;
 PResult::Ok(opentype_table_directory { sfnt_version, num_tables, search_range, entry_selector, range_shift, table_records, table_links })
 }
 
@@ -5601,13 +5601,13 @@ let length = ((|| PResult::Ok((Decoder20(_input))?))())?;
 PResult::Ok(opentype_table_record { table_id, checksum, offset, length })
 }
 
-fn Decoder_opentype_table_directory_table_links<'input>(_input: &mut Parser<'input>, start: u32, tables: Vec<opentype_table_record>) -> Result<opentype_table_directory_table_links, ParseError> {
+fn Decoder_opentype_table_directory_table_links<'input>(_input: &mut Parser<'input>, start: u32, tables: &Vec<opentype_table_record>) -> Result<opentype_table_directory_table_links, ParseError> {
 let cmap = ((|| PResult::Ok(match (find_by_key_sorted(|elem: &opentype_table_record| elem.table_id.clone(), 1668112752u32, tables)).cloned() {
 Some(ref matching_table) => {
 let tgt_offset = start + matching_table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| PResult::Ok({
-let sz = (matching_table.length.clone()) as usize<>;
+let sz = (matching_table.length.clone()) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_opentype_cmap_table(_input))?))())?;
 _input.end_slice()?;
@@ -5626,7 +5626,7 @@ Some(ref matching_table) => {
 let tgt_offset = start + matching_table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| PResult::Ok({
-let sz = (matching_table.length.clone()) as usize<>;
+let sz = (matching_table.length.clone()) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_opentype_head_table(_input))?))())?;
 _input.end_slice()?;
@@ -5645,7 +5645,7 @@ Some(ref matching_table) => {
 let tgt_offset = start + matching_table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| PResult::Ok({
-let sz = (matching_table.length.clone()) as usize<>;
+let sz = (matching_table.length.clone()) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_opentype_hhea_table(_input))?))())?;
 _input.end_slice()?;
@@ -5664,7 +5664,7 @@ Some(ref matching_table) => {
 let tgt_offset = start + matching_table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| PResult::Ok({
-let sz = (matching_table.length.clone()) as usize<>;
+let sz = (matching_table.length.clone()) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_opentype_maxp_table(_input))?))())?;
 _input.end_slice()?;
@@ -5683,7 +5683,7 @@ Some(ref matching_table) => {
 let tgt_offset = start + matching_table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| PResult::Ok({
-let sz = (matching_table.length.clone()) as usize<>;
+let sz = (matching_table.length.clone()) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_opentype_hmtx_table(_input, hhea.number_of_long_metrics.clone(), maxp.num_glyphs.clone()))?))())?;
 _input.end_slice()?;
@@ -5702,7 +5702,7 @@ Some(ref matching_table) => {
 let tgt_offset = start + matching_table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| PResult::Ok({
-let sz = (matching_table.length.clone()) as usize<>;
+let sz = (matching_table.length.clone()) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_opentype_name_table(_input))?))())?;
 _input.end_slice()?;
@@ -5722,7 +5722,7 @@ let tgt_offset = start + matching_table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| PResult::Ok({
 let table_len = matching_table.length.clone();
-let sz = table_len as usize<>;
+let sz = table_len as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_opentype_os2_table(_input, table_len.clone()))?))())?;
 _input.end_slice()?;
@@ -5741,7 +5741,7 @@ Some(ref matching_table) => {
 let tgt_offset = start + matching_table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| PResult::Ok({
-let sz = (matching_table.length.clone()) as usize<>;
+let sz = (matching_table.length.clone()) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_opentype_post_table(_input))?))())?;
 _input.end_slice()?;
@@ -5761,7 +5761,7 @@ let inner = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| PResult::Ok({
-let sz = (table.length.clone()) as usize<>;
+let sz = (table.length.clone()) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let mut accum = Vec::new();
@@ -5803,7 +5803,7 @@ let inner = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| PResult::Ok({
-let sz = (table.length.clone()) as usize<>;
+let sz = (table.length.clone()) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let mut accum = Vec::new();
@@ -5845,7 +5845,7 @@ let inner = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| PResult::Ok({
-let sz = (table.length.clone()) as usize<>;
+let sz = (table.length.clone()) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_opentype_loca_table(_input, maxp.num_glyphs.clone(), head.index_to_loc_format.clone()))?))())?;
 _input.end_slice()?;
@@ -5867,7 +5867,7 @@ let inner = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| PResult::Ok({
-let sz = (table.length.clone()) as usize<>;
+let sz = (table.length.clone()) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder36(_input, match loca {
 Some(ref x) => {
@@ -5897,7 +5897,7 @@ let inner = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| PResult::Ok({
-let sz = (table.length.clone()) as usize<>;
+let sz = (table.length.clone()) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let mut accum = Vec::new();
@@ -5939,7 +5939,7 @@ let inner = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| PResult::Ok({
-let sz = (table.length.clone()) as usize<>;
+let sz = (table.length.clone()) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_opentype_gasp_table(_input))?))())?;
 _input.end_slice()?;
@@ -5961,7 +5961,7 @@ let inner = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| PResult::Ok({
-let sz = (table.length.clone()) as usize<>;
+let sz = (table.length.clone()) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_opentype_base_table(_input))?))())?;
 _input.end_slice()?;
@@ -5983,7 +5983,7 @@ let inner = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| PResult::Ok({
-let sz = (table.length.clone()) as usize<>;
+let sz = (table.length.clone()) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_opentype_gdef_table(_input))?))())?;
 _input.end_slice()?;
@@ -6005,7 +6005,7 @@ let inner = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| PResult::Ok({
-let sz = (table.length.clone()) as usize<>;
+let sz = (table.length.clone()) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_opentype_gpos_table(_input))?))())?;
 _input.end_slice()?;
@@ -6027,7 +6027,7 @@ let inner = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| PResult::Ok({
-let sz = (table.length.clone()) as usize<>;
+let sz = (table.length.clone()) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_opentype_gsub_table(_input))?))())?;
 _input.end_slice()?;
@@ -6049,7 +6049,7 @@ let inner = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| PResult::Ok({
-let sz = (table.length.clone()) as usize<>;
+let sz = (table.length.clone()) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_opentype_fvar_table(_input))?))())?;
 _input.end_slice()?;
@@ -6071,7 +6071,7 @@ let inner = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| PResult::Ok({
-let sz = (table.length.clone()) as usize<>;
+let sz = (table.length.clone()) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_opentype_gvar_table(_input))?))())?;
 _input.end_slice()?;
@@ -6093,7 +6093,7 @@ let inner = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| PResult::Ok({
-let sz = (table.length.clone()) as usize<>;
+let sz = (table.length.clone()) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_opentype_kern_table(_input))?))())?;
 _input.end_slice()?;
@@ -6115,7 +6115,7 @@ let inner = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| PResult::Ok({
-let sz = (table.length.clone()) as usize<>;
+let sz = (table.length.clone()) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_opentype_stat_table(_input))?))())?;
 _input.end_slice()?;
@@ -6137,7 +6137,7 @@ let inner = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| PResult::Ok({
-let sz = (table.length.clone()) as usize<>;
+let sz = (table.length.clone()) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_opentype_hhea_table(_input))?))())?;
 _input.end_slice()?;
@@ -6159,7 +6159,7 @@ let inner = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| PResult::Ok({
-let sz = (table.length.clone()) as usize<>;
+let sz = (table.length.clone()) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_opentype_hmtx_table(_input, match vhea {
 Some(ref x) => {
@@ -7964,13 +7964,13 @@ return Err(ParseError::FalsifiedWhere(10603707580403307601u64));
 let tgt_offset = 0u32 + table_start + (__offset_axes as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| PResult::Ok({
-let sz = __axes_length as usize<>;
+let sz = __axes_length as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let mut accum = Vec::new();
 for _ in 0..axis_count {
 accum.push({
-let sz = axis_size as usize<>;
+let sz = axis_size as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_opentype_var_variation_axis_record(_input))?))())?;
 _input.end_slice()?;
@@ -8003,7 +8003,7 @@ let ret = ((|| PResult::Ok({
 let mut accum = Vec::new();
 for _ in 0..instance_count {
 accum.push({
-let sz = instance_size as usize<>;
+let sz = instance_size as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let subfamily_nameid = ((|| PResult::Ok((Decoder23(_input))?))())?;
@@ -8145,7 +8145,7 @@ if next_offs > this_offs {
 let tgt_offset = array_start + this_offs;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| PResult::Ok({
-let sz = (try_sub!(next_offs, this_offs, 11876854719037224982u64)) as usize<>;
+let sz = (try_sub!(next_offs, this_offs, 11876854719037224982u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_opentype_var_glyph_variation_data_table(_input, axis_count.clone()))?))())?;
 _input.end_slice()?;
@@ -8172,7 +8172,7 @@ if next_offs > this_offs {
 let tgt_offset = array_start + this_offs;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| PResult::Ok({
-let sz = (try_sub!(next_offs, this_offs, 18270091135093349626u64)) as usize<>;
+let sz = (try_sub!(next_offs, this_offs, 18270091135093349626u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_opentype_var_glyph_variation_data_table(_input, axis_count.clone()))?))())?;
 _input.end_slice()?;
@@ -9000,7 +9000,7 @@ let per_tuple_variation_data = ((|| PResult::Ok({
 let mut accum = Vec::new();
 for header in tuple_variation_headers.clone() {
 accum.push({
-let sz = (header.variation_data_size.clone()) as usize<>;
+let sz = (header.variation_data_size.clone()) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let private_point_numbers = ((|| PResult::Ok(if header.tuple_index.private_point_numbers.clone() {
@@ -14090,7 +14090,7 @@ opentype_cmap_subtable_format14_raw_raw { format }
 _input.close_peek_context()?;
 ret
 };
-let sz = length as usize<>;
+let sz = length as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let format = ((|| PResult::Ok((Decoder23(_input))?))())?;
@@ -14134,7 +14134,7 @@ return Err(ParseError::FalsifiedWhere(14954891776835932150u64));
 _input.close_peek_context()?;
 ret
 };
-let sz = length as usize<>;
+let sz = length as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let format = ((|| PResult::Ok({
@@ -14249,7 +14249,7 @@ opentype_cmap_subtable_format14_raw_raw { format }
 _input.close_peek_context()?;
 ret
 };
-let sz = length as usize<>;
+let sz = length as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let format = ((|| PResult::Ok({
@@ -14383,7 +14383,7 @@ opentype_cmap_subtable_format13_raw_raw { format, __reserved }
 _input.close_peek_context()?;
 ret
 };
-let sz = length as usize<>;
+let sz = length as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let format = ((|| PResult::Ok({
@@ -14453,7 +14453,7 @@ opentype_cmap_subtable_format13_raw_raw { format, __reserved }
 _input.close_peek_context()?;
 ret
 };
-let sz = length as usize<>;
+let sz = length as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let format = ((|| PResult::Ok({
@@ -14517,7 +14517,7 @@ opentype_cmap_subtable_format13_raw_raw { format, __reserved }
 _input.close_peek_context()?;
 ret
 };
-let sz = length as usize<>;
+let sz = length as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let format = ((|| PResult::Ok({
@@ -14580,7 +14580,7 @@ opentype_cmap_subtable_format13_raw_raw { format, __reserved }
 _input.close_peek_context()?;
 ret
 };
-let sz = length as usize<>;
+let sz = length as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let format = ((|| PResult::Ok({
@@ -14635,7 +14635,7 @@ opentype_cmap_subtable_format14_raw_raw { format }
 _input.close_peek_context()?;
 ret
 };
-let sz = length as usize<>;
+let sz = length as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let format = ((|| PResult::Ok({
@@ -14770,7 +14770,7 @@ PResult::Ok(opentype_types_sequential_map_record { start_char_code, end_char_cod
 
 fn Decoder_elf_header<'input>(_input: &mut Parser<'input>) -> Result<elf_header, ParseError> {
 let ident = ((|| PResult::Ok({
-let sz = 16u32 as usize<>;
+let sz = 16u32 as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_elf_header_ident(_input))?))())?;
 _input.end_slice()?;
@@ -15235,18 +15235,18 @@ PResult::Ok(tar_header_with_data { header, file, __padding })
 }
 
 fn Decoder_tar_header<'input>(_input: &mut Parser<'input>) -> Result<tar_header, ParseError> {
-let sz = 512u32 as usize<>;
+let sz = 512u32 as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let name = ((|| PResult::Ok({
-let sz = 100u16 as usize<>;
+let sz = 100u16 as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_tar_ascii_string_opt0(_input))?))())?;
 _input.end_slice()?;
 ret
 }))())?;
 let mode = ((|| PResult::Ok({
-let sz = 8u16 as usize<>;
+let sz = 8u16 as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let string = ((|| PResult::Ok({
@@ -15321,7 +15321,7 @@ _input.end_slice()?;
 ret
 }))())?;
 let uid = ((|| PResult::Ok({
-let sz = 8u16 as usize<>;
+let sz = 8u16 as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let string = ((|| PResult::Ok({
@@ -15396,7 +15396,7 @@ _input.end_slice()?;
 ret
 }))())?;
 let gid = ((|| PResult::Ok({
-let sz = 8u16 as usize<>;
+let sz = 8u16 as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let string = ((|| PResult::Ok({
@@ -15523,7 +15523,7 @@ tar_header_size_raw { oA, o9, o8, o7, o6, o5, o4, o3, o2, o1, o0, __nil, value }
 ((|rec: tar_header_size_raw| PResult::Ok(rec.value.clone()))(inner))?
 }))())?;
 let mtime = ((|| PResult::Ok({
-let sz = 12u16 as usize<>;
+let sz = 12u16 as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let string = ((|| PResult::Ok({
@@ -15598,7 +15598,7 @@ _input.end_slice()?;
 ret
 }))())?;
 let chksum = ((|| PResult::Ok({
-let sz = 8u16 as usize<>;
+let sz = 8u16 as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let string = ((|| PResult::Ok({
@@ -15674,7 +15674,7 @@ ret
 }))())?;
 let typeflag = ((|| PResult::Ok((Decoder150(_input))?))())?;
 let linkname = ((|| PResult::Ok({
-let sz = 100u16 as usize<>;
+let sz = 100u16 as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder151(_input))?))())?;
 _input.end_slice()?;
@@ -15751,21 +15751,21 @@ return Err(ParseError::ExcludedBranch(5170050512307443704u64));
 (field0, field1)
 }))())?;
 let uname = ((|| PResult::Ok({
-let sz = 32u16 as usize<>;
+let sz = 32u16 as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_tar_ascii_string(_input))?))())?;
 _input.end_slice()?;
 ret
 }))())?;
 let gname = ((|| PResult::Ok({
-let sz = 32u16 as usize<>;
+let sz = 32u16 as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_tar_ascii_string(_input))?))())?;
 _input.end_slice()?;
 ret
 }))())?;
 let devmajor = ((|| PResult::Ok({
-let sz = 8u16 as usize<>;
+let sz = 8u16 as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let string = ((|| PResult::Ok({
@@ -15840,7 +15840,7 @@ _input.end_slice()?;
 ret
 }))())?;
 let devminor = ((|| PResult::Ok({
-let sz = 8u16 as usize<>;
+let sz = 8u16 as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let string = ((|| PResult::Ok({
@@ -15915,7 +15915,7 @@ _input.end_slice()?;
 ret
 }))())?;
 let prefix = ((|| PResult::Ok({
-let sz = 155u16 as usize<>;
+let sz = 155u16 as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder151(_input))?))())?;
 _input.end_slice()?;
@@ -16238,7 +16238,7 @@ fn Decoder_riff_chunk<'input>(_input: &mut Parser<'input>) -> Result<riff_chunk,
 let tag = ((|| PResult::Ok((Decoder154(_input))?))())?;
 let length = ((|| PResult::Ok((Decoder127(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = length as usize<>;
+let sz = length as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let mut accum = Vec::new();
@@ -16356,7 +16356,7 @@ return Err(ParseError::FalsifiedWhere(14903563845775542749u64));
 }))())?;
 let tag = ((|| PResult::Ok((Decoder203(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = length as usize<>;
+let sz = length as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_png_ihdr_data(_input))?))())?;
 _input.end_slice()?;
@@ -16400,7 +16400,7 @@ accum.push((Decoder174(_input))?);
 accum
 }))())?;
 let data = ((|| PResult::Ok({
-let sz = length as usize<>;
+let sz = length as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok(match tag.as_slice() {
 [80u8, 76u8, 84u8, 69u8] => {
@@ -16521,7 +16521,7 @@ return Err(ParseError::FalsifiedWhere(7281717462557989541u64));
 }))())?;
 let tag = ((|| PResult::Ok((Decoder172(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = length as usize<>;
+let sz = length as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder173(_input))?))())?;
 _input.end_slice()?;
@@ -16579,7 +16579,7 @@ return Err(ParseError::FalsifiedWhere(14681668243282477517u64));
 }))())?;
 let tag = ((|| PResult::Ok((Decoder162(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = length as usize<>;
+let sz = length as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder163(_input))?))())?;
 _input.end_slice()?;
@@ -16644,26 +16644,26 @@ accum.push(elem);
 accum
 }))())?;
 let codes = ((|| PResult::Ok((try_flat_map_vec(blocks.iter().cloned(), |x: deflate_block| PResult::Ok(match x.data.clone() {
-deflate_main_codes__dupX1::uncompressed(ref y) => {
+deflate_main_codes::uncompressed(ref y) => {
 y.codes_values.clone()
 },
 
-deflate_main_codes__dupX1::fixed_huffman(ref y) => {
+deflate_main_codes::fixed_huffman(ref y) => {
 y.codes_values.clone()
 },
 
-deflate_main_codes__dupX1::dynamic_huffman(ref y) => {
+deflate_main_codes::dynamic_huffman(ref y) => {
 y.codes_values.clone()
 }
 })))?))())?;
-let inflate = ((|| PResult::Ok((try_flat_map_append_vec(codes.iter().cloned(), |tuple_var: (&Vec<u8>, deflate_main_codes)| PResult::Ok(match tuple_var {
+let inflate = ((|| PResult::Ok((try_flat_map_append_vec(codes.iter().cloned(), |tuple_var: (&Vec<u8>, deflate_main_codes__dupX1)| PResult::Ok(match tuple_var {
 (buffer, symbol) => {
 match symbol {
-deflate_main_codes::literal(b) => {
+deflate_main_codes__dupX1::literal(b) => {
 [b].to_vec()
 },
 
-deflate_main_codes::reference(r) => {
+deflate_main_codes__dupX1::reference(r) => {
 {
 let ix = (try_sub!((buffer.len()) as u32, (r.distance.clone()) as u32, 9851243859021733611u64)) as usize;
 (slice_ext(&buffer, ix..ix + (((r.length.clone()) as u32) as usize))).to_vec()
@@ -16688,17 +16688,17 @@ let field1 = ((|| PResult::Ok((Decoder166(_input))?))())?;
 let data = ((|| PResult::Ok(match r#type {
 0u8 => {
 let inner = (Decoder_deflate_uncompressed(_input))?;
-deflate_main_codes__dupX1::uncompressed(inner)
+deflate_main_codes::uncompressed(inner)
 },
 
 1u8 => {
 let inner = (Decoder_deflate_fixed_huffman(_input))?;
-deflate_main_codes__dupX1::fixed_huffman(inner)
+deflate_main_codes::fixed_huffman(inner)
 },
 
 2u8 => {
 let inner = (Decoder_deflate_dynamic_huffman(_input))?;
-deflate_main_codes__dupX1::dynamic_huffman(inner)
+deflate_main_codes::dynamic_huffman(inner)
 },
 
 _other => {
@@ -16779,7 +16779,7 @@ let field7 = ((|| PResult::Ok((Decoder166(_input))?))())?;
 }
 accum
 }))())?;
-let codes_values = ((|| PResult::Ok((try_flat_map_vec(bytes.iter().cloned(), |x: u8| PResult::Ok([deflate_main_codes::literal(x)].to_vec())))?))())?;
+let codes_values = ((|| PResult::Ok((try_flat_map_vec(bytes.iter().cloned(), |x: u8| PResult::Ok([deflate_main_codes__dupX1::literal(x)].to_vec())))?))())?;
 PResult::Ok(deflate_uncompressed { align, len, nlen, bytes, codes_values })
 }
 
@@ -17558,7 +17558,7 @@ let codes_values = ((|| PResult::Ok((try_flat_map_vec(codes.iter().cloned(), |x:
 257u16..=285u16 => {
 match x.extra.clone() {
 Some(ref rec) => {
-[deflate_main_codes::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
+[deflate_main_codes__dupX1::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
 },
 
 _ => {
@@ -17572,7 +17572,7 @@ return Err(ParseError::ExcludedBranch(5357406925723651718u64));
 },
 
 _ => {
-[deflate_main_codes::literal((x.code.clone()) as u8)].to_vec()
+[deflate_main_codes__dupX1::literal((x.code.clone()) as u8)].to_vec()
 }
 })))?))())?;
 PResult::Ok(deflate_fixed_huffman { codes, codes_values })
@@ -18258,7 +18258,7 @@ let codes_values = ((|| PResult::Ok((try_flat_map_vec(codes.iter().cloned(), |x:
 257u16..=285u16 => {
 match x.extra.clone() {
 Some(ref rec) => {
-[deflate_main_codes::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
+[deflate_main_codes__dupX1::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
 },
 
 _ => {
@@ -18272,7 +18272,7 @@ return Err(ParseError::ExcludedBranch(3673300442962989464u64));
 },
 
 _ => {
-[deflate_main_codes::literal((x.code.clone()) as u8)].to_vec()
+[deflate_main_codes__dupX1::literal((x.code.clone()) as u8)].to_vec()
 }
 })))?))())?;
 PResult::Ok(deflate_dynamic_huffman { hlit, hdist, hclen, code_length_alphabet_code_lengths, literal_length_distance_alphabet_code_lengths, literal_length_distance_alphabet_code_lengths_value, literal_length_alphabet_code_lengths_value, distance_alphabet_code_lengths_value, codes, codes_values })
@@ -24981,7 +24981,7 @@ _ => {
 }
 }))())?;
 let data = ((|| PResult::Ok({
-let sz = size as usize<>;
+let sz = size as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok(match r#type {
 (102u8, 116u8, 121u8, 112u8) => {
@@ -25130,7 +25130,7 @@ _ => {
 }
 }))())?;
 let data = ((|| PResult::Ok({
-let sz = size as usize<>;
+let sz = size as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok(match r#type {
 (100u8, 105u8, 110u8, 102u8) => {
@@ -25279,7 +25279,7 @@ _ => {
 }
 }))())?;
 let data = ((|| PResult::Ok({
-let sz = size as usize<>;
+let sz = size as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let from_item_ID = ((|| PResult::Ok((Decoder23(_input))?))())?;
@@ -25340,7 +25340,7 @@ _ => {
 }
 }))())?;
 let data = ((|| PResult::Ok({
-let sz = size as usize<>;
+let sz = size as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let from_item_ID = ((|| PResult::Ok((Decoder20(_input))?))())?;
@@ -25622,7 +25622,7 @@ _ => {
 }
 }))())?;
 let data = ((|| PResult::Ok({
-let sz = size as usize<>;
+let sz = size as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok(match r#type {
 (109u8, 118u8, 104u8, 100u8) => {
@@ -25788,7 +25788,7 @@ _ => {
 }
 }))())?;
 let data = ((|| PResult::Ok({
-let sz = size as usize<>;
+let sz = size as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok(match r#type {
 (116u8, 107u8, 104u8, 100u8) => {
@@ -25951,7 +25951,7 @@ _ => {
 }
 }))())?;
 let data = ((|| PResult::Ok({
-let sz = size as usize<>;
+let sz = size as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok(match r#type {
 (109u8, 101u8, 116u8, 97u8) => {
@@ -26029,7 +26029,7 @@ _ => {
 }
 }))())?;
 let data = ((|| PResult::Ok({
-let sz = size as usize<>;
+let sz = size as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok(match r#type {
 (101u8, 108u8, 115u8, 116u8) => {
@@ -26108,7 +26108,7 @@ _ => {
 }
 }))())?;
 let data = ((|| PResult::Ok({
-let sz = size as usize<>;
+let sz = size as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok(match r#type {
 (104u8, 100u8, 108u8, 114u8) => {
@@ -26300,7 +26300,7 @@ _ => {
 }
 }))())?;
 let data = ((|| PResult::Ok({
-let sz = size as usize<>;
+let sz = size as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok(match r#type {
 (118u8, 109u8, 104u8, 100u8) => {
@@ -26440,7 +26440,7 @@ _ => {
 }
 }))())?;
 let data = ((|| PResult::Ok({
-let sz = size as usize<>;
+let sz = size as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok(match r#type {
 (100u8, 114u8, 101u8, 102u8) => {
@@ -26484,7 +26484,7 @@ _ => {
 }
 }))())?;
 let data = ((|| PResult::Ok({
-let sz = size as usize<>;
+let sz = size as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let mut accum = Vec::new();
@@ -26573,7 +26573,7 @@ _ => {
 }
 }))())?;
 let data = ((|| PResult::Ok({
-let sz = size as usize<>;
+let sz = size as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok(match r#type {
 (115u8, 116u8, 115u8, 100u8) => {
@@ -26607,7 +26607,7 @@ _ => {
 }
 }))())?;
 let data = ((|| PResult::Ok({
-let sz = size as usize<>;
+let sz = size as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let mut accum = Vec::new();
@@ -26936,7 +26936,7 @@ _ => {
 }
 }))())?;
 let data = ((|| PResult::Ok({
-let sz = size as usize<>;
+let sz = size as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok(match r#type {
 (105u8, 110u8, 102u8, 101u8) => {
@@ -27056,7 +27056,7 @@ _ => {
 }
 }))())?;
 let data = ((|| PResult::Ok({
-let sz = size as usize<>;
+let sz = size as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok(match r#type {
 (169u8, 116u8, 111u8, 111u8) => {
@@ -27133,7 +27133,7 @@ _ => {
 }
 }))())?;
 let data = ((|| PResult::Ok({
-let sz = size as usize<>;
+let sz = size as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok(match r#type {
 (100u8, 97u8, 116u8, 97u8) => {
@@ -27986,7 +27986,7 @@ jpeg_eoi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = (try_sub!(length, 2u16, 6569230515699692699u64)) as usize<>;
+let sz = (try_sub!(length, 2u16, 6569230515699692699u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_jpeg_app0_data(_input))?))())?;
 _input.end_slice()?;
@@ -28017,7 +28017,7 @@ jpeg_eoi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = (try_sub!(length, 2u16, 15682767706885925172u64)) as usize<>;
+let sz = (try_sub!(length, 2u16, 15682767706885925172u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_jpeg_app1_data(_input))?))())?;
 _input.end_slice()?;
@@ -28530,7 +28530,7 @@ jpeg_eoi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = (try_sub!(length, 2u16, 2946338368865429585u64)) as usize<>;
+let sz = (try_sub!(length, 2u16, 2946338368865429585u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_jpeg_dnl_data(_input))?))())?;
 _input.end_slice()?;
@@ -28685,7 +28685,7 @@ jpeg_eoi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = (try_sub!(length, 2u16, 466150863659326234u64)) as usize<>;
+let sz = (try_sub!(length, 2u16, 466150863659326234u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_jpeg_sos_data(_input))?))())?;
 _input.end_slice()?;
@@ -29654,7 +29654,7 @@ jpeg_eoi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = (try_sub!(length, 2u16, 11988854374464943326u64)) as usize<>;
+let sz = (try_sub!(length, 2u16, 11988854374464943326u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_jpeg_sof_data(_input))?))())?;
 _input.end_slice()?;
@@ -29685,7 +29685,7 @@ jpeg_eoi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = (try_sub!(length, 2u16, 7620281735474506525u64)) as usize<>;
+let sz = (try_sub!(length, 2u16, 7620281735474506525u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_jpeg_sof_data(_input))?))())?;
 _input.end_slice()?;
@@ -29716,7 +29716,7 @@ jpeg_eoi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = (try_sub!(length, 2u16, 11599300513837427027u64)) as usize<>;
+let sz = (try_sub!(length, 2u16, 11599300513837427027u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_jpeg_sof_data(_input))?))())?;
 _input.end_slice()?;
@@ -29747,7 +29747,7 @@ jpeg_eoi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = (try_sub!(length, 2u16, 950046280632689001u64)) as usize<>;
+let sz = (try_sub!(length, 2u16, 950046280632689001u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_jpeg_sof_data(_input))?))())?;
 _input.end_slice()?;
@@ -29778,7 +29778,7 @@ jpeg_eoi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = (try_sub!(length, 2u16, 5625702265340316943u64)) as usize<>;
+let sz = (try_sub!(length, 2u16, 5625702265340316943u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_jpeg_sof_data(_input))?))())?;
 _input.end_slice()?;
@@ -29809,7 +29809,7 @@ jpeg_eoi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = (try_sub!(length, 2u16, 4260205764162136487u64)) as usize<>;
+let sz = (try_sub!(length, 2u16, 4260205764162136487u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_jpeg_sof_data(_input))?))())?;
 _input.end_slice()?;
@@ -29840,7 +29840,7 @@ jpeg_eoi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = (try_sub!(length, 2u16, 5712308626808297759u64)) as usize<>;
+let sz = (try_sub!(length, 2u16, 5712308626808297759u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_jpeg_sof_data(_input))?))())?;
 _input.end_slice()?;
@@ -29871,7 +29871,7 @@ jpeg_eoi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = (try_sub!(length, 2u16, 8638089167112501923u64)) as usize<>;
+let sz = (try_sub!(length, 2u16, 8638089167112501923u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_jpeg_sof_data(_input))?))())?;
 _input.end_slice()?;
@@ -29902,7 +29902,7 @@ jpeg_eoi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = (try_sub!(length, 2u16, 1453530207670075215u64)) as usize<>;
+let sz = (try_sub!(length, 2u16, 1453530207670075215u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_jpeg_sof_data(_input))?))())?;
 _input.end_slice()?;
@@ -29933,7 +29933,7 @@ jpeg_eoi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = (try_sub!(length, 2u16, 15915510438164744429u64)) as usize<>;
+let sz = (try_sub!(length, 2u16, 15915510438164744429u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_jpeg_sof_data(_input))?))())?;
 _input.end_slice()?;
@@ -29964,7 +29964,7 @@ jpeg_eoi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = (try_sub!(length, 2u16, 1542992798780655146u64)) as usize<>;
+let sz = (try_sub!(length, 2u16, 1542992798780655146u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_jpeg_sof_data(_input))?))())?;
 _input.end_slice()?;
@@ -29995,7 +29995,7 @@ jpeg_eoi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = (try_sub!(length, 2u16, 7028560493922100069u64)) as usize<>;
+let sz = (try_sub!(length, 2u16, 7028560493922100069u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_jpeg_sof_data(_input))?))())?;
 _input.end_slice()?;
@@ -30026,7 +30026,7 @@ jpeg_eoi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = (try_sub!(length, 2u16, 2649783168072194737u64)) as usize<>;
+let sz = (try_sub!(length, 2u16, 2649783168072194737u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_jpeg_sof_data(_input))?))())?;
 _input.end_slice()?;
@@ -30113,7 +30113,7 @@ jpeg_eoi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = (try_sub!(length, 2u16, 8253205784254894771u64)) as usize<>;
+let sz = (try_sub!(length, 2u16, 8253205784254894771u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let mut accum = Vec::new();
@@ -30168,7 +30168,7 @@ jpeg_eoi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = (try_sub!(length, 2u16, 1225514472166157741u64)) as usize<>;
+let sz = (try_sub!(length, 2u16, 1225514472166157741u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_jpeg_dht_data(_input))?))())?;
 _input.end_slice()?;
@@ -30199,7 +30199,7 @@ jpeg_eoi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = (try_sub!(length, 2u16, 1224415506115142500u64)) as usize<>;
+let sz = (try_sub!(length, 2u16, 1224415506115142500u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_jpeg_dac_data(_input))?))())?;
 _input.end_slice()?;
@@ -30230,7 +30230,7 @@ jpeg_eoi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = (try_sub!(length, 2u16, 16859485491091215361u64)) as usize<>;
+let sz = (try_sub!(length, 2u16, 16859485491091215361u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok((Decoder_jpeg_dri_data(_input))?))())?;
 _input.end_slice()?;
@@ -30261,7 +30261,7 @@ jpeg_eoi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = (try_sub!(length, 2u16, 14898840355839773829u64)) as usize<>;
+let sz = (try_sub!(length, 2u16, 14898840355839773829u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let mut accum = Vec::new();
@@ -30312,7 +30312,7 @@ jpeg_eoi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = (try_sub!(length, 2u16, 9453951600195794313u64)) as usize<>;
+let sz = (try_sub!(length, 2u16, 9453951600195794313u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let mut accum = Vec::new();
@@ -30363,7 +30363,7 @@ jpeg_eoi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = (try_sub!(length, 2u16, 10036157788440812915u64)) as usize<>;
+let sz = (try_sub!(length, 2u16, 10036157788440812915u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let mut accum = Vec::new();
@@ -30414,7 +30414,7 @@ jpeg_eoi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = (try_sub!(length, 2u16, 6349531732377484771u64)) as usize<>;
+let sz = (try_sub!(length, 2u16, 6349531732377484771u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let mut accum = Vec::new();
@@ -30465,7 +30465,7 @@ jpeg_eoi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = (try_sub!(length, 2u16, 13785646910930464515u64)) as usize<>;
+let sz = (try_sub!(length, 2u16, 13785646910930464515u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let mut accum = Vec::new();
@@ -30516,7 +30516,7 @@ jpeg_eoi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = (try_sub!(length, 2u16, 5323644471994966730u64)) as usize<>;
+let sz = (try_sub!(length, 2u16, 5323644471994966730u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let mut accum = Vec::new();
@@ -30567,7 +30567,7 @@ jpeg_eoi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = (try_sub!(length, 2u16, 13278122992382147879u64)) as usize<>;
+let sz = (try_sub!(length, 2u16, 13278122992382147879u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let mut accum = Vec::new();
@@ -30618,7 +30618,7 @@ jpeg_eoi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = (try_sub!(length, 2u16, 18159646757349796721u64)) as usize<>;
+let sz = (try_sub!(length, 2u16, 18159646757349796721u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let mut accum = Vec::new();
@@ -30669,7 +30669,7 @@ jpeg_eoi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = (try_sub!(length, 2u16, 7124606020426797957u64)) as usize<>;
+let sz = (try_sub!(length, 2u16, 7124606020426797957u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let mut accum = Vec::new();
@@ -30720,7 +30720,7 @@ jpeg_eoi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = (try_sub!(length, 2u16, 15116592996336247086u64)) as usize<>;
+let sz = (try_sub!(length, 2u16, 15116592996336247086u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let mut accum = Vec::new();
@@ -30771,7 +30771,7 @@ jpeg_eoi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = (try_sub!(length, 2u16, 10346499338674982396u64)) as usize<>;
+let sz = (try_sub!(length, 2u16, 10346499338674982396u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let mut accum = Vec::new();
@@ -30822,7 +30822,7 @@ jpeg_eoi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = (try_sub!(length, 2u16, 10951432197815892834u64)) as usize<>;
+let sz = (try_sub!(length, 2u16, 10951432197815892834u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let mut accum = Vec::new();
@@ -30873,7 +30873,7 @@ jpeg_eoi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = (try_sub!(length, 2u16, 14864597187136898256u64)) as usize<>;
+let sz = (try_sub!(length, 2u16, 14864597187136898256u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let mut accum = Vec::new();
@@ -30924,7 +30924,7 @@ jpeg_eoi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = (try_sub!(length, 2u16, 15238960955167157760u64)) as usize<>;
+let sz = (try_sub!(length, 2u16, 15238960955167157760u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let mut accum = Vec::new();
@@ -30975,7 +30975,7 @@ jpeg_eoi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
-let sz = (try_sub!(length, 2u16, 17527274083228188873u64)) as usize<>;
+let sz = (try_sub!(length, 2u16, 17527274083228188873u64)) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let mut accum = Vec::new();
@@ -31419,7 +31419,7 @@ PResult::Ok(gzip_header { magic, method, file_flags, timestamp, compression_flag
 fn Decoder_gzip_fextra<'input>(_input: &mut Parser<'input>) -> Result<gzip_fextra, ParseError> {
 let xlen = ((|| PResult::Ok((Decoder139(_input))?))())?;
 let subfields = ((|| PResult::Ok({
-let sz = xlen as usize<>;
+let sz = xlen as usize;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let mut accum = Vec::new();
