@@ -2207,10 +2207,7 @@ impl TypeChecker {
                 self.unify_var_proj_elem(xs_var, x_var)?;
                 self.unify_var_pair(ret_var, key_var)?;
                 self.unify_var_pair(elem_var, x_var)?;
-                self.unify_var_utype(
-                    newvar,
-                    Rc::new(UType::Option(x_var.into()))
-                )?;
+                self.unify_var_utype(newvar, Rc::new(UType::Option(x_var.into())))?;
 
                 newvar
             }

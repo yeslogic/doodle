@@ -141,8 +141,7 @@ impl<T: Clone> SeqKind<T> {
     }
 }
 
-impl<T: Clone> Index<usize> for SeqKind<T>
-{
+impl<T: Clone> Index<usize> for SeqKind<T> {
     type Output = T;
 
     fn index(&self, index: usize) -> &Self::Output {

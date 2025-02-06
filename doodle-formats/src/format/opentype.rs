@@ -384,46 +384,40 @@ fn subheader_index(seq: Expr) -> Expr {
 const START_VAR: Expr = Expr::Var(Label::Borrowed("start"));
 const START_ARG: (Label, ValueType) = (Label::Borrowed("start"), ValueType::Base(BaseType::U32));
 
-/// Given `Expr`s `table_records` and a `query_table_id` of the appropriate type,
-/// seeks through `table_records` and filters the elements whose projected field `table_id`
-/// is a one-to-one match for `query_table_id`; then, applies the dependent Format-closure
-/// `dep_format` to the expression representing this array computation.
-
+/// Given `Expr`s `table_records` and a `query_table_id` of the appropriate Rust-type (`u32`),
+/// applies `dep_format` to the `Option<T>`-kinded `Expr` yielded by a binary search over
+/// `table_records ~ Seq<T>`.
+///
 /// # Notes
 ///
-/// Callers should be aware that while not allowed by the standard, there is no type-level
-/// guarantee the Expr-Seq `dep_format` is applied to, is only ever singleton-or-empty.
+/// When constructing the `dep_format` closure, callers should be aware that the `Expr`
+/// parameter it accepts will implicitly have the ValueType `Option<opentype_table_record>`,
+/// where `table_records` has ValueType `Seq<opentype_table_record>`.
 ///
-/// Also note that while in principle a binary search is ideal, the constructions
-/// we have on hand only allow for linear search without short-circuiting for
-/// `Θ(N)` performance regardless of where the match is in the list.
+/// As the search is hardcoded to be binary, this method should only be called when the
+/// only cases where `table_records` might be unsorted are deemed definitionally invalid
+/// OpenType streams.
+///
+/// Care should also be taken that only OpenType streams are parsed to the point where
+/// this function's output would be parsed, and that any non-OpenType streams are filtered
+/// out by that point (either as a result of delaying OpenType alternatives until very few
+/// formats remain, or precluding invalid streams via parse-level invariants such as magic
+/// bytes).
 fn with_table(
     table_records: Expr,
     query_table_id: u32,
     dep_format: impl FnOnce(Expr) -> Format,
 ) -> Format {
-    // FIXME[epic=perf] - this is a naive algorithm that could be improved with the right primitives in-hand
-    // TODO[epic=binary-search]: accelerate using binary search
-    // TODO: make use of `search_range` etc.
-    let matches_query = |table_record: Expr| {
-        expr_eq(
-            record_proj(table_record, "table_id"),
-            Expr::U32(query_table_id),
-        )
-    };
-    // FIXME - we have no current means to short-circuit the iteration once a match is found
-    let matching_tables = flat_map(
-        lambda(
-            "table",
-            expr_if_else(
-                matches_query(var("table")),
-                singleton(var("table")),
-                seq_empty(),
-            ),
-        ),
+    // REVIEW - we assume by default that all OpenType table-directories are sorted by id
+    const TABLE_RECORDS_ARE_SORTED: bool = true;
+    let f_get_table_id = |table_record: Expr| record_proj(table_record, "table_id");
+    let opt_match = find_by_key(
+        TABLE_RECORDS_ARE_SORTED,
+        f_get_table_id,
+        Expr::U32(query_table_id),
         table_records,
     );
-    dep_format(matching_tables)
+    dep_format(opt_match)
 }
 
 /// Given a raw Format `format` and an absolute buffer-offset `abs_offset`,
@@ -497,7 +491,7 @@ fn offset16_mandatory(base_offset: Expr, format: Format, base: &BaseModule) -> F
                 is_nonzero_u16(var("offset")),
                 // because link-checked can also return format_none, it has to be the one to wrap format_some around the parse
                 link_forward_checked(pos_add_u16(base_offset, var("offset")), format),
-                format_none(),
+                fmt_none(),
             ),
         ),
     ])
@@ -529,7 +523,7 @@ fn offset16_nullable(base_offset: Expr, format: Format, base: &BaseModule) -> Fo
                 is_nonzero_u16(var("offset")),
                 // because link-checked can also return format_none, it has to be the one to wrap format_some around the parse
                 link_forward_checked(pos_add_u16(base_offset, var("offset")), format),
-                format_none(),
+                fmt_none(),
             ),
         ),
     ])
@@ -559,8 +553,8 @@ fn offset32(base_offset: Expr, format: Format, base: &BaseModule) -> Format {
             "link",
             if_then_else(
                 is_nonzero_u32(var("offset")),
-                linked_offset32(base_offset, var("offset"), format_some(format)),
-                format_none(),
+                linked_offset32(base_offset, var("offset"), fmt_some(format)),
+                fmt_none(),
             ),
         ),
     ])
@@ -610,22 +604,21 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             id: u32,
             table_format: Format,
         ) -> Format {
-            let dep_format = |table_matches: Expr| -> Format {
-                fmt_let(
-                    "table_matches",
-                    table_matches,
-                    fmt_let(
-                        "matching_table",
-                        unwrap_singleton(var("table_matches")),
-                        linked_offset32(
-                            sof_offset,
-                            record_proj(var("matching_table"), "offset"),
-                            Format::Slice(
-                                Box::new(record_proj(var("matching_table"), "length")),
-                                Box::new(table_format),
+            let dep_format = |opt_table_match: Expr| -> Format {
+                fmt_match(
+                    opt_table_match,
+                    [
+                        (
+                            pat_some(bind("matching_table")),
+                            linked_offset32(
+                                sof_offset,
+                                record_proj(var("matching_table"), "offset"),
+                                slice(record_proj(var("matching_table"), "length"), table_format),
                             ),
                         ),
-                    ),
+                        // NOTE - the line below is not strictly necessary as an ExcludedBranch catchall will be generate
+                        // (pat_none(), Format::Fail)
+                    ],
                 )
             };
             with_table(table_records, id, dep_format)
@@ -637,28 +630,30 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             id: u32,
             table_format_ref: FormatRef,
         ) -> Format {
-            let dep_format =
-                |table_matches: Expr| -> Format {
-                    fmt_let(
-                        "table_matches",
-                        table_matches,
-                        fmt_let(
-                            "matching_table",
-                            unwrap_singleton(var("table_matches")),
+            let dep_format = |opt_table_match: Expr| -> Format {
+                fmt_match(
+                    opt_table_match,
+                    [
+                        (
+                            pat_some(bind("matching_table")),
                             linked_offset32(
                                 sof_offset,
                                 record_proj(var("matching_table"), "offset"),
-                                Format::Slice(
-                                    Box::new(record_proj(var("matching_table"), "length")),
-                                    Box::new(table_format_ref.call_args(vec![record_proj(
-                                        var("matching_table"),
-                                        "length",
-                                    )])),
+                                fmt_let(
+                                    "table_len",
+                                    record_proj(var("matching_table"), "length"),
+                                    slice(
+                                        var("table_len"),
+                                        table_format_ref.call_args(vec![var("table_len")]),
+                                    ),
                                 ),
                             ),
                         ),
-                    )
-                };
+                        // NOTE - the line below is not strictly necessary as an ExcludedBranch catchall will be generate
+                        // (pat_none(), Format::Fail)
+                    ],
+                )
+            };
             with_table(table_records, id, dep_format)
         }
 
@@ -668,26 +663,15 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             id: u32,
             table_format: Format,
         ) -> Format {
-            let cond_fmt = |matching_table: Expr| -> Format {
-                fmt_let(
-                    "table",
-                    matching_table,
-                    format_some(linked_offset32(
-                        sof_offset,
-                        record_proj(var("table"), "offset"),
-                        Format::Slice(
-                            Box::new(record_proj(var("table"), "length")),
-                            Box::new(table_format),
-                        ),
-                    )),
+            let cond_fmt = |table_match: Expr| -> Format {
+                linked_offset32(
+                    sof_offset,
+                    record_proj(table_match.clone(), "offset"),
+                    slice(record_proj(table_match, "length"), table_format),
                 )
             };
-            let dep_format = move |table_matches: Expr| -> Format {
-                fmt_let(
-                    "table_matches",
-                    table_matches,
-                    maybe_singleton(var("table_matches"), cond_fmt),
-                )
+            let dep_format = move |opt_table_match: Expr| -> Format {
+                map_option(opt_table_match, "table", cond_fmt)
             };
             with_table(table_records, id, dep_format)
         }
@@ -1795,20 +1779,20 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 let glyf_scale = |flags: Expr| -> Format {
                     if_then_else(
                         record_proj(flags.clone(), "we_have_a_scale"),
-                        format_some(fmt_variant("Scale", f2dot14(base))),
+                        fmt_some(fmt_variant("Scale", f2dot14(base))),
                         if_then_else(
                             record_proj(flags.clone(), "we_have_an_x_and_y_scale"),
-                            format_some(fmt_variant(
+                            fmt_some(fmt_variant(
                                 "XY",
                                 record_repeat(["x_scale", "y_scale"], f2dot14(base)),
                             )),
                             if_then_else(
                                 record_proj(flags, "we_have_a_two_by_two"),
-                                format_some(fmt_variant(
+                                fmt_some(fmt_variant(
                                     "Matrix",
                                     tuple_repeat(2, tuple_repeat(2, f2dot14(base))),
                                 )),
-                                format_none(),
+                                fmt_none(),
                             ),
                         ),
                     )
@@ -3918,8 +3902,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                             "mark_filtering_set",
                             if_then_else(
                                 record_proj(var("lookup_flag"), "use_mark_filtering_set"),
-                                format_some(base.u16be()),
-                                format_none(),
+                                fmt_some(base.u16be()),
+                                fmt_none(),
                             ),
                         ),
                     ])

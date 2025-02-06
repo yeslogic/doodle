@@ -477,13 +477,15 @@ impl Expr {
                         child_scope.push(name.clone(), t.as_ref().clone());
                         match expr.infer_type(&child_scope)?.unify(&key_type)? {
                             ValueType::Base(b) if b.is_numeric() => Ok(ValueType::Option(t)),
-                            other => Err(anyhow!("FindByKey: expected numeric key type, found {other:?}"))
+                            other => Err(anyhow!(
+                                "FindByKey: expected numeric key type, found {other:?}"
+                            )),
                         }
                     }
                     other => Err(anyhow!("FindByKey: expected Seq, found {other:?}")),
-                }
+                },
                 other => Err(anyhow!("FindByKey: Expected Lambda, found {other:?}")),
-            }
+            },
             Expr::FlatMapList(expr, ret_type, seq) => match expr.as_ref() {
                 Expr::Lambda(name, expr) => match seq.infer_type(scope)? {
                     ValueType::Seq(t) => {

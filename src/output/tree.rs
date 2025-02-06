@@ -1711,7 +1711,15 @@ impl<'module> TreePrinter<'module> {
                 Precedence::FUN_APPLICATION,
             ),
             Expr::FindByKey(is_sorted, keying_fn, query, seq) => cond_paren(
-                self.prefix_op(if *is_sorted { "binary-search" } else { "linear-search" }, Some(&[keying_fn, query]), seq),
+                self.prefix_op(
+                    if *is_sorted {
+                        "binary-search"
+                    } else {
+                        "linear-search"
+                    },
+                    Some(&[keying_fn, query]),
+                    seq,
+                ),
                 prec,
                 Precedence::FUN_APPLICATION,
             ),
