@@ -585,6 +585,39 @@ impl RustType {
         Self::Verbatim(con.into(), params.unwrap_or_default())
     }
 
+    /// Predicate function that determines whether values of RustType `self` should be borrowed
+    /// before being used in signatures of, or when passed in as arguments to, top-level decoder functions.
+    pub fn should_borrow_for_arg(&self) -> bool {
+        match self {
+            RustType::Atom(ref atom_type) => match atom_type {
+                AtomType::Comp(ct) => match ct {
+                    // REVIEW - this may lead to code divergence and may not be stable...
+                    CompType::Vec(..) => true,
+                    CompType::Borrow(..) => false,
+                    CompType::Option(t) => t.should_borrow_for_arg(),
+                    CompType::Result(t_ok, _t_err) => t_ok.should_borrow_for_arg(),
+                },
+                AtomType::TypeRef(local) => match local {
+                    // REVIEW - shallow wrappers around vec should be treated as if vec, but that is difficult to achieve without more state-info from generation process
+                    LocalType::LocalDef(_ix, ..) => false,
+                    LocalType::External(..) => false,
+                },
+                AtomType::Prim(..) => false,
+            },
+            // REVIEW - are there cases where we want to selectively borrow anon-tuples (and if so, distributive or unified)?
+            RustType::AnonTuple(_elts) => false,
+            RustType::Verbatim(..) => false,
+        }
+    }
+
+    pub fn selective_borrow(lt: Option<RustLt>, m: Mut, ty: RustType) -> Self {
+        if ty.should_borrow_for_arg() {
+            Self::borrow_of(lt, m, ty)
+        } else {
+            ty
+        }
+    }
+
     /// Constructs a `RustType` representing `&'a (mut|) T` from parameters representing `'a` (optional),
     /// the mutability of the reference, and `T`, respectively.
     pub fn borrow_of(lt: Option<RustLt>, m: Mut, ty: RustType) -> Self {

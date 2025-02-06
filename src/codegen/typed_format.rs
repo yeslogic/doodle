@@ -682,8 +682,13 @@ impl<TypeRep> TypedExpr<TypeRep> {
 }
 
 impl TypedExpr<GenType> {
+    /// Returns the `GenType` associated with `self`.
+    ///
+    /// Returns `None` if and only if `self` is `TypedExpr::Lambda`.
     pub(crate) fn get_type(&self) -> Option<Cow<'_, GenType>> {
         match self {
+            TypedExpr::Lambda(..) => None,
+
             TypedExpr::Bool(_) => Some(Cow::Owned(GenType::from(PrimType::Bool))),
             TypedExpr::AsU8(_) | TypedExpr::U8(_) => Some(Cow::Owned(GenType::from(PrimType::U8))),
             TypedExpr::U16Le(_) | TypedExpr::U16Be(_) | TypedExpr::AsU16(_) | TypedExpr::U16(_) => {
@@ -698,7 +703,6 @@ impl TypedExpr<GenType> {
                 Some(Cow::Owned(GenType::from(PrimType::U64)))
             }
             TypedExpr::AsChar(_) => Some(Cow::Owned(GenType::from(PrimType::Char))),
-            TypedExpr::Lambda(..) => None,
             TypedExpr::Var(gt, ..)
             | TypedExpr::Tuple(gt, ..)
             | TypedExpr::TupleProj(gt, ..)
