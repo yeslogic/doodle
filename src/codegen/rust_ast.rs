@@ -1298,7 +1298,9 @@ impl RustClosure {
         )
     }
 
-    /// Constructs a new closure with 'predicate' (ref) semantics.
+    /// Constructs a new closure with 'predicate' (ref-bound argument) semantics.
+    ///
+    /// Also applies to extract-key semantics `(&T) -> K where K: Copy`
     pub fn new_predicate(
         head: impl IntoLabel,
         deref_t: Option<RustType>,

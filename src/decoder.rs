@@ -160,6 +160,8 @@ impl Value {
             _ => false,
         }
     }
+
+
 }
 
 impl Value {
@@ -687,6 +689,26 @@ impl Expr {
                 }
                 _ => panic!("LeftFold: expected Seq"),
             },
+            Expr::FindByKey(is_sorted, f_get_key, query_key, seq) => match seq.eval_value(scope) {
+                Value::Seq(values) => {
+                    let query = query_key.eval_value(scope);
+                    let eval = |lambda: &Expr, arg: &Value| {
+                        lambda.eval_lambda(scope, arg)
+                    };
+                    if *is_sorted {
+                        match search::find_index_by_key_sorted(f_get_key, &query, &values, eval) {
+                            Some(ix) => Cow::Owned(Value::Option(Some(Box::new(values[ix].clone())))),
+                            None => Cow::Owned(Value::Option(None)),
+                        }
+                    } else {
+                        match search::find_index_by_key_unsorted(f_get_key, &query, &values, eval) {
+                            Some(ix) => Cow::Owned(Value::Option(Some(Box::new(values[ix].clone())))),
+                            None => Cow::Owned(Value::Option(None)),
+                        }
+                    }
+                }
+                _ => panic!("FindByKey: expected Seq"),
+            }
             Expr::FlatMapList(expr, _ret_type, seq) => match seq.eval_value(scope) {
                 Value::Seq(values) => {
                     let mut vs = Vec::new();
@@ -747,6 +769,8 @@ impl Expr {
         }
     }
 }
+
+pub(crate) mod search;
 
 /// Decoders with a fixed amount of lookahead
 #[derive(Clone, Debug)]

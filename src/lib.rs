@@ -169,6 +169,8 @@ pub enum Expr {
     FlatMapAccum(Box<Expr>, Box<Expr>, TypeHint, Box<Expr>),
     /// FlatMapList :: ((\[U\], T) -> \[U\]) -> TypeRep U -> \[T\] -> \[U\] (lambda call yields a run of values to append to the final list)
     FlatMapList(Box<Expr>, TypeHint, Box<Expr>),
+    /// FindByKey :: (is-sorted) -> (T -> K) -> K -> \[T\] ->  Option(T) (is-sorted indicates whether the values are sorted w.r.t. the keying function in question; only simple types can be keys for now)
+    FindByKey(bool, Box<Expr>, Box<Expr>, Box<Expr>),
 
     /// EnumFromTo :: (Num, Num) -> \[Num\]
     EnumFromTo(Box<Expr>, Box<Expr>),
@@ -467,6 +469,21 @@ impl Expr {
                 },
                 other => Err(anyhow!("LeftFold: expected Lambda, found {other:?}")),
             },
+            Expr::FindByKey(_is_sorted, get_key, query_key, seq) => match get_key.as_ref() {
+                Expr::Lambda(name, expr) => match seq.infer_type(scope)? {
+                    ValueType::Seq(t) => {
+                        let key_type = query_key.infer_type(scope)?;
+                        let mut child_scope = TypeScope::child(scope);
+                        child_scope.push(name.clone(), t.as_ref().clone());
+                        match expr.infer_type(&child_scope)?.unify(&key_type)? {
+                            ValueType::Base(b) if b.is_numeric() => Ok(ValueType::Option(t)),
+                            other => Err(anyhow!("FindByKey: expected numeric key type, found {other:?}"))
+                        }
+                    }
+                    other => Err(anyhow!("FindByKey: expected Seq, found {other:?}")),
+                }
+                other => Err(anyhow!("FindByKey: Expected Lambda, found {other:?}")),
+            }
             Expr::FlatMapList(expr, ret_type, seq) => match expr.as_ref() {
                 Expr::Lambda(name, expr) => match seq.infer_type(scope)? {
                     ValueType::Seq(t) => {
@@ -579,6 +596,9 @@ impl Expr {
             }
             Expr::FlatMapAccum(f, z, _, x) | Expr::LeftFold(f, z, _, x) => {
                 f.is_shadowed_by(name) || z.is_shadowed_by(name) || x.is_shadowed_by(name)
+            }
+            Expr::FindByKey(_, k, v, s) => {
+                k.is_shadowed_by(name) || v.is_shadowed_by(name) || s.is_shadowed_by(name)
             }
             Expr::LiftOption(opt_x) => opt_x.as_ref().is_some_and(|x| x.is_shadowed_by(name)),
         }

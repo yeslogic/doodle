@@ -4,7 +4,7 @@
 │       ├── noise <- repeat [= 255]
 │       ├── sep <- [= 0]
 │       ├── here <- pos := 12
-│       └── waldo <- with-relative-offset (where - here) (...) :=
+│       └── waldo <- with-relative-offset here (where - here) (...) :=
 │           ├── 0 <- [= 87]
 │           ├── 1 <- [= 97]
 │           ├── 2 <- [= 108]

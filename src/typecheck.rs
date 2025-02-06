@@ -2194,6 +2194,26 @@ impl TypeChecker {
 
                 newvar
             }
+            Expr::FindByKey(_is_sorted, f_get_key, query_key, seq_expr) => {
+                // NOTE - (is-sorted) ~> (x -> key) -> key -> [x] -> Option(T)
+                let newvar = self.get_new_uvar();
+
+                let (elem_var, ret_var) = self.infer_vars_expr_lambda(f_get_key, scope)?;
+                let key_var = self.infer_var_expr(query_key, scope)?;
+                let xs_var = self.infer_var_expr(seq_expr, scope)?;
+
+                let x_var = self.get_new_uvar();
+
+                self.unify_var_proj_elem(xs_var, x_var)?;
+                self.unify_var_pair(ret_var, key_var)?;
+                self.unify_var_pair(elem_var, x_var)?;
+                self.unify_var_utype(
+                    newvar,
+                    Rc::new(UType::Option(x_var.into()))
+                )?;
+
+                newvar
+            }
             Expr::FlatMapList(f_expr, ret_type, seq_expr) => {
                 // NOTE - (([y], x) -> [y]) -> Vt(y) -> [x] -> [y]
                 let ys_var = self.get_new_uvar();

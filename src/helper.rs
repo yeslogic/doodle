@@ -1284,3 +1284,18 @@ pub fn fmt_let(clone_varname: &'static str, orig: Expr, dep_format: Format) -> F
 pub fn enum_from_to(start: Expr, end: Expr) -> Expr {
     Expr::EnumFromTo(Box::new(start), Box::new(end))
 }
+
+/// Helper for [`Expr::FindByKey`].
+pub fn find_by_key(
+    is_sorted: bool,
+    key_fn: impl FnOnce(Expr) -> Expr,
+    query: Expr,
+    array: Expr,
+) -> Expr {
+    Expr::FindByKey(
+        is_sorted,
+        Box::new(lambda("elem", key_fn(var("elem")))),
+        Box::new(query),
+        Box::new(array),
+    )
+}
