@@ -1031,6 +1031,22 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                     embed_lambda_dft(f, ClosureKind::PairBorrowOwned, true),
                 ])
                 .wrap_try(),
+        TypedExpr::FindByKey(_, is_sorted, f, query, seq) => {
+            let method = if *is_sorted {
+                "find_by_key_sorted"
+            } else {
+                "find_by_key_unsorted"
+            };
+            let seq = embed_expr(seq, ExprInfo::Natural).make_persistent().into_owned();
+            RustExpr::local(method)
+                .call_with([
+                    embed_lambda_dft(f, ClosureKind::ExtractKey, false),
+                    embed_expr(query, ExprInfo::Natural),
+                    seq,
+                ])
+                // REVIEW - do we need this? (we probably do)
+                .call_method("cloned")
+        }
         TypedExpr::Dup(_, n, expr) => {
             // NOTE - the dup count should be simple, but the duplicated expression must be move-safe
             RustExpr::local("dup32").call_with([
@@ -1261,6 +1277,8 @@ pub(crate) enum ClosureKind {
     PairBorrowOwned,
     /// Hybrid category for closures taking an pair-argument, the first element of which is owned and the second of which is borrowed
     PairOwnedBorrow,
+    /// Category for closures that take a single borrowed argument and extract an owned value of a `Copy` type, to use as a key for scanning arrays
+    ExtractKey,
 }
 
 /// Transcribes `GTExpr::Lambda` instances into RustExpr values.
@@ -1280,7 +1298,8 @@ pub(crate) enum ClosureKind {
 fn embed_lambda(expr: &GTExpr, kind: ClosureKind, needs_ok: bool, info: ExprInfo) -> RustExpr {
     match expr {
         TypedExpr::Lambda((head_t, _), head, body) => match kind {
-            ClosureKind::Predicate => {
+            // REVIEW - while ExtractKind is very similar to Predicate semantics, we want to avoid hard-coding Predicate for cases where that descriptor is misleading
+            ClosureKind::Predicate | ClosureKind::ExtractKey => {
                 let expansion = embed_expr(body, info);
                 RustExpr::Closure(RustClosure::new_predicate(
                     head.clone(),
@@ -3743,6 +3762,31 @@ impl<'a> Elaborator<'a> {
                     Box::new(t_lambda),
                     Box::new(t_acc),
                     _acc_vt.clone(),
+                    Box::new(t_seq),
+                )
+            }
+            Expr::FindByKey(_is_sorted, f_get_key, query_key, seq) => {
+                self.codegen.name_gen.ctxt.push_atom(NameAtom::DeadEnd);
+                let t_f_get_key = self.elaborate_expr_lambda(f_get_key);
+                self.codegen.name_gen.ctxt.escape();
+
+                self.codegen.name_gen.ctxt.push_atom(NameAtom::DeadEnd);
+                let t_query_key = self.elaborate_expr(query_key);
+                self.codegen.name_gen.ctxt.escape();
+
+                self.codegen.name_gen.ctxt.push_atom(NameAtom::DeadEnd);
+                let t_seq = self.elaborate_expr(seq);
+                self.codegen.name_gen.ctxt.escape();
+
+                self.increment_index();
+
+                let gt = self.get_gt_from_index(index);
+
+                TypedExpr::FindByKey(
+                    gt,
+                    *_is_sorted,
+                    Box::new(t_f_get_key),
+                    Box::new(t_query_key),
                     Box::new(t_seq),
                 )
             }

@@ -1,13 +1,10 @@
 use crate::byte_set::ByteSet;
-use crate::decoder::seq_kind::sub_range;
-use crate::decoder::{cow_remap, extract_pair, Compiler, ScopeEntry, SeqKind, ValueSeq};
 use crate::error::{DecodeError, LocDecodeError};
 use crate::read::ReadCtxt;
-use crate::UnaryOp;
+use crate::decoder::{cow_map, cow_remap, extract_pair, search::{find_index_by_key_sorted, find_index_by_key_unsorted}, seq_kind::sub_range, Compiler, Decoder, Program, ScopeEntry, SeqKind, Value, ValueSeq};
 use crate::{
-    decoder::{cow_map, Decoder, Program, Value},
-    pattern::Pattern,
-    Arith, DynFormat, Expr, Format, IntRel, Label,
+    Pattern,
+    Arith, UnaryOp, IntRel, Label, DynFormat, Expr, Format,
 };
 use std::borrow::Cow;
 use std::cmp::Ordering;
@@ -304,9 +301,14 @@ impl ParsedValue {
             ParsedValue::Tuple(ts) => {
                 Value::Tuple(Vec::from_iter(ts.inner.iter().cloned().map(Value::from)))
             }
-            ParsedValue::Seq(elts) => Value::Seq(SeqKind::from_iter(
-                elts.inner.iter().cloned().map(Value::from),
-            )),
+            ParsedValue::Seq(seq) => {
+                match &seq.inner {
+                    SeqKind::Strict(elts) => Value::Seq(SeqKind::Strict(Vec::from_iter(
+                        elts.iter().cloned().map(Value::from),
+                    ))),
+                    SeqKind::Dup(n, v) => Value::Seq(SeqKind::Dup(*n, Box::new(v.clone_into_value()))),
+                }
+            },
             ParsedValue::Record(fs) => Value::Record(Vec::from_iter(
                 fs.inner.iter().cloned().map(|(lab, f)| (lab, f.into())),
             )),
@@ -981,43 +983,64 @@ impl Expr {
                     _ => panic!("FlatMap: expected Seq"),
                 }
             }
-            Expr::FlatMapAccum(expr, accum, _accum_type, seq) => {
-                match seq.eval_value_with_loc(scope) {
-                    Value::Seq(values) => {
-                        let mut accum = accum.eval_value_with_loc(scope);
-                        let mut vs = Vec::new();
-                        for v in values {
-                            let ret = expr.eval_lambda_with_loc(
-                                scope,
-                                &ParsedValue::from_evaluated(Value::Tuple(vec![accum, v])),
-                            );
-                            accum = match extract_pair(ret.unwrap_tuple()) {
-                                (accum, Value::Seq(vn)) => {
-                                    vs.extend(vn);
-                                    accum
-                                }
-                                _ => panic!("FlatMapAccum: expected two values"),
-                            };
-                        }
-                        Cow::Owned(ParsedValue::from_evaluated(Value::Seq(vs.into())))
+            Expr::FlatMapAccum(expr, accum, _accum_type, seq) => match seq.eval_with_loc(scope).coerce_mapped_value().get_sequence() {
+                Some(values) => {
+                    let mut accum = accum.eval_value_with_loc(scope);
+                    let mut vs = Vec::new();
+                    for v in values {
+                        let ret = expr.eval_lambda_with_loc(
+                            scope,
+                            &ParsedValue::from_evaluated(Value::Tuple(vec![accum, v.clone_into_value()])),
+                        );
+                        accum = match extract_pair(ret.unwrap_tuple()) {
+                            (accum, Value::Seq(vn)) => {
+                                vs.extend(vn);
+                                accum
+                            }
+                            other => panic!("FlatMapAccum: bad lambda output type {other:?}"),
+                        };
                     }
-                    _ => panic!("FlatMapAccum: expected Seq"),
+                    Cow::Owned(ParsedValue::from_evaluated(Value::Seq(vs.into())))
                 }
+                None => panic!("FlatMapAccum: expected Seq"),
             }
-            Expr::LeftFold(expr, accum, _accum_type, seq) => match seq.eval_value_with_loc(scope) {
-                Value::Seq(values) => {
+            Expr::LeftFold(expr, accum, _accum_type, seq) => match seq.eval_with_loc(scope).coerce_mapped_value().get_sequence() {
+                Some(values) => {
                     let mut accum = accum.eval_value_with_loc(scope);
                     for v in values {
                         let new_accum = expr.eval_lambda_with_loc(
                             scope,
-                            &ParsedValue::from_evaluated(Value::Tuple(vec![accum, v])),
+                            &ParsedValue::from_evaluated(Value::Tuple(vec![accum, v.clone_into_value()])),
                         );
                         accum = new_accum;
                     }
                     Cow::Owned(ParsedValue::from_evaluated(accum))
                 }
-                _ => panic!("LeftFold: expected Seq"),
-            },
+                None => panic!("LeftFold: expected Seq"),
+            }
+            Expr::FindByKey(is_sorted, f_get_key, query_key, seq) => {
+                match seq.eval_with_loc(scope).coerce_mapped_value().get_sequence() {
+                    Some(ValueSeq::ValueSeq(values)) => {
+                        let eval = |lambda: &Expr, v: &ParsedValue| {
+                            lambda.eval_lambda_with_loc(scope, v)
+                        };
+                        let query = query_key.eval_value_with_loc(scope);
+                        if *is_sorted {
+                            match find_index_by_key_sorted(f_get_key, &query, &values, eval) {
+                                Some(ix) => Cow::Owned(ParsedValue::Option(Some(Box::new(values[ix].clone())))),
+                                None => Cow::Owned(ParsedValue::from_evaluated(Value::Option(None))),
+                            }
+                        } else {
+                            match find_index_by_key_unsorted(f_get_key, &query, &values, eval) {
+                                Some(ix) => Cow::Owned(ParsedValue::Option(Some(Box::new(values[ix].clone())))),
+                                None => Cow::Owned(ParsedValue::from_evaluated(Value::Option(None))),
+                            }
+                        }
+                    }
+                    Some(ValueSeq::IntRange(_)) => unimplemented!("FindByKey: unimplemented on IntRange"),
+                    None => panic!("FindByKey: expected Seq"),
+                }
+            }
             Expr::FlatMapList(expr, _ret_type, seq) => match seq.eval_value_with_loc(scope) {
                 Value::Seq(values) => {
                     let mut vs = Vec::new();

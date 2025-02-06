@@ -141,15 +141,13 @@ impl<T: Clone> SeqKind<T> {
     }
 }
 
-impl<T> Index<usize> for SeqKind<T>
-where
-    T: Clone + Debug,
+impl<T: Clone> Index<usize> for SeqKind<T>
 {
     type Output = T;
 
     fn index(&self, index: usize) -> &Self::Output {
         self.get(index)
-            .expect(format!("out of bounds indexing {index:?} on {self:?}").as_str())
+            .expect(format!("out of bounds indexing {index:?} (len: {})", self.len()).as_str())
     }
 }
 

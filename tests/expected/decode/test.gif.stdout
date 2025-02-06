@@ -7,14 +7,14 @@
 │       │   ├── descriptor <- gif.logical-screen-descriptor :=
 │       │   │   ├── screen-width <- base.u16le := 50
 │       │   │   ├── screen-height <- base.u16le := 50
-│       │   │   ├── flags <- map (packedbits -> { ... }) U8 :=
+│       │   │   ├── flags <- map (packed_bits -> { ... }) U8 :=
 │       │   │   │   ├── table-flag := 1
 │       │   │   │   ├── color-resolution := 7
 │       │   │   │   ├── sort-flag := 0
 │       │   │   │   └── table-size := 4
 │       │   │   ├── bg-color-index <- base.u8 := 0
 │       │   │   └── pixel-aspect-ratio <- base.u8 := 0
-│       │   └── global-color-table <- maybe (descriptor.flags.table-flag != 0) (repeat-count (2 << as-u16 (descriptor.flags.table-size)) gif.color-table-entry) :=
+│       │   └── global-color-table <- maybe (descriptor.flags.table-flag > 0) (repeat-count (2 << as-u16 (descriptor.flags.table-size)) gif.color-table-entry) :=
 │       │       └── some <- repeat-count (2 << as-u16 (descriptor.flags.table-size)) gif.color-table-entry :=
 │       │           └──    r   g   b
 │       │                  0   0   0
@@ -57,7 +57,7 @@
 │       │           │       ├── separator <- [= 33]
 │       │           │       ├── label <- [= 249]
 │       │           │       ├── block-size <- [= 4]
-│       │           │       ├── flags <- map (packedbits -> { ... }) U8 :=
+│       │           │       ├── flags <- map (packed_bits -> { ... }) U8 :=
 │       │           │       │   ├── reserved := 0
 │       │           │       │   ├── disposal-method := 0
 │       │           │       │   ├── user-input-flag := 0
@@ -73,13 +73,13 @@
 │       │                   │   ├── image-top-position <- base.u16le := 0
 │       │                   │   ├── image-width <- base.u16le := 50
 │       │                   │   ├── image-height <- base.u16le := 50
-│       │                   │   └── flags <- map (packedbits -> { ... }) U8 :=
+│       │                   │   └── flags <- map (packed_bits -> { ... }) U8 :=
 │       │                   │       ├── table-flag := 0
 │       │                   │       ├── interlace-flag := 0
 │       │                   │       ├── sort-flag := 0
 │       │                   │       ├── reserved := 0
 │       │                   │       └── table-size := 0
-│       │                   ├── local-color-table <- maybe (descriptor.flags.table-flag != 0) (repeat-count (2 << as-u16 (descriptor.flags.table-size)) gif.color-table-entry) := none
+│       │                   ├── local-color-table <- maybe (descriptor.flags.table-flag > 0) (repeat-count (2 << as-u16 (descriptor.flags.table-size)) gif.color-table-entry) := none
 │       │                   └── data <- gif.table-based-image-data :=
 │       │                       ├── lzw-min-code-size <- base.u8 := 5
 │       │                       ├── image-data <- repeat gif.subblock :=
