@@ -5602,7 +5602,7 @@ PResult::Ok(opentype_table_record { table_id, checksum, offset, length })
 }
 
 fn Decoder_opentype_table_directory_table_links<'input>(_input: &mut Parser<'input>, start: u32, tables: &Vec<opentype_table_record>) -> Result<opentype_table_directory_table_links, ParseError> {
-let cmap = ((|| PResult::Ok(match (find_by_key_sorted(|elem: &opentype_table_record| elem.table_id.clone(), 1668112752u32, tables)).cloned() {
+let cmap = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1668112752u32, tables)).cloned() {
 Some(ref matching_table) => {
 let tgt_offset = start + matching_table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -5621,7 +5621,7 @@ _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
 }))())?;
-let head = ((|| PResult::Ok(match (find_by_key_sorted(|elem: &opentype_table_record| elem.table_id.clone(), 1751474532u32, tables)).cloned() {
+let head = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1751474532u32, tables)).cloned() {
 Some(ref matching_table) => {
 let tgt_offset = start + matching_table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -5640,7 +5640,7 @@ _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
 }))())?;
-let hhea = ((|| PResult::Ok(match (find_by_key_sorted(|elem: &opentype_table_record| elem.table_id.clone(), 1751672161u32, tables)).cloned() {
+let hhea = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1751672161u32, tables)).cloned() {
 Some(ref matching_table) => {
 let tgt_offset = start + matching_table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -5659,7 +5659,7 @@ _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
 }))())?;
-let maxp = ((|| PResult::Ok(match (find_by_key_sorted(|elem: &opentype_table_record| elem.table_id.clone(), 1835104368u32, tables)).cloned() {
+let maxp = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1835104368u32, tables)).cloned() {
 Some(ref matching_table) => {
 let tgt_offset = start + matching_table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -5678,7 +5678,7 @@ _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
 }))())?;
-let hmtx = ((|| PResult::Ok(match (find_by_key_sorted(|elem: &opentype_table_record| elem.table_id.clone(), 1752003704u32, tables)).cloned() {
+let hmtx = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1752003704u32, tables)).cloned() {
 Some(ref matching_table) => {
 let tgt_offset = start + matching_table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -5697,7 +5697,7 @@ _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
 }))())?;
-let name = ((|| PResult::Ok(match (find_by_key_sorted(|elem: &opentype_table_record| elem.table_id.clone(), 1851878757u32, tables)).cloned() {
+let name = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1851878757u32, tables)).cloned() {
 Some(ref matching_table) => {
 let tgt_offset = start + matching_table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -5716,7 +5716,7 @@ _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
 }))())?;
-let os2 = ((|| PResult::Ok(match (find_by_key_sorted(|elem: &opentype_table_record| elem.table_id.clone(), 1330851634u32, tables)).cloned() {
+let os2 = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1330851634u32, tables)).cloned() {
 Some(ref matching_table) => {
 let tgt_offset = start + matching_table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -5736,7 +5736,7 @@ _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
 }))())?;
-let post = ((|| PResult::Ok(match (find_by_key_sorted(|elem: &opentype_table_record| elem.table_id.clone(), 1886352244u32, tables)).cloned() {
+let post = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1886352244u32, tables)).cloned() {
 Some(ref matching_table) => {
 let tgt_offset = start + matching_table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -5755,7 +5755,7 @@ _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
 }))())?;
-let cvt = ((|| PResult::Ok(match (find_by_key_sorted(|elem: &opentype_table_record| elem.table_id.clone(), 1668707360u32, tables)).cloned() {
+let cvt = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1668707360u32, tables)).cloned() {
 Some(ref table) => {
 let inner = {
 let tgt_offset = start + table.offset.clone();
@@ -5797,7 +5797,7 @@ None => {
 None
 }
 }))())?;
-let fpgm = ((|| PResult::Ok(match (find_by_key_sorted(|elem: &opentype_table_record| elem.table_id.clone(), 1718642541u32, tables)).cloned() {
+let fpgm = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1718642541u32, tables)).cloned() {
 Some(ref table) => {
 let inner = {
 let tgt_offset = start + table.offset.clone();
@@ -5839,7 +5839,7 @@ None => {
 None
 }
 }))())?;
-let loca = ((|| PResult::Ok(match (find_by_key_sorted(|elem: &opentype_table_record| elem.table_id.clone(), 1819239265u32, tables)).cloned() {
+let loca = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1819239265u32, tables)).cloned() {
 Some(ref table) => {
 let inner = {
 let tgt_offset = start + table.offset.clone();
@@ -5861,7 +5861,7 @@ None => {
 None
 }
 }))())?;
-let glyf = ((|| PResult::Ok(match (find_by_key_sorted(|elem: &opentype_table_record| elem.table_id.clone(), 1735162214u32, tables)).cloned() {
+let glyf = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1735162214u32, tables)).cloned() {
 Some(ref table) => {
 let inner = {
 let tgt_offset = start + table.offset.clone();
@@ -5891,7 +5891,7 @@ None => {
 None
 }
 }))())?;
-let prep = ((|| PResult::Ok(match (find_by_key_sorted(|elem: &opentype_table_record| elem.table_id.clone(), 1886545264u32, tables)).cloned() {
+let prep = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1886545264u32, tables)).cloned() {
 Some(ref table) => {
 let inner = {
 let tgt_offset = start + table.offset.clone();
@@ -5933,7 +5933,7 @@ None => {
 None
 }
 }))())?;
-let gasp = ((|| PResult::Ok(match (find_by_key_sorted(|elem: &opentype_table_record| elem.table_id.clone(), 1734439792u32, tables)).cloned() {
+let gasp = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1734439792u32, tables)).cloned() {
 Some(ref table) => {
 let inner = {
 let tgt_offset = start + table.offset.clone();
@@ -5955,7 +5955,7 @@ None => {
 None
 }
 }))())?;
-let base = ((|| PResult::Ok(match (find_by_key_sorted(|elem: &opentype_table_record| elem.table_id.clone(), 1111577413u32, tables)).cloned() {
+let base = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1111577413u32, tables)).cloned() {
 Some(ref table) => {
 let inner = {
 let tgt_offset = start + table.offset.clone();
@@ -5977,7 +5977,7 @@ None => {
 None
 }
 }))())?;
-let gdef = ((|| PResult::Ok(match (find_by_key_sorted(|elem: &opentype_table_record| elem.table_id.clone(), 1195656518u32, tables)).cloned() {
+let gdef = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1195656518u32, tables)).cloned() {
 Some(ref table) => {
 let inner = {
 let tgt_offset = start + table.offset.clone();
@@ -5999,7 +5999,7 @@ None => {
 None
 }
 }))())?;
-let gpos = ((|| PResult::Ok(match (find_by_key_sorted(|elem: &opentype_table_record| elem.table_id.clone(), 1196445523u32, tables)).cloned() {
+let gpos = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1196445523u32, tables)).cloned() {
 Some(ref table) => {
 let inner = {
 let tgt_offset = start + table.offset.clone();
@@ -6021,7 +6021,7 @@ None => {
 None
 }
 }))())?;
-let gsub = ((|| PResult::Ok(match (find_by_key_sorted(|elem: &opentype_table_record| elem.table_id.clone(), 1196643650u32, tables)).cloned() {
+let gsub = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1196643650u32, tables)).cloned() {
 Some(ref table) => {
 let inner = {
 let tgt_offset = start + table.offset.clone();
@@ -6043,7 +6043,7 @@ None => {
 None
 }
 }))())?;
-let fvar = ((|| PResult::Ok(match (find_by_key_sorted(|elem: &opentype_table_record| elem.table_id.clone(), 1719034226u32, tables)).cloned() {
+let fvar = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1719034226u32, tables)).cloned() {
 Some(ref table) => {
 let inner = {
 let tgt_offset = start + table.offset.clone();
@@ -6065,7 +6065,7 @@ None => {
 None
 }
 }))())?;
-let gvar = ((|| PResult::Ok(match (find_by_key_sorted(|elem: &opentype_table_record| elem.table_id.clone(), 1735811442u32, tables)).cloned() {
+let gvar = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1735811442u32, tables)).cloned() {
 Some(ref table) => {
 let inner = {
 let tgt_offset = start + table.offset.clone();
@@ -6087,7 +6087,7 @@ None => {
 None
 }
 }))())?;
-let kern = ((|| PResult::Ok(match (find_by_key_sorted(|elem: &opentype_table_record| elem.table_id.clone(), 1801810542u32, tables)).cloned() {
+let kern = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1801810542u32, tables)).cloned() {
 Some(ref table) => {
 let inner = {
 let tgt_offset = start + table.offset.clone();
@@ -6109,7 +6109,7 @@ None => {
 None
 }
 }))())?;
-let stat = ((|| PResult::Ok(match (find_by_key_sorted(|elem: &opentype_table_record| elem.table_id.clone(), 1398030676u32, tables)).cloned() {
+let stat = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1398030676u32, tables)).cloned() {
 Some(ref table) => {
 let inner = {
 let tgt_offset = start + table.offset.clone();
@@ -6131,7 +6131,7 @@ None => {
 None
 }
 }))())?;
-let vhea = ((|| PResult::Ok(match (find_by_key_sorted(|elem: &opentype_table_record| elem.table_id.clone(), 1986553185u32, tables)).cloned() {
+let vhea = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1986553185u32, tables)).cloned() {
 Some(ref table) => {
 let inner = {
 let tgt_offset = start + table.offset.clone();
@@ -6153,7 +6153,7 @@ None => {
 None
 }
 }))())?;
-let vmtx = ((|| PResult::Ok(match (find_by_key_sorted(|elem: &opentype_table_record| elem.table_id.clone(), 1986884728u32, tables)).cloned() {
+let vmtx = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1986884728u32, tables)).cloned() {
 Some(ref table) => {
 let inner = {
 let tgt_offset = start + table.offset.clone();

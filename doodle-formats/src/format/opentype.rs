@@ -408,8 +408,9 @@ fn with_table(
     query_table_id: u32,
     dep_format: impl FnOnce(Expr) -> Format,
 ) -> Format {
-    // REVIEW - we assume by default that all OpenType table-directories are sorted by id
-    const TABLE_RECORDS_ARE_SORTED: bool = true;
+    // Not all fonts are actually sorted: https://github.com/harfbuzz/harfbuzz/issues/3065
+    // NOTE - while technically, we could refactor to make the sortedness a runtime-dependant parameter and check (once) whether the directory is sorted, this may yield only marginal benefits
+    const TABLE_RECORDS_ARE_SORTED: bool = false;
     let f_get_table_id = |table_record: Expr| record_proj(table_record, "table_id");
     let opt_match = find_by_key(
         TABLE_RECORDS_ARE_SORTED,
