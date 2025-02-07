@@ -12,10 +12,11 @@
 │       │   │               └── exif <- jpeg.app1-exif :=
 │       │   │                   ├── padding <- [= 0]
 │       │   │                   └── exif <- tiff.main :=
+│       │   │                       ├── start_of_header <- map (x -> as-u32 x) pos := 12
 │       │   │                       ├── byte-order <- _ |...| _ := be
 │       │   │                       ├── magic <- match byte-order { ... } := 42
 │       │   │                       ├── offset <- match byte-order { ... } := 8
-│       │   │                       └── ifd <- with-relative-offset (offset - 8) (match byte-order { ... }) :=
+│       │   │                       └── ifd <- with-relative-offset start_of_header offset (match byte-order { ... }) :=
 │       │   │                           ├── num-fields <- base.u16be := 7
 │       │   │                           ├── fields <- repeat-count num-fields { ... } :=
 │       │   │                           │   ├── 0 :=
@@ -146,7 +147,7 @@
 │       │   │           ├── length <- base.u16be := 132
 │       │   │           └── data <- slice (length - 2) (repeat1 jpeg.dqt-data) :=
 │       │   │               ├── 0 <- jpeg.dqt-data :=
-│       │   │               │   ├── precision-table-id <- assert (precision-table-id -> (precision-table-id.precision <= 1) && (precision-table-id.table-id <= 3)) (map (packedbits -> { ... }) U8) :=
+│       │   │               │   ├── precision-table-id <- assert (precision-table-id -> (precision-table-id.precision <= 1) && (precision-table-id.table-id <= 3)) (map (packed_bits -> { ... }) U8) :=
 │       │   │               │   │   ├── precision := 0
 │       │   │               │   │   └── table-id := 0
 │       │   │               │   └── elements <- match precision-table-id.precision { ... } :=
@@ -164,7 +165,7 @@
 │       │   │               │           ~
 │       │   │               │           └── 63 := 12
 │       │   │               └── 1 <- jpeg.dqt-data :=
-│       │   │                   ├── precision-table-id <- assert (precision-table-id -> (precision-table-id.precision <= 1) && (precision-table-id.table-id <= 3)) (map (packedbits -> { ... }) U8) :=
+│       │   │                   ├── precision-table-id <- assert (precision-table-id -> (precision-table-id.precision <= 1) && (precision-table-id.table-id <= 3)) (map (packed_bits -> { ... }) U8) :=
 │       │   │                   │   ├── precision := 0
 │       │   │                   │   └── table-id := 1
 │       │   │                   └── elements <- match precision-table-id.precision { ... } :=
@@ -193,19 +194,19 @@
 │       │   │           └── image-components <- repeat-count num-image-components jpeg.sof-image-component :=
 │       │   │               ├── 0 <- jpeg.sof-image-component :=
 │       │   │               │   ├── id <- base.u8 := 1
-│       │   │               │   ├── sampling-factor <- map (packedbits -> { ... }) U8 :=
+│       │   │               │   ├── sampling-factor <- map (packed_bits -> { ... }) U8 :=
 │       │   │               │   │   ├── horizontal := 1
 │       │   │               │   │   └── vertical := 1
 │       │   │               │   └── quantization-table-id <- assert (x -> x <= 3) base.u8 := 0
 │       │   │               ├── 1 <- jpeg.sof-image-component :=
 │       │   │               │   ├── id <- base.u8 := 2
-│       │   │               │   ├── sampling-factor <- map (packedbits -> { ... }) U8 :=
+│       │   │               │   ├── sampling-factor <- map (packed_bits -> { ... }) U8 :=
 │       │   │               │   │   ├── horizontal := 1
 │       │   │               │   │   └── vertical := 1
 │       │   │               │   └── quantization-table-id <- assert (x -> x <= 3) base.u8 := 1
 │       │   │               └── 2 <- jpeg.sof-image-component :=
 │       │   │                   ├── id <- base.u8 := 3
-│       │   │                   ├── sampling-factor <- map (packedbits -> { ... }) U8 :=
+│       │   │                   ├── sampling-factor <- map (packed_bits -> { ... }) U8 :=
 │       │   │                   │   ├── horizontal := 1
 │       │   │                   │   └── vertical := 1
 │       │   │                   └── quantization-table-id <- assert (x -> x <= 3) base.u8 := 1
@@ -222,7 +223,7 @@
 │       │   │   │           ├── marker <- { ... }
 │       │   │   │           ├── length <- base.u16be := 418
 │       │   │   │           └── data <- slice (length - 2) jpeg.dht-data :=
-│       │   │   │               ├── class-table-id <- assert (class-table-id -> (class-table-id.class < 2) && (class-table-id.table-id < 4)) (map (packedbits -> { ... }) U8) :=
+│       │   │   │               ├── class-table-id <- assert (class-table-id -> (class-table-id.class < 2) && (class-table-id.table-id < 4)) (map (packed_bits -> { ... }) U8) :=
 │       │   │   │               │   ├── class := 0
 │       │   │   │               │   └── table-id := 0
 │       │   │   │               ├── num-codes <- repeat-count 16 base.u8 :=
@@ -271,22 +272,22 @@
 │       │   │   │       ├── image-components <- repeat-count num-image-components jpeg.sos-image-component :=
 │       │   │   │       │   ├── 0 <- jpeg.sos-image-component :=
 │       │   │   │       │   │   ├── component-selector <- base.u8 := 1
-│       │   │   │       │   │   └── entropy-coding-table-ids <- assert (entropy-coding-table-ids -> (entropy-coding-table-ids.dc-entropy-coding-table-id <= 3) && (entropy-coding-table-ids.ac-entropy-coding-table-id <= 3)) (map (packedbits -> { ... }) U8) :=
+│       │   │   │       │   │   └── entropy-coding-table-ids <- assert (entropy-coding-table-ids -> (entropy-coding-table-ids.dc-entropy-coding-table-id <= 3) && (entropy-coding-table-ids.ac-entropy-coding-table-id <= 3)) (map (packed_bits -> { ... }) U8) :=
 │       │   │   │       │   │       ├── dc-entropy-coding-table-id := 0
 │       │   │   │       │   │       └── ac-entropy-coding-table-id := 0
 │       │   │   │       │   ├── 1 <- jpeg.sos-image-component :=
 │       │   │   │       │   │   ├── component-selector <- base.u8 := 2
-│       │   │   │       │   │   └── entropy-coding-table-ids <- assert (entropy-coding-table-ids -> (entropy-coding-table-ids.dc-entropy-coding-table-id <= 3) && (entropy-coding-table-ids.ac-entropy-coding-table-id <= 3)) (map (packedbits -> { ... }) U8) :=
+│       │   │   │       │   │   └── entropy-coding-table-ids <- assert (entropy-coding-table-ids -> (entropy-coding-table-ids.dc-entropy-coding-table-id <= 3) && (entropy-coding-table-ids.ac-entropy-coding-table-id <= 3)) (map (packed_bits -> { ... }) U8) :=
 │       │   │   │       │   │       ├── dc-entropy-coding-table-id := 1
 │       │   │   │       │   │       └── ac-entropy-coding-table-id := 1
 │       │   │   │       │   └── 2 <- jpeg.sos-image-component :=
 │       │   │   │       │       ├── component-selector <- base.u8 := 3
-│       │   │   │       │       └── entropy-coding-table-ids <- assert (entropy-coding-table-ids -> (entropy-coding-table-ids.dc-entropy-coding-table-id <= 3) && (entropy-coding-table-ids.ac-entropy-coding-table-id <= 3)) (map (packedbits -> { ... }) U8) :=
+│       │   │   │       │       └── entropy-coding-table-ids <- assert (entropy-coding-table-ids -> (entropy-coding-table-ids.dc-entropy-coding-table-id <= 3) && (entropy-coding-table-ids.ac-entropy-coding-table-id <= 3)) (map (packed_bits -> { ... }) U8) :=
 │       │   │   │       │           ├── dc-entropy-coding-table-id := 1
 │       │   │   │       │           └── ac-entropy-coding-table-id := 1
 │       │   │   │       ├── start-spectral-selection <- assert (x -> x <= 63) base.u8 := 0
 │       │   │   │       ├── end-spectral-selection <- assert (x -> x <= 63) base.u8 := 63
-│       │   │   │       └── approximation-bit-position <- map (packedbits -> { ... }) U8 :=
+│       │   │   │       └── approximation-bit-position <- map (packed_bits -> { ... }) U8 :=
 │       │   │   │           ├── high := 0
 │       │   │   │           └── low := 0
 │       │   │   └── data <- jpeg.scan-data :=

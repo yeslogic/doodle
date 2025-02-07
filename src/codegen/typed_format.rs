@@ -543,6 +543,13 @@ pub enum TypedExpr<TypeRep> {
         TypeHint,
         Box<TypedExpr<TypeRep>>,
     ),
+    FindByKey(
+        TypeRep,
+        bool,
+        Box<TypedExpr<TypeRep>>,
+        Box<TypedExpr<TypeRep>>,
+        Box<TypedExpr<TypeRep>>,
+    ),
     FlatMapList(
         TypeRep,
         Box<TypedExpr<TypeRep>>,
@@ -637,6 +644,12 @@ impl<TypeRep> std::hash::Hash for TypedExpr<TypeRep> {
                 acc.hash(state);
                 seq.hash(state);
             }
+            TypedExpr::FindByKey(_, is_sorted, f, key, seq) => {
+                is_sorted.hash(state);
+                f.hash(state);
+                key.hash(state);
+                seq.hash(state);
+            }
             TypedExpr::FlatMapList(_, f, _vt, seq) => {
                 f.hash(state);
                 seq.hash(state);
@@ -669,8 +682,13 @@ impl<TypeRep> TypedExpr<TypeRep> {
 }
 
 impl TypedExpr<GenType> {
+    /// Returns the `GenType` associated with `self`.
+    ///
+    /// Returns `None` if and only if `self` is `TypedExpr::Lambda`.
     pub(crate) fn get_type(&self) -> Option<Cow<'_, GenType>> {
         match self {
+            TypedExpr::Lambda(..) => None,
+
             TypedExpr::Bool(_) => Some(Cow::Owned(GenType::from(PrimType::Bool))),
             TypedExpr::AsU8(_) | TypedExpr::U8(_) => Some(Cow::Owned(GenType::from(PrimType::U8))),
             TypedExpr::U16Le(_) | TypedExpr::U16Be(_) | TypedExpr::AsU16(_) | TypedExpr::U16(_) => {
@@ -685,7 +703,6 @@ impl TypedExpr<GenType> {
                 Some(Cow::Owned(GenType::from(PrimType::U64)))
             }
             TypedExpr::AsChar(_) => Some(Cow::Owned(GenType::from(PrimType::Char))),
-            TypedExpr::Lambda(..) => None,
             TypedExpr::Var(gt, ..)
             | TypedExpr::Tuple(gt, ..)
             | TypedExpr::TupleProj(gt, ..)
@@ -703,6 +720,7 @@ impl TypedExpr<GenType> {
             | TypedExpr::FlatMap(gt, ..)
             | TypedExpr::FlatMapAccum(gt, ..)
             | TypedExpr::LeftFold(gt, ..)
+            | TypedExpr::FindByKey(gt, ..)
             | TypedExpr::FlatMapList(gt, ..)
             | TypedExpr::LiftOption(gt, ..)
             | TypedExpr::Dup(gt, ..)
@@ -877,6 +895,9 @@ mod __impls {
                 }
                 TypedExpr::LeftFold(_, lambda, acc, vt, seq) => {
                     Expr::LeftFold(rebox(lambda), rebox(acc), vt, rebox(seq))
+                }
+                TypedExpr::FindByKey(_, is_sorted, lambda, key, seq) => {
+                    Expr::FindByKey(is_sorted, rebox(lambda), rebox(key), rebox(seq))
                 }
                 TypedExpr::FlatMapList(_, lambda, vt, seq) => {
                     Expr::FlatMapList(rebox(lambda), vt, rebox(seq))
