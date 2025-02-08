@@ -1231,7 +1231,7 @@ impl ToFragment for MethodSpecifier {
 #[derive(Debug, Clone)]
 pub(crate) enum StructExpr {
     EmptyExpr,
-    RecordExpr(Vec<(Label, Option<Box<RustExpr>>)>),
+    RecordExpr(Vec<(Label, Option<RustExpr>)>),
     TupleExpr(Vec<RustExpr>),
 }
 
@@ -1281,6 +1281,7 @@ pub(crate) enum RustExpr {
     Index(Box<RustExpr>, Box<RustExpr>),      // object, index
     Slice(Box<RustExpr>, Box<RustExpr>, Box<RustExpr>), // object, start ix, end ix (exclusive)
     RangeExclusive(Box<RustExpr>, Box<RustExpr>),
+    ResultOk(Option<Label>, Box<RustExpr>),
 }
 
 #[derive(Clone, Debug)]
@@ -1884,12 +1885,16 @@ impl RustExpr {
                 // REVIEW - we might want to log the number of times we hit this branch, and with what values, to see if there are any obvious cases to handle
                 None
             }
+            RustExpr::ResultOk(..) => None,
             RustExpr::CloneOf(x) | RustExpr::Deref(x) => match &**x {
                 RustExpr::Borrow(y) | RustExpr::BorrowMut(y) => y.try_get_primtype(),
                 other => other.try_get_primtype(),
             },
             RustExpr::Borrow(_) | RustExpr::BorrowMut(_) => None,
-            RustExpr::Try(..) => None,
+            RustExpr::Try(inner) => match inner.as_ref() {
+                RustExpr::ResultOk(.., x) => x.try_get_primtype(),
+                _ => None,
+            },
             RustExpr::Operation(op) => match op {
                 RustOp::InfixOp(op, lhs, rhs) => {
                     let lhs_type = lhs.try_get_primtype()?;
@@ -1948,7 +1953,7 @@ impl RustExpr {
             RustExpr::Struct(_, assigns) => match assigns {
                 StructExpr::RecordExpr(assigns) => assigns
                     .iter()
-                    .all(|(_, val)| val.as_deref().map_or(true, Self::is_pure)),
+                    .all(|(_, val)| val.as_ref().map_or(true, Self::is_pure)),
                 StructExpr::TupleExpr(values) => values.iter().all(|val| val.is_pure()),
                 StructExpr::EmptyExpr => true,
             },
@@ -1963,6 +1968,7 @@ impl RustExpr {
                 // NOTE - illegal casts like `x as u8` where x >= 256 are language-level errors that are neither pure nor impure
                 RustOp::AsCast(expr, ..) => expr.is_pure() && op.is_sound(),
             },
+            RustExpr::ResultOk(.., inner) => inner.is_pure(),
             // NOTE - we can have block-scopes with non-empty statements that are pure, but that is a bit too much work for our purposes right now.
             RustExpr::BlockScope(stmts, tail) => stmts.is_empty() && tail.is_pure(),
             // NOTE - there may be some pure control expressions but those will be relatively rare as natural occurrences
@@ -1995,6 +2001,10 @@ impl RustExpr {
             )),
         }
     }
+
+    pub(crate) fn wrap_ok<Name: IntoLabel>(self, qualifier: Option<Name>) -> RustExpr {
+        RustExpr::ResultOk(qualifier.map(Name::into), Box::new(self))
+    }
 }
 
 impl ToFragmentExt for RustExpr {
@@ -2014,6 +2024,21 @@ impl ToFragmentExt for RustExpr {
                     .cat(ToFragmentExt::paren_list_prec(args, Precedence::Top)),
                 prec,
                 Precedence::Projection,
+            ),
+            RustExpr::ResultOk(opt_qual, inner) => cond_paren(
+                Fragment::group(
+                    Fragment::opt(opt_qual.as_ref(), |qual| {
+                        Fragment::String(qual.clone()).cat(Fragment::string("::"))
+                    })
+                    .cat(Fragment::string("Ok")),
+                )
+                .cat(
+                    inner
+                        .to_fragment_precedence(Precedence::Top)
+                        .delimit(Fragment::Char('('), Fragment::Char(')')),
+                ),
+                prec,
+                Precedence::INVOKE,
             ),
             RustExpr::CloneOf(x) => cond_paren(
                 x.to_fragment_precedence(Precedence::Projection)
@@ -2538,3 +2563,150 @@ mod test {
         expect_fragment(&re, "this.append(&mut other)")
     }
 }
+
+pub mod short_circuit {
+    use super::{
+        RustCatchAll, RustControl, RustExpr, RustMatchBody, RustMatchCase, RustOp, RustStmt,
+        StructExpr,
+    };
+
+    pub trait ShortCircuit {
+        /// Returns `true` if `self` might have a (non-panic) short-circuit, as `return` or a Try (`?`) expression.
+        fn is_short_circuiting(&self) -> bool;
+    }
+
+    impl ShortCircuit for RustStmt {
+        fn is_short_circuiting(&self) -> bool {
+            match self {
+                RustStmt::Expr(expr) | RustStmt::Reassign(.., expr) | RustStmt::Let(.., expr) => {
+                    expr.is_short_circuiting()
+                }
+                RustStmt::Return(..) => true,
+                RustStmt::Control(ctrl) => ctrl.is_short_circuiting(),
+            }
+        }
+    }
+
+    impl<T> ShortCircuit for Vec<T>
+    where
+        T: ShortCircuit,
+    {
+        fn is_short_circuiting(&self) -> bool {
+            self.iter().any(T::is_short_circuiting)
+        }
+    }
+
+    impl ShortCircuit for RustControl {
+        fn is_short_circuiting(&self) -> bool {
+            match self {
+                RustControl::Loop(stmts) => stmts.is_short_circuiting(),
+                RustControl::ForIter(_, expr, stmts)
+                | RustControl::While(expr, stmts)
+                | RustControl::ForRange0(_, expr, stmts) => {
+                    expr.is_short_circuiting() || stmts.is_short_circuiting()
+                }
+                RustControl::If(cond, then, opt_else) => {
+                    cond.is_short_circuiting()
+                        || then.is_short_circuiting()
+                        || opt_else
+                            .as_ref()
+                            .is_some_and(<Vec<RustStmt> as ShortCircuit>::is_short_circuiting)
+                }
+                RustControl::Match(scrutinee, body) => {
+                    scrutinee.is_short_circuiting() || body.is_short_circuiting()
+                }
+                RustControl::Break => false,
+            }
+        }
+    }
+
+    impl ShortCircuit for RustMatchCase {
+        fn is_short_circuiting(&self) -> bool {
+            self.1.is_short_circuiting()
+        }
+    }
+
+    impl ShortCircuit for RustMatchBody {
+        fn is_short_circuiting(&self) -> bool {
+            match self {
+                RustMatchBody::Irrefutable(items) => items.is_short_circuiting(),
+                RustMatchBody::Refutable(items, rust_catch_all) => match rust_catch_all {
+                    RustCatchAll::ReturnErrorValue { .. } => true,
+                    RustCatchAll::PanicUnreachable { .. } => items.is_short_circuiting(),
+                },
+            }
+        }
+    }
+
+    impl ShortCircuit for RustExpr {
+        fn is_short_circuiting(&self) -> bool {
+            match self {
+                RustExpr::ArrayLit(exprs) => exprs.is_short_circuiting(),
+                RustExpr::Entity(..) => false,
+                RustExpr::PrimitiveLit(..) => false,
+                RustExpr::MethodCall(recv, _, args) => {
+                    recv.is_short_circuiting() || args.is_short_circuiting()
+                }
+                RustExpr::FieldAccess(expr, ..) => expr.is_short_circuiting(),
+                RustExpr::FunctionCall(.., args) => args.is_short_circuiting(),
+                RustExpr::Tuple(elts) => elts.is_short_circuiting(),
+                RustExpr::Struct(.., struct_expr) => struct_expr.is_short_circuiting(),
+                RustExpr::CloneOf(inner)
+                | RustExpr::Deref(inner)
+                | RustExpr::Borrow(inner)
+                | RustExpr::ResultOk(.., inner)
+                | RustExpr::BorrowMut(inner) => inner.is_short_circuiting(),
+                RustExpr::Try(inner) => match inner.as_ref() {
+                    RustExpr::ResultOk(.., expr) => expr.is_short_circuiting(),
+                    _ => true,
+                },
+                RustExpr::Operation(op) => op.is_short_circuiting(),
+                RustExpr::BlockScope(stmts, expr) => {
+                    stmts.is_short_circuiting() || expr.is_short_circuiting()
+                }
+                RustExpr::Control(ctrl) => ctrl.is_short_circuiting(),
+                RustExpr::Closure(..) => false,
+                RustExpr::Index(head, index) => {
+                    head.is_short_circuiting() || index.is_short_circuiting()
+                }
+                RustExpr::Slice(seq, start, stop) => {
+                    seq.is_short_circuiting()
+                        || start.is_short_circuiting()
+                        || stop.is_short_circuiting()
+                }
+                RustExpr::RangeExclusive(start, stop) => {
+                    start.is_short_circuiting() || stop.is_short_circuiting()
+                }
+            }
+        }
+    }
+
+    impl ShortCircuit for RustOp {
+        fn is_short_circuiting(&self) -> bool {
+            match self {
+                RustOp::InfixOp(_, lhs, rhs) => {
+                    lhs.is_short_circuiting() || rhs.is_short_circuiting()
+                }
+                RustOp::PrefixOp(_, expr) => expr.is_short_circuiting(),
+                RustOp::AsCast(expr, _) => expr.is_short_circuiting(),
+            }
+        }
+    }
+
+    impl ShortCircuit for (crate::Label, Option<RustExpr>) {
+        fn is_short_circuiting(&self) -> bool {
+            self.1.as_ref().is_some_and(RustExpr::is_short_circuiting)
+        }
+    }
+
+    impl ShortCircuit for StructExpr {
+        fn is_short_circuiting(&self) -> bool {
+            match self {
+                StructExpr::EmptyExpr => false,
+                StructExpr::TupleExpr(elts) => elts.is_short_circuiting(),
+                StructExpr::RecordExpr(flds) => flds.is_short_circuiting(),
+            }
+        }
+    }
+}
+pub use short_circuit::ShortCircuit;

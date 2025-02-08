@@ -111,6 +111,9 @@ impl Rebindable for RustExpr {
     fn rebind(&mut self, table: &HashMap<Label, Label>) {
         match self {
             RustExpr::Entity(ent) => ent.rebind(table),
+            RustExpr::ResultOk(.., inner) => {
+                inner.rebind(table);
+            }
             RustExpr::PrimitiveLit(..) => (),
             RustExpr::ArrayLit(arr) => arr.rebind(table),
             RustExpr::MethodCall(head, _, args) => {

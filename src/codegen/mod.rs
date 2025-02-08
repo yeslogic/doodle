@@ -751,7 +751,7 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                     .iter()
                     .map(|(name, val)| (
                         name.clone(),
-                        Some(Box::new(embed_expr(val, ExprInfo::Natural))),
+                        Some(embed_expr(val, ExprInfo::Natural)),
                     ))
                     .collect()
                 )
@@ -1058,7 +1058,7 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
             // REVIEW - lexical scopes, shadowing, and variable-name sanitization may not be quite right in the current implementation
             let loc = RustExpr::local(vname.clone());
             match info {
-                ExprInfo::EmbedCloned  => RustExpr::CloneOf(Box::new(loc)),
+                ExprInfo::EmbedCloned => RustExpr::CloneOf(Box::new(loc)),
                 ExprInfo::Natural => loc,
             }
         }
@@ -1305,7 +1305,7 @@ fn embed_lambda(expr: &GTExpr, kind: ClosureKind, needs_ok: bool, info: ExprInfo
                     head.clone(),
                     Some(head_t.clone().to_rust_type()),
                     if needs_ok {
-                        RustExpr::scoped(["PResult"], "Ok").call_with([expansion])
+                        expansion.wrap_ok(Some("PResult"))
                     } else {
                         expansion
                     },
@@ -1317,7 +1317,7 @@ fn embed_lambda(expr: &GTExpr, kind: ClosureKind, needs_ok: bool, info: ExprInfo
                     head.clone(),
                     Some(head_t.clone().to_rust_type()),
                     if needs_ok {
-                        RustExpr::scoped(["PResult"], "Ok").call_with([expansion])
+                        expansion.wrap_ok(Some("PResult"))
                     } else {
                         expansion
                     },
@@ -1339,7 +1339,7 @@ fn embed_lambda(expr: &GTExpr, kind: ClosureKind, needs_ok: bool, info: ExprInfo
                     head.clone(),
                     Some(point_t),
                     if needs_ok {
-                        RustExpr::scoped(["PResult"], "Ok").call_with([expansion])
+                        expansion.wrap_ok(Some("PResult"))
                     } else {
                         expansion
                     },
@@ -1361,7 +1361,7 @@ fn embed_lambda(expr: &GTExpr, kind: ClosureKind, needs_ok: bool, info: ExprInfo
                     head.clone(),
                     Some(point_t),
                     if needs_ok {
-                        RustExpr::scoped(["PResult"], "Ok").call_with([expansion])
+                        expansion.wrap_ok(Some("PResult"))
                     } else {
                         expansion
                     },
@@ -1617,19 +1617,119 @@ fn implicate_return(value: RustBlock) -> Vec<RustStmt> {
     }
 }
 
+/// Construct a RustBlock where any short-circuiting statements before the final value cause
+/// an Err or value to propagate to the final value rather than escaping the current function
+/// or closure altogether.
+fn local_try_block(block: RustBlock) -> RustExpr {
+    let (stmts, ret) = block;
+    match ret {
+        Some(ret) if stmts.is_empty() => match ret {
+            RustExpr::Try(..) => ret,
+            RustExpr::ResultOk(.., inner) => *inner,
+            _ => {
+                if ret.is_short_circuiting() {
+                    let thunk_body = ret.wrap_ok(Some("PResult"));
+                    RustExpr::Closure(RustClosure::thunk_expr(thunk_body))
+                        .call()
+                        .wrap_try()
+                } else {
+                    ret
+                }
+            }
+        },
+        Some(ret) => {
+            if stmts.iter().any(RustStmt::is_short_circuiting) {
+                RustExpr::Closure(RustClosure::thunk_expr(RustExpr::BlockScope(
+                    stmts,
+                    Box::new(ret.wrap_ok(Some("PResult"))),
+                )))
+                .call()
+                .wrap_try()
+            } else {
+                match ret {
+                    RustExpr::Try(..) => return RustExpr::BlockScope(stmts, Box::new(ret)),
+                    RustExpr::ResultOk(.., inner) => return RustExpr::BlockScope(stmts, inner),
+                    _ => {
+                        if ret.is_short_circuiting() {
+                            let thunk_body = ret.wrap_ok(Some("PResult"));
+                            RustExpr::BlockScope(
+                                stmts,
+                                Box::new(
+                                    RustExpr::Closure(RustClosure::thunk_expr(thunk_body))
+                                        .call()
+                                        .wrap_try(),
+                                ),
+                            )
+                        } else {
+                            RustExpr::BlockScope(stmts, Box::new(ret))
+                        }
+                    }
+                }
+            }
+        }
+        None => {
+            if stmts.is_short_circuiting() {
+                RustExpr::Closure(RustClosure::thunk_body(stmts))
+                    .call()
+                    .wrap_try()
+            } else {
+                RustExpr::BlockScope(stmts, Box::new(RustExpr::UNIT))
+            }
+        }
+    }
+}
+
 /// Applies a lambda-abstraction to a `RustBlock` for internal logic to simultaneously
 /// allow for local-only short-circuiting behavior of `?` and `return Err(...)`.
+///
+/// Used when the value of `Err` must be inspected (as in `PeekNot`` or `Alts`),
+/// rather than short-circuited on (in which case, [`local_try_block`] should be used).
 fn abstracted_try_block(block: RustBlock) -> RustExpr {
     let (stmts, ret) = block;
     match ret {
-        Some(ret) if stmts.is_empty() => RustExpr::Closure(RustClosure::thunk_expr(
-            RustExpr::scoped(["PResult"], "Ok").call_with([ret]),
-        )),
-        Some(ret) => RustExpr::Closure(RustClosure::thunk_expr(
-            RustExpr::scoped(["PResult"], "Ok")
-                .call_with([RustExpr::BlockScope(stmts, Box::new(ret))]),
-        )),
-        None => RustExpr::Closure(RustClosure::thunk_body(stmts)),
+        Some(ret) if stmts.is_empty() => {
+            match ret {
+                // short-cut
+                RustExpr::Try(expr) => return *expr,
+                _ => {
+                    if ret.is_short_circuiting() {
+                        let thunk_body = ret.wrap_ok(Some("PResult"));
+                        RustExpr::Closure(RustClosure::thunk_expr(thunk_body)).call()
+                    } else {
+                        ret
+                    }
+                }
+            }
+        }
+        Some(ret) => {
+            if stmts.is_short_circuiting() {
+                RustExpr::Closure(RustClosure::thunk_expr(RustExpr::BlockScope(
+                    stmts,
+                    Box::new(ret.wrap_ok(Some("PResult"))),
+                )))
+                .call()
+            } else {
+                match ret {
+                    RustExpr::Try(expr) => return RustExpr::BlockScope(stmts, expr),
+                    _ => {
+                        if ret.is_short_circuiting() {
+                            let thunk_body = ret.wrap_ok(Some("PResult"));
+                            RustExpr::BlockScope(
+                                stmts,
+                                Box::new(
+                                    RustExpr::Closure(RustClosure::thunk_expr(thunk_body)).call(),
+                                ),
+                            )
+                        } else {
+                            ret
+                        }
+                    }
+                }
+            }
+        }
+        None => {
+            unreachable!("unexpected: abstracted_try_block called with no return-value to wrap")
+        }
     }
 }
 
@@ -1826,12 +1926,7 @@ where
                             .call_method_with("start_slice", [RustExpr::local("sz")])
                             .wrap_try(),
                     ),
-                    RustStmt::assign(
-                        "ret",
-                        abstracted_try_block(cl_inner.to_ast(ctxt))
-                            .call()
-                            .wrap_try(),
-                    ),
+                    RustStmt::assign("ret", local_try_block(cl_inner.to_ast(ctxt))),
                     // // FIXME - remove or gate this
                     // RustStmt::Expr(
                     //     RustExpr::local("eprintln!").call_with([
@@ -1855,12 +1950,7 @@ where
                         RustExpr::local(ctxt.input_varname.clone())
                             .call_method("open_peek_context"),
                     ),
-                    RustStmt::assign(
-                        "ret",
-                        abstracted_try_block(cl_inner.to_ast(ctxt))
-                            .call()
-                            .wrap_try(),
-                    ),
+                    RustStmt::assign("ret", local_try_block(cl_inner.to_ast(ctxt))),
                     RustStmt::Expr(
                         RustExpr::local(ctxt.input_varname.clone())
                             .call_method("close_peek_context")
@@ -1869,7 +1959,6 @@ where
                 ],
                 Some(RustExpr::local("ret")),
             ),
-
             EngineLogic::OffsetPeek(base_addr, offs, cl_inner) => (
                 vec![
                     RustStmt::assign(
@@ -1882,12 +1971,7 @@ where
                             .call_method_with("advance_or_seek", [RustExpr::local("tgt_offset")])
                             .wrap_try(),
                     ),
-                    RustStmt::assign(
-                        "ret",
-                        abstracted_try_block(cl_inner.to_ast(ctxt))
-                            .call()
-                            .wrap_try(),
-                    ),
+                    RustStmt::assign("ret", local_try_block(cl_inner.to_ast(ctxt))),
                     RustStmt::Expr(
                         RustExpr::local(ctxt.input_varname.clone())
                             .call_method("close_peek_context")
@@ -1896,14 +1980,13 @@ where
                 ],
                 Some(RustExpr::local("ret")),
             ),
-
             EngineLogic::PeekNot(cl_inner) => (
                 vec![
                     RustStmt::Expr(
                         RustExpr::local(ctxt.input_varname.clone())
                             .call_method("open_peek_not_context"),
                     ),
-                    RustStmt::assign("_res", abstracted_try_block(cl_inner.to_ast(ctxt)).call()),
+                    RustStmt::assign("_res", abstracted_try_block(cl_inner.to_ast(ctxt))),
                     RustStmt::Control(RustControl::If(
                         RustExpr::local("_res").call_method("is_err"),
                         vec![RustStmt::Expr(
@@ -1927,12 +2010,7 @@ where
                             .call_method("enter_bits_mode")
                             .wrap_try(),
                     ),
-                    RustStmt::assign(
-                        "ret",
-                        abstracted_try_block(cl_inner.to_ast(ctxt))
-                            .call()
-                            .wrap_try(),
-                    ),
+                    RustStmt::assign("ret", local_try_block(cl_inner.to_ast(ctxt))),
                     RustStmt::assign(
                         "_bits_read", // FIXME: promote to non-hardcoded identifier
                         RustExpr::local(ctxt.input_varname.clone())
@@ -2331,8 +2409,10 @@ where
                 for (ix, elt_cl) in elements.iter().enumerate() {
                     let varname = format!("field{}", ix);
                     names.push(varname.clone().into());
-                    let elt_thunk = abstracted_try_block(elt_cl.to_ast(ctxt));
-                    body.push(RustStmt::assign(varname, elt_thunk.call().wrap_try()));
+                    body.push(RustStmt::assign(
+                        varname,
+                        local_try_block(elt_cl.to_ast(ctxt)),
+                    ));
                 }
 
                 if let Some(con) = constructor {
@@ -2368,8 +2448,10 @@ where
                 for (fname, fld_cl) in fields.iter() {
                     let varname = rust_ast::sanitize_label(fname);
                     names.push(varname.clone());
-                    let fld_thunk = abstracted_try_block(fld_cl.to_ast(ctxt));
-                    body.push(RustStmt::assign(varname, fld_thunk.call().wrap_try()));
+                    body.push(RustStmt::assign(
+                        varname,
+                        local_try_block(fld_cl.to_ast(ctxt)),
+                    ));
                 }
 
                 (
@@ -2517,11 +2599,11 @@ where
                                     .wrap_try(),
                             ),
                         };
-                        let thunk = abstracted_try_block(branch_cl.to_ast(ctxt));
+                        let branch_result = abstracted_try_block(branch_cl.to_ast(ctxt));
                         RustStmt::Expr(RustExpr::BlockScope(
-                            [RustStmt::assign_mut("f_tmp", thunk)].to_vec(),
+                            [RustStmt::assign("res", branch_result)].to_vec(),
                             Box::new(RustExpr::Control(Box::new(RustControl::Match(
-                                RustExpr::local("f_tmp").call(),
+                                RustExpr::local("res"),
                                 RustMatchBody::Irrefutable(vec![
                                     (
                                         MatchCaseLHS::Pattern(RustPattern::Variant(
@@ -2532,8 +2614,7 @@ where
                                         )),
                                         [RustStmt::Return(
                                             ReturnKind::Keyword,
-                                            RustExpr::scoped(["PResult"], "Ok")
-                                                .call_with([RustExpr::local("inner")]),
+                                            RustExpr::local("inner").wrap_ok(Some("PResult")),
                                         )]
                                         .to_vec(),
                                     ),
@@ -2903,7 +2984,7 @@ where
                 stmts.into_iter(),
                 std::iter::once(RustStmt::Return(
                     ReturnKind::Implicit,
-                    RustExpr::scoped(["PResult"], "Ok").call_with([ret]),
+                    ret.wrap_ok(Some("PResult")),
                 )),
             )
             .collect()
@@ -3171,11 +3252,7 @@ impl<'a> Elaborator<'a> {
             Format::DecodeBytes(expr, inner) => {
                 let index = self.get_and_increment_index();
 
-                // REVIEW - should this be DeadEnd instead?
-                self.codegen
-                    .name_gen
-                    .ctxt
-                    .push_atom(NameAtom::Derived(Derivation::Preimage));
+                self.codegen.name_gen.ctxt.push_atom(NameAtom::DeadEnd);
                 let t_expr = self.elaborate_expr(expr);
                 self.codegen.name_gen.ctxt.escape();
 

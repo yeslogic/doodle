@@ -51,7 +51,6 @@ pub fn main() -> RunResult<()> {
         Box::new(
             std::fs::read_dir("test-fonts")?
                 .flatten()
-                .into_iter()
                 .map(|entry| format!("test-fonts/{}", entry.file_name().to_string_lossy())),
         )
     };
