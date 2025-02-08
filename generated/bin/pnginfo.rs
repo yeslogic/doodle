@@ -8,7 +8,6 @@ pub fn main() -> std::io::Result<()> {
         Box::new(
             std::fs::read_dir("test-images")?
                 .flatten()
-                .into_iter()
                 .map(|entry| format!("test-images/{}", entry.file_name().to_string_lossy())),
         )
     };

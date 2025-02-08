@@ -684,7 +684,9 @@ pub fn flat_map_accum(f: Expr, accum: Expr, accum_type: ValueType, seq: Expr) ->
 ///
 /// The `seq` parameter must evaluate to a sequence, and `f` must be a lambda that takes a `(list, x)` pair and returns a sequence with the same type as `list`.
 ///
-/// The first iteration will pass in an empty list, and each iteration will extend the list by appending the return value of its corresponding call to `f`.
+/// The `list` (tuple index 0) passed into `f` is initially empty, and will be post-extended with the output of each call to `f`.
+/// Specifically, the second iteration will call `f` with `list` equal to the output of `f([], seq[0])`, and the third iteration
+/// will call `f((f([], seq[0]) ++ f(f([], seq[0]), seq[1])), seq[2])`, and so on.
 ///
 /// The parameter `ret_type` corresponds to the element-type of the list being returned, not the overall type of the return-value.
 pub fn flat_map_list(f: Expr, ret_type: ValueType, seq: Expr) -> Expr {
