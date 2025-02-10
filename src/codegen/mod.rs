@@ -1450,14 +1450,7 @@ impl GenLambda {
                         }
                     };
                     let head_bind = RustStmt::assign(self.head.clone(), capture);
-                    let expansion = {
-                        let tmp = embed_expr(&self.body, body_info);
-                        if self.needs_ok() {
-                            tmp.wrap_ok(Some("PResult"))
-                        } else {
-                            tmp
-                        }
-                    };
+                    let expansion = embed_expr(&self.body, body_info);
                     RustExpr::BlockScope(vec![head_bind], Box::new(expansion))
                 }
             }
@@ -3097,10 +3090,11 @@ impl ToAst for DerivedLogic<GTExpr> {
             }
             DerivedLogic::Where(f, inner) => {
                 let assign_inner = RustStmt::assign("inner", RustExpr::from(inner.to_ast(ctxt)));
+                let arg = RustExpr::local("inner");
+                let is_valid = f.apply(arg, ExprInfo::default());
+                let bind_cond = RustStmt::assign("is_valid", is_valid);
                 let ctrl = {
                     // REVIEW[epic=clone-of-copy] - figure out whether cloning is necessary at this layer
-                    let arg = RustExpr::CloneOf(Box::new(RustExpr::local("inner")));
-                    let cond_valid = f.apply(arg, ExprInfo::default());
                     let b_valid = vec![RustStmt::Return(
                         ReturnKind::Implicit,
                         RustExpr::local("inner"),
@@ -3113,12 +3107,12 @@ impl ToAst for DerivedLogic<GTExpr> {
                         ),
                     )];
                     RustExpr::Control(Box::new(RustControl::If(
-                        cond_valid,
+                        RustExpr::local("is_valid"),
                         b_valid,
                         Some(b_invalid),
                     )))
                 };
-                (vec![assign_inner], Some(ctrl))
+                (vec![assign_inner, bind_cond], Some(ctrl))
             }
             DerivedLogic::Let(name, expr, inner) => {
                 let mut stmts = Vec::new();
@@ -3240,18 +3234,14 @@ where
 
     fn to_ast(&self, _ctxt: ProdCtxt<'_>) -> RustFn {
         let name = decoder_fname(self.ixlabel);
-        let params = {
-            let mut tmp = DefParams::new();
-            tmp.push_lifetime("'input");
-            tmp
-        };
+        let params = DefParams::new();
         let sig = {
             let args = {
                 let arg0 = {
                     let name = "_input".into();
                     let ty = {
                         let mut params = RustParams::<RustLt, RustType>::new();
-                        params.push_lifetime(RustLt::Parametric("'input".into()));
+                        params.push_lifetime(RustLt::Parametric("'_".into()));
                         RustType::borrow_of(
                             None,
                             Mut::Mutable,

@@ -2019,7 +2019,10 @@ impl RustExpr {
     }
 
     pub(crate) fn wrap_ok<Name: IntoLabel>(self, qualifier: Option<Name>) -> RustExpr {
-        RustExpr::ResultOk(qualifier.map(Name::into), Box::new(self))
+        match self {
+            RustExpr::Try(x) => *x,
+            other => RustExpr::ResultOk(qualifier.map(Name::into), Box::new(other)),
+        }
     }
 }
 
