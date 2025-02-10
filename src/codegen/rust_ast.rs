@@ -1284,6 +1284,17 @@ pub(crate) enum RustExpr {
     ResultOk(Option<Label>, Box<RustExpr>),
 }
 
+impl RustExpr {
+    /// Returns `Some(varname)` if `self` is a simple entity-reference to identifir `varname`, and
+    /// `None` otherwise.
+    pub fn as_local(&self) -> Option<&Label> {
+        match self {
+            RustExpr::Entity(RustEntity::Local(v)) => Some(v),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct RustClosure(RustClosureHead, ClosureBody);
 
@@ -1759,7 +1770,12 @@ impl RustExpr {
     }
 
     pub fn wrap_try(self) -> Self {
-        Self::Try(Box::new(self))
+        match self {
+            Self::ResultOk(_, inner) => *inner,
+            Self::BlockScope(stmts, ret) => Self::BlockScope(stmts, Box::new(ret.wrap_try())),
+            // REVIEW - consider whether there are any other special cases
+            _ => Self::Try(Box::new(self)),
+        }
     }
 
     pub fn str_lit(str: impl Into<Label>) -> Self {
@@ -2219,6 +2235,29 @@ pub(crate) enum RustMatchBody {
     Refutable(Vec<RustMatchCase>, RustCatchAll),
 }
 
+impl RustMatchBody {
+    pub fn tuple_capture<const N: usize>(
+        labels: [&'static str; N],
+        is_ref_flags: [bool; N],
+    ) -> Self {
+        let case_valid = {
+            let lhs = {
+                let pat = RustPattern::tuple_capture(labels, is_ref_flags);
+                MatchCaseLHS::Pattern(pat)
+            };
+            let rhs = {
+                let stmt = {
+                    let expr = RustExpr::Tuple(labels.into_iter().map(RustExpr::local).collect());
+                    RustStmt::Expr(expr)
+                };
+                vec![stmt]
+            };
+            (lhs, rhs)
+        };
+        Self::Irrefutable(vec![case_valid])
+    }
+}
+
 impl ToFragment for RustMatchBody {
     fn to_fragment(&self) -> Fragment {
         match self {
@@ -2254,6 +2293,24 @@ impl RustPattern {
             RustPattern::CatchAll(Some(label)) => RustPattern::BindRef(label),
             _ => self,
         }
+    }
+
+    /// Captures an `N`-tuple with the provided per-position labels, along with a boolean flag
+    /// to signal to bind by `ref` (if true) or by direct identifier capture (if false).
+    pub(crate) fn tuple_capture<Name: IntoLabel, const N: usize>(
+        bindings: [Name; N],
+        is_ref_flags: [bool; N],
+    ) -> Self {
+        let mut binds = Vec::with_capacity(N);
+        for (name, is_ref) in Iterator::zip(bindings.into_iter(), is_ref_flags.into_iter()) {
+            let pat = if is_ref {
+                RustPattern::BindRef(name.into())
+            } else {
+                RustPattern::CatchAll(Some(name.into()))
+            };
+            binds.push(pat)
+        }
+        RustPattern::TupleLiteral(binds)
     }
 }
 
@@ -2566,8 +2623,8 @@ mod test {
 
 pub mod short_circuit {
     use super::{
-        RustCatchAll, RustControl, RustExpr, RustMatchBody, RustMatchCase, RustOp, RustStmt,
-        StructExpr,
+        ReturnKind, RustCatchAll, RustControl, RustExpr, RustMatchBody, RustMatchCase, RustOp,
+        RustStmt, StructExpr,
     };
 
     pub trait ShortCircuit {
@@ -2575,13 +2632,70 @@ pub mod short_circuit {
         fn is_short_circuiting(&self) -> bool;
     }
 
+    pub trait ValueCheckpoint {
+        /// Returns `true` if, as a value-producing AST node, `self` would need to be wrapped in `Ok(..)` in order to
+        /// properly encompass internal short-circuiting.
+        fn needs_ok(&self) -> bool;
+    }
+
+    impl ValueCheckpoint for RustExpr {
+        fn needs_ok(&self) -> bool {
+            match self {
+                RustExpr::ResultOk(..) => false,
+                RustExpr::BlockScope(.., ret) => ret.needs_ok(),
+                RustExpr::Control(ctrl) => ctrl.needs_ok(),
+                _ => true,
+            }
+        }
+    }
+
+    impl ValueCheckpoint for RustControl {
+        fn needs_ok(&self) -> bool {
+            match self {
+                RustControl::Match(.., body) => match body {
+                    RustMatchBody::Refutable(.., RustCatchAll::ReturnErrorValue { .. }) => true,
+                    RustMatchBody::Refutable(cases, ..) | RustMatchBody::Irrefutable(cases) => {
+                        cases
+                            .iter()
+                            .map(|(_, body)| body)
+                            .any(<Vec<RustStmt>>::needs_ok)
+                    }
+                },
+                // REVIEW - check these  always-true conditions
+                RustControl::Loop(..) => true,
+                RustControl::While(..) => true,
+                RustControl::ForRange0(..) => true,
+                RustControl::ForIter(..) => true,
+                RustControl::If(.., None) => true,
+                RustControl::Break => {
+                    unreachable!("bad descent: ValueCheckpoint::needs_ok hit RustControl::Break")
+                }
+                RustControl::If(.., t, Some(f)) => t.needs_ok() || f.needs_ok(),
+            }
+        }
+    }
+
+    impl ValueCheckpoint for Vec<RustStmt> {
+        fn needs_ok(&self) -> bool {
+            match self.last() {
+                None => true,
+                Some(stmt) => match stmt {
+                    RustStmt::Let(..) | RustStmt::Reassign(..) => true,
+                    RustStmt::Expr(expr) | RustStmt::Return(_, expr) => expr.needs_ok(),
+                    RustStmt::Control(ctrl) => ctrl.needs_ok(),
+                },
+            }
+        }
+    }
+
     impl ShortCircuit for RustStmt {
         fn is_short_circuiting(&self) -> bool {
             match self {
-                RustStmt::Expr(expr) | RustStmt::Reassign(.., expr) | RustStmt::Let(.., expr) => {
-                    expr.is_short_circuiting()
-                }
-                RustStmt::Return(..) => true,
+                RustStmt::Expr(expr)
+                | RustStmt::Reassign(.., expr)
+                | RustStmt::Let(.., expr)
+                | RustStmt::Return(ReturnKind::Implicit, expr) => expr.is_short_circuiting(),
+                RustStmt::Return(ReturnKind::Keyword, ..) => true,
                 RustStmt::Control(ctrl) => ctrl.is_short_circuiting(),
             }
         }
@@ -2709,4 +2823,4 @@ pub mod short_circuit {
         }
     }
 }
-pub use short_circuit::ShortCircuit;
+pub use short_circuit::{ShortCircuit, ValueCheckpoint};
