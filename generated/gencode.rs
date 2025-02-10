@@ -8881,7 +8881,7 @@ b
 return Err(ParseError::ExcludedBranch(9042484249406774160u64));
 }
 };
-let mut seq = Vec::new();
+let mut seq: Vec<opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes> = Vec::new();
 let mut acc = 0u16;
 loop {
 if {
@@ -8944,7 +8944,7 @@ return Err(ParseError::ExcludedBranch(7801539417877429212u64));
 }
 };
 let lo = (Decoder24(_input))?;
-let mut seq = Vec::new();
+let mut seq: Vec<opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes> = Vec::new();
 let mut acc = 0u16;
 loop {
 if {
@@ -9058,7 +9058,7 @@ b
 return Err(ParseError::ExcludedBranch(15432825464810477099u64));
 }
 };
-let mut seq = Vec::new();
+let mut seq: Vec<opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes> = Vec::new();
 let mut acc = 0u16;
 loop {
 if {
@@ -9121,7 +9121,7 @@ return Err(ParseError::ExcludedBranch(8987822076696059625u64));
 }
 };
 let lo = (Decoder24(_input))?;
-let mut seq = Vec::new();
+let mut seq: Vec<opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes> = Vec::new();
 let mut acc = 0u16;
 loop {
 if {
@@ -9199,7 +9199,7 @@ return Err(ParseError::ExcludedBranch(18147521187885925800u64));
 }
 }
 }.0;
-let mut seq = Vec::new();
+let mut seq: Vec<opentype_var_glyph_variation_data_table_data_per_tuple_variation_data_x_and_y_coordinate_deltas> = Vec::new();
 let mut acc = 0u16;
 loop {
 if {
@@ -13600,7 +13600,7 @@ let number_of_coordinates = succ(end_points_of_contour[(pred((end_points_of_cont
 let flags = ((|| {
 let arr_flags = {
 let tuple_var = {
-let mut seq = Vec::new();
+let mut seq: Vec<opentype_glyf_simple_flags_raw> = Vec::new();
 let mut acc = 0u16;
 loop {
 if {
@@ -13726,7 +13726,7 @@ PResult::Ok(opentype_glyf_simple { end_points_of_contour, instruction_length, in
 
 fn Decoder_opentype_glyf_composite<'input>(_input: &mut Parser<'input>) -> Result<opentype_glyf_composite, ParseError> {
 let acc_glyphs = {
-let mut seq = Vec::new();
+let mut seq: Vec<opentype_glyf_composite_raw> = Vec::new();
 let mut acc = false;
 loop {
 if {
@@ -32261,4 +32261,3 @@ PResult::Ok(match tuple_var {
 }
 })
 }
-

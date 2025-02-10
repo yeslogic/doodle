@@ -2627,9 +2627,14 @@ where
             RepeatLogic::AccumUntil(cond, update, init, elt) => {
                 let mut stmts = Vec::new();
                 let elt_expr = elt.to_ast(ctxt).into();
-
-                stmts.push(RustStmt::assign_mut(
-                    "seq",
+                let seq_type = match cond.head_type.to_rust_type() {
+                    RustType::AnonTuple(ts) => ts[1].clone(),
+                    other => unreachable!("bad type {other:?}"),
+                };
+                stmts.push(RustStmt::Let(
+                    Mut::Mutable,
+                    Label::Borrowed("seq"),
+                    Some(seq_type),
                     RustExpr::scoped(["Vec"], "new").call(),
                 ));
                 stmts.push(RustStmt::assign_mut("acc", init.clone()));
