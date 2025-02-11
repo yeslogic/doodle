@@ -246,7 +246,7 @@ trait TryFromRef<Original: _Ref>: Sized {
     type Error: std::error::Error;
 
     /// Fallibly convert from the GAT `Ref<'a>` defined on `Original` (via the `_Ref` trait), into `Self`.
-    fn try_from_ref<'a>(orig: <Original as _Ref>::Ref<'a>) -> Result<Self, Self::Error>;
+    fn try_from_ref(orig: <Original as _Ref>::Ref<'_>) -> Result<Self, Self::Error>;
 }
 
 /// Helper trait for implementing custom partial-borrow-semantics for non-atomic types
@@ -330,13 +330,13 @@ where
 /// by using LetFormat or other forgetful chaining formats.
 macro_rules! follow_link {
     ( opt ) => {
-        (|offset| promote_opt(&offset.link))
+        |offset| promote_opt(&offset.link)
     };
     ( req ) => {
-        (|offset| promote_link(&offset.link))
+        |offset| promote_link(&offset.link)
     };
     ( req, $t:ty $(as $t2:ty)? ) => {
-        (|offset| <$t $(as Promote<$t2>)?>::promote(&offset.link))
+        |offset| <$t $(as Promote<$t2>)?>::promote(&offset.link)
     }
 }
 
@@ -477,8 +477,8 @@ pub struct MultiFontMetrics {
 pub struct SingleFontMetrics {
     sfnt_version: u32, // magic(0x0001_0000 | b"OTTO")
     num_tables: usize,
-    required: RequiredTableMetrics,
-    optional: OptionalTableMetrics,
+    required: Heap<RequiredTableMetrics>,
+    optional: Heap<OptionalTableMetrics>,
     extraMagic: Vec<u32>,
 }
 
@@ -587,7 +587,7 @@ where
             result.push(promoted);
         }
     }
-    return result;
+    result
 }
 
 pub type OpentypeFvar = opentype_fvar_table;
@@ -1132,7 +1132,7 @@ impl TryFrom<u16> for MacintoshEncodingId {
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match value {
-            0..=32 => unsafe { Ok(std::mem::transmute(value)) },
+            0..=32 => unsafe { Ok(std::mem::transmute::<u16, MacintoshEncodingId>(value)) },
             bad_value => Err(UnknownValueError {
                 what: "Macintosh Encoding ID".into(),
                 bad_value,
@@ -1263,14 +1263,14 @@ struct PostMetrics {
 
 #[derive(Clone, Debug)]
 pub struct RequiredTableMetrics {
-    cmap: Cmap,
-    head: HeadMetrics,
-    hhea: HheaMetrics,
-    maxp: MaxpMetrics,
-    hmtx: HmtxMetrics,
-    name: NameMetrics,
-    os2: Os2Metrics,
-    post: PostMetrics,
+    cmap: Heap<Cmap>,
+    head: Heap<HeadMetrics>,
+    hhea: Heap<HheaMetrics>,
+    maxp: Heap<MaxpMetrics>,
+    hmtx: Heap<HmtxMetrics>,
+    name: Heap<NameMetrics>,
+    os2: Heap<Os2Metrics>,
+    post: Heap<PostMetrics>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1370,8 +1370,8 @@ enum CoverageTable {
 impl CoverageTable {
     fn iter(&self) -> Box<dyn Iterator<Item = u16> + '_> {
         match self {
-            &CoverageTable::Format1 { ref glyph_array } => Box::new(glyph_array.iter().copied()),
-            &CoverageTable::Format2 { ref range_records } => Box::new(
+            CoverageTable::Format1 { glyph_array } => Box::new(glyph_array.iter().copied()),
+            CoverageTable::Format2 { range_records } => Box::new(
                 range_records
                     .iter()
                     .flat_map(|rr| rr.start_glyph_id..=rr.end_glyph_id),
@@ -1582,8 +1582,8 @@ impl Promote<OpentypeClassDef> for ClassDef {
 
 impl Promote<OpentypeClassDefData> for ClassDef {
     fn promote(orig: &OpentypeClassDefData) -> Self {
-        match orig {
-            &OpentypeClassDefData::Format1(OpentypeClassDefFormat1 {
+        match *orig {
+            OpentypeClassDefData::Format1(OpentypeClassDefFormat1 {
                 start_glyph_id,
                 ref class_value_array,
                 ..
@@ -1591,7 +1591,7 @@ impl Promote<OpentypeClassDefData> for ClassDef {
                 start_glyph_id,
                 class_value_array: class_value_array.clone(),
             },
-            &OpentypeClassDefData::Format2(OpentypeClassDefFormat2 {
+            OpentypeClassDefData::Format2(OpentypeClassDefFormat2 {
                 ref class_range_records,
                 ..
             }) => ClassDef::Format2 {
@@ -1733,7 +1733,7 @@ fn bits<const N: usize>(raw: u8) -> i8 {
     let range_max: i8 = 1 << N;
     let i_raw = raw as i8;
     if i_raw >= range_max / 2 {
-        return i_raw - range_max;
+        i_raw - range_max
     } else {
         i_raw
     }
@@ -1742,7 +1742,7 @@ fn bits<const N: usize>(raw: u8) -> i8 {
 impl TryFromRef<(u16, Vec<u16>)> for DeltaValues {
     type Error = Local<UnknownValueError<u16>>;
 
-    fn try_from_ref<'a>(value: (u16, &'a Vec<u16>)) -> Result<Self, Self::Error> {
+    fn try_from_ref(value: (u16, &Vec<u16>)) -> Result<Self, Self::Error> {
         match value.0 {
             0x0001 => {
                 // 2-bit Deltas
@@ -1815,9 +1815,9 @@ struct VariationIndexTable {
 
 #[derive(Clone, Debug)]
 enum DeviceOrVariationIndexTable {
-    DeviceTable(DeviceTable),
-    VariationIndexTable(VariationIndexTable),
-    OtherTable { delta_format: u16 },
+    Device(DeviceTable),
+    VariationIndex(VariationIndexTable),
+    NonStandard { delta_format: u16 },
 }
 
 #[derive(Clone, Debug)]
@@ -1851,33 +1851,33 @@ impl TryPromote<OpentypeDeviceOrVariationIndexTable> for DeviceOrVariationIndexT
     type Error = ReflType<TFRErr<(u16, Vec<u16>), DeltaValues>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeDeviceOrVariationIndexTable) -> Result<Self, Self::Error> {
-        match orig {
-            &OpentypeDeviceOrVariationIndexTable::DeviceTable(OpentypeDeviceTable {
+        match *orig {
+            OpentypeDeviceOrVariationIndexTable::DeviceTable(OpentypeDeviceTable {
                 start_size,
                 end_size,
                 delta_format,
                 ref delta_values,
-            }) => Ok(DeviceOrVariationIndexTable::DeviceTable(DeviceTable {
+            }) => Ok(DeviceOrVariationIndexTable::Device(DeviceTable {
                 start_size,
                 end_size,
                 delta_values: DeltaValues::try_from_ref((delta_format, delta_values))?,
             })),
-            &OpentypeDeviceOrVariationIndexTable::VariationIndexTable(
+            OpentypeDeviceOrVariationIndexTable::VariationIndexTable(
                 OpentypeVariationIndexTable {
                     delta_set_outer_index,
                     delta_set_inner_index,
                     ..
                 },
-            ) => Ok(DeviceOrVariationIndexTable::VariationIndexTable(
+            ) => Ok(DeviceOrVariationIndexTable::VariationIndex(
                 VariationIndexTable {
                     delta_set_outer_index,
                     delta_set_inner_index,
                 },
             )),
-            &OpentypeDeviceOrVariationIndexTable::OtherTable(OpentypeDVIOtherTable {
+            OpentypeDeviceOrVariationIndexTable::OtherTable(OpentypeDVIOtherTable {
                 delta_format,
                 ..
-            }) => Ok(DeviceOrVariationIndexTable::OtherTable { delta_format }),
+            }) => Ok(DeviceOrVariationIndexTable::NonStandard { delta_format }),
         }
     }
 }
@@ -2459,7 +2459,7 @@ pub type OpentypeReverseChainSingleSubst = opentype_layout_reverse_chain_single_
 impl Promote<OpentypeReverseChainSingleSubst> for ReverseChainSingleSubst {
     fn promote(orig: &OpentypeReverseChainSingleSubst) -> Self {
         fn promote_coverages(
-            offsets: &'_ Vec<opentype_layout_reverse_chain_single_subst_coverage>,
+            offsets: &[opentype_layout_reverse_chain_single_subst_coverage],
         ) -> Vec<CoverageTable> {
             offsets
                 .iter()
@@ -3620,7 +3620,6 @@ pub type OpentypeFeatureVariations = opentype_layout_feature_variations;
 impl Promote<OpentypeFeatureVariations> for FeatureVariations {
     fn promote(_orig: &OpentypeFeatureVariations) -> FeatureVariations {
         // STUB - implement proper promotion rules once feature variation type is refined
-        ()
     }
 }
 
@@ -3711,9 +3710,7 @@ impl Eq for KernPair {}
 
 impl PartialOrd for KernPair {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        let this_key = ((self.left as u32) << 16) & (self.right as u32);
-        let other_key = ((other.left as u32) << 16) & (other.right as u32);
-        this_key.partial_cmp(&other_key)
+        Some(self.cmp(other))
     }
 }
 
@@ -3759,7 +3756,7 @@ struct KerningArray(Wec<i16>);
 
 impl Promote<Vec<Vec<u16>>> for KerningArray {
     fn promote(orig: &Vec<Vec<u16>>) -> Self {
-        let Some(row0) = orig.get(0) else {
+        let Some(row0) = orig.first() else {
             unreachable!("Cannot initialize KerningArray without at least one row");
         };
 
@@ -3827,6 +3824,7 @@ struct KernMetrics {
     subtables: Vec<KernSubtable>,
 }
 
+type Heap<T> = Box<T>;
 #[derive(Clone, Debug)]
 pub struct OptionalTableMetrics {
     cvt: Option<CvtMetrics>,
@@ -3837,14 +3835,15 @@ pub struct OptionalTableMetrics {
     gasp: Option<GaspMetrics>,
     // STUB - more tables may end up in between these fields as we add support for them in the order in which microsoft lists them
     base: Option<BaseMetrics>,
-    gdef: Option<GdefMetrics>,
-    gpos: Option<LayoutMetrics>,
-    gsub: Option<LayoutMetrics>,
+    gdef: Option<Heap<GdefMetrics>>,
+    gpos: Option<Heap<LayoutMetrics>>,
+    gsub: Option<Heap<LayoutMetrics>>,
     // STUB - add more tables as we expand opentype definition
-    fvar: Option<FvarMetrics>,
+    fvar: Option<Heap<FvarMetrics>>,
+    // gvar: Option<Heap<GvarMetrics>>,
     // STUB - add more tables as we expand opentype definition
     kern: Option<KernMetrics>,
-    stat: Option<StatMetrics>,
+    stat: Option<Heap<StatMetrics>>,
     vhea: Option<VheaMetrics>,
     vmtx: Option<VmtxMetrics>,
 }
@@ -3915,7 +3914,7 @@ pub fn analyze_font(test_file: &str) -> TestResult<OpentypeMetrics> {
             let (num_fonts, font_metrics) = match multi.header {
                 opentype_ttc_header_header::UnknownVersion(n) => {
                     return Err(Box::new(UnknownValueError {
-                        what: format!("ttc header version"),
+                        what: "ttc header version".to_string(),
                         bad_value: n,
                     }));
                 }
@@ -3966,32 +3965,32 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
     let required = {
         let cmap = {
             let cmap = &dir.table_links.cmap;
-            Cmap::promote(cmap)
+            Heap::new(Cmap::promote(cmap))
         };
         let head = {
             let head = &dir.table_links.head;
-            HeadMetrics {
+            Heap::new(HeadMetrics {
                 major_version: head.major_version,
                 minor_version: head.minor_version,
                 dir_hint: head.font_direction_hint.try_into().unwrap(),
-            }
+            })
         };
         let hhea = {
             let hhea = &dir.table_links.hhea;
-            HheaMetrics {
+            Heap::new(HheaMetrics {
                 major_version: hhea.major_version,
                 minor_version: hhea.minor_version,
                 num_lhm: hhea.number_of_long_metrics as usize,
-            }
+            })
         };
         let maxp = {
             let maxp = &dir.table_links.maxp;
             let version = maxp.version;
-            match &maxp.data {
+            Heap::new(match &maxp.data {
                 opentype_maxp_table_data::MaxpPostScript => MaxpMetrics::Postscript { version },
                 opentype_maxp_table_data::MaxpV1(_table) => MaxpMetrics::Version1 { version },
                 opentype_maxp_table_data::MaxpUnknown(_) => MaxpMetrics::UnknownVersion { version },
-            }
+            })
         };
         let hmtx = {
             let hmtx = &dir.table_links.hmtx;
@@ -4009,7 +4008,7 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
                     left_side_bearing: as_s16(*lsb),
                 });
             }
-            HmtxMetrics(accum)
+            Heap::new(HmtxMetrics(accum))
         };
         let name = {
             let name = &dir.table_links.name;
@@ -4054,33 +4053,33 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
                     }
                     opentype_name_table_data::NameVersionUnknown(ver) => {
                         return Err(Box::new(UnknownValueError {
-                            what: format!("name table version"),
+                            what: "name table version".to_string(),
                             bad_value: *ver,
                         }))
                     }
                 }
             };
-            NameMetrics {
+            Heap::new(NameMetrics {
                 version: name.version,
                 name_count: name.name_count as usize,
                 name_records,
                 lang_tag_records,
-            }
+            })
         };
         let os2 = {
             let os2 = &dir.table_links.os2;
-            Os2Metrics {
+            Heap::new(Os2Metrics {
                 version: os2.version,
-            }
+            })
         };
         let post = {
             let post = &dir.table_links.post;
-            PostMetrics {
+            Heap::new(PostMetrics {
                 version: post.version,
                 is_fixed_pitch: post.is_fixed_pitch != 0,
-            }
+            })
         };
-        RequiredTableMetrics {
+        Heap::new(RequiredTableMetrics {
             cmap,
             head,
             hhea,
@@ -4089,7 +4088,7 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
             name,
             os2,
             post,
-        }
+        })
     };
     let optional = {
         let cvt = dir
@@ -4180,7 +4179,7 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
             let gdef = &dir.table_links.gdef;
             gdef.as_ref()
                 .map(|gdef| {
-                    TestResult::Ok(GdefMetrics {
+                    TestResult::Ok(Heap::new(GdefMetrics {
                         major_version: gdef.major_version,
                         minor_version: gdef.minor_version,
                         glyph_class_def: promote_opt(&gdef.glyph_class_def.link),
@@ -4188,7 +4187,7 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
                         lig_caret_list: try_promote_opt(&gdef.lig_caret_list.link)?,
                         mark_attach_class_def: promote_opt(&gdef.mark_attach_class_def.link),
                         data: GdefTableDataMetrics::try_promote(&gdef.data)?,
-                    })
+                    }))
                 })
                 .transpose()?
         };
@@ -4196,7 +4195,7 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
             let gpos = &dir.table_links.gpos;
             gpos.as_ref()
                 .map(|gpos| {
-                    TestResult::Ok(LayoutMetrics {
+                    TestResult::Ok(Heap::new(LayoutMetrics {
                         major_version: gpos.major_version,
                         minor_version: gpos.minor_version,
                         script_list: ScriptList::promote(&gpos.script_list.link),
@@ -4205,9 +4204,8 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
                         feature_variations: gpos
                             .feature_variations_offset
                             .as_ref()
-                            .map(|offset| promote_link(&offset.link))
-                            .flatten(),
-                    })
+                            .and_then(|offset| promote_link(&offset.link)),
+                    }))
                 })
                 .transpose()?
         };
@@ -4215,7 +4213,7 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
             let gsub = &dir.table_links.gsub;
             gsub.as_ref()
                 .map(|gsub| {
-                    TestResult::Ok(LayoutMetrics {
+                    TestResult::Ok(Heap::new(LayoutMetrics {
                         major_version: gsub.major_version,
                         minor_version: gsub.minor_version,
                         script_list: ScriptList::promote(&gsub.script_list.link),
@@ -4224,20 +4222,19 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
                         feature_variations: gsub
                             .feature_variations_offset
                             .as_ref()
-                            .map(|offset| promote_link(&offset.link))
-                            .flatten(),
-                    })
+                            .and_then(|offset| promote_link(&offset.link)),
+                    }))
                 })
                 .transpose()?
         };
-        let fvar = promote_opt(&dir.table_links.fvar);
+        let fvar = promote_opt(&dir.table_links.fvar).map(Heap::new);
         let kern = {
             let kern = &dir.table_links.kern;
             kern.as_ref().map(|kern| KernMetrics {
                 subtables: promote_vec(&kern.subtables),
             })
         };
-        let stat = promote_opt(&dir.table_links.stat);
+        let stat = promote_opt(&dir.table_links.stat).map(Heap::new);
         let vhea = {
             let vhea = &dir.table_links.vhea;
             vhea.as_ref().map(|vhea| VheaMetrics {
@@ -4270,7 +4267,7 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
                 VmtxMetrics(accum)
             })
         };
-        OptionalTableMetrics {
+        Heap::new(OptionalTableMetrics {
             cvt,
             fpgm,
             loca,
@@ -4284,12 +4281,13 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
             gsub,
             // TODO - add more variation tables as they are added to the spec
             fvar,
+            // gvar,
             // TODO - add more optional tables as they are added to the spec
             kern,
             stat,
             vhea,
             vmtx,
-        }
+        })
     };
     let extraMagic = dir
         .table_records
@@ -4413,19 +4411,27 @@ fn show_optional_metrics(optional: &OptionalTableMetrics, conf: &Config) {
     // STUB - anything between gasp and gdef go here
 
     show_base_metrics(&optional.base, conf);
-    show_gdef_metrics(&optional.gdef, conf);
-    show_layout_metrics(&optional.gpos, Ctxt::from(TableDiscriminator::Gpos), conf);
-    show_layout_metrics(&optional.gsub, Ctxt::from(TableDiscriminator::Gsub), conf);
+    show_gdef_metrics(optional.gdef.as_deref(), conf);
+    show_layout_metrics(
+        optional.gpos.as_deref(),
+        Ctxt::from(TableDiscriminator::Gpos),
+        conf,
+    );
+    show_layout_metrics(
+        optional.gsub.as_deref(),
+        Ctxt::from(TableDiscriminator::Gsub),
+        conf,
+    );
 
-    show_fvar_metrics(&optional.fvar, conf);
+    show_fvar_metrics(optional.fvar.as_deref(), conf);
 
     show_kern_metrics(&optional.kern, conf);
-    show_stat_metrics(&optional.stat, conf);
+    show_stat_metrics(optional.stat.as_deref(), conf);
     show_vhea_metrics(&optional.vhea, conf);
     show_vmtx_metrics(&optional.vmtx, conf);
 }
 
-fn show_fvar_metrics(fvar: &Option<FvarMetrics>, conf: &Config) {
+fn show_fvar_metrics(fvar: Option<&FvarMetrics>, conf: &Config) {
     let Some(fvar) = fvar else { return };
     if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
         println!(
@@ -4516,7 +4522,7 @@ fn show_loca_metrics(loca: &Option<LocaMetrics>, _conf: &Config) {
     }
 }
 
-fn show_gdef_metrics(gdef: &Option<GdefMetrics>, conf: &Config) {
+fn show_gdef_metrics(gdef: Option<&GdefMetrics>, conf: &Config) {
     if let Some(GdefMetrics {
         major_version,
         minor_version,
@@ -4577,7 +4583,7 @@ fn format_table_disc(disc: TableDiscriminator) -> &'static str {
     }
 }
 
-fn show_layout_metrics(layout: &Option<LayoutMetrics>, ctxt: Ctxt, conf: &Config) {
+fn show_layout_metrics(layout: Option<&LayoutMetrics>, ctxt: Ctxt, conf: &Config) {
     if let Some(LayoutMetrics {
         major_version,
         minor_version,
@@ -4593,9 +4599,9 @@ fn show_layout_metrics(layout: &Option<LayoutMetrics>, ctxt: Ctxt, conf: &Config
             format_version_major_minor(*major_version, *minor_version)
         );
         if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
-            show_script_list(&script_list, conf);
-            show_feature_list(&feature_list, conf);
-            show_lookup_list(&lookup_list, ctxt, conf);
+            show_script_list(script_list, conf);
+            show_feature_list(feature_list, conf);
+            show_lookup_list(lookup_list, ctxt, conf);
         }
     }
 }
@@ -4751,7 +4757,7 @@ fn show_lookup_table(table: &LookupTable, ctxt: Ctxt, conf: &Config) {
 fn format_lookup_subtable(
     subtable: &LookupSubtable,
     show_lookup_type: bool,
-    _conf: &Config,
+    conf: &Config,
 ) -> String {
     // STUB - because the subtables are both partial (more variants exist) and abridged (existing variants are missing details), reimplement as necessary
     let (label, contents) = match subtable {
@@ -4816,90 +4822,98 @@ fn format_lookup_subtable(
             };
             ("PairPos", contents)
         }
-        LookupSubtable::CursivePos(cursive_pos) => {
-            let contents = {
-                match cursive_pos {
-                    CursivePos { coverage, .. } => {
-                        format!("entryExit({})", format_coverage_table(coverage))
-                    }
-                }
-            };
+        LookupSubtable::CursivePos(CursivePos { coverage, .. }) => {
+            let contents = format!("entryExit({})", format_coverage_table(coverage));
             ("CursivePos", contents)
         }
-        LookupSubtable::MarkBasePos(mb_pos) => {
+        LookupSubtable::MarkBasePos(MarkBasePos {
+            mark_coverage,
+            base_coverage,
+            mark_array,
+            base_array,
+        }) => {
             let contents = {
-                match mb_pos {
-                    MarkBasePos {
-                        mark_coverage,
-                        base_coverage,
-                        mark_array,
-                        base_array,
-                    } => {
-                        let mut mark_iter = mark_coverage.iter();
-                        let mut base_iter = base_coverage.iter();
-                        format!(
-                            "Mark({})+Base({})=>MarkArray[{}]+BaseArray[{}]",
-                            format_coverage_table(mark_coverage),
-                            format_coverage_table(base_coverage),
-                            format_mark_array(mark_array, &mut mark_iter),
-                            format_base_array(base_array, &mut base_iter),
-                        )
-                    }
-                }
+                let mut mark_iter = mark_coverage.iter();
+                let mut base_iter = base_coverage.iter();
+                format!(
+                    "Mark({})+Base({})=>MarkArray[{}]+BaseArray[{}]",
+                    format_coverage_table(mark_coverage),
+                    format_coverage_table(base_coverage),
+                    format_mark_array(mark_array, &mut mark_iter),
+                    format_base_array(base_array, &mut base_iter),
+                )
             };
             ("MarkBasePos", contents)
         }
-        LookupSubtable::MarkLigPos(ml_pos) => {
+        LookupSubtable::MarkLigPos(MarkLigPos {
+            mark_coverage,
+            ligature_coverage,
+            mark_array,
+            ligature_array,
+        }) => {
             let contents = {
-                match ml_pos {
-                    MarkLigPos {
-                        mark_coverage,
-                        ligature_coverage,
-                        mark_array,
-                        ligature_array,
-                    } => {
-                        let mut mark_iter = mark_coverage.iter();
-                        let mut ligature_iter = ligature_coverage.iter();
-                        format!(
-                            "Mark({})+Ligature({})=>MarkArray[{}]+LigatureArray[{}]",
-                            format_coverage_table(mark_coverage),
-                            format_coverage_table(ligature_coverage),
-                            format_mark_array(mark_array, &mut mark_iter),
-                            format_ligature_array(ligature_array, &mut ligature_iter),
-                        )
-                    }
-                }
+                let mut mark_iter = mark_coverage.iter();
+                let mut ligature_iter = ligature_coverage.iter();
+                format!(
+                    "Mark({})+Ligature({})=>MarkArray[{}]+LigatureArray[{}]",
+                    format_coverage_table(mark_coverage),
+                    format_coverage_table(ligature_coverage),
+                    format_mark_array(mark_array, &mut mark_iter),
+                    format_ligature_array(ligature_array, &mut ligature_iter),
+                )
             };
             ("MarkLigPos", contents)
         }
-        LookupSubtable::MarkMarkPos(mm_pos) => {
+        LookupSubtable::MarkMarkPos(MarkMarkPos {
+            mark1_coverage,
+            mark2_coverage,
+            mark1_array,
+            mark2_array,
+        }) => {
             let contents = {
-                match mm_pos {
-                    MarkMarkPos {
-                        mark1_coverage,
-                        mark2_coverage,
-                        mark1_array,
-                        mark2_array,
-                    } => {
-                        let mut mark1_iter = mark1_coverage.iter();
-                        let mut mark2_iter = mark2_coverage.iter();
-                        format!(
-                            "Mark({})+Mark({})=>MarkArray[{}]+Mark2Array[{}]",
-                            format_coverage_table(mark1_coverage),
-                            format_coverage_table(mark2_coverage),
-                            format_mark_array(mark1_array, &mut mark1_iter),
-                            format_mark2_array(mark2_array, &mut mark2_iter),
-                        )
-                    }
-                }
+                let mut mark1_iter = mark1_coverage.iter();
+                let mut mark2_iter = mark2_coverage.iter();
+                format!(
+                    "Mark({})+Mark({})=>MarkArray[{}]+Mark2Array[{}]",
+                    format_coverage_table(mark1_coverage),
+                    format_coverage_table(mark2_coverage),
+                    format_mark_array(mark1_array, &mut mark1_iter),
+                    format_mark2_array(mark2_array, &mut mark2_iter),
+                )
             };
             ("MarkMarkPos", contents)
         }
-
         LookupSubtable::SingleSubst(single_subst) => {
             let contents = match single_subst {
-                // STUB[placeholder]
-                _ => format!("(..)"),
+                SingleSubst::Format1(SingleSubstFormat1 {
+                    coverage,
+                    delta_glyph_id,
+                }) => {
+                    format!("{}=>({delta_glyph_id:+})", format_coverage_table(coverage))
+                }
+                SingleSubst::Format2(SingleSubstFormat2 {
+                    coverage,
+                    substitute_glyph_ids,
+                }) => {
+                    let iter = coverage.iter();
+                    format!(
+                        "{}=>{}",
+                        format_coverage_table(coverage),
+                        format_coverage_linked_array(
+                            substitute_glyph_ids,
+                            iter,
+                            |orig_glyph, subst_glyph| {
+                                format!(
+                                    "{}->{}",
+                                    format_glyphid_hex(orig_glyph, true),
+                                    format_glyphid_hex(*subst_glyph, true),
+                                )
+                            },
+                            conf.inline_bookend,
+                            |n_skipped| format!("..(skipping {n_skipped} substs).."),
+                        )
+                    )
+                }
             };
             ("SingleSubst", contents)
         }
@@ -4918,31 +4932,24 @@ fn format_lookup_subtable(
             };
             ("MultipleSubst", contents)
         }
-        LookupSubtable::AlternateSubst(alt_subst) => {
-            let contents = match alt_subst {
-                AlternateSubst {
-                    coverage,
-                    alternate_sets,
-                } => {
-                    format!(
-                        "{}=>{}",
-                        format_coverage_table(coverage),
-                        format_alternate_sets(alternate_sets)
-                    )
-                }
+        LookupSubtable::AlternateSubst(AlternateSubst {
+            coverage,
+            alternate_sets,
+        }) => {
+            let contents = {
+                format!(
+                    "{}=>{}",
+                    format_coverage_table(coverage),
+                    format_alternate_sets(alternate_sets),
+                )
             };
             ("AlternateSubst", contents)
         }
-        LookupSubtable::LigatureSubst(lig_subst) => {
-            let contents = match lig_subst {
-                LigatureSubst {
-                    coverage,
-                    ligature_sets,
-                } => {
-                    let mut iter = coverage.iter();
-                    format_ligature_sets(ligature_sets, &mut iter)
-                }
-            };
+        LookupSubtable::LigatureSubst(LigatureSubst {
+            coverage,
+            ligature_sets,
+        }) => {
+            let contents = format_ligature_sets(ligature_sets, coverage.iter());
             ("LigatureSubst", contents)
         }
         LookupSubtable::ReverseChainSingleSubst(rev_subst) => {
@@ -5093,7 +5100,7 @@ fn format_lookup_subtable(
     }
 }
 
-fn show_stat_metrics(stat: &Option<StatMetrics>, conf: &Config) {
+fn show_stat_metrics(stat: Option<&StatMetrics>, conf: &Config) {
     fn format_design_axis(axis: &DesignAxis, _conf: &Config) -> String {
         format!(
             "Tag={} ; Axis NameID={} ; Ordering={}",
@@ -5338,13 +5345,14 @@ fn format_mark2_array(arr: &Mark2Array, coverage: &mut impl Iterator<Item = u16>
     fn format_mark2_record(mark2_record: &Mark2Record, cov: u16) -> String {
         const CLASS_ANCHORS: usize = 2;
         format!(
-            "{cov:04x}: {}",
+            "{}: {}",
+            format_glyphid_hex(cov, true),
             format_indexed_nullable(
                 &mark2_record.mark2_anchors,
                 |ix, anchor| format!("[{ix}]=>{}", format_anchor_table(anchor)),
                 CLASS_ANCHORS,
                 |n, (start, end)| format!("...(skipping {n} indices spanning {start}..={end})...",),
-            )
+            ),
         )
     }
 
@@ -5523,7 +5531,7 @@ fn format_anchor_table(anchor: &AnchorTable) -> String {
 
 fn format_ligature_sets(
     lig_sets: &[LigatureSet],
-    coverage: &mut impl Iterator<Item = u16>,
+    mut coverage: impl Iterator<Item = u16>,
 ) -> String {
     fn format_ligature_set(lig_set: &LigatureSet, cov: u16) -> String {
         fn format_ligature(lig: &Ligature, cov: u16) -> String {
@@ -5550,9 +5558,10 @@ fn format_ligature_sets(
         [ref set] => format_ligature_set(set, coverage.next().expect("missing coverage")),
         more => {
             const LIG_SET_BOOKEND: usize = 1;
-            format_items_inline(
+            format_coverage_linked_array(
                 more,
-                |lig_set| format_ligature_set(lig_set, coverage.next().expect("missing coverage")),
+                coverage,
+                |cov, lig_set| format_ligature_set(lig_set, cov),
                 LIG_SET_BOOKEND,
                 |_| String::from(".."),
             )
@@ -5832,11 +5841,11 @@ fn format_caret_value(cv: &Link<CaretValue>) -> String {
 
 fn format_device_or_variation_index_table(table: &DeviceOrVariationIndexTable) -> String {
     match table {
-        DeviceOrVariationIndexTable::DeviceTable(dev_table) => format_device_table(dev_table),
-        DeviceOrVariationIndexTable::VariationIndexTable(var_ix_table) => {
+        DeviceOrVariationIndexTable::Device(dev_table) => format_device_table(dev_table),
+        DeviceOrVariationIndexTable::VariationIndex(var_ix_table) => {
             format_variation_index_table(var_ix_table)
         }
-        DeviceOrVariationIndexTable::OtherTable { delta_format } => {
+        DeviceOrVariationIndexTable::NonStandard { delta_format } => {
             format!("[<DeltaFormat {delta_format}>]")
         }
     }
@@ -6147,6 +6156,48 @@ fn show_items_inline<T>(
 ) {
     let oput = format_items_inline(items, show_fn, bookend, ellipsis);
     println!("{oput}");
+}
+
+fn format_coverage_linked_array<T>(
+    items: &[T],
+    mut coverage: impl Iterator<Item = u16>,
+    mut fmt_fn: impl FnMut(u16, &T) -> String,
+    bookend: usize,
+    ellipsis: impl FnOnce(usize) -> String,
+) -> String {
+    let count = items.len();
+    let mut buffer = Vec::<String>::with_capacity(Ord::min(count, bookend * 2 + 1));
+
+    if count > bookend * 2 {
+        let mut iter = coverage;
+
+        for ix in 0..bookend {
+            let Some(glyph_id) = iter.next() else {
+                panic!("Coverage iterator ran out early (after {ix} of {count} cross-indexed elements)")
+            };
+            buffer.push(fmt_fn(glyph_id, &items[ix]))
+        }
+        let n_skipped = count - bookend * 2;
+
+        buffer.push(ellipsis(n_skipped));
+        // we have to create a new binding because the type has changed
+        let mut iter = iter.skip(n_skipped);
+
+        for ix in (count - bookend)..count {
+            let Some(glyph_id) = iter.next() else {
+                panic!("Coverage iterator ran out early (after {ix} of {count} cross-indexed elements)")
+            };
+            buffer.push(fmt_fn(glyph_id, &items[ix]))
+        }
+    } else {
+        for ix in 0..count {
+            let Some(glyph_id) = coverage.next() else {
+                panic!("Coverage iterator ran out early (after {ix} of {count} cross-indexed elements)")
+            };
+            buffer.push(fmt_fn(glyph_id, &items[ix]))
+        }
+    }
+    format!("[{}]", buffer.join(", "))
 }
 
 fn format_items_inline<T>(

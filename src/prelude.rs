@@ -12,7 +12,7 @@ pub use crate::parser::{
 #[macro_export]
 macro_rules! try_sub {
     ( $x:expr, $y:expr, $trace:expr ) => {
-        (match $x.checked_sub($y) {
+        match $x.checked_sub($y) {
             Some(z) => z,
             None => {
                 return Err(ParseError::UnsoundOperation(
@@ -20,7 +20,7 @@ macro_rules! try_sub {
                     $trace,
                 ))
             }
-        })
+        }
     };
 }
 
