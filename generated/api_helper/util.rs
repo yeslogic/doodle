@@ -217,3 +217,97 @@ impl FromIterator<u16> for U16Set {
         }
     }
 }
+
+/// Splits a slice into a prefix, middle, and suffix.
+///
+/// # Safety
+///
+/// `slice` must have length at least `prefix_len + suffix_len`. If this is not upheld,
+/// calling this function will lead to undefined behavior.
+pub unsafe fn trisect_unchecked<T>(
+    slice: &[T],
+    prefix_len: usize,
+    suffix_len: usize,
+) -> (&[T], &[T], &[T]) {
+    let len = slice.len();
+    let (lead, suffix) = slice.split_at_unchecked(len - suffix_len);
+    let (prefix, middle) = lead.split_at_unchecked(prefix_len);
+    (prefix, middle, suffix)
+}
+
+/// Specialized helper Iterator object for cross-indexing an array with an iterator,
+/// where we want an index for every item (as with `enumerate`) but want to know afterwards
+/// whether we stopped early because the iterator ran out, or if we reached the final index
+/// of the array successfully.
+pub struct PerIndex<'a, T, R: Iterator<Item = usize>, I: Iterator<Item = T>,> {
+    index_iter: &'a mut R,
+    value_iter: &'a mut I,
+}
+
+impl<T, R, I> Iterator for PerIndex<'_, T, R, I>
+where
+    R: Iterator<Item = usize>,
+    I: Iterator<Item = T>,
+{
+    type Item = (usize, T);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // we take the value element first to avoid incrementing the index if no value is yielded
+        let ret = self.value_iter.next()?;
+        let ix = self.index_iter.next()?;
+        Some((ix, ret))
+    }
+}
+
+pub struct EnumLen<T, I: Iterator<Item = T>> {
+    iter: I,
+    range: std::ops::Range<usize>,
+    len: usize,
+}
+
+
+#[derive(Debug)]
+pub enum EnumLenError<T> {
+    TooShort { len: usize, yielded: usize },
+    TooLong { len: usize, next: T },
+}
+
+impl<T: std::fmt::Display> std::fmt::Display for EnumLenError<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EnumLenError::TooShort { len, yielded } => write!(f, "value iteration stopped early (after {yielded} of {len} elements)"),
+            EnumLenError::TooLong { len, next } => write!(f, "value iterator not fully-consumed (next value: {next}) after yielding all {len} elements requested"),
+        }
+    }
+}
+
+impl<T: std::fmt::Debug + std::fmt::Display> std::error::Error for EnumLenError<T> {}
+
+impl<T, I: Iterator<Item = T>> EnumLen<T, I> {
+    pub fn new(iter: I, len: usize) -> Self {
+        EnumLen { iter, len, range: 0..len }
+    }
+
+    pub fn iter_with(&mut self) -> impl '_ + Iterator<Item = (usize, T)> {
+        PerIndex {
+            index_iter: &mut self.range,
+            value_iter: &mut self.iter,
+        }
+    }
+
+    pub fn finish(mut self, strict: bool) -> Result<(), EnumLenError<T>> {
+        match self.range.next() {
+            Some(ix) => Err(EnumLenError::TooShort { len: self.len, yielded: ix }),
+            None => {
+                if strict {
+                    match self.iter.next() {
+                        Some(next) => Err(EnumLenError::TooLong { len: self.len, next }),
+                        None => Ok(()),
+                    }
+                } else {
+                    Ok(())
+                }
+            }
+        }
+    }
+}

@@ -15,6 +15,10 @@ name = "pnginfo"
 path = "bin/fontinfo.rs"
 name = "fontinfo"
 
+[[bin]]
+path = "bin/szck.rs"
+name = "szck"
+
 [[bench]]
 name = "gen_benchmark"
 path = "benches/gen_benchmark.rs"
