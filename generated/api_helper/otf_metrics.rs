@@ -1,4 +1,4 @@
-use super::util::{U16Set, Wec};
+use super::util::{U16Set, Wec, trisect_unchecked, EnumLen};
 use super::*;
 use derive_builder::Builder;
 use doodle::Label;
@@ -4952,46 +4952,38 @@ fn format_lookup_subtable(
             let contents = format_ligature_sets(ligature_sets, coverage.iter());
             ("LigatureSubst", contents)
         }
-        LookupSubtable::ReverseChainSingleSubst(rev_subst) => {
-            let contents = match rev_subst {
-                ReverseChainSingleSubst {
-                    coverage,
-                    backtrack_coverages,
-                    lookahead_coverages,
-                    substitute_glyph_ids,
-                    ..
-                } => {
-                    // REVIEW - since we are already within an inline elision context, try to avoid taking up too much space per item, but this might not want to be a hardcoded value
-                    const INLINE_INLINE_BOOKEND: usize = 1;
-                    // FIXME - show_lookup_table calls this function through show_items_inline already, so we might want to reduce how many values we are willing to show proportionally
-                    let backtrack_pattern = if backtrack_coverages.is_empty() {
-                        String::new()
-                    } else {
-                        let tmp = format_items_inline(
-                            backtrack_coverages,
-                            format_coverage_table,
-                            INLINE_INLINE_BOOKEND,
-                            |n| format!("(..{n}..)"),
-                        );
-                        format!("(?<={tmp})")
-                    };
-                    let input_pattern = format_coverage_table(coverage);
-                    let lookahead_pattern = if lookahead_coverages.is_empty() {
-                        String::new()
-                    } else {
-                        let tmp = format_items_inline(
-                            lookahead_coverages,
-                            format_coverage_table,
-                            INLINE_INLINE_BOOKEND,
-                            |n| format!("(..{n}..)"),
-                        );
-                        format!("(?={tmp})")
-                    };
-                    let substitute_ids = format_glyphid_array_hex(substitute_glyph_ids, true);
-                    format!(
-                        "{backtrack_pattern}{input_pattern}{lookahead_pattern}=>{substitute_ids}"
-                    )
-                }
+        LookupSubtable::ReverseChainSingleSubst(ReverseChainSingleSubst { coverage, ref backtrack_coverages, ref lookahead_coverages, ref substitute_glyph_ids, .. }) => {
+            let contents = {
+                // REVIEW - since we are already within an inline elision context, try to avoid taking up too much space per item, but this might not want to be a hardcoded value
+                const INLINE_INLINE_BOOKEND: usize = 1;
+                // FIXME - show_lookup_table calls this function through show_items_inline already, so we might want to reduce how many values we are willing to show proportionally
+                let backtrack_pattern = if backtrack_coverages.is_empty() {
+                    String::new()
+                } else {
+                    let tmp = format_items_inline(
+                        backtrack_coverages,
+                        format_coverage_table,
+                        INLINE_INLINE_BOOKEND,
+                        |n| format!("(..{n}..)"),
+                    );
+                    format!("(?<={tmp})")
+                };
+                let input_pattern = format_coverage_table(coverage);
+                let lookahead_pattern = if lookahead_coverages.is_empty() {
+                    String::new()
+                } else {
+                    let tmp = format_items_inline(
+                        lookahead_coverages,
+                        format_coverage_table,
+                        INLINE_INLINE_BOOKEND,
+                        |n| format!("(..{n}..)"),
+                    );
+                    format!("(?={tmp})")
+                };
+                let substitute_ids = format_glyphid_array_hex(substitute_glyph_ids, true);
+                format!(
+                    "{backtrack_pattern}{input_pattern}{lookahead_pattern}=>{substitute_ids}"
+                )
             };
             ("RevChainSingleSubst", contents)
         }
@@ -5013,13 +5005,13 @@ fn format_lookup_subtable(
                     // FIXME - show_lookup_table calls this function through show_items_inline already, so we might want to reduce how many values we are willing to show proportionally
                     let input_pattern = format_items_inline(
                         coverage_tables,
-                        |cov| format_coverage_table(cov),
+                        format_coverage_table,
                         INLINE_INLINE_BOOKEND,
                         |n| format!("(..{n}..)"),
                     );
                     let seq_lookups = format_items_inline(
                         seq_lookup_records,
-                        |seq_lookup| format_sequence_lookup(seq_lookup),
+                        format_sequence_lookup,
                         INLINE_INLINE_BOOKEND,
                         |n| format!("(..{n}..)"),
                     );
@@ -5083,7 +5075,7 @@ fn format_lookup_subtable(
                     };
                     let seq_lookups = format_items_inline(
                         seq_lookup_records,
-                        |seq_lookup| format_sequence_lookup(seq_lookup),
+                        format_sequence_lookup,
                         INLINE_INLINE_BOOKEND,
                         |n| format!("(..{n}..)"),
                     );
@@ -5255,8 +5247,7 @@ fn show_kern_metrics(kern: &Option<KernMetrics>, conf: &Config) {
                 params.push("v")
             }
 
-            let str_flags = params.join(" | ");
-            str_flags
+            params.join(" | ")
         }
         print!("KernSubtable ({}):", format_kern_flags(subtable.flags));
         match &subtable.data {
@@ -5297,7 +5288,7 @@ fn show_kern_metrics(kern: &Option<KernMetrics>, conf: &Config) {
                         |ix, row| {
                             print!("\t\t[{ix}]: ");
                             show_items_inline(
-                                &row,
+                                row,
                                 |kern_val| format!("{:+}", kern_val),
                                 conf.inline_bookend,
                                 |n| format!("(..{n}..)"),
@@ -5367,6 +5358,8 @@ fn format_mark2_array(arr: &Mark2Array, coverage: &mut impl Iterator<Item = u16>
     )
 }
 
+
+
 fn format_indexed_nullable<T>(
     opt_items: &[Option<T>],
     mut show_fn: impl FnMut(usize, &T) -> String,
@@ -5383,17 +5376,21 @@ fn format_indexed_nullable<T>(
     let count = items.len();
 
     if count > bookend * 2 {
-        for _ix in 0..bookend {
-            let (ix, it) = items[_ix];
-            buffer.push(show_fn(ix, it));
+        let (left_bookend, middle, right_bookend) = unsafe { trisect_unchecked(&items, bookend, bookend) };
+
+        for (ix, it) in left_bookend {
+            buffer.push(show_fn(*ix, it));
         }
+
+        let n_skipped = count - bookend * 2;
+        assert_eq!(middle.len(), n_skipped);
         buffer.push(ellipsis(
-            count - bookend * 2,
-            (items[bookend].0, items[count - bookend - 1].0),
+            n_skipped,
+            (middle[0].0, middle[n_skipped - 1].0)
         ));
-        for _ix in (count - bookend)..count {
-            let (ix, it) = items[_ix];
-            buffer.push(show_fn(ix, it));
+
+        for (ix, it) in right_bookend {
+            buffer.push(show_fn(*ix, it));
         }
     } else {
         for (ix, it) in items.into_iter() {
@@ -5427,7 +5424,7 @@ fn format_ligature_array(
                 &ligature_attach.component_records,
                 format_component_record,
                 COMPONENTS_BOOKEND,
-                |_| format!("..."),
+                |_| "..".to_string(),
             )
         )
     }
@@ -5791,10 +5788,8 @@ fn show_mark_glyph_set(mgs: &MarkGlyphSet, conf: &Config) {
     )
 }
 
-fn show_item_variation_store(ivs: &ItemVariationStore) {
-    match ivs {
-        _ => println!("\tItemVariationStore: <unimplemented>"),
-    }
+fn show_item_variation_store(_ivs: &ItemVariationStore) {
+    println!("\tItemVariationStore: <unimplemented>")
 }
 
 fn show_lig_caret_list(lig_caret_list: &LigCaretList, conf: &Config) {
@@ -5953,15 +5948,15 @@ fn format_coverage_table(cov: &CoverageTable) -> String {
         CoverageTable::Format1 { ref glyph_array } => {
             let num_glyphs = glyph_array.len();
             match glyph_array.as_slice() {
-                &[] => format!("∅"),
-                &[id] => format!("[{id}]"),
-                &[first, .., last] => format!("[{num_glyphs} ∈ [{first},{last}]]"),
+                [] => "∅".to_string(),
+                [id] => format!("[{id}]"),
+                [first, .., last] => format!("[{num_glyphs} ∈ [{first},{last}]]"),
             }
         }
         CoverageTable::Format2 { ref range_records } => match range_records.as_slice() {
-            &[] => format!("∅"),
-            &[rr] => format!("[∀: {}..={}]", rr.start_glyph_id, rr.end_glyph_id),
-            &[first, .., last] => {
+            [] => "∅".to_string(),
+            [rr] => format!("[∀: {}..={}]", rr.start_glyph_id, rr.end_glyph_id),
+            [first, .., last] => {
                 let num_glyphs: u16 = range_records
                     .iter()
                     .map(|rr| rr.end_glyph_id - rr.start_glyph_id + 1)
@@ -6004,10 +5999,8 @@ fn show_mark_attach_class_def(mark_attach_class_def: &ClassDef, conf: &Config) {
 }
 
 fn format_mark_attach_class(mark_attach_class: &u16) -> String {
-    match mark_attach_class {
-        // STUB - if we come up with a semantic association for specific numbers, add those in before this catchall
-        _ => format!("{}", mark_attach_class),
-    }
+    // STUB - if we come up with a semantic association for specific numbers, add branches here
+    format!("{}", mark_attach_class)
 }
 
 fn show_glyph_class_def(class_def: &ClassDef, conf: &Config) {
@@ -6020,13 +6013,14 @@ fn show_class_def<S: std::fmt::Display>(
     show_fn: impl Fn(&u16) -> S,
     conf: &Config,
 ) {
-    match class_def {
-        &ClassDef::Format1 {
+    match *class_def {
+        ClassDef::Format1 {
             start_glyph_id,
             ref class_value_array,
         } => {
             match start_glyph_id {
                 0 => (),
+                // REVIEW - indent level model might be useful instead of ad-hoc tabs and spaces
                 1 => println!("\t    (skipping uncovered glyph 0)"),
                 n => println!("\t    (skipping uncovered glyphs 0..{n})"),
             }
@@ -6040,13 +6034,13 @@ fn show_class_def<S: std::fmt::Display>(
                 |start, stop| {
                     format!(
                         "\t    (skipping glyphs {}..{})",
-                        start_glyph_id as usize + start,
-                        start_glyph_id as usize + stop
+                        format_glyphid_hex(start_glyph_id + start as u16, false),
+                        format_glyphid_hex(start_glyph_id + stop as u16, false),
                     )
                 },
             )
         }
-        &ClassDef::Format2 {
+        ClassDef::Format2 {
             ref class_range_records,
         } => show_items_elided(
             class_range_records,
@@ -6132,14 +6126,14 @@ fn show_gasp_metrics(gasp: &Option<GaspMetrics>, conf: &Config) {
         println!("gasp: version {version}, {num_ranges} ranges");
         if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
             show_items_elided(
-                &ranges,
+                ranges,
                 show_gasp_range,
                 conf.bookend_size,
                 |start, stop| {
                     format!(
                         "    skipping gasp ranges for max_ppem values {}..={}",
-                        &ranges[start].range_max_ppem,
-                        &ranges[stop - 1].range_max_ppem
+                        ranges[start].range_max_ppem,
+                        ranges[stop - 1].range_max_ppem
                     )
                 },
             );
@@ -6160,7 +6154,7 @@ fn show_items_inline<T>(
 
 fn format_coverage_linked_array<T>(
     items: &[T],
-    mut coverage: impl Iterator<Item = u16>,
+    coverage: impl Iterator<Item = u16>,
     mut fmt_fn: impl FnMut(u16, &T) -> String,
     bookend: usize,
     ellipsis: impl FnOnce(usize) -> String,
@@ -6168,41 +6162,38 @@ fn format_coverage_linked_array<T>(
     let count = items.len();
     let mut buffer = Vec::<String>::with_capacity(Ord::min(count, bookend * 2 + 1));
 
-    if count > bookend * 2 {
-        let mut iter = coverage;
+    let mut ix_iter = EnumLen::new(coverage, count);
 
-        for ix in 0..bookend {
-            let Some(glyph_id) = iter.next() else {
-                panic!("Coverage iterator ran out early (after {ix} of {count} cross-indexed elements)")
-            };
-            buffer.push(fmt_fn(glyph_id, &items[ix]))
+    if count > bookend * 2 {
+
+        for (ix, glyph_id) in ix_iter.iter_with().take(bookend) {
+            buffer.push(fmt_fn(glyph_id, &items[ix]));
         }
+
         let n_skipped = count - bookend * 2;
 
         buffer.push(ellipsis(n_skipped));
-        // we have to create a new binding because the type has changed
-        let mut iter = iter.skip(n_skipped);
 
-        for ix in (count - bookend)..count {
-            let Some(glyph_id) = iter.next() else {
-                panic!("Coverage iterator ran out early (after {ix} of {count} cross-indexed elements)")
-            };
-            buffer.push(fmt_fn(glyph_id, &items[ix]))
+        for (ix, glyph_id) in ix_iter.iter_with().skip(n_skipped).take(bookend) {
+            buffer.push(fmt_fn(glyph_id, &items[ix]));
         }
+
     } else {
-        for ix in 0..count {
-            let Some(glyph_id) = coverage.next() else {
-                panic!("Coverage iterator ran out early (after {ix} of {count} cross-indexed elements)")
-            };
-            buffer.push(fmt_fn(glyph_id, &items[ix]))
+        for (ix, glyph_id) in ix_iter.iter_with() {
+            buffer.push(fmt_fn(glyph_id, &items[ix]));
         }
+    }
+    // NOTE - the boolean arg is set to false to avoid flagging leftover coverage as an error
+    match ix_iter.finish(false) {
+        Ok(_) => {},
+        Err(e) => panic!("format_coverage_linked_array found error: {e}"),
     }
     format!("[{}]", buffer.join(", "))
 }
 
 fn format_items_inline<T>(
     items: &[T],
-    mut show_fn: impl FnMut(&T) -> String,
+    mut fmt_fn: impl FnMut(&T) -> String,
     bookend: usize,
     ellipsis: impl Fn(usize) -> String,
 ) -> String {
@@ -6211,17 +6202,17 @@ fn format_items_inline<T>(
 
     let count = items.len();
     if count > bookend * 2 {
-        for ix in 0..bookend {
-            buffer.push(show_fn(&items[ix]));
+        for item in &items[..bookend] {
+            buffer.push(fmt_fn(item));
         }
+
         buffer.push(ellipsis(count - bookend * 2));
-        for ix in (count - bookend)..count {
-            buffer.push(show_fn(&items[ix]));
+
+        for item in &items[count - bookend..] {
+            buffer.push(fmt_fn(item));
         }
     } else {
-        for ix in 0..count {
-            buffer.push(show_fn(&items[ix]));
-        }
+        buffer.extend(items.into_iter().map(fmt_fn));
     }
     format!("[{}]", buffer.join(", "))
 }
@@ -6264,12 +6255,12 @@ fn show_items_elided<T>(
 ) {
     let count = items.len();
     if count > bookend * 2 {
-        for ix in 0..bookend {
-            show_fn(ix, &items[ix]);
+        for (ix, item) in items.iter().enumerate().take(bookend) {
+            show_fn(ix, item);
         }
         println!("{}", fn_message(bookend, count - bookend));
-        for ix in (count - bookend)..count {
-            show_fn(ix, &items[ix]);
+        for (ix, item) in items.iter().enumerate().skip(count - bookend) {
+            show_fn(ix, item);
         }
     } else {
         for (ix, item) in items.iter().enumerate() {
@@ -6579,7 +6570,7 @@ pub mod lookup_subtable {
                 let ret = match multi.header {
                     opentype_ttc_header_header::UnknownVersion(n) => {
                         return Err(Box::new(UnknownValueError {
-                            what: format!("ttc header version"),
+                            what: "ttc header version".to_string(),
                             bad_value: n,
                         }));
                     }
@@ -6587,11 +6578,8 @@ pub mod lookup_subtable {
                         let mut lookup_metrics =
                             Vec::with_capacity(v1header.table_directories.len());
                         for font in v1header.table_directories.iter() {
-                            let tmp = match &font.link {
-                                Some(dir) => Some(analyze_table_directory_lookups(dir)),
-                                None => None,
-                            };
-                            lookup_metrics.push(tmp);
+                            let per_font = font.link.as_ref().map(analyze_table_directory_lookups);
+                            lookup_metrics.push(per_font);
                         }
                         lookup_metrics
                     }
@@ -6599,11 +6587,8 @@ pub mod lookup_subtable {
                         let mut lookup_metrics =
                             Vec::with_capacity(v2header.table_directories.len());
                         for font in v2header.table_directories.iter() {
-                            let tmp = match &font.link {
-                                Some(dir) => Some(analyze_table_directory_lookups(dir)),
-                                None => None,
-                            };
-                            lookup_metrics.push(tmp);
+                            let per_font = font.link.as_ref().map(analyze_table_directory_lookups);
+                            lookup_metrics.push(per_font);
                         }
                         lookup_metrics
                     }

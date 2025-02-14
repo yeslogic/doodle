@@ -3,6 +3,7 @@ use std::cmp::Ordering;
 use std::rc::Rc;
 
 pub(crate) mod rebind;
+pub(crate) mod size;
 
 use crate::output::{Fragment, FragmentBuilder};
 

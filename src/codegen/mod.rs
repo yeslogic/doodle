@@ -1388,7 +1388,7 @@ struct TypedLambda<TypeRep> {
     kind: ClosureKind,
     // REVIEW - we might be able to deprecate this field and use is_short_circuiting instead
     body: Rc<TypedExpr<TypeRep>>,
-    __eta_safe: OnceCell<bool>,
+    __beta_reducible: OnceCell<bool>,
     __needs_ok: OnceCell<bool>,
 }
 
@@ -1417,12 +1417,12 @@ impl GenLambda {
             head_type,
             kind,
             body,
-            __eta_safe: OnceCell::new(),
+            __beta_reducible: OnceCell::new(),
             __needs_ok: OnceCell::new(),
         }
     }
 
-    fn eta_reduce(&self, param: RustExpr, body_info: ExprInfo) -> RustExpr {
+    fn beta_reduce(&self, param: RustExpr, body_info: ExprInfo) -> RustExpr {
         match param.as_local() {
             Some(outer) => {
                 if &**outer == &*self.head {
@@ -1516,8 +1516,8 @@ impl GenLambda {
 
     // FIXME - the logic here may be broken
     pub fn apply_pair(&self, param0: RustExpr, param1: RustExpr, body_info: ExprInfo) -> RustExpr {
-        let eta_safe = self.is_eta_safe();
-        match (self.kind, eta_safe) {
+        let beta_reducible = self.is_beta_reducible();
+        match (self.kind, beta_reducible) {
             (_, false) => {
                 let arg = RustExpr::Tuple(vec![param0, param1]);
                 self.embed(body_info).call_with([arg])
@@ -1541,10 +1541,10 @@ impl GenLambda {
     }
 
     /// Abstraction layer that allows for conditional selection of embed-closure-then-call
-    /// and eta-reduction strategies.
+    /// and beta-reduction strategies.
     pub fn apply(&self, param: RustExpr, body_info: ExprInfo) -> RustExpr {
-        if self.should_eta_reduce(&param) {
-            self.eta_reduce(param, body_info)
+        if self.should_beta_reduce(&param) {
+            self.beta_reduce(param, body_info)
         } else {
             let raw = self.embed(body_info).call_with([param]);
             // REVIEW - double-check this is the right predicate to apply
@@ -1557,16 +1557,16 @@ impl GenLambda {
     }
 
     /// Internal heuristic that returns `true` if the application of `self` to `arg` should be handled
-    /// via eta-reduction rather than embed-and-call.
-    fn should_eta_reduce(&self, _arg: &RustExpr) -> bool {
+    /// via beta-reduction rather than embed-and-call.
+    fn should_beta_reduce(&self, _arg: &RustExpr) -> bool {
         // REVIEW - decide on what heuristics, if any, to replace this with
-        self.is_eta_safe()
+        self.is_beta_reducible()
     }
 
-    pub fn is_eta_safe(&self) -> bool {
+    pub fn is_beta_reducible(&self) -> bool {
         let __body = self.body.clone();
         *self
-            .__eta_safe
+            .__beta_reducible
             .get_or_init(move || !embed_expr_dft(__body.as_ref()).is_short_circuiting())
     }
 
@@ -2562,7 +2562,7 @@ where
                 ));
                 let ctrl = {
                     let elt_bind = RustStmt::assign("elem", elt_expr);
-                    let cond = pred_last.eta_reduce(
+                    let cond = pred_last.beta_reduce(
                         RustExpr::Borrow(Box::new(RustExpr::local("elem"))),
                         ExprInfo::default(),
                     );
@@ -4450,9 +4450,9 @@ mod tests {
 
     #[test]
     fn test_lambda_sanity() {
-        const TU16: RustType = { RustType::Atom(AtomType::Prim(PrimType::U16)) };
-        const TU8: GenType = { GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::U8))) };
-        const GTBOOL: GenType = { GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::Bool))) };
+        const TU16: RustType = RustType::Atom(AtomType::Prim(PrimType::U16));
+        const TU8: GenType = GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::U8)));
+        const GTBOOL: GenType = GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::Bool)));
         let lambda = {
             let names = ["totlen", "seq"];
             let body = {
@@ -4495,7 +4495,7 @@ mod tests {
             }
         };
 
-        assert!(lambda.is_eta_safe());
+        assert!(lambda.is_beta_reducible());
         assert!(lambda.needs_ok());
 
         assert_eq!(
