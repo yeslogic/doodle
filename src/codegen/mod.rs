@@ -183,7 +183,7 @@ impl CodeGen {
         }
     }
 
-    /// Converts a `ValueType` to a `PreGenType`, potentially creating new ad-hoc names
+    /// Converts a `ValueType` to a `GenType`, potentially creating new ad-hoc names
     /// for any records or unions encountered, and registering any new ad-hoc type definitions
     /// in `self`.
     fn lift_type(&mut self, vt: &ValueType) -> GenType {
@@ -3136,6 +3136,8 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
     let mut table = elaborator.codegen.name_gen.manifest_renaming_table();
     // Set of identifiers we have picked as bespoke names for decoder functions based on the type they are parsing (rather than sequentially enumerated)
     let mut fn_renames = BTreeSet::<Label>::new();
+    let type_context = &elaborator.codegen.defined_types[..];
+    let src_context = rust_ast::size::SourceContext::from(type_context);
     let mut type_defs = Vec::from_iter(elaborator.codegen.defined_types.iter().map(|type_def| {
         elaborator
             .codegen
@@ -3161,7 +3163,8 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
             TraitSet::DebugClone
         };
         let it = RustItem::pub_decl_with_traits(RustDecl::type_def(name, type_def.clone()), traits);
-        items.push(it);
+        let comment = [format!("expected size: {}", rust_ast::size::MemSize::size_hint(type_def, &src_context))];
+        items.push(it.with_comment(comment));
     }
 
     for mut decoder_fn in sourcemap.decoder_skels {

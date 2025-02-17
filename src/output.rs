@@ -88,13 +88,17 @@ impl Fragment {
     /// Returns true if a [Fragment] produces a zero-length string when rendered
     ///
     /// The set of Fragments that satisfy this predicate is a super-set of those that satisfy [`Fragment::is_empty`].
+    ///
+    /// # Note
+    ///
+    /// Despite lexical coincidence, `Symbol::Vacuum` is not actually vacuous, as it contains non-zero amounts of whitespace.
     #[allow(dead_code)]
     fn is_vacuous(&self) -> bool {
         match self {
             Fragment::Empty => true,
             Fragment::Symbol(_) => false,
             Fragment::Char(_) => false,
-            Fragment::String(s) => s.len() == 0,
+            Fragment::String(s) => s.is_empty(),
             // in practice, we will not use DisplayAtom or DebugAtom if they entail zero-length output
             Fragment::DebugAtom(_) | Fragment::DisplayAtom(_) => false,
             Fragment::Group(g) => g.is_vacuous(),
@@ -115,12 +119,24 @@ impl Fragment {
     /// Forms a compound fragment from a Fragment-valued iterable, with
     /// an optional Fragment separating each element in the output sequence.
     ///
-    /// It is possibly more efficient to pass `sep := None` than `sep := Some(Fragment::Empty)`,
+    /// Optimizes for corner-cases,
     /// but the resulting output will differ in performance alone, and not output.
     pub fn seq(items: impl IntoIterator<Item = Fragment>, sep: Option<Fragment>) -> Self {
-        Self::Sequence {
-            items: items.into_iter().collect(),
-            sep: sep.map(Box::new),
+        let items: Vec<Fragment> = items.into_iter().collect();
+        if items.is_empty() {
+            Fragment::Empty
+        } else {
+            let sep = if items.len() == 1 {
+                // In practice, we don't need to allocate a separator if there is only one item in the sequence
+                None
+            } else {
+                // Use a separator of `None` if it amounts to the same behavior (based on vacuity)
+                sep.and_then(|s| if s.is_vacuous() { None } else { Some(Box::new(s)) })
+            };
+            Fragment::Sequence {
+                items,
+                sep,
+            }
         }
     }
 
@@ -326,7 +342,6 @@ impl Fragment {
     ///    - If `other` does not require more than one line to print, joins with `' '`, with a newline at the very end (and without `trailer`).
     ///    - Otherwise, joins `self` and `trailer` with no separation, followed by `other` on the following line
     pub(crate) fn join_with_wsp_eol(self, other: Self, trailer: Self) -> Self {
-        // FIXME - As currently implemented, if `other` contains Symbols, calling this method may break them
         if other.fits_inline() {
             self.cat(Self::Char(' ')).cat(other).cat_break()
         } else {

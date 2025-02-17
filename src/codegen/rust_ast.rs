@@ -206,9 +206,30 @@ impl ToFragment for RustImportItems {
 pub(crate) struct RustItem {
     vis: Visibility,
     attrs: Vec<RustAttr>,
+    doc_comment: Option<RustDocComment>,
     decl: RustDecl,
 }
 
+type CommentLine = Label;
+
+#[derive(Clone, Debug)]
+pub(crate) struct RustDocComment {
+    lines: Vec<CommentLine>,
+}
+
+impl ToFragment for RustDocComment {
+    fn to_fragment(&self) -> Fragment {
+        // REVIEW - consider a Fragment token that is either newline (if not at column 1) or no-op (if at column 1)
+        Fragment::seq(
+            self.lines.iter().map(|line|
+                Fragment::string("/// ").cat(Fragment::String(line.clone()))
+            ),
+            Some(Fragment::Char('\n')),
+        )
+    }
+}
+
+/// Specialized pseudo-bitflags implementation that directly implies Clone when Copy is set
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 #[repr(u8)]
 #[allow(dead_code)]
@@ -273,6 +294,7 @@ impl RustItem {
         Self {
             attrs,
             vis: Default::default(),
+            doc_comment: None,
             decl,
         }
     }
@@ -290,6 +312,7 @@ impl RustItem {
         Self {
             attrs,
             vis: Visibility::Public,
+            doc_comment: None,
             decl,
         }
     }
@@ -312,11 +335,23 @@ impl RustItem {
     pub fn pub_decl(decl: RustDecl) -> Self {
         Self::pub_decl_with_traits(decl, TraitSet::default())
     }
+
+    pub fn with_comment<Text: IntoLabel>(mut self, comment: impl IntoIterator<Item = Text>) -> Self {
+        if let Some(doc_comment) = self.doc_comment.as_mut() {
+            // We only want to call this once because doc-comments are exclusive
+            unreachable!("RustItem already has a doc comment: {doc_comment:?}");
+        };
+        self.doc_comment = Some(RustDocComment { lines: comment.into_iter().map(Text::into).collect::<Vec<Label>>() });
+        self
+    }
 }
 
-impl RustItem {
-    pub fn to_fragment(&self) -> Fragment {
+impl ToFragment for RustItem {
+    fn to_fragment(&self) -> Fragment {
         let mut builder = FragmentBuilder::new();
+        if let Some(com) = &self.doc_comment {
+            builder.push(com.to_fragment().cat_break());
+        }
         for attr in self.attrs.iter() {
             builder.push(attr.to_fragment().cat_break());
         }
