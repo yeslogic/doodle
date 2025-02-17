@@ -9,6 +9,7 @@ pub mod api_helper;
 use doodle::prelude::*;
 use doodle::try_sub;
 
+/// expected size: 33
 #[derive(Debug, Clone)]
 pub struct elf_header_ident {
 magic: (u8, u8, u8, u8),
@@ -20,12 +21,15 @@ abi_version: u8,
 __pad: Vec<u8>
 }
 
+/// expected size: 16
 #[derive(Debug, Copy, Clone)]
 pub enum elf_types_elf_addr { Addr32(u32), Addr64(u64) }
 
+/// expected size: 16
 #[derive(Debug, Copy, Clone)]
 pub enum elf_types_elf_off { Off32(u32), Off64(u64) }
 
+/// expected size: 105
 #[derive(Debug, Clone)]
 pub struct elf_header {
 ident: elf_header_ident,
@@ -44,9 +48,11 @@ shnum: u16,
 shstrndx: u16
 }
 
+/// expected size: 16
 #[derive(Debug, Copy, Clone)]
 pub enum elf_types_elf_full { Full32(u32), Full64(u64) }
 
+/// expected size: 116
 #[derive(Debug, Clone)]
 pub struct elf_phdr_table {
 r#type: u32,
@@ -60,6 +66,7 @@ flags32: Option<u32>,
 align: elf_types_elf_full
 }
 
+/// expected size: 112
 #[derive(Debug, Clone)]
 pub struct elf_shdr_table {
 name: u32,
@@ -74,6 +81,7 @@ addralign: elf_types_elf_full,
 entsize: elf_types_elf_full
 }
 
+/// expected size: 185
 #[derive(Debug, Clone)]
 pub struct elf_main {
 header: elf_header,
@@ -84,12 +92,14 @@ sections: Option<Vec<Option<Vec<u8>>>>,
 __skip: ()
 }
 
+/// expected size: 27
 #[derive(Debug, Clone)]
 pub struct gif_header {
 signature: (u8, u8, u8),
 version: Vec<u8>
 }
 
+/// expected size: 4
 #[derive(Debug, Copy, Clone)]
 pub struct gif_logical_screen_descriptor_flags {
 table_flag: u8,
@@ -98,6 +108,7 @@ sort_flag: u8,
 table_size: u8
 }
 
+/// expected size: 10
 #[derive(Debug, Clone)]
 pub struct gif_logical_screen_descriptor {
 screen_width: u16,
@@ -107,6 +118,7 @@ bg_color_index: u8,
 pixel_aspect_ratio: u8
 }
 
+/// expected size: 3
 #[derive(Debug, Copy, Clone)]
 pub struct png_plte {
 r: u8,
@@ -114,12 +126,14 @@ g: u8,
 b: u8
 }
 
+/// expected size: 34
 #[derive(Debug, Clone)]
 pub struct gif_logical_screen {
 descriptor: gif_logical_screen_descriptor,
 global_color_table: Option<Vec<png_plte>>
 }
 
+/// expected size: 4
 #[derive(Debug, Copy, Clone)]
 pub struct gif_graphic_control_extension_flags {
 reserved: u8,
@@ -128,6 +142,7 @@ user_input_flag: u8,
 transparent_color_flag: u8
 }
 
+/// expected size: 11
 #[derive(Debug, Clone)]
 pub struct gif_graphic_control_extension {
 separator: u8,
@@ -139,15 +154,18 @@ transparent_color_index: u8,
 terminator: u8
 }
 
+/// expected size: 13
 #[derive(Debug, Clone)]
 pub enum gif_graphic_block_graphic_control_extension { none, some(gif_graphic_control_extension) }
 
+/// expected size: 25
 #[derive(Debug, Clone)]
 pub struct gif_subblock {
 len_bytes: u8,
 data: Vec<u8>
 }
 
+/// expected size: 40
 #[derive(Debug, Clone)]
 pub struct gif_plain_text_extension {
 separator: u8,
@@ -165,6 +183,7 @@ plain_text_data: Vec<gif_subblock>,
 terminator: u8
 }
 
+/// expected size: 5
 #[derive(Debug, Copy, Clone)]
 pub struct gif_image_descriptor_flags {
 table_flag: u8,
@@ -174,6 +193,7 @@ reserved: u8,
 table_size: u8
 }
 
+/// expected size: 14
 #[derive(Debug, Clone)]
 pub struct gif_image_descriptor {
 separator: u8,
@@ -184,6 +204,7 @@ image_height: u16,
 flags: gif_image_descriptor_flags
 }
 
+/// expected size: 26
 #[derive(Debug, Clone)]
 pub struct gif_table_based_image_data {
 lzw_min_code_size: u8,
@@ -191,6 +212,7 @@ image_data: Vec<gif_subblock>,
 terminator: u8
 }
 
+/// expected size: 64
 #[derive(Debug, Clone)]
 pub struct gif_table_based_image {
 descriptor: gif_image_descriptor,
@@ -198,15 +220,18 @@ local_color_table: Option<Vec<png_plte>>,
 data: gif_table_based_image_data
 }
 
+/// expected size: 72
 #[derive(Debug, Clone)]
 pub enum gif_graphic_rendering_block { plain_text_extension(gif_plain_text_extension), table_based_image(gif_table_based_image) }
 
+/// expected size: 85
 #[derive(Debug, Clone)]
 pub struct gif_graphic_block {
 graphic_control_extension: gif_graphic_block_graphic_control_extension,
 graphic_rendering_block: gif_graphic_rendering_block
 }
 
+/// expected size: 76
 #[derive(Debug, Clone)]
 pub struct gif_application_extension {
 separator: u8,
@@ -218,6 +243,7 @@ application_data: Vec<gif_subblock>,
 terminator: u8
 }
 
+/// expected size: 27
 #[derive(Debug, Clone)]
 pub struct gif_comment_extension {
 separator: u8,
@@ -226,17 +252,21 @@ comment_data: Vec<gif_subblock>,
 terminator: u8
 }
 
+/// expected size: 84
 #[derive(Debug, Clone)]
 pub enum gif_special_purpose_block { application_extension(gif_application_extension), comment_extension(gif_comment_extension) }
 
+/// expected size: 93
 #[derive(Debug, Clone)]
 pub enum gif_block { graphic_block(gif_graphic_block), special_purpose_block(gif_special_purpose_block) }
 
+/// expected size: 1
 #[derive(Debug, Copy, Clone)]
 pub struct gif_trailer {
 separator: u8
 }
 
+/// expected size: 86
 #[derive(Debug, Clone)]
 pub struct gif_main {
 header: gif_header,
@@ -245,6 +275,7 @@ blocks: Vec<gif_block>,
 trailer: gif_trailer
 }
 
+/// expected size: 5
 #[derive(Debug, Copy, Clone)]
 pub struct gzip_header_file_flags {
 fcomment: bool,
@@ -254,6 +285,7 @@ fhcrc: bool,
 ftext: bool
 }
 
+/// expected size: 14
 #[derive(Debug, Clone)]
 pub struct gzip_header {
 magic: (u8, u8),
@@ -264,6 +296,7 @@ compression_flags: u8,
 os_id: u8
 }
 
+/// expected size: 28
 #[derive(Debug, Clone)]
 pub struct gzip_fextra_subfield {
 si1: u8,
@@ -272,40 +305,47 @@ len: u16,
 data: Vec<u8>
 }
 
+/// expected size: 26
 #[derive(Debug, Clone)]
 pub struct gzip_fextra {
 xlen: u16,
 subfields: Vec<gzip_fextra_subfield>
 }
 
+/// expected size: 25
 #[derive(Debug, Clone)]
 pub struct base_asciiz_string {
 string: Vec<u8>,
 null: u8
 }
 
+/// expected size: 25
 #[derive(Debug, Clone)]
 pub struct gzip_fcomment {
 comment: base_asciiz_string
 }
 
+/// expected size: 2
 #[derive(Debug, Copy, Clone)]
 pub struct gzip_fhcrc {
 crc: u16
 }
 
+/// expected size: 3
 #[derive(Debug, Copy, Clone)]
 pub struct deflate_dynamic_huffman_literal_length_distance_alphabet_code_lengths {
 code: u16,
 extra: u8
 }
 
+/// expected size: 4
 #[derive(Debug, Copy, Clone)]
 pub struct deflate_distance_record {
 distance_extra_bits: u16,
 distance: u16
 }
 
+/// expected size: 9
 #[derive(Debug, Clone)]
 pub struct deflate_dynamic_huffman_codes_values {
 length_extra_bits: u8,
@@ -314,21 +354,25 @@ distance_code: u16,
 distance_record: deflate_distance_record
 }
 
+/// expected size: 13
 #[derive(Debug, Clone)]
 pub struct deflate_dynamic_huffman_codes {
 code: u16,
 extra: Option<deflate_dynamic_huffman_codes_values>
 }
 
+/// expected size: 4
 #[derive(Debug, Copy, Clone)]
 pub struct deflate_main_codes_reference {
 length: u16,
 distance: u16
 }
 
+/// expected size: 6
 #[derive(Debug, Clone)]
-pub enum deflate_main_codes__dupX1 { literal(u8), reference(deflate_main_codes_reference) }
+pub enum deflate_main_codes { literal(u8), reference(deflate_main_codes_reference) }
 
+/// expected size: 171
 #[derive(Debug, Clone)]
 pub struct deflate_dynamic_huffman {
 hlit: u8,
@@ -340,9 +384,10 @@ literal_length_distance_alphabet_code_lengths_value: Vec<u8>,
 literal_length_alphabet_code_lengths_value: Vec<u8>,
 distance_alphabet_code_lengths_value: Vec<u8>,
 codes: Vec<deflate_dynamic_huffman_codes>,
-codes_values: Vec<deflate_main_codes__dupX1>
+codes_values: Vec<deflate_main_codes>
 }
 
+/// expected size: 8
 #[derive(Debug, Clone)]
 pub struct deflate_fixed_huffman_codes_values {
 length_extra_bits: u8,
@@ -351,50 +396,58 @@ distance_code: u8,
 distance_record: deflate_distance_record
 }
 
+/// expected size: 12
 #[derive(Debug, Clone)]
 pub struct deflate_fixed_huffman_codes {
 code: u16,
 extra: Option<deflate_fixed_huffman_codes_values>
 }
 
+/// expected size: 48
 #[derive(Debug, Clone)]
 pub struct deflate_fixed_huffman {
 codes: Vec<deflate_fixed_huffman_codes>,
-codes_values: Vec<deflate_main_codes__dupX1>
+codes_values: Vec<deflate_main_codes>
 }
 
+/// expected size: 52
 #[derive(Debug, Clone)]
 pub struct deflate_uncompressed {
 align: (),
 len: u16,
 nlen: u16,
 bytes: Vec<u8>,
-codes_values: Vec<deflate_main_codes__dupX1>
+codes_values: Vec<deflate_main_codes>
 }
 
+/// expected size: 179
 #[derive(Debug, Clone)]
-pub enum deflate_main_codes { dynamic_huffman(deflate_dynamic_huffman), fixed_huffman(deflate_fixed_huffman), uncompressed(deflate_uncompressed) }
+pub enum deflate_main_codes__dupX1 { dynamic_huffman(deflate_dynamic_huffman), fixed_huffman(deflate_fixed_huffman), uncompressed(deflate_uncompressed) }
 
+/// expected size: 181
 #[derive(Debug, Clone)]
 pub struct deflate_block {
 r#final: u8,
 r#type: u8,
-data: deflate_main_codes
+data: deflate_main_codes__dupX1
 }
 
+/// expected size: 72
 #[derive(Debug, Clone)]
 pub struct deflate_main {
 blocks: Vec<deflate_block>,
-codes: Vec<deflate_main_codes__dupX1>,
+codes: Vec<deflate_main_codes>,
 inflate: Vec<u8>
 }
 
+/// expected size: 8
 #[derive(Debug, Copy, Clone)]
 pub struct gzip_footer {
 crc: u32,
 length: u32
 }
 
+/// expected size: 174
 #[derive(Debug, Clone)]
 pub struct gzip_main {
 header: gzip_header,
@@ -406,12 +459,14 @@ data: deflate_main,
 footer: gzip_footer
 }
 
+/// expected size: 2
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_eoi {
 ff: u8,
 marker: u8
 }
 
+/// expected size: 33
 #[derive(Debug, Clone)]
 pub struct jpeg_app0_jfif {
 version_major: u8,
@@ -424,15 +479,18 @@ thumbnail_height: u8,
 thumbnail_pixels: Vec<Vec<png_plte>>
 }
 
+/// expected size: 41
 #[derive(Debug, Clone)]
 pub enum jpeg_app0_data_data { jfif(jpeg_app0_jfif), other(Vec<u8>) }
 
+/// expected size: 66
 #[derive(Debug, Clone)]
 pub struct jpeg_app0_data {
 identifier: base_asciiz_string,
 data: jpeg_app0_data_data
 }
 
+/// expected size: 70
 #[derive(Debug, Clone)]
 pub struct jpeg_app0 {
 marker: jpeg_eoi,
@@ -440,9 +498,11 @@ length: u16,
 data: jpeg_app0_data
 }
 
+/// expected size: 3
 #[derive(Debug, Copy, Clone)]
 pub enum tiff_main_byte_order { be(u8, u8), le(u8, u8) }
 
+/// expected size: 12
 #[derive(Debug, Copy, Clone)]
 pub struct tiff_main_ifd_fields {
 tag: u16,
@@ -451,6 +511,7 @@ length: u32,
 offset_or_data: u32
 }
 
+/// expected size: 54
 #[derive(Debug, Clone)]
 pub struct tiff_main_ifd {
 num_fields: u16,
@@ -459,6 +520,7 @@ next_ifd_offset: u32,
 next_ifd: Vec<u8>
 }
 
+/// expected size: 67
 #[derive(Debug, Clone)]
 pub struct tiff_main {
 start_of_header: u32,
@@ -468,26 +530,31 @@ offset: u32,
 ifd: tiff_main_ifd
 }
 
+/// expected size: 68
 #[derive(Debug, Clone)]
 pub struct jpeg_app1_exif {
 padding: u8,
 exif: tiff_main
 }
 
+/// expected size: 24
 #[derive(Debug, Clone)]
 pub struct jpeg_app1_xmp {
 xmp: Vec<u8>
 }
 
+/// expected size: 76
 #[derive(Debug, Clone)]
 pub enum jpeg_app1_data_data { exif(jpeg_app1_exif), other(Vec<u8>), xmp(jpeg_app1_xmp) }
 
+/// expected size: 101
 #[derive(Debug, Clone)]
 pub struct jpeg_app1_data {
 identifier: base_asciiz_string,
 data: jpeg_app1_data_data
 }
 
+/// expected size: 105
 #[derive(Debug, Clone)]
 pub struct jpeg_app1 {
 marker: jpeg_eoi,
@@ -495,9 +562,11 @@ length: u16,
 data: jpeg_app1_data
 }
 
+/// expected size: 113
 #[derive(Debug, Clone)]
 pub enum jpeg_frame_initial_segment { app0(jpeg_app0), app1(jpeg_app1) }
 
+/// expected size: 28
 #[derive(Debug, Clone)]
 pub struct jpeg_com {
 marker: jpeg_eoi,
@@ -505,18 +574,21 @@ length: u16,
 data: Vec<u8>
 }
 
+/// expected size: 2
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_dac_data_class_table_id {
 class: u8,
 table_id: u8
 }
 
+/// expected size: 3
 #[derive(Debug, Clone)]
 pub struct jpeg_dac_data {
 class_table_id: jpeg_dac_data_class_table_id,
 value: u8
 }
 
+/// expected size: 7
 #[derive(Debug, Clone)]
 pub struct jpeg_dac {
 marker: jpeg_eoi,
@@ -524,6 +596,7 @@ length: u16,
 data: jpeg_dac_data
 }
 
+/// expected size: 50
 #[derive(Debug, Clone)]
 pub struct jpeg_dht_data {
 class_table_id: jpeg_dac_data_class_table_id,
@@ -531,6 +604,7 @@ num_codes: Vec<u8>,
 values: Vec<Vec<u8>>
 }
 
+/// expected size: 54
 #[derive(Debug, Clone)]
 pub struct jpeg_dht {
 marker: jpeg_eoi,
@@ -538,21 +612,25 @@ length: u16,
 data: jpeg_dht_data
 }
 
+/// expected size: 2
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_dqt_data_precision_table_id {
 precision: u8,
 table_id: u8
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub enum jpeg_dqt_data_elements { Bytes(Vec<u8>), Shorts(Vec<u16>) }
 
+/// expected size: 34
 #[derive(Debug, Clone)]
 pub struct jpeg_dqt_data {
 precision_table_id: jpeg_dqt_data_precision_table_id,
 elements: jpeg_dqt_data_elements
 }
 
+/// expected size: 28
 #[derive(Debug, Clone)]
 pub struct jpeg_dqt {
 marker: jpeg_eoi,
@@ -560,11 +638,13 @@ length: u16,
 data: Vec<jpeg_dqt_data>
 }
 
+/// expected size: 2
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_dri_data {
 restart_interval: u16
 }
 
+/// expected size: 6
 #[derive(Debug, Clone)]
 pub struct jpeg_dri {
 marker: jpeg_eoi,
@@ -572,15 +652,18 @@ length: u16,
 data: jpeg_dri_data
 }
 
+/// expected size: 113
 #[derive(Debug, Clone)]
 pub enum jpeg_table_or_misc { app0(jpeg_app0), app1(jpeg_app1), app10(jpeg_com), app11(jpeg_com), app12(jpeg_com), app13(jpeg_com), app14(jpeg_com), app15(jpeg_com), app2(jpeg_com), app3(jpeg_com), app4(jpeg_com), app5(jpeg_com), app6(jpeg_com), app7(jpeg_com), app8(jpeg_com), app9(jpeg_com), com(jpeg_com), dac(jpeg_dac), dht(jpeg_dht), dqt(jpeg_dqt), dri(jpeg_dri) }
 
+/// expected size: 2
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_sof_image_component_sampling_factor {
 horizontal: u8,
 vertical: u8
 }
 
+/// expected size: 4
 #[derive(Debug, Clone)]
 pub struct jpeg_sof_image_component {
 id: u8,
@@ -588,6 +671,7 @@ sampling_factor: jpeg_sof_image_component_sampling_factor,
 quantization_table_id: u8
 }
 
+/// expected size: 30
 #[derive(Debug, Clone)]
 pub struct jpeg_sof_data {
 sample_precision: u8,
@@ -597,6 +681,7 @@ num_image_components: u8,
 image_components: Vec<jpeg_sof_image_component>
 }
 
+/// expected size: 34
 #[derive(Debug, Clone)]
 pub struct jpeg_sof15 {
 marker: jpeg_eoi,
@@ -604,27 +689,32 @@ length: u16,
 data: jpeg_sof_data
 }
 
+/// expected size: 42
 #[derive(Debug, Clone)]
 pub enum jpeg_frame_header { sof0(jpeg_sof15), sof1(jpeg_sof15), sof10(jpeg_sof15), sof11(jpeg_sof15), sof13(jpeg_sof15), sof14(jpeg_sof15), sof15(jpeg_sof15), sof2(jpeg_sof15), sof3(jpeg_sof15), sof5(jpeg_sof15), sof6(jpeg_sof15), sof7(jpeg_sof15), sof9(jpeg_sof15) }
 
+/// expected size: 2
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_sos_image_component_entropy_coding_table_ids {
 dc_entropy_coding_table_id: u8,
 ac_entropy_coding_table_id: u8
 }
 
+/// expected size: 3
 #[derive(Debug, Clone)]
 pub struct jpeg_sos_image_component {
 component_selector: u8,
 entropy_coding_table_ids: jpeg_sos_image_component_entropy_coding_table_ids
 }
 
+/// expected size: 2
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_sos_data_approximation_bit_position {
 high: u8,
 low: u8
 }
 
+/// expected size: 29
 #[derive(Debug, Clone)]
 pub struct jpeg_sos_data {
 num_image_components: u8,
@@ -634,6 +724,7 @@ end_spectral_selection: u8,
 approximation_bit_position: jpeg_sos_data_approximation_bit_position
 }
 
+/// expected size: 33
 #[derive(Debug, Clone)]
 pub struct jpeg_sos {
 marker: jpeg_eoi,
@@ -641,15 +732,18 @@ length: u16,
 data: jpeg_sos_data
 }
 
+/// expected size: 3
 #[derive(Debug, Clone)]
 pub enum jpeg_scan_data_scan_data { mcu(u8), rst0(jpeg_eoi), rst1(jpeg_eoi), rst2(jpeg_eoi), rst3(jpeg_eoi), rst4(jpeg_eoi), rst5(jpeg_eoi), rst6(jpeg_eoi), rst7(jpeg_eoi) }
 
+/// expected size: 48
 #[derive(Debug, Clone)]
 pub struct jpeg_scan_data {
 scan_data: Vec<jpeg_scan_data_scan_data>,
 scan_data_stream: Vec<u8>
 }
 
+/// expected size: 105
 #[derive(Debug, Clone)]
 pub struct jpeg_scan {
 segments: Vec<jpeg_table_or_misc>,
@@ -657,11 +751,13 @@ sos: jpeg_sos,
 data: jpeg_scan_data
 }
 
+/// expected size: 2
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_dnl_data {
 num_lines: u16
 }
 
+/// expected size: 6
 #[derive(Debug, Clone)]
 pub struct jpeg_dnl {
 marker: jpeg_eoi,
@@ -669,9 +765,11 @@ length: u16,
 data: jpeg_dnl_data
 }
 
+/// expected size: 8
 #[derive(Debug, Clone)]
 pub enum jpeg_frame_dnl { none, some(jpeg_dnl) }
 
+/// expected size: 316
 #[derive(Debug, Clone)]
 pub struct jpeg_frame {
 initial_segment: jpeg_frame_initial_segment,
@@ -682,6 +780,7 @@ dnl: jpeg_frame_dnl,
 scans: Vec<jpeg_scan>
 }
 
+/// expected size: 320
 #[derive(Debug, Clone)]
 pub struct jpeg_main {
 soi: jpeg_eoi,
@@ -689,6 +788,7 @@ frame: jpeg_frame,
 eoi: jpeg_eoi
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct mpeg4_atom_data_ftyp {
 major_brand: (u8, u8, u8, u8),
@@ -696,6 +796,7 @@ minor_version: u32,
 compatible_brands: Vec<(u8, u8, u8, u8)>
 }
 
+/// expected size: 40
 #[derive(Debug, Clone)]
 pub struct mpeg4_stbl_atom_data_stsd_sample_entries {
 size_field: u32,
@@ -704,6 +805,7 @@ size: u64,
 data: Vec<u8>
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct mpeg4_dinf_atom_data_dref {
 version: u8,
@@ -712,9 +814,11 @@ number_of_entries: u32,
 data: Vec<mpeg4_stbl_atom_data_stsd_sample_entries>
 }
 
+/// expected size: 40
 #[derive(Debug, Clone)]
 pub enum mpeg4_dinf_atom_data { dref(mpeg4_dinf_atom_data_dref), unknown(Vec<u8>) }
 
+/// expected size: 56
 #[derive(Debug, Clone)]
 pub struct mpeg4_dinf_atom {
 size_field: u32,
@@ -723,6 +827,7 @@ size: u64,
 data: mpeg4_dinf_atom_data
 }
 
+/// expected size: 49
 #[derive(Debug, Clone)]
 pub struct mpeg4_meta_atom_data_hdlr {
 version: u8,
@@ -733,19 +838,23 @@ reserved: (u32, u32, u32),
 name: base_asciiz_string
 }
 
+/// expected size: 25
 #[derive(Debug, Clone)]
 pub struct mpeg4_iinf_atom_data_infe_fields_no_extra_fields_mime {
 content_type: base_asciiz_string
 }
 
+/// expected size: 25
 #[derive(Debug, Clone)]
 pub struct mpeg4_iinf_atom_data_infe_fields_no_extra_fields_uri {
 item_uri_type: base_asciiz_string
 }
 
+/// expected size: 33
 #[derive(Debug, Clone)]
 pub enum mpeg4_iinf_atom_data_infe_fields_no_extra_fields { mime(mpeg4_iinf_atom_data_infe_fields_no_extra_fields_mime), unknown, uri(mpeg4_iinf_atom_data_infe_fields_no_extra_fields_uri) }
 
+/// expected size: 68
 #[derive(Debug, Clone)]
 pub struct mpeg4_iinf_atom_data_infe_fields_no {
 item_ID: u32,
@@ -755,6 +864,7 @@ item_name: base_asciiz_string,
 extra_fields: mpeg4_iinf_atom_data_infe_fields_no_extra_fields
 }
 
+/// expected size: 79
 #[derive(Debug, Clone)]
 pub struct mpeg4_iinf_atom_data_infe_fields_yes {
 item_ID: u16,
@@ -764,9 +874,11 @@ content_type: base_asciiz_string,
 content_encoding: base_asciiz_string
 }
 
+/// expected size: 87
 #[derive(Debug, Clone)]
 pub enum mpeg4_iinf_atom_data_infe_fields { no(mpeg4_iinf_atom_data_infe_fields_no), yes(mpeg4_iinf_atom_data_infe_fields_yes) }
 
+/// expected size: 91
 #[derive(Debug, Clone)]
 pub struct mpeg4_iinf_atom_data_infe {
 version: u8,
@@ -774,9 +886,11 @@ flags: (u8, u8, u8),
 fields: mpeg4_iinf_atom_data_infe_fields
 }
 
+/// expected size: 99
 #[derive(Debug, Clone)]
 pub enum mpeg4_iinf_atom_data { infe(mpeg4_iinf_atom_data_infe), unknown(Vec<u8>) }
 
+/// expected size: 115
 #[derive(Debug, Clone)]
 pub struct mpeg4_iinf_atom {
 size_field: u32,
@@ -785,6 +899,7 @@ size: u64,
 data: mpeg4_iinf_atom_data
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct mpeg4_meta_atom_data_iinf {
 version: u8,
@@ -793,6 +908,7 @@ entry_count: u32,
 item_info_entry: Vec<mpeg4_iinf_atom>
 }
 
+/// expected size: 24
 #[derive(Debug, Copy, Clone)]
 pub struct mpeg4_meta_atom_data_iloc_items_extents {
 extent_index: u64,
@@ -800,6 +916,7 @@ extent_offset: u64,
 extent_length: u64
 }
 
+/// expected size: 44
 #[derive(Debug, Clone)]
 pub struct mpeg4_meta_atom_data_iloc_items {
 item_ID: u32,
@@ -810,6 +927,7 @@ extent_count: u16,
 extents: Vec<mpeg4_meta_atom_data_iloc_items_extents>
 }
 
+/// expected size: 38
 #[derive(Debug, Clone)]
 pub struct mpeg4_meta_atom_data_iloc {
 version: u8,
@@ -824,6 +942,7 @@ item_count: u32,
 items: Vec<mpeg4_meta_atom_data_iloc_items>
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct mpeg4_tool_atom_data_data {
 type_indicator: u32,
@@ -831,9 +950,11 @@ locale_indicator: u32,
 value: Vec<u8>
 }
 
+/// expected size: 40
 #[derive(Debug, Clone)]
 pub enum mpeg4_tool_atom_data { data(mpeg4_tool_atom_data_data), unknown(Vec<u8>) }
 
+/// expected size: 56
 #[derive(Debug, Clone)]
 pub struct mpeg4_tool_atom {
 size_field: u32,
@@ -842,9 +963,11 @@ size: u64,
 data: mpeg4_tool_atom_data
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub enum mpeg4_ilst_atom_data { tool(Vec<mpeg4_tool_atom>), unknown(Vec<u8>) }
 
+/// expected size: 48
 #[derive(Debug, Clone)]
 pub struct mpeg4_ilst_atom {
 size_field: u32,
@@ -853,6 +976,7 @@ size: u64,
 data: mpeg4_ilst_atom_data
 }
 
+/// expected size: 30
 #[derive(Debug, Clone)]
 pub struct mpeg4_meta_atom_data_iref_single_item_reference_large_data {
 from_item_ID: u32,
@@ -860,6 +984,7 @@ reference_count: u16,
 to_item_ID: Vec<u32>
 }
 
+/// expected size: 46
 #[derive(Debug, Clone)]
 pub struct mpeg4_meta_atom_data_iref_single_item_reference_large {
 size_field: u32,
@@ -868,6 +993,7 @@ size: u64,
 data: mpeg4_meta_atom_data_iref_single_item_reference_large_data
 }
 
+/// expected size: 28
 #[derive(Debug, Clone)]
 pub struct mpeg4_meta_atom_data_iref_single_item_reference_small_data {
 from_item_ID: u16,
@@ -875,6 +1001,7 @@ reference_count: u16,
 to_item_ID: Vec<u16>
 }
 
+/// expected size: 44
 #[derive(Debug, Clone)]
 pub struct mpeg4_meta_atom_data_iref_single_item_reference_small {
 size_field: u32,
@@ -883,9 +1010,11 @@ size: u64,
 data: mpeg4_meta_atom_data_iref_single_item_reference_small_data
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub enum mpeg4_meta_atom_data_iref_single_item_reference { large(Vec<mpeg4_meta_atom_data_iref_single_item_reference_large>), small(Vec<mpeg4_meta_atom_data_iref_single_item_reference_small>) }
 
+/// expected size: 36
 #[derive(Debug, Clone)]
 pub struct mpeg4_meta_atom_data_iref {
 version: u8,
@@ -893,9 +1022,11 @@ flags: (u8, u8, u8),
 single_item_reference: mpeg4_meta_atom_data_iref_single_item_reference
 }
 
+/// expected size: 8
 #[derive(Debug, Copy, Clone)]
 pub enum mpeg4_meta_atom_data_pitm_item_ID { no(u32), yes(u16) }
 
+/// expected size: 12
 #[derive(Debug, Clone)]
 pub struct mpeg4_meta_atom_data_pitm {
 version: u8,
@@ -903,9 +1034,11 @@ flags: (u8, u8, u8),
 item_ID: mpeg4_meta_atom_data_pitm_item_ID
 }
 
+/// expected size: 57
 #[derive(Debug, Clone)]
 pub enum mpeg4_meta_atom_data { dinf(Vec<mpeg4_dinf_atom>), hdlr(mpeg4_meta_atom_data_hdlr), idat(Vec<u8>), iinf(mpeg4_meta_atom_data_iinf), iloc(mpeg4_meta_atom_data_iloc), ilst(Vec<mpeg4_ilst_atom>), iref(mpeg4_meta_atom_data_iref), pitm(mpeg4_meta_atom_data_pitm), unknown(Vec<u8>) }
 
+/// expected size: 73
 #[derive(Debug, Clone)]
 pub struct mpeg4_meta_atom {
 size_field: u32,
@@ -914,6 +1047,7 @@ size: u64,
 data: mpeg4_meta_atom_data
 }
 
+/// expected size: 16
 #[derive(Debug, Copy, Clone)]
 pub struct mpeg4_moov_atom_data_mvhd_fields_version0 {
 creation_time: u32,
@@ -922,6 +1056,7 @@ timescale: u32,
 duration: u32
 }
 
+/// expected size: 28
 #[derive(Debug, Copy, Clone)]
 pub struct mpeg4_moov_atom_data_mvhd_fields_version1 {
 creation_time: u64,
@@ -930,9 +1065,11 @@ timescale: u32,
 duration: u64
 }
 
+/// expected size: 36
 #[derive(Debug, Clone)]
 pub enum mpeg4_moov_atom_data_mvhd_fields { version0(mpeg4_moov_atom_data_mvhd_fields_version0), version1(mpeg4_moov_atom_data_mvhd_fields_version1) }
 
+/// expected size: 108
 #[derive(Debug, Clone)]
 pub struct mpeg4_moov_atom_data_mvhd {
 version: u8,
@@ -947,6 +1084,7 @@ pre_defined: Vec<u32>,
 next_track_ID: u32
 }
 
+/// expected size: 12
 #[derive(Debug, Copy, Clone)]
 pub struct mpeg4_edts_atom_data_elst_edit_list_table {
 track_duration: u32,
@@ -954,6 +1092,7 @@ media_time: u32,
 media_rate: u32
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct mpeg4_edts_atom_data_elst {
 version: u8,
@@ -962,9 +1101,11 @@ number_of_entries: u32,
 edit_list_table: Vec<mpeg4_edts_atom_data_elst_edit_list_table>
 }
 
+/// expected size: 40
 #[derive(Debug, Clone)]
 pub enum mpeg4_edts_atom_data { elst(mpeg4_edts_atom_data_elst), unknown(Vec<u8>) }
 
+/// expected size: 56
 #[derive(Debug, Clone)]
 pub struct mpeg4_edts_atom {
 size_field: u32,
@@ -973,6 +1114,7 @@ size: u64,
 data: mpeg4_edts_atom_data
 }
 
+/// expected size: 49
 #[derive(Debug, Clone)]
 pub struct mpeg4_mdia_atom_data_hdlr {
 version: u8,
@@ -985,6 +1127,7 @@ component_flags_mask: u32,
 component_name: base_asciiz_string
 }
 
+/// expected size: 44
 #[derive(Debug, Clone)]
 pub struct mpeg4_mdia_atom_data_mdhd {
 version: u8,
@@ -994,6 +1137,7 @@ language: u16,
 pre_defined: u16
 }
 
+/// expected size: 8
 #[derive(Debug, Copy, Clone)]
 pub struct mpeg4_minf_atom_data_smhd {
 version: u8,
@@ -1002,6 +1146,7 @@ balance: u16,
 reserved: u16
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct mpeg4_stbl_atom_data_co64 {
 version: u8,
@@ -1010,12 +1155,14 @@ entry_count: u32,
 chunk_offset: Vec<u64>
 }
 
+/// expected size: 8
 #[derive(Debug, Copy, Clone)]
 pub struct mpeg4_stbl_atom_data_ctts_sample_entries {
 sample_count: u32,
 sample_offset: u32
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct mpeg4_stbl_atom_data_ctts {
 version: u8,
@@ -1024,12 +1171,14 @@ entry_count: u32,
 sample_entries: Vec<mpeg4_stbl_atom_data_ctts_sample_entries>
 }
 
+/// expected size: 8
 #[derive(Debug, Copy, Clone)]
 pub struct mpeg4_stbl_atom_data_sbgp_sample_groups {
 sample_count: u32,
 group_description_index: u32
 }
 
+/// expected size: 44
 #[derive(Debug, Clone)]
 pub struct mpeg4_stbl_atom_data_sbgp {
 version: u8,
@@ -1040,12 +1189,14 @@ entry_count: u32,
 sample_groups: Vec<mpeg4_stbl_atom_data_sbgp_sample_groups>
 }
 
+/// expected size: 28
 #[derive(Debug, Clone)]
 pub struct mpeg4_stbl_atom_data_sgpd_sample_groups {
 description_length: u32,
 sample_group_entry: Vec<u8>
 }
 
+/// expected size: 40
 #[derive(Debug, Clone)]
 pub struct mpeg4_stbl_atom_data_sgpd {
 version: u8,
@@ -1056,6 +1207,7 @@ entry_count: u32,
 sample_groups: Vec<mpeg4_stbl_atom_data_sgpd_sample_groups>
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct mpeg4_stbl_atom_data_stco {
 version: u8,
@@ -1064,6 +1216,7 @@ entry_count: u32,
 chunk_offset: Vec<u32>
 }
 
+/// expected size: 12
 #[derive(Debug, Copy, Clone)]
 pub struct mpeg4_stbl_atom_data_stsc_chunk_entries {
 first_chunk: u32,
@@ -1071,6 +1224,7 @@ samples_per_chunk: u32,
 sample_description_index: u32
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct mpeg4_stbl_atom_data_stsc {
 version: u8,
@@ -1079,6 +1233,7 @@ entry_count: u32,
 chunk_entries: Vec<mpeg4_stbl_atom_data_stsc_chunk_entries>
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct mpeg4_stbl_atom_data_stsd {
 version: u8,
@@ -1087,6 +1242,7 @@ entry_count: u32,
 sample_entries: Vec<mpeg4_stbl_atom_data_stsd_sample_entries>
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct mpeg4_stbl_atom_data_stss {
 version: u8,
@@ -1095,6 +1251,7 @@ entry_count: u32,
 sample_number: Vec<u32>
 }
 
+/// expected size: 36
 #[derive(Debug, Clone)]
 pub struct mpeg4_stbl_atom_data_stsz {
 version: u8,
@@ -1104,12 +1261,14 @@ sample_count: u32,
 entry_size: Option<Vec<u32>>
 }
 
+/// expected size: 8
 #[derive(Debug, Copy, Clone)]
 pub struct mpeg4_stbl_atom_data_stts_sample_entries {
 sample_count: u32,
 sample_delta: u32
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct mpeg4_stbl_atom_data_stts {
 version: u8,
@@ -1118,9 +1277,11 @@ entry_count: u32,
 sample_entries: Vec<mpeg4_stbl_atom_data_stts_sample_entries>
 }
 
+/// expected size: 52
 #[derive(Debug, Clone)]
 pub enum mpeg4_stbl_atom_data { co64(mpeg4_stbl_atom_data_co64), ctts(mpeg4_stbl_atom_data_ctts), sbgp(mpeg4_stbl_atom_data_sbgp), sgpd(mpeg4_stbl_atom_data_sgpd), stco(mpeg4_stbl_atom_data_stco), stsc(mpeg4_stbl_atom_data_stsc), stsd(mpeg4_stbl_atom_data_stsd), stss(mpeg4_stbl_atom_data_stss), stsz(mpeg4_stbl_atom_data_stsz), stts(mpeg4_stbl_atom_data_stts), unknown(Vec<u8>) }
 
+/// expected size: 68
 #[derive(Debug, Clone)]
 pub struct mpeg4_stbl_atom {
 size_field: u32,
@@ -1129,6 +1290,7 @@ size: u64,
 data: mpeg4_stbl_atom_data
 }
 
+/// expected size: 30
 #[derive(Debug, Clone)]
 pub struct mpeg4_minf_atom_data_vmhd {
 version: u8,
@@ -1137,9 +1299,11 @@ graphicsmode: u16,
 opcolor: Vec<u16>
 }
 
+/// expected size: 38
 #[derive(Debug, Clone)]
 pub enum mpeg4_minf_atom_data { dinf(Vec<mpeg4_dinf_atom>), smhd(mpeg4_minf_atom_data_smhd), stbl(Vec<mpeg4_stbl_atom>), unknown(Vec<u8>), vmhd(mpeg4_minf_atom_data_vmhd) }
 
+/// expected size: 54
 #[derive(Debug, Clone)]
 pub struct mpeg4_minf_atom {
 size_field: u32,
@@ -1148,9 +1312,11 @@ size: u64,
 data: mpeg4_minf_atom_data
 }
 
+/// expected size: 57
 #[derive(Debug, Clone)]
 pub enum mpeg4_mdia_atom_data { hdlr(mpeg4_mdia_atom_data_hdlr), mdhd(mpeg4_mdia_atom_data_mdhd), minf(Vec<mpeg4_minf_atom>), unknown(Vec<u8>) }
 
+/// expected size: 73
 #[derive(Debug, Clone)]
 pub struct mpeg4_mdia_atom {
 size_field: u32,
@@ -1159,6 +1325,7 @@ size: u64,
 data: mpeg4_mdia_atom_data
 }
 
+/// expected size: 20
 #[derive(Debug, Copy, Clone)]
 pub struct mpeg4_trak_atom_data_tkhd_fields_version0 {
 creation_time: u32,
@@ -1168,6 +1335,7 @@ reserved: u32,
 duration: u32
 }
 
+/// expected size: 32
 #[derive(Debug, Copy, Clone)]
 pub struct mpeg4_trak_atom_data_tkhd_fields_version1 {
 creation_time: u64,
@@ -1177,9 +1345,11 @@ reserved: u32,
 duration: u64
 }
 
+/// expected size: 40
 #[derive(Debug, Clone)]
 pub enum mpeg4_trak_atom_data_tkhd_fields { version0(mpeg4_trak_atom_data_tkhd_fields_version0), version1(mpeg4_trak_atom_data_tkhd_fields_version1) }
 
+/// expected size: 92
 #[derive(Debug, Clone)]
 pub struct mpeg4_trak_atom_data_tkhd {
 version: u8,
@@ -1195,9 +1365,11 @@ width: u32,
 height: u32
 }
 
+/// expected size: 100
 #[derive(Debug, Clone)]
 pub enum mpeg4_trak_atom_data { edts(Vec<mpeg4_edts_atom>), mdia(Vec<mpeg4_mdia_atom>), tkhd(mpeg4_trak_atom_data_tkhd), unknown(Vec<u8>) }
 
+/// expected size: 116
 #[derive(Debug, Clone)]
 pub struct mpeg4_trak_atom {
 size_field: u32,
@@ -1206,9 +1378,11 @@ size: u64,
 data: mpeg4_trak_atom_data
 }
 
+/// expected size: 36
 #[derive(Debug, Clone)]
 pub enum mpeg4_udta_atom_data { meta(u32, Vec<mpeg4_meta_atom>), unknown(Vec<u8>) }
 
+/// expected size: 52
 #[derive(Debug, Clone)]
 pub struct mpeg4_udta_atom {
 size_field: u32,
@@ -1217,9 +1391,11 @@ size: u64,
 data: mpeg4_udta_atom_data
 }
 
+/// expected size: 116
 #[derive(Debug, Clone)]
 pub enum mpeg4_moov_atom_data { mvhd(mpeg4_moov_atom_data_mvhd), trak(Vec<mpeg4_trak_atom>), udta(Vec<mpeg4_udta_atom>), unknown(Vec<u8>) }
 
+/// expected size: 132
 #[derive(Debug, Clone)]
 pub struct mpeg4_moov_atom {
 size_field: u32,
@@ -1228,9 +1404,11 @@ size: u64,
 data: mpeg4_moov_atom_data
 }
 
+/// expected size: 40
 #[derive(Debug, Clone)]
 pub enum mpeg4_atom_data { free, ftyp(mpeg4_atom_data_ftyp), mdat, meta(u32, Vec<mpeg4_meta_atom>), moov(Vec<mpeg4_moov_atom>), unknown(Vec<u8>) }
 
+/// expected size: 56
 #[derive(Debug, Clone)]
 pub struct mpeg4_atom {
 size_field: u32,
@@ -1239,11 +1417,13 @@ size: u64,
 data: mpeg4_atom_data
 }
 
+/// expected size: 24
 #[derive(Debug, Clone)]
 pub struct mpeg4_main {
 atoms: Vec<mpeg4_atom>
 }
 
+/// expected size: 16
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_table_record {
 table_id: u32,
@@ -1252,6 +1432,7 @@ offset: u32,
 length: u32
 }
 
+/// expected size: 30
 #[derive(Debug, Clone)]
 pub struct opentype_cmap_subtable_format0 {
 format: u16,
@@ -1260,6 +1441,7 @@ language: u16,
 glyph_id_array: Vec<u8>
 }
 
+/// expected size: 44
 #[derive(Debug, Clone)]
 pub struct opentype_cmap_subtable_format10 {
 format: u16,
@@ -1271,6 +1453,7 @@ num_chars: u32,
 glyph_id_array: Vec<u16>
 }
 
+/// expected size: 12
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_types_sequential_map_record {
 start_char_code: u32,
@@ -1278,6 +1461,7 @@ end_char_code: u32,
 start_glyph_id: u32
 }
 
+/// expected size: 40
 #[derive(Debug, Clone)]
 pub struct opentype_cmap_subtable_format13 {
 format: u16,
@@ -1288,42 +1472,49 @@ num_groups: u32,
 groups: Vec<opentype_types_sequential_map_record>
 }
 
+/// expected size: 5
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_variation_selector_default_uvs_offset_link_ranges {
 start_unicode_value: u32,
 additional_count: u8
 }
 
+/// expected size: 28
 #[derive(Debug, Clone)]
 pub struct opentype_variation_selector_default_uvs_offset_link {
 num_unicode_value_ranges: u32,
 ranges: Vec<opentype_variation_selector_default_uvs_offset_link_ranges>
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct opentype_variation_selector_default_uvs_offset {
 offset: u32,
 link: Option<opentype_variation_selector_default_uvs_offset_link>
 }
 
+/// expected size: 6
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_variation_selector_non_default_uvs_offset_link_uvs_mappings {
 unicode_value: u32,
 glyph_id: u16
 }
 
+/// expected size: 28
 #[derive(Debug, Clone)]
 pub struct opentype_variation_selector_non_default_uvs_offset_link {
 num_uvs_mappings: u32,
 uvs_mappings: Vec<opentype_variation_selector_non_default_uvs_offset_link_uvs_mappings>
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct opentype_variation_selector_non_default_uvs_offset {
 offset: u32,
 link: Option<opentype_variation_selector_non_default_uvs_offset_link>
 }
 
+/// expected size: 68
 #[derive(Debug, Clone)]
 pub struct opentype_variation_selector {
 var_selector: u32,
@@ -1331,6 +1522,7 @@ default_uvs_offset: opentype_variation_selector_default_uvs_offset,
 non_default_uvs_offset: opentype_variation_selector_non_default_uvs_offset
 }
 
+/// expected size: 34
 #[derive(Debug, Clone)]
 pub struct opentype_cmap_subtable_format14 {
 format: u16,
@@ -1339,6 +1531,7 @@ num_var_selector_records: u32,
 var_selector: Vec<opentype_variation_selector>
 }
 
+/// expected size: 8
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_cmap_subtable_format2_sub_headers {
 first_code: u16,
@@ -1347,6 +1540,7 @@ id_delta: u16,
 id_range_offset: u16
 }
 
+/// expected size: 78
 #[derive(Debug, Clone)]
 pub struct opentype_cmap_subtable_format2 {
 format: u16,
@@ -1357,6 +1551,7 @@ sub_headers: Vec<opentype_cmap_subtable_format2_sub_headers>,
 glyph_array: Vec<u16>
 }
 
+/// expected size: 136
 #[derive(Debug, Clone)]
 pub struct opentype_cmap_subtable_format4 {
 format: u16,
@@ -1374,6 +1569,7 @@ id_range_offset: Vec<u16>,
 glyph_array: Vec<u16>
 }
 
+/// expected size: 34
 #[derive(Debug, Clone)]
 pub struct opentype_cmap_subtable_format6 {
 format: u16,
@@ -1384,6 +1580,7 @@ entry_count: u16,
 glyph_id_array: Vec<u16>
 }
 
+/// expected size: 64
 #[derive(Debug, Clone)]
 pub struct opentype_cmap_subtable_format8 {
 format: u16,
@@ -1395,9 +1592,11 @@ num_groups: u32,
 groups: Vec<opentype_types_sequential_map_record>
 }
 
+/// expected size: 144
 #[derive(Debug, Clone)]
 pub enum opentype_cmap_subtable_data { Format0(opentype_cmap_subtable_format0), Format10(opentype_cmap_subtable_format10), Format12(opentype_cmap_subtable_format13), Format13(opentype_cmap_subtable_format13), Format14(opentype_cmap_subtable_format14), Format2(opentype_cmap_subtable_format2), Format4(opentype_cmap_subtable_format4), Format6(opentype_cmap_subtable_format6), Format8(opentype_cmap_subtable_format8) }
 
+/// expected size: 150
 #[derive(Debug, Clone)]
 pub struct opentype_cmap_subtable {
 table_start: u32,
@@ -1405,12 +1604,14 @@ format: u16,
 data: opentype_cmap_subtable_data
 }
 
+/// expected size: 154
 #[derive(Debug, Clone)]
 pub struct opentype_encoding_record_subtable_offset {
 offset: u32,
 link: Option<opentype_cmap_subtable>
 }
 
+/// expected size: 158
 #[derive(Debug, Clone)]
 pub struct opentype_encoding_record {
 platform: u16,
@@ -1418,6 +1619,7 @@ encoding: u16,
 subtable_offset: opentype_encoding_record_subtable_offset
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct opentype_cmap_table {
 table_start: u32,
@@ -1426,9 +1628,11 @@ num_tables: u16,
 encoding_records: Vec<opentype_encoding_record>
 }
 
+/// expected size: 8
 #[derive(Debug, Copy, Clone)]
 pub enum opentype_var_user_tuple_coordinates { Fixed32(u32) }
 
+/// expected size: 8
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_head_table_glyph_extents {
 x_min: u16,
@@ -1437,6 +1641,7 @@ x_max: u16,
 y_max: u16
 }
 
+/// expected size: 7
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_head_table_mac_style {
 extended: bool,
@@ -1448,6 +1653,7 @@ italic: bool,
 bold: bool
 }
 
+/// expected size: 63
 #[derive(Debug, Clone)]
 pub struct opentype_head_table {
 major_version: u16,
@@ -1467,12 +1673,14 @@ index_to_loc_format: u16,
 glyph_data_format: u16
 }
 
+/// expected size: 4
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_hhea_table_caret_slope {
 rise: u16,
 run: u16
 }
 
+/// expected size: 36
 #[derive(Debug, Clone)]
 pub struct opentype_hhea_table {
 major_version: u16,
@@ -1491,6 +1699,7 @@ metric_data_format: u16,
 number_of_long_metrics: u16
 }
 
+/// expected size: 26
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_maxp_table_version1 {
 max_points: u16,
@@ -1508,9 +1717,11 @@ max_component_elements: u16,
 max_component_depth: u16
 }
 
+/// expected size: 30
 #[derive(Debug, Clone)]
 pub enum opentype_maxp_table_data { MaxpPostScript, MaxpUnknown(u32), MaxpV1(opentype_maxp_table_version1) }
 
+/// expected size: 36
 #[derive(Debug, Clone)]
 pub struct opentype_maxp_table {
 version: u32,
@@ -1518,24 +1729,28 @@ num_glyphs: u16,
 data: opentype_maxp_table_data
 }
 
+/// expected size: 4
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_hmtx_table_long_metrics {
 advance_width: u16,
 left_side_bearing: u16
 }
 
+/// expected size: 48
 #[derive(Debug, Clone)]
 pub struct opentype_hmtx_table {
 long_metrics: Vec<opentype_hmtx_table_long_metrics>,
 left_side_bearings: Vec<u16>
 }
 
+/// expected size: 26
 #[derive(Debug, Clone)]
 pub struct opentype_name_table_name_records_offset {
 offset: u16,
 link: Option<Vec<u8>>
 }
 
+/// expected size: 36
 #[derive(Debug, Clone)]
 pub struct opentype_name_table_name_records {
 platform: u16,
@@ -1546,21 +1761,25 @@ length: u16,
 offset: opentype_name_table_name_records_offset
 }
 
+/// expected size: 28
 #[derive(Debug, Clone)]
 pub struct opentype_name_table_name_version_1_lang_tag_records {
 length: u16,
 offset: opentype_name_table_name_records_offset
 }
 
+/// expected size: 26
 #[derive(Debug, Clone)]
 pub struct opentype_name_table_name_version_1 {
 lang_tag_count: u16,
 lang_tag_records: Vec<opentype_name_table_name_version_1_lang_tag_records>
 }
 
+/// expected size: 34
 #[derive(Debug, Clone)]
 pub enum opentype_name_table_data { NameVersion0, NameVersion1(opentype_name_table_name_version_1), NameVersionUnknown(u16) }
 
+/// expected size: 68
 #[derive(Debug, Clone)]
 pub struct opentype_name_table {
 table_start: u32,
@@ -1571,12 +1790,14 @@ name_records: Vec<opentype_name_table_name_records>,
 data: opentype_name_table_data
 }
 
+/// expected size: 4
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_os2_table_data_extra_fields_v1_extra_fields_v2_extra_fields_v5 {
 us_lower_optical_point_size: u16,
 us_upper_optical_point_size: u16
 }
 
+/// expected size: 16
 #[derive(Debug, Clone)]
 pub struct opentype_os2_table_data_extra_fields_v1_extra_fields_v2 {
 sx_height: u16,
@@ -1587,6 +1808,7 @@ us_max_context: u16,
 extra_fields_v5: Option<opentype_os2_table_data_extra_fields_v1_extra_fields_v2_extra_fields_v5>
 }
 
+/// expected size: 24
 #[derive(Debug, Clone)]
 pub struct opentype_os2_table_data_extra_fields_v1 {
 ul_code_page_range_1: u32,
@@ -1594,6 +1816,7 @@ ul_code_page_range_2: u32,
 extra_fields_v2: Option<opentype_os2_table_data_extra_fields_v1_extra_fields_v2>
 }
 
+/// expected size: 34
 #[derive(Debug, Clone)]
 pub struct opentype_os2_table_data {
 s_typo_ascender: u16,
@@ -1604,6 +1827,7 @@ us_win_descent: u16,
 extra_fields_v1: Option<opentype_os2_table_data_extra_fields_v1>
 }
 
+/// expected size: 116
 #[derive(Debug, Clone)]
 pub struct opentype_os2_table {
 version: u16,
@@ -1634,6 +1858,7 @@ us_last_char_index: u16,
 data: Option<opentype_os2_table_data>
 }
 
+/// expected size: 30
 #[derive(Debug, Clone)]
 pub struct opentype_post_table_names_Version2 {
 num_glyphs: u16,
@@ -1641,15 +1866,18 @@ glyph_name_index: Vec<u16>,
 string_data: u32
 }
 
+/// expected size: 26
 #[derive(Debug, Clone)]
 pub struct opentype_post_table_names_Version2Dot5 {
 num_glyphs: u16,
 offset: Vec<u8>
 }
 
+/// expected size: 38
 #[derive(Debug, Clone)]
 pub enum opentype_post_table_names { Version1, Version2(opentype_post_table_names_Version2), Version2Dot5(opentype_post_table_names_Version2Dot5), Version3, VersionUnknown(u32) }
 
+/// expected size: 74
 #[derive(Debug, Clone)]
 pub struct opentype_post_table {
 version: u32,
@@ -1664,14 +1892,17 @@ max_mem_type1: u32,
 names: opentype_post_table_names
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub enum opentype_gvar_table_glyph_variation_data_offsets { Offsets16(Vec<u16>), Offsets32(Vec<u32>) }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct opentype_loca_table {
 offsets: opentype_gvar_table_glyph_variation_data_offsets
 }
 
+/// expected size: 12
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_glyf_composite_raw_flags {
 unscaled_component_offset: bool,
@@ -1688,21 +1919,26 @@ args_are_xy_values: bool,
 arg_1_and_2_are_words: bool
 }
 
+/// expected size: 4
 #[derive(Debug, Copy, Clone)]
 pub enum opentype_glyf_composite_raw_argument1 { Int16(u16), Int8(u8), Uint16(u16), Uint8(u8) }
 
+/// expected size: 4
 #[derive(Debug, Copy, Clone)]
 pub enum opentype_var_tuple_record_coordinates { F2Dot14(u16) }
 
+/// expected size: 8
 #[derive(Debug, Clone)]
 pub struct opentype_glyf_composite_raw_scale_XY {
 x_scale: opentype_var_tuple_record_coordinates,
 y_scale: opentype_var_tuple_record_coordinates
 }
 
+/// expected size: 18
 #[derive(Debug, Clone)]
 pub enum opentype_glyf_composite_raw_scale { Matrix((opentype_var_tuple_record_coordinates, opentype_var_tuple_record_coordinates), (opentype_var_tuple_record_coordinates, opentype_var_tuple_record_coordinates)), Scale(opentype_var_tuple_record_coordinates), XY(opentype_glyf_composite_raw_scale_XY) }
 
+/// expected size: 42
 #[derive(Debug, Clone)]
 pub struct opentype_glyf_composite_raw {
 flags: opentype_glyf_composite_raw_flags,
@@ -1712,12 +1948,14 @@ argument2: opentype_glyf_composite_raw_argument1,
 scale: Option<opentype_glyf_composite_raw_scale>
 }
 
+/// expected size: 48
 #[derive(Debug, Clone)]
 pub struct opentype_glyf_composite {
 glyphs: Vec<opentype_glyf_composite_raw>,
 instructions: Vec<u8>
 }
 
+/// expected size: 6
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_glyf_simple_flags {
 on_curve_point: bool,
@@ -1728,6 +1966,7 @@ y_is_same_or_positive_y_short_vector: bool,
 overlap_simple: bool
 }
 
+/// expected size: 124
 #[derive(Debug, Clone)]
 pub struct opentype_glyf_simple {
 end_points_of_contour: Vec<u16>,
@@ -1739,9 +1978,11 @@ x_coordinates: Vec<u16>,
 y_coordinates: Vec<u16>
 }
 
+/// expected size: 132
 #[derive(Debug, Clone)]
 pub enum opentype_glyf_description { Composite(opentype_glyf_composite), HeaderOnly, Simple(opentype_glyf_simple) }
 
+/// expected size: 142
 #[derive(Debug, Clone)]
 pub struct opentype_glyf_table_Glyph {
 number_of_contours: u16,
@@ -1752,15 +1993,18 @@ y_max: u16,
 description: opentype_glyf_description
 }
 
+/// expected size: 150
 #[derive(Debug, Clone)]
 pub enum opentype_glyf_table { EmptyGlyph, Glyph(opentype_glyf_table_Glyph) }
 
+/// expected size: 2
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_gasp_table_gasp_ranges_range_gasp_behavior_Version0 {
 dogray: bool,
 gridfit: bool
 }
 
+/// expected size: 4
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_gasp_table_gasp_ranges_range_gasp_behavior_Version1 {
 symmetric_smoothing: bool,
@@ -1769,15 +2013,18 @@ dogray: bool,
 gridfit: bool
 }
 
+/// expected size: 5
 #[derive(Debug, Clone)]
 pub enum opentype_gasp_table_gasp_ranges_range_gasp_behavior { Version0(opentype_gasp_table_gasp_ranges_range_gasp_behavior_Version0), Version1(opentype_gasp_table_gasp_ranges_range_gasp_behavior_Version1) }
 
+/// expected size: 7
 #[derive(Debug, Clone)]
 pub struct opentype_gasp_table_gasp_ranges {
 range_max_ppem: u16,
 range_gasp_behavior: opentype_gasp_table_gasp_ranges_range_gasp_behavior
 }
 
+/// expected size: 28
 #[derive(Debug, Clone)]
 pub struct opentype_gasp_table {
 version: u16,
@@ -1785,18 +2032,21 @@ num_ranges: u16,
 gasp_ranges: Vec<opentype_gasp_table_gasp_ranges>
 }
 
+/// expected size: 26
 #[derive(Debug, Clone)]
 pub struct opentype_layout_axis_table_base_tag_list_offset_link {
 base_tag_count: u16,
 baseline_tags: Vec<u32>
 }
 
+/// expected size: 28
 #[derive(Debug, Clone)]
 pub struct opentype_layout_axis_table_base_tag_list_offset {
 offset: u16,
 link: Option<opentype_layout_axis_table_base_tag_list_offset_link>
 }
 
+/// expected size: 30
 #[derive(Debug, Clone)]
 pub struct opentype_common_device_or_variation_index_table_DeviceTable {
 start_size: u16,
@@ -1805,6 +2055,7 @@ delta_format: u16,
 delta_values: Vec<u16>
 }
 
+/// expected size: 6
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_common_device_or_variation_index_table_OtherTable {
 field0: u16,
@@ -1812,6 +2063,7 @@ field1: u16,
 delta_format: u16
 }
 
+/// expected size: 6
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_common_device_or_variation_index_table_VariationIndexTable {
 delta_set_outer_index: u16,
@@ -1819,29 +2071,35 @@ delta_set_inner_index: u16,
 delta_format: (u8, u8)
 }
 
+/// expected size: 38
 #[derive(Debug, Clone)]
 pub enum opentype_common_device_or_variation_index_table { DeviceTable(opentype_common_device_or_variation_index_table_DeviceTable), OtherTable(opentype_common_device_or_variation_index_table_OtherTable), VariationIndexTable(opentype_common_device_or_variation_index_table_VariationIndexTable) }
 
+/// expected size: 40
 #[derive(Debug, Clone)]
 pub struct opentype_common_value_record_x_advance_device {
 offset: u16,
 link: Option<opentype_common_device_or_variation_index_table>
 }
 
+/// expected size: 40
 #[derive(Debug, Clone)]
 pub struct opentype_layout_base_coord_hint_DeviceHint {
 device_offset: opentype_common_value_record_x_advance_device
 }
 
+/// expected size: 4
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_layout_base_coord_hint_GlyphHint {
 reference_glyph: u16,
 base_coord_point: u16
 }
 
+/// expected size: 48
 #[derive(Debug, Clone)]
 pub enum opentype_layout_base_coord_hint { DeviceHint(opentype_layout_base_coord_hint_DeviceHint), GlyphHint(opentype_layout_base_coord_hint_GlyphHint), NoHint }
 
+/// expected size: 56
 #[derive(Debug, Clone)]
 pub struct opentype_layout_base_coord {
 table_start: u32,
@@ -1850,12 +2108,14 @@ coordinate: u16,
 hint: opentype_layout_base_coord_hint
 }
 
+/// expected size: 58
 #[derive(Debug, Clone)]
 pub struct opentype_layout_min_max_min_coord_offset {
 offset: u16,
 link: Option<opentype_layout_base_coord>
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct opentype_layout_base_values {
 table_start: u32,
@@ -1864,12 +2124,14 @@ base_coord_count: u16,
 base_coord_offsets: Vec<opentype_layout_min_max_min_coord_offset>
 }
 
+/// expected size: 34
 #[derive(Debug, Clone)]
 pub struct opentype_layout_base_script_base_values_offset {
 offset: u16,
 link: Option<opentype_layout_base_values>
 }
 
+/// expected size: 120
 #[derive(Debug, Clone)]
 pub struct opentype_layout_min_max_feat_min_max_records {
 feature_tag: u32,
@@ -1877,6 +2139,7 @@ min_coord_offset: opentype_layout_min_max_min_coord_offset,
 max_coord_offset: opentype_layout_min_max_min_coord_offset
 }
 
+/// expected size: 146
 #[derive(Debug, Clone)]
 pub struct opentype_layout_min_max {
 table_start: u32,
@@ -1886,18 +2149,21 @@ feat_min_max_count: u16,
 feat_min_max_records: Vec<opentype_layout_min_max_feat_min_max_records>
 }
 
+/// expected size: 148
 #[derive(Debug, Clone)]
 pub struct opentype_layout_base_script_default_min_max_offset {
 offset: u16,
 link: Option<opentype_layout_min_max>
 }
 
+/// expected size: 152
 #[derive(Debug, Clone)]
 pub struct opentype_layout_base_script_base_lang_sys_records {
 base_lang_sys_tag: u32,
 min_max_offset: opentype_layout_base_script_default_min_max_offset
 }
 
+/// expected size: 212
 #[derive(Debug, Clone)]
 pub struct opentype_layout_base_script {
 table_start: u32,
@@ -1907,18 +2173,21 @@ base_lang_sys_count: u16,
 base_lang_sys_records: Vec<opentype_layout_base_script_base_lang_sys_records>
 }
 
+/// expected size: 214
 #[derive(Debug, Clone)]
 pub struct opentype_layout_axis_table_base_script_list_offset_link_base_script_records_base_script_offset {
 offset: u16,
 link: Option<opentype_layout_base_script>
 }
 
+/// expected size: 218
 #[derive(Debug, Clone)]
 pub struct opentype_layout_axis_table_base_script_list_offset_link_base_script_records {
 base_script_tag: u32,
 base_script_offset: opentype_layout_axis_table_base_script_list_offset_link_base_script_records_base_script_offset
 }
 
+/// expected size: 30
 #[derive(Debug, Clone)]
 pub struct opentype_layout_axis_table_base_script_list_offset_link {
 table_start: u32,
@@ -1926,12 +2195,14 @@ base_script_count: u16,
 base_script_records: Vec<opentype_layout_axis_table_base_script_list_offset_link_base_script_records>
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct opentype_layout_axis_table_base_script_list_offset {
 offset: u16,
 link: Option<opentype_layout_axis_table_base_script_list_offset_link>
 }
 
+/// expected size: 64
 #[derive(Debug, Clone)]
 pub struct opentype_layout_axis_table {
 table_start: u32,
@@ -1939,18 +2210,21 @@ base_tag_list_offset: opentype_layout_axis_table_base_tag_list_offset,
 base_script_list_offset: opentype_layout_axis_table_base_script_list_offset
 }
 
+/// expected size: 66
 #[derive(Debug, Clone)]
 pub struct opentype_base_table_vert_axis_offset {
 offset: u16,
 link: Option<opentype_layout_axis_table>
 }
 
+/// expected size: 5
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_base_table_item_var_store_offset {
 offset: u32,
 link: Option<()>
 }
 
+/// expected size: 145
 #[derive(Debug, Clone)]
 pub struct opentype_base_table {
 table_start: u32,
@@ -1961,6 +2235,7 @@ vert_axis_offset: opentype_base_table_vert_axis_offset,
 item_var_store_offset: Option<opentype_base_table_item_var_store_offset>
 }
 
+/// expected size: 28
 #[derive(Debug, Clone)]
 pub struct opentype_class_def_data_Format1 {
 start_glyph_id: u16,
@@ -1968,6 +2243,7 @@ glyph_count: u16,
 class_value_array: Vec<u16>
 }
 
+/// expected size: 6
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_class_def_data_Format2_class_range_records {
 start_glyph_id: u16,
@@ -1975,33 +2251,39 @@ end_glyph_id: u16,
 class: u16
 }
 
+/// expected size: 26
 #[derive(Debug, Clone)]
 pub struct opentype_class_def_data_Format2 {
 class_range_count: u16,
 class_range_records: Vec<opentype_class_def_data_Format2_class_range_records>
 }
 
+/// expected size: 36
 #[derive(Debug, Clone)]
 pub enum opentype_class_def_data { Format1(opentype_class_def_data_Format1), Format2(opentype_class_def_data_Format2) }
 
+/// expected size: 38
 #[derive(Debug, Clone)]
 pub struct opentype_class_def {
 class_format: u16,
 data: opentype_class_def_data
 }
 
+/// expected size: 40
 #[derive(Debug, Clone)]
 pub struct opentype_gdef_table_glyph_class_def {
 offset: u16,
 link: Option<opentype_class_def>
 }
 
+/// expected size: 26
 #[derive(Debug, Clone)]
 pub struct opentype_coverage_table_data_Format1 {
 glyph_count: u16,
 glyph_array: Vec<u16>
 }
 
+/// expected size: 6
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_coverage_table_data_Format2_range_records {
 start_glyph_id: u16,
@@ -2009,39 +2291,46 @@ end_glyph_id: u16,
 start_coverage_index: u16
 }
 
+/// expected size: 26
 #[derive(Debug, Clone)]
 pub struct opentype_coverage_table_data_Format2 {
 range_count: u16,
 range_records: Vec<opentype_coverage_table_data_Format2_range_records>
 }
 
+/// expected size: 34
 #[derive(Debug, Clone)]
 pub enum opentype_coverage_table_data { Format1(opentype_coverage_table_data_Format1), Format2(opentype_coverage_table_data_Format2) }
 
+/// expected size: 36
 #[derive(Debug, Clone)]
 pub struct opentype_coverage_table {
 coverage_format: u16,
 data: opentype_coverage_table_data
 }
 
+/// expected size: 38
 #[derive(Debug, Clone)]
 pub struct opentype_layout_reverse_chain_single_subst_coverage {
 offset: u16,
 link: Option<opentype_coverage_table>
 }
 
+/// expected size: 26
 #[derive(Debug, Clone)]
 pub struct opentype_gdef_table_attach_list_link_attach_point_offsets_link {
 point_count: u16,
 point_indices: Vec<u16>
 }
 
+/// expected size: 28
 #[derive(Debug, Clone)]
 pub struct opentype_gdef_table_attach_list_link_attach_point_offsets {
 offset: u16,
 link: Option<opentype_gdef_table_attach_list_link_attach_point_offsets_link>
 }
 
+/// expected size: 68
 #[derive(Debug, Clone)]
 pub struct opentype_gdef_table_attach_list_link {
 table_start: u32,
@@ -2050,31 +2339,37 @@ glyph_count: u16,
 attach_point_offsets: Vec<opentype_gdef_table_attach_list_link_attach_point_offsets>
 }
 
+/// expected size: 70
 #[derive(Debug, Clone)]
 pub struct opentype_gdef_table_attach_list {
 offset: u16,
 link: Option<opentype_gdef_table_attach_list_link>
 }
 
+/// expected size: 2
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link_data_Format1 {
 coordinate: u16
 }
 
+/// expected size: 2
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link_data_Format2 {
 caret_value_point_index: u16
 }
 
+/// expected size: 42
 #[derive(Debug, Clone)]
 pub struct opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link_data_Format3 {
 coordinate: u16,
 table: opentype_common_value_record_x_advance_device
 }
 
+/// expected size: 50
 #[derive(Debug, Clone)]
 pub enum opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link_data { Format1(opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link_data_Format1), Format2(opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link_data_Format2), Format3(opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link_data_Format3) }
 
+/// expected size: 56
 #[derive(Debug, Clone)]
 pub struct opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link {
 table_start: u32,
@@ -2082,12 +2377,14 @@ caret_value_format: u16,
 data: opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link_data
 }
 
+/// expected size: 58
 #[derive(Debug, Clone)]
 pub struct opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values {
 offset: u16,
 link: Option<opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link>
 }
 
+/// expected size: 30
 #[derive(Debug, Clone)]
 pub struct opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link {
 table_start: u32,
@@ -2095,12 +2392,14 @@ caret_count: u16,
 caret_values: Vec<opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values>
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets {
 offset: u16,
 link: Option<opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link>
 }
 
+/// expected size: 68
 #[derive(Debug, Clone)]
 pub struct opentype_gdef_table_lig_caret_list_link {
 table_start: u32,
@@ -2109,18 +2408,21 @@ lig_glyph_count: u16,
 lig_glyph_offsets: Vec<opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets>
 }
 
+/// expected size: 70
 #[derive(Debug, Clone)]
 pub struct opentype_gdef_table_lig_caret_list {
 offset: u16,
 link: Option<opentype_gdef_table_lig_caret_list_link>
 }
 
+/// expected size: 40
 #[derive(Debug, Clone)]
 pub struct opentype_mark_glyph_set_coverage {
 offset: u32,
 link: Option<opentype_coverage_table>
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct opentype_mark_glyph_set {
 table_start: u32,
@@ -2129,26 +2431,31 @@ mark_glyph_set_count: u16,
 coverage: Vec<opentype_mark_glyph_set_coverage>
 }
 
+/// expected size: 34
 #[derive(Debug, Clone)]
 pub struct opentype_gdef_table_data_Version1_2_mark_glyph_sets_def {
 offset: u16,
 link: Option<opentype_mark_glyph_set>
 }
 
+/// expected size: 34
 #[derive(Debug, Clone)]
 pub struct opentype_gdef_table_data_Version1_2 {
 mark_glyph_sets_def: opentype_gdef_table_data_Version1_2_mark_glyph_sets_def
 }
 
+/// expected size: 39
 #[derive(Debug, Clone)]
 pub struct opentype_gdef_table_data_Version1_3 {
 mark_glyph_sets_def: opentype_gdef_table_data_Version1_2_mark_glyph_sets_def,
 item_var_store: opentype_base_table_item_var_store_offset
 }
 
+/// expected size: 47
 #[derive(Debug, Clone)]
 pub enum opentype_gdef_table_data { Version1_0, Version1_2(opentype_gdef_table_data_Version1_2), Version1_3(opentype_gdef_table_data_Version1_3) }
 
+/// expected size: 275
 #[derive(Debug, Clone)]
 pub struct opentype_gdef_table {
 table_start: u32,
@@ -2161,6 +2468,7 @@ mark_attach_class_def: opentype_gdef_table_glyph_class_def,
 data: opentype_gdef_table_data
 }
 
+/// expected size: 30
 #[derive(Debug, Clone)]
 pub struct opentype_common_langsys {
 lookup_order_offset: u16,
@@ -2169,18 +2477,21 @@ feature_index_count: u16,
 feature_indices: Vec<u16>
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct opentype_common_script_table_default_lang_sys {
 offset: u16,
 link: Option<opentype_common_langsys>
 }
 
+/// expected size: 36
 #[derive(Debug, Clone)]
 pub struct opentype_common_script_table_lang_sys_records {
 lang_sys_tag: u32,
 lang_sys: opentype_common_script_table_default_lang_sys
 }
 
+/// expected size: 62
 #[derive(Debug, Clone)]
 pub struct opentype_common_script_table {
 table_start: u32,
@@ -2189,18 +2500,21 @@ lang_sys_count: u16,
 lang_sys_records: Vec<opentype_common_script_table_lang_sys_records>
 }
 
+/// expected size: 64
 #[derive(Debug, Clone)]
 pub struct opentype_common_script_list_script_records_script {
 offset: u16,
 link: Option<opentype_common_script_table>
 }
 
+/// expected size: 68
 #[derive(Debug, Clone)]
 pub struct opentype_common_script_list_script_records {
 script_tag: u32,
 script: opentype_common_script_list_script_records_script
 }
 
+/// expected size: 30
 #[derive(Debug, Clone)]
 pub struct opentype_common_script_list {
 table_start: u32,
@@ -2208,12 +2522,14 @@ script_count: u16,
 script_records: Vec<opentype_common_script_list_script_records>
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct opentype_gsub_table_script_list {
 offset: u16,
 link: Option<opentype_common_script_list>
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct opentype_common_feature_table {
 table_start: u32,
@@ -2222,18 +2538,21 @@ lookup_index_count: u16,
 lookup_list_indices: Vec<u16>
 }
 
+/// expected size: 34
 #[derive(Debug, Clone)]
 pub struct opentype_common_feature_list_feature_records_feature {
 offset: u16,
 link: Option<opentype_common_feature_table>
 }
 
+/// expected size: 38
 #[derive(Debug, Clone)]
 pub struct opentype_common_feature_list_feature_records {
 feature_tag: u32,
 feature: opentype_common_feature_list_feature_records_feature
 }
 
+/// expected size: 30
 #[derive(Debug, Clone)]
 pub struct opentype_common_feature_list {
 table_start: u32,
@@ -2241,12 +2560,14 @@ feature_count: u16,
 feature_records: Vec<opentype_common_feature_list_feature_records>
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct opentype_gsub_table_feature_list {
 offset: u16,
 link: Option<opentype_common_feature_list>
 }
 
+/// expected size: 7
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_gsub_table_lookup_list_link_lookups_link_lookup_flag {
 mark_attachment_class_filter: u16,
@@ -2257,12 +2578,14 @@ ignore_base_glyphs: bool,
 right_to_left: bool
 }
 
+/// expected size: 4
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_common_sequence_lookup {
 sequence_index: u16,
 lookup_list_index: u16
 }
 
+/// expected size: 104
 #[derive(Debug, Clone)]
 pub struct opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link_chained_seq_rules_link {
 backtrack_glyph_count: u16,
@@ -2275,12 +2598,14 @@ seq_lookup_count: u16,
 seq_lookup_records: Vec<opentype_common_sequence_lookup>
 }
 
+/// expected size: 106
 #[derive(Debug, Clone)]
 pub struct opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link_chained_seq_rules {
 offset: u16,
 link: Option<opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link_chained_seq_rules_link>
 }
 
+/// expected size: 30
 #[derive(Debug, Clone)]
 pub struct opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link {
 table_start: u32,
@@ -2288,12 +2613,14 @@ chained_seq_rule_count: u16,
 chained_seq_rules: Vec<opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link_chained_seq_rules>
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets {
 offset: u16,
 link: Option<opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link>
 }
 
+/// expected size: 64
 #[derive(Debug, Clone)]
 pub struct opentype_common_chained_sequence_context_subst_Format1 {
 coverage: opentype_layout_reverse_chain_single_subst_coverage,
@@ -2301,6 +2628,7 @@ chained_seq_rule_set_count: u16,
 chained_seq_rule_sets: Vec<opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets>
 }
 
+/// expected size: 184
 #[derive(Debug, Clone)]
 pub struct opentype_common_chained_sequence_context_subst_Format2 {
 coverage: opentype_layout_reverse_chain_single_subst_coverage,
@@ -2311,6 +2639,7 @@ chained_class_seq_rule_set_count: u16,
 chained_class_seq_rule_sets: Vec<opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets>
 }
 
+/// expected size: 104
 #[derive(Debug, Clone)]
 pub struct opentype_common_chained_sequence_context_subst_Format3 {
 backtrack_glyph_count: u16,
@@ -2323,9 +2652,11 @@ seq_lookup_count: u16,
 seq_lookup_records: Vec<opentype_common_sequence_lookup>
 }
 
+/// expected size: 192
 #[derive(Debug, Clone)]
 pub enum opentype_common_chained_sequence_context_subst { Format1(opentype_common_chained_sequence_context_subst_Format1), Format2(opentype_common_chained_sequence_context_subst_Format2), Format3(opentype_common_chained_sequence_context_subst_Format3) }
 
+/// expected size: 198
 #[derive(Debug, Clone)]
 pub struct opentype_common_chained_sequence_context {
 table_start: u32,
@@ -2333,12 +2664,14 @@ format: u16,
 subst: opentype_common_chained_sequence_context_subst
 }
 
+/// expected size: 4
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_common_anchor_table_table_Format1 {
 x_coordinate: u16,
 y_coordinate: u16
 }
 
+/// expected size: 6
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_common_anchor_table_table_Format2 {
 x_coordinate: u16,
@@ -2346,6 +2679,7 @@ y_coordinate: u16,
 anchor_point: u16
 }
 
+/// expected size: 84
 #[derive(Debug, Clone)]
 pub struct opentype_common_anchor_table_table_Format3 {
 x_coordinate: u16,
@@ -2354,9 +2688,11 @@ x_device_offset: opentype_common_value_record_x_advance_device,
 y_device_offset: opentype_common_value_record_x_advance_device
 }
 
+/// expected size: 92
 #[derive(Debug, Clone)]
 pub enum opentype_common_anchor_table_table { Format1(opentype_common_anchor_table_table_Format1), Format2(opentype_common_anchor_table_table_Format2), Format3(opentype_common_anchor_table_table_Format3) }
 
+/// expected size: 98
 #[derive(Debug, Clone)]
 pub struct opentype_common_anchor_table {
 table_start: u32,
@@ -2364,18 +2700,21 @@ anchor_format: u16,
 table: opentype_common_anchor_table_table
 }
 
+/// expected size: 100
 #[derive(Debug, Clone)]
 pub struct opentype_layout_mark_array_mark_records_mark_anchor_offset {
 offset: u16,
 link: Option<opentype_common_anchor_table>
 }
 
+/// expected size: 200
 #[derive(Debug, Clone)]
 pub struct opentype_layout_cursive_pos_entry_exit_records {
 entry_anchor: opentype_layout_mark_array_mark_records_mark_anchor_offset,
 exit_anchor: opentype_layout_mark_array_mark_records_mark_anchor_offset
 }
 
+/// expected size: 70
 #[derive(Debug, Clone)]
 pub struct opentype_layout_cursive_pos {
 table_start: u32,
@@ -2385,12 +2724,14 @@ entry_exit_count: u16,
 entry_exit_records: Vec<opentype_layout_cursive_pos_entry_exit_records>
 }
 
+/// expected size: 102
 #[derive(Debug, Clone)]
 pub struct opentype_layout_mark_array_mark_records {
 mark_class: u16,
 mark_anchor_offset: opentype_layout_mark_array_mark_records_mark_anchor_offset
 }
 
+/// expected size: 30
 #[derive(Debug, Clone)]
 pub struct opentype_layout_mark_array {
 table_start: u32,
@@ -2398,17 +2739,20 @@ mark_count: u16,
 mark_records: Vec<opentype_layout_mark_array_mark_records>
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct opentype_layout_mark_mark_pos_mark1_array_offset {
 offset: u16,
 link: Option<opentype_layout_mark_array>
 }
 
+/// expected size: 24
 #[derive(Debug, Clone)]
 pub struct opentype_layout_mark_base_pos_base_array_offset_link_base_records {
 base_anchor_offsets: Vec<opentype_layout_mark_array_mark_records_mark_anchor_offset>
 }
 
+/// expected size: 30
 #[derive(Debug, Clone)]
 pub struct opentype_layout_mark_base_pos_base_array_offset_link {
 table_start: u32,
@@ -2416,12 +2760,14 @@ base_count: u16,
 base_records: Vec<opentype_layout_mark_base_pos_base_array_offset_link_base_records>
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct opentype_layout_mark_base_pos_base_array_offset {
 offset: u16,
 link: Option<opentype_layout_mark_base_pos_base_array_offset_link>
 }
 
+/// expected size: 148
 #[derive(Debug, Clone)]
 pub struct opentype_layout_mark_base_pos {
 table_start: u32,
@@ -2433,11 +2779,13 @@ mark_array_offset: opentype_layout_mark_mark_pos_mark1_array_offset,
 base_array_offset: opentype_layout_mark_base_pos_base_array_offset
 }
 
+/// expected size: 24
 #[derive(Debug, Clone)]
 pub struct opentype_layout_mark_lig_pos_ligature_array_offset_link_ligature_attach_offsets_link_component_records {
 ligature_anchor_offsets: Vec<opentype_layout_mark_array_mark_records_mark_anchor_offset>
 }
 
+/// expected size: 30
 #[derive(Debug, Clone)]
 pub struct opentype_layout_mark_lig_pos_ligature_array_offset_link_ligature_attach_offsets_link {
 table_start: u32,
@@ -2445,12 +2793,14 @@ component_count: u16,
 component_records: Vec<opentype_layout_mark_lig_pos_ligature_array_offset_link_ligature_attach_offsets_link_component_records>
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct opentype_layout_mark_lig_pos_ligature_array_offset_link_ligature_attach_offsets {
 offset: u16,
 link: Option<opentype_layout_mark_lig_pos_ligature_array_offset_link_ligature_attach_offsets_link>
 }
 
+/// expected size: 30
 #[derive(Debug, Clone)]
 pub struct opentype_layout_mark_lig_pos_ligature_array_offset_link {
 table_start: u32,
@@ -2458,12 +2808,14 @@ ligature_count: u16,
 ligature_attach_offsets: Vec<opentype_layout_mark_lig_pos_ligature_array_offset_link_ligature_attach_offsets>
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct opentype_layout_mark_lig_pos_ligature_array_offset {
 offset: u16,
 link: Option<opentype_layout_mark_lig_pos_ligature_array_offset_link>
 }
 
+/// expected size: 148
 #[derive(Debug, Clone)]
 pub struct opentype_layout_mark_lig_pos {
 table_start: u32,
@@ -2475,11 +2827,13 @@ mark_array_offset: opentype_layout_mark_mark_pos_mark1_array_offset,
 ligature_array_offset: opentype_layout_mark_lig_pos_ligature_array_offset
 }
 
+/// expected size: 24
 #[derive(Debug, Clone)]
 pub struct opentype_layout_mark_mark_pos_mark2_array_offset_link_mark2_records {
 mark2_anchor_offsets: Vec<opentype_layout_mark_array_mark_records_mark_anchor_offset>
 }
 
+/// expected size: 30
 #[derive(Debug, Clone)]
 pub struct opentype_layout_mark_mark_pos_mark2_array_offset_link {
 table_start: u32,
@@ -2487,12 +2841,14 @@ mark2_count: u16,
 mark2_records: Vec<opentype_layout_mark_mark_pos_mark2_array_offset_link_mark2_records>
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct opentype_layout_mark_mark_pos_mark2_array_offset {
 offset: u16,
 link: Option<opentype_layout_mark_mark_pos_mark2_array_offset_link>
 }
 
+/// expected size: 148
 #[derive(Debug, Clone)]
 pub struct opentype_layout_mark_mark_pos {
 table_start: u32,
@@ -2504,6 +2860,7 @@ mark1_array_offset: opentype_layout_mark_mark_pos_mark1_array_offset,
 mark2_array_offset: opentype_layout_mark_mark_pos_mark2_array_offset
 }
 
+/// expected size: 8
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_common_value_format_flags {
 y_advance_device: bool,
@@ -2516,6 +2873,7 @@ y_placement: bool,
 x_placement: bool
 }
 
+/// expected size: 176
 #[derive(Debug, Clone)]
 pub struct opentype_common_value_record {
 x_placement: Option<u16>,
@@ -2528,6 +2886,7 @@ x_advance_device: Option<opentype_common_value_record_x_advance_device>,
 y_advance_device: Option<opentype_common_value_record_x_advance_device>
 }
 
+/// expected size: 354
 #[derive(Debug, Clone)]
 pub struct opentype_layout_pair_pos_subtable_Format1_pair_sets_link_pair_value_records {
 second_glyph: u16,
@@ -2535,6 +2894,7 @@ value_record1: Option<opentype_common_value_record>,
 value_record2: Option<opentype_common_value_record>
 }
 
+/// expected size: 30
 #[derive(Debug, Clone)]
 pub struct opentype_layout_pair_pos_subtable_Format1_pair_sets_link {
 table_start: u32,
@@ -2542,12 +2902,14 @@ pair_value_count: u16,
 pair_value_records: Vec<opentype_layout_pair_pos_subtable_Format1_pair_sets_link_pair_value_records>
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct opentype_layout_pair_pos_subtable_Format1_pair_sets {
 offset: u16,
 link: Option<opentype_layout_pair_pos_subtable_Format1_pair_sets_link>
 }
 
+/// expected size: 80
 #[derive(Debug, Clone)]
 pub struct opentype_layout_pair_pos_subtable_Format1 {
 coverage: opentype_layout_reverse_chain_single_subst_coverage,
@@ -2557,17 +2919,20 @@ pair_set_count: u16,
 pair_sets: Vec<opentype_layout_pair_pos_subtable_Format1_pair_sets>
 }
 
+/// expected size: 352
 #[derive(Debug, Clone)]
 pub struct opentype_layout_pair_pos_subtable_Format2_class1_records_class2_records {
 value_record1: Option<opentype_common_value_record>,
 value_record2: Option<opentype_common_value_record>
 }
 
+/// expected size: 24
 #[derive(Debug, Clone)]
 pub struct opentype_layout_pair_pos_subtable_Format2_class1_records {
 class2_records: Vec<opentype_layout_pair_pos_subtable_Format2_class1_records_class2_records>
 }
 
+/// expected size: 162
 #[derive(Debug, Clone)]
 pub struct opentype_layout_pair_pos_subtable_Format2 {
 coverage: opentype_layout_reverse_chain_single_subst_coverage,
@@ -2580,9 +2945,11 @@ class2_count: u16,
 class1_records: Vec<opentype_layout_pair_pos_subtable_Format2_class1_records>
 }
 
+/// expected size: 170
 #[derive(Debug, Clone)]
 pub enum opentype_layout_pair_pos_subtable { Format1(opentype_layout_pair_pos_subtable_Format1), Format2(opentype_layout_pair_pos_subtable_Format2) }
 
+/// expected size: 176
 #[derive(Debug, Clone)]
 pub struct opentype_layout_pair_pos {
 table_start: u32,
@@ -2590,6 +2957,7 @@ pos_format: u16,
 subtable: opentype_layout_pair_pos_subtable
 }
 
+/// expected size: 52
 #[derive(Debug, Clone)]
 pub struct opentype_common_sequence_context_subst_Format1_seq_rule_sets_link_rules_link {
 glyph_count: u16,
@@ -2598,12 +2966,14 @@ input_sequence: Vec<u16>,
 seq_lookup_records: Vec<opentype_common_sequence_lookup>
 }
 
+/// expected size: 54
 #[derive(Debug, Clone)]
 pub struct opentype_common_sequence_context_subst_Format1_seq_rule_sets_link_rules {
 offset: u16,
 link: Option<opentype_common_sequence_context_subst_Format1_seq_rule_sets_link_rules_link>
 }
 
+/// expected size: 30
 #[derive(Debug, Clone)]
 pub struct opentype_common_sequence_context_subst_Format1_seq_rule_sets_link {
 table_start: u32,
@@ -2611,12 +2981,14 @@ rule_count: u16,
 rules: Vec<opentype_common_sequence_context_subst_Format1_seq_rule_sets_link_rules>
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct opentype_common_sequence_context_subst_Format1_seq_rule_sets {
 offset: u16,
 link: Option<opentype_common_sequence_context_subst_Format1_seq_rule_sets_link>
 }
 
+/// expected size: 64
 #[derive(Debug, Clone)]
 pub struct opentype_common_sequence_context_subst_Format1 {
 coverage: opentype_layout_reverse_chain_single_subst_coverage,
@@ -2624,6 +2996,7 @@ seq_rule_set_count: u16,
 seq_rule_sets: Vec<opentype_common_sequence_context_subst_Format1_seq_rule_sets>
 }
 
+/// expected size: 104
 #[derive(Debug, Clone)]
 pub struct opentype_common_sequence_context_subst_Format2 {
 coverage: opentype_layout_reverse_chain_single_subst_coverage,
@@ -2632,6 +3005,7 @@ class_seq_rule_set_count: u16,
 class_seq_rule_sets: Vec<opentype_common_sequence_context_subst_Format1_seq_rule_sets>
 }
 
+/// expected size: 52
 #[derive(Debug, Clone)]
 pub struct opentype_common_sequence_context_subst_Format3 {
 glyph_count: u16,
@@ -2640,9 +3014,11 @@ coverage_tables: Vec<opentype_layout_reverse_chain_single_subst_coverage>,
 seq_lookup_records: Vec<opentype_common_sequence_lookup>
 }
 
+/// expected size: 112
 #[derive(Debug, Clone)]
 pub enum opentype_common_sequence_context_subst { Format1(opentype_common_sequence_context_subst_Format1), Format2(opentype_common_sequence_context_subst_Format2), Format3(opentype_common_sequence_context_subst_Format3) }
 
+/// expected size: 118
 #[derive(Debug, Clone)]
 pub struct opentype_common_sequence_context {
 table_start: u32,
@@ -2650,6 +3026,7 @@ format: u16,
 subst: opentype_common_sequence_context_subst
 }
 
+/// expected size: 222
 #[derive(Debug, Clone)]
 pub struct opentype_layout_single_pos_subtable_Format1 {
 coverage_offset: opentype_layout_reverse_chain_single_subst_coverage,
@@ -2657,6 +3034,7 @@ value_format: opentype_common_value_format_flags,
 value_record: opentype_common_value_record
 }
 
+/// expected size: 72
 #[derive(Debug, Clone)]
 pub struct opentype_layout_single_pos_subtable_Format2 {
 coverage_offset: opentype_layout_reverse_chain_single_subst_coverage,
@@ -2665,9 +3043,11 @@ value_count: u16,
 value_records: Vec<opentype_common_value_record>
 }
 
+/// expected size: 230
 #[derive(Debug, Clone)]
 pub enum opentype_layout_single_pos_subtable { Format1(opentype_layout_single_pos_subtable_Format1), Format2(opentype_layout_single_pos_subtable_Format2) }
 
+/// expected size: 236
 #[derive(Debug, Clone)]
 pub struct opentype_layout_single_pos {
 table_start: u32,
@@ -2675,15 +3055,18 @@ pos_format: u16,
 subtable: opentype_layout_single_pos_subtable
 }
 
+/// expected size: 244
 #[derive(Debug, Clone)]
 pub enum opentype_layout_ground_pos { ChainedSequenceContext(opentype_common_chained_sequence_context), CursivePos(opentype_layout_cursive_pos), MarkBasePos(opentype_layout_mark_base_pos), MarkLigPos(opentype_layout_mark_lig_pos), MarkMarkPos(opentype_layout_mark_mark_pos), PairPos(opentype_layout_pair_pos), SequenceContext(opentype_common_sequence_context), SinglePos(opentype_layout_single_pos) }
 
+/// expected size: 248
 #[derive(Debug, Clone)]
 pub struct opentype_layout_pos_extension_extension_offset {
 offset: u32,
 link: Option<opentype_layout_ground_pos>
 }
 
+/// expected size: 256
 #[derive(Debug, Clone)]
 pub struct opentype_layout_pos_extension {
 table_start: u32,
@@ -2692,15 +3075,18 @@ extension_lookup_type: u16,
 extension_offset: opentype_layout_pos_extension_extension_offset
 }
 
+/// expected size: 264
 #[derive(Debug, Clone)]
 pub enum opentype_gpos_table_lookup_list_link_lookups_link_subtables_link { GroundPos(opentype_layout_ground_pos), PosExtension(opentype_layout_pos_extension) }
 
+/// expected size: 266
 #[derive(Debug, Clone)]
 pub struct opentype_gpos_table_lookup_list_link_lookups_link_subtables {
 offset: u16,
 link: Option<opentype_gpos_table_lookup_list_link_lookups_link_subtables_link>
 }
 
+/// expected size: 43
 #[derive(Debug, Clone)]
 pub struct opentype_gpos_table_lookup_list_link_lookups_link {
 table_start: u32,
@@ -2711,12 +3097,14 @@ subtables: Vec<opentype_gpos_table_lookup_list_link_lookups_link_subtables>,
 mark_filtering_set: Option<u16>
 }
 
+/// expected size: 45
 #[derive(Debug, Clone)]
 pub struct opentype_gpos_table_lookup_list_link_lookups {
 offset: u16,
 link: Option<opentype_gpos_table_lookup_list_link_lookups_link>
 }
 
+/// expected size: 30
 #[derive(Debug, Clone)]
 pub struct opentype_gpos_table_lookup_list_link {
 table_start: u32,
@@ -2724,12 +3112,14 @@ lookup_count: u16,
 lookups: Vec<opentype_gpos_table_lookup_list_link_lookups>
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct opentype_gpos_table_lookup_list {
 offset: u16,
 link: Option<opentype_gpos_table_lookup_list_link>
 }
 
+/// expected size: 12
 #[derive(Debug, Clone)]
 pub struct opentype_layout_feature_variations_feature_variation_records_condition_set_offset_link_condition_offsets_link {
 format: u16,
@@ -2738,12 +3128,14 @@ filter_range_min_value: opentype_var_tuple_record_coordinates,
 filter_range_max_value: opentype_var_tuple_record_coordinates
 }
 
+/// expected size: 18
 #[derive(Debug, Clone)]
 pub struct opentype_layout_feature_variations_feature_variation_records_condition_set_offset_link_condition_offsets {
 offset: u32,
 link: Option<opentype_layout_feature_variations_feature_variation_records_condition_set_offset_link_condition_offsets_link>
 }
 
+/// expected size: 30
 #[derive(Debug, Clone)]
 pub struct opentype_layout_feature_variations_feature_variation_records_condition_set_offset_link {
 table_start: u32,
@@ -2751,24 +3143,28 @@ condition_count: u16,
 condition_offsets: Vec<opentype_layout_feature_variations_feature_variation_records_condition_set_offset_link_condition_offsets>
 }
 
+/// expected size: 34
 #[derive(Debug, Clone)]
 pub struct opentype_layout_feature_variations_feature_variation_records_condition_set_offset {
 offset: u32,
 link: Option<opentype_layout_feature_variations_feature_variation_records_condition_set_offset_link>
 }
 
+/// expected size: 36
 #[derive(Debug, Clone)]
 pub struct opentype_layout_feature_variations_feature_variation_records_feature_table_substitution_offset_link_substitutions_alternate_feature_offset {
 offset: u32,
 link: Option<opentype_common_feature_table>
 }
 
+/// expected size: 38
 #[derive(Debug, Clone)]
 pub struct opentype_layout_feature_variations_feature_variation_records_feature_table_substitution_offset_link_substitutions {
 feature_index: u16,
 alternate_feature_offset: opentype_layout_feature_variations_feature_variation_records_feature_table_substitution_offset_link_substitutions_alternate_feature_offset
 }
 
+/// expected size: 34
 #[derive(Debug, Clone)]
 pub struct opentype_layout_feature_variations_feature_variation_records_feature_table_substitution_offset_link {
 table_start: u32,
@@ -2778,18 +3174,21 @@ substitution_count: u16,
 substitutions: Vec<opentype_layout_feature_variations_feature_variation_records_feature_table_substitution_offset_link_substitutions>
 }
 
+/// expected size: 38
 #[derive(Debug, Clone)]
 pub struct opentype_layout_feature_variations_feature_variation_records_feature_table_substitution_offset {
 offset: u32,
 link: Option<opentype_layout_feature_variations_feature_variation_records_feature_table_substitution_offset_link>
 }
 
+/// expected size: 72
 #[derive(Debug, Clone)]
 pub struct opentype_layout_feature_variations_feature_variation_records {
 condition_set_offset: opentype_layout_feature_variations_feature_variation_records_condition_set_offset,
 feature_table_substitution_offset: opentype_layout_feature_variations_feature_variation_records_feature_table_substitution_offset
 }
 
+/// expected size: 36
 #[derive(Debug, Clone)]
 pub struct opentype_layout_feature_variations {
 table_start: u32,
@@ -2799,12 +3198,14 @@ feature_variation_record_count: u32,
 feature_variation_records: Vec<opentype_layout_feature_variations_feature_variation_records>
 }
 
+/// expected size: 40
 #[derive(Debug, Clone)]
 pub struct opentype_gsub_table_feature_variations_offset {
 offset: u32,
 link: Option<opentype_layout_feature_variations>
 }
 
+/// expected size: 144
 #[derive(Debug, Clone)]
 pub struct opentype_gpos_table {
 table_start: u32,
@@ -2816,18 +3217,21 @@ lookup_list: opentype_gpos_table_lookup_list,
 feature_variations_offset: Option<opentype_gsub_table_feature_variations_offset>
 }
 
+/// expected size: 26
 #[derive(Debug, Clone)]
 pub struct opentype_layout_alternate_subst_alternate_sets_link {
 glyph_count: u16,
 alternate_glyph_ids: Vec<u16>
 }
 
+/// expected size: 28
 #[derive(Debug, Clone)]
 pub struct opentype_layout_alternate_subst_alternate_sets {
 offset: u16,
 link: Option<opentype_layout_alternate_subst_alternate_sets_link>
 }
 
+/// expected size: 70
 #[derive(Debug, Clone)]
 pub struct opentype_layout_alternate_subst {
 table_start: u32,
@@ -2837,6 +3241,7 @@ alternate_set_count: u16,
 alternate_sets: Vec<opentype_layout_alternate_subst_alternate_sets>
 }
 
+/// expected size: 28
 #[derive(Debug, Clone)]
 pub struct opentype_layout_ligature_subst_ligature_sets_link_ligatures_link {
 ligature_glyph: u16,
@@ -2844,12 +3249,14 @@ component_count: u16,
 component_glyph_ids: Vec<u16>
 }
 
+/// expected size: 30
 #[derive(Debug, Clone)]
 pub struct opentype_layout_ligature_subst_ligature_sets_link_ligatures {
 offset: u16,
 link: Option<opentype_layout_ligature_subst_ligature_sets_link_ligatures_link>
 }
 
+/// expected size: 30
 #[derive(Debug, Clone)]
 pub struct opentype_layout_ligature_subst_ligature_sets_link {
 table_start: u32,
@@ -2857,12 +3264,14 @@ ligature_count: u16,
 ligatures: Vec<opentype_layout_ligature_subst_ligature_sets_link_ligatures>
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct opentype_layout_ligature_subst_ligature_sets {
 offset: u16,
 link: Option<opentype_layout_ligature_subst_ligature_sets_link>
 }
 
+/// expected size: 70
 #[derive(Debug, Clone)]
 pub struct opentype_layout_ligature_subst {
 table_start: u32,
@@ -2872,27 +3281,32 @@ ligature_set_count: u16,
 ligature_sets: Vec<opentype_layout_ligature_subst_ligature_sets>
 }
 
+/// expected size: 26
 #[derive(Debug, Clone)]
 pub struct opentype_layout_multiple_subst_subst_Format1_sequences_link {
 glyph_count: u16,
 substitute_glyph_ids: Vec<u16>
 }
 
+/// expected size: 28
 #[derive(Debug, Clone)]
 pub struct opentype_layout_multiple_subst_subst_Format1_sequences {
 offset: u16,
 link: Option<opentype_layout_multiple_subst_subst_Format1_sequences_link>
 }
 
+/// expected size: 26
 #[derive(Debug, Clone)]
 pub struct opentype_layout_multiple_subst_subst_Format1 {
 sequence_count: u16,
 sequences: Vec<opentype_layout_multiple_subst_subst_Format1_sequences>
 }
 
+/// expected size: 34
 #[derive(Debug, Clone)]
 pub enum opentype_layout_multiple_subst_subst { Format1(opentype_layout_multiple_subst_subst_Format1) }
 
+/// expected size: 78
 #[derive(Debug, Clone)]
 pub struct opentype_layout_multiple_subst {
 table_start: u32,
@@ -2901,6 +3315,7 @@ coverage: opentype_layout_reverse_chain_single_subst_coverage,
 subst: opentype_layout_multiple_subst_subst
 }
 
+/// expected size: 122
 #[derive(Debug, Clone)]
 pub struct opentype_layout_reverse_chain_single_subst {
 table_start: u32,
@@ -2914,12 +3329,14 @@ glyph_count: u16,
 substitute_glyph_ids: Vec<u16>
 }
 
+/// expected size: 40
 #[derive(Debug, Clone)]
 pub struct opentype_layout_single_subst_subst_Format1 {
 coverage: opentype_layout_reverse_chain_single_subst_coverage,
 delta_glyph_id: u16
 }
 
+/// expected size: 64
 #[derive(Debug, Clone)]
 pub struct opentype_layout_single_subst_subst_Format2 {
 coverage: opentype_layout_reverse_chain_single_subst_coverage,
@@ -2927,9 +3344,11 @@ glyph_count: u16,
 substitute_glyph_ids: Vec<u16>
 }
 
+/// expected size: 72
 #[derive(Debug, Clone)]
 pub enum opentype_layout_single_subst_subst { Format1(opentype_layout_single_subst_subst_Format1), Format2(opentype_layout_single_subst_subst_Format2) }
 
+/// expected size: 78
 #[derive(Debug, Clone)]
 pub struct opentype_layout_single_subst {
 table_start: u32,
@@ -2937,15 +3356,18 @@ subst_format: u16,
 subst: opentype_layout_single_subst_subst
 }
 
+/// expected size: 206
 #[derive(Debug, Clone)]
 pub enum opentype_layout_ground_subst { AlternateSubst(opentype_layout_alternate_subst), ChainedSequenceContext(opentype_common_chained_sequence_context), LigatureSubst(opentype_layout_ligature_subst), MultipleSubst(opentype_layout_multiple_subst), ReverseChainSingleSubst(opentype_layout_reverse_chain_single_subst), SequenceContext(opentype_common_sequence_context), SingleSubst(opentype_layout_single_subst) }
 
+/// expected size: 210
 #[derive(Debug, Clone)]
 pub struct opentype_layout_subst_extension_extension_offset {
 offset: u32,
 link: Option<opentype_layout_ground_subst>
 }
 
+/// expected size: 218
 #[derive(Debug, Clone)]
 pub struct opentype_layout_subst_extension {
 table_start: u32,
@@ -2954,15 +3376,18 @@ extension_lookup_type: u16,
 extension_offset: opentype_layout_subst_extension_extension_offset
 }
 
+/// expected size: 226
 #[derive(Debug, Clone)]
 pub enum opentype_gsub_table_lookup_list_link_lookups_link_subtables_link { GroundSubst(opentype_layout_ground_subst), SubstExtension(opentype_layout_subst_extension) }
 
+/// expected size: 228
 #[derive(Debug, Clone)]
 pub struct opentype_gsub_table_lookup_list_link_lookups_link_subtables {
 offset: u16,
 link: Option<opentype_gsub_table_lookup_list_link_lookups_link_subtables_link>
 }
 
+/// expected size: 43
 #[derive(Debug, Clone)]
 pub struct opentype_gsub_table_lookup_list_link_lookups_link {
 table_start: u32,
@@ -2973,12 +3398,14 @@ subtables: Vec<opentype_gsub_table_lookup_list_link_lookups_link_subtables>,
 mark_filtering_set: Option<u16>
 }
 
+/// expected size: 45
 #[derive(Debug, Clone)]
 pub struct opentype_gsub_table_lookup_list_link_lookups {
 offset: u16,
 link: Option<opentype_gsub_table_lookup_list_link_lookups_link>
 }
 
+/// expected size: 30
 #[derive(Debug, Clone)]
 pub struct opentype_gsub_table_lookup_list_link {
 table_start: u32,
@@ -2986,12 +3413,14 @@ lookup_count: u16,
 lookups: Vec<opentype_gsub_table_lookup_list_link_lookups>
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct opentype_gsub_table_lookup_list {
 offset: u16,
 link: Option<opentype_gsub_table_lookup_list_link>
 }
 
+/// expected size: 144
 #[derive(Debug, Clone)]
 pub struct opentype_gsub_table {
 table_start: u32,
@@ -3003,11 +3432,13 @@ lookup_list: opentype_gsub_table_lookup_list,
 feature_variations_offset: Option<opentype_gsub_table_feature_variations_offset>
 }
 
+/// expected size: 1
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_var_variation_axis_record_flags {
 hidden_axis: bool
 }
 
+/// expected size: 31
 #[derive(Debug, Clone)]
 pub struct opentype_var_variation_axis_record {
 axis_tag: u32,
@@ -3018,11 +3449,13 @@ flags: opentype_var_variation_axis_record_flags,
 axis_name_id: u16
 }
 
+/// expected size: 24
 #[derive(Debug, Clone)]
 pub struct opentype_var_user_tuple {
 coordinates: Vec<opentype_var_user_tuple_coordinates>
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct opentype_fvar_table_instances {
 subfamily_nameid: u16,
@@ -3031,6 +3464,7 @@ coordinates: opentype_var_user_tuple,
 postscript_nameid: Option<u16>
 }
 
+/// expected size: 70
 #[derive(Debug, Clone)]
 pub struct opentype_fvar_table {
 table_start: u32,
@@ -3047,28 +3481,33 @@ axes: Vec<opentype_var_variation_axis_record>,
 instances: Vec<opentype_fvar_table_instances>
 }
 
+/// expected size: 24
 #[derive(Debug, Clone)]
 pub struct opentype_var_tuple_record {
 coordinates: Vec<opentype_var_tuple_record_coordinates>
 }
 
+/// expected size: 28
 #[derive(Debug, Clone)]
 pub struct opentype_gvar_table_shared_tuples_offset {
 offset: u32,
 link: Option<Vec<opentype_var_tuple_record>>
 }
 
+/// expected size: 1
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_gvar_table_flags {
 is_long_offset: bool
 }
 
+/// expected size: 3
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_var_glyph_variation_data_table_tuple_variation_count {
 shared_point_numbers: bool,
 tuple_count: u16
 }
 
+/// expected size: 5
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_var_glyph_variation_data_table_tuple_variation_headers_tuple_index {
 embedded_peak_tuple: bool,
@@ -3077,12 +3516,14 @@ private_point_numbers: bool,
 tuple_index: u16
 }
 
+/// expected size: 48
 #[derive(Debug, Clone)]
 pub struct opentype_var_glyph_variation_data_table_tuple_variation_headers_intermediate_tuples {
 start_tuple: opentype_var_tuple_record,
 end_tuple: opentype_var_tuple_record
 }
 
+/// expected size: 79
 #[derive(Debug, Clone)]
 pub struct opentype_var_glyph_variation_data_table_tuple_variation_headers {
 variation_data_size: u16,
@@ -3091,21 +3532,25 @@ peak_tuple: Option<opentype_var_tuple_record>,
 intermediate_tuples: Option<opentype_var_glyph_variation_data_table_tuple_variation_headers_intermediate_tuples>
 }
 
+/// expected size: 2
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes_control {
 points_are_words: bool,
 point_run_count: u8
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub enum opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes_points { Points16(Vec<u16>), Points8(Vec<u8>) }
 
+/// expected size: 34
 #[derive(Debug, Clone)]
 pub struct opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes {
 control: opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes_control,
 points: opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes_points
 }
 
+/// expected size: 3
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_var_glyph_variation_data_table_data_per_tuple_variation_data_x_and_y_coordinate_deltas_control {
 deltas_are_zero: bool,
@@ -3113,27 +3558,32 @@ deltas_are_words: bool,
 delta_run_count: u8
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub enum opentype_var_glyph_variation_data_table_data_per_tuple_variation_data_x_and_y_coordinate_deltas_deltas { Delta0(u8), Delta16(Vec<u16>), Delta8(Vec<u8>) }
 
+/// expected size: 35
 #[derive(Debug, Clone)]
 pub struct opentype_var_glyph_variation_data_table_data_per_tuple_variation_data_x_and_y_coordinate_deltas {
 control: opentype_var_glyph_variation_data_table_data_per_tuple_variation_data_x_and_y_coordinate_deltas_control,
 deltas: opentype_var_glyph_variation_data_table_data_per_tuple_variation_data_x_and_y_coordinate_deltas_deltas
 }
 
+/// expected size: 52
 #[derive(Debug, Clone)]
 pub struct opentype_var_glyph_variation_data_table_data_per_tuple_variation_data {
 private_point_numbers: Option<(u16, Vec<opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes>)>,
 x_and_y_coordinate_deltas: (u16, Vec<opentype_var_glyph_variation_data_table_data_per_tuple_variation_data_x_and_y_coordinate_deltas>)
 }
 
+/// expected size: 50
 #[derive(Debug, Clone)]
 pub struct opentype_var_glyph_variation_data_table_data {
 shared_point_numbers: Option<(u16, Vec<opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes>)>,
 per_tuple_variation_data: Vec<opentype_var_glyph_variation_data_table_data_per_tuple_variation_data>
 }
 
+/// expected size: 83
 #[derive(Debug, Clone)]
 pub struct opentype_var_glyph_variation_data_table {
 table_start: u32,
@@ -3143,6 +3593,7 @@ tuple_variation_headers: Vec<opentype_var_glyph_variation_data_table_tuple_varia
 data: opentype_var_glyph_variation_data_table_data
 }
 
+/// expected size: 103
 #[derive(Debug, Clone)]
 pub struct opentype_gvar_table {
 gvar_table_start: u32,
@@ -3158,6 +3609,7 @@ glyph_variation_data_offsets: opentype_gvar_table_glyph_variation_data_offsets,
 glyph_variation_data_array: Vec<Option<opentype_var_glyph_variation_data_table>>
 }
 
+/// expected size: 6
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_kern_table_subtables_coverage {
 format: u16,
@@ -3167,6 +3619,7 @@ minimum: bool,
 horizontal: bool
 }
 
+/// expected size: 6
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_kern_table_subtables_data_Format0_kern_pairs {
 left: u16,
@@ -3174,6 +3627,7 @@ right: u16,
 value: u16
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct opentype_kern_table_subtables_data_Format0 {
 n_pairs: u16,
@@ -3183,6 +3637,7 @@ range_shift: u16,
 kern_pairs: Vec<opentype_kern_table_subtables_data_Format0_kern_pairs>
 }
 
+/// expected size: 28
 #[derive(Debug, Clone)]
 pub struct opentype_kern_table_subtables_data_Format2_left_class_offset_link {
 first_glyph: u16,
@@ -3190,18 +3645,21 @@ n_glyphs: u16,
 class_values: Vec<u16>
 }
 
+/// expected size: 30
 #[derive(Debug, Clone)]
 pub struct opentype_kern_table_subtables_data_Format2_left_class_offset {
 offset: u16,
 link: Option<opentype_kern_table_subtables_data_Format2_left_class_offset_link>
 }
 
+/// expected size: 26
 #[derive(Debug, Clone)]
 pub struct opentype_kern_table_subtables_data_Format2_kerning_array_offset {
 offset: u16,
 link: Option<Vec<Vec<u16>>>
 }
 
+/// expected size: 92
 #[derive(Debug, Clone)]
 pub struct opentype_kern_table_subtables_data_Format2 {
 table_start: u32,
@@ -3211,9 +3669,11 @@ right_class_offset: opentype_kern_table_subtables_data_Format2_left_class_offset
 kerning_array_offset: opentype_kern_table_subtables_data_Format2_kerning_array_offset
 }
 
+/// expected size: 100
 #[derive(Debug, Clone)]
 pub enum opentype_kern_table_subtables_data { Format0(opentype_kern_table_subtables_data_Format0), Format2(opentype_kern_table_subtables_data_Format2) }
 
+/// expected size: 110
 #[derive(Debug, Clone)]
 pub struct opentype_kern_table_subtables {
 version: u16,
@@ -3222,6 +3682,7 @@ coverage: opentype_kern_table_subtables_coverage,
 data: opentype_kern_table_subtables_data
 }
 
+/// expected size: 28
 #[derive(Debug, Clone)]
 pub struct opentype_kern_table {
 version: u16,
@@ -3229,6 +3690,7 @@ n_tables: u16,
 subtables: Vec<opentype_kern_table_subtables>
 }
 
+/// expected size: 8
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_stat_table_design_axes_offset_link_design_axes {
 axis_tag: u32,
@@ -3236,23 +3698,27 @@ axis_name_id: u16,
 axis_ordering: u16
 }
 
+/// expected size: 24
 #[derive(Debug, Clone)]
 pub struct opentype_stat_table_design_axes_offset_link {
 design_axes: Vec<opentype_stat_table_design_axes_offset_link_design_axes>
 }
 
+/// expected size: 28
 #[derive(Debug, Clone)]
 pub struct opentype_stat_table_design_axes_offset {
 offset: u32,
 link: Option<opentype_stat_table_design_axes_offset_link>
 }
 
+/// expected size: 2
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1_flags {
 elidable_axis_value_name: bool,
 older_sibling_font_attribute: bool
 }
 
+/// expected size: 14
 #[derive(Debug, Clone)]
 pub struct opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1 {
 axis_index: u16,
@@ -3261,6 +3727,7 @@ value_name_id: u16,
 value: opentype_var_user_tuple_coordinates
 }
 
+/// expected size: 30
 #[derive(Debug, Clone)]
 pub struct opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format2 {
 axis_index: u16,
@@ -3271,6 +3738,7 @@ range_min_value: opentype_var_user_tuple_coordinates,
 range_max_value: opentype_var_user_tuple_coordinates
 }
 
+/// expected size: 22
 #[derive(Debug, Clone)]
 pub struct opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format3 {
 axis_index: u16,
@@ -3280,12 +3748,14 @@ value: opentype_var_user_tuple_coordinates,
 linked_value: opentype_var_user_tuple_coordinates
 }
 
+/// expected size: 10
 #[derive(Debug, Clone)]
 pub struct opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format4_axis_values {
 axis_index: u16,
 value: opentype_var_user_tuple_coordinates
 }
 
+/// expected size: 30
 #[derive(Debug, Clone)]
 pub struct opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format4 {
 axis_count: u16,
@@ -3294,33 +3764,39 @@ value_name_id: u16,
 axis_values: Vec<opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format4_axis_values>
 }
 
+/// expected size: 38
 #[derive(Debug, Clone)]
 pub enum opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data { Format1(opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1), Format2(opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format2), Format3(opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format3), Format4(opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format4) }
 
+/// expected size: 40
 #[derive(Debug, Clone)]
 pub struct opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link {
 format: u16,
 data: opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data
 }
 
+/// expected size: 42
 #[derive(Debug, Clone)]
 pub struct opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets {
 offset: u16,
 link: Option<opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link>
 }
 
+/// expected size: 28
 #[derive(Debug, Clone)]
 pub struct opentype_stat_table_offset_to_axis_value_offsets_link {
 table_start: u32,
 axis_value_offsets: Vec<opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets>
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub struct opentype_stat_table_offset_to_axis_value_offsets {
 offset: u32,
 link: Option<opentype_stat_table_offset_to_axis_value_offsets_link>
 }
 
+/// expected size: 76
 #[derive(Debug, Clone)]
 pub struct opentype_stat_table {
 table_start: u32,
@@ -3334,6 +3810,7 @@ offset_to_axis_value_offsets: opentype_stat_table_offset_to_axis_value_offsets,
 elided_fallback_name_id: u16
 }
 
+/// expected size: 1700
 #[derive(Debug, Clone)]
 pub struct opentype_table_directory_table_links {
 cmap: opentype_cmap_table,
@@ -3363,6 +3840,7 @@ vmtx: Option<opentype_hmtx_table>,
 __skip: ()
 }
 
+/// expected size: 1736
 #[derive(Debug, Clone)]
 pub struct opentype_table_directory {
 sfnt_version: u32,
@@ -3374,18 +3852,21 @@ table_records: Vec<opentype_table_record>,
 table_links: opentype_table_directory_table_links
 }
 
+/// expected size: 1740
 #[derive(Debug, Clone)]
 pub struct opentype_ttc_header_header_Version1_table_directories {
 offset: u32,
 link: Option<opentype_table_directory>
 }
 
+/// expected size: 28
 #[derive(Debug, Clone)]
 pub struct opentype_ttc_header_header_Version1 {
 num_fonts: u32,
 table_directories: Vec<opentype_ttc_header_header_Version1_table_directories>
 }
 
+/// expected size: 40
 #[derive(Debug, Clone)]
 pub struct opentype_ttc_header_header_Version2 {
 num_fonts: u32,
@@ -3395,9 +3876,11 @@ dsig_length: u32,
 dsig_offset: u32
 }
 
+/// expected size: 48
 #[derive(Debug, Clone)]
 pub enum opentype_ttc_header_header { UnknownVersion(u16), Version1(opentype_ttc_header_header_Version1), Version2(opentype_ttc_header_header_Version2) }
 
+/// expected size: 56
 #[derive(Debug, Clone)]
 pub struct opentype_ttc_header {
 ttc_tag: u32,
@@ -3407,9 +3890,11 @@ header: opentype_ttc_header_header,
 __skip: ()
 }
 
+/// expected size: 1744
 #[derive(Debug, Clone)]
 pub enum opentype_main_directory { TTCHeader(opentype_ttc_header), TableDirectory(opentype_table_directory) }
 
+/// expected size: 1752
 #[derive(Debug, Clone)]
 pub struct opentype_main {
 file_start: u32,
@@ -3417,6 +3902,7 @@ magic: u32,
 directory: opentype_main_directory
 }
 
+/// expected size: 13
 #[derive(Debug, Copy, Clone)]
 pub struct png_ihdr_data {
 width: u32,
@@ -3428,6 +3914,7 @@ filter_method: u8,
 interlace_method: u8
 }
 
+/// expected size: 25
 #[derive(Debug, Clone)]
 pub struct png_ihdr {
 length: u32,
@@ -3436,11 +3923,13 @@ data: png_ihdr_data,
 crc: u32
 }
 
+/// expected size: 2
 #[derive(Debug, Copy, Clone)]
 pub struct png_bkgd_color_type_0 {
 greyscale: u16
 }
 
+/// expected size: 6
 #[derive(Debug, Copy, Clone)]
 pub struct png_bkgd_color_type_2 {
 red: u16,
@@ -3448,14 +3937,17 @@ green: u16,
 blue: u16
 }
 
+/// expected size: 1
 #[derive(Debug, Copy, Clone)]
 pub struct png_bkgd_color_type_3 {
 palette_index: u8
 }
 
+/// expected size: 8
 #[derive(Debug, Clone)]
 pub enum png_bkgd { color_type_0(png_bkgd_color_type_0), color_type_2(png_bkgd_color_type_2), color_type_3(png_bkgd_color_type_3), color_type_4(png_bkgd_color_type_0), color_type_6(png_bkgd_color_type_2) }
 
+/// expected size: 32
 #[derive(Debug, Copy, Clone)]
 pub struct png_chrm {
 whitepoint_x: u32,
@@ -3468,22 +3960,26 @@ blue_x: u32,
 blue_y: u32
 }
 
+/// expected size: 4
 #[derive(Debug, Copy, Clone)]
 pub struct png_gama {
 gamma: u32
 }
 
+/// expected size: 24
 #[derive(Debug, Clone)]
 pub struct png_hist {
 histogram: Vec<u16>
 }
 
+/// expected size: 2
 #[derive(Debug, Copy, Clone)]
 pub struct zlib_main_compression_method_flags {
 compression_info: u8,
 compression_method: u8
 }
 
+/// expected size: 3
 #[derive(Debug, Copy, Clone)]
 pub struct zlib_main_flags {
 flevel: u8,
@@ -3491,6 +3987,7 @@ fdict: bool,
 fcheck: u8
 }
 
+/// expected size: 89
 #[derive(Debug, Clone)]
 pub struct zlib_main {
 compression_method_flags: zlib_main_compression_method_flags,
@@ -3500,6 +3997,7 @@ data: deflate_main,
 adler32: u32
 }
 
+/// expected size: 114
 #[derive(Debug, Clone)]
 pub struct png_iccp {
 profile_name: Vec<u8>,
@@ -3507,12 +4005,15 @@ compression_method: u8,
 compressed_profile: zlib_main
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub enum png_itxt_text_compressed { invalid(Vec<u8>), valid(Vec<char>) }
 
+/// expected size: 40
 #[derive(Debug, Clone)]
 pub enum png_itxt_text { compressed(png_itxt_text_compressed), uncompressed(Vec<char>) }
 
+/// expected size: 115
 #[derive(Debug, Clone)]
 pub struct png_itxt {
 keyword: Vec<u8>,
@@ -3523,6 +4024,7 @@ translated_keyword: Vec<char>,
 text: png_itxt_text
 }
 
+/// expected size: 9
 #[derive(Debug, Copy, Clone)]
 pub struct png_phys {
 pixels_per_unit_x: u32,
@@ -3530,11 +4032,13 @@ pixels_per_unit_y: u32,
 unit_specifier: u8
 }
 
+/// expected size: 1
 #[derive(Debug, Copy, Clone)]
 pub struct png_sbit_color_type_0 {
 sig_greyscale_bits: u8
 }
 
+/// expected size: 3
 #[derive(Debug, Copy, Clone)]
 pub struct png_sbit_color_type_2 {
 sig_red_bits: u8,
@@ -3542,12 +4046,14 @@ sig_green_bits: u8,
 sig_blue_bits: u8
 }
 
+/// expected size: 2
 #[derive(Debug, Copy, Clone)]
 pub struct png_sbit_color_type_4 {
 sig_greyscale_bits: u8,
 sig_alpha_bits: u8
 }
 
+/// expected size: 4
 #[derive(Debug, Copy, Clone)]
 pub struct png_sbit_color_type_6 {
 sig_red_bits: u8,
@@ -3556,9 +4062,11 @@ sig_blue_bits: u8,
 sig_alpha_bits: u8
 }
 
+/// expected size: 5
 #[derive(Debug, Clone)]
 pub enum png_sbit { color_type_0(png_sbit_color_type_0), color_type_2(png_sbit_color_type_2), color_type_3(png_sbit_color_type_2), color_type_4(png_sbit_color_type_4), color_type_6(png_sbit_color_type_6) }
 
+/// expected size: 10
 #[derive(Debug, Copy, Clone)]
 pub struct png_splt_pallette_sample_depth_u16 {
 red: u16,
@@ -3568,6 +4076,7 @@ alpha: u16,
 frequency: u16
 }
 
+/// expected size: 6
 #[derive(Debug, Copy, Clone)]
 pub struct png_splt_pallette_sample_depth_u8 {
 red: u8,
@@ -3577,9 +4086,11 @@ alpha: u8,
 frequency: u16
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub enum png_splt_pallette { sample_depth_u16(Vec<png_splt_pallette_sample_depth_u16>), sample_depth_u8(Vec<png_splt_pallette_sample_depth_u8>) }
 
+/// expected size: 57
 #[derive(Debug, Clone)]
 pub struct png_splt {
 palette_name: Vec<u8>,
@@ -3587,17 +4098,20 @@ sample_depth: u8,
 pallette: png_splt_pallette
 }
 
+/// expected size: 1
 #[derive(Debug, Copy, Clone)]
 pub struct png_srgb {
 rendering_intent: u8
 }
 
+/// expected size: 48
 #[derive(Debug, Clone)]
 pub struct png_text {
 keyword: Vec<u8>,
 text: Vec<u8>
 }
 
+/// expected size: 7
 #[derive(Debug, Copy, Clone)]
 pub struct png_time {
 year: u16,
@@ -3608,9 +4122,11 @@ minute: u8,
 second: u8
 }
 
+/// expected size: 32
 #[derive(Debug, Clone)]
 pub enum png_trns { color_type_0(png_bkgd_color_type_0), color_type_2(png_bkgd_color_type_2), color_type_3(Vec<png_bkgd_color_type_3>) }
 
+/// expected size: 49
 #[derive(Debug, Clone)]
 pub struct png_ztxt {
 keyword: Vec<u8>,
@@ -3618,9 +4134,11 @@ compression_method: u8,
 compressed_text: Vec<char>
 }
 
+/// expected size: 123
 #[derive(Debug, Clone)]
 pub enum png_chunk_data { PLTE(Vec<png_plte>), bKGD(png_bkgd), cHRM(png_chrm), gAMA(png_gama), hIST(png_hist), iCCP(png_iccp), iTXt(png_itxt), pHYs(png_phys), sBIT(png_sbit), sPLT(png_splt), sRGB(png_srgb), tEXt(png_text), tIME(png_time), tRNS(png_trns), unknown(Vec<u8>), zTXt(png_ztxt) }
 
+/// expected size: 155
 #[derive(Debug, Clone)]
 pub struct png_chunk {
 length: u32,
@@ -3629,6 +4147,7 @@ data: png_chunk_data,
 crc: u32
 }
 
+/// expected size: 12
 #[derive(Debug, Copy, Clone)]
 pub struct png_iend {
 length: u32,
@@ -3637,6 +4156,7 @@ data: (),
 crc: u32
 }
 
+/// expected size: 182
 #[derive(Debug, Clone)]
 pub struct png_main {
 signature: (u8, u8, u8, u8, u8, u8, u8, u8),
@@ -3647,6 +4167,7 @@ more_chunks: Vec<png_chunk>,
 iend: png_iend
 }
 
+/// expected size: 34
 #[derive(Debug, Clone)]
 pub struct riff_chunk {
 tag: (u8, u8, u8, u8),
@@ -3655,12 +4176,14 @@ data: Vec<u8>,
 pad: Option<u8>
 }
 
+/// expected size: 28
 #[derive(Debug, Clone)]
 pub struct riff_subchunks {
 tag: (u8, u8, u8, u8),
 chunks: Vec<riff_chunk>
 }
 
+/// expected size: 38
 #[derive(Debug, Clone)]
 pub struct riff_main {
 tag: (u8, u8, u8, u8),
@@ -3669,12 +4192,14 @@ data: riff_subchunks,
 pad: Option<u8>
 }
 
+/// expected size: 48
 #[derive(Debug, Clone)]
 pub struct tar_ascii_string_opt0 {
 string: Vec<u8>,
 __padding: Vec<u8>
 }
 
+/// expected size: 49
 #[derive(Debug, Clone)]
 pub struct tar_header_uid {
 string: Vec<u8>,
@@ -3682,12 +4207,14 @@ __nul_or_wsp: u8,
 __padding: Vec<u8>
 }
 
+/// expected size: 48
 #[derive(Debug, Clone)]
 pub struct tar_ascii_string {
 string: Vec<u8>,
 padding: Vec<u8>
 }
 
+/// expected size: 620
 #[derive(Debug, Clone)]
 pub struct tar_header {
 name: tar_ascii_string_opt0,
@@ -3709,6 +4236,7 @@ prefix: tar_ascii_string_opt0,
 pad: Vec<u8>
 }
 
+/// expected size: 644
 #[derive(Debug, Clone)]
 pub struct tar_header_with_data {
 header: tar_header,
@@ -3716,6 +4244,7 @@ file: Vec<u8>,
 __padding: ()
 }
 
+/// expected size: 72
 #[derive(Debug, Clone)]
 pub struct tar_main {
 contents: Vec<tar_header_with_data>,
@@ -3723,6 +4252,7 @@ __padding: Vec<u8>,
 __trailing: Vec<u8>
 }
 
+/// expected size: 46
 #[derive(Debug, Clone)]
 pub struct waldo_main {
 r#where: u64,
@@ -3733,9 +4263,11 @@ waldo: (u8, u8, u8, u8, u8),
 __rem: ()
 }
 
+/// expected size: 1760
 #[derive(Debug, Clone)]
 pub enum main_data { elf(elf_main), gif(gif_main), gzip(Vec<gzip_main>), jpeg(jpeg_main), mpeg4(mpeg4_main), opentype(opentype_main), peano(Vec<u32>), png(png_main), riff(riff_main), tar(tar_main), text(Vec<char>), tgz(Vec<tar_main>), tiff(tiff_main), waldo(waldo_main) }
 
+/// expected size: 16
 #[derive(Debug, Copy, Clone)]
 pub struct tar_header_size_raw {
 oA: u8,
@@ -3753,6 +4285,7 @@ __nil: u8,
 value: u32
 }
 
+/// expected size: 36
 #[derive(Debug, Clone)]
 pub struct png_idat {
 length: u32,
@@ -3761,23 +4294,27 @@ data: Vec<u8>,
 crc: u32
 }
 
+/// expected size: 2
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_cmap_subtable_format14_raw_raw {
 format: u16
 }
 
+/// expected size: 4
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_cmap_subtable_format13_raw_raw {
 format: u16,
 __reserved: u16
 }
 
+/// expected size: 7
 #[derive(Debug, Clone)]
 pub struct opentype_glyf_simple_flags_raw {
 repeats: u8,
 field_set: opentype_glyf_simple_flags
 }
 
+/// expected size: 7
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_glyph_description_simple_flags_raw {
 overlap_simple: bool,
@@ -3789,12 +4326,14 @@ x_short_vector: bool,
 on_curve_point: bool
 }
 
+/// expected size: 4
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_common_device_or_variation_index_table_raw_raw {
 __skipped0: u16,
 __skipped1: u16
 }
 
+/// expected size: 1760
 #[derive(Debug, Clone)]
 pub struct main {
 data: main_data,
@@ -16879,26 +17418,26 @@ accum.push(elem);
 PResult::Ok(accum)
 })())?;
 let codes = (try_flat_map_vec(blocks.iter().cloned(), |x: deflate_block| PResult::Ok(match x.data.clone() {
-deflate_main_codes::uncompressed(ref y) => {
+deflate_main_codes__dupX1::uncompressed(ref y) => {
 y.codes_values.clone()
 },
 
-deflate_main_codes::fixed_huffman(ref y) => {
+deflate_main_codes__dupX1::fixed_huffman(ref y) => {
 y.codes_values.clone()
 },
 
-deflate_main_codes::dynamic_huffman(ref y) => {
+deflate_main_codes__dupX1::dynamic_huffman(ref y) => {
 y.codes_values.clone()
 }
 })))?;
-let inflate = (try_flat_map_append_vec(codes.iter().cloned(), |tuple_var: (&Vec<u8>, deflate_main_codes__dupX1)| PResult::Ok(match tuple_var {
+let inflate = (try_flat_map_append_vec(codes.iter().cloned(), |tuple_var: (&Vec<u8>, deflate_main_codes)| PResult::Ok(match tuple_var {
 (buffer, symbol) => {
 match symbol {
-deflate_main_codes__dupX1::literal(b) => {
+deflate_main_codes::literal(b) => {
 [b].to_vec()
 },
 
-deflate_main_codes__dupX1::reference(r) => {
+deflate_main_codes::reference(r) => {
 {
 let ix = (try_sub!((buffer.len()) as u32, (r.distance.clone()) as u32, 16200207902741715318u64)) as usize;
 (slice_ext(&buffer, ix..ix + (((r.length.clone()) as u32) as usize))).to_vec()
@@ -16923,17 +17462,17 @@ PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8)
 let data = ((|| PResult::Ok(match r#type {
 0u8 => {
 let inner = (Decoder_deflate_uncompressed(_input))?;
-deflate_main_codes::uncompressed(inner)
+deflate_main_codes__dupX1::uncompressed(inner)
 },
 
 1u8 => {
 let inner = (Decoder_deflate_fixed_huffman(_input))?;
-deflate_main_codes::fixed_huffman(inner)
+deflate_main_codes__dupX1::fixed_huffman(inner)
 },
 
 2u8 => {
 let inner = (Decoder_deflate_dynamic_huffman(_input))?;
-deflate_main_codes::dynamic_huffman(inner)
+deflate_main_codes__dupX1::dynamic_huffman(inner)
 },
 
 _other => {
@@ -17013,7 +17552,7 @@ bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.c
 }
 PResult::Ok(accum)
 })())?;
-let codes_values = (try_flat_map_vec(bytes.iter().cloned(), |x: u8| PResult::Ok([deflate_main_codes__dupX1::literal(x)].to_vec())))?;
+let codes_values = (try_flat_map_vec(bytes.iter().cloned(), |x: u8| PResult::Ok([deflate_main_codes::literal(x)].to_vec())))?;
 PResult::Ok(deflate_uncompressed { align, len, nlen, bytes, codes_values })
 }
 
@@ -17795,7 +18334,7 @@ let codes_values = (try_flat_map_vec(codes.iter().cloned(), |x: deflate_fixed_hu
 257u16..=285u16 => {
 match x.extra.clone() {
 Some(ref rec) => {
-[deflate_main_codes__dupX1::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
+[deflate_main_codes::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
 },
 
 _ => {
@@ -17809,7 +18348,7 @@ return Err(ParseError::ExcludedBranch(5576343694315527798u64));
 },
 
 _ => {
-[deflate_main_codes__dupX1::literal((x.code.clone()) as u8)].to_vec()
+[deflate_main_codes::literal((x.code.clone()) as u8)].to_vec()
 }
 })))?;
 PResult::Ok(deflate_fixed_huffman { codes, codes_values })
@@ -18498,7 +19037,7 @@ let codes_values = (try_flat_map_vec(codes.iter().cloned(), |x: deflate_dynamic_
 257u16..=285u16 => {
 match x.extra.clone() {
 Some(ref rec) => {
-[deflate_main_codes__dupX1::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
+[deflate_main_codes::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
 },
 
 _ => {
@@ -18512,7 +19051,7 @@ return Err(ParseError::ExcludedBranch(98102193810481173u64));
 },
 
 _ => {
-[deflate_main_codes__dupX1::literal((x.code.clone()) as u8)].to_vec()
+[deflate_main_codes::literal((x.code.clone()) as u8)].to_vec()
 }
 })))?;
 PResult::Ok(deflate_dynamic_huffman { hlit, hdist, hclen, code_length_alphabet_code_lengths, literal_length_distance_alphabet_code_lengths, literal_length_distance_alphabet_code_lengths_value, literal_length_alphabet_code_lengths_value, distance_alphabet_code_lengths_value, codes, codes_values })
