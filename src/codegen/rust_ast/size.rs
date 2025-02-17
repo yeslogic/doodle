@@ -120,15 +120,9 @@ impl ASTContext for PrimType {
     type Context = ();
 }
 
-// Inclusive bounds ranges for Unicode Scalar Values (0 to 0xD7FF; 0xE000 to 0x10FFFF)
-const UTF16_SCALAR_RANGE0_BOUNDS: (usize, usize) = (0, 0xD7FF);
-const UTF16_SCALAR_RANGE1_BOUNDS: (usize, usize) = (0xE000, 0x10FFF);
+// Maximum valid char, beyond which is the first value-niche
+const UTF16_SCALAR_MAX: usize = 0x10FFF;
 
-const UTF16_SCALAR_RANGE0_COUNT: usize = UTF16_SCALAR_RANGE0_BOUNDS.1 - UTF16_SCALAR_RANGE0_BOUNDS.0 + 1;
-const UTF16_SCALAR_RANGE1_COUNT: usize = UTF16_SCALAR_RANGE1_BOUNDS.1 - UTF16_SCALAR_RANGE1_BOUNDS.0 + 1;
-
-/// Total number of Unicode Scalar Values in UTF-16
-const UTF16_SCALAR_COUNT: usize = UTF16_SCALAR_RANGE0_COUNT + UTF16_SCALAR_RANGE1_COUNT;
 
 impl CanOptimize for PrimType {
     fn niches(&self, _: &()) -> usize {
@@ -139,7 +133,7 @@ impl CanOptimize for PrimType {
             PrimType::Char => {
                 match char::UNICODE_VERSION {
                     (16, 0, 0) => {
-                        const { u32::MAX as usize - UTF16_SCALAR_COUNT + 1 }
+                        const { u32::MAX as usize - UTF16_SCALAR_MAX }
                     }
                     _ => unimplemented!("unsupported Unicode version"),
                 }
