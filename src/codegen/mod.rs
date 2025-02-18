@@ -3163,7 +3163,10 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
             TraitSet::DebugClone
         };
         let it = RustItem::pub_decl_with_traits(RustDecl::type_def(name, type_def.clone()), traits);
-        let comment = [format!("expected size: {}", rust_ast::size::MemSize::size_hint(type_def, &src_context))];
+        let comment = [format!(
+            "expected size: {}",
+            rust_ast::size::MemSize::size_hint(type_def, &src_context)
+        )];
         items.push(it.with_comment(comment));
     }
 

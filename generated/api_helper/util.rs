@@ -239,7 +239,7 @@ pub unsafe fn trisect_unchecked<T>(
 /// where we want an index for every item (as with `enumerate`) but want to know afterwards
 /// whether we stopped early because the iterator ran out, or if we reached the final index
 /// of the array successfully.
-pub struct PerIndex<'a, T, R: Iterator<Item = usize>, I: Iterator<Item = T>,> {
+pub struct PerIndex<'a, T, R: Iterator<Item = usize>, I: Iterator<Item = T>> {
     index_iter: &'a mut R,
     value_iter: &'a mut I,
 }
@@ -265,7 +265,6 @@ pub struct EnumLen<T, I: Iterator<Item = T>> {
     len: usize,
 }
 
-
 #[derive(Debug)]
 pub enum EnumLenError<T> {
     TooShort { len: usize, yielded: usize },
@@ -285,7 +284,11 @@ impl<T: std::fmt::Debug + std::fmt::Display> std::error::Error for EnumLenError<
 
 impl<T, I: Iterator<Item = T>> EnumLen<T, I> {
     pub fn new(iter: I, len: usize) -> Self {
-        EnumLen { iter, len, range: 0..len }
+        EnumLen {
+            iter,
+            len,
+            range: 0..len,
+        }
     }
 
     pub fn iter_with(&mut self) -> impl '_ + Iterator<Item = (usize, T)> {
@@ -297,11 +300,17 @@ impl<T, I: Iterator<Item = T>> EnumLen<T, I> {
 
     pub fn finish(mut self, strict: bool) -> Result<(), EnumLenError<T>> {
         match self.range.next() {
-            Some(ix) => Err(EnumLenError::TooShort { len: self.len, yielded: ix }),
+            Some(ix) => Err(EnumLenError::TooShort {
+                len: self.len,
+                yielded: ix,
+            }),
             None => {
                 if strict {
                     match self.iter.next() {
-                        Some(next) => Err(EnumLenError::TooLong { len: self.len, next }),
+                        Some(next) => Err(EnumLenError::TooLong {
+                            len: self.len,
+                            next,
+                        }),
                         None => Ok(()),
                     }
                 } else {

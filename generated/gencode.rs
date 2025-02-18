@@ -154,10 +154,6 @@ transparent_color_index: u8,
 terminator: u8
 }
 
-/// expected size: 14
-#[derive(Debug, Clone)]
-pub enum gif_graphic_block_graphic_control_extension { none, some(gif_graphic_control_extension) }
-
 /// expected size: 32
 #[derive(Debug, Clone)]
 pub struct gif_subblock {
@@ -227,7 +223,7 @@ pub enum gif_graphic_rendering_block { plain_text_extension(gif_plain_text_exten
 /// expected size: 96
 #[derive(Debug, Clone)]
 pub struct gif_graphic_block {
-graphic_control_extension: gif_graphic_block_graphic_control_extension,
+graphic_control_extension: Option<gif_graphic_control_extension>,
 graphic_rendering_block: gif_graphic_rendering_block
 }
 
@@ -765,10 +761,6 @@ length: u16,
 data: jpeg_dnl_data
 }
 
-/// expected size: 8
-#[derive(Debug, Clone)]
-pub enum jpeg_frame_dnl { none, some(jpeg_dnl) }
-
 /// expected size: 352
 #[derive(Debug, Clone)]
 pub struct jpeg_frame {
@@ -776,7 +768,7 @@ initial_segment: jpeg_frame_initial_segment,
 segments: Vec<jpeg_table_or_misc>,
 header: jpeg_frame_header,
 scan: jpeg_scan,
-dnl: jpeg_frame_dnl,
+dnl: Option<jpeg_dnl>,
 scans: Vec<jpeg_scan>
 }
 
@@ -28183,12 +28175,12 @@ ret
 };
 PResult::Ok(match tree_index {
 0 => {
-let inner = (Decoder_jpeg_dnl(_input))?;
-jpeg_frame_dnl::some(inner)
+let val = (Decoder_jpeg_dnl(_input))?;
+Some(val)
 },
 
 1 => {
-jpeg_frame_dnl::none
+None
 },
 
 _ => {
@@ -32313,12 +32305,12 @@ ret
 };
 PResult::Ok(match tree_index {
 0 => {
-let inner = (Decoder_gif_graphic_control_extension(_input))?;
-gif_graphic_block_graphic_control_extension::some(inner)
+let val = (Decoder_gif_graphic_control_extension(_input))?;
+Some(val)
 },
 
 1 => {
-gif_graphic_block_graphic_control_extension::none
+None
 },
 
 _ => {

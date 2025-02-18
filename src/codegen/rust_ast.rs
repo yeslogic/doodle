@@ -221,9 +221,9 @@ impl ToFragment for RustDocComment {
     fn to_fragment(&self) -> Fragment {
         // REVIEW - consider a Fragment token that is either newline (if not at column 1) or no-op (if at column 1)
         Fragment::seq(
-            self.lines.iter().map(|line|
-                Fragment::string("/// ").cat(Fragment::String(line.clone()))
-            ),
+            self.lines
+                .iter()
+                .map(|line| Fragment::string("/// ").cat(Fragment::String(line.clone()))),
             Some(Fragment::Char('\n')),
         )
     }
@@ -336,12 +336,17 @@ impl RustItem {
         Self::pub_decl_with_traits(decl, TraitSet::default())
     }
 
-    pub fn with_comment<Text: IntoLabel>(mut self, comment: impl IntoIterator<Item = Text>) -> Self {
+    pub fn with_comment<Text: IntoLabel>(
+        mut self,
+        comment: impl IntoIterator<Item = Text>,
+    ) -> Self {
         if let Some(doc_comment) = self.doc_comment.as_mut() {
             // We only want to call this once because doc-comments are exclusive
             unreachable!("RustItem already has a doc comment: {doc_comment:?}");
         };
-        self.doc_comment = Some(RustDocComment { lines: comment.into_iter().map(Text::into).collect::<Vec<Label>>() });
+        self.doc_comment = Some(RustDocComment {
+            lines: comment.into_iter().map(Text::into).collect::<Vec<Label>>(),
+        });
         self
     }
 }

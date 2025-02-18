@@ -354,13 +354,14 @@ pub fn record<Name: IntoLabel>(fields: impl IntoIterator<Item = (Name, Format)>)
     )
 }
 
-/// Helper function that returns a novel Format that is the (distinguished) union of `format` and [`Format::EMPTY`].
+/// Helper function that encloses a Format in an 'optional' context,
+/// parsing it only if it its characteristic byte-pattern is detected,
+/// and otherwise as a no-op parse.
 ///
-/// The variant-name assigned to a positive match for the given format will be `"some"`,
-/// and the variant-name assigned to a negative match will be `"none"`.
+/// Uses the in-model `Option` layer to avoid constructing a duplicate
+/// version of `Option`.
 pub fn optional(format: Format) -> Format {
-    // REVIEW - do we want to use in-model Option-type here?
-    alts([("some", format), ("none", Format::EMPTY)])
+    Format::Union([fmt_some(format), fmt_none()].to_vec())
 }
 
 /// Helper-function for [`Format::Repeat`].
