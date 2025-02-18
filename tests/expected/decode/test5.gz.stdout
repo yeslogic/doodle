@@ -4,7 +4,7 @@
 │           ├── header <- gzip.header :=
 │           │   ├── magic <- (...)
 │           │   ├── method <- base.u8 := 8
-│           │   ├── file-flags <- map (flagbits -> { ... }) U8 := bool-flags[fname]
+│           │   ├── file-flags <- map (packed_bits -> { ... }) U8 := bool-flags[fname]
 │           │   ├── timestamp <- base.u32le := 1687676820
 │           │   ├── compression-flags <- base.u8 := 0
 │           │   └── os-id <- base.u8 := 3

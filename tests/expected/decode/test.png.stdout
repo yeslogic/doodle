@@ -89,14 +89,14 @@
 │       │       │       └── second <- base.u8 := 34
 │       │       └── crc <- base.u32be := 491070829
 │       ├── idat <- let-format idat (map (xs -> flat-map (x -> x.data) xs) (repeat1 png.idat)) (decode-bytes idat zlib.main) :=
-│       │   ├── compression-method-flags <- assert (method-info -> method-info.compression-method == 8) (map (packedbits -> { ... }) U8) :=
+│       │   ├── compression-method-flags <- assert (method-info -> method-info.compression-method == 8) (map (packed_bits -> { ... }) U8) :=
 │       │   │   ├── compression-info := 4
 │       │   │   └── compression-method := 8
-│       │   ├── flags <- map (packedbits -> { ... }) U8 :=
+│       │   ├── flags <- map (packed_bits -> { ... }) U8 :=
 │       │   │   ├── flevel := 3
-│       │   │   ├── fdict := 0
+│       │   │   ├── fdict := false
 │       │   │   └── fcheck := 7
-│       │   ├── dict-id <- maybe (flags.fdict != 0) base.u32be := none
+│       │   ├── dict-id <- maybe (flags.fdict) base.u32be := none
 │       │   ├── data <- bits deflate.main :=
 │       │   │   ├── blocks <- repeat-until-last (x -> x.final == 1) deflate.block :=
 │       │   │   │   └── 0 <- deflate.block :=

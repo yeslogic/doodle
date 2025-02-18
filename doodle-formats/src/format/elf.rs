@@ -676,7 +676,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     vec![
                         (
                             pat_some(Pattern::binding("shdrs")),
-                            format_some(for_each(
+                            fmt_some(for_each(
                                 var("shdrs"),
                                 "shdr",
                                 cond_maybe(
@@ -701,7 +701,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 ),
                             )),
                         ),
-                        (pat_none(), format_none()),
+                        (pat_none(), fmt_none()),
                     ],
                 ),
             ),

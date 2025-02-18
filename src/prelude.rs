@@ -12,7 +12,7 @@ pub use crate::parser::{
 #[macro_export]
 macro_rules! try_sub {
     ( $x:expr, $y:expr, $trace:expr ) => {
-        (match $x.checked_sub($y) {
+        match $x.checked_sub($y) {
             Some(z) => z,
             None => {
                 return Err(ParseError::UnsoundOperation(
@@ -20,7 +20,7 @@ macro_rules! try_sub {
                     $trace,
                 ))
             }
-        })
+        }
     };
 }
 
@@ -121,6 +121,32 @@ where
         accum = new_accum;
     }
     Ok(res)
+}
+
+/// Performs a binary search through a slice, returning the element at the index found by the
+/// slice method [`std::slice::binary_search_by_key`]. If this search fails, returns `None`
+/// instead.
+pub fn find_by_key_sorted<T, K>(f: impl FnMut(&T) -> K, query: K, slice: &[T]) -> Option<&T>
+where
+    K: Ord + Copy,
+{
+    match slice.binary_search_by_key(&query, f) {
+        Ok(ix) => Some(&slice[ix]),
+        Err(_) => None,
+    }
+}
+
+/// Performs a linear search through a slice, returning the first element such that
+/// `f(elem) == query`.
+///
+/// Short-circuiting, and does not bother to check any further elements after a match is
+/// found. This means that even if there are multiple candidate matches, only the first
+/// is encountered and returned.
+pub fn find_by_key_unsorted<T, K>(mut f: impl FnMut(&T) -> K, query: K, slice: &[T]) -> Option<&T>
+where
+    K: Eq + Copy,
+{
+    slice.iter().find(|x| f(x) == query)
 }
 
 pub fn u16le(input: (u8, u8)) -> u16 {

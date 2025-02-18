@@ -413,7 +413,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                     vec![
                                         (
                                             Pattern::U16(257),
-                                            format_some(length_record_fixed(
+                                            fmt_some(length_record_fixed(
                                                 3,
                                                 base,
                                                 0,
@@ -422,7 +422,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         ),
                                         (
                                             Pattern::U16(258),
-                                            format_some(length_record_fixed(
+                                            fmt_some(length_record_fixed(
                                                 4,
                                                 base,
                                                 0,
@@ -431,7 +431,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         ),
                                         (
                                             Pattern::U16(259),
-                                            format_some(length_record_fixed(
+                                            fmt_some(length_record_fixed(
                                                 5,
                                                 base,
                                                 0,
@@ -440,7 +440,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         ),
                                         (
                                             Pattern::U16(260),
-                                            format_some(length_record_fixed(
+                                            fmt_some(length_record_fixed(
                                                 6,
                                                 base,
                                                 0,
@@ -449,7 +449,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         ),
                                         (
                                             Pattern::U16(261),
-                                            format_some(length_record_fixed(
+                                            fmt_some(length_record_fixed(
                                                 7,
                                                 base,
                                                 0,
@@ -458,7 +458,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         ),
                                         (
                                             Pattern::U16(262),
-                                            format_some(length_record_fixed(
+                                            fmt_some(length_record_fixed(
                                                 8,
                                                 base,
                                                 0,
@@ -467,7 +467,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         ),
                                         (
                                             Pattern::U16(263),
-                                            format_some(length_record_fixed(
+                                            fmt_some(length_record_fixed(
                                                 9,
                                                 base,
                                                 0,
@@ -476,7 +476,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         ),
                                         (
                                             Pattern::U16(264),
-                                            format_some(length_record_fixed(
+                                            fmt_some(length_record_fixed(
                                                 10,
                                                 base,
                                                 0,
@@ -485,7 +485,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         ),
                                         (
                                             Pattern::U16(265),
-                                            format_some(length_record_fixed(
+                                            fmt_some(length_record_fixed(
                                                 11,
                                                 base,
                                                 1,
@@ -494,7 +494,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         ),
                                         (
                                             Pattern::U16(266),
-                                            format_some(length_record_fixed(
+                                            fmt_some(length_record_fixed(
                                                 13,
                                                 base,
                                                 1,
@@ -503,7 +503,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         ),
                                         (
                                             Pattern::U16(267),
-                                            format_some(length_record_fixed(
+                                            fmt_some(length_record_fixed(
                                                 15,
                                                 base,
                                                 1,
@@ -512,7 +512,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         ),
                                         (
                                             Pattern::U16(268),
-                                            format_some(length_record_fixed(
+                                            fmt_some(length_record_fixed(
                                                 17,
                                                 base,
                                                 1,
@@ -521,7 +521,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         ),
                                         (
                                             Pattern::U16(269),
-                                            format_some(length_record_fixed(
+                                            fmt_some(length_record_fixed(
                                                 19,
                                                 base,
                                                 2,
@@ -530,7 +530,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         ),
                                         (
                                             Pattern::U16(270),
-                                            format_some(length_record_fixed(
+                                            fmt_some(length_record_fixed(
                                                 23,
                                                 base,
                                                 2,
@@ -539,7 +539,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         ),
                                         (
                                             Pattern::U16(271),
-                                            format_some(length_record_fixed(
+                                            fmt_some(length_record_fixed(
                                                 27,
                                                 base,
                                                 2,
@@ -548,7 +548,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         ),
                                         (
                                             Pattern::U16(272),
-                                            format_some(length_record_fixed(
+                                            fmt_some(length_record_fixed(
                                                 31,
                                                 base,
                                                 2,
@@ -557,7 +557,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         ),
                                         (
                                             Pattern::U16(273),
-                                            format_some(length_record_fixed(
+                                            fmt_some(length_record_fixed(
                                                 35,
                                                 base,
                                                 3,
@@ -566,7 +566,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         ),
                                         (
                                             Pattern::U16(274),
-                                            format_some(length_record_fixed(
+                                            fmt_some(length_record_fixed(
                                                 43,
                                                 base,
                                                 3,
@@ -575,7 +575,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         ),
                                         (
                                             Pattern::U16(275),
-                                            format_some(length_record_fixed(
+                                            fmt_some(length_record_fixed(
                                                 51,
                                                 base,
                                                 3,
@@ -584,7 +584,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         ),
                                         (
                                             Pattern::U16(276),
-                                            format_some(length_record_fixed(
+                                            fmt_some(length_record_fixed(
                                                 59,
                                                 base,
                                                 3,
@@ -593,7 +593,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         ),
                                         (
                                             Pattern::U16(277),
-                                            format_some(length_record_fixed(
+                                            fmt_some(length_record_fixed(
                                                 67,
                                                 base,
                                                 4,
@@ -602,7 +602,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         ),
                                         (
                                             Pattern::U16(278),
-                                            format_some(length_record_fixed(
+                                            fmt_some(length_record_fixed(
                                                 83,
                                                 base,
                                                 4,
@@ -611,7 +611,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         ),
                                         (
                                             Pattern::U16(279),
-                                            format_some(length_record_fixed(
+                                            fmt_some(length_record_fixed(
                                                 99,
                                                 base,
                                                 4,
@@ -620,7 +620,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         ),
                                         (
                                             Pattern::U16(280),
-                                            format_some(length_record_fixed(
+                                            fmt_some(length_record_fixed(
                                                 115,
                                                 base,
                                                 4,
@@ -629,7 +629,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         ),
                                         (
                                             Pattern::U16(281),
-                                            format_some(length_record_fixed(
+                                            fmt_some(length_record_fixed(
                                                 131,
                                                 base,
                                                 5,
@@ -638,7 +638,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         ),
                                         (
                                             Pattern::U16(282),
-                                            format_some(length_record_fixed(
+                                            fmt_some(length_record_fixed(
                                                 163,
                                                 base,
                                                 5,
@@ -647,7 +647,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         ),
                                         (
                                             Pattern::U16(283),
-                                            format_some(length_record_fixed(
+                                            fmt_some(length_record_fixed(
                                                 195,
                                                 base,
                                                 5,
@@ -656,7 +656,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         ),
                                         (
                                             Pattern::U16(284),
-                                            format_some(length_record_fixed(
+                                            fmt_some(length_record_fixed(
                                                 227,
                                                 base,
                                                 5,
@@ -665,7 +665,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         ),
                                         (
                                             Pattern::U16(285),
-                                            format_some(length_record_fixed(
+                                            fmt_some(length_record_fixed(
                                                 258,
                                                 base,
                                                 0,
@@ -673,8 +673,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                             )),
                                         ),
                                         // REVIEW - consider whether we want to use Format::Fail instead
-                                        (Pattern::Int(Bounds::new(286, 287)), format_none()),
-                                        (Pattern::Wildcard, format_none()),
+                                        (Pattern::Int(Bounds::new(286, 287)), fmt_none()),
+                                        (Pattern::Wildcard, fmt_none()),
                                     ],
                                 ),
                             ),
@@ -946,7 +946,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         vec![
                                             (
                                                 Pattern::U16(257),
-                                                format_some(length_record(
+                                                fmt_some(length_record(
                                                     3,
                                                     base,
                                                     0,
@@ -955,7 +955,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                             ),
                                             (
                                                 Pattern::U16(258),
-                                                format_some(length_record(
+                                                fmt_some(length_record(
                                                     4,
                                                     base,
                                                     0,
@@ -964,7 +964,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                             ),
                                             (
                                                 Pattern::U16(259),
-                                                format_some(length_record(
+                                                fmt_some(length_record(
                                                     5,
                                                     base,
                                                     0,
@@ -973,7 +973,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                             ),
                                             (
                                                 Pattern::U16(260),
-                                                format_some(length_record(
+                                                fmt_some(length_record(
                                                     6,
                                                     base,
                                                     0,
@@ -982,7 +982,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                             ),
                                             (
                                                 Pattern::U16(261),
-                                                format_some(length_record(
+                                                fmt_some(length_record(
                                                     7,
                                                     base,
                                                     0,
@@ -991,7 +991,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                             ),
                                             (
                                                 Pattern::U16(262),
-                                                format_some(length_record(
+                                                fmt_some(length_record(
                                                     8,
                                                     base,
                                                     0,
@@ -1000,7 +1000,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                             ),
                                             (
                                                 Pattern::U16(263),
-                                                format_some(length_record(
+                                                fmt_some(length_record(
                                                     9,
                                                     base,
                                                     0,
@@ -1009,7 +1009,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                             ),
                                             (
                                                 Pattern::U16(264),
-                                                format_some(length_record(
+                                                fmt_some(length_record(
                                                     10,
                                                     base,
                                                     0,
@@ -1018,7 +1018,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                             ),
                                             (
                                                 Pattern::U16(265),
-                                                format_some(length_record(
+                                                fmt_some(length_record(
                                                     11,
                                                     base,
                                                     1,
@@ -1027,7 +1027,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                             ),
                                             (
                                                 Pattern::U16(266),
-                                                format_some(length_record(
+                                                fmt_some(length_record(
                                                     13,
                                                     base,
                                                     1,
@@ -1036,7 +1036,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                             ),
                                             (
                                                 Pattern::U16(267),
-                                                format_some(length_record(
+                                                fmt_some(length_record(
                                                     15,
                                                     base,
                                                     1,
@@ -1045,7 +1045,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                             ),
                                             (
                                                 Pattern::U16(268),
-                                                format_some(length_record(
+                                                fmt_some(length_record(
                                                     17,
                                                     base,
                                                     1,
@@ -1054,7 +1054,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                             ),
                                             (
                                                 Pattern::U16(269),
-                                                format_some(length_record(
+                                                fmt_some(length_record(
                                                     19,
                                                     base,
                                                     2,
@@ -1063,7 +1063,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                             ),
                                             (
                                                 Pattern::U16(270),
-                                                format_some(length_record(
+                                                fmt_some(length_record(
                                                     23,
                                                     base,
                                                     2,
@@ -1072,7 +1072,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                             ),
                                             (
                                                 Pattern::U16(271),
-                                                format_some(length_record(
+                                                fmt_some(length_record(
                                                     27,
                                                     base,
                                                     2,
@@ -1081,7 +1081,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                             ),
                                             (
                                                 Pattern::U16(272),
-                                                format_some(length_record(
+                                                fmt_some(length_record(
                                                     31,
                                                     base,
                                                     2,
@@ -1090,7 +1090,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                             ),
                                             (
                                                 Pattern::U16(273),
-                                                format_some(length_record(
+                                                fmt_some(length_record(
                                                     35,
                                                     base,
                                                     3,
@@ -1099,7 +1099,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                             ),
                                             (
                                                 Pattern::U16(274),
-                                                format_some(length_record(
+                                                fmt_some(length_record(
                                                     43,
                                                     base,
                                                     3,
@@ -1108,7 +1108,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                             ),
                                             (
                                                 Pattern::U16(275),
-                                                format_some(length_record(
+                                                fmt_some(length_record(
                                                     51,
                                                     base,
                                                     3,
@@ -1117,7 +1117,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                             ),
                                             (
                                                 Pattern::U16(276),
-                                                format_some(length_record(
+                                                fmt_some(length_record(
                                                     59,
                                                     base,
                                                     3,
@@ -1126,7 +1126,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                             ),
                                             (
                                                 Pattern::U16(277),
-                                                format_some(length_record(
+                                                fmt_some(length_record(
                                                     67,
                                                     base,
                                                     4,
@@ -1135,7 +1135,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                             ),
                                             (
                                                 Pattern::U16(278),
-                                                format_some(length_record(
+                                                fmt_some(length_record(
                                                     83,
                                                     base,
                                                     4,
@@ -1144,7 +1144,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                             ),
                                             (
                                                 Pattern::U16(279),
-                                                format_some(length_record(
+                                                fmt_some(length_record(
                                                     99,
                                                     base,
                                                     4,
@@ -1153,7 +1153,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                             ),
                                             (
                                                 Pattern::U16(280),
-                                                format_some(length_record(
+                                                fmt_some(length_record(
                                                     115,
                                                     base,
                                                     4,
@@ -1162,7 +1162,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                             ),
                                             (
                                                 Pattern::U16(281),
-                                                format_some(length_record(
+                                                fmt_some(length_record(
                                                     131,
                                                     base,
                                                     5,
@@ -1171,7 +1171,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                             ),
                                             (
                                                 Pattern::U16(282),
-                                                format_some(length_record(
+                                                fmt_some(length_record(
                                                     163,
                                                     base,
                                                     5,
@@ -1180,7 +1180,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                             ),
                                             (
                                                 Pattern::U16(283),
-                                                format_some(length_record(
+                                                fmt_some(length_record(
                                                     195,
                                                     base,
                                                     5,
@@ -1189,7 +1189,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                             ),
                                             (
                                                 Pattern::U16(284),
-                                                format_some(length_record(
+                                                fmt_some(length_record(
                                                     227,
                                                     base,
                                                     5,
@@ -1198,7 +1198,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                             ),
                                             (
                                                 Pattern::U16(285),
-                                                format_some(length_record(
+                                                fmt_some(length_record(
                                                     258,
                                                     base,
                                                     0,
@@ -1206,8 +1206,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                                 )),
                                             ),
                                             // NOTE - currently no difference in behavior compared to wildcard pattern, but adds specificity/clarity, and gives us an easy hook to treat as erroneous
-                                            (Pattern::Int(Bounds::new(286, 287)), format_none()),
-                                            (Pattern::Wildcard, format_none()),
+                                            (Pattern::Int(Bounds::new(286, 287)), fmt_none()),
+                                            (Pattern::Wildcard, fmt_none()),
                                         ],
                                     ),
                                 ),

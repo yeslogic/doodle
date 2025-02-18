@@ -2,7 +2,9 @@ use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::rc::Rc;
 
+pub(crate) mod heap_optimize;
 pub(crate) mod rebind;
+pub(crate) mod size;
 
 use crate::output::{Fragment, FragmentBuilder};
 
@@ -205,9 +207,30 @@ impl ToFragment for RustImportItems {
 pub(crate) struct RustItem {
     vis: Visibility,
     attrs: Vec<RustAttr>,
+    doc_comment: Option<RustDocComment>,
     decl: RustDecl,
 }
 
+type CommentLine = Label;
+
+#[derive(Clone, Debug)]
+pub(crate) struct RustDocComment {
+    lines: Vec<CommentLine>,
+}
+
+impl ToFragment for RustDocComment {
+    fn to_fragment(&self) -> Fragment {
+        // REVIEW - consider a Fragment token that is either newline (if not at column 1) or no-op (if at column 1)
+        Fragment::seq(
+            self.lines
+                .iter()
+                .map(|line| Fragment::string("/// ").cat(Fragment::String(line.clone()))),
+            Some(Fragment::Char('\n')),
+        )
+    }
+}
+
+/// Specialized pseudo-bitflags implementation that directly implies Clone when Copy is set
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 #[repr(u8)]
 #[allow(dead_code)]
@@ -272,6 +295,7 @@ impl RustItem {
         Self {
             attrs,
             vis: Default::default(),
+            doc_comment: None,
             decl,
         }
     }
@@ -289,6 +313,7 @@ impl RustItem {
         Self {
             attrs,
             vis: Visibility::Public,
+            doc_comment: None,
             decl,
         }
     }
@@ -311,11 +336,28 @@ impl RustItem {
     pub fn pub_decl(decl: RustDecl) -> Self {
         Self::pub_decl_with_traits(decl, TraitSet::default())
     }
+
+    pub fn with_comment<Text: IntoLabel>(
+        mut self,
+        comment: impl IntoIterator<Item = Text>,
+    ) -> Self {
+        if let Some(doc_comment) = self.doc_comment.as_mut() {
+            // We only want to call this once because doc-comments are exclusive
+            unreachable!("RustItem already has a doc comment: {doc_comment:?}");
+        };
+        self.doc_comment = Some(RustDocComment {
+            lines: comment.into_iter().map(Text::into).collect::<Vec<Label>>(),
+        });
+        self
+    }
 }
 
-impl RustItem {
-    pub fn to_fragment(&self) -> Fragment {
+impl ToFragment for RustItem {
+    fn to_fragment(&self) -> Fragment {
         let mut builder = FragmentBuilder::new();
+        if let Some(com) = &self.doc_comment {
+            builder.push(com.to_fragment().cat_break());
+        }
         for attr in self.attrs.iter() {
             builder.push(attr.to_fragment().cat_break());
         }
@@ -583,6 +625,39 @@ impl RustType {
     /// with an optional list of generic arguments to parameterize it with.
     pub fn verbatim(con: impl Into<Label>, params: Option<UseParams>) -> Self {
         Self::Verbatim(con.into(), params.unwrap_or_default())
+    }
+
+    /// Predicate function that determines whether values of RustType `self` should be borrowed
+    /// before being used in signatures of, or when passed in as arguments to, top-level decoder functions.
+    pub fn should_borrow_for_arg(&self) -> bool {
+        match self {
+            RustType::Atom(ref atom_type) => match atom_type {
+                AtomType::Comp(ct) => match ct {
+                    // REVIEW - this may lead to code divergence and may not be stable...
+                    CompType::Vec(..) => true,
+                    CompType::Borrow(..) => false,
+                    CompType::Option(t) => t.should_borrow_for_arg(),
+                    CompType::Result(t_ok, _t_err) => t_ok.should_borrow_for_arg(),
+                },
+                AtomType::TypeRef(local) => match local {
+                    // REVIEW - shallow wrappers around vec should be treated as if vec, but that is difficult to achieve without more state-info from generation process
+                    LocalType::LocalDef(_ix, ..) => false,
+                    LocalType::External(..) => false,
+                },
+                AtomType::Prim(..) => false,
+            },
+            // REVIEW - are there cases where we want to selectively borrow anon-tuples (and if so, distributive or unified)?
+            RustType::AnonTuple(_elts) => false,
+            RustType::Verbatim(..) => false,
+        }
+    }
+
+    pub fn selective_borrow(lt: Option<RustLt>, m: Mut, ty: RustType) -> Self {
+        if ty.should_borrow_for_arg() {
+            Self::borrow_of(lt, m, ty)
+        } else {
+            ty
+        }
     }
 
     /// Constructs a `RustType` representing `&'a (mut|) T` from parameters representing `'a` (optional),
@@ -1198,7 +1273,7 @@ impl ToFragment for MethodSpecifier {
 #[derive(Debug, Clone)]
 pub(crate) enum StructExpr {
     EmptyExpr,
-    RecordExpr(Vec<(Label, Option<Box<RustExpr>>)>),
+    RecordExpr(Vec<(Label, Option<RustExpr>)>),
     TupleExpr(Vec<RustExpr>),
 }
 
@@ -1248,6 +1323,18 @@ pub(crate) enum RustExpr {
     Index(Box<RustExpr>, Box<RustExpr>),      // object, index
     Slice(Box<RustExpr>, Box<RustExpr>, Box<RustExpr>), // object, start ix, end ix (exclusive)
     RangeExclusive(Box<RustExpr>, Box<RustExpr>),
+    ResultOk(Option<Label>, Box<RustExpr>),
+}
+
+impl RustExpr {
+    /// Returns `Some(varname)` if `self` is a simple entity-reference to identifir `varname`, and
+    /// `None` otherwise.
+    pub fn as_local(&self) -> Option<&Label> {
+        match self {
+            RustExpr::Entity(RustEntity::Local(v)) => Some(v),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -1298,7 +1385,9 @@ impl RustClosure {
         )
     }
 
-    /// Constructs a new closure with 'predicate' (ref) semantics.
+    /// Constructs a new closure with 'predicate' (ref-bound argument) semantics.
+    ///
+    /// Also applies to extract-key semantics `(&T) -> K where K: Copy`
     pub fn new_predicate(
         head: impl IntoLabel,
         deref_t: Option<RustType>,
@@ -1723,7 +1812,12 @@ impl RustExpr {
     }
 
     pub fn wrap_try(self) -> Self {
-        Self::Try(Box::new(self))
+        match self {
+            Self::ResultOk(_, inner) => *inner,
+            Self::BlockScope(stmts, ret) => Self::BlockScope(stmts, Box::new(ret.wrap_try())),
+            // REVIEW - consider whether there are any other special cases
+            _ => Self::Try(Box::new(self)),
+        }
     }
 
     pub fn str_lit(str: impl Into<Label>) -> Self {
@@ -1849,12 +1943,16 @@ impl RustExpr {
                 // REVIEW - we might want to log the number of times we hit this branch, and with what values, to see if there are any obvious cases to handle
                 None
             }
+            RustExpr::ResultOk(..) => None,
             RustExpr::CloneOf(x) | RustExpr::Deref(x) => match &**x {
                 RustExpr::Borrow(y) | RustExpr::BorrowMut(y) => y.try_get_primtype(),
                 other => other.try_get_primtype(),
             },
             RustExpr::Borrow(_) | RustExpr::BorrowMut(_) => None,
-            RustExpr::Try(..) => None,
+            RustExpr::Try(inner) => match inner.as_ref() {
+                RustExpr::ResultOk(.., x) => x.try_get_primtype(),
+                _ => None,
+            },
             RustExpr::Operation(op) => match op {
                 RustOp::InfixOp(op, lhs, rhs) => {
                     let lhs_type = lhs.try_get_primtype()?;
@@ -1913,7 +2011,7 @@ impl RustExpr {
             RustExpr::Struct(_, assigns) => match assigns {
                 StructExpr::RecordExpr(assigns) => assigns
                     .iter()
-                    .all(|(_, val)| val.as_deref().map_or(true, Self::is_pure)),
+                    .all(|(_, val)| val.as_ref().map_or(true, Self::is_pure)),
                 StructExpr::TupleExpr(values) => values.iter().all(|val| val.is_pure()),
                 StructExpr::EmptyExpr => true,
             },
@@ -1928,6 +2026,7 @@ impl RustExpr {
                 // NOTE - illegal casts like `x as u8` where x >= 256 are language-level errors that are neither pure nor impure
                 RustOp::AsCast(expr, ..) => expr.is_pure() && op.is_sound(),
             },
+            RustExpr::ResultOk(.., inner) => inner.is_pure(),
             // NOTE - we can have block-scopes with non-empty statements that are pure, but that is a bit too much work for our purposes right now.
             RustExpr::BlockScope(stmts, tail) => stmts.is_empty() && tail.is_pure(),
             // NOTE - there may be some pure control expressions but those will be relatively rare as natural occurrences
@@ -1960,6 +2059,13 @@ impl RustExpr {
             )),
         }
     }
+
+    pub(crate) fn wrap_ok<Name: IntoLabel>(self, qualifier: Option<Name>) -> RustExpr {
+        match self {
+            RustExpr::Try(x) => *x,
+            other => RustExpr::ResultOk(qualifier.map(Name::into), Box::new(other)),
+        }
+    }
 }
 
 impl ToFragmentExt for RustExpr {
@@ -1979,6 +2085,21 @@ impl ToFragmentExt for RustExpr {
                     .cat(ToFragmentExt::paren_list_prec(args, Precedence::Top)),
                 prec,
                 Precedence::Projection,
+            ),
+            RustExpr::ResultOk(opt_qual, inner) => cond_paren(
+                Fragment::group(
+                    Fragment::opt(opt_qual.as_ref(), |qual| {
+                        Fragment::String(qual.clone()).cat(Fragment::string("::"))
+                    })
+                    .cat(Fragment::string("Ok")),
+                )
+                .cat(
+                    inner
+                        .to_fragment_precedence(Precedence::Top)
+                        .delimit(Fragment::Char('('), Fragment::Char(')')),
+                ),
+                prec,
+                Precedence::INVOKE,
             ),
             RustExpr::CloneOf(x) => cond_paren(
                 x.to_fragment_precedence(Precedence::Projection)
@@ -2159,6 +2280,29 @@ pub(crate) enum RustMatchBody {
     Refutable(Vec<RustMatchCase>, RustCatchAll),
 }
 
+impl RustMatchBody {
+    pub fn tuple_capture<const N: usize>(
+        labels: [&'static str; N],
+        is_ref_flags: [bool; N],
+    ) -> Self {
+        let case_valid = {
+            let lhs = {
+                let pat = RustPattern::tuple_capture(labels, is_ref_flags);
+                MatchCaseLHS::Pattern(pat)
+            };
+            let rhs = {
+                let stmt = {
+                    let expr = RustExpr::Tuple(labels.into_iter().map(RustExpr::local).collect());
+                    RustStmt::Expr(expr)
+                };
+                vec![stmt]
+            };
+            (lhs, rhs)
+        };
+        Self::Irrefutable(vec![case_valid])
+    }
+}
+
 impl ToFragment for RustMatchBody {
     fn to_fragment(&self) -> Fragment {
         match self {
@@ -2194,6 +2338,24 @@ impl RustPattern {
             RustPattern::CatchAll(Some(label)) => RustPattern::BindRef(label),
             _ => self,
         }
+    }
+
+    /// Captures an `N`-tuple with the provided per-position labels, along with a boolean flag
+    /// to signal to bind by `ref` (if true) or by direct identifier capture (if false).
+    pub(crate) fn tuple_capture<Name: IntoLabel, const N: usize>(
+        bindings: [Name; N],
+        is_ref_flags: [bool; N],
+    ) -> Self {
+        let mut binds = Vec::with_capacity(N);
+        for (name, is_ref) in Iterator::zip(bindings.into_iter(), is_ref_flags.into_iter()) {
+            let pat = if is_ref {
+                RustPattern::BindRef(name.into())
+            } else {
+                RustPattern::CatchAll(Some(name.into()))
+            };
+            binds.push(pat)
+        }
+        RustPattern::TupleLiteral(binds)
     }
 }
 
@@ -2503,3 +2665,207 @@ mod test {
         expect_fragment(&re, "this.append(&mut other)")
     }
 }
+
+pub mod short_circuit {
+    use super::{
+        ReturnKind, RustCatchAll, RustControl, RustExpr, RustMatchBody, RustMatchCase, RustOp,
+        RustStmt, StructExpr,
+    };
+
+    pub trait ShortCircuit {
+        /// Returns `true` if `self` might have a (non-panic) short-circuit, as `return` or a Try (`?`) expression.
+        fn is_short_circuiting(&self) -> bool;
+    }
+
+    pub trait ValueCheckpoint {
+        /// Returns `true` if, as a value-producing AST node, `self` would need to be wrapped in `Ok(..)` in order to
+        /// properly encompass internal short-circuiting.
+        fn needs_ok(&self) -> bool;
+    }
+
+    impl ValueCheckpoint for RustExpr {
+        fn needs_ok(&self) -> bool {
+            match self {
+                RustExpr::ResultOk(..) => false,
+                RustExpr::BlockScope(.., ret) => ret.needs_ok(),
+                RustExpr::Control(ctrl) => ctrl.needs_ok(),
+                _ => true,
+            }
+        }
+    }
+
+    impl ValueCheckpoint for RustControl {
+        fn needs_ok(&self) -> bool {
+            match self {
+                RustControl::Match(.., body) => match body {
+                    RustMatchBody::Refutable(.., RustCatchAll::ReturnErrorValue { .. }) => true,
+                    RustMatchBody::Refutable(cases, ..) | RustMatchBody::Irrefutable(cases) => {
+                        cases
+                            .iter()
+                            .map(|(_, body)| body)
+                            .any(<Vec<RustStmt>>::needs_ok)
+                    }
+                },
+                // REVIEW - check these  always-true conditions
+                RustControl::Loop(..) => true,
+                RustControl::While(..) => true,
+                RustControl::ForRange0(..) => true,
+                RustControl::ForIter(..) => true,
+                RustControl::If(.., None) => true,
+                RustControl::Break => {
+                    unreachable!("bad descent: ValueCheckpoint::needs_ok hit RustControl::Break")
+                }
+                RustControl::If(.., t, Some(f)) => t.needs_ok() || f.needs_ok(),
+            }
+        }
+    }
+
+    impl ValueCheckpoint for Vec<RustStmt> {
+        fn needs_ok(&self) -> bool {
+            match self.last() {
+                None => true,
+                Some(stmt) => match stmt {
+                    RustStmt::Let(..) | RustStmt::Reassign(..) => true,
+                    RustStmt::Expr(expr) | RustStmt::Return(_, expr) => expr.needs_ok(),
+                    RustStmt::Control(ctrl) => ctrl.needs_ok(),
+                },
+            }
+        }
+    }
+
+    impl ShortCircuit for RustStmt {
+        fn is_short_circuiting(&self) -> bool {
+            match self {
+                RustStmt::Expr(expr)
+                | RustStmt::Reassign(.., expr)
+                | RustStmt::Let(.., expr)
+                | RustStmt::Return(ReturnKind::Implicit, expr) => expr.is_short_circuiting(),
+                RustStmt::Return(ReturnKind::Keyword, ..) => true,
+                RustStmt::Control(ctrl) => ctrl.is_short_circuiting(),
+            }
+        }
+    }
+
+    impl<T> ShortCircuit for Vec<T>
+    where
+        T: ShortCircuit,
+    {
+        fn is_short_circuiting(&self) -> bool {
+            self.iter().any(T::is_short_circuiting)
+        }
+    }
+
+    impl ShortCircuit for RustControl {
+        fn is_short_circuiting(&self) -> bool {
+            match self {
+                RustControl::Loop(stmts) => stmts.is_short_circuiting(),
+                RustControl::ForIter(_, expr, stmts)
+                | RustControl::While(expr, stmts)
+                | RustControl::ForRange0(_, expr, stmts) => {
+                    expr.is_short_circuiting() || stmts.is_short_circuiting()
+                }
+                RustControl::If(cond, then, opt_else) => {
+                    cond.is_short_circuiting()
+                        || then.is_short_circuiting()
+                        || opt_else
+                            .as_ref()
+                            .is_some_and(<Vec<RustStmt> as ShortCircuit>::is_short_circuiting)
+                }
+                RustControl::Match(scrutinee, body) => {
+                    scrutinee.is_short_circuiting() || body.is_short_circuiting()
+                }
+                RustControl::Break => false,
+            }
+        }
+    }
+
+    impl ShortCircuit for RustMatchCase {
+        fn is_short_circuiting(&self) -> bool {
+            self.1.is_short_circuiting()
+        }
+    }
+
+    impl ShortCircuit for RustMatchBody {
+        fn is_short_circuiting(&self) -> bool {
+            match self {
+                RustMatchBody::Irrefutable(items) => items.is_short_circuiting(),
+                RustMatchBody::Refutable(items, rust_catch_all) => match rust_catch_all {
+                    RustCatchAll::ReturnErrorValue { .. } => true,
+                    RustCatchAll::PanicUnreachable { .. } => items.is_short_circuiting(),
+                },
+            }
+        }
+    }
+
+    impl ShortCircuit for RustExpr {
+        fn is_short_circuiting(&self) -> bool {
+            match self {
+                RustExpr::ArrayLit(exprs) => exprs.is_short_circuiting(),
+                RustExpr::Entity(..) => false,
+                RustExpr::PrimitiveLit(..) => false,
+                RustExpr::MethodCall(recv, _, args) => {
+                    recv.is_short_circuiting() || args.is_short_circuiting()
+                }
+                RustExpr::FieldAccess(expr, ..) => expr.is_short_circuiting(),
+                RustExpr::FunctionCall(.., args) => args.is_short_circuiting(),
+                RustExpr::Tuple(elts) => elts.is_short_circuiting(),
+                RustExpr::Struct(.., struct_expr) => struct_expr.is_short_circuiting(),
+                RustExpr::CloneOf(inner)
+                | RustExpr::Deref(inner)
+                | RustExpr::Borrow(inner)
+                | RustExpr::ResultOk(.., inner)
+                | RustExpr::BorrowMut(inner) => inner.is_short_circuiting(),
+                RustExpr::Try(inner) => match inner.as_ref() {
+                    RustExpr::ResultOk(.., expr) => expr.is_short_circuiting(),
+                    _ => true,
+                },
+                RustExpr::Operation(op) => op.is_short_circuiting(),
+                RustExpr::BlockScope(stmts, expr) => {
+                    stmts.is_short_circuiting() || expr.is_short_circuiting()
+                }
+                RustExpr::Control(ctrl) => ctrl.is_short_circuiting(),
+                RustExpr::Closure(..) => false,
+                RustExpr::Index(head, index) => {
+                    head.is_short_circuiting() || index.is_short_circuiting()
+                }
+                RustExpr::Slice(seq, start, stop) => {
+                    seq.is_short_circuiting()
+                        || start.is_short_circuiting()
+                        || stop.is_short_circuiting()
+                }
+                RustExpr::RangeExclusive(start, stop) => {
+                    start.is_short_circuiting() || stop.is_short_circuiting()
+                }
+            }
+        }
+    }
+
+    impl ShortCircuit for RustOp {
+        fn is_short_circuiting(&self) -> bool {
+            match self {
+                RustOp::InfixOp(_, lhs, rhs) => {
+                    lhs.is_short_circuiting() || rhs.is_short_circuiting()
+                }
+                RustOp::PrefixOp(_, expr) => expr.is_short_circuiting(),
+                RustOp::AsCast(expr, _) => expr.is_short_circuiting(),
+            }
+        }
+    }
+
+    impl ShortCircuit for (crate::Label, Option<RustExpr>) {
+        fn is_short_circuiting(&self) -> bool {
+            self.1.as_ref().is_some_and(RustExpr::is_short_circuiting)
+        }
+    }
+
+    impl ShortCircuit for StructExpr {
+        fn is_short_circuiting(&self) -> bool {
+            match self {
+                StructExpr::EmptyExpr => false,
+                StructExpr::TupleExpr(elts) => elts.is_short_circuiting(),
+                StructExpr::RecordExpr(flds) => flds.is_short_circuiting(),
+            }
+        }
+    }
+}
+pub use short_circuit::{ShortCircuit, ValueCheckpoint};
