@@ -1,5 +1,6 @@
 use std::{cell::RefCell, collections::HashMap};
 
+use super::heap_optimize::{HeapOptimize, HeapOutcome, HeapStrategy};
 use super::*;
 
 /// Helper trait for any AST type-rep whose memory footprint and other metrics may require
@@ -39,6 +40,7 @@ struct CacheEntry {
     niches: Option<usize>,
     size: Option<usize>,
     align: Option<usize>,
+    heap: Option<HeapOutcome>,
 }
 
 pub(crate) struct SourceContext<'a> {
@@ -47,18 +49,18 @@ pub(crate) struct SourceContext<'a> {
 }
 
 macro_rules! cache_get {
-    ( $this:expr, $field:ident, $ix:ident, $method:ident ) => {{
+    ( $this:expr, $field:ident, $ix:ident, $method:ident $( , $pre_arg:expr )? ) => {{
         let cache = $this.cache.borrow();
         if cache.contains_key(&$ix) {
-            match cache[&$ix].$field {
-                Some(ret) => ret,
+            match &cache[&$ix].$field {
+                Some(ret) => ret.clone(),
                 None => {
                     drop(cache);
                     let ret = {
                         let def = &$this.def_map[$ix];
-                        def.$method($this)
+                        def.$method($( $pre_arg, )? $this)
                     };
-                    $this.cache.borrow_mut().get_mut(&$ix).unwrap().$field = Some(ret);
+                    $this.cache.borrow_mut().get_mut(&$ix).unwrap().$field = Some(ret.clone());
                     ret
                 }
             }
@@ -66,25 +68,33 @@ macro_rules! cache_get {
             drop(cache);
             let ret = {
                 let def = &$this.def_map[$ix];
-                def.$method($this)
+                def.$method($( $pre_arg, )? $this)
             };
-            $this.cache.borrow_mut().entry($ix).or_default().$field = Some(ret);
+            $this.cache.borrow_mut().entry($ix).or_default().$field = Some(ret.clone());
             ret
         }
     }};
 }
 
 impl SourceContext<'_> {
-    fn get_niches(&self, ix: usize) -> usize {
+    pub fn get_niches(&self, ix: usize) -> usize {
         cache_get!(self, niches, ix, niches)
     }
 
-    fn get_size(&self, ix: usize) -> usize {
+    pub fn get_size(&self, ix: usize) -> usize {
         cache_get!(self, size, ix, size_hint)
     }
 
-    fn get_align(&self, ix: usize) -> usize {
+    pub fn get_align(&self, ix: usize) -> usize {
         cache_get!(self, align, ix, align_hint)
+    }
+
+    /// NOTE: Due to memoization, only one strategy will be computed for a given type-definition,
+    /// meaning that if you then request a different strategy with the same Context object, the old
+    /// result will be served up regardless of the actual strategy being passed in the second time
+    /// around.
+    pub fn get_heap(&self, strategy: HeapStrategy, ix: usize) -> HeapOutcome {
+        cache_get!(self, heap, ix, dry_run, strategy)
     }
 }
 
@@ -123,7 +133,7 @@ impl MemSize for RustType {
                     raw_size += t.size_hint(context);
                     max_align = max_align.max(t.align_hint(context));
                 }
-                padded_size(raw_size, max_align)
+                aligned_size(raw_size, max_align)
             }
             RustType::Verbatim(..) => {
                 unreachable!("unexpected RustType::Verbatim in structural type")
@@ -365,12 +375,15 @@ impl MemSize for RustTypeDef {
             RustTypeDef::Struct(def) => def.size_hint(context),
             RustTypeDef::Enum(vars) => {
                 // TODO: detect and report if there is a huge disparity between variant sizes (as clippy warns us about)
-                vars.iter().map(|v| v.size_hint(context)).max().unwrap_or(0)
-                    + vars
-                        .iter()
-                        .map(|v| v.align_hint(context))
-                        .max()
-                        .unwrap_or(1)
+                // NOTE: there will be discrepancies in cases where niche-optimization can fit a tag into a niche of one variant to eliminate an external tag-field
+                let max_size = vars.iter().map(|v| v.size_hint(context)).max().unwrap_or(0);
+                let max_align = vars
+                    .iter()
+                    .map(|v| v.align_hint(context))
+                    .max()
+                    .unwrap_or(1);
+                // We can't simply add as the largest variant may not be the largest-alignment variant (e.g. [u8; 71] vs Vec<u8>)
+                aligned_size(max_size + 1, max_align)
             }
         }
     }
@@ -411,7 +424,7 @@ impl MemSize for RustVariant {
                     raw_size += elt.size_hint(context);
                     max_align = max_align.max(elt.align_hint(context));
                 }
-                padded_size(raw_size, max_align)
+                aligned_size(raw_size, max_align)
             }
         }
     }
@@ -451,7 +464,7 @@ impl MemSize for RustStruct {
                     raw_size += item.1.size_hint(context);
                     max_align = max_align.max(item.1.align_hint(context));
                 }
-                padded_size(raw_size, max_align)
+                aligned_size(raw_size, max_align)
             }
         }
     }
@@ -468,7 +481,7 @@ impl MemSize for RustStruct {
 }
 
 /// Optimized function that computes the smallest multiple of `align` greater than or equal to `size`.
-fn padded_size(size: usize, align: usize) -> usize {
+pub(crate) fn aligned_size(size: usize, align: usize) -> usize {
     (size + align - 1) & !(align - 1)
 }
 
@@ -493,7 +506,7 @@ mod algo_test {
     proptest! {
         #[test]
         fn test_roundup_equality(x: usize, y in small_two_powers()) {
-            prop_assert_eq!(roundup(x, y), padded_size(x, y));
+            prop_assert_eq!(roundup(x, y), aligned_size(x, y));
         }
     }
 }
