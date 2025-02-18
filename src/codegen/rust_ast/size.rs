@@ -17,6 +17,7 @@ fn niche_sum(iter: impl Iterator<Item = usize>) -> usize {
 }
 
 
+
 /// Helper trait for any AST type-rep that might be subject to specialized optimization
 /// when wrapped in `Option` (e.g. `Option<&T>`, `Option<bool>`).
 pub trait CanOptimize: ASTContext {
@@ -109,7 +110,6 @@ impl CanOptimize for RustType {
         match self {
             RustType::Atom(at) => at.niches(context),
             RustType::AnonTuple(ts) => {
-                // REVIEW - confirm this logic works properly
                 niche_product(ts.iter().map(|t| t.niches(context)))
             }
             // conservative estimate based on our assumption we won't see any Verbatim types in gencode structs
@@ -123,12 +123,13 @@ impl MemSize for RustType {
         match self {
             RustType::Atom(at) => at.size_hint(context),
             RustType::AnonTuple(ts) => {
-                // FIXME - doesn't respect padding requirements based on alignment
-                let mut ret = 0;
+                let mut raw_size = 0;
+                let mut max_align = 1;
                 for t in ts.iter() {
-                    ret += t.size_hint(context);
+                    raw_size += t.size_hint(context);
+                    max_align = max_align.max(t.align_hint(context));
                 }
-                ret
+                padded_size(raw_size, max_align)
             }
             RustType::Verbatim(..) => unreachable!("unexpected RustType::Verbatim in structural type"),
         }
@@ -366,6 +367,7 @@ impl MemSize for RustTypeDef {
         match self {
             RustTypeDef::Struct(def) => def.size_hint(context),
             RustTypeDef::Enum(vars) => {
+                // TODO: detect and report if there is a huge disparity between variant sizes (as clippy warns us about)
                 vars.iter().map(|v| v.size_hint(context)).max().unwrap_or(0) +
                 vars.iter().map(|v| v.align_hint(context)).max().unwrap_or(1)
             }
@@ -397,7 +399,15 @@ impl MemSize for RustVariant {
     fn size_hint(&self, context: &SourceContext<'_>) -> usize {
         match self {
             RustVariant::Unit(..) => 0,
-            RustVariant::Tuple(.., elts) => elts.iter().map(|e| e.size_hint(context)).sum::<usize>(),
+            RustVariant::Tuple(.., elts) => {
+                let mut raw_size = 0;
+                let mut max_align = 1;
+                for elt in elts.iter() {
+                    raw_size += elt.size_hint(context);
+                    max_align = max_align.max(elt.align_hint(context));
+                }
+                padded_size(raw_size, max_align)
+            }
         }
     }
 
@@ -425,8 +435,15 @@ impl CanOptimize for RustStruct {
 impl MemSize for RustStruct {
     fn size_hint(&self, context: &SourceContext<'_>) -> usize {
         match self {
-            // FIXME - doesn't respect padding requirements based on alignment
-            RustStruct::Record(items) => items.iter().map(|f| f.1.size_hint(context)).sum::<usize>(),
+            RustStruct::Record(items) => {
+                let mut raw_size = 0;
+                let mut max_align = 1;
+                for item in items.iter() {
+                    raw_size += item.1.size_hint(context);
+                    max_align = max_align.max(item.1.align_hint(context));
+                }
+                padded_size(raw_size, max_align)
+            }
         }
     }
 
@@ -437,41 +454,81 @@ impl MemSize for RustStruct {
     }
 }
 
+
+/// Optimized function that computes the smallest multiple of `align` greater than or equal to `size`.
+fn padded_size(size: usize, align: usize) -> usize {
+    (size + align - 1) & !(align - 1)
+}
+
+#[cfg(test)]
+fn roundup(size: usize, align: usize) -> usize {
+    if size % align == 0 {
+        size
+    } else {
+        (size / align + 1) * align
+    }
+}
+
+#[cfg(test)]
+mod algo_test {
+    use super::*;
+    use proptest::prelude::*;
+
+    fn small_two_powers() -> impl Strategy<Value = usize> {
+        (0usize..=3).prop_map(|x| 1usize << x)
+    }
+
+    proptest! {
+        #[test]
+        fn test_roundup_equality(x: usize, y in small_two_powers()) {
+            prop_assert_eq!(roundup(x, y), padded_size(x, y));
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn eq_size_hint<T>(ast_t: RustType, context: &[RustTypeDef]) {
+    fn eq_size_hint<T, Rep>(ast_t: Rep, context: Rep::Context<'_>)
+    where
+        Rep: MemSize + std::fmt::Debug,
+        for<'a> Rep::Context<'a>: Copy
+    {
         let expected = size_of::<T>();
         let actual = ast_t.size_hint(context);
         assert_eq!(actual, expected);
     }
 
-    fn eq_size_hint_option<T>(ast_t: RustType, context: &[RustTypeDef]) {
+    fn eq_size_hint_option<T, Rep>(ast_t: Rep, context: Rep::Context<'_>)
+    where
+        Rep: MemSize + std::fmt::Debug,
+        for<'a> Rep::Context<'a>: Copy
+    {
         let expected = size_of::<Option<T>>();
-        let actual = (RustType::from(CompType::Option(Box::new(ast_t)))).size_hint(context);
+        let actual = (CompType::Option(Box::new(ast_t))).size_hint(context);
         assert_eq!(actual, expected);
     }
 
     #[test]
     fn size_hint_prim() {
-        eq_size_hint::<()>(RustType::from(PrimType::Unit), &[]);
-        eq_size_hint::<bool>(RustType::from(PrimType::Bool), &[]);
-        eq_size_hint::<u8>(RustType::from(PrimType::U8), &[]);
-        eq_size_hint::<u16>(RustType::from(PrimType::U16), &[]);
-        eq_size_hint::<u32>(RustType::from(PrimType::U32), &[]);
-        eq_size_hint::<u64>(RustType::from(PrimType::U64), &[]);
-        eq_size_hint::<char>(RustType::from(PrimType::Char), &[]);
+        eq_size_hint::<(), _>(PrimType::Unit, ());
+        eq_size_hint::<bool, _>(PrimType::Bool, ());
+        eq_size_hint::<u8, _>(PrimType::U8, ());
+        eq_size_hint::<u16, _>(PrimType::U16, ());
+        eq_size_hint::<u32, _>(PrimType::U32, ());
+        eq_size_hint::<u64, _>(PrimType::U64, ());
+        eq_size_hint::<char, _>(PrimType::Char, ());
     }
 
     #[test]
     fn size_hint_option_prim() {
-        eq_size_hint_option::<()>(RustType::from(PrimType::Unit), &[]);
-        eq_size_hint_option::<bool>(RustType::from(PrimType::Bool), &[]);
-        eq_size_hint_option::<u8>(RustType::from(PrimType::U8), &[]);
-        eq_size_hint_option::<u16>(RustType::from(PrimType::U16), &[]);
-        eq_size_hint_option::<u32>(RustType::from(PrimType::U32), &[]);
-        eq_size_hint_option::<u64>(RustType::from(PrimType::U64), &[]);
-        eq_size_hint_option::<char>(RustType::from(PrimType::Char), &[]);
+        eq_size_hint_option::<(), _>(PrimType::Unit, ());
+        eq_size_hint_option::<bool, _>(PrimType::Bool, ());
+        eq_size_hint_option::<u8, _>(PrimType::U8, ());
+        eq_size_hint_option::<u16, _>(PrimType::U16, ());
+        eq_size_hint_option::<u32, _>(PrimType::U32, ());
+        eq_size_hint_option::<u64, _>(PrimType::U64, ());
+        eq_size_hint_option::<char, _>(PrimType::Char, ());
     }
 }
