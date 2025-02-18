@@ -343,21 +343,37 @@ impl HeapOptimize for RustVariant {
     fn dry_run(&self, strategy: HeapStrategy, context: Self::Context<'_>) -> HeapOutcome {
         match self {
             RustVariant::Unit(..) => (HeapAction::Noop, Layout::from_size_align(0, 1).unwrap()),
-            RustVariant::Tuple(_, args) => {
-                let &[ref typ] = args.as_slice() else {
-                    panic!("expected mono-variant, found {self:?}")
-                };
-                let (action, layout) = typ.dry_run(strategy, context);
-                let sz = layout.size();
+            RustVariant::Tuple(_, ts) => {
+                if strategy.is_never() {
+                    return (HeapAction::Noop, mk_layout(self, context));
+                }
+                let mut raw_size = 0;
+                let mut max_align = 1;
+                let mut pos_actions = Vec::with_capacity(ts.len());
+                let mut is_productive = false;
+                for t in ts.iter() {
+                    let (action, layout) = t.dry_run(strategy, context);
+                    is_productive |= !action.is_noop();
+                    pos_actions.push(action);
+                    raw_size += layout.size();
+                    max_align = max_align.max(layout.align());
+                }
+                let size = aligned_size(raw_size, max_align);
                 if strategy
                     .min_heap_size()
-                    .is_some_and(|min_size| sz > min_size)
+                    .is_some_and(|min_size| size > min_size)
                 {
                     (HeapAction::DirectHeap, HEAP_LAYOUT)
-                } else if action.is_noop() {
-                    (HeapAction::Noop, layout)
+                } else if is_productive {
+                    (
+                        HeapAction::InTuple { pos: pos_actions },
+                        Layout::from_size_align(size, max_align).unwrap(),
+                    )
                 } else {
-                    (HeapAction::NonLocal, layout)
+                    (
+                        HeapAction::Noop,
+                        Layout::from_size_align(size, max_align).unwrap(),
+                    )
                 }
             }
         }
