@@ -366,7 +366,7 @@ distance: u16
 
 /// expected size: 6
 #[derive(Debug, Clone)]
-pub enum deflate_main_codes { literal(u8), reference(deflate_main_codes_reference) }
+pub enum deflate_main_codes__dupX1 { literal(u8), reference(deflate_main_codes_reference) }
 
 /// expected size: 176
 #[derive(Debug, Clone)]
@@ -380,7 +380,7 @@ literal_length_distance_alphabet_code_lengths_value: Vec<u8>,
 literal_length_alphabet_code_lengths_value: Vec<u8>,
 distance_alphabet_code_lengths_value: Vec<u8>,
 codes: Vec<deflate_dynamic_huffman_codes>,
-codes_values: Vec<deflate_main_codes>
+codes_values: Vec<deflate_main_codes__dupX1>
 }
 
 /// expected size: 8
@@ -403,7 +403,7 @@ extra: Option<deflate_fixed_huffman_codes_values>
 #[derive(Debug, Clone)]
 pub struct deflate_fixed_huffman {
 codes: Vec<deflate_fixed_huffman_codes>,
-codes_values: Vec<deflate_main_codes>
+codes_values: Vec<deflate_main_codes__dupX1>
 }
 
 /// expected size: 56
@@ -413,26 +413,28 @@ align: (),
 len: u16,
 nlen: u16,
 bytes: Vec<u8>,
-codes_values: Vec<deflate_main_codes>
+codes_values: Vec<deflate_main_codes__dupX1>
 }
 
 /// expected size: 184
+/// heap outcome (EnumDiscrepancy(128)): (InEnum { variants: [DirectHeap, Noop, Noop] }, Layout { size: 56, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
-pub enum deflate_main_codes__dupX1 { dynamic_huffman(deflate_dynamic_huffman), fixed_huffman(deflate_fixed_huffman), uncompressed(deflate_uncompressed) }
+pub enum deflate_main_codes { dynamic_huffman(deflate_dynamic_huffman), fixed_huffman(deflate_fixed_huffman), uncompressed(deflate_uncompressed) }
 
 /// expected size: 192
+/// heap outcome (EnumDiscrepancy(128)): (InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [DirectHeap, Noop, Noop] })] }, Layout { size: 64, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub struct deflate_block {
 r#final: u8,
 r#type: u8,
-data: deflate_main_codes__dupX1
+data: deflate_main_codes
 }
 
 /// expected size: 72
 #[derive(Debug, Clone)]
 pub struct deflate_main {
 blocks: Vec<deflate_block>,
-codes: Vec<deflate_main_codes>,
+codes: Vec<deflate_main_codes__dupX1>,
 inflate: Vec<u8>
 }
 
@@ -1709,7 +1711,7 @@ max_component_elements: u16,
 max_component_depth: u16
 }
 
-/// expected size: 30
+/// expected size: 28
 #[derive(Debug, Clone)]
 pub enum opentype_maxp_table_data { MaxpPostScript, MaxpUnknown(u32), MaxpV1(opentype_maxp_table_version1) }
 
@@ -1971,10 +1973,12 @@ y_coordinates: Vec<u16>
 }
 
 /// expected size: 136
+/// heap outcome (EnumDiscrepancy(128)): (InEnum { variants: [Noop, Noop, DirectHeap] }, Layout { size: 48, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub enum opentype_glyf_description { Composite(opentype_glyf_composite), HeaderOnly, Simple(opentype_glyf_simple) }
 
 /// expected size: 152
+/// heap outcome (EnumDiscrepancy(128)): (InRecord { fields: [Noop, Noop, Noop, Noop, Noop, InDef(InEnum { variants: [Noop, Noop, DirectHeap] })] }, Layout { size: 64, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub struct opentype_glyf_table_Glyph {
 number_of_contours: u16,
@@ -1986,6 +1990,7 @@ description: opentype_glyf_description
 }
 
 /// expected size: 160
+/// heap outcome (EnumDiscrepancy(128)): (NonLocal, Layout { size: 72, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub enum opentype_glyf_table { EmptyGlyph, Glyph(opentype_glyf_table_Glyph) }
 
@@ -2645,10 +2650,12 @@ seq_lookup_records: Vec<opentype_common_sequence_lookup>
 }
 
 /// expected size: 264
+/// heap outcome (EnumDiscrepancy(128)): (InEnum { variants: [Noop, DirectHeap, Noop] }, Layout { size: 104, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub enum opentype_common_chained_sequence_context_subst { Format1(opentype_common_chained_sequence_context_subst_Format1), Format2(opentype_common_chained_sequence_context_subst_Format2), Format3(opentype_common_chained_sequence_context_subst_Format3) }
 
 /// expected size: 272
+/// heap outcome (EnumDiscrepancy(128)): (InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap, Noop] })] }, Layout { size: 112, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub struct opentype_common_chained_sequence_context {
 table_start: u32,
@@ -3036,10 +3043,12 @@ value_records: Vec<opentype_common_value_record>
 }
 
 /// expected size: 280
+/// heap outcome (EnumDiscrepancy(128)): (InEnum { variants: [DirectHeap, Noop] }, Layout { size: 96, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub enum opentype_layout_single_pos_subtable { Format1(opentype_layout_single_pos_subtable_Format1), Format2(opentype_layout_single_pos_subtable_Format2) }
 
 /// expected size: 288
+/// heap outcome (EnumDiscrepancy(128)): (InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [DirectHeap, Noop] })] }, Layout { size: 104, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub struct opentype_layout_single_pos {
 table_start: u32,
@@ -3048,10 +3057,12 @@ subtable: opentype_layout_single_pos_subtable
 }
 
 /// expected size: 296
+/// heap outcome (EnumDiscrepancy(128)): (InEnum { variants: [InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap, Noop] })] })] }, Noop, Noop, Noop, Noop, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [DirectHeap, Noop] })] })] }] }, Layout { size: 200, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub enum opentype_layout_ground_pos { ChainedSequenceContext(opentype_common_chained_sequence_context), CursivePos(opentype_layout_cursive_pos), MarkBasePos(opentype_layout_mark_base_pos), MarkLigPos(opentype_layout_mark_lig_pos), MarkMarkPos(opentype_layout_mark_mark_pos), PairPos(opentype_layout_pair_pos), SequenceContext(opentype_common_sequence_context), SinglePos(opentype_layout_single_pos) }
 
 /// expected size: 304
+/// heap outcome (EnumDiscrepancy(128)): (InRecord { fields: [Noop, InOption(InDef(InEnum { variants: [InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap, Noop] })] })] }, Noop, Noop, Noop, Noop, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [DirectHeap, Noop] })] })] }] }))] }, Layout { size: 24, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub struct opentype_layout_pos_extension_extension_offset {
 offset: u32,
@@ -3059,6 +3070,7 @@ link: Option<opentype_layout_ground_pos>
 }
 
 /// expected size: 312
+/// heap outcome (EnumDiscrepancy(128)): (InRecord { fields: [Noop, Noop, Noop, InDef(InRecord { fields: [Noop, InOption(InDef(InEnum { variants: [InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap, Noop] })] })] }, Noop, Noop, Noop, Noop, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [DirectHeap, Noop] })] })] }] }))] })] }, Layout { size: 32, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub struct opentype_layout_pos_extension {
 table_start: u32,
@@ -3068,10 +3080,12 @@ extension_offset: opentype_layout_pos_extension_extension_offset
 }
 
 /// expected size: 320
+/// heap outcome (EnumDiscrepancy(128)): (InEnum { variants: [DirectHeap, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, Noop, InDef(InRecord { fields: [Noop, InOption(InDef(InEnum { variants: [InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap, Noop] })] })] }, Noop, Noop, Noop, Noop, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [DirectHeap, Noop] })] })] }] }))] })] })] }] }, Layout { size: 32, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub enum opentype_gpos_table_lookup_list_link_lookups_link_subtables_link { GroundPos(opentype_layout_ground_pos), PosExtension(opentype_layout_pos_extension) }
 
 /// expected size: 328
+/// heap outcome (EnumDiscrepancy(128)): (InRecord { fields: [Noop, InOption(InDef(InEnum { variants: [DirectHeap, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, Noop, InDef(InRecord { fields: [Noop, InOption(InDef(InEnum { variants: [InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap, Noop] })] })] }, Noop, Noop, Noop, Noop, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [DirectHeap, Noop] })] })] }] }))] })] })] }] }))] }, Layout { size: 24, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub struct opentype_gpos_table_lookup_list_link_lookups_link_subtables {
 offset: u16,
@@ -3349,10 +3363,12 @@ subst: opentype_layout_single_subst_subst
 }
 
 /// expected size: 280
+/// heap outcome (EnumDiscrepancy(128)): (NonLocal, Layout { size: 168, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub enum opentype_layout_ground_subst { AlternateSubst(opentype_layout_alternate_subst), ChainedSequenceContext(opentype_common_chained_sequence_context), LigatureSubst(opentype_layout_ligature_subst), MultipleSubst(opentype_layout_multiple_subst), ReverseChainSingleSubst(opentype_layout_reverse_chain_single_subst), SequenceContext(opentype_common_sequence_context), SingleSubst(opentype_layout_single_subst) }
 
 /// expected size: 288
+/// heap outcome (EnumDiscrepancy(128)): (InRecord { fields: [Noop, InOption(NonLocal)] }, Layout { size: 24, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub struct opentype_layout_subst_extension_extension_offset {
 offset: u32,
@@ -3360,6 +3376,7 @@ link: Option<opentype_layout_ground_subst>
 }
 
 /// expected size: 296
+/// heap outcome (EnumDiscrepancy(128)): (InRecord { fields: [Noop, Noop, Noop, InDef(InRecord { fields: [Noop, InOption(NonLocal)] })] }, Layout { size: 32, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub struct opentype_layout_subst_extension {
 table_start: u32,
@@ -3369,10 +3386,12 @@ extension_offset: opentype_layout_subst_extension_extension_offset
 }
 
 /// expected size: 304
+/// heap outcome (EnumDiscrepancy(128)): (InEnum { variants: [DirectHeap, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, Noop, InDef(InRecord { fields: [Noop, InOption(NonLocal)] })] })] }] }, Layout { size: 32, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub enum opentype_gsub_table_lookup_list_link_lookups_link_subtables_link { GroundSubst(opentype_layout_ground_subst), SubstExtension(opentype_layout_subst_extension) }
 
 /// expected size: 312
+/// heap outcome (EnumDiscrepancy(128)): (InRecord { fields: [Noop, InOption(InDef(InEnum { variants: [DirectHeap, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, Noop, InDef(InRecord { fields: [Noop, InOption(NonLocal)] })] })] }] }))] }, Layout { size: 24, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub struct opentype_gsub_table_lookup_list_link_lookups_link_subtables {
 offset: u16,
@@ -3883,10 +3902,12 @@ __skip: ()
 }
 
 /// expected size: 2024
+/// heap outcome (EnumDiscrepancy(128)): (InEnum { variants: [Noop, DirectHeap] }, Layout { size: 56, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub enum opentype_main_directory { TTCHeader(opentype_ttc_header), TableDirectory(opentype_table_directory) }
 
 /// expected size: 2032
+/// heap outcome (EnumDiscrepancy(128)): (InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap] })] }, Layout { size: 64, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub struct opentype_main {
 file_start: u32,
@@ -4256,6 +4277,7 @@ __rem: ()
 }
 
 /// expected size: 2040
+/// heap outcome (EnumDiscrepancy(128)): (InEnum { variants: [DirectHeap, Noop, Noop, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap] })] })] }, Noop, DirectHeap, Noop, Noop, Noop, Noop, Noop, Noop] }, Layout { size: 104, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub enum main_data { elf(elf_main), gif(gif_main), gzip(Vec<gzip_main>), jpeg(jpeg_main), mpeg4(mpeg4_main), opentype(opentype_main), peano(Vec<u32>), png(png_main), riff(riff_main), tar(tar_main), text(Vec<char>), tgz(Vec<tar_main>), tiff(tiff_main), waldo(waldo_main) }
 
@@ -4326,6 +4348,7 @@ __skipped1: u16
 }
 
 /// expected size: 2040
+/// heap outcome (EnumDiscrepancy(128)): (InRecord { fields: [InDef(InEnum { variants: [DirectHeap, Noop, Noop, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap] })] })] }, Noop, DirectHeap, Noop, Noop, Noop, Noop, Noop, Noop] }), Noop] }, Layout { size: 104, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub struct main {
 data: main_data,
@@ -17410,26 +17433,26 @@ accum.push(elem);
 PResult::Ok(accum)
 })())?;
 let codes = (try_flat_map_vec(blocks.iter().cloned(), |x: deflate_block| PResult::Ok(match x.data.clone() {
-deflate_main_codes__dupX1::uncompressed(ref y) => {
+deflate_main_codes::uncompressed(ref y) => {
 y.codes_values.clone()
 },
 
-deflate_main_codes__dupX1::fixed_huffman(ref y) => {
+deflate_main_codes::fixed_huffman(ref y) => {
 y.codes_values.clone()
 },
 
-deflate_main_codes__dupX1::dynamic_huffman(ref y) => {
+deflate_main_codes::dynamic_huffman(ref y) => {
 y.codes_values.clone()
 }
 })))?;
-let inflate = (try_flat_map_append_vec(codes.iter().cloned(), |tuple_var: (&Vec<u8>, deflate_main_codes)| PResult::Ok(match tuple_var {
+let inflate = (try_flat_map_append_vec(codes.iter().cloned(), |tuple_var: (&Vec<u8>, deflate_main_codes__dupX1)| PResult::Ok(match tuple_var {
 (buffer, symbol) => {
 match symbol {
-deflate_main_codes::literal(b) => {
+deflate_main_codes__dupX1::literal(b) => {
 [b].to_vec()
 },
 
-deflate_main_codes::reference(r) => {
+deflate_main_codes__dupX1::reference(r) => {
 {
 let ix = (try_sub!((buffer.len()) as u32, (r.distance.clone()) as u32, 16200207902741715318u64)) as usize;
 (slice_ext(&buffer, ix..ix + (((r.length.clone()) as u32) as usize))).to_vec()
@@ -17454,17 +17477,17 @@ PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8)
 let data = ((|| PResult::Ok(match r#type {
 0u8 => {
 let inner = (Decoder_deflate_uncompressed(_input))?;
-deflate_main_codes__dupX1::uncompressed(inner)
+deflate_main_codes::uncompressed(inner)
 },
 
 1u8 => {
 let inner = (Decoder_deflate_fixed_huffman(_input))?;
-deflate_main_codes__dupX1::fixed_huffman(inner)
+deflate_main_codes::fixed_huffman(inner)
 },
 
 2u8 => {
 let inner = (Decoder_deflate_dynamic_huffman(_input))?;
-deflate_main_codes__dupX1::dynamic_huffman(inner)
+deflate_main_codes::dynamic_huffman(inner)
 },
 
 _other => {
@@ -17544,7 +17567,7 @@ bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.c
 }
 PResult::Ok(accum)
 })())?;
-let codes_values = (try_flat_map_vec(bytes.iter().cloned(), |x: u8| PResult::Ok([deflate_main_codes::literal(x)].to_vec())))?;
+let codes_values = (try_flat_map_vec(bytes.iter().cloned(), |x: u8| PResult::Ok([deflate_main_codes__dupX1::literal(x)].to_vec())))?;
 PResult::Ok(deflate_uncompressed { align, len, nlen, bytes, codes_values })
 }
 
@@ -18326,7 +18349,7 @@ let codes_values = (try_flat_map_vec(codes.iter().cloned(), |x: deflate_fixed_hu
 257u16..=285u16 => {
 match x.extra.clone() {
 Some(ref rec) => {
-[deflate_main_codes::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
+[deflate_main_codes__dupX1::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
 },
 
 _ => {
@@ -18340,7 +18363,7 @@ return Err(ParseError::ExcludedBranch(5576343694315527798u64));
 },
 
 _ => {
-[deflate_main_codes::literal((x.code.clone()) as u8)].to_vec()
+[deflate_main_codes__dupX1::literal((x.code.clone()) as u8)].to_vec()
 }
 })))?;
 PResult::Ok(deflate_fixed_huffman { codes, codes_values })
@@ -19029,7 +19052,7 @@ let codes_values = (try_flat_map_vec(codes.iter().cloned(), |x: deflate_dynamic_
 257u16..=285u16 => {
 match x.extra.clone() {
 Some(ref rec) => {
-[deflate_main_codes::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
+[deflate_main_codes__dupX1::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
 },
 
 _ => {
@@ -19043,7 +19066,7 @@ return Err(ParseError::ExcludedBranch(98102193810481173u64));
 },
 
 _ => {
-[deflate_main_codes::literal((x.code.clone()) as u8)].to_vec()
+[deflate_main_codes__dupX1::literal((x.code.clone()) as u8)].to_vec()
 }
 })))?;
 PResult::Ok(deflate_dynamic_huffman { hlit, hdist, hclen, code_length_alphabet_code_lengths, literal_length_distance_alphabet_code_lengths, literal_length_distance_alphabet_code_lengths_value, literal_length_alphabet_code_lengths_value, distance_alphabet_code_lengths_value, codes, codes_values })

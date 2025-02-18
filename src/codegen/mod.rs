@@ -24,7 +24,7 @@ use std::{
 };
 
 use name::{Derivation, NameAtom};
-use rust_ast::*;
+use rust_ast::{heap_optimize::HeapStrategy, *};
 
 use typed_format::{GenType, TypedExpr, TypedFormat, TypedPattern};
 
@@ -3147,6 +3147,7 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
             .unwrap()
     }));
     type_defs.sort_by_key(|(_, (ix, _))| ix);
+    const HEAP_STRATEGY: HeapStrategy = HeapStrategy::EnumDiscrepancy(128);
 
     for (type_def, (_ix, path)) in type_defs.into_iter() {
         let name = elaborator
@@ -3163,11 +3164,23 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
             TraitSet::DebugClone
         };
         let it = RustItem::pub_decl_with_traits(RustDecl::type_def(name, type_def.clone()), traits);
-        let comment = [format!(
-            "expected size: {}",
-            rust_ast::size::MemSize::size_hint(type_def, &src_context)
-        )];
-        items.push(it.with_comment(comment));
+        let comments = {
+            let sz_comment = format!(
+                "expected size: {}",
+                rust_ast::size::MemSize::size_hint(type_def, &src_context)
+            );
+            let outcome = rust_ast::heap_optimize::HeapOptimize::dry_run(type_def, HEAP_STRATEGY, &src_context);
+            if outcome.0.is_noop() {
+                vec![sz_comment]
+            } else {
+                let heap_comment = format!("heap outcome ({:?}): {:?}",
+                    HEAP_STRATEGY,
+                    outcome
+                );
+                vec![sz_comment, heap_comment]
+            }
+        };
+        items.push(it.with_comment(comments));
     }
 
     for mut decoder_fn in sourcemap.decoder_skels {
