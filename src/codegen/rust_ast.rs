@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::rc::Rc;
 
+pub(crate) mod heap_optimize;
 pub(crate) mod rebind;
 pub(crate) mod size;
 
