@@ -9,14 +9,14 @@ pub trait ASTContext {
 }
 
 fn niche_product(iter: impl Iterator<Item = usize>) -> usize {
-    iter.map(|x| x.saturating_add(1)).fold(1usize, usize::saturating_mul) - 1
+    iter.map(|x| x.saturating_add(1))
+        .fold(1usize, usize::saturating_mul)
+        - 1
 }
 
 fn niche_sum(iter: impl Iterator<Item = usize>) -> usize {
     iter.fold(0usize, usize::saturating_add)
 }
-
-
 
 /// Helper trait for any AST type-rep that might be subject to specialized optimization
 /// when wrapped in `Option` (e.g. `Option<&T>`, `Option<bool>`).
@@ -47,33 +47,31 @@ pub(crate) struct SourceContext<'a> {
 }
 
 macro_rules! cache_get {
-    ( $this:expr, $field:ident, $ix:ident, $method:ident ) => {
-        {
-            let cache = $this.cache.borrow();
-            if cache.contains_key(&$ix) {
-                match cache[&$ix].$field {
-                    Some(ret) => ret,
-                    None => {
-                        drop(cache);
-                        let ret = {
-                            let def = &$this.def_map[$ix];
-                            def.$method($this)
-                        };
-                        $this.cache.borrow_mut().get_mut(&$ix).unwrap().$field = Some(ret);
-                        ret
-                    }
+    ( $this:expr, $field:ident, $ix:ident, $method:ident ) => {{
+        let cache = $this.cache.borrow();
+        if cache.contains_key(&$ix) {
+            match cache[&$ix].$field {
+                Some(ret) => ret,
+                None => {
+                    drop(cache);
+                    let ret = {
+                        let def = &$this.def_map[$ix];
+                        def.$method($this)
+                    };
+                    $this.cache.borrow_mut().get_mut(&$ix).unwrap().$field = Some(ret);
+                    ret
                 }
-            } else {
-                drop(cache);
-                let ret = {
-                    let def = &$this.def_map[$ix];
-                    def.$method($this)
-                };
-                $this.cache.borrow_mut().entry($ix).or_default().$field = Some(ret);
-                ret
             }
+        } else {
+            drop(cache);
+            let ret = {
+                let def = &$this.def_map[$ix];
+                def.$method($this)
+            };
+            $this.cache.borrow_mut().entry($ix).or_default().$field = Some(ret);
+            ret
         }
-    };
+    }};
 }
 
 impl SourceContext<'_> {
@@ -99,8 +97,6 @@ impl<'a> From<&'a [RustTypeDef]> for SourceContext<'a> {
     }
 }
 
-
-
 impl ASTContext for RustType {
     type Context<'a> = &'a SourceContext<'a>;
 }
@@ -109,9 +105,7 @@ impl CanOptimize for RustType {
     fn niches(&self, context: &SourceContext<'_>) -> usize {
         match self {
             RustType::Atom(at) => at.niches(context),
-            RustType::AnonTuple(ts) => {
-                niche_product(ts.iter().map(|t| t.niches(context)))
-            }
+            RustType::AnonTuple(ts) => niche_product(ts.iter().map(|t| t.niches(context))),
             // conservative estimate based on our assumption we won't see any Verbatim types in gencode structs
             RustType::Verbatim(..) => 0,
         }
@@ -131,7 +125,9 @@ impl MemSize for RustType {
                 }
                 padded_size(raw_size, max_align)
             }
-            RustType::Verbatim(..) => unreachable!("unexpected RustType::Verbatim in structural type"),
+            RustType::Verbatim(..) => {
+                unreachable!("unexpected RustType::Verbatim in structural type")
+            }
         }
     }
 
@@ -146,7 +142,9 @@ impl MemSize for RustType {
                 }
                 ret
             }
-            RustType::Verbatim(..) => unreachable!("unexpected RustType::Verbatim in structural type"),
+            RustType::Verbatim(..) => {
+                unreachable!("unexpected RustType::Verbatim in structural type")
+            }
         }
     }
 }
@@ -203,20 +201,15 @@ impl ASTContext for PrimType {
 // Maximum valid char, beyond which is the first value-niche
 const UTF16_SCALAR_MAX: usize = 0x10FFF;
 
-
 impl CanOptimize for PrimType {
     fn niches(&self, _: ()) -> usize {
         match self {
             PrimType::Unit => 0,
             PrimType::Bool => const { (u8::MAX as usize + 1) - 2 },
             // Because Char is Unicode, there are invalid ranges that form niches
-            PrimType::Char => {
-                match char::UNICODE_VERSION {
-                    (16, 0, 0) => {
-                        const { u32::MAX as usize - UTF16_SCALAR_MAX }
-                    }
-                    _ => unimplemented!("unsupported Unicode version"),
-                }
+            PrimType::Char => match char::UNICODE_VERSION {
+                (16, 0, 0) => const { u32::MAX as usize - UTF16_SCALAR_MAX },
+                _ => unimplemented!("unsupported Unicode version"),
             },
             PrimType::U8 | PrimType::U16 | PrimType::U32 | PrimType::U64 | PrimType::Usize => 0,
         }
@@ -257,7 +250,7 @@ type VecFiller = u8;
 
 impl<T> ASTContext for CompType<Box<T>>
 where
-    T: ASTContext
+    T: ASTContext,
 {
     type Context<'a> = T::Context<'a>;
 }
@@ -265,7 +258,7 @@ where
 impl<T> MemSize for CompType<Box<T>>
 where
     T: MemSize + CanOptimize + std::fmt::Debug,
-    for<'a> T::Context<'a>: Copy
+    for<'a> T::Context<'a>: Copy,
 {
     fn size_hint(&self, context: Self::Context<'_>) -> usize {
         match self {
@@ -276,7 +269,7 @@ where
                 } else {
                     inner.size_hint(context) + inner.align_hint(context)
                 }
-            },
+            }
             CompType::Result(..) => unimplemented!("unexpected result in structural type"),
             CompType::Borrow(..) => unimplemented!("unexpected borrow in structural type"),
         }
@@ -295,25 +288,23 @@ where
 impl<T> CanOptimize for CompType<Box<T>>
 where
     T: CanOptimize + MemSize + std::fmt::Debug,
-    for<'a> T::Context<'a>: Copy
+    for<'a> T::Context<'a>: Copy,
 {
     fn niches(&self, context: Self::Context<'_>) -> usize {
         match self {
             // Vec<T> has enough niches that all values of `n: u8` are optimizable
             CompType::Vec(..) => usize::MAX,
-            CompType::Option(inner) => {
-                match inner.niches(context) {
-                    0 => match inner.align_hint(context) {
-                        n @ 1..=7 => (1 << (8 * n)) - 1,
-                        8 => usize::MAX,
-                        n => unreachable!("align of {n} is not an expected case: {inner:?}"),
-                    }
-                    n => n - 1,
-                }
-            }
+            CompType::Option(inner) => match inner.niches(context) {
+                0 => match inner.align_hint(context) {
+                    n @ 1..=7 => (1 << (8 * n)) - 1,
+                    8 => usize::MAX,
+                    n => unreachable!("align of {n} is not an expected case: {inner:?}"),
+                },
+                n => n - 1,
+            },
             // Option<&T> cannot be optimized, but &T itself and Option<Option<&T>> (and above) can be
             CompType::Borrow(..) => unreachable!("unexpected borrow in structural type"),
-            CompType::Result(..) => unreachable!("unexpected result in structural type")
+            CompType::Result(..) => unreachable!("unexpected result in structural type"),
         }
     }
 }
@@ -327,7 +318,9 @@ impl CanOptimize for LocalType {
         match self {
             // Note - this can be circular if we are not careful, but we don't expect circularity in practice
             LocalType::LocalDef(ix, _) => context.get_niches(*ix),
-            LocalType::External(_) => unreachable!("unexpected external type-reference in structural type"),
+            LocalType::External(_) => {
+                unreachable!("unexpected external type-reference in structural type")
+            }
         }
     }
 }
@@ -336,14 +329,18 @@ impl MemSize for LocalType {
     fn size_hint(&self, context: &SourceContext<'_>) -> usize {
         match self {
             LocalType::LocalDef(ix, _) => context.get_size(*ix),
-            LocalType::External(_) => unreachable!("unexpected external type-reference in structural type"),
+            LocalType::External(_) => {
+                unreachable!("unexpected external type-reference in structural type")
+            }
         }
     }
 
     fn align_hint(&self, context: &SourceContext<'_>) -> usize {
         match self {
             LocalType::LocalDef(ix, _) => context.get_align(*ix),
-            LocalType::External(_) => unreachable!("unexpected external type-reference in structural type"),
+            LocalType::External(_) => {
+                unreachable!("unexpected external type-reference in structural type")
+            }
         }
     }
 }
@@ -368,8 +365,12 @@ impl MemSize for RustTypeDef {
             RustTypeDef::Struct(def) => def.size_hint(context),
             RustTypeDef::Enum(vars) => {
                 // TODO: detect and report if there is a huge disparity between variant sizes (as clippy warns us about)
-                vars.iter().map(|v| v.size_hint(context)).max().unwrap_or(0) +
-                vars.iter().map(|v| v.align_hint(context)).max().unwrap_or(1)
+                vars.iter().map(|v| v.size_hint(context)).max().unwrap_or(0)
+                    + vars
+                        .iter()
+                        .map(|v| v.align_hint(context))
+                        .max()
+                        .unwrap_or(1)
             }
         }
     }
@@ -377,7 +378,11 @@ impl MemSize for RustTypeDef {
     fn align_hint(&self, context: &SourceContext<'_>) -> usize {
         match self {
             RustTypeDef::Struct(def) => def.align_hint(context),
-            RustTypeDef::Enum(vars) => vars.iter().map(|v| v.align_hint(context)).max().unwrap_or(1),
+            RustTypeDef::Enum(vars) => vars
+                .iter()
+                .map(|v| v.align_hint(context))
+                .max()
+                .unwrap_or(1),
         }
     }
 }
@@ -414,7 +419,11 @@ impl MemSize for RustVariant {
     fn align_hint(&self, context: &SourceContext<'_>) -> usize {
         match self {
             RustVariant::Unit(..) => 1,
-            RustVariant::Tuple(.., elts) => elts.iter().map(|e| e.align_hint(context)).max().unwrap_or(1),
+            RustVariant::Tuple(.., elts) => elts
+                .iter()
+                .map(|e| e.align_hint(context))
+                .max()
+                .unwrap_or(1),
         }
     }
 }
@@ -427,7 +436,7 @@ impl CanOptimize for RustStruct {
     fn niches(&self, context: &SourceContext<'_>) -> usize {
         match self {
             // Because `Vec` in particular has `usize::MAX + 1` niches, we need to be careful to avoid overflow
-            RustStruct::Record(fields) => niche_product(fields.iter().map(|f| f.1.niches(context)))
+            RustStruct::Record(fields) => niche_product(fields.iter().map(|f| f.1.niches(context))),
         }
     }
 }
@@ -449,11 +458,14 @@ impl MemSize for RustStruct {
 
     fn align_hint(&self, context: &SourceContext<'_>) -> usize {
         match self {
-            RustStruct::Record(items) => items.iter().map(|f| f.1.align_hint(context)).max().unwrap_or(1),
+            RustStruct::Record(items) => items
+                .iter()
+                .map(|f| f.1.align_hint(context))
+                .max()
+                .unwrap_or(1),
         }
     }
 }
-
 
 /// Optimized function that computes the smallest multiple of `align` greater than or equal to `size`.
 fn padded_size(size: usize, align: usize) -> usize {
@@ -493,7 +505,7 @@ mod tests {
     fn eq_size_hint<T, Rep>(ast_t: Rep, context: Rep::Context<'_>)
     where
         Rep: MemSize + std::fmt::Debug,
-        for<'a> Rep::Context<'a>: Copy
+        for<'a> Rep::Context<'a>: Copy,
     {
         let expected = size_of::<T>();
         let actual = ast_t.size_hint(context);
@@ -503,7 +515,7 @@ mod tests {
     fn eq_size_hint_option<T, Rep>(ast_t: Rep, context: Rep::Context<'_>)
     where
         Rep: MemSize + std::fmt::Debug,
-        for<'a> Rep::Context<'a>: Copy
+        for<'a> Rep::Context<'a>: Copy,
     {
         let expected = size_of::<Option<T>>();
         let actual = (CompType::Option(Box::new(ast_t))).size_hint(context);

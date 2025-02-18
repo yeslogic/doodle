@@ -1,4 +1,4 @@
-use super::util::{U16Set, Wec, trisect_unchecked, EnumLen};
+use super::util::{trisect_unchecked, EnumLen, U16Set, Wec};
 use super::*;
 use derive_builder::Builder;
 use doodle::Label;
@@ -4952,7 +4952,13 @@ fn format_lookup_subtable(
             let contents = format_ligature_sets(ligature_sets, coverage.iter());
             ("LigatureSubst", contents)
         }
-        LookupSubtable::ReverseChainSingleSubst(ReverseChainSingleSubst { coverage, ref backtrack_coverages, ref lookahead_coverages, ref substitute_glyph_ids, .. }) => {
+        LookupSubtable::ReverseChainSingleSubst(ReverseChainSingleSubst {
+            coverage,
+            ref backtrack_coverages,
+            ref lookahead_coverages,
+            ref substitute_glyph_ids,
+            ..
+        }) => {
             let contents = {
                 // REVIEW - since we are already within an inline elision context, try to avoid taking up too much space per item, but this might not want to be a hardcoded value
                 const INLINE_INLINE_BOOKEND: usize = 1;
@@ -4981,9 +4987,7 @@ fn format_lookup_subtable(
                     format!("(?={tmp})")
                 };
                 let substitute_ids = format_glyphid_array_hex(substitute_glyph_ids, true);
-                format!(
-                    "{backtrack_pattern}{input_pattern}{lookahead_pattern}=>{substitute_ids}"
-                )
+                format!("{backtrack_pattern}{input_pattern}{lookahead_pattern}=>{substitute_ids}")
             };
             ("RevChainSingleSubst", contents)
         }
@@ -5358,8 +5362,6 @@ fn format_mark2_array(arr: &Mark2Array, coverage: &mut impl Iterator<Item = u16>
     )
 }
 
-
-
 fn format_indexed_nullable<T>(
     opt_items: &[Option<T>],
     mut show_fn: impl FnMut(usize, &T) -> String,
@@ -5376,7 +5378,8 @@ fn format_indexed_nullable<T>(
     let count = items.len();
 
     if count > bookend * 2 {
-        let (left_bookend, middle, right_bookend) = unsafe { trisect_unchecked(&items, bookend, bookend) };
+        let (left_bookend, middle, right_bookend) =
+            unsafe { trisect_unchecked(&items, bookend, bookend) };
 
         for (ix, it) in left_bookend {
             buffer.push(show_fn(*ix, it));
@@ -5384,10 +5387,7 @@ fn format_indexed_nullable<T>(
 
         let n_skipped = count - bookend * 2;
         assert_eq!(middle.len(), n_skipped);
-        buffer.push(ellipsis(
-            n_skipped,
-            (middle[0].0, middle[n_skipped - 1].0)
-        ));
+        buffer.push(ellipsis(n_skipped, (middle[0].0, middle[n_skipped - 1].0)));
 
         for (ix, it) in right_bookend {
             buffer.push(show_fn(*ix, it));
@@ -6125,18 +6125,13 @@ fn show_gasp_metrics(gasp: &Option<GaspMetrics>, conf: &Config) {
         };
         println!("gasp: version {version}, {num_ranges} ranges");
         if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
-            show_items_elided(
-                ranges,
-                show_gasp_range,
-                conf.bookend_size,
-                |start, stop| {
-                    format!(
-                        "    skipping gasp ranges for max_ppem values {}..={}",
-                        ranges[start].range_max_ppem,
-                        ranges[stop - 1].range_max_ppem
-                    )
-                },
-            );
+            show_items_elided(ranges, show_gasp_range, conf.bookend_size, |start, stop| {
+                format!(
+                    "    skipping gasp ranges for max_ppem values {}..={}",
+                    ranges[start].range_max_ppem,
+                    ranges[stop - 1].range_max_ppem
+                )
+            });
         }
     }
 }
@@ -6165,7 +6160,6 @@ fn format_coverage_linked_array<T>(
     let mut ix_iter = EnumLen::new(coverage, count);
 
     if count > bookend * 2 {
-
         for (ix, glyph_id) in ix_iter.iter_with().take(bookend) {
             buffer.push(fmt_fn(glyph_id, &items[ix]));
         }
@@ -6177,7 +6171,6 @@ fn format_coverage_linked_array<T>(
         for (ix, glyph_id) in ix_iter.iter_with().skip(n_skipped).take(bookend) {
             buffer.push(fmt_fn(glyph_id, &items[ix]));
         }
-
     } else {
         for (ix, glyph_id) in ix_iter.iter_with() {
             buffer.push(fmt_fn(glyph_id, &items[ix]));
@@ -6185,7 +6178,7 @@ fn format_coverage_linked_array<T>(
     }
     // NOTE - the boolean arg is set to false to avoid flagging leftover coverage as an error
     match ix_iter.finish(false) {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => panic!("format_coverage_linked_array found error: {e}"),
     }
     format!("[{}]", buffer.join(", "))

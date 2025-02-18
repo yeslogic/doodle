@@ -131,12 +131,15 @@ impl Fragment {
                 None
             } else {
                 // Use a separator of `None` if it amounts to the same behavior (based on vacuity)
-                sep.and_then(|s| if s.is_vacuous() { None } else { Some(Box::new(s)) })
+                sep.and_then(|s| {
+                    if s.is_vacuous() {
+                        None
+                    } else {
+                        Some(Box::new(s))
+                    }
+                })
             };
-            Fragment::Sequence {
-                items,
-                sep,
-            }
+            Fragment::Sequence { items, sep }
         }
     }
 
