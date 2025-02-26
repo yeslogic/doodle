@@ -1,27 +1,26 @@
-use std::collections::HashMap;
-
+use crate::codegen::util::MapLike;
 use crate::Label;
 
 use super::*;
 
 pub trait Rebindable {
-    fn rebind(&mut self, table: &HashMap<Label, Label>);
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>);
 }
 
 impl<T: Rebindable> Rebindable for Box<T> {
-    fn rebind(&mut self, table: &HashMap<Label, Label>) {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         self.as_mut().rebind(table)
     }
 }
 
 impl<T: Rebindable> Rebindable for Vec<T> {
-    fn rebind(&mut self, table: &HashMap<Label, Label>) {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         self.iter_mut().for_each(|item| item.rebind(table));
     }
 }
 
 impl<T: Rebindable> Rebindable for Option<T> {
-    fn rebind(&mut self, table: &HashMap<Label, Label>) {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         if let Some(item) = self {
             item.rebind(table)
         }
@@ -29,23 +28,23 @@ impl<T: Rebindable> Rebindable for Option<T> {
 }
 
 impl Rebindable for RustProgram {
-    fn rebind(&mut self, table: &HashMap<Label, Label>) {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         self.items.rebind(table)
     }
 }
 
 impl Rebindable for RustItem {
-    fn rebind(&mut self, table: &HashMap<Label, Label>) {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         self.decl.rebind(table)
     }
 }
 
 impl Rebindable for RustDecl {
-    fn rebind(&mut self, table: &HashMap<Label, Label>) {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         match self {
             RustDecl::TypeDef(name, tdef) => {
                 if table.contains_key(&*name) {
-                    *name = table[&*name].clone();
+                    *name = table.index(&*name).clone();
                 }
                 tdef.rebind(table)
             }
@@ -55,7 +54,7 @@ impl Rebindable for RustDecl {
 }
 
 impl Rebindable for RustTypeDef {
-    fn rebind(&mut self, table: &HashMap<Label, Label>) {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         match self {
             RustTypeDef::Enum(vars) => vars.rebind(table),
             RustTypeDef::Struct(str) => str.rebind(table),
@@ -64,9 +63,9 @@ impl Rebindable for RustTypeDef {
 }
 
 impl Rebindable for RustFn {
-    fn rebind(&mut self, table: &HashMap<Label, Label>) {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         if table.contains_key(&self.name) {
-            self.name = table[&*self.name].clone();
+            self.name = table.index(&*self.name).clone();
         }
         self.sig.rebind(table);
         self.body.iter_mut().for_each(|stmt| stmt.rebind(table))
@@ -74,7 +73,7 @@ impl Rebindable for RustFn {
 }
 
 impl Rebindable for RustStmt {
-    fn rebind(&mut self, table: &HashMap<Label, Label>) {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         match self {
             RustStmt::Expr(expr) => expr.rebind(table),
             RustStmt::Control(ctrl) => ctrl.rebind(table),
@@ -89,17 +88,17 @@ impl Rebindable for RustStmt {
 }
 
 impl Rebindable for RustEntity {
-    fn rebind(&mut self, table: &HashMap<Label, Label>) {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         match self {
             RustEntity::Local(lab) => {
                 if table.contains_key(lab) {
-                    *lab = table[lab].clone();
+                    *lab = table.index(lab).clone();
                 }
             }
             RustEntity::Scoped(path, _lab) => {
                 for lab in path.iter_mut() {
                     if table.contains_key(lab) {
-                        *lab = table[lab].clone();
+                        *lab = table.index(lab).clone();
                     }
                 }
             }
@@ -108,7 +107,7 @@ impl Rebindable for RustEntity {
 }
 
 impl Rebindable for RustExpr {
-    fn rebind(&mut self, table: &HashMap<Label, Label>) {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         match self {
             RustExpr::Entity(ent) => ent.rebind(table),
             RustExpr::ResultOk(.., inner) => {
@@ -168,14 +167,14 @@ impl Rebindable for RustExpr {
 }
 
 impl Rebindable for RustClosure {
-    fn rebind(&mut self, table: &HashMap<Label, Label>) {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         self.0.rebind(table);
         self.1.rebind(table);
     }
 }
 
 impl Rebindable for RustClosureHead {
-    fn rebind(&mut self, table: &HashMap<Label, Label>) {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         match self {
             RustClosureHead::Thunk => (),
             RustClosureHead::SimpleVar(_, otyp) => otyp.rebind(table),
@@ -184,7 +183,7 @@ impl Rebindable for RustClosureHead {
 }
 
 impl Rebindable for ClosureBody {
-    fn rebind(&mut self, table: &HashMap<Label, Label>) {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         match self {
             ClosureBody::Expression(expr) => expr.rebind(table),
             ClosureBody::Statements(stmts) => stmts.rebind(table),
@@ -193,7 +192,7 @@ impl Rebindable for ClosureBody {
 }
 
 impl Rebindable for RustControl {
-    fn rebind(&mut self, table: &HashMap<Label, Label>) {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         match self {
             RustControl::Loop(stmts) => stmts.rebind(table),
             RustControl::While(cond, stmts) => {
@@ -223,7 +222,7 @@ impl Rebindable for RustControl {
 }
 
 impl Rebindable for RustMatchBody {
-    fn rebind(&mut self, table: &HashMap<Label, Label>) {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         match self {
             RustMatchBody::Irrefutable(branches) | RustMatchBody::Refutable(branches, _) => {
                 branches.rebind(table);
@@ -233,14 +232,14 @@ impl Rebindable for RustMatchBody {
 }
 
 impl Rebindable for RustMatchCase {
-    fn rebind(&mut self, table: &HashMap<Label, Label>) {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         self.0.rebind(table);
         self.1.rebind(table);
     }
 }
 
 impl Rebindable for MatchCaseLHS {
-    fn rebind(&mut self, table: &HashMap<Label, Label>) {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         match self {
             MatchCaseLHS::Pattern(pat) => pat.rebind(table),
             MatchCaseLHS::WithGuard(pat, cond) => {
@@ -252,7 +251,7 @@ impl Rebindable for MatchCaseLHS {
 }
 
 impl Rebindable for RustPattern {
-    fn rebind(&mut self, table: &HashMap<Label, Label>) {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         match self {
             RustPattern::PrimLiteral(..)
             | RustPattern::PrimRange(..)
@@ -271,16 +270,16 @@ impl Rebindable for RustPattern {
 }
 
 impl Rebindable for Constructor {
-    fn rebind(&mut self, table: &HashMap<Label, Label>) {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         match self {
             Constructor::Simple(name) => {
                 if table.contains_key(&*name) {
-                    *name = table[&*name].clone();
+                    *name = table.index(&*name).clone();
                 }
             }
             Constructor::Compound(name, _) => {
                 if table.contains_key(&*name) {
-                    *name = table[&*name].clone();
+                    *name = table.index(&*name).clone();
                 }
             }
         }
@@ -288,7 +287,7 @@ impl Rebindable for Constructor {
 }
 
 impl Rebindable for RustOp {
-    fn rebind(&mut self, table: &HashMap<Label, Label>) {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         match self {
             RustOp::InfixOp(_, x, y) => {
                 x.rebind(table);
@@ -301,7 +300,7 @@ impl Rebindable for RustOp {
 }
 
 impl Rebindable for RustVariant {
-    fn rebind(&mut self, table: &HashMap<Label, Label>) {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         match self {
             RustVariant::Unit(..) => (),
             RustVariant::Tuple(_, elts) => elts.iter_mut().for_each(|elt| elt.rebind(table)),
@@ -310,7 +309,7 @@ impl Rebindable for RustVariant {
 }
 
 impl Rebindable for RustStruct {
-    fn rebind(&mut self, table: &HashMap<Label, Label>) {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         match self {
             RustStruct::Record(flds) => flds.iter_mut().for_each(|(_, ftype)| ftype.rebind(table)),
         }
@@ -318,7 +317,7 @@ impl Rebindable for RustStruct {
 }
 
 impl Rebindable for FnSig {
-    fn rebind(&mut self, table: &HashMap<Label, Label>) {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         self.args.iter_mut().for_each(|(_, arg)| arg.rebind(table));
         match self.ret.as_mut() {
             Some(ret) => ret.rebind(table),
@@ -328,7 +327,7 @@ impl Rebindable for FnSig {
 }
 
 impl Rebindable for RustType {
-    fn rebind(&mut self, table: &HashMap<Label, Label>) {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         match self {
             RustType::Atom(at) => at.rebind(table),
             RustType::AnonTuple(args) => args.iter_mut().for_each(|arg| arg.rebind(table)),
@@ -338,7 +337,7 @@ impl Rebindable for RustType {
 }
 
 impl Rebindable for AtomType {
-    fn rebind(&mut self, table: &HashMap<Label, Label>) {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         match self {
             AtomType::TypeRef(tref) => tref.rebind(table),
             AtomType::Prim(_) => (),
@@ -348,11 +347,11 @@ impl Rebindable for AtomType {
 }
 
 impl Rebindable for LocalType {
-    fn rebind(&mut self, table: &HashMap<Label, Label>) {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         match self {
             LocalType::LocalDef(_ix, lab) => {
                 if table.contains_key(lab) {
-                    *lab = table[lab].clone();
+                    *lab = table.index(lab).clone();
                 }
             }
             LocalType::External(..) => (),
@@ -361,7 +360,7 @@ impl Rebindable for LocalType {
 }
 
 impl Rebindable for CompType {
-    fn rebind(&mut self, table: &HashMap<Label, Label>) {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         match self {
             CompType::Vec(t)
             | CompType::Option(t)

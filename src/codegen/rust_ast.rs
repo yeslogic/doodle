@@ -1317,6 +1317,7 @@ pub(crate) enum RustExpr {
     BorrowMut(Box<RustExpr>),
     Try(Box<RustExpr>),
     Operation(RustOp),
+    // REVIEW - Blocks without a final value are implicitly Unit, so maybe optimize for such cases by allowing the expr to be elided entirely (perhaps only if there is at least one statement)
     BlockScope(Vec<RustStmt>, Box<RustExpr>), // scoped block with a final value as an implicit return
     Control(Box<RustControl>),                // for control blocks that return a value
     Closure(RustClosure),                     // only simple lambdas for now
@@ -2234,19 +2235,17 @@ impl RustStmt {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) enum RustControl {
-    Loop(Vec<RustStmt>),
-    While(RustExpr, Vec<RustStmt>),
-    // FIXME: this variant is unused
-    #[allow(dead_code)]
-    ForIter(Label, RustExpr, Vec<RustStmt>), // element variable name, iterator expression (verbatim), loop contents
-    ForRange0(Label, RustExpr, Vec<RustStmt>), // index variable name, upper bound (exclusive), loop contents (0..N)
-    If(RustExpr, Vec<RustStmt>, Option<Vec<RustStmt>>),
-    Match(RustExpr, RustMatchBody),
+pub(crate) enum RustControl<BlockType = Vec<RustStmt>> {
+    Loop(BlockType),
+    While(RustExpr, BlockType),
+    ForIter(Label, RustExpr, BlockType), // element variable name, iterator expression (verbatim), loop contents
+    ForRange0(Label, RustExpr, BlockType), // index variable name, upper bound (exclusive), loop contents (0..N)
+    If(RustExpr, BlockType, Option<BlockType>),
+    Match(RustExpr, RustMatchBody<BlockType>),
     Break, // no support for break values or loop labels, yet
 }
 
-pub(crate) type RustMatchCase = (MatchCaseLHS, Vec<RustStmt>);
+pub(crate) type RustMatchCase<BlockType = Vec<RustStmt>> = (MatchCaseLHS, BlockType);
 
 #[derive(Clone, Debug)]
 pub(crate) enum RustCatchAll {
@@ -2275,9 +2274,9 @@ impl RustCatchAll {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) enum RustMatchBody {
-    Irrefutable(Vec<RustMatchCase>),
-    Refutable(Vec<RustMatchCase>, RustCatchAll),
+pub(crate) enum RustMatchBody<BlockType = Vec<RustStmt>> {
+    Irrefutable(Vec<RustMatchCase<BlockType>>),
+    Refutable(Vec<RustMatchCase<BlockType>>, RustCatchAll),
 }
 
 impl RustMatchBody {
@@ -2319,14 +2318,51 @@ impl ToFragment for RustMatchBody {
     }
 }
 
-impl From<Vec<RustMatchCase>> for RustMatchBody {
-    fn from(value: Vec<RustMatchCase>) -> Self {
+impl<T> From<Vec<RustMatchCase<T>>> for RustMatchBody<T> {
+    fn from(value: Vec<RustMatchCase<T>>) -> Self {
         RustMatchBody::Refutable(
             value,
             RustCatchAll::ReturnErrorValue {
                 value: RustExpr::scoped(["ParseError"], "ExcludedBranch"),
             },
         )
+    }
+}
+
+impl<T> RustControl<T> {
+    pub(crate) fn translate<U: From<T>>(self) -> RustControl<U> {
+        match self {
+            RustControl::Loop(block) => RustControl::Loop(U::from(block)),
+            RustControl::While(cond, block) => RustControl::While(cond, U::from(block)),
+            RustControl::ForIter(iter_var, iter, block) => {
+                RustControl::ForIter(iter_var, iter, U::from(block))
+            }
+            RustControl::ForRange0(iter_var, range_max, block) => {
+                RustControl::ForRange0(iter_var, range_max, U::from(block))
+            }
+            RustControl::If(cond, then, opt_else) => {
+                RustControl::If(cond, U::from(then), opt_else.map(U::from))
+            }
+            RustControl::Match(scrutinee, body) => RustControl::Match(scrutinee, body.translate()),
+            RustControl::Break => RustControl::Break,
+        }
+    }
+}
+
+impl<T> RustMatchBody<T> {
+    fn translate<U: From<T>>(self) -> RustMatchBody<U> {
+        fn from_branches<T, U: From<T>>(branches: Vec<RustMatchCase<T>>) -> Vec<RustMatchCase<U>> {
+            branches
+                .into_iter()
+                .map(|(pat, rhs)| (pat, rhs.into()))
+                .collect()
+        }
+        match self {
+            RustMatchBody::Irrefutable(block) => RustMatchBody::Irrefutable(from_branches(block)),
+            RustMatchBody::Refutable(block, catchall) => {
+                RustMatchBody::Refutable(from_branches(block), catchall)
+            }
+        }
     }
 }
 
@@ -2755,7 +2791,7 @@ pub mod short_circuit {
         }
     }
 
-    impl ShortCircuit for RustControl {
+    impl<BlockType: ShortCircuit> ShortCircuit for RustControl<BlockType> {
         fn is_short_circuiting(&self) -> bool {
             match self {
                 RustControl::Loop(stmts) => stmts.is_short_circuiting(),
@@ -2769,7 +2805,7 @@ pub mod short_circuit {
                         || then.is_short_circuiting()
                         || opt_else
                             .as_ref()
-                            .is_some_and(<Vec<RustStmt> as ShortCircuit>::is_short_circuiting)
+                            .is_some_and(<BlockType as ShortCircuit>::is_short_circuiting)
                 }
                 RustControl::Match(scrutinee, body) => {
                     scrutinee.is_short_circuiting() || body.is_short_circuiting()
@@ -2779,19 +2815,19 @@ pub mod short_circuit {
         }
     }
 
-    impl ShortCircuit for RustMatchCase {
+    impl<BlockType: ShortCircuit> ShortCircuit for RustMatchCase<BlockType> {
         fn is_short_circuiting(&self) -> bool {
             self.1.is_short_circuiting()
         }
     }
 
-    impl ShortCircuit for RustMatchBody {
+    impl<BlockType: ShortCircuit> ShortCircuit for RustMatchBody<BlockType> {
         fn is_short_circuiting(&self) -> bool {
             match self {
-                RustMatchBody::Irrefutable(items) => items.is_short_circuiting(),
-                RustMatchBody::Refutable(items, rust_catch_all) => match rust_catch_all {
+                RustMatchBody::Irrefutable(branches) => branches.is_short_circuiting(),
+                RustMatchBody::Refutable(branches, rust_catch_all) => match rust_catch_all {
                     RustCatchAll::ReturnErrorValue { .. } => true,
-                    RustCatchAll::PanicUnreachable { .. } => items.is_short_circuiting(),
+                    RustCatchAll::PanicUnreachable { .. } => branches.is_short_circuiting(),
                 },
             }
         }

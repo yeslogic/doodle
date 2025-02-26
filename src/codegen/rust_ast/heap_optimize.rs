@@ -3,31 +3,64 @@ use super::{
     AtomType, CompType, LocalType, PrimType, RustStruct, RustType, RustTypeDef, RustVariant,
 };
 use core::alloc::Layout;
+use std::num::NonZeroUsize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub enum HeapStrategy {
-    /// Default strategy: never box anything
-    #[default]
-    Never,
-    /// Simple strategy: heap-indirect types in all struct contexts when larger than `N` bytes
-    ///
-    /// When applied to a direct positional argument of a tuple that will still be heap-allocated,
-    /// the inner heap-allocation is lifted to avoid excessive indirection
-    ContextFreeLifted(usize),
-    /// Clippy strategy: heap-indirect all variants more than `N` bytes larger than the smallest variant
-    EnumDiscrepancy(usize),
+pub struct HeapStrategy {
+    absolute_cutoff: Option<NonZeroUsize>,
+    variant_cutoff: Option<NonZeroUsize>,
 }
 
 impl HeapStrategy {
+    pub const fn new() -> Self {
+        Self {
+            absolute_cutoff: None,
+            variant_cutoff: None,
+        }
+    }
+
+    /// Chainable method for mutating the absolute cutoff (i.e. minimum type-size that will be boxed rather than directly embedded).
+    ///
+    /// A value of `0` is legal, but has the semantics of 'unsetting' the absolute cutoff, meaning that no absolute-cutoff will be enforced.
+    #[expect(unused)]
+    pub const fn absolute_cutoff(self, cutoff: usize) -> Self {
+        Self {
+            absolute_cutoff: NonZeroUsize::new(cutoff),
+            ..self
+        }
+    }
+
+    /// Chainable method for mutating the variant cutoff (i.e. minimum difference between variant sizes that causes large variants to be boxed).
+    ///
+    /// A value of `0` is legal, but has the semantics of 'unsetting' the variant cutoff, meaning that no variant-cutoff will be enforced.
+    pub const fn variant_cutoff(self, cutoff: usize) -> Self {
+        Self {
+            variant_cutoff: NonZeroUsize::new(cutoff),
+            ..self
+        }
+    }
+
     pub const fn is_never(&self) -> bool {
-        matches!(self, Self::Never)
+        matches!(
+            self,
+            Self {
+                absolute_cutoff: None,
+                variant_cutoff: None
+            }
+        )
     }
 
     pub const fn min_heap_size(&self) -> Option<usize> {
-        match *self {
-            HeapStrategy::Never => None,
-            HeapStrategy::EnumDiscrepancy(..) => None,
-            HeapStrategy::ContextFreeLifted(min_size) => Some(min_size),
+        match self.absolute_cutoff {
+            Some(it) => Some(it.get()),
+            None => None,
+        }
+    }
+
+    pub const fn min_enum_delta(&self) -> Option<usize> {
+        match self.variant_cutoff {
+            Some(it) => Some(it.get()),
+            None => None,
         }
     }
 }
@@ -91,34 +124,33 @@ where
 
 impl HeapOptimize for RustStruct {
     fn dry_run(&self, strategy: HeapStrategy, context: Self::Context<'_>) -> HeapOutcome {
-        match strategy {
-            HeapStrategy::Never => (HeapAction::Noop, mk_layout(self, context)),
-            _ => {
-                // NOTE - a rust struct, as a standalone object, cannot be wrapped in a heap allocation; only its fields can be individually heap-allocated
-                let fields = match &self {
-                    RustStruct::Record(fields) => fields,
-                };
-                let mut raw_size = 0;
-                let mut max_align = 1;
-                let mut field_actions = Vec::with_capacity(fields.len());
-                let mut is_productive = false;
-                for (_, f_type) in fields.iter() {
-                    let (action, layout) = f_type.dry_run(strategy, context);
-                    is_productive |= !action.is_noop();
-                    field_actions.push(action);
-                    raw_size += layout.size();
-                    max_align = max_align.max(layout.align());
-                }
-                let size = aligned_size(raw_size, max_align);
-                let ret = if is_productive {
-                    HeapAction::InRecord {
-                        fields: field_actions,
-                    }
-                } else {
-                    HeapAction::Noop
-                };
-                (ret, Layout::from_size_align(size, max_align).unwrap())
+        if strategy.is_never() {
+            (HeapAction::Noop, mk_layout(self, context))
+        } else {
+            // NOTE - a rust struct, as a standalone object, cannot be wrapped in a heap allocation; only its fields can be individually heap-allocated
+            let fields = match &self {
+                RustStruct::Record(fields) => fields,
+            };
+            let mut raw_size = 0;
+            let mut max_align = 1;
+            let mut field_actions = Vec::with_capacity(fields.len());
+            let mut is_productive = false;
+            for (_, f_type) in fields.iter() {
+                let (action, layout) = f_type.dry_run(strategy, context);
+                is_productive |= !action.is_noop();
+                field_actions.push(action);
+                raw_size += layout.size();
+                max_align = max_align.max(layout.align());
             }
+            let size = aligned_size(raw_size, max_align);
+            let ret = if is_productive {
+                HeapAction::InRecord {
+                    fields: field_actions,
+                }
+            } else {
+                HeapAction::Noop
+            };
+            (ret, Layout::from_size_align(size, max_align).unwrap())
         }
     }
 }
@@ -252,9 +284,9 @@ impl HeapOptimize for LocalType {
 impl HeapOptimize for RustTypeDef {
     fn dry_run(&self, strategy: HeapStrategy, context: Self::Context<'_>) -> HeapOutcome {
         match self {
-            RustTypeDef::Enum(vars) => match strategy {
-                HeapStrategy::Never => (HeapAction::Noop, mk_layout(self, context)),
-                HeapStrategy::EnumDiscrepancy(threshold_delta) => {
+            RustTypeDef::Struct(str) => str.dry_run(strategy, context),
+            RustTypeDef::Enum(vars) => {
+                if let Some(threshold_delta) = strategy.min_enum_delta() {
                     let mut var_sizes = Vec::with_capacity(vars.len());
                     let mut var_actions = Vec::with_capacity(vars.len());
                     let mut is_productive = false;
@@ -305,8 +337,7 @@ impl HeapOptimize for RustTypeDef {
                             (HeapAction::Noop, mk_layout(self, context))
                         }
                     }
-                }
-                HeapStrategy::ContextFreeLifted(..) => {
+                } else if let Some(_abs_cutoff) = strategy.min_heap_size() {
                     let mut var_actions = Vec::with_capacity(vars.len());
                     let mut max_var_size = 0;
                     let mut max_align = 1;
@@ -332,9 +363,10 @@ impl HeapOptimize for RustTypeDef {
                     } else {
                         (HeapAction::Noop, mk_layout(self, context))
                     }
+                } else {
+                    (HeapAction::Noop, mk_layout(self, context))
                 }
-            },
-            RustTypeDef::Struct(str) => str.dry_run(strategy, context),
+            }
         }
     }
 }
