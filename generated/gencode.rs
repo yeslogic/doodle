@@ -366,7 +366,7 @@ distance: u16
 
 /// expected size: 6
 #[derive(Debug, Clone)]
-pub enum deflate_main_codes__dupX1 { literal(u8), reference(deflate_main_codes_reference) }
+pub enum deflate_main_codes { literal(u8), reference(deflate_main_codes_reference) }
 
 /// expected size: 176
 #[derive(Debug, Clone)]
@@ -380,7 +380,7 @@ literal_length_distance_alphabet_code_lengths_value: Vec<u8>,
 literal_length_alphabet_code_lengths_value: Vec<u8>,
 distance_alphabet_code_lengths_value: Vec<u8>,
 codes: Vec<deflate_dynamic_huffman_codes>,
-codes_values: Vec<deflate_main_codes__dupX1>
+codes_values: Vec<deflate_main_codes>
 }
 
 /// expected size: 8
@@ -403,7 +403,7 @@ extra: Option<deflate_fixed_huffman_codes_values>
 #[derive(Debug, Clone)]
 pub struct deflate_fixed_huffman {
 codes: Vec<deflate_fixed_huffman_codes>,
-codes_values: Vec<deflate_main_codes__dupX1>
+codes_values: Vec<deflate_main_codes>
 }
 
 /// expected size: 56
@@ -413,28 +413,28 @@ align: (),
 len: u16,
 nlen: u16,
 bytes: Vec<u8>,
-codes_values: Vec<deflate_main_codes__dupX1>
+codes_values: Vec<deflate_main_codes>
 }
 
 /// expected size: 184
-/// heap outcome (EnumDiscrepancy(128)): (InEnum { variants: [DirectHeap, Noop, Noop] }, Layout { size: 56, align: 8 (1 << 3) })
+/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InEnum { variants: [DirectHeap, Noop, Noop] }, Layout { size: 56, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
-pub enum deflate_main_codes { dynamic_huffman(deflate_dynamic_huffman), fixed_huffman(deflate_fixed_huffman), uncompressed(deflate_uncompressed) }
+pub enum deflate_main_codes__dupX1 { dynamic_huffman(deflate_dynamic_huffman), fixed_huffman(deflate_fixed_huffman), uncompressed(deflate_uncompressed) }
 
 /// expected size: 192
-/// heap outcome (EnumDiscrepancy(128)): (InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [DirectHeap, Noop, Noop] })] }, Layout { size: 64, align: 8 (1 << 3) })
+/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [DirectHeap, Noop, Noop] })] }, Layout { size: 64, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub struct deflate_block {
 r#final: u8,
 r#type: u8,
-data: deflate_main_codes
+data: deflate_main_codes__dupX1
 }
 
 /// expected size: 72
 #[derive(Debug, Clone)]
 pub struct deflate_main {
 blocks: Vec<deflate_block>,
-codes: Vec<deflate_main_codes__dupX1>,
+codes: Vec<deflate_main_codes>,
 inflate: Vec<u8>
 }
 
@@ -1973,12 +1973,12 @@ y_coordinates: Vec<u16>
 }
 
 /// expected size: 136
-/// heap outcome (EnumDiscrepancy(128)): (InEnum { variants: [Noop, Noop, DirectHeap] }, Layout { size: 48, align: 8 (1 << 3) })
+/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InEnum { variants: [Noop, Noop, DirectHeap] }, Layout { size: 48, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub enum opentype_glyf_description { Composite(opentype_glyf_composite), HeaderOnly, Simple(opentype_glyf_simple) }
 
 /// expected size: 152
-/// heap outcome (EnumDiscrepancy(128)): (InRecord { fields: [Noop, Noop, Noop, Noop, Noop, InDef(InEnum { variants: [Noop, Noop, DirectHeap] })] }, Layout { size: 64, align: 8 (1 << 3) })
+/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [Noop, Noop, Noop, Noop, Noop, InDef(InEnum { variants: [Noop, Noop, DirectHeap] })] }, Layout { size: 64, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub struct opentype_glyf_table_Glyph {
 number_of_contours: u16,
@@ -1990,7 +1990,7 @@ description: opentype_glyf_description
 }
 
 /// expected size: 160
-/// heap outcome (EnumDiscrepancy(128)): (NonLocal, Layout { size: 72, align: 8 (1 << 3) })
+/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (NonLocal, Layout { size: 72, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub enum opentype_glyf_table { EmptyGlyph, Glyph(opentype_glyf_table_Glyph) }
 
@@ -2650,12 +2650,12 @@ seq_lookup_records: Vec<opentype_common_sequence_lookup>
 }
 
 /// expected size: 264
-/// heap outcome (EnumDiscrepancy(128)): (InEnum { variants: [Noop, DirectHeap, Noop] }, Layout { size: 104, align: 8 (1 << 3) })
+/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InEnum { variants: [Noop, DirectHeap, Noop] }, Layout { size: 104, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub enum opentype_common_chained_sequence_context_subst { Format1(opentype_common_chained_sequence_context_subst_Format1), Format2(opentype_common_chained_sequence_context_subst_Format2), Format3(opentype_common_chained_sequence_context_subst_Format3) }
 
 /// expected size: 272
-/// heap outcome (EnumDiscrepancy(128)): (InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap, Noop] })] }, Layout { size: 112, align: 8 (1 << 3) })
+/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap, Noop] })] }, Layout { size: 112, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub struct opentype_common_chained_sequence_context {
 table_start: u32,
@@ -3043,12 +3043,12 @@ value_records: Vec<opentype_common_value_record>
 }
 
 /// expected size: 280
-/// heap outcome (EnumDiscrepancy(128)): (InEnum { variants: [DirectHeap, Noop] }, Layout { size: 96, align: 8 (1 << 3) })
+/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InEnum { variants: [DirectHeap, Noop] }, Layout { size: 96, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub enum opentype_layout_single_pos_subtable { Format1(opentype_layout_single_pos_subtable_Format1), Format2(opentype_layout_single_pos_subtable_Format2) }
 
 /// expected size: 288
-/// heap outcome (EnumDiscrepancy(128)): (InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [DirectHeap, Noop] })] }, Layout { size: 104, align: 8 (1 << 3) })
+/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [DirectHeap, Noop] })] }, Layout { size: 104, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub struct opentype_layout_single_pos {
 table_start: u32,
@@ -3057,12 +3057,12 @@ subtable: opentype_layout_single_pos_subtable
 }
 
 /// expected size: 296
-/// heap outcome (EnumDiscrepancy(128)): (InEnum { variants: [InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap, Noop] })] })] }, Noop, Noop, Noop, Noop, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [DirectHeap, Noop] })] })] }] }, Layout { size: 200, align: 8 (1 << 3) })
+/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InEnum { variants: [InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap, Noop] })] })] }, Noop, Noop, Noop, Noop, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [DirectHeap, Noop] })] })] }] }, Layout { size: 200, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub enum opentype_layout_ground_pos { ChainedSequenceContext(opentype_common_chained_sequence_context), CursivePos(opentype_layout_cursive_pos), MarkBasePos(opentype_layout_mark_base_pos), MarkLigPos(opentype_layout_mark_lig_pos), MarkMarkPos(opentype_layout_mark_mark_pos), PairPos(opentype_layout_pair_pos), SequenceContext(opentype_common_sequence_context), SinglePos(opentype_layout_single_pos) }
 
 /// expected size: 304
-/// heap outcome (EnumDiscrepancy(128)): (InRecord { fields: [Noop, InOption(InDef(InEnum { variants: [InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap, Noop] })] })] }, Noop, Noop, Noop, Noop, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [DirectHeap, Noop] })] })] }] }))] }, Layout { size: 24, align: 8 (1 << 3) })
+/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [Noop, InOption(InDef(InEnum { variants: [InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap, Noop] })] })] }, Noop, Noop, Noop, Noop, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [DirectHeap, Noop] })] })] }] }))] }, Layout { size: 24, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub struct opentype_layout_pos_extension_extension_offset {
 offset: u32,
@@ -3070,7 +3070,7 @@ link: Option<opentype_layout_ground_pos>
 }
 
 /// expected size: 312
-/// heap outcome (EnumDiscrepancy(128)): (InRecord { fields: [Noop, Noop, Noop, InDef(InRecord { fields: [Noop, InOption(InDef(InEnum { variants: [InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap, Noop] })] })] }, Noop, Noop, Noop, Noop, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [DirectHeap, Noop] })] })] }] }))] })] }, Layout { size: 32, align: 8 (1 << 3) })
+/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [Noop, Noop, Noop, InDef(InRecord { fields: [Noop, InOption(InDef(InEnum { variants: [InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap, Noop] })] })] }, Noop, Noop, Noop, Noop, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [DirectHeap, Noop] })] })] }] }))] })] }, Layout { size: 32, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub struct opentype_layout_pos_extension {
 table_start: u32,
@@ -3080,12 +3080,12 @@ extension_offset: opentype_layout_pos_extension_extension_offset
 }
 
 /// expected size: 320
-/// heap outcome (EnumDiscrepancy(128)): (InEnum { variants: [DirectHeap, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, Noop, InDef(InRecord { fields: [Noop, InOption(InDef(InEnum { variants: [InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap, Noop] })] })] }, Noop, Noop, Noop, Noop, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [DirectHeap, Noop] })] })] }] }))] })] })] }] }, Layout { size: 32, align: 8 (1 << 3) })
+/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InEnum { variants: [DirectHeap, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, Noop, InDef(InRecord { fields: [Noop, InOption(InDef(InEnum { variants: [InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap, Noop] })] })] }, Noop, Noop, Noop, Noop, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [DirectHeap, Noop] })] })] }] }))] })] })] }] }, Layout { size: 32, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub enum opentype_gpos_table_lookup_list_link_lookups_link_subtables_link { GroundPos(opentype_layout_ground_pos), PosExtension(opentype_layout_pos_extension) }
 
 /// expected size: 328
-/// heap outcome (EnumDiscrepancy(128)): (InRecord { fields: [Noop, InOption(InDef(InEnum { variants: [DirectHeap, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, Noop, InDef(InRecord { fields: [Noop, InOption(InDef(InEnum { variants: [InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap, Noop] })] })] }, Noop, Noop, Noop, Noop, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [DirectHeap, Noop] })] })] }] }))] })] })] }] }))] }, Layout { size: 24, align: 8 (1 << 3) })
+/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [Noop, InOption(InDef(InEnum { variants: [DirectHeap, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, Noop, InDef(InRecord { fields: [Noop, InOption(InDef(InEnum { variants: [InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap, Noop] })] })] }, Noop, Noop, Noop, Noop, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [DirectHeap, Noop] })] })] }] }))] })] })] }] }))] }, Layout { size: 24, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub struct opentype_gpos_table_lookup_list_link_lookups_link_subtables {
 offset: u16,
@@ -3363,12 +3363,12 @@ subst: opentype_layout_single_subst_subst
 }
 
 /// expected size: 280
-/// heap outcome (EnumDiscrepancy(128)): (NonLocal, Layout { size: 168, align: 8 (1 << 3) })
+/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (NonLocal, Layout { size: 168, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub enum opentype_layout_ground_subst { AlternateSubst(opentype_layout_alternate_subst), ChainedSequenceContext(opentype_common_chained_sequence_context), LigatureSubst(opentype_layout_ligature_subst), MultipleSubst(opentype_layout_multiple_subst), ReverseChainSingleSubst(opentype_layout_reverse_chain_single_subst), SequenceContext(opentype_common_sequence_context), SingleSubst(opentype_layout_single_subst) }
 
 /// expected size: 288
-/// heap outcome (EnumDiscrepancy(128)): (InRecord { fields: [Noop, InOption(NonLocal)] }, Layout { size: 24, align: 8 (1 << 3) })
+/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [Noop, InOption(NonLocal)] }, Layout { size: 24, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub struct opentype_layout_subst_extension_extension_offset {
 offset: u32,
@@ -3376,7 +3376,7 @@ link: Option<opentype_layout_ground_subst>
 }
 
 /// expected size: 296
-/// heap outcome (EnumDiscrepancy(128)): (InRecord { fields: [Noop, Noop, Noop, InDef(InRecord { fields: [Noop, InOption(NonLocal)] })] }, Layout { size: 32, align: 8 (1 << 3) })
+/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [Noop, Noop, Noop, InDef(InRecord { fields: [Noop, InOption(NonLocal)] })] }, Layout { size: 32, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub struct opentype_layout_subst_extension {
 table_start: u32,
@@ -3386,12 +3386,12 @@ extension_offset: opentype_layout_subst_extension_extension_offset
 }
 
 /// expected size: 304
-/// heap outcome (EnumDiscrepancy(128)): (InEnum { variants: [DirectHeap, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, Noop, InDef(InRecord { fields: [Noop, InOption(NonLocal)] })] })] }] }, Layout { size: 32, align: 8 (1 << 3) })
+/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InEnum { variants: [DirectHeap, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, Noop, InDef(InRecord { fields: [Noop, InOption(NonLocal)] })] })] }] }, Layout { size: 32, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub enum opentype_gsub_table_lookup_list_link_lookups_link_subtables_link { GroundSubst(opentype_layout_ground_subst), SubstExtension(opentype_layout_subst_extension) }
 
 /// expected size: 312
-/// heap outcome (EnumDiscrepancy(128)): (InRecord { fields: [Noop, InOption(InDef(InEnum { variants: [DirectHeap, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, Noop, InDef(InRecord { fields: [Noop, InOption(NonLocal)] })] })] }] }))] }, Layout { size: 24, align: 8 (1 << 3) })
+/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [Noop, InOption(InDef(InEnum { variants: [DirectHeap, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, Noop, InDef(InRecord { fields: [Noop, InOption(NonLocal)] })] })] }] }))] }, Layout { size: 24, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub struct opentype_gsub_table_lookup_list_link_lookups_link_subtables {
 offset: u16,
@@ -3902,12 +3902,12 @@ __skip: ()
 }
 
 /// expected size: 2024
-/// heap outcome (EnumDiscrepancy(128)): (InEnum { variants: [Noop, DirectHeap] }, Layout { size: 56, align: 8 (1 << 3) })
+/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InEnum { variants: [Noop, DirectHeap] }, Layout { size: 56, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub enum opentype_main_directory { TTCHeader(opentype_ttc_header), TableDirectory(opentype_table_directory) }
 
 /// expected size: 2032
-/// heap outcome (EnumDiscrepancy(128)): (InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap] })] }, Layout { size: 64, align: 8 (1 << 3) })
+/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap] })] }, Layout { size: 64, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub struct opentype_main {
 file_start: u32,
@@ -4277,7 +4277,7 @@ __rem: ()
 }
 
 /// expected size: 2040
-/// heap outcome (EnumDiscrepancy(128)): (InEnum { variants: [DirectHeap, Noop, Noop, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap] })] })] }, Noop, DirectHeap, Noop, Noop, Noop, Noop, Noop, Noop] }, Layout { size: 104, align: 8 (1 << 3) })
+/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InEnum { variants: [DirectHeap, Noop, Noop, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap] })] })] }, Noop, DirectHeap, Noop, Noop, Noop, Noop, Noop, Noop] }, Layout { size: 104, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub enum main_data { elf(elf_main), gif(gif_main), gzip(Vec<gzip_main>), jpeg(jpeg_main), mpeg4(mpeg4_main), opentype(opentype_main), peano(Vec<u32>), png(png_main), riff(riff_main), tar(tar_main), text(Vec<char>), tgz(Vec<tar_main>), tiff(tiff_main), waldo(waldo_main) }
 
@@ -4348,7 +4348,7 @@ __skipped1: u16
 }
 
 /// expected size: 2040
-/// heap outcome (EnumDiscrepancy(128)): (InRecord { fields: [InDef(InEnum { variants: [DirectHeap, Noop, Noop, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap] })] })] }, Noop, DirectHeap, Noop, Noop, Noop, Noop, Noop, Noop] }), Noop] }, Layout { size: 104, align: 8 (1 << 3) })
+/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [InDef(InEnum { variants: [DirectHeap, Noop, Noop, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap] })] })] }, Noop, DirectHeap, Noop, Noop, Noop, Noop, Noop, Noop] }), Noop] }, Layout { size: 104, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub struct main {
 data: main_data,
@@ -4362,7 +4362,6 @@ Decoder1(_input)
 fn Decoder1<>(_input: &mut Parser<'_>) -> Result<main, ParseError> {
 let data = ((|| {
 _input.start_alt();
-{
 let res = (|| {
 let inner = (Decoder_waldo_main(_input))?;
 PResult::Ok(main_data::waldo(inner))
@@ -4375,9 +4374,7 @@ return PResult::Ok(inner);
 Err(_e) => {
 _input.next_alt(false)?;
 }
-}
 };
-{
 let res = (|| {
 let inner = (Decoder3(_input))?;
 PResult::Ok(main_data::peano(inner))
@@ -4390,9 +4387,7 @@ return PResult::Ok(inner);
 Err(_e) => {
 _input.next_alt(false)?;
 }
-}
 };
-{
 let res = (|| {
 let inner = (Decoder_gif_main(_input))?;
 PResult::Ok(main_data::gif(inner))
@@ -4405,9 +4400,7 @@ return PResult::Ok(inner);
 Err(_e) => {
 _input.next_alt(false)?;
 }
-}
 };
-{
 let res = (|| {
 let inner = (Decoder5(_input))?;
 PResult::Ok(main_data::tgz(inner))
@@ -4420,9 +4413,7 @@ return PResult::Ok(inner);
 Err(_e) => {
 _input.next_alt(false)?;
 }
-}
 };
-{
 let res = (|| {
 let inner = (Decoder6(_input))?;
 PResult::Ok(main_data::gzip(inner))
@@ -4435,9 +4426,7 @@ return PResult::Ok(inner);
 Err(_e) => {
 _input.next_alt(false)?;
 }
-}
 };
-{
 let res = (|| {
 let inner = (Decoder_jpeg_main(_input))?;
 PResult::Ok(main_data::jpeg(inner))
@@ -4450,9 +4439,7 @@ return PResult::Ok(inner);
 Err(_e) => {
 _input.next_alt(false)?;
 }
-}
 };
-{
 let res = (|| {
 let inner = (Decoder_mpeg4_main(_input))?;
 PResult::Ok(main_data::mpeg4(inner))
@@ -4465,9 +4452,7 @@ return PResult::Ok(inner);
 Err(_e) => {
 _input.next_alt(false)?;
 }
-}
 };
-{
 let res = (|| {
 let inner = (Decoder_png_main(_input))?;
 PResult::Ok(main_data::png(inner))
@@ -4480,9 +4465,7 @@ return PResult::Ok(inner);
 Err(_e) => {
 _input.next_alt(false)?;
 }
-}
 };
-{
 let res = (|| {
 let inner = (Decoder_riff_main(_input))?;
 PResult::Ok(main_data::riff(inner))
@@ -4495,9 +4478,7 @@ return PResult::Ok(inner);
 Err(_e) => {
 _input.next_alt(false)?;
 }
-}
 };
-{
 let res = (|| {
 let inner = (Decoder_tiff_main(_input))?;
 PResult::Ok(main_data::tiff(inner))
@@ -4510,9 +4491,7 @@ return PResult::Ok(inner);
 Err(_e) => {
 _input.next_alt(false)?;
 }
-}
 };
-{
 let res = (|| {
 let inner = (Decoder_tar_main(_input))?;
 PResult::Ok(main_data::tar(inner))
@@ -4525,9 +4504,7 @@ return PResult::Ok(inner);
 Err(_e) => {
 _input.next_alt(false)?;
 }
-}
 };
-{
 let res = (|| {
 let inner = (Decoder_elf_main(_input))?;
 PResult::Ok(main_data::elf(inner))
@@ -4540,9 +4517,7 @@ return PResult::Ok(inner);
 Err(_e) => {
 _input.next_alt(false)?;
 }
-}
 };
-{
 let res = (|| {
 let inner = (Decoder_opentype_main(_input))?;
 PResult::Ok(main_data::opentype(inner))
@@ -4555,9 +4530,7 @@ return PResult::Ok(inner);
 Err(_e) => {
 _input.next_alt(true)?;
 }
-}
 };
-{
 let res = (|| {
 let inner = (Decoder15(_input))?;
 PResult::Ok(main_data::text(inner))
@@ -4569,7 +4542,6 @@ return PResult::Ok(inner);
 
 Err(_e) => {
 return Err(_e);
-}
 }
 };
 })())?;
@@ -4798,26 +4770,38 @@ break
 } else {
 let next_elem = {
 let header = (Decoder_gzip_header(_input))?;
-let fextra = ((|| PResult::Ok(if header.file_flags.fextra.clone() {
+let fextra = ((|| {
+let ret = if header.file_flags.fextra.clone() {
 Some((Decoder_gzip_fextra(_input))?)
 } else {
 None
-}))())?;
-let fname = ((|| PResult::Ok(if header.file_flags.fname.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let fname = ((|| {
+let ret = if header.file_flags.fname.clone() {
 Some((Decoder298(_input))?)
 } else {
 None
-}))())?;
-let fcomment = ((|| PResult::Ok(if header.file_flags.fcomment.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let fcomment = ((|| {
+let ret = if header.file_flags.fcomment.clone() {
 Some((Decoder_gzip_fcomment(_input))?)
 } else {
 None
-}))())?;
-let fhcrc = ((|| PResult::Ok(if header.file_flags.fhcrc.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let fhcrc = ((|| {
+let ret = if header.file_flags.fhcrc.clone() {
 Some((Decoder_gzip_fhcrc(_input))?)
 } else {
 None
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let data = ((|| {
 _input.enter_bits_mode()?;
 let ret = (Decoder_deflate_main(_input))?;
@@ -5058,7 +5042,8 @@ let ret = (Decoder_riff_subchunks(_input))?;
 _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
-let pad = ((|| PResult::Ok(if length % 2u32 == 1u32 {
+let pad = ((|| {
+let ret = if length % 2u32 == 1u32 {
 let b = _input.read_byte()?;
 Some(if b == 0 {
 b
@@ -5067,7 +5052,9 @@ return Err(ParseError::ExcludedBranch(13785646910930464515u64));
 })
 } else {
 None
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(riff_main { tag, length, data, pad })
 }
 
@@ -5097,7 +5084,7 @@ _input.close_peek_context()?;
 ret
 }
 };
-PResult::Ok(match tree_index {
+let ret = match tree_index {
 0 => {
 let field0 = ((|| {
 let b = _input.read_byte()?;
@@ -5141,9 +5128,11 @@ tiff_main_byte_order::be(field0, field1)
 _ => {
 return Err(ParseError::ExcludedBranch(10346499338674982396u64));
 }
-})
+};
+PResult::Ok(ret)
 })())?;
-let magic = ((|| PResult::Ok(match byte_order {
+let magic = ((|| {
+let ret = match byte_order {
 tiff_main_byte_order::le(..) => {
 (Decoder139(_input))?
 },
@@ -5151,8 +5140,11 @@ tiff_main_byte_order::le(..) => {
 tiff_main_byte_order::be(..) => {
 (Decoder23(_input))?
 }
-}))())?;
-let offset = ((|| PResult::Ok(match byte_order {
+};
+PResult::Ok(ret)
+})())?;
+let offset = ((|| {
+let ret = match byte_order {
 tiff_main_byte_order::le(..) => {
 (Decoder127(_input))?
 },
@@ -5160,11 +5152,14 @@ tiff_main_byte_order::le(..) => {
 tiff_main_byte_order::be(..) => {
 (Decoder20(_input))?
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let ifd = ((|| {
 let tgt_offset = start_of_header + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| PResult::Ok(match byte_order {
+let ret = ((|| {
+let ret = match byte_order {
 tiff_main_byte_order::le(..) => {
 let num_fields = (Decoder139(_input))?;
 let fields = ((|| {
@@ -5244,7 +5239,9 @@ PResult::Ok(accum)
 })())?;
 tiff_main_ifd { num_fields, fields, next_ifd_offset, next_ifd }
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 _input.close_peek_context()?;
 PResult::Ok(ret)
 })())?;
@@ -5340,7 +5337,8 @@ PResult::Ok(tar_main { contents, __padding, __trailing })
 fn Decoder_elf_main<>(_input: &mut Parser<'_>) -> Result<elf_main, ParseError> {
 let header = (Decoder_elf_header(_input))?;
 let __eoh = _input.get_offset_u64();
-let program_headers = ((|| PResult::Ok(if match header.phoff.clone() {
+let program_headers = ((|| {
+let ret = if match header.phoff.clone() {
 elf_types_elf_off::Off32(0u32) => {
 false
 },
@@ -5368,8 +5366,11 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}))())?;
-let section_headers = ((|| PResult::Ok(if match header.shoff.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let section_headers = ((|| {
+let ret = if match header.shoff.clone() {
 elf_types_elf_off::Off32(0u32) => {
 false
 },
@@ -5397,13 +5398,17 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}))())?;
-let sections = ((|| PResult::Ok(match section_headers {
+};
+PResult::Ok(ret)
+})())?;
+let sections = ((|| {
+let ret = match section_headers {
 Some(ref shdrs) => {
 let val = {
 let mut accum = Vec::new();
 for shdr in shdrs.clone() {
-accum.push(if (shdr.r#type.clone() != 8u32) && (shdr.r#type.clone() != 0u32) {
+accum.push({
+let ret = if (shdr.r#type.clone() != 8u32) && (shdr.r#type.clone() != 0u32) {
 let tgt_offset = 0u64 + match shdr.offset.clone() {
 elf_types_elf_off::Off32(x32) => {
 x32 as u64
@@ -5427,6 +5432,8 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
+};
+ret
 });
 }
 accum
@@ -5437,7 +5444,9 @@ Some(val)
 None => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let __skip = _input.skip_remainder();
 PResult::Ok(elf_main { header, __eoh, program_headers, section_headers, sections, __skip })
 }
@@ -5453,7 +5462,8 @@ let ret = (Decoder20(_input))?;
 _input.close_peek_context()?;
 PResult::Ok(ret)
 })())?;
-let directory = ((|| PResult::Ok(match magic {
+let directory = ((|| {
+let ret = match magic {
 65536u32 => {
 let inner = (Decoder_opentype_table_directory(_input, file_start.clone()))?;
 opentype_main_directory::TableDirectory(inner)
@@ -5477,7 +5487,9 @@ opentype_main_directory::TableDirectory(inner)
 _ => {
 return Err(ParseError::FailToken(17527274083228188873u64));
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_main { file_start, magic, directory })
 }
 
@@ -5603,7 +5615,7 @@ _input.close_peek_context()?;
 ret
 }
 };
-PResult::Ok(match tree_index {
+let ret = match tree_index {
 0 => {
 let _ = {
 let b = _input.read_byte()?;
@@ -5623,7 +5635,8 @@ return Err(ParseError::ExcludedBranch(11054356281452530428u64));
 _ => {
 return Err(ParseError::ExcludedBranch(11100042044514704042u64));
 }
-})
+};
+PResult::Ok(ret)
 }
 
 fn Decoder18<>(_input: &mut Parser<'_>) -> Result<char, ParseError> {
@@ -5676,7 +5689,7 @@ _input.close_peek_context()?;
 ret
 }
 };
-match tree_index {
+let ret = match tree_index {
 0 => {
 let byte = {
 let b = _input.read_byte()?;
@@ -5742,7 +5755,7 @@ _input.close_peek_context()?;
 ret
 }
 };
-match tree_index {
+let ret = match tree_index {
 0 => {
 let field0 = ((|| {
 let raw = {
@@ -5834,7 +5847,8 @@ let field2 = (Decoder19(_input))?;
 _ => {
 return Err(ParseError::ExcludedBranch(2391834656526534993u64));
 }
-}
+};
+ret
 };
 match tuple_var {
 (x2, x1, x0) => {
@@ -5869,7 +5883,7 @@ _input.close_peek_context()?;
 ret
 }
 };
-match tree_index {
+let ret = match tree_index {
 0 => {
 let field0 = ((|| {
 let raw = {
@@ -5947,7 +5961,8 @@ let field3 = (Decoder19(_input))?;
 _ => {
 return Err(ParseError::ExcludedBranch(3725673472712527969u64));
 }
-}
+};
+ret
 };
 match tuple_var {
 (x3, x2, x1, x0) => {
@@ -5959,7 +5974,8 @@ match tuple_var {
 _ => {
 return Err(ParseError::ExcludedBranch(15741082764016749161u64));
 }
-}
+};
+ret
 };
 PResult::Ok((char::from_u32(codepoint)).unwrap())
 }
@@ -6010,11 +6026,12 @@ false
 }
 }
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(8376883036401934317u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let num_tables = (Decoder23(_input))?;
 let search_range = (Decoder23(_input))?;
@@ -6038,15 +6055,17 @@ let is_valid = {
 let tag = inner;
 tag == 1953784678u32
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(9069368457806005425u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let major_version = (Decoder23(_input))?;
 let minor_version = (Decoder23(_input))?;
-let header = ((|| PResult::Ok(match major_version {
+let header = ((|| {
+let ret = match major_version {
 1u16 => {
 let inner = {
 let num_fonts = (Decoder20(_input))?;
@@ -6055,7 +6074,8 @@ let mut accum = Vec::new();
 for _ in 0..num_fonts {
 accum.push({
 let offset = (Decoder20(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u32 {
+let link = ((|| {
+let ret = match offset > 0u32 {
 true => {
 let tgt_offset = start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6070,7 +6090,9 @@ ret
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_ttc_header_header_Version1_table_directories { offset, link }
 });
 }
@@ -6089,7 +6111,8 @@ let mut accum = Vec::new();
 for _ in 0..num_fonts {
 accum.push({
 let offset = (Decoder20(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u32 {
+let link = ((|| {
+let ret = match offset > 0u32 {
 true => {
 let tgt_offset = start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6104,7 +6127,9 @@ ret
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_ttc_header_header_Version1_table_directories { offset, link }
 });
 }
@@ -6122,7 +6147,9 @@ unknown => {
 let inner = unknown.clone();
 opentype_ttc_header_header::UnknownVersion(inner)
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let __skip = _input.skip_remainder();
 PResult::Ok(opentype_ttc_header { ttc_tag, major_version, minor_version, header, __skip })
 }
@@ -6149,7 +6176,8 @@ PResult::Ok(opentype_table_record { table_id, checksum, offset, length })
 }
 
 fn Decoder_opentype_table_directory_table_links<>(_input: &mut Parser<'_>, start: u32, tables: &Vec<opentype_table_record>) -> Result<opentype_table_directory_table_links, ParseError> {
-let cmap = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1668112752u32, tables)).cloned() {
+let cmap = ((|| {
+let ret = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1668112752u32, tables)).cloned() {
 Some(ref matching_table) => {
 let tgt_offset = start + matching_table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6167,8 +6195,11 @@ ret
 _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
-}))())?;
-let head = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1751474532u32, tables)).cloned() {
+};
+PResult::Ok(ret)
+})())?;
+let head = ((|| {
+let ret = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1751474532u32, tables)).cloned() {
 Some(ref matching_table) => {
 let tgt_offset = start + matching_table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6186,8 +6217,11 @@ ret
 _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
-}))())?;
-let hhea = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1751672161u32, tables)).cloned() {
+};
+PResult::Ok(ret)
+})())?;
+let hhea = ((|| {
+let ret = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1751672161u32, tables)).cloned() {
 Some(ref matching_table) => {
 let tgt_offset = start + matching_table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6205,8 +6239,11 @@ ret
 _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
-}))())?;
-let maxp = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1835104368u32, tables)).cloned() {
+};
+PResult::Ok(ret)
+})())?;
+let maxp = ((|| {
+let ret = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1835104368u32, tables)).cloned() {
 Some(ref matching_table) => {
 let tgt_offset = start + matching_table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6224,8 +6261,11 @@ ret
 _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
-}))())?;
-let hmtx = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1752003704u32, tables)).cloned() {
+};
+PResult::Ok(ret)
+})())?;
+let hmtx = ((|| {
+let ret = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1752003704u32, tables)).cloned() {
 Some(ref matching_table) => {
 let tgt_offset = start + matching_table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6243,8 +6283,11 @@ ret
 _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
-}))())?;
-let name = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1851878757u32, tables)).cloned() {
+};
+PResult::Ok(ret)
+})())?;
+let name = ((|| {
+let ret = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1851878757u32, tables)).cloned() {
 Some(ref matching_table) => {
 let tgt_offset = start + matching_table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6262,8 +6305,11 @@ ret
 _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
-}))())?;
-let os2 = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1330851634u32, tables)).cloned() {
+};
+PResult::Ok(ret)
+})())?;
+let os2 = ((|| {
+let ret = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1330851634u32, tables)).cloned() {
 Some(ref matching_table) => {
 let tgt_offset = start + matching_table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6282,8 +6328,11 @@ ret
 _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
-}))())?;
-let post = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1886352244u32, tables)).cloned() {
+};
+PResult::Ok(ret)
+})())?;
+let post = ((|| {
+let ret = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1886352244u32, tables)).cloned() {
 Some(ref matching_table) => {
 let tgt_offset = start + matching_table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6301,8 +6350,11 @@ ret
 _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
-}))())?;
-let cvt = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1668707360u32, tables)).cloned() {
+};
+PResult::Ok(ret)
+})())?;
+let cvt = ((|| {
+let ret = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1668707360u32, tables)).cloned() {
 Some(ref table) => {
 let val = {
 let tgt_offset = start + table.offset.clone();
@@ -6343,8 +6395,11 @@ Some(val)
 None => {
 None
 }
-}))())?;
-let fpgm = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1718642541u32, tables)).cloned() {
+};
+PResult::Ok(ret)
+})())?;
+let fpgm = ((|| {
+let ret = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1718642541u32, tables)).cloned() {
 Some(ref table) => {
 let val = {
 let tgt_offset = start + table.offset.clone();
@@ -6385,8 +6440,11 @@ Some(val)
 None => {
 None
 }
-}))())?;
-let loca = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1819239265u32, tables)).cloned() {
+};
+PResult::Ok(ret)
+})())?;
+let loca = ((|| {
+let ret = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1819239265u32, tables)).cloned() {
 Some(ref table) => {
 let val = {
 let tgt_offset = start + table.offset.clone();
@@ -6407,8 +6465,11 @@ Some(val)
 None => {
 None
 }
-}))())?;
-let glyf = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1735162214u32, tables)).cloned() {
+};
+PResult::Ok(ret)
+})())?;
+let glyf = ((|| {
+let ret = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1735162214u32, tables)).cloned() {
 Some(ref table) => {
 let val = {
 let tgt_offset = start + table.offset.clone();
@@ -6437,8 +6498,11 @@ Some(val)
 None => {
 None
 }
-}))())?;
-let prep = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1886545264u32, tables)).cloned() {
+};
+PResult::Ok(ret)
+})())?;
+let prep = ((|| {
+let ret = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1886545264u32, tables)).cloned() {
 Some(ref table) => {
 let val = {
 let tgt_offset = start + table.offset.clone();
@@ -6479,8 +6543,11 @@ Some(val)
 None => {
 None
 }
-}))())?;
-let gasp = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1734439792u32, tables)).cloned() {
+};
+PResult::Ok(ret)
+})())?;
+let gasp = ((|| {
+let ret = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1734439792u32, tables)).cloned() {
 Some(ref table) => {
 let val = {
 let tgt_offset = start + table.offset.clone();
@@ -6501,8 +6568,11 @@ Some(val)
 None => {
 None
 }
-}))())?;
-let base = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1111577413u32, tables)).cloned() {
+};
+PResult::Ok(ret)
+})())?;
+let base = ((|| {
+let ret = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1111577413u32, tables)).cloned() {
 Some(ref table) => {
 let val = {
 let tgt_offset = start + table.offset.clone();
@@ -6523,8 +6593,11 @@ Some(val)
 None => {
 None
 }
-}))())?;
-let gdef = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1195656518u32, tables)).cloned() {
+};
+PResult::Ok(ret)
+})())?;
+let gdef = ((|| {
+let ret = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1195656518u32, tables)).cloned() {
 Some(ref table) => {
 let val = {
 let tgt_offset = start + table.offset.clone();
@@ -6545,8 +6618,11 @@ Some(val)
 None => {
 None
 }
-}))())?;
-let gpos = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1196445523u32, tables)).cloned() {
+};
+PResult::Ok(ret)
+})())?;
+let gpos = ((|| {
+let ret = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1196445523u32, tables)).cloned() {
 Some(ref table) => {
 let val = {
 let tgt_offset = start + table.offset.clone();
@@ -6567,8 +6643,11 @@ Some(val)
 None => {
 None
 }
-}))())?;
-let gsub = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1196643650u32, tables)).cloned() {
+};
+PResult::Ok(ret)
+})())?;
+let gsub = ((|| {
+let ret = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1196643650u32, tables)).cloned() {
 Some(ref table) => {
 let val = {
 let tgt_offset = start + table.offset.clone();
@@ -6589,8 +6668,11 @@ Some(val)
 None => {
 None
 }
-}))())?;
-let fvar = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1719034226u32, tables)).cloned() {
+};
+PResult::Ok(ret)
+})())?;
+let fvar = ((|| {
+let ret = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1719034226u32, tables)).cloned() {
 Some(ref table) => {
 let val = {
 let tgt_offset = start + table.offset.clone();
@@ -6611,8 +6693,11 @@ Some(val)
 None => {
 None
 }
-}))())?;
-let gvar = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1735811442u32, tables)).cloned() {
+};
+PResult::Ok(ret)
+})())?;
+let gvar = ((|| {
+let ret = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1735811442u32, tables)).cloned() {
 Some(ref table) => {
 let val = {
 let tgt_offset = start + table.offset.clone();
@@ -6633,8 +6718,11 @@ Some(val)
 None => {
 None
 }
-}))())?;
-let kern = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1801810542u32, tables)).cloned() {
+};
+PResult::Ok(ret)
+})())?;
+let kern = ((|| {
+let ret = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1801810542u32, tables)).cloned() {
 Some(ref table) => {
 let val = {
 let tgt_offset = start + table.offset.clone();
@@ -6655,8 +6743,11 @@ Some(val)
 None => {
 None
 }
-}))())?;
-let stat = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1398030676u32, tables)).cloned() {
+};
+PResult::Ok(ret)
+})())?;
+let stat = ((|| {
+let ret = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1398030676u32, tables)).cloned() {
 Some(ref table) => {
 let val = {
 let tgt_offset = start + table.offset.clone();
@@ -6677,8 +6768,11 @@ Some(val)
 None => {
 None
 }
-}))())?;
-let vhea = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1986553185u32, tables)).cloned() {
+};
+PResult::Ok(ret)
+})())?;
+let vhea = ((|| {
+let ret = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1986553185u32, tables)).cloned() {
 Some(ref table) => {
 let val = {
 let tgt_offset = start + table.offset.clone();
@@ -6699,8 +6793,11 @@ Some(val)
 None => {
 None
 }
-}))())?;
-let vmtx = ((|| PResult::Ok(match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1986884728u32, tables)).cloned() {
+};
+PResult::Ok(ret)
+})())?;
+let vmtx = ((|| {
+let ret = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1986884728u32, tables)).cloned() {
 Some(ref table) => {
 let val = {
 let tgt_offset = start + table.offset.clone();
@@ -6729,7 +6826,9 @@ Some(val)
 None => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let __skip = _input.skip_remainder();
 PResult::Ok(opentype_table_directory_table_links { cmap, head, hhea, maxp, hmtx, name, os2, post, cvt, fpgm, loca, glyf, prep, gasp, base, gdef, gpos, gsub, fvar, gvar, kern, stat, vhea, vmtx, __skip })
 }
@@ -6758,11 +6857,12 @@ let is_valid = {
 let x = inner;
 x == 1u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(15080388466336998873u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let minor_version = ((|| {
 let inner = (Decoder23(_input))?;
@@ -6770,11 +6870,12 @@ let is_valid = {
 let x = inner;
 x == 0u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(6070260202873699214u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let font_revision = ((|| {
 let x = (Decoder20(_input))?;
@@ -6823,11 +6924,12 @@ let is_valid = {
 let x = inner;
 (x >= 16u16) && (x <= 16384u16)
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(9220862562374507822u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let created = (Decoder98(_input))?;
 let modified = (Decoder98(_input))?;
@@ -6857,11 +6959,12 @@ let is_valid = {
 let x = inner;
 x <= 1u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(8772793160380380086u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let glyph_data_format = ((|| {
 let inner = (Decoder23(_input))?;
@@ -6869,11 +6972,12 @@ let is_valid = {
 let x = inner;
 x == 0u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(2605623462625042002u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 PResult::Ok(opentype_head_table { major_version, minor_version, font_revision, checksum_adjustment, magic_number, flags, units_per_em, created, modified, glyph_extents, mac_style, lowest_rec_ppem, font_direction_hint, index_to_loc_format, glyph_data_format })
 }
@@ -6885,11 +6989,12 @@ let is_valid = {
 let x = inner;
 x == 1u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(18164850183020044607u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let minor_version = ((|| {
 let inner = (Decoder23(_input))?;
@@ -6909,11 +7014,12 @@ false
 }
 }
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(10688770705819276010u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let ascent = (Decoder23(_input))?;
 let descent = (Decoder23(_input))?;
@@ -6935,11 +7041,12 @@ let is_valid = {
 let x = inner;
 x == 0u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(10416240583538343445u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let field1 = ((|| {
 let inner = (Decoder23(_input))?;
@@ -6947,11 +7054,12 @@ let is_valid = {
 let x = inner;
 x == 0u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(1457499133218925748u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let field2 = ((|| {
 let inner = (Decoder23(_input))?;
@@ -6959,11 +7067,12 @@ let is_valid = {
 let x = inner;
 x == 0u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(14215639860155940137u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let field3 = ((|| {
 let inner = (Decoder23(_input))?;
@@ -6971,11 +7080,12 @@ let is_valid = {
 let x = inner;
 x == 0u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(5584166819955891466u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 PResult::Ok((field0, field1, field2, field3))
 })())?;
@@ -6985,11 +7095,12 @@ let is_valid = {
 let x = inner;
 x == 0u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(11133239979815295357u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let number_of_long_metrics = (Decoder23(_input))?;
 PResult::Ok(opentype_hhea_table { major_version, minor_version, ascent, descent, line_gap, advance_width_max, min_left_side_bearing, min_right_side_bearing, x_max_extent, caret_slope, caret_offset, __reservedX4, metric_data_format, number_of_long_metrics })
@@ -6998,7 +7109,8 @@ PResult::Ok(opentype_hhea_table { major_version, minor_version, ascent, descent,
 fn Decoder_opentype_maxp_table<>(_input: &mut Parser<'_>) -> Result<opentype_maxp_table, ParseError> {
 let version = (Decoder20(_input))?;
 let num_glyphs = (Decoder23(_input))?;
-let data = ((|| PResult::Ok(match version {
+let data = ((|| {
+let ret = match version {
 65536u32 => {
 let inner = (Decoder_opentype_maxp_table_version1(_input))?;
 opentype_maxp_table_data::MaxpV1(inner)
@@ -7012,7 +7124,9 @@ unknown => {
 let inner = unknown.clone();
 opentype_maxp_table_data::MaxpUnknown(inner)
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_maxp_table { version, num_glyphs, data })
 }
 
@@ -7057,13 +7171,14 @@ let name_id = (Decoder23(_input))?;
 let length = (Decoder23(_input))?;
 let offset = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (storage_offset as u32) + (offset as u32) >= __here {
+let ret = if table_start + (storage_offset as u32) + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (storage_offset as u32) + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -7077,13 +7192,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_name_table_name_records_offset { offset, link })
 })())?;
 opentype_name_table_name_records { platform, encoding, language, name_id, length, offset }
@@ -7091,7 +7209,8 @@ opentype_name_table_name_records { platform, encoding, language, name_id, length
 }
 PResult::Ok(accum)
 })())?;
-let data = ((|| PResult::Ok(match version {
+let data = ((|| {
+let ret = match version {
 0u16 => {
 opentype_name_table_data::NameVersion0
 },
@@ -7105,7 +7224,9 @@ unknown => {
 let inner = unknown.clone();
 opentype_name_table_data::NameVersionUnknown(inner)
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_name_table { table_start, version, name_count, storage_offset, name_records, data })
 }
 
@@ -7141,13 +7262,15 @@ let ach_vend_id = (Decoder46(_input))?;
 let fs_selection = (Decoder23(_input))?;
 let us_first_char_index = (Decoder23(_input))?;
 let us_last_char_index = (Decoder23(_input))?;
-let data = ((|| PResult::Ok(if (version > 0u16) || (table_length >= 78u32) {
+let data = ((|| {
+let ret = if (version > 0u16) || (table_length >= 78u32) {
 let s_typo_ascender = (Decoder23(_input))?;
 let s_typo_descender = (Decoder23(_input))?;
 let s_typo_line_gap = (Decoder23(_input))?;
 let us_win_ascent = (Decoder23(_input))?;
 let us_win_descent = (Decoder23(_input))?;
-let extra_fields_v1 = ((|| PResult::Ok(if match version {
+let extra_fields_v1 = ((|| {
+let ret = if match version {
 1u16.. => {
 true
 },
@@ -7158,7 +7281,8 @@ false
 } {
 let ul_code_page_range_1 = (Decoder20(_input))?;
 let ul_code_page_range_2 = (Decoder20(_input))?;
-let extra_fields_v2 = ((|| PResult::Ok(if match version {
+let extra_fields_v2 = ((|| {
+let ret = if match version {
 2u16.. => {
 true
 },
@@ -7172,7 +7296,8 @@ let s_cap_height = (Decoder23(_input))?;
 let us_default_char = (Decoder23(_input))?;
 let us_break_char = (Decoder23(_input))?;
 let us_max_context = (Decoder23(_input))?;
-let extra_fields_v5 = ((|| PResult::Ok(if match version {
+let extra_fields_v5 = ((|| {
+let ret = if match version {
 5u16.. => {
 true
 },
@@ -7186,19 +7311,27 @@ let us_upper_optical_point_size = (Decoder23(_input))?;
 Some(opentype_os2_table_data_extra_fields_v1_extra_fields_v2_extra_fields_v5 { us_lower_optical_point_size, us_upper_optical_point_size })
 } else {
 None
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 Some(opentype_os2_table_data_extra_fields_v1_extra_fields_v2 { sx_height, s_cap_height, us_default_char, us_break_char, us_max_context, extra_fields_v5 })
 } else {
 None
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 Some(opentype_os2_table_data_extra_fields_v1 { ul_code_page_range_1, ul_code_page_range_2, extra_fields_v2 })
 } else {
 None
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 Some(opentype_os2_table_data { s_typo_ascender, s_typo_descender, s_typo_line_gap, us_win_ascent, us_win_descent, extra_fields_v1 })
 } else {
 None
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_os2_table { version, x_avg_char_width, us_weight_class, us_width_class, fs_type, y_subscript_x_size, y_subscript_y_size, y_subscript_x_offset, y_subscript_y_offset, y_superscript_x_size, y_superscript_y_size, y_superscript_x_offset, y_superscript_y_offset, y_strikeout_size, y_strikeout_position, s_family_class, panose, ul_unicode_range1, ul_unicode_range2, ul_unicode_range3, ul_unicode_range4, ach_vend_id, fs_selection, us_first_char_index, us_last_char_index, data })
 }
 
@@ -7215,7 +7348,8 @@ let min_mem_type42 = (Decoder20(_input))?;
 let max_mem_type42 = (Decoder20(_input))?;
 let min_mem_type1 = (Decoder20(_input))?;
 let max_mem_type1 = (Decoder20(_input))?;
-let names = ((|| PResult::Ok(match version {
+let names = ((|| {
+let ret = match version {
 65536u32 => {
 opentype_post_table_names::Version1
 },
@@ -7262,12 +7396,15 @@ unknown => {
 let inner = unknown.clone();
 opentype_post_table_names::VersionUnknown(inner)
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_post_table { version, italic_angle, underline_position, underline_thickness, is_fixed_pitch, min_mem_type42, max_mem_type42, min_mem_type1, max_mem_type1, names })
 }
 
 fn Decoder_opentype_loca_table<>(_input: &mut Parser<'_>, num_glyphs: u16, index_to_loc_format: u16) -> Result<opentype_loca_table, ParseError> {
-let offsets = ((|| PResult::Ok(match index_to_loc_format {
+let offsets = ((|| {
+let ret = match index_to_loc_format {
 0u16 => {
 let inner = {
 let mut accum = Vec::new();
@@ -7293,7 +7430,9 @@ opentype_gvar_table_glyph_variation_data_offsets::Offsets32(inner)
 _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_loca_table { offsets })
 }
 
@@ -7302,14 +7441,15 @@ let start_offset = {
 let x = _input.get_offset_u64();
 x as u32
 };
-PResult::Ok(match offsets {
+let ret = match offsets {
 opentype_gvar_table_glyph_variation_data_offsets::Offsets16(ref half16s) => {
 let len = pred((half16s.len()) as u32);
 let mut accum = Vec::new();
 for ix in 0u32..len {
-accum.push(match (((half16s[ix as usize].clone()) as u32) * 2u32, ((half16s[(succ(ix)) as usize].clone()) as u32) * 2u32) {
+accum.push({
+let ret = match (((half16s[ix as usize].clone()) as u32) * 2u32, ((half16s[(succ(ix)) as usize].clone()) as u32) * 2u32) {
 (this_offs, next_offs) => {
-match next_offs > this_offs {
+let ret = match next_offs > this_offs {
 true => {
 let tgt_offset = start_offset + this_offs;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -7332,8 +7472,11 @@ ret
 false => {
 opentype_glyf_table::EmptyGlyph
 }
+};
+ret
 }
-}
+};
+ret
 });
 }
 accum
@@ -7343,9 +7486,10 @@ opentype_gvar_table_glyph_variation_data_offsets::Offsets32(ref off32s) => {
 let len = pred((off32s.len()) as u32);
 let mut accum = Vec::new();
 for ix in 0u32..len {
-accum.push(match (off32s[ix as usize].clone(), off32s[(succ(ix)) as usize].clone()) {
+accum.push({
+let ret = match (off32s[ix as usize].clone(), off32s[(succ(ix)) as usize].clone()) {
 (this_offs, next_offs) => {
-match next_offs > this_offs {
+let ret = match next_offs > this_offs {
 true => {
 let tgt_offset = start_offset + this_offs;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -7368,13 +7512,17 @@ ret
 false => {
 opentype_glyf_table::EmptyGlyph
 }
+};
+ret
 }
-}
+};
+ret
 });
 }
 accum
 }
-})
+};
+PResult::Ok(ret)
 }
 
 fn Decoder_opentype_gasp_table<>(_input: &mut Parser<'_>) -> Result<opentype_gasp_table, ParseError> {
@@ -7385,7 +7533,8 @@ let mut accum = Vec::new();
 for _ in 0..num_ranges {
 accum.push({
 let range_max_ppem = (Decoder23(_input))?;
-let range_gasp_behavior = ((|| PResult::Ok(match version {
+let range_gasp_behavior = ((|| {
+let ret = match version {
 0u16 => {
 let inner = {
 let packed_bits = {
@@ -7419,7 +7568,9 @@ opentype_gasp_table_gasp_ranges_range_gasp_behavior::Version1(inner)
 _ => {
 return Err(ParseError::FailToken(1275286460638129217u64));
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_gasp_table_gasp_ranges { range_max_ppem, range_gasp_behavior }
 });
 }
@@ -7439,11 +7590,12 @@ let is_valid = {
 let x = inner;
 x == 1u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(386759067598651566u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let minor_version = ((|| {
 let inner = (Decoder23(_input))?;
@@ -7451,21 +7603,23 @@ let is_valid = {
 let x = inner;
 x <= 1u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(13527164188224560282u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let horiz_axis_offset = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_layout_axis_table(_input))?;
@@ -7473,24 +7627,28 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_base_table_vert_axis_offset { offset, link })
 })())?;
 let vert_axis_offset = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_layout_axis_table(_input))?;
@@ -7498,18 +7656,23 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_base_table_vert_axis_offset { offset, link })
 })())?;
-let item_var_store_offset = ((|| PResult::Ok(if minor_version > 0u16 {
+let item_var_store_offset = ((|| {
+let ret = if minor_version > 0u16 {
 let offset = (Decoder20(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u32 {
+let link = ((|| {
+let ret = match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -7524,11 +7687,15 @@ ret
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 Some(opentype_base_table_item_var_store_offset { offset, link })
 } else {
 None
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_base_table { table_start, major_version, minor_version, horiz_axis_offset, vert_axis_offset, item_var_store_offset })
 }
 
@@ -7543,22 +7710,24 @@ let is_valid = {
 let x = inner;
 x == 1u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(240888096670347429u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let minor_version = (Decoder23(_input))?;
 let glyph_class_def = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_class_def(_input))?;
@@ -7566,24 +7735,28 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_gdef_table_glyph_class_def { offset, link })
 })())?;
 let attach_list = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -7593,13 +7766,14 @@ x as u32
 };
 let coverage = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
@@ -7607,13 +7781,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_reverse_chain_single_subst_coverage { offset, link })
 })())?;
 let glyph_count = (Decoder23(_input))?;
@@ -7622,13 +7799,14 @@ let mut accum = Vec::new();
 for _ in 0..glyph_count {
 accum.push({
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -7646,13 +7824,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_gdef_table_attach_list_link_attach_point_offsets { offset, link }
 });
 }
@@ -7664,24 +7845,28 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_gdef_table_attach_list { offset, link })
 })())?;
 let lig_caret_list = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -7691,13 +7876,14 @@ x as u32
 };
 let coverage = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
@@ -7705,13 +7891,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_reverse_chain_single_subst_coverage { offset, link })
 })())?;
 let lig_glyph_count = (Decoder23(_input))?;
@@ -7720,13 +7909,14 @@ let mut accum = Vec::new();
 for _ in 0..lig_glyph_count {
 accum.push({
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -7740,13 +7930,14 @@ let mut accum = Vec::new();
 for _ in 0..caret_count {
 accum.push({
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -7755,7 +7946,8 @@ let x = _input.get_offset_u64();
 x as u32
 };
 let caret_value_format = (Decoder23(_input))?;
-let data = ((|| PResult::Ok(match caret_value_format {
+let data = ((|| {
+let ret = match caret_value_format {
 1u16 => {
 let inner = {
 let coordinate = (Decoder23(_input))?;
@@ -7777,13 +7969,14 @@ let inner = {
 let coordinate = (Decoder23(_input))?;
 let table = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
@@ -7791,13 +7984,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_common_value_record_x_advance_device { offset, link })
 })())?;
 opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link_data_Format3 { coordinate, table }
@@ -7808,20 +8004,25 @@ opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link
 _ => {
 return Err(ParseError::FailToken(11936787736236307191u64));
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link { table_start, caret_value_format, data })
 })())?;
 _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values { offset, link }
 });
 }
@@ -7833,13 +8034,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets { offset, link }
 });
 }
@@ -7851,24 +8055,28 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_gdef_table_lig_caret_list { offset, link })
 })())?;
 let mark_attach_class_def = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_class_def(_input))?;
@@ -7876,16 +8084,20 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_gdef_table_glyph_class_def { offset, link })
 })())?;
-let data = ((|| PResult::Ok(match minor_version {
+let data = ((|| {
+let ret = match minor_version {
 0u16 => {
 opentype_gdef_table_data::Version1_0
 },
@@ -7898,13 +8110,14 @@ return Err(ParseError::FailToken(5215619712890029856u64));
 let inner = {
 let mark_glyph_sets_def = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_mark_glyph_set(_input))?;
@@ -7912,13 +8125,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_gdef_table_data_Version1_2_mark_glyph_sets_def { offset, link })
 })())?;
 opentype_gdef_table_data_Version1_2 { mark_glyph_sets_def }
@@ -7930,13 +8146,14 @@ opentype_gdef_table_data::Version1_2(inner)
 let inner = {
 let mark_glyph_sets_def = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_mark_glyph_set(_input))?;
@@ -7944,18 +8161,22 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_gdef_table_data_Version1_2_mark_glyph_sets_def { offset, link })
 })())?;
 let item_var_store = ((|| {
 let offset = (Decoder20(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u32 {
+let link = ((|| {
+let ret = match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -7970,7 +8191,9 @@ ret
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_base_table_item_var_store_offset { offset, link })
 })())?;
 opentype_gdef_table_data_Version1_3 { mark_glyph_sets_def, item_var_store }
@@ -7982,13 +8205,14 @@ _ => {
 let inner = {
 let mark_glyph_sets_def = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_mark_glyph_set(_input))?;
@@ -7996,18 +8220,22 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_gdef_table_data_Version1_2_mark_glyph_sets_def { offset, link })
 })())?;
 let item_var_store = ((|| {
 let offset = (Decoder20(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u32 {
+let link = ((|| {
+let ret = match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -8022,14 +8250,18 @@ ret
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_base_table_item_var_store_offset { offset, link })
 })())?;
 opentype_gdef_table_data_Version1_3 { mark_glyph_sets_def, item_var_store }
 };
 opentype_gdef_table_data::Version1_3(inner)
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_gdef_table { table_start, major_version, minor_version, glyph_class_def, attach_list, lig_caret_list, mark_attach_class_def, data })
 }
 
@@ -8044,22 +8276,24 @@ let is_valid = {
 let x = inner;
 x == 1u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(3167775832820164678u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let minor_version = (Decoder23(_input))?;
 let script_list = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_script_list(_input))?;
@@ -8067,24 +8301,28 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_gsub_table_script_list { offset, link })
 })())?;
 let feature_list = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_feature_list(_input))?;
@@ -8092,24 +8330,28 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_gsub_table_feature_list { offset, link })
 })())?;
 let lookup_list = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -8123,13 +8365,14 @@ let mut accum = Vec::new();
 for _ in 0..lookup_count {
 accum.push({
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -8155,16 +8398,18 @@ let mut accum = Vec::new();
 for _ in 0..sub_table_count {
 accum.push({
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| PResult::Ok(match lookup_type {
+let ret = ((|| {
+let ret = match lookup_type {
 9u16 => {
 let inner = (Decoder_opentype_layout_pos_extension(_input))?;
 opentype_gpos_table_lookup_list_link_lookups_link_subtables_link::PosExtension(inner)
@@ -8174,24 +8419,30 @@ _ => {
 let inner = (Decoder_opentype_layout_ground_pos(_input, lookup_type.clone()))?;
 opentype_gpos_table_lookup_list_link_lookups_link_subtables_link::GroundPos(inner)
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_gpos_table_lookup_list_link_lookups_link_subtables { offset, link }
 });
 }
 PResult::Ok(accum)
 })())?;
-let mark_filtering_set = ((|| PResult::Ok(match lookup_flag.use_mark_filtering_set.clone() {
+let mark_filtering_set = ((|| {
+let ret = match lookup_flag.use_mark_filtering_set.clone() {
 true => {
 let val = (Decoder23(_input))?;
 Some(val)
@@ -8200,20 +8451,25 @@ Some(val)
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_gpos_table_lookup_list_link_lookups_link { table_start, lookup_type, lookup_flag, sub_table_count, subtables, mark_filtering_set })
 })())?;
 _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_gpos_table_lookup_list_link_lookups { offset, link }
 });
 }
@@ -8225,18 +8481,23 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_gpos_table_lookup_list { offset, link })
 })())?;
-let feature_variations_offset = ((|| PResult::Ok(if minor_version > 0u16 {
+let feature_variations_offset = ((|| {
+let ret = if minor_version > 0u16 {
 let offset = (Decoder20(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u32 {
+let link = ((|| {
+let ret = match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -8251,11 +8512,15 @@ ret
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 Some(opentype_gsub_table_feature_variations_offset { offset, link })
 } else {
 None
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_gpos_table { table_start, major_version, minor_version, script_list, feature_list, lookup_list, feature_variations_offset })
 }
 
@@ -8270,22 +8535,24 @@ let is_valid = {
 let x = inner;
 x == 1u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(7215050775822222282u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let minor_version = (Decoder23(_input))?;
 let script_list = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_script_list(_input))?;
@@ -8293,24 +8560,28 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_gsub_table_script_list { offset, link })
 })())?;
 let feature_list = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_feature_list(_input))?;
@@ -8318,24 +8589,28 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_gsub_table_feature_list { offset, link })
 })())?;
 let lookup_list = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -8349,13 +8624,14 @@ let mut accum = Vec::new();
 for _ in 0..lookup_count {
 accum.push({
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -8381,16 +8657,18 @@ let mut accum = Vec::new();
 for _ in 0..sub_table_count {
 accum.push({
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| PResult::Ok(match lookup_type {
+let ret = ((|| {
+let ret = match lookup_type {
 7u16 => {
 let inner = (Decoder_opentype_layout_subst_extension(_input))?;
 opentype_gsub_table_lookup_list_link_lookups_link_subtables_link::SubstExtension(inner)
@@ -8400,24 +8678,30 @@ _ => {
 let inner = (Decoder_opentype_layout_ground_subst(_input, lookup_type.clone()))?;
 opentype_gsub_table_lookup_list_link_lookups_link_subtables_link::GroundSubst(inner)
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_gsub_table_lookup_list_link_lookups_link_subtables { offset, link }
 });
 }
 PResult::Ok(accum)
 })())?;
-let mark_filtering_set = ((|| PResult::Ok(match lookup_flag.use_mark_filtering_set.clone() {
+let mark_filtering_set = ((|| {
+let ret = match lookup_flag.use_mark_filtering_set.clone() {
 true => {
 let val = (Decoder23(_input))?;
 Some(val)
@@ -8426,20 +8710,25 @@ Some(val)
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_gsub_table_lookup_list_link_lookups_link { table_start, lookup_type, lookup_flag, sub_table_count, subtables, mark_filtering_set })
 })())?;
 _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_gsub_table_lookup_list_link_lookups { offset, link }
 });
 }
@@ -8451,18 +8740,23 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_gsub_table_lookup_list { offset, link })
 })())?;
-let feature_variations_offset = ((|| PResult::Ok(if minor_version > 0u16 {
+let feature_variations_offset = ((|| {
+let ret = if minor_version > 0u16 {
 let offset = (Decoder20(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u32 {
+let link = ((|| {
+let ret = match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -8477,11 +8771,15 @@ ret
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 Some(opentype_gsub_table_feature_variations_offset { offset, link })
 } else {
 None
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_gsub_table { table_start, major_version, minor_version, script_list, feature_list, lookup_list, feature_variations_offset })
 }
 
@@ -8496,11 +8794,12 @@ let is_valid = {
 let x = inner;
 x == 1u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(3743786174148899814u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let minor_version = ((|| {
 let inner = (Decoder23(_input))?;
@@ -8508,11 +8807,12 @@ let is_valid = {
 let x = inner;
 x == 0u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(12652804269632162478u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let __offset_axes = ((|| {
 let inner = (Decoder23(_input))?;
@@ -8520,11 +8820,12 @@ let is_valid = {
 let raw = inner;
 raw > 0u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(18134882366868794706u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let __reserved = ((|| {
 let inner = (Decoder23(_input))?;
@@ -8532,11 +8833,12 @@ let is_valid = {
 let x = inner;
 x == 2u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(7155653122005708978u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let axis_count = (Decoder23(_input))?;
 let axis_size = ((|| {
@@ -8545,11 +8847,12 @@ let is_valid = {
 let x = inner;
 x == 20u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(17920584887603040596u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let instance_count = (Decoder23(_input))?;
 let instance_size = (Decoder23(_input))?;
@@ -8564,11 +8867,12 @@ let is_valid = {
 let __here = inner;
 table_start + (__offset_axes as u32) >= __here
 };
-if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(5673845796627816005u64));
-}
+};
+ret
 };
 let tgt_offset = 0u32 + table_start + (__offset_axes as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -8604,11 +8908,12 @@ let is_valid = {
 let __here = inner;
 table_start + ((__offset_axes + __axes_length) as u32) >= __here
 };
-if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(14591018267292443527u64));
-}
+};
+ret
 };
 let tgt_offset = 0u32 + table_start + ((__offset_axes + __axes_length) as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -8626,18 +8931,22 @@ let is_valid = {
 let x = inner;
 x == 0u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(4762692522317026931u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let coordinates = (Decoder_opentype_var_user_tuple(_input, axis_count.clone()))?;
-let postscript_nameid = ((|| PResult::Ok(if instance_size % 4u16 == 2u16 {
+let postscript_nameid = ((|| {
+let ret = if instance_size % 4u16 == 2u16 {
 Some((Decoder23(_input))?)
 } else {
 None
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_fvar_table_instances { subfamily_nameid, flags, coordinates, postscript_nameid })
 })())?;
 _input.end_slice()?;
@@ -8663,11 +8972,12 @@ let is_valid = {
 let x = inner;
 x == 1u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(9630069758457681762u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let minor_version = ((|| {
 let inner = (Decoder23(_input))?;
@@ -8675,17 +8985,19 @@ let is_valid = {
 let x = inner;
 x == 0u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(908377722732597655u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let axis_count = (Decoder23(_input))?;
 let shared_tuple_count = (Decoder23(_input))?;
 let shared_tuples_offset = ((|| {
 let offset = (Decoder20(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u32 {
+let link = ((|| {
+let ret = match offset > 0u32 {
 true => {
 let tgt_offset = gvar_table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -8706,7 +9018,9 @@ ret
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_gvar_table_shared_tuples_offset { offset, link })
 })())?;
 let glyph_count = (Decoder23(_input))?;
@@ -8722,7 +9036,8 @@ u16be(x)
 PResult::Ok(opentype_gvar_table_flags { is_long_offset: packed_bits >> 0u16 & 1u16 > 0u16 })
 })())?;
 let glyph_variation_data_array_offset = (Decoder20(_input))?;
-let glyph_variation_data_offsets = ((|| PResult::Ok(match flags.is_long_offset.clone() {
+let glyph_variation_data_offsets = ((|| {
+let ret = match flags.is_long_offset.clone() {
 true => {
 let inner = {
 let mut accum = Vec::new();
@@ -8744,23 +9059,26 @@ accum
 };
 opentype_gvar_table_glyph_variation_data_offsets::Offsets16(inner)
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let glyph_variation_data_array = ((|| {
 let tgt_offset = gvar_table_start + glyph_variation_data_array_offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = {
+let ret = ((|| {
 let array_start = {
 let x = _input.get_offset_u64();
 x as u32
 };
-((|| PResult::Ok(match glyph_variation_data_offsets {
+let ret = match glyph_variation_data_offsets {
 opentype_gvar_table_glyph_variation_data_offsets::Offsets16(ref half16s) => {
 let len = pred((half16s.len()) as u32);
 let mut accum = Vec::new();
 for ix in 0u32..len {
-accum.push(match (((half16s[ix as usize].clone()) as u32) * 2u32, ((half16s[(succ(ix)) as usize].clone()) as u32) * 2u32) {
+accum.push({
+let ret = match (((half16s[ix as usize].clone()) as u32) * 2u32, ((half16s[(succ(ix)) as usize].clone()) as u32) * 2u32) {
 (this_offs, next_offs) => {
-if next_offs > this_offs {
+let ret = if next_offs > this_offs {
 let tgt_offset = array_start + this_offs;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -8774,8 +9092,11 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
+};
+ret
 }
-}
+};
+ret
 });
 }
 accum
@@ -8785,9 +9106,10 @@ opentype_gvar_table_glyph_variation_data_offsets::Offsets32(ref off32s) => {
 let len = pred((off32s.len()) as u32);
 let mut accum = Vec::new();
 for ix in 0u32..len {
-accum.push(match (off32s[ix as usize].clone(), off32s[(succ(ix)) as usize].clone()) {
+accum.push({
+let ret = match (off32s[ix as usize].clone(), off32s[(succ(ix)) as usize].clone()) {
 (this_offs, next_offs) => {
-if next_offs > this_offs {
+let ret = if next_offs > this_offs {
 let tgt_offset = array_start + this_offs;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -8801,14 +9123,18 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
+};
+ret
 }
-}
+};
+ret
 });
 }
 accum
 }
-}))())?
 };
+PResult::Ok(ret)
+})())?;
 _input.close_peek_context()?;
 PResult::Ok(ret)
 })())?;
@@ -8822,11 +9148,12 @@ let is_valid = {
 let x = inner;
 x == 0u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(3203034260088513018u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let n_tables = (Decoder23(_input))?;
 let subtables = ((|| {
@@ -8839,11 +9166,12 @@ let is_valid = {
 let x = inner;
 x == 0u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(14677505873656710393u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let length = (Decoder23(_input))?;
 let coverage = ((|| {
@@ -8857,7 +9185,8 @@ u16be(x)
 };
 PResult::Ok(opentype_kern_table_subtables_coverage { format: packed_bits >> 8u16 & 255u16, r#override: packed_bits >> 3u16 & 1u16 > 0u16, cross_stream: packed_bits >> 2u16 & 1u16 > 0u16, minimum: packed_bits >> 1u16 & 1u16 > 0u16, horizontal: packed_bits >> 0u16 & 1u16 > 0u16 })
 })())?;
-let data = ((|| PResult::Ok(match coverage.format.clone() {
+let data = ((|| {
+let ret = match coverage.format.clone() {
 0u16 => {
 let inner = {
 let n_pairs = (Decoder23(_input))?;
@@ -8890,13 +9219,14 @@ x as u32
 let row_width = (Decoder23(_input))?;
 let left_class_offset = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -8915,24 +9245,28 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_kern_table_subtables_data_Format2_left_class_offset { offset, link })
 })())?;
 let right_class_offset = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -8951,24 +9285,28 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_kern_table_subtables_data_Format2_left_class_offset { offset, link })
 })())?;
 let kerning_array_offset = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -9004,13 +9342,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_kern_table_subtables_data_Format2_kerning_array_offset { offset, link })
 })())?;
 opentype_kern_table_subtables_data_Format2 { table_start, row_width, left_class_offset, right_class_offset, kerning_array_offset }
@@ -9021,7 +9362,9 @@ opentype_kern_table_subtables_data::Format2(inner)
 _ => {
 return Err(ParseError::FailToken(10102114574336663273u64));
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_kern_table_subtables { version, length, coverage, data }
 });
 }
@@ -9041,11 +9384,12 @@ let is_valid = {
 let x = inner;
 x == 1u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(4386762582485017400u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let minor_version = ((|| {
 let inner = (Decoder23(_input))?;
@@ -9065,17 +9409,19 @@ false
 }
 }
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(8893850231119365992u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let design_axis_size = (Decoder23(_input))?;
 let design_axis_count = (Decoder23(_input))?;
 let design_axes_offset = ((|| {
 let offset = (Decoder20(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u32 {
+let link = ((|| {
+let ret = match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -9104,13 +9450,16 @@ ret
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_stat_table_design_axes_offset { offset, link })
 })())?;
 let axis_value_count = (Decoder23(_input))?;
 let offset_to_axis_value_offsets = ((|| {
 let offset = (Decoder20(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u32 {
+let link = ((|| {
+let ret = match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -9125,13 +9474,14 @@ let mut accum = Vec::new();
 for _ in 0..axis_value_count {
 accum.push({
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -9161,13 +9511,15 @@ false
 }
 }
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(7659860344311718435u64));
-})
+};
+PResult::Ok(ret)
 })())?;
-let data = ((|| PResult::Ok(match format {
+let data = ((|| {
+let ret = match format {
 1u16 => {
 let inner = {
 let axis_index = (Decoder23(_input))?;
@@ -9289,20 +9641,25 @@ opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_da
 _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link { format, data })
 })())?;
 _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets { offset, link }
 });
 }
@@ -9319,7 +9676,9 @@ ret
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_stat_table_offset_to_axis_value_offsets { offset, link })
 })())?;
 let elided_fallback_name_id = (Decoder23(_input))?;
@@ -9366,11 +9725,12 @@ let is_valid = {
 let x = inner;
 x != 0u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(11052099086134529863u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let tuple_variation_headers = ((|| {
 let mut accum = Vec::new();
@@ -9388,18 +9748,24 @@ u16be(x)
 };
 PResult::Ok(opentype_var_glyph_variation_data_table_tuple_variation_headers_tuple_index { embedded_peak_tuple: packed_bits >> 15u16 & 1u16 > 0u16, intermediate_region: packed_bits >> 14u16 & 1u16 > 0u16, private_point_numbers: packed_bits >> 13u16 & 1u16 > 0u16, tuple_index: packed_bits >> 0u16 & 4095u16 })
 })())?;
-let peak_tuple = ((|| PResult::Ok(if tuple_index.embedded_peak_tuple.clone() {
+let peak_tuple = ((|| {
+let ret = if tuple_index.embedded_peak_tuple.clone() {
 Some((Decoder_opentype_var_tuple_record(_input, axis_count.clone()))?)
 } else {
 None
-}))())?;
-let intermediate_tuples = ((|| PResult::Ok(if tuple_index.intermediate_region.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let intermediate_tuples = ((|| {
+let ret = if tuple_index.intermediate_region.clone() {
 let start_tuple = (Decoder_opentype_var_tuple_record(_input, axis_count.clone()))?;
 let end_tuple = (Decoder_opentype_var_tuple_record(_input, axis_count.clone()))?;
 Some(opentype_var_glyph_variation_data_table_tuple_variation_headers_intermediate_tuples { start_tuple, end_tuple })
 } else {
 None
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_var_glyph_variation_data_table_tuple_variation_headers { variation_data_size, tuple_index, peak_tuple, intermediate_tuples }
 });
 }
@@ -9415,16 +9781,18 @@ let is_valid = {
 let __here = inner;
 table_start + (__data_offset as u32) >= __here
 };
-if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(1079884235207081886u64));
-}
+};
+ret
 };
 let tgt_offset = 0u32 + table_start + (__data_offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
-let shared_point_numbers = ((|| PResult::Ok(if tuple_variation_count.shared_point_numbers.clone() {
+let shared_point_numbers = ((|| {
+let ret = if tuple_variation_count.shared_point_numbers.clone() {
 let tree_index = {
 _input.open_peek_context();
 {
@@ -9449,7 +9817,7 @@ _input.close_peek_context()?;
 ret
 }
 };
-Some(match tree_index {
+let ret = match tree_index {
 0 => {
 let _ = {
 let b = _input.read_byte()?;
@@ -9486,9 +9854,9 @@ let control = ((|| {
 let packed_bits = _input.read_byte()?;
 PResult::Ok(opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes_control { points_are_words: packed_bits >> 7u8 & 1u8 > 0u8, point_run_count: packed_bits >> 0u8 & 127u8 })
 })())?;
-let points = {
+let points = ((|| {
 let run_length = succ(control.point_run_count.clone());
-((|| PResult::Ok(match control.points_are_words.clone() {
+let ret = match control.points_are_words.clone() {
 true => {
 let inner = {
 let mut accum = Vec::new();
@@ -9510,8 +9878,9 @@ accum
 };
 opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes_points::Points8(inner)
 }
-}))())?
 };
+PResult::Ok(ret)
+})())?;
 opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes { control, points }
 };
 seq.push(elem.clone());
@@ -9549,9 +9918,9 @@ let control = ((|| {
 let packed_bits = _input.read_byte()?;
 PResult::Ok(opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes_control { points_are_words: packed_bits >> 7u8 & 1u8 > 0u8, point_run_count: packed_bits >> 0u8 & 127u8 })
 })())?;
-let points = {
+let points = ((|| {
 let run_length = succ(control.point_run_count.clone());
-((|| PResult::Ok(match control.points_are_words.clone() {
+let ret = match control.points_are_words.clone() {
 true => {
 let inner = {
 let mut accum = Vec::new();
@@ -9573,8 +9942,9 @@ accum
 };
 opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes_points::Points8(inner)
 }
-}))())?
 };
+PResult::Ok(ret)
+})())?;
 opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes { control, points }
 };
 seq.push(elem.clone());
@@ -9590,10 +9960,13 @@ acc + (succ((run.control.point_run_count.clone()) as u16))
 _ => {
 return Err(ParseError::ExcludedBranch(11328034188734904930u64));
 }
-})
+};
+Some(ret)
 } else {
 None
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let per_tuple_variation_data = ((|| {
 let mut accum = Vec::new();
 for header in tuple_variation_headers.clone() {
@@ -9601,7 +9974,8 @@ accum.push({
 let sz = (header.variation_data_size.clone()) as usize;
 _input.start_slice(sz)?;
 let ret = ((|| {
-let private_point_numbers = ((|| PResult::Ok(if header.tuple_index.private_point_numbers.clone() {
+let private_point_numbers = ((|| {
+let ret = if header.tuple_index.private_point_numbers.clone() {
 let tree_index = {
 _input.open_peek_context();
 {
@@ -9626,7 +10000,7 @@ _input.close_peek_context()?;
 ret
 }
 };
-Some(match tree_index {
+let ret = match tree_index {
 0 => {
 let _ = {
 let b = _input.read_byte()?;
@@ -9663,9 +10037,9 @@ let control = ((|| {
 let packed_bits = _input.read_byte()?;
 PResult::Ok(opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes_control { points_are_words: packed_bits >> 7u8 & 1u8 > 0u8, point_run_count: packed_bits >> 0u8 & 127u8 })
 })())?;
-let points = {
+let points = ((|| {
 let run_length = succ(control.point_run_count.clone());
-((|| PResult::Ok(match control.points_are_words.clone() {
+let ret = match control.points_are_words.clone() {
 true => {
 let inner = {
 let mut accum = Vec::new();
@@ -9687,8 +10061,9 @@ accum
 };
 opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes_points::Points8(inner)
 }
-}))())?
 };
+PResult::Ok(ret)
+})())?;
 opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes { control, points }
 };
 seq.push(elem.clone());
@@ -9726,9 +10101,9 @@ let control = ((|| {
 let packed_bits = _input.read_byte()?;
 PResult::Ok(opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes_control { points_are_words: packed_bits >> 7u8 & 1u8 > 0u8, point_run_count: packed_bits >> 0u8 & 127u8 })
 })())?;
-let points = {
+let points = ((|| {
 let run_length = succ(control.point_run_count.clone());
-((|| PResult::Ok(match control.points_are_words.clone() {
+let ret = match control.points_are_words.clone() {
 true => {
 let inner = {
 let mut accum = Vec::new();
@@ -9750,8 +10125,9 @@ accum
 };
 opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes_points::Points8(inner)
 }
-}))())?
 };
+PResult::Ok(ret)
+})())?;
 opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes { control, points }
 };
 seq.push(elem.clone());
@@ -9767,10 +10143,13 @@ acc + (succ((run.control.point_run_count.clone()) as u16))
 _ => {
 return Err(ParseError::ExcludedBranch(1977899765720151190u64));
 }
-})
+};
+Some(ret)
 } else {
 None
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let x_and_y_coordinate_deltas = ((|| {
 let point_count = match private_point_numbers {
 Some(ref x) => {
@@ -9804,16 +10183,16 @@ let control = ((|| {
 let packed_bits = _input.read_byte()?;
 PResult::Ok(opentype_var_glyph_variation_data_table_data_per_tuple_variation_data_x_and_y_coordinate_deltas_control { deltas_are_zero: packed_bits >> 7u8 & 1u8 > 0u8, deltas_are_words: packed_bits >> 6u8 & 1u8 > 0u8, delta_run_count: packed_bits >> 0u8 & 63u8 })
 })())?;
-let deltas = {
+let deltas = ((|| {
 let run_length = succ(control.delta_run_count.clone());
-((|| PResult::Ok(match control.deltas_are_zero.clone() {
+let ret = match control.deltas_are_zero.clone() {
 true => {
 let inner = run_length.clone();
 opentype_var_glyph_variation_data_table_data_per_tuple_variation_data_x_and_y_coordinate_deltas_deltas::Delta0(inner)
 },
 
 false => {
-match control.deltas_are_words.clone() {
+let ret = match control.deltas_are_words.clone() {
 true => {
 let inner = {
 let mut accum = Vec::new();
@@ -9835,10 +10214,12 @@ accum
 };
 opentype_var_glyph_variation_data_table_data_per_tuple_variation_data_x_and_y_coordinate_deltas_deltas::Delta8(inner)
 }
-}
-}
-}))())?
 };
+ret
+}
+};
+PResult::Ok(ret)
+})())?;
 opentype_var_glyph_variation_data_table_data_per_tuple_variation_data_x_and_y_coordinate_deltas { control, deltas }
 };
 seq.push(elem.clone());
@@ -9922,13 +10303,14 @@ accum.push({
 let script_tag = (Decoder46(_input))?;
 let script = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_script_table(_input))?;
@@ -9936,13 +10318,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_common_script_list_script_records_script { offset, link })
 })())?;
 opentype_common_script_list_script_records { script_tag, script }
@@ -9966,13 +10351,14 @@ accum.push({
 let feature_tag = (Decoder46(_input))?;
 let feature = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_feature_table(_input))?;
@@ -9980,13 +10366,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_common_feature_list_feature_records_feature { offset, link })
 })())?;
 opentype_common_feature_list_feature_records { feature_tag, feature }
@@ -10008,11 +10397,12 @@ let is_valid = {
 let format = inner;
 format == 1u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(7343323033370781545u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let extension_lookup_type = ((|| {
 let inner = (Decoder23(_input))?;
@@ -10032,15 +10422,17 @@ false
 }
 }
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(12890902517277365935u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let extension_offset = ((|| {
 let offset = (Decoder20(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u32 {
+let link = ((|| {
+let ret = match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -10055,14 +10447,16 @@ ret
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_subst_extension_extension_offset { offset, link })
 })())?;
 PResult::Ok(opentype_layout_subst_extension { table_start, format, extension_lookup_type, extension_offset })
 }
 
 fn Decoder_opentype_layout_ground_subst<>(_input: &mut Parser<'_>, lookup_type: u16) -> Result<opentype_layout_ground_subst, ParseError> {
-PResult::Ok(match lookup_type {
+let ret = match lookup_type {
 1u16 => {
 let inner = (Decoder_opentype_layout_single_subst(_input))?;
 opentype_layout_ground_subst::SingleSubst(inner)
@@ -10105,7 +10499,8 @@ return Err(ParseError::FailToken(13049534979177835905u64));
 _ => {
 return Err(ParseError::FailToken(9011855507994367971u64));
 }
-})
+};
+PResult::Ok(ret)
 }
 
 fn Decoder_opentype_layout_feature_variations<>(_input: &mut Parser<'_>) -> Result<opentype_layout_feature_variations, ParseError> {
@@ -10119,11 +10514,12 @@ let is_valid = {
 let x = inner;
 x == 1u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(14796083725261108356u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let minor_version = ((|| {
 let inner = (Decoder23(_input))?;
@@ -10131,11 +10527,12 @@ let is_valid = {
 let x = inner;
 x == 0u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(2879885114680241844u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let feature_variation_record_count = (Decoder20(_input))?;
 let feature_variation_records = ((|| {
@@ -10144,7 +10541,8 @@ for _ in 0..feature_variation_record_count {
 accum.push({
 let condition_set_offset = ((|| {
 let offset = (Decoder20(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u32 {
+let link = ((|| {
+let ret = match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -10160,7 +10558,8 @@ let mut accum = Vec::new();
 for _ in 0..condition_count {
 accum.push({
 let offset = (Decoder20(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u32 {
+let link = ((|| {
+let ret = match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -10172,11 +10571,12 @@ let is_valid = {
 let format = inner;
 format == 1u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(14009314771729697611u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let axis_index = (Decoder23(_input))?;
 let filter_range_min_value = ((|| {
@@ -10198,7 +10598,9 @@ ret
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_layout_feature_variations_feature_variation_records_condition_set_offset_link_condition_offsets { offset, link }
 });
 }
@@ -10215,12 +10617,15 @@ ret
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_feature_variations_feature_variation_records_condition_set_offset { offset, link })
 })())?;
 let feature_table_substitution_offset = ((|| {
 let offset = (Decoder20(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u32 {
+let link = ((|| {
+let ret = match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -10236,11 +10641,12 @@ let is_valid = {
 let x = inner;
 x == 1u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(10973085168168570837u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let minor_version = ((|| {
 let inner = (Decoder23(_input))?;
@@ -10248,11 +10654,12 @@ let is_valid = {
 let x = inner;
 x == 0u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(10603707580403307601u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let substitution_count = (Decoder23(_input))?;
 let substitutions = ((|| {
@@ -10262,7 +10669,8 @@ accum.push({
 let feature_index = (Decoder23(_input))?;
 let alternate_feature_offset = ((|| {
 let offset = (Decoder20(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u32 {
+let link = ((|| {
+let ret = match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -10277,7 +10685,9 @@ ret
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_feature_variations_feature_variation_records_feature_table_substitution_offset_link_substitutions_alternate_feature_offset { offset, link })
 })())?;
 opentype_layout_feature_variations_feature_variation_records_feature_table_substitution_offset_link_substitutions { feature_index, alternate_feature_offset }
@@ -10296,7 +10706,9 @@ ret
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_feature_variations_feature_variation_records_feature_table_substitution_offset { offset, link })
 })())?;
 opentype_layout_feature_variations_feature_variation_records { condition_set_offset, feature_table_substitution_offset }
@@ -10330,18 +10742,20 @@ let x = _input.get_offset_u64();
 x as u32
 };
 let subst_format = (Decoder23(_input))?;
-let subst = ((|| PResult::Ok(match subst_format {
+let subst = ((|| {
+let ret = match subst_format {
 1u16 => {
 let inner = {
 let coverage = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
@@ -10349,13 +10763,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_reverse_chain_single_subst_coverage { offset, link })
 })())?;
 let delta_glyph_id = (Decoder23(_input))?;
@@ -10368,13 +10785,14 @@ opentype_layout_single_subst_subst::Format1(inner)
 let inner = {
 let coverage = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
@@ -10382,13 +10800,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_reverse_chain_single_subst_coverage { offset, link })
 })())?;
 let glyph_count = (Decoder23(_input))?;
@@ -10407,7 +10828,9 @@ opentype_layout_single_subst_subst::Format2(inner)
 _ => {
 return Err(ParseError::FailToken(18065118697073160549u64));
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_single_subst { table_start, subst_format, subst })
 }
 
@@ -10419,13 +10842,14 @@ x as u32
 let subst_format = (Decoder23(_input))?;
 let coverage = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
@@ -10433,16 +10857,20 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_reverse_chain_single_subst_coverage { offset, link })
 })())?;
-let subst = ((|| PResult::Ok(match subst_format {
+let subst = ((|| {
+let ret = match subst_format {
 1u16 => {
 let inner = {
 let sequence_count = (Decoder23(_input))?;
@@ -10451,13 +10879,14 @@ let mut accum = Vec::new();
 for _ in 0..sequence_count {
 accum.push({
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -10475,13 +10904,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_layout_multiple_subst_subst_Format1_sequences { offset, link }
 });
 }
@@ -10495,7 +10927,9 @@ opentype_layout_multiple_subst_subst::Format1(inner)
 _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_multiple_subst { table_start, subst_format, coverage, subst })
 }
 
@@ -10510,21 +10944,23 @@ let is_valid = {
 let subst_format = inner;
 subst_format == 1u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(10686389193617118447u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let coverage = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
@@ -10532,13 +10968,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_reverse_chain_single_subst_coverage { offset, link })
 })())?;
 let alternate_set_count = (Decoder23(_input))?;
@@ -10547,13 +10986,14 @@ let mut accum = Vec::new();
 for _ in 0..alternate_set_count {
 accum.push({
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -10571,13 +11011,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_layout_alternate_subst_alternate_sets { offset, link }
 });
 }
@@ -10597,21 +11040,23 @@ let is_valid = {
 let subst_format = inner;
 subst_format == 1u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(16128388243093908143u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let coverage = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
@@ -10619,13 +11064,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_reverse_chain_single_subst_coverage { offset, link })
 })())?;
 let ligature_set_count = (Decoder23(_input))?;
@@ -10634,13 +11082,14 @@ let mut accum = Vec::new();
 for _ in 0..ligature_set_count {
 accum.push({
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -10654,13 +11103,14 @@ let mut accum = Vec::new();
 for _ in 0..ligature_count {
 accum.push({
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -10679,13 +11129,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_layout_ligature_subst_ligature_sets_link_ligatures { offset, link }
 });
 }
@@ -10697,13 +11150,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_layout_ligature_subst_ligature_sets { offset, link }
 });
 }
@@ -10718,18 +11174,20 @@ let x = _input.get_offset_u64();
 x as u32
 };
 let format = (Decoder23(_input))?;
-let subst = ((|| PResult::Ok(match format {
+let subst = ((|| {
+let ret = match format {
 1u16 => {
 let inner = {
 let coverage = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
@@ -10737,13 +11195,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_reverse_chain_single_subst_coverage { offset, link })
 })())?;
 let seq_rule_set_count = (Decoder23(_input))?;
@@ -10752,13 +11213,14 @@ let mut accum = Vec::new();
 for _ in 0..seq_rule_set_count {
 accum.push({
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -10772,13 +11234,14 @@ let mut accum = Vec::new();
 for _ in 0..rule_count {
 accum.push({
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -10788,11 +11251,12 @@ let is_valid = {
 let x = inner;
 x != 0u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(2818918064991511645u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let seq_lookup_count = (Decoder23(_input))?;
 let input_sequence = ((|| {
@@ -10815,13 +11279,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_common_sequence_context_subst_Format1_seq_rule_sets_link_rules { offset, link }
 });
 }
@@ -10833,13 +11300,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_common_sequence_context_subst_Format1_seq_rule_sets { offset, link }
 });
 }
@@ -10854,13 +11324,14 @@ opentype_common_sequence_context_subst::Format1(inner)
 let inner = {
 let coverage = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
@@ -10868,24 +11339,28 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_reverse_chain_single_subst_coverage { offset, link })
 })())?;
 let class_def = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_class_def(_input))?;
@@ -10893,13 +11368,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_gdef_table_glyph_class_def { offset, link })
 })())?;
 let class_seq_rule_set_count = (Decoder23(_input))?;
@@ -10908,13 +11386,14 @@ let mut accum = Vec::new();
 for _ in 0..class_seq_rule_set_count {
 accum.push({
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -10928,13 +11407,14 @@ let mut accum = Vec::new();
 for _ in 0..rule_count {
 accum.push({
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -10944,11 +11424,12 @@ let is_valid = {
 let x = inner;
 x != 0u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(14082539304789607227u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let seq_lookup_count = (Decoder23(_input))?;
 let input_sequence = ((|| {
@@ -10971,13 +11452,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_common_sequence_context_subst_Format1_seq_rule_sets_link_rules { offset, link }
 });
 }
@@ -10989,13 +11473,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_common_sequence_context_subst_Format1_seq_rule_sets { offset, link }
 });
 }
@@ -11015,13 +11502,14 @@ let mut accum = Vec::new();
 for _ in 0..glyph_count {
 accum.push({
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
@@ -11029,13 +11517,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_layout_reverse_chain_single_subst_coverage { offset, link }
 });
 }
@@ -11056,7 +11547,9 @@ opentype_common_sequence_context_subst::Format3(inner)
 _ => {
 return Err(ParseError::FailToken(11072034178440885507u64));
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_common_sequence_context { table_start, format, subst })
 }
 
@@ -11066,18 +11559,20 @@ let x = _input.get_offset_u64();
 x as u32
 };
 let format = (Decoder23(_input))?;
-let subst = ((|| PResult::Ok(match format {
+let subst = ((|| {
+let ret = match format {
 1u16 => {
 let inner = {
 let coverage = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
@@ -11085,13 +11580,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_reverse_chain_single_subst_coverage { offset, link })
 })())?;
 let chained_seq_rule_set_count = (Decoder23(_input))?;
@@ -11100,13 +11598,14 @@ let mut accum = Vec::new();
 for _ in 0..chained_seq_rule_set_count {
 accum.push({
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -11120,13 +11619,14 @@ let mut accum = Vec::new();
 for _ in 0..chained_seq_rule_count {
 accum.push({
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -11168,13 +11668,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link_chained_seq_rules { offset, link }
 });
 }
@@ -11186,13 +11689,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets { offset, link }
 });
 }
@@ -11207,13 +11713,14 @@ opentype_common_chained_sequence_context_subst::Format1(inner)
 let inner = {
 let coverage = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
@@ -11221,24 +11728,28 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_reverse_chain_single_subst_coverage { offset, link })
 })())?;
 let backtrack_class_def = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_class_def(_input))?;
@@ -11246,24 +11757,28 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_gdef_table_glyph_class_def { offset, link })
 })())?;
 let input_class_def = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_class_def(_input))?;
@@ -11271,24 +11786,28 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_gdef_table_glyph_class_def { offset, link })
 })())?;
 let lookahead_class_def = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_class_def(_input))?;
@@ -11296,13 +11815,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_gdef_table_glyph_class_def { offset, link })
 })())?;
 let chained_class_seq_rule_set_count = (Decoder23(_input))?;
@@ -11311,13 +11833,14 @@ let mut accum = Vec::new();
 for _ in 0..chained_class_seq_rule_set_count {
 accum.push({
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -11331,13 +11854,14 @@ let mut accum = Vec::new();
 for _ in 0..chained_seq_rule_count {
 accum.push({
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -11379,13 +11903,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link_chained_seq_rules { offset, link }
 });
 }
@@ -11397,13 +11924,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets { offset, link }
 });
 }
@@ -11422,13 +11952,14 @@ let mut accum = Vec::new();
 for _ in 0..backtrack_glyph_count {
 accum.push({
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
@@ -11436,13 +11967,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_layout_reverse_chain_single_subst_coverage { offset, link }
 });
 }
@@ -11454,13 +11988,14 @@ let mut accum = Vec::new();
 for _ in 0..input_glyph_count {
 accum.push({
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
@@ -11468,13 +12003,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_layout_reverse_chain_single_subst_coverage { offset, link }
 });
 }
@@ -11486,13 +12024,14 @@ let mut accum = Vec::new();
 for _ in 0..lookahead_glyph_count {
 accum.push({
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
@@ -11500,13 +12039,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_layout_reverse_chain_single_subst_coverage { offset, link }
 });
 }
@@ -11528,7 +12070,9 @@ opentype_common_chained_sequence_context_subst::Format3(inner)
 _ => {
 return Err(ParseError::FailToken(4608405370414018463u64));
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_common_chained_sequence_context { table_start, format, subst })
 }
 
@@ -11543,21 +12087,23 @@ let is_valid = {
 let subst_format = inner;
 subst_format == 1u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(4418518334087228745u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let coverage = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
@@ -11565,13 +12111,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_reverse_chain_single_subst_coverage { offset, link })
 })())?;
 let backtrack_glyph_count = (Decoder23(_input))?;
@@ -11580,13 +12129,14 @@ let mut accum = Vec::new();
 for _ in 0..backtrack_glyph_count {
 accum.push({
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
@@ -11594,13 +12144,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_layout_reverse_chain_single_subst_coverage { offset, link }
 });
 }
@@ -11612,13 +12165,14 @@ let mut accum = Vec::new();
 for _ in 0..lookahead_glyph_count {
 accum.push({
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
@@ -11626,13 +12180,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_layout_reverse_chain_single_subst_coverage { offset, link }
 });
 }
@@ -11651,7 +12208,8 @@ PResult::Ok(opentype_layout_reverse_chain_single_subst { table_start, subst_form
 
 fn Decoder_opentype_coverage_table<>(_input: &mut Parser<'_>) -> Result<opentype_coverage_table, ParseError> {
 let coverage_format = (Decoder23(_input))?;
-let data = ((|| PResult::Ok(match coverage_format {
+let data = ((|| {
+let ret = match coverage_format {
 1u16 => {
 let inner = {
 let glyph_count = (Decoder23(_input))?;
@@ -11690,7 +12248,9 @@ opentype_coverage_table_data::Format2(inner)
 _ => {
 return Err(ParseError::FailToken(7086880279337729577u64));
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_coverage_table { coverage_format, data })
 }
 
@@ -11702,7 +12262,8 @@ PResult::Ok(opentype_common_sequence_lookup { sequence_index, lookup_list_index 
 
 fn Decoder_opentype_class_def<>(_input: &mut Parser<'_>) -> Result<opentype_class_def, ParseError> {
 let class_format = (Decoder23(_input))?;
-let data = ((|| PResult::Ok(match class_format {
+let data = ((|| {
+let ret = match class_format {
 1u16 => {
 let inner = {
 let start_glyph_id = (Decoder23(_input))?;
@@ -11742,7 +12303,9 @@ opentype_class_def_data::Format2(inner)
 _ => {
 return Err(ParseError::FailToken(7511456693437940214u64));
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_class_def { class_format, data })
 }
 
@@ -11753,13 +12316,14 @@ x as u32
 };
 let default_lang_sys = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_langsys(_input))?;
@@ -11767,13 +12331,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_common_script_table_default_lang_sys { offset, link })
 })())?;
 let lang_sys_count = (Decoder23(_input))?;
@@ -11784,13 +12351,14 @@ accum.push({
 let lang_sys_tag = (Decoder46(_input))?;
 let lang_sys = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_langsys(_input))?;
@@ -11798,13 +12366,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_common_script_table_default_lang_sys { offset, link })
 })())?;
 opentype_common_script_table_lang_sys_records { lang_sys_tag, lang_sys }
@@ -11822,11 +12393,12 @@ let is_valid = {
 let x = inner;
 x == 0u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(973408085875818710u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let required_feature_index = (Decoder23(_input))?;
 let feature_index_count = (Decoder23(_input))?;
@@ -11851,11 +12423,12 @@ let is_valid = {
 let format = inner;
 format == 1u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(15557503981608772456u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let extension_lookup_type = ((|| {
 let inner = (Decoder23(_input))?;
@@ -11871,15 +12444,17 @@ false
 }
 }
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(2154669163482751322u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let extension_offset = ((|| {
 let offset = (Decoder20(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u32 {
+let link = ((|| {
+let ret = match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -11894,14 +12469,16 @@ ret
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_pos_extension_extension_offset { offset, link })
 })())?;
 PResult::Ok(opentype_layout_pos_extension { table_start, format, extension_lookup_type, extension_offset })
 }
 
 fn Decoder_opentype_layout_ground_pos<>(_input: &mut Parser<'_>, lookup_type: u16) -> Result<opentype_layout_ground_pos, ParseError> {
-PResult::Ok(match lookup_type {
+let ret = match lookup_type {
 1u16 => {
 let inner = (Decoder_opentype_layout_single_pos(_input))?;
 opentype_layout_ground_pos::SinglePos(inner)
@@ -11949,7 +12526,8 @@ return Err(ParseError::FailToken(10263667190582992611u64));
 _ => {
 return Err(ParseError::FailToken(5482396765248532989u64));
 }
-})
+};
+PResult::Ok(ret)
 }
 
 fn Decoder_opentype_layout_single_pos<>(_input: &mut Parser<'_>) -> Result<opentype_layout_single_pos, ParseError> {
@@ -11958,18 +12536,20 @@ let x = _input.get_offset_u64();
 x as u32
 };
 let pos_format = (Decoder23(_input))?;
-let subtable = ((|| PResult::Ok(match pos_format {
+let subtable = ((|| {
+let ret = match pos_format {
 1u16 => {
 let inner = {
 let coverage_offset = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
@@ -11977,13 +12557,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_reverse_chain_single_subst_coverage { offset, link })
 })())?;
 let value_format = (Decoder_opentype_common_value_format_flags(_input))?;
@@ -11997,13 +12580,14 @@ opentype_layout_single_pos_subtable::Format1(inner)
 let inner = {
 let coverage_offset = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
@@ -12011,13 +12595,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_reverse_chain_single_subst_coverage { offset, link })
 })())?;
 let value_format = (Decoder_opentype_common_value_format_flags(_input))?;
@@ -12037,7 +12624,9 @@ opentype_layout_single_pos_subtable::Format2(inner)
 _ => {
 return Err(ParseError::FailToken(12275201028130973875u64));
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_single_pos { table_start, pos_format, subtable })
 }
 
@@ -12047,18 +12636,20 @@ let x = _input.get_offset_u64();
 x as u32
 };
 let pos_format = (Decoder23(_input))?;
-let subtable = ((|| PResult::Ok(match pos_format {
+let subtable = ((|| {
+let ret = match pos_format {
 1u16 => {
 let inner = {
 let coverage = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
@@ -12066,13 +12657,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_reverse_chain_single_subst_coverage { offset, link })
 })())?;
 let value_format1 = (Decoder_opentype_common_value_format_flags(_input))?;
@@ -12083,13 +12677,14 @@ let mut accum = Vec::new();
 for _ in 0..pair_set_count {
 accum.push({
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -12103,16 +12698,22 @@ let mut accum = Vec::new();
 for _ in 0..pair_value_count {
 accum.push({
 let second_glyph = (Decoder23(_input))?;
-let value_record1 = ((|| PResult::Ok(if value_format1.x_placement.clone() || value_format1.y_placement.clone() || value_format1.x_advance.clone() || value_format1.y_advance.clone() || value_format1.x_placement_device.clone() || value_format1.y_placement_device.clone() || value_format1.x_advance_device.clone() || value_format1.y_advance_device.clone() {
+let value_record1 = ((|| {
+let ret = if value_format1.x_placement.clone() || value_format1.y_placement.clone() || value_format1.x_advance.clone() || value_format1.y_advance.clone() || value_format1.x_placement_device.clone() || value_format1.y_placement_device.clone() || value_format1.x_advance_device.clone() || value_format1.y_advance_device.clone() {
 Some((Decoder_opentype_common_value_record(_input, table_start.clone(), value_format1.clone()))?)
 } else {
 None
-}))())?;
-let value_record2 = ((|| PResult::Ok(if value_format2.x_placement.clone() || value_format2.y_placement.clone() || value_format2.x_advance.clone() || value_format2.y_advance.clone() || value_format2.x_placement_device.clone() || value_format2.y_placement_device.clone() || value_format2.x_advance_device.clone() || value_format2.y_advance_device.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let value_record2 = ((|| {
+let ret = if value_format2.x_placement.clone() || value_format2.y_placement.clone() || value_format2.x_advance.clone() || value_format2.y_advance.clone() || value_format2.x_placement_device.clone() || value_format2.y_placement_device.clone() || value_format2.x_advance_device.clone() || value_format2.y_advance_device.clone() {
 Some((Decoder82(_input, table_start.clone(), value_format2.clone()))?)
 } else {
 None
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_layout_pair_pos_subtable_Format1_pair_sets_link_pair_value_records { second_glyph, value_record1, value_record2 }
 });
 }
@@ -12124,13 +12725,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_layout_pair_pos_subtable_Format1_pair_sets { offset, link }
 });
 }
@@ -12145,13 +12749,14 @@ opentype_layout_pair_pos_subtable::Format1(inner)
 let inner = {
 let coverage = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
@@ -12159,26 +12764,30 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_reverse_chain_single_subst_coverage { offset, link })
 })())?;
 let value_format1 = (Decoder_opentype_common_value_format_flags(_input))?;
 let value_format2 = (Decoder_opentype_common_value_format_flags(_input))?;
 let class_def1 = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_class_def(_input))?;
@@ -12186,24 +12795,28 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_gdef_table_glyph_class_def { offset, link })
 })())?;
 let class_def2 = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_class_def(_input))?;
@@ -12211,13 +12824,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_gdef_table_glyph_class_def { offset, link })
 })())?;
 let class1_count = (Decoder23(_input))?;
@@ -12230,16 +12846,22 @@ let class2_records = ((|| {
 let mut accum = Vec::new();
 for _ in 0..class2_count {
 accum.push({
-let value_record1 = ((|| PResult::Ok(if value_format1.x_placement.clone() || value_format1.y_placement.clone() || value_format1.x_advance.clone() || value_format1.y_advance.clone() || value_format1.x_placement_device.clone() || value_format1.y_placement_device.clone() || value_format1.x_advance_device.clone() || value_format1.y_advance_device.clone() {
+let value_record1 = ((|| {
+let ret = if value_format1.x_placement.clone() || value_format1.y_placement.clone() || value_format1.x_advance.clone() || value_format1.y_advance.clone() || value_format1.x_placement_device.clone() || value_format1.y_placement_device.clone() || value_format1.x_advance_device.clone() || value_format1.y_advance_device.clone() {
 Some((Decoder83(_input, table_start.clone(), value_format1.clone()))?)
 } else {
 None
-}))())?;
-let value_record2 = ((|| PResult::Ok(if value_format2.x_placement.clone() || value_format2.y_placement.clone() || value_format2.x_advance.clone() || value_format2.y_advance.clone() || value_format2.x_placement_device.clone() || value_format2.y_placement_device.clone() || value_format2.x_advance_device.clone() || value_format2.y_advance_device.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let value_record2 = ((|| {
+let ret = if value_format2.x_placement.clone() || value_format2.y_placement.clone() || value_format2.x_advance.clone() || value_format2.y_advance.clone() || value_format2.x_placement_device.clone() || value_format2.y_placement_device.clone() || value_format2.x_advance_device.clone() || value_format2.y_advance_device.clone() {
 Some((Decoder84(_input, table_start.clone(), value_format2.clone()))?)
 } else {
 None
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_layout_pair_pos_subtable_Format2_class1_records_class2_records { value_record1, value_record2 }
 });
 }
@@ -12258,7 +12880,9 @@ opentype_layout_pair_pos_subtable::Format2(inner)
 _ => {
 return Err(ParseError::FailToken(16097120758067046920u64));
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_pair_pos { table_start, pos_format, subtable })
 }
 
@@ -12273,21 +12897,23 @@ let is_valid = {
 let pos_format = inner;
 pos_format == 1u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(9331632426086095927u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let coverage = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
@@ -12295,13 +12921,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_reverse_chain_single_subst_coverage { offset, link })
 })())?;
 let entry_exit_count = (Decoder23(_input))?;
@@ -12311,13 +12940,14 @@ for _ in 0..entry_exit_count {
 accum.push({
 let entry_anchor = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_anchor_table(_input))?;
@@ -12325,24 +12955,28 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_mark_array_mark_records_mark_anchor_offset { offset, link })
 })())?;
 let exit_anchor = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_anchor_table(_input))?;
@@ -12350,13 +12984,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_mark_array_mark_records_mark_anchor_offset { offset, link })
 })())?;
 opentype_layout_cursive_pos_entry_exit_records { entry_anchor, exit_anchor }
@@ -12378,21 +13015,23 @@ let is_valid = {
 let format = inner;
 format == 1u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(14959848987246965519u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let mark_coverage_offset = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
@@ -12400,24 +13039,28 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_reverse_chain_single_subst_coverage { offset, link })
 })())?;
 let base_coverage_offset = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
@@ -12425,25 +13068,29 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_reverse_chain_single_subst_coverage { offset, link })
 })())?;
 let mark_class_count = (Decoder23(_input))?;
 let mark_array_offset = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_layout_mark_array(_input))?;
@@ -12451,24 +13098,28 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_mark_mark_pos_mark1_array_offset { offset, link })
 })())?;
 let base_array_offset = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -12486,13 +13137,14 @@ let mut accum = Vec::new();
 for _ in 0..mark_class_count {
 accum.push({
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_anchor_table(_input))?;
@@ -12500,13 +13152,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_layout_mark_array_mark_records_mark_anchor_offset { offset, link }
 });
 }
@@ -12523,13 +13178,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_mark_base_pos_base_array_offset { offset, link })
 })())?;
 PResult::Ok(opentype_layout_mark_base_pos { table_start, format, mark_coverage_offset, base_coverage_offset, mark_class_count, mark_array_offset, base_array_offset })
@@ -12546,21 +13204,23 @@ let is_valid = {
 let format = inner;
 format == 1u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(9092905213558799443u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let mark_coverage_offset = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
@@ -12568,24 +13228,28 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_reverse_chain_single_subst_coverage { offset, link })
 })())?;
 let ligature_coverage_offset = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
@@ -12593,25 +13257,29 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_reverse_chain_single_subst_coverage { offset, link })
 })())?;
 let mark_class_count = (Decoder23(_input))?;
 let mark_array_offset = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_layout_mark_array(_input))?;
@@ -12619,24 +13287,28 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_mark_mark_pos_mark1_array_offset { offset, link })
 })())?;
 let ligature_array_offset = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -12650,13 +13322,14 @@ let mut accum = Vec::new();
 for _ in 0..ligature_count {
 accum.push({
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -12674,13 +13347,14 @@ let mut accum = Vec::new();
 for _ in 0..mark_class_count {
 accum.push({
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_anchor_table(_input))?;
@@ -12688,13 +13362,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_layout_mark_array_mark_records_mark_anchor_offset { offset, link }
 });
 }
@@ -12711,13 +13388,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_layout_mark_lig_pos_ligature_array_offset_link_ligature_attach_offsets { offset, link }
 });
 }
@@ -12729,13 +13409,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_mark_lig_pos_ligature_array_offset { offset, link })
 })())?;
 PResult::Ok(opentype_layout_mark_lig_pos { table_start, format, mark_coverage_offset, ligature_coverage_offset, mark_class_count, mark_array_offset, ligature_array_offset })
@@ -12752,21 +13435,23 @@ let is_valid = {
 let format = inner;
 format == 1u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(17544092807091201u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let mark1_coverage_offset = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
@@ -12774,24 +13459,28 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_reverse_chain_single_subst_coverage { offset, link })
 })())?;
 let mark2_coverage_offset = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
@@ -12799,25 +13488,29 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_reverse_chain_single_subst_coverage { offset, link })
 })())?;
 let mark_class_count = (Decoder23(_input))?;
 let mark1_array_offset = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_layout_mark_array(_input))?;
@@ -12825,24 +13518,28 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_mark_mark_pos_mark1_array_offset { offset, link })
 })())?;
 let mark2_array_offset = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -12860,13 +13557,14 @@ let mut accum = Vec::new();
 for _ in 0..mark_class_count {
 accum.push({
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_anchor_table(_input))?;
@@ -12874,13 +13572,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_layout_mark_array_mark_records_mark_anchor_offset { offset, link }
 });
 }
@@ -12897,13 +13598,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_mark_mark_pos_mark2_array_offset { offset, link })
 })())?;
 PResult::Ok(opentype_layout_mark_mark_pos { table_start, format, mark1_coverage_offset, mark2_coverage_offset, mark_class_count, mark1_array_offset, mark2_array_offset })
@@ -12922,13 +13626,14 @@ accum.push({
 let mark_class = (Decoder23(_input))?;
 let mark_anchor_offset = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_anchor_table(_input))?;
@@ -12936,13 +13641,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_mark_array_mark_records_mark_anchor_offset { offset, link })
 })())?;
 opentype_layout_mark_array_mark_records { mark_class, mark_anchor_offset }
@@ -12959,7 +13667,8 @@ let x = _input.get_offset_u64();
 x as u32
 };
 let anchor_format = (Decoder23(_input))?;
-let table = ((|| PResult::Ok(match anchor_format {
+let table = ((|| {
+let ret = match anchor_format {
 1u16 => {
 let inner = {
 let x_coordinate = (Decoder23(_input))?;
@@ -12985,13 +13694,14 @@ let x_coordinate = (Decoder23(_input))?;
 let y_coordinate = (Decoder23(_input))?;
 let x_device_offset = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
@@ -12999,24 +13709,28 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_common_value_record_x_advance_device { offset, link })
 })())?;
 let y_device_offset = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
@@ -13024,13 +13738,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_common_value_record_x_advance_device { offset, link })
 })())?;
 opentype_common_anchor_table_table_Format3 { x_coordinate, y_coordinate, x_device_offset, y_device_offset }
@@ -13041,7 +13758,9 @@ opentype_common_anchor_table_table::Format3(inner)
 _ => {
 return Err(ParseError::FailToken(10502127387712395480u64));
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_common_anchor_table { table_start, anchor_format, table })
 }
 
@@ -13059,7 +13778,7 @@ Decoder23(_input)
 _input.close_peek_context()?;
 ret
 };
-PResult::Ok(match delta_format {
+let ret = match delta_format {
 1u16..=3u16 => {
 let inner = {
 let start_size = (Decoder23(_input))?;
@@ -13154,7 +13873,8 @@ opentype_common_device_or_variation_index_table_OtherTable { field0, field1, del
 };
 opentype_common_device_or_variation_index_table::OtherTable(inner)
 }
-})
+};
+PResult::Ok(ret)
 }
 
 fn Decoder_opentype_common_value_format_flags<>(_input: &mut Parser<'_>) -> Result<opentype_common_value_format_flags, ParseError> {
@@ -13170,35 +13890,49 @@ PResult::Ok(opentype_common_value_format_flags { y_advance_device: packed_bits >
 }
 
 fn Decoder_opentype_common_value_record<>(_input: &mut Parser<'_>, table_start: u32, flags: opentype_common_value_format_flags) -> Result<opentype_common_value_record, ParseError> {
-let x_placement = ((|| PResult::Ok(if flags.x_placement.clone() {
+let x_placement = ((|| {
+let ret = if flags.x_placement.clone() {
 Some((Decoder23(_input))?)
 } else {
 None
-}))())?;
-let y_placement = ((|| PResult::Ok(if flags.y_placement.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let y_placement = ((|| {
+let ret = if flags.y_placement.clone() {
 Some((Decoder23(_input))?)
 } else {
 None
-}))())?;
-let x_advance = ((|| PResult::Ok(if flags.x_advance.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let x_advance = ((|| {
+let ret = if flags.x_advance.clone() {
 Some((Decoder23(_input))?)
 } else {
 None
-}))())?;
-let y_advance = ((|| PResult::Ok(if flags.y_advance.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let y_advance = ((|| {
+let ret = if flags.y_advance.clone() {
 Some((Decoder23(_input))?)
 } else {
 None
-}))())?;
-let x_placement_device = ((|| PResult::Ok(if flags.x_placement_device.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let x_placement_device = ((|| {
+let ret = if flags.x_placement_device.clone() {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
@@ -13206,26 +13940,33 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
-}))())?;
-let y_placement_device = ((|| PResult::Ok(if flags.y_placement_device.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let y_placement_device = ((|| {
+let ret = if flags.y_placement_device.clone() {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
@@ -13233,26 +13974,33 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
-}))())?;
-let x_advance_device = ((|| PResult::Ok(if flags.x_advance_device.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let x_advance_device = ((|| {
+let ret = if flags.x_advance_device.clone() {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
@@ -13260,26 +14008,33 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
-}))())?;
-let y_advance_device = ((|| PResult::Ok(if flags.y_advance_device.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let y_advance_device = ((|| {
+let ret = if flags.y_advance_device.clone() {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
@@ -13287,50 +14042,69 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_common_value_record { x_placement, y_placement, x_advance, y_advance, x_placement_device, y_placement_device, x_advance_device, y_advance_device })
 }
 
 fn Decoder82<>(_input: &mut Parser<'_>, table_start: u32, flags: opentype_common_value_format_flags) -> Result<opentype_common_value_record, ParseError> {
-let x_placement = ((|| PResult::Ok(if flags.x_placement.clone() {
+let x_placement = ((|| {
+let ret = if flags.x_placement.clone() {
 Some((Decoder23(_input))?)
 } else {
 None
-}))())?;
-let y_placement = ((|| PResult::Ok(if flags.y_placement.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let y_placement = ((|| {
+let ret = if flags.y_placement.clone() {
 Some((Decoder23(_input))?)
 } else {
 None
-}))())?;
-let x_advance = ((|| PResult::Ok(if flags.x_advance.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let x_advance = ((|| {
+let ret = if flags.x_advance.clone() {
 Some((Decoder23(_input))?)
 } else {
 None
-}))())?;
-let y_advance = ((|| PResult::Ok(if flags.y_advance.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let y_advance = ((|| {
+let ret = if flags.y_advance.clone() {
 Some((Decoder23(_input))?)
 } else {
 None
-}))())?;
-let x_placement_device = ((|| PResult::Ok(if flags.x_placement_device.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let x_placement_device = ((|| {
+let ret = if flags.x_placement_device.clone() {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
@@ -13338,26 +14112,33 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
-}))())?;
-let y_placement_device = ((|| PResult::Ok(if flags.y_placement_device.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let y_placement_device = ((|| {
+let ret = if flags.y_placement_device.clone() {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
@@ -13365,26 +14146,33 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
-}))())?;
-let x_advance_device = ((|| PResult::Ok(if flags.x_advance_device.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let x_advance_device = ((|| {
+let ret = if flags.x_advance_device.clone() {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
@@ -13392,26 +14180,33 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
-}))())?;
-let y_advance_device = ((|| PResult::Ok(if flags.y_advance_device.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let y_advance_device = ((|| {
+let ret = if flags.y_advance_device.clone() {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
@@ -13419,50 +14214,69 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_common_value_record { x_placement, y_placement, x_advance, y_advance, x_placement_device, y_placement_device, x_advance_device, y_advance_device })
 }
 
 fn Decoder83<>(_input: &mut Parser<'_>, table_start: u32, flags: opentype_common_value_format_flags) -> Result<opentype_common_value_record, ParseError> {
-let x_placement = ((|| PResult::Ok(if flags.x_placement.clone() {
+let x_placement = ((|| {
+let ret = if flags.x_placement.clone() {
 Some((Decoder23(_input))?)
 } else {
 None
-}))())?;
-let y_placement = ((|| PResult::Ok(if flags.y_placement.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let y_placement = ((|| {
+let ret = if flags.y_placement.clone() {
 Some((Decoder23(_input))?)
 } else {
 None
-}))())?;
-let x_advance = ((|| PResult::Ok(if flags.x_advance.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let x_advance = ((|| {
+let ret = if flags.x_advance.clone() {
 Some((Decoder23(_input))?)
 } else {
 None
-}))())?;
-let y_advance = ((|| PResult::Ok(if flags.y_advance.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let y_advance = ((|| {
+let ret = if flags.y_advance.clone() {
 Some((Decoder23(_input))?)
 } else {
 None
-}))())?;
-let x_placement_device = ((|| PResult::Ok(if flags.x_placement_device.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let x_placement_device = ((|| {
+let ret = if flags.x_placement_device.clone() {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
@@ -13470,26 +14284,33 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
-}))())?;
-let y_placement_device = ((|| PResult::Ok(if flags.y_placement_device.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let y_placement_device = ((|| {
+let ret = if flags.y_placement_device.clone() {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
@@ -13497,26 +14318,33 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
-}))())?;
-let x_advance_device = ((|| PResult::Ok(if flags.x_advance_device.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let x_advance_device = ((|| {
+let ret = if flags.x_advance_device.clone() {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
@@ -13524,26 +14352,33 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
-}))())?;
-let y_advance_device = ((|| PResult::Ok(if flags.y_advance_device.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let y_advance_device = ((|| {
+let ret = if flags.y_advance_device.clone() {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
@@ -13551,50 +14386,69 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_common_value_record { x_placement, y_placement, x_advance, y_advance, x_placement_device, y_placement_device, x_advance_device, y_advance_device })
 }
 
 fn Decoder84<>(_input: &mut Parser<'_>, table_start: u32, flags: opentype_common_value_format_flags) -> Result<opentype_common_value_record, ParseError> {
-let x_placement = ((|| PResult::Ok(if flags.x_placement.clone() {
+let x_placement = ((|| {
+let ret = if flags.x_placement.clone() {
 Some((Decoder23(_input))?)
 } else {
 None
-}))())?;
-let y_placement = ((|| PResult::Ok(if flags.y_placement.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let y_placement = ((|| {
+let ret = if flags.y_placement.clone() {
 Some((Decoder23(_input))?)
 } else {
 None
-}))())?;
-let x_advance = ((|| PResult::Ok(if flags.x_advance.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let x_advance = ((|| {
+let ret = if flags.x_advance.clone() {
 Some((Decoder23(_input))?)
 } else {
 None
-}))())?;
-let y_advance = ((|| PResult::Ok(if flags.y_advance.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let y_advance = ((|| {
+let ret = if flags.y_advance.clone() {
 Some((Decoder23(_input))?)
 } else {
 None
-}))())?;
-let x_placement_device = ((|| PResult::Ok(if flags.x_placement_device.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let x_placement_device = ((|| {
+let ret = if flags.x_placement_device.clone() {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
@@ -13602,26 +14456,33 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
-}))())?;
-let y_placement_device = ((|| PResult::Ok(if flags.y_placement_device.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let y_placement_device = ((|| {
+let ret = if flags.y_placement_device.clone() {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
@@ -13629,26 +14490,33 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
-}))())?;
-let x_advance_device = ((|| PResult::Ok(if flags.x_advance_device.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let x_advance_device = ((|| {
+let ret = if flags.x_advance_device.clone() {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
@@ -13656,26 +14524,33 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
-}))())?;
-let y_advance_device = ((|| PResult::Ok(if flags.y_advance_device.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let y_advance_device = ((|| {
+let ret = if flags.y_advance_device.clone() {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
@@ -13683,17 +14558,22 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_common_value_record { x_placement, y_placement, x_advance, y_advance, x_placement_device, y_placement_device, x_advance_device, y_advance_device })
 }
 
@@ -13708,11 +14588,12 @@ let is_valid = {
 let x = inner;
 x == 1u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(17869550927478639832u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let mark_glyph_set_count = (Decoder23(_input))?;
 let coverage = ((|| {
@@ -13720,7 +14601,8 @@ let mut accum = Vec::new();
 for _ in 0..mark_glyph_set_count {
 accum.push({
 let offset = (Decoder20(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u32 {
+let link = ((|| {
+let ret = match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -13735,7 +14617,9 @@ ret
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_mark_glyph_set_coverage { offset, link }
 });
 }
@@ -13755,13 +14639,14 @@ x as u32
 };
 let base_tag_list_offset = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -13779,24 +14664,28 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_axis_table_base_tag_list_offset { offset, link })
 })())?;
 let base_script_list_offset = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -13812,13 +14701,14 @@ accum.push({
 let base_script_tag = (Decoder46(_input))?;
 let base_script_offset = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_layout_base_script(_input))?;
@@ -13826,13 +14716,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_axis_table_base_script_list_offset_link_base_script_records_base_script_offset { offset, link })
 })())?;
 opentype_layout_axis_table_base_script_list_offset_link_base_script_records { base_script_tag, base_script_offset }
@@ -13846,13 +14739,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_axis_table_base_script_list_offset { offset, link })
 })())?;
 PResult::Ok(opentype_layout_axis_table { table_start, base_tag_list_offset, base_script_list_offset })
@@ -13865,13 +14761,14 @@ x as u32
 };
 let base_values_offset = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_layout_base_values(_input))?;
@@ -13879,24 +14776,28 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_base_script_base_values_offset { offset, link })
 })())?;
 let default_min_max_offset = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_layout_min_max(_input))?;
@@ -13904,13 +14805,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_base_script_default_min_max_offset { offset, link })
 })())?;
 let base_lang_sys_count = (Decoder23(_input))?;
@@ -13921,13 +14825,14 @@ accum.push({
 let base_lang_sys_tag = (Decoder46(_input))?;
 let min_max_offset = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_layout_min_max(_input))?;
@@ -13935,13 +14840,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_base_script_default_min_max_offset { offset, link })
 })())?;
 opentype_layout_base_script_base_lang_sys_records { base_lang_sys_tag, min_max_offset }
@@ -13964,13 +14872,14 @@ let mut accum = Vec::new();
 for _ in 0..base_coord_count {
 accum.push({
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_layout_base_coord(_input))?;
@@ -13978,13 +14887,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_layout_min_max_min_coord_offset { offset, link }
 });
 }
@@ -14000,13 +14912,14 @@ x as u32
 };
 let min_coord_offset = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_layout_base_coord(_input))?;
@@ -14014,24 +14927,28 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_min_max_min_coord_offset { offset, link })
 })())?;
 let max_coord_offset = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_layout_base_coord(_input))?;
@@ -14039,13 +14956,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_min_max_min_coord_offset { offset, link })
 })())?;
 let feat_min_max_count = (Decoder23(_input))?;
@@ -14056,13 +14976,14 @@ accum.push({
 let feature_tag = (Decoder46(_input))?;
 let min_coord_offset = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_layout_base_coord(_input))?;
@@ -14070,24 +14991,28 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_min_max_min_coord_offset { offset, link })
 })())?;
 let max_coord_offset = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_layout_base_coord(_input))?;
@@ -14095,13 +15020,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_min_max_min_coord_offset { offset, link })
 })())?;
 opentype_layout_min_max_feat_min_max_records { feature_tag, min_coord_offset, max_coord_offset }
@@ -14119,7 +15047,8 @@ x as u32
 };
 let format = (Decoder23(_input))?;
 let coordinate = (Decoder23(_input))?;
-let hint = ((|| PResult::Ok(match format {
+let hint = ((|| {
+let ret = match format {
 1u16 => {
 opentype_layout_base_coord_hint::NoHint
 },
@@ -14137,13 +15066,14 @@ opentype_layout_base_coord_hint::GlyphHint(inner)
 let inner = {
 let device_offset = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if table_start + (offset as u32) >= __here {
+let ret = if table_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
@@ -14151,13 +15081,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_common_value_record_x_advance_device { offset, link })
 })())?;
 opentype_layout_base_coord_hint_DeviceHint { device_offset }
@@ -14168,12 +15101,14 @@ opentype_layout_base_coord_hint::DeviceHint(inner)
 _ => {
 return Err(ParseError::FailToken(13431462572241034712u64));
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_layout_base_coord { table_start, format, coordinate, hint })
 }
 
 fn Decoder_opentype_glyf_description<>(_input: &mut Parser<'_>, n_contours: u16) -> Result<opentype_glyf_description, ParseError> {
-PResult::Ok(match n_contours {
+let ret = match n_contours {
 0u16 => {
 opentype_glyf_description::HeaderOnly
 },
@@ -14187,7 +15122,8 @@ _ => {
 let inner = (Decoder_opentype_glyf_composite(_input))?;
 opentype_glyf_description::Composite(inner)
 }
-})
+};
+PResult::Ok(ret)
 }
 
 fn Decoder_opentype_glyf_simple<>(_input: &mut Parser<'_>, n_contours: u16) -> Result<opentype_glyf_simple, ParseError> {
@@ -14222,7 +15158,8 @@ break
 }
 let elem = {
 let flags = (Decoder_opentype_glyph_description_simple_flags_raw(_input))?;
-let repeats = ((|| PResult::Ok(match flags.repeat_flag.clone() {
+let repeats = ((|| {
+let ret = match flags.repeat_flag.clone() {
 true => {
 (Decoder24(_input))?
 },
@@ -14230,7 +15167,9 @@ true => {
 false => {
 0u8
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let field_set = opentype_glyf_simple_flags { on_curve_point: flags.on_curve_point.clone(), x_short_vector: flags.x_short_vector.clone(), y_short_vector: flags.y_short_vector.clone(), x_is_same_or_positive_x_short_vector: flags.x_is_same_or_positive_x_short_vector.clone(), y_is_same_or_positive_y_short_vector: flags.y_is_same_or_positive_y_short_vector.clone(), overlap_simple: flags.overlap_simple.clone() };
 opentype_glyf_simple_flags_raw { repeats, field_set }
 };
@@ -14254,7 +15193,8 @@ flags
 let x_coordinates = ((|| {
 let mut accum = Vec::new();
 for flag_vals in flags.clone() {
-accum.push(match flag_vals.x_short_vector.clone() {
+accum.push({
+let ret = match flag_vals.x_short_vector.clone() {
 true => {
 let abs = (Decoder24(_input))?;
 match flag_vals.x_is_same_or_positive_x_short_vector.clone() {
@@ -14277,7 +15217,7 @@ try_sub!(65535u16, pred(n as u16), 13516986665125759073u64)
 },
 
 false => {
-match flag_vals.x_is_same_or_positive_x_short_vector.clone() {
+let ret = match flag_vals.x_is_same_or_positive_x_short_vector.clone() {
 true => {
 0u16
 },
@@ -14285,8 +15225,11 @@ true => {
 false => {
 (Decoder23(_input))?
 }
+};
+ret
 }
-}
+};
+ret
 });
 }
 PResult::Ok(accum)
@@ -14294,7 +15237,8 @@ PResult::Ok(accum)
 let y_coordinates = ((|| {
 let mut accum = Vec::new();
 for flag_vals in flags.clone() {
-accum.push(match flag_vals.y_short_vector.clone() {
+accum.push({
+let ret = match flag_vals.y_short_vector.clone() {
 true => {
 let abs = (Decoder24(_input))?;
 match flag_vals.y_is_same_or_positive_y_short_vector.clone() {
@@ -14317,7 +15261,7 @@ try_sub!(65535u16, pred(n as u16), 5733880678136728614u64)
 },
 
 false => {
-match flag_vals.y_is_same_or_positive_y_short_vector.clone() {
+let ret = match flag_vals.y_is_same_or_positive_y_short_vector.clone() {
 true => {
 0u16
 },
@@ -14325,8 +15269,11 @@ true => {
 false => {
 (Decoder23(_input))?
 }
+};
+ret
 }
-}
+};
+ret
 });
 }
 PResult::Ok(accum)
@@ -14375,38 +15322,10 @@ u16be(x)
 PResult::Ok(opentype_glyf_composite_raw_flags { unscaled_component_offset: packed_bits >> 12u16 & 1u16 > 0u16, scaled_component_offset: packed_bits >> 11u16 & 1u16 > 0u16, overlap_compound: packed_bits >> 10u16 & 1u16 > 0u16, use_my_metrics: packed_bits >> 9u16 & 1u16 > 0u16, we_have_instructions: packed_bits >> 8u16 & 1u16 > 0u16, we_have_a_two_by_two: packed_bits >> 7u16 & 1u16 > 0u16, we_have_an_x_and_y_scale: packed_bits >> 6u16 & 1u16 > 0u16, more_components: packed_bits >> 5u16 & 1u16 > 0u16, we_have_a_scale: packed_bits >> 3u16 & 1u16 > 0u16, round_xy_to_grid: packed_bits >> 2u16 & 1u16 > 0u16, args_are_xy_values: packed_bits >> 1u16 & 1u16 > 0u16, arg_1_and_2_are_words: packed_bits >> 0u16 & 1u16 > 0u16 })
 })())?;
 let glyph_index = (Decoder23(_input))?;
-let argument1 = ((|| PResult::Ok(match flags.arg_1_and_2_are_words.clone() {
+let argument1 = ((|| {
+let ret = match flags.arg_1_and_2_are_words.clone() {
 true => {
-match flags.args_are_xy_values.clone() {
-true => {
-let inner = (Decoder23(_input))?;
-opentype_glyf_composite_raw_argument1::Int16(inner)
-},
-
-false => {
-let inner = (Decoder23(_input))?;
-opentype_glyf_composite_raw_argument1::Uint16(inner)
-}
-}
-},
-
-false => {
-match flags.args_are_xy_values.clone() {
-true => {
-let inner = (Decoder24(_input))?;
-opentype_glyf_composite_raw_argument1::Int8(inner)
-},
-
-false => {
-let inner = (Decoder24(_input))?;
-opentype_glyf_composite_raw_argument1::Uint8(inner)
-}
-}
-}
-}))())?;
-let argument2 = ((|| PResult::Ok(match flags.arg_1_and_2_are_words.clone() {
-true => {
-match flags.args_are_xy_values.clone() {
+let ret = match flags.args_are_xy_values.clone() {
 true => {
 let inner = (Decoder23(_input))?;
 opentype_glyf_composite_raw_argument1::Int16(inner)
@@ -14416,11 +15335,12 @@ false => {
 let inner = (Decoder23(_input))?;
 opentype_glyf_composite_raw_argument1::Uint16(inner)
 }
-}
+};
+ret
 },
 
 false => {
-match flags.args_are_xy_values.clone() {
+let ret = match flags.args_are_xy_values.clone() {
 true => {
 let inner = (Decoder24(_input))?;
 opentype_glyf_composite_raw_argument1::Int8(inner)
@@ -14430,10 +15350,48 @@ false => {
 let inner = (Decoder24(_input))?;
 opentype_glyf_composite_raw_argument1::Uint8(inner)
 }
+};
+ret
 }
+};
+PResult::Ok(ret)
+})())?;
+let argument2 = ((|| {
+let ret = match flags.arg_1_and_2_are_words.clone() {
+true => {
+let ret = match flags.args_are_xy_values.clone() {
+true => {
+let inner = (Decoder23(_input))?;
+opentype_glyf_composite_raw_argument1::Int16(inner)
+},
+
+false => {
+let inner = (Decoder23(_input))?;
+opentype_glyf_composite_raw_argument1::Uint16(inner)
 }
-}))())?;
-let scale = ((|| PResult::Ok(match flags.we_have_a_scale.clone() {
+};
+ret
+},
+
+false => {
+let ret = match flags.args_are_xy_values.clone() {
+true => {
+let inner = (Decoder24(_input))?;
+opentype_glyf_composite_raw_argument1::Int8(inner)
+},
+
+false => {
+let inner = (Decoder24(_input))?;
+opentype_glyf_composite_raw_argument1::Uint8(inner)
+}
+};
+ret
+}
+};
+PResult::Ok(ret)
+})())?;
+let scale = ((|| {
+let ret = match flags.we_have_a_scale.clone() {
 true => {
 let val = {
 let inner = {
@@ -14446,7 +15404,7 @@ Some(val)
 },
 
 false => {
-match flags.we_have_an_x_and_y_scale.clone() {
+let ret = match flags.we_have_an_x_and_y_scale.clone() {
 true => {
 let val = {
 let inner = {
@@ -14466,7 +15424,7 @@ Some(val)
 },
 
 false => {
-match flags.we_have_a_two_by_two.clone() {
+let ret = match flags.we_have_a_two_by_two.clone() {
 true => {
 let val = {
 let field0 = ((|| {
@@ -14499,11 +15457,15 @@ Some(val)
 false => {
 None
 }
+};
+ret
 }
+};
+ret
 }
-}
-}
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 opentype_glyf_composite_raw { flags, glyph_index, argument1, argument2, scale }
 };
 seq.push(elem.clone());
@@ -14516,7 +15478,8 @@ acc || glyph.flags.we_have_instructions.clone()
 (acc, seq)
 };
 let glyphs = acc_glyphs.1.clone();
-let instructions = ((|| PResult::Ok(match acc_glyphs.0.clone() {
+let instructions = ((|| {
+let ret = match acc_glyphs.0.clone() {
 true => {
 let instructions_length = (Decoder23(_input))?;
 let mut accum = Vec::new();
@@ -14529,7 +15492,9 @@ accum
 false => {
 [].to_vec()
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_glyf_composite { glyphs, instructions })
 }
 
@@ -14547,13 +15512,14 @@ accum.push({
 let length = (Decoder23(_input))?;
 let offset = ((|| {
 let offset = (Decoder23(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u16 {
+let link = ((|| {
+let ret = match offset > 0u16 {
 true => {
 let __here = {
 let x = _input.get_offset_u64();
 x as u32
 };
-if storage_start + (offset as u32) >= __here {
+let ret = if storage_start + (offset as u32) >= __here {
 let tgt_offset = 0u32 + storage_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -14567,13 +15533,16 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
+};
+ret
 },
 
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_name_table_name_records_offset { offset, link })
 })())?;
 opentype_name_table_name_version_1_lang_tag_records { length, offset }
@@ -14595,11 +15564,12 @@ let is_valid = {
 let x = inner;
 (x >= 1u16) && (x <= 2u16)
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(8997881400116719018u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let max_twilight_points = (Decoder23(_input))?;
 let max_storage = (Decoder23(_input))?;
@@ -14614,11 +15584,12 @@ let is_valid = {
 let x = inner;
 x <= 16u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(13614619987783239962u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 PResult::Ok(opentype_maxp_table_version1 { max_points, max_contours, max_composite_points, max_composite_contours, max_zones, max_twilight_points, max_storage, max_function_defs, max_instruction_defs, max_stack_elements, max_size_of_instructions, max_component_elements, max_component_depth })
 }
@@ -14647,7 +15618,8 @@ let platform = (Decoder23(_input))?;
 let encoding = (Decoder23(_input))?;
 let subtable_offset = ((|| {
 let offset = (Decoder20(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u32 {
+let link = ((|| {
+let ret = match offset > 0u32 {
 true => {
 let tgt_offset = start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -14662,7 +15634,9 @@ ret
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_encoding_record_subtable_offset { offset, link })
 })())?;
 PResult::Ok(opentype_encoding_record { platform, encoding, subtable_offset })
@@ -14679,7 +15653,8 @@ let ret = (Decoder23(_input))?;
 _input.close_peek_context()?;
 PResult::Ok(ret)
 })())?;
-let data = ((|| PResult::Ok(match format {
+let data = ((|| {
+let ret = match format {
 0u16 => {
 let inner = (Decoder_opentype_cmap_subtable_format0(_input, _platform.clone()))?;
 opentype_cmap_subtable_data::Format0(inner)
@@ -14728,7 +15703,9 @@ opentype_cmap_subtable_data::Format14(inner)
 _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_cmap_subtable { table_start, format, data })
 }
 
@@ -14775,11 +15752,12 @@ let is_valid = {
 let x = inner;
 x == 2u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(6915530142412472120u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 opentype_cmap_subtable_format14_raw_raw { format }
 };
@@ -14788,11 +15766,12 @@ let is_valid = {
 let l = inner;
 (l >= 518u16) && (l % 2u16 == 0u16)
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(6949960292533894002u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 _input.close_peek_context()?;
 ret
@@ -14806,11 +15785,12 @@ let is_valid = {
 let x = inner;
 x == 2u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(1347174710810305478u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let length = ((|| {
 let inner = (Decoder23(_input))?;
@@ -14818,11 +15798,12 @@ let is_valid = {
 let l = inner;
 (l >= 518u16) && (l % 2u16 == 0u16)
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(8958899994948144829u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let language = (Decoder23(_input))?;
 let sub_header_keys = ((|| {
@@ -14911,11 +15892,12 @@ let is_valid = {
 let x = inner;
 x == 4u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(15803403730818557393u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 opentype_cmap_subtable_format14_raw_raw { format }
 };
@@ -14933,11 +15915,12 @@ let is_valid = {
 let x = inner;
 x == 4u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(8390724546948265409u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let length = (Decoder23(_input))?;
 let language = (Decoder23(_input))?;
@@ -14961,11 +15944,12 @@ let is_valid = {
 let x = inner;
 x == 0u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(6347242493551283856u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let start_code = ((|| {
 let mut accum = Vec::new();
@@ -15022,11 +16006,12 @@ let is_valid = {
 let x = inner;
 x == 6u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(4251627061094365437u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let length = (Decoder23(_input))?;
 let language = (Decoder23(_input))?;
@@ -15053,11 +16038,12 @@ let is_valid = {
 let x = inner;
 x == 8u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(11915580511665106140u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let __reserved = ((|| {
 let inner = (Decoder23(_input))?;
@@ -15065,11 +16051,12 @@ let is_valid = {
 let x = inner;
 x == 0u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(17324980155911269375u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 opentype_cmap_subtable_format13_raw_raw { format, __reserved }
 };
@@ -15087,11 +16074,12 @@ let is_valid = {
 let x = inner;
 x == 8u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(17670535809278048255u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let __reserved = ((|| {
 let inner = (Decoder23(_input))?;
@@ -15099,11 +16087,12 @@ let is_valid = {
 let x = inner;
 x == 0u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(2444204717155307095u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let length = (Decoder20(_input))?;
 let language = (Decoder20(_input))?;
@@ -15139,11 +16128,12 @@ let is_valid = {
 let x = inner;
 x == 10u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(1278184758971178969u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let __reserved = ((|| {
 let inner = (Decoder23(_input))?;
@@ -15151,11 +16141,12 @@ let is_valid = {
 let x = inner;
 x == 0u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(4480225125687487743u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 opentype_cmap_subtable_format13_raw_raw { format, __reserved }
 };
@@ -15173,11 +16164,12 @@ let is_valid = {
 let x = inner;
 x == 10u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(12879845237981630531u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let __reserved = ((|| {
 let inner = (Decoder23(_input))?;
@@ -15185,11 +16177,12 @@ let is_valid = {
 let x = inner;
 x == 0u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(3426398976290336157u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let length = (Decoder20(_input))?;
 let language = (Decoder20(_input))?;
@@ -15219,11 +16212,12 @@ let is_valid = {
 let x = inner;
 x == 12u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(11250208753083412758u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let __reserved = ((|| {
 let inner = (Decoder23(_input))?;
@@ -15231,11 +16225,12 @@ let is_valid = {
 let x = inner;
 x == 0u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(17349123374714965876u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 opentype_cmap_subtable_format13_raw_raw { format, __reserved }
 };
@@ -15253,11 +16248,12 @@ let is_valid = {
 let x = inner;
 x == 12u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(2153064741293804702u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let __reserved = ((|| {
 let inner = (Decoder23(_input))?;
@@ -15265,11 +16261,12 @@ let is_valid = {
 let x = inner;
 x == 0u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(1588651938759015246u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let length = (Decoder20(_input))?;
 let language = (Decoder20(_input))?;
@@ -15298,11 +16295,12 @@ let is_valid = {
 let x = inner;
 x == 13u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(3249387167439447765u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let __reserved = ((|| {
 let inner = (Decoder23(_input))?;
@@ -15310,11 +16308,12 @@ let is_valid = {
 let x = inner;
 x == 0u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(7744051144774795087u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 opentype_cmap_subtable_format13_raw_raw { format, __reserved }
 };
@@ -15332,11 +16331,12 @@ let is_valid = {
 let x = inner;
 x == 13u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(8700288293163706751u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let __reserved = ((|| {
 let inner = (Decoder23(_input))?;
@@ -15344,11 +16344,12 @@ let is_valid = {
 let x = inner;
 x == 0u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(16771529512960957239u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let length = (Decoder20(_input))?;
 let language = (Decoder20(_input))?;
@@ -15377,11 +16378,12 @@ let is_valid = {
 let x = inner;
 x == 14u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(13846498452079501214u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 opentype_cmap_subtable_format14_raw_raw { format }
 };
@@ -15399,11 +16401,12 @@ let is_valid = {
 let x = inner;
 x == 14u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(9798710097031164942u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let length = (Decoder20(_input))?;
 let num_var_selector_records = (Decoder20(_input))?;
@@ -15433,7 +16436,8 @@ PResult::Ok(u32be(x))
 })())?;
 let default_uvs_offset = ((|| {
 let offset = (Decoder20(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u32 {
+let link = ((|| {
+let ret = match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -15471,12 +16475,15 @@ ret
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_variation_selector_default_uvs_offset { offset, link })
 })())?;
 let non_default_uvs_offset = ((|| {
 let offset = (Decoder20(_input))?;
-let link = ((|| PResult::Ok(match offset > 0u32 {
+let link = ((|| {
+let ret = match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -15514,7 +16521,9 @@ ret
 false => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(opentype_variation_selector_non_default_uvs_offset { offset, link })
 })())?;
 PResult::Ok(opentype_variation_selector { var_selector, default_uvs_offset, non_default_uvs_offset })
@@ -15568,7 +16577,7 @@ PResult::Ok(accum)
 }
 
 fn Decoder116<>(_input: &mut Parser<'_>, r#type: u32, size: u64) -> Result<Vec<u8>, ParseError> {
-PResult::Ok(match r#type {
+let ret = match r#type {
 _ => {
 let mut accum = Vec::new();
 for _ in 0..size {
@@ -15576,7 +16585,8 @@ accum.push((Decoder24(_input))?);
 }
 accum
 }
-})
+};
+PResult::Ok(ret)
 }
 
 fn Decoder_elf_shdr_table<>(_input: &mut Parser<'_>, is_be: bool, class: u8) -> Result<elf_shdr_table, ParseError> {
@@ -15595,7 +16605,7 @@ PResult::Ok(elf_shdr_table { name, r#type, flags, addr, offset, size, link, info
 
 fn Decoder118<>(_input: &mut Parser<'_>, is_be: bool) -> Result<u32, ParseError> {
 let _ = _input.skip_align(4)?;
-PResult::Ok(match is_be {
+let ret = match is_be {
 true => {
 (Decoder20(_input))?
 },
@@ -15603,7 +16613,8 @@ true => {
 false => {
 (Decoder127(_input))?
 }
-})
+};
+PResult::Ok(ret)
 }
 
 fn Decoder119<>(_input: &mut Parser<'_>, is_be: bool) -> Result<u32, ParseError> {
@@ -15628,15 +16639,16 @@ false
 }
 }
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(9819345728844658158u64));
-})
+};
+PResult::Ok(ret)
 }
 
 fn Decoder_elf_types_elf_full<>(_input: &mut Parser<'_>, is_be: bool, class: u8) -> Result<elf_types_elf_full, ParseError> {
-PResult::Ok(match class {
+let ret = match class {
 1u8 => {
 let inner = (Decoder118(_input, is_be.clone()))?;
 elf_types_elf_full::Full32(inner)
@@ -15650,11 +16662,12 @@ elf_types_elf_full::Full64(inner)
 _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
-})
+};
+PResult::Ok(ret)
 }
 
 fn Decoder_elf_types_elf_addr<>(_input: &mut Parser<'_>, is_be: bool, class: u8) -> Result<elf_types_elf_addr, ParseError> {
-PResult::Ok(match class {
+let ret = match class {
 1u8 => {
 let inner = (Decoder128(_input, is_be.clone()))?;
 elf_types_elf_addr::Addr32(inner)
@@ -15668,11 +16681,12 @@ elf_types_elf_addr::Addr64(inner)
 _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
-})
+};
+PResult::Ok(ret)
 }
 
 fn Decoder_elf_types_elf_off<>(_input: &mut Parser<'_>, is_be: bool, class: u8) -> Result<elf_types_elf_off, ParseError> {
-PResult::Ok(match class {
+let ret = match class {
 1u8 => {
 let inner = (Decoder124(_input, is_be.clone()))?;
 elf_types_elf_off::Off32(inner)
@@ -15686,7 +16700,8 @@ elf_types_elf_off::Off64(inner)
 _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
-})
+};
+PResult::Ok(ret)
 }
 
 fn Decoder123<>(_input: &mut Parser<'_>, is_be: bool) -> Result<u32, ParseError> {
@@ -15695,7 +16710,7 @@ Decoder118(_input, is_be.clone())
 
 fn Decoder124<>(_input: &mut Parser<'_>, is_be: bool) -> Result<u32, ParseError> {
 let _ = _input.skip_align(4)?;
-PResult::Ok(match is_be {
+let ret = match is_be {
 true => {
 (Decoder20(_input))?
 },
@@ -15703,12 +16718,13 @@ true => {
 false => {
 (Decoder127(_input))?
 }
-})
+};
+PResult::Ok(ret)
 }
 
 fn Decoder125<>(_input: &mut Parser<'_>, is_be: bool) -> Result<u64, ParseError> {
 let _ = _input.skip_align(8)?;
-PResult::Ok(match is_be {
+let ret = match is_be {
 true => {
 (Decoder99(_input))?
 },
@@ -15716,7 +16732,8 @@ true => {
 false => {
 (Decoder126(_input))?
 }
-})
+};
+PResult::Ok(ret)
 }
 
 fn Decoder126<>(_input: &mut Parser<'_>) -> Result<u64, ParseError> {
@@ -15747,7 +16764,7 @@ PResult::Ok(u32le(x))
 
 fn Decoder128<>(_input: &mut Parser<'_>, is_be: bool) -> Result<u32, ParseError> {
 let _ = _input.skip_align(4)?;
-PResult::Ok(match is_be {
+let ret = match is_be {
 true => {
 (Decoder20(_input))?
 },
@@ -15755,12 +16772,13 @@ true => {
 false => {
 (Decoder127(_input))?
 }
-})
+};
+PResult::Ok(ret)
 }
 
 fn Decoder129<>(_input: &mut Parser<'_>, is_be: bool) -> Result<u64, ParseError> {
 let _ = _input.skip_align(8)?;
-PResult::Ok(match is_be {
+let ret = match is_be {
 true => {
 (Decoder99(_input))?
 },
@@ -15768,12 +16786,13 @@ true => {
 false => {
 (Decoder126(_input))?
 }
-})
+};
+PResult::Ok(ret)
 }
 
 fn Decoder130<>(_input: &mut Parser<'_>, is_be: bool) -> Result<u64, ParseError> {
 let _ = _input.skip_align(8)?;
-PResult::Ok(match is_be {
+let ret = match is_be {
 true => {
 (Decoder99(_input))?
 },
@@ -15781,7 +16800,8 @@ true => {
 false => {
 (Decoder126(_input))?
 }
-})
+};
+PResult::Ok(ret)
 }
 
 fn Decoder_elf_phdr_table<>(_input: &mut Parser<'_>, is_be: bool, class: u8) -> Result<elf_phdr_table, ParseError> {
@@ -15798,19 +16818,21 @@ PResult::Ok(elf_phdr_table { r#type, flags64, offset, vaddr, paddr, filesz, mems
 }
 
 fn Decoder132<>(_input: &mut Parser<'_>, is_be: bool, class: u8) -> Result<Option<u32>, ParseError> {
-PResult::Ok(if class == 2u8 {
+let ret = if class == 2u8 {
 Some((Decoder118(_input, is_be.clone()))?)
 } else {
 None
-})
+};
+PResult::Ok(ret)
 }
 
 fn Decoder133<>(_input: &mut Parser<'_>, is_be: bool, class: u8) -> Result<Option<u32>, ParseError> {
-PResult::Ok(if class == 1u8 {
+let ret = if class == 1u8 {
 Some((Decoder118(_input, is_be.clone()))?)
 } else {
 None
-})
+};
+PResult::Ok(ret)
 }
 
 fn Decoder_elf_header_ident<>(_input: &mut Parser<'_>) -> Result<elf_header_ident, ParseError> {
@@ -15911,11 +16933,12 @@ false
 }
 }
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(13404710972790825894u64));
-})
+};
+PResult::Ok(ret)
 }
 
 fn Decoder136<>(_input: &mut Parser<'_>, is_be: bool) -> Result<u16, ParseError> {
@@ -15928,16 +16951,17 @@ let is_valid = {
 let x = inner;
 x <= 1u32
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(2688427941405105545u64));
-})
+};
+PResult::Ok(ret)
 }
 
 fn Decoder138<>(_input: &mut Parser<'_>, is_be: bool) -> Result<u16, ParseError> {
 let _ = _input.skip_align(2)?;
-PResult::Ok(match is_be {
+let ret = match is_be {
 true => {
 (Decoder23(_input))?
 },
@@ -15945,7 +16969,8 @@ true => {
 false => {
 (Decoder139(_input))?
 }
-})
+};
+PResult::Ok(ret)
 }
 
 fn Decoder139<>(_input: &mut Parser<'_>) -> Result<u16, ParseError> {
@@ -15963,11 +16988,12 @@ let is_valid = {
 let x = inner;
 x <= 2u8
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(6279463968646665849u64));
-})
+};
+PResult::Ok(ret)
 }
 
 fn Decoder141<>(_input: &mut Parser<'_>) -> Result<u8, ParseError> {
@@ -15976,11 +17002,12 @@ let is_valid = {
 let x = inner;
 x <= 2u8
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(10875553067752207222u64));
-})
+};
+PResult::Ok(ret)
 }
 
 fn Decoder142<>(_input: &mut Parser<'_>) -> Result<u8, ParseError> {
@@ -15989,11 +17016,12 @@ let is_valid = {
 let x = inner;
 x <= 1u8
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(11323981950571132721u64));
-})
+};
+PResult::Ok(ret)
 }
 
 fn Decoder143<>(_input: &mut Parser<'_>) -> Result<u8, ParseError> {
@@ -17036,7 +18064,8 @@ PResult::Ok(accum)
 _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
-let pad = ((|| PResult::Ok(if length % 2u32 == 1u32 {
+let pad = ((|| {
+let ret = if length % 2u32 == 1u32 {
 let b = _input.read_byte()?;
 Some(if b == 0 {
 b
@@ -17045,7 +18074,9 @@ return Err(ParseError::ExcludedBranch(5955168674639093440u64));
 })
 } else {
 None
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(riff_chunk { tag, length, data, pad })
 }
 
@@ -17124,11 +18155,12 @@ let is_valid = {
 let length = inner;
 length <= 2147483647u32
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(12668500753644823654u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let tag = (Decoder203(_input))?;
 let data = ((|| {
@@ -17149,16 +18181,17 @@ let is_valid = {
 let length = inner;
 length <= 2147483647u32
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(8094248233631264621u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let tag = ((|| {
 let _ = {
 _input.open_peek_not_context();
-let _res = (|| {
+let res = (|| {
 let b = _input.read_byte()?;
 PResult::Ok(if b == 73 {
 b
@@ -17166,7 +18199,7 @@ b
 return Err(ParseError::ExcludedBranch(1844274570107701975u64));
 })
 })();
-if _res.is_err() {
+if res.is_err() {
 _input.close_peek_not_context()?;
 } else {
 return Err(ParseError::NegatedSuccess);
@@ -17182,7 +18215,8 @@ PResult::Ok(accum)
 let data = ((|| {
 let sz = length as usize;
 _input.start_slice(sz)?;
-let ret = ((|| PResult::Ok(match tag.as_slice() {
+let ret = ((|| {
+let ret = match tag.as_slice() {
 [80u8, 76u8, 84u8, 69u8] => {
 let inner = (Decoder175(_input))?;
 png_chunk_data::PLTE(inner)
@@ -17282,7 +18316,9 @@ accum
 };
 png_chunk_data::unknown(inner)
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
@@ -17297,11 +18333,12 @@ let is_valid = {
 let length = inner;
 length <= 2147483647u32
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(4839194687019048322u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let tag = (Decoder172(_input))?;
 let data = ((|| {
@@ -17325,21 +18362,25 @@ let is_valid = {
 let method_info = inner;
 method_info.compression_method.clone() == 8u8
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(7230273548678969972u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let flags = ((|| {
 let packed_bits = _input.read_byte()?;
 PResult::Ok(zlib_main_flags { flevel: packed_bits >> 6u8 & 3u8, fdict: packed_bits >> 5u8 & 1u8 > 0u8, fcheck: packed_bits >> 0u8 & 31u8 })
 })())?;
-let dict_id = ((|| PResult::Ok(if flags.fdict.clone() {
+let dict_id = ((|| {
+let ret = if flags.fdict.clone() {
 Some((Decoder20(_input))?)
 } else {
 None
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let data = ((|| {
 _input.enter_bits_mode()?;
 let ret = (Decoder_deflate_main(_input))?;
@@ -17357,11 +18398,12 @@ let is_valid = {
 let length = inner;
 length <= 2147483647u32
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(14903563845775542749u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let tag = (Decoder162(_input))?;
 let data = ((|| {
@@ -17433,26 +18475,26 @@ accum.push(elem);
 PResult::Ok(accum)
 })())?;
 let codes = (try_flat_map_vec(blocks.iter().cloned(), |x: deflate_block| PResult::Ok(match x.data.clone() {
-deflate_main_codes::uncompressed(ref y) => {
+deflate_main_codes__dupX1::uncompressed(ref y) => {
 y.codes_values.clone()
 },
 
-deflate_main_codes::fixed_huffman(ref y) => {
+deflate_main_codes__dupX1::fixed_huffman(ref y) => {
 y.codes_values.clone()
 },
 
-deflate_main_codes::dynamic_huffman(ref y) => {
+deflate_main_codes__dupX1::dynamic_huffman(ref y) => {
 y.codes_values.clone()
 }
 })))?;
-let inflate = (try_flat_map_append_vec(codes.iter().cloned(), |tuple_var: (&Vec<u8>, deflate_main_codes__dupX1)| PResult::Ok(match tuple_var {
+let inflate = (try_flat_map_append_vec(codes.iter().cloned(), |tuple_var: (&Vec<u8>, deflate_main_codes)| PResult::Ok(match tuple_var {
 (buffer, symbol) => {
 match symbol {
-deflate_main_codes__dupX1::literal(b) => {
+deflate_main_codes::literal(b) => {
 [b].to_vec()
 },
 
-deflate_main_codes__dupX1::reference(r) => {
+deflate_main_codes::reference(r) => {
 {
 let ix = (try_sub!((buffer.len()) as u32, (r.distance.clone()) as u32, 16200207902741715318u64)) as usize;
 (slice_ext(&buffer, ix..ix + (((r.length.clone()) as u32) as usize))).to_vec()
@@ -17474,26 +18516,29 @@ let field1 = (Decoder166(_input))?;
 };
 PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8)
 })())?;
-let data = ((|| PResult::Ok(match r#type {
+let data = ((|| {
+let ret = match r#type {
 0u8 => {
 let inner = (Decoder_deflate_uncompressed(_input))?;
-deflate_main_codes::uncompressed(inner)
+deflate_main_codes__dupX1::uncompressed(inner)
 },
 
 1u8 => {
 let inner = (Decoder_deflate_fixed_huffman(_input))?;
-deflate_main_codes::fixed_huffman(inner)
+deflate_main_codes__dupX1::fixed_huffman(inner)
 },
 
 2u8 => {
 let inner = (Decoder_deflate_dynamic_huffman(_input))?;
-deflate_main_codes::dynamic_huffman(inner)
+deflate_main_codes__dupX1::dynamic_huffman(inner)
 },
 
 _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(deflate_block { r#final, r#type, data })
 }
 
@@ -17567,7 +18612,7 @@ bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.c
 }
 PResult::Ok(accum)
 })())?;
-let codes_values = (try_flat_map_vec(bytes.iter().cloned(), |x: u8| PResult::Ok([deflate_main_codes__dupX1::literal(x)].to_vec())))?;
+let codes_values = (try_flat_map_vec(bytes.iter().cloned(), |x: u8| PResult::Ok([deflate_main_codes::literal(x)].to_vec())))?;
 PResult::Ok(deflate_uncompressed { align, len, nlen, bytes, codes_values })
 }
 
@@ -17578,7 +18623,8 @@ let mut accum = Vec::new();
 loop {
 let elem = {
 let code = (format(_input))?;
-let extra = ((|| PResult::Ok(match code {
+let extra = ((|| {
+let ret = match code {
 257u16 => {
 let val = {
 let length_extra_bits = 0u8;
@@ -18326,7 +19372,9 @@ None
 _ => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 deflate_fixed_huffman_codes { code, extra }
 };
 if {
@@ -18349,7 +19397,7 @@ let codes_values = (try_flat_map_vec(codes.iter().cloned(), |x: deflate_fixed_hu
 257u16..=285u16 => {
 match x.extra.clone() {
 Some(ref rec) => {
-[deflate_main_codes__dupX1::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
+[deflate_main_codes::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
 },
 
 _ => {
@@ -18363,7 +19411,7 @@ return Err(ParseError::ExcludedBranch(5576343694315527798u64));
 },
 
 _ => {
-[deflate_main_codes__dupX1::literal((x.code.clone()) as u8)].to_vec()
+[deflate_main_codes::literal((x.code.clone()) as u8)].to_vec()
 }
 })))?;
 PResult::Ok(deflate_fixed_huffman { codes, codes_values })
@@ -18423,7 +19471,8 @@ let mut accum = Vec::new();
 loop {
 let elem = {
 let code = (code_length_alphabet_format(_input))?;
-let extra = ((|| PResult::Ok(match code as u8 {
+let extra = ((|| {
+let ret = match code as u8 {
 16u8 => {
 let bits = {
 let field0 = (Decoder166(_input))?;
@@ -18460,7 +19509,9 @@ bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.c
 _ => {
 0u8
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 deflate_dynamic_huffman_literal_length_distance_alphabet_code_lengths { code, extra }
 };
 accum.push(elem);
@@ -18542,7 +19593,8 @@ let mut accum = Vec::new();
 loop {
 let elem = {
 let code = (literal_length_alphabet_format(_input))?;
-let extra = ((|| PResult::Ok(match code {
+let extra = ((|| {
+let ret = match code {
 257u16 => {
 let val = {
 let length_extra_bits = 0u8;
@@ -19029,7 +20081,9 @@ None
 _ => {
 None
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 deflate_dynamic_huffman_codes { code, extra }
 };
 if {
@@ -19052,7 +20106,7 @@ let codes_values = (try_flat_map_vec(codes.iter().cloned(), |x: deflate_dynamic_
 257u16..=285u16 => {
 match x.extra.clone() {
 Some(ref rec) => {
-[deflate_main_codes__dupX1::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
+[deflate_main_codes::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
 },
 
 _ => {
@@ -19066,14 +20120,14 @@ return Err(ParseError::ExcludedBranch(98102193810481173u64));
 },
 
 _ => {
-[deflate_main_codes__dupX1::literal((x.code.clone()) as u8)].to_vec()
+[deflate_main_codes::literal((x.code.clone()) as u8)].to_vec()
 }
 })))?;
 PResult::Ok(deflate_dynamic_huffman { hlit, hdist, hclen, code_length_alphabet_code_lengths, literal_length_distance_alphabet_code_lengths, literal_length_distance_alphabet_code_lengths_value, literal_length_alphabet_code_lengths_value, distance_alphabet_code_lengths_value, codes, codes_values })
 }
 
 fn Decoder_deflate_distance_record<>(_input: &mut Parser<'_>, distance_code: u16) -> Result<deflate_distance_record, ParseError> {
-PResult::Ok(match distance_code as u8 {
+let ret = match distance_code as u8 {
 0u8 => {
 (Decoder171(_input, 0u8, 1u16))?
 },
@@ -19201,11 +20255,13 @@ return Err(ParseError::FailToken(12217686503432178884u64));
 _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
-})
+};
+PResult::Ok(ret)
 }
 
 fn Decoder171<>(_input: &mut Parser<'_>, extra_bits: u8, start: u16) -> Result<deflate_distance_record, ParseError> {
-let distance_extra_bits = ((|| PResult::Ok(match extra_bits {
+let distance_extra_bits = ((|| {
+let ret = match extra_bits {
 0u8 => {
 0u16
 },
@@ -19395,7 +20451,9 @@ let field12 = (Decoder166(_input))?;
 _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let distance = start + distance_extra_bits;
 PResult::Ok(deflate_distance_record { distance_extra_bits, distance })
 }
@@ -19499,7 +20557,7 @@ PResult::Ok(accum)
 }
 
 fn Decoder_png_trns<>(_input: &mut Parser<'_>, ihdr: png_ihdr) -> Result<png_trns, ParseError> {
-PResult::Ok(match ihdr.data.color_type.clone() {
+let ret = match ihdr.data.color_type.clone() {
 0u8 => {
 let inner = {
 let greyscale = (Decoder23(_input))?;
@@ -19549,7 +20607,8 @@ png_trns::color_type_3(inner)
 _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
-})
+};
+PResult::Ok(ret)
 }
 
 fn Decoder_png_chrm<>(_input: &mut Parser<'_>) -> Result<png_chrm, ParseError> {
@@ -19595,18 +20654,19 @@ let is_valid = {
 let x = inner;
 x == 0u8
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(8179432974518885725u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let compressed_profile = (Decoder202(_input))?;
 PResult::Ok(png_iccp { profile_name, compression_method, compressed_profile })
 }
 
 fn Decoder_png_sbit<>(_input: &mut Parser<'_>, ihdr: png_ihdr) -> Result<png_sbit, ParseError> {
-PResult::Ok(match ihdr.data.color_type.clone() {
+let ret = match ihdr.data.color_type.clone() {
 0u8 => {
 let inner = {
 let sig_greyscale_bits = (Decoder24(_input))?;
@@ -19658,7 +20718,8 @@ png_sbit::color_type_6(inner)
 _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
-})
+};
+PResult::Ok(ret)
 }
 
 fn Decoder_png_srgb<>(_input: &mut Parser<'_>) -> Result<png_srgb, ParseError> {
@@ -19668,11 +20729,12 @@ let is_valid = {
 let x = inner;
 x <= 3u8
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(5152282179373241998u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 PResult::Ok(png_srgb { rendering_intent })
 }
@@ -19733,10 +20795,10 @@ x
 }
 })
 })())?;
-let text = ((|| PResult::Ok(match compression_flag == 1u8 {
+let text = ((|| {
+let ret = match compression_flag == 1u8 {
 true => {
 _input.start_alt();
-{
 let res = (|| {
 let inner = {
 let inner = {
@@ -19757,9 +20819,7 @@ return PResult::Ok(inner);
 Err(_e) => {
 _input.next_alt(true)?;
 }
-}
 };
-{
 let res = (|| {
 let inner = {
 let inner = {
@@ -19795,7 +20855,6 @@ return PResult::Ok(inner);
 Err(_e) => {
 return Err(_e);
 }
-}
 };
 },
 
@@ -19803,7 +20862,9 @@ false => {
 let inner = (Decoder193(_input))?;
 png_itxt_text::uncompressed(inner)
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(png_itxt { keyword, compression_flag, compression_method, language_tag, translated_keyword, text })
 }
 
@@ -19889,7 +20950,7 @@ PResult::Ok(png_ztxt { keyword, compression_method, compressed_text })
 }
 
 fn Decoder_png_bkgd<>(_input: &mut Parser<'_>, ihdr: png_ihdr) -> Result<png_bkgd, ParseError> {
-PResult::Ok(match ihdr.data.color_type.clone() {
+let ret = match ihdr.data.color_type.clone() {
 0u8 => {
 let inner = {
 let greyscale = (Decoder23(_input))?;
@@ -19937,7 +20998,8 @@ png_bkgd::color_type_3(inner)
 _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
-})
+};
+PResult::Ok(ret)
 }
 
 fn Decoder_png_hist<>(_input: &mut Parser<'_>) -> Result<png_hist, ParseError> {
@@ -19998,13 +21060,15 @@ let is_valid = {
 let x = inner;
 (x == 8u8) || (x == 16u8)
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(5599331855309773603u64));
-})
+};
+PResult::Ok(ret)
 })())?;
-let pallette = ((|| PResult::Ok(match sample_depth {
+let pallette = ((|| {
+let ret = match sample_depth {
 8u8 => {
 let inner = {
 let mut accum = Vec::new();
@@ -20072,7 +21136,9 @@ png_splt_pallette::sample_depth_u16(inner)
 _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(png_splt { palette_name, sample_depth, pallette })
 }
 
@@ -22048,21 +23114,25 @@ let is_valid = {
 let method_info = inner;
 method_info.compression_method.clone() == 8u8
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(7572218778908935167u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let flags = ((|| {
 let packed_bits = _input.read_byte()?;
 PResult::Ok(zlib_main_flags { flevel: packed_bits >> 6u8 & 3u8, fdict: packed_bits >> 5u8 & 1u8 > 0u8, fcheck: packed_bits >> 0u8 & 31u8 })
 })())?;
-let dict_id = ((|| PResult::Ok(if flags.fdict.clone() {
+let dict_id = ((|| {
+let ret = if flags.fdict.clone() {
 Some((Decoder20(_input))?)
 } else {
 None
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let data = ((|| {
 _input.enter_bits_mode()?;
 let ret = (Decoder_deflate_main(_input))?;
@@ -24220,21 +25290,25 @@ let is_valid = {
 let method_info = inner;
 method_info.compression_method.clone() == 8u8
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(5713736954960046494u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let flags = ((|| {
 let packed_bits = _input.read_byte()?;
 PResult::Ok(zlib_main_flags { flevel: packed_bits >> 6u8 & 3u8, fdict: packed_bits >> 5u8 & 1u8 > 0u8, fcheck: packed_bits >> 0u8 & 31u8 })
 })())?;
-let dict_id = ((|| PResult::Ok(if flags.fdict.clone() {
+let dict_id = ((|| {
+let ret = if flags.fdict.clone() {
 Some((Decoder20(_input))?)
 } else {
 None
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let data = ((|| {
 _input.enter_bits_mode()?;
 let ret = (Decoder_deflate_main(_input))?;
@@ -25292,21 +26366,25 @@ let is_valid = {
 let method_info = inner;
 method_info.compression_method.clone() == 8u8
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(15321253101048235163u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let flags = ((|| {
 let packed_bits = _input.read_byte()?;
 PResult::Ok(zlib_main_flags { flevel: packed_bits >> 6u8 & 3u8, fdict: packed_bits >> 5u8 & 1u8 > 0u8, fcheck: packed_bits >> 0u8 & 31u8 })
 })())?;
-let dict_id = ((|| PResult::Ok(if flags.fdict.clone() {
+let dict_id = ((|| {
+let ret = if flags.fdict.clone() {
 Some((Decoder20(_input))?)
 } else {
 None
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let data = ((|| {
 _input.enter_bits_mode()?;
 let ret = (Decoder_deflate_main(_input))?;
@@ -25367,7 +26445,8 @@ PResult::Ok(png_ihdr_data { width, height, bit_depth, color_type, compression_me
 fn Decoder_mpeg4_atom<>(_input: &mut Parser<'_>) -> Result<mpeg4_atom, ParseError> {
 let size_field = (Decoder20(_input))?;
 let r#type = (Decoder206(_input))?;
-let size = ((|| PResult::Ok(match size_field {
+let size = ((|| {
+let ret = match size_field {
 0u32 => {
 0u64
 },
@@ -25380,11 +26459,14 @@ try_sub!(x, 16u64, 15885886181646629118u64)
 _ => {
 (try_sub!(size_field, 8u32, 734991270787736827u64)) as u64
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let data = ((|| {
 let sz = size as usize;
 _input.start_slice(sz)?;
-let ret = ((|| PResult::Ok(match r#type {
+let ret = ((|| {
+let ret = match r#type {
 (102u8, 116u8, 121u8, 112u8) => {
 let inner = {
 let major_brand = (Decoder206(_input))?;
@@ -25498,7 +26580,9 @@ accum
 };
 mpeg4_atom_data::unknown(inner)
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
@@ -25516,7 +26600,8 @@ PResult::Ok((field0, field1, field2, field3))
 fn Decoder_mpeg4_meta_atom<>(_input: &mut Parser<'_>) -> Result<mpeg4_meta_atom, ParseError> {
 let size_field = (Decoder20(_input))?;
 let r#type = (Decoder206(_input))?;
-let size = ((|| PResult::Ok(match size_field {
+let size = ((|| {
+let ret = match size_field {
 0u32 => {
 0u64
 },
@@ -25529,11 +26614,14 @@ try_sub!(x, 16u64, 14349391981174483355u64)
 _ => {
 (try_sub!(size_field, 8u32, 18167425999583150549u64)) as u64
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let data = ((|| {
 let sz = size as usize;
 _input.start_slice(sz)?;
-let ret = ((|| PResult::Ok(match r#type {
+let ret = ((|| {
+let ret = match r#type {
 (100u8, 105u8, 110u8, 102u8) => {
 let inner = {
 let mut accum = Vec::new();
@@ -25591,7 +26679,8 @@ let field1 = (Decoder24(_input))?;
 let field2 = (Decoder24(_input))?;
 PResult::Ok((field0, field1, field2))
 })())?;
-let item_ID = ((|| PResult::Ok(match version == 0u8 {
+let item_ID = ((|| {
+let ret = match version == 0u8 {
 true => {
 let inner = (Decoder23(_input))?;
 mpeg4_meta_atom_data_pitm_item_ID::yes(inner)
@@ -25601,7 +26690,9 @@ false => {
 let inner = (Decoder20(_input))?;
 mpeg4_meta_atom_data_pitm_item_ID::no(inner)
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 mpeg4_meta_atom_data_pitm { version, flags, item_ID }
 };
 mpeg4_meta_atom_data::pitm(inner)
@@ -25616,7 +26707,8 @@ let field1 = (Decoder24(_input))?;
 let field2 = (Decoder24(_input))?;
 PResult::Ok((field0, field1, field2))
 })())?;
-let entry_count = ((|| PResult::Ok(match version == 0u8 {
+let entry_count = ((|| {
+let ret = match version == 0u8 {
 true => {
 let x = (Decoder23(_input))?;
 x as u32
@@ -25625,7 +26717,9 @@ x as u32
 false => {
 (Decoder20(_input))?
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let item_info_entry = ((|| {
 let mut accum = Vec::new();
 for _ in 0..entry_count {
@@ -25647,7 +26741,8 @@ let field1 = (Decoder24(_input))?;
 let field2 = (Decoder24(_input))?;
 PResult::Ok((field0, field1, field2))
 })())?;
-let single_item_reference = ((|| PResult::Ok(match version {
+let single_item_reference = ((|| {
+let ret = match version {
 0u8 => {
 let inner = {
 let mut accum = Vec::new();
@@ -25665,7 +26760,8 @@ if matching_ix == 0 {
 let next_elem = {
 let size_field = (Decoder20(_input))?;
 let r#type = (Decoder206(_input))?;
-let size = ((|| PResult::Ok(match size_field {
+let size = ((|| {
+let ret = match size_field {
 0u32 => {
 0u64
 },
@@ -25678,7 +26774,9 @@ try_sub!(x, 16u64, 13819997351842221509u64)
 _ => {
 (try_sub!(size_field, 8u32, 1644793874183523166u64)) as u64
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let data = ((|| {
 let sz = size as usize;
 _input.start_slice(sz)?;
@@ -25726,7 +26824,8 @@ if matching_ix == 0 {
 let next_elem = {
 let size_field = (Decoder20(_input))?;
 let r#type = (Decoder206(_input))?;
-let size = ((|| PResult::Ok(match size_field {
+let size = ((|| {
+let ret = match size_field {
 0u32 => {
 0u64
 },
@@ -25739,7 +26838,9 @@ try_sub!(x, 16u64, 14114750189009003637u64)
 _ => {
 (try_sub!(size_field, 8u32, 16396082708135795071u64)) as u64
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let data = ((|| {
 let sz = size as usize;
 _input.start_slice(sz)?;
@@ -25773,7 +26874,9 @@ mpeg4_meta_atom_data_iref_single_item_reference::large(inner)
 _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 mpeg4_meta_atom_data_iref { version, flags, single_item_reference }
 };
 mpeg4_meta_atom_data::iref(inner)
@@ -25793,7 +26896,8 @@ let base_offset_size_index_size = (Decoder24(_input))?;
 let offset_size = offset_size_length_size >> 4u8;
 let length_size = offset_size_length_size & 7u8;
 let base_offset_size = base_offset_size_index_size >> 4u8;
-let index_size = match version > 0u8 {
+let index_size = {
+let ret = match version > 0u8 {
 true => {
 base_offset_size_index_size & 7u8
 },
@@ -25802,7 +26906,10 @@ false => {
 0u8
 }
 };
-let item_count = ((|| PResult::Ok(match version < 2u8 {
+ret
+};
+let item_count = ((|| {
+let ret = match version < 2u8 {
 true => {
 let x = (Decoder23(_input))?;
 x as u32
@@ -25811,12 +26918,15 @@ x as u32
 false => {
 (Decoder20(_input))?
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let items = ((|| {
 let mut accum = Vec::new();
 for _ in 0..item_count {
 accum.push({
-let item_ID = ((|| PResult::Ok(match version < 2u8 {
+let item_ID = ((|| {
+let ret = match version < 2u8 {
 true => {
 let x = (Decoder23(_input))?;
 x as u32
@@ -25825,14 +26935,20 @@ x as u32
 false => {
 (Decoder20(_input))?
 }
-}))())?;
-let construction_method = ((|| PResult::Ok(if version > 0u8 {
+};
+PResult::Ok(ret)
+})())?;
+let construction_method = ((|| {
+let ret = if version > 0u8 {
 Some((Decoder23(_input))?)
 } else {
 None
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let data_reference_index = (Decoder23(_input))?;
-let base_offset = ((|| PResult::Ok(match base_offset_size {
+let base_offset = ((|| {
+let ret = match base_offset_size {
 0u8 => {
 0u64
 },
@@ -25849,13 +26965,16 @@ x as u64
 _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let extent_count = (Decoder23(_input))?;
 let extents = ((|| {
 let mut accum = Vec::new();
 for _ in 0..extent_count {
 accum.push({
-let extent_index = ((|| PResult::Ok(match index_size {
+let extent_index = ((|| {
+let ret = match index_size {
 0u8 => {
 0u64
 },
@@ -25872,8 +26991,11 @@ x as u64
 _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
-}))())?;
-let extent_offset = ((|| PResult::Ok(match offset_size {
+};
+PResult::Ok(ret)
+})())?;
+let extent_offset = ((|| {
+let ret = match offset_size {
 0u8 => {
 0u64
 },
@@ -25890,8 +27012,11 @@ x as u64
 _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
-}))())?;
-let extent_length = ((|| PResult::Ok(match length_size {
+};
+PResult::Ok(ret)
+})())?;
+let extent_length = ((|| {
+let ret = match length_size {
 0u8 => {
 0u64
 },
@@ -25908,7 +27033,9 @@ x as u64
 _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 mpeg4_meta_atom_data_iloc_items_extents { extent_index, extent_offset, extent_length }
 });
 }
@@ -25998,7 +27125,9 @@ accum
 };
 mpeg4_meta_atom_data::unknown(inner)
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
@@ -26008,7 +27137,8 @@ PResult::Ok(mpeg4_meta_atom { size_field, r#type, size, data })
 fn Decoder_mpeg4_moov_atom<>(_input: &mut Parser<'_>) -> Result<mpeg4_moov_atom, ParseError> {
 let size_field = (Decoder20(_input))?;
 let r#type = (Decoder206(_input))?;
-let size = ((|| PResult::Ok(match size_field {
+let size = ((|| {
+let ret = match size_field {
 0u32 => {
 0u64
 },
@@ -26021,11 +27151,14 @@ try_sub!(x, 16u64, 9620443865397033050u64)
 _ => {
 (try_sub!(size_field, 8u32, 5546123200965512193u64)) as u64
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let data = ((|| {
 let sz = size as usize;
 _input.start_slice(sz)?;
-let ret = ((|| PResult::Ok(match r#type {
+let ret = ((|| {
+let ret = match r#type {
 (109u8, 118u8, 104u8, 100u8) => {
 let inner = {
 let version = (Decoder24(_input))?;
@@ -26035,7 +27168,8 @@ let field1 = (Decoder24(_input))?;
 let field2 = (Decoder24(_input))?;
 PResult::Ok((field0, field1, field2))
 })())?;
-let fields = ((|| PResult::Ok(match version {
+let fields = ((|| {
+let ret = match version {
 0u8 => {
 let inner = {
 let creation_time = (Decoder20(_input))?;
@@ -26061,7 +27195,9 @@ mpeg4_moov_atom_data_mvhd_fields::version1(inner)
 _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let rate = (Decoder20(_input))?;
 let volume = (Decoder23(_input))?;
 let reserved1 = (Decoder23(_input))?;
@@ -26164,7 +27300,9 @@ accum
 };
 mpeg4_moov_atom_data::unknown(inner)
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
@@ -26174,7 +27312,8 @@ PResult::Ok(mpeg4_moov_atom { size_field, r#type, size, data })
 fn Decoder_mpeg4_trak_atom<>(_input: &mut Parser<'_>) -> Result<mpeg4_trak_atom, ParseError> {
 let size_field = (Decoder20(_input))?;
 let r#type = (Decoder206(_input))?;
-let size = ((|| PResult::Ok(match size_field {
+let size = ((|| {
+let ret = match size_field {
 0u32 => {
 0u64
 },
@@ -26187,11 +27326,14 @@ try_sub!(x, 16u64, 3933597635930613605u64)
 _ => {
 (try_sub!(size_field, 8u32, 9403121491749669432u64)) as u64
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let data = ((|| {
 let sz = size as usize;
 _input.start_slice(sz)?;
-let ret = ((|| PResult::Ok(match r#type {
+let ret = ((|| {
+let ret = match r#type {
 (116u8, 107u8, 104u8, 100u8) => {
 let inner = {
 let version = (Decoder24(_input))?;
@@ -26201,7 +27343,8 @@ let field1 = (Decoder24(_input))?;
 let field2 = (Decoder24(_input))?;
 PResult::Ok((field0, field1, field2))
 })())?;
-let fields = ((|| PResult::Ok(match version {
+let fields = ((|| {
+let ret = match version {
 0u8 => {
 let inner = {
 let creation_time = (Decoder20(_input))?;
@@ -26229,7 +27372,9 @@ mpeg4_trak_atom_data_tkhd_fields::version1(inner)
 _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let reserved2 = ((|| {
 let field0 = (Decoder20(_input))?;
 let field1 = (Decoder20(_input))?;
@@ -26327,7 +27472,9 @@ accum
 };
 mpeg4_trak_atom_data::unknown(inner)
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
@@ -26337,7 +27484,8 @@ PResult::Ok(mpeg4_trak_atom { size_field, r#type, size, data })
 fn Decoder_mpeg4_udta_atom<>(_input: &mut Parser<'_>) -> Result<mpeg4_udta_atom, ParseError> {
 let size_field = (Decoder20(_input))?;
 let r#type = (Decoder206(_input))?;
-let size = ((|| PResult::Ok(match size_field {
+let size = ((|| {
+let ret = match size_field {
 0u32 => {
 0u64
 },
@@ -26350,11 +27498,14 @@ try_sub!(x, 16u64, 1105171745447487568u64)
 _ => {
 (try_sub!(size_field, 8u32, 7981520858864097140u64)) as u64
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let data = ((|| {
 let sz = size as usize;
 _input.start_slice(sz)?;
-let ret = ((|| PResult::Ok(match r#type {
+let ret = ((|| {
+let ret = match r#type {
 (109u8, 101u8, 116u8, 97u8) => {
 let field0 = (Decoder20(_input))?;
 let field1 = ((|| {
@@ -26405,7 +27556,9 @@ accum
 };
 mpeg4_udta_atom_data::unknown(inner)
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
@@ -26415,7 +27568,8 @@ PResult::Ok(mpeg4_udta_atom { size_field, r#type, size, data })
 fn Decoder_mpeg4_edts_atom<>(_input: &mut Parser<'_>) -> Result<mpeg4_edts_atom, ParseError> {
 let size_field = (Decoder20(_input))?;
 let r#type = (Decoder206(_input))?;
-let size = ((|| PResult::Ok(match size_field {
+let size = ((|| {
+let ret = match size_field {
 0u32 => {
 0u64
 },
@@ -26428,11 +27582,14 @@ try_sub!(x, 16u64, 6351919260209655786u64)
 _ => {
 (try_sub!(size_field, 8u32, 17948395312093823900u64)) as u64
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let data = ((|| {
 let sz = size as usize;
 _input.start_slice(sz)?;
-let ret = ((|| PResult::Ok(match r#type {
+let ret = ((|| {
+let ret = match r#type {
 (101u8, 108u8, 115u8, 116u8) => {
 let inner = {
 let version = (Decoder24(_input))?;
@@ -26484,7 +27641,9 @@ accum
 };
 mpeg4_edts_atom_data::unknown(inner)
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
@@ -26494,7 +27653,8 @@ PResult::Ok(mpeg4_edts_atom { size_field, r#type, size, data })
 fn Decoder_mpeg4_mdia_atom<>(_input: &mut Parser<'_>) -> Result<mpeg4_mdia_atom, ParseError> {
 let size_field = (Decoder20(_input))?;
 let r#type = (Decoder206(_input))?;
-let size = ((|| PResult::Ok(match size_field {
+let size = ((|| {
+let ret = match size_field {
 0u32 => {
 0u64
 },
@@ -26507,11 +27667,14 @@ try_sub!(x, 16u64, 17332407069754301555u64)
 _ => {
 (try_sub!(size_field, 8u32, 7370180348639650351u64)) as u64
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let data = ((|| {
 let sz = size as usize;
 _input.start_slice(sz)?;
-let ret = ((|| PResult::Ok(match r#type {
+let ret = ((|| {
+let ret = match r#type {
 (104u8, 100u8, 108u8, 114u8) => {
 let inner = {
 let version = (Decoder24(_input))?;
@@ -26541,7 +27704,8 @@ let field1 = (Decoder24(_input))?;
 let field2 = (Decoder24(_input))?;
 PResult::Ok((field0, field1, field2))
 })())?;
-let fields = ((|| PResult::Ok(match version {
+let fields = ((|| {
+let ret = match version {
 0u8 => {
 let inner = {
 let creation_time = (Decoder20(_input))?;
@@ -26567,7 +27731,9 @@ mpeg4_moov_atom_data_mvhd_fields::version1(inner)
 _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let language = (Decoder23(_input))?;
 let pre_defined = (Decoder23(_input))?;
 mpeg4_mdia_atom_data_mdhd { version, flags, fields, language, pre_defined }
@@ -26624,7 +27790,9 @@ accum
 };
 mpeg4_mdia_atom_data::unknown(inner)
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
@@ -26685,7 +27853,8 @@ PResult::Ok(base_asciiz_string { string, null })
 fn Decoder_mpeg4_minf_atom<>(_input: &mut Parser<'_>) -> Result<mpeg4_minf_atom, ParseError> {
 let size_field = (Decoder20(_input))?;
 let r#type = (Decoder206(_input))?;
-let size = ((|| PResult::Ok(match size_field {
+let size = ((|| {
+let ret = match size_field {
 0u32 => {
 0u64
 },
@@ -26698,11 +27867,14 @@ try_sub!(x, 16u64, 17741760072369420240u64)
 _ => {
 (try_sub!(size_field, 8u32, 9851243859021733611u64)) as u64
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let data = ((|| {
 let sz = size as usize;
 _input.start_slice(sz)?;
-let ret = ((|| PResult::Ok(match r#type {
+let ret = ((|| {
+let ret = match r#type {
 (118u8, 109u8, 104u8, 100u8) => {
 let inner = {
 let version = (Decoder24(_input))?;
@@ -26815,7 +27987,9 @@ accum
 };
 mpeg4_minf_atom_data::unknown(inner)
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
@@ -26825,7 +27999,8 @@ PResult::Ok(mpeg4_minf_atom { size_field, r#type, size, data })
 fn Decoder_mpeg4_dinf_atom<>(_input: &mut Parser<'_>) -> Result<mpeg4_dinf_atom, ParseError> {
 let size_field = (Decoder20(_input))?;
 let r#type = (Decoder206(_input))?;
-let size = ((|| PResult::Ok(match size_field {
+let size = ((|| {
+let ret = match size_field {
 0u32 => {
 0u64
 },
@@ -26838,11 +28013,14 @@ try_sub!(x, 16u64, 6072942808717419822u64)
 _ => {
 (try_sub!(size_field, 8u32, 5357406925723651718u64)) as u64
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let data = ((|| {
 let sz = size as usize;
 _input.start_slice(sz)?;
-let ret = ((|| PResult::Ok(match r#type {
+let ret = ((|| {
+let ret = match r#type {
 (100u8, 114u8, 101u8, 102u8) => {
 let inner = {
 let version = (Decoder24(_input))?;
@@ -26869,7 +28047,8 @@ if matching_ix == 0 {
 let next_elem = {
 let size_field = (Decoder20(_input))?;
 let r#type = (Decoder206(_input))?;
-let size = ((|| PResult::Ok(match size_field {
+let size = ((|| {
+let ret = match size_field {
 0u32 => {
 0u64
 },
@@ -26882,7 +28061,9 @@ try_sub!(x, 16u64, 7977419944699061624u64)
 _ => {
 (try_sub!(size_field, 8u32, 12318721104400761032u64)) as u64
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let data = ((|| {
 let sz = size as usize;
 _input.start_slice(sz)?;
@@ -26948,7 +28129,9 @@ accum
 };
 mpeg4_dinf_atom_data::unknown(inner)
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
@@ -26958,7 +28141,8 @@ PResult::Ok(mpeg4_dinf_atom { size_field, r#type, size, data })
 fn Decoder_mpeg4_stbl_atom<>(_input: &mut Parser<'_>) -> Result<mpeg4_stbl_atom, ParseError> {
 let size_field = (Decoder20(_input))?;
 let r#type = (Decoder206(_input))?;
-let size = ((|| PResult::Ok(match size_field {
+let size = ((|| {
+let ret = match size_field {
 0u32 => {
 0u64
 },
@@ -26971,11 +28155,14 @@ try_sub!(x, 16u64, 11678443062630698028u64)
 _ => {
 (try_sub!(size_field, 8u32, 3320665455366264189u64)) as u64
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let data = ((|| {
 let sz = size as usize;
 _input.start_slice(sz)?;
-let ret = ((|| PResult::Ok(match r#type {
+let ret = ((|| {
+let ret = match r#type {
 (115u8, 116u8, 115u8, 100u8) => {
 let inner = {
 let version = (Decoder24(_input))?;
@@ -26992,7 +28179,8 @@ for _ in 0..entry_count {
 accum.push({
 let size_field = (Decoder20(_input))?;
 let r#type = (Decoder206(_input))?;
-let size = ((|| PResult::Ok(match size_field {
+let size = ((|| {
+let ret = match size_field {
 0u32 => {
 0u64
 },
@@ -27005,7 +28193,9 @@ try_sub!(x, 16u64, 1398536204687975789u64)
 _ => {
 (try_sub!(size_field, 8u32, 3673300442962989464u64)) as u64
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let data = ((|| {
 let sz = size as usize;
 _input.start_slice(sz)?;
@@ -27155,7 +28345,8 @@ PResult::Ok((field0, field1, field2))
 })())?;
 let sample_size = (Decoder20(_input))?;
 let sample_count = (Decoder20(_input))?;
-let entry_size = ((|| PResult::Ok(if sample_size == 0u32 {
+let entry_size = ((|| {
+let ret = if sample_size == 0u32 {
 let mut accum = Vec::new();
 for _ in 0..sample_count {
 accum.push((Decoder20(_input))?);
@@ -27163,7 +28354,9 @@ accum.push((Decoder20(_input))?);
 Some(accum)
 } else {
 None
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 mpeg4_stbl_atom_data_stsz { version, flags, sample_size, sample_count, entry_size }
 };
 mpeg4_stbl_atom_data::stsz(inner)
@@ -27229,7 +28422,8 @@ let sample_groups = ((|| {
 let mut accum = Vec::new();
 for _ in 0..entry_count {
 accum.push({
-let description_length = ((|| PResult::Ok(match default_length == 0u32 {
+let description_length = ((|| {
+let ret = match default_length == 0u32 {
 true => {
 (Decoder20(_input))?
 },
@@ -27237,7 +28431,9 @@ true => {
 false => {
 default_length.clone()
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let sample_group_entry = ((|| {
 let mut accum = Vec::new();
 for _ in 0..description_length {
@@ -27265,11 +28461,14 @@ let field2 = (Decoder24(_input))?;
 PResult::Ok((field0, field1, field2))
 })())?;
 let grouping_type = (Decoder20(_input))?;
-let grouping_type_parameter = ((|| PResult::Ok(if version == 1u8 {
+let grouping_type_parameter = ((|| {
+let ret = if version == 1u8 {
 Some((Decoder20(_input))?)
 } else {
 None
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let entry_count = (Decoder20(_input))?;
 let sample_groups = ((|| {
 let mut accum = Vec::new();
@@ -27311,7 +28510,9 @@ accum
 };
 mpeg4_stbl_atom_data::unknown(inner)
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
@@ -27321,7 +28522,8 @@ PResult::Ok(mpeg4_stbl_atom { size_field, r#type, size, data })
 fn Decoder_mpeg4_iinf_atom<>(_input: &mut Parser<'_>) -> Result<mpeg4_iinf_atom, ParseError> {
 let size_field = (Decoder20(_input))?;
 let r#type = (Decoder206(_input))?;
-let size = ((|| PResult::Ok(match size_field {
+let size = ((|| {
+let ret = match size_field {
 0u32 => {
 0u64
 },
@@ -27334,11 +28536,14 @@ try_sub!(x, 16u64, 4152914559762097168u64)
 _ => {
 (try_sub!(size_field, 8u32, 8970999014112821604u64)) as u64
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let data = ((|| {
 let sz = size as usize;
 _input.start_slice(sz)?;
-let ret = ((|| PResult::Ok(match r#type {
+let ret = ((|| {
+let ret = match r#type {
 (105u8, 110u8, 102u8, 101u8) => {
 let inner = {
 let version = (Decoder24(_input))?;
@@ -27348,7 +28553,8 @@ let field1 = (Decoder24(_input))?;
 let field2 = (Decoder24(_input))?;
 PResult::Ok((field0, field1, field2))
 })())?;
-let fields = ((|| PResult::Ok(match version < 2u8 {
+let fields = ((|| {
+let ret = match version < 2u8 {
 true => {
 let inner = {
 let item_ID = (Decoder23(_input))?;
@@ -27363,7 +28569,8 @@ mpeg4_iinf_atom_data_infe_fields::yes(inner)
 
 false => {
 let inner = {
-let item_ID = ((|| PResult::Ok(match version == 2u8 {
+let item_ID = ((|| {
+let ret = match version == 2u8 {
 true => {
 let x = (Decoder23(_input))?;
 x as u32
@@ -27372,11 +28579,14 @@ x as u32
 false => {
 (Decoder20(_input))?
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let item_protection_index = (Decoder23(_input))?;
 let item_type = (Decoder206(_input))?;
 let item_name = (Decoder223(_input))?;
-let extra_fields = ((|| PResult::Ok(match item_type {
+let extra_fields = ((|| {
+let ret = match item_type {
 (109u8, 105u8, 109u8, 101u8) => {
 let inner = {
 let content_type = (Decoder224(_input))?;
@@ -27396,12 +28606,16 @@ mpeg4_iinf_atom_data_infe_fields_no_extra_fields::uri(inner)
 _ => {
 mpeg4_iinf_atom_data_infe_fields_no_extra_fields::unknown
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 mpeg4_iinf_atom_data_infe_fields_no { item_ID, item_protection_index, item_type, item_name, extra_fields }
 };
 mpeg4_iinf_atom_data_infe_fields::no(inner)
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 mpeg4_iinf_atom_data_infe { version, flags, fields }
 };
 mpeg4_iinf_atom_data::infe(inner)
@@ -27431,7 +28645,9 @@ accum
 };
 mpeg4_iinf_atom_data::unknown(inner)
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
@@ -27441,7 +28657,8 @@ PResult::Ok(mpeg4_iinf_atom { size_field, r#type, size, data })
 fn Decoder_mpeg4_ilst_atom<>(_input: &mut Parser<'_>) -> Result<mpeg4_ilst_atom, ParseError> {
 let size_field = (Decoder20(_input))?;
 let r#type = (Decoder206(_input))?;
-let size = ((|| PResult::Ok(match size_field {
+let size = ((|| {
+let ret = match size_field {
 0u32 => {
 0u64
 },
@@ -27454,11 +28671,14 @@ try_sub!(x, 16u64, 5095757730543354711u64)
 _ => {
 (try_sub!(size_field, 8u32, 17089130856162883194u64)) as u64
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let data = ((|| {
 let sz = size as usize;
 _input.start_slice(sz)?;
-let ret = ((|| PResult::Ok(match r#type {
+let ret = ((|| {
+let ret = match r#type {
 (169u8, 116u8, 111u8, 111u8) => {
 let inner = {
 let mut accum = Vec::new();
@@ -27508,7 +28728,9 @@ accum
 };
 mpeg4_ilst_atom_data::unknown(inner)
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
@@ -27518,7 +28740,8 @@ PResult::Ok(mpeg4_ilst_atom { size_field, r#type, size, data })
 fn Decoder_mpeg4_tool_atom<>(_input: &mut Parser<'_>) -> Result<mpeg4_tool_atom, ParseError> {
 let size_field = (Decoder20(_input))?;
 let r#type = (Decoder206(_input))?;
-let size = ((|| PResult::Ok(match size_field {
+let size = ((|| {
+let ret = match size_field {
 0u32 => {
 0u64
 },
@@ -27531,11 +28754,14 @@ try_sub!(x, 16u64, 6515957116553005671u64)
 _ => {
 (try_sub!(size_field, 8u32, 13537165373980795457u64)) as u64
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let data = ((|| {
 let sz = size as usize;
 _input.start_slice(sz)?;
-let ret = ((|| PResult::Ok(match r#type {
+let ret = ((|| {
+let ret = match r#type {
 (100u8, 97u8, 116u8, 97u8) => {
 let inner = {
 let type_indicator = (Decoder20(_input))?;
@@ -27590,7 +28816,9 @@ accum
 };
 mpeg4_tool_atom_data::unknown(inner)
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
@@ -27899,7 +29127,7 @@ _input.close_peek_context()?;
 ret
 }
 };
-PResult::Ok(match tree_index {
+let ret = match tree_index {
 0 => {
 let inner = (Decoder_jpeg_app0(_input))?;
 jpeg_frame_initial_segment::app0(inner)
@@ -27913,7 +29141,8 @@ jpeg_frame_initial_segment::app1(inner)
 _ => {
 return Err(ParseError::ExcludedBranch(7840596951976883698u64));
 }
-})
+};
+PResult::Ok(ret)
 })())?;
 let segments = ((|| {
 let mut accum = Vec::new();
@@ -28196,7 +29425,7 @@ _input.close_peek_context()?;
 ret
 }
 };
-PResult::Ok(match tree_index {
+let ret = match tree_index {
 0 => {
 let val = (Decoder_jpeg_dnl(_input))?;
 Some(val)
@@ -28209,7 +29438,8 @@ None
 _ => {
 return Err(ParseError::ExcludedBranch(2859130192484418172u64));
 }
-})
+};
+PResult::Ok(ret)
 })())?;
 let scans = ((|| {
 let mut accum = Vec::new();
@@ -28519,7 +29749,7 @@ _input.close_peek_context()?;
 ret
 }
 };
-PResult::Ok(match tree_index {
+let ret = match tree_index {
 0 => {
 let inner = (Decoder_jpeg_dqt(_input))?;
 jpeg_table_or_misc::dqt(inner)
@@ -28628,7 +29858,8 @@ jpeg_table_or_misc::com(inner)
 _ => {
 return Err(ParseError::ExcludedBranch(17636172564439370608u64));
 }
-})
+};
+PResult::Ok(ret)
 }
 
 fn Decoder_jpeg_frame_header<>(_input: &mut Parser<'_>) -> Result<jpeg_frame_header, ParseError> {
@@ -28701,7 +29932,7 @@ _input.close_peek_context()?;
 ret
 }
 };
-PResult::Ok(match tree_index {
+let ret = match tree_index {
 0 => {
 let inner = (Decoder_jpeg_sof15(_input))?;
 jpeg_frame_header::sof0(inner)
@@ -28770,7 +30001,8 @@ jpeg_frame_header::sof15(inner)
 _ => {
 return Err(ParseError::ExcludedBranch(2157707350523277837u64));
 }
-})
+};
+PResult::Ok(ret)
 }
 
 fn Decoder_jpeg_scan<>(_input: &mut Parser<'_>) -> Result<jpeg_scan, ParseError> {
@@ -29299,7 +30531,7 @@ _input.close_peek_context()?;
 ret
 }
 };
-match tree_index {
+let ret = match tree_index {
 0 => {
 let inner = (Decoder237(_input))?;
 jpeg_scan_data_scan_data::mcu(inner)
@@ -29348,7 +30580,8 @@ jpeg_scan_data_scan_data::rst7(inner)
 _ => {
 return Err(ParseError::ExcludedBranch(4600414761378562541u64));
 }
-}
+};
+ret
 };
 accum.push(next_elem);
 } else {
@@ -29418,7 +30651,7 @@ _input.close_peek_context()?;
 ret
 }
 };
-PResult::Ok(match tree_index {
+let ret = match tree_index {
 0 => {
 let b = _input.read_byte()?;
 if b != 255 {
@@ -29454,7 +30687,8 @@ return Err(ParseError::ExcludedBranch(7931358881575056193u64));
 _ => {
 return Err(ParseError::ExcludedBranch(11515797873012483658u64));
 }
-})
+};
+PResult::Ok(ret)
 }
 
 fn Decoder238<>(_input: &mut Parser<'_>) -> Result<jpeg_eoi, ParseError> {
@@ -29624,11 +30858,12 @@ let is_valid = {
 let x = inner;
 (x >= 1u8) && (x <= 4u8)
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(3484767027554133518u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let image_components = ((|| {
 let mut accum = Vec::new();
@@ -29643,11 +30878,12 @@ let is_valid = {
 let x = inner;
 x <= 63u8
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(15403934492100194569u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let end_spectral_selection = ((|| {
 let inner = (Decoder24(_input))?;
@@ -29655,11 +30891,12 @@ let is_valid = {
 let x = inner;
 x <= 63u8
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(12041148194529633639u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let approximation_bit_position = ((|| {
 let packed_bits = _input.read_byte()?;
@@ -29679,11 +30916,12 @@ let is_valid = {
 let entropy_coding_table_ids = inner;
 (entropy_coding_table_ids.dc_entropy_coding_table_id.clone() <= 3u8) && (entropy_coding_table_ids.ac_entropy_coding_table_id.clone() <= 3u8)
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(2288772415159374970u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 PResult::Ok(jpeg_sos_image_component { component_selector, entropy_coding_table_ids })
 }
@@ -29695,11 +30933,12 @@ let is_valid = {
 let x = inner;
 x != 0u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(17888323854924040413u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 PResult::Ok(jpeg_dnl_data { num_lines })
 }
@@ -29926,7 +31165,7 @@ _input.close_peek_context()?;
 ret
 }
 };
-match tree_index {
+let ret = match tree_index {
 0 => {
 let inner = (Decoder237(_input))?;
 jpeg_scan_data_scan_data::mcu(inner)
@@ -29975,7 +31214,8 @@ jpeg_scan_data_scan_data::rst7(inner)
 _ => {
 return Err(ParseError::ExcludedBranch(15601622509425384091u64));
 }
-}
+};
+ret
 };
 accum.push(next_elem);
 } else {
@@ -30434,11 +31674,12 @@ let is_valid = {
 let x = inner;
 (x >= 2u8) && (x <= 16u8)
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(10776065777346510440u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let num_lines = (Decoder23(_input))?;
 let num_samples_per_line = ((|| {
@@ -30447,11 +31688,12 @@ let is_valid = {
 let x = inner;
 x != 0u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(1821331332215525359u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let num_image_components = ((|| {
 let inner = (Decoder24(_input))?;
@@ -30459,11 +31701,12 @@ let is_valid = {
 let x = inner;
 x != 0u8
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(1550574349011231204u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let image_components = ((|| {
 let mut accum = Vec::new();
@@ -30487,11 +31730,12 @@ let is_valid = {
 let x = inner;
 x <= 3u8
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(6867774794241173436u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 PResult::Ok(jpeg_sof_image_component { id, sampling_factor, quantization_table_id })
 }
@@ -31424,11 +32668,12 @@ let is_valid = {
 let class_table_id = inner;
 (class_table_id.class.clone() < 2u8) && (class_table_id.table_id.clone() < 4u8)
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(2858990937242709991u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let value = (Decoder24(_input))?;
 PResult::Ok(jpeg_dac_data { class_table_id, value })
@@ -31444,11 +32689,12 @@ let is_valid = {
 let class_table_id = inner;
 (class_table_id.class.clone() < 2u8) && (class_table_id.table_id.clone() < 4u8)
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(13162270726566423196u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let num_codes = ((|| {
 let mut accum = Vec::new();
@@ -31483,13 +32729,15 @@ let is_valid = {
 let precision_table_id = inner;
 (precision_table_id.precision.clone() <= 1u8) && (precision_table_id.table_id.clone() <= 3u8)
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(6766897041260485978u64));
-})
+};
+PResult::Ok(ret)
 })())?;
-let elements = ((|| PResult::Ok(match precision_table_id.precision.clone() {
+let elements = ((|| {
+let ret = match precision_table_id.precision.clone() {
 0u8 => {
 let inner = {
 let mut accum = Vec::new();
@@ -31515,13 +32763,16 @@ jpeg_dqt_data_elements::Shorts(inner)
 _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(jpeg_dqt_data { precision_table_id, elements })
 }
 
 fn Decoder_jpeg_app1_data<>(_input: &mut Parser<'_>) -> Result<jpeg_app1_data, ParseError> {
 let identifier = (Decoder289(_input))?;
-let data = ((|| PResult::Ok(match identifier.string.as_slice() {
+let data = ((|| {
+let ret = match identifier.string.as_slice() {
 [69u8, 120u8, 105u8, 102u8] => {
 let inner = (Decoder_jpeg_app1_exif(_input))?;
 jpeg_app1_data_data::exif(inner)
@@ -31556,7 +32807,9 @@ accum
 };
 jpeg_app1_data_data::other(inner)
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(jpeg_app1_data { identifier, data })
 }
 
@@ -31651,7 +32904,8 @@ PResult::Ok(jpeg_app1_xmp { xmp })
 
 fn Decoder_jpeg_app0_data<>(_input: &mut Parser<'_>) -> Result<jpeg_app0_data, ParseError> {
 let identifier = (Decoder293(_input))?;
-let data = ((|| PResult::Ok(match identifier.string.as_slice() {
+let data = ((|| {
+let ret = match identifier.string.as_slice() {
 [74u8, 70u8, 73u8, 70u8] => {
 let inner = (Decoder_jpeg_app0_jfif(_input))?;
 jpeg_app0_data_data::jfif(inner)
@@ -31681,7 +32935,9 @@ accum
 };
 jpeg_app0_data_data::other(inner)
 }
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(jpeg_app0_data { identifier, data })
 }
 
@@ -31745,11 +33001,12 @@ let is_valid = {
 let x = inner;
 x <= 2u8
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(4248622096514297129u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let density_x = ((|| {
 let inner = (Decoder23(_input))?;
@@ -31757,11 +33014,12 @@ let is_valid = {
 let x = inner;
 x != 0u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(18304605036866855350u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let density_y = ((|| {
 let inner = (Decoder23(_input))?;
@@ -31769,11 +33027,12 @@ let is_valid = {
 let x = inner;
 x != 0u16
 };
-PResult::Ok(if is_valid {
+let ret = if is_valid {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere(49400955721755355u64));
-})
+};
+PResult::Ok(ret)
 })())?;
 let thumbnail_width = (Decoder24(_input))?;
 let thumbnail_height = (Decoder24(_input))?;
@@ -32024,26 +33283,38 @@ break
 } else {
 let next_elem = {
 let header = (Decoder_gzip_header(_input))?;
-let fextra = ((|| PResult::Ok(if header.file_flags.fextra.clone() {
+let fextra = ((|| {
+let ret = if header.file_flags.fextra.clone() {
 Some((Decoder_gzip_fextra(_input))?)
 } else {
 None
-}))())?;
-let fname = ((|| PResult::Ok(if header.file_flags.fname.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let fname = ((|| {
+let ret = if header.file_flags.fname.clone() {
 Some((Decoder306(_input))?)
 } else {
 None
-}))())?;
-let fcomment = ((|| PResult::Ok(if header.file_flags.fcomment.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let fcomment = ((|| {
+let ret = if header.file_flags.fcomment.clone() {
 Some((Decoder307(_input))?)
 } else {
 None
-}))())?;
-let fhcrc = ((|| PResult::Ok(if header.file_flags.fhcrc.clone() {
+};
+PResult::Ok(ret)
+})())?;
+let fhcrc = ((|| {
+let ret = if header.file_flags.fhcrc.clone() {
 Some((Decoder_gzip_fhcrc(_input))?)
 } else {
 None
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let data = ((|| {
 _input.enter_bits_mode()?;
 let ret = (Decoder_deflate_main(_input))?;
@@ -32210,7 +33481,8 @@ PResult::Ok(gif_header { signature, version })
 
 fn Decoder_gif_logical_screen<>(_input: &mut Parser<'_>) -> Result<gif_logical_screen, ParseError> {
 let descriptor = (Decoder_gif_logical_screen_descriptor(_input))?;
-let global_color_table = ((|| PResult::Ok(if descriptor.flags.table_flag.clone() > 0u8 {
+let global_color_table = ((|| {
+let ret = if descriptor.flags.table_flag.clone() > 0u8 {
 let mut accum = Vec::new();
 for _ in 0..2u16 << ((descriptor.flags.table_size.clone()) as u16) {
 accum.push((Decoder325(_input))?);
@@ -32218,7 +33490,9 @@ accum.push((Decoder325(_input))?);
 Some(accum)
 } else {
 None
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 PResult::Ok(gif_logical_screen { descriptor, global_color_table })
 }
 
@@ -32263,7 +33537,7 @@ _input.close_peek_context()?;
 ret
 }
 };
-PResult::Ok(match tree_index {
+let ret = match tree_index {
 0 => {
 let inner = (Decoder_gif_graphic_block(_input))?;
 gif_block::graphic_block(inner)
@@ -32277,7 +33551,8 @@ gif_block::special_purpose_block(inner)
 _ => {
 return Err(ParseError::ExcludedBranch(18069850277258932991u64));
 }
-})
+};
+PResult::Ok(ret)
 }
 
 fn Decoder_gif_trailer<>(_input: &mut Parser<'_>) -> Result<gif_trailer, ParseError> {
@@ -32326,7 +33601,7 @@ _input.close_peek_context()?;
 ret
 }
 };
-PResult::Ok(match tree_index {
+let ret = match tree_index {
 0 => {
 let val = (Decoder_gif_graphic_control_extension(_input))?;
 Some(val)
@@ -32339,7 +33614,8 @@ None
 _ => {
 return Err(ParseError::ExcludedBranch(6596410053543851077u64));
 }
-})
+};
+PResult::Ok(ret)
 })())?;
 let graphic_rendering_block = (Decoder_gif_graphic_rendering_block(_input))?;
 PResult::Ok(gif_graphic_block { graphic_control_extension, graphic_rendering_block })
@@ -32371,7 +33647,7 @@ _input.close_peek_context()?;
 ret
 }
 };
-PResult::Ok(match tree_index {
+let ret = match tree_index {
 0 => {
 let inner = (Decoder_gif_application_extension(_input))?;
 gif_special_purpose_block::application_extension(inner)
@@ -32385,7 +33661,8 @@ gif_special_purpose_block::comment_extension(inner)
 _ => {
 return Err(ParseError::ExcludedBranch(17004441093219507547u64));
 }
-})
+};
+PResult::Ok(ret)
 }
 
 fn Decoder_gif_application_extension<>(_input: &mut Parser<'_>) -> Result<gif_application_extension, ParseError> {
@@ -32600,7 +33877,7 @@ _input.close_peek_context()?;
 ret
 }
 };
-PResult::Ok(match tree_index {
+let ret = match tree_index {
 0 => {
 let inner = (Decoder_gif_table_based_image(_input))?;
 gif_graphic_rendering_block::table_based_image(inner)
@@ -32614,12 +33891,14 @@ gif_graphic_rendering_block::plain_text_extension(inner)
 _ => {
 return Err(ParseError::ExcludedBranch(1432698095084823598u64));
 }
-})
+};
+PResult::Ok(ret)
 }
 
 fn Decoder_gif_table_based_image<>(_input: &mut Parser<'_>) -> Result<gif_table_based_image, ParseError> {
 let descriptor = (Decoder_gif_image_descriptor(_input))?;
-let local_color_table = ((|| PResult::Ok(if descriptor.flags.table_flag.clone() > 0u8 {
+let local_color_table = ((|| {
+let ret = if descriptor.flags.table_flag.clone() > 0u8 {
 let mut accum = Vec::new();
 for _ in 0..2u16 << ((descriptor.flags.table_size.clone()) as u16) {
 accum.push((Decoder325(_input))?);
@@ -32627,7 +33906,9 @@ accum.push((Decoder325(_input))?);
 Some(accum)
 } else {
 None
-}))())?;
+};
+PResult::Ok(ret)
+})())?;
 let data = (Decoder_gif_table_based_image_data(_input))?;
 PResult::Ok(gif_table_based_image { descriptor, local_color_table, data })
 }

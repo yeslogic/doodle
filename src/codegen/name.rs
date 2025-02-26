@@ -1,16 +1,17 @@
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::anyhow;
 
 use crate::output::Fragment;
 use crate::Label;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum Derivation {
     // Incidental type that is mapped or transformed (e.g. via Format::LetFormat, Format::Map, Format::DecodeBytes)
     Preimage,
-    // Inner-Type that appears inside of a Maybe-Context
+    /// Inner-Type that appears inside of a Maybe-Context
+    // REVIEW - do we need to distinguish items in such positions?
     Yes,
 }
 
@@ -24,7 +25,7 @@ impl Derivation {
 }
 
 /// Path-component of a hierarchically-derived identifier for a possibly-anonymous type
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum NameAtom {
     /// Any type-entity given a name explicitly in the FormatModule
     Explicit(Label),
@@ -110,23 +111,23 @@ pub(crate) fn pick_best_path(x: &mut PathLabel, y: PathLabel) {
 #[derive(Debug)]
 pub(crate) struct NameCtxt {
     stack: Vec<NameAtom>,
-    table: HashMap<Label, RefCell<PHeap<PathLabel>>>,
+    table: BTreeMap<Label, RefCell<PHeap<PathLabel>>>,
 }
 
 /// Priority Heap: a loose collection of 'candidates' that are initially unsorted, but can be later promoted to the next available priority-slot,
 /// which are immutable once assigned.
 #[derive(Debug)]
-struct PHeap<T: Eq + std::hash::Hash> {
+struct PHeap<T: Ord> {
     fixed: Vec<T>,
-    floating: HashSet<T>,
+    floating: BTreeSet<T>,
 }
 
-impl<T: Eq + std::hash::Hash> PHeap<T> {
-    /// Construts a new, initially-empty PHeap
+impl<T: Ord> PHeap<T> {
+    /// Constructs a new, initially-empty PHeap
     pub fn new() -> Self {
         Self {
             fixed: Vec::new(),
-            floating: HashSet::new(),
+            floating: BTreeSet::new(),
         }
     }
 
@@ -166,7 +167,7 @@ impl NameCtxt {
     pub fn new() -> Self {
         NameCtxt {
             stack: Vec::new(),
-            table: HashMap::new(),
+            table: BTreeMap::new(),
         }
     }
 
@@ -240,7 +241,7 @@ impl NameCtxt {
 
     /// Inserts a delayed-priority association between `identifier` and `location` into `table`
     fn resolve(
-        table: &mut HashMap<Label, RefCell<PHeap<PathLabel>>>,
+        table: &mut BTreeMap<Label, RefCell<PHeap<PathLabel>>>,
         identifier: Label,
         location: &PathLabel,
     ) {
