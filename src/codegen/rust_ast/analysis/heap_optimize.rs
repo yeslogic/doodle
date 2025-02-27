@@ -1,5 +1,5 @@
-use super::{
-    size::{aligned_size, MemSize},
+use super::{aligned_size, MemSize};
+use crate::codegen::rust_ast::{
     AtomType, CompType, LocalType, PrimType, RustStruct, RustType, RustTypeDef, RustVariant,
 };
 use core::alloc::Layout;
@@ -112,7 +112,7 @@ pub const HEAP_ALIGN: usize = HEAP_LAYOUT.align();
 pub trait HeapOptimize: MemSize {
     /// Speculatively executes the given `strategy` over `self`, returning both the outcome of the
     /// strategy's application, and the new size of the type if the strategy were employed.
-    fn dry_run(&self, strategy: HeapStrategy, context: Self::Context<'_>) -> HeapOutcome;
+    fn heap_hint(&self, strategy: HeapStrategy, context: Self::Context<'_>) -> HeapOutcome;
 }
 
 pub fn mk_layout<T: MemSize>(t: &T, context: T::Context<'_>) -> Layout
@@ -123,7 +123,7 @@ where
 }
 
 impl HeapOptimize for RustStruct {
-    fn dry_run(&self, strategy: HeapStrategy, context: Self::Context<'_>) -> HeapOutcome {
+    fn heap_hint(&self, strategy: HeapStrategy, context: Self::Context<'_>) -> HeapOutcome {
         if strategy.is_never() {
             (HeapAction::Noop, mk_layout(self, context))
         } else {
@@ -136,7 +136,7 @@ impl HeapOptimize for RustStruct {
             let mut field_actions = Vec::with_capacity(fields.len());
             let mut is_productive = false;
             for (_, f_type) in fields.iter() {
-                let (action, layout) = f_type.dry_run(strategy, context);
+                let (action, layout) = f_type.heap_hint(strategy, context);
                 is_productive |= !action.is_noop();
                 field_actions.push(action);
                 raw_size += layout.size();
@@ -156,9 +156,9 @@ impl HeapOptimize for RustStruct {
 }
 
 impl HeapOptimize for RustType {
-    fn dry_run(&self, strategy: HeapStrategy, context: Self::Context<'_>) -> HeapOutcome {
+    fn heap_hint(&self, strategy: HeapStrategy, context: Self::Context<'_>) -> HeapOutcome {
         match self {
-            RustType::Atom(at) => at.dry_run(strategy, context),
+            RustType::Atom(at) => at.heap_hint(strategy, context),
             RustType::AnonTuple(ts) => {
                 if strategy.is_never() {
                     return (HeapAction::Noop, mk_layout(self, context));
@@ -168,7 +168,7 @@ impl HeapOptimize for RustType {
                 let mut pos_actions = Vec::with_capacity(ts.len());
                 let mut is_productive = false;
                 for t in ts.iter() {
-                    let (action, layout) = t.dry_run(strategy, context);
+                    let (action, layout) = t.heap_hint(strategy, context);
                     is_productive |= !action.is_noop();
                     pos_actions.push(action);
                     raw_size += layout.size();
@@ -200,27 +200,27 @@ impl HeapOptimize for RustType {
 }
 
 impl HeapOptimize for AtomType {
-    fn dry_run(&self, strategy: HeapStrategy, context: Self::Context<'_>) -> HeapOutcome {
+    fn heap_hint(&self, strategy: HeapStrategy, context: Self::Context<'_>) -> HeapOutcome {
         match self {
-            AtomType::Prim(pt) => pt.dry_run(strategy, ()),
-            AtomType::Comp(ct) => ct.dry_run(strategy, context),
-            AtomType::TypeRef(lt) => lt.dry_run(strategy, context),
+            AtomType::Prim(pt) => pt.heap_hint(strategy, ()),
+            AtomType::Comp(ct) => ct.heap_hint(strategy, context),
+            AtomType::TypeRef(lt) => lt.heap_hint(strategy, context),
         }
     }
 }
 
 impl HeapOptimize for PrimType {
-    fn dry_run(&self, _: HeapStrategy, context: Self::Context<'_>) -> HeapOutcome {
+    fn heap_hint(&self, _: HeapStrategy, context: Self::Context<'_>) -> HeapOutcome {
         (HeapAction::Noop, mk_layout(self, context))
     }
 }
 
 impl HeapOptimize for CompType<Box<RustType>> {
-    fn dry_run(&self, strategy: HeapStrategy, context: Self::Context<'_>) -> HeapOutcome {
+    fn heap_hint(&self, strategy: HeapStrategy, context: Self::Context<'_>) -> HeapOutcome {
         match self {
             CompType::Vec(..) => (HeapAction::Noop, mk_layout(self, context)),
             CompType::Option(inner) => {
-                let (outcome, _) = inner.dry_run(strategy, context);
+                let (outcome, _) = inner.heap_hint(strategy, context);
                 match &outcome {
                     HeapAction::Noop => (HeapAction::Noop, mk_layout(self, context)),
                     HeapAction::NonLocal
@@ -244,7 +244,7 @@ impl HeapOptimize for CompType<Box<RustType>> {
 }
 
 impl HeapOptimize for LocalType {
-    fn dry_run(&self, strategy: HeapStrategy, context: Self::Context<'_>) -> HeapOutcome {
+    fn heap_hint(&self, strategy: HeapStrategy, context: Self::Context<'_>) -> HeapOutcome {
         match self {
             LocalType::LocalDef(ix, _) => {
                 let (action, layout) = context.get_heap(strategy, *ix);
@@ -282,9 +282,9 @@ impl HeapOptimize for LocalType {
 }
 
 impl HeapOptimize for RustTypeDef {
-    fn dry_run(&self, strategy: HeapStrategy, context: Self::Context<'_>) -> HeapOutcome {
+    fn heap_hint(&self, strategy: HeapStrategy, context: Self::Context<'_>) -> HeapOutcome {
         match self {
-            RustTypeDef::Struct(str) => str.dry_run(strategy, context),
+            RustTypeDef::Struct(str) => str.heap_hint(strategy, context),
             RustTypeDef::Enum(vars) => {
                 if let Some(threshold_delta) = strategy.min_enum_delta() {
                     let mut var_sizes = Vec::with_capacity(vars.len());
@@ -293,7 +293,7 @@ impl HeapOptimize for RustTypeDef {
                     let mut max_var_size = 0;
                     let mut max_align = 1;
                     for var in vars.iter() {
-                        let (action, layout) = var.dry_run(strategy, context);
+                        let (action, layout) = var.heap_hint(strategy, context);
                         var_sizes.push(layout.size());
                         is_productive |= !action.is_noop();
                         var_actions.push(action);
@@ -343,7 +343,7 @@ impl HeapOptimize for RustTypeDef {
                     let mut max_align = 1;
                     let mut is_productive = false;
                     for var in vars.iter() {
-                        let (action, layout) = var.dry_run(strategy, context);
+                        let (action, layout) = var.heap_hint(strategy, context);
                         is_productive |= !action.is_noop();
                         var_actions.push(action);
                         max_var_size = max_var_size.max(layout.size());
@@ -372,7 +372,7 @@ impl HeapOptimize for RustTypeDef {
 }
 
 impl HeapOptimize for RustVariant {
-    fn dry_run(&self, strategy: HeapStrategy, context: Self::Context<'_>) -> HeapOutcome {
+    fn heap_hint(&self, strategy: HeapStrategy, context: Self::Context<'_>) -> HeapOutcome {
         match self {
             RustVariant::Unit(..) => (HeapAction::Noop, Layout::from_size_align(0, 1).unwrap()),
             RustVariant::Tuple(_, ts) => {
@@ -384,7 +384,7 @@ impl HeapOptimize for RustVariant {
                 let mut pos_actions = Vec::with_capacity(ts.len());
                 let mut is_productive = false;
                 for t in ts.iter() {
-                    let (action, layout) = t.dry_run(strategy, context);
+                    let (action, layout) = t.heap_hint(strategy, context);
                     is_productive |= !action.is_noop();
                     pos_actions.push(action);
                     raw_size += layout.size();

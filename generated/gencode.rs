@@ -53,7 +53,7 @@ shstrndx: u16
 pub enum elf_types_elf_full { Full32(u32), Full64(u64) }
 
 /// expected size: 120
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct elf_phdr_table {
 r#type: u32,
 flags64: Option<u32>,
@@ -67,7 +67,7 @@ align: elf_types_elf_full
 }
 
 /// expected size: 112
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct elf_shdr_table {
 name: u32,
 r#type: u32,
@@ -109,7 +109,7 @@ table_size: u8
 }
 
 /// expected size: 10
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct gif_logical_screen_descriptor {
 screen_width: u16,
 screen_height: u16,
@@ -143,7 +143,7 @@ transparent_color_flag: u8
 }
 
 /// expected size: 12
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct gif_graphic_control_extension {
 separator: u8,
 label: u8,
@@ -190,7 +190,7 @@ table_size: u8
 }
 
 /// expected size: 14
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct gif_image_descriptor {
 separator: u8,
 image_left_position: u16,
@@ -282,7 +282,7 @@ ftext: bool
 }
 
 /// expected size: 16
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct gzip_header {
 magic: (u8, u8),
 method: u8,
@@ -342,7 +342,7 @@ distance: u16
 }
 
 /// expected size: 10
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct deflate_dynamic_huffman_codes_values {
 length_extra_bits: u8,
 length: u16,
@@ -351,7 +351,7 @@ distance_record: deflate_distance_record
 }
 
 /// expected size: 14
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct deflate_dynamic_huffman_codes {
 code: u16,
 extra: Option<deflate_dynamic_huffman_codes_values>
@@ -365,7 +365,7 @@ distance: u16
 }
 
 /// expected size: 6
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum deflate_main_codes { literal(u8), reference(deflate_main_codes_reference) }
 
 /// expected size: 176
@@ -384,7 +384,7 @@ codes_values: Vec<deflate_main_codes>
 }
 
 /// expected size: 8
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct deflate_fixed_huffman_codes_values {
 length_extra_bits: u8,
 length: u16,
@@ -393,7 +393,7 @@ distance_record: deflate_distance_record
 }
 
 /// expected size: 12
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct deflate_fixed_huffman_codes {
 code: u16,
 extra: Option<deflate_fixed_huffman_codes_values>
@@ -580,14 +580,14 @@ table_id: u8
 }
 
 /// expected size: 3
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct jpeg_dac_data {
 class_table_id: jpeg_dac_data_class_table_id,
 value: u8
 }
 
 /// expected size: 8
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct jpeg_dac {
 marker: jpeg_eoi,
 length: u16,
@@ -643,7 +643,7 @@ restart_interval: u16
 }
 
 /// expected size: 6
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct jpeg_dri {
 marker: jpeg_eoi,
 length: u16,
@@ -662,7 +662,7 @@ vertical: u8
 }
 
 /// expected size: 4
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct jpeg_sof_image_component {
 id: u8,
 sampling_factor: jpeg_sof_image_component_sampling_factor,
@@ -699,7 +699,7 @@ ac_entropy_coding_table_id: u8
 }
 
 /// expected size: 3
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct jpeg_sos_image_component {
 component_selector: u8,
 entropy_coding_table_ids: jpeg_sos_image_component_entropy_coding_table_ids
@@ -731,7 +731,7 @@ data: jpeg_sos_data
 }
 
 /// expected size: 3
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum jpeg_scan_data_scan_data { mcu(u8), rst0(jpeg_eoi), rst1(jpeg_eoi), rst2(jpeg_eoi), rst3(jpeg_eoi), rst4(jpeg_eoi), rst5(jpeg_eoi), rst6(jpeg_eoi), rst7(jpeg_eoi) }
 
 /// expected size: 48
@@ -756,7 +756,7 @@ num_lines: u16
 }
 
 /// expected size: 6
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct jpeg_dnl {
 marker: jpeg_eoi,
 length: u16,
@@ -1021,7 +1021,7 @@ single_item_reference: mpeg4_meta_atom_data_iref_single_item_reference
 pub enum mpeg4_meta_atom_data_pitm_item_ID { no(u32), yes(u16) }
 
 /// expected size: 12
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct mpeg4_meta_atom_data_pitm {
 version: u8,
 flags: (u8, u8, u8),
@@ -1060,7 +1060,7 @@ duration: u64
 }
 
 /// expected size: 40
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum mpeg4_moov_atom_data_mvhd_fields { version0(mpeg4_moov_atom_data_mvhd_fields_version0), version1(mpeg4_moov_atom_data_mvhd_fields_version1) }
 
 /// expected size: 112
@@ -1122,7 +1122,7 @@ component_name: base_asciiz_string
 }
 
 /// expected size: 48
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct mpeg4_mdia_atom_data_mdhd {
 version: u8,
 flags: (u8, u8, u8),
@@ -1340,7 +1340,7 @@ duration: u64
 }
 
 /// expected size: 40
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum mpeg4_trak_atom_data_tkhd_fields { version0(mpeg4_trak_atom_data_tkhd_fields_version0), version1(mpeg4_trak_atom_data_tkhd_fields_version1) }
 
 /// expected size: 96
@@ -1648,7 +1648,7 @@ bold: bool
 }
 
 /// expected size: 64
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct opentype_head_table {
 major_version: u16,
 minor_version: u16,
@@ -1675,7 +1675,7 @@ run: u16
 }
 
 /// expected size: 36
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct opentype_hhea_table {
 major_version: u16,
 minor_version: u16,
@@ -1712,11 +1712,11 @@ max_component_depth: u16
 }
 
 /// expected size: 28
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum opentype_maxp_table_data { MaxpPostScript, MaxpUnknown(u32), MaxpV1(opentype_maxp_table_version1) }
 
 /// expected size: 36
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct opentype_maxp_table {
 version: u32,
 num_glyphs: u16,
@@ -1792,7 +1792,7 @@ us_upper_optical_point_size: u16
 }
 
 /// expected size: 16
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct opentype_os2_table_data_extra_fields_v1_extra_fields_v2 {
 sx_height: u16,
 s_cap_height: u16,
@@ -1803,7 +1803,7 @@ extra_fields_v5: Option<opentype_os2_table_data_extra_fields_v1_extra_fields_v2_
 }
 
 /// expected size: 24
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct opentype_os2_table_data_extra_fields_v1 {
 ul_code_page_range_1: u32,
 ul_code_page_range_2: u32,
@@ -1811,7 +1811,7 @@ extra_fields_v2: Option<opentype_os2_table_data_extra_fields_v1_extra_fields_v2>
 }
 
 /// expected size: 36
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct opentype_os2_table_data {
 s_typo_ascender: u16,
 s_typo_descender: u16,
@@ -1922,18 +1922,18 @@ pub enum opentype_glyf_composite_raw_argument1 { Int16(u16), Int8(u8), Uint16(u1
 pub enum opentype_var_tuple_record_coordinates { F2Dot14(u16) }
 
 /// expected size: 8
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct opentype_glyf_composite_raw_scale_XY {
 x_scale: opentype_var_tuple_record_coordinates,
 y_scale: opentype_var_tuple_record_coordinates
 }
 
 /// expected size: 18
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum opentype_glyf_composite_raw_scale { Matrix((opentype_var_tuple_record_coordinates, opentype_var_tuple_record_coordinates), (opentype_var_tuple_record_coordinates, opentype_var_tuple_record_coordinates)), Scale(opentype_var_tuple_record_coordinates), XY(opentype_glyf_composite_raw_scale_XY) }
 
 /// expected size: 42
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct opentype_glyf_composite_raw {
 flags: opentype_glyf_composite_raw_flags,
 glyph_index: u16,
@@ -2011,11 +2011,11 @@ gridfit: bool
 }
 
 /// expected size: 5
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum opentype_gasp_table_gasp_ranges_range_gasp_behavior { Version0(opentype_gasp_table_gasp_ranges_range_gasp_behavior_Version0), Version1(opentype_gasp_table_gasp_ranges_range_gasp_behavior_Version1) }
 
 /// expected size: 8
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct opentype_gasp_table_gasp_ranges {
 range_max_ppem: u16,
 range_gasp_behavior: opentype_gasp_table_gasp_ranges_range_gasp_behavior
@@ -3126,7 +3126,7 @@ link: Option<opentype_gpos_table_lookup_list_link>
 }
 
 /// expected size: 12
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct opentype_layout_feature_variations_feature_variation_records_condition_set_offset_link_condition_offsets_link {
 format: u16,
 axis_index: u16,
@@ -3135,7 +3135,7 @@ filter_range_max_value: opentype_var_tuple_record_coordinates
 }
 
 /// expected size: 20
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct opentype_layout_feature_variations_feature_variation_records_condition_set_offset_link_condition_offsets {
 offset: u32,
 link: Option<opentype_layout_feature_variations_feature_variation_records_condition_set_offset_link_condition_offsets_link>
@@ -3450,7 +3450,7 @@ hidden_axis: bool
 }
 
 /// expected size: 32
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct opentype_var_variation_axis_record {
 axis_tag: u32,
 min_value: opentype_var_user_tuple_coordinates,
@@ -3730,7 +3730,7 @@ older_sibling_font_attribute: bool
 }
 
 /// expected size: 16
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1 {
 axis_index: u16,
 flags: opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1_flags,
@@ -3739,7 +3739,7 @@ value: opentype_var_user_tuple_coordinates
 }
 
 /// expected size: 32
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format2 {
 axis_index: u16,
 flags: opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1_flags,
@@ -3750,7 +3750,7 @@ range_max_value: opentype_var_user_tuple_coordinates
 }
 
 /// expected size: 24
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format3 {
 axis_index: u16,
 flags: opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1_flags,
@@ -3760,7 +3760,7 @@ linked_value: opentype_var_user_tuple_coordinates
 }
 
 /// expected size: 12
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format4_axis_values {
 axis_index: u16,
 value: opentype_var_user_tuple_coordinates
@@ -3928,7 +3928,7 @@ interlace_method: u8
 }
 
 /// expected size: 28
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct png_ihdr {
 length: u32,
 tag: (u8, u8, u8, u8),
@@ -3957,7 +3957,7 @@ palette_index: u8
 }
 
 /// expected size: 8
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum png_bkgd { color_type_0(png_bkgd_color_type_0), color_type_2(png_bkgd_color_type_2), color_type_3(png_bkgd_color_type_3), color_type_4(png_bkgd_color_type_0), color_type_6(png_bkgd_color_type_2) }
 
 /// expected size: 32
@@ -4076,7 +4076,7 @@ sig_alpha_bits: u8
 }
 
 /// expected size: 5
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum png_sbit { color_type_0(png_sbit_color_type_0), color_type_2(png_sbit_color_type_2), color_type_3(png_sbit_color_type_2), color_type_4(png_sbit_color_type_4), color_type_6(png_sbit_color_type_6) }
 
 /// expected size: 10
@@ -4322,7 +4322,7 @@ __reserved: u16
 }
 
 /// expected size: 7
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct opentype_glyf_simple_flags_raw {
 repeats: u8,
 field_set: opentype_glyf_simple_flags
@@ -15479,7 +15479,7 @@ acc || glyph.flags.we_have_instructions.clone()
 };
 let glyphs = acc_glyphs.1.clone();
 let instructions = ((|| {
-let ret = match acc_glyphs.0.clone() {
+let ret = match acc_glyphs.0 {
 true => {
 let instructions_length = (Decoder23(_input))?;
 let mut accum = Vec::new();
@@ -18514,7 +18514,7 @@ let field0 = (Decoder166(_input))?;
 let field1 = (Decoder166(_input))?;
 (field0, field1)
 };
-PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8)
+PResult::Ok(bits.0 << 0u8 | bits.1 << 1u8)
 })())?;
 let data = ((|| {
 let ret = match r#type {
@@ -18568,7 +18568,7 @@ let field14 = (Decoder166(_input))?;
 let field15 = (Decoder166(_input))?;
 (field0, field1, field2, field3, field4, field5, field6, field7, field8, field9, field10, field11, field12, field13, field14, field15)
 };
-PResult::Ok(((bits.0.clone()) as u16) << 0u16 | ((bits.1.clone()) as u16) << 1u16 | ((bits.2.clone()) as u16) << 2u16 | ((bits.3.clone()) as u16) << 3u16 | ((bits.4.clone()) as u16) << 4u16 | ((bits.5.clone()) as u16) << 5u16 | ((bits.6.clone()) as u16) << 6u16 | ((bits.7.clone()) as u16) << 7u16 | ((bits.8.clone()) as u16) << 8u16 | ((bits.9.clone()) as u16) << 9u16 | ((bits.10.clone()) as u16) << 10u16 | ((bits.11.clone()) as u16) << 11u16 | ((bits.12.clone()) as u16) << 12u16 | ((bits.13.clone()) as u16) << 13u16 | ((bits.14.clone()) as u16) << 14u16 | ((bits.15.clone()) as u16) << 15u16)
+PResult::Ok((bits.0 as u16) << 0u16 | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16 | (bits.3 as u16) << 3u16 | (bits.4 as u16) << 4u16 | (bits.5 as u16) << 5u16 | (bits.6 as u16) << 6u16 | (bits.7 as u16) << 7u16 | (bits.8 as u16) << 8u16 | (bits.9 as u16) << 9u16 | (bits.10 as u16) << 10u16 | (bits.11 as u16) << 11u16 | (bits.12 as u16) << 12u16 | (bits.13 as u16) << 13u16 | (bits.14 as u16) << 14u16 | (bits.15 as u16) << 15u16)
 })())?;
 let nlen = ((|| {
 let bits = {
@@ -18590,7 +18590,7 @@ let field14 = (Decoder166(_input))?;
 let field15 = (Decoder166(_input))?;
 (field0, field1, field2, field3, field4, field5, field6, field7, field8, field9, field10, field11, field12, field13, field14, field15)
 };
-PResult::Ok(((bits.0.clone()) as u16) << 0u16 | ((bits.1.clone()) as u16) << 1u16 | ((bits.2.clone()) as u16) << 2u16 | ((bits.3.clone()) as u16) << 3u16 | ((bits.4.clone()) as u16) << 4u16 | ((bits.5.clone()) as u16) << 5u16 | ((bits.6.clone()) as u16) << 6u16 | ((bits.7.clone()) as u16) << 7u16 | ((bits.8.clone()) as u16) << 8u16 | ((bits.9.clone()) as u16) << 9u16 | ((bits.10.clone()) as u16) << 10u16 | ((bits.11.clone()) as u16) << 11u16 | ((bits.12.clone()) as u16) << 12u16 | ((bits.13.clone()) as u16) << 13u16 | ((bits.14.clone()) as u16) << 14u16 | ((bits.15.clone()) as u16) << 15u16)
+PResult::Ok((bits.0 as u16) << 0u16 | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16 | (bits.3 as u16) << 3u16 | (bits.4 as u16) << 4u16 | (bits.5 as u16) << 5u16 | (bits.6 as u16) << 6u16 | (bits.7 as u16) << 7u16 | (bits.8 as u16) << 8u16 | (bits.9 as u16) << 9u16 | (bits.10 as u16) << 10u16 | (bits.11 as u16) << 11u16 | (bits.12 as u16) << 12u16 | (bits.13 as u16) << 13u16 | (bits.14 as u16) << 14u16 | (bits.15 as u16) << 15u16)
 })())?;
 let bytes = ((|| {
 let mut accum = Vec::new();
@@ -18607,7 +18607,7 @@ let field6 = (Decoder166(_input))?;
 let field7 = (Decoder166(_input))?;
 (field0, field1, field2, field3, field4, field5, field6, field7)
 };
-bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8 | bits.4.clone() << 4u8 | bits.5.clone() << 5u8 | bits.6.clone() << 6u8 | bits.7.clone() << 7u8
+bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8 | bits.5 << 5u8 | bits.6 << 6u8 | bits.7 << 7u8
 });
 }
 PResult::Ok(accum)
@@ -18792,7 +18792,7 @@ let bits = {
 let field0 = (Decoder166(_input))?;
 (field0,)
 };
-PResult::Ok(bits.0.clone())
+PResult::Ok(bits.0)
 })())?;
 let length = 11u16 + (length_extra_bits as u16);
 let distance_code = ((|| {
@@ -18818,7 +18818,7 @@ let bits = {
 let field0 = (Decoder166(_input))?;
 (field0,)
 };
-PResult::Ok(bits.0.clone())
+PResult::Ok(bits.0)
 })())?;
 let length = 13u16 + (length_extra_bits as u16);
 let distance_code = ((|| {
@@ -18844,7 +18844,7 @@ let bits = {
 let field0 = (Decoder166(_input))?;
 (field0,)
 };
-PResult::Ok(bits.0.clone())
+PResult::Ok(bits.0)
 })())?;
 let length = 15u16 + (length_extra_bits as u16);
 let distance_code = ((|| {
@@ -18870,7 +18870,7 @@ let bits = {
 let field0 = (Decoder166(_input))?;
 (field0,)
 };
-PResult::Ok(bits.0.clone())
+PResult::Ok(bits.0)
 })())?;
 let length = 17u16 + (length_extra_bits as u16);
 let distance_code = ((|| {
@@ -18897,7 +18897,7 @@ let field0 = (Decoder166(_input))?;
 let field1 = (Decoder166(_input))?;
 (field0, field1)
 };
-PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8)
+PResult::Ok(bits.0 << 0u8 | bits.1 << 1u8)
 })())?;
 let length = 19u16 + (length_extra_bits as u16);
 let distance_code = ((|| {
@@ -18924,7 +18924,7 @@ let field0 = (Decoder166(_input))?;
 let field1 = (Decoder166(_input))?;
 (field0, field1)
 };
-PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8)
+PResult::Ok(bits.0 << 0u8 | bits.1 << 1u8)
 })())?;
 let length = 23u16 + (length_extra_bits as u16);
 let distance_code = ((|| {
@@ -18951,7 +18951,7 @@ let field0 = (Decoder166(_input))?;
 let field1 = (Decoder166(_input))?;
 (field0, field1)
 };
-PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8)
+PResult::Ok(bits.0 << 0u8 | bits.1 << 1u8)
 })())?;
 let length = 27u16 + (length_extra_bits as u16);
 let distance_code = ((|| {
@@ -18978,7 +18978,7 @@ let field0 = (Decoder166(_input))?;
 let field1 = (Decoder166(_input))?;
 (field0, field1)
 };
-PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8)
+PResult::Ok(bits.0 << 0u8 | bits.1 << 1u8)
 })())?;
 let length = 31u16 + (length_extra_bits as u16);
 let distance_code = ((|| {
@@ -19006,7 +19006,7 @@ let field1 = (Decoder166(_input))?;
 let field2 = (Decoder166(_input))?;
 (field0, field1, field2)
 };
-PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8)
+PResult::Ok(bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8)
 })())?;
 let length = 35u16 + (length_extra_bits as u16);
 let distance_code = ((|| {
@@ -19034,7 +19034,7 @@ let field1 = (Decoder166(_input))?;
 let field2 = (Decoder166(_input))?;
 (field0, field1, field2)
 };
-PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8)
+PResult::Ok(bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8)
 })())?;
 let length = 43u16 + (length_extra_bits as u16);
 let distance_code = ((|| {
@@ -19062,7 +19062,7 @@ let field1 = (Decoder166(_input))?;
 let field2 = (Decoder166(_input))?;
 (field0, field1, field2)
 };
-PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8)
+PResult::Ok(bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8)
 })())?;
 let length = 51u16 + (length_extra_bits as u16);
 let distance_code = ((|| {
@@ -19090,7 +19090,7 @@ let field1 = (Decoder166(_input))?;
 let field2 = (Decoder166(_input))?;
 (field0, field1, field2)
 };
-PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8)
+PResult::Ok(bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8)
 })())?;
 let length = 59u16 + (length_extra_bits as u16);
 let distance_code = ((|| {
@@ -19119,7 +19119,7 @@ let field2 = (Decoder166(_input))?;
 let field3 = (Decoder166(_input))?;
 (field0, field1, field2, field3)
 };
-PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8)
+PResult::Ok(bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8)
 })())?;
 let length = 67u16 + (length_extra_bits as u16);
 let distance_code = ((|| {
@@ -19148,7 +19148,7 @@ let field2 = (Decoder166(_input))?;
 let field3 = (Decoder166(_input))?;
 (field0, field1, field2, field3)
 };
-PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8)
+PResult::Ok(bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8)
 })())?;
 let length = 83u16 + (length_extra_bits as u16);
 let distance_code = ((|| {
@@ -19177,7 +19177,7 @@ let field2 = (Decoder166(_input))?;
 let field3 = (Decoder166(_input))?;
 (field0, field1, field2, field3)
 };
-PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8)
+PResult::Ok(bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8)
 })())?;
 let length = 99u16 + (length_extra_bits as u16);
 let distance_code = ((|| {
@@ -19206,7 +19206,7 @@ let field2 = (Decoder166(_input))?;
 let field3 = (Decoder166(_input))?;
 (field0, field1, field2, field3)
 };
-PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8)
+PResult::Ok(bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8)
 })())?;
 let length = 115u16 + (length_extra_bits as u16);
 let distance_code = ((|| {
@@ -19236,7 +19236,7 @@ let field3 = (Decoder166(_input))?;
 let field4 = (Decoder166(_input))?;
 (field0, field1, field2, field3, field4)
 };
-PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8 | bits.4.clone() << 4u8)
+PResult::Ok(bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8)
 })())?;
 let length = 131u16 + (length_extra_bits as u16);
 let distance_code = ((|| {
@@ -19266,7 +19266,7 @@ let field3 = (Decoder166(_input))?;
 let field4 = (Decoder166(_input))?;
 (field0, field1, field2, field3, field4)
 };
-PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8 | bits.4.clone() << 4u8)
+PResult::Ok(bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8)
 })())?;
 let length = 163u16 + (length_extra_bits as u16);
 let distance_code = ((|| {
@@ -19296,7 +19296,7 @@ let field3 = (Decoder166(_input))?;
 let field4 = (Decoder166(_input))?;
 (field0, field1, field2, field3, field4)
 };
-PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8 | bits.4.clone() << 4u8)
+PResult::Ok(bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8)
 })())?;
 let length = 195u16 + (length_extra_bits as u16);
 let distance_code = ((|| {
@@ -19326,7 +19326,7 @@ let field3 = (Decoder166(_input))?;
 let field4 = (Decoder166(_input))?;
 (field0, field1, field2, field3, field4)
 };
-PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8 | bits.4.clone() << 4u8)
+PResult::Ok(bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8)
 })())?;
 let length = 227u16 + (length_extra_bits as u16);
 let distance_code = ((|| {
@@ -19427,7 +19427,7 @@ let field3 = (Decoder166(_input))?;
 let field4 = (Decoder166(_input))?;
 (field0, field1, field2, field3, field4)
 };
-PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8 | bits.4.clone() << 4u8)
+PResult::Ok(bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8)
 })())?;
 let hdist = ((|| {
 let bits = {
@@ -19438,7 +19438,7 @@ let field3 = (Decoder166(_input))?;
 let field4 = (Decoder166(_input))?;
 (field0, field1, field2, field3, field4)
 };
-PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8 | bits.4.clone() << 4u8)
+PResult::Ok(bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8)
 })())?;
 let hclen = ((|| {
 let bits = {
@@ -19448,7 +19448,7 @@ let field2 = (Decoder166(_input))?;
 let field3 = (Decoder166(_input))?;
 (field0, field1, field2, field3)
 };
-PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8)
+PResult::Ok(bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8)
 })())?;
 let code_length_alphabet_code_lengths = ((|| {
 let mut accum = Vec::new();
@@ -19460,7 +19460,7 @@ let field1 = (Decoder166(_input))?;
 let field2 = (Decoder166(_input))?;
 (field0, field1, field2)
 };
-bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8
+bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8
 });
 }
 PResult::Ok(accum)
@@ -19479,7 +19479,7 @@ let field0 = (Decoder166(_input))?;
 let field1 = (Decoder166(_input))?;
 (field0, field1)
 };
-bits.0.clone() << 0u8 | bits.1.clone() << 1u8
+bits.0 << 0u8 | bits.1 << 1u8
 },
 
 17u8 => {
@@ -19489,7 +19489,7 @@ let field1 = (Decoder166(_input))?;
 let field2 = (Decoder166(_input))?;
 (field0, field1, field2)
 };
-bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8
+bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8
 },
 
 18u8 => {
@@ -19503,7 +19503,7 @@ let field5 = (Decoder166(_input))?;
 let field6 = (Decoder166(_input))?;
 (field0, field1, field2, field3, field4, field5, field6)
 };
-bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8 | bits.4.clone() << 4u8 | bits.5.clone() << 5u8 | bits.6.clone() << 6u8
+bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8 | bits.5 << 5u8 | bits.6 << 6u8
 },
 
 _ => {
@@ -19690,7 +19690,7 @@ let bits = {
 let field0 = (Decoder166(_input))?;
 (field0,)
 };
-PResult::Ok(bits.0.clone())
+PResult::Ok(bits.0)
 })())?;
 let length = 11u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
@@ -19707,7 +19707,7 @@ let bits = {
 let field0 = (Decoder166(_input))?;
 (field0,)
 };
-PResult::Ok(bits.0.clone())
+PResult::Ok(bits.0)
 })())?;
 let length = 13u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
@@ -19724,7 +19724,7 @@ let bits = {
 let field0 = (Decoder166(_input))?;
 (field0,)
 };
-PResult::Ok(bits.0.clone())
+PResult::Ok(bits.0)
 })())?;
 let length = 15u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
@@ -19741,7 +19741,7 @@ let bits = {
 let field0 = (Decoder166(_input))?;
 (field0,)
 };
-PResult::Ok(bits.0.clone())
+PResult::Ok(bits.0)
 })())?;
 let length = 17u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
@@ -19759,7 +19759,7 @@ let field0 = (Decoder166(_input))?;
 let field1 = (Decoder166(_input))?;
 (field0, field1)
 };
-PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8)
+PResult::Ok(bits.0 << 0u8 | bits.1 << 1u8)
 })())?;
 let length = 19u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
@@ -19777,7 +19777,7 @@ let field0 = (Decoder166(_input))?;
 let field1 = (Decoder166(_input))?;
 (field0, field1)
 };
-PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8)
+PResult::Ok(bits.0 << 0u8 | bits.1 << 1u8)
 })())?;
 let length = 23u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
@@ -19795,7 +19795,7 @@ let field0 = (Decoder166(_input))?;
 let field1 = (Decoder166(_input))?;
 (field0, field1)
 };
-PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8)
+PResult::Ok(bits.0 << 0u8 | bits.1 << 1u8)
 })())?;
 let length = 27u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
@@ -19813,7 +19813,7 @@ let field0 = (Decoder166(_input))?;
 let field1 = (Decoder166(_input))?;
 (field0, field1)
 };
-PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8)
+PResult::Ok(bits.0 << 0u8 | bits.1 << 1u8)
 })())?;
 let length = 31u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
@@ -19832,7 +19832,7 @@ let field1 = (Decoder166(_input))?;
 let field2 = (Decoder166(_input))?;
 (field0, field1, field2)
 };
-PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8)
+PResult::Ok(bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8)
 })())?;
 let length = 35u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
@@ -19851,7 +19851,7 @@ let field1 = (Decoder166(_input))?;
 let field2 = (Decoder166(_input))?;
 (field0, field1, field2)
 };
-PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8)
+PResult::Ok(bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8)
 })())?;
 let length = 43u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
@@ -19870,7 +19870,7 @@ let field1 = (Decoder166(_input))?;
 let field2 = (Decoder166(_input))?;
 (field0, field1, field2)
 };
-PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8)
+PResult::Ok(bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8)
 })())?;
 let length = 51u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
@@ -19889,7 +19889,7 @@ let field1 = (Decoder166(_input))?;
 let field2 = (Decoder166(_input))?;
 (field0, field1, field2)
 };
-PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8)
+PResult::Ok(bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8)
 })())?;
 let length = 59u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
@@ -19909,7 +19909,7 @@ let field2 = (Decoder166(_input))?;
 let field3 = (Decoder166(_input))?;
 (field0, field1, field2, field3)
 };
-PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8)
+PResult::Ok(bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8)
 })())?;
 let length = 67u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
@@ -19929,7 +19929,7 @@ let field2 = (Decoder166(_input))?;
 let field3 = (Decoder166(_input))?;
 (field0, field1, field2, field3)
 };
-PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8)
+PResult::Ok(bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8)
 })())?;
 let length = 83u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
@@ -19949,7 +19949,7 @@ let field2 = (Decoder166(_input))?;
 let field3 = (Decoder166(_input))?;
 (field0, field1, field2, field3)
 };
-PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8)
+PResult::Ok(bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8)
 })())?;
 let length = 99u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
@@ -19969,7 +19969,7 @@ let field2 = (Decoder166(_input))?;
 let field3 = (Decoder166(_input))?;
 (field0, field1, field2, field3)
 };
-PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8)
+PResult::Ok(bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8)
 })())?;
 let length = 115u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
@@ -19990,7 +19990,7 @@ let field3 = (Decoder166(_input))?;
 let field4 = (Decoder166(_input))?;
 (field0, field1, field2, field3, field4)
 };
-PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8 | bits.4.clone() << 4u8)
+PResult::Ok(bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8)
 })())?;
 let length = 131u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
@@ -20011,7 +20011,7 @@ let field3 = (Decoder166(_input))?;
 let field4 = (Decoder166(_input))?;
 (field0, field1, field2, field3, field4)
 };
-PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8 | bits.4.clone() << 4u8)
+PResult::Ok(bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8)
 })())?;
 let length = 163u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
@@ -20032,7 +20032,7 @@ let field3 = (Decoder166(_input))?;
 let field4 = (Decoder166(_input))?;
 (field0, field1, field2, field3, field4)
 };
-PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8 | bits.4.clone() << 4u8)
+PResult::Ok(bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8)
 })())?;
 let length = 195u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
@@ -20053,7 +20053,7 @@ let field3 = (Decoder166(_input))?;
 let field4 = (Decoder166(_input))?;
 (field0, field1, field2, field3, field4)
 };
-PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8 | bits.4.clone() << 4u8)
+PResult::Ok(bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8)
 })())?;
 let length = 227u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
@@ -20271,7 +20271,7 @@ let bits = {
 let field0 = (Decoder166(_input))?;
 (field0,)
 };
-(bits.0.clone()) as u16
+bits.0 as u16
 },
 
 2u8 => {
@@ -20280,7 +20280,7 @@ let field0 = (Decoder166(_input))?;
 let field1 = (Decoder166(_input))?;
 (field0, field1)
 };
-((bits.0.clone()) as u16) << 0u16 | ((bits.1.clone()) as u16) << 1u16
+(bits.0 as u16) << 0u16 | (bits.1 as u16) << 1u16
 },
 
 3u8 => {
@@ -20290,7 +20290,7 @@ let field1 = (Decoder166(_input))?;
 let field2 = (Decoder166(_input))?;
 (field0, field1, field2)
 };
-((bits.0.clone()) as u16) << 0u16 | ((bits.1.clone()) as u16) << 1u16 | ((bits.2.clone()) as u16) << 2u16
+(bits.0 as u16) << 0u16 | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16
 },
 
 4u8 => {
@@ -20301,7 +20301,7 @@ let field2 = (Decoder166(_input))?;
 let field3 = (Decoder166(_input))?;
 (field0, field1, field2, field3)
 };
-((bits.0.clone()) as u16) << 0u16 | ((bits.1.clone()) as u16) << 1u16 | ((bits.2.clone()) as u16) << 2u16 | ((bits.3.clone()) as u16) << 3u16
+(bits.0 as u16) << 0u16 | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16 | (bits.3 as u16) << 3u16
 },
 
 5u8 => {
@@ -20313,7 +20313,7 @@ let field3 = (Decoder166(_input))?;
 let field4 = (Decoder166(_input))?;
 (field0, field1, field2, field3, field4)
 };
-((bits.0.clone()) as u16) << 0u16 | ((bits.1.clone()) as u16) << 1u16 | ((bits.2.clone()) as u16) << 2u16 | ((bits.3.clone()) as u16) << 3u16 | ((bits.4.clone()) as u16) << 4u16
+(bits.0 as u16) << 0u16 | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16 | (bits.3 as u16) << 3u16 | (bits.4 as u16) << 4u16
 },
 
 6u8 => {
@@ -20326,7 +20326,7 @@ let field4 = (Decoder166(_input))?;
 let field5 = (Decoder166(_input))?;
 (field0, field1, field2, field3, field4, field5)
 };
-((bits.0.clone()) as u16) << 0u16 | ((bits.1.clone()) as u16) << 1u16 | ((bits.2.clone()) as u16) << 2u16 | ((bits.3.clone()) as u16) << 3u16 | ((bits.4.clone()) as u16) << 4u16 | ((bits.5.clone()) as u16) << 5u16
+(bits.0 as u16) << 0u16 | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16 | (bits.3 as u16) << 3u16 | (bits.4 as u16) << 4u16 | (bits.5 as u16) << 5u16
 },
 
 7u8 => {
@@ -20340,7 +20340,7 @@ let field5 = (Decoder166(_input))?;
 let field6 = (Decoder166(_input))?;
 (field0, field1, field2, field3, field4, field5, field6)
 };
-((bits.0.clone()) as u16) << 0u16 | ((bits.1.clone()) as u16) << 1u16 | ((bits.2.clone()) as u16) << 2u16 | ((bits.3.clone()) as u16) << 3u16 | ((bits.4.clone()) as u16) << 4u16 | ((bits.5.clone()) as u16) << 5u16 | ((bits.6.clone()) as u16) << 6u16
+(bits.0 as u16) << 0u16 | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16 | (bits.3 as u16) << 3u16 | (bits.4 as u16) << 4u16 | (bits.5 as u16) << 5u16 | (bits.6 as u16) << 6u16
 },
 
 8u8 => {
@@ -20355,7 +20355,7 @@ let field6 = (Decoder166(_input))?;
 let field7 = (Decoder166(_input))?;
 (field0, field1, field2, field3, field4, field5, field6, field7)
 };
-((bits.0.clone()) as u16) << 0u16 | ((bits.1.clone()) as u16) << 1u16 | ((bits.2.clone()) as u16) << 2u16 | ((bits.3.clone()) as u16) << 3u16 | ((bits.4.clone()) as u16) << 4u16 | ((bits.5.clone()) as u16) << 5u16 | ((bits.6.clone()) as u16) << 6u16 | ((bits.7.clone()) as u16) << 7u16
+(bits.0 as u16) << 0u16 | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16 | (bits.3 as u16) << 3u16 | (bits.4 as u16) << 4u16 | (bits.5 as u16) << 5u16 | (bits.6 as u16) << 6u16 | (bits.7 as u16) << 7u16
 },
 
 9u8 => {
@@ -20371,7 +20371,7 @@ let field7 = (Decoder166(_input))?;
 let field8 = (Decoder166(_input))?;
 (field0, field1, field2, field3, field4, field5, field6, field7, field8)
 };
-((bits.0.clone()) as u16) << 0u16 | ((bits.1.clone()) as u16) << 1u16 | ((bits.2.clone()) as u16) << 2u16 | ((bits.3.clone()) as u16) << 3u16 | ((bits.4.clone()) as u16) << 4u16 | ((bits.5.clone()) as u16) << 5u16 | ((bits.6.clone()) as u16) << 6u16 | ((bits.7.clone()) as u16) << 7u16 | ((bits.8.clone()) as u16) << 8u16
+(bits.0 as u16) << 0u16 | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16 | (bits.3 as u16) << 3u16 | (bits.4 as u16) << 4u16 | (bits.5 as u16) << 5u16 | (bits.6 as u16) << 6u16 | (bits.7 as u16) << 7u16 | (bits.8 as u16) << 8u16
 },
 
 10u8 => {
@@ -20388,7 +20388,7 @@ let field8 = (Decoder166(_input))?;
 let field9 = (Decoder166(_input))?;
 (field0, field1, field2, field3, field4, field5, field6, field7, field8, field9)
 };
-((bits.0.clone()) as u16) << 0u16 | ((bits.1.clone()) as u16) << 1u16 | ((bits.2.clone()) as u16) << 2u16 | ((bits.3.clone()) as u16) << 3u16 | ((bits.4.clone()) as u16) << 4u16 | ((bits.5.clone()) as u16) << 5u16 | ((bits.6.clone()) as u16) << 6u16 | ((bits.7.clone()) as u16) << 7u16 | ((bits.8.clone()) as u16) << 8u16 | ((bits.9.clone()) as u16) << 9u16
+(bits.0 as u16) << 0u16 | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16 | (bits.3 as u16) << 3u16 | (bits.4 as u16) << 4u16 | (bits.5 as u16) << 5u16 | (bits.6 as u16) << 6u16 | (bits.7 as u16) << 7u16 | (bits.8 as u16) << 8u16 | (bits.9 as u16) << 9u16
 },
 
 11u8 => {
@@ -20406,7 +20406,7 @@ let field9 = (Decoder166(_input))?;
 let field10 = (Decoder166(_input))?;
 (field0, field1, field2, field3, field4, field5, field6, field7, field8, field9, field10)
 };
-((bits.0.clone()) as u16) << 0u16 | ((bits.1.clone()) as u16) << 1u16 | ((bits.2.clone()) as u16) << 2u16 | ((bits.3.clone()) as u16) << 3u16 | ((bits.4.clone()) as u16) << 4u16 | ((bits.5.clone()) as u16) << 5u16 | ((bits.6.clone()) as u16) << 6u16 | ((bits.7.clone()) as u16) << 7u16 | ((bits.8.clone()) as u16) << 8u16 | ((bits.9.clone()) as u16) << 9u16 | ((bits.10.clone()) as u16) << 10u16
+(bits.0 as u16) << 0u16 | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16 | (bits.3 as u16) << 3u16 | (bits.4 as u16) << 4u16 | (bits.5 as u16) << 5u16 | (bits.6 as u16) << 6u16 | (bits.7 as u16) << 7u16 | (bits.8 as u16) << 8u16 | (bits.9 as u16) << 9u16 | (bits.10 as u16) << 10u16
 },
 
 12u8 => {
@@ -20425,7 +20425,7 @@ let field10 = (Decoder166(_input))?;
 let field11 = (Decoder166(_input))?;
 (field0, field1, field2, field3, field4, field5, field6, field7, field8, field9, field10, field11)
 };
-((bits.0.clone()) as u16) << 0u16 | ((bits.1.clone()) as u16) << 1u16 | ((bits.2.clone()) as u16) << 2u16 | ((bits.3.clone()) as u16) << 3u16 | ((bits.4.clone()) as u16) << 4u16 | ((bits.5.clone()) as u16) << 5u16 | ((bits.6.clone()) as u16) << 6u16 | ((bits.7.clone()) as u16) << 7u16 | ((bits.8.clone()) as u16) << 8u16 | ((bits.9.clone()) as u16) << 9u16 | ((bits.10.clone()) as u16) << 10u16 | ((bits.11.clone()) as u16) << 11u16
+(bits.0 as u16) << 0u16 | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16 | (bits.3 as u16) << 3u16 | (bits.4 as u16) << 4u16 | (bits.5 as u16) << 5u16 | (bits.6 as u16) << 6u16 | (bits.7 as u16) << 7u16 | (bits.8 as u16) << 8u16 | (bits.9 as u16) << 9u16 | (bits.10 as u16) << 10u16 | (bits.11 as u16) << 11u16
 },
 
 13u8 => {
@@ -20445,7 +20445,7 @@ let field11 = (Decoder166(_input))?;
 let field12 = (Decoder166(_input))?;
 (field0, field1, field2, field3, field4, field5, field6, field7, field8, field9, field10, field11, field12)
 };
-((bits.0.clone()) as u16) << 0u16 | ((bits.1.clone()) as u16) << 1u16 | ((bits.2.clone()) as u16) << 2u16 | ((bits.3.clone()) as u16) << 3u16 | ((bits.4.clone()) as u16) << 4u16 | ((bits.5.clone()) as u16) << 5u16 | ((bits.6.clone()) as u16) << 6u16 | ((bits.7.clone()) as u16) << 7u16 | ((bits.8.clone()) as u16) << 8u16 | ((bits.9.clone()) as u16) << 9u16 | ((bits.10.clone()) as u16) << 10u16 | ((bits.11.clone()) as u16) << 11u16 | ((bits.12.clone()) as u16) << 12u16
+(bits.0 as u16) << 0u16 | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16 | (bits.3 as u16) << 3u16 | (bits.4 as u16) << 4u16 | (bits.5 as u16) << 5u16 | (bits.6 as u16) << 6u16 | (bits.7 as u16) << 7u16 | (bits.8 as u16) << 8u16 | (bits.9 as u16) << 9u16 | (bits.10 as u16) << 10u16 | (bits.11 as u16) << 11u16 | (bits.12 as u16) << 12u16
 },
 
 _other => {
