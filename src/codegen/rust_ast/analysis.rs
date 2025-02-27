@@ -1,10 +1,11 @@
 use std::{cell::RefCell, collections::HashMap};
 
-use super::heap_optimize::{HeapOptimize, HeapOutcome, HeapStrategy};
+pub(crate) mod heap_optimize;
 use super::*;
+use heap_optimize::{HeapOptimize, HeapOutcome, HeapStrategy};
 
-/// Helper trait for any AST type-rep whose memory footprint and other metrics may require
-/// non-empty context to observe (such as a dictionary of type-definitions for LocalType).
+/// Helper trait for any AST model-type that represents a type-construct in Rust that may rely on non-local
+/// context to properly analyze certain static properties of.
 pub trait ASTContext {
     type Context<'a>: Sized + 'a;
 }
@@ -35,8 +36,13 @@ pub trait MemSize: CanOptimize {
     fn align_hint(&self, context: Self::Context<'_>) -> usize;
 }
 
+pub trait CopyEligible: ASTContext {
+    fn copy_hint(&self, context: Self::Context<'_>) -> bool;
+}
+
 #[derive(Default)]
 struct CacheEntry {
+    copy: Option<bool>,
     niches: Option<usize>,
     size: Option<usize>,
     align: Option<usize>,
@@ -89,12 +95,16 @@ impl SourceContext<'_> {
         cache_get!(self, align, ix, align_hint)
     }
 
+    pub fn get_copy(&self, ix: usize) -> bool {
+        cache_get!(self, copy, ix, copy_hint)
+    }
+
     /// NOTE: Due to memoization, only one strategy will be computed for a given type-definition,
     /// meaning that if you then request a different strategy with the same Context object, the old
     /// result will be served up regardless of the actual strategy being passed in the second time
     /// around.
     pub fn get_heap(&self, strategy: HeapStrategy, ix: usize) -> HeapOutcome {
-        cache_get!(self, heap, ix, dry_run, strategy)
+        cache_get!(self, heap, ix, heap_hint, strategy)
     }
 }
 
@@ -159,6 +169,18 @@ impl MemSize for RustType {
     }
 }
 
+impl CopyEligible for RustType {
+    fn copy_hint(&self, context: &SourceContext<'_>) -> bool {
+        match self {
+            RustType::Atom(at) => at.copy_hint(context),
+            RustType::AnonTuple(ts) => ts.iter().all(|t| t.copy_hint(context)),
+            RustType::Verbatim(..) => {
+                unreachable!("unexpected RustType::Verbatim in structural type")
+            }
+        }
+    }
+}
+
 impl ASTContext for AtomType {
     type Context<'a> = &'a SourceContext<'a>;
 }
@@ -187,6 +209,16 @@ impl MemSize for AtomType {
             AtomType::Prim(pt) => pt.align_hint(()),
             AtomType::Comp(ct) => ct.align_hint(context),
             AtomType::TypeRef(lt) => lt.align_hint(context),
+        }
+    }
+}
+
+impl CopyEligible for AtomType {
+    fn copy_hint(&self, context: &SourceContext<'_>) -> bool {
+        match self {
+            AtomType::Prim(pt) => pt.copy_hint(()),
+            AtomType::Comp(ct) => ct.copy_hint(context),
+            AtomType::TypeRef(lt) => lt.copy_hint(context),
         }
     }
 }
@@ -251,6 +283,23 @@ impl MemSize for PrimType {
             Char => char,
             Usize => usize,
         }
+    }
+}
+
+impl CopyEligible for PrimType {
+    fn copy_hint(&self, _: ()) -> bool {
+        // NOTE - as implemented, all PrimTypes are copy, but we don't want to hardcode this and forget if we add non-Copy primtypes later on
+        matches!(
+            self,
+            PrimType::U8
+                | PrimType::U16
+                | PrimType::U32
+                | PrimType::U64
+                | PrimType::Usize
+                | PrimType::Unit
+                | PrimType::Bool
+                | PrimType::Char
+        )
     }
 }
 
@@ -319,6 +368,24 @@ where
     }
 }
 
+impl<T> CopyEligible for CompType<Box<T>>
+where
+    T: CopyEligible + std::fmt::Debug,
+    for<'a> T::Context<'a>: Copy,
+{
+    fn copy_hint(&self, context: Self::Context<'_>) -> bool {
+        match self {
+            CompType::Borrow(_lt, Mut::Immutable, _) => true,
+            CompType::Borrow(_lt, Mut::Mutable, _) => {
+                unreachable!("unexpected mutable borrow in generative type: {self:?}")
+            }
+            CompType::Vec(..) => false,
+            CompType::Option(inner) => inner.copy_hint(context),
+            CompType::Result(ok_t, err_t) => ok_t.copy_hint(context) && err_t.copy_hint(context),
+        }
+    }
+}
+
 impl ASTContext for LocalType {
     type Context<'a> = &'a SourceContext<'a>;
 }
@@ -350,6 +417,17 @@ impl MemSize for LocalType {
             LocalType::LocalDef(ix, _) => context.get_align(*ix),
             LocalType::External(_) => {
                 unreachable!("unexpected external type-reference in structural type")
+            }
+        }
+    }
+}
+
+impl CopyEligible for LocalType {
+    fn copy_hint(&self, context: &SourceContext<'_>) -> bool {
+        match self {
+            LocalType::LocalDef(ix, _) => context.get_copy(*ix),
+            LocalType::External(ext_type) => {
+                unreachable!("unexpected external type-reference encountered during copy-analysis: {ext_type}")
             }
         }
     }
@@ -400,6 +478,15 @@ impl MemSize for RustTypeDef {
     }
 }
 
+impl CopyEligible for RustTypeDef {
+    fn copy_hint(&self, context: &SourceContext<'_>) -> bool {
+        match self {
+            RustTypeDef::Struct(def) => def.copy_hint(context),
+            RustTypeDef::Enum(vars) => vars.iter().all(|v| v.copy_hint(context)),
+        }
+    }
+}
+
 impl ASTContext for RustVariant {
     type Context<'a> = &'a SourceContext<'a>;
 }
@@ -441,6 +528,15 @@ impl MemSize for RustVariant {
     }
 }
 
+impl CopyEligible for RustVariant {
+    fn copy_hint(&self, context: &SourceContext<'_>) -> bool {
+        match self {
+            RustVariant::Unit(..) => true,
+            RustVariant::Tuple(.., elts) => elts.iter().all(|e| e.copy_hint(context)),
+        }
+    }
+}
+
 impl ASTContext for RustStruct {
     type Context<'a> = &'a SourceContext<'a>;
 }
@@ -476,6 +572,14 @@ impl MemSize for RustStruct {
                 .map(|f| f.1.align_hint(context))
                 .max()
                 .unwrap_or(1),
+        }
+    }
+}
+
+impl CopyEligible for RustStruct {
+    fn copy_hint(&self, context: &SourceContext<'_>) -> bool {
+        match self {
+            RustStruct::Record(fields) => fields.iter().all(|f| f.1.copy_hint(context)),
         }
     }
 }

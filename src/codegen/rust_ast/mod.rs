@@ -2,9 +2,8 @@ use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::rc::Rc;
 
-pub(crate) mod heap_optimize;
+pub(crate) mod analysis;
 pub(crate) mod rebind;
-pub(crate) mod size;
 
 use crate::output::{Fragment, FragmentBuilder};
 
@@ -1710,6 +1709,10 @@ impl RustExpr {
         Self::PrimitiveLit(RustPrimLit::Numeric(RustNumLit::Usize(num.into())))
     }
 
+    pub fn bool_lit(b: bool) -> Self {
+        Self::PrimitiveLit(RustPrimLit::Boolean(b))
+    }
+
     pub fn u8lit(num: u8) -> Self {
         Self::PrimitiveLit(RustPrimLit::Numeric(RustNumLit::U8(num)))
     }
@@ -1736,7 +1739,12 @@ impl RustExpr {
 
     pub fn borrow_of(self) -> Self {
         match self {
-            Self::CloneOf(this) => *this,
+            // REVIEW - we need a more cohesive idea/model for where we want to borrow and what syntax is required for the desired semantics
+            Self::CloneOf(this) => match &*this {
+                Self::FieldAccess(..) => Self::Borrow(this),
+                // NOTE - original behavior
+                _ => *this,
+            },
             other => Self::Borrow(Box::new(other)),
         }
     }
@@ -2066,6 +2074,19 @@ impl RustExpr {
             RustExpr::Try(x) => *x,
             other => RustExpr::ResultOk(qualifier.map(Name::into), Box::new(other)),
         }
+    }
+
+    pub(crate) fn wrap_some(self) -> RustExpr {
+        match self {
+            RustExpr::BlockScope(stmts, tail) => {
+                RustExpr::BlockScope(stmts, Box::new(tail.wrap_some()))
+            }
+            _ => RustExpr::local("Some").call_with([self]),
+        }
+    }
+
+    pub(crate) fn option_none() -> Self {
+        RustExpr::local("None")
     }
 }
 

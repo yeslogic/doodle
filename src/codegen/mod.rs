@@ -1,9 +1,10 @@
 mod name;
-pub(crate) mod rust_ast;
+mod rust_ast;
 mod trace;
-pub(crate) mod typed_decoder;
+mod typed_decoder;
 pub(crate) mod typed_format;
 mod util;
+
 use rebind::Rebindable;
 pub use rust_ast::ToFragment;
 
@@ -23,21 +24,22 @@ use std::{
     hash::{Hash, Hasher},
     rc::Rc,
 };
+mod ixlabel;
+mod path_names;
 
+use ixlabel::IxLabel;
 use name::{Derivation, NameAtom};
-use rust_ast::{heap_optimize::HeapStrategy, *};
+use path_names::NameGen;
+use rust_ast::analysis::{
+    heap_optimize::{HeapOptimize, HeapStrategy},
+    CopyEligible,
+};
+use rust_ast::*;
 use util::{BTree, MapLike, StableMap};
 
-use typed_format::{GenType, TypedExpr, TypedFormat, TypedPattern};
-
-use self::{
-    typed_decoder::{GTCompiler, GTDecoder, TypedDecoder},
-    typed_format::TypedDynFormat,
-};
 use trace::get_and_increment_seed;
-
-pub(crate) mod ixlabel;
-pub(crate) use ixlabel::IxLabel;
+use typed_decoder::{GTCompiler, GTDecoder, TypedDecoder};
+use typed_format::{GenType, TypedDynFormat, TypedExpr, TypedFormat, TypedPattern};
 
 /// Produces a probabilistically unique TraceHash based on the value of a thread-local counter-state
 /// (and post-increments the counter).
@@ -57,9 +59,6 @@ fn get_trace(_salt: &impl std::hash::Hash) -> TraceHash {
 
     hasher.finish()
 }
-
-mod path_names;
-use path_names::NameGen;
 
 pub struct CodeGen {
     name_gen: NameGen,
@@ -158,7 +157,6 @@ impl CodeGen {
                         }
                     };
                     rt_vars.push(var);
-                    // FIXME - hardcoded path_names version
                     self.name_gen.ctxt.escape();
                 }
                 let rt_def = RustTypeDef::Enum(rt_vars);
@@ -343,12 +341,12 @@ impl CodeGen {
                     )
                 ),
             TypedDecoder::ForEach(_gt, expr, lbl, single) => {
-                // FIXME - do we need to ensure this is cloned?
+                // REVIEW[epic=zealous-clone] - do we need to ensure this is cloned?
                 let cl_expr = embed_expr(expr, ExprInfo::EmbedCloned);
                 CaseLogic::Repeat(RepeatLogic::ForEach(cl_expr, lbl.clone(), Box::new(self.translate(single.get_dec()))))
             }
             TypedDecoder::DecodeBytes(_gt, expr, inner) => {
-                let cl_expr = embed_expr(expr, ExprInfo::Natural);
+                let cl_expr = embed_expr_dft(expr);
                 CaseLogic::Derived(DerivedLogic::DecodeBytes(cl_expr, Box::new(self.translate(inner.get_dec()))))
             }
             TypedDecoder::RepeatCount(_gt, expr_count, single) =>
@@ -363,7 +361,7 @@ impl CodeGen {
                     RepeatLogic::BetweenCounts(
                         tree.clone(),
                         embed_expr_dft(expr_min),
-                       embed_expr_dft(expr_max),
+                        embed_expr_dft(expr_max),
                         Box::new(self.translate(single.get_dec()))
                     )
                 )
@@ -371,7 +369,6 @@ impl CodeGen {
             TypedDecoder::RepeatUntilLast(_gt, pred_terminal, single) =>
                 CaseLogic::Repeat(
                     RepeatLogic::ConditionTerminal(
-                        // REVIEW - double-check needs-ok value
                         GenLambda::from_expr(*pred_terminal.clone(), ClosureKind::Predicate),
                         Box::new(self.translate(single.get_dec()))
                     )
@@ -379,7 +376,6 @@ impl CodeGen {
             TypedDecoder::RepeatUntilSeq(_gt, pred_complete, single) => {
                 CaseLogic::Repeat(
                     RepeatLogic::ConditionComplete(
-                        // REVIEW - double-check needs-ok value
                         GenLambda::from_expr(*pred_complete.clone(), ClosureKind::Predicate),
                         Box::new(self.translate(single.get_dec()))
                     )
@@ -398,7 +394,7 @@ impl CodeGen {
             TypedDecoder::Maybe(_gt, cond, inner) => {
                 CaseLogic::Derived(
                     DerivedLogic::Maybe(
-                        embed_expr(cond, ExprInfo::Natural),
+                        embed_expr_dft(cond),
                         Box::new(self.translate(inner.get_dec()))
                     )
                 )
@@ -422,12 +418,14 @@ impl CodeGen {
                 )
             }
             TypedDecoder::Compute(_t, expr) =>
+                // REVIEW[epic=zealous-clone] - try to gate Clone when Move, Copy or reference is possible
                 CaseLogic::Simple(SimpleLogic::Eval(embed_expr(expr, ExprInfo::EmbedCloned))),
             TypedDecoder::Let(_t, name, expr, inner) => {
                 let cl_inner = self.translate(inner.get_dec());
                 CaseLogic::Derived(
                     DerivedLogic::Let(
                         name.clone(),
+                        // REVIEW[epic=zealous-clone] - gate cloning when reference or Copy is possible
                         embed_expr(expr, ExprInfo::EmbedCloned),
                         Box::new(cl_inner)
                     )
@@ -445,7 +443,7 @@ impl CodeGen {
                 )
             }
             TypedDecoder::Match(_t, scrutinee, cases) => {
-                let scrutinized = embed_expr(scrutinee, ExprInfo::Natural);
+                let scrutinized = embed_expr_dft(scrutinee);
                 let head = match scrutinee.get_type().unwrap().as_ref() {
                     GenType::Inline(RustType::Atom(AtomType::Comp(CompType::Vec(..)))) =>
                         scrutinized.vec_as_slice(),
@@ -454,7 +452,7 @@ impl CodeGen {
                 let mut cl_cases = Vec::new();
                 for (pat, dec) in cases.iter() {
                     cl_cases.push((
-                        MatchCaseLHS::Pattern(embed_pattern_t(pat)),
+                        MatchCaseLHS::Pattern(embed_pattern(pat)),
                         self.translate(dec.get_dec()),
                     ));
                 }
@@ -490,7 +488,7 @@ impl CodeGen {
                 CaseLogic::Engine(EngineLogic::PeekNot(Box::new(cl_inner)))
             }
             TypedDecoder::Slice(_t, width, inner) => {
-                let re_width = embed_expr(width, ExprInfo::Natural);
+                let re_width = embed_expr_dft(width);
                 let cl_inner = self.translate(inner.get_dec());
                 CaseLogic::Engine(EngineLogic::Slice(re_width, Box::new(cl_inner)))
             }
@@ -499,8 +497,8 @@ impl CodeGen {
                 CaseLogic::Engine(EngineLogic::Bits(Box::new(cl_inner)))
             }
             TypedDecoder::WithRelativeOffset(_t, base_addr, offset, inner) => {
-                let re_base_addr = embed_expr(base_addr, ExprInfo::Natural);
-                let re_offset = embed_expr(offset, ExprInfo::Natural);
+                let re_base_addr = embed_expr_dft(base_addr);
+                let re_offset = embed_expr_dft(offset);
                 let cl_inner = self.translate(inner.get_dec());
                 CaseLogic::Engine(EngineLogic::OffsetPeek(re_base_addr, re_offset, Box::new(cl_inner)))
             }
@@ -508,11 +506,11 @@ impl CodeGen {
     }
 }
 
-fn embed_pattern_t(pat: &GTPattern) -> RustPattern {
+fn embed_pattern(pat: &GTPattern) -> RustPattern {
     match pat {
         TypedPattern::Tuple(_, elts) => match elts.as_slice() {
             [TypedPattern::Wildcard(..)] => RustPattern::Fill,
-            _ => RustPattern::TupleLiteral(elts.iter().map(embed_pattern_t).collect()),
+            _ => RustPattern::TupleLiteral(elts.iter().map(embed_pattern).collect()),
         },
         TypedPattern::Variant(gt, vname, inner) => match gt {
             GenType::Def((_, tname), _def) => {
@@ -521,7 +519,8 @@ fn embed_pattern_t(pat: &GTPattern) -> RustPattern {
                     TypedPattern::Wildcard(..) => RustPattern::Fill,
                     _ => {
                         let inner_t = inner.get_type();
-                        let tmp = embed_pattern_t(inner);
+                        let tmp = embed_pattern(inner);
+                        // TODO[epic=multiphase] - replace with Phase2 copy_hint
                         if inner_t.is_copy() {
                             tmp
                         } else {
@@ -540,7 +539,7 @@ fn embed_pattern_t(pat: &GTPattern) -> RustPattern {
                 match inner.as_ref() {
                     Some(inner_pat) => {
                         RustPattern::Option(Some(Box::new({
-                            let tmp = embed_pattern_t(inner_pat);
+                            let tmp = embed_pattern(inner_pat);
                             // NOTE - when T is Copy, we want `Option<T>` to be destructed to allow direct arithmetic
                             if t.is_copy() {
                                 tmp
@@ -556,7 +555,7 @@ fn embed_pattern_t(pat: &GTPattern) -> RustPattern {
             _ => unreachable!("cannot inline TypedPattern::Option with non-Option GenType: {gt:?}"),
         },
         TypedPattern::Seq(_t, elts) => {
-            RustPattern::ArrayLiteral(elts.iter().map(embed_pattern_t).collect())
+            RustPattern::ArrayLiteral(elts.iter().map(embed_pattern).collect())
         }
         TypedPattern::Wildcard(_) => RustPattern::CatchAll(None),
         TypedPattern::Binding(_, name) => RustPattern::CatchAll(Some(name.clone())),
@@ -644,7 +643,7 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                     .iter()
                     .map(|(name, val)| (
                         name.clone(),
-                        Some(embed_expr(val, ExprInfo::Natural)),
+                        Some(embed_expr_dft(val)),
                     ))
                     .collect()
                 )
@@ -670,7 +669,7 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                                 }
                                 RustVariant::Tuple(_vname, _elts) => {
                                     // FIXME - not sure how to avoid 1 x N (unary-over-tuple) if inner becomes RustExpr::Tuple...
-                                    RustExpr::Struct(constr, StructExpr::TupleExpr(vec![embed_expr(inner, ExprInfo::Natural)]))
+                                    RustExpr::Struct(constr, StructExpr::TupleExpr(vec![embed_expr_dft(inner)]))
                                 }
                             }
                         }
@@ -706,7 +705,7 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                 .iter()
                 .map(|(pat, rhs)| {
                     (
-                        MatchCaseLHS::Pattern(embed_pattern_t(pat)),
+                        MatchCaseLHS::Pattern(embed_pattern(pat)),
                         vec![RustStmt::Return(ReturnKind::Implicit, embed_expr(rhs, info))],
                     )
                 })
@@ -728,13 +727,15 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                     .collect()
             ),
         TypedExpr::TupleProj(_, expr_tup, ix) => {
-            embed_expr(expr_tup, ExprInfo::EmbedCloned).nth(*ix)
+            embed_expr(expr_tup, info /* ExprInfo::EmbedCloned */).nth(*ix)
         }
         TypedExpr::SeqIx(_, expr_seq, ix) => {
             let ix_expr = RustExpr::Operation(RustOp::AsCast(Box::new(embed_expr_dft(ix)), PrimType::Usize.into()));
+            // REVIEW[epic=zealous-clone] - figure out under what circumstances we can avoid introducing cloning here
             embed_expr(expr_seq, ExprInfo::EmbedCloned).index(ix_expr)
         }
         TypedExpr::RecordProj(_, expr_rec, fld) => {
+            // REVIEW[epic=zealous-clone] - figure out under what circumstances we can avoid introducing cloning here
             embed_expr(expr_rec, ExprInfo::EmbedCloned).field(fld.clone())
         }
         TypedExpr::Seq(_, elts) => {
@@ -892,35 +893,35 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
 
             let range = RustExpr::RangeExclusive(Box::new(RustExpr::local("ix")), Box::new(end_expr));
 
-            RustExpr::BlockScope(vec![bind_ix], Box::new(RustExpr::local("slice_ext").call_with(vec![RustExpr::borrow_of(embed_expr(seq, ExprInfo::Natural)), range]).call_method("to_vec")))
+            RustExpr::BlockScope(vec![bind_ix], Box::new(RustExpr::local("slice_ext").call_with(vec![RustExpr::borrow_of(embed_expr_dft(seq)), range]).call_method("to_vec")))
         }
         TypedExpr::FlatMap(_, f, seq) =>
             RustExpr::local("try_flat_map_vec")
                 .call_with([
-                    embed_expr(seq, ExprInfo::Natural).call_method("iter").call_method("cloned"),
+                    embed_expr_dft(seq).call_method("iter").call_method("cloned"),
                     embed_lambda(f, ClosureKind::Transform, true, ExprInfo::EmbedCloned),
                 ])
                 .wrap_try(),
         TypedExpr::FlatMapAccum(_, f, acc_init, _acc_type, seq) =>
             RustExpr::local("try_fold_map_curried")
                 .call_with([
-                    embed_expr(seq, ExprInfo::Natural).call_method("iter").call_method("cloned"),
-                    embed_expr(acc_init, ExprInfo::EmbedCloned),
+                    embed_expr_dft(seq).call_method("iter").call_method("cloned"),
+                    embed_expr(acc_init, info /* ExprInfo::EmbedCloned */),
                     embed_lambda(f, ClosureKind::Transform, true, ExprInfo::EmbedCloned),
                 ])
                 .wrap_try(),
         TypedExpr::LeftFold(_, f, acc_init, _acc_type, seq) =>
             RustExpr::local("try_fold_left_curried")
                 .call_with([
-                    embed_expr(seq, ExprInfo::Natural).call_method("iter").call_method("cloned"),
-                    embed_expr(acc_init, ExprInfo::EmbedCloned),
+                    embed_expr_dft(seq).call_method("iter").call_method("cloned"),
+                    embed_expr(acc_init, info /* ExprInfo::EmbedCloned */),
                     embed_lambda(f, ClosureKind::Transform, true, ExprInfo::EmbedCloned),
                 ])
                 .wrap_try(),
         TypedExpr::FlatMapList(_, f, _ret_type, seq) =>
             RustExpr::local("try_flat_map_append_vec")
                 .call_with([
-                    embed_expr(seq, ExprInfo::Natural).call_method("iter").call_method("cloned"),
+                    embed_expr_dft(seq).call_method("iter").call_method("cloned"),
                     embed_lambda_dft(f, ClosureKind::PairBorrowOwned, true),
                 ])
                 .wrap_try(),
@@ -930,32 +931,35 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
             } else {
                 "find_by_key_unsorted"
             };
-            let seq = embed_expr(seq, ExprInfo::Natural).make_persistent().into_owned();
+            let seq = embed_expr_dft(seq).make_persistent().into_owned();
             RustExpr::local(method)
                 .call_with([
                     embed_lambda_dft(f, ClosureKind::ExtractKey, false),
                     embed_expr(query, ExprInfo::Natural),
                     seq,
                 ])
-                // REVIEW - do we need this? (we probably do)
+                // REVIEW[epic=zealous-clone] - do we need this? (we probably do)
+                // TODO: gate 'copied' by whether the GenType is Copy/Clone; we may want to infer whether an owned value is needed at all, but that is harder to answer locally
                 .call_method("cloned")
         }
         TypedExpr::Dup(_, n, expr) => {
             // NOTE - the dup count should be simple, but the duplicated expression must be move-safe
             RustExpr::local("dup32").call_with([
-                embed_expr(n, ExprInfo::Natural),
+                embed_expr_dft(n),
+                // REVIEW[epc=zealous-clone] - consider under what circumstances the clone can be eliminated
                 embed_expr(expr, ExprInfo::EmbedCloned),
             ])
         }
         TypedExpr::Var(_, vname) => {
             // REVIEW - lexical scopes, shadowing, and variable-name sanitization may not be quite right in the current implementation
             let loc = RustExpr::local(vname.clone());
+            // REVIEW[epic=zealous-clone] - figure out if there is a way to avoid cloning here...
             match info {
                 ExprInfo::EmbedCloned => RustExpr::CloneOf(Box::new(loc)),
                 ExprInfo::Natural => loc,
             }
         }
-        TypedExpr::Bool(b) => RustExpr::PrimitiveLit(RustPrimLit::Boolean(*b)),
+        TypedExpr::Bool(b) => RustExpr::bool_lit(*b),
         TypedExpr::U8(n) => RustExpr::u8lit(*n),
         TypedExpr::U16(n) => RustExpr::u16lit(*n),
         TypedExpr::U32(n) => RustExpr::u32lit(*n),
@@ -965,8 +969,8 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                 "TypedExpr::Lambda unsupported as first-class embed (requires embed_lambda with proper ClosureKind argument)"
             ),
         // TODO - determine if we need to type-annotate the Some call based on the gt we are currently ignoring
-        TypedExpr::LiftOption(_, Some(x)) => RustExpr::local("Some").call_with([embed_expr(x, info)]),
-        TypedExpr::LiftOption(_, None) => RustExpr::local("None"),
+        TypedExpr::LiftOption(_, Some(x)) => embed_expr(x, info).wrap_some(),
+        TypedExpr::LiftOption(_, None) => RustExpr::option_none(),
     }
 }
 
@@ -3432,7 +3436,7 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
     // Set of identifiers we have picked as bespoke names for decoder functions based on the type they are parsing (rather than sequentially enumerated)
     let mut fn_renames = BTreeSet::<Label>::new();
     let type_context = &elaborator.codegen.defined_types[..];
-    let src_context = rust_ast::size::SourceContext::from(type_context);
+    let src_context = rust_ast::analysis::SourceContext::from(type_context);
     let mut type_defs = Vec::from_iter(elaborator.codegen.defined_types.iter().map(|type_def| {
         elaborator
             .codegen
@@ -3454,7 +3458,7 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
             .ctxt
             .find_name_for(path)
             .expect("no name found");
-        let traits = if type_def.can_be_copy() {
+        let traits = if type_def.copy_hint(&src_context) {
             // Derive `Copy` if we can statically infer the definition to be compatible with `Copy`
             // TODO - it might be possible to track which LocalDef items have already been marked Copy, but even that isn't perfect if the def follows its first reference
             TraitSet::DebugCopy
@@ -3465,13 +3469,9 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
         let comments = {
             let sz_comment = format!(
                 "expected size: {}",
-                rust_ast::size::MemSize::size_hint(type_def, &src_context)
+                rust_ast::analysis::MemSize::size_hint(type_def, &src_context)
             );
-            let outcome = rust_ast::heap_optimize::HeapOptimize::dry_run(
-                type_def,
-                HEAP_STRATEGY,
-                &src_context,
-            );
+            let outcome = HeapOptimize::heap_hint(type_def, HEAP_STRATEGY, &src_context);
             if outcome.0.is_noop() {
                 vec![sz_comment]
             } else {
