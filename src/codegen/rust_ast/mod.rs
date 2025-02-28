@@ -1378,10 +1378,10 @@ impl RustClosure {
         )
     }
 
-    pub fn thunk_body(body: impl IntoIterator<Item = RustStmt>) -> RustClosure {
+    pub fn thunk_body(stmts: impl IntoIterator<Item = RustStmt>) -> RustClosure {
         RustClosure(
             RustClosureHead::Thunk,
-            ClosureBody::Statements(Vec::from_iter(body)),
+            ClosureBody::Statements(Vec::from_iter(stmts)),
         )
     }
 
@@ -2229,9 +2229,8 @@ pub(crate) enum RustStmt {
     Let(Mut, Label, Option<RustType>, RustExpr),
     Reassign(Label, RustExpr),
     Expr(RustExpr),
-    Return(ReturnKind, RustExpr), // bool: true for explicit return, false for implicit return
+    Return(ReturnKind, RustExpr),
     Control(RustControl),
-    // LocalFn(RustFn),
 }
 
 impl RustStmt {
