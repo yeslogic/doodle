@@ -467,99 +467,114 @@ impl<TypeRep> std::hash::Hash for TypedDynFormat<TypeRep> {
     }
 }
 
+
+mod sealed {
+    pub(super) trait Sealed {}
+
+    impl Sealed for crate::Label {}
+    impl Sealed for u32 {}
+}
+
+pub trait Ident: Clone + std::fmt::Debug + PartialEq + Eq + PartialOrd + Ord + std::hash::Hash + 'static + sealed::Sealed {}
+
+impl Ident for Label {}
+impl Ident for u32 {}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum TypedExpr<TypeRep> {
-    Var(TypeRep, Label),
+pub enum TypedExpr<TypeRep, VarId = Label>
+where
+    VarId: Ident
+{
+    Var(TypeRep, VarId),
     Bool(bool),
     U8(u8),
     U16(u16),
     U32(u32),
     U64(u64),
-    Tuple(TypeRep, Vec<TypedExpr<TypeRep>>),
-    TupleProj(TypeRep, Box<TypedExpr<TypeRep>>, usize),
-    Record(TypeRep, Vec<(Label, TypedExpr<TypeRep>)>),
-    RecordProj(TypeRep, Box<TypedExpr<TypeRep>>, Label),
-    Variant(TypeRep, Label, Box<TypedExpr<TypeRep>>),
-    Seq(TypeRep, Vec<TypedExpr<TypeRep>>),
+    Tuple(TypeRep, Vec<TypedExpr<TypeRep, VarId>>),
+    TupleProj(TypeRep, Box<TypedExpr<TypeRep, VarId>>, usize),
+    Record(TypeRep, Vec<(Label, TypedExpr<TypeRep, VarId>)>),
+    RecordProj(TypeRep, Box<TypedExpr<TypeRep, VarId>>, Label),
+    Variant(TypeRep, Label, Box<TypedExpr<TypeRep, VarId>>),
+    Seq(TypeRep, Vec<TypedExpr<TypeRep, VarId>>),
     Match(
         TypeRep,
-        Box<TypedExpr<TypeRep>>,
-        Vec<(TypedPattern<TypeRep>, TypedExpr<TypeRep>)>,
+        Box<TypedExpr<TypeRep, VarId>>,
+        Vec<(TypedPattern<TypeRep>, TypedExpr<TypeRep, VarId>)>,
     ),
-    Lambda((TypeRep, TypeRep), Label, Box<TypedExpr<TypeRep>>),
-
+    Lambda((TypeRep, TypeRep), Label, Box<TypedExpr<TypeRep, VarId>>),
     IntRel(
         TypeRep,
         IntRel,
-        Box<TypedExpr<TypeRep>>,
-        Box<TypedExpr<TypeRep>>,
+        Box<TypedExpr<TypeRep, VarId>>,
+        Box<TypedExpr<TypeRep, VarId>>,
     ),
     Arith(
         TypeRep,
         Arith,
-        Box<TypedExpr<TypeRep>>,
-        Box<TypedExpr<TypeRep>>,
+        Box<TypedExpr<TypeRep, VarId>>,
+        Box<TypedExpr<TypeRep, VarId>>,
     ),
 
-    AsU8(Box<TypedExpr<TypeRep>>),
-    AsU16(Box<TypedExpr<TypeRep>>),
-    AsU32(Box<TypedExpr<TypeRep>>),
-    AsU64(Box<TypedExpr<TypeRep>>),
-    AsChar(Box<TypedExpr<TypeRep>>),
+    AsU8(Box<TypedExpr<TypeRep, VarId>>),
+    AsU16(Box<TypedExpr<TypeRep, VarId>>),
+    AsU32(Box<TypedExpr<TypeRep, VarId>>),
+    AsU64(Box<TypedExpr<TypeRep, VarId>>),
+    AsChar(Box<TypedExpr<TypeRep, VarId>>),
 
-    U16Be(Box<TypedExpr<TypeRep>>),
-    U16Le(Box<TypedExpr<TypeRep>>),
-    U32Be(Box<TypedExpr<TypeRep>>),
-    U32Le(Box<TypedExpr<TypeRep>>),
-    U64Be(Box<TypedExpr<TypeRep>>),
-    U64Le(Box<TypedExpr<TypeRep>>),
+    U16Be(Box<TypedExpr<TypeRep, VarId>>),
+    U16Le(Box<TypedExpr<TypeRep, VarId>>),
+    U32Be(Box<TypedExpr<TypeRep, VarId>>),
+    U32Le(Box<TypedExpr<TypeRep, VarId>>),
+    U64Be(Box<TypedExpr<TypeRep, VarId>>),
+    U64Le(Box<TypedExpr<TypeRep, VarId>>),
 
-    SeqLength(Box<TypedExpr<TypeRep>>),
-    SeqIx(TypeRep, Box<TypedExpr<TypeRep>>, Box<TypedExpr<TypeRep>>),
+    SeqLength(Box<TypedExpr<TypeRep, VarId>>),
+    SeqIx(TypeRep, Box<TypedExpr<TypeRep, VarId>>, Box<TypedExpr<TypeRep, VarId>>),
     SubSeq(
         TypeRep,
-        Box<TypedExpr<TypeRep>>,
-        Box<TypedExpr<TypeRep>>,
-        Box<TypedExpr<TypeRep>>,
+        Box<TypedExpr<TypeRep, VarId>>,
+        Box<TypedExpr<TypeRep, VarId>>,
+        Box<TypedExpr<TypeRep, VarId>>,
     ),
     SubSeqInflate(
         TypeRep,
-        Box<TypedExpr<TypeRep>>,
-        Box<TypedExpr<TypeRep>>,
-        Box<TypedExpr<TypeRep>>,
+        Box<TypedExpr<TypeRep, VarId>>,
+        Box<TypedExpr<TypeRep, VarId>>,
+        Box<TypedExpr<TypeRep, VarId>>,
     ),
-    FlatMap(TypeRep, Box<TypedExpr<TypeRep>>, Box<TypedExpr<TypeRep>>),
+    FlatMap(TypeRep, Box<TypedExpr<TypeRep, VarId>>, Box<TypedExpr<TypeRep, VarId>>),
     FlatMapAccum(
         TypeRep,
-        Box<TypedExpr<TypeRep>>,
-        Box<TypedExpr<TypeRep>>,
+        Box<TypedExpr<TypeRep, VarId>>,
+        Box<TypedExpr<TypeRep, VarId>>,
         TypeHint,
-        Box<TypedExpr<TypeRep>>,
+        Box<TypedExpr<TypeRep, VarId>>,
     ),
     LeftFold(
         TypeRep,
-        Box<TypedExpr<TypeRep>>,
-        Box<TypedExpr<TypeRep>>,
+        Box<TypedExpr<TypeRep, VarId>>,
+        Box<TypedExpr<TypeRep, VarId>>,
         TypeHint,
-        Box<TypedExpr<TypeRep>>,
+        Box<TypedExpr<TypeRep, VarId>>,
     ),
     FindByKey(
         TypeRep,
         bool,
-        Box<TypedExpr<TypeRep>>,
-        Box<TypedExpr<TypeRep>>,
-        Box<TypedExpr<TypeRep>>,
+        Box<TypedExpr<TypeRep, VarId>>,
+        Box<TypedExpr<TypeRep, VarId>>,
+        Box<TypedExpr<TypeRep, VarId>>,
     ),
     FlatMapList(
         TypeRep,
-        Box<TypedExpr<TypeRep>>,
+        Box<TypedExpr<TypeRep, VarId>>,
         TypeHint,
-        Box<TypedExpr<TypeRep>>,
+        Box<TypedExpr<TypeRep, VarId>>,
     ),
-    Dup(TypeRep, Box<TypedExpr<TypeRep>>, Box<TypedExpr<TypeRep>>),
-    EnumFromTo(TypeRep, Box<TypedExpr<TypeRep>>, Box<TypedExpr<TypeRep>>),
-    LiftOption(TypeRep, Option<Box<TypedExpr<TypeRep>>>),
-    Unary(TypeRep, UnaryOp, Box<TypedExpr<TypeRep>>),
+    Dup(TypeRep, Box<TypedExpr<TypeRep, VarId>>, Box<TypedExpr<TypeRep, VarId>>),
+    EnumFromTo(TypeRep, Box<TypedExpr<TypeRep, VarId>>, Box<TypedExpr<TypeRep, VarId>>),
+    LiftOption(TypeRep, Option<Box<TypedExpr<TypeRep, VarId>>>),
+    Unary(TypeRep, UnaryOp, Box<TypedExpr<TypeRep, VarId>>),
 }
 
 impl<TypeRep> std::hash::Hash for TypedExpr<TypeRep> {

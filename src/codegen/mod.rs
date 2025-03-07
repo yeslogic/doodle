@@ -1318,36 +1318,51 @@ impl GenLambda {
         }
     }
 
+    fn try_alpha_convert(&self, new_head: &Label) -> Option<Self> {
+        assert_ne!(&self.head, new_head, "alpha conversion would be no-op");
+        let _trial_conv = self.clone();
+        // TOOD - implement alpha conversion
+        None
+    }
+
     fn beta_reduce(&self, param: RustExpr, body_info: ExprInfo) -> RustExpr {
         match param.as_local() {
             Some(outer) => {
                 if &**outer == &*self.head {
                     embed_expr(&self.body, body_info)
+                } else if let Some(rebound) = self.try_alpha_convert(outer) {
+                    embed_expr(&rebound.body, body_info)
                 } else {
-                    // FIXME - what actually goes here should be a check as to whether it is safe to map all references to `head` with `outer`. If so, do so; if not, introduce a local rebinding.
-                    let capture = match self.kind {
+                    let bind_param_and_head = match self.kind {
                         ClosureKind::Predicate | ClosureKind::ExtractKey => {
-                            RustExpr::borrow_of(param)
+                            let bind_param_to_head = RustStmt::assign(self.head.clone(), RustExpr::borrow_of(param));
+                            vec![bind_param_to_head]
                         }
-                        ClosureKind::Transform => param,
+                        ClosureKind::Transform => {
+                            let bind_param_to_head = RustStmt::assign(self.head.clone(), param);
+                            vec![bind_param_to_head]
+                        }
                         ClosureKind::PairBorrowOwned => {
+                            use rust_ast::CaptureSemantics::*;
                             // REVIEW - This may lead to redundancy if the body itself de-structures the pair
-                            RustExpr::Control(Box::new(RustControl::Match(
-                                param,
-                                RustMatchBody::tuple_capture(["fst", "snd"], [true, false]),
-                            )))
+                            const PAIR_BIND: [&str; 2] = ["fst", "snd"];
+                            const SEMANTICS: [CaptureSemantics; 2] = [Ref, Owned];
+                            let bind_param_to_tuple = RustStmt::destructure(RustPattern::tuple_capture(PAIR_BIND, SEMANTICS), param);
+                            let bind_tuple_to_head = RustStmt::assign(self.head.clone(), RustExpr::local_tuple(PAIR_BIND));
+                            vec![bind_param_to_tuple, bind_tuple_to_head]
                         }
                         ClosureKind::PairOwnedBorrow => {
+                            use rust_ast::CaptureSemantics::*;
                             // REVIEW - This may lead to redundancy if the body itself de-structures the pair
-                            RustExpr::Control(Box::new(RustControl::Match(
-                                param,
-                                RustMatchBody::tuple_capture(["fst", "snd"], [false, true]),
-                            )))
+                            const PAIR_BIND: [&str; 2] = ["fst", "snd"];
+                            const SEMANTICS: [CaptureSemantics; 2] = [Owned, Ref];
+                            let bind_param_to_tuple = RustStmt::destructure(RustPattern::tuple_capture(PAIR_BIND, SEMANTICS), param);
+                            let bind_tuple_to_head = RustStmt::assign(self.head.clone(), RustExpr::local_tuple(PAIR_BIND));
+                            vec![bind_param_to_tuple, bind_tuple_to_head]
                         }
                     };
-                    let head_bind = RustStmt::assign(self.head.clone(), capture);
                     let expansion = embed_expr(&self.body, body_info);
-                    RustExpr::BlockScope(vec![head_bind], Box::new(expansion))
+                    RustExpr::BlockScope(bind_param_and_head, Box::new(expansion))
                 }
             }
             None => {
@@ -1375,12 +1390,12 @@ impl GenLambda {
                                         (RustPattern::CatchAll(Some(fst_lbl)), RustPattern::CatchAll(Some(snd_lbl))) => {
                                             let fst_bind = RustStmt::assign(fst_lbl.clone(), param0);
                                             let snd_bind = RustStmt::assign(snd_lbl.clone(), param1);
-                                            match stmts_to_block(rhs) {
+                                            match stmts_to_block(Cow::Borrowed(rhs)) {
                                                 Some((block, ret)) => {
                                                     let all_stmts = [fst_bind, snd_bind].into_iter().chain(block.iter().cloned()).collect();
                                                     RustExpr::BlockScope(
                                                         all_stmts,
-                                                        Box::new(ret)
+                                                        Box::new(ret.into_owned())
                                                     )
                                                 }
                                                 None => unreachable!("unexpected short-circuit: {rhs:?}"),
@@ -1577,6 +1592,7 @@ impl GenExpr {
     }
 
     fn wrap_some(self) -> GenExpr {
+        // REVIEW - consider whether `wrap_some` should permeate through BlockScope
         Self::WrapSome(Box::new(self))
     }
 
@@ -1591,6 +1607,28 @@ impl GenExpr {
                 Self::BlockScope(Box::new(block0))
             }
             _ => Self::Try(Box::new(self)),
+        }
+    }
+
+    /// Constructs the most appropriate `GenExpr` for a given nominal match-expression,
+    /// namely a block-scope let-pattern destructuring for single-case infallible matches,
+    /// or a natural embed of `RustControl::Match` for fallible or branching matches.
+    fn embed_match(expr: RustExpr, body: RustMatchBody<GenBlock>) -> Self {
+        match body {
+            RustMatchBody::Irrefutable(mut cases) if cases.len() == 1 && cases[0].0.is_simple() => {
+                // unwwrap is safe because we checked cases above
+                let Some((MatchCaseLHS::Pattern(pat), mut block)) = cases.pop() else { panic!("bad guard") };
+                let let_bind = GenStmt::Embed(RustStmt::destructure(pat, expr));
+                block.prepend_stmt(let_bind);
+                GenExpr::BlockScope(Box::new(block))
+            }
+            _ => {
+                let match_item = RustControl::Match(
+                    expr,
+                    body
+                );
+                GenExpr::Control(Box::new(match_item))
+            }
         }
     }
 }
@@ -1651,6 +1689,24 @@ enum GenStmt {
     Embed(RustStmt),
     /// One-time immutable binding of an expression, modeled as `GenBlock`.
     BindOnce(Label, GenBlock),
+}
+
+impl GenBlock {
+    /// Inserts the single statement `before` at the start of the statements contained in `self`.
+    fn prepend_stmt(&mut self, before: GenStmt) {
+        let mut stmts = Vec::with_capacity(self.stmts.len() + 1);
+        stmts.push(before);
+        stmts.append(&mut self.stmts);
+        self.stmts = stmts;
+    }
+
+    /// Inserts the statments contained in the iterable `preamble`, in order, directly before
+    /// the statements contained in `self`.
+    fn prepend_stmts(&mut self, preamble: impl IntoIterator<Item = GenStmt>) {
+        let stmts = Iterator::chain(preamble.into_iter(), self.stmts.drain(..)).collect::<Vec<GenStmt>>();
+        self.stmts = stmts;
+    }
+
 }
 
 impl From<GenStmt> for RustStmt {
@@ -2177,26 +2233,6 @@ fn embed_byteset(bs: &ByteSet) -> RustExpr {
     }
 }
 
-/// Given a block of `RustStmt` that do not have any explicit `return` keywords anywhere within,
-/// extract the value of the statement-block as a `RustExpr` (or Unit, if this is the implicit evaluation),
-/// and return it.
-///
-/// Returns `None` if the query is ill-founded, i.e. the block can short-circuit (without `try`).
-fn stmts_to_block(stmts: &[RustStmt]) -> Option<(&[RustStmt], RustExpr)> {
-    if let Some((last, block)) = stmts.split_last() {
-        match last {
-            RustStmt::Return(ReturnKind::Implicit, expr) | RustStmt::Expr(expr) => {
-                Some((block, expr.clone()))
-            }
-            RustStmt::Return(ReturnKind::Keyword, ..) => None,
-            RustStmt::Let(..) | RustStmt::Reassign(..) => Some((stmts, RustExpr::UNIT)),
-            // REVIEW - is unguarded inheritance of a Control block always correct?
-            RustStmt::Control(ctrl) => Some((block, RustExpr::Control(Box::new(ctrl.clone())))),
-        }
-    } else {
-        Some((stmts, RustExpr::UNIT))
-    }
-}
 
 // follows the same rules as CaseLogic::to_ast as far as the expression type of the generated code
 fn embed_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> GenBlock {
@@ -3024,10 +3060,8 @@ where
                     }
                     Refutability::Irrefutable => RustMatchBody::Irrefutable(branches),
                 };
-                GenBlock::single_expr(GenExpr::Control(Box::new(RustControl::Match(
-                    expr.clone(),
-                    match_body,
-                ))))
+                let match_expr = GenExpr::embed_match(expr.clone(), match_body);
+                GenBlock::single_expr(match_expr)
             }
             OtherLogic::LetFormat(prior, name, inner) => {
                 let prior_block = prior.to_ast(ctxt);

@@ -6819,7 +6819,7 @@ let field1 = ((|| _input.read_byte())())?;
 };
 u16be(x)
 };
-PResult::Ok(opentype_head_table_mac_style { extended: packed_bits >> 6u16 & 1u16 > 0u16, condensed: packed_bits >> 5u16 & 1u16 > 0u16, shadow: packed_bits >> 4u16 & 1u16 > 0u16, outline: packed_bits >> 3u16 & 1u16 > 0u16, underline: packed_bits >> 2u16 & 1u16 > 0u16, italic: packed_bits >> 1u16 & 1u16 > 0u16, bold: packed_bits >> 0u16 & 1u16 > 0u16 })
+PResult::Ok(opentype_head_table_mac_style { extended: packed_bits >> 6u16 & 1u16 > 0u16, condensed: packed_bits >> 5u16 & 1u16 > 0u16, shadow: packed_bits >> 4u16 & 1u16 > 0u16, outline: packed_bits >> 3u16 & 1u16 > 0u16, underline: packed_bits >> 2u16 & 1u16 > 0u16, italic: packed_bits >> 1u16 & 1u16 > 0u16, bold: packed_bits & 1u16 > 0u16 })
 })())?;
 let lowest_rec_ppem = ((|| Decoder23(_input))())?;
 let font_direction_hint = ((|| Decoder23(_input))())?;
@@ -7279,8 +7279,8 @@ opentype_gvar_table_glyph_variation_data_offsets::Offsets16(ref half16s) => {
 let len = pred((half16s.len()) as u32);
 let mut accum = Vec::new();
 for ix in 0u32..len {
-accum.push(match (((half16s[ix as usize].clone()) as u32) * 2u32, ((half16s[(succ(ix)) as usize].clone()) as u32) * 2u32) {
-(this_offs, next_offs) => {
+accum.push({
+let (this_offs, next_offs) = (((half16s[ix as usize].clone()) as u32) * 2u32, ((half16s[(succ(ix)) as usize].clone()) as u32) * 2u32);
 match next_offs > this_offs {
 true => {
 let tgt_offset = start_offset + this_offs;
@@ -7303,7 +7303,6 @@ ret
 
 false => {
 opentype_glyf_table::EmptyGlyph
-}
 }
 }
 });
@@ -7315,8 +7314,8 @@ opentype_gvar_table_glyph_variation_data_offsets::Offsets32(ref off32s) => {
 let len = pred((off32s.len()) as u32);
 let mut accum = Vec::new();
 for ix in 0u32..len {
-accum.push(match (off32s[ix as usize].clone(), off32s[(succ(ix)) as usize].clone()) {
-(this_offs, next_offs) => {
+accum.push({
+let (this_offs, next_offs) = (off32s[ix as usize].clone(), off32s[(succ(ix)) as usize].clone());
 match next_offs > this_offs {
 true => {
 let tgt_offset = start_offset + this_offs;
@@ -7339,7 +7338,6 @@ ret
 
 false => {
 opentype_glyf_table::EmptyGlyph
-}
 }
 }
 });
@@ -7368,7 +7366,7 @@ let field1 = ((|| _input.read_byte())())?;
 };
 u16be(x)
 };
-opentype_gasp_table_gasp_ranges_range_gasp_behavior_Version0 { dogray: packed_bits >> 1u16 & 1u16 > 0u16, gridfit: packed_bits >> 0u16 & 1u16 > 0u16 }
+opentype_gasp_table_gasp_ranges_range_gasp_behavior_Version0 { dogray: packed_bits >> 1u16 & 1u16 > 0u16, gridfit: packed_bits & 1u16 > 0u16 }
 };
 opentype_gasp_table_gasp_ranges_range_gasp_behavior::Version0(inner)
 },
@@ -7383,7 +7381,7 @@ let field1 = ((|| _input.read_byte())())?;
 };
 u16be(x)
 };
-opentype_gasp_table_gasp_ranges_range_gasp_behavior_Version1 { symmetric_smoothing: packed_bits >> 3u16 & 1u16 > 0u16, symmetric_gridfit: packed_bits >> 2u16 & 1u16 > 0u16, dogray: packed_bits >> 1u16 & 1u16 > 0u16, gridfit: packed_bits >> 0u16 & 1u16 > 0u16 }
+opentype_gasp_table_gasp_ranges_range_gasp_behavior_Version1 { symmetric_smoothing: packed_bits >> 3u16 & 1u16 > 0u16, symmetric_gridfit: packed_bits >> 2u16 & 1u16 > 0u16, dogray: packed_bits >> 1u16 & 1u16 > 0u16, gridfit: packed_bits & 1u16 > 0u16 }
 };
 opentype_gasp_table_gasp_ranges_range_gasp_behavior::Version1(inner)
 },
@@ -8119,7 +8117,7 @@ let field1 = ((|| _input.read_byte())())?;
 };
 u16be(x)
 };
-PResult::Ok(opentype_gsub_table_lookup_list_link_lookups_link_lookup_flag { mark_attachment_class_filter: packed_bits >> 8u16 & 255u16, use_mark_filtering_set: packed_bits >> 4u16 & 1u16 > 0u16, ignore_marks: packed_bits >> 3u16 & 1u16 > 0u16, ignore_ligatures: packed_bits >> 2u16 & 1u16 > 0u16, ignore_base_glyphs: packed_bits >> 1u16 & 1u16 > 0u16, right_to_left: packed_bits >> 0u16 & 1u16 > 0u16 })
+PResult::Ok(opentype_gsub_table_lookup_list_link_lookups_link_lookup_flag { mark_attachment_class_filter: packed_bits >> 8u16 & 255u16, use_mark_filtering_set: packed_bits >> 4u16 & 1u16 > 0u16, ignore_marks: packed_bits >> 3u16 & 1u16 > 0u16, ignore_ligatures: packed_bits >> 2u16 & 1u16 > 0u16, ignore_base_glyphs: packed_bits >> 1u16 & 1u16 > 0u16, right_to_left: packed_bits & 1u16 > 0u16 })
 })())?;
 let sub_table_count = ((|| Decoder23(_input))())?;
 let subtables = ((|| {
@@ -8345,7 +8343,7 @@ let field1 = ((|| _input.read_byte())())?;
 };
 u16be(x)
 };
-PResult::Ok(opentype_gsub_table_lookup_list_link_lookups_link_lookup_flag { mark_attachment_class_filter: packed_bits >> 8u16 & 255u16, use_mark_filtering_set: packed_bits >> 4u16 & 1u16 > 0u16, ignore_marks: packed_bits >> 3u16 & 1u16 > 0u16, ignore_ligatures: packed_bits >> 2u16 & 1u16 > 0u16, ignore_base_glyphs: packed_bits >> 1u16 & 1u16 > 0u16, right_to_left: packed_bits >> 0u16 & 1u16 > 0u16 })
+PResult::Ok(opentype_gsub_table_lookup_list_link_lookups_link_lookup_flag { mark_attachment_class_filter: packed_bits >> 8u16 & 255u16, use_mark_filtering_set: packed_bits >> 4u16 & 1u16 > 0u16, ignore_marks: packed_bits >> 3u16 & 1u16 > 0u16, ignore_ligatures: packed_bits >> 2u16 & 1u16 > 0u16, ignore_base_glyphs: packed_bits >> 1u16 & 1u16 > 0u16, right_to_left: packed_bits & 1u16 > 0u16 })
 })())?;
 let sub_table_count = ((|| Decoder23(_input))())?;
 let subtables = ((|| {
@@ -8691,7 +8689,7 @@ let field1 = ((|| _input.read_byte())())?;
 };
 u16be(x)
 };
-PResult::Ok(opentype_gvar_table_flags { is_long_offset: packed_bits >> 0u16 & 1u16 > 0u16 })
+PResult::Ok(opentype_gvar_table_flags { is_long_offset: packed_bits & 1u16 > 0u16 })
 })())?;
 let glyph_variation_data_array_offset = ((|| Decoder20(_input))())?;
 let glyph_variation_data_offsets = ((|| PResult::Ok(match flags.is_long_offset.clone() {
@@ -8730,8 +8728,8 @@ opentype_gvar_table_glyph_variation_data_offsets::Offsets16(ref half16s) => {
 let len = pred((half16s.len()) as u32);
 let mut accum = Vec::new();
 for ix in 0u32..len {
-accum.push(match (((half16s[ix as usize].clone()) as u32) * 2u32, ((half16s[(succ(ix)) as usize].clone()) as u32) * 2u32) {
-(this_offs, next_offs) => {
+accum.push({
+let (this_offs, next_offs) = (((half16s[ix as usize].clone()) as u32) * 2u32, ((half16s[(succ(ix)) as usize].clone()) as u32) * 2u32);
 if next_offs > this_offs {
 let tgt_offset = array_start + this_offs;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -8747,7 +8745,6 @@ Some(ret)
 } else {
 None
 }
-}
 });
 }
 accum
@@ -8757,8 +8754,8 @@ opentype_gvar_table_glyph_variation_data_offsets::Offsets32(ref off32s) => {
 let len = pred((off32s.len()) as u32);
 let mut accum = Vec::new();
 for ix in 0u32..len {
-accum.push(match (off32s[ix as usize].clone(), off32s[(succ(ix)) as usize].clone()) {
-(this_offs, next_offs) => {
+accum.push({
+let (this_offs, next_offs) = (off32s[ix as usize].clone(), off32s[(succ(ix)) as usize].clone());
 if next_offs > this_offs {
 let tgt_offset = array_start + this_offs;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -8773,7 +8770,6 @@ _input.close_peek_context()?;
 Some(ret)
 } else {
 None
-}
 }
 });
 }
@@ -8827,7 +8823,7 @@ let field1 = ((|| _input.read_byte())())?;
 };
 u16be(x)
 };
-PResult::Ok(opentype_kern_table_subtables_coverage { format: packed_bits >> 8u16 & 255u16, r#override: packed_bits >> 3u16 & 1u16 > 0u16, cross_stream: packed_bits >> 2u16 & 1u16 > 0u16, minimum: packed_bits >> 1u16 & 1u16 > 0u16, horizontal: packed_bits >> 0u16 & 1u16 > 0u16 })
+PResult::Ok(opentype_kern_table_subtables_coverage { format: packed_bits >> 8u16 & 255u16, r#override: packed_bits >> 3u16 & 1u16 > 0u16, cross_stream: packed_bits >> 2u16 & 1u16 > 0u16, minimum: packed_bits >> 1u16 & 1u16 > 0u16, horizontal: packed_bits & 1u16 > 0u16 })
 })())?;
 let data = ((|| PResult::Ok(match coverage.format.clone() {
 0u16 => {
@@ -9152,7 +9148,7 @@ let field1 = ((|| _input.read_byte())())?;
 };
 u16be(x)
 };
-PResult::Ok(opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1_flags { elidable_axis_value_name: packed_bits >> 1u16 & 1u16 > 0u16, older_sibling_font_attribute: packed_bits >> 0u16 & 1u16 > 0u16 })
+PResult::Ok(opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1_flags { elidable_axis_value_name: packed_bits >> 1u16 & 1u16 > 0u16, older_sibling_font_attribute: packed_bits & 1u16 > 0u16 })
 })())?;
 let value_name_id = ((|| Decoder23(_input))())?;
 let value = ((|| {
@@ -9176,7 +9172,7 @@ let field1 = ((|| _input.read_byte())())?;
 };
 u16be(x)
 };
-PResult::Ok(opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1_flags { elidable_axis_value_name: packed_bits >> 1u16 & 1u16 > 0u16, older_sibling_font_attribute: packed_bits >> 0u16 & 1u16 > 0u16 })
+PResult::Ok(opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1_flags { elidable_axis_value_name: packed_bits >> 1u16 & 1u16 > 0u16, older_sibling_font_attribute: packed_bits & 1u16 > 0u16 })
 })())?;
 let value_name_id = ((|| Decoder23(_input))())?;
 let nominal_value = ((|| {
@@ -9208,7 +9204,7 @@ let field1 = ((|| _input.read_byte())())?;
 };
 u16be(x)
 };
-PResult::Ok(opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1_flags { elidable_axis_value_name: packed_bits >> 1u16 & 1u16 > 0u16, older_sibling_font_attribute: packed_bits >> 0u16 & 1u16 > 0u16 })
+PResult::Ok(opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1_flags { elidable_axis_value_name: packed_bits >> 1u16 & 1u16 > 0u16, older_sibling_font_attribute: packed_bits & 1u16 > 0u16 })
 })())?;
 let value_name_id = ((|| Decoder23(_input))())?;
 let value = ((|| {
@@ -9236,7 +9232,7 @@ let field1 = ((|| _input.read_byte())())?;
 };
 u16be(x)
 };
-PResult::Ok(opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1_flags { elidable_axis_value_name: packed_bits >> 1u16 & 1u16 > 0u16, older_sibling_font_attribute: packed_bits >> 0u16 & 1u16 > 0u16 })
+PResult::Ok(opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1_flags { elidable_axis_value_name: packed_bits >> 1u16 & 1u16 > 0u16, older_sibling_font_attribute: packed_bits & 1u16 > 0u16 })
 })())?;
 let value_name_id = ((|| Decoder23(_input))())?;
 let axis_values = ((|| {
@@ -9330,7 +9326,7 @@ let field1 = ((|| _input.read_byte())())?;
 };
 u16be(x)
 };
-PResult::Ok(opentype_var_glyph_variation_data_table_tuple_variation_count { shared_point_numbers: packed_bits >> 15u16 & 1u16 > 0u16, tuple_count: packed_bits >> 0u16 & 4095u16 })
+PResult::Ok(opentype_var_glyph_variation_data_table_tuple_variation_count { shared_point_numbers: packed_bits >> 15u16 & 1u16 > 0u16, tuple_count: packed_bits & 4095u16 })
 })())?;
 let __data_offset = ((|| {
 let inner = (Decoder23(_input))?;
@@ -9358,7 +9354,7 @@ let field1 = ((|| _input.read_byte())())?;
 };
 u16be(x)
 };
-PResult::Ok(opentype_var_glyph_variation_data_table_tuple_variation_headers_tuple_index { embedded_peak_tuple: packed_bits >> 15u16 & 1u16 > 0u16, intermediate_region: packed_bits >> 14u16 & 1u16 > 0u16, private_point_numbers: packed_bits >> 13u16 & 1u16 > 0u16, tuple_index: packed_bits >> 0u16 & 4095u16 })
+PResult::Ok(opentype_var_glyph_variation_data_table_tuple_variation_headers_tuple_index { embedded_peak_tuple: packed_bits >> 15u16 & 1u16 > 0u16, intermediate_region: packed_bits >> 14u16 & 1u16 > 0u16, private_point_numbers: packed_bits >> 13u16 & 1u16 > 0u16, tuple_index: packed_bits & 4095u16 })
 })())?;
 let peak_tuple = ((|| PResult::Ok(if tuple_index.embedded_peak_tuple.clone() {
 Some((Decoder_opentype_var_tuple_record(_input, axis_count.clone()))?)
@@ -9456,7 +9452,7 @@ break
 let elem = {
 let control = ((|| {
 let packed_bits = _input.read_byte()?;
-PResult::Ok(opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes_control { points_are_words: packed_bits >> 7u8 & 1u8 > 0u8, point_run_count: packed_bits >> 0u8 & 127u8 })
+PResult::Ok(opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes_control { points_are_words: packed_bits >> 7u8 & 1u8 > 0u8, point_run_count: packed_bits & 127u8 })
 })())?;
 let points = {
 let run_length = succ(control.point_run_count.clone());
@@ -9519,7 +9515,7 @@ break
 let elem = {
 let control = ((|| {
 let packed_bits = _input.read_byte()?;
-PResult::Ok(opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes_control { points_are_words: packed_bits >> 7u8 & 1u8 > 0u8, point_run_count: packed_bits >> 0u8 & 127u8 })
+PResult::Ok(opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes_control { points_are_words: packed_bits >> 7u8 & 1u8 > 0u8, point_run_count: packed_bits & 127u8 })
 })())?;
 let points = {
 let run_length = succ(control.point_run_count.clone());
@@ -9633,7 +9629,7 @@ break
 let elem = {
 let control = ((|| {
 let packed_bits = _input.read_byte()?;
-PResult::Ok(opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes_control { points_are_words: packed_bits >> 7u8 & 1u8 > 0u8, point_run_count: packed_bits >> 0u8 & 127u8 })
+PResult::Ok(opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes_control { points_are_words: packed_bits >> 7u8 & 1u8 > 0u8, point_run_count: packed_bits & 127u8 })
 })())?;
 let points = {
 let run_length = succ(control.point_run_count.clone());
@@ -9696,7 +9692,7 @@ break
 let elem = {
 let control = ((|| {
 let packed_bits = _input.read_byte()?;
-PResult::Ok(opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes_control { points_are_words: packed_bits >> 7u8 & 1u8 > 0u8, point_run_count: packed_bits >> 0u8 & 127u8 })
+PResult::Ok(opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes_control { points_are_words: packed_bits >> 7u8 & 1u8 > 0u8, point_run_count: packed_bits & 127u8 })
 })())?;
 let points = {
 let run_length = succ(control.point_run_count.clone());
@@ -9774,7 +9770,7 @@ break
 let elem = {
 let control = ((|| {
 let packed_bits = _input.read_byte()?;
-PResult::Ok(opentype_var_glyph_variation_data_table_data_per_tuple_variation_data_x_and_y_coordinate_deltas_control { deltas_are_zero: packed_bits >> 7u8 & 1u8 > 0u8, deltas_are_words: packed_bits >> 6u8 & 1u8 > 0u8, delta_run_count: packed_bits >> 0u8 & 63u8 })
+PResult::Ok(opentype_var_glyph_variation_data_table_data_per_tuple_variation_data_x_and_y_coordinate_deltas_control { deltas_are_zero: packed_bits >> 7u8 & 1u8 > 0u8, deltas_are_words: packed_bits >> 6u8 & 1u8 > 0u8, delta_run_count: packed_bits & 63u8 })
 })())?;
 let deltas = {
 let run_length = succ(control.delta_run_count.clone());
@@ -9861,7 +9857,7 @@ let field1 = ((|| _input.read_byte())())?;
 };
 u16be(x)
 };
-PResult::Ok(opentype_var_variation_axis_record_flags { hidden_axis: packed_bits >> 0u16 & 1u16 > 0u16 })
+PResult::Ok(opentype_var_variation_axis_record_flags { hidden_axis: packed_bits & 1u16 > 0u16 })
 })())?;
 let axis_name_id = ((|| Decoder23(_input))())?;
 PResult::Ok(opentype_var_variation_axis_record { axis_tag, min_value, default_value, max_value, flags, axis_name_id })
@@ -13138,7 +13134,7 @@ let field1 = ((|| _input.read_byte())())?;
 };
 u16be(x)
 };
-PResult::Ok(opentype_common_value_format_flags { y_advance_device: packed_bits >> 7u16 & 1u16 > 0u16, x_advance_device: packed_bits >> 6u16 & 1u16 > 0u16, y_placement_device: packed_bits >> 5u16 & 1u16 > 0u16, x_placement_device: packed_bits >> 4u16 & 1u16 > 0u16, y_advance: packed_bits >> 3u16 & 1u16 > 0u16, x_advance: packed_bits >> 2u16 & 1u16 > 0u16, y_placement: packed_bits >> 1u16 & 1u16 > 0u16, x_placement: packed_bits >> 0u16 & 1u16 > 0u16 })
+PResult::Ok(opentype_common_value_format_flags { y_advance_device: packed_bits >> 7u16 & 1u16 > 0u16, x_advance_device: packed_bits >> 6u16 & 1u16 > 0u16, y_placement_device: packed_bits >> 5u16 & 1u16 > 0u16, x_placement_device: packed_bits >> 4u16 & 1u16 > 0u16, y_advance: packed_bits >> 3u16 & 1u16 > 0u16, x_advance: packed_bits >> 2u16 & 1u16 > 0u16, y_placement: packed_bits >> 1u16 & 1u16 > 0u16, x_placement: packed_bits & 1u16 > 0u16 })
 }
 
 fn Decoder_opentype_common_value_record<>(_input: &mut Parser<'_>, table_start: u32, flags: opentype_common_value_format_flags) -> Result<opentype_common_value_record, ParseError> {
@@ -14344,7 +14340,7 @@ let field1 = ((|| _input.read_byte())())?;
 };
 u16be(x)
 };
-PResult::Ok(opentype_glyf_composite_raw_flags { unscaled_component_offset: packed_bits >> 12u16 & 1u16 > 0u16, scaled_component_offset: packed_bits >> 11u16 & 1u16 > 0u16, overlap_compound: packed_bits >> 10u16 & 1u16 > 0u16, use_my_metrics: packed_bits >> 9u16 & 1u16 > 0u16, we_have_instructions: packed_bits >> 8u16 & 1u16 > 0u16, we_have_a_two_by_two: packed_bits >> 7u16 & 1u16 > 0u16, we_have_an_x_and_y_scale: packed_bits >> 6u16 & 1u16 > 0u16, more_components: packed_bits >> 5u16 & 1u16 > 0u16, we_have_a_scale: packed_bits >> 3u16 & 1u16 > 0u16, round_xy_to_grid: packed_bits >> 2u16 & 1u16 > 0u16, args_are_xy_values: packed_bits >> 1u16 & 1u16 > 0u16, arg_1_and_2_are_words: packed_bits >> 0u16 & 1u16 > 0u16 })
+PResult::Ok(opentype_glyf_composite_raw_flags { unscaled_component_offset: packed_bits >> 12u16 & 1u16 > 0u16, scaled_component_offset: packed_bits >> 11u16 & 1u16 > 0u16, overlap_compound: packed_bits >> 10u16 & 1u16 > 0u16, use_my_metrics: packed_bits >> 9u16 & 1u16 > 0u16, we_have_instructions: packed_bits >> 8u16 & 1u16 > 0u16, we_have_a_two_by_two: packed_bits >> 7u16 & 1u16 > 0u16, we_have_an_x_and_y_scale: packed_bits >> 6u16 & 1u16 > 0u16, more_components: packed_bits >> 5u16 & 1u16 > 0u16, we_have_a_scale: packed_bits >> 3u16 & 1u16 > 0u16, round_xy_to_grid: packed_bits >> 2u16 & 1u16 > 0u16, args_are_xy_values: packed_bits >> 1u16 & 1u16 > 0u16, arg_1_and_2_are_words: packed_bits & 1u16 > 0u16 })
 })())?;
 let glyph_index = ((|| Decoder23(_input))())?;
 let argument1 = ((|| PResult::Ok(match flags.arg_1_and_2_are_words.clone() {
@@ -14507,7 +14503,7 @@ PResult::Ok(opentype_glyf_composite { glyphs, instructions })
 
 fn Decoder_opentype_glyph_description_simple_flags_raw<>(_input: &mut Parser<'_>) -> Result<opentype_glyph_description_simple_flags_raw, ParseError> {
 let packed_bits = _input.read_byte()?;
-PResult::Ok(opentype_glyph_description_simple_flags_raw { overlap_simple: packed_bits >> 6u8 & 1u8 > 0u8, y_is_same_or_positive_y_short_vector: packed_bits >> 5u8 & 1u8 > 0u8, x_is_same_or_positive_x_short_vector: packed_bits >> 4u8 & 1u8 > 0u8, repeat_flag: packed_bits >> 3u8 & 1u8 > 0u8, y_short_vector: packed_bits >> 2u8 & 1u8 > 0u8, x_short_vector: packed_bits >> 1u8 & 1u8 > 0u8, on_curve_point: packed_bits >> 0u8 & 1u8 > 0u8 })
+PResult::Ok(opentype_glyph_description_simple_flags_raw { overlap_simple: packed_bits >> 6u8 & 1u8 > 0u8, y_is_same_or_positive_y_short_vector: packed_bits >> 5u8 & 1u8 > 0u8, x_is_same_or_positive_x_short_vector: packed_bits >> 4u8 & 1u8 > 0u8, repeat_flag: packed_bits >> 3u8 & 1u8 > 0u8, y_short_vector: packed_bits >> 2u8 & 1u8 > 0u8, x_short_vector: packed_bits >> 1u8 & 1u8 > 0u8, on_curve_point: packed_bits & 1u8 > 0u8 })
 }
 
 fn Decoder_opentype_name_table_name_version_1<>(_input: &mut Parser<'_>, storage_start: u32) -> Result<opentype_name_table_name_version_1, ParseError> {
@@ -15540,14 +15536,13 @@ PResult::Ok(accum)
 }
 
 fn Decoder116<>(_input: &mut Parser<'_>, r#type: u32, size: u64) -> Result<Vec<u8>, ParseError> {
-PResult::Ok(match r#type {
-_ => {
+PResult::Ok({
+let _ = r#type;
 let mut accum = Vec::new();
 for _ in 0..size {
 accum.push((Decoder24(_input))?);
 }
 accum
-}
 })
 }
 
@@ -17290,7 +17285,7 @@ fn Decoder_zlib_main<>(_input: &mut Parser<'_>) -> Result<zlib_main, ParseError>
 let compression_method_flags = ((|| {
 let inner = {
 let packed_bits = _input.read_byte()?;
-zlib_main_compression_method_flags { compression_info: packed_bits >> 4u8 & 15u8, compression_method: packed_bits >> 0u8 & 15u8 }
+zlib_main_compression_method_flags { compression_info: packed_bits >> 4u8 & 15u8, compression_method: packed_bits & 15u8 }
 };
 let is_valid = {
 let method_info = inner;
@@ -17304,7 +17299,7 @@ return Err(ParseError::FalsifiedWhere(7230273548678969972u64));
 })())?;
 let flags = ((|| {
 let packed_bits = _input.read_byte()?;
-PResult::Ok(zlib_main_flags { flevel: packed_bits >> 6u8 & 3u8, fdict: packed_bits >> 5u8 & 1u8 > 0u8, fcheck: packed_bits >> 0u8 & 31u8 })
+PResult::Ok(zlib_main_flags { flevel: packed_bits >> 6u8 & 3u8, fdict: packed_bits >> 5u8 & 1u8 > 0u8, fcheck: packed_bits & 31u8 })
 })())?;
 let dict_id = ((|| PResult::Ok(if flags.fdict.clone() {
 Some((Decoder20(_input))?)
@@ -22009,7 +22004,7 @@ fn Decoder192<>(_input: &mut Parser<'_>) -> Result<zlib_main, ParseError> {
 let compression_method_flags = ((|| {
 let inner = {
 let packed_bits = _input.read_byte()?;
-zlib_main_compression_method_flags { compression_info: packed_bits >> 4u8 & 15u8, compression_method: packed_bits >> 0u8 & 15u8 }
+zlib_main_compression_method_flags { compression_info: packed_bits >> 4u8 & 15u8, compression_method: packed_bits & 15u8 }
 };
 let is_valid = {
 let method_info = inner;
@@ -22023,7 +22018,7 @@ return Err(ParseError::FalsifiedWhere(7572218778908935167u64));
 })())?;
 let flags = ((|| {
 let packed_bits = _input.read_byte()?;
-PResult::Ok(zlib_main_flags { flevel: packed_bits >> 6u8 & 3u8, fdict: packed_bits >> 5u8 & 1u8 > 0u8, fcheck: packed_bits >> 0u8 & 31u8 })
+PResult::Ok(zlib_main_flags { flevel: packed_bits >> 6u8 & 3u8, fdict: packed_bits >> 5u8 & 1u8 > 0u8, fcheck: packed_bits & 31u8 })
 })())?;
 let dict_id = ((|| PResult::Ok(if flags.fdict.clone() {
 Some((Decoder20(_input))?)
@@ -24181,7 +24176,7 @@ fn Decoder199<>(_input: &mut Parser<'_>) -> Result<zlib_main, ParseError> {
 let compression_method_flags = ((|| {
 let inner = {
 let packed_bits = _input.read_byte()?;
-zlib_main_compression_method_flags { compression_info: packed_bits >> 4u8 & 15u8, compression_method: packed_bits >> 0u8 & 15u8 }
+zlib_main_compression_method_flags { compression_info: packed_bits >> 4u8 & 15u8, compression_method: packed_bits & 15u8 }
 };
 let is_valid = {
 let method_info = inner;
@@ -24195,7 +24190,7 @@ return Err(ParseError::FalsifiedWhere(5713736954960046494u64));
 })())?;
 let flags = ((|| {
 let packed_bits = _input.read_byte()?;
-PResult::Ok(zlib_main_flags { flevel: packed_bits >> 6u8 & 3u8, fdict: packed_bits >> 5u8 & 1u8 > 0u8, fcheck: packed_bits >> 0u8 & 31u8 })
+PResult::Ok(zlib_main_flags { flevel: packed_bits >> 6u8 & 3u8, fdict: packed_bits >> 5u8 & 1u8 > 0u8, fcheck: packed_bits & 31u8 })
 })())?;
 let dict_id = ((|| PResult::Ok(if flags.fdict.clone() {
 Some((Decoder20(_input))?)
@@ -25253,7 +25248,7 @@ fn Decoder202<>(_input: &mut Parser<'_>) -> Result<zlib_main, ParseError> {
 let compression_method_flags = ((|| {
 let inner = {
 let packed_bits = _input.read_byte()?;
-zlib_main_compression_method_flags { compression_info: packed_bits >> 4u8 & 15u8, compression_method: packed_bits >> 0u8 & 15u8 }
+zlib_main_compression_method_flags { compression_info: packed_bits >> 4u8 & 15u8, compression_method: packed_bits & 15u8 }
 };
 let is_valid = {
 let method_info = inner;
@@ -25267,7 +25262,7 @@ return Err(ParseError::FalsifiedWhere(15321253101048235163u64));
 })())?;
 let flags = ((|| {
 let packed_bits = _input.read_byte()?;
-PResult::Ok(zlib_main_flags { flevel: packed_bits >> 6u8 & 3u8, fdict: packed_bits >> 5u8 & 1u8 > 0u8, fcheck: packed_bits >> 0u8 & 31u8 })
+PResult::Ok(zlib_main_flags { flevel: packed_bits >> 6u8 & 3u8, fdict: packed_bits >> 5u8 & 1u8 > 0u8, fcheck: packed_bits & 31u8 })
 })())?;
 let dict_id = ((|| PResult::Ok(if flags.fdict.clone() {
 Some((Decoder20(_input))?)
@@ -29630,7 +29625,7 @@ return Err(ParseError::FalsifiedWhere(12041148194529633639u64));
 })())?;
 let approximation_bit_position = ((|| {
 let packed_bits = _input.read_byte()?;
-PResult::Ok(jpeg_sos_data_approximation_bit_position { high: packed_bits >> 4u8 & 15u8, low: packed_bits >> 0u8 & 15u8 })
+PResult::Ok(jpeg_sos_data_approximation_bit_position { high: packed_bits >> 4u8 & 15u8, low: packed_bits & 15u8 })
 })())?;
 PResult::Ok(jpeg_sos_data { num_image_components, image_components, start_spectral_selection, end_spectral_selection, approximation_bit_position })
 }
@@ -29640,7 +29635,7 @@ let component_selector = ((|| Decoder24(_input))())?;
 let entropy_coding_table_ids = ((|| {
 let inner = {
 let packed_bits = _input.read_byte()?;
-jpeg_sos_image_component_entropy_coding_table_ids { dc_entropy_coding_table_id: packed_bits >> 4u8 & 15u8, ac_entropy_coding_table_id: packed_bits >> 0u8 & 15u8 }
+jpeg_sos_image_component_entropy_coding_table_ids { dc_entropy_coding_table_id: packed_bits >> 4u8 & 15u8, ac_entropy_coding_table_id: packed_bits & 15u8 }
 };
 let is_valid = {
 let entropy_coding_table_ids = inner;
@@ -30446,7 +30441,7 @@ fn Decoder_jpeg_sof_image_component<>(_input: &mut Parser<'_>) -> Result<jpeg_so
 let id = ((|| Decoder24(_input))())?;
 let sampling_factor = ((|| {
 let packed_bits = _input.read_byte()?;
-PResult::Ok(jpeg_sof_image_component_sampling_factor { horizontal: packed_bits >> 4u8 & 15u8, vertical: packed_bits >> 0u8 & 15u8 })
+PResult::Ok(jpeg_sof_image_component_sampling_factor { horizontal: packed_bits >> 4u8 & 15u8, vertical: packed_bits & 15u8 })
 })())?;
 let quantization_table_id = ((|| {
 let inner = (Decoder24(_input))?;
@@ -31385,7 +31380,7 @@ fn Decoder_jpeg_dac_data<>(_input: &mut Parser<'_>) -> Result<jpeg_dac_data, Par
 let class_table_id = ((|| {
 let inner = {
 let packed_bits = _input.read_byte()?;
-jpeg_dac_data_class_table_id { class: packed_bits >> 4u8 & 15u8, table_id: packed_bits >> 0u8 & 15u8 }
+jpeg_dac_data_class_table_id { class: packed_bits >> 4u8 & 15u8, table_id: packed_bits & 15u8 }
 };
 let is_valid = {
 let class_table_id = inner;
@@ -31405,7 +31400,7 @@ fn Decoder_jpeg_dht_data<>(_input: &mut Parser<'_>) -> Result<jpeg_dht_data, Par
 let class_table_id = ((|| {
 let inner = {
 let packed_bits = _input.read_byte()?;
-jpeg_dac_data_class_table_id { class: packed_bits >> 4u8 & 15u8, table_id: packed_bits >> 0u8 & 15u8 }
+jpeg_dac_data_class_table_id { class: packed_bits >> 4u8 & 15u8, table_id: packed_bits & 15u8 }
 };
 let is_valid = {
 let class_table_id = inner;
@@ -31444,7 +31439,7 @@ fn Decoder_jpeg_dqt_data<>(_input: &mut Parser<'_>) -> Result<jpeg_dqt_data, Par
 let precision_table_id = ((|| {
 let inner = {
 let packed_bits = _input.read_byte()?;
-jpeg_dqt_data_precision_table_id { precision: packed_bits >> 4u8 & 15u8, table_id: packed_bits >> 0u8 & 15u8 }
+jpeg_dqt_data_precision_table_id { precision: packed_bits >> 4u8 & 15u8, table_id: packed_bits & 15u8 }
 };
 let is_valid = {
 let precision_table_id = inner;
@@ -31790,7 +31785,7 @@ PResult::Ok((field0, field1))
 let method = ((|| Decoder24(_input))())?;
 let file_flags = ((|| {
 let packed_bits = _input.read_byte()?;
-PResult::Ok(gzip_header_file_flags { fcomment: packed_bits >> 4u8 & 1u8 > 0u8, fname: packed_bits >> 3u8 & 1u8 > 0u8, fextra: packed_bits >> 2u8 & 1u8 > 0u8, fhcrc: packed_bits >> 1u8 & 1u8 > 0u8, ftext: packed_bits >> 0u8 & 1u8 > 0u8 })
+PResult::Ok(gzip_header_file_flags { fcomment: packed_bits >> 4u8 & 1u8 > 0u8, fname: packed_bits >> 3u8 & 1u8 > 0u8, fextra: packed_bits >> 2u8 & 1u8 > 0u8, fhcrc: packed_bits >> 1u8 & 1u8 > 0u8, ftext: packed_bits & 1u8 > 0u8 })
 })())?;
 let timestamp = ((|| Decoder127(_input))())?;
 let compression_flags = ((|| Decoder24(_input))())?;
@@ -32538,7 +32533,7 @@ return Err(ParseError::ExcludedBranch(13246474195614162055u64));
 })())?;
 let flags = ((|| {
 let packed_bits = _input.read_byte()?;
-PResult::Ok(gif_graphic_control_extension_flags { reserved: packed_bits >> 5u8 & 7u8, disposal_method: packed_bits >> 2u8 & 7u8, user_input_flag: packed_bits >> 1u8 & 1u8, transparent_color_flag: packed_bits >> 0u8 & 1u8 })
+PResult::Ok(gif_graphic_control_extension_flags { reserved: packed_bits >> 5u8 & 7u8, disposal_method: packed_bits >> 2u8 & 7u8, user_input_flag: packed_bits >> 1u8 & 1u8, transparent_color_flag: packed_bits & 1u8 })
 })())?;
 let delay_time = ((|| Decoder139(_input))())?;
 let transparent_color_index = ((|| Decoder24(_input))())?;
@@ -32683,7 +32678,7 @@ let image_width = ((|| Decoder139(_input))())?;
 let image_height = ((|| Decoder139(_input))())?;
 let flags = ((|| {
 let packed_bits = _input.read_byte()?;
-PResult::Ok(gif_image_descriptor_flags { table_flag: packed_bits >> 7u8 & 1u8, interlace_flag: packed_bits >> 6u8 & 1u8, sort_flag: packed_bits >> 5u8 & 1u8, reserved: packed_bits >> 3u8 & 3u8, table_size: packed_bits >> 0u8 & 7u8 })
+PResult::Ok(gif_image_descriptor_flags { table_flag: packed_bits >> 7u8 & 1u8, interlace_flag: packed_bits >> 6u8 & 1u8, sort_flag: packed_bits >> 5u8 & 1u8, reserved: packed_bits >> 3u8 & 3u8, table_size: packed_bits & 7u8 })
 })())?;
 PResult::Ok(gif_image_descriptor { separator, image_left_position, image_top_position, image_width, image_height, flags })
 }
@@ -32738,7 +32733,7 @@ let screen_width = ((|| Decoder139(_input))())?;
 let screen_height = ((|| Decoder139(_input))())?;
 let flags = ((|| {
 let packed_bits = _input.read_byte()?;
-PResult::Ok(gif_logical_screen_descriptor_flags { table_flag: packed_bits >> 7u8 & 1u8, color_resolution: packed_bits >> 4u8 & 7u8, sort_flag: packed_bits >> 3u8 & 1u8, table_size: packed_bits >> 0u8 & 7u8 })
+PResult::Ok(gif_logical_screen_descriptor_flags { table_flag: packed_bits >> 7u8 & 1u8, color_resolution: packed_bits >> 4u8 & 7u8, sort_flag: packed_bits >> 3u8 & 1u8, table_size: packed_bits & 7u8 })
 })())?;
 let bg_color_index = ((|| Decoder24(_input))())?;
 let pixel_aspect_ratio = ((|| Decoder24(_input))())?;

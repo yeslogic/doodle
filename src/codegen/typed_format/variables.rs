@@ -1,102 +1,73 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-
-use super::{GenType, TypedExpr};
+use super::TypedExpr;
 use crate::Label;
+use cons_rs::List;
 
-impl TypedExpr<GenType> {
-    pub(crate) fn get_vars(&self) -> Variables {
-        let mut vars = Variables::new();
-        let ctxt = VarCtxt::new();
-        self.poll_vars(&mut vars, ctxt);
-        vars
+impl<Rep: Clone> TypedExpr<Rep, Label>  {
+    pub(crate) fn to_nameless(&self) -> TypedExpr<Rep, u32> {
+        let mut stack = VarStack::new();
+        self.__to_nameless(&mut stack)
     }
 
-    /// Extends a collection with a list of all the variable-names used in an Expr, as well
-    /// as whether their provenance at site-of-use is internal or external, and how they are
-    /// accessed.
-    ///
-    /// If the expression is itself a raw `TypedExpr::Var`, returns the variable's verbatim identifier, otherwise None.
-    fn poll_vars<'a>(&'a self, _vars: &mut Variables, _ctxt: VarCtxt<'a>) -> Option<&'a Label> {
+    fn __to_nameless(&self, vars: &mut VarStack<'_>) -> TypedExpr<Rep, u32> {
         match self {
-            TypedExpr::U8(..)
-            | TypedExpr::U16(..)
-            | TypedExpr::U32(..)
-            | TypedExpr::U64(..)
-            | TypedExpr::Bool(..) => None,
+            TypedExpr::Var(gt, var) => {
+                let Some(index) = vars.get_index(var) else { panic!("reference to var {:?} not found in env: {:?}", var, vars) };
+                TypedExpr::Var(gt.clone(), index as u32)
+            }
 
-            _ => unimplemented!(),
+            TypedExpr::U8(n) => TypedExpr::U8(*n),
+            TypedExpr::U16(n) => TypedExpr::U16(*n),
+            TypedExpr::U32(n) => TypedExpr::U32(*n),
+            TypedExpr::U64(n) => TypedExpr::U64(*n),
+            TypedExpr::Arith(t, op, a, b) => TypedExpr::Arith(t.clone(), *op, Box::new(a.__to_nameless(vars)), Box::new(b.__to_nameless(vars))),
+            TypedExpr::Record(gt, fields) => {
+                todo!()
+            }
+            _ => todo!(),
+
+
         }
     }
 }
 
-// REVIEW - consider HashMap?
-type ScopeContainer<K, V> = std::collections::BTreeMap<K, V>;
-
-#[derive(Debug, Clone, Default)]
-enum VarCtxt<'a> {
-    #[default]
-    Empty,
-    SingleCtxt(Option<&'a VarCtxt<'a>>, &'a Label),
+#[derive(Default)]
+struct VarStack<'a> {
+    vars: List<&'a Label>,
 }
 
-impl<'a> VarCtxt<'a> {
+impl<'a> VarStack<'a> {
     pub fn new() -> Self {
-        VarCtxt::Empty
+        Self { vars: List::new() }
     }
-}
 
-#[derive(Clone, Debug, Default)]
-struct PerScope<T> {
-    scopes: ScopeContainer<Provenance, T>,
-}
+    pub fn push(&'a mut self, var: &'a Label) {
+        self.vars.push(var)
+    }
 
-impl<T> PerScope<T> {
-    pub fn new() -> Self {
-        PerScope {
-            scopes: ScopeContainer::new(),
+    pub fn pop(&mut self) -> Option<&Label> {
+        self.vars.pop()
+    }
+
+    pub fn len(&self) -> usize {
+        self.vars.len()
+    }
+
+    pub fn get_index(&self, var: &Label) -> Option<usize> {
+        for (dist, var0) in self.vars.iter().copied().enumerate() {
+            if var0 == var {
+                return Some(dist);
+            }
         }
-    }
-
-    pub fn insert(&mut self, provenance: Provenance, value: T) -> Option<T> {
-        self.scopes.insert(provenance, value)
+        return None
     }
 }
 
-#[derive(Debug, Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Default, Hash)]
-enum Provenance {
-    #[default]
-    External,
-    // De Bruijn index. 1 indicates usage-site is in the exact binding-scope of the definition site
-    DeBruijn(std::num::NonZeroU32),
-}
-
-type VarStore<K, V> = std::collections::HashMap<K, V>;
-
-#[derive(Debug, Clone)]
-pub(crate) struct Variables {
-    _store: VarStore<Label, PerScope<AccessKind>>,
-}
-
-impl Variables {
-    pub fn new() -> Self {
-        Variables {
-            _store: VarStore::new(),
+impl<'a> std::fmt::Debug for VarStack<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "VarStack: ")?;
+        for (dist, var) in self.vars.iter().copied().enumerate() {
+            write!(f, "${}: {}, ", dist, var)?
         }
+        Ok(())
     }
-
-    fn entry(
-        &mut self,
-        vname: Label,
-    ) -> std::collections::hash_map::Entry<'_, Label, PerScope<AccessKind>> {
-        self._store.entry(vname)
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
-pub(crate) enum AccessKind {
-    /// How `x` is accessed in `let y = x;`
-    Rebind,
-    /// How `x` is accessed in `match x { .. }`
-    Switch,
 }
