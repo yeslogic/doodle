@@ -1335,7 +1335,8 @@ impl GenLambda {
                 } else {
                     let bind_param_and_head = match self.kind {
                         ClosureKind::Predicate | ClosureKind::ExtractKey => {
-                            let bind_param_to_head = RustStmt::assign(self.head.clone(), RustExpr::borrow_of(param));
+                            let bind_param_to_head =
+                                RustStmt::assign(self.head.clone(), RustExpr::borrow_of(param));
                             vec![bind_param_to_head]
                         }
                         ClosureKind::Transform => {
@@ -1347,8 +1348,14 @@ impl GenLambda {
                             // REVIEW - This may lead to redundancy if the body itself de-structures the pair
                             const PAIR_BIND: [&str; 2] = ["fst", "snd"];
                             const SEMANTICS: [CaptureSemantics; 2] = [Ref, Owned];
-                            let bind_param_to_tuple = RustStmt::destructure(RustPattern::tuple_capture(PAIR_BIND, SEMANTICS), param);
-                            let bind_tuple_to_head = RustStmt::assign(self.head.clone(), RustExpr::local_tuple(PAIR_BIND));
+                            let bind_param_to_tuple = RustStmt::destructure(
+                                RustPattern::tuple_capture(PAIR_BIND, SEMANTICS),
+                                param,
+                            );
+                            let bind_tuple_to_head = RustStmt::assign(
+                                self.head.clone(),
+                                RustExpr::local_tuple(PAIR_BIND),
+                            );
                             vec![bind_param_to_tuple, bind_tuple_to_head]
                         }
                         ClosureKind::PairOwnedBorrow => {
@@ -1356,8 +1363,14 @@ impl GenLambda {
                             // REVIEW - This may lead to redundancy if the body itself de-structures the pair
                             const PAIR_BIND: [&str; 2] = ["fst", "snd"];
                             const SEMANTICS: [CaptureSemantics; 2] = [Owned, Ref];
-                            let bind_param_to_tuple = RustStmt::destructure(RustPattern::tuple_capture(PAIR_BIND, SEMANTICS), param);
-                            let bind_tuple_to_head = RustStmt::assign(self.head.clone(), RustExpr::local_tuple(PAIR_BIND));
+                            let bind_param_to_tuple = RustStmt::destructure(
+                                RustPattern::tuple_capture(PAIR_BIND, SEMANTICS),
+                                param,
+                            );
+                            let bind_tuple_to_head = RustStmt::assign(
+                                self.head.clone(),
+                                RustExpr::local_tuple(PAIR_BIND),
+                            );
                             vec![bind_param_to_tuple, bind_tuple_to_head]
                         }
                     };
@@ -1617,16 +1630,15 @@ impl GenExpr {
         match body {
             RustMatchBody::Irrefutable(mut cases) if cases.len() == 1 && cases[0].0.is_simple() => {
                 // unwwrap is safe because we checked cases above
-                let Some((MatchCaseLHS::Pattern(pat), mut block)) = cases.pop() else { panic!("bad guard") };
+                let Some((MatchCaseLHS::Pattern(pat), mut block)) = cases.pop() else {
+                    panic!("bad guard")
+                };
                 let let_bind = GenStmt::Embed(RustStmt::destructure(pat, expr));
                 block.prepend_stmt(let_bind);
                 GenExpr::BlockScope(Box::new(block))
             }
             _ => {
-                let match_item = RustControl::Match(
-                    expr,
-                    body
-                );
+                let match_item = RustControl::Match(expr, body);
                 GenExpr::Control(Box::new(match_item))
             }
         }
@@ -1703,10 +1715,10 @@ impl GenBlock {
     /// Inserts the statments contained in the iterable `preamble`, in order, directly before
     /// the statements contained in `self`.
     fn prepend_stmts(&mut self, preamble: impl IntoIterator<Item = GenStmt>) {
-        let stmts = Iterator::chain(preamble.into_iter(), self.stmts.drain(..)).collect::<Vec<GenStmt>>();
+        let stmts =
+            Iterator::chain(preamble.into_iter(), self.stmts.drain(..)).collect::<Vec<GenStmt>>();
         self.stmts = stmts;
     }
-
 }
 
 impl From<GenStmt> for RustStmt {
@@ -2232,7 +2244,6 @@ fn embed_byteset(bs: &ByteSet) -> RustExpr {
         ])])
     }
 }
-
 
 // follows the same rules as CaseLogic::to_ast as far as the expression type of the generated code
 fn embed_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> GenBlock {
