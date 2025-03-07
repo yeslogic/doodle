@@ -1335,6 +1335,80 @@ impl RustExpr {
             _ => None,
         }
     }
+
+    pub fn embed_match(scrutinee: Self, body: RustMatchBody<Vec<RustStmt>>) -> Self {
+        match body {
+            RustMatchBody::Irrefutable(mut cases) if cases.len() == 1 && cases[0].0.is_simple() => {
+                let Some((MatchCaseLHS::Pattern(pat), mut stmts)) = cases.pop() else { panic!("bad guard") };
+                let let_bind = RustStmt::destructure(pat, scrutinee);
+                stmts.insert(0, let_bind);
+                match vec_stmts_to_block(stmts) {
+                    None => unreachable!("unexpected no-value match expr in RustExpr::embed_match"),
+                    Some((stmts, expr)) => Self::BlockScope(stmts, Box::new(expr)),
+                }
+            }
+            _ => {
+                let match_item = RustControl::Match(
+                    scrutinee,
+                    body
+                );
+                Self::Control(Box::new(match_item))
+            }
+        }
+    }
+
+    pub(crate) fn local_tuple<Name: IntoLabel>(locals: impl IntoIterator<Item = Name>) -> Self {
+        Self::Tuple(locals.into_iter().map(Self::local).collect())
+    }
+}
+
+/// Given a block of `RustStmt` that do not have any explicit `return` keywords anywhere within,
+/// extract the value of the statement-block as a `RustExpr` (or Unit, if this is the implicit evaluation),
+/// and return it.
+///
+/// Returns `None` if the query is ill-founded, i.e. the block can short-circuit (without `try`).
+pub(crate) fn stmts_to_block(stmts: Cow<'_, [RustStmt]>) -> Option<(Cow<'_, [RustStmt]>, Cow<'_, RustExpr>)>  {
+    match stmts {
+        Cow::Owned(stmts) => {
+            let (init, last) = vec_stmts_to_block(stmts)?;
+            Some((Cow::Owned(init), Cow::Owned(last)))
+        }
+        Cow::Borrowed(stmts) => {
+            let (init, last) = slice_stmts_to_block(stmts)?;
+            Some((Cow::Borrowed(init), last))
+        }
+    }
+}
+
+pub(crate) fn slice_stmts_to_block(stmts: &[RustStmt]) -> Option<(&[RustStmt], Cow<'_, RustExpr>)> {
+    if let Some((last, init)) = stmts.split_last() {
+        match last {
+            RustStmt::Return(ReturnKind::Implicit, expr) | RustStmt::Expr(expr) => {
+                Some((init, Cow::Borrowed(expr)))
+            }
+            RustStmt::Return(ReturnKind::Keyword, ..) => None,
+            RustStmt::LetPattern(..) | RustStmt::Let(..) | RustStmt::Reassign(..) => Some((stmts, Cow::Owned(RustExpr::UNIT))),
+            // REVIEW - is unguarded inheritance of a Control block always correct?
+            RustStmt::Control(ctrl) => Some((init, Cow::Owned(RustExpr::Control(Box::new(ctrl.clone()))))),
+        }
+    } else {
+        Some((stmts, Cow::Owned(RustExpr::UNIT)))
+    }
+}
+
+pub(crate) fn vec_stmts_to_block(stmts: Vec<RustStmt>) -> Option<(Vec<RustStmt>, RustExpr)> {
+    let mut init = stmts;
+    let last = match init.pop() {
+        None => RustExpr::UNIT,
+        Some(stmt) => match stmt {
+            RustStmt::Return(ReturnKind::Keyword, ..) => return None,
+            RustStmt::Return(_, expr) | RustStmt::Expr(expr) => expr,
+            RustStmt::LetPattern(..) | RustStmt::Let(..) | RustStmt::Reassign(..) => RustExpr::UNIT,
+            // REVIEW - is unguarded inheritance of a Control block always correct?
+            RustStmt::Control(ctrl) => RustExpr::Control(Box::new(ctrl.clone())),
+        }
+    };
+    Some((init, last))
 }
 
 #[derive(Clone, Debug)]
@@ -2227,6 +2301,8 @@ impl From<bool> for ReturnKind {
 #[derive(Clone, Debug)]
 pub(crate) enum RustStmt {
     Let(Mut, Label, Option<RustType>, RustExpr),
+    // REVIEW - we might be able to modify `Let` to use a Pattern in place of a Label, but that would be a bit disruptive as the first pass
+    LetPattern(RustPattern, RustExpr),
     Reassign(Label, RustExpr),
     Expr(RustExpr),
     Return(ReturnKind, RustExpr),
@@ -2240,6 +2316,10 @@ impl RustStmt {
 
     pub fn assign_mut(name: impl Into<Label>, rhs: RustExpr) -> Self {
         Self::Let(Mut::Mutable, name.into(), None, rhs)
+    }
+
+    pub fn destructure(pat: RustPattern, rhs: RustExpr) -> Self {
+        Self::LetPattern(pat, rhs)
     }
 
     /// Classifies the provided Expr using [`RustExpr::is_pure`], and returns a [`RustStmt`]
@@ -2302,11 +2382,11 @@ pub(crate) enum RustMatchBody<BlockType = Vec<RustStmt>> {
 impl RustMatchBody {
     pub fn tuple_capture<const N: usize>(
         labels: [&'static str; N],
-        is_ref_flags: [bool; N],
+        semantics: [CaptureSemantics; N],
     ) -> Self {
         let case_valid = {
             let lhs = {
-                let pat = RustPattern::tuple_capture(labels, is_ref_flags);
+                let pat = RustPattern::tuple_capture(labels, semantics);
                 MatchCaseLHS::Pattern(pat)
             };
             let rhs = {
@@ -2386,6 +2466,19 @@ impl<T> RustMatchBody<T> {
     }
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
+pub enum CaptureSemantics {
+    #[default]
+    Owned,
+    Ref,
+}
+
+impl CaptureSemantics {
+    pub fn is_ref(self) -> bool {
+        matches!(self, Self::Ref)
+    }
+}
+
 impl RustPattern {
     /// Manually replaces a direct capture of a variable with a `ref` binding under the same name, or preserves
     /// the original value if some other pattern.
@@ -2400,11 +2493,11 @@ impl RustPattern {
     /// to signal to bind by `ref` (if true) or by direct identifier capture (if false).
     pub(crate) fn tuple_capture<Name: IntoLabel, const N: usize>(
         bindings: [Name; N],
-        is_ref_flags: [bool; N],
+        semantics: [CaptureSemantics; N],
     ) -> Self {
         let mut binds = Vec::with_capacity(N);
-        for (name, is_ref) in Iterator::zip(bindings.into_iter(), is_ref_flags.into_iter()) {
-            let pat = if is_ref {
+        for (name, sem) in Iterator::zip(bindings.into_iter(), semantics.into_iter()) {
+            let pat = if sem.is_ref() {
                 RustPattern::BindRef(name.into())
             } else {
                 RustPattern::CatchAll(Some(name.into()))
@@ -2419,6 +2512,12 @@ impl RustPattern {
 pub(crate) enum MatchCaseLHS {
     Pattern(RustPattern),
     WithGuard(RustPattern, RustExpr),
+}
+
+impl MatchCaseLHS {
+    pub(crate) fn is_simple(&self) -> bool {
+        matches!(self, MatchCaseLHS::Pattern(..))
+    }
 }
 
 impl ToFragment for MatchCaseLHS {
@@ -2572,6 +2671,12 @@ impl ToFragment for RustStmt {
                 Fragment::string(": "),
                 Fragment::opt(sig.as_ref(), RustType::to_fragment),
             )
+            .cat(Fragment::string(" = "))
+            .cat(value.to_fragment_precedence(Precedence::TOP))
+            .cat(Fragment::Char(';')),
+            RustStmt::LetPattern(pat, value) =>
+            Fragment::string("let ")
+            .cat(pat.to_fragment())
             .cat(Fragment::string(" = "))
             .cat(value.to_fragment_precedence(Precedence::TOP))
             .cat(Fragment::Char(';')),
@@ -2781,7 +2886,7 @@ pub mod short_circuit {
             match self.last() {
                 None => true,
                 Some(stmt) => match stmt {
-                    RustStmt::Let(..) | RustStmt::Reassign(..) => true,
+                    RustStmt::Let(..) | RustStmt::LetPattern(..) | RustStmt::Reassign(..) => true,
                     RustStmt::Expr(expr) | RustStmt::Return(_, expr) => expr.needs_ok(),
                     RustStmt::Control(ctrl) => ctrl.needs_ok(),
                 },
@@ -2795,6 +2900,7 @@ pub mod short_circuit {
                 RustStmt::Expr(expr)
                 | RustStmt::Reassign(.., expr)
                 | RustStmt::Let(.., expr)
+                | RustStmt::LetPattern(.., expr)
                 | RustStmt::Return(ReturnKind::Implicit, expr) => expr.is_short_circuiting(),
                 RustStmt::Return(ReturnKind::Keyword, ..) => true,
                 RustStmt::Control(ctrl) => ctrl.is_short_circuiting(),

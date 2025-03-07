@@ -217,6 +217,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "cons-rs"
+version = "0.7.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b5bc35d2309ad4cff36f82b04bd9db6100d514990f630f6ba32a1374545dd2b2"
+
+[[package]]
 name = "criterion"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -361,6 +367,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "cons-rs",
  "expect-test",
  "num-traits",
  "proptest",

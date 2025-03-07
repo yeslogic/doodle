@@ -151,18 +151,33 @@ pub fn bit_fields_u8<const N: usize>(bit_fields: [BitFieldKind; N]) -> Format {
 pub fn mask_bits_u8(x: Expr, high_bits_used: u8, nbits: u8) -> Expr {
     assert!(
         nbits + high_bits_used <= 8,
-        "mask_bits cannot create mask {nbits} bits out of available {}",
+        "mask_bits_u8 cannot create mask {nbits} bits out of available {}",
         8 - high_bits_used
     );
     let shift = 8 - high_bits_used - nbits;
     let mask = (1 << nbits) - 1;
-    bit_and(shr(x, Expr::U8(shift)), Expr::U8(mask))
+    let shifted = if shift == 0 {
+        x
+    } else {
+        shr(x, Expr::U8(shift))
+    };
+    bit_and(shifted, Expr::U8(mask))
 }
 
 fn mask_bits_u16(x: Expr, high_bits_used: u8, nbits: u8) -> Expr {
+    assert!(
+        nbits + high_bits_used <= 16,
+        "mask_bits_u16 cannot create mask {nbits} bits out of available {}",
+        16 - high_bits_used
+    );
     let shift = 16 - (high_bits_used + nbits) as u16;
     let mask = (1u16 << nbits) - 1;
-    bit_and(shr(x, Expr::U16(shift)), Expr::U16(mask))
+    let shifted = if shift == 0 {
+        x
+    } else {
+        shr(x, Expr::U16(shift))
+    };
+    bit_and(shifted, Expr::U16(mask))
 }
 
 /// Ergonomic helper for parsing a 16-bit packed value into a multi-field record with more

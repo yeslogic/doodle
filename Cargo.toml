@@ -23,3 +23,4 @@ anyhow = "1.0"
 clap = { version = "4.2", features = ["derive"] }
 num-traits = "0.2"
 rustc-hash = "2.1.1"
+cons-rs = "0.7.3"

@@ -77,6 +77,10 @@ impl Rebindable for RustStmt {
         match self {
             RustStmt::Expr(expr) => expr.rebind(table),
             RustStmt::Control(ctrl) => ctrl.rebind(table),
+            RustStmt::LetPattern(pat, rhs) => {
+                pat.rebind(table);
+                rhs.rebind(table)
+            }
             RustStmt::Let(_, _, otyp, rhs) => {
                 otyp.rebind(table);
                 rhs.rebind(table)
