@@ -1339,7 +1339,9 @@ impl RustExpr {
     pub fn embed_match(scrutinee: Self, body: RustMatchBody<Vec<RustStmt>>) -> Self {
         match body {
             RustMatchBody::Irrefutable(mut cases) if cases.len() == 1 && cases[0].0.is_simple() => {
-                let Some((MatchCaseLHS::Pattern(pat), mut stmts)) = cases.pop() else { panic!("bad guard") };
+                let Some((MatchCaseLHS::Pattern(pat), mut stmts)) = cases.pop() else {
+                    panic!("bad guard")
+                };
                 let let_bind = RustStmt::destructure(pat, scrutinee);
                 stmts.insert(0, let_bind);
                 match vec_stmts_to_block(stmts) {
@@ -1348,10 +1350,7 @@ impl RustExpr {
                 }
             }
             _ => {
-                let match_item = RustControl::Match(
-                    scrutinee,
-                    body
-                );
+                let match_item = RustControl::Match(scrutinee, body);
                 Self::Control(Box::new(match_item))
             }
         }
@@ -1367,7 +1366,9 @@ impl RustExpr {
 /// and return it.
 ///
 /// Returns `None` if the query is ill-founded, i.e. the block can short-circuit (without `try`).
-pub(crate) fn stmts_to_block(stmts: Cow<'_, [RustStmt]>) -> Option<(Cow<'_, [RustStmt]>, Cow<'_, RustExpr>)>  {
+pub(crate) fn stmts_to_block(
+    stmts: Cow<'_, [RustStmt]>,
+) -> Option<(Cow<'_, [RustStmt]>, Cow<'_, RustExpr>)> {
     match stmts {
         Cow::Owned(stmts) => {
             let (init, last) = vec_stmts_to_block(stmts)?;
@@ -1387,9 +1388,13 @@ pub(crate) fn slice_stmts_to_block(stmts: &[RustStmt]) -> Option<(&[RustStmt], C
                 Some((init, Cow::Borrowed(expr)))
             }
             RustStmt::Return(ReturnKind::Keyword, ..) => None,
-            RustStmt::LetPattern(..) | RustStmt::Let(..) | RustStmt::Reassign(..) => Some((stmts, Cow::Owned(RustExpr::UNIT))),
+            RustStmt::LetPattern(..) | RustStmt::Let(..) | RustStmt::Reassign(..) => {
+                Some((stmts, Cow::Owned(RustExpr::UNIT)))
+            }
             // REVIEW - is unguarded inheritance of a Control block always correct?
-            RustStmt::Control(ctrl) => Some((init, Cow::Owned(RustExpr::Control(Box::new(ctrl.clone()))))),
+            RustStmt::Control(ctrl) => {
+                Some((init, Cow::Owned(RustExpr::Control(Box::new(ctrl.clone())))))
+            }
         }
     } else {
         Some((stmts, Cow::Owned(RustExpr::UNIT)))
@@ -1406,7 +1411,7 @@ pub(crate) fn vec_stmts_to_block(stmts: Vec<RustStmt>) -> Option<(Vec<RustStmt>,
             RustStmt::LetPattern(..) | RustStmt::Let(..) | RustStmt::Reassign(..) => RustExpr::UNIT,
             // REVIEW - is unguarded inheritance of a Control block always correct?
             RustStmt::Control(ctrl) => RustExpr::Control(Box::new(ctrl.clone())),
-        }
+        },
     };
     Some((init, last))
 }
@@ -2674,12 +2679,11 @@ impl ToFragment for RustStmt {
             .cat(Fragment::string(" = "))
             .cat(value.to_fragment_precedence(Precedence::TOP))
             .cat(Fragment::Char(';')),
-            RustStmt::LetPattern(pat, value) =>
-            Fragment::string("let ")
-            .cat(pat.to_fragment())
-            .cat(Fragment::string(" = "))
-            .cat(value.to_fragment_precedence(Precedence::TOP))
-            .cat(Fragment::Char(';')),
+            RustStmt::LetPattern(pat, value) => Fragment::string("let ")
+                .cat(pat.to_fragment())
+                .cat(Fragment::string(" = "))
+                .cat(value.to_fragment_precedence(Precedence::TOP))
+                .cat(Fragment::Char(';')),
             RustStmt::Reassign(binding, value) => binding
                 .to_fragment()
                 .cat(Fragment::string(" = "))

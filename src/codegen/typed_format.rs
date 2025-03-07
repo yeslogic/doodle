@@ -467,7 +467,6 @@ impl<TypeRep> std::hash::Hash for TypedDynFormat<TypeRep> {
     }
 }
 
-
 mod sealed {
     pub(super) trait Sealed {}
 
@@ -475,7 +474,18 @@ mod sealed {
     impl Sealed for u32 {}
 }
 
-pub trait Ident: Clone + std::fmt::Debug + PartialEq + Eq + PartialOrd + Ord + std::hash::Hash + 'static + sealed::Sealed {}
+pub trait Ident:
+    Clone
+    + std::fmt::Debug
+    + PartialEq
+    + Eq
+    + PartialOrd
+    + Ord
+    + std::hash::Hash
+    + 'static
+    + sealed::Sealed
+{
+}
 
 impl Ident for Label {}
 impl Ident for u32 {}
@@ -483,7 +493,7 @@ impl Ident for u32 {}
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TypedExpr<TypeRep, VarId = Label>
 where
-    VarId: Ident
+    VarId: Ident,
 {
     Var(TypeRep, VarId),
     Bool(bool),
@@ -530,7 +540,11 @@ where
     U64Le(Box<TypedExpr<TypeRep, VarId>>),
 
     SeqLength(Box<TypedExpr<TypeRep, VarId>>),
-    SeqIx(TypeRep, Box<TypedExpr<TypeRep, VarId>>, Box<TypedExpr<TypeRep, VarId>>),
+    SeqIx(
+        TypeRep,
+        Box<TypedExpr<TypeRep, VarId>>,
+        Box<TypedExpr<TypeRep, VarId>>,
+    ),
     SubSeq(
         TypeRep,
         Box<TypedExpr<TypeRep, VarId>>,
@@ -543,7 +557,11 @@ where
         Box<TypedExpr<TypeRep, VarId>>,
         Box<TypedExpr<TypeRep, VarId>>,
     ),
-    FlatMap(TypeRep, Box<TypedExpr<TypeRep, VarId>>, Box<TypedExpr<TypeRep, VarId>>),
+    FlatMap(
+        TypeRep,
+        Box<TypedExpr<TypeRep, VarId>>,
+        Box<TypedExpr<TypeRep, VarId>>,
+    ),
     FlatMapAccum(
         TypeRep,
         Box<TypedExpr<TypeRep, VarId>>,
@@ -571,8 +589,16 @@ where
         TypeHint,
         Box<TypedExpr<TypeRep, VarId>>,
     ),
-    Dup(TypeRep, Box<TypedExpr<TypeRep, VarId>>, Box<TypedExpr<TypeRep, VarId>>),
-    EnumFromTo(TypeRep, Box<TypedExpr<TypeRep, VarId>>, Box<TypedExpr<TypeRep, VarId>>),
+    Dup(
+        TypeRep,
+        Box<TypedExpr<TypeRep, VarId>>,
+        Box<TypedExpr<TypeRep, VarId>>,
+    ),
+    EnumFromTo(
+        TypeRep,
+        Box<TypedExpr<TypeRep, VarId>>,
+        Box<TypedExpr<TypeRep, VarId>>,
+    ),
     LiftOption(TypeRep, Option<Box<TypedExpr<TypeRep, VarId>>>),
     Unary(TypeRep, UnaryOp, Box<TypedExpr<TypeRep, VarId>>),
 }

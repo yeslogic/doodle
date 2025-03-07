@@ -2,7 +2,7 @@ use super::TypedExpr;
 use crate::Label;
 use cons_rs::List;
 
-impl<Rep: Clone> TypedExpr<Rep, Label>  {
+impl<Rep: Clone> TypedExpr<Rep, Label> {
     pub(crate) fn to_nameless(&self) -> TypedExpr<Rep, u32> {
         let mut stack = VarStack::new();
         self.__to_nameless(&mut stack)
@@ -11,7 +11,9 @@ impl<Rep: Clone> TypedExpr<Rep, Label>  {
     fn __to_nameless(&self, vars: &mut VarStack<'_>) -> TypedExpr<Rep, u32> {
         match self {
             TypedExpr::Var(gt, var) => {
-                let Some(index) = vars.get_index(var) else { panic!("reference to var {:?} not found in env: {:?}", var, vars) };
+                let Some(index) = vars.get_index(var) else {
+                    panic!("reference to var {:?} not found in env: {:?}", var, vars)
+                };
                 TypedExpr::Var(gt.clone(), index as u32)
             }
 
@@ -19,13 +21,16 @@ impl<Rep: Clone> TypedExpr<Rep, Label>  {
             TypedExpr::U16(n) => TypedExpr::U16(*n),
             TypedExpr::U32(n) => TypedExpr::U32(*n),
             TypedExpr::U64(n) => TypedExpr::U64(*n),
-            TypedExpr::Arith(t, op, a, b) => TypedExpr::Arith(t.clone(), *op, Box::new(a.__to_nameless(vars)), Box::new(b.__to_nameless(vars))),
+            TypedExpr::Arith(t, op, a, b) => TypedExpr::Arith(
+                t.clone(),
+                *op,
+                Box::new(a.__to_nameless(vars)),
+                Box::new(b.__to_nameless(vars)),
+            ),
             TypedExpr::Record(gt, fields) => {
                 todo!()
             }
             _ => todo!(),
-
-
         }
     }
 }
@@ -58,7 +63,7 @@ impl<'a> VarStack<'a> {
                 return Some(dist);
             }
         }
-        return None
+        return None;
     }
 }
 
