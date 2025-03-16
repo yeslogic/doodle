@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use super::TypedExpr;
 use crate::Label;
 use cons_rs::List;
@@ -27,7 +28,7 @@ impl<Rep: Clone> TypedExpr<Rep, Label> {
                 Box::new(a.__to_nameless(vars)),
                 Box::new(b.__to_nameless(vars)),
             ),
-            TypedExpr::Record(gt, fields) => {
+            TypedExpr::Record(_gt, _fields) => {
                 todo!()
             }
             _ => todo!(),

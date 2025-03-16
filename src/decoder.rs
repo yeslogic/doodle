@@ -809,6 +809,7 @@ pub enum Decoder {
     SkipRemainder,
     DecodeBytes(Box<Expr>, Box<Decoder>),
     LetFormat(Box<Decoder>, Label, Box<Decoder>),
+    MonadSeq(Box<Decoder>, Box<Decoder>),
     AccumUntil(Box<Expr>, Box<Expr>, Box<Expr>, TypeHint, Box<Decoder>),
 }
 
@@ -944,19 +945,6 @@ impl<'a> Compiler<'a> {
                     decs.push(df);
                 }
                 Ok(Decoder::Tuple(decs))
-            }
-            Format::Record(fields) => {
-                let mut decs = Vec::with_capacity(fields.len());
-                let mut fields = fields.iter();
-                while let Some((name, f)) = fields.next() {
-                    let next = Rc::new(Next::Record(
-                        MaybeTyped::Untyped(fields.as_slice()),
-                        next.clone(),
-                    ));
-                    let df = self.compile_format(f, next)?;
-                    decs.push((name.clone(), df));
-                }
-                Ok(Decoder::Record(decs))
             }
             Format::Repeat(a) => {
                 if a.is_nullable(self.module) {
@@ -1129,12 +1117,22 @@ impl<'a> Compiler<'a> {
                 let db = Box::new(self.compile_format(second, next.clone())?);
                 Ok(Decoder::LetFormat(da, name.clone(), db))
             }
+            Format::MonadSeq(first, second) => {
+                let a_next = Next::Cat(MaybeTyped::Untyped(second), next.clone());
+                let da = Box::new(self.compile_format(first, Rc::new(a_next))?);
+                let db = Box::new(self.compile_format(second, next.clone())?);
+                Ok(Decoder::MonadSeq(da, db))
+            }
+            Format::Hint(_hint, a) => {
+                // REVIEW - do we want to preserve any facet of the hinting within the Decoder?
+                self.compile_format(a, next)
+            }
         }
     }
 }
 
 #[derive(Clone, Debug)]
-pub enum ScopeEntry<Value: Clone /*  = Value */> {
+pub enum ScopeEntry<Value: Clone> {
     Value(Value),
     Decoder(Decoder),
 }
@@ -1436,6 +1434,10 @@ impl Decoder {
                 let (va, input) = da.parse(program, scope, input)?;
                 let new_scope = Scope::Single(SingleScope::new(scope, name, &va));
                 db.parse(program, &new_scope, input)
+            }
+            Decoder::MonadSeq(da, db) => {
+                let (_, input) = da.parse(program, scope, input)?;
+                db.parse(program, scope, input)
             }
             Decoder::ForEach(expr, lbl, a) => {
                 let mut input = input;

@@ -98,7 +98,7 @@ fn embedded_singleton_alternation<const OUTER: usize, const INNER: usize>(
             accum
         }
     };
-    Format::Record(accum)
+    Format::record(accum)
 }
 
 fn for_each_pair(

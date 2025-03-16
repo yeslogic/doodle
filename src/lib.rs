@@ -2,7 +2,7 @@
 #![deny(rust_2018_idioms)]
 
 use std::cmp::Ordering;
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashSet, VecDeque};
 use std::ops::Add;
 use std::rc::Rc;
 
@@ -692,9 +692,6 @@ pub enum Format {
     UnionNondet(Vec<Format>),
     /// Matches a sequence of concatenated formats
     Tuple(Vec<Format>),
-    /// Matches a sequence of named formats where later formats can depend on
-    /// the decoded value of earlier formats
-    Record(Vec<(Label, Format)>),
     /// Repeat a format zero-or-more times
     Repeat(Box<Format>),
     /// Repeat a format one-or-more times
@@ -746,7 +743,141 @@ pub enum Format {
     DecodeBytes(Box<Expr>, Box<Format>),
     /// Process one format, bind the result to a label, and process a second format, discarding the result of the first
     LetFormat(Box<Format>, Label, Box<Format>),
+    /// Process one format without capturing the resultant value, and then process the a second format as normal
+    MonadSeq(Box<Format>, Box<Format>),
+    /// Encapsulation of a Format with a structurally significant artifact of what it represents or how it was constructed
+    Hint(StyleHint, Box<Format>),
 }
+
+// NOTE - as currently defined, StyleHint could easily be Copy, but it would be a breaking change if we later had to remove that trait
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+#[serde(tag = "tag", content = "args")]
+pub enum StyleHint {
+    /// Old-style: all field-parses are named and persisted in the original order
+    /// New-style: not all fields are persisted, and names can be changed as needed
+    Record { old_style: bool },
+}
+
+#[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub(crate) enum FieldLabel<'a> {
+    Anonymous,
+    Ephemeral(&'a Label),
+    Permanent { in_capture: &'a Label, in_value: &'a Label },
+}
+
+pub(crate) struct RecordFormat<'a> {
+    // First label is the
+    flat: Vec<(FieldLabel<'a>, &'a Format)>,
+}
+
+impl<'a> std::ops::Deref for RecordFormat<'a> {
+    type Target = Vec<(FieldLabel<'a>, &'a Format)>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.flat
+    }
+}
+
+impl<'a> TryFrom<&'a Format> for RecordFormat<'a> {
+    type Error = anyhow::Error;
+
+    fn try_from(format: &'a Format) -> Result<Self, Self::Error> {
+        let mut builder = RecordBuilder::init();
+        builder.accum(format)?;
+        Ok(builder.finish())
+    }
+}
+
+impl<'a> RecordFormat<'a> {
+    pub(crate) fn lookup_value_field(&self, field_name: &Label) -> Option<(&'a Format, &'a Label)> {
+        for (label, format) in &self.flat {
+            match label {
+                FieldLabel::Permanent { in_value, in_capture } if *in_value == field_name => {
+                    return Some((format, in_capture));
+                }
+                _ => continue,
+            }
+        }
+        None
+    }
+}
+
+
+
+#[derive(Debug)]
+pub(crate) struct RecordBuilder<'a> {
+    labels: Vec<Option<&'a Label>>,
+    formats: Vec<&'a Format>,
+    res: Option<&'a Vec<(Label, Expr)>>,
+}
+
+impl<'a> RecordBuilder<'a> {
+    pub const fn init() -> Self {
+        Self {
+            labels: Vec::new(),
+            formats: Vec::new(),
+            res: None,
+        }
+    }
+
+    pub fn step(&mut self, format: &'a Format) -> AResult<Option<&'a Format>> {
+        match format {
+            Format::Hint(StyleHint::Record { .. }, inner) => self.step(inner),
+            Format::LetFormat(f, name, inner) => {
+                self.labels.push(Some(name));
+                self.formats.push(f);
+                Ok(Some(inner))
+            }
+            Format::MonadSeq(f, inner) => {
+                self.labels.push(None);
+                self.formats.push(f);
+                Ok(Some(inner))
+            }
+            Format::Compute(expr) => match &**expr {
+                Expr::Record(res) => {
+                    assert!(self.res.replace(res).is_none());
+                    Ok(None)
+                }
+                other => Err(anyhow!("expected Record, found {other:?}")),
+            }
+            other => Err(anyhow!("unexpected non-Record-shape format: {other:?}")),
+        }
+    }
+
+    pub fn accum(&mut self, format: &'a Format) -> AResult<()> {
+        let mut node = format;
+        while let Some(inner) = self.step(node)? {
+            node = inner;
+        }
+        Ok(())
+    }
+
+    pub fn finish(self) -> RecordFormat<'a> {
+        let mut flat = Vec::with_capacity(self.labels.len());
+        let mut kept = std::collections::BTreeMap::new();
+        for (lab, r_expr) in self.res.unwrap() {
+            match r_expr {
+                Expr::Var(var) => kept.insert(var, lab),
+                other => unreachable!("non-variable expression in format-record construction: {other:?}"),
+            };
+        }
+        for (label, format) in Iterator::zip(self.labels.into_iter(), self.formats.into_iter()) {
+            let f_label = match label {
+                None => FieldLabel::Anonymous,
+                Some(in_capture) => {
+                    // there is no check for shadowing here, so we hope that is avoided.
+                    match kept.get(in_capture) {
+                        Some(in_value) => FieldLabel::Permanent { in_capture, in_value },
+                        None => FieldLabel::Ephemeral(in_capture),
+                    }
+                }
+            };
+            flat.push((f_label, format));
+        }
+        RecordFormat { flat }
+    }
+}
+
 
 impl Format {
     pub const EMPTY: Format = Format::Tuple(Vec::new());
@@ -760,13 +891,52 @@ impl Format {
         )
     }
 
+    pub(crate) fn is_record_whnf(&self) -> bool {
+        match self {
+            Format::Hint(StyleHint::Record { .. }, _inner) => true,
+            Format::LetFormat(..) => true,
+            Format::MonadSeq(..) => true,
+            Format::Compute(expr) => matches!(&**expr, Expr::Record(..)),
+            _ => false,
+        }
+    }
+
+    pub(crate) fn is_record_deep(&self) -> bool {
+        match self {
+            Format::Hint(StyleHint::Record { .. }, inner)
+            | Format::LetFormat(.., inner)
+            | Format::MonadSeq(.., inner) => inner.is_record_deep(),
+            Format::Compute(expr) => matches!(&**expr, Expr::Record(..)),
+            _ => false,
+        }
+    }
+
+    /// Old-style record where every field is preserved and the constructed record uses the same names as the individual parse-bindings.
     pub fn record<Name: IntoLabel>(fields: impl IntoIterator<Item = (Name, Format)>) -> Format {
-        Format::Record(
-            fields
-                .into_iter()
-                .map(|(label, format)| (label.into(), format))
-                .collect(),
-        )
+        let mut fields = fields.into_iter().collect::<VecDeque<(Name, Format)>>();
+        let accum = Vec::with_capacity(fields.len());
+        Format::Hint(StyleHint::Record { old_style: true }, Box::new(Format::__chain_record(accum, &mut fields)))
+    }
+
+    pub(crate) fn synthesize_record(&self) -> RecordFormat<'_> {
+        RecordFormat::try_from(self).unwrap()
+    }
+
+
+    fn __chain_record<Name: IntoLabel>(mut captured: Vec<(Label, Expr)>, remaining: &mut VecDeque<(Name, Format)>) -> Format {
+        if remaining.is_empty() {
+            Format::Compute(Box::new(Expr::Record(captured)))
+        } else {
+            let this = remaining.pop_front().unwrap();
+            let (name, format) = this;
+            let name: Label = name.into();
+            captured.push((name.clone(), Expr::Var(name.clone())));
+            Format::LetFormat(
+                Box::new(format.clone()),
+                name,
+                Box::new(Format::__chain_record(captured, remaining)),
+            )
+        }
     }
 }
 
@@ -790,11 +960,6 @@ impl Format {
             Format::Tuple(fields) => fields
                 .iter()
                 .map(|f| f.match_bounds(module))
-                .reduce(Bounds::add)
-                .unwrap_or(Bounds::exact(0)),
-            Format::Record(fields) => fields
-                .iter()
-                .map(|(_, f)| f.match_bounds(module))
                 .reduce(Bounds::add)
                 .unwrap_or(Bounds::exact(0)),
             Format::Repeat(_) => Bounds::any(),
@@ -826,9 +991,10 @@ impl Format {
             Format::ForEach(_expr, _lbl, _f) => Bounds::any(),
             // NOTE - because we are parsing a sequence of bytes, we do not interact with the actual buffer
             Format::DecodeBytes(_bytes, _f) => Bounds::exact(0),
-            Format::LetFormat(first, _, second) => {
+            Format::LetFormat(first, _, second) | Format::MonadSeq(first, second) => {
                 first.match_bounds(module) + second.match_bounds(module)
             }
+            Format::Hint(.., inner) => inner.match_bounds(module),
         }
     }
 
@@ -853,11 +1019,6 @@ impl Format {
             Format::Tuple(fields) => fields
                 .iter()
                 .map(|f| f.lookahead_bounds(module))
-                .reduce(Bounds::add)
-                .unwrap_or(Bounds::exact(0)),
-            Format::Record(fields) => fields
-                .iter()
-                .map(|(_, f)| f.lookahead_bounds(module))
                 .reduce(Bounds::add)
                 .unwrap_or(Bounds::exact(0)),
             Format::Repeat(_) => Bounds::any(),
@@ -889,10 +1050,11 @@ impl Format {
             Format::Dynamic(_name, _dynformat, f) => f.lookahead_bounds(module),
             Format::Apply(_) => Bounds::at_least(1),
             Format::DecodeBytes(_bytes, _f) => Bounds::exact(0),
-            Format::LetFormat(f0, _, f) => Bounds::union(
+            Format::MonadSeq(f0, f) | Format::LetFormat(f0, _, f) => Bounds::union(
                 f0.lookahead_bounds(module),
                 f0.match_bounds(module) + f.lookahead_bounds(module),
             ),
+            Format::Hint(_, f) => f.lookahead_bounds(module),
         }
     }
 
@@ -916,7 +1078,6 @@ impl Format {
                 Format::union_depends_on_next(branches, module)
             }
             Format::Tuple(fields) => fields.iter().any(|f| f.depends_on_next(module)),
-            Format::Record(fields) => fields.iter().any(|(_, f)| f.depends_on_next(module)),
             Format::Repeat(..) => true,
             Format::Repeat1(..) => true,
             Format::RepeatBetween(..) => true,
@@ -939,9 +1100,10 @@ impl Format {
             Format::Apply(..) => false,
             Format::ForEach(_expr, _lbl, f) => f.depends_on_next(module),
             Format::DecodeBytes(_bytes, _f) => false,
-            Format::LetFormat(first, _, second) => {
+            Format::MonadSeq(first, second) | Format::LetFormat(first, _, second) => {
                 first.depends_on_next(module) || second.depends_on_next(module)
             }
+            Format::Hint(_, f) => f.depends_on_next(module),
         }
     }
 
@@ -988,6 +1150,14 @@ impl Format {
             | Format::RepeatUntilSeq(_, format) => format.is_ascii_char_format(module),
             Format::Slice(_, format) => format.is_ascii_string_format(module),
             // NOTE there may be other cases we should consider ASCII
+            _ => false,
+        }
+    }
+
+    pub fn is_record_format(&self) -> bool {
+        // we take it on faith that a format is a record iff it is hinted as such
+        match self {
+            Format::Hint(StyleHint::Record { .. }, _) => true,
             _ => false,
         }
     }
@@ -1127,16 +1297,6 @@ impl FormatModule {
                     ts.push(self.infer_format_type(scope, f)?);
                 }
                 Ok(ValueType::Tuple(ts))
-            }
-            Format::Record(fields) => {
-                let mut ts = Vec::with_capacity(fields.len());
-                let mut record_scope = TypeScope::child(scope);
-                for (label, f) in fields {
-                    let t = self.infer_format_type(&record_scope, f)?;
-                    ts.push((label.clone(), t.clone()));
-                    record_scope.push(label.clone(), t);
-                }
-                Ok(ValueType::Record(ts))
             }
             Format::Repeat(a) | Format::Repeat1(a) => {
                 let t = self.infer_format_type(scope, a)?;
@@ -1281,6 +1441,14 @@ impl FormatModule {
                 new_scope.push(name.clone(), t0);
                 self.infer_format_type(&new_scope, f)
             }
+            Format::MonadSeq(f0, f) => {
+                // We want to check that the type of f0 is inferable, but it is used anywhere in the type of self
+                self.infer_format_type(scope, f0)?;
+                self.infer_format_type(scope, f)
+            }
+            Format::Hint(_hint, f) => {
+                self.infer_format_type(scope, f)
+            }
             Format::Match(head, branches) => {
                 if branches.is_empty() {
                     return Err(anyhow!("infer_format_type: empty Match"));
@@ -1357,7 +1525,6 @@ impl<'a, U: ?Sized + 'a, T: ?Sized + 'a> Copy for MaybeTyped<'a, U, T> {}
 
 type MTFormatRef<'a> = MaybeTyped<'a, Format, TypedFormat<GenType>>;
 type MTFormatSlice<'a> = MaybeTyped<'a, [Format], [TypedFormat<GenType>]>;
-type MTFieldSlice<'a> = MaybeTyped<'a, [(Label, Format)], [(Label, TypedFormat<GenType>)]>;
 
 /// Incremental decomposition of a Format into a partially consumed head
 /// sub-format, and a possibly-empty tail of remaining sub-formats.
@@ -1371,7 +1538,6 @@ enum Next<'a> {
     Union(Rc<Next<'a>>, Rc<Next<'a>>),
     Cat(MTFormatRef<'a>, Rc<Next<'a>>),
     Tuple(MTFormatSlice<'a>, Rc<Next<'a>>),
-    Record(MTFieldSlice<'a>, Rc<Next<'a>>),
     Repeat(MTFormatRef<'a>, Rc<Next<'a>>),
     RepeatCount(usize, MTFormatRef<'a>, Rc<Next<'a>>),
     RepeatMax(usize, MTFormatRef<'a>, Rc<Next<'a>>), // dual to [RepeatCount] for 0..=N repeats
@@ -1528,24 +1694,6 @@ impl<'a> MatchTreeStep<'a> {
         }
     }
 
-    /// Constructs a [MatchTreeStep] that accepts a given record of sequential formats, with a trailing sequence of partially-consumed formats ([`Next`]s).
-    ///
-    /// This is mostly equivalent to `from_tuple`, as the name of a given field does not have implications on the prefix tree of the overall format.
-    fn from_record(
-        module: &'a FormatModule,
-        fields: &'a [(Label, Format)],
-        next: Rc<Next<'a>>,
-    ) -> MatchTreeStep<'a> {
-        match fields.split_first() {
-            None => Self::from_next(module, next),
-            Some(((_label, f), fs)) => Self::from_format(
-                module,
-                f,
-                Rc::new(Next::Record(MaybeTyped::Untyped(fs), next)),
-            ),
-        }
-    }
-
     /// Constructs a [MatchTreeStep] that accepts a fixed-count repetition of a given format, with a trailing sequence of partially-consumed formats ([`Next`]s).
     fn from_repeat_count(
         module: &'a FormatModule,
@@ -1665,27 +1813,6 @@ impl<'a> MatchTreeStep<'a> {
                     },
                 }
             }
-            Next::Record(fields, next) => {
-                let next = next.clone();
-                match fields {
-                    MaybeTyped::Untyped(fields) => match fields.split_first() {
-                        None => Self::from_next(module, next),
-                        Some(((_label, f), fs)) => Self::from_format(
-                            module,
-                            f,
-                            Rc::new(Next::Record(MaybeTyped::Untyped(fs), next)),
-                        ),
-                    },
-                    MaybeTyped::Typed(fields) => match fields.split_first() {
-                        None => Self::from_next(module, next),
-                        Some(((_label, f), fs)) => Self::from_gt_format(
-                            module,
-                            f,
-                            Rc::new(Next::Record(MaybeTyped::Typed(fs), next)),
-                        ),
-                    },
-                }
-            }
             Next::Repeat(a, next0) => {
                 let tree = MatchTreeStep::<'a>::from_next(module, next0.clone());
                 let next1 = next.clone();
@@ -1787,14 +1914,6 @@ impl<'a> MatchTreeStep<'a> {
                     module,
                     f,
                     Rc::new(Next::Tuple(MaybeTyped::Typed(fs), next)),
-                ),
-            },
-            TypedFormat::Record(_, fields) => match fields.split_first() {
-                None => Self::from_next(module, next),
-                Some(((_label, f), fs)) => Self::from_gt_format(
-                    module,
-                    f,
-                    Rc::new(Next::Record(MaybeTyped::Typed(fs), next)),
                 ),
             },
 
@@ -1975,9 +2094,12 @@ impl<'a> MatchTreeStep<'a> {
             }
             TypedFormat::Dynamic(_, _name, _expr, f) => Self::from_gt_format(module, f, next),
             TypedFormat::Apply(..) => Self::accept(),
-            TypedFormat::LetFormat(_, f0, _name, f) => {
+            TypedFormat::MonadSeq(_, f0, f) | TypedFormat::LetFormat(_, f0, _, f) => {
                 let next0 = Rc::new(Next::Cat(MaybeTyped::Typed(f), next));
                 Self::from_gt_format(module, f0, next0)
+            }
+            TypedFormat::Hint(_, _hint, f) => {
+                Self::from_gt_format(module, f, next)
             }
         }
     }
@@ -2007,7 +2129,6 @@ impl<'a> MatchTreeStep<'a> {
                 tree
             }
             Format::Tuple(fields) => Self::from_tuple(module, fields, next),
-            Format::Record(fields) => Self::from_record(module, fields, next),
             Format::Repeat(a) => {
                 let tree = Self::from_next(module, next.clone());
                 tree.union(Self::from_format(
@@ -2125,10 +2246,11 @@ impl<'a> MatchTreeStep<'a> {
             }
             Format::Dynamic(_name, _expr, f) => Self::from_format(module, f, next),
             Format::Apply(_name) => Self::accept(),
-            Format::LetFormat(f0, _name, f) => {
+            Format::MonadSeq(f0, f) | Format::LetFormat(f0, _, f) => {
                 let next0 = Rc::new(Next::Cat(MaybeTyped::Untyped(f), next));
                 Self::from_format(module, f0, next0)
             }
+            Format::Hint(_hint, f) => Self::from_format(module, f, next),
         }
     }
 

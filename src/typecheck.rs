@@ -2736,20 +2736,6 @@ impl TypeChecker {
                 self.unify_var_utype(newvar, Rc::new(UType::Tuple(uts)))?;
                 Ok(newvar)
             }
-            Format::Record(fs) => {
-                let newvar = self.get_new_uvar();
-                let mut child = UMultiScope::with_capacity(ctxt.scope, fs.len());
-                let mut fields = Vec::with_capacity(fs.len());
-                for (lbl, f) in fs {
-                    let scope = UScope::Multi(&child);
-                    let child_ctxt = ctxt.with_scope(&scope);
-                    let fv = self.infer_var_format(f, child_ctxt)?;
-                    child.push(lbl.clone(), fv);
-                    fields.push((lbl.clone(), fv.into()));
-                }
-                self.unify_var_utype(newvar, Rc::new(UType::Record(fields)))?;
-                Ok(newvar)
-            }
             Format::Repeat(inner) | Format::Repeat1(inner) => {
                 let newvar = self.get_new_uvar();
                 let t = self.infer_utype_format(inner, ctxt)?;
@@ -2945,6 +2931,19 @@ impl TypeChecker {
                 let new_ctxt = ctxt.with_scope(&scope);
                 let f_v = self.infer_var_format(f, new_ctxt)?;
                 self.unify_var_pair(newvar, f_v)?;
+                Ok(newvar)
+            }
+            Format::MonadSeq(f0, f) => {
+                let newvar = self.get_new_uvar();
+                let _f0_v = self.infer_var_format(f0, ctxt)?;
+                let f_v = self.infer_var_format(f, ctxt)?;
+                self.unify_var_pair(newvar, f_v)?;
+                Ok(newvar)
+            }
+            Format::Hint(.., inner) => {
+                let newvar = self.get_new_uvar();
+                let inner_v = self.infer_var_format(inner, ctxt)?;
+                self.unify_var_pair(newvar, inner_v)?;
                 Ok(newvar)
             }
         }

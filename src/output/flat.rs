@@ -1,7 +1,7 @@
 use std::io;
 
 use crate::decoder::Value;
-use crate::Label;
+use crate::{Label, StyleHint};
 use crate::{Format, FormatModule};
 
 pub fn print_decoded_value(module: &FormatModule, value: &Value, format: &Format) {
@@ -148,13 +148,6 @@ fn check_covered(
                 check_covered(module, path, format)?;
             }
         }
-        Format::Record(format_fields) => {
-            for (label, format) in format_fields {
-                path.push(label.clone());
-                check_covered(module, path, format)?;
-                path.pop();
-            }
-        }
         Format::Repeat(format)
         | Format::Repeat1(format)
         | Format::RepeatCount(_, format)
@@ -197,10 +190,11 @@ fn check_covered(
         }
         Format::Dynamic(_name, _dynformat, format) => check_covered(module, path, format)?,
         Format::Apply(_) => {}
-        Format::LetFormat(f0, _name, f) => {
+        Format::MonadSeq(f0, f) | Format::LetFormat(f0, _, f) => {
             check_covered(module, path, f0)?;
             check_covered(module, path, f)?;
         }
+        Format::Hint(_hint, format) => check_covered(module, path, format)?,
     }
     Ok(())
 }
@@ -252,16 +246,6 @@ impl<'module, W: io::Write> Context<'module, W> {
                     Ok(())
                 }
                 _ => panic!("expected tuple, found {value:?}"),
-            },
-            Format::Record(format_fields) => match value {
-                Value::Record(value_fields) => {
-                    for (index, (_label, value)) in value_fields.iter().enumerate() {
-                        let format = &format_fields[index].1;
-                        self.write_flat(value, format)?;
-                    }
-                    Ok(())
-                }
-                _ => panic!("expected record, found {value:?}"),
             },
             Format::Repeat(format)
             | Format::Repeat1(format)
@@ -322,6 +306,24 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::Dynamic(_name, _dynformat, format) => self.write_flat(value, format),
             Format::Apply(_) => Ok(()), // FIXME
             Format::LetFormat(_f0, _name, f) => self.write_flat(value, f),
+            Format::MonadSeq(_f0, f) => self.write_flat(value, f),
+            Format::Hint(StyleHint::Record { .. }, record_format) => {
+                self.write_record(value, record_format)
+            }
+        }
+    }
+
+    fn write_record(&mut self, value: &Value, record_format: &Format) -> io::Result<()> {
+        let rec = record_format.synthesize_record();
+        match value {
+            Value::Record(value_fields) => {
+                for (label, value) in value_fields.iter() {
+                    let Some((fmt, _)) = rec.lookup_value_field(label) else { panic!("missing field {label}") };
+                    self.write_flat(value, fmt)?;
+                }
+                Ok(())
+            }
+            _ => panic!("expected record, found {value:?}"),
         }
     }
 }

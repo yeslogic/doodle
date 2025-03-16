@@ -1574,6 +1574,10 @@ impl Decoder {
                 let new_scope = LocScope::Single(LocSingleScope::new(scope, name, &va));
                 db.parse_with_loc(program, &new_scope, input)
             }
+            Decoder::MonadSeq(da, db) => {
+                let (_, input) = da.parse_with_loc(program, scope, input)?;
+                db.parse_with_loc(program, scope, input)
+            }
             Decoder::PeekNot(a) => {
                 if a.parse_with_loc(program, scope, input).is_ok() {
                     Err(DecodeError::loc_fail(scope, input))

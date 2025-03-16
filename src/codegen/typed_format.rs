@@ -6,7 +6,7 @@ use super::rust_ast::{PrimType, RustType, RustTypeDef};
 use super::{AtomType, LocalType};
 use crate::bounds::Bounds;
 use crate::byte_set::ByteSet;
-use crate::{Arith, IntRel, Label, TypeHint, UnaryOp};
+use crate::{Arith, IntRel, Label, StyleHint, TypeHint, UnaryOp};
 
 pub(crate) mod variables;
 
@@ -82,7 +82,6 @@ impl<TypeRep> std::hash::Hash for TypedFormat<TypeRep> {
                 branches.hash(state)
             }
             TypedFormat::Tuple(_, elts) => elts.hash(state),
-            TypedFormat::Record(_, flds) => flds.hash(state),
             TypedFormat::RepeatCount(_, n, inner) => {
                 n.hash(state);
                 inner.hash(state);
@@ -151,6 +150,14 @@ impl<TypeRep> std::hash::Hash for TypedFormat<TypeRep> {
                 lbl.hash(state);
                 f.hash(state);
             }
+            TypedFormat::MonadSeq(_, f0, f) => {
+                f0.hash(state);
+                f.hash(state);
+            }
+            TypedFormat::Hint(_, hint, f) => {
+                hint.hash(state);
+                f.hash(state);
+            }
         }
     }
 }
@@ -177,7 +184,7 @@ pub enum TypedFormat<TypeRep> {
     Union(TypeRep, Vec<TypedFormat<TypeRep>>),
     UnionNondet(TypeRep, Vec<TypedFormat<TypeRep>>),
     Tuple(TypeRep, Vec<TypedFormat<TypeRep>>),
-    Record(TypeRep, Vec<(Label, TypedFormat<TypeRep>)>),
+    // Record(TypeRep, Vec<(Label, TypedFormat<TypeRep>)>),
     Repeat(TypeRep, Box<TypedFormat<TypeRep>>),
     Repeat1(TypeRep, Box<TypedFormat<TypeRep>>),
     RepeatCount(TypeRep, Box<TypedExpr<TypeRep>>, Box<TypedFormat<TypeRep>>),
@@ -230,6 +237,16 @@ pub enum TypedFormat<TypeRep> {
         Label,
         Box<TypedFormat<TypeRep>>,
     ),
+    MonadSeq(
+        TypeRep,
+        Box<TypedFormat<TypeRep>>,
+        Box<TypedFormat<TypeRep>>,
+    ),
+    Hint(
+        TypeRep,
+        StyleHint,
+        Box<TypedFormat<TypeRep>>,
+    ),
     AccumUntil(
         TypeRep,
         Box<TypedExpr<TypeRep>>,
@@ -271,12 +288,6 @@ impl TypedFormat<GenType> {
                 .map(TypedFormat::lookahead_bounds)
                 .reduce(<Bounds as Add>::add)
                 .unwrap_or(Bounds::exact(0)),
-            TypedFormat::Record(_, flds) => flds
-                .iter()
-                .map(|(_l, f)| f.lookahead_bounds())
-                .reduce(<Bounds as Add>::add)
-                .unwrap_or(Bounds::exact(0)),
-
             TypedFormat::RepeatCount(_, t_exp, f) => f.lookahead_bounds() * t_exp.bounds(),
             TypedFormat::RepeatBetween(_, t_min, t_max, f) => {
                 f.lookahead_bounds() * Bounds::union(t_min.bounds(), t_max.bounds())
@@ -313,10 +324,11 @@ impl TypedFormat<GenType> {
                 .unwrap(),
 
             TypedFormat::Apply(_, _, _) => Bounds::at_least(1),
-            TypedFormat::LetFormat(_, f0, _name, f) => Bounds::union(
+            TypedFormat::LetFormat(_, f0, _, f) | TypedFormat::MonadSeq(_, f0, f) => Bounds::union(
                 f0.lookahead_bounds(),
                 f0.match_bounds() + f.lookahead_bounds(),
             ),
+            TypedFormat::Hint(.., inner) => inner.lookahead_bounds(),
         }
     }
 
@@ -345,12 +357,6 @@ impl TypedFormat<GenType> {
                 .map(TypedFormat::match_bounds)
                 .reduce(<Bounds as Add>::add)
                 .unwrap_or(Bounds::exact(0)),
-            TypedFormat::Record(_, flds) => flds
-                .iter()
-                .map(|(_l, f)| f.match_bounds())
-                .reduce(<Bounds as Add>::add)
-                .unwrap_or(Bounds::exact(0)),
-
             TypedFormat::RepeatCount(_, t_exp, f) => f.match_bounds() * t_exp.bounds(),
             TypedFormat::RepeatBetween(_, t_min, t_max, f) => {
                 f.match_bounds() * Bounds::union(t_min.bounds(), t_max.bounds())
@@ -387,7 +393,9 @@ impl TypedFormat<GenType> {
                 .unwrap(),
 
             TypedFormat::Apply(_, _, _) => Bounds::at_least(1),
-            TypedFormat::LetFormat(_, f0, _name, f1) => f0.match_bounds() + f1.match_bounds(),
+            TypedFormat::LetFormat(_, f0, _, f1)
+            | TypedFormat::MonadSeq(_, f0, f1) => f0.match_bounds() + f1.match_bounds(),
+            TypedFormat::Hint(.., inner) => inner.match_bounds(),
         }
     }
 
@@ -418,13 +426,14 @@ impl TypedFormat<GenType> {
             TypedFormat::Pos => Some(Cow::Owned(GenType::from(PrimType::U64))),
 
             TypedFormat::LetFormat(gt, ..)
+            | TypedFormat::MonadSeq(gt, ..)
+            | TypedFormat::Hint(gt, ..)
             | TypedFormat::DecodeBytes(gt, ..)
             | TypedFormat::FormatCall(gt, ..)
             | TypedFormat::Variant(gt, ..)
             | TypedFormat::Union(gt, ..)
             | TypedFormat::UnionNondet(gt, ..)
             | TypedFormat::Tuple(gt, ..)
-            | TypedFormat::Record(gt, ..)
             | TypedFormat::Repeat(gt, ..)
             | TypedFormat::Repeat1(gt, ..)
             | TypedFormat::ForEach(gt, ..)
@@ -467,8 +476,8 @@ impl<TypeRep> std::hash::Hash for TypedDynFormat<TypeRep> {
     }
 }
 
-mod sealed {
-    pub(super) trait Sealed {}
+mod private {
+    pub trait Sealed {}
 
     impl Sealed for crate::Label {}
     impl Sealed for u32 {}
@@ -483,7 +492,7 @@ pub trait Ident:
     + Ord
     + std::hash::Hash
     + 'static
-    + sealed::Sealed
+    + private::Sealed
 {
 }
 
@@ -976,6 +985,12 @@ mod __impls {
                 TypedFormat::LetFormat(_, f0, name, f) => {
                     Format::LetFormat(rebox(f0), name, rebox(f))
                 }
+                TypedFormat::MonadSeq(_, f0, f) => {
+                    Format::MonadSeq(rebox(f0), rebox(f))
+                }
+                TypedFormat::Hint(_, hint, f) => {
+                    Format::Hint(hint.clone(), rebox(f))
+                }
                 TypedFormat::Union(_, branches) => {
                     Format::Union(branches.into_iter().map(Format::from).collect())
                 }
@@ -983,7 +998,6 @@ mod __impls {
                     Format::UnionNondet(branches.into_iter().map(Format::from).collect())
                 }
                 TypedFormat::Tuple(_, elts) => Format::Tuple(revec(elts)),
-                TypedFormat::Record(_, flds) => Format::Record(revec_pair(flds)),
                 TypedFormat::Repeat(_, inner) => Format::Repeat(rebox(inner)),
                 TypedFormat::Repeat1(_, inner) => Format::Repeat1(rebox(inner)),
                 TypedFormat::RepeatCount(_, count, inner) => {

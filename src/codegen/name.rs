@@ -8,7 +8,7 @@ use crate::Label;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum Derivation {
-    // Incidental type that is mapped or transformed (e.g. via Format::LetFormat, Format::Map, Format::DecodeBytes)
+    /// Incidental type that is mapped or transformed (e.g. via Format::LetFormat, Format::Map, Format::DecodeBytes)
     Preimage,
     /// Inner-Type that appears inside of a Maybe-Context
     // REVIEW - do we need to distinguish items in such positions?
@@ -29,12 +29,14 @@ impl Derivation {
 pub(crate) enum NameAtom {
     /// Any type-entity given a name explicitly in the FormatModule
     Explicit(Label),
-    /// Any type-entity accessed via a positional argument of a tuple
-    Positional(usize),
     /// Any type-entity accessed via a field of a record
     RecordField(Label),
     /// Type-Entity that is embedded within a variant of an existing enum
     Variant(Label),
+    /// Any type-entity accessed via a positional argument of a tuple
+    Positional(usize),
+    /// A type-entity captured under a local binding
+    Bind(Label),
     /// Type-entity that is derived from another via an abstracted relation
     Derived(Derivation),
     /// 'Poison' atom to prevent local ascription of misleading names to entities whose provenance is hierarchically distinct
@@ -47,6 +49,7 @@ impl std::fmt::Display for NameAtom {
             NameAtom::Explicit(name) => write!(f, "{}", name),
             NameAtom::Positional(pos) => write!(f, "ix{}", pos),
             NameAtom::RecordField(fld) => write!(f, "{}", fld),
+            NameAtom::Bind(bind) => write!(f, "{}", bind),
             NameAtom::Variant(vn) => write!(f, "{}", vn),
             NameAtom::Derived(dev) => write!(f, "{}", dev.token()),
             NameAtom::DeadEnd => write!(f, "POISON"),

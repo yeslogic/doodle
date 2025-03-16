@@ -362,11 +362,7 @@ pub fn union_nondet<Name: IntoLabel>(branches: impl IntoIterator<Item = (Name, F
 /// conform to the specification and will typically be invariant for
 /// non-self-describing formats.
 pub fn record<Name: IntoLabel>(fields: impl IntoIterator<Item = (Name, Format)>) -> Format {
-    Format::Record(
-        (fields.into_iter())
-            .map(|(label, format)| (label.into(), format))
-            .collect(),
-    )
+    Format::record(fields)
 }
 
 /// Helper function that encloses a Format in an 'optional' context,
@@ -770,7 +766,7 @@ pub fn record_repeat<const N: usize>(field_names: [&'static str; N], format: For
     let iter = field_names
         .iter()
         .map(|name| (Label::Borrowed(name), format.clone()));
-    Format::Record(iter.collect())
+    Format::record(iter)
 }
 
 pub trait ZeroMarker {
