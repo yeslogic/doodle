@@ -9,12 +9,7 @@ use rebind::Rebindable;
 pub use rust_ast::ToFragment;
 
 use crate::{
-    byte_set::ByteSet,
-    decoder::extract_pair,
-    parser::error::TraceHash,
-    typecheck::{TypeChecker, UScope, UVar},
-    Arith, BaseType, DynFormat, Expr, Format, FormatModule, IntRel, IntoLabel, Label, MatchTree,
-    Pattern, UnaryOp, ValueType,
+    byte_set::ByteSet, decoder::extract_pair, parser::error::TraceHash, typecheck::{TypeChecker, UScope, UVar}, Arith, BaseType, DynFormat, Expr, Format, FormatModule, IntRel, IntoLabel, Label, MatchTree, Pattern, StyleHint, UnaryOp, ValueType
 };
 
 use std::{
@@ -312,19 +307,6 @@ impl CodeGen {
                             "TypedDecoder::Tuple expected to have type RustType::AnonTuple(..) (or UNIT if empty), found {other:?}"
                         ),
                 }
-            TypedDecoder::Record(gt, fields) => {
-                match gt.try_as_adhoc() {
-                    Some((_, lab)) =>  {
-                        let constructor = Constructor::Simple(lab.clone());
-                        let fields = fields.iter().map(|(l0, d)| (l0.clone(), self.translate(d.get_dec()))).collect();
-                        CaseLogic::Sequential(SequentialLogic::AccumRecord { constructor, fields, })
-                    }
-                    None =>
-                        unreachable!(
-                            "TypedDecoder::Record expected to have type Def(..) or Inline(Atom(TypeRef(..))), found {gt:?}"
-                        ),
-                }
-            }
             TypedDecoder::Repeat0While(_gt, tree_continue, single) =>
                 CaseLogic::Repeat(
                     RepeatLogic::Repeat0ContinueOnMatch(
@@ -441,6 +423,20 @@ impl CodeGen {
                         Box::new(cl_f),
                     )
                 )
+            }
+            TypedDecoder::MonadSeq(_t, f0, f) => {
+                let cl_f0 = self.translate(f0.get_dec());
+                let cl_f = self.translate(f.get_dec());
+                CaseLogic::Other(
+                    OtherLogic::MonadSeq(
+                        Box::new(cl_f0),
+                        Box::new(cl_f),
+                    )
+                )
+            }
+            TypedDecoder::Hint(_t, hint, inner) => {
+                let cl_inner = self.translate(inner.get_dec());
+                CaseLogic::Other(OtherLogic::Hint(hint.clone(), Box::new(cl_inner)))
             }
             TypedDecoder::Match(_t, scrutinee, cases) => {
                 let scrutinized = embed_expr_dft(scrutinee);
@@ -1695,7 +1691,7 @@ impl ShortCircuit for GenExpr {
 /// rules that are very fragile and difficult to reason about.
 #[derive(Clone, Debug)]
 enum GenStmt {
-    /// Evaluate a `GenExpr` without bindings its value locally
+    /// Evaluate a `GenExpr` without binding its value locally
     Expr(GenExpr),
     /// One-to-one lifted `RustStmt` without exposure for further modifications
     Embed(RustStmt),
@@ -1712,7 +1708,7 @@ impl GenBlock {
         self.stmts = stmts;
     }
 
-    /// Inserts the statments contained in the iterable `preamble`, in order, directly before
+    /// Inserts the statements contained in the iterable `preamble`, in order, directly before
     /// the statements contained in `self`.
     fn prepend_stmts(&mut self, preamble: impl IntoIterator<Item = GenStmt>) {
         let stmts =
@@ -2923,10 +2919,6 @@ enum SequentialLogic<ExprT> {
         constructor: Option<Constructor>,
         elements: Vec<CaseLogic<ExprT>>,
     },
-    AccumRecord {
-        constructor: Constructor,
-        fields: Vec<(Label, CaseLogic<ExprT>)>,
-    },
 }
 
 impl<ExprT> ToAst for SequentialLogic<ExprT>
@@ -2973,33 +2965,7 @@ where
                     )
                 }
             }
-            SequentialLogic::AccumRecord {
-                constructor,
-                fields,
-            } => {
-                if fields.is_empty() {
-                    unreachable!(
-                        "SequentialLogic::AccumRecord has no fields, which is not an expected case"
-                    );
-                }
 
-                let mut names: Vec<Label> = Vec::new();
-                let mut stmts = Vec::new();
-
-                for (fname, fld_cl) in fields.iter() {
-                    let varname = rust_ast::sanitize_label(fname);
-                    names.push(varname.clone());
-                    stmts.push(GenStmt::assign(varname, fld_cl.to_ast(ctxt).local_try()));
-                }
-
-                GenBlock::from_parts(
-                    stmts,
-                    Some(GenExpr::TyValCon(RustExpr::Struct(
-                        constructor.clone().into(),
-                        StructExpr::RecordExpr(names.into_iter().map(|l| (l, None)).collect()),
-                    ))),
-                )
-            }
         }
     }
 }
@@ -3014,6 +2980,8 @@ enum OtherLogic<ExprT> {
         Refutability,
     ),
     LetFormat(Box<CaseLogic<ExprT>>, Label, Box<CaseLogic<ExprT>>),
+    MonadSeq(Box<CaseLogic<ExprT>>, Box<CaseLogic<ExprT>>),
+    Hint(StyleHint, Box<CaseLogic<ExprT>>),
 }
 
 impl<ExprT> ToAst for OtherLogic<ExprT>
@@ -3081,6 +3049,22 @@ where
                 inner_block
                     .stmts
                     .insert(0, GenStmt::assign(name.clone(), prior_block));
+                inner_block
+            }
+            OtherLogic::MonadSeq(prior, inner) => {
+                let prior_block = prior.to_ast(ctxt);
+                let mut inner_block = inner.to_ast(ctxt);
+
+                // REVIEW - is there a better construction we can use instead of this?
+                let prior_stmt = GenStmt::Expr(GenExpr::BlockScope(Box::new(prior_block)));
+
+                inner_block.prepend_stmt(prior_stmt);
+                inner_block
+            }
+            OtherLogic::Hint(_hint, inner) => {
+                let inner_block = inner.to_ast(ctxt);
+
+                // REVIEW - do we want to perform any local modifications?
                 inner_block
             }
         }
@@ -3236,7 +3220,7 @@ impl ToAst for DerivedLogic<GTExpr> {
                 let bytes_ctxt = ProdCtxt {
                     input_varname: &Cow::Borrowed(INNER_NAME),
                 };
-                let GenBlock { ret, mut stmts } = inner_cl.to_ast(bytes_ctxt);
+                let mut inner_block = inner_cl.to_ast(bytes_ctxt);
 
                 // prepend boilerplate for second-phase byte-parsing
                 let persist_parser = GenStmt::Embed(RustStmt::assign_mut(
@@ -3249,15 +3233,8 @@ impl ToAst for DerivedLogic<GTExpr> {
                     RustExpr::BorrowMut(Box::new(RustExpr::local("tmp"))),
                 ));
 
-                // REVIEW - we need a way to prepend without invalidating the indices
-                let _stmts = &mut stmts;
-                // concatenate preamble to inner parse
-                let mut stmts = Vec::with_capacity(_stmts.len() + 2);
-                stmts.push(persist_parser);
-                stmts.push(bind_ref_mut_parser);
-                stmts.append(_stmts);
-
-                GenBlock::from_parts(stmts, ret)
+                inner_block.prepend_stmts([persist_parser, bind_ref_mut_parser]);
+                inner_block
             }
             DerivedLogic::Maybe(is_present, inner_cl) => {
                 let mut if_true = inner_cl.to_ast(ctxt);
@@ -3876,33 +3853,6 @@ impl<'a> Elaborator<'a> {
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::Tuple(gt, t_elts)
             }
-            Format::Record(flds) => {
-                let index = self.get_and_increment_index();
-                let mut t_flds = Vec::with_capacity(flds.len());
-                for (lbl, t) in flds {
-                    self.codegen
-                        .name_gen
-                        .ctxt
-                        .push_atom(NameAtom::RecordField(lbl.clone()));
-                    let t_fld = self.elaborate_format(t, dyn_scope);
-                    t_flds.push((lbl.clone(), t_fld));
-                    self.codegen.name_gen.ctxt.escape();
-                }
-                let gt = self.get_gt_from_index(index);
-                match gt.try_as_adhoc() {
-                    Some(_) => (),
-                    None => {
-                        let before = self.get_gt_from_index(index - 1);
-                        let after = self.get_gt_from_index(index + 1);
-                        eprintln!("Possible frame-shift error around {index} (looking for Struct)");
-                        eprintln!("[{}]: {before:?}", index - 1);
-                        eprintln!("[{}]: {gt:?}", index);
-                        eprintln!("[{}]: {after:?}", index + 1);
-                        // unreachable!("found non-adhoc type for record format elaboration: {gt:?} @ {index} ({flds:#?})");
-                    }
-                }
-                TypedFormat::Record(gt, t_flds)
-            }
             Format::Repeat(inner) => {
                 let index = self.get_and_increment_index();
                 let t_inner = self.elaborate_format(inner, dyn_scope);
@@ -4094,12 +4044,45 @@ impl<'a> Elaborator<'a> {
                 self.codegen
                     .name_gen
                     .ctxt
-                    .push_atom(NameAtom::Derived(Derivation::Preimage));
+                    .push_atom(NameAtom::Bind(name.clone()));
                 let t_f0 = self.elaborate_format(f0, dyn_scope);
                 self.codegen.name_gen.ctxt.escape();
                 let t_f = self.elaborate_format(f, dyn_scope);
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::LetFormat(gt, Box::new(t_f0), name.clone(), Box::new(t_f))
+            }
+            Format::MonadSeq(f0, f) => {
+                // FIXME - adhoc types introduced in MonadSeq are not properly path-named
+                let index = self.get_and_increment_index();
+                self.codegen
+                    .name_gen
+                    .ctxt
+                    .push_atom(NameAtom::Derived(Derivation::Preimage));
+                let t_f0 = self.elaborate_format(f0, dyn_scope);
+                self.codegen.name_gen.ctxt.escape();
+                let t_f = self.elaborate_format(f, dyn_scope);
+                let gt = self.get_gt_from_index(index);
+                TypedFormat::MonadSeq(gt, Box::new(t_f0), Box::new(t_f))
+            }
+            Format::Hint(style_hint, inner) => {
+                let index = self.get_and_increment_index();
+                let t_inner = self.elaborate_format(inner, dyn_scope);
+                let gt = self.get_gt_from_index(index);
+                match style_hint {
+                    StyleHint::Record { .. } => match gt.try_as_adhoc() {
+                        Some(_) => (),
+                        None => {
+                            let before = self.get_gt_from_index(index - 1);
+                            let after = self.get_gt_from_index(index + 1);
+                            eprintln!("Possible frame-shift error around {index} (looking for Struct)");
+                            eprintln!("[{}]: {before:?}", index - 1);
+                            eprintln!("[{}]: {gt:?}", index);
+                            eprintln!("[{}]: {after:?}", index + 1);
+                            // unreachable!("found non-adhoc type for record format elaboration: {gt:?} @ {index} ({flds:#?})");
+                        }
+                    }
+                }
+                TypedFormat::Hint(gt, style_hint.clone(), Box::new(t_inner))
             }
         }
     }

@@ -1,5 +1,5 @@
 use crate::byte_set::ByteSet;
-use crate::{Format, FormatModule, Label, MatchTree, MaybeTyped, Next};
+use crate::{Format, FormatModule, Label, MatchTree, MaybeTyped, Next, StyleHint};
 use anyhow::{anyhow, Result as AResult};
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -64,7 +64,6 @@ impl TypedDecoder<GenType> {
             | TypedDecoder::Parallel(t, ..)
             | TypedDecoder::Branch(t, ..)
             | TypedDecoder::Tuple(t, ..)
-            | TypedDecoder::Record(t, ..)
             | TypedDecoder::Repeat0While(t, ..)
             | TypedDecoder::Repeat1Until(t, ..)
             | TypedDecoder::RepeatCount(t, ..)
@@ -87,6 +86,8 @@ impl TypedDecoder<GenType> {
             | TypedDecoder::ForEach(t, ..)
             | TypedDecoder::DecodeBytes(t, ..)
             | TypedDecoder::LetFormat(t, ..)
+            | TypedDecoder::MonadSeq(t, ..)
+            | TypedDecoder::Hint(t, ..)
             | TypedDecoder::AccumUntil(t, ..) => Some(Cow::Borrowed(t)),
         }
     }
@@ -104,7 +105,6 @@ pub(crate) enum TypedDecoder<TypeRep> {
     Parallel(TypeRep, Vec<TypedDecoderExt<TypeRep>>),
     Branch(TypeRep, MatchTree, Vec<TypedDecoderExt<TypeRep>>),
     Tuple(TypeRep, Vec<TypedDecoderExt<TypeRep>>),
-    Record(TypeRep, Vec<(Label, TypedDecoderExt<TypeRep>)>),
     Repeat0While(TypeRep, MatchTree, Box<TypedDecoderExt<TypeRep>>),
     Repeat1Until(TypeRep, MatchTree, Box<TypedDecoderExt<TypeRep>>),
     RepeatCount(
@@ -196,6 +196,11 @@ pub(crate) enum TypedDecoder<TypeRep> {
         Label,
         Box<TypedDecoderExt<TypeRep>>,
     ),
+    MonadSeq(
+        TypeRep,
+        Box<TypedDecoderExt<TypeRep>>,
+        Box<TypedDecoderExt<TypeRep>>,
+    ),
     AccumUntil(
         TypeRep,
         Box<TypedExpr<TypeRep>>,
@@ -203,6 +208,7 @@ pub(crate) enum TypedDecoder<TypeRep> {
         Box<TypedExpr<TypeRep>>,
         Box<TypedDecoderExt<TypeRep>>,
     ),
+    Hint(TypeRep, StyleHint, Box<TypedDecoderExt<TypeRep>>),
 }
 
 #[derive(Clone, Debug)]
@@ -286,7 +292,7 @@ impl<'a> GTCompiler<'a> {
         next: Rc<Next<'a>>,
     ) -> AResult<GTDecoderExt> {
         let dec = match format {
-            GTFormat::FormatCall(gt, level, arg_exprs, deref) => {
+            TypedFormat::FormatCall(gt, level, arg_exprs, deref) => {
                 let this_args = arg_exprs.to_vec();
                 let sig_args = if arg_exprs.is_empty() {
                     None
@@ -322,11 +328,11 @@ impl<'a> GTCompiler<'a> {
 
                 Ok(TypedDecoder::Call(gt.clone(), n, this_args))
             }
-            GTFormat::DecodeBytes(gt, expr, f) => {
+            TypedFormat::DecodeBytes(gt, expr, f) => {
                 let da = Box::new(self.compile_gt_format(f, None, next)?);
                 Ok(TypedDecoder::DecodeBytes(gt.clone(), expr.clone(), da))
             }
-            GTFormat::ForEach(gt, expr, lbl, f) => {
+            TypedFormat::ForEach(gt, expr, lbl, f) => {
                 let da = Box::new(self.compile_gt_format(f, None, next)?);
                 Ok(TypedDecoder::ForEach(
                     gt.clone(),
@@ -335,12 +341,12 @@ impl<'a> GTCompiler<'a> {
                     da,
                 ))
             }
-            GTFormat::Fail => Ok(TypedDecoder::Fail),
-            GTFormat::EndOfInput => Ok(TypedDecoder::EndOfInput),
-            GTFormat::SkipRemainder => Ok(TypedDecoder::SkipRemainder),
-            GTFormat::Align(n) => Ok(TypedDecoder::Align(*n)),
-            GTFormat::Byte(bs) => Ok(TypedDecoder::Byte(*bs)),
-            GTFormat::Variant(gt, label, f) => {
+            TypedFormat::Fail => Ok(TypedDecoder::Fail),
+            TypedFormat::EndOfInput => Ok(TypedDecoder::EndOfInput),
+            TypedFormat::SkipRemainder => Ok(TypedDecoder::SkipRemainder),
+            TypedFormat::Align(n) => Ok(TypedDecoder::Align(*n)),
+            TypedFormat::Byte(bs) => Ok(TypedDecoder::Byte(*bs)),
+            TypedFormat::Variant(gt, label, f) => {
                 let d = self.compile_gt_format(f, None, next.clone())?;
                 // FIXME - this is a bit slipshod, maybe we want an inductive method for determining what formats are constructive vs void
                 if matches!(&d.dec, TypedDecoder::Fail) {
@@ -353,7 +359,7 @@ impl<'a> GTCompiler<'a> {
                     ))
                 }
             }
-            GTFormat::Union(gt, branches) => {
+            TypedFormat::Union(gt, branches) => {
                 let mut fs = Vec::with_capacity(branches.len());
                 let mut ds = Vec::with_capacity(branches.len());
                 for f in branches {
@@ -366,7 +372,7 @@ impl<'a> GTCompiler<'a> {
                     Err(anyhow!("cannot build match tree for {:?}", format))
                 }
             }
-            GTFormat::UnionNondet(gt, branches) => {
+            TypedFormat::UnionNondet(gt, branches) => {
                 let mut ds = Vec::with_capacity(branches.len());
                 for f in branches {
                     let d = self.compile_gt_format(f, None, next.clone())?;
@@ -374,7 +380,7 @@ impl<'a> GTCompiler<'a> {
                 }
                 Ok(TypedDecoder::Parallel(gt.clone(), ds))
             }
-            GTFormat::Tuple(gt, fields) => {
+            TypedFormat::Tuple(gt, fields) => {
                 let mut dfields = Vec::with_capacity(fields.len());
                 let mut fields = fields.iter();
                 while let Some(f) = fields.next() {
@@ -387,20 +393,7 @@ impl<'a> GTCompiler<'a> {
                 }
                 Ok(TypedDecoder::Tuple(gt.clone(), dfields))
             }
-            GTFormat::Record(gt, fields) => {
-                let mut dfields = Vec::with_capacity(fields.len());
-                let mut fields = fields.iter();
-                while let Some((name, f)) = fields.next() {
-                    let next = Rc::new(Next::Record(
-                        MaybeTyped::Typed(fields.as_slice()),
-                        next.clone(),
-                    ));
-                    let df = self.compile_gt_format(f, None, next)?;
-                    dfields.push((name.clone(), df));
-                }
-                Ok(TypedDecoder::Record(gt.clone(), dfields))
-            }
-            GTFormat::Repeat(gt, a) => {
+            TypedFormat::Repeat(gt, a) => {
                 if a.as_ref().is_nullable() {
                     return Err(anyhow!("cannot repeat nullable format: {a:?}"));
                 }
@@ -418,7 +411,7 @@ impl<'a> GTCompiler<'a> {
                     Err(anyhow!("cannot build match tree for {:?}", format))
                 }
             }
-            GTFormat::Repeat1(gt, a) => {
+            TypedFormat::Repeat1(gt, a) => {
                 if a.is_nullable() {
                     return Err(anyhow!("cannot repeat nullable format: {a:?}"));
                 }
@@ -436,12 +429,12 @@ impl<'a> GTCompiler<'a> {
                     Err(anyhow!("cannot build match tree for {:?}", format))
                 }
             }
-            GTFormat::RepeatCount(gt, expr, a) => {
+            TypedFormat::RepeatCount(gt, expr, a) => {
                 // FIXME probably not right
                 let da = Box::new(self.compile_gt_format(a, None, next)?);
                 Ok(TypedDecoder::RepeatCount(gt.clone(), expr.clone(), da))
             }
-            GTFormat::RepeatBetween(gt, min_expr, max_expr, a) => {
+            TypedFormat::RepeatBetween(gt, min_expr, max_expr, a) => {
                 // FIXME - preliminary support only for exact-bound limit values
                 let Some(min) = min_expr.bounds().is_exact() else {
                     unimplemented!("RepeatBetween on inexact bounds-expr")
@@ -485,17 +478,17 @@ impl<'a> GTCompiler<'a> {
                     Box::new(da),
                 ))
             }
-            GTFormat::RepeatUntilLast(gt, expr, a) => {
+            TypedFormat::RepeatUntilLast(gt, expr, a) => {
                 // FIXME probably not right
                 let da = Box::new(self.compile_gt_format(a, None, next)?);
                 Ok(TypedDecoder::RepeatUntilLast(gt.clone(), expr.clone(), da))
             }
-            GTFormat::RepeatUntilSeq(gt, expr, a) => {
+            TypedFormat::RepeatUntilSeq(gt, expr, a) => {
                 // FIXME probably not right
                 let da = Box::new(self.compile_gt_format(a, None, next)?);
                 Ok(TypedDecoder::RepeatUntilSeq(gt.clone(), expr.clone(), da))
             }
-            GTFormat::AccumUntil(gt, cond, update, init, _vt, a) => {
+            TypedFormat::AccumUntil(gt, cond, update, init, _vt, a) => {
                 // FIXME probably not right
                 let da = Box::new(self.compile_gt_format(a, None, next)?);
                 Ok(TypedDecoder::AccumUntil(
@@ -506,15 +499,15 @@ impl<'a> GTCompiler<'a> {
                     da,
                 ))
             }
-            GTFormat::Maybe(gt, cond, a) => {
+            TypedFormat::Maybe(gt, cond, a) => {
                 let da = Box::new(self.compile_gt_format(a, None, next)?);
                 Ok(TypedDecoder::Maybe(gt.clone(), cond.clone(), da))
             }
-            GTFormat::Peek(gt, a) => {
+            TypedFormat::Peek(gt, a) => {
                 let da = Box::new(self.compile_gt_format(a, None, Rc::new(Next::Empty))?);
                 Ok(TypedDecoder::Peek(gt.clone(), da))
             }
-            GTFormat::PeekNot(_t, a) => {
+            TypedFormat::PeekNot(_t, a) => {
                 const MAX_LOOKAHEAD: usize = 1024;
                 match a.lookahead_bounds().max {
                     None => {
@@ -530,15 +523,15 @@ impl<'a> GTCompiler<'a> {
                 let da = Box::new(self.compile_gt_format(a, None, Rc::new(Next::Empty))?);
                 Ok(TypedDecoder::PeekNot(_t.clone(), da))
             }
-            GTFormat::Slice(gt, expr, a) => {
+            TypedFormat::Slice(gt, expr, a) => {
                 let da = Box::new(self.compile_gt_format(a, None, Rc::new(Next::Empty))?);
                 Ok(TypedDecoder::Slice(gt.clone(), expr.clone(), da))
             }
-            GTFormat::Bits(gt, a) => {
+            TypedFormat::Bits(gt, a) => {
                 let da = Box::new(self.compile_gt_format(a, None, Rc::new(Next::Empty))?);
                 Ok(TypedDecoder::Bits(gt.clone(), da))
             }
-            GTFormat::WithRelativeOffset(gt, base_addr, offset, a) => {
+            TypedFormat::WithRelativeOffset(gt, base_addr, offset, a) => {
                 let da = Box::new(self.compile_gt_format(a, None, Rc::new(Next::Empty))?);
                 Ok(TypedDecoder::WithRelativeOffset(
                     gt.clone(),
@@ -547,17 +540,17 @@ impl<'a> GTCompiler<'a> {
                     da,
                 ))
             }
-            GTFormat::Map(gt, a, expr) => {
+            TypedFormat::Map(gt, a, expr) => {
                 let da = Box::new(self.compile_gt_format(a, None, next.clone())?);
                 Ok(TypedDecoder::Map(gt.clone(), da, expr.clone()))
             }
-            GTFormat::Where(gt, a, expr) => {
+            TypedFormat::Where(gt, a, expr) => {
                 let da = Box::new(self.compile_gt_format(a, None, next.clone())?);
                 Ok(TypedDecoder::Where(gt.clone(), da, expr.clone()))
             }
-            GTFormat::Compute(gt, expr) => Ok(TypedDecoder::Compute(gt.clone(), expr.clone())),
-            GTFormat::Pos => Ok(TypedDecoder::Pos),
-            GTFormat::Let(gt, name, expr, a) => {
+            TypedFormat::Compute(gt, expr) => Ok(TypedDecoder::Compute(gt.clone(), expr.clone())),
+            TypedFormat::Pos => Ok(TypedDecoder::Pos),
+            TypedFormat::Let(gt, name, expr, a) => {
                 let da = Box::new(self.compile_gt_format(a, None, next.clone())?);
                 Ok(TypedDecoder::Let(
                     gt.clone(),
@@ -566,7 +559,7 @@ impl<'a> GTCompiler<'a> {
                     da,
                 ))
             }
-            GTFormat::Match(gt, head, branches) => {
+            TypedFormat::Match(gt, head, branches) => {
                 let branches = branches
                     .iter()
                     .map(|(pattern, f)| {
@@ -578,7 +571,7 @@ impl<'a> GTCompiler<'a> {
                     .collect::<AResult<_>>()?;
                 Ok(TypedDecoder::Match(gt.clone(), head.clone(), branches))
             }
-            GTFormat::Dynamic(gt, name, dynformat, a) => {
+            TypedFormat::Dynamic(gt, name, dynformat, a) => {
                 let da = Box::new(self.compile_gt_format(a, None, next.clone())?);
                 Ok(TypedDecoder::Dynamic(
                     gt.clone(),
@@ -587,12 +580,22 @@ impl<'a> GTCompiler<'a> {
                     da,
                 ))
             }
-            GTFormat::Apply(gt, name, _) => Ok(TypedDecoder::Apply(gt.clone(), name.clone())),
-            GTFormat::LetFormat(gt, f0, name, f) => {
+            TypedFormat::Apply(gt, name, _) => Ok(TypedDecoder::Apply(gt.clone(), name.clone())),
+            TypedFormat::LetFormat(gt, f0, name, f) => {
                 let a_next = Next::Cat(MaybeTyped::Typed(f.as_ref()), next.clone());
                 let d0 = Box::new(self.compile_gt_format(f0, None, Rc::new(a_next))?);
                 let d = Box::new(self.compile_gt_format(f, None, next)?);
                 Ok(TypedDecoder::LetFormat(gt.clone(), d0, name.clone(), d))
+            }
+            TypedFormat::MonadSeq(gt, f0, f) => {
+                let a_next = Next::Cat(MaybeTyped::Typed(f.as_ref()), next.clone());
+                let d0 = Box::new(self.compile_gt_format(f0, None, Rc::new(a_next))?);
+                let d = Box::new(self.compile_gt_format(f, None, next)?);
+                Ok(TypedDecoder::MonadSeq(gt.clone(), d0, d))
+            }
+            TypedFormat::Hint(gt, hint, a) => {
+                let da = Box::new(self.compile_gt_format(a, None, next.clone())?);
+                Ok(TypedDecoder::Hint(gt.clone(), hint.clone(), da))
             }
         }?;
         Ok(TypedDecoderExt::new(dec, args))
