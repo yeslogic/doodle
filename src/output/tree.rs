@@ -468,7 +468,7 @@ impl<'module> TreePrinter<'module> {
                 }
             }
             Format::DecodeBytes(_bytes, f) => self.compile_decoded_value(value, f),
-            Format::Fail => panic!("uninhabited format (value={value:?}"),
+            Format::Fail => panic!("uninhabited format (value={value}"),
             Format::SkipRemainder | Format::EndOfInput => self.compile_value(value),
             Format::Align(_) => self.compile_value(value),
             Format::Byte(_) => self.compile_value(value),
@@ -481,14 +481,14 @@ impl<'module> TreePrinter<'module> {
                         panic!("expected variant label {label}, found {label2}");
                     }
                 }
-                _ => panic!("expected variant, found {value:?}"),
+                _ => panic!("expected variant, found {value}"),
             },
             Format::Union(branches) | Format::UnionNondet(branches) => match value {
                 Value::Branch(n, value) => {
                     let format = &branches[*n];
                     self.compile_decoded_value(value, format)
                 }
-                _ => panic!("expected branch, found {value:?}"),
+                _ => panic!("expected branch, found {value}"),
             },
             Format::Tuple(formats) => match value {
                 Value::Tuple(values) => {
@@ -498,14 +498,14 @@ impl<'module> TreePrinter<'module> {
                         self.compile_tuple(values, Some(formats))
                     }
                 }
-                _ => panic!("expected tuple, found {value:?}"),
+                _ => panic!("expected tuple, found {value}"),
             },
             Format::Hint(StyleHint::Record { .. }, ..) => match value {
                 Value::Record(value_fields) => {
                     let record_format = fmt.synthesize_record();
                     self.compile_record(value_fields, Some(&record_format))
                 }
-                _ => panic!("expected record, found {value:?}"),
+                _ => panic!("expected record, found {value}"),
             },
             Format::Repeat(format)
             | Format::Repeat1(format)
@@ -527,7 +527,7 @@ impl<'module> TreePrinter<'module> {
                         self.compile_seq(values, Some(format))
                     }
                 }
-                _ => panic!("expected sequence, found {value:?}"),
+                _ => panic!("expected sequence, found {value}"),
             },
             Format::AccumUntil(.., format) => match value {
                 Value::Tuple(values) => match &values[..] {
@@ -547,7 +547,7 @@ impl<'module> TreePrinter<'module> {
                                     self.compile_seq(values, Some(format))
                                 }
                             }
-                            _ => panic!("expected sequence, found {seq:?}"),
+                            _ => panic!("expected sequence, found {seq}"),
                         };
                         // FIXME - this may be easily-broken formatting and need some tweaking
                         frag.append(accum);
@@ -557,14 +557,14 @@ impl<'module> TreePrinter<'module> {
                     }
                     _ => panic!("expected 2-tuple, found {values:#?}"),
                 },
-                _ => panic!("expected tuple, found {value:?}"),
+                _ => panic!("expected tuple, found {value}"),
             },
             Format::Maybe(_, inner) => match value {
                 Value::Option(opt_val) => match opt_val {
                     Some(val) => self.compile_variant("some", val, Some(inner)),
                     None => self.compile_variant("none", &Value::UNIT, Some(&Format::EMPTY)),
                 },
-                _ => panic!("expected Option, found {value:?}"),
+                _ => panic!("expected Option, found {value}"),
             },
             Format::Peek(format) => self.compile_decoded_value(value, format),
             Format::PeekNot(_format) => self.compile_value(value),
@@ -579,7 +579,7 @@ impl<'module> TreePrinter<'module> {
                 } else {
                     match value {
                         Value::Mapped(orig, _value) => self.compile_decoded_value(orig, format),
-                        _ => panic!("expected mapped value, found {value:?}"),
+                        _ => panic!("expected mapped value, found {value}"),
                     }
                 }
             }
@@ -592,7 +592,7 @@ impl<'module> TreePrinter<'module> {
                     frag.append(self.compile_decoded_value(value, format));
                     frag
                 }
-                _ => panic!("expected branch, found {value:?}"),
+                _ => panic!("expected branch, found {value}"),
             },
             Format::Dynamic(_name, _dynformat, format) => self.compile_decoded_value(value, format),
             Format::Apply(_) => self.compile_value(value),
@@ -670,11 +670,11 @@ impl<'module> TreePrinter<'module> {
                     .unwrap_or_else(|| unreachable!("no string field"))
                 {
                     Value::Seq(vs) => vs,
-                    v => panic!("expected sequence value, found {v:?}"),
+                    v => panic!("expected sequence value, found {v}"),
                 }
             }
             Value::Seq(vs) => vs,
-            v => panic!("expected record or sequence, found {v:?}"),
+            v => panic!("expected record or sequence, found {v}"),
         };
         self.compile_char_seq(vs)
     }
@@ -704,11 +704,11 @@ impl<'module> TreePrinter<'module> {
                     .unwrap_or_else(|| unreachable!("no string field"))
                 {
                     Value::Seq(vs) => vs,
-                    v => panic!("expected sequence value, found {v:?}"),
+                    v => panic!("expected sequence value, found {v}"),
                 }
             }
             Value::Seq(vs) => vs,
-            _ => panic!("expected record value, found {value:?}"),
+            _ => panic!("expected record value, found {value}"),
         };
         self.compile_ascii_seq(vs)
     }
@@ -784,7 +784,7 @@ impl<'module> TreePrinter<'module> {
         let c = match v.coerce_mapped_value() {
             Value::U8(b) => *b as char,
             Value::Char(c) => *c,
-            _ => panic!("expected U8 or Char value, found {v:?}"),
+            _ => panic!("expected U8 or Char value, found {v}"),
         };
         match c {
             '\x00'..='\x7f' => Fragment::String(c.escape_debug().collect::<String>().into()),
@@ -815,7 +815,7 @@ impl<'module> TreePrinter<'module> {
     fn compile_ascii_char(&self, v: &Value) -> Fragment {
         let b = match v {
             Value::U8(b) => *b,
-            _ => panic!("expected U8 value, found {v:?}"),
+            _ => panic!("expected U8 value, found {v}"),
         };
         match b {
             0x00 => Fragment::String("\\0".into()),
@@ -999,7 +999,7 @@ impl<'module> TreePrinter<'module> {
                     row.push(cell);
                 }
             } else {
-                panic!("expected record value: {v:?}");
+                panic!("expected record value: {v}");
             }
             rows.push(row);
         }
@@ -2090,15 +2090,19 @@ impl<'module> TreePrinter<'module> {
             Format::Tuple(_) => Fragment::String("(...)".into()),
 
             Format::Hint(StyleHint::Record { old_style: true }, inner) => match inner.as_ref() {
-                Format::Compute(..) => Fragment::String("{}".into()),
+                Format::Compute(expr) if matches!(&**expr, Expr::Record(vs) if vs.is_empty()) => Fragment::String("{}".into()),
+                Format::Compute(..) => Fragment::String("{ ... }".into()),
                 Format::LetFormat(..) => Fragment::String("{ ... }".into()),
+                Format::MonadSeq(..) => Fragment::String("{ ... }".into()),
                 _ => unreachable!("unexpected old-style record-hint inner format: {inner:?}"),
             },
             Format::Hint(StyleHint::Record { old_style: false }, inner) => {
                 // FIXME - print enhanced output for new-style records
                 match inner.as_ref() {
-                    Format::Compute(..) => Fragment::String("{}".into()),
+                    Format::Compute(expr) if matches!(&**expr, Expr::Record(vs) if vs.is_empty()) => Fragment::String("{}".into()),
+                    Format::Compute(..) => Fragment::String("{ ... }".into()),
                     Format::LetFormat(..) => Fragment::String("{ ... }".into()),
+                    Format::MonadSeq(..) => Fragment::String("{ ... }".into()),
                     _ => unreachable!("unexpected old-style record-hint inner format: {inner:?}"),
                 }
             }
