@@ -2296,7 +2296,7 @@ mod tests {
             &[],
             Value::record([
                 ("first", Value::Seq(vec![].into())),
-                ("second-and-third", Value::Option(None)),
+                ("second-and-third", Value::Branch(1, Box::new(Value::Option(None)))),
             ]),
         );
         accepts(
@@ -2305,7 +2305,7 @@ mod tests {
             &[],
             Value::record([
                 ("first", Value::Seq(vec![Value::U8(0x00)].into())),
-                ("second-and-third", Value::Option(None)),
+                ("second-and-third", Value::Branch(1, Box::new(Value::Option(None)))),
             ]),
         );
         accepts(
@@ -2316,7 +2316,7 @@ mod tests {
                 ("first", Value::Seq(vec![Value::U8(0x00)].into())),
                 (
                     "second-and-third",
-                    Value::Option(Some(Box::new(Value::record([
+                    Value::Branch(0, Box::new(mapped_some(Value::record([
                         (
                             "second",
                             Value::Tuple(vec![Value::U8(0xFF), Value::Seq(vec![].into())]),
@@ -2334,7 +2334,7 @@ mod tests {
                 ("first", Value::Seq(vec![Value::U8(0x00)].into())),
                 (
                     "second-and-third",
-                    Value::Option(Some(Box::new(Value::record(vec![
+                    Value::Branch(0, Box::new(mapped_some(Value::record(vec![
                         (
                             "second",
                             Value::Tuple(vec![Value::U8(0xFF), Value::Seq(vec![].into())]),
@@ -2350,7 +2350,7 @@ mod tests {
             &[0x7F],
             Value::record(vec![
                 ("first", Value::Seq(vec![Value::U8(0x00)].into())),
-                ("second-and-third", Value::Option(None)),
+                ("second-and-third", Value::Branch(1, Box::new(Value::Option(None)))),
             ]),
         );
     }
