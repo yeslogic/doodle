@@ -290,7 +290,7 @@ impl Expr {
             Expr::Record(fields) => Cow::Owned(Value::record(
                 fields
                     .iter()
-                    .map(|(label, expr)| (label.clone(), expr.eval_value(scope))),
+                    .map(|(label, expr)| (label.clone(), expr.eval(scope).into_owned())),
             )),
             Expr::RecordProj(head, label) => cow_map(head.eval(scope), |v| {
                 v.coerce_mapped_value().record_proj(label.as_ref())
@@ -2045,7 +2045,7 @@ mod tests {
             &[],
             Value::Tuple(vec![
                 Value::Branch(0, Box::new(mapped_some(Value::U8(0)))),
-                Value::Branch(0, Box::new(mapped_some((Value::U8(0xFF))))),
+                Value::Branch(0, Box::new(mapped_some(Value::U8(0xFF)))),
             ]),
         );
         accepts(
@@ -2563,5 +2563,18 @@ mod tests {
         rejects(&d, &[0xFF]);
         rejects(&d, &[0x00, 0x00]);
         rejects(&d, &[0xFF, 0xFF]);
+    }
+
+    #[test]
+    fn branch_value_record_revamp() {
+        let f = Format::record([("inner", Format::Union(vec![is_byte(0), is_byte(1)]))]);
+        let d = Compiler::compile_one(&f).unwrap();
+
+        accepts(
+            &d,
+            &[0x00],
+            &[],
+            Value::Record(vec![(Label::Borrowed("inner"), Value::Branch(0, Box::new(Value::U8(0))))]),
+        );
     }
 }
