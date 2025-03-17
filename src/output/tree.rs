@@ -1104,20 +1104,20 @@ impl<'module> TreePrinter<'module> {
 
         if v_fields.is_empty() {
             Fragment::String("{}".into())
-        } else if value_fields.iter().all(|(_, v)| v.is_boolean())
+        } else if v_fields.iter().all(|(_, v)| v.is_boolean())
             && self.flags.summarize_boolean_record_set_fields
         {
-            self.compile_parsed_bool_flags(value_fields)
+            self.compile_parsed_bool_flags(v_fields)
         } else {
             let mut frag = Fragment::new();
-            let last_index = value_fields.len() - 1;
-            for (label, value) in value_fields[..last_index].iter() {
+            let last_index = v_fields.len() - 1;
+            for (label, value) in v_fields[..last_index].iter() {
                 let format = format_fields
                     .and_then(|fs| fs.lookup_value_field(label))
                     .map(|(f, _)| f);
                 frag.append(self.compile_parsed_field_value_continue(label, value, format, true));
             }
-            let (label, value) = &value_fields[last_index];
+            let (label, value) = &v_fields[last_index];
             let format = format_fields
                 .and_then(|fs| fs.lookup_value_field(label))
                 .map(|(f, _)| f);
@@ -1161,22 +1161,22 @@ impl<'module> TreePrinter<'module> {
             value_fields
         };
 
-        if value_fields.is_empty() {
+        if v_fields.is_empty() {
             Fragment::String("{}".into())
-        } else if value_fields.iter().all(|(_, v)| v.is_boolean())
+        } else if v_fields.iter().all(|(_, v)| v.is_boolean())
             && self.flags.summarize_boolean_record_set_fields
         {
-            self.compile_bool_flags(value_fields)
+            self.compile_bool_flags(v_fields)
         } else {
             let mut frag = Fragment::new();
-            let last_index = value_fields.len() - 1;
-            for (label, value) in value_fields[..last_index].iter() {
+            let last_index = v_fields.len() - 1;
+            for (label, value) in v_fields[..last_index].iter() {
                 let format = format_spine
                     .and_then(|fs| fs.lookup_value_field(label))
                     .map(|(f, _)| f);
                 frag.append(self.compile_field_value_continue(label, value, format, true));
             }
-            let (label, value) = &value_fields[last_index];
+            let (label, value) = &v_fields[last_index];
             let format = format_spine
                 .and_then(|fs| fs.lookup_value_field(label))
                 .map(|(f, _)| f);
