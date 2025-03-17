@@ -1,8 +1,8 @@
 use std::io;
 
 use crate::decoder::Value;
-use crate::{Label, StyleHint};
 use crate::{Format, FormatModule};
+use crate::{Label, StyleHint};
 
 pub fn print_decoded_value(module: &FormatModule, value: &Value, format: &Format) {
     let mut path = Vec::new();
@@ -318,7 +318,9 @@ impl<'module, W: io::Write> Context<'module, W> {
         match value {
             Value::Record(value_fields) => {
                 for (label, value) in value_fields.iter() {
-                    let Some((fmt, _)) = rec.lookup_value_field(label) else { panic!("missing field {label}") };
+                    let Some((fmt, _)) = rec.lookup_value_field(label) else {
+                        panic!("missing field {label}")
+                    };
                     self.write_flat(value, fmt)?;
                 }
                 Ok(())

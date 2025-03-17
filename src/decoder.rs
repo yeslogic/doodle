@@ -1767,6 +1767,13 @@ mod tests {
             .is_err());
     }
 
+    fn mapped_some(x: Value) -> Value {
+        Value::Mapped(
+            Box::new(x.clone()),
+            Box::new(Value::Option(Some(Box::new(x)))),
+        )
+    }
+
     #[test]
     fn compile_fail() {
         let f = Format::Fail;
@@ -1966,7 +1973,7 @@ mod tests {
             &[0x00, 0xFF],
             &[],
             Value::Tuple(vec![
-                Value::Branch(0, Box::new(Value::variant("some", Value::U8(0)))),
+                Value::Branch(0, Box::new(mapped_some(Value::U8(0)))),
                 Value::U8(0xFF),
             ]),
         );
@@ -1975,7 +1982,7 @@ mod tests {
             &[0xFF],
             &[],
             Value::Tuple(vec![
-                Value::Branch(1, Box::new(Value::variant("none", Value::UNIT))),
+                Value::Branch(1, Box::new(Value::Option(None))),
                 Value::U8(0xFF),
             ]),
         );
@@ -1992,8 +1999,8 @@ mod tests {
             &[0x00, 0xFF],
             &[],
             Value::Tuple(vec![
-                Value::Branch(0, Box::new(Value::variant("some", Value::U8(0)))),
-                Value::Branch(0, Box::new(Value::variant("some", Value::U8(0xFF)))),
+                Value::Branch(0, Box::new(mapped_some(Value::U8(0)))),
+                Value::Branch(0, Box::new(mapped_some((Value::U8(0xFF))))),
             ]),
         );
         accepts(
@@ -2001,8 +2008,8 @@ mod tests {
             &[0x00],
             &[],
             Value::Tuple(vec![
-                Value::Branch(0, Box::new(Value::variant("some", Value::U8(0)))),
-                Value::Branch(1, Box::new(Value::variant("none", Value::UNIT))),
+                Value::Branch(0, Box::new(mapped_some(Value::U8(0)))),
+                Value::Branch(1, Box::new(Value::Option(None))),
             ]),
         );
         accepts(
@@ -2010,8 +2017,8 @@ mod tests {
             &[0xFF],
             &[],
             Value::Tuple(vec![
-                Value::Branch(1, Box::new(Value::variant("none", Value::UNIT))),
-                Value::Branch(0, Box::new(Value::variant("some", Value::U8(0xFF)))),
+                Value::Branch(1, Box::new(Value::Option(None))),
+                Value::Branch(0, Box::new(mapped_some(Value::U8(0xFF)))),
             ]),
         );
         accepts(
@@ -2019,8 +2026,8 @@ mod tests {
             &[],
             &[],
             Value::Tuple(vec![
-                Value::Branch(1, Box::new(Value::variant("none", Value::UNIT))),
-                Value::Branch(1, Box::new(Value::variant("none", Value::UNIT))),
+                Value::Branch(1, Box::new(Value::Option(None))),
+                Value::Branch(1, Box::new(Value::Option(None))),
             ]),
         );
         accepts(
@@ -2028,8 +2035,8 @@ mod tests {
             &[],
             &[],
             Value::Tuple(vec![
-                Value::Branch(1, Box::new(Value::variant("none", Value::UNIT))),
-                Value::Branch(1, Box::new(Value::variant("none", Value::UNIT))),
+                Value::Branch(1, Box::new(Value::Option(None))),
+                Value::Branch(1, Box::new(Value::Option(None))),
             ]),
         );
         accepts(
@@ -2037,8 +2044,8 @@ mod tests {
             &[0x7F],
             &[0x7F],
             Value::Tuple(vec![
-                Value::Branch(1, Box::new(Value::variant("none", Value::UNIT))),
-                Value::Branch(1, Box::new(Value::variant("none", Value::UNIT))),
+                Value::Branch(1, Box::new(Value::Option(None))),
+                Value::Branch(1, Box::new(Value::Option(None))),
             ]),
         );
     }
@@ -2244,10 +2251,7 @@ mod tests {
             &[],
             Value::record([
                 ("first", Value::Seq(vec![].into())),
-                (
-                    "second-and-third",
-                    Value::Branch(1, Box::new(Value::variant("none", Value::UNIT))),
-                ),
+                ("second-and-third", Value::Option(None)),
             ]),
         );
         accepts(
@@ -2256,10 +2260,7 @@ mod tests {
             &[],
             Value::record([
                 ("first", Value::Seq(vec![Value::U8(0x00)].into())),
-                (
-                    "second-and-third",
-                    Value::Branch(1, Box::new(Value::variant("none", Value::UNIT))),
-                ),
+                ("second-and-third", Value::Option(None)),
             ]),
         );
         accepts(
@@ -2270,19 +2271,13 @@ mod tests {
                 ("first", Value::Seq(vec![Value::U8(0x00)].into())),
                 (
                     "second-and-third",
-                    Value::Branch(
-                        0,
-                        Box::new(Value::variant(
-                            "some",
-                            Value::record([
-                                (
-                                    "second",
-                                    Value::Tuple(vec![Value::U8(0xFF), Value::Seq(vec![].into())]),
-                                ),
-                                ("third", Value::Seq(vec![].into())),
-                            ]),
-                        )),
-                    ),
+                    Value::Option(Some(Box::new(Value::record([
+                        (
+                            "second",
+                            Value::Tuple(vec![Value::U8(0xFF), Value::Seq(vec![].into())]),
+                        ),
+                        ("third", Value::Seq(vec![].into())),
+                    ])))),
                 ),
             ]),
         );
@@ -2294,19 +2289,13 @@ mod tests {
                 ("first", Value::Seq(vec![Value::U8(0x00)].into())),
                 (
                     "second-and-third",
-                    Value::Branch(
-                        0,
-                        Box::new(Value::variant(
-                            "some",
-                            Value::record(vec![
-                                (
-                                    "second",
-                                    Value::Tuple(vec![Value::U8(0xFF), Value::Seq(vec![].into())]),
-                                ),
-                                ("third", Value::Seq(vec![Value::U8(0x00)].into())),
-                            ]),
-                        )),
-                    ),
+                    Value::Option(Some(Box::new(Value::record(vec![
+                        (
+                            "second",
+                            Value::Tuple(vec![Value::U8(0xFF), Value::Seq(vec![].into())]),
+                        ),
+                        ("third", Value::Seq(vec![Value::U8(0x00)].into())),
+                    ])))),
                 ),
             ]),
         );
@@ -2316,10 +2305,7 @@ mod tests {
             &[0x7F],
             Value::record(vec![
                 ("first", Value::Seq(vec![Value::U8(0x00)].into())),
-                (
-                    "second-and-third",
-                    Value::Branch(1, Box::new(Value::variant("none", Value::UNIT))),
-                ),
+                ("second-and-third", Value::Option(None)),
             ]),
         );
     }

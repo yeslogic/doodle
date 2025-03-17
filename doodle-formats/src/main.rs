@@ -63,6 +63,55 @@ enum Command {
     TypeCheck,
 }
 
+const SELECTORS: &[(&[&str], FormatSelector)] = &[
+    (&["deflate"], FormatSelector::Deflate),
+    (&["zlib"], FormatSelector::Zlib),
+    (&["tiff"], FormatSelector::Tiff),
+    (
+        &["text", "txt", "utf8", "utf", "unicode"],
+        FormatSelector::Utf8Text,
+    ),
+    (&["gif"], FormatSelector::Gif),
+    (&["gzip"], FormatSelector::Gzip),
+    (&["jpeg", "jpg"], FormatSelector::Jpeg),
+    (&["mp4", "mpeg4"], FormatSelector::Mp4),
+    (&["peano"], FormatSelector::Peano),
+    (&["png"], FormatSelector::Png),
+    (&["riff"], FormatSelector::Riff),
+    (&["ustar", "tar"], FormatSelector::Tar),
+    (&["targz", "tgz"], FormatSelector::TarGz),
+    (&["elf"], FormatSelector::Elf),
+    (&["waldo"], FormatSelector::Waldo),
+    (
+        &["opentype", "font", "otf", "ttf", "ttc"],
+        FormatSelector::Opentype,
+    ),
+];
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+enum FormatSelector {
+    Deflate,
+    Elf,
+    Gif,
+    Gzip,
+    Jpeg,
+    Mp4,
+    Opentype,
+    Peano,
+    Png,
+    Riff,
+    Tar,
+    TarGz,
+    Tiff,
+    Utf8Text,
+    Waldo,
+    Zlib,
+}
+
+thread_local! {
+    static SELECTOR_MAP: std::collections::BTreeMap<&'static str, FormatSelector> = SELECTORS.iter().flat_map(|(keys, v)| keys.iter().map(|k| (*k, *v))).collect::<std::collections::BTreeMap<_, _>>();
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
     match Command::parse() {
         Command::Format { output, dest } => {
@@ -90,36 +139,44 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
                 None => format::main(&mut module).call(),
                 Some(selector) => {
                     let base = format::base::main(&mut module);
-                    match selector.to_lowercase().as_str() {
-                        "deflate" => format::deflate::main(&mut module, &base).call(),
-                        "zlib" => {
+
+                    let normalized = selector.to_lowercase();
+                    let Some(selected) = SELECTOR_MAP
+                        .try_with(|map| map.get(normalized.as_str()).copied())
+                        .unwrap_or_else(|err| {
+                            panic!("Error accessing thread-local SELECTOR_MAP: {err}")
+                        })
+                    else {
+                        return Err(anyhow!("Unknown format specifier `{normalized}`").into());
+                    };
+                    match selected {
+                        FormatSelector::Deflate => format::deflate::main(&mut module, &base).call(),
+                        FormatSelector::Zlib => {
                             let deflate = format::deflate::main(&mut module, &base);
                             format::zlib::main(&mut module, &base, deflate).call()
                         }
-                        "tiff" => format::tiff::main(&mut module, &base).call(),
-                        "text" | "txt" | "utf8" | "utf" | "unicode" => {
-                            format::text::main(&mut module, &base).0.call()
-                        }
-                        "gif" => format::gif::main(&mut module, &base).call(),
-                        "gzip" => {
+                        FormatSelector::Tiff => format::tiff::main(&mut module, &base).call(),
+                        FormatSelector::Utf8Text => format::text::main(&mut module, &base).0.call(),
+                        FormatSelector::Gif => format::gif::main(&mut module, &base).call(),
+                        FormatSelector::Gzip => {
                             let deflate = format::deflate::main(&mut module, &base);
                             format::gzip::main(&mut module, deflate, &base).call()
                         }
-                        "jpeg" | "jpg" => {
+                        FormatSelector::Jpeg => {
                             let tiff = format::tiff::main(&mut module, &base);
                             format::jpeg::main(&mut module, &base, &tiff).call()
                         }
-                        "mp4" | "mpeg4" => format::mpeg4::main(&mut module, &base).call(),
-                        "peano" => format::peano::main(&mut module).call(),
-                        "png" => {
+                        FormatSelector::Mp4 => format::mpeg4::main(&mut module, &base).call(),
+                        FormatSelector::Peano => format::peano::main(&mut module).call(),
+                        FormatSelector::Png => {
                             let deflate = format::deflate::main(&mut module, &base);
                             let zlib = format::zlib::main(&mut module, &base, deflate);
                             let (text, utf8nz) = format::text::main(&mut module, &base);
                             format::png::main(&mut module, zlib, text, utf8nz, &base).call()
                         }
-                        "riff" => format::riff::main(&mut module, &base).call(),
-                        "ustar" | "tar" => format::tar::main(&mut module, &base).call(),
-                        "targz" | "tgz" => {
+                        FormatSelector::Riff => format::riff::main(&mut module, &base).call(),
+                        FormatSelector::Tar => format::tar::main(&mut module, &base).call(),
+                        FormatSelector::TarGz => {
                             let deflate = format::deflate::main(&mut module, &base);
                             let gzip = format::gzip::main(&mut module, deflate, &base);
                             let tar = format::tar::main(&mut module, &base);
@@ -145,12 +202,11 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
                                 )
                                 .call()
                         }
-                        "elf" => format::elf::main(&mut module, &base).call(),
-                        "waldo" => format::waldo::main(&mut module, &base).call(),
-                        "opentype" | "font" | "otf" | "ttf" | "ttc" => {
+                        FormatSelector::Elf => format::elf::main(&mut module, &base).call(),
+                        FormatSelector::Waldo => format::waldo::main(&mut module, &base).call(),
+                        FormatSelector::Opentype => {
                             format::opentype::main(&mut module, &base).call()
                         }
-                        _other => Err(anyhow!("Unknown format specifier `{_other}`"))?,
                     }
                 }
             };

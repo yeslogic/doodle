@@ -351,7 +351,7 @@ pub fn union_nondet<Name: IntoLabel>(branches: impl IntoIterator<Item = (Name, F
     )
 }
 
-/// Helper-function for [`Format::Record`] taking any iterable container of
+/// Helper-function for [`Format::record`] taking any iterable container of
 /// `(Name, Format)` pairs, which define each field's name and contents, in order.
 ///
 /// # Notes

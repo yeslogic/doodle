@@ -3388,10 +3388,10 @@ mod tests {
     #[test]
     fn test_non_union_complex() -> TCResult<()> {
         let mut tc = TypeChecker::new();
-        let format = Format::Record(vec![
-            ("number".into(), Format::Byte(ByteSet::full())),
+        let format = Format::record(vec![
+            ("number", Format::Byte(ByteSet::full())),
             (
-                "isEven".into(),
+                "isEven",
                 compute(Expr::Match(
                     Box::new(Expr::Arith(
                         Arith::Rem,
@@ -3425,10 +3425,10 @@ mod tests {
     #[test]
     fn test_union_complex() -> TCResult<()> {
         let mut tc = TypeChecker::new();
-        let format = Format::Record(vec![
-            ("number".into(), Format::Byte(ByteSet::full())),
+        let format = Format::record(vec![
+            ("number", Format::Byte(ByteSet::full())),
             (
-                "parity".into(),
+                "parity",
                 compute(Expr::Match(
                     Box::new(Expr::Arith(
                         Arith::Rem,
