@@ -762,7 +762,10 @@ pub enum StyleHint {
 pub(crate) enum FieldLabel<'a> {
     Anonymous,
     Ephemeral(&'a Label),
-    Permanent { in_capture: &'a Label, in_value: &'a Label },
+    Permanent {
+        in_capture: &'a Label,
+        in_value: &'a Label,
+    },
 }
 
 pub(crate) struct RecordFormat<'a> {
@@ -792,7 +795,10 @@ impl<'a> RecordFormat<'a> {
     pub(crate) fn lookup_value_field(&self, field_name: &Label) -> Option<(&'a Format, &'a Label)> {
         for (label, format) in &self.flat {
             match label {
-                FieldLabel::Permanent { in_value, in_capture } if *in_value == field_name => {
+                FieldLabel::Permanent {
+                    in_value,
+                    in_capture,
+                } if *in_value == field_name => {
                     return Some((format, in_capture));
                 }
                 _ => continue,
@@ -801,8 +807,6 @@ impl<'a> RecordFormat<'a> {
         None
     }
 }
-
-
 
 #[derive(Debug)]
 pub(crate) struct RecordBuilder<'a> {
@@ -839,7 +843,7 @@ impl<'a> RecordBuilder<'a> {
                     Ok(None)
                 }
                 other => Err(anyhow!("expected Record, found {other:?}")),
-            }
+            },
             other => Err(anyhow!("unexpected non-Record-shape format: {other:?}")),
         }
     }
@@ -858,7 +862,9 @@ impl<'a> RecordBuilder<'a> {
         for (lab, r_expr) in self.res.unwrap() {
             match r_expr {
                 Expr::Var(var) => kept.insert(var, lab),
-                other => unreachable!("non-variable expression in format-record construction: {other:?}"),
+                other => {
+                    unreachable!("non-variable expression in format-record construction: {other:?}")
+                }
             };
         }
         for (label, format) in Iterator::zip(self.labels.into_iter(), self.formats.into_iter()) {
@@ -867,7 +873,10 @@ impl<'a> RecordBuilder<'a> {
                 Some(in_capture) => {
                     // there is no check for shadowing here, so we hope that is avoided.
                     match kept.get(in_capture) {
-                        Some(in_value) => FieldLabel::Permanent { in_capture, in_value },
+                        Some(in_value) => FieldLabel::Permanent {
+                            in_capture,
+                            in_value,
+                        },
                         None => FieldLabel::Ephemeral(in_capture),
                     }
                 }
@@ -877,7 +886,6 @@ impl<'a> RecordBuilder<'a> {
         RecordFormat { flat }
     }
 }
-
 
 impl Format {
     pub const EMPTY: Format = Format::Tuple(Vec::new());
@@ -915,15 +923,20 @@ impl Format {
     pub fn record<Name: IntoLabel>(fields: impl IntoIterator<Item = (Name, Format)>) -> Format {
         let mut fields = fields.into_iter().collect::<VecDeque<(Name, Format)>>();
         let accum = Vec::with_capacity(fields.len());
-        Format::Hint(StyleHint::Record { old_style: true }, Box::new(Format::__chain_record(accum, &mut fields)))
+        Format::Hint(
+            StyleHint::Record { old_style: true },
+            Box::new(Format::__chain_record(accum, &mut fields)),
+        )
     }
 
     pub(crate) fn synthesize_record(&self) -> RecordFormat<'_> {
         RecordFormat::try_from(self).unwrap()
     }
 
-
-    fn __chain_record<Name: IntoLabel>(mut captured: Vec<(Label, Expr)>, remaining: &mut VecDeque<(Name, Format)>) -> Format {
+    fn __chain_record<Name: IntoLabel>(
+        mut captured: Vec<(Label, Expr)>,
+        remaining: &mut VecDeque<(Name, Format)>,
+    ) -> Format {
         if remaining.is_empty() {
             Format::Compute(Box::new(Expr::Record(captured)))
         } else {
@@ -2098,9 +2111,7 @@ impl<'a> MatchTreeStep<'a> {
                 let next0 = Rc::new(Next::Cat(MaybeTyped::Typed(f), next));
                 Self::from_gt_format(module, f0, next0)
             }
-            TypedFormat::Hint(_, _hint, f) => {
-                Self::from_gt_format(module, f, next)
-            }
+            TypedFormat::Hint(_, _hint, f) => Self::from_gt_format(module, f, next),
         }
     }
 
@@ -2497,7 +2508,7 @@ mod test {
             Box::new(Format::Let(
                 Label::Borrowed("x"),
                 Box::new(Expr::Var(Label::Borrowed("y"))),
-                Box::new(Format::Record(vec![
+                Box::new(Format::record(vec![
                     (Label::Borrowed("y"), compute(Expr::U8(5))),
                     (
                         Label::Borrowed("z"),

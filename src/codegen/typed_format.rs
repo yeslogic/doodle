@@ -242,11 +242,7 @@ pub enum TypedFormat<TypeRep> {
         Box<TypedFormat<TypeRep>>,
         Box<TypedFormat<TypeRep>>,
     ),
-    Hint(
-        TypeRep,
-        StyleHint,
-        Box<TypedFormat<TypeRep>>,
-    ),
+    Hint(TypeRep, StyleHint, Box<TypedFormat<TypeRep>>),
     AccumUntil(
         TypeRep,
         Box<TypedExpr<TypeRep>>,
@@ -393,8 +389,9 @@ impl TypedFormat<GenType> {
                 .unwrap(),
 
             TypedFormat::Apply(_, _, _) => Bounds::at_least(1),
-            TypedFormat::LetFormat(_, f0, _, f1)
-            | TypedFormat::MonadSeq(_, f0, f1) => f0.match_bounds() + f1.match_bounds(),
+            TypedFormat::LetFormat(_, f0, _, f1) | TypedFormat::MonadSeq(_, f0, f1) => {
+                f0.match_bounds() + f1.match_bounds()
+            }
             TypedFormat::Hint(.., inner) => inner.match_bounds(),
         }
     }
@@ -985,12 +982,8 @@ mod __impls {
                 TypedFormat::LetFormat(_, f0, name, f) => {
                     Format::LetFormat(rebox(f0), name, rebox(f))
                 }
-                TypedFormat::MonadSeq(_, f0, f) => {
-                    Format::MonadSeq(rebox(f0), rebox(f))
-                }
-                TypedFormat::Hint(_, hint, f) => {
-                    Format::Hint(hint.clone(), rebox(f))
-                }
+                TypedFormat::MonadSeq(_, f0, f) => Format::MonadSeq(rebox(f0), rebox(f)),
+                TypedFormat::Hint(_, hint, f) => Format::Hint(hint.clone(), rebox(f)),
                 TypedFormat::Union(_, branches) => {
                     Format::Union(branches.into_iter().map(Format::from).collect())
                 }

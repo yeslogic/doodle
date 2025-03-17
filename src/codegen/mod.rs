@@ -9,7 +9,12 @@ use rebind::Rebindable;
 pub use rust_ast::ToFragment;
 
 use crate::{
-    byte_set::ByteSet, decoder::extract_pair, parser::error::TraceHash, typecheck::{TypeChecker, UScope, UVar}, Arith, BaseType, DynFormat, Expr, Format, FormatModule, IntRel, IntoLabel, Label, MatchTree, Pattern, StyleHint, UnaryOp, ValueType
+    byte_set::ByteSet,
+    decoder::extract_pair,
+    parser::error::TraceHash,
+    typecheck::{TypeChecker, UScope, UVar},
+    Arith, BaseType, DynFormat, Expr, Format, FormatModule, IntRel, IntoLabel, Label, MatchTree,
+    Pattern, StyleHint, UnaryOp, ValueType,
 };
 
 use std::{
@@ -2965,7 +2970,6 @@ where
                     )
                 }
             }
-
         }
     }
 }
@@ -4069,16 +4073,18 @@ impl<'a> Elaborator<'a> {
                 let t_inner = self.elaborate_format(inner, dyn_scope);
                 let gt = self.get_gt_from_index(index);
                 match style_hint {
-                    StyleHint::Record { .. } => match gt.try_as_adhoc() {
-                        Some(_) => (),
-                        None => {
-                            let before = self.get_gt_from_index(index - 1);
-                            let after = self.get_gt_from_index(index + 1);
-                            eprintln!("Possible frame-shift error around {index} (looking for Struct)");
-                            eprintln!("[{}]: {before:?}", index - 1);
-                            eprintln!("[{}]: {gt:?}", index);
-                            eprintln!("[{}]: {after:?}", index + 1);
-                            // unreachable!("found non-adhoc type for record format elaboration: {gt:?} @ {index} ({flds:#?})");
+                    StyleHint::Record { .. } => {
+                        match gt.try_as_adhoc() {
+                            Some(_) => (),
+                            None => {
+                                let before = self.get_gt_from_index(index - 1);
+                                let after = self.get_gt_from_index(index + 1);
+                                eprintln!("Possible frame-shift error around {index} (looking for Struct)");
+                                eprintln!("[{}]: {before:?}", index - 1);
+                                eprintln!("[{}]: {gt:?}", index);
+                                eprintln!("[{}]: {after:?}", index + 1);
+                                // unreachable!("found non-adhoc type for record format elaboration: {gt:?} @ {index} ({flds:#?})");
+                            }
                         }
                     }
                 }
@@ -4582,10 +4588,10 @@ mod tests {
 
     #[test]
     fn test_headcount_record_simple() {
-        let f = Format::Record(vec![
-            ("any_byte".into(), Format::Byte(ByteSet::full())),
-            ("align64".into(), Format::Align(64)),
-            ("eoi".into(), Format::EndOfInput),
+        let f = Format::record(vec![
+            ("any_byte", Format::Byte(ByteSet::full())),
+            ("align64", Format::Align(64)),
+            ("eoi", Format::EndOfInput),
         ]);
 
         run_headcount(&[("record_simple", f)]);
@@ -4621,7 +4627,7 @@ mod tests {
             Box::new(Expr::Var("x".into())),
         ));
 
-        let f = Format::Record(vec![("x".into(), x), ("fx".into(), fx), ("gx".into(), gx)]);
+        let f = Format::record(vec![("x", x), ("fx", fx), ("gx", gx)]);
         run_headcount(&[("test.compute_simple", f)]);
     }
 
@@ -4659,7 +4665,7 @@ mod tests {
             Box::new(Expr::Var("xs".into())),
         ));
 
-        let f = Format::Record(vec![("xs".into(), xs), ("fxs".into(), fxs)]);
+        let f = Format::record(vec![("xs", xs), ("fxs", fxs)]);
         run_headcount(&[("test.compute_complex", f)]);
     }
 

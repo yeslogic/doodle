@@ -6,7 +6,9 @@ use crate::{
     decoder::Value,
     loc_decoder::{ParseLoc, Parsed, ParsedValue},
 };
-use crate::{Arith, DynFormat, Expr, FieldLabel, Format, FormatModule, IntRel, RecordFormat, StyleHint};
+use crate::{
+    Arith, DynFormat, Expr, FieldLabel, Format, FormatModule, IntRel, RecordFormat, StyleHint,
+};
 use crate::{Label, UnaryOp};
 
 use super::{Fragment, FragmentBuilder, Symbol};
@@ -74,11 +76,11 @@ impl<'module> TreePrinter<'module> {
     fn is_implied_value_format_old_style_record(&self, format: &Format) -> bool {
         match format {
             Format::LetFormat(bind, _, inner) => {
-                self.is_implied_value_format(bind) &&
-                self.is_implied_value_format_old_style_record(inner)
+                self.is_implied_value_format(bind)
+                    && self.is_implied_value_format_old_style_record(inner)
             }
             Format::Compute(..) => true,
-            other => unreachable!("unexpected format {other:?}")
+            other => unreachable!("unexpected format {other:?}"),
         }
     }
 
@@ -128,7 +130,10 @@ impl<'module> TreePrinter<'module> {
                 let record_fmt = format.synthesize_record();
                 for (field_label, field_format) in record_fmt.iter() {
                     match field_label {
-                        FieldLabel::Permanent { in_value, .. } if !(in_value.starts_with("__") && self.flags.hide_double_underscore_fields) => {
+                        FieldLabel::Permanent { in_value, .. }
+                            if !(in_value.starts_with("__")
+                                && self.flags.hide_double_underscore_fields) =>
+                        {
                             if self.is_atomic_format(field_format) {
                                 fields.push((*in_value, *field_format));
                             } else {
@@ -591,7 +596,9 @@ impl<'module> TreePrinter<'module> {
             },
             Format::Dynamic(_name, _dynformat, format) => self.compile_decoded_value(value, format),
             Format::Apply(_) => self.compile_value(value),
-            Format::LetFormat(.., f) | Format::MonadSeq(_, f) => self.compile_decoded_value(value, f),
+            Format::LetFormat(.., f) | Format::MonadSeq(_, f) => {
+                self.compile_decoded_value(value, f)
+            }
         }
     }
 
@@ -1081,7 +1088,9 @@ impl<'module> TreePrinter<'module> {
         } = p_value_fields;
         let mut value_fields_keep = Vec::new();
 
-        let v_fields = if self.flags.hide_double_underscore_fields && value_fields.iter().any(|(lab, _)| lab.starts_with("__")) {
+        let v_fields = if self.flags.hide_double_underscore_fields
+            && value_fields.iter().any(|(lab, _)| lab.starts_with("__"))
+        {
             value_fields_keep.extend(
                 value_fields
                     .iter()
@@ -1103,11 +1112,15 @@ impl<'module> TreePrinter<'module> {
             let mut frag = Fragment::new();
             let last_index = value_fields.len() - 1;
             for (label, value) in value_fields[..last_index].iter() {
-                let format = format_fields.and_then(|fs| fs.lookup_value_field(label)).map(|(f, _)| f);
+                let format = format_fields
+                    .and_then(|fs| fs.lookup_value_field(label))
+                    .map(|(f, _)| f);
                 frag.append(self.compile_parsed_field_value_continue(label, value, format, true));
             }
             let (label, value) = &value_fields[last_index];
-            let format = format_fields.and_then(|fs| fs.lookup_value_field(label)).map(|(f, _)| f);
+            let format = format_fields
+                .and_then(|fs| fs.lookup_value_field(label))
+                .map(|(f, _)| f);
             frag.append(self.compile_parsed_field_value_last(label, value, format, true));
             frag
         }
@@ -1134,7 +1147,9 @@ impl<'module> TreePrinter<'module> {
     ) -> Fragment {
         let mut value_fields_keep = Vec::new();
 
-        let v_fields = if self.flags.hide_double_underscore_fields && value_fields.iter().any(|(lab, _)| lab.starts_with("__")) {
+        let v_fields = if self.flags.hide_double_underscore_fields
+            && value_fields.iter().any(|(lab, _)| lab.starts_with("__"))
+        {
             value_fields_keep.extend(
                 value_fields
                     .iter()
@@ -1156,11 +1171,15 @@ impl<'module> TreePrinter<'module> {
             let mut frag = Fragment::new();
             let last_index = value_fields.len() - 1;
             for (label, value) in value_fields[..last_index].iter() {
-                let format = format_spine.and_then(|fs| fs.lookup_value_field(label)).map(|(f, _)| f);
+                let format = format_spine
+                    .and_then(|fs| fs.lookup_value_field(label))
+                    .map(|(f, _)| f);
                 frag.append(self.compile_field_value_continue(label, value, format, true));
             }
             let (label, value) = &value_fields[last_index];
-            let format = format_spine.and_then(|fs| fs.lookup_value_field(label)).map(|(f, _)| f);
+            let format = format_spine
+                .and_then(|fs| fs.lookup_value_field(label))
+                .map(|(f, _)| f);
             frag.append(self.compile_field_value_last(label, value, format, true));
             frag
         }
@@ -1984,12 +2003,7 @@ impl<'module> TreePrinter<'module> {
             Format::MonadSeq(f0, f) => {
                 let fmt_frag = self.compile_format(f0, Precedence::ATOM);
                 cond_paren(
-                    self.compile_nested_format(
-                        "monad-seq",
-                        Some(&[fmt_frag]),
-                        f,
-                        prec,
-                    ),
+                    self.compile_nested_format("monad-seq", Some(&[fmt_frag]), f, prec),
                     prec,
                     Precedence::FORMAT_COMPOUND,
                 )
@@ -2075,13 +2089,11 @@ impl<'module> TreePrinter<'module> {
             Format::Tuple(formats) if formats.is_empty() => Fragment::String("()".into()),
             Format::Tuple(_) => Fragment::String("(...)".into()),
 
-            Format::Hint(StyleHint::Record { old_style: true }, inner) => {
-                match inner.as_ref() {
-                    Format::Compute(..) => Fragment::String("{}".into()),
-                    Format::LetFormat(..) => Fragment::String("{ ... }".into()),
-                    _ => unreachable!("unexpected old-style record-hint inner format: {inner:?}"),
-                }
-            }
+            Format::Hint(StyleHint::Record { old_style: true }, inner) => match inner.as_ref() {
+                Format::Compute(..) => Fragment::String("{}".into()),
+                Format::LetFormat(..) => Fragment::String("{ ... }".into()),
+                _ => unreachable!("unexpected old-style record-hint inner format: {inner:?}"),
+            },
             Format::Hint(StyleHint::Record { old_style: false }, inner) => {
                 // FIXME - print enhanced output for new-style records
                 match inner.as_ref() {
