@@ -54,6 +54,51 @@ impl From<usize> for Value {
     }
 }
 
+const MAX_SEQ_LEN: usize = 64;
+
+impl std::fmt::Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Value::Bool(b) => write!(f, "{}", b),
+            Value::U8(i) => write!(f, "{}", i),
+            Value::U16(i) => write!(f, "{}", i),
+            Value::U32(i) => write!(f, "{}", i),
+            Value::U64(i) => write!(f, "{}", i),
+            Value::Char(c) => write!(f, "{:?}", c),
+            Value::Usize(i) => write!(f, "{}", i),
+            Value::EnumFromTo(r) => write!(f, "{:?}", r),
+            Value::Option(v) => match v {
+                None => write!(f, "None"),
+                Some(v) => write!(f, "Some({})", v),
+            },
+            Value::Tuple(vs) => {
+                write!(f, "({})", vs.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(", "))
+            }
+            Value::Record(fields) => {
+                write!(f, "{{ {} }}", fields.iter().map(|(f, v)| format!("{}: {}", f, v)).collect::<Vec<_>>().join(", "))
+            }
+            Value::Variant(label, value) => {
+                write!(f, "`{}({})", label, value)
+            }
+            Value::Seq(s_kind) => match s_kind {
+                SeqKind::Dup(n, v) => write!(f, "[{v}; {n}]"),
+                SeqKind::Strict(vs) => {
+                    if vs.len() > MAX_SEQ_LEN {
+                        write!(f, "[...; {}]", vs.len())
+                    } else {
+                        write!(f, "[{}]", vs.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(", "))
+                    }
+                }
+            }
+            Value::Mapped(orig, image) => {
+                write!(f, "({} => {})", orig, image)
+            }
+            Value::Branch(n, value) => write!(f, "({n} :~ {})", value),
+        }
+    }
+}
+
+
 impl Value {
     fn tuple_proj(&self, index: usize) -> &Self {
         match self.coerce_mapped_value() {
