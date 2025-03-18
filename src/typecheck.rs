@@ -2946,6 +2946,15 @@ impl TypeChecker {
                 self.unify_var_pair(newvar, inner_v)?;
                 Ok(newvar)
             }
+            Format::LiftedOption(opt_f) => {
+                let newvar = self.get_new_uvar();
+                let inner_var = match opt_f {
+                    None => self.get_new_uvar(),
+                    Some(inner_f) => self.infer_var_format(inner_f, ctxt)?,
+                };
+                self.unify_var_utype(newvar, Rc::new(UType::Option(inner_var.into())))?;
+                Ok(newvar)
+            }
         }
     }
 

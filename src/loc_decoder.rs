@@ -531,11 +531,12 @@ impl Expr {
             Expr::TupleProj(head, index) => cow_map(head.eval_with_loc(scope), |v| {
                 v.coerce_mapped_value().tuple_proj(*index)
             }),
-            Expr::Record(fields) => Cow::Owned(ParsedValue::from_evaluated(Value::record(
+            Expr::Record(fields) => Cow::Owned(ParsedValue::collect_fields(
                 fields
                     .iter()
-                    .map(|(label, expr)| (label.clone(), expr.eval_value_with_loc(scope))),
-            ))),
+                    .map(|(label, expr)| (label.clone(), expr.eval_with_loc(scope).into_owned()))
+                    .collect(),
+            )),
             Expr::RecordProj(head, label) => cow_map(head.eval_with_loc(scope), |v| {
                 v.coerce_mapped_value().record_proj(label.as_ref())
             }),
@@ -1676,6 +1677,15 @@ impl Decoder {
             Decoder::Apply(name) => {
                 let d = scope.get_decoder_by_name(name);
                 d.parse_with_loc(program, scope, input)
+            }
+            Decoder::LiftedOption(None) => {
+                let v = ParsedValue::from_evaluated(Value::Option(None));
+                Ok((v, input))
+            }
+            Decoder::LiftedOption(Some(d)) => {
+                let (v, input) = d.parse_with_loc(program, scope, input)?;
+                let some_v = ParsedValue::Option(Some(Box::new(v)));
+                Ok((some_v, input))
             }
         }
     }

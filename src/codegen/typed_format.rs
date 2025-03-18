@@ -158,6 +158,7 @@ impl<TypeRep> std::hash::Hash for TypedFormat<TypeRep> {
                 hint.hash(state);
                 f.hash(state);
             }
+            TypedFormat::LiftedOption(_, opt_f) => opt_f.hash(state),
         }
     }
 }
@@ -251,6 +252,7 @@ pub enum TypedFormat<TypeRep> {
         TypeHint,
         Box<TypedFormat<TypeRep>>,
     ),
+    LiftedOption(TypeRep, Option<Box<TypedFormat<TypeRep>>>),
 }
 
 impl TypedFormat<GenType> {
@@ -325,6 +327,9 @@ impl TypedFormat<GenType> {
                 f0.match_bounds() + f.lookahead_bounds(),
             ),
             TypedFormat::Hint(.., inner) => inner.lookahead_bounds(),
+            TypedFormat::LiftedOption(_, f) => f
+                .as_ref()
+                .map_or(Bounds::exact(0), |f| f.lookahead_bounds()),
         }
     }
 
@@ -393,6 +398,9 @@ impl TypedFormat<GenType> {
                 f0.match_bounds() + f1.match_bounds()
             }
             TypedFormat::Hint(.., inner) => inner.match_bounds(),
+            TypedFormat::LiftedOption(_, f) => {
+                f.as_ref().map_or(Bounds::exact(0), |f| f.match_bounds())
+            }
         }
     }
 
@@ -451,6 +459,7 @@ impl TypedFormat<GenType> {
             | TypedFormat::Let(gt, ..)
             | TypedFormat::Match(gt, ..)
             | TypedFormat::Dynamic(gt, ..)
+            | TypedFormat::LiftedOption(gt, ..)
             | TypedFormat::Apply(gt, ..) => Some(Cow::Borrowed(gt)),
         }
     }
@@ -1038,6 +1047,7 @@ mod __impls {
                     Format::Dynamic(name, DynFormat::from(dynf), rebox(inner))
                 }
                 TypedFormat::Apply(_, name, _) => Format::Apply(name),
+                TypedFormat::LiftedOption(_, inner) => Format::LiftedOption(inner.map(rebox)),
             }
         }
     }

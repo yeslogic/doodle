@@ -72,10 +72,25 @@ impl std::fmt::Display for Value {
                 Some(v) => write!(f, "Some({})", v),
             },
             Value::Tuple(vs) => {
-                write!(f, "({})", vs.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(", "))
+                write!(
+                    f,
+                    "({})",
+                    vs.iter()
+                        .map(|v| v.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
             }
             Value::Record(fields) => {
-                write!(f, "{{ {} }}", fields.iter().map(|(f, v)| format!("{}: {}", f, v)).collect::<Vec<_>>().join(", "))
+                write!(
+                    f,
+                    "{{ {} }}",
+                    fields
+                        .iter()
+                        .map(|(f, v)| format!("{}: {}", f, v))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
             }
             Value::Variant(label, value) => {
                 write!(f, "`{}({})", label, value)
@@ -86,10 +101,17 @@ impl std::fmt::Display for Value {
                     if vs.len() > MAX_SEQ_LEN {
                         write!(f, "[...; {}]", vs.len())
                     } else {
-                        write!(f, "[{}]", vs.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(", "))
+                        write!(
+                            f,
+                            "[{}]",
+                            vs.iter()
+                                .map(|v| v.to_string())
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        )
                     }
                 }
-            }
+            },
             Value::Mapped(orig, image) => {
                 write!(f, "({} => {})", orig, image)
             }
@@ -97,7 +119,6 @@ impl std::fmt::Display for Value {
         }
     }
 }
-
 
 impl Value {
     fn tuple_proj(&self, index: usize) -> &Self {
@@ -287,11 +308,11 @@ impl Expr {
             Expr::TupleProj(head, index) => cow_map(head.eval(scope), |v| {
                 v.coerce_mapped_value().tuple_proj(*index)
             }),
-            Expr::Record(fields) => Cow::Owned(Value::record(
-                fields
-                    .iter()
-                    .map(|(label, expr)| (label.clone(), expr.eval(scope).into_owned())),
-            )),
+            Expr::Record(fields) => {
+                Cow::Owned(Value::record(fields.iter().map(|(label, expr)| {
+                    (label.clone(), expr.eval(scope).into_owned())
+                })))
+            }
             Expr::RecordProj(head, label) => cow_map(head.eval(scope), |v| {
                 v.coerce_mapped_value().record_proj(label.as_ref())
             }),
@@ -856,6 +877,7 @@ pub enum Decoder {
     LetFormat(Box<Decoder>, Label, Box<Decoder>),
     MonadSeq(Box<Decoder>, Box<Decoder>),
     AccumUntil(Box<Expr>, Box<Expr>, Box<Expr>, TypeHint, Box<Decoder>),
+    LiftedOption(Option<Box<Decoder>>),
 }
 
 #[derive(Clone, Debug)]
@@ -1172,6 +1194,10 @@ impl<'a> Compiler<'a> {
                 // REVIEW - do we want to preserve any facet of the hinting within the Decoder?
                 self.compile_format(a, next)
             }
+            Format::LiftedOption(None) => Ok(Decoder::LiftedOption(None)),
+            Format::LiftedOption(Some(a)) => Ok(Decoder::LiftedOption(Some(Box::new(
+                self.compile_format(a, next)?,
+            )))),
         }
     }
 }
@@ -1692,6 +1718,11 @@ impl Decoder {
             Decoder::Apply(name) => {
                 let d = scope.get_decoder_by_name(name);
                 d.parse(program, scope, input)
+            }
+            Decoder::LiftedOption(None) => Ok((Value::Option(None), input)),
+            Decoder::LiftedOption(Some(dec)) => {
+                let (v, input) = dec.parse(program, scope, input)?;
+                Ok((Value::Option(Some(Box::new(v))), input))
             }
         }
     }
@@ -2296,7 +2327,10 @@ mod tests {
             &[],
             Value::record([
                 ("first", Value::Seq(vec![].into())),
-                ("second-and-third", Value::Branch(1, Box::new(Value::Option(None)))),
+                (
+                    "second-and-third",
+                    Value::Branch(1, Box::new(Value::Option(None))),
+                ),
             ]),
         );
         accepts(
@@ -2305,7 +2339,10 @@ mod tests {
             &[],
             Value::record([
                 ("first", Value::Seq(vec![Value::U8(0x00)].into())),
-                ("second-and-third", Value::Branch(1, Box::new(Value::Option(None)))),
+                (
+                    "second-and-third",
+                    Value::Branch(1, Box::new(Value::Option(None))),
+                ),
             ]),
         );
         accepts(
@@ -2316,13 +2353,16 @@ mod tests {
                 ("first", Value::Seq(vec![Value::U8(0x00)].into())),
                 (
                     "second-and-third",
-                    Value::Branch(0, Box::new(mapped_some(Value::record([
-                        (
-                            "second",
-                            Value::Tuple(vec![Value::U8(0xFF), Value::Seq(vec![].into())]),
-                        ),
-                        ("third", Value::Seq(vec![].into())),
-                    ])))),
+                    Value::Branch(
+                        0,
+                        Box::new(mapped_some(Value::record([
+                            (
+                                "second",
+                                Value::Tuple(vec![Value::U8(0xFF), Value::Seq(vec![].into())]),
+                            ),
+                            ("third", Value::Seq(vec![].into())),
+                        ]))),
+                    ),
                 ),
             ]),
         );
@@ -2334,13 +2374,16 @@ mod tests {
                 ("first", Value::Seq(vec![Value::U8(0x00)].into())),
                 (
                     "second-and-third",
-                    Value::Branch(0, Box::new(mapped_some(Value::record(vec![
-                        (
-                            "second",
-                            Value::Tuple(vec![Value::U8(0xFF), Value::Seq(vec![].into())]),
-                        ),
-                        ("third", Value::Seq(vec![Value::U8(0x00)].into())),
-                    ])))),
+                    Value::Branch(
+                        0,
+                        Box::new(mapped_some(Value::record(vec![
+                            (
+                                "second",
+                                Value::Tuple(vec![Value::U8(0xFF), Value::Seq(vec![].into())]),
+                            ),
+                            ("third", Value::Seq(vec![Value::U8(0x00)].into())),
+                        ]))),
+                    ),
                 ),
             ]),
         );
@@ -2350,7 +2393,10 @@ mod tests {
             &[0x7F],
             Value::record(vec![
                 ("first", Value::Seq(vec![Value::U8(0x00)].into())),
-                ("second-and-third", Value::Branch(1, Box::new(Value::Option(None)))),
+                (
+                    "second-and-third",
+                    Value::Branch(1, Box::new(Value::Option(None))),
+                ),
             ]),
         );
     }
@@ -2574,7 +2620,10 @@ mod tests {
             &d,
             &[0x00],
             &[],
-            Value::Record(vec![(Label::Borrowed("inner"), Value::Branch(0, Box::new(Value::U8(0))))]),
+            Value::Record(vec![(
+                Label::Borrowed("inner"),
+                Value::Branch(0, Box::new(Value::U8(0))),
+            )]),
         );
     }
 }

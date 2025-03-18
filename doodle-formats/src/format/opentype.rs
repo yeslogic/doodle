@@ -133,7 +133,7 @@ fn embedded_variadic_alternation<C, const OUTER: usize, const BRANCHES: usize>(
     nesting_kind: NestingKind,
 ) -> Format
 where
-    C: IntoIterator<Item = (&'static str, Format)>,
+    C: IntoIterator<Item = (&'static str, Format), IntoIter: DoubleEndedIterator>,
 {
     match nesting_kind {
         NestingKind::MinimalVariation => {
