@@ -127,7 +127,7 @@ impl<'module> TreePrinter<'module> {
                 self.try_as_record_with_atomic_fields(self.module.get_format(*level))
             }
             Format::Hint(StyleHint::Record { .. }, ..) => {
-                let record_fmt = format.synthesize_record();
+                let record_fmt = format.to_record_format();
                 for (field_label, field_format) in record_fmt.iter() {
                     match field_label {
                         FieldLabel::Permanent { in_value, .. }
@@ -404,7 +404,16 @@ impl<'module> TreePrinter<'module> {
                         Some(&Format::EMPTY),
                     ),
                 },
-                _ => panic!("expected variant, found {value:?}"),
+                _ => panic!("expected Option, found {value:?}"),
+            },
+            Format::LiftedOption(fmt) => match value {
+                ParsedValue::Option(opt_val) => match (fmt, opt_val) {
+                    (None, None) => Fragment::string("none"),
+                    (Some(fmt), Some(val)) => self.compile_parsed_variant("some", val, Some(fmt)),
+                    (Some(_), None) => panic!("expected Some, found None"),
+                    (None, Some(_)) => panic!("expected None, found {opt_val:?}"),
+                },
+                _ => panic!("expected Option, found {value:?}"),
             },
             Format::Peek(format) => self.compile_parsed_decoded_value(value, format),
             Format::PeekNot(_format) => self.compile_parsed_value(value),
@@ -500,9 +509,18 @@ impl<'module> TreePrinter<'module> {
                 }
                 _ => panic!("expected tuple, found {value}"),
             },
+            Format::LiftedOption(fmt) => match value {
+                Value::Option(opt_val) => match (fmt, opt_val) {
+                    (None, None) => Fragment::string("none"),
+                    (Some(fmt), Some(val)) => self.compile_variant("some", val, Some(fmt)),
+                    (Some(_), None) => panic!("expected Some, found None"),
+                    (None, Some(_)) => panic!("expected None, found {opt_val:?}"),
+                },
+                _ => panic!("expected Option, found {value:?}"),
+            },
             Format::Hint(StyleHint::Record { .. }, ..) => match value {
                 Value::Record(value_fields) => {
-                    let record_format = fmt.synthesize_record();
+                    let record_format = fmt.to_record_format();
                     self.compile_record(value_fields, Some(&record_format))
                 }
                 _ => panic!("expected record, found {value}"),
@@ -1845,6 +1863,15 @@ impl<'module> TreePrinter<'module> {
                 prec,
                 Precedence::FORMAT_COMPOUND,
             ),
+            Format::LiftedOption(None) => {
+                // REVIEW - do we wish to specify this more formally, or is this good enough?
+                Fragment::string("lifted-none")
+            }
+            Format::LiftedOption(Some(format)) => cond_paren(
+                self.compile_nested_format("lifted-some", None, format, prec),
+                prec,
+                Precedence::FORMAT_COMPOUND,
+            ),
             Format::RepeatCount(len, format) => {
                 let expr_frag = self.compile_expr(len, Precedence::ATOM);
                 cond_paren(
@@ -2090,7 +2117,9 @@ impl<'module> TreePrinter<'module> {
             Format::Tuple(_) => Fragment::String("(...)".into()),
 
             Format::Hint(StyleHint::Record { old_style: true }, inner) => match inner.as_ref() {
-                Format::Compute(expr) if matches!(&**expr, Expr::Record(vs) if vs.is_empty()) => Fragment::String("{}".into()),
+                Format::Compute(expr) if matches!(&**expr, Expr::Record(vs) if vs.is_empty()) => {
+                    Fragment::String("{}".into())
+                }
                 Format::Compute(..) => Fragment::String("{ ... }".into()),
                 Format::LetFormat(..) => Fragment::String("{ ... }".into()),
                 Format::MonadSeq(..) => Fragment::String("{ ... }".into()),
@@ -2099,7 +2128,9 @@ impl<'module> TreePrinter<'module> {
             Format::Hint(StyleHint::Record { old_style: false }, inner) => {
                 // FIXME - print enhanced output for new-style records
                 match inner.as_ref() {
-                    Format::Compute(expr) if matches!(&**expr, Expr::Record(vs) if vs.is_empty()) => Fragment::String("{}".into()),
+                    Format::Compute(expr) if matches!(&**expr, Expr::Record(vs) if vs.is_empty()) => {
+                        Fragment::String("{}".into())
+                    }
                     Format::Compute(..) => Fragment::String("{ ... }".into()),
                     Format::LetFormat(..) => Fragment::String("{ ... }".into()),
                     Format::MonadSeq(..) => Fragment::String("{ ... }".into()),

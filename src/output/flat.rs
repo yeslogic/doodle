@@ -169,6 +169,10 @@ fn check_covered(
             check_covered(module, path, &Format::EMPTY)?;
             path.pop();
         }
+        Format::LiftedOption(None) => {}
+        Format::LiftedOption(Some(format)) => {
+            check_covered(module, path, format)?;
+        }
         Format::Peek(_) => {}    // FIXME
         Format::PeekNot(_) => {} // FIXME
         Format::Slice(_, format) => {
@@ -220,6 +224,14 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::Align(_) => Ok(()),
             Format::Pos => Ok(()),
             Format::Byte(_) => Ok(()),
+            Format::LiftedOption(None) => match value {
+                Value::Option(None) => Ok(()),
+                other => panic!("expected Value::Option(None), found {other:?}"),
+            },
+            Format::LiftedOption(Some(f)) => match value {
+                Value::Option(Some(val)) => self.write_flat(val, f),
+                other => panic!("expected Value::Option(Some(..)), found {other:?}"),
+            },
             Format::Variant(label, format) => match value {
                 Value::Variant(label2, value) => {
                     if label == label2 {
@@ -314,7 +326,7 @@ impl<'module, W: io::Write> Context<'module, W> {
     }
 
     fn write_record(&mut self, value: &Value, record_format: &Format) -> io::Result<()> {
-        let rec = record_format.synthesize_record();
+        let rec = record_format.to_record_format();
         match value {
             Value::Record(value_fields) => {
                 for (label, value) in value_fields.iter() {

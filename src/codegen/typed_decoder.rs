@@ -88,6 +88,7 @@ impl TypedDecoder<GenType> {
             | TypedDecoder::LetFormat(t, ..)
             | TypedDecoder::MonadSeq(t, ..)
             | TypedDecoder::Hint(t, ..)
+            | TypedDecoder::LiftedOption(t, ..)
             | TypedDecoder::AccumUntil(t, ..) => Some(Cow::Borrowed(t)),
         }
     }
@@ -209,6 +210,7 @@ pub(crate) enum TypedDecoder<TypeRep> {
         Box<TypedDecoderExt<TypeRep>>,
     ),
     Hint(TypeRep, StyleHint, Box<TypedDecoderExt<TypeRep>>),
+    LiftedOption(TypeRep, Option<Box<TypedDecoderExt<TypeRep>>>),
 }
 
 #[derive(Clone, Debug)]
@@ -596,6 +598,16 @@ impl<'a> GTCompiler<'a> {
             TypedFormat::Hint(gt, hint, a) => {
                 let da = Box::new(self.compile_gt_format(a, None, next.clone())?);
                 Ok(TypedDecoder::Hint(gt.clone(), hint.clone(), da))
+            }
+            TypedFormat::LiftedOption(gt, opt_f) => {
+                let inner_dec = match opt_f {
+                    None => None,
+                    Some(a) => {
+                        let da = Box::new(self.compile_gt_format(a, None, next.clone())?);
+                        Some(da)
+                    }
+                };
+                Ok(TypedDecoder::LiftedOption(gt.clone(), inner_dec))
             }
         }?;
         Ok(TypedDecoderExt::new(dec, args))

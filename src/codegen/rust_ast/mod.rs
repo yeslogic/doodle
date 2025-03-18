@@ -1327,7 +1327,15 @@ pub(crate) enum RustExpr {
 }
 
 impl RustExpr {
-    /// Returns `Some(varname)` if `self` is a simple entity-reference to identifir `varname`, and
+    pub const UNIT: Self = Self::Tuple(Vec::new());
+
+    pub const NONE: Self = Self::Entity(RustEntity::Local(Label::Borrowed("None")));
+
+    pub const TRUE: Self = Self::PrimitiveLit(RustPrimLit::Boolean(true));
+
+    pub const FALSE: Self = Self::PrimitiveLit(RustPrimLit::Boolean(false));
+
+    /// Returns `Some(varname)` if `self` is a simple entity-reference to identifier `varname`, and
     /// `None` otherwise.
     pub fn as_local(&self) -> Option<&Label> {
         match self {
@@ -1336,6 +1344,7 @@ impl RustExpr {
         }
     }
 
+    #[expect(dead_code)]
     pub fn embed_match(scrutinee: Self, body: RustMatchBody<Vec<RustStmt>>) -> Self {
         match body {
             RustMatchBody::Irrefutable(mut cases) if cases.len() == 1 && cases[0].0.is_simple() => {
@@ -1358,6 +1367,518 @@ impl RustExpr {
 
     pub(crate) fn local_tuple<Name: IntoLabel>(locals: impl IntoIterator<Item = Name>) -> Self {
         Self::Tuple(locals.into_iter().map(Self::local).collect())
+    }
+
+    pub fn some(inner: Self) -> Self {
+        Self::local("Some").call_with([inner])
+    }
+
+    pub fn local(name: impl Into<Label>) -> Self {
+        Self::Entity(RustEntity::Local(name.into()))
+    }
+
+    pub fn num_lit<N: Into<usize>>(num: N) -> Self {
+        Self::PrimitiveLit(RustPrimLit::Numeric(RustNumLit::Usize(num.into())))
+    }
+
+    pub fn bool_lit(b: bool) -> Self {
+        Self::PrimitiveLit(RustPrimLit::Boolean(b))
+    }
+
+    pub fn u8lit(num: u8) -> Self {
+        Self::PrimitiveLit(RustPrimLit::Numeric(RustNumLit::U8(num)))
+    }
+
+    pub fn u16lit(num: u16) -> Self {
+        Self::PrimitiveLit(RustPrimLit::Numeric(RustNumLit::U16(num)))
+    }
+
+    pub fn u32lit(num: u32) -> Self {
+        Self::PrimitiveLit(RustPrimLit::Numeric(RustNumLit::U32(num)))
+    }
+
+    pub fn u64lit(num: u64) -> RustExpr {
+        Self::PrimitiveLit(RustPrimLit::Numeric(RustNumLit::U64(num)))
+    }
+
+    pub fn scoped<Name: Into<Label>>(
+        path: impl IntoIterator<Item = Name>,
+        name: impl Into<Label>,
+    ) -> Self {
+        let labels = path.into_iter().map(|x| x.into()).collect::<Vec<Label>>();
+        Self::Entity(RustEntity::Scoped(labels, name.into()))
+    }
+
+    pub fn borrow_of(self) -> Self {
+        match self {
+            // REVIEW - we need a more cohesive idea/model for where we want to borrow and what syntax is required for the desired semantics
+            Self::CloneOf(this) => match &*this {
+                Self::FieldAccess(..) => Self::Borrow(this),
+                // NOTE - original behavior
+                _ => *this,
+            },
+            other => Self::Borrow(Box::new(other)),
+        }
+    }
+
+    pub fn field(self, name: impl Into<Label>) -> Self {
+        match self {
+            Self::CloneOf(this) => Self::CloneOf(Box::new(this.field(name))),
+            other => Self::FieldAccess(Box::new(other), SubIdent::ByName(name.into())),
+        }
+    }
+
+    pub fn nth(self, ix: usize) -> Self {
+        match self {
+            Self::CloneOf(this) => Self::CloneOf(Box::new(this.nth(ix))),
+            other => Self::FieldAccess(Box::new(other), SubIdent::ByIndex(ix)),
+        }
+    }
+
+    pub fn index(self, ix: RustExpr) -> RustExpr {
+        match self {
+            Self::CloneOf(this) => Self::CloneOf(Box::new(this.index(ix))),
+            other => Self::Index(Box::new(other), Box::new(ix)),
+        }
+    }
+
+    pub fn call_with(self, args: impl IntoIterator<Item = Self>) -> Self {
+        Self::FunctionCall(Box::new(self), args.into_iter().collect())
+    }
+
+    pub fn call(self) -> Self {
+        self.call_with(None)
+    }
+
+    /// Helper method that calls the `as_slice` method on the expression passed in,
+    /// unpacking any top-level `RustExpr::CloneOf` variants to avoid inefficient (and unnecessary)
+    /// clone-then-borrow constructs in the generated code.
+    pub fn vec_as_slice(self) -> Self {
+        let this = match self {
+            Self::CloneOf(this) => *this,
+            other => other,
+        };
+        this.call_method("as_slice")
+    }
+
+    /// Helper method that calls the `len` method on the expression passed in,
+    /// unpacking any top-level `RustExpr::CloneOf` variants to avoid inefficient (and unnecessary)
+    /// clone-then-borrow constructs in the generated code.
+    pub fn vec_len(self) -> Self {
+        let this = match self {
+            Self::CloneOf(this) => this,
+            other => Box::new(other),
+        };
+        RustExpr::MethodCall(this, MethodSpecifier::LEN, Vec::new())
+    }
+
+    /// Invokes `<self>.<name>` as a callable method, passing in an empty list of arguments.
+    pub fn call_method(self, name: impl Into<Label>) -> Self {
+        self.call_method_with(name, None)
+    }
+
+    /// Invokes `<self>.<name>` as a callable method, passing in the argument list produced by iterating
+    /// over `args`.
+    pub fn call_method_with(
+        self,
+        name: impl Into<Label>,
+        args: impl IntoIterator<Item = Self>,
+    ) -> Self {
+        RustExpr::MethodCall(
+            Box::new(self),
+            SubIdent::ByName(name.into()).into(),
+            args.into_iter().collect(),
+        )
+    }
+
+    /// Produces the infix-operator term with surface syntax `<lhs> <op> <rhs>`.
+    pub fn infix(lhs: Self, op: InfixOperator, rhs: Self) -> Self {
+        Self::Operation(RustOp::InfixOp(op, Box::new(lhs), Box::new(rhs)))
+    }
+
+    /// Produces the most natural expression equivalent to `<self>?`.
+    ///
+    /// Cancels out `Result::Ok(...)`, and permeates `RustExpr::BlockScope` constructs to avoid overly complex syntactical
+    /// productions.
+    pub fn wrap_try(self) -> Self {
+        match self {
+            Self::ResultOk(_, inner) => *inner,
+            Self::BlockScope(stmts, ret) => Self::BlockScope(stmts, Box::new(ret.wrap_try())),
+            // REVIEW - consider whether there are any other special cases
+            _ => Self::Try(Box::new(self)),
+        }
+    }
+
+    pub fn str_lit(str: impl Into<Label>) -> Self {
+        Self::PrimitiveLit(RustPrimLit::String(str.into()))
+    }
+
+    pub fn err(err_val: RustExpr) -> RustExpr {
+        Self::local("Err").call_with([err_val])
+    }
+
+    /// Attempts to infer and return the (primitive) type of the given `RustExpr`,
+    /// returning `None` if the expression is not a primitive type or otherwise
+    /// cannot be inferred without further context or more complicated heuristics.
+    pub fn try_get_primtype(&self) -> Option<PrimType> {
+        match self {
+            RustExpr::Entity(_) => None,
+            RustExpr::PrimitiveLit(p_lit) => match p_lit {
+                RustPrimLit::Boolean(..) => Some(PrimType::Bool),
+                RustPrimLit::Numeric(n_lit) => match n_lit {
+                    RustNumLit::U8(..) => Some(PrimType::U8),
+                    RustNumLit::U16(..) => Some(PrimType::U16),
+                    RustNumLit::U32(..) => Some(PrimType::U32),
+                    RustNumLit::U64(..) => Some(PrimType::U64),
+                    RustNumLit::Usize(..) => Some(PrimType::Usize),
+                },
+                RustPrimLit::Char(..) => Some(PrimType::Char),
+                RustPrimLit::String(..) => None,
+            },
+            RustExpr::ArrayLit(..) => None,
+            RustExpr::MethodCall(_recv, _method, _args) => {
+                match _method {
+                    MethodSpecifier::Common(cm) => {
+                        // REVIEW - the current only CommonMethod, Len, is not well-defined over non-empty argument lists, but we don't check this
+                        cm.try_get_return_primtype()
+                    }
+                    MethodSpecifier::Arbitrary(SubIdent::ByIndex(_)) => {
+                        unreachable!("unexpected method call using numeric SubIdent")
+                    }
+                    MethodSpecifier::Arbitrary(SubIdent::ByName(name)) => {
+                        if name.as_ref() == "len" && _args.is_empty() {
+                            if cfg!(debug_assertions) {
+                                // REVIEW - is this worth warning about or should it be an acceptable invocation?
+                                eprintln!("WARNING: `.len()` method should be specified as a `MethodSpecifier::Common`, but was called via `Arbitrary(SubIdent::ByName)` instead...");
+                            }
+                            // REVIEW - we don't really check anything about `_recv`, and really just assume that a `.len()` method will always return `usize`
+                            Some(PrimType::Usize)
+                        } else {
+                            // REVIEW - we might want to log the number of times we hit this branch, and with what values, to see if there are any obvious cases to handle
+                            None
+                        }
+                    }
+                }
+            }
+            RustExpr::FieldAccess(obj, ident) => {
+                match ident {
+                    &SubIdent::ByIndex(ix) => match &**obj {
+                        RustExpr::Tuple(tuple)
+                        | RustExpr::Struct(_, StructExpr::TupleExpr(tuple)) => {
+                            if tuple.len() <= ix {
+                                unreachable!(
+                                    "bad tuple-index `_.{ix}` on {}-tuple {:?}",
+                                    tuple.len(),
+                                    tuple
+                                );
+                            }
+                            tuple[ix].try_get_primtype()
+                        }
+                        _ => {
+                            // REVIEW - at least notionally, it is hard to come up with any other cases that aren't invariably dead-ends
+                            None
+                        }
+                    },
+                    SubIdent::ByName(name) => match &**obj {
+                        RustExpr::Struct(_con, StructExpr::RecordExpr(fields)) => {
+                            for (field, val) in fields {
+                                if field == name {
+                                    if let Some(val) = val {
+                                        return val.try_get_primtype();
+                                    } else {
+                                        // NOTE - solving a named-field pun requires non-local reasoning equivalent to solving `RustExpr::Entity`
+                                        return None;
+                                    }
+                                }
+                            }
+                            unreachable!(
+                                "missing struct-field `_.{name}` on struct expression: {obj:?}"
+                            );
+                        }
+                        RustExpr::Struct(..) => unreachable!(
+                            "bad indexing {ident:?} on non-record struct expression: {obj:?}"
+                        ),
+                        _ => {
+                            // REVIEW - at least notionally, it is hard to come up with any other cases that aren't invariably dead-ends
+                            None
+                        }
+                    },
+                }
+            }
+            RustExpr::Struct(..) => None,
+            RustExpr::Tuple(tuple) => match &tuple[..] {
+                [] => Some(PrimType::Unit),
+                [x] => x.try_get_primtype(),
+                [_, ..] => None,
+            },
+            RustExpr::Index(seq, index) => {
+                match &**seq {
+                    RustExpr::ArrayLit(lits) => {
+                        if index.try_get_primtype() == Some(PrimType::Usize) {
+                            lits[0].try_get_primtype()
+                        } else {
+                            None
+                        }
+                    }
+                    _ => {
+                        // REVIEW - It is unclear whether adding logic to support anything more complex than an array literal would be worth it
+                        // TODO - we might want to log the number of times we hit this branch, and with what values, to see if there are any obvious cases to handle
+                        None
+                    }
+                }
+            }
+            RustExpr::FunctionCall(..) => {
+                // FIXME - there may be some functions we can predict the return values of, but for now we can leave this alone
+                // REVIEW - we might want to log the number of times we hit this branch, and with what values, to see if there are any obvious cases to handle
+                None
+            }
+            RustExpr::ResultOk(..) => None,
+            RustExpr::CloneOf(x) | RustExpr::Deref(x) => match &**x {
+                RustExpr::Borrow(y) | RustExpr::BorrowMut(y) => y.try_get_primtype(),
+                other => other.try_get_primtype(),
+            },
+            RustExpr::Borrow(_) | RustExpr::BorrowMut(_) => None,
+            RustExpr::Try(inner) => match inner.as_ref() {
+                RustExpr::ResultOk(.., x) => x.try_get_primtype(),
+                _ => None,
+            },
+            RustExpr::Operation(op) => match op {
+                RustOp::InfixOp(op, lhs, rhs) => {
+                    let lhs_type = lhs.try_get_primtype()?;
+                    let rhs_type = rhs.try_get_primtype()?;
+                    op.out_type(lhs_type, rhs_type)
+                }
+                RustOp::PrefixOp(op, expr) => {
+                    let expr_type = expr.try_get_primtype()?;
+                    op.out_type(expr_type)
+                }
+                RustOp::AsCast(expr, typ) => {
+                    let out_typ = typ.try_as_prim()?;
+                    if expr
+                        .try_get_primtype()
+                        .as_ref()
+                        .map_or(false, PrimType::is_numeric)
+                        && out_typ.is_numeric()
+                    {
+                        Some(out_typ)
+                    } else {
+                        None
+                    }
+                }
+            },
+            RustExpr::BlockScope(_stmts, ret) => {
+                // REVIEW - consider whether it is worthwhile to bother scanning `_stmts` for local definitions that `ret` might then refer to...
+                ret.try_get_primtype()
+            }
+            RustExpr::Control(..)
+            | RustExpr::Closure(..)
+            | RustExpr::Slice(..)
+            | RustExpr::RangeExclusive(..) => None,
+        }
+    }
+
+    /// Basic heuristic to determine whether a `RustExpr` is free of any side-effects, and therefore can be fully elided
+    /// if its direct evaluation would be immediately discarded (as with [`RustStmt::Expr`],  or [`RustStmt::Let`] with the `_` identifier).
+    pub fn is_pure(&self) -> bool {
+        match self {
+            RustExpr::Entity(..) => true,
+            RustExpr::PrimitiveLit(..) => true,
+            RustExpr::ArrayLit(arr) => arr.iter().all(Self::is_pure),
+            // REVIEW - over types we have no control over, clone itself can be impure, but it should never be so for the code we ourselves are generating
+            RustExpr::CloneOf(expr) => expr.is_pure(),
+            RustExpr::MethodCall(x, MethodSpecifier::LEN, args) => {
+                if args.is_empty() {
+                    x.is_pure()
+                } else {
+                    unreachable!("unexpected method call on `len` with args: {:?}", args);
+                }
+            }
+            // NOTE - there is no guaranteed-accurate static heuristic to distinguish pure fn's from those with possible side-effects
+            RustExpr::FunctionCall(..) | RustExpr::MethodCall(..) => false,
+            RustExpr::FieldAccess(expr, ..) => expr.is_pure(),
+            RustExpr::Tuple(tuple) => tuple.iter().all(Self::is_pure),
+            RustExpr::Struct(_, assigns) => match assigns {
+                StructExpr::RecordExpr(assigns) => assigns
+                    .iter()
+                    .all(|(_, val)| val.as_ref().map_or(true, Self::is_pure)),
+                StructExpr::TupleExpr(values) => values.iter().all(|val| val.is_pure()),
+                StructExpr::EmptyExpr => true,
+            },
+            RustExpr::Deref(expr) | RustExpr::Borrow(expr) | RustExpr::BorrowMut(expr) => {
+                expr.is_pure()
+            }
+            // NOTE - while we can construct pure Try-expressions manually, the intent of `?` is to have potential side-effects and so we judge them de-facto impure
+            RustExpr::Try(..) => false,
+            RustExpr::Operation(op) => match op {
+                RustOp::InfixOp(.., lhs, rhs) => lhs.is_pure() && rhs.is_pure() && op.is_sound(),
+                RustOp::PrefixOp(.., inner) => inner.is_pure() && op.is_sound(),
+                // NOTE - illegal casts like `x as u8` where x >= 256 are language-level errors that are neither pure nor impure
+                RustOp::AsCast(expr, ..) => expr.is_pure() && op.is_sound(),
+            },
+            RustExpr::ResultOk(.., inner) => inner.is_pure(),
+            // NOTE - we can have block-scopes with non-empty statements that are pure, but that is a bit too much work for our purposes right now.
+            RustExpr::BlockScope(stmts, tail) => stmts.is_empty() && tail.is_pure(),
+            // NOTE - there may be some pure control expressions but those will be relatively rare as natural occurrences
+            RustExpr::Control(..) => false,
+            // NOTE - closures are presupposed to never appear in a context where elision is a possibility to consider so this result doesn't actually need to be refined further
+            RustExpr::Closure(..) => false,
+            // NOTE - slice/index exprs can always be out-of-bounds so they cannot be elided without changing program behavior
+            RustExpr::Slice(..) | RustExpr::Index(..) => false,
+            // NOTE - ranges can only ever be language-level errors if the endpoint types are not the same
+            RustExpr::RangeExclusive(start, end) => {
+                start.is_pure()
+                    && end.is_pure()
+                    && match (start.try_get_primtype(), end.try_get_primtype()) {
+                        (Some(pt0), Some(pt1)) => pt0 == pt1,
+                        // NOTE - there are legal cases for ranges involving unknown types (i.e. those with untyped variables) but we cannot rule one way or another on those
+                        _ => false,
+                    }
+            }
+        }
+    }
+
+    /// Embed a RustExpr into a new non-temporary value, or return it if it is already non-temporary
+    pub(crate) fn make_persistent(&self) -> Cow<'_, Self> {
+        match self {
+            RustExpr::Entity(..) => Cow::Borrowed(self),
+            // REVIEW - consider which non-entity cases are already 'persistent'
+            _ => Cow::Owned(RustExpr::BlockScope(
+                vec![RustStmt::assign("tmp", self.clone())],
+                Box::new(RustExpr::local("tmp")),
+            )),
+        }
+    }
+
+    pub(crate) fn wrap_ok<Name: IntoLabel>(self, qualifier: Option<Name>) -> RustExpr {
+        match self {
+            RustExpr::Try(x) => *x,
+            other => RustExpr::ResultOk(qualifier.map(Name::into), Box::new(other)),
+        }
+    }
+
+    pub(crate) fn wrap_some(self) -> RustExpr {
+        match self {
+            RustExpr::BlockScope(stmts, tail) => {
+                RustExpr::BlockScope(stmts, Box::new(tail.wrap_some()))
+            }
+            _ => RustExpr::local("Some").call_with([self]),
+        }
+    }
+
+    pub(crate) fn option_none() -> Self {
+        RustExpr::local("None")
+    }
+}
+
+impl ToFragmentExt for RustExpr {
+    fn to_fragment_precedence(&self, prec: Precedence) -> Fragment {
+        match self {
+            RustExpr::Entity(e) => e.to_fragment(),
+            RustExpr::PrimitiveLit(pl) => pl.to_fragment(),
+            RustExpr::ArrayLit(elts) => Fragment::seq(
+                elts.iter()
+                    .map(|x| RustExpr::to_fragment_precedence(x, Precedence::Top)),
+                Some(Fragment::string(", ")),
+            )
+            .delimit(Fragment::Char('['), Fragment::Char(']')),
+            RustExpr::MethodCall(x, name, args) => cond_paren(
+                x.to_fragment_precedence(Precedence::Projection)
+                    .intervene(Fragment::Char('.'), name.to_fragment())
+                    .cat(ToFragmentExt::paren_list_prec(args, Precedence::Top)),
+                prec,
+                Precedence::Projection,
+            ),
+            RustExpr::ResultOk(opt_qual, inner) => cond_paren(
+                Fragment::group(
+                    Fragment::opt(opt_qual.as_ref(), |qual| {
+                        Fragment::String(qual.clone()).cat(Fragment::string("::"))
+                    })
+                    .cat(Fragment::string("Ok")),
+                )
+                .cat(
+                    inner
+                        .to_fragment_precedence(Precedence::Top)
+                        .delimit(Fragment::Char('('), Fragment::Char(')')),
+                ),
+                prec,
+                Precedence::INVOKE,
+            ),
+            RustExpr::CloneOf(x) => cond_paren(
+                x.to_fragment_precedence(Precedence::Projection)
+                    .intervene(Fragment::Char('.'), Fragment::string("clone()")),
+                prec,
+                Precedence::Projection,
+            ),
+            RustExpr::FieldAccess(x, name) => x
+                .to_fragment_precedence(Precedence::Projection)
+                .intervene(Fragment::Char('.'), name.to_fragment()),
+            RustExpr::FunctionCall(f, args) => cond_paren(
+                f.to_fragment_precedence(Precedence::INVOKE)
+                    .cat(ToFragmentExt::paren_list_prec(args, Precedence::Top)),
+                prec,
+                Precedence::INVOKE,
+            ),
+            RustExpr::Tuple(elts) => match elts.as_slice() {
+                [elt] => elt
+                    .to_fragment_precedence(Precedence::Top)
+                    .delimit(Fragment::Char('('), Fragment::string(",)")),
+                _ => Self::paren_list_prec(elts, Precedence::Top),
+            },
+            RustExpr::Struct(con, contents) => RustEntity::from(con.clone())
+                .to_fragment()
+                .cat(contents.to_fragment()),
+            RustExpr::Deref(expr) => {
+                Fragment::Char('*').cat(expr.to_fragment_precedence(Precedence::Prefix))
+            }
+            RustExpr::Borrow(expr) => {
+                Fragment::Char('&').cat(expr.to_fragment_precedence(Precedence::Prefix))
+            }
+            RustExpr::BorrowMut(expr) => {
+                Fragment::string("&mut ").cat(expr.to_fragment_precedence(Precedence::Prefix))
+            }
+            RustExpr::Try(expr) => expr
+                .to_fragment_precedence(Precedence::Projection)
+                .cat(Fragment::Char('?')),
+            RustExpr::Operation(op) => op.to_fragment_precedence(prec),
+            RustExpr::BlockScope(stmts, val) => {
+                RustStmt::block(stmts.iter().chain(std::iter::once(&RustStmt::Return(
+                    ReturnKind::Implicit,
+                    val.as_ref().clone(),
+                ))))
+            }
+            RustExpr::Control(ctrl) => ctrl.to_fragment(),
+            RustExpr::Closure(cl) => cl.to_fragment_precedence(prec),
+            RustExpr::Index(expr, ix) => expr.to_fragment_precedence(Precedence::Projection).cat(
+                ix.to_fragment_precedence(Precedence::Top)
+                    .delimit(Fragment::Char('['), Fragment::Char(']')),
+            ),
+            RustExpr::Slice(expr, start, stop) => expr
+                .to_fragment_precedence(Precedence::Projection)
+                .cat(Fragment::seq(
+                    [
+                        Fragment::Char('['),
+                        start.to_fragment(),
+                        Fragment::string(".."),
+                        stop.to_fragment(),
+                        Fragment::Char(']'),
+                    ],
+                    None,
+                )),
+            RustExpr::RangeExclusive(start, stop) => cond_paren(
+                start.to_fragment_precedence(Precedence::Top).intervene(
+                    Fragment::string(".."),
+                    stop.to_fragment_precedence(Precedence::Top),
+                ),
+                prec,
+                Precedence::Top,
+            ),
+        }
+    }
+}
+
+impl ToFragment for RustExpr {
+    fn to_fragment(&self) -> Fragment {
+        self.to_fragment_precedence(Precedence::Atomic)
     }
 }
 
@@ -1767,520 +2288,6 @@ impl ToFragment for RustOp {
     }
 }
 
-impl RustExpr {
-    pub const UNIT: Self = Self::Tuple(Vec::new());
-
-    pub const NONE: Self = Self::Entity(RustEntity::Local(Label::Borrowed("None")));
-
-    pub const TRUE: Self = Self::PrimitiveLit(RustPrimLit::Boolean(true));
-
-    pub const FALSE: Self = Self::PrimitiveLit(RustPrimLit::Boolean(false));
-
-    pub fn some(inner: Self) -> Self {
-        Self::local("Some").call_with([inner])
-    }
-
-    pub fn local(name: impl Into<Label>) -> Self {
-        Self::Entity(RustEntity::Local(name.into()))
-    }
-
-    pub fn num_lit<N: Into<usize>>(num: N) -> Self {
-        Self::PrimitiveLit(RustPrimLit::Numeric(RustNumLit::Usize(num.into())))
-    }
-
-    pub fn bool_lit(b: bool) -> Self {
-        Self::PrimitiveLit(RustPrimLit::Boolean(b))
-    }
-
-    pub fn u8lit(num: u8) -> Self {
-        Self::PrimitiveLit(RustPrimLit::Numeric(RustNumLit::U8(num)))
-    }
-
-    pub fn u16lit(num: u16) -> Self {
-        Self::PrimitiveLit(RustPrimLit::Numeric(RustNumLit::U16(num)))
-    }
-
-    pub fn u32lit(num: u32) -> Self {
-        Self::PrimitiveLit(RustPrimLit::Numeric(RustNumLit::U32(num)))
-    }
-
-    pub fn u64lit(num: u64) -> RustExpr {
-        Self::PrimitiveLit(RustPrimLit::Numeric(RustNumLit::U64(num)))
-    }
-
-    pub fn scoped<Name: Into<Label>>(
-        path: impl IntoIterator<Item = Name>,
-        name: impl Into<Label>,
-    ) -> Self {
-        let labels = path.into_iter().map(|x| x.into()).collect::<Vec<Label>>();
-        Self::Entity(RustEntity::Scoped(labels, name.into()))
-    }
-
-    pub fn borrow_of(self) -> Self {
-        match self {
-            // REVIEW - we need a more cohesive idea/model for where we want to borrow and what syntax is required for the desired semantics
-            Self::CloneOf(this) => match &*this {
-                Self::FieldAccess(..) => Self::Borrow(this),
-                // NOTE - original behavior
-                _ => *this,
-            },
-            other => Self::Borrow(Box::new(other)),
-        }
-    }
-
-    pub fn field(self, name: impl Into<Label>) -> Self {
-        match self {
-            Self::CloneOf(this) => Self::CloneOf(Box::new(this.field(name))),
-            other => Self::FieldAccess(Box::new(other), SubIdent::ByName(name.into())),
-        }
-    }
-
-    pub fn nth(self, ix: usize) -> Self {
-        match self {
-            Self::CloneOf(this) => Self::CloneOf(Box::new(this.nth(ix))),
-            other => Self::FieldAccess(Box::new(other), SubIdent::ByIndex(ix)),
-        }
-    }
-
-    pub fn index(self, ix: RustExpr) -> RustExpr {
-        match self {
-            Self::CloneOf(this) => Self::CloneOf(Box::new(this.index(ix))),
-            other => Self::Index(Box::new(other), Box::new(ix)),
-        }
-    }
-
-    pub fn call_with(self, args: impl IntoIterator<Item = Self>) -> Self {
-        Self::FunctionCall(Box::new(self), args.into_iter().collect())
-    }
-
-    pub fn call(self) -> Self {
-        self.call_with(None)
-    }
-
-    /// Helper method that calls the `as_slice` method on the expression passed in,
-    /// unpacking any top-level `RustExpr::CloneOf` variants to avoid inefficient (and unnecessary)
-    /// clone-then-borrow constructs in the generated code.
-    pub fn vec_as_slice(self) -> Self {
-        let this = match self {
-            Self::CloneOf(this) => *this,
-            other => other,
-        };
-        this.call_method("as_slice")
-    }
-
-    /// Helper method that calls the `len` method on the expression passed in,
-    /// unpacking any top-level `RustExpr::CloneOf` variants to avoid inefficient (and unnecessary)
-    /// clone-then-borrow constructs in the generated code.
-    pub fn vec_len(self) -> Self {
-        let this = match self {
-            Self::CloneOf(this) => this,
-            other => Box::new(other),
-        };
-        RustExpr::MethodCall(this, MethodSpecifier::LEN, Vec::new())
-    }
-
-    pub fn call_method(self, name: impl Into<Label>) -> Self {
-        self.call_method_with(name, None)
-    }
-
-    pub fn call_method_with(
-        self,
-        name: impl Into<Label>,
-        args: impl IntoIterator<Item = Self>,
-    ) -> Self {
-        RustExpr::MethodCall(
-            Box::new(self),
-            SubIdent::ByName(name.into()).into(),
-            args.into_iter().collect(),
-        )
-    }
-
-    pub fn infix(lhs: Self, op: InfixOperator, rhs: Self) -> Self {
-        Self::Operation(RustOp::InfixOp(op, Box::new(lhs), Box::new(rhs)))
-    }
-
-    pub fn wrap_try(self) -> Self {
-        match self {
-            Self::ResultOk(_, inner) => *inner,
-            Self::BlockScope(stmts, ret) => Self::BlockScope(stmts, Box::new(ret.wrap_try())),
-            // REVIEW - consider whether there are any other special cases
-            _ => Self::Try(Box::new(self)),
-        }
-    }
-
-    pub fn str_lit(str: impl Into<Label>) -> Self {
-        Self::PrimitiveLit(RustPrimLit::String(str.into()))
-    }
-
-    pub fn err(err_val: RustExpr) -> RustExpr {
-        Self::local("Err").call_with([err_val])
-    }
-
-    /// Attempts to infer and return the (primitive) type of the given `RustExpr`,
-    /// returning `None` if the expression is not a primitive type or otherwise
-    /// cannot be inferred without further context or more complicated heuristics.
-    pub fn try_get_primtype(&self) -> Option<PrimType> {
-        match self {
-            RustExpr::Entity(_) => None,
-            RustExpr::PrimitiveLit(p_lit) => match p_lit {
-                RustPrimLit::Boolean(..) => Some(PrimType::Bool),
-                RustPrimLit::Numeric(n_lit) => match n_lit {
-                    RustNumLit::U8(..) => Some(PrimType::U8),
-                    RustNumLit::U16(..) => Some(PrimType::U16),
-                    RustNumLit::U32(..) => Some(PrimType::U32),
-                    RustNumLit::U64(..) => Some(PrimType::U64),
-                    RustNumLit::Usize(..) => Some(PrimType::Usize),
-                },
-                RustPrimLit::Char(..) => Some(PrimType::Char),
-                RustPrimLit::String(..) => None,
-            },
-            RustExpr::ArrayLit(..) => None,
-            RustExpr::MethodCall(_recv, _method, _args) => {
-                match _method {
-                    MethodSpecifier::Common(cm) => {
-                        // REVIEW - the current only CommonMethod, Len, is not well-defined over non-empty argument lists, but we don't check this
-                        cm.try_get_return_primtype()
-                    }
-                    MethodSpecifier::Arbitrary(SubIdent::ByIndex(_)) => {
-                        unreachable!("unexpected method call using numeric SubIdent")
-                    }
-                    MethodSpecifier::Arbitrary(SubIdent::ByName(name)) => {
-                        if name.as_ref() == "len" && _args.is_empty() {
-                            if cfg!(debug_assertions) {
-                                // REVIEW - is this worth warning about or should it be an acceptable invocation?
-                                eprintln!("WARNING: `.len()` method should be specified as a `MethodSpecifier::Common`, but was called via `Arbitrary(SubIdent::ByName)` instead...");
-                            }
-                            // REVIEW - we don't really check anything about `_recv`, and really just assume that a `.len()` method will always return `usize`
-                            Some(PrimType::Usize)
-                        } else {
-                            // REVIEW - we might want to log the number of times we hit this branch, and with what values, to see if there are any obvious cases to handle
-                            None
-                        }
-                    }
-                }
-            }
-            RustExpr::FieldAccess(obj, ident) => {
-                match ident {
-                    &SubIdent::ByIndex(ix) => match &**obj {
-                        RustExpr::Tuple(tuple)
-                        | RustExpr::Struct(_, StructExpr::TupleExpr(tuple)) => {
-                            if tuple.len() <= ix {
-                                unreachable!(
-                                    "bad tuple-index `_.{ix}` on {}-tuple {:?}",
-                                    tuple.len(),
-                                    tuple
-                                );
-                            }
-                            tuple[ix].try_get_primtype()
-                        }
-                        _ => {
-                            // REVIEW - at least notionally, it is hard to come up with any other cases that aren't invariably dead-ends
-                            None
-                        }
-                    },
-                    SubIdent::ByName(name) => match &**obj {
-                        RustExpr::Struct(_con, StructExpr::RecordExpr(fields)) => {
-                            for (field, val) in fields {
-                                if field == name {
-                                    if let Some(val) = val {
-                                        return val.try_get_primtype();
-                                    } else {
-                                        // NOTE - solving a named-field pun requires non-local reasoning equivalent to solving `RustExpr::Entity`
-                                        return None;
-                                    }
-                                }
-                            }
-                            unreachable!(
-                                "missing struct-field `_.{name}` on struct expression: {obj:?}"
-                            );
-                        }
-                        RustExpr::Struct(..) => unreachable!(
-                            "bad indexing {ident:?} on non-record struct expression: {obj:?}"
-                        ),
-                        _ => {
-                            // REVIEW - at least notionally, it is hard to come up with any other cases that aren't invariably dead-ends
-                            None
-                        }
-                    },
-                }
-            }
-            RustExpr::Struct(..) => None,
-            RustExpr::Tuple(tuple) => match &tuple[..] {
-                [] => Some(PrimType::Unit),
-                [x] => x.try_get_primtype(),
-                [_, ..] => None,
-            },
-            RustExpr::Index(seq, index) => {
-                match &**seq {
-                    RustExpr::ArrayLit(lits) => {
-                        if index.try_get_primtype() == Some(PrimType::Usize) {
-                            lits[0].try_get_primtype()
-                        } else {
-                            None
-                        }
-                    }
-                    _ => {
-                        // REVIEW - It is unclear whether adding logic to support anything more complex than an array literal would be worth it
-                        // TODO - we might want to log the number of times we hit this branch, and with what values, to see if there are any obvious cases to handle
-                        None
-                    }
-                }
-            }
-            RustExpr::FunctionCall(..) => {
-                // FIXME - there may be some functions we can predict the return values of, but for now we can leave this alone
-                // REVIEW - we might want to log the number of times we hit this branch, and with what values, to see if there are any obvious cases to handle
-                None
-            }
-            RustExpr::ResultOk(..) => None,
-            RustExpr::CloneOf(x) | RustExpr::Deref(x) => match &**x {
-                RustExpr::Borrow(y) | RustExpr::BorrowMut(y) => y.try_get_primtype(),
-                other => other.try_get_primtype(),
-            },
-            RustExpr::Borrow(_) | RustExpr::BorrowMut(_) => None,
-            RustExpr::Try(inner) => match inner.as_ref() {
-                RustExpr::ResultOk(.., x) => x.try_get_primtype(),
-                _ => None,
-            },
-            RustExpr::Operation(op) => match op {
-                RustOp::InfixOp(op, lhs, rhs) => {
-                    let lhs_type = lhs.try_get_primtype()?;
-                    let rhs_type = rhs.try_get_primtype()?;
-                    op.out_type(lhs_type, rhs_type)
-                }
-                RustOp::PrefixOp(op, expr) => {
-                    let expr_type = expr.try_get_primtype()?;
-                    op.out_type(expr_type)
-                }
-                RustOp::AsCast(expr, typ) => {
-                    let out_typ = typ.try_as_prim()?;
-                    if expr
-                        .try_get_primtype()
-                        .as_ref()
-                        .map_or(false, PrimType::is_numeric)
-                        && out_typ.is_numeric()
-                    {
-                        Some(out_typ)
-                    } else {
-                        None
-                    }
-                }
-            },
-            RustExpr::BlockScope(_stmts, ret) => {
-                // REVIEW - consider whether it is worthwhile to bother scanning `_stmts` for local definitions that `ret` might then refer to...
-                ret.try_get_primtype()
-            }
-            RustExpr::Control(..)
-            | RustExpr::Closure(..)
-            | RustExpr::Slice(..)
-            | RustExpr::RangeExclusive(..) => None,
-        }
-    }
-
-    /// Basic heuristic to determine whether a `RustExpr` is free of any side-effects, and therefore can be fully elided
-    /// if its direct evaluation would be immediately discarded (as with a RustStmt::Expr or RustStmt::Let over the `_` identifier).
-    pub fn is_pure(&self) -> bool {
-        match self {
-            RustExpr::Entity(..) => true,
-            RustExpr::PrimitiveLit(..) => true,
-            RustExpr::ArrayLit(arr) => arr.iter().all(Self::is_pure),
-            // REVIEW - over types we have no control over, clone itself can be impure, but it should never be so for the code we ourselves are generating
-            RustExpr::CloneOf(expr) => expr.is_pure(),
-            RustExpr::MethodCall(x, MethodSpecifier::LEN, args) => {
-                if args.is_empty() {
-                    x.is_pure()
-                } else {
-                    unreachable!("unexpected method call on `len` with args: {:?}", args);
-                }
-            }
-            // NOTE - there is no guaranteed-accurate static heuristic to distinguish pure fn's from those with possible side-effects
-            RustExpr::FunctionCall(..) | RustExpr::MethodCall(..) => false,
-            RustExpr::FieldAccess(expr, ..) => expr.is_pure(),
-            RustExpr::Tuple(tuple) => tuple.iter().all(Self::is_pure),
-            RustExpr::Struct(_, assigns) => match assigns {
-                StructExpr::RecordExpr(assigns) => assigns
-                    .iter()
-                    .all(|(_, val)| val.as_ref().map_or(true, Self::is_pure)),
-                StructExpr::TupleExpr(values) => values.iter().all(|val| val.is_pure()),
-                StructExpr::EmptyExpr => true,
-            },
-            RustExpr::Deref(expr) | RustExpr::Borrow(expr) | RustExpr::BorrowMut(expr) => {
-                expr.is_pure()
-            }
-            // NOTE - while we can construct pure Try-expressions manually, the intent of `?` is to have potential side-effects and so we judge them de-facto impure
-            RustExpr::Try(..) => false,
-            RustExpr::Operation(op) => match op {
-                RustOp::InfixOp(.., lhs, rhs) => lhs.is_pure() && rhs.is_pure() && op.is_sound(),
-                RustOp::PrefixOp(.., inner) => inner.is_pure() && op.is_sound(),
-                // NOTE - illegal casts like `x as u8` where x >= 256 are language-level errors that are neither pure nor impure
-                RustOp::AsCast(expr, ..) => expr.is_pure() && op.is_sound(),
-            },
-            RustExpr::ResultOk(.., inner) => inner.is_pure(),
-            // NOTE - we can have block-scopes with non-empty statements that are pure, but that is a bit too much work for our purposes right now.
-            RustExpr::BlockScope(stmts, tail) => stmts.is_empty() && tail.is_pure(),
-            // NOTE - there may be some pure control expressions but those will be relatively rare as natural occurrences
-            RustExpr::Control(..) => false,
-            // NOTE - closures never appear in a context where elision is a possibility to consider so this result doesn't actually need to be refined further
-            RustExpr::Closure(..) => false,
-            // NOTE - slice/index exprs can always be out-of-bounds so they cannot be elided without changing program behavior
-            RustExpr::Slice(..) | RustExpr::Index(..) => false,
-            // NOTE - ranges can only ever be language-level errors if the endpoint types are not the same
-            RustExpr::RangeExclusive(start, end) => {
-                start.is_pure()
-                    && end.is_pure()
-                    && match (start.try_get_primtype(), end.try_get_primtype()) {
-                        (Some(pt0), Some(pt1)) => pt0 == pt1,
-                        // NOTE - there are legal cases for ranges involving unknown types (i.e. those with untyped variables) but we cannot rule one way or another on those
-                        _ => false,
-                    }
-            }
-        }
-    }
-
-    /// Embed a RustExpr into a new non-temporary value, or return it if it is already non-temporary
-    pub(crate) fn make_persistent(&self) -> Cow<'_, Self> {
-        match self {
-            RustExpr::Entity(..) => Cow::Borrowed(self),
-            // REVIEW - consider which non-entity cases are already 'persistent'
-            _ => Cow::Owned(RustExpr::BlockScope(
-                vec![RustStmt::assign("tmp", self.clone())],
-                Box::new(RustExpr::local("tmp")),
-            )),
-        }
-    }
-
-    pub(crate) fn wrap_ok<Name: IntoLabel>(self, qualifier: Option<Name>) -> RustExpr {
-        match self {
-            RustExpr::Try(x) => *x,
-            other => RustExpr::ResultOk(qualifier.map(Name::into), Box::new(other)),
-        }
-    }
-
-    pub(crate) fn wrap_some(self) -> RustExpr {
-        match self {
-            RustExpr::BlockScope(stmts, tail) => {
-                RustExpr::BlockScope(stmts, Box::new(tail.wrap_some()))
-            }
-            _ => RustExpr::local("Some").call_with([self]),
-        }
-    }
-
-    pub(crate) fn option_none() -> Self {
-        RustExpr::local("None")
-    }
-}
-
-impl ToFragmentExt for RustExpr {
-    fn to_fragment_precedence(&self, prec: Precedence) -> Fragment {
-        match self {
-            RustExpr::Entity(e) => e.to_fragment(),
-            RustExpr::PrimitiveLit(pl) => pl.to_fragment(),
-            RustExpr::ArrayLit(elts) => Fragment::seq(
-                elts.iter()
-                    .map(|x| RustExpr::to_fragment_precedence(x, Precedence::Top)),
-                Some(Fragment::string(", ")),
-            )
-            .delimit(Fragment::Char('['), Fragment::Char(']')),
-            RustExpr::MethodCall(x, name, args) => cond_paren(
-                x.to_fragment_precedence(Precedence::Projection)
-                    .intervene(Fragment::Char('.'), name.to_fragment())
-                    .cat(ToFragmentExt::paren_list_prec(args, Precedence::Top)),
-                prec,
-                Precedence::Projection,
-            ),
-            RustExpr::ResultOk(opt_qual, inner) => cond_paren(
-                Fragment::group(
-                    Fragment::opt(opt_qual.as_ref(), |qual| {
-                        Fragment::String(qual.clone()).cat(Fragment::string("::"))
-                    })
-                    .cat(Fragment::string("Ok")),
-                )
-                .cat(
-                    inner
-                        .to_fragment_precedence(Precedence::Top)
-                        .delimit(Fragment::Char('('), Fragment::Char(')')),
-                ),
-                prec,
-                Precedence::INVOKE,
-            ),
-            RustExpr::CloneOf(x) => cond_paren(
-                x.to_fragment_precedence(Precedence::Projection)
-                    .intervene(Fragment::Char('.'), Fragment::string("clone()")),
-                prec,
-                Precedence::Projection,
-            ),
-            RustExpr::FieldAccess(x, name) => x
-                .to_fragment_precedence(Precedence::Projection)
-                .intervene(Fragment::Char('.'), name.to_fragment()),
-            RustExpr::FunctionCall(f, args) => cond_paren(
-                f.to_fragment_precedence(Precedence::INVOKE)
-                    .cat(ToFragmentExt::paren_list_prec(args, Precedence::Top)),
-                prec,
-                Precedence::INVOKE,
-            ),
-            RustExpr::Tuple(elts) => match elts.as_slice() {
-                [elt] => elt
-                    .to_fragment_precedence(Precedence::Top)
-                    .delimit(Fragment::Char('('), Fragment::string(",)")),
-                _ => Self::paren_list_prec(elts, Precedence::Top),
-            },
-            RustExpr::Struct(con, contents) => RustEntity::from(con.clone())
-                .to_fragment()
-                .cat(contents.to_fragment()),
-            RustExpr::Deref(expr) => {
-                Fragment::Char('*').cat(expr.to_fragment_precedence(Precedence::Prefix))
-            }
-            RustExpr::Borrow(expr) => {
-                Fragment::Char('&').cat(expr.to_fragment_precedence(Precedence::Prefix))
-            }
-            RustExpr::BorrowMut(expr) => {
-                Fragment::string("&mut ").cat(expr.to_fragment_precedence(Precedence::Prefix))
-            }
-            RustExpr::Try(expr) => expr
-                .to_fragment_precedence(Precedence::Projection)
-                .cat(Fragment::Char('?')),
-            RustExpr::Operation(op) => op.to_fragment_precedence(prec),
-            RustExpr::BlockScope(stmts, val) => {
-                RustStmt::block(stmts.iter().chain(std::iter::once(&RustStmt::Return(
-                    ReturnKind::Implicit,
-                    val.as_ref().clone(),
-                ))))
-            }
-            RustExpr::Control(ctrl) => ctrl.to_fragment(),
-            RustExpr::Closure(cl) => cl.to_fragment_precedence(prec),
-            RustExpr::Index(expr, ix) => expr.to_fragment_precedence(Precedence::Projection).cat(
-                ix.to_fragment_precedence(Precedence::Top)
-                    .delimit(Fragment::Char('['), Fragment::Char(']')),
-            ),
-            RustExpr::Slice(expr, start, stop) => expr
-                .to_fragment_precedence(Precedence::Projection)
-                .cat(Fragment::seq(
-                    [
-                        Fragment::Char('['),
-                        start.to_fragment(),
-                        Fragment::string(".."),
-                        stop.to_fragment(),
-                        Fragment::Char(']'),
-                    ],
-                    None,
-                )),
-            RustExpr::RangeExclusive(start, stop) => cond_paren(
-                start.to_fragment_precedence(Precedence::Top).intervene(
-                    Fragment::string(".."),
-                    stop.to_fragment_precedence(Precedence::Top),
-                ),
-                prec,
-                Precedence::Top,
-            ),
-        }
-    }
-}
-
-impl ToFragment for RustExpr {
-    fn to_fragment(&self) -> Fragment {
-        self.to_fragment_precedence(Precedence::Atomic)
-    }
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Default)]
 pub(crate) enum ReturnKind {
     #[default]
@@ -2385,6 +2392,7 @@ pub(crate) enum RustMatchBody<BlockType = Vec<RustStmt>> {
 }
 
 impl RustMatchBody {
+    #[expect(dead_code)]
     pub fn tuple_capture<const N: usize>(
         labels: [&'static str; N],
         semantics: [CaptureSemantics; N],

@@ -503,6 +503,14 @@ impl CodeGen {
                 let cl_inner = self.translate(inner.get_dec());
                 CaseLogic::Engine(EngineLogic::OffsetPeek(re_base_addr, re_offset, Box::new(cl_inner)))
             }
+            TypedDecoder::LiftedOption(_, None) => {
+                // REVIEW - do we ever need to preserve the type of the None value?
+                CaseLogic::Simple(SimpleLogic::ConstNone)
+            }
+            TypedDecoder::LiftedOption(_, Some(da)) => {
+                let cl_inner = self.translate(da.get_dec());
+                CaseLogic::Derived(DerivedLogic::WrapSome(Box::new(cl_inner)))
+            }
         }
     }
 }
@@ -1605,9 +1613,16 @@ impl GenExpr {
         }
     }
 
-    fn wrap_some(self) -> GenExpr {
-        // REVIEW - consider whether `wrap_some` should permeate through BlockScope
-        Self::WrapSome(Box::new(self))
+    fn wrap_some(mut self) -> GenExpr {
+        match self {
+            Self::ResultOk(t, inner) => Self::ResultOk(t, Box::new(inner.wrap_some())),
+            Self::BlockScope(ref mut block) => {
+                // REVIEW - this may not be enough if non-`ret` (statements) can return values
+                block.wrap_some_final_value();
+                self
+            }
+            this => Self::WrapSome(Box::new(this)),
+        }
     }
 
     fn wrap_try(self) -> GenExpr {
@@ -1719,6 +1734,29 @@ impl GenBlock {
         let stmts =
             Iterator::chain(preamble.into_iter(), self.stmts.drain(..)).collect::<Vec<GenStmt>>();
         self.stmts = stmts;
+    }
+
+    pub fn wrap_some_final_value(&mut self) {
+        let fallback = || {
+            Result::<_, std::convert::Infallible>::Ok(Some(GenExpr::from(
+                RustExpr::UNIT.wrap_some(),
+            )))
+        };
+        self.transform_return_value(GenExpr::wrap_some, fallback)
+            .unwrap()
+    }
+
+    fn transform_return_value<E, F, G>(&mut self, f: F, fallback: G) -> Result<(), E>
+    where
+        F: Fn(GenExpr) -> GenExpr,
+        G: FnOnce() -> Result<Option<GenExpr>, E>,
+    {
+        if let Some(val) = self.ret.take() {
+            self.ret.replace(f(val));
+        } else {
+            self.ret = fallback()?;
+        }
+        Ok(())
     }
 }
 
@@ -2170,6 +2208,7 @@ impl ToAst for SimpleLogic<GTExpr> {
                 }
             }
             SimpleLogic::Eval(expr) => GenBlock::simple_expr(expr.clone()),
+            SimpleLogic::ConstNone => GenBlock::simple_expr(RustExpr::NONE),
         }
     }
 }
@@ -3162,11 +3201,13 @@ enum SimpleLogic<ExprT> {
     CallDynamic(Label),
     YieldCurrentOffset,
     SkipRemainder,
+    ConstNone,
 }
 
 /// Cases that recurse into other case-logic only once
 #[derive(Clone, Debug)]
 enum DerivedLogic<ExprT> {
+    WrapSome(Box<CaseLogic<ExprT>>),
     VariantOf(Constructor, Box<CaseLogic<ExprT>>),
     UnitVariantOf(Constructor, Box<CaseLogic<ExprT>>),
     MapOf(GenLambda, Box<CaseLogic<ExprT>>),
@@ -3263,6 +3304,15 @@ impl ToAst for DerivedLogic<GTExpr> {
                     StructExpr::TupleExpr(vec![RustExpr::local(BIND_NAME)]),
                 )));
                 GenBlock::from_parts(stmts, ret)
+            }
+            DerivedLogic::WrapSome(inner) => {
+                let mut inner_block = inner.to_ast(ctxt);
+                if let Some(ret) = inner_block.ret.take() {
+                    inner_block.ret.replace(ret.wrap_some());
+                } else {
+                    unreachable!("SomeOf called on non-value-producing GenBlock: {inner_block:?}");
+                };
+                inner_block
             }
             DerivedLogic::UnitVariantOf(constr, inner) => {
                 let inner_block = inner.to_ast(ctxt);
@@ -4089,6 +4139,19 @@ impl<'a> Elaborator<'a> {
                     }
                 }
                 TypedFormat::Hint(gt, style_hint.clone(), Box::new(t_inner))
+            }
+            Format::LiftedOption(opt_f) => {
+                let index = self.get_and_increment_index();
+                let inner = match opt_f {
+                    None => {
+                        // increment to account for the 'ghost' index of the free type parameter
+                        self.increment_index();
+                        None
+                    }
+                    Some(inner_f) => Some(Box::new(self.elaborate_format(inner_f, dyn_scope))),
+                };
+                let gt = self.get_gt_from_index(index);
+                TypedFormat::LiftedOption(gt, inner)
             }
         }
     }

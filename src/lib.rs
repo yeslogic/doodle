@@ -2,7 +2,7 @@
 #![deny(rust_2018_idioms)]
 
 use std::cmp::Ordering;
-use std::collections::{BTreeMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, HashSet};
 use std::ops::Add;
 use std::rc::Rc;
 
@@ -631,124 +631,6 @@ pub enum DynFormat {
     Huffman(Box<Expr>, Option<Box<Expr>>),
 }
 
-/// Binary format descriptions
-///
-/// # Binary formats as regular expressions
-///
-/// Given a language of [regular expressions]:
-///
-/// ```text
-/// r ∈ Regexp ::=
-///   | ∅           empty set
-///   | ε           empty byte string
-///   | .           any byte
-///   | b           literal byte
-///   | r|r         alternation
-///   | r r         concatenation
-///   | r*          Kleene star
-/// ```
-///
-/// We can use these to model a subset of our binary format descriptions:
-///
-/// ```text
-/// ⟦ _ ⟧ : Format ⇀ Regexp
-/// ⟦ Fail ⟧                                = ∅
-/// ⟦ Byte({}) ⟧                            = ∅
-/// ⟦ Byte(!{}) ⟧                           = .
-/// ⟦ Byte({b}) ⟧                           = b
-/// ⟦ Byte({b₀, ... bₙ}) ⟧                  = b₀ | ... | bₙ
-/// ⟦ Union([]) ⟧                           = ∅
-/// ⟦ Union([(l₀, f₀), ..., (lₙ, fₙ)]) ⟧    = ⟦ f₀ ⟧ | ... | ⟦ fₙ ⟧
-/// ⟦ Tuple([]) ⟧                           = ε
-/// ⟦ Tuple([f₀, ..., fₙ]) ⟧                = ⟦ f₀ ⟧ ... ⟦ fₙ ⟧
-/// ⟦ Repeat(f) ⟧                           = ⟦ f ⟧*
-/// ⟦ Repeat1(f) ⟧                          = ⟦ f ⟧ ⟦ f ⟧*
-/// ⟦ RepeatCount(n, f) ⟧                   = ⟦ f ⟧ ... ⟦ f ⟧
-///                                           ╰── n times ──╯
-/// ```
-///
-/// Note that the data dependency present in record formats means that these
-/// formats no longer describe regular languages.
-///
-/// [regular expressions]: https://en.wikipedia.org/wiki/Regular_expression#Formal_definition
-#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
-#[serde(tag = "tag", content = "data")]
-pub enum Format {
-    /// Reference to a top-level item
-    ItemVar(usize, Vec<Expr>), // FIXME - do the exprs here need type(+) info?
-    /// A format that never matches
-    Fail,
-    /// Matches if the end of the input has been reached
-    EndOfInput,
-    /// Skips bytes if necessary to align the current offset to a multiple of N
-    Align(usize),
-    /// Matches a byte in the given byte set
-    Byte(ByteSet),
-    /// Wraps the value from the inner format in a variant
-    Variant(Label, Box<Format>),
-    /// Matches the union of all the formats, which must have the same type
-    Union(Vec<Format>),
-    /// Nondeterministic unions, where the formats are not mutually exclusive
-    UnionNondet(Vec<Format>),
-    /// Matches a sequence of concatenated formats
-    Tuple(Vec<Format>),
-    /// Repeat a format zero-or-more times
-    Repeat(Box<Format>),
-    /// Repeat a format one-or-more times
-    Repeat1(Box<Format>),
-    /// Repeat a format an exact number of times
-    RepeatCount(Box<Expr>, Box<Format>),
-    /// Repeat a format at least N and at most M times
-    RepeatBetween(Box<Expr>, Box<Expr>, Box<Format>),
-    /// Repeat a format until a condition is satisfied by its last item
-    RepeatUntilLast(Box<Expr>, Box<Format>),
-    /// Repeat a format until a condition is satisfied by the sequence
-    RepeatUntilSeq(Box<Expr>, Box<Format>),
-    /// Repeat a format until a condition is satisfied by a tuple constructed from a left-fold accumulator and the sequence, returning both
-    /// AccumUntil :: ((A, [T]) -> bool) -> ((A, T) -> A) -> A -> Vt(A) -> T -> (A, [T])
-    AccumUntil(Box<Expr>, Box<Expr>, Box<Expr>, TypeHint, Box<Format>),
-    /// Apply a parametric format for each element of a sequence-typed Expr using a fused lambda binding
-    ForEach(Box<Expr>, Label, Box<Format>),
-    /// Parse a format if and only if the given expression evaluates to true, otherwise skip
-    Maybe(Box<Expr>, Box<Format>),
-    /// Parse a format without advancing the stream position afterwards
-    Peek(Box<Format>),
-    /// Attempt to parse a format and fail if it succeeds
-    PeekNot(Box<Format>),
-    /// Restrict a format to a sub-stream of a given number of bytes (skips any leftover bytes in the sub-stream)
-    Slice(Box<Expr>, Box<Format>),
-    /// Parse bitstream
-    Bits(Box<Format>),
-    /// Matches a format at a byte offset relative to the given base address
-    WithRelativeOffset(Box<Expr>, Box<Expr>, Box<Format>),
-    /// Map a value with a lambda expression
-    Map(Box<Format>, Box<Expr>),
-    /// Assert that a boolean condition holds on a value
-    Where(Box<Format>, Box<Expr>),
-    /// Compute a value
-    Compute(Box<Expr>),
-    /// Let binding
-    Let(Label, Box<Expr>, Box<Format>),
-    /// Pattern match on an expression
-    Match(Box<Expr>, Vec<(Pattern, Format)>),
-    /// Format generated dynamically
-    Dynamic(Label, DynFormat, Box<Format>),
-    /// Apply a dynamic format from a named variable in the scope
-    Apply(Label),
-    /// Current byte-offset relative to start-of-buffer (as a U64(?))
-    Pos,
-    /// Skip the remainder of the stream, up until the end of input or the last available byte within a Slice
-    SkipRemainder,
-    /// Given an expression corresponding to a byte-sequence, decode it again using the provided Format. This can be used to reparse the initial decode of formats that output Vec<u8> or similar
-    DecodeBytes(Box<Expr>, Box<Format>),
-    /// Process one format, bind the result to a label, and process a second format, discarding the result of the first
-    LetFormat(Box<Format>, Label, Box<Format>),
-    /// Process one format without capturing the resultant value, and then process the a second format as normal
-    MonadSeq(Box<Format>, Box<Format>),
-    /// Encapsulation of a Format with a structurally significant artifact of what it represents or how it was constructed
-    Hint(StyleHint, Box<Format>),
-}
-
 // NOTE - as currently defined, StyleHint could easily be Copy, but it would be a breaking change if we later had to remove that trait
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(tag = "tag", content = "args")]
@@ -887,6 +769,126 @@ impl<'a> RecordBuilder<'a> {
     }
 }
 
+/// Binary format descriptions
+///
+/// # Binary formats as regular expressions
+///
+/// Given a language of [regular expressions]:
+///
+/// ```text
+/// r ∈ Regexp ::=
+///   | ∅           empty set
+///   | ε           empty byte string
+///   | .           any byte
+///   | b           literal byte
+///   | r|r         alternation
+///   | r r         concatenation
+///   | r*          Kleene star
+/// ```
+///
+/// We can use these to model a subset of our binary format descriptions:
+///
+/// ```text
+/// ⟦ _ ⟧ : Format ⇀ Regexp
+/// ⟦ Fail ⟧                                = ∅
+/// ⟦ Byte({}) ⟧                            = ∅
+/// ⟦ Byte(!{}) ⟧                           = .
+/// ⟦ Byte({b}) ⟧                           = b
+/// ⟦ Byte({b₀, ... bₙ}) ⟧                  = b₀ | ... | bₙ
+/// ⟦ Union([]) ⟧                           = ∅
+/// ⟦ Union([(l₀, f₀), ..., (lₙ, fₙ)]) ⟧    = ⟦ f₀ ⟧ | ... | ⟦ fₙ ⟧
+/// ⟦ Tuple([]) ⟧                           = ε
+/// ⟦ Tuple([f₀, ..., fₙ]) ⟧                = ⟦ f₀ ⟧ ... ⟦ fₙ ⟧
+/// ⟦ Repeat(f) ⟧                           = ⟦ f ⟧*
+/// ⟦ Repeat1(f) ⟧                          = ⟦ f ⟧ ⟦ f ⟧*
+/// ⟦ RepeatCount(n, f) ⟧                   = ⟦ f ⟧ ... ⟦ f ⟧
+///                                           ╰── n times ──╯
+/// ```
+///
+/// Note that the data dependency present in record formats means that these
+/// formats no longer describe regular languages.
+///
+/// [regular expressions]: https://en.wikipedia.org/wiki/Regular_expression#Formal_definition
+#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
+#[serde(tag = "tag", content = "data")]
+pub enum Format {
+    /// Reference to a top-level item
+    ItemVar(usize, Vec<Expr>), // FIXME - do the exprs here need type(+) info?
+    /// A format that never matches
+    Fail,
+    /// Matches if the end of the input has been reached
+    EndOfInput,
+    /// Skips bytes if necessary to align the current offset to a multiple of N
+    Align(usize),
+    /// Matches a byte in the given byte set
+    Byte(ByteSet),
+    /// Wraps the value from the inner format in a variant
+    Variant(Label, Box<Format>),
+    /// Matches the union of all the formats, which must have the same type
+    Union(Vec<Format>),
+    /// Nondeterministic unions, where the formats are not mutually exclusive
+    UnionNondet(Vec<Format>),
+    /// Matches a sequence of concatenated formats
+    Tuple(Vec<Format>),
+    /// Repeat a format zero-or-more times
+    Repeat(Box<Format>),
+    /// Repeat a format one-or-more times
+    Repeat1(Box<Format>),
+    /// Repeat a format an exact number of times
+    RepeatCount(Box<Expr>, Box<Format>),
+    /// Repeat a format at least N and at most M times
+    RepeatBetween(Box<Expr>, Box<Expr>, Box<Format>),
+    /// Repeat a format until a condition is satisfied by its last item
+    RepeatUntilLast(Box<Expr>, Box<Format>),
+    /// Repeat a format until a condition is satisfied by the sequence
+    RepeatUntilSeq(Box<Expr>, Box<Format>),
+    /// Repeat a format until a condition is satisfied by a tuple constructed from a left-fold accumulator and the sequence, returning both
+    /// AccumUntil :: ((A, [T]) -> bool) -> ((A, T) -> A) -> A -> Vt(A) -> T -> (A, [T])
+    AccumUntil(Box<Expr>, Box<Expr>, Box<Expr>, TypeHint, Box<Format>),
+    /// Apply a parametric format for each element of a sequence-typed Expr using a fused lambda binding
+    ForEach(Box<Expr>, Label, Box<Format>),
+    /// Parse a format if and only if the given expression evaluates to true, otherwise skip
+    Maybe(Box<Expr>, Box<Format>),
+    /// Parse a format without advancing the stream position afterwards
+    Peek(Box<Format>),
+    /// Attempt to parse a format and fail if it succeeds
+    PeekNot(Box<Format>),
+    /// Restrict a format to a sub-stream of a given number of bytes (skips any leftover bytes in the sub-stream)
+    Slice(Box<Expr>, Box<Format>),
+    /// Parse bitstream
+    Bits(Box<Format>),
+    /// Matches a format at a byte offset relative to the given base address
+    WithRelativeOffset(Box<Expr>, Box<Expr>, Box<Format>),
+    /// Map a value with a lambda expression
+    Map(Box<Format>, Box<Expr>),
+    /// Assert that a boolean condition holds on a value
+    Where(Box<Format>, Box<Expr>),
+    /// Compute a value
+    Compute(Box<Expr>),
+    /// Let binding
+    Let(Label, Box<Expr>, Box<Format>),
+    /// Pattern match on an expression
+    Match(Box<Expr>, Vec<(Pattern, Format)>),
+    /// Format generated dynamically
+    Dynamic(Label, DynFormat, Box<Format>),
+    /// Apply a dynamic format from a named variable in the scope
+    Apply(Label),
+    /// Current byte-offset relative to start-of-buffer (as a U64(?))
+    Pos,
+    /// Skip the remainder of the stream, up until the end of input or the last available byte within a Slice
+    SkipRemainder,
+    /// Given an expression corresponding to a byte-sequence, decode it again using the provided Format. This can be used to reparse the initial decode of formats that output Vec<u8> or similar
+    DecodeBytes(Box<Expr>, Box<Format>),
+    /// Process one format, bind the result to a label, and process a second format, discarding the result of the first
+    LetFormat(Box<Format>, Label, Box<Format>),
+    /// Process one format without capturing the resultant value, and then process the a second format as normal
+    MonadSeq(Box<Format>, Box<Format>),
+    /// Encapsulation of a Format with a structurally significant artifact of what it represents or how it was constructed
+    Hint(StyleHint, Box<Format>),
+    /// Wrap the result of `format` in `Some` if `Some(format)`, yield `None` if `None`
+    LiftedOption(Option<Box<Format>>),
+}
+
 impl Format {
     pub const EMPTY: Format = Format::Tuple(Vec::new());
 
@@ -899,48 +901,32 @@ impl Format {
         )
     }
 
-    pub(crate) fn is_record_whnf(&self) -> bool {
-        match self {
-            Format::Hint(StyleHint::Record { .. }, _inner) => true,
-            Format::LetFormat(..) => true,
-            Format::MonadSeq(..) => true,
-            Format::Compute(expr) => matches!(&**expr, Expr::Record(..)),
-            _ => false,
-        }
-    }
-
-    pub(crate) fn is_record_deep(&self) -> bool {
-        match self {
-            Format::Hint(StyleHint::Record { .. }, inner)
-            | Format::LetFormat(.., inner)
-            | Format::MonadSeq(.., inner) => inner.is_record_deep(),
-            Format::Compute(expr) => matches!(&**expr, Expr::Record(..)),
-            _ => false,
-        }
+    pub(crate) fn to_record_format(&self) -> RecordFormat<'_> {
+        RecordFormat::try_from(self).unwrap()
     }
 
     /// Old-style record where every field is preserved and the constructed record uses the same names as the individual parse-bindings.
-    pub fn record<Name: IntoLabel>(fields: impl IntoIterator<Item = (Name, Format)>) -> Format {
-        let mut fields = fields.into_iter().collect::<VecDeque<(Name, Format)>>();
-        let accum = Vec::with_capacity(fields.len());
+    pub fn record<Name: IntoLabel, I>(fields: I) -> Format
+    where
+        I: IntoIterator<Item = (Name, Format), IntoIter: DoubleEndedIterator>,
+    {
+        // NOTE - reverse-order so `.pop()` removes the earliest remaining entry
+        let mut rev_fields = fields.into_iter().rev().collect::<Vec<(Name, Format)>>();
+        let accum = Vec::with_capacity(rev_fields.len());
         Format::Hint(
             StyleHint::Record { old_style: true },
-            Box::new(Format::__chain_record(accum, &mut fields)),
+            Box::new(Format::__chain_record(accum, &mut rev_fields)),
         )
-    }
-
-    pub(crate) fn synthesize_record(&self) -> RecordFormat<'_> {
-        RecordFormat::try_from(self).unwrap()
     }
 
     fn __chain_record<Name: IntoLabel>(
         mut captured: Vec<(Label, Expr)>,
-        remaining: &mut VecDeque<(Name, Format)>,
+        remaining: &mut Vec<(Name, Format)>,
     ) -> Format {
         if remaining.is_empty() {
             Format::Compute(Box::new(Expr::Record(captured)))
         } else {
-            let this = remaining.pop_front().unwrap();
+            let this = remaining.pop().unwrap();
             let (name, format) = this;
             let name: Label = name.into();
             captured.push((name.clone(), Expr::Var(name.clone())));
@@ -1008,6 +994,10 @@ impl Format {
                 first.match_bounds(module) + second.match_bounds(module)
             }
             Format::Hint(.., inner) => inner.match_bounds(module),
+            Format::LiftedOption(opt) => match opt {
+                None => Bounds::exact(0),
+                Some(f) => f.match_bounds(module),
+            },
         }
     }
 
@@ -1068,6 +1058,10 @@ impl Format {
                 f0.match_bounds(module) + f.lookahead_bounds(module),
             ),
             Format::Hint(_, f) => f.lookahead_bounds(module),
+            Format::LiftedOption(opt) => match opt {
+                None => Bounds::exact(0),
+                Some(f) => f.lookahead_bounds(module),
+            },
         }
     }
 
@@ -1117,6 +1111,7 @@ impl Format {
                 first.depends_on_next(module) || second.depends_on_next(module)
             }
             Format::Hint(_, f) => f.depends_on_next(module),
+            Format::LiftedOption(opt) => opt.as_ref().is_some_and(|f| f.depends_on_next(module)),
         }
     }
 
@@ -1517,6 +1512,13 @@ impl FormatModule {
                 child_scope.push(lbl.clone(), elem_t);
                 let inner_t = self.infer_format_type(&child_scope, format)?;
                 Ok(ValueType::Seq(Box::new(inner_t)))
+            }
+            Format::LiftedOption(opt_f) => {
+                let inner_type = match opt_f {
+                    None => ValueType::Any,
+                    Some(inner_f) => self.infer_format_type(scope, inner_f)?,
+                };
+                Ok(ValueType::Option(Box::new(inner_type)))
             }
         }
     }
@@ -2062,6 +2064,8 @@ impl<'a> MatchTreeStep<'a> {
                 let tree_none = Self::from_next(module, next);
                 tree_none.union(tree_some)
             }
+            TypedFormat::LiftedOption(_, None) => Self::from_next(module, next),
+            TypedFormat::LiftedOption(_, Some(a)) => Self::from_gt_format(module, a, next),
             TypedFormat::Peek(_, a) => {
                 let tree = Self::from_next(module, next.clone());
                 let peek = Self::from_gt_format(module, a, Rc::new(Next::Empty));
@@ -2262,6 +2266,8 @@ impl<'a> MatchTreeStep<'a> {
                 Self::from_format(module, f0, next0)
             }
             Format::Hint(_hint, f) => Self::from_format(module, f, next),
+            Format::LiftedOption(None) => Self::from_next(module, next),
+            Format::LiftedOption(Some(f)) => Self::from_format(module, f, next),
         }
     }
 

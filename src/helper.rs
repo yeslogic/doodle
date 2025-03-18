@@ -361,7 +361,9 @@ pub fn union_nondet<Name: IntoLabel>(branches: impl IntoIterator<Item = (Name, F
 /// binary formats must decode in the same order they were encoded, which must
 /// conform to the specification and will typically be invariant for
 /// non-self-describing formats.
-pub fn record<Name: IntoLabel>(fields: impl IntoIterator<Item = (Name, Format)>) -> Format {
+pub fn record<Name: IntoLabel>(
+    fields: impl IntoIterator<Item = (Name, Format), IntoIter: DoubleEndedIterator>,
+) -> Format {
     Format::record(fields)
 }
 
