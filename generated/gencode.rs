@@ -5372,7 +5372,6 @@ None
 };
 let sections = match section_headers {
 Some(ref shdrs) => {
-let val = {
 let mut accum = Vec::new();
 for shdr in shdrs.clone() {
 accum.push(if (shdr.r#type.clone() != 8u32) && (shdr.r#type.clone() != 0u32) {
@@ -5401,9 +5400,7 @@ Some(ret)
 None
 });
 }
-accum
-};
-Some(val)
+Some(accum)
 },
 
 None => {
@@ -6031,10 +6028,7 @@ let link = match offset > 0u32 {
 true => {
 let tgt_offset = start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
-let val = (Decoder_opentype_table_directory(_input, start.clone()))?;
-PResult::Ok(Some(val))
-})())?;
+let ret = ((|| PResult::Ok(Some((Decoder_opentype_table_directory(_input, start.clone()))?)))())?;
 _input.close_peek_context()?;
 ret
 },
@@ -6065,10 +6059,7 @@ let link = match offset > 0u32 {
 true => {
 let tgt_offset = start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
-let val = (Decoder_opentype_table_directory(_input, start.clone()))?;
-PResult::Ok(Some(val))
-})())?;
+let ret = ((|| PResult::Ok(Some((Decoder_opentype_table_directory(_input, start.clone()))?)))())?;
 _input.close_peek_context()?;
 ret
 },
@@ -6276,7 +6267,6 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 };
 let cvt = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1668707360u32, tables)).cloned() {
 Some(ref table) => {
-let val = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -6307,9 +6297,7 @@ _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
 _input.close_peek_context()?;
-ret
-};
-Some(val)
+Some(ret)
 },
 
 None => {
@@ -6318,7 +6306,6 @@ None
 };
 let fpgm = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1718642541u32, tables)).cloned() {
 Some(ref table) => {
-let val = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -6349,9 +6336,7 @@ _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
 _input.close_peek_context()?;
-ret
-};
-Some(val)
+Some(ret)
 },
 
 None => {
@@ -6360,7 +6345,6 @@ None
 };
 let loca = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1819239265u32, tables)).cloned() {
 Some(ref table) => {
-let val = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -6371,9 +6355,7 @@ _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
 _input.close_peek_context()?;
-ret
-};
-Some(val)
+Some(ret)
 },
 
 None => {
@@ -6382,7 +6364,6 @@ None
 };
 let glyf = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1735162214u32, tables)).cloned() {
 Some(ref table) => {
-let val = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -6401,9 +6382,7 @@ _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
 _input.close_peek_context()?;
-ret
-};
-Some(val)
+Some(ret)
 },
 
 None => {
@@ -6412,7 +6391,6 @@ None
 };
 let prep = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1886545264u32, tables)).cloned() {
 Some(ref table) => {
-let val = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -6443,9 +6421,7 @@ _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
 _input.close_peek_context()?;
-ret
-};
-Some(val)
+Some(ret)
 },
 
 None => {
@@ -6454,7 +6430,6 @@ None
 };
 let gasp = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1734439792u32, tables)).cloned() {
 Some(ref table) => {
-let val = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -6465,9 +6440,7 @@ _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
 _input.close_peek_context()?;
-ret
-};
-Some(val)
+Some(ret)
 },
 
 None => {
@@ -6476,7 +6449,6 @@ None
 };
 let base = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1111577413u32, tables)).cloned() {
 Some(ref table) => {
-let val = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -6487,9 +6459,7 @@ _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
 _input.close_peek_context()?;
-ret
-};
-Some(val)
+Some(ret)
 },
 
 None => {
@@ -6498,7 +6468,6 @@ None
 };
 let gdef = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1195656518u32, tables)).cloned() {
 Some(ref table) => {
-let val = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -6509,9 +6478,7 @@ _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
 _input.close_peek_context()?;
-ret
-};
-Some(val)
+Some(ret)
 },
 
 None => {
@@ -6520,7 +6487,6 @@ None
 };
 let gpos = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1196445523u32, tables)).cloned() {
 Some(ref table) => {
-let val = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -6531,9 +6497,7 @@ _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
 _input.close_peek_context()?;
-ret
-};
-Some(val)
+Some(ret)
 },
 
 None => {
@@ -6542,7 +6506,6 @@ None
 };
 let gsub = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1196643650u32, tables)).cloned() {
 Some(ref table) => {
-let val = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -6553,9 +6516,7 @@ _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
 _input.close_peek_context()?;
-ret
-};
-Some(val)
+Some(ret)
 },
 
 None => {
@@ -6564,7 +6525,6 @@ None
 };
 let fvar = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1719034226u32, tables)).cloned() {
 Some(ref table) => {
-let val = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -6575,9 +6535,7 @@ _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
 _input.close_peek_context()?;
-ret
-};
-Some(val)
+Some(ret)
 },
 
 None => {
@@ -6586,7 +6544,6 @@ None
 };
 let gvar = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1735811442u32, tables)).cloned() {
 Some(ref table) => {
-let val = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -6597,9 +6554,7 @@ _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
 _input.close_peek_context()?;
-ret
-};
-Some(val)
+Some(ret)
 },
 
 None => {
@@ -6608,7 +6563,6 @@ None
 };
 let kern = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1801810542u32, tables)).cloned() {
 Some(ref table) => {
-let val = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -6619,9 +6573,7 @@ _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
 _input.close_peek_context()?;
-ret
-};
-Some(val)
+Some(ret)
 },
 
 None => {
@@ -6630,7 +6582,6 @@ None
 };
 let stat = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1398030676u32, tables)).cloned() {
 Some(ref table) => {
-let val = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -6641,9 +6592,7 @@ _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
 _input.close_peek_context()?;
-ret
-};
-Some(val)
+Some(ret)
 },
 
 None => {
@@ -6652,7 +6601,6 @@ None
 };
 let vhea = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1986553185u32, tables)).cloned() {
 Some(ref table) => {
-let val = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -6663,9 +6611,7 @@ _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
 _input.close_peek_context()?;
-ret
-};
-Some(val)
+Some(ret)
 },
 
 None => {
@@ -6674,7 +6620,6 @@ None
 };
 let vmtx = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1986884728u32, tables)).cloned() {
 Some(ref table) => {
-let val = {
 let tgt_offset = start + table.offset.clone();
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
@@ -6693,9 +6638,7 @@ _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
 _input.close_peek_context()?;
-ret
-};
-Some(val)
+Some(ret)
 },
 
 None => {
@@ -7483,10 +7426,7 @@ let link = match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
-let val = (Decoder88(_input))?;
-PResult::Ok(Some(val))
-})())?;
+let ret = ((|| PResult::Ok(Some((Decoder88(_input))?)))())?;
 _input.close_peek_context()?;
 ret
 },
@@ -7929,10 +7869,7 @@ let link = match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
-let val = (Decoder88(_input))?;
-PResult::Ok(Some(val))
-})())?;
+let ret = ((|| PResult::Ok(Some((Decoder88(_input))?)))())?;
 _input.close_peek_context()?;
 ret
 },
@@ -7981,10 +7918,7 @@ let link = match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
-let val = (Decoder88(_input))?;
-PResult::Ok(Some(val))
-})())?;
+let ret = ((|| PResult::Ok(Some((Decoder88(_input))?)))())?;
 _input.close_peek_context()?;
 ret
 },
@@ -8163,8 +8097,7 @@ accum
 };
 let mark_filtering_set = match lookup_flag.use_mark_filtering_set.clone() {
 true => {
-let val = (Decoder23(_input))?;
-Some(val)
+Some((Decoder23(_input))?)
 },
 
 false => {
@@ -8210,10 +8143,7 @@ let link = match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
-let val = (Decoder_opentype_layout_feature_variations(_input))?;
-PResult::Ok(Some(val))
-})())?;
+let ret = ((|| PResult::Ok(Some((Decoder_opentype_layout_feature_variations(_input))?)))())?;
 _input.close_peek_context()?;
 ret
 },
@@ -8389,8 +8319,7 @@ accum
 };
 let mark_filtering_set = match lookup_flag.use_mark_filtering_set.clone() {
 true => {
-let val = (Decoder23(_input))?;
-Some(val)
+Some((Decoder23(_input))?)
 },
 
 false => {
@@ -8436,10 +8365,7 @@ let link = match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
-let val = (Decoder_opentype_layout_feature_variations(_input))?;
-PResult::Ok(Some(val))
-})())?;
+let ret = ((|| PResult::Ok(Some((Decoder_opentype_layout_feature_variations(_input))?)))())?;
 _input.close_peek_context()?;
 ret
 },
@@ -8660,14 +8586,11 @@ true => {
 let tgt_offset = gvar_table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
-let val = {
 let mut accum = Vec::new();
 for _ in 0..shared_tuple_count {
 accum.push((Decoder_opentype_var_tuple_record(_input, axis_count.clone()))?);
 }
-accum
-};
-PResult::Ok(Some(val))
+PResult::Ok(Some(accum))
 })())?;
 _input.close_peek_context()?;
 ret
@@ -9048,7 +8971,6 @@ true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
-let val = {
 let design_axes = {
 let mut accum = Vec::new();
 for _ in 0..design_axis_count {
@@ -9061,9 +8983,7 @@ opentype_stat_table_design_axes_offset_link_design_axes { axis_tag: axis_tag, ax
 }
 accum
 };
-opentype_stat_table_design_axes_offset_link { design_axes: design_axes }
-};
-PResult::Ok(Some(val))
+PResult::Ok(Some(opentype_stat_table_design_axes_offset_link { design_axes: design_axes }))
 })())?;
 _input.close_peek_context()?;
 ret
@@ -9083,7 +9003,6 @@ true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
-let val = {
 let table_start = {
 let x = _input.get_offset_u64();
 x as u32
@@ -9276,9 +9195,7 @@ opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets { offse
 }
 accum
 };
-opentype_stat_table_offset_to_axis_value_offsets_link { table_start: table_start, axis_value_offsets: axis_value_offsets }
-};
-PResult::Ok(Some(val))
+PResult::Ok(Some(opentype_stat_table_offset_to_axis_value_offsets_link { table_start: table_start, axis_value_offsets: axis_value_offsets }))
 })())?;
 _input.close_peek_context()?;
 ret
@@ -10012,10 +9929,7 @@ let link = match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
-let val = (Decoder_opentype_layout_ground_subst(_input, extension_lookup_type.clone()))?;
-PResult::Ok(Some(val))
-})())?;
+let ret = ((|| PResult::Ok(Some((Decoder_opentype_layout_ground_subst(_input, extension_lookup_type.clone()))?)))())?;
 _input.close_peek_context()?;
 ret
 },
@@ -10117,7 +10031,6 @@ true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
-let val = {
 let table_start = {
 let x = _input.get_offset_u64();
 x as u32
@@ -10133,7 +10046,6 @@ true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
-let val = {
 let format = {
 let inner = (Decoder23(_input))?;
 let is_valid = {
@@ -10155,9 +10067,7 @@ let filter_range_max_value = {
 let x = (Decoder23(_input))?;
 opentype_var_tuple_record_coordinates::F2Dot14(x)
 };
-opentype_layout_feature_variations_feature_variation_records_condition_set_offset_link_condition_offsets_link { format: format, axis_index: axis_index, filter_range_min_value: filter_range_min_value, filter_range_max_value: filter_range_max_value }
-};
-PResult::Ok(Some(val))
+PResult::Ok(Some(opentype_layout_feature_variations_feature_variation_records_condition_set_offset_link_condition_offsets_link { format: format, axis_index: axis_index, filter_range_min_value: filter_range_min_value, filter_range_max_value: filter_range_max_value }))
 })())?;
 _input.close_peek_context()?;
 ret
@@ -10172,9 +10082,7 @@ opentype_layout_feature_variations_feature_variation_records_condition_set_offse
 }
 accum
 };
-opentype_layout_feature_variations_feature_variation_records_condition_set_offset_link { table_start: table_start, condition_count: condition_count, condition_offsets: condition_offsets }
-};
-PResult::Ok(Some(val))
+PResult::Ok(Some(opentype_layout_feature_variations_feature_variation_records_condition_set_offset_link { table_start: table_start, condition_count: condition_count, condition_offsets: condition_offsets }))
 })())?;
 _input.close_peek_context()?;
 ret
@@ -10193,7 +10101,6 @@ true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
-let val = {
 let table_start = {
 let x = _input.get_offset_u64();
 x as u32
@@ -10234,10 +10141,7 @@ let link = match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
-let val = (Decoder_opentype_common_feature_table(_input))?;
-PResult::Ok(Some(val))
-})())?;
+let ret = ((|| PResult::Ok(Some((Decoder_opentype_common_feature_table(_input))?)))())?;
 _input.close_peek_context()?;
 ret
 },
@@ -10253,9 +10157,7 @@ opentype_layout_feature_variations_feature_variation_records_feature_table_subst
 }
 accum
 };
-opentype_layout_feature_variations_feature_variation_records_feature_table_substitution_offset_link { table_start: table_start, major_version: major_version, minor_version: minor_version, substitution_count: substitution_count, substitutions: substitutions }
-};
-PResult::Ok(Some(val))
+PResult::Ok(Some(opentype_layout_feature_variations_feature_variation_records_feature_table_substitution_offset_link { table_start: table_start, major_version: major_version, minor_version: minor_version, substitution_count: substitution_count, substitutions: substitutions }))
 })())?;
 _input.close_peek_context()?;
 ret
@@ -11851,10 +11753,7 @@ let link = match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
-let val = (Decoder_opentype_layout_ground_pos(_input, extension_lookup_type.clone()))?;
-PResult::Ok(Some(val))
-})())?;
+let ret = ((|| PResult::Ok(Some((Decoder_opentype_layout_ground_pos(_input, extension_lookup_type.clone()))?)))())?;
 _input.close_peek_context()?;
 ret
 },
@@ -13956,10 +13855,7 @@ let link = match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
-let val = (Decoder_opentype_coverage_table(_input))?;
-PResult::Ok(Some(val))
-})())?;
+let ret = ((|| PResult::Ok(Some((Decoder_opentype_coverage_table(_input))?)))())?;
 _input.close_peek_context()?;
 ret
 },
@@ -14667,20 +14563,16 @@ opentype_glyf_composite_glyphs_argument1::Uint8(inner)
 };
 let scale = match flags.we_have_a_scale.clone() {
 true => {
-let val = {
 let inner = {
 let x = (Decoder23(_input))?;
 opentype_var_tuple_record_coordinates::F2Dot14(x)
 };
-opentype_glyf_composite_glyphs_scale::Scale(inner)
-};
-Some(val)
+Some(opentype_glyf_composite_glyphs_scale::Scale(inner))
 },
 
 false => {
 match flags.we_have_an_x_and_y_scale.clone() {
 true => {
-let val = {
 let inner = {
 let x_scale = {
 let x = (Decoder23(_input))?;
@@ -14692,15 +14584,12 @@ opentype_var_tuple_record_coordinates::F2Dot14(x)
 };
 opentype_glyf_composite_glyphs_scale_XY { x_scale: x_scale, y_scale: y_scale }
 };
-opentype_glyf_composite_glyphs_scale::XY(inner)
-};
-Some(val)
+Some(opentype_glyf_composite_glyphs_scale::XY(inner))
 },
 
 false => {
 match flags.we_have_a_two_by_two.clone() {
 true => {
-let val = {
 let field0 = ((|| {
 let field0 = ((|| {
 let x = (Decoder23(_input))?;
@@ -14723,9 +14612,7 @@ PResult::Ok(opentype_var_tuple_record_coordinates::F2Dot14(x))
 })())?;
 PResult::Ok((field0, field1))
 })())?;
-opentype_glyf_composite_glyphs_scale::Matrix(field0, field1)
-};
-Some(val)
+Some(opentype_glyf_composite_glyphs_scale::Matrix(field0, field1))
 },
 
 false => {
@@ -14883,10 +14770,7 @@ let link = match offset > 0u32 {
 true => {
 let tgt_offset = start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
-let val = (Decoder_opentype_cmap_subtable(_input, platform.clone()))?;
-PResult::Ok(Some(val))
-})())?;
+let ret = ((|| PResult::Ok(Some((Decoder_opentype_cmap_subtable(_input, platform.clone()))?)))())?;
 _input.close_peek_context()?;
 ret
 },
@@ -15670,7 +15554,6 @@ true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
-let val = {
 let num_unicode_value_ranges = (Decoder20(_input))?;
 let ranges = {
 let mut accum = Vec::new();
@@ -15692,9 +15575,7 @@ opentype_variation_selector_default_uvs_offset_link_ranges { start_unicode_value
 }
 accum
 };
-opentype_variation_selector_default_uvs_offset_link { num_unicode_value_ranges: num_unicode_value_ranges, ranges: ranges }
-};
-PResult::Ok(Some(val))
+PResult::Ok(Some(opentype_variation_selector_default_uvs_offset_link { num_unicode_value_ranges: num_unicode_value_ranges, ranges: ranges }))
 })())?;
 _input.close_peek_context()?;
 ret
@@ -15713,7 +15594,6 @@ true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
-let val = {
 let num_uvs_mappings = (Decoder20(_input))?;
 let uvs_mappings = {
 let mut accum = Vec::new();
@@ -15735,9 +15615,7 @@ opentype_variation_selector_non_default_uvs_offset_link_uvs_mappings { unicode_v
 }
 accum
 };
-opentype_variation_selector_non_default_uvs_offset_link { num_uvs_mappings: num_uvs_mappings, uvs_mappings: uvs_mappings }
-};
-PResult::Ok(Some(val))
+PResult::Ok(Some(opentype_variation_selector_non_default_uvs_offset_link { num_uvs_mappings: num_uvs_mappings, uvs_mappings: uvs_mappings }))
 })())?;
 _input.close_peek_context()?;
 ret
@@ -17810,7 +17688,6 @@ let elem = {
 let code = (format(_input))?;
 let extra = match code {
 257u16 => {
-let val = {
 let length_extra_bits = 0u8;
 let length = 3u16 + (length_extra_bits as u16);
 let distance_code = {
@@ -17824,13 +17701,10 @@ accum
 bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
-deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 258u16 => {
-let val = {
 let length_extra_bits = 0u8;
 let length = 4u16 + (length_extra_bits as u16);
 let distance_code = {
@@ -17844,13 +17718,10 @@ accum
 bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
-deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 259u16 => {
-let val = {
 let length_extra_bits = 0u8;
 let length = 5u16 + (length_extra_bits as u16);
 let distance_code = {
@@ -17864,13 +17735,10 @@ accum
 bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
-deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 260u16 => {
-let val = {
 let length_extra_bits = 0u8;
 let length = 6u16 + (length_extra_bits as u16);
 let distance_code = {
@@ -17884,13 +17752,10 @@ accum
 bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
-deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 261u16 => {
-let val = {
 let length_extra_bits = 0u8;
 let length = 7u16 + (length_extra_bits as u16);
 let distance_code = {
@@ -17904,13 +17769,10 @@ accum
 bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
-deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 262u16 => {
-let val = {
 let length_extra_bits = 0u8;
 let length = 8u16 + (length_extra_bits as u16);
 let distance_code = {
@@ -17924,13 +17786,10 @@ accum
 bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
-deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 263u16 => {
-let val = {
 let length_extra_bits = 0u8;
 let length = 9u16 + (length_extra_bits as u16);
 let distance_code = {
@@ -17944,13 +17803,10 @@ accum
 bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
-deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 264u16 => {
-let val = {
 let length_extra_bits = 0u8;
 let length = 10u16 + (length_extra_bits as u16);
 let distance_code = {
@@ -17964,13 +17820,10 @@ accum
 bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
-deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 265u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -17990,13 +17843,10 @@ accum
 bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
-deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 266u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -18016,13 +17866,10 @@ accum
 bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
-deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 267u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -18042,13 +17889,10 @@ accum
 bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
-deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 268u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -18068,13 +17912,10 @@ accum
 bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
-deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 269u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -18095,13 +17936,10 @@ accum
 bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
-deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 270u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -18122,13 +17960,10 @@ accum
 bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
-deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 271u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -18149,13 +17984,10 @@ accum
 bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
-deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 272u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -18176,13 +18008,10 @@ accum
 bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
-deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 273u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -18204,13 +18033,10 @@ accum
 bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
-deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 274u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -18232,13 +18058,10 @@ accum
 bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
-deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 275u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -18260,13 +18083,10 @@ accum
 bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
-deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 276u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -18288,13 +18108,10 @@ accum
 bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
-deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 277u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -18317,13 +18134,10 @@ accum
 bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
-deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 278u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -18346,13 +18160,10 @@ accum
 bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
-deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 279u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -18375,13 +18186,10 @@ accum
 bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
-deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 280u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -18404,13 +18212,10 @@ accum
 bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
-deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 281u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -18434,13 +18239,10 @@ accum
 bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
-deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 282u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -18464,13 +18266,10 @@ accum
 bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
-deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 283u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -18494,13 +18293,10 @@ accum
 bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
-deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 284u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -18524,13 +18320,10 @@ accum
 bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
-deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 285u16 => {
-let val = {
 let length_extra_bits = 0u8;
 let length = 258u16 + (length_extra_bits as u16);
 let distance_code = {
@@ -18544,9 +18337,7 @@ accum
 bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
-deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_fixed_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 286u16..=287u16 => {
@@ -18774,95 +18565,70 @@ let elem = {
 let code = (literal_length_alphabet_format(_input))?;
 let extra = match code {
 257u16 => {
-let val = {
 let length_extra_bits = 0u8;
 let length = 3u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
-deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 258u16 => {
-let val = {
 let length_extra_bits = 0u8;
 let length = 4u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
-deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 259u16 => {
-let val = {
 let length_extra_bits = 0u8;
 let length = 5u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
-deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 260u16 => {
-let val = {
 let length_extra_bits = 0u8;
 let length = 6u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
-deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 261u16 => {
-let val = {
 let length_extra_bits = 0u8;
 let length = 7u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
-deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 262u16 => {
-let val = {
 let length_extra_bits = 0u8;
 let length = 8u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
-deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 263u16 => {
-let val = {
 let length_extra_bits = 0u8;
 let length = 9u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
-deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 264u16 => {
-let val = {
 let length_extra_bits = 0u8;
 let length = 10u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
-deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 265u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -18873,13 +18639,10 @@ bits.0
 let length = 11u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
-deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 266u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -18890,13 +18653,10 @@ bits.0
 let length = 13u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
-deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 267u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -18907,13 +18667,10 @@ bits.0
 let length = 15u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
-deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 268u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -18924,13 +18681,10 @@ bits.0
 let length = 17u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
-deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 269u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -18942,13 +18696,10 @@ bits.0 << 0u8 | bits.1 << 1u8
 let length = 19u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
-deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 270u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -18960,13 +18711,10 @@ bits.0 << 0u8 | bits.1 << 1u8
 let length = 23u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
-deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 271u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -18978,13 +18726,10 @@ bits.0 << 0u8 | bits.1 << 1u8
 let length = 27u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
-deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 272u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -18996,13 +18741,10 @@ bits.0 << 0u8 | bits.1 << 1u8
 let length = 31u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
-deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 273u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -19015,13 +18757,10 @@ bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8
 let length = 35u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
-deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 274u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -19034,13 +18773,10 @@ bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8
 let length = 43u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
-deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 275u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -19053,13 +18789,10 @@ bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8
 let length = 51u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
-deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 276u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -19072,13 +18805,10 @@ bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8
 let length = 59u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
-deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 277u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -19092,13 +18822,10 @@ bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8
 let length = 67u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
-deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 278u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -19112,13 +18839,10 @@ bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8
 let length = 83u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
-deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 279u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -19132,13 +18856,10 @@ bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8
 let length = 99u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
-deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 280u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -19152,13 +18873,10 @@ bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8
 let length = 115u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
-deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 281u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -19173,13 +18891,10 @@ bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8
 let length = 131u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
-deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 282u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -19194,13 +18909,10 @@ bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8
 let length = 163u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
-deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 283u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -19215,13 +18927,10 @@ bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8
 let length = 195u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
-deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 284u16 => {
-let val = {
 let length_extra_bits = {
 let bits = {
 let field0 = ((|| Decoder168(_input))())?;
@@ -19236,20 +18945,15 @@ bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8
 let length = 227u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
-deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 285u16 => {
-let val = {
 let length_extra_bits = 0u8;
 let length = 258u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
-deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record }
-};
-Some(val)
+Some(deflate_dynamic_huffman_codes_values { length_extra_bits: length_extra_bits, length: length, distance_code: distance_code, distance_record: distance_record })
 },
 
 286u16..=287u16 => {
@@ -28597,8 +28301,7 @@ ret
 };
 match tree_index {
 0 => {
-let val = (Decoder_jpeg_dnl(_input))?;
-Some(val)
+Some((Decoder_jpeg_dnl(_input))?)
 },
 
 1 => {
@@ -32727,8 +32430,7 @@ ret
 };
 match tree_index {
 0 => {
-let val = (Decoder_gif_graphic_control_extension(_input))?;
-Some(val)
+Some((Decoder_gif_graphic_control_extension(_input))?)
 },
 
 1 => {
@@ -33330,3 +33032,4 @@ PResult::Ok(match tuple_var {
 }
 })
 }
+
