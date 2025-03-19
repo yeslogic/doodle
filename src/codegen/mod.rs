@@ -3183,7 +3183,7 @@ where
                     }),
                 )
                 .collect();
-                GenBlock::from_parts(stmts, None)
+                GenBlock::from_parts(stmts, None).local_try()
             }
         }
     }

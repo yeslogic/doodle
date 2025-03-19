@@ -1709,7 +1709,7 @@ enum DeltaValues {
 ///
 /// # Examples
 ///
-/// ```no_run
+/// ```ignore
 /// // bits::<8>(raw) is the same as `raw as i8` so we omit those cases
 ///
 /// // We only show the significant endpoints of the positive and negative ranges
