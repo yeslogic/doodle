@@ -10,7 +10,7 @@ fn test_png_signature_decoder() {
     // PNG signature
     let input = b"\x89PNG\r\n\x1A\n";
     let mut parser = Parser::new(input);
-    let ret = Decoder103(&mut parser);
+    let ret = Decoder158(&mut parser);
     assert!(ret.is_ok());
 }
 
@@ -31,8 +31,8 @@ fn test_decoder_tgz() -> TestResult {
 
 #[test]
 fn test_decoder_font() -> TestResult {
-    let metrics = analyze_font(&testpath("../prince/tests/data/fonts/lsansuni.ttf"))?;
-    show_opentype_stats(&metrics);
+    let metrics = otf_metrics::analyze_font(&testpath("../prince/tests/data/fonts/lsansuni.ttf"))?;
+    otf_metrics::show_opentype_stats(&metrics, &otf_metrics::Config::default());
     Ok(())
 }
 
