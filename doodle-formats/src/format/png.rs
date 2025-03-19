@@ -408,12 +408,11 @@ pub fn main(
                     "length",
                     expr_lte(var("length"), Expr::U32(0x7fff_ffff)),
                 ),
-            ), // NOTE: < 2^31
+            ),
             (
                 "tag",
-                chain(
+                monad_seq(
                     Format::PeekNot(Box::new(is_byte(b'I'))),
-                    "_",
                     repeat_count(Expr::U32(4), base.ascii_char_strict()),
                 ),
             ),

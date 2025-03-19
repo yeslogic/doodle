@@ -783,6 +783,9 @@ pub struct U16;
 /// Marker type for [`Expr::U32`]-specific generic trait impls
 pub struct U32;
 
+/// Marker type for [`Expr::U32`]-specific generic trait impls
+pub struct U64;
+
 macro_rules! impl_zeromarker {
     ( $( $t:ident ),+ $(,)? ) => {
         $(
@@ -795,7 +798,7 @@ macro_rules! impl_zeromarker {
     };
 }
 
-impl_zeromarker!(U8, U16, U32);
+impl_zeromarker!(U8, U16, U32, U64);
 
 /// Given the appropriate Marker-type, returns an Expr that evaluates to `true` if the expression `expr` (of the appropriate type for the Marker passed in)
 /// is non-zero.
@@ -866,10 +869,10 @@ pub fn chain(f0: Format, name: impl IntoLabel, f: Format) -> Format {
     Format::LetFormat(Box::new(f0), name.into(), Box::new(f))
 }
 
-/// Helper method for [`Format::LefFormat`] for raw sequencing-without-capture, to avoid open-coding [`chain`] with the non-name "_".
+/// Helper method for [`Format::MonadSeq`]
 #[inline]
 pub fn monad_seq(f0: Format, f: Format) -> Format {
-    Format::LetFormat(Box::new(f0), Label::Borrowed("_"), Box::new(f))
+    Format::MonadSeq(Box::new(f0), Box::new(f))
 }
 
 /// Helper for destructuring an `Expr`-level tuple-value into a set of locally bound variables.
