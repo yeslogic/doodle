@@ -837,16 +837,12 @@ pub fn pat_some(pat: Pattern) -> Pattern {
 
 /// Helper for constructing `fmt -> Option::Some` within the Format model-language.
 pub fn fmt_some(f: Format) -> Format {
-    // REVIEW - do we want a more natural approach for synthesizing Option-kinded parse-values?
-    map(
-        f,
-        lambda("val", Expr::LiftOption(Some(Box::new(var("val"))))),
-    )
+    Format::LiftedOption(Some(Box::new(f)))
 }
 
 /// Helper for constructing `Option::None` within the Format model-language.
-pub fn fmt_none() -> Format {
-    compute(expr_none())
+pub const fn fmt_none() -> Format {
+    Format::LiftedOption(None)
 }
 
 /// Shortcut for `where_lambda` applied over the simple predicate [`is_nonzero`]

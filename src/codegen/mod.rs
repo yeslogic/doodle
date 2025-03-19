@@ -1950,7 +1950,7 @@ impl GenBlock {
     /// altogether.
     ///
     /// E.g.
-    /// ```no_run
+    /// ```ignore
     /// fn incorrect() -> Result<bool, E> {
     ///     let x = {
     ///         let y = fallible_operation()?;

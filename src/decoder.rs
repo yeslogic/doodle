@@ -1843,11 +1843,8 @@ mod tests {
             .is_err());
     }
 
-    fn mapped_some(x: Value) -> Value {
-        Value::Mapped(
-            Box::new(x.clone()),
-            Box::new(Value::Option(Some(Box::new(x)))),
-        )
+    fn value_some(x: Value) -> Value {
+        Value::Option(Some(Box::new(x)))
     }
 
     #[test]
@@ -2049,7 +2046,7 @@ mod tests {
             &[0x00, 0xFF],
             &[],
             Value::Tuple(vec![
-                Value::Branch(0, Box::new(mapped_some(Value::U8(0)))),
+                Value::Branch(0, Box::new(value_some(Value::U8(0)))),
                 Value::U8(0xFF),
             ]),
         );
@@ -2075,8 +2072,8 @@ mod tests {
             &[0x00, 0xFF],
             &[],
             Value::Tuple(vec![
-                Value::Branch(0, Box::new(mapped_some(Value::U8(0)))),
-                Value::Branch(0, Box::new(mapped_some(Value::U8(0xFF)))),
+                Value::Branch(0, Box::new(value_some(Value::U8(0)))),
+                Value::Branch(0, Box::new(value_some(Value::U8(0xFF)))),
             ]),
         );
         accepts(
@@ -2084,7 +2081,7 @@ mod tests {
             &[0x00],
             &[],
             Value::Tuple(vec![
-                Value::Branch(0, Box::new(mapped_some(Value::U8(0)))),
+                Value::Branch(0, Box::new(value_some(Value::U8(0)))),
                 Value::Branch(1, Box::new(Value::Option(None))),
             ]),
         );
@@ -2094,7 +2091,7 @@ mod tests {
             &[],
             Value::Tuple(vec![
                 Value::Branch(1, Box::new(Value::Option(None))),
-                Value::Branch(0, Box::new(mapped_some(Value::U8(0xFF)))),
+                Value::Branch(0, Box::new(value_some(Value::U8(0xFF)))),
             ]),
         );
         accepts(
@@ -2355,7 +2352,7 @@ mod tests {
                     "second-and-third",
                     Value::Branch(
                         0,
-                        Box::new(mapped_some(Value::record([
+                        Box::new(value_some(Value::record([
                             (
                                 "second",
                                 Value::Tuple(vec![Value::U8(0xFF), Value::Seq(vec![].into())]),
@@ -2376,7 +2373,7 @@ mod tests {
                     "second-and-third",
                     Value::Branch(
                         0,
-                        Box::new(mapped_some(Value::record(vec![
+                        Box::new(value_some(Value::record(vec![
                             (
                                 "second",
                                 Value::Tuple(vec![Value::U8(0xFF), Value::Seq(vec![].into())]),
