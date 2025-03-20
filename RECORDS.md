@@ -61,7 +61,7 @@ let f1 = Format::record_custom([(Ephemeral("part_of_record"), f), ..xs]);
 
 In other words, we can no longer reliably answer the question "is a given node `f` the conceptual root of a record-producing subtree".
 
-To combat this, `Format::Hint` is tobe wrapped around each and every Format representing a record we have just constructed, whether old- or new-style, along with a `StyleHint` storing all salient properties that are difficult or impossible to reverse-engineer after-the-fact.
+To combat this, `Format::Hint` is to be wrapped around each and every Format representing a record we have just constructed, whether old- or new-style, along with a `StyleHint` storing all salient properties that are difficult or impossible to reverse-engineer after-the-fact.
 
 ## Usage Patterns
 
