@@ -641,22 +641,19 @@ pub enum StyleHint {
 }
 
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub(crate) enum FieldLabel<'a> {
+pub(crate) enum FieldLabel<Name> {
     Anonymous,
-    Ephemeral(&'a Label),
-    Permanent {
-        in_capture: &'a Label,
-        in_value: &'a Label,
-    },
+    Ephemeral(Name),
+    Permanent { in_capture: Name, in_value: Name },
 }
 
 pub(crate) struct RecordFormat<'a> {
     // First label is the
-    flat: Vec<(FieldLabel<'a>, &'a Format)>,
+    flat: Vec<(FieldLabel<&'a Label>, &'a Format)>,
 }
 
 impl<'a> std::ops::Deref for RecordFormat<'a> {
-    type Target = Vec<(FieldLabel<'a>, &'a Format)>;
+    type Target = Vec<(FieldLabel<&'a Label>, &'a Format)>;
 
     fn deref(&self) -> &Self::Target {
         &self.flat
@@ -892,6 +889,8 @@ pub enum Format {
 impl Format {
     pub const EMPTY: Format = Format::Tuple(Vec::new());
 
+    pub const ANY_BYTE: Format = Format::Byte(ByteSet::full());
+
     pub fn alts<Name: IntoLabel>(fields: impl IntoIterator<Item = (Name, Format)>) -> Format {
         Format::Union(
             fields
@@ -911,7 +910,11 @@ impl Format {
         I: IntoIterator<Item = (Name, Format), IntoIter: DoubleEndedIterator>,
     {
         // NOTE - reverse-order so `.pop()` removes the earliest remaining entry
-        let mut rev_fields = fields.into_iter().rev().collect::<Vec<(Name, Format)>>();
+        let mut rev_fields = fields
+            .into_iter()
+            .rev()
+            .map(|(name, format)| (Some((name, true)), format))
+            .collect::<Vec<(Option<(Name, bool)>, Format)>>();
         let accum = Vec::with_capacity(rev_fields.len());
         Format::Hint(
             StyleHint::Record { old_style: true },
@@ -919,22 +922,32 @@ impl Format {
         )
     }
 
-    fn __chain_record<Name: IntoLabel>(
+    pub(crate) fn __chain_record<Name: IntoLabel>(
         mut captured: Vec<(Label, Expr)>,
-        remaining: &mut Vec<(Name, Format)>,
+        remaining: &mut Vec<(Option<(Name, bool)>, Format)>,
     ) -> Format {
         if remaining.is_empty() {
             Format::Compute(Box::new(Expr::Record(captured)))
         } else {
             let this = remaining.pop().unwrap();
-            let (name, format) = this;
-            let name: Label = name.into();
-            captured.push((name.clone(), Expr::Var(name.clone())));
-            Format::LetFormat(
-                Box::new(format.clone()),
-                name,
-                Box::new(Format::__chain_record(captured, remaining)),
-            )
+            let (label, format) = this;
+            match label {
+                None => Format::MonadSeq(
+                    Box::new(format),
+                    Box::new(Format::__chain_record(captured, remaining)),
+                ),
+                Some((name, is_persist)) => {
+                    let name: Label = name.into();
+                    if is_persist {
+                        captured.push((name.clone(), Expr::Var(name.clone())));
+                    }
+                    Format::LetFormat(
+                        Box::new(format),
+                        name,
+                        Box::new(Format::__chain_record(captured, remaining)),
+                    )
+                }
+            }
         }
     }
 }

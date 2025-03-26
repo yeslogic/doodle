@@ -16,7 +16,7 @@
 │       ├── chunks <- repeat png.chunk(...) :=
 │       │   ├── 0 <- png.chunk(...) :=
 │       │   │   ├── length <- assert (length -> length <= 2147483647) base.u32be := 87
-│       │   │   ├── tag <- let-format _ (peek-not [= 73]) (repeat-count 4 base.ascii-char.strict) := "PLTE"
+│       │   │   ├── tag <- monad-seq (peek-not [= 73]) (repeat-count 4 base.ascii-char.strict) := "PLTE"
 │       │   │   ├── data <- slice length (match tag { ... }) :=
 │       │   │   │   └── PLTE <- png.plte :=
 │       │   │   │       └──    r   g   b
@@ -52,7 +52,7 @@
 │       │   │   └── crc <- base.u32be := 1943707985
 │       │   ├── 1 <- png.chunk(...) :=
 │       │   │   ├── length <- assert (length -> length <= 2147483647) base.u32be := 1
-│       │   │   ├── tag <- let-format _ (peek-not [= 73]) (repeat-count 4 base.ascii-char.strict) := "tRNS"
+│       │   │   ├── tag <- monad-seq (peek-not [= 73]) (repeat-count 4 base.ascii-char.strict) := "tRNS"
 │       │   │   ├── data <- slice length (match tag { ... }) :=
 │       │   │   │   └── tRNS <- png.trns(...) :=
 │       │   │   │       └── color-type-3 <- repeat { ... } :=
@@ -61,7 +61,7 @@
 │       │   │   └── crc <- base.u32be := 1088870502
 │       │   ├── 2 <- png.chunk(...) :=
 │       │   │   ├── length <- assert (length -> length <= 2147483647) base.u32be := 1
-│       │   │   ├── tag <- let-format _ (peek-not [= 73]) (repeat-count 4 base.ascii-char.strict) := "bKGD"
+│       │   │   ├── tag <- monad-seq (peek-not [= 73]) (repeat-count 4 base.ascii-char.strict) := "bKGD"
 │       │   │   ├── data <- slice length (match tag { ... }) :=
 │       │   │   │   └── bKGD <- png.bkgd(...) :=
 │       │   │   │       └── color-type-3 <- { ... } :=
@@ -69,7 +69,7 @@
 │       │   │   └── crc <- base.u32be := 2282036552
 │       │   ├── 3 <- png.chunk(...) :=
 │       │   │   ├── length <- assert (length -> length <= 2147483647) base.u32be := 9
-│       │   │   ├── tag <- let-format _ (peek-not [= 73]) (repeat-count 4 base.ascii-char.strict) := "pHYs"
+│       │   │   ├── tag <- monad-seq (peek-not [= 73]) (repeat-count 4 base.ascii-char.strict) := "pHYs"
 │       │   │   ├── data <- slice length (match tag { ... }) :=
 │       │   │   │   └── pHYs <- png.phys :=
 │       │   │   │       ├── pixels-per-unit-x <- base.u32be := 2835
@@ -78,7 +78,7 @@
 │       │   │   └── crc <- base.u32be := 10132504
 │       │   └── 4 <- png.chunk(...) :=
 │       │       ├── length <- assert (length -> length <= 2147483647) base.u32be := 7
-│       │       ├── tag <- let-format _ (peek-not [= 73]) (repeat-count 4 base.ascii-char.strict) := "tIME"
+│       │       ├── tag <- monad-seq (peek-not [= 73]) (repeat-count 4 base.ascii-char.strict) := "tIME"
 │       │       ├── data <- slice length (match tag { ... }) :=
 │       │       │   └── tIME <- png.time :=
 │       │       │       ├── year <- base.u16be := 2005
