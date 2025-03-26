@@ -3,7 +3,8 @@ use std::collections::BTreeSet;
 use crate::bounds::Bounds;
 use crate::byte_set::ByteSet;
 use crate::{
-    Arith, BaseType, Expr, Format, IntRel, IntoLabel, Label, Pattern, TypeHint, UnaryOp, ValueType,
+    Arith, BaseType, Expr, Format, IntRel, IntoLabel, Label, Pattern, StyleHint, TypeHint, UnaryOp,
+    ValueType,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -365,6 +366,60 @@ pub fn record<Name: IntoLabel>(
     fields: impl IntoIterator<Item = (Name, Format), IntoIter: DoubleEndedIterator>,
 ) -> Format {
     Format::record(fields)
+}
+
+/// 'Smart' new-style record constructor that will discard labels starting with `__`,
+/// capture labels starting with `_` without forcing in-record persistence (e.g. count-fields for
+/// repeat arrays), and capture all other labels with in-record persistence.
+///
+/// # Examples
+///
+/// ```
+/// # use doodle::helper::*;
+/// # use doodle::Format;
+/// record_auto([
+///     ("_foo", Format::ANY_BYTE), // will be captured, but not persisted
+///     ("bar", repeat_count(var("_foo"), Format::ANY_BYTE)), // will be captured and persisted
+///     ("__baz", Format::ANY_BYTE), // will be discarded without ever being captured
+/// ]); // yields `struct _ { bar: Vec<u8> }`
+/// ```
+pub fn record_auto<Name: IntoLabel + AsRef<str>>(
+    fields: impl IntoIterator<Item = (Name, Format), IntoIter: DoubleEndedIterator>,
+) -> Format {
+    let fields_persist = fields.into_iter().map(|(label, format)| {
+        if label.as_ref().starts_with("__") {
+            (None, format)
+        } else {
+            let is_tmp = label.as_ref().starts_with("_");
+            (Some((label, !is_tmp)), format)
+        }
+    });
+    record_ext(fields_persist)
+}
+
+/// Bespoke record-constructor for new-style `Format`-level records.
+///
+/// Instead of a simple label, each format is given a synthetic marker for the field-capture
+/// semantics corresponding to said format.
+///
+/// - `None` is to be used for non-fields that should be parsed but ignored (e.g. padding, alignment, leftover bytes).
+/// - `Some((label, true))` will capture the field as `label` and persist it within the record under the same name and in the natural order-of-definition.
+/// - `Some((label, false))` will capture the field as `label` but only for use in dependent formats in later fields, and it will not appear in the final record.
+pub fn record_ext<Name: IntoLabel>(
+    fields_persist: impl IntoIterator<
+        Item = (Option<(Name, bool)>, Format),
+        IntoIter: DoubleEndedIterator,
+    >,
+) -> Format {
+    let mut rev_fields = fields_persist
+        .into_iter()
+        .rev()
+        .collect::<Vec<(Option<(Name, bool)>, Format)>>();
+    let accum = Vec::with_capacity(rev_fields.len());
+    Format::Hint(
+        StyleHint::Record { old_style: false },
+        Box::new(Format::__chain_record(accum, &mut rev_fields)),
+    )
 }
 
 /// Helper function that encloses a Format in an 'optional' context,
