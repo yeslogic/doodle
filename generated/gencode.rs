@@ -19505,23 +19505,16 @@ PResult::Ok(png_gama { gamma: gamma })
 
 fn Decoder_png_iccp<>(_input: &mut Parser<'_>) -> Result<png_iccp, ParseError> {
 let profile_name = {
-let tuple_var = {
-let field0 = ((|| Decoder205(_input))())?;
-let field1 = ((|| {
+let val = (Decoder205(_input))?;
+{
 let b = _input.read_byte()?;
-PResult::Ok(if b == 0 {
+if b == 0 {
 b
 } else {
 return Err(ParseError::ExcludedBranch(14485842416732585139u64));
-})
-})())?;
-(field0, field1)
+}
 };
-match tuple_var {
-(x, __null) => {
-x
-}
-}
+val.clone()
 };
 let compression_method = {
 let inner = (Decoder24(_input))?;
@@ -19613,23 +19606,16 @@ PResult::Ok(png_srgb { rendering_intent: rendering_intent })
 
 fn Decoder_png_itxt<>(_input: &mut Parser<'_>) -> Result<png_itxt, ParseError> {
 let keyword = {
-let tuple_var = {
-let field0 = ((|| Decoder198(_input))())?;
-let field1 = ((|| {
+let val = (Decoder198(_input))?;
+{
 let b = _input.read_byte()?;
-PResult::Ok(if b == 0 {
+if b == 0 {
 b
 } else {
 return Err(ParseError::ExcludedBranch(13780055874544357936u64));
-})
-})())?;
-(field0, field1)
+}
 };
-match tuple_var {
-(x, __null) => {
-x
-}
-}
+val.clone()
 };
 let compression_flag = {
 let b = _input.read_byte()?;
@@ -19649,23 +19635,16 @@ return Err(ParseError::ExcludedBranch(7933266403838225878u64));
 };
 let language_tag = (Decoder_base_asciiz_string(_input))?;
 let translated_keyword = {
-let tuple_var = {
-let field0 = ((|| Decoder200(_input))())?;
-let field1 = ((|| {
+let val = (Decoder200(_input))?;
+{
 let b = _input.read_byte()?;
-PResult::Ok(if b == 0 {
+if b == 0 {
 b
 } else {
 return Err(ParseError::ExcludedBranch(12100308281236296642u64));
-})
-})())?;
-(field0, field1)
+}
 };
-match tuple_var {
-(x, __null) => {
-x
-}
-}
+val.clone()
 };
 let text = match compression_flag == 1u8 {
 true => {
@@ -19741,23 +19720,16 @@ PResult::Ok(png_itxt { keyword: keyword, compression_flag: compression_flag, com
 
 fn Decoder_png_text<>(_input: &mut Parser<'_>) -> Result<png_text, ParseError> {
 let keyword = {
-let tuple_var = {
-let field0 = ((|| Decoder197(_input))())?;
-let field1 = ((|| {
+let val = (Decoder197(_input))?;
+{
 let b = _input.read_byte()?;
-PResult::Ok(if b == 0 {
+if b == 0 {
 b
 } else {
 return Err(ParseError::ExcludedBranch(9041056097467752267u64));
-})
-})())?;
-(field0, field1)
+}
 };
-match tuple_var {
-(x, __null) => {
-x
-}
-}
+val.clone()
 };
 let text = {
 let mut accum = Vec::new();
@@ -19785,23 +19757,16 @@ PResult::Ok(png_text { keyword: keyword, text: text })
 
 fn Decoder_png_ztxt<>(_input: &mut Parser<'_>) -> Result<png_ztxt, ParseError> {
 let keyword = {
-let tuple_var = {
-let field0 = ((|| Decoder193(_input))())?;
-let field1 = ((|| {
+let val = (Decoder193(_input))?;
+{
 let b = _input.read_byte()?;
-PResult::Ok(if b == 0 {
+if b == 0 {
 b
 } else {
 return Err(ParseError::ExcludedBranch(5025197102194587315u64));
-})
-})())?;
-(field0, field1)
+}
 };
-match tuple_var {
-(x, __null) => {
-x
-}
-}
+val.clone()
 };
 let compression_method = {
 let b = _input.read_byte()?;
@@ -19906,23 +19871,16 @@ PResult::Ok(png_phys { pixels_per_unit_x: pixels_per_unit_x, pixels_per_unit_y: 
 
 fn Decoder_png_splt<>(_input: &mut Parser<'_>) -> Result<png_splt, ParseError> {
 let palette_name = {
-let tuple_var = {
-let field0 = ((|| Decoder192(_input))())?;
-let field1 = ((|| {
+let val = (Decoder192(_input))?;
+{
 let b = _input.read_byte()?;
-PResult::Ok(if b == 0 {
+if b == 0 {
 b
 } else {
 return Err(ParseError::ExcludedBranch(15252450768049745444u64));
-})
-})())?;
-(field0, field1)
+}
 };
-match tuple_var {
-(x, __null) => {
-x
-}
-}
+val.clone()
 };
 let sample_depth = {
 let inner = (Decoder24(_input))?;
