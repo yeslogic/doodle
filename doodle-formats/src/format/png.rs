@@ -4,10 +4,7 @@ use doodle::helper::*;
 use doodle::{Expr, Format, FormatModule, FormatRef, Pattern};
 
 fn null_terminated(f: Format) -> Format {
-    map(
-        tuple(vec![f, is_byte(0)]),
-        lambda_tuple(["x", "__null"], var("x")),
-    )
+    chain(f, "val", monad_seq(is_byte(0), compute(var("val"))))
 }
 
 pub fn main(

@@ -14,6 +14,7 @@ pub mod opentype;
 pub mod peano;
 pub mod png;
 pub mod riff;
+pub mod run_length;
 pub mod tar;
 pub mod text;
 pub mod tiff;
