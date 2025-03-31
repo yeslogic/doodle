@@ -53,7 +53,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             )),
         );
         module.define_format(
-            "rle.old-style",
+            "rle.new-style",
             record_auto([
                 ("_runs", repeat(run.call())),
                 ("data", rle_ascii_string_ns.call_args(vec![var("_runs")])),

@@ -210,6 +210,109 @@ pub mod png_metrics {
     }
 }
 
+pub mod rle_scan {
+    use super::*;
+
+    #[derive(Clone, Copy, Debug, PartialOrd, PartialEq, Eq, Ord, Hash)]
+    pub enum Style {
+        OldStyle = 0,
+        NewStyle = 1,
+    }
+
+    impl std::fmt::Display for Style {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                Style::OldStyle => write!(f, "old-style"),
+                Style::NewStyle => write!(f, "new-style"),
+            }
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct RunInfo {
+        run_count: u32,
+        run_length_bounds: (u16, u16),
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct RleStat {
+        style: Style,
+        input_len: u32,
+        run_info: Option<RunInfo>,
+        data: String,
+    }
+
+    pub fn scan_rle(input: &mut impl std::io::Read) -> TestResult<RleStat> {
+        let mut buf = Vec::new();
+        input.read_to_end(&mut buf)?;
+        // subtract one byte for the leading sentinel byte, which is artificially tacked on
+        let input_len = buf.len() as u32 - 1;
+        let mut parser = Parser::new(&buf);
+        match Decoder_rle_main(&mut parser)? {
+            rle_main::new_style(new_style) => {
+                let data = String::from_utf8(new_style.data)?;
+                Ok(RleStat {
+                    style: Style::NewStyle,
+                    input_len,
+                    run_info: None,
+                    data,
+                })
+            }
+            rle_main::old_style(old_style) => {
+                let data = String::from_utf8(old_style.data)?;
+                let mut run_length_min = 256;
+                let mut run_length_max = 0;
+                for run in old_style.runs.iter() {
+                    let len = run.len;
+                    run_length_min = std::cmp::min(run_length_min, len as u16);
+                    run_length_max = std::cmp::max(run_length_max, len as u16);
+                }
+                if run_length_min > 255 {
+                    run_length_min = 0;
+                }
+                let run_info = Some(RunInfo {
+                    run_count: old_style.runs.len() as u32,
+                    run_length_bounds: (run_length_min, run_length_max),
+                });
+                Ok(RleStat {
+                    style: Style::OldStyle,
+                    input_len,
+                    run_info,
+                    data,
+                })
+            }
+        }
+    }
+
+    pub fn analyze_rle(filename: &str) -> TestResult<()> {
+        let file = std::fs::File::open(std::path::Path::new(filename))?;
+        let mut input = std::io::BufReader::new(file);
+        let RleStat {
+            style,
+            input_len,
+            run_info,
+            data,
+        } = scan_rle(&mut input)?;
+        if let Some(RunInfo {
+            run_count,
+            run_length_bounds,
+        }) = run_info
+        {
+            let (run_length_min, run_length_max) = run_length_bounds;
+            println!(
+                "RLE ({filename}): style={style}, len={input_len}, data={data:?}, run_count={run_count}, [min={run_length_min}, max={run_length_max}] (compression: {:.2}%)",
+                input_len as f64 / data.len() as f64 * 100.0
+            )
+        } else {
+            println!(
+                "RLE ({filename}): style={style}, len={input_len}, data={data:?} (compression: {:.2}%)",
+                input_len as f64 / data.len() as f64 * 100.0
+            )
+        }
+        Ok(())
+    }
+}
+
 pub mod otf_metrics;
 pub(crate) mod util;
 
