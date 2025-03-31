@@ -84,6 +84,21 @@ impl<'module> TreePrinter<'module> {
         }
     }
 
+    fn is_implied_value_format_new_style_record(&self, format: &Format) -> bool {
+        let record_format = format.to_record_format();
+        for (field_label, format) in record_format.iter() {
+            match field_label {
+                FieldLabel::Permanent { .. } => {
+                    if !self.is_implied_value_format(format) {
+                        return false;
+                    }
+                }
+                _ => (),
+            }
+        }
+        true
+    }
+
     fn is_implied_value_format(&self, format: &Format) -> bool {
         match format {
             Format::ItemVar(level, _args) => {
@@ -96,7 +111,7 @@ impl<'module> TreePrinter<'module> {
                 if *old_style {
                     self.is_implied_value_format_old_style_record(inner)
                 } else {
-                    unimplemented!("implement new-style is_implied_value_format");
+                    self.is_implied_value_format_new_style_record(inner)
                 }
             }
             Format::Repeat(format)

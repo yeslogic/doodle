@@ -40,6 +40,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
     let tar = tar::main(module, &base);
     let elf = elf::main(module, &base);
     let waldo = waldo::main(module, &base);
+    let rle = run_length::main(module, &base);
     let opentype = opentype::main(module, &base);
 
     let tgz = {
@@ -79,6 +80,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                     ("tar", tar.call()),
                     ("elf", elf.call()),
                     ("opentype", opentype.call()),
+                    ("rle", rle.call()),
                     ("text", text.call()),
                 ]),
             ),
