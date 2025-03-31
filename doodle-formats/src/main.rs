@@ -82,6 +82,7 @@ const SELECTORS: &[(&[&str], FormatSelector)] = &[
     (&["targz", "tgz"], FormatSelector::TarGz),
     (&["elf"], FormatSelector::Elf),
     (&["waldo"], FormatSelector::Waldo),
+    (&["rle", "run-length", "run_length"], FormatSelector::Rle),
     (
         &["opentype", "font", "otf", "ttf", "ttc"],
         FormatSelector::Opentype,
@@ -100,6 +101,7 @@ enum FormatSelector {
     Peano,
     Png,
     Riff,
+    Rle,
     Tar,
     TarGz,
     Tiff,
@@ -175,6 +177,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
                             format::png::main(&mut module, zlib, text, utf8nz, &base).call()
                         }
                         FormatSelector::Riff => format::riff::main(&mut module, &base).call(),
+                        FormatSelector::Rle => format::run_length::main(&mut module, &base).call(),
                         FormatSelector::Tar => format::tar::main(&mut module, &base).call(),
                         FormatSelector::TarGz => {
                             let deflate = format::deflate::main(&mut module, &base);
