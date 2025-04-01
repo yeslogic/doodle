@@ -144,11 +144,11 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     // ELF Identification (e_ident[])
     let elf_ident = module.define_format(
         "elf.header.ident",
-        record([
-            ("magic", is_bytes(b"\x7fELF")), // Magic bytes
-            ("class", ei_class.call()),      // Class (32-bit or 64-bit)
-            ("data", ei_data.call()),        // Data Encoding (endianness)
-            ("version", ei_version.call()),  // Elf Version (should be EV_CURRENT (:= 1 ?))
+        record_auto([
+            ("__magic", is_bytes(b"\x7fELF")), // Magic bytes
+            ("class", ei_class.call()),        // Class (32-bit or 64-bit)
+            ("data", ei_data.call()),          // Data Encoding (endianness)
+            ("version", ei_version.call()),    // Elf Version (should be EV_CURRENT (:= 1 ?))
             ("os_abi", ei_osabi.call()),
             ("abi_version", ei_abiversion.call()),
             ("__pad", repeat(is_byte(0x00))), // Zero-byte padding to end of Ident section
@@ -663,7 +663,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
     module.define_format(
         "elf.main",
-        record([
+        record_auto([
             ("header", elf_header.call()),
             ("__eoh", Format::Pos),
             ("program_headers", elf_ph),
