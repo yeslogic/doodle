@@ -207,6 +207,14 @@ impl<'module> TreePrinter<'module> {
                     let (_pattern, format) = &branches[*n];
                     self.is_atomic_value(value.as_ref(), Some(format))
                 }
+                // expose wrapped format contents
+                Some(Format::Let(.., inner))
+                | Some(Format::Hint(.., inner))
+                | Some(Format::WithRelativeOffset(.., inner))
+                | Some(Format::MonadSeq(.., inner))
+                | Some(Format::LetFormat(.., inner)) => {
+                    self.is_atomic_value(value.as_ref(), Some(inner))
+                }
                 None => self.is_atomic_value(value.as_ref(), None),
                 f => panic!("expected format suitable for branch: {f:?}"),
             },
