@@ -9,16 +9,14 @@ pub mod api_helper;
 use doodle::prelude::*;
 use doodle::try_sub;
 
-/// expected size: 40
-#[derive(Debug, Clone)]
+/// expected size: 5
+#[derive(Debug, Copy, Clone)]
 pub struct elf_header_ident {
-magic: (u8, u8, u8, u8),
 class: u8,
 data: u8,
 version: u8,
 os_abi: u8,
-abi_version: u8,
-__pad: Vec<u8>
+abi_version: u8
 }
 
 /// expected size: 16
@@ -29,8 +27,8 @@ pub enum elf_types_elf_addr { Addr32(u32), Addr64(u64) }
 #[derive(Debug, Copy, Clone)]
 pub enum elf_types_elf_off { Off32(u32), Off64(u64) }
 
-/// expected size: 112
-#[derive(Debug, Clone)]
+/// expected size: 80
+#[derive(Debug, Copy, Clone)]
 pub struct elf_header {
 ident: elf_header_ident,
 r#type: u16,
@@ -81,15 +79,13 @@ addralign: elf_types_elf_full,
 entsize: elf_types_elf_full
 }
 
-/// expected size: 192
+/// expected size: 152
 #[derive(Debug, Clone)]
 pub struct elf_main {
 header: elf_header,
-__eoh: u64,
 program_headers: Option<Vec<elf_phdr_table>>,
 section_headers: Option<Vec<elf_shdr_table>>,
-sections: Option<Vec<Option<Vec<u8>>>>,
-__skip: ()
+sections: Option<Vec<Option<Vec<u8>>>>
 }
 
 /// expected size: 32
@@ -5357,7 +5353,7 @@ PResult::Ok(tar_main { contents: contents, __padding: __padding, __trailing: __t
 
 fn Decoder_elf_main<>(_input: &mut Parser<'_>) -> Result<elf_main, ParseError> {
 let header = (Decoder_elf_header(_input))?;
-let __eoh = _input.get_offset_u64();
+_input.get_offset_u64();
 let program_headers = if match header.phoff.clone() {
 elf_types_elf_off::Off32(0u32) => {
 false
@@ -5453,8 +5449,8 @@ None => {
 None
 }
 };
-let __skip = _input.skip_remainder();
-PResult::Ok(elf_main { header: header, __eoh: __eoh, program_headers: program_headers, section_headers: section_headers, sections: sections, __skip: __skip })
+_input.skip_remainder();
+PResult::Ok(elf_main { header: header, program_headers: program_headers, section_headers: section_headers, sections: sections })
 }
 
 fn Decoder_opentype_main<>(_input: &mut Parser<'_>) -> Result<opentype_main, ParseError> {
@@ -16105,7 +16101,7 @@ None
 }
 
 fn Decoder_elf_header_ident<>(_input: &mut Parser<'_>) -> Result<elf_header_ident, ParseError> {
-let magic = {
+{
 let field0 = ((|| {
 let b = _input.read_byte()?;
 PResult::Ok(if b == 127 {
@@ -16145,7 +16141,7 @@ let data = (Decoder149(_input))?;
 let version = (Decoder150(_input))?;
 let os_abi = (Decoder151(_input))?;
 let abi_version = (Decoder152(_input))?;
-let __pad = {
+{
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
 let matching_ix = {
@@ -16177,7 +16173,7 @@ break
 }
 accum
 };
-PResult::Ok(elf_header_ident { magic: magic, class: class, data: data, version: version, os_abi: os_abi, abi_version: abi_version, __pad: __pad })
+PResult::Ok(elf_header_ident { class: class, data: data, version: version, os_abi: os_abi, abi_version: abi_version })
 }
 
 fn Decoder143<>(_input: &mut Parser<'_>, is_be: bool) -> Result<u16, ParseError> {
