@@ -210,6 +210,25 @@ pub mod png_metrics {
     }
 }
 
+pub mod elf_info {
+    use super::*;
+
+    pub fn scan_elf(input: &mut impl std::io::Read) -> TestResult<()> {
+        let mut buf = Vec::new();
+        input.read_to_end(&mut buf)?;
+        let mut parser = Parser::new(&buf);
+        let elf = Decoder_elf_main(&mut parser)?;
+        println!("{:?}", elf);
+        Ok(())
+    }
+
+    pub fn analyze_elf(filename: &str) -> TestResult<()> {
+        let file = std::fs::File::open(std::path::Path::new(filename))?;
+        let mut input = std::io::BufReader::new(file);
+        scan_elf(&mut input)
+    }
+}
+
 pub mod rle_scan {
     use super::*;
 

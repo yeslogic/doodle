@@ -23,6 +23,10 @@ name = "szck"
 path = "bin/rle_info.rs"
 name = "rle_info"
 
+[[bin]]
+path = "bin/elfinfo.rs"
+name = "elfinfo"
+
 [[bench]]
 name = "gen_benchmark"
 path = "benches/gen_benchmark.rs"
