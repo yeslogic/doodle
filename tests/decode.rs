@@ -88,6 +88,17 @@ mod png {
     }
 }
 
+mod elf {
+    use super::*;
+
+    #[test]
+    fn test_decode_test_elf() {
+        let output = doodle().args(["file", "test.elf"]).output().unwrap();
+        let expected = expect_test::expect_file!("expected/decode/test.elf.stdout");
+        check_output(output, expected);
+    }
+}
+
 mod riff {
     use super::*;
 

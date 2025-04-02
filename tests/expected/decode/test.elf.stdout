@@ -1,0 +1,404 @@
+├── data <- _ |...| _ :=
+│   └── elf <- elf.main :=
+│       ├── header <- elf.header :=
+│       │   ├── ident <- slice 16 elf.header.ident :=
+│       │   │   ├── class <- elf.header.ident.class := 2
+│       │   │   ├── data <- elf.header.ident.data := 1
+│       │   │   ├── version <- elf.header.ident.version := 1
+│       │   │   ├── os_abi <- elf.header.ident.os-abi := 0
+│       │   │   └── abi_version <- elf.header.ident.abi-version := 0
+│       │   ├── type <- elf.header.type(...) := 3
+│       │   ├── machine <- elf.header.machine(...) := 62
+│       │   ├── version <- elf.header.version(...) := 1
+│       │   ├── entry <- elf.types.elf-addr(...) := { Addr64 := 4224 }
+│       │   ├── phoff <- elf.types.elf-off(...) := { Off64 := 64 }
+│       │   ├── shoff <- elf.types.elf-off(...) := { Off64 := 13976 }
+│       │   ├── flags <- elf.types.elf-word(...) := 0
+│       │   ├── ehsize <- elf.types.elf-half(...) := 64
+│       │   ├── phentsize <- elf.types.elf-half(...) := 56
+│       │   ├── phnum <- elf.types.elf-half(...) := 13
+│       │   ├── shentsize <- elf.types.elf-half(...) := 64
+│       │   ├── shnum <- elf.types.elf-half(...) := 31
+│       │   └── shstrndx <- elf.types.elf-half(...) := 30
+│       ├── program_headers <- maybe (match header.phoff { ... }) (with-relative-offset 0 (match header.phoff { ... }) elf.phdr-table(...)) :=
+│       │   └── some <- with-relative-offset 0 (match header.phoff { ... }) elf.phdr-table(...) :=
+│       │       ├── 0 <- elf.phdr(...) :=
+│       │       │   ├── type <- elf.types.elf-word(...) := 6
+│       │       │   ├── flags64 <- elf.phdr.p-flags64(...) := { some := 4 }
+│       │       │   ├── offset <- elf.types.elf-off(...) := { Off64 := 64 }
+│       │       │   ├── vaddr <- elf.types.elf-addr(...) := { Addr64 := 64 }
+│       │       │   ├── paddr <- elf.types.elf-addr(...) := { Addr64 := 64 }
+│       │       │   ├── filesz <- elf.types.elf-full(...) := { Full64 := 728 }
+│       │       │   ├── memsz <- elf.types.elf-full(...) := { Full64 := 728 }
+│       │       │   ├── flags32 <- elf.phdr.p-flags32(...) := none
+│       │       │   └── align <- elf.types.elf-full(...) := { Full64 := 8 }
+│       │       ├── 1 <- elf.phdr(...) :=
+│       │       │   ├── type <- elf.types.elf-word(...) := 3
+│       │       │   ├── flags64 <- elf.phdr.p-flags64(...) := { some := 4 }
+│       │       │   ├── offset <- elf.types.elf-off(...) := { Off64 := 792 }
+│       │       │   ├── vaddr <- elf.types.elf-addr(...) := { Addr64 := 792 }
+│       │       │   ├── paddr <- elf.types.elf-addr(...) := { Addr64 := 792 }
+│       │       │   ├── filesz <- elf.types.elf-full(...) := { Full64 := 28 }
+│       │       │   ├── memsz <- elf.types.elf-full(...) := { Full64 := 28 }
+│       │       │   ├── flags32 <- elf.phdr.p-flags32(...) := none
+│       │       │   └── align <- elf.types.elf-full(...) := { Full64 := 1 }
+│       │       ├── 2 <- elf.phdr(...) :=
+│       │       │   ├── type <- elf.types.elf-word(...) := 1
+│       │       │   ├── flags64 <- elf.phdr.p-flags64(...) := { some := 4 }
+│       │       │   ├── offset <- elf.types.elf-off(...) := { Off64 := 0 }
+│       │       │   ├── vaddr <- elf.types.elf-addr(...) := { Addr64 := 0 }
+│       │       │   ├── paddr <- elf.types.elf-addr(...) := { Addr64 := 0 }
+│       │       │   ├── filesz <- elf.types.elf-full(...) := { Full64 := 1576 }
+│       │       │   ├── memsz <- elf.types.elf-full(...) := { Full64 := 1576 }
+│       │       │   ├── flags32 <- elf.phdr.p-flags32(...) := none
+│       │       │   └── align <- elf.types.elf-full(...) := { Full64 := 4096 }
+│       │       ├── 3 <- elf.phdr(...) :=
+│       │       │   ├── type <- elf.types.elf-word(...) := 1
+│       │       │   ├── flags64 <- elf.phdr.p-flags64(...) := { some := 5 }
+│       │       │   ├── offset <- elf.types.elf-off(...) := { Off64 := 4096 }
+│       │       │   ├── vaddr <- elf.types.elf-addr(...) := { Addr64 := 4096 }
+│       │       │   ├── paddr <- elf.types.elf-addr(...) := { Addr64 := 4096 }
+│       │       │   ├── filesz <- elf.types.elf-full(...) := { Full64 := 377 }
+│       │       │   ├── memsz <- elf.types.elf-full(...) := { Full64 := 377 }
+│       │       │   ├── flags32 <- elf.phdr.p-flags32(...) := none
+│       │       │   └── align <- elf.types.elf-full(...) := { Full64 := 4096 }
+│       │       ├── 4 <- elf.phdr(...) :=
+│       │       │   ├── type <- elf.types.elf-word(...) := 1
+│       │       │   ├── flags64 <- elf.phdr.p-flags64(...) := { some := 4 }
+│       │       │   ├── offset <- elf.types.elf-off(...) := { Off64 := 8192 }
+│       │       │   ├── vaddr <- elf.types.elf-addr(...) := { Addr64 := 8192 }
+│       │       │   ├── paddr <- elf.types.elf-addr(...) := { Addr64 := 8192 }
+│       │       │   ├── filesz <- elf.types.elf-full(...) := { Full64 := 236 }
+│       │       │   ├── memsz <- elf.types.elf-full(...) := { Full64 := 236 }
+│       │       │   ├── flags32 <- elf.phdr.p-flags32(...) := none
+│       │       │   └── align <- elf.types.elf-full(...) := { Full64 := 4096 }
+│       │       ├── 5 <- elf.phdr(...) :=
+│       │       │   ├── type <- elf.types.elf-word(...) := 1
+│       │       │   ├── flags64 <- elf.phdr.p-flags64(...) := { some := 6 }
+│       │       │   ├── offset <- elf.types.elf-off(...) := { Off64 := 11704 }
+│       │       │   ├── vaddr <- elf.types.elf-addr(...) := { Addr64 := 15800 }
+│       │       │   ├── paddr <- elf.types.elf-addr(...) := { Addr64 := 15800 }
+│       │       │   ├── filesz <- elf.types.elf-full(...) := { Full64 := 600 }
+│       │       │   ├── memsz <- elf.types.elf-full(...) := { Full64 := 608 }
+│       │       │   ├── flags32 <- elf.phdr.p-flags32(...) := none
+│       │       │   └── align <- elf.types.elf-full(...) := { Full64 := 4096 }
+│       │       ├── 6 <- elf.phdr(...) :=
+│       │       │   ├── type <- elf.types.elf-word(...) := 2
+│       │       │   ├── flags64 <- elf.phdr.p-flags64(...) := { some := 6 }
+│       │       │   ├── offset <- elf.types.elf-off(...) := { Off64 := 11720 }
+│       │       │   ├── vaddr <- elf.types.elf-addr(...) := { Addr64 := 15816 }
+│       │       │   ├── paddr <- elf.types.elf-addr(...) := { Addr64 := 15816 }
+│       │       │   ├── filesz <- elf.types.elf-full(...) := { Full64 := 496 }
+│       │       │   ├── memsz <- elf.types.elf-full(...) := { Full64 := 496 }
+│       │       │   ├── flags32 <- elf.phdr.p-flags32(...) := none
+│       │       │   └── align <- elf.types.elf-full(...) := { Full64 := 8 }
+│       │       ├── 7 <- elf.phdr(...) :=
+│       │       │   ├── type <- elf.types.elf-word(...) := 4
+│       │       │   ├── flags64 <- elf.phdr.p-flags64(...) := { some := 4 }
+│       │       │   ├── offset <- elf.types.elf-off(...) := { Off64 := 824 }
+│       │       │   ├── vaddr <- elf.types.elf-addr(...) := { Addr64 := 824 }
+│       │       │   ├── paddr <- elf.types.elf-addr(...) := { Addr64 := 824 }
+│       │       │   ├── filesz <- elf.types.elf-full(...) := { Full64 := 48 }
+│       │       │   ├── memsz <- elf.types.elf-full(...) := { Full64 := 48 }
+│       │       │   ├── flags32 <- elf.phdr.p-flags32(...) := none
+│       │       │   └── align <- elf.types.elf-full(...) := { Full64 := 8 }
+│       │       ├── 8 <- elf.phdr(...) :=
+│       │       │   ├── type <- elf.types.elf-word(...) := 4
+│       │       │   ├── flags64 <- elf.phdr.p-flags64(...) := { some := 4 }
+│       │       │   ├── offset <- elf.types.elf-off(...) := { Off64 := 872 }
+│       │       │   ├── vaddr <- elf.types.elf-addr(...) := { Addr64 := 872 }
+│       │       │   ├── paddr <- elf.types.elf-addr(...) := { Addr64 := 872 }
+│       │       │   ├── filesz <- elf.types.elf-full(...) := { Full64 := 68 }
+│       │       │   ├── memsz <- elf.types.elf-full(...) := { Full64 := 68 }
+│       │       │   ├── flags32 <- elf.phdr.p-flags32(...) := none
+│       │       │   └── align <- elf.types.elf-full(...) := { Full64 := 4 }
+│       │       ├── 9 <- elf.phdr(...) :=
+│       │       │   ├── type <- elf.types.elf-word(...) := 1685382483
+│       │       │   ├── flags64 <- elf.phdr.p-flags64(...) := { some := 4 }
+│       │       │   ├── offset <- elf.types.elf-off(...) := { Off64 := 824 }
+│       │       │   ├── vaddr <- elf.types.elf-addr(...) := { Addr64 := 824 }
+│       │       │   ├── paddr <- elf.types.elf-addr(...) := { Addr64 := 824 }
+│       │       │   ├── filesz <- elf.types.elf-full(...) := { Full64 := 48 }
+│       │       │   ├── memsz <- elf.types.elf-full(...) := { Full64 := 48 }
+│       │       │   ├── flags32 <- elf.phdr.p-flags32(...) := none
+│       │       │   └── align <- elf.types.elf-full(...) := { Full64 := 8 }
+│       │       ~
+│       │       └── 12 <- elf.phdr(...) :=
+│       │           ├── type <- elf.types.elf-word(...) := 1685382482
+│       │           ├── flags64 <- elf.phdr.p-flags64(...) := { some := 4 }
+│       │           ├── offset <- elf.types.elf-off(...) := { Off64 := 11704 }
+│       │           ├── vaddr <- elf.types.elf-addr(...) := { Addr64 := 15800 }
+│       │           ├── paddr <- elf.types.elf-addr(...) := { Addr64 := 15800 }
+│       │           ├── filesz <- elf.types.elf-full(...) := { Full64 := 584 }
+│       │           ├── memsz <- elf.types.elf-full(...) := { Full64 := 584 }
+│       │           ├── flags32 <- elf.phdr.p-flags32(...) := none
+│       │           └── align <- elf.types.elf-full(...) := { Full64 := 1 }
+│       ├── section_headers <- maybe (match header.shoff { ... }) (with-relative-offset 0 (match header.shoff { ... }) elf.shdr-table(...)) :=
+│       │   └── some <- with-relative-offset 0 (match header.shoff { ... }) elf.shdr-table(...) :=
+│       │       ├── 0 <- elf.shdr(...) :=
+│       │       │   ├── name <- elf.types.elf-word(...) := 0
+│       │       │   ├── type <- elf.shdr.sh-type(...) := 0
+│       │       │   ├── flags <- elf.types.elf-full(...) := { Full64 := 0 }
+│       │       │   ├── addr <- elf.types.elf-addr(...) := { Addr64 := 0 }
+│       │       │   ├── offset <- elf.types.elf-off(...) := { Off64 := 0 }
+│       │       │   ├── size <- elf.types.elf-full(...) := { Full64 := 0 }
+│       │       │   ├── link <- elf.types.elf-word(...) := 0
+│       │       │   ├── info <- elf.shdr.sh-info(...) := 0
+│       │       │   ├── addralign <- elf.types.elf-full(...) := { Full64 := 0 }
+│       │       │   └── entsize <- elf.types.elf-full(...) := { Full64 := 0 }
+│       │       ├── 1 <- elf.shdr(...) :=
+│       │       │   ├── name <- elf.types.elf-word(...) := 27
+│       │       │   ├── type <- elf.shdr.sh-type(...) := 1
+│       │       │   ├── flags <- elf.types.elf-full(...) := { Full64 := 2 }
+│       │       │   ├── addr <- elf.types.elf-addr(...) := { Addr64 := 792 }
+│       │       │   ├── offset <- elf.types.elf-off(...) := { Off64 := 792 }
+│       │       │   ├── size <- elf.types.elf-full(...) := { Full64 := 28 }
+│       │       │   ├── link <- elf.types.elf-word(...) := 0
+│       │       │   ├── info <- elf.shdr.sh-info(...) := 0
+│       │       │   ├── addralign <- elf.types.elf-full(...) := { Full64 := 1 }
+│       │       │   └── entsize <- elf.types.elf-full(...) := { Full64 := 0 }
+│       │       ├── 2 <- elf.shdr(...) :=
+│       │       │   ├── name <- elf.types.elf-word(...) := 35
+│       │       │   ├── type <- elf.shdr.sh-type(...) := 7
+│       │       │   ├── flags <- elf.types.elf-full(...) := { Full64 := 2 }
+│       │       │   ├── addr <- elf.types.elf-addr(...) := { Addr64 := 824 }
+│       │       │   ├── offset <- elf.types.elf-off(...) := { Off64 := 824 }
+│       │       │   ├── size <- elf.types.elf-full(...) := { Full64 := 48 }
+│       │       │   ├── link <- elf.types.elf-word(...) := 0
+│       │       │   ├── info <- elf.shdr.sh-info(...) := 0
+│       │       │   ├── addralign <- elf.types.elf-full(...) := { Full64 := 8 }
+│       │       │   └── entsize <- elf.types.elf-full(...) := { Full64 := 0 }
+│       │       ├── 3 <- elf.shdr(...) :=
+│       │       │   ├── name <- elf.types.elf-word(...) := 54
+│       │       │   ├── type <- elf.shdr.sh-type(...) := 7
+│       │       │   ├── flags <- elf.types.elf-full(...) := { Full64 := 2 }
+│       │       │   ├── addr <- elf.types.elf-addr(...) := { Addr64 := 872 }
+│       │       │   ├── offset <- elf.types.elf-off(...) := { Off64 := 872 }
+│       │       │   ├── size <- elf.types.elf-full(...) := { Full64 := 36 }
+│       │       │   ├── link <- elf.types.elf-word(...) := 0
+│       │       │   ├── info <- elf.shdr.sh-info(...) := 0
+│       │       │   ├── addralign <- elf.types.elf-full(...) := { Full64 := 4 }
+│       │       │   └── entsize <- elf.types.elf-full(...) := { Full64 := 0 }
+│       │       ├── 4 <- elf.shdr(...) :=
+│       │       │   ├── name <- elf.types.elf-word(...) := 73
+│       │       │   ├── type <- elf.shdr.sh-type(...) := 7
+│       │       │   ├── flags <- elf.types.elf-full(...) := { Full64 := 2 }
+│       │       │   ├── addr <- elf.types.elf-addr(...) := { Addr64 := 908 }
+│       │       │   ├── offset <- elf.types.elf-off(...) := { Off64 := 908 }
+│       │       │   ├── size <- elf.types.elf-full(...) := { Full64 := 32 }
+│       │       │   ├── link <- elf.types.elf-word(...) := 0
+│       │       │   ├── info <- elf.shdr.sh-info(...) := 0
+│       │       │   ├── addralign <- elf.types.elf-full(...) := { Full64 := 4 }
+│       │       │   └── entsize <- elf.types.elf-full(...) := { Full64 := 0 }
+│       │       ├── 5 <- elf.shdr(...) :=
+│       │       │   ├── name <- elf.types.elf-word(...) := 87
+│       │       │   ├── type <- elf.shdr.sh-type(...) := 1879048182
+│       │       │   ├── flags <- elf.types.elf-full(...) := { Full64 := 2 }
+│       │       │   ├── addr <- elf.types.elf-addr(...) := { Addr64 := 944 }
+│       │       │   ├── offset <- elf.types.elf-off(...) := { Off64 := 944 }
+│       │       │   ├── size <- elf.types.elf-full(...) := { Full64 := 36 }
+│       │       │   ├── link <- elf.types.elf-word(...) := 6
+│       │       │   ├── info <- elf.shdr.sh-info(...) := 0
+│       │       │   ├── addralign <- elf.types.elf-full(...) := { Full64 := 8 }
+│       │       │   └── entsize <- elf.types.elf-full(...) := { Full64 := 0 }
+│       │       ├── 6 <- elf.shdr(...) :=
+│       │       │   ├── name <- elf.types.elf-word(...) := 97
+│       │       │   ├── type <- elf.shdr.sh-type(...) := 11
+│       │       │   ├── flags <- elf.types.elf-full(...) := { Full64 := 2 }
+│       │       │   ├── addr <- elf.types.elf-addr(...) := { Addr64 := 984 }
+│       │       │   ├── offset <- elf.types.elf-off(...) := { Off64 := 984 }
+│       │       │   ├── size <- elf.types.elf-full(...) := { Full64 := 168 }
+│       │       │   ├── link <- elf.types.elf-word(...) := 7
+│       │       │   ├── info <- elf.shdr.sh-info(...) := 1
+│       │       │   ├── addralign <- elf.types.elf-full(...) := { Full64 := 8 }
+│       │       │   └── entsize <- elf.types.elf-full(...) := { Full64 := 24 }
+│       │       ├── 7 <- elf.shdr(...) :=
+│       │       │   ├── name <- elf.types.elf-word(...) := 105
+│       │       │   ├── type <- elf.shdr.sh-type(...) := 3
+│       │       │   ├── flags <- elf.types.elf-full(...) := { Full64 := 2 }
+│       │       │   ├── addr <- elf.types.elf-addr(...) := { Addr64 := 1152 }
+│       │       │   ├── offset <- elf.types.elf-off(...) := { Off64 := 1152 }
+│       │       │   ├── size <- elf.types.elf-full(...) := { Full64 := 141 }
+│       │       │   ├── link <- elf.types.elf-word(...) := 0
+│       │       │   ├── info <- elf.shdr.sh-info(...) := 0
+│       │       │   ├── addralign <- elf.types.elf-full(...) := { Full64 := 1 }
+│       │       │   └── entsize <- elf.types.elf-full(...) := { Full64 := 0 }
+│       │       ├── 8 <- elf.shdr(...) :=
+│       │       │   ├── name <- elf.types.elf-word(...) := 113
+│       │       │   ├── type <- elf.shdr.sh-type(...) := 1879048191
+│       │       │   ├── flags <- elf.types.elf-full(...) := { Full64 := 2 }
+│       │       │   ├── addr <- elf.types.elf-addr(...) := { Addr64 := 1294 }
+│       │       │   ├── offset <- elf.types.elf-off(...) := { Off64 := 1294 }
+│       │       │   ├── size <- elf.types.elf-full(...) := { Full64 := 14 }
+│       │       │   ├── link <- elf.types.elf-word(...) := 6
+│       │       │   ├── info <- elf.shdr.sh-info(...) := 0
+│       │       │   ├── addralign <- elf.types.elf-full(...) := { Full64 := 2 }
+│       │       │   └── entsize <- elf.types.elf-full(...) := { Full64 := 2 }
+│       │       ├── 9 <- elf.shdr(...) :=
+│       │       │   ├── name <- elf.types.elf-word(...) := 126
+│       │       │   ├── type <- elf.shdr.sh-type(...) := 1879048190
+│       │       │   ├── flags <- elf.types.elf-full(...) := { Full64 := 2 }
+│       │       │   ├── addr <- elf.types.elf-addr(...) := { Addr64 := 1312 }
+│       │       │   ├── offset <- elf.types.elf-off(...) := { Off64 := 1312 }
+│       │       │   ├── size <- elf.types.elf-full(...) := { Full64 := 48 }
+│       │       │   ├── link <- elf.types.elf-word(...) := 7
+│       │       │   ├── info <- elf.shdr.sh-info(...) := 1
+│       │       │   ├── addralign <- elf.types.elf-full(...) := { Full64 := 8 }
+│       │       │   └── entsize <- elf.types.elf-full(...) := { Full64 := 0 }
+│       │       ~
+│       │       └── 30 <- elf.shdr(...) :=
+│       │           ├── name <- elf.types.elf-word(...) := 17
+│       │           ├── type <- elf.shdr.sh-type(...) := 3
+│       │           ├── flags <- elf.types.elf-full(...) := { Full64 := 0 }
+│       │           ├── addr <- elf.types.elf-addr(...) := { Addr64 := 0 }
+│       │           ├── offset <- elf.types.elf-off(...) := { Off64 := 13689 }
+│       │           ├── size <- elf.types.elf-full(...) := { Full64 := 282 }
+│       │           ├── link <- elf.types.elf-word(...) := 0
+│       │           ├── info <- elf.shdr.sh-info(...) := 0
+│       │           ├── addralign <- elf.types.elf-full(...) := { Full64 := 1 }
+│       │           └── entsize <- elf.types.elf-full(...) := { Full64 := 0 }
+│       └── sections <- match section_headers { ... } :=
+│           └── some <- for-each shdrs shdr (maybe ((shdr.type != 8) && (shdr.type != 0)) (with-relative-offset 0 (match shdr.offset { ... }) elf.section(...))) :=
+│               ├── 0 := none
+│               ├── 1 :=
+│               │   └── some <- with-relative-offset 0 (match shdr.offset { ... }) elf.section(...) :=
+│               │       ├── 0 := 47
+│               │       ├── 1 := 108
+│               │       ├── 2 := 105
+│               │       ├── 3 := 98
+│               │       ├── 4 := 54
+│               │       ├── 5 := 52
+│               │       ├── 6 := 47
+│               │       ├── 7 := 108
+│               │       ├── 8 := 100
+│               │       ├── 9 := 45
+│               │       ~
+│               │       └── 27 := 0
+│               ├── 2 :=
+│               │   └── some <- with-relative-offset 0 (match shdr.offset { ... }) elf.section(...) :=
+│               │       ├── 0 := 4
+│               │       ├── 1 := 0
+│               │       ├── 2 := 0
+│               │       ├── 3 := 0
+│               │       ├── 4 := 32
+│               │       ├── 5 := 0
+│               │       ├── 6 := 0
+│               │       ├── 7 := 0
+│               │       ├── 8 := 5
+│               │       ├── 9 := 0
+│               │       ~
+│               │       └── 47 := 0
+│               ├── 3 :=
+│               │   └── some <- with-relative-offset 0 (match shdr.offset { ... }) elf.section(...) :=
+│               │       ├── 0 := 4
+│               │       ├── 1 := 0
+│               │       ├── 2 := 0
+│               │       ├── 3 := 0
+│               │       ├── 4 := 20
+│               │       ├── 5 := 0
+│               │       ├── 6 := 0
+│               │       ├── 7 := 0
+│               │       ├── 8 := 3
+│               │       ├── 9 := 0
+│               │       ~
+│               │       └── 35 := 168
+│               ├── 4 :=
+│               │   └── some <- with-relative-offset 0 (match shdr.offset { ... }) elf.section(...) :=
+│               │       ├── 0 := 4
+│               │       ├── 1 := 0
+│               │       ├── 2 := 0
+│               │       ├── 3 := 0
+│               │       ├── 4 := 16
+│               │       ├── 5 := 0
+│               │       ├── 6 := 0
+│               │       ├── 7 := 0
+│               │       ├── 8 := 1
+│               │       ├── 9 := 0
+│               │       ~
+│               │       └── 31 := 0
+│               ├── 5 :=
+│               │   └── some <- with-relative-offset 0 (match shdr.offset { ... }) elf.section(...) :=
+│               │       ├── 0 := 2
+│               │       ├── 1 := 0
+│               │       ├── 2 := 0
+│               │       ├── 3 := 0
+│               │       ├── 4 := 6
+│               │       ├── 5 := 0
+│               │       ├── 6 := 0
+│               │       ├── 7 := 0
+│               │       ├── 8 := 1
+│               │       ├── 9 := 0
+│               │       ~
+│               │       └── 35 := 109
+│               ├── 6 :=
+│               │   └── some <- with-relative-offset 0 (match shdr.offset { ... }) elf.section(...) :=
+│               │       ├── 0 := 0
+│               │       ├── 1 := 0
+│               │       ├── 2 := 0
+│               │       ├── 3 := 0
+│               │       ├── 4 := 0
+│               │       ├── 5 := 0
+│               │       ├── 6 := 0
+│               │       ├── 7 := 0
+│               │       ├── 8 := 0
+│               │       ├── 9 := 0
+│               │       ~
+│               │       └── 167 := 0
+│               ├── 7 :=
+│               │   └── some <- with-relative-offset 0 (match shdr.offset { ... }) elf.section(...) :=
+│               │       ├── 0 := 0
+│               │       ├── 1 := 95
+│               │       ├── 2 := 95
+│               │       ├── 3 := 99
+│               │       ├── 4 := 120
+│               │       ├── 5 := 97
+│               │       ├── 6 := 95
+│               │       ├── 7 := 102
+│               │       ├── 8 := 105
+│               │       ├── 9 := 110
+│               │       ~
+│               │       └── 140 := 0
+│               ├── 8 :=
+│               │   └── some <- with-relative-offset 0 (match shdr.offset { ... }) elf.section(...) :=
+│               │       ├── 0 := 0
+│               │       ├── 1 := 0
+│               │       ├── 2 := 2
+│               │       ├── 3 := 0
+│               │       ├── 4 := 1
+│               │       ├── 5 := 0
+│               │       ├── 6 := 3
+│               │       ├── 7 := 0
+│               │       ├── 8 := 1
+│               │       ├── 9 := 0
+│               │       ~
+│               │       └── 13 := 0
+│               ├── 9 :=
+│               │   └── some <- with-relative-offset 0 (match shdr.offset { ... }) elf.section(...) :=
+│               │       ├── 0 := 1
+│               │       ├── 1 := 0
+│               │       ├── 2 := 2
+│               │       ├── 3 := 0
+│               │       ├── 4 := 39
+│               │       ├── 5 := 0
+│               │       ├── 6 := 0
+│               │       ├── 7 := 0
+│               │       ├── 8 := 16
+│               │       ├── 9 := 0
+│               │       ~
+│               │       └── 47 := 0
+│               ~
+│               └── 30 :=
+│                   └── some <- with-relative-offset 0 (match shdr.offset { ... }) elf.section(...) :=
+│                       ├── 0 := 0
+│                       ├── 1 := 46
+│                       ├── 2 := 115
+│                       ├── 3 := 121
+│                       ├── 4 := 109
+│                       ├── 5 := 116
+│                       ├── 6 := 97
+│                       ├── 7 := 98
+│                       ├── 8 := 0
+│                       ├── 9 := 46
+│                       ~
+│                       └── 281 := 0
+└── end <- end-of-input
