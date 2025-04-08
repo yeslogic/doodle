@@ -650,11 +650,13 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                 Constructor::Simple(tname.clone()),
                 StructExpr::RecordExpr(fields
                     .iter()
-                    .map(|(name, val)| (
-                        name.clone(),
-                        Some(embed_expr_dft(val)),
-                    ))
-                    .collect()
+                    .map(|(name, val)| {
+                        let value = match embed_expr_dft(val) {
+                            RustExpr::Entity(RustEntity::Local(ref v)) if v == name => None,
+                            other => Some(other),
+                        };
+                        (name.clone(), value)
+                    }).collect()
                 )
             )
         }
