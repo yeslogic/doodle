@@ -6205,7 +6205,7 @@ fn format_items_inline<T>(
             buffer.push(fmt_fn(item));
         }
     } else {
-        buffer.extend(items.into_iter().map(fmt_fn));
+        buffer.extend(items.iter().map(fmt_fn));
     }
     format!("[{}]", buffer.join(", "))
 }
