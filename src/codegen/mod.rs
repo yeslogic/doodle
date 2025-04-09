@@ -1988,33 +1988,7 @@ impl GenBlock {
                 ret: Some(ret),
             }
         } else {
-            let GenBlock { stmts, ret } = self;
-            match ret {
-                Some(expr) => match expr {
-                    GenExpr::Try(inner) => GenBlock {
-                        stmts,
-                        ret: Some(GenExpr::Try(inner)),
-                    },
-                    _ => {
-                        if expr.is_short_circuiting() {
-                            let thunk_body = GenBlock {
-                                stmts: Vec::new(),
-                                ret: Some(expr.wrap_ok(Some("PResult"))),
-                            };
-                            GenBlock {
-                                stmts,
-                                ret: Some(GenThunk::new(thunk_body).call().wrap_try()),
-                            }
-                        } else {
-                            GenBlock {
-                                stmts,
-                                ret: Some(expr),
-                            }
-                        }
-                    }
-                },
-                None => GenBlock { stmts, ret: None },
-            }
+            self
         }
     }
 
@@ -3596,11 +3570,11 @@ impl<'a> Generator<'a> {
         let _ = tc
             .infer_utype_format(top_format, ctxt)
             .unwrap_or_else(|err| panic!("Failed to infer top-level format type: {err}"));
-        let mut gen = Self {
+        let mut cgen = Self {
             elaborator: Elaborator::new(module, tc, CodeGen::new()),
             sourcemap: SourceMap::new(),
         };
-        let elab = &mut gen.elaborator;
+        let elab = &mut cgen.elaborator;
 
         let top = elab.elaborate_format(top_format, &TypedDynScope::Empty);
         // assert_eq!(elab.next_index, elab.tc.size());
@@ -3623,10 +3597,10 @@ impl<'a> Generator<'a> {
                     ret_type: t.to_rust_type(),
                 }
             };
-            gen.sourcemap.decoder_skels.push(dec_fn);
+            cgen.sourcemap.decoder_skels.push(dec_fn);
         }
 
-        gen
+        cgen
     }
 }
 
@@ -4591,7 +4565,7 @@ impl<'a> TypedDynScope<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::helper::compute;
+    use crate::helper::{compute, record, ANY_BYTE};
     use crate::{typecheck::Ctxt, TypeHint};
 
     fn population_check(module: &FormatModule, f: &Format, label: Option<&'static str>) {
@@ -4809,5 +4783,14 @@ mod tests {
             ),
             "{\nlet totlen = acc.clone();\nlet seq = &seq;\ntotlen >= (point_count as u16)\n}"
         );
+    }
+
+    #[test]
+    fn test_simple_closure_codegen() {
+        let mut module = FormatModule::new();
+        let inner = module.define_format("test.inner", ANY_BYTE);
+        let outer = module.define_format("test.outer", record([("inner", inner.call())]));
+        let output = produce_string_gencode(&module, &outer.call());
+        println!("{}", output);
     }
 }
