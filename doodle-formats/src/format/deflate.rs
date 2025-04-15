@@ -4,11 +4,20 @@ use doodle::{bounds::Bounds, helper::*};
 use doodle::{BaseType, DynFormat, Expr, Format, FormatModule, FormatRef, Pattern, ValueType};
 
 fn shl_u8(x: Expr, r: u8) -> Expr {
-    shl(x, Expr::U8(r))
+    if r == 0 {
+        x
+    } else {
+        shl(x, Expr::U8(r))
+    }
 }
 
 fn shl_u16(x: Expr, r: u16) -> Expr {
-    shl(as_u16(x), Expr::U16(r))
+    let y = as_u16(x);
+    if r == 0 {
+        y
+    } else {
+        shl(y, Expr::U16(r))
+    }
 }
 
 fn cast<N>(x: usize) -> N
