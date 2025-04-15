@@ -190,8 +190,8 @@ fn hi_flag_u15be(flag_name: &'static str, field_name: &'static str) -> Format {
         BitFieldKind::FlagBit(flag_name),
         BitFieldKind::BitsField {
             field_name,
-            bit_width: 15
-        }
+            bit_width: 15,
+        },
     ])
 }
 
@@ -2266,36 +2266,52 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ])
             };
             let item_variation_data = {
-                let delta_set = |word_delta_count: Expr, region_index_count: Expr| {
+                let deltas = |full_format: Format,
+                              half_format: Format,
+                              word_count: Expr,
+                              region_index_count: Expr| {
                     record([
                         // FIXME - due to implementation limits, currently broken into two separate arrays rather than fused together
                         (
                             "delta_data_full_word",
-                            repeat_count(
-                                record_proj(word_delta_count.clone(), "word_count"),
-                                if_then_else(
-                                    record_proj(word_delta_count.clone(), "long_words"),
-                                    fmt_variant("Delta32", s32be(base)),
-                                    fmt_variant("Delta16", s16be(base)),
-                                ),
-                            ),
+                            repeat_count(word_count.clone(), full_format),
                         ),
                         (
                             "delta_data_half_word",
-                            repeat_count(
-                                sub(
-                                    region_index_count,
-                                    record_proj(word_delta_count.clone(), "word_count"),
-                                ),
-                                if_then_else(
-                                    record_proj(word_delta_count, "long_words"),
-                                    fmt_variant("Delta16", s16be(base)),
-                                    fmt_variant("Delta8", s8(base)),
-                                ),
-                            ),
+                            repeat_count(sub(region_index_count, word_count), half_format),
                         ),
                     ])
                 };
+                let delta_sets =
+                    |item_count: Expr, word_delta_count: Expr, region_index_count: Expr| {
+                        if_then_else(
+                            record_proj(word_delta_count.clone(), "long_words"),
+                            fmt_variant(
+                                "Delta32Sets",
+                                repeat_count(
+                                    item_count.clone(),
+                                    deltas(
+                                        s32be(base),
+                                        s16be(base),
+                                        record_proj(word_delta_count.clone(), "word_count"),
+                                        region_index_count.clone(),
+                                    ),
+                                ),
+                            ),
+                            fmt_variant(
+                                "Delta16Sets",
+                                repeat_count(
+                                    item_count,
+                                    deltas(
+                                        s16be(base),
+                                        s8(base),
+                                        record_proj(word_delta_count.clone(), "word_count"),
+                                        region_index_count,
+                                    ),
+                                ),
+                            ),
+                        )
+                    };
                 record([
                     ("item_count", base.u16be()),
                     (
@@ -2309,9 +2325,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ),
                     (
                         "delta_sets",
-                        repeat_count(
+                        delta_sets(
                             var("item_count"),
-                            delta_set(var("word_delta_count"), var("region_index_count")),
+                            var("word_delta_count"),
+                            var("region_index_count"),
                         ),
                     ),
                 ])
