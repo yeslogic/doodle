@@ -18026,7 +18026,7 @@ let field0 = (Decoder174(_input))?;
 let field1 = (Decoder174(_input))?;
 (field0, field1)
 };
-bits.0 << 0u8 | bits.1 << 1u8
+bits.0 | bits.1 << 1u8
 };
 let data = match r#type {
 0u8 => {
@@ -18077,7 +18077,7 @@ let field14 = (Decoder174(_input))?;
 let field15 = (Decoder174(_input))?;
 (field0, field1, field2, field3, field4, field5, field6, field7, field8, field9, field10, field11, field12, field13, field14, field15)
 };
-(bits.0 as u16) << 0u16 | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16 | (bits.3 as u16) << 3u16 | (bits.4 as u16) << 4u16 | (bits.5 as u16) << 5u16 | (bits.6 as u16) << 6u16 | (bits.7 as u16) << 7u16 | (bits.8 as u16) << 8u16 | (bits.9 as u16) << 9u16 | (bits.10 as u16) << 10u16 | (bits.11 as u16) << 11u16 | (bits.12 as u16) << 12u16 | (bits.13 as u16) << 13u16 | (bits.14 as u16) << 14u16 | (bits.15 as u16) << 15u16
+(bits.0 as u16) | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16 | (bits.3 as u16) << 3u16 | (bits.4 as u16) << 4u16 | (bits.5 as u16) << 5u16 | (bits.6 as u16) << 6u16 | (bits.7 as u16) << 7u16 | (bits.8 as u16) << 8u16 | (bits.9 as u16) << 9u16 | (bits.10 as u16) << 10u16 | (bits.11 as u16) << 11u16 | (bits.12 as u16) << 12u16 | (bits.13 as u16) << 13u16 | (bits.14 as u16) << 14u16 | (bits.15 as u16) << 15u16
 };
 let nlen = {
 let bits = {
@@ -18099,7 +18099,7 @@ let field14 = (Decoder174(_input))?;
 let field15 = (Decoder174(_input))?;
 (field0, field1, field2, field3, field4, field5, field6, field7, field8, field9, field10, field11, field12, field13, field14, field15)
 };
-(bits.0 as u16) << 0u16 | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16 | (bits.3 as u16) << 3u16 | (bits.4 as u16) << 4u16 | (bits.5 as u16) << 5u16 | (bits.6 as u16) << 6u16 | (bits.7 as u16) << 7u16 | (bits.8 as u16) << 8u16 | (bits.9 as u16) << 9u16 | (bits.10 as u16) << 10u16 | (bits.11 as u16) << 11u16 | (bits.12 as u16) << 12u16 | (bits.13 as u16) << 13u16 | (bits.14 as u16) << 14u16 | (bits.15 as u16) << 15u16
+(bits.0 as u16) | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16 | (bits.3 as u16) << 3u16 | (bits.4 as u16) << 4u16 | (bits.5 as u16) << 5u16 | (bits.6 as u16) << 6u16 | (bits.7 as u16) << 7u16 | (bits.8 as u16) << 8u16 | (bits.9 as u16) << 9u16 | (bits.10 as u16) << 10u16 | (bits.11 as u16) << 11u16 | (bits.12 as u16) << 12u16 | (bits.13 as u16) << 13u16 | (bits.14 as u16) << 14u16 | (bits.15 as u16) << 15u16
 };
 let bytes = {
 let mut accum = Vec::new();
@@ -18116,7 +18116,7 @@ let field6 = (Decoder174(_input))?;
 let field7 = (Decoder174(_input))?;
 (field0, field1, field2, field3, field4, field5, field6, field7)
 };
-bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8 | bits.5 << 5u8 | bits.6 << 6u8 | bits.7 << 7u8
+bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8 | bits.5 << 5u8 | bits.6 << 6u8 | bits.7 << 7u8
 });
 }
 accum
@@ -18368,7 +18368,7 @@ let field0 = (Decoder174(_input))?;
 let field1 = (Decoder174(_input))?;
 (field0, field1)
 };
-bits.0 << 0u8 | bits.1 << 1u8
+bits.0 | bits.1 << 1u8
 };
 let length = 19u16 + (length_extra_bits as u16);
 let distance_code = {
@@ -18392,7 +18392,7 @@ let field0 = (Decoder174(_input))?;
 let field1 = (Decoder174(_input))?;
 (field0, field1)
 };
-bits.0 << 0u8 | bits.1 << 1u8
+bits.0 | bits.1 << 1u8
 };
 let length = 23u16 + (length_extra_bits as u16);
 let distance_code = {
@@ -18416,7 +18416,7 @@ let field0 = (Decoder174(_input))?;
 let field1 = (Decoder174(_input))?;
 (field0, field1)
 };
-bits.0 << 0u8 | bits.1 << 1u8
+bits.0 | bits.1 << 1u8
 };
 let length = 27u16 + (length_extra_bits as u16);
 let distance_code = {
@@ -18440,7 +18440,7 @@ let field0 = (Decoder174(_input))?;
 let field1 = (Decoder174(_input))?;
 (field0, field1)
 };
-bits.0 << 0u8 | bits.1 << 1u8
+bits.0 | bits.1 << 1u8
 };
 let length = 31u16 + (length_extra_bits as u16);
 let distance_code = {
@@ -18465,7 +18465,7 @@ let field1 = (Decoder174(_input))?;
 let field2 = (Decoder174(_input))?;
 (field0, field1, field2)
 };
-bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8
+bits.0 | bits.1 << 1u8 | bits.2 << 2u8
 };
 let length = 35u16 + (length_extra_bits as u16);
 let distance_code = {
@@ -18490,7 +18490,7 @@ let field1 = (Decoder174(_input))?;
 let field2 = (Decoder174(_input))?;
 (field0, field1, field2)
 };
-bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8
+bits.0 | bits.1 << 1u8 | bits.2 << 2u8
 };
 let length = 43u16 + (length_extra_bits as u16);
 let distance_code = {
@@ -18515,7 +18515,7 @@ let field1 = (Decoder174(_input))?;
 let field2 = (Decoder174(_input))?;
 (field0, field1, field2)
 };
-bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8
+bits.0 | bits.1 << 1u8 | bits.2 << 2u8
 };
 let length = 51u16 + (length_extra_bits as u16);
 let distance_code = {
@@ -18540,7 +18540,7 @@ let field1 = (Decoder174(_input))?;
 let field2 = (Decoder174(_input))?;
 (field0, field1, field2)
 };
-bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8
+bits.0 | bits.1 << 1u8 | bits.2 << 2u8
 };
 let length = 59u16 + (length_extra_bits as u16);
 let distance_code = {
@@ -18566,7 +18566,7 @@ let field2 = (Decoder174(_input))?;
 let field3 = (Decoder174(_input))?;
 (field0, field1, field2, field3)
 };
-bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8
+bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8
 };
 let length = 67u16 + (length_extra_bits as u16);
 let distance_code = {
@@ -18592,7 +18592,7 @@ let field2 = (Decoder174(_input))?;
 let field3 = (Decoder174(_input))?;
 (field0, field1, field2, field3)
 };
-bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8
+bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8
 };
 let length = 83u16 + (length_extra_bits as u16);
 let distance_code = {
@@ -18618,7 +18618,7 @@ let field2 = (Decoder174(_input))?;
 let field3 = (Decoder174(_input))?;
 (field0, field1, field2, field3)
 };
-bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8
+bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8
 };
 let length = 99u16 + (length_extra_bits as u16);
 let distance_code = {
@@ -18644,7 +18644,7 @@ let field2 = (Decoder174(_input))?;
 let field3 = (Decoder174(_input))?;
 (field0, field1, field2, field3)
 };
-bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8
+bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8
 };
 let length = 115u16 + (length_extra_bits as u16);
 let distance_code = {
@@ -18671,7 +18671,7 @@ let field3 = (Decoder174(_input))?;
 let field4 = (Decoder174(_input))?;
 (field0, field1, field2, field3, field4)
 };
-bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8
+bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8
 };
 let length = 131u16 + (length_extra_bits as u16);
 let distance_code = {
@@ -18698,7 +18698,7 @@ let field3 = (Decoder174(_input))?;
 let field4 = (Decoder174(_input))?;
 (field0, field1, field2, field3, field4)
 };
-bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8
+bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8
 };
 let length = 163u16 + (length_extra_bits as u16);
 let distance_code = {
@@ -18725,7 +18725,7 @@ let field3 = (Decoder174(_input))?;
 let field4 = (Decoder174(_input))?;
 (field0, field1, field2, field3, field4)
 };
-bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8
+bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8
 };
 let length = 195u16 + (length_extra_bits as u16);
 let distance_code = {
@@ -18752,7 +18752,7 @@ let field3 = (Decoder174(_input))?;
 let field4 = (Decoder174(_input))?;
 (field0, field1, field2, field3, field4)
 };
-bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8
+bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8
 };
 let length = 227u16 + (length_extra_bits as u16);
 let distance_code = {
@@ -18846,7 +18846,7 @@ let field3 = (Decoder174(_input))?;
 let field4 = (Decoder174(_input))?;
 (field0, field1, field2, field3, field4)
 };
-bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8
+bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8
 };
 let hdist = {
 let bits = {
@@ -18857,7 +18857,7 @@ let field3 = (Decoder174(_input))?;
 let field4 = (Decoder174(_input))?;
 (field0, field1, field2, field3, field4)
 };
-bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8
+bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8
 };
 let hclen = {
 let bits = {
@@ -18867,7 +18867,7 @@ let field2 = (Decoder174(_input))?;
 let field3 = (Decoder174(_input))?;
 (field0, field1, field2, field3)
 };
-bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8
+bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8
 };
 let code_length_alphabet_code_lengths = {
 let mut accum = Vec::new();
@@ -18879,7 +18879,7 @@ let field1 = (Decoder174(_input))?;
 let field2 = (Decoder174(_input))?;
 (field0, field1, field2)
 };
-bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8
+bits.0 | bits.1 << 1u8 | bits.2 << 2u8
 });
 }
 accum
@@ -18897,7 +18897,7 @@ let field0 = (Decoder174(_input))?;
 let field1 = (Decoder174(_input))?;
 (field0, field1)
 };
-bits.0 << 0u8 | bits.1 << 1u8
+bits.0 | bits.1 << 1u8
 },
 
 17u8 => {
@@ -18907,7 +18907,7 @@ let field1 = (Decoder174(_input))?;
 let field2 = (Decoder174(_input))?;
 (field0, field1, field2)
 };
-bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8
+bits.0 | bits.1 << 1u8 | bits.2 << 2u8
 },
 
 18u8 => {
@@ -18921,7 +18921,7 @@ let field5 = (Decoder174(_input))?;
 let field6 = (Decoder174(_input))?;
 (field0, field1, field2, field3, field4, field5, field6)
 };
-bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8 | bits.5 << 5u8 | bits.6 << 6u8
+bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8 | bits.5 << 5u8 | bits.6 << 6u8
 },
 
 _ => {
@@ -19137,7 +19137,7 @@ let field0 = (Decoder174(_input))?;
 let field1 = (Decoder174(_input))?;
 (field0, field1)
 };
-bits.0 << 0u8 | bits.1 << 1u8
+bits.0 | bits.1 << 1u8
 };
 let length = 19u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
@@ -19152,7 +19152,7 @@ let field0 = (Decoder174(_input))?;
 let field1 = (Decoder174(_input))?;
 (field0, field1)
 };
-bits.0 << 0u8 | bits.1 << 1u8
+bits.0 | bits.1 << 1u8
 };
 let length = 23u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
@@ -19167,7 +19167,7 @@ let field0 = (Decoder174(_input))?;
 let field1 = (Decoder174(_input))?;
 (field0, field1)
 };
-bits.0 << 0u8 | bits.1 << 1u8
+bits.0 | bits.1 << 1u8
 };
 let length = 27u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
@@ -19182,7 +19182,7 @@ let field0 = (Decoder174(_input))?;
 let field1 = (Decoder174(_input))?;
 (field0, field1)
 };
-bits.0 << 0u8 | bits.1 << 1u8
+bits.0 | bits.1 << 1u8
 };
 let length = 31u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
@@ -19198,7 +19198,7 @@ let field1 = (Decoder174(_input))?;
 let field2 = (Decoder174(_input))?;
 (field0, field1, field2)
 };
-bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8
+bits.0 | bits.1 << 1u8 | bits.2 << 2u8
 };
 let length = 35u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
@@ -19214,7 +19214,7 @@ let field1 = (Decoder174(_input))?;
 let field2 = (Decoder174(_input))?;
 (field0, field1, field2)
 };
-bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8
+bits.0 | bits.1 << 1u8 | bits.2 << 2u8
 };
 let length = 43u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
@@ -19230,7 +19230,7 @@ let field1 = (Decoder174(_input))?;
 let field2 = (Decoder174(_input))?;
 (field0, field1, field2)
 };
-bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8
+bits.0 | bits.1 << 1u8 | bits.2 << 2u8
 };
 let length = 51u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
@@ -19246,7 +19246,7 @@ let field1 = (Decoder174(_input))?;
 let field2 = (Decoder174(_input))?;
 (field0, field1, field2)
 };
-bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8
+bits.0 | bits.1 << 1u8 | bits.2 << 2u8
 };
 let length = 59u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
@@ -19263,7 +19263,7 @@ let field2 = (Decoder174(_input))?;
 let field3 = (Decoder174(_input))?;
 (field0, field1, field2, field3)
 };
-bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8
+bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8
 };
 let length = 67u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
@@ -19280,7 +19280,7 @@ let field2 = (Decoder174(_input))?;
 let field3 = (Decoder174(_input))?;
 (field0, field1, field2, field3)
 };
-bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8
+bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8
 };
 let length = 83u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
@@ -19297,7 +19297,7 @@ let field2 = (Decoder174(_input))?;
 let field3 = (Decoder174(_input))?;
 (field0, field1, field2, field3)
 };
-bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8
+bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8
 };
 let length = 99u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
@@ -19314,7 +19314,7 @@ let field2 = (Decoder174(_input))?;
 let field3 = (Decoder174(_input))?;
 (field0, field1, field2, field3)
 };
-bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8
+bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8
 };
 let length = 115u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
@@ -19332,7 +19332,7 @@ let field3 = (Decoder174(_input))?;
 let field4 = (Decoder174(_input))?;
 (field0, field1, field2, field3, field4)
 };
-bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8
+bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8
 };
 let length = 131u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
@@ -19350,7 +19350,7 @@ let field3 = (Decoder174(_input))?;
 let field4 = (Decoder174(_input))?;
 (field0, field1, field2, field3, field4)
 };
-bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8
+bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8
 };
 let length = 163u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
@@ -19368,7 +19368,7 @@ let field3 = (Decoder174(_input))?;
 let field4 = (Decoder174(_input))?;
 (field0, field1, field2, field3, field4)
 };
-bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8
+bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8
 };
 let length = 195u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
@@ -19386,7 +19386,7 @@ let field3 = (Decoder174(_input))?;
 let field4 = (Decoder174(_input))?;
 (field0, field1, field2, field3, field4)
 };
-bits.0 << 0u8 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8
+bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8
 };
 let length = 227u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
@@ -19604,7 +19604,7 @@ let field0 = (Decoder174(_input))?;
 let field1 = (Decoder174(_input))?;
 (field0, field1)
 };
-(bits.0 as u16) << 0u16 | (bits.1 as u16) << 1u16
+(bits.0 as u16) | (bits.1 as u16) << 1u16
 },
 
 3u8 => {
@@ -19614,7 +19614,7 @@ let field1 = (Decoder174(_input))?;
 let field2 = (Decoder174(_input))?;
 (field0, field1, field2)
 };
-(bits.0 as u16) << 0u16 | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16
+(bits.0 as u16) | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16
 },
 
 4u8 => {
@@ -19625,7 +19625,7 @@ let field2 = (Decoder174(_input))?;
 let field3 = (Decoder174(_input))?;
 (field0, field1, field2, field3)
 };
-(bits.0 as u16) << 0u16 | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16 | (bits.3 as u16) << 3u16
+(bits.0 as u16) | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16 | (bits.3 as u16) << 3u16
 },
 
 5u8 => {
@@ -19637,7 +19637,7 @@ let field3 = (Decoder174(_input))?;
 let field4 = (Decoder174(_input))?;
 (field0, field1, field2, field3, field4)
 };
-(bits.0 as u16) << 0u16 | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16 | (bits.3 as u16) << 3u16 | (bits.4 as u16) << 4u16
+(bits.0 as u16) | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16 | (bits.3 as u16) << 3u16 | (bits.4 as u16) << 4u16
 },
 
 6u8 => {
@@ -19650,7 +19650,7 @@ let field4 = (Decoder174(_input))?;
 let field5 = (Decoder174(_input))?;
 (field0, field1, field2, field3, field4, field5)
 };
-(bits.0 as u16) << 0u16 | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16 | (bits.3 as u16) << 3u16 | (bits.4 as u16) << 4u16 | (bits.5 as u16) << 5u16
+(bits.0 as u16) | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16 | (bits.3 as u16) << 3u16 | (bits.4 as u16) << 4u16 | (bits.5 as u16) << 5u16
 },
 
 7u8 => {
@@ -19664,7 +19664,7 @@ let field5 = (Decoder174(_input))?;
 let field6 = (Decoder174(_input))?;
 (field0, field1, field2, field3, field4, field5, field6)
 };
-(bits.0 as u16) << 0u16 | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16 | (bits.3 as u16) << 3u16 | (bits.4 as u16) << 4u16 | (bits.5 as u16) << 5u16 | (bits.6 as u16) << 6u16
+(bits.0 as u16) | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16 | (bits.3 as u16) << 3u16 | (bits.4 as u16) << 4u16 | (bits.5 as u16) << 5u16 | (bits.6 as u16) << 6u16
 },
 
 8u8 => {
@@ -19679,7 +19679,7 @@ let field6 = (Decoder174(_input))?;
 let field7 = (Decoder174(_input))?;
 (field0, field1, field2, field3, field4, field5, field6, field7)
 };
-(bits.0 as u16) << 0u16 | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16 | (bits.3 as u16) << 3u16 | (bits.4 as u16) << 4u16 | (bits.5 as u16) << 5u16 | (bits.6 as u16) << 6u16 | (bits.7 as u16) << 7u16
+(bits.0 as u16) | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16 | (bits.3 as u16) << 3u16 | (bits.4 as u16) << 4u16 | (bits.5 as u16) << 5u16 | (bits.6 as u16) << 6u16 | (bits.7 as u16) << 7u16
 },
 
 9u8 => {
@@ -19695,7 +19695,7 @@ let field7 = (Decoder174(_input))?;
 let field8 = (Decoder174(_input))?;
 (field0, field1, field2, field3, field4, field5, field6, field7, field8)
 };
-(bits.0 as u16) << 0u16 | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16 | (bits.3 as u16) << 3u16 | (bits.4 as u16) << 4u16 | (bits.5 as u16) << 5u16 | (bits.6 as u16) << 6u16 | (bits.7 as u16) << 7u16 | (bits.8 as u16) << 8u16
+(bits.0 as u16) | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16 | (bits.3 as u16) << 3u16 | (bits.4 as u16) << 4u16 | (bits.5 as u16) << 5u16 | (bits.6 as u16) << 6u16 | (bits.7 as u16) << 7u16 | (bits.8 as u16) << 8u16
 },
 
 10u8 => {
@@ -19712,7 +19712,7 @@ let field8 = (Decoder174(_input))?;
 let field9 = (Decoder174(_input))?;
 (field0, field1, field2, field3, field4, field5, field6, field7, field8, field9)
 };
-(bits.0 as u16) << 0u16 | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16 | (bits.3 as u16) << 3u16 | (bits.4 as u16) << 4u16 | (bits.5 as u16) << 5u16 | (bits.6 as u16) << 6u16 | (bits.7 as u16) << 7u16 | (bits.8 as u16) << 8u16 | (bits.9 as u16) << 9u16
+(bits.0 as u16) | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16 | (bits.3 as u16) << 3u16 | (bits.4 as u16) << 4u16 | (bits.5 as u16) << 5u16 | (bits.6 as u16) << 6u16 | (bits.7 as u16) << 7u16 | (bits.8 as u16) << 8u16 | (bits.9 as u16) << 9u16
 },
 
 11u8 => {
@@ -19730,7 +19730,7 @@ let field9 = (Decoder174(_input))?;
 let field10 = (Decoder174(_input))?;
 (field0, field1, field2, field3, field4, field5, field6, field7, field8, field9, field10)
 };
-(bits.0 as u16) << 0u16 | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16 | (bits.3 as u16) << 3u16 | (bits.4 as u16) << 4u16 | (bits.5 as u16) << 5u16 | (bits.6 as u16) << 6u16 | (bits.7 as u16) << 7u16 | (bits.8 as u16) << 8u16 | (bits.9 as u16) << 9u16 | (bits.10 as u16) << 10u16
+(bits.0 as u16) | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16 | (bits.3 as u16) << 3u16 | (bits.4 as u16) << 4u16 | (bits.5 as u16) << 5u16 | (bits.6 as u16) << 6u16 | (bits.7 as u16) << 7u16 | (bits.8 as u16) << 8u16 | (bits.9 as u16) << 9u16 | (bits.10 as u16) << 10u16
 },
 
 12u8 => {
@@ -19749,7 +19749,7 @@ let field10 = (Decoder174(_input))?;
 let field11 = (Decoder174(_input))?;
 (field0, field1, field2, field3, field4, field5, field6, field7, field8, field9, field10, field11)
 };
-(bits.0 as u16) << 0u16 | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16 | (bits.3 as u16) << 3u16 | (bits.4 as u16) << 4u16 | (bits.5 as u16) << 5u16 | (bits.6 as u16) << 6u16 | (bits.7 as u16) << 7u16 | (bits.8 as u16) << 8u16 | (bits.9 as u16) << 9u16 | (bits.10 as u16) << 10u16 | (bits.11 as u16) << 11u16
+(bits.0 as u16) | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16 | (bits.3 as u16) << 3u16 | (bits.4 as u16) << 4u16 | (bits.5 as u16) << 5u16 | (bits.6 as u16) << 6u16 | (bits.7 as u16) << 7u16 | (bits.8 as u16) << 8u16 | (bits.9 as u16) << 9u16 | (bits.10 as u16) << 10u16 | (bits.11 as u16) << 11u16
 },
 
 13u8 => {
@@ -19769,7 +19769,7 @@ let field11 = (Decoder174(_input))?;
 let field12 = (Decoder174(_input))?;
 (field0, field1, field2, field3, field4, field5, field6, field7, field8, field9, field10, field11, field12)
 };
-(bits.0 as u16) << 0u16 | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16 | (bits.3 as u16) << 3u16 | (bits.4 as u16) << 4u16 | (bits.5 as u16) << 5u16 | (bits.6 as u16) << 6u16 | (bits.7 as u16) << 7u16 | (bits.8 as u16) << 8u16 | (bits.9 as u16) << 9u16 | (bits.10 as u16) << 10u16 | (bits.11 as u16) << 11u16 | (bits.12 as u16) << 12u16
+(bits.0 as u16) | (bits.1 as u16) << 1u16 | (bits.2 as u16) << 2u16 | (bits.3 as u16) << 3u16 | (bits.4 as u16) << 4u16 | (bits.5 as u16) << 5u16 | (bits.6 as u16) << 6u16 | (bits.7 as u16) << 7u16 | (bits.8 as u16) << 8u16 | (bits.9 as u16) << 9u16 | (bits.10 as u16) << 10u16 | (bits.11 as u16) << 11u16 | (bits.12 as u16) << 12u16
 },
 
 _other => {
