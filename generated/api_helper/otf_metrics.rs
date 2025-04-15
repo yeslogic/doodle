@@ -6,7 +6,7 @@ use encoding::{
     all::{MAC_ROMAN, UTF_16BE},
     DecoderTrap, Encoding,
 };
-use fixed::types::I16F16;
+use fixed::types::{I16F16, I2F14};
 
 // SECTION - Command-line configurable options for what to show
 
@@ -106,8 +106,9 @@ impl Promote<OpentypeTag> for Tag {
     }
 }
 
-// REVIEW - no module-level definition so the name is the semi-arbitrary 'first' one the code-generator sees
+// REVIEW - no module-level definition so the names are the semi-arbitrary 'first' one the code-generator sees
 pub type OpentypeFixed = opentype_var_user_tuple_coordinates;
+pub type Fixed = I16F16;
 
 impl Promote<OpentypeFixed> for Fixed {
     fn promote(orig: &OpentypeFixed) -> Self {
@@ -117,7 +118,16 @@ impl Promote<OpentypeFixed> for Fixed {
     }
 }
 
-type Fixed = I16F16;
+pub type OpentypeF2Dot14 = opentype_var_tuple_record_coordinates;
+pub type F2Dot14 = I2F14;
+
+impl Promote<OpentypeF2Dot14> for F2Dot14 {
+    fn promote(orig: &OpentypeF2Dot14) -> Self {
+        match orig {
+            OpentypeF2Dot14::F2Dot14(raw) => I2F14::from_bits(*raw as i16),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[repr(transparent)]
@@ -1448,8 +1458,147 @@ impl TryPromote<OpentypeMarkGlyphSet> for MarkGlyphSet {
     }
 }
 
+pub type OpentypeRegionAxisCoordinates = opentype_common_item_variation_store_variation_region_list_offset_link_variation_regions_region_axes;
+#[derive(Debug, Clone, Copy)]
+struct RegionAxisCoordinates {
+    start_coord: F2Dot14,
+    peak_coord: F2Dot14,
+    end_coord: F2Dot14,
+}
+
+impl Promote<OpentypeRegionAxisCoordinates> for RegionAxisCoordinates {
+    fn promote(orig: &OpentypeRegionAxisCoordinates) -> Self {
+        RegionAxisCoordinates {
+            start_coord: F2Dot14::promote(&orig.start_coord),
+            peak_coord: F2Dot14::promote(&orig.peak_coord),
+            end_coord: F2Dot14::promote(&orig.end_coord),
+        }
+    }
+}
+
+pub type OpentypeVariationRegionList =
+    opentype_common_item_variation_store_variation_region_list_offset_link;
+
+#[derive(Debug, Clone, Default)]
+struct VariationRegionList(Vec<Vec<RegionAxisCoordinates>>);
+
+impl Promote<OpentypeVariationRegionList> for VariationRegionList {
+    fn promote(orig: &OpentypeVariationRegionList) -> Self {
+        let mut major_accum = Vec::with_capacity(orig.region_count as usize);
+        for per_region in orig.variation_regions.iter() {
+            let mut minor_accum = Vec::with_capacity(orig.axis_count as usize);
+            for coords in per_region.region_axes.iter() {
+                minor_accum.push(RegionAxisCoordinates::promote(coords));
+            }
+            major_accum.push(minor_accum);
+        }
+        Self(major_accum)
+    }
+}
+
+pub type OpentypeDeltaSets =
+    opentype_common_item_variation_store_item_variation_data_offsets_link_delta_sets;
+
+impl Promote<OpentypeDeltaSets> for DeltaSets {
+    fn promote(orig: &OpentypeDeltaSets) -> Self {
+        match orig {
+            OpentypeDeltaSets::Delta32Sets(delta32s) => DeltaSets::Delta32Sets(
+                delta32s
+                    .iter()
+                    .map(|delta_set| {
+                        (
+                            delta_set
+                                .delta_data_full_word
+                                .iter()
+                                .map(|u: &u32| *u as i32)
+                                .collect(),
+                            delta_set
+                                .delta_data_half_word
+                                .iter()
+                                .map(|u: &u16| *u as i16)
+                                .collect(),
+                        )
+                    })
+                    .collect(),
+            ),
+            OpentypeDeltaSets::Delta16Sets(delta16s) => DeltaSets::Delta16Sets(
+                delta16s
+                    .iter()
+                    .map(|delta_set| {
+                        (
+                            delta_set
+                                .delta_data_full_word
+                                .iter()
+                                .map(|u: &u16| *u as i16)
+                                .collect(),
+                            delta_set
+                                .delta_data_half_word
+                                .iter()
+                                .map(|u: &u8| *u as i8)
+                                .collect(),
+                        )
+                    })
+                    .collect(),
+            ),
+        }
+    }
+}
+
+pub type Deltas<Full, Half> = (Vec<Full>, Vec<Half>);
+
+#[derive(Debug, Clone)]
+enum DeltaSets {
+    Delta16Sets(Vec<Deltas<i16, i8>>),
+    Delta32Sets(Vec<Deltas<i32, i16>>),
+}
+
+pub type OpentypeItemVariationData =
+    opentype_common_item_variation_store_item_variation_data_offsets_link;
+
+impl Promote<OpentypeItemVariationData> for ItemVariationData {
+    fn promote(orig: &OpentypeItemVariationData) -> Self {
+        ItemVariationData {
+            item_count: orig.item_count,
+            long_words: orig.word_delta_count.long_words,
+            word_count: orig.word_delta_count.word_count,
+            region_index_count: orig.region_index_count,
+            region_indices: orig.region_indices.clone(),
+            delta_sets: DeltaSets::promote(&orig.delta_sets),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ItemVariationData {
+    item_count: u16,
+    long_words: bool,
+    word_count: u16,
+    region_index_count: u16,
+    region_indices: Vec<u16>,
+    delta_sets: DeltaSets,
+}
+
+pub type OpentypeItemVariationStore = opentype_common_item_variation_store;
+
+impl Promote<OpentypeItemVariationStore> for ItemVariationStore {
+    fn promote(orig: &OpentypeItemVariationStore) -> Self {
+        ItemVariationStore {
+            variation_region_list: promote_from_null(&orig.variation_region_list_offset.link),
+            item_variation_data_list: orig
+                .item_variation_data_offsets
+                .iter()
+                .map(follow_link!(req))
+                .collect(),
+        }
+    }
+}
+
 // STUB - this represents the fact that we only record but do not interpret the offset for the ItemVariationStore in the current OpenType implementation
-type ItemVariationStore = ();
+#[derive(Clone, Debug)]
+struct ItemVariationStore {
+    variation_region_list: VariationRegionList,
+    item_variation_data_list: Vec<Option<ItemVariationData>>,
+}
 
 // pub type OpentypeItemVariationStore = opentype_common_item_variation_store;
 pub type OpentypeItemVariationStoreOffset = opentype_base_table_item_var_store_offset;
@@ -4556,7 +4705,7 @@ fn show_gdef_metrics(gdef: Option<&GdefMetrics>, conf: &Config) {
             }
             match &data.item_var_store {
                 None => println!("\tItemVariationStore: <none>"),
-                Some(ivs) => show_item_variation_store(ivs),
+                Some(ivs) => show_item_variation_store(ivs, conf),
             }
         }
     }
@@ -5788,8 +5937,124 @@ fn show_mark_glyph_set(mgs: &MarkGlyphSet, conf: &Config) {
     )
 }
 
-fn show_item_variation_store(_ivs: &ItemVariationStore) {
-    println!("\tItemVariationStore: <unimplemented>")
+fn show_table_column_horiz<A>(
+    heading: &str,
+    items: &[A],
+    mut show_fn: impl FnMut(&A) -> String,
+    bookend: usize,
+    ellipsis: impl FnOnce(usize) -> String,
+) {
+    print!("{heading}");
+    let count = items.len();
+    if count > 2 * bookend {
+        let (left_bookend, _middle, right_bookend) =
+            unsafe { trisect_unchecked(items, bookend, bookend) };
+
+        for it in left_bookend {
+            print!("{} ", show_fn(it));
+        }
+
+        let n_skipped = count - bookend * 2;
+        print!("{}", ellipsis(n_skipped));
+
+        for it in right_bookend {
+            print!(" {}", show_fn(it));
+        }
+    } else {
+        print!("{}", show_fn(&items[0]));
+        for it in &items[1..] {
+            print!(" {}", show_fn(it));
+        }
+    }
+    println!();
+}
+
+fn show_item_variation_store(ivs: &ItemVariationStore, conf: &Config) {
+    fn show_variation_regions(vrl: &VariationRegionList, conf: &Config) {
+        fn show_variation_axes(per_region: &[RegionAxisCoordinates], conf: &Config) {
+            show_table_column_horiz(
+                "\t\t start |",
+                per_region,
+                |coords| format!("{:.03}", coords.start_coord),
+                conf.inline_bookend,
+                |n_skipped| format!("..{n_skipped:02}.."),
+            );
+            show_table_column_horiz(
+                "\t\t  peak |",
+                per_region,
+                |coords| format!("{:.03}", coords.peak_coord),
+                conf.inline_bookend,
+                |n_skipped| format!("..{n_skipped:02}.."),
+            );
+            show_table_column_horiz(
+                "\t\t   end |",
+                per_region,
+                |coords| format!("{:.03}", coords.end_coord),
+                conf.inline_bookend,
+                |n_skipped| format!("..{n_skipped:02}.."),
+            );
+        }
+        println!(
+            "\t    VariationRegions: {} regions ({} axes)",
+            vrl.0.len(),
+            vrl.0[0].len()
+        );
+        show_items_elided(
+            &vrl.0,
+            |ix, per_region| {
+                println!("\t\t[{ix}]:");
+                show_variation_axes(per_region, conf);
+            },
+            conf.bookend_size,
+            |start_ix, end_ix| format!("\t    (skipping regions {start_ix}..{end_ix})"),
+        )
+    }
+    fn show_variation_data_array(ivda: &[Option<ItemVariationData>], conf: &Config) {
+        fn show_variation_data(ivd: &ItemVariationData, conf: &Config) {
+            fn show_delta_sets(_sets: &DeltaSets, _conf: &Config) {
+                println!("\t\t\t<show_delta_sets: incomplete>")
+            }
+            println!("ItemVariationData:");
+
+            print!("\t\t\t{} region indices: ", ivd.region_index_count);
+            show_items_inline(
+                &ivd.region_indices,
+                |ix| format!("{ix}"),
+                conf.inline_bookend,
+                |n_skipped| format!("..({n_skipped}).."),
+            );
+
+            let full_bits = if ivd.long_words { 32 } else { 16 };
+            println!(
+                "\t\t\t{} delta-sets ({} full [{}-bit], {} half [{}-bit]): ",
+                ivd.item_count,
+                ivd.word_count,
+                full_bits,
+                ivd.region_index_count - ivd.word_count,
+                full_bits >> 1
+            );
+            show_delta_sets(&ivd.delta_sets, conf);
+        }
+        println!("\t    ItemVariationData[{}]", ivda.len());
+        show_items_elided(
+            ivda,
+            |ix, o_ivd| match o_ivd {
+                Some(ivd) => {
+                    print!("\t\t[{ix}]: ");
+                    show_variation_data(ivd, conf);
+                }
+                None => {
+                    println!("\t\t[{ix}]: <NONE>");
+                }
+            },
+            conf.bookend_size,
+            |start_ix, stop_ix| format!("\t    ...(skipping entries {start_ix}..{stop_ix})..."),
+        )
+    }
+
+    println!("\tItemVariationStore:");
+    show_variation_regions(&ivs.variation_region_list, conf);
+    show_variation_data_array(&ivs.item_variation_data_list, conf);
 }
 
 fn show_lig_caret_list(lig_caret_list: &LigCaretList, conf: &Config) {
