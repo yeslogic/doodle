@@ -2481,7 +2481,7 @@ where
             EngineLogic::OffsetPeek(base_addr, offs, cl_inner) => {
                 let bind_tgt_offset_var = GenStmt::Embed(RustStmt::assign(
                     "tgt_offset",
-                    RustExpr::infix(base_addr.clone(), InfixOperator::Add, offs.clone()),
+                    RustExpr::add(base_addr.clone(), offs.clone()),
                 ));
                 let advance_or_seek = GenStmt::Embed(RustStmt::assign(
                     "_is_advance",

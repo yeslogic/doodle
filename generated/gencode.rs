@@ -5448,7 +5448,7 @@ _ => {
 true
 }
 } {
-let tgt_offset = 0u64 + match header.phoff.clone() {
+let tgt_offset = match header.phoff.clone() {
 elf_types_elf_off::Off32(x32) => {
 x32 as u64
 },
@@ -5477,7 +5477,7 @@ _ => {
 true
 }
 } {
-let tgt_offset = 0u64 + match header.shoff.clone() {
+let tgt_offset = match header.shoff.clone() {
 elf_types_elf_off::Off32(x32) => {
 x32 as u64
 },
@@ -5498,7 +5498,7 @@ Some(ref shdrs) => {
 let mut accum = Vec::new();
 for shdr in shdrs.clone() {
 accum.push(if (shdr.r#type.clone() != 8u32) && (shdr.r#type.clone() != 0u32) {
-let tgt_offset = 0u64 + match shdr.offset.clone() {
+let tgt_offset = match shdr.offset.clone() {
 elf_types_elf_off::Off32(x32) => {
 x32 as u64
 },
@@ -7238,7 +7238,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (storage_offset as u32) + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (storage_offset as u32) + (offset as u32);
+let tgt_offset = table_start + (storage_offset as u32) + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let mut accum = Vec::new();
@@ -7638,7 +7638,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_layout_axis_table(_input))?;
 _input.close_peek_context()?;
@@ -7663,7 +7663,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_layout_axis_table(_input))?;
 _input.close_peek_context()?;
@@ -7728,7 +7728,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_class_def(_input))?;
 _input.close_peek_context()?;
@@ -7753,7 +7753,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let table_start = {
@@ -7769,7 +7769,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
 _input.close_peek_context()?;
@@ -7798,7 +7798,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let point_count = (Decoder30(_input))?;
@@ -7851,7 +7851,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let table_start = {
@@ -7867,7 +7867,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
 _input.close_peek_context()?;
@@ -7896,7 +7896,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let table_start = {
@@ -7916,7 +7916,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let table_start = {
@@ -7953,7 +7953,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
 _input.close_peek_context()?;
@@ -8038,7 +8038,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_class_def(_input))?;
 _input.close_peek_context()?;
@@ -8074,7 +8074,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_mark_glyph_set(_input))?;
 _input.close_peek_context()?;
@@ -8106,7 +8106,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_mark_glyph_set(_input))?;
 _input.close_peek_context()?;
@@ -8155,7 +8155,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_mark_glyph_set(_input))?;
 _input.close_peek_context()?;
@@ -8223,7 +8223,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_script_list(_input))?;
 _input.close_peek_context()?;
@@ -8248,7 +8248,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_feature_list(_input))?;
 _input.close_peek_context()?;
@@ -8273,7 +8273,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let table_start = {
@@ -8293,7 +8293,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let table_start = {
@@ -8325,7 +8325,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = match lookup_type {
 9u16 => {
@@ -8445,7 +8445,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_script_list(_input))?;
 _input.close_peek_context()?;
@@ -8470,7 +8470,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_feature_list(_input))?;
 _input.close_peek_context()?;
@@ -8495,7 +8495,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let table_start = {
@@ -8515,7 +8515,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let table_start = {
@@ -8547,7 +8547,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = match lookup_type {
 7u16 => {
@@ -8725,7 +8725,7 @@ inner
 return Err(ParseError::FalsifiedWhere(14677505873656710393u64));
 }
 };
-let tgt_offset = 0u32 + table_start + (__offset_axes as u32);
+let tgt_offset = table_start + (__offset_axes as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let sz = __axes_length as usize;
@@ -8765,7 +8765,7 @@ inner
 return Err(ParseError::FalsifiedWhere(10102114574336663273u64));
 }
 };
-let tgt_offset = 0u32 + table_start + ((__offset_axes + __axes_length) as u32);
+let tgt_offset = table_start + ((__offset_axes + __axes_length) as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let mut accum = Vec::new();
@@ -9047,7 +9047,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let first_glyph = (Decoder30(_input))?;
@@ -9083,7 +9083,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let first_glyph = (Decoder30(_input))?;
@@ -9119,7 +9119,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let mut accum = Vec::new();
@@ -9278,7 +9278,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let format = {
@@ -9565,7 +9565,7 @@ inner
 return Err(ParseError::FalsifiedWhere(1338347005175300217u64));
 }
 };
-let tgt_offset = 0u32 + table_start + (__data_offset as u32);
+let tgt_offset = table_start + (__data_offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let shared_point_numbers = if tuple_variation_count.shared_point_numbers.clone() {
@@ -10073,7 +10073,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_script_table(_input))?;
 _input.close_peek_context()?;
@@ -10117,7 +10117,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_feature_table(_input))?;
 _input.close_peek_context()?;
@@ -10471,7 +10471,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
 _input.close_peek_context()?;
@@ -10504,7 +10504,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
 _input.close_peek_context()?;
@@ -10555,7 +10555,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
 _input.close_peek_context()?;
@@ -10587,7 +10587,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let glyph_count = (Decoder30(_input))?;
@@ -10654,7 +10654,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
 _input.close_peek_context()?;
@@ -10683,7 +10683,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let glyph_count = (Decoder30(_input))?;
@@ -10741,7 +10741,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
 _input.close_peek_context()?;
@@ -10770,7 +10770,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let table_start = {
@@ -10790,7 +10790,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let ligature_glyph = (Decoder30(_input))?;
@@ -10859,7 +10859,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
 _input.close_peek_context()?;
@@ -10888,7 +10888,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let table_start = {
@@ -10908,7 +10908,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let glyph_count = {
@@ -10990,7 +10990,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
 _input.close_peek_context()?;
@@ -11015,7 +11015,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_class_def(_input))?;
 _input.close_peek_context()?;
@@ -11044,7 +11044,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let table_start = {
@@ -11064,7 +11064,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let glyph_count = {
@@ -11151,7 +11151,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
 _input.close_peek_context()?;
@@ -11207,7 +11207,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
 _input.close_peek_context()?;
@@ -11236,7 +11236,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let table_start = {
@@ -11256,7 +11256,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let backtrack_glyph_count = (Decoder30(_input))?;
@@ -11343,7 +11343,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
 _input.close_peek_context()?;
@@ -11368,7 +11368,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_class_def(_input))?;
 _input.close_peek_context()?;
@@ -11393,7 +11393,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_class_def(_input))?;
 _input.close_peek_context()?;
@@ -11418,7 +11418,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_class_def(_input))?;
 _input.close_peek_context()?;
@@ -11447,7 +11447,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let table_start = {
@@ -11467,7 +11467,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let backtrack_glyph_count = (Decoder30(_input))?;
@@ -11558,7 +11558,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
 _input.close_peek_context()?;
@@ -11590,7 +11590,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
 _input.close_peek_context()?;
@@ -11622,7 +11622,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
 _input.close_peek_context()?;
@@ -11687,7 +11687,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
 _input.close_peek_context()?;
@@ -11716,7 +11716,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
 _input.close_peek_context()?;
@@ -11748,7 +11748,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
 _input.close_peek_context()?;
@@ -11889,7 +11889,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_langsys(_input))?;
 _input.close_peek_context()?;
@@ -11920,7 +11920,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_langsys(_input))?;
 _input.close_peek_context()?;
@@ -12096,7 +12096,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
 _input.close_peek_context()?;
@@ -12130,7 +12130,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
 _input.close_peek_context()?;
@@ -12185,7 +12185,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
 _input.close_peek_context()?;
@@ -12216,7 +12216,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let table_start = {
@@ -12278,7 +12278,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
 _input.close_peek_context()?;
@@ -12305,7 +12305,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_class_def(_input))?;
 _input.close_peek_context()?;
@@ -12330,7 +12330,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_class_def(_input))?;
 _input.close_peek_context()?;
@@ -12414,7 +12414,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
 _input.close_peek_context()?;
@@ -12444,7 +12444,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_anchor_table(_input))?;
 _input.close_peek_context()?;
@@ -12469,7 +12469,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_anchor_table(_input))?;
 _input.close_peek_context()?;
@@ -12519,7 +12519,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
 _input.close_peek_context()?;
@@ -12544,7 +12544,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
 _input.close_peek_context()?;
@@ -12570,7 +12570,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_layout_mark_array(_input))?;
 _input.close_peek_context()?;
@@ -12595,7 +12595,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let table_start = {
@@ -12619,7 +12619,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_anchor_table(_input))?;
 _input.close_peek_context()?;
@@ -12687,7 +12687,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
 _input.close_peek_context()?;
@@ -12712,7 +12712,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
 _input.close_peek_context()?;
@@ -12738,7 +12738,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_layout_mark_array(_input))?;
 _input.close_peek_context()?;
@@ -12763,7 +12763,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let table_start = {
@@ -12783,7 +12783,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let table_start = {
@@ -12807,7 +12807,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_anchor_table(_input))?;
 _input.close_peek_context()?;
@@ -12893,7 +12893,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
 _input.close_peek_context()?;
@@ -12918,7 +12918,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_coverage_table(_input))?;
 _input.close_peek_context()?;
@@ -12944,7 +12944,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_layout_mark_array(_input))?;
 _input.close_peek_context()?;
@@ -12969,7 +12969,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let table_start = {
@@ -12993,7 +12993,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_anchor_table(_input))?;
 _input.close_peek_context()?;
@@ -13055,7 +13055,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_anchor_table(_input))?;
 _input.close_peek_context()?;
@@ -13118,7 +13118,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
 _input.close_peek_context()?;
@@ -13143,7 +13143,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
 _input.close_peek_context()?;
@@ -13325,7 +13325,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
 _input.close_peek_context()?;
@@ -13352,7 +13352,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
 _input.close_peek_context()?;
@@ -13379,7 +13379,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
 _input.close_peek_context()?;
@@ -13406,7 +13406,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
 _input.close_peek_context()?;
@@ -13457,7 +13457,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
 _input.close_peek_context()?;
@@ -13484,7 +13484,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
 _input.close_peek_context()?;
@@ -13511,7 +13511,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
 _input.close_peek_context()?;
@@ -13538,7 +13538,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
 _input.close_peek_context()?;
@@ -13589,7 +13589,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
 _input.close_peek_context()?;
@@ -13616,7 +13616,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
 _input.close_peek_context()?;
@@ -13643,7 +13643,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
 _input.close_peek_context()?;
@@ -13670,7 +13670,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
 _input.close_peek_context()?;
@@ -13721,7 +13721,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
 _input.close_peek_context()?;
@@ -13748,7 +13748,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
 _input.close_peek_context()?;
@@ -13775,7 +13775,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
 _input.close_peek_context()?;
@@ -13802,7 +13802,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
 _input.close_peek_context()?;
@@ -13853,7 +13853,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
 _input.close_peek_context()?;
@@ -13880,7 +13880,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
 _input.close_peek_context()?;
@@ -13907,7 +13907,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
 _input.close_peek_context()?;
@@ -13934,7 +13934,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
 _input.close_peek_context()?;
@@ -13985,7 +13985,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
 _input.close_peek_context()?;
@@ -14012,7 +14012,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
 _input.close_peek_context()?;
@@ -14039,7 +14039,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
 _input.close_peek_context()?;
@@ -14066,7 +14066,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
 _input.close_peek_context()?;
@@ -14336,7 +14336,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let base_tag_count = (Decoder30(_input))?;
@@ -14371,7 +14371,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let table_start = {
@@ -14393,7 +14393,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_layout_base_script(_input))?;
 _input.close_peek_context()?;
@@ -14446,7 +14446,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_layout_base_values(_input))?;
 _input.close_peek_context()?;
@@ -14471,7 +14471,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_layout_min_max(_input))?;
 _input.close_peek_context()?;
@@ -14502,7 +14502,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_layout_min_max(_input))?;
 _input.close_peek_context()?;
@@ -14545,7 +14545,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_layout_base_coord(_input))?;
 _input.close_peek_context()?;
@@ -14581,7 +14581,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_layout_base_coord(_input))?;
 _input.close_peek_context()?;
@@ -14606,7 +14606,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_layout_base_coord(_input))?;
 _input.close_peek_context()?;
@@ -14637,7 +14637,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_layout_base_coord(_input))?;
 _input.close_peek_context()?;
@@ -14662,7 +14662,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_layout_base_coord(_input))?;
 _input.close_peek_context()?;
@@ -14718,7 +14718,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if table_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + table_start + (offset as u32);
+let tgt_offset = table_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
 _input.close_peek_context()?;
@@ -15119,7 +15119,7 @@ let x = _input.get_offset_u64();
 x as u32
 };
 if storage_start + (offset as u32) >= __here {
-let tgt_offset = 0u32 + storage_start + (offset as u32);
+let tgt_offset = storage_start + (offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let mut accum = Vec::new();

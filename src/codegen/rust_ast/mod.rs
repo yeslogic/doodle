@@ -1192,6 +1192,18 @@ pub(crate) enum RustNumLit {
     Usize(usize),
 }
 
+impl From<RustNumLit> for usize {
+    fn from(value: RustNumLit) -> Self {
+        match value {
+            RustNumLit::U8(n) => n as usize,
+            RustNumLit::U16(n) => n as usize,
+            RustNumLit::U32(n) => n as usize,
+            RustNumLit::U64(n) => n as usize,
+            RustNumLit::Usize(n) => n,
+        }
+    }
+}
+
 impl ToFragment for RustNumLit {
     fn to_fragment(&self) -> Fragment {
         match self {
@@ -1767,6 +1779,33 @@ impl RustExpr {
 
     pub(crate) fn option_none() -> Self {
         RustExpr::local("None")
+    }
+
+    /// Returns `true` if the expression has a guaranteed-constant
+    /// value.
+    pub(crate) fn is_pure_numeric_const(&self) -> bool {
+        match self {
+            RustExpr::PrimitiveLit(RustPrimLit::Numeric(..)) => true,
+            // REVIEW - there are edge cases but they are largely 'obfuscations'
+            _ => false,
+        }
+    }
+
+    pub(crate) fn get_const(&self) -> Option<usize> {
+        match self {
+            RustExpr::PrimitiveLit(RustPrimLit::Numeric(rnl)) => Some(usize::from(*rnl)),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn add(lhs: RustExpr, rhs: RustExpr) -> RustExpr {
+        if lhs.is_pure_numeric_const() && matches!(lhs.get_const(), Some(0)) {
+            rhs
+        } else if rhs.is_pure_numeric_const() && matches!(rhs.get_const(), Some(0)) {
+            lhs
+        } else {
+            RustExpr::infix(lhs, InfixOperator::Add, rhs)
+        }
     }
 }
 
