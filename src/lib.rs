@@ -136,7 +136,10 @@ pub enum Expr {
     RecordProj(Box<Expr>, Label),
     Variant(Label, Box<Expr>),
     Seq(Vec<Expr>),
+
     Match(Box<Expr>, Vec<(Pattern, Expr)>),
+    Destructure(Box<Expr>, Pattern, Box<Expr>),
+
     Lambda(Label, Box<Expr>),
 
     IntRel(IntRel, Box<Expr>, Box<Expr>),
@@ -259,6 +262,10 @@ impl Expr {
                     )?)?;
                 }
                 Ok(t)
+            }
+            Expr::Destructure(head, pattern, body) => {
+                let head_type = Rc::new(head.infer_type(scope)?);
+                pattern.infer_expr_branch_type(scope, head_type, body)
             }
             Expr::Lambda(..) => Err(anyhow!("infer_type encountered unexpected lambda")),
 
@@ -575,6 +582,9 @@ impl Expr {
                     || arms
                         .iter()
                         .any(|(pat, x)| !pat.shadows(name) && x.is_shadowed_by(name))
+            }
+            Expr::Destructure(head, pattern, body) => {
+                head.is_shadowed_by(name) || (!pattern.shadows(name) && body.is_shadowed_by(name))
             }
             Expr::AsU8(x)
             | Expr::AsU16(x)

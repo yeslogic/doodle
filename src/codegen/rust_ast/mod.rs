@@ -1807,6 +1807,18 @@ impl RustExpr {
             RustExpr::infix(lhs, InfixOperator::Add, rhs)
         }
     }
+
+    pub(crate) fn prepend_stmt(self, value: RustStmt) -> Self {
+        match self {
+            RustExpr::BlockScope(mut stmts, tail) => {
+                let mut stmts0 = Vec::with_capacity(stmts.len() + 1);
+                stmts0.push(value);
+                stmts0.append(&mut stmts);
+                RustExpr::BlockScope(stmts0, tail)
+            }
+            other => RustExpr::BlockScope(vec![value], Box::new(other)),
+        }
+    }
 }
 
 impl ToFragmentExt for RustExpr {

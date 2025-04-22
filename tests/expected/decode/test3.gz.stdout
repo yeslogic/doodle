@@ -16,7 +16,7 @@
 │       │   │   ├── blocks <- repeat-until-last (x -> x.final == 1) deflate.block :=
 │       │   │   │   └── 0 <- deflate.block :=
 │       │   │   │       ├── final <- base.bit := 1
-│       │   │   │       ├── type <- map (bits -> bits.0 << 0 | bits.1 << 1) (...) := 1
+│       │   │   │       ├── type <- map (bits -> bits.0 | bits.1 << 1) (...) := 1
 │       │   │   │       └── data <- match type { ... } :=
 │       │   │   │           └── fixed_huffman <- deflate.fixed_huffman :=
 │       │   │   │               ├── codes <- dynamic format huffman (repeat-until-last (x -> as-u16 (x.code) == 256) { ... }) :=
@@ -80,7 +80,7 @@
 │       │   │   │   ├── 9 := { literal := 114 }
 │       │   │   │   ~
 │       │   │   │   └── 13 := { literal := 10 }
-│       │   │   └── inflate <- compute flat-map-list (tuple_var -> match tuple_var { ... }) codes :=
+│       │   │   └── inflate <- compute flat-map-list (tuple_var -> pat-bind [(buffer, symbol) = tuple_var] match symbol { ... }) codes :=
 │       │   │       ├── 0 := 72
 │       │   │       ├── 1 := 101
 │       │   │       ├── 2 := 108
@@ -112,7 +112,7 @@
 │           │   ├── blocks <- repeat-until-last (x -> x.final == 1) deflate.block :=
 │           │   │   └── 0 <- deflate.block :=
 │           │   │       ├── final <- base.bit := 1
-│           │   │       ├── type <- map (bits -> bits.0 << 0 | bits.1 << 1) (...) := 1
+│           │   │       ├── type <- map (bits -> bits.0 | bits.1 << 1) (...) := 1
 │           │   │       └── data <- match type { ... } :=
 │           │   │           └── fixed_huffman <- deflate.fixed_huffman :=
 │           │   │               ├── codes <- dynamic format huffman (repeat-until-last (x -> as-u16 (x.code) == 256) { ... }) :=
@@ -179,7 +179,7 @@
 │           │   │   │       ├── length := 4
 │           │   │   │       └── distance := 6
 │           │   │   └── 8 := { literal := 10 }
-│           │   └── inflate <- compute flat-map-list (tuple_var -> match tuple_var { ... }) codes :=
+│           │   └── inflate <- compute flat-map-list (tuple_var -> pat-bind [(buffer, symbol) = tuple_var] match symbol { ... }) codes :=
 │           │       ├── 0 := 104
 │           │       ├── 1 := 101
 │           │       ├── 2 := 108

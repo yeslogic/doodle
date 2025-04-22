@@ -616,6 +616,12 @@ where
     ),
     LiftOption(TypeRep, Option<Box<TypedExpr<TypeRep, VarId>>>),
     Unary(TypeRep, UnaryOp, Box<TypedExpr<TypeRep, VarId>>),
+    Destructure(
+        TypeRep,
+        Box<TypedExpr<TypeRep, VarId>>,
+        TypedPattern<TypeRep>,
+        Box<TypedExpr<TypeRep, VarId>>,
+    ),
 }
 
 impl<TypeRep> std::hash::Hash for TypedExpr<TypeRep> {
@@ -646,6 +652,11 @@ impl<TypeRep> std::hash::Hash for TypedExpr<TypeRep> {
             TypedExpr::Match(_, head, cases) => {
                 head.hash(state);
                 cases.hash(state);
+            }
+            TypedExpr::Destructure(_, head, pat, expr) => {
+                head.hash(state);
+                pat.hash(state);
+                expr.hash(state);
             }
             TypedExpr::Lambda(_, var, body) => {
                 var.hash(state);
@@ -768,6 +779,7 @@ impl TypedExpr<GenType> {
             | TypedExpr::Seq(gt, ..)
             | TypedExpr::SeqIx(gt, ..)
             | TypedExpr::Match(gt, ..)
+            | TypedExpr::Destructure(gt, ..)
             | TypedExpr::IntRel(gt, ..)
             | TypedExpr::Arith(gt, ..)
             | TypedExpr::Unary(gt, ..)
@@ -921,6 +933,9 @@ mod __impls {
                 TypedExpr::Seq(_, t_elems) => Expr::Seq(revec(t_elems)),
                 TypedExpr::Match(_, head, branches) => {
                     Expr::Match(rebox(head), revec_pair(branches))
+                }
+                TypedExpr::Destructure(_, head, pattern, expr) => {
+                    Expr::Destructure(rebox(head), pattern.into(), rebox(expr))
                 }
                 TypedExpr::Lambda(_, name, inner) => Expr::Lambda(name, rebox(inner)),
                 TypedExpr::IntRel(_, rel, x, y) => Expr::IntRel(rel, rebox(x), rebox(y)),

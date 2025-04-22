@@ -695,6 +695,18 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                     ),
             }
         }
+        TypedExpr::Destructure(_t, bound_value, pattern, inner) => {
+            if is_pattern_irrefutable(pattern) {
+                // REVIEW - confirm ExprInfo pragmatics of these choices
+                let value = embed_expr(bound_value, info);
+                let pattern = embed_pattern(pattern);
+                let inner = embed_expr(inner, info);
+
+                inner.prepend_stmt(RustStmt::LetPattern(pattern, value))
+            } else {
+                unimplemented!("non-irrefutable destructuring");
+            }
+        }
         TypedExpr::Match(_t, scrutinee, cases) => {
             let scrutinized = embed_expr_dft(scrutinee);
             let head = match scrutinee.get_type().unwrap().as_ref() {
@@ -4248,6 +4260,16 @@ impl<'a> Elaborator<'a> {
                 }
                 let gt = self.get_gt_from_index(index);
                 TypedExpr::Match(gt, Box::new(t_head), t_branches)
+            }
+            Expr::Destructure(head, pattern, expr) => {
+                self.codegen.name_gen.ctxt.push_atom(NameAtom::DeadEnd);
+                let t_head = self.elaborate_expr(head);
+                self.codegen.name_gen.ctxt.escape();
+
+                let t_pat = self.elaborate_pattern(pattern);
+                let t_expr = self.elaborate_expr(expr);
+                let gt = self.get_gt_from_index(index);
+                TypedExpr::Destructure(gt, Box::new(t_head), t_pat, Box::new(t_expr))
             }
             Expr::Lambda(..) => unreachable!(
                 "Cannot elaborate Expr::Lambda in neutral (i.e. not lambda-aware) context"

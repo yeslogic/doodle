@@ -560,6 +560,14 @@ impl Expr {
                 }
                 panic!("non-exhaustive patterns");
             }
+            Expr::Destructure(head, pattern, expr) => {
+                let head = head.eval_with_loc(scope);
+                if let Some(pattern_scope) = head.matches(scope, pattern) {
+                    let value = expr.eval_value_with_loc(&LocScope::Multi(&pattern_scope));
+                    return Cow::Owned(ParsedValue::from_evaluated(value));
+                }
+                panic!("refuted pattern: {head:?} does not match {pattern:?}")
+            }
             Expr::Lambda(_, _) => panic!("cannot eval lambda"),
 
             Expr::IntRel(IntRel::Eq, x, y) => Cow::Owned(ParsedValue::from_evaluated(

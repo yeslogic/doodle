@@ -332,6 +332,15 @@ impl Expr {
                 }
                 panic!("non-exhaustive patterns");
             }
+            Expr::Destructure(head, pat, expr) => {
+                let head = head.eval(scope);
+                if let Some(pattern_scope) = head.matches(scope, pat) {
+                    let value = expr.eval_value(&Scope::Multi(&pattern_scope));
+                    return Cow::Owned(value);
+                } else {
+                    panic!("refutable pattern failed to match: {pat:?} :~ {head:?}");
+                }
+            }
             Expr::Lambda(_, _) => panic!("cannot eval lambda"),
 
             Expr::IntRel(IntRel::Eq, x, y) => {
