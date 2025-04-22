@@ -7,7 +7,8 @@ use crate::{
     loc_decoder::{ParseLoc, Parsed, ParsedValue},
 };
 use crate::{
-    Arith, DynFormat, Expr, FieldLabel, Format, FormatModule, IntRel, RecordFormat, StyleHint,
+    Arith, DynFormat, Expr, FieldLabel, Format, FormatModule, IntRel, Pattern, RecordFormat,
+    StyleHint,
 };
 use crate::{Label, UnaryOp};
 
@@ -1535,6 +1536,44 @@ impl<'module> TreePrinter<'module> {
         frags.finalize_with_sep(Fragment::Char(' '))
     }
 
+    // NOTE - currently used only for `Expr::Destructure, otherwise patterns are not shown`.
+    fn compile_pattern(&mut self, pat: &Pattern) -> Fragment {
+        match pat {
+            Pattern::Binding(name) => Fragment::String(name.clone()),
+            Pattern::Tuple(elts) => Fragment::seq(
+                elts.iter().map(|e| self.compile_pattern(e)),
+                Some(Fragment::String(", ".into())),
+            )
+            .delimit(Fragment::Char('('), Fragment::Char(')'))
+            .group(),
+            Pattern::Option(Some(pat)) => Fragment::string("Some")
+                .cat(Fragment::Char('('))
+                .cat(self.compile_pattern(pat))
+                .cat(Fragment::Char(')'))
+                .group(),
+            Pattern::Option(None) => Fragment::string("None"),
+            Pattern::Wildcard => Fragment::string("_"),
+            Pattern::Seq(pats) => Fragment::seq(
+                pats.iter().map(|e| self.compile_pattern(e)),
+                Some(Fragment::String(", ".into())),
+            )
+            .delimit(Fragment::Char('['), Fragment::Char(']'))
+            .group(),
+            Pattern::Variant(name, pat) => Fragment::String(name.clone())
+                .cat(Fragment::Char('('))
+                .cat(self.compile_pattern(pat))
+                .cat(Fragment::Char(')'))
+                .group(),
+            Pattern::Int(..)
+            | Pattern::U8(..)
+            | Pattern::U16(..)
+            | Pattern::U32(..)
+            | Pattern::U64(..)
+            | Pattern::Bool(..)
+            | Pattern::Char(..) => unreachable!("compile_pattern: unexpected pattern: {pat:?}"),
+        }
+    }
+
     fn compile_expr(&mut self, expr: &Expr, prec: Precedence) -> Fragment {
         match expr {
             Expr::Match(head, _) => cond_paren(
@@ -1543,6 +1582,18 @@ impl<'module> TreePrinter<'module> {
                     .cat(Fragment::String(" { ... }".into()))
                     .group(),
                 prec,
+                Precedence::MATCH,
+            ),
+            Expr::Destructure(head, pat, expr) => cond_paren(
+                Fragment::String("pat-bind ".into())
+                    .cat(Fragment::Char('['))
+                    .cat(self.compile_pattern(pat))
+                    .cat(Fragment::String(" = ".into()))
+                    .cat(self.compile_expr(head, Precedence::TOP))
+                    .cat(Fragment::string("] "))
+                    .cat(self.compile_expr(expr, prec)),
+                prec,
+                // REVIEW - does this need its own precedence level?
                 Precedence::MATCH,
             ),
             Expr::Lambda(name, expr) => cond_paren(

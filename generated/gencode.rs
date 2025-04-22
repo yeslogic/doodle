@@ -5851,10 +5851,9 @@ PResult::Ok(raw & 31u8)
 let field1 = (Decoder20(_input))?;
 (field0, field1)
 };
-match tuple_var {
-(x1, x0) => {
+{
+let (x1, x0) = tuple_var;
 (x1 as u32) << 6u32 | (x0 as u32)
-}
 }
 },
 
@@ -5982,10 +5981,9 @@ return Err(ParseError::ExcludedBranch(658824046370133753u64));
 }
 }
 };
-match tuple_var {
-(x2, x1, x0) => {
+{
+let (x2, x1, x0) = tuple_var;
 (x2 as u32) << 12u32 | (x1 as u32) << 6u32 | (x0 as u32)
-}
 }
 },
 
@@ -6095,10 +6093,9 @@ return Err(ParseError::ExcludedBranch(3179861450314844647u64));
 }
 }
 };
-match tuple_var {
-(x3, x2, x1, x0) => {
+{
+let (x3, x2, x1, x0) = tuple_var;
 (x3 as u32) << 18u32 | (x2 as u32) << 12u32 | (x1 as u32) << 6u32 | (x0 as u32)
-}
 }
 },
 
@@ -9619,9 +9616,11 @@ let mut seq: Vec<opentype_var_glyph_variation_data_table_data_shared_point_numbe
 let mut acc = 0u16;
 loop {
 if {
-let totlen = acc.clone();
-let _seq = &seq;
+let tuple_var = (acc.clone(), &seq);
+{
+let (totlen, _seq) = tuple_var;
 totlen >= (point_count as u16)
+}
 } {
 break
 }
@@ -9660,9 +9659,11 @@ opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes { control,
 };
 seq.push(elem.clone());
 acc = {
-let acc = acc;
-let run = elem;
+let tuple_var = (acc, elem);
+{
+let (acc, run) = tuple_var;
 acc + (succ((run.control.point_run_count.clone()) as u16))
+}
 };
 }
 (acc, seq)
@@ -9682,9 +9683,11 @@ let mut seq: Vec<opentype_var_glyph_variation_data_table_data_shared_point_numbe
 let mut acc = 0u16;
 loop {
 if {
-let totlen = acc.clone();
-let _seq = &seq;
+let tuple_var = (acc.clone(), &seq);
+{
+let (totlen, _seq) = tuple_var;
 totlen >= ((hi as u16) & 127u16) << 8u16 | (lo as u16)
+}
 } {
 break
 }
@@ -9723,9 +9726,11 @@ opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes { control,
 };
 seq.push(elem.clone());
 acc = {
-let acc = acc;
-let run = elem;
+let tuple_var = (acc, elem);
+{
+let (acc, run) = tuple_var;
 acc + (succ((run.control.point_run_count.clone()) as u16))
+}
 };
 }
 (acc, seq)
@@ -9796,9 +9801,11 @@ let mut seq: Vec<opentype_var_glyph_variation_data_table_data_shared_point_numbe
 let mut acc = 0u16;
 loop {
 if {
-let totlen = acc.clone();
-let _seq = &seq;
+let tuple_var = (acc.clone(), &seq);
+{
+let (totlen, _seq) = tuple_var;
 totlen >= (point_count as u16)
+}
 } {
 break
 }
@@ -9837,9 +9844,11 @@ opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes { control,
 };
 seq.push(elem.clone());
 acc = {
-let acc = acc;
-let run = elem;
+let tuple_var = (acc, elem);
+{
+let (acc, run) = tuple_var;
 acc + (succ((run.control.point_run_count.clone()) as u16))
+}
 };
 }
 (acc, seq)
@@ -9859,9 +9868,11 @@ let mut seq: Vec<opentype_var_glyph_variation_data_table_data_shared_point_numbe
 let mut acc = 0u16;
 loop {
 if {
-let totlen = acc.clone();
-let _seq = &seq;
+let tuple_var = (acc.clone(), &seq);
+{
+let (totlen, _seq) = tuple_var;
 totlen >= ((hi as u16) & 127u16) << 8u16 | (lo as u16)
+}
 } {
 break
 }
@@ -9900,9 +9911,11 @@ opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes { control,
 };
 seq.push(elem.clone());
 acc = {
-let acc = acc;
-let run = elem;
+let tuple_var = (acc, elem);
+{
+let (acc, run) = tuple_var;
 acc + (succ((run.control.point_run_count.clone()) as u16))
+}
 };
 }
 (acc, seq)
@@ -9937,9 +9950,11 @@ let mut seq: Vec<opentype_var_glyph_variation_data_table_data_per_tuple_variatio
 let mut acc = 0u16;
 loop {
 if {
-let totlen = acc.clone();
-let _seq = &seq;
+let tuple_var = (acc.clone(), &seq);
+{
+let (totlen, _seq) = tuple_var;
 totlen >= point_count * 2u16
+}
 } {
 break
 }
@@ -9987,9 +10002,11 @@ opentype_var_glyph_variation_data_table_data_per_tuple_variation_data_x_and_y_co
 };
 seq.push(elem.clone());
 acc = {
-let acc = acc;
-let run = elem;
+let tuple_var = (acc, elem);
+{
+let (acc, run) = tuple_var;
 acc + (succ((run.control.delta_run_count.clone()) as u16))
+}
 };
 }
 (acc, seq)
@@ -14788,9 +14805,11 @@ let mut seq: Vec<opentype_glyf_simple_flags_raw> = Vec::new();
 let mut acc = 0u16;
 loop {
 if {
-let totlen = acc.clone();
-let _seq = &seq;
+let tuple_var = (acc.clone(), &seq);
+{
+let (totlen, _seq) = tuple_var;
 totlen >= number_of_coordinates
+}
 } {
 break
 }
@@ -14810,17 +14829,18 @@ opentype_glyf_simple_flags_raw { repeats, field_set }
 };
 seq.push(elem.clone());
 acc = {
-let acc = acc;
-let flags = elem;
+let tuple_var = (acc, elem);
+{
+let (acc, flags) = tuple_var;
 acc + (succ((flags.repeats.clone()) as u16))
+}
 };
 }
 (acc, seq)
 };
-match tuple_var {
-(_len, flags) => {
+{
+let (_len, flags) = tuple_var;
 flags
-}
 }
 };
 ((|arr_flags: Vec<opentype_glyf_simple_flags_raw>| try_flat_map_vec(arr_flags.iter().cloned(), |packed: opentype_glyf_simple_flags_raw| PResult::Ok(dup32(((packed.repeats.clone()) as u32) + 1u32, packed.field_set.clone()))))(arr_flags))?
@@ -14914,8 +14934,9 @@ let mut seq: Vec<opentype_glyf_composite_glyphs> = Vec::new();
 let mut acc = false;
 loop {
 if {
-let _has_instructions = acc.clone();
-let seq = &seq;
+let tuple_var = (acc.clone(), &seq);
+{
+let (_has_instructions, seq) = tuple_var;
 match match ((seq.len()) as u32) != 0u32 {
 true => {
 Some(seq[(pred((seq.len()) as u32)) as usize].clone())
@@ -14931,6 +14952,7 @@ Some(ref x) => {
 
 None => {
 false
+}
 }
 }
 } {
@@ -15073,9 +15095,11 @@ opentype_glyf_composite_glyphs { flags, glyph_index, argument1, argument2, scale
 };
 seq.push(elem.clone());
 acc = {
-let acc = acc;
-let glyph = elem;
+let tuple_var = (acc, elem);
+{
+let (acc, glyph) = tuple_var;
 acc || glyph.flags.we_have_instructions.clone()
+}
 };
 }
 (acc, seq)
@@ -15396,8 +15420,8 @@ accum
 };
 let sub_headers = {
 let mut accum = Vec::new();
-for _ in 0..succ(match (try_fold_left_curried(sub_header_keys.iter().cloned(), None, |tuple_var: (Option<u16>, u16)| PResult::Ok(match tuple_var {
-(acc, y) => {
+for _ in 0..succ(match (try_fold_left_curried(sub_header_keys.iter().cloned(), None, |tuple_var: (Option<u16>, u16)| PResult::Ok({
+let (acc, y) = tuple_var.clone();
 match acc {
 Some(x) => {
 Some(match x >= y / 8u16 {
@@ -15413,7 +15437,6 @@ y / 8u16
 
 None => {
 Some(y / 8u16)
-}
 }
 }
 })))? {
@@ -17999,8 +18022,8 @@ deflate_main_codes__dupX1::dynamic_huffman(ref y) => {
 y.codes_values.clone()
 }
 })))?;
-let inflate = (try_flat_map_append_vec(codes.iter().cloned(), |tuple_var: (&Vec<u8>, deflate_main_codes)| PResult::Ok(match tuple_var {
-(buffer, symbol) => {
+let inflate = (try_flat_map_append_vec(codes.iter().cloned(), |tuple_var: (&Vec<u8>, deflate_main_codes)| PResult::Ok({
+let (buffer, symbol) = tuple_var;
 match symbol {
 deflate_main_codes::literal(b) => {
 [b].to_vec()
@@ -18010,7 +18033,6 @@ deflate_main_codes::reference(r) => {
 {
 let ix = (try_sub!((buffer.len()) as u32, (r.distance.clone()) as u32, 4672672775256824980u64)) as usize;
 (slice_ext(&buffer, ix..ix + (((r.length.clone()) as u32) as usize))).to_vec()
-}
 }
 }
 }
@@ -18931,8 +18953,8 @@ _ => {
 deflate_dynamic_huffman_literal_length_distance_alphabet_code_lengths { code, extra }
 };
 accum.push(elem);
-if ((|y: &Vec<deflate_dynamic_huffman_literal_length_distance_alphabet_code_lengths>| PResult::Ok((((try_fold_map_curried(y.iter().cloned(), None, |tuple_var: (Option<u8>, deflate_dynamic_huffman_literal_length_distance_alphabet_code_lengths)| PResult::Ok(match tuple_var {
-(last_symbol, cl_code_extra) => {
+if ((|y: &Vec<deflate_dynamic_huffman_literal_length_distance_alphabet_code_lengths>| PResult::Ok((((try_fold_map_curried(y.iter().cloned(), None, |tuple_var: (Option<u8>, deflate_dynamic_huffman_literal_length_distance_alphabet_code_lengths)| PResult::Ok({
+let (last_symbol, cl_code_extra) = tuple_var.clone();
 match (cl_code_extra.code.clone()) as u8 {
 16u8 => {
 (last_symbol.clone(), dup32((cl_code_extra.extra.clone() + 3u8) as u32, match last_symbol {
@@ -18958,15 +18980,14 @@ v => {
 (Some(v.clone()), [v.clone()].to_vec())
 }
 }
-}
 })))?.len()) as u32) >= ((hlit + hdist) as u32) + 258u32))(&accum))? {
 break
 }
 }
 accum
 };
-let literal_length_distance_alphabet_code_lengths_value = (try_fold_map_curried(literal_length_distance_alphabet_code_lengths.iter().cloned(), None, |tuple_var: (Option<u8>, deflate_dynamic_huffman_literal_length_distance_alphabet_code_lengths)| PResult::Ok(match tuple_var {
-(last_symbol, cl_code_extra) => {
+let literal_length_distance_alphabet_code_lengths_value = (try_fold_map_curried(literal_length_distance_alphabet_code_lengths.iter().cloned(), None, |tuple_var: (Option<u8>, deflate_dynamic_huffman_literal_length_distance_alphabet_code_lengths)| PResult::Ok({
+let (last_symbol, cl_code_extra) = tuple_var.clone();
 match (cl_code_extra.code.clone()) as u8 {
 16u8 => {
 (last_symbol.clone(), dup32((cl_code_extra.extra.clone() + 3u8) as u32, match last_symbol {
@@ -18990,7 +19011,6 @@ return Err(ParseError::ExcludedBranch(734991270787736827u64));
 
 v => {
 (Some(v.clone()), [v.clone()].to_vec())
-}
 }
 }
 })))?;
@@ -33430,10 +33450,9 @@ return Err(ParseError::ExcludedBranch(10865781264025109219u64));
 })())?;
 (field0, field1)
 };
-PResult::Ok(match tuple_var {
-(s, _z) => {
+PResult::Ok({
+let (s, _z) = tuple_var;
 (s.len()) as u32
-}
 })
 }
 

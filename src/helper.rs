@@ -1072,11 +1072,23 @@ pub fn lambda_tuple<const N: usize>(names: [&'static str; N], body: Expr) -> Exp
     const HEAD_VAR: &str = "tuple_var";
     lambda(
         HEAD_VAR,
-        expr_match(
+        expr_destruct(
             var(HEAD_VAR),
-            [(Pattern::Tuple(names.into_iter().map(bind).collect()), body)],
+            Pattern::Tuple(names.into_iter().map(bind).collect()),
+            body,
         ),
     )
+}
+
+/// Boilerplate helper for [`Pattern`]-based destructuring of an `Expr` (`value`)
+/// for post-processing in `body`.
+///
+/// Intended for cases where the `Pattern` is irrefutable.
+///
+/// Will result in runtime failure if the pattern does not match.
+pub fn expr_destruct(value: Expr, pattern: Pattern, body: Expr) -> Expr {
+    // FIXME - develop a first-class solution for this paradigm
+    Expr::Destructure(Box::new(value), pattern, Box::new(body))
 }
 
 /// Shorthand for Expr::LeftFold

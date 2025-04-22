@@ -1964,6 +1964,12 @@ impl TypeChecker {
                 }
                 newvar
             }
+            Expr::Destructure(head, pattern, rhs_expr) => {
+                let newvar = self.get_new_uvar();
+                let head_t = self.infer_utype_expr(head, scope)?;
+                self.unify_utype_expr_match_case(head_t, pattern, newvar, rhs_expr, scope)?;
+                newvar
+            }
             Expr::Lambda(_, _) => {
                 unreachable!("infer_utype_expr: cannot directly infer utype of lambda expression")
             }

@@ -16,13 +16,13 @@
 │           │   ├── blocks <- repeat-until-last (x -> x.final == 1) deflate.block :=
 │           │   │   ├── 0 <- deflate.block :=
 │           │   │   │   ├── final <- base.bit := 0
-│           │   │   │   ├── type <- map (bits -> bits.0 << 0 | bits.1 << 1) (...) := 2
+│           │   │   │   ├── type <- map (bits -> bits.0 | bits.1 << 1) (...) := 2
 │           │   │   │   └── data <- match type { ... } :=
 │           │   │   │       └── dynamic_huffman <- deflate.dynamic_huffman :=
-│           │   │   │           ├── hlit <- map (bits -> bits.0 << 0 | bits.1 << 1 | bits.2 << 2 | bits.3 << 3 | bits.4 << 4) (...) := 23
-│           │   │   │           ├── hdist <- map (bits -> bits.0 << 0 | bits.1 << 1 | bits.2 << 2 | bits.3 << 3 | bits.4 << 4) (...) := 27
-│           │   │   │           ├── hclen <- map (bits -> bits.0 << 0 | bits.1 << 1 | bits.2 << 2 | bits.3 << 3) (...) := 10
-│           │   │   │           ├── code-length-alphabet-code-lengths <- repeat-count (hclen + 4) (map (bits -> bits.0 << 0 | bits.1 << 1 | bits.2 << 2) (...)) :=
+│           │   │   │           ├── hlit <- map (bits -> bits.0 | bits.1 << 1 | bits.2 << 2 | bits.3 << 3 | bits.4 << 4) (...) := 23
+│           │   │   │           ├── hdist <- map (bits -> bits.0 | bits.1 << 1 | bits.2 << 2 | bits.3 << 3 | bits.4 << 4) (...) := 27
+│           │   │   │           ├── hclen <- map (bits -> bits.0 | bits.1 << 1 | bits.2 << 2 | bits.3 << 3) (...) := 10
+│           │   │   │           ├── code-length-alphabet-code-lengths <- repeat-count (hclen + 4) (map (bits -> bits.0 | bits.1 << 1 | bits.2 << 2) (...)) :=
 │           │   │   │           │   ├── 0 := 6
 │           │   │   │           │   ├── 1 := 4
 │           │   │   │           │   ├── 2 := 6
@@ -35,7 +35,7 @@
 │           │   │   │           │   ├── 9 := 3
 │           │   │   │           │   ~
 │           │   │   │           │   └── 13 := 5
-│           │   │   │           ├── literal-length-distance-alphabet-code-lengths <- dynamic code-length-alphabet-format huffman (repeat-until-seq (y -> seq-length (flat-map-accum (tuple_var -> match tuple_var { ... }, none) y) >= as-u32 (hlit + hdist) + 258) { ... }) :=
+│           │   │   │           ├── literal-length-distance-alphabet-code-lengths <- dynamic code-length-alphabet-format huffman (repeat-until-seq (y -> seq-length (flat-map-accum (tuple_var -> pat-bind [(last-symbol, cl-code-extra) = tuple_var] match as-u8 (cl-code-extra.code) { ... }, none) y) >= as-u32 (hlit + hdist) + 258) { ... }) :=
 │           │   │   │           │   ├── 0 :=
 │           │   │   │           │   │   ├── code <- apply := 17
 │           │   │   │           │   │   └── extra <- match (as-u8 code) { ... } := 7
@@ -70,7 +70,7 @@
 │           │   │   │           │   └── 115 :=
 │           │   │   │           │       ├── code <- apply := 6
 │           │   │   │           │       └── extra <- match (as-u8 code) { ... } := 0
-│           │   │   │           ├── literal-length-distance-alphabet-code-lengths-value <- compute flat-map-accum (tuple_var -> match tuple_var { ... }, none) literal-length-distance-alphabet-code-lengths :=
+│           │   │   │           ├── literal-length-distance-alphabet-code-lengths-value <- compute flat-map-accum (tuple_var -> pat-bind [(last-symbol, cl-code-extra) = tuple_var] match as-u8 (cl-code-extra.code) { ... }, none) literal-length-distance-alphabet-code-lengths :=
 │           │   │   │           │   ├── 0 := 0
 │           │   │   │           │   ├── 1 := 0
 │           │   │   │           │   ├── 2 := 0
@@ -159,13 +159,13 @@
 │           │   │   │               └── 4095 := { literal := 48 }
 │           │   │   └── 1 <- deflate.block :=
 │           │   │       ├── final <- base.bit := 1
-│           │   │       ├── type <- map (bits -> bits.0 << 0 | bits.1 << 1) (...) := 2
+│           │   │       ├── type <- map (bits -> bits.0 | bits.1 << 1) (...) := 2
 │           │   │       └── data <- match type { ... } :=
 │           │   │           └── dynamic_huffman <- deflate.dynamic_huffman :=
-│           │   │               ├── hlit <- map (bits -> bits.0 << 0 | bits.1 << 1 | bits.2 << 2 | bits.3 << 3 | bits.4 << 4) (...) := 23
-│           │   │               ├── hdist <- map (bits -> bits.0 << 0 | bits.1 << 1 | bits.2 << 2 | bits.3 << 3 | bits.4 << 4) (...) := 28
-│           │   │               ├── hclen <- map (bits -> bits.0 << 0 | bits.1 << 1 | bits.2 << 2 | bits.3 << 3) (...) := 10
-│           │   │               ├── code-length-alphabet-code-lengths <- repeat-count (hclen + 4) (map (bits -> bits.0 << 0 | bits.1 << 1 | bits.2 << 2) (...)) :=
+│           │   │               ├── hlit <- map (bits -> bits.0 | bits.1 << 1 | bits.2 << 2 | bits.3 << 3 | bits.4 << 4) (...) := 23
+│           │   │               ├── hdist <- map (bits -> bits.0 | bits.1 << 1 | bits.2 << 2 | bits.3 << 3 | bits.4 << 4) (...) := 28
+│           │   │               ├── hclen <- map (bits -> bits.0 | bits.1 << 1 | bits.2 << 2 | bits.3 << 3) (...) := 10
+│           │   │               ├── code-length-alphabet-code-lengths <- repeat-count (hclen + 4) (map (bits -> bits.0 | bits.1 << 1 | bits.2 << 2) (...)) :=
 │           │   │               │   ├── 0 := 5
 │           │   │               │   ├── 1 := 4
 │           │   │               │   ├── 2 := 4
@@ -178,7 +178,7 @@
 │           │   │               │   ├── 9 := 3
 │           │   │               │   ~
 │           │   │               │   └── 13 := 5
-│           │   │               ├── literal-length-distance-alphabet-code-lengths <- dynamic code-length-alphabet-format huffman (repeat-until-seq (y -> seq-length (flat-map-accum (tuple_var -> match tuple_var { ... }, none) y) >= as-u32 (hlit + hdist) + 258) { ... }) :=
+│           │   │               ├── literal-length-distance-alphabet-code-lengths <- dynamic code-length-alphabet-format huffman (repeat-until-seq (y -> seq-length (flat-map-accum (tuple_var -> pat-bind [(last-symbol, cl-code-extra) = tuple_var] match as-u8 (cl-code-extra.code) { ... }, none) y) >= as-u32 (hlit + hdist) + 258) { ... }) :=
 │           │   │               │   ├── 0 :=
 │           │   │               │   │   ├── code <- apply := 18
 │           │   │               │   │   └── extra <- match (as-u8 code) { ... } := 37
@@ -213,7 +213,7 @@
 │           │   │               │   └── 59 :=
 │           │   │               │       ├── code <- apply := 5
 │           │   │               │       └── extra <- match (as-u8 code) { ... } := 0
-│           │   │               ├── literal-length-distance-alphabet-code-lengths-value <- compute flat-map-accum (tuple_var -> match tuple_var { ... }, none) literal-length-distance-alphabet-code-lengths :=
+│           │   │               ├── literal-length-distance-alphabet-code-lengths-value <- compute flat-map-accum (tuple_var -> pat-bind [(last-symbol, cl-code-extra) = tuple_var] match as-u8 (cl-code-extra.code) { ... }, none) literal-length-distance-alphabet-code-lengths :=
 │           │   │               │   ├── 0 := 0
 │           │   │               │   ├── 1 := 0
 │           │   │               │   ├── 2 := 0
@@ -339,7 +339,7 @@
 │           │   │       └── reference :=
 │           │   │           ├── length := 4
 │           │   │           └── distance := 16499
-│           │   └── inflate <- compute flat-map-list (tuple_var -> match tuple_var { ... }) codes :=
+│           │   └── inflate <- compute flat-map-list (tuple_var -> pat-bind [(buffer, symbol) = tuple_var] match symbol { ... }) codes :=
 │           │       ├── 0 := 35
 │           │       ├── 1 := 32
 │           │       ├── 2 := 84
