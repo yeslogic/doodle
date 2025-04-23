@@ -1336,6 +1336,12 @@ pub(crate) enum RustExpr {
     Slice(Box<RustExpr>, Box<RustExpr>, Box<RustExpr>), // object, start ix, end ix (exclusive)
     RangeExclusive(Box<RustExpr>, Box<RustExpr>),
     ResultOk(Option<Label>, Box<RustExpr>),
+    Macro(RustMacro),
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum RustMacro {
+    Matches(Box<RustExpr>, Vec<RustPattern>),
 }
 
 impl RustExpr {
@@ -1547,6 +1553,7 @@ impl RustExpr {
                 RustPrimLit::Char(..) => Some(PrimType::Char),
                 RustPrimLit::String(..) => None,
             },
+            RustExpr::Macro(RustMacro::Matches(..)) => Some(PrimType::Bool),
             RustExpr::ArrayLit(..) => None,
             RustExpr::MethodCall(_recv, _method, _args) => {
                 match _method {
@@ -1694,6 +1701,7 @@ impl RustExpr {
     pub fn is_pure(&self) -> bool {
         match self {
             RustExpr::Entity(..) => true,
+            RustExpr::Macro(RustMacro::Matches(expr, ..)) => expr.is_pure(),
             RustExpr::PrimitiveLit(..) => true,
             RustExpr::ArrayLit(arr) => arr.iter().all(Self::is_pure),
             // REVIEW - over types we have no control over, clone itself can be impure, but it should never be so for the code we ourselves are generating
@@ -1869,6 +1877,17 @@ impl ToFragmentExt for RustExpr {
                 prec,
                 Precedence::INVOKE,
             ),
+            RustExpr::Macro(RustMacro::Matches(head, pats)) => Fragment::string("matches!")
+                .cat(
+                    head.to_fragment_precedence(Precedence::Top)
+                        .cat(Fragment::string(", "))
+                        .cat(Fragment::seq(
+                            pats.iter().map(|p| p.to_fragment()),
+                            Some(Fragment::string(" | ")),
+                        ))
+                        .delimit(Fragment::Char('('), Fragment::Char(')')),
+                )
+                .group(),
             RustExpr::Tuple(elts) => match elts.as_slice() {
                 [elt] => elt
                     .to_fragment_precedence(Precedence::Top)
@@ -2892,8 +2911,8 @@ mod test {
 
 pub mod short_circuit {
     use super::{
-        ReturnKind, RustCatchAll, RustControl, RustExpr, RustMatchBody, RustMatchCase, RustOp,
-        RustStmt, StructExpr,
+        ReturnKind, RustCatchAll, RustControl, RustExpr, RustMacro, RustMatchBody, RustMatchCase,
+        RustOp, RustStmt, StructExpr,
     };
 
     pub trait ShortCircuit {
@@ -3048,6 +3067,7 @@ pub mod short_circuit {
                 RustExpr::BlockScope(stmts, expr) => {
                     stmts.is_short_circuiting() || expr.is_short_circuiting()
                 }
+                RustExpr::Macro(RustMacro::Matches(expr, ..)) => expr.is_short_circuiting(),
                 RustExpr::Control(ctrl) => ctrl.is_short_circuiting(),
                 RustExpr::Closure(..) => false,
                 RustExpr::Index(head, index) => {

@@ -128,6 +128,10 @@ impl Rebindable for RustExpr {
                 f.rebind(table);
                 args.rebind(table);
             }
+            RustExpr::Macro(RustMacro::Matches(expr, pats)) => {
+                expr.rebind(table);
+                pats.rebind(table);
+            }
             RustExpr::Tuple(elts) => elts.rebind(table),
             RustExpr::Struct(con, expr) => {
                 con.rebind(table);
