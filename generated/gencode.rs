@@ -5435,19 +5435,7 @@ PResult::Ok(tar_main { contents, __padding, __trailing })
 fn Decoder_elf_main<>(_input: &mut Parser<'_>) -> Result<elf_main, ParseError> {
 let header = (Decoder_elf_header(_input))?;
 _input.get_offset_u64();
-let program_headers = if match header.phoff.clone() {
-elf_types_elf_off::Off32(0u32) => {
-false
-},
-
-elf_types_elf_off::Off64(0u64) => {
-false
-},
-
-_ => {
-true
-}
-} {
+let program_headers = if !matches!(header.phoff.clone(), elf_types_elf_off::Off32(0u32) | elf_types_elf_off::Off64(0u64)) {
 let tgt_offset = match header.phoff.clone() {
 elf_types_elf_off::Off32(x32) => {
 x32 as u64
@@ -5464,19 +5452,7 @@ Some(ret)
 } else {
 None
 };
-let section_headers = if match header.shoff.clone() {
-elf_types_elf_off::Off32(0u32) => {
-false
-},
-
-elf_types_elf_off::Off64(0u64) => {
-false
-},
-
-_ => {
-true
-}
-} {
+let section_headers = if !matches!(header.shoff.clone(), elf_types_elf_off::Off32(0u32) | elf_types_elf_off::Off64(0u64)) {
 let tgt_offset = match header.shoff.clone() {
 elf_types_elf_off::Off32(x32) => {
 x32 as u64

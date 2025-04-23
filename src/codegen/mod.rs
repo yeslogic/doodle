@@ -974,10 +974,9 @@ fn embed_match_expr(
 ) -> RustExpr {
     let scrutinized = embed_expr_dft(scrutinee);
     let head = match scrutinee.get_type().unwrap().as_ref() {
-        GenType::Inline(RustType::Atom(AtomType::Comp(CompType::Vec(..)))) => scrutinized
-            .make_persistent()
-            .into_owned()
-            .call_method("as_slice"),
+        GenType::Inline(RustType::Atom(AtomType::Comp(CompType::Vec(..)))) => {
+            scrutinized.make_persistent().into_owned().vec_as_slice()
+        }
         _ => scrutinized,
     };
 
@@ -985,8 +984,11 @@ fn embed_match_expr(
         expr_type,
         GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::Bool)))
     ) {
-        if let Some(positive_patterns) = try_as_matches_macro_cases(cases) {
+        if let Some(positive_patterns) = try_as_matches_macro_cases(cases, true) {
             return RustExpr::Macro(RustMacro::Matches(Box::new(head), positive_patterns));
+        }
+        if let Some(negative_patterns) = try_as_matches_macro_cases(cases, false) {
+            return RustExpr::Macro(RustMacro::Matches(Box::new(head), negative_patterns)).negate();
         }
     }
 
@@ -1024,19 +1026,28 @@ fn embed_match_expr(
     RustExpr::Control(Box::new(RustControl::Match(head, rust_body)))
 }
 
-fn try_as_matches_macro_cases(cases: &[(GTPattern, GTExpr)]) -> Option<Vec<RustPattern>> {
+/// Speculatively collects the RustPatterns corresponding to the match-set of a `matches!`-like `match` expression,
+/// given a set of patterns and their corresponding branch-values.
+///
+/// Collects the set as a positive-match if `branch_sel` is `true` (for `matches!(x, positive)`)
+/// and as a negated-match if `branch_sel` is `false` (for `!matches!(x, negative)`)
+fn try_as_matches_macro_cases(
+    cases: &[(GTPattern, GTExpr)],
+    branch_sel: bool,
+) -> Option<Vec<RustPattern>> {
     let mut accum = Vec::new();
     for (pat, branch_val) in cases {
         match branch_val {
-            TypedExpr::Bool(true) => {
-                if matches!(pat, TypedPattern::Wildcard(..)) && cases.len() > 1 {
-                    return None;
-                }
-                accum.push(embed_pattern(pat));
-            }
-            TypedExpr::Bool(false) => {
-                if !matches!(pat, TypedPattern::Wildcard(..)) {
-                    return None;
+            TypedExpr::Bool(bval) => {
+                if *bval == branch_sel {
+                    if matches!(pat, TypedPattern::Wildcard(..)) && cases.len() > 1 {
+                        return None;
+                    }
+                    accum.push(embed_pattern(pat));
+                } else {
+                    if !matches!(pat, TypedPattern::Wildcard(..)) {
+                        return None;
+                    }
                 }
             }
             _other => return None,
