@@ -6221,23 +6221,7 @@ let sfnt_version = {
 let inner = (Decoder27(_input))?;
 let is_valid = {
 let version = inner;
-match version {
-65536u32 => {
-true
-},
-
-1330926671u32 => {
-true
-},
-
-1953658213u32 => {
-true
-},
-
-_ => {
-false
-}
-}
+matches!(version, 65536u32 | 1330926671u32 | 1953658213u32)
 };
 if is_valid {
 inner
@@ -7066,19 +7050,7 @@ let minor_version = {
 let inner = (Decoder30(_input))?;
 let is_valid = {
 let x = inner;
-match x {
-0u16 => {
-true
-},
-
-4096u16 => {
-true
-},
-
-_ => {
-false
-}
-}
+matches!(x, 0u16 | 4096u16)
 };
 if is_valid {
 inner
@@ -7318,40 +7290,16 @@ let s_typo_descender = (Decoder30(_input))?;
 let s_typo_line_gap = (Decoder30(_input))?;
 let us_win_ascent = (Decoder30(_input))?;
 let us_win_descent = (Decoder30(_input))?;
-let extra_fields_v1 = if match version {
-1u16.. => {
-true
-},
-
-_ => {
-false
-}
-} {
+let extra_fields_v1 = if matches!(version, 1u16..) {
 let ul_code_page_range_1 = (Decoder27(_input))?;
 let ul_code_page_range_2 = (Decoder27(_input))?;
-let extra_fields_v2 = if match version {
-2u16.. => {
-true
-},
-
-_ => {
-false
-}
-} {
+let extra_fields_v2 = if matches!(version, 2u16..) {
 let sx_height = (Decoder30(_input))?;
 let s_cap_height = (Decoder30(_input))?;
 let us_default_char = (Decoder30(_input))?;
 let us_break_char = (Decoder30(_input))?;
 let us_max_context = (Decoder30(_input))?;
-let extra_fields_v5 = if match version {
-5u16.. => {
-true
-},
-
-_ => {
-false
-}
-} {
+let extra_fields_v5 = if matches!(version, 5u16..) {
 let us_lower_optical_point_size = (Decoder30(_input))?;
 let us_upper_optical_point_size = (Decoder30(_input))?;
 Some(opentype_os2_table_data_extra_fields_v1_extra_fields_v2_extra_fields_v5 { us_lower_optical_point_size, us_upper_optical_point_size })
@@ -9198,19 +9146,7 @@ let minor_version = {
 let inner = (Decoder30(_input))?;
 let is_valid = {
 let x = inner;
-match x {
-1u16 => {
-true
-},
-
-2u16 => {
-true
-},
-
-_ => {
-false
-}
-}
+matches!(x, 1u16 | 2u16)
 };
 if is_valid {
 inner
@@ -9282,27 +9218,7 @@ let format = {
 let inner = (Decoder30(_input))?;
 let is_valid = {
 let x = inner;
-match x {
-1u16 => {
-true
-},
-
-2u16 => {
-true
-},
-
-3u16 => {
-true
-},
-
-4u16 => {
-true
-},
-
-_ => {
-false
-}
-}
+matches!(x, 1u16 | 2u16 | 3u16 | 4u16)
 };
 if is_valid {
 inner
@@ -10179,19 +10095,7 @@ let extension_lookup_type = {
 let inner = (Decoder30(_input))?;
 let is_valid = {
 let x = inner;
-match x {
-1u16..=6u16 => {
-true
-},
-
-8 => {
-true
-},
-
-_ => {
-false
-}
-}
+matches!(x, 1u16..=6u16 | 8)
 };
 if is_valid {
 inner
@@ -12007,15 +11911,7 @@ let extension_lookup_type = {
 let inner = (Decoder30(_input))?;
 let is_valid = {
 let x = inner;
-match x {
-1u16..=8u16 => {
-true
-},
-
-_ => {
-false
-}
-}
+matches!(x, 1u16..=8u16)
 };
 if is_valid {
 inner
@@ -14177,15 +14073,7 @@ let region_count = {
 let inner = (Decoder30(_input))?;
 let is_valid = {
 let x = inner;
-match x {
-0u16..=32767u16 => {
-true
-},
-
-_ => {
-false
-}
-}
+matches!(x, 0u16..=32767u16)
 };
 if is_valid {
 inner
@@ -16188,23 +16076,7 @@ fn Decoder127<>(_input: &mut Parser<'_>, is_be: bool) -> Result<u32, ParseError>
 let inner = (Decoder126(_input, is_be.clone()))?;
 let is_valid = {
 let sh_type = inner;
-match sh_type {
-0u32..=11u32 => {
-true
-},
-
-14u32..=18u32 => {
-true
-},
-
-1610612736u32..=4294967295u32 => {
-true
-},
-
-_ => {
-false
-}
-}
+matches!(sh_type, 0u32..=11u32 | 14u32..=18u32 | 1610612736u32..=4294967295u32)
 };
 PResult::Ok(if is_valid {
 inner
@@ -16471,23 +16343,7 @@ fn Decoder143<>(_input: &mut Parser<'_>, is_be: bool) -> Result<u16, ParseError>
 let inner = (Decoder146(_input, is_be.clone()))?;
 let is_valid = {
 let r#type = inner;
-match r#type {
-0u16..=4u16 => {
-true
-},
-
-65024u16..=65279u16 => {
-true
-},
-
-65280u16..=65535u16 => {
-true
-},
-
-_ => {
-false
-}
-}
+matches!(r#type, 0u16..=4u16 | 65024u16..=65279u16 | 65280u16..=65535u16)
 };
 PResult::Ok(if is_valid {
 inner

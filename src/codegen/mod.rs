@@ -707,40 +707,8 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                 unimplemented!("non-irrefutable destructuring");
             }
         }
-        TypedExpr::Match(_t, scrutinee, cases) => {
-            let scrutinized = embed_expr_dft(scrutinee);
-            let head = match scrutinee.get_type().unwrap().as_ref() {
-                GenType::Inline(
-                    RustType::Atom(
-                        AtomType::Comp(
-                            | CompType::Vec(..)
-                        ),
-                    ),
-                ) => scrutinized.make_persistent().into_owned().call_method("as_slice"),
-                _ => scrutinized,
-            };
-            let ck = refutability_check(
-                &scrutinee.get_type().expect("unexpected lambda in match-scrutinee position"),
-                cases
-            );
-
-            let rust_cases = cases
-                .iter()
-                .map(|(pat, rhs)| {
-                    (
-                        MatchCaseLHS::Pattern(embed_pattern(pat)),
-                        vec![RustStmt::Return(ReturnKind::Implicit, embed_expr(rhs, info))],
-                    )
-                })
-                .collect::<Vec<RustMatchCase>>();
-            let rust_body = match ck {
-                Refutability::Refutable | Refutability::Indeterminate =>
-                    RustMatchBody::Refutable(rust_cases, RustCatchAll::ReturnErrorValue {
-                        value: RustExpr::err(RustExpr::scoped(["ParseError"], "ExcludedBranch").call_with([RustExpr::u64lit(get_trace(&expr))])),
-                    }),
-                Refutability::Irrefutable => RustMatchBody::Irrefutable(rust_cases),
-            };
-            RustExpr::Control(Box::new(RustControl::Match(head, rust_body)))
+        TypedExpr::Match(t, scrutinee, cases) => {
+            embed_match_expr(expr, t, scrutinee.as_ref(), cases, info)
         }
         TypedExpr::Tuple(_t, tup) =>
             RustExpr::Tuple(
@@ -995,6 +963,86 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
         TypedExpr::LiftOption(_, Some(x)) => embed_expr(x, info).wrap_some(),
         TypedExpr::LiftOption(_, None) => RustExpr::option_none(),
     }
+}
+
+fn embed_match_expr(
+    expr: &GTExpr,
+    expr_type: &GenType,
+    scrutinee: &GTExpr,
+    cases: &Vec<(GTPattern, GTExpr)>,
+    info: ExprInfo,
+) -> RustExpr {
+    let scrutinized = embed_expr_dft(scrutinee);
+    let head = match scrutinee.get_type().unwrap().as_ref() {
+        GenType::Inline(RustType::Atom(AtomType::Comp(CompType::Vec(..)))) => scrutinized
+            .make_persistent()
+            .into_owned()
+            .call_method("as_slice"),
+        _ => scrutinized,
+    };
+
+    if matches!(
+        expr_type,
+        GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::Bool)))
+    ) {
+        if let Some(positive_patterns) = try_as_matches_macro_cases(cases) {
+            return RustExpr::Macro(RustMacro::Matches(Box::new(head), positive_patterns));
+        }
+    }
+
+    let ck = refutability_check(
+        &scrutinee
+            .get_type()
+            .expect("unexpected lambda in match-scrutinee position"),
+        cases,
+    );
+
+    let rust_cases = cases
+        .iter()
+        .map(|(pat, rhs)| {
+            (
+                MatchCaseLHS::Pattern(embed_pattern(pat)),
+                vec![RustStmt::Return(
+                    ReturnKind::Implicit,
+                    embed_expr(rhs, info),
+                )],
+            )
+        })
+        .collect::<Vec<RustMatchCase>>();
+    let rust_body = match ck {
+        Refutability::Refutable | Refutability::Indeterminate => RustMatchBody::Refutable(
+            rust_cases,
+            RustCatchAll::ReturnErrorValue {
+                value: RustExpr::err(
+                    RustExpr::scoped(["ParseError"], "ExcludedBranch")
+                        .call_with([RustExpr::u64lit(get_trace(&expr))]),
+                ),
+            },
+        ),
+        Refutability::Irrefutable => RustMatchBody::Irrefutable(rust_cases),
+    };
+    RustExpr::Control(Box::new(RustControl::Match(head, rust_body)))
+}
+
+fn try_as_matches_macro_cases(cases: &[(GTPattern, GTExpr)]) -> Option<Vec<RustPattern>> {
+    let mut accum = Vec::new();
+    for (pat, branch_val) in cases {
+        match branch_val {
+            TypedExpr::Bool(true) => {
+                if matches!(pat, TypedPattern::Wildcard(..)) && cases.len() > 1 {
+                    return None;
+                }
+                accum.push(embed_pattern(pat));
+            }
+            TypedExpr::Bool(false) => {
+                if !matches!(pat, TypedPattern::Wildcard(..)) {
+                    return None;
+                }
+            }
+            _other => return None,
+        }
+    }
+    Some(accum)
 }
 
 /// Uses the default value of `ExprInfo` for [`embed_expr`]
