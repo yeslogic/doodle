@@ -1468,6 +1468,10 @@ impl RustExpr {
         self.call_with(None)
     }
 
+    pub fn negate(self) -> Self {
+        RustExpr::Operation(RustOp::PrefixOp(PrefixOperator::BoolNot, Box::new(self)))
+    }
+
     /// Helper method that calls the `as_slice` method on the expression passed in,
     /// unpacking any top-level `RustExpr::CloneOf` variants to avoid inefficient (and unnecessary)
     /// clone-then-borrow constructs in the generated code.
