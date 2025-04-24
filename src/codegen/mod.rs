@@ -2886,8 +2886,13 @@ where
                     .into(),
                 );
                 let ctrl = {
+                    let mut loop_body = Vec::new();
+
                     // FIXME[epic=sigbind-missing] - We can't sigbind this due to GenStmt and RustControl being incompatible
                     let elt_bind = RustStmt::assign("elem", elt_expr);
+
+                    loop_body.push(elt_bind);
+
                     let cond = pred_last.beta_reduce(
                         RustExpr::Borrow(Box::new(RustExpr::local("elem"))),
                         ExprInfo::default(),
@@ -2905,11 +2910,23 @@ where
                             .call_method_with("push", [RustExpr::local("elem")]),
                     )]
                     .to_vec();
-                    let escape_clause = RustControl::If(cond, b_terminal, Some(b_else));
-                    RustStmt::Control(RustControl::Loop(vec![
-                        elt_bind,
-                        RustStmt::Control(escape_clause),
-                    ]))
+                    if cond.is_complex() {
+                        // REVIEW - we might need a strategy to avoid shadowing
+                        let tmp_var_name = "tmp_cond";
+                        loop_body.push(RustStmt::assign(tmp_var_name, cond));
+                        loop_body.push(RustStmt::Control(RustControl::If(
+                            RustExpr::local(tmp_var_name),
+                            b_terminal,
+                            Some(b_else),
+                        )));
+                    } else {
+                        loop_body.push(RustStmt::Control(RustControl::If(
+                            cond,
+                            b_terminal,
+                            Some(b_else),
+                        )));
+                    };
+                    RustStmt::Control(RustControl::Loop(loop_body))
                 };
                 stmts.push(ctrl.into());
                 GenBlock::lift_block(stmts, RustExpr::local("accum"))
@@ -2923,23 +2940,36 @@ where
                     RustStmt::assign_mut("accum", RustExpr::scoped(["Vec"], "new").call()).into(),
                 );
                 let ctrl = {
+                    let mut loop_body = Vec::new();
+
                     // FIXME[epic=sigbind-missing] - We can't sigbind this due to GenStmt and RustControl being incompatible
-                    let elt_bind = RustStmt::assign("elem", elt_expr);
-                    let elt_push = RustStmt::Expr(
+                    loop_body.push(RustStmt::assign("elem", elt_expr));
+                    loop_body.push(RustStmt::Expr(
                         RustExpr::local("accum")
                             .call_method_with("push", [RustExpr::local("elem")]),
-                    );
+                    ));
+
                     let cond = pred_full.apply(
                         RustExpr::borrow_of(RustExpr::local("accum")),
                         ExprInfo::default(),
                     );
-                    let b_terminal = [RustStmt::Control(RustControl::Break)].to_vec();
-                    let escape_clause = RustControl::If(cond, b_terminal, None);
-                    RustStmt::Control(RustControl::Loop(vec![
-                        elt_bind,
-                        elt_push,
-                        RustStmt::Control(escape_clause),
-                    ]))
+                    if cond.is_complex() {
+                        // REVIEW - we might need a strategy to avoid shadowing
+                        let tmp_var_name = "tmp_cond";
+                        loop_body.push(RustStmt::assign(tmp_var_name, cond));
+                        loop_body.push(RustStmt::Control(RustControl::If(
+                            RustExpr::local(tmp_var_name),
+                            vec![RustStmt::BREAK],
+                            None,
+                        )));
+                    } else {
+                        loop_body.push(RustStmt::Control(RustControl::If(
+                            cond,
+                            vec![RustStmt::BREAK],
+                            None,
+                        )));
+                    };
+                    RustStmt::Control(RustControl::Loop(loop_body))
                 };
                 stmts.push(ctrl.into());
                 GenBlock::lift_block(stmts, RustExpr::local("accum"))
@@ -2963,35 +2993,43 @@ where
                 );
                 stmts.push(RustStmt::assign_mut("acc", init.clone()));
                 let ctrl = {
+                    let mut loop_body = Vec::new();
+
                     let done_call = cond.apply_pair(
                         // REVIEW[epic=clone-of-copy] - figure out if we can avoid cloning copy-types here
                         RustExpr::CloneOf(Box::new(RustExpr::local("acc"))),
                         RustExpr::local("seq"),
                         ExprInfo::default(),
                     );
-                    let break_if_done = RustStmt::Control(RustControl::If(
-                        done_call,
-                        vec![RustStmt::Control(RustControl::Break)],
-                        None,
-                    ));
+                    if done_call.is_complex() {
+                        let tmp_var_done = "tmp_is_done";
+                        loop_body.push(RustStmt::assign(tmp_var_done, done_call));
+                        loop_body.push(RustStmt::Control(RustControl::If(
+                            RustExpr::local(tmp_var_done),
+                            vec![RustStmt::Control(RustControl::Break)],
+                            None,
+                        )));
+                    } else {
+                        loop_body.push(RustStmt::Control(RustControl::If(
+                            done_call,
+                            vec![RustStmt::Control(RustControl::Break)],
+                            None,
+                        )));
+                    }
+
                     // FIXME[epic=sigbind-missing] - We can't sigbind this due to GenStmt and RustControl being incompatible
-                    let elt_bind = RustStmt::assign("elem", elt_expr);
-                    let push_elt = RustStmt::Expr(RustExpr::local("seq").call_method_with(
+                    loop_body.push(RustStmt::assign("elem", elt_expr));
+                    loop_body.push(RustStmt::Expr(RustExpr::local("seq").call_method_with(
                         "push",
                         [RustExpr::CloneOf(Box::new(RustExpr::local("elem")))],
-                    ));
+                    )));
                     let new_acc = update.apply_pair(
                         RustExpr::local("acc"),
                         RustExpr::local("elem"),
                         ExprInfo::default(),
                     );
-                    let update_acc = RustStmt::Reassign(Label::Borrowed("acc"), new_acc);
-                    RustStmt::Control(RustControl::Loop(vec![
-                        break_if_done,
-                        elt_bind,
-                        push_elt,
-                        update_acc,
-                    ]))
+                    loop_body.push(RustStmt::Reassign(Label::Borrowed("acc"), new_acc));
+                    RustStmt::Control(RustControl::Loop(loop_body))
                 };
                 stmts.push(ctrl.into());
                 GenBlock::lift_block(
@@ -3335,8 +3373,16 @@ impl ToAst for DerivedLogic<GTExpr> {
                     Some(expr) => if_true.ret = Some(expr.wrap_some()),
                 }
                 let if_false = GenBlock::simple_expr(RustExpr::local("None"));
-                let ctrl = RustControl::If(is_present.clone(), if_true, Some(if_false));
-                GenBlock::single_expr(GenExpr::Control(Box::new(ctrl)))
+                if is_present.is_complex() {
+                    let tmp_var_name = "tmp_is_present";
+
+                    let tmp_bind = GenStmt::Embed(RustStmt::assign("tmp_is_present", is_present.clone()));
+                    let ctrl = GenExpr::Control(Box::new(RustControl::If(RustExpr::local(tmp_var_name), if_true, Some(if_false))));
+                    GenBlock::from_parts(vec![tmp_bind], Some(ctrl))
+                } else {
+                    let ctrl = GenExpr::Control(Box::new(RustControl::If(is_present.clone(), if_true, Some(if_false))));
+                    GenBlock::single_expr(ctrl)
+                }
             }
             DerivedLogic::VariantOf(constr, inner) => {
                 const BIND_NAME: &str = "inner";

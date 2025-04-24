@@ -9507,13 +9507,14 @@ return Err(ParseError::ExcludedBranch(8987822076696059625u64));
 let mut seq: Vec<opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes> = Vec::new();
 let mut acc = 0u16;
 loop {
-if {
+let tmp_is_done = {
 let tuple_var = (acc.clone(), &seq);
 {
 let (totlen, _seq) = tuple_var;
 totlen >= (point_count as u16)
 }
-} {
+};
+if tmp_is_done {
 break
 }
 let elem = {
@@ -9574,13 +9575,14 @@ let lo = (Decoder25(_input))?;
 let mut seq: Vec<opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes> = Vec::new();
 let mut acc = 0u16;
 loop {
-if {
+let tmp_is_done = {
 let tuple_var = (acc.clone(), &seq);
 {
 let (totlen, _seq) = tuple_var;
 totlen >= ((hi as u16) & 127u16) << 8u16 | (lo as u16)
 }
-} {
+};
+if tmp_is_done {
 break
 }
 let elem = {
@@ -9692,13 +9694,14 @@ return Err(ParseError::ExcludedBranch(13049534979177835905u64));
 let mut seq: Vec<opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes> = Vec::new();
 let mut acc = 0u16;
 loop {
-if {
+let tmp_is_done = {
 let tuple_var = (acc.clone(), &seq);
 {
 let (totlen, _seq) = tuple_var;
 totlen >= (point_count as u16)
 }
-} {
+};
+if tmp_is_done {
 break
 }
 let elem = {
@@ -9759,13 +9762,14 @@ let lo = (Decoder25(_input))?;
 let mut seq: Vec<opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes> = Vec::new();
 let mut acc = 0u16;
 loop {
-if {
+let tmp_is_done = {
 let tuple_var = (acc.clone(), &seq);
 {
 let (totlen, _seq) = tuple_var;
 totlen >= ((hi as u16) & 127u16) << 8u16 | (lo as u16)
 }
-} {
+};
+if tmp_is_done {
 break
 }
 let elem = {
@@ -9841,13 +9845,14 @@ return Err(ParseError::ExcludedBranch(18147521187885925800u64));
 let mut seq: Vec<opentype_var_glyph_variation_data_table_data_per_tuple_variation_data_x_and_y_coordinate_deltas> = Vec::new();
 let mut acc = 0u16;
 loop {
-if {
+let tmp_is_done = {
 let tuple_var = (acc.clone(), &seq);
 {
 let (totlen, _seq) = tuple_var;
 totlen >= point_count * 2u16
 }
-} {
+};
+if tmp_is_done {
 break
 }
 let elem = {
@@ -14668,13 +14673,14 @@ let tuple_var = {
 let mut seq: Vec<opentype_glyf_simple_flags_raw> = Vec::new();
 let mut acc = 0u16;
 loop {
-if {
+let tmp_is_done = {
 let tuple_var = (acc.clone(), &seq);
 {
 let (totlen, _seq) = tuple_var;
 totlen >= number_of_coordinates
 }
-} {
+};
+if tmp_is_done {
 break
 }
 let elem = {
@@ -14797,7 +14803,7 @@ let acc_glyphs = {
 let mut seq: Vec<opentype_glyf_composite_glyphs> = Vec::new();
 let mut acc = false;
 loop {
-if {
+let tmp_is_done = {
 let tuple_var = (acc.clone(), &seq);
 {
 let (_has_instructions, seq) = tuple_var;
@@ -14819,7 +14825,8 @@ false
 }
 }
 }
-} {
+};
+if tmp_is_done {
 break
 }
 let elem = {
@@ -17829,10 +17836,11 @@ let blocks = {
 let mut accum = Vec::new();
 loop {
 let elem = (Decoder_deflate_block(_input))?;
-if {
+let tmp_cond = {
 let x = &elem;
 x.r#final.clone() == 1u8
-} {
+};
+if tmp_cond {
 accum.push(elem);
 break
 } else {
@@ -18650,10 +18658,11 @@ None
 };
 deflate_fixed_huffman_codes { code, extra }
 };
-if {
+let tmp_cond = {
 let x = &elem;
 ((x.code.clone()) as u16) == 256u16
-} {
+};
+if tmp_cond {
 accum.push(elem);
 break
 } else {
@@ -18785,7 +18794,7 @@ _ => {
 deflate_dynamic_huffman_literal_length_distance_alphabet_code_lengths { code, extra }
 };
 accum.push(elem);
-if ((|y: &Vec<deflate_dynamic_huffman_literal_length_distance_alphabet_code_lengths>| PResult::Ok((((try_fold_map_curried(y.iter().cloned(), None, |tuple_var: (Option<u8>, deflate_dynamic_huffman_literal_length_distance_alphabet_code_lengths)| PResult::Ok({
+let tmp_cond = ((|y: &Vec<deflate_dynamic_huffman_literal_length_distance_alphabet_code_lengths>| PResult::Ok((((try_fold_map_curried(y.iter().cloned(), None, |tuple_var: (Option<u8>, deflate_dynamic_huffman_literal_length_distance_alphabet_code_lengths)| PResult::Ok({
 let (last_symbol, cl_code_extra) = tuple_var.clone();
 match (cl_code_extra.code.clone()) as u8 {
 16u8 => {
@@ -18812,7 +18821,8 @@ v => {
 (Some(v.clone()), [v.clone()].to_vec())
 }
 }
-})))?.len()) as u32) >= ((hlit + hdist) as u32) + 258u32))(&accum))? {
+})))?.len()) as u32) >= ((hlit + hdist) as u32) + 258u32))(&accum))?;
+if tmp_cond {
 break
 }
 }
@@ -19264,10 +19274,11 @@ None
 };
 deflate_dynamic_huffman_codes { code, extra }
 };
-if {
+let tmp_cond = {
 let x = &elem;
 ((x.code.clone()) as u16) == 256u16
-} {
+};
+if tmp_cond {
 accum.push(elem);
 break
 } else {

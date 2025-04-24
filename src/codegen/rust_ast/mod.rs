@@ -1773,6 +1773,69 @@ impl RustExpr {
         }
     }
 
+    /// Determines whether a given [`RustExpr`] is "complex" in the sense of
+    /// preferentially requiring a temporary assignment rather than being directly
+    /// used as an `if` or `match` expression scrutinee.
+    ///
+    /// This corresponds primarily to [`RustExpr::BlockScope`] and any ancestor-nodes
+    /// thereof.
+    pub(crate) fn is_complex(&self) -> bool {
+        match self {
+            // base cases
+            RustExpr::Entity(..) => false,
+            RustExpr::PrimitiveLit(..) => false,
+            RustExpr::BlockScope(stmts, _) => !stmts.is_empty(),
+            RustExpr::Control(..) => true,
+            RustExpr::Struct(_, StructExpr::EmptyExpr) => false,
+
+            // Special case - `matches!` macro is an idiomatic conditional expression
+            RustExpr::Macro(RustMacro::Matches(..)) => false,
+
+            // REVIEW - is there a better heuristic?
+            RustExpr::Closure(..) => true,
+
+            // '.any(..)' cases
+            RustExpr::Struct(_, StructExpr::TupleExpr(exprs))
+            | RustExpr::ArrayLit(exprs)
+            | RustExpr::Tuple(exprs) => exprs.iter().any(RustExpr::is_complex),
+
+            // special cases
+            RustExpr::Struct(.., StructExpr::RecordExpr(flds)) => flds
+                .iter()
+                .any(|(_, val)| val.as_ref().is_some_and(RustExpr::is_complex)),
+
+            // single descent cases
+            RustExpr::CloneOf(expr)
+            | RustExpr::Deref(expr)
+            | RustExpr::Try(expr)
+            | RustExpr::ResultOk(.., expr)
+            | RustExpr::FieldAccess(expr, _)
+            | RustExpr::Operation(RustOp::PrefixOp(.., expr) | RustOp::AsCast(expr, ..))
+            | RustExpr::BorrowMut(expr)
+            | RustExpr::Borrow(expr) => expr.is_complex(),
+
+            // 1 + N cases
+            RustExpr::MethodCall(head, _meth, args) => {
+                head.is_complex() || args.iter().any(RustExpr::is_complex)
+            }
+            RustExpr::FunctionCall(fun, args) => {
+                fun.is_complex() || args.iter().any(RustExpr::is_complex)
+            }
+
+            // 1 + 1 cases
+            RustExpr::Index(lhs, rhs)
+            | RustExpr::RangeExclusive(lhs, rhs)
+            | RustExpr::Operation(RustOp::InfixOp(.., lhs, rhs)) => {
+                lhs.is_complex() || rhs.is_complex()
+            }
+
+            // 1 + 1 + 1 cases
+            RustExpr::Slice(head, start, stop) => {
+                head.is_complex() || start.is_complex() || stop.is_complex()
+            }
+        }
+    }
+
     pub(crate) fn wrap_ok<Name: IntoLabel>(self, qualifier: Option<Name>) -> RustExpr {
         match self {
             RustExpr::Try(x) => *x,
@@ -2396,6 +2459,8 @@ pub(crate) enum RustStmt {
 }
 
 impl RustStmt {
+    pub const BREAK: Self = Self::Control(RustControl::Break);
+
     pub fn assign(name: impl Into<Label>, rhs: RustExpr) -> Self {
         Self::Let(Mut::Immutable, name.into(), None, rhs)
     }
