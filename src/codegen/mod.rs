@@ -1472,6 +1472,50 @@ impl GenLambda {
     fn __apply_pair(&self, param0: RustExpr, param1: RustExpr, body_info: ExprInfo) -> RustExpr {
         let raw_expansion = embed_expr(&self.body, body_info);
         match raw_expansion {
+            RustExpr::BlockScope(stmts, tail) => match stmts.as_slice() {
+                [] => unreachable!("empty RustStmt-array in RustExpr::BlockScope"),
+                [first, rest @ ..] => match first {
+                    RustStmt::LetPattern(pat, rhs) if rhs.as_local() == Some(&self.head) => {
+                        match pat {
+                            RustPattern::TupleLiteral(pair) => match &pair[..] {
+                                [RustPattern::CatchAll(fst), RustPattern::CatchAll(snd)] => {
+                                    let mut out_stmts = Vec::new();
+                                    if let Some(fst_lbl) = fst {
+                                        if rest.contains_var_ref(fst_lbl)
+                                            || tail.contains_var_ref(fst_lbl)
+                                        {
+                                            let fst_bind =
+                                                RustStmt::assign(fst_lbl.clone(), param0);
+                                            out_stmts.push(fst_bind);
+                                        }
+                                    }
+                                    if let Some(snd_lbl) = snd {
+                                        if rest.contains_var_ref(snd_lbl)
+                                            || tail.contains_var_ref(snd_lbl)
+                                        {
+                                            let snd_bind =
+                                                RustStmt::assign(snd_lbl.clone(), param1);
+                                            out_stmts.push(snd_bind);
+                                        }
+                                    }
+                                    out_stmts.extend_from_slice(rest.as_ref());
+                                    RustExpr::BlockScope(out_stmts, tail)
+                                }
+                                other => unreachable!(
+                                    "expected pair-var capture pattern in lhs, found {other:?}"
+                                ),
+                            },
+                            other => unreachable!(
+                                "expected pair-var capture pattern in lhs, found {other:?}"
+                            ),
+                        }
+                    }
+                    _ => {
+                        let arg = RustExpr::Tuple(vec![param0, param1]);
+                        return self.apply(arg, body_info);
+                    }
+                },
+            },
             RustExpr::Control(ctrl) => match ctrl.as_ref() {
                 RustControl::Match(scrutinee, match_body) => {
                     if scrutinee.as_local() != Some(&self.head) {
@@ -3376,11 +3420,20 @@ impl ToAst for DerivedLogic<GTExpr> {
                 if is_present.is_complex() {
                     let tmp_var_name = "tmp_is_present";
 
-                    let tmp_bind = GenStmt::Embed(RustStmt::assign("tmp_is_present", is_present.clone()));
-                    let ctrl = GenExpr::Control(Box::new(RustControl::If(RustExpr::local(tmp_var_name), if_true, Some(if_false))));
+                    let tmp_bind =
+                        GenStmt::Embed(RustStmt::assign("tmp_is_present", is_present.clone()));
+                    let ctrl = GenExpr::Control(Box::new(RustControl::If(
+                        RustExpr::local(tmp_var_name),
+                        if_true,
+                        Some(if_false),
+                    )));
                     GenBlock::from_parts(vec![tmp_bind], Some(ctrl))
                 } else {
-                    let ctrl = GenExpr::Control(Box::new(RustControl::If(is_present.clone(), if_true, Some(if_false))));
+                    let ctrl = GenExpr::Control(Box::new(RustControl::If(
+                        is_present.clone(),
+                        if_true,
+                        Some(if_false),
+                    )));
                     GenBlock::single_expr(ctrl)
                 }
             }

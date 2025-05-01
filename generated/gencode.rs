@@ -9508,11 +9508,8 @@ let mut seq: Vec<opentype_var_glyph_variation_data_table_data_shared_point_numbe
 let mut acc = 0u16;
 loop {
 let tmp_is_done = {
-let tuple_var = (acc.clone(), &seq);
-{
-let (totlen, _seq) = tuple_var;
+let totlen = acc.clone();
 totlen >= (point_count as u16)
-}
 };
 if tmp_is_done {
 break
@@ -9552,11 +9549,9 @@ opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes { control,
 };
 seq.push(elem.clone());
 acc = {
-let tuple_var = (acc, elem);
-{
-let (acc, run) = tuple_var;
+let acc = acc;
+let run = elem;
 acc + (succ((run.control.point_run_count.clone()) as u16))
-}
 };
 }
 (acc, seq)
@@ -9576,11 +9571,8 @@ let mut seq: Vec<opentype_var_glyph_variation_data_table_data_shared_point_numbe
 let mut acc = 0u16;
 loop {
 let tmp_is_done = {
-let tuple_var = (acc.clone(), &seq);
-{
-let (totlen, _seq) = tuple_var;
+let totlen = acc.clone();
 totlen >= ((hi as u16) & 127u16) << 8u16 | (lo as u16)
-}
 };
 if tmp_is_done {
 break
@@ -9620,11 +9612,9 @@ opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes { control,
 };
 seq.push(elem.clone());
 acc = {
-let tuple_var = (acc, elem);
-{
-let (acc, run) = tuple_var;
+let acc = acc;
+let run = elem;
 acc + (succ((run.control.point_run_count.clone()) as u16))
-}
 };
 }
 (acc, seq)
@@ -9695,11 +9685,8 @@ let mut seq: Vec<opentype_var_glyph_variation_data_table_data_shared_point_numbe
 let mut acc = 0u16;
 loop {
 let tmp_is_done = {
-let tuple_var = (acc.clone(), &seq);
-{
-let (totlen, _seq) = tuple_var;
+let totlen = acc.clone();
 totlen >= (point_count as u16)
-}
 };
 if tmp_is_done {
 break
@@ -9739,11 +9726,9 @@ opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes { control,
 };
 seq.push(elem.clone());
 acc = {
-let tuple_var = (acc, elem);
-{
-let (acc, run) = tuple_var;
+let acc = acc;
+let run = elem;
 acc + (succ((run.control.point_run_count.clone()) as u16))
-}
 };
 }
 (acc, seq)
@@ -9763,11 +9748,8 @@ let mut seq: Vec<opentype_var_glyph_variation_data_table_data_shared_point_numbe
 let mut acc = 0u16;
 loop {
 let tmp_is_done = {
-let tuple_var = (acc.clone(), &seq);
-{
-let (totlen, _seq) = tuple_var;
+let totlen = acc.clone();
 totlen >= ((hi as u16) & 127u16) << 8u16 | (lo as u16)
-}
 };
 if tmp_is_done {
 break
@@ -9807,11 +9789,9 @@ opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes { control,
 };
 seq.push(elem.clone());
 acc = {
-let tuple_var = (acc, elem);
-{
-let (acc, run) = tuple_var;
+let acc = acc;
+let run = elem;
 acc + (succ((run.control.point_run_count.clone()) as u16))
-}
 };
 }
 (acc, seq)
@@ -9846,11 +9826,8 @@ let mut seq: Vec<opentype_var_glyph_variation_data_table_data_per_tuple_variatio
 let mut acc = 0u16;
 loop {
 let tmp_is_done = {
-let tuple_var = (acc.clone(), &seq);
-{
-let (totlen, _seq) = tuple_var;
+let totlen = acc.clone();
 totlen >= point_count * 2u16
-}
 };
 if tmp_is_done {
 break
@@ -9899,11 +9876,9 @@ opentype_var_glyph_variation_data_table_data_per_tuple_variation_data_x_and_y_co
 };
 seq.push(elem.clone());
 acc = {
-let tuple_var = (acc, elem);
-{
-let (acc, run) = tuple_var;
+let acc = acc;
+let run = elem;
 acc + (succ((run.control.delta_run_count.clone()) as u16))
-}
 };
 }
 (acc, seq)
@@ -14674,11 +14649,8 @@ let mut seq: Vec<opentype_glyf_simple_flags_raw> = Vec::new();
 let mut acc = 0u16;
 loop {
 let tmp_is_done = {
-let tuple_var = (acc.clone(), &seq);
-{
-let (totlen, _seq) = tuple_var;
+let totlen = acc.clone();
 totlen >= number_of_coordinates
-}
 };
 if tmp_is_done {
 break
@@ -14699,11 +14671,9 @@ opentype_glyf_simple_flags_raw { repeats, field_set }
 };
 seq.push(elem.clone());
 acc = {
-let tuple_var = (acc, elem);
-{
-let (acc, flags) = tuple_var;
+let acc = acc;
+let flags = elem;
 acc + (succ((flags.repeats.clone()) as u16))
-}
 };
 }
 (acc, seq)
@@ -14804,9 +14774,7 @@ let mut seq: Vec<opentype_glyf_composite_glyphs> = Vec::new();
 let mut acc = false;
 loop {
 let tmp_is_done = {
-let tuple_var = (acc.clone(), &seq);
-{
-let (_has_instructions, seq) = tuple_var;
+let seq = &seq;
 match match ((seq.len()) as u32) != 0u32 {
 true => {
 Some(seq[(pred((seq.len()) as u32)) as usize].clone())
@@ -14822,7 +14790,6 @@ Some(ref x) => {
 
 None => {
 false
-}
 }
 }
 };
@@ -14966,11 +14933,9 @@ opentype_glyf_composite_glyphs { flags, glyph_index, argument1, argument2, scale
 };
 seq.push(elem.clone());
 acc = {
-let tuple_var = (acc, elem);
-{
-let (acc, glyph) = tuple_var;
+let acc = acc;
+let glyph = elem;
 acc || glyph.flags.we_have_instructions.clone()
-}
 };
 }
 (acc, seq)
