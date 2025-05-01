@@ -29,6 +29,20 @@ pub fn main(
             ("crc", base.u32be()), // REVIEW - do we want to attempt to validate this?
         ])
     };
+    let chunk_unit = |tag: Format| {
+        record([
+            (
+                "length",
+                where_lambda(
+                    base.u32be(),
+                    "length",
+                    expr_eq(var("length"), Expr::U32(0)),
+                ),
+            ),
+            ("tag", tag),
+            ("crc", base.u32be()), // REVIEW - do we want to attempt to validate this?
+        ])
+    };
 
     // PNG keyword for iTXt, zTXt, tEXt, and other contexts
     //   - Length >= 1, < 80 characters
@@ -74,8 +88,7 @@ pub fn main(
     let idat = module.define_format("png.idat", chunk(idat_tag.call(), idat_data.call()));
 
     let iend_tag = module.define_format("png.iend-tag", is_bytes(b"IEND"));
-    let iend_data = module.define_format("png.iend-data", Format::EMPTY); // FIXME ensure IEND length = 0
-    let iend = module.define_format("png.iend", chunk(iend_tag.call(), iend_data.call()));
+    let iend = module.define_format("png.iend", chunk_unit(iend_tag.call()));
 
     let bkgd = module.define_format_args(
         "png.bkgd",
