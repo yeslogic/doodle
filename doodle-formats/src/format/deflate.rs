@@ -385,8 +385,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
     let uncompressed = module.define_format(
         "deflate.uncompressed",
-        record([
-            ("align", Format::Align(8)),
+        record_auto([
+            ("__align", Format::Align(8)),
             ("len", bits16(16, base)),
             ("nlen", bits16(16, base)),
             ("bytes", repeat_count(var("len"), bits8(8, base))),

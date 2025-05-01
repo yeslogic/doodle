@@ -1,297 +1,296 @@
-├── data <- _ |...| _ :=
-│   └── png <- png.main :=
-│       ├── signature <- png.signature
-│       ├── ihdr <- png.ihdr :=
-│       │   ├── length <- assert (length -> length <= 2147483647) base.u32be := 13
-│       │   ├── tag <- png.ihdr-tag
-│       │   ├── data <- slice length png.ihdr-data :=
-│       │   │   ├── width <- base.u32be := 50
-│       │   │   ├── height <- base.u32be := 50
-│       │   │   ├── bit-depth <- base.u8 := 8
-│       │   │   ├── color-type <- base.u8 := 3
-│       │   │   ├── compression-method <- base.u8 := 0
-│       │   │   ├── filter-method <- base.u8 := 0
-│       │   │   └── interlace-method <- base.u8 := 1
-│       │   └── crc <- base.u32be := 1592150037
-│       ├── chunks <- repeat png.chunk(...) :=
-│       │   ├── 0 <- png.chunk(...) :=
-│       │   │   ├── length <- assert (length -> length <= 2147483647) base.u32be := 87
-│       │   │   ├── tag <- monad-seq (peek-not [= 73]) (repeat-count 4 base.ascii-char.strict) := "PLTE"
-│       │   │   ├── data <- slice length (match tag { ... }) :=
-│       │   │   │   └── PLTE <- png.plte :=
-│       │   │   │       └──    r   g   b
-│       │   │   │            192 192 192
-│       │   │   │            162 161 162
-│       │   │   │            158 157 158
-│       │   │   │            114 117 117
-│       │   │   │            124 126 126
-│       │   │   │            132 134 134
-│       │   │   │            205 206 206
-│       │   │   │            196 197 197
-│       │   │   │            173 174 174
-│       │   │   │            143 144 144
-│       │   │   │            152 150 151
-│       │   │   │            149 159 157
-│       │   │   │            212 229 225
-│       │   │   │             52  56  55
-│       │   │   │             88  92  91
-│       │   │   │            231 239 237
-│       │   │   │            156 170 166
-│       │   │   │             72  75  74
-│       │   │   │            179 182 181
-│       │   │   │            103 105 104
-│       │   │   │            191 193 192
-│       │   │   │            211 212 211
-│       │   │   │            218 218 217
-│       │   │   │            226 224 223
-│       │   │   │            231 229 229
-│       │   │   │            187 186 186
-│       │   │   │            168 167 167
-│       │   │   │            201 201 201
-│       │   │   │            138 138 138
-│       │   │   └── crc <- base.u32be := 1943707985
-│       │   ├── 1 <- png.chunk(...) :=
-│       │   │   ├── length <- assert (length -> length <= 2147483647) base.u32be := 1
-│       │   │   ├── tag <- monad-seq (peek-not [= 73]) (repeat-count 4 base.ascii-char.strict) := "tRNS"
-│       │   │   ├── data <- slice length (match tag { ... }) :=
-│       │   │   │   └── tRNS <- png.trns(...) :=
-│       │   │   │       └── color-type-3 <- repeat { ... } :=
-│       │   │   │           └──  palette-index
-│       │   │   │                            0
-│       │   │   └── crc <- base.u32be := 1088870502
-│       │   ├── 2 <- png.chunk(...) :=
-│       │   │   ├── length <- assert (length -> length <= 2147483647) base.u32be := 1
-│       │   │   ├── tag <- monad-seq (peek-not [= 73]) (repeat-count 4 base.ascii-char.strict) := "bKGD"
-│       │   │   ├── data <- slice length (match tag { ... }) :=
-│       │   │   │   └── bKGD <- png.bkgd(...) :=
-│       │   │   │       └── color-type-3 <- { ... } :=
-│       │   │   │           └── palette-index <- base.u8 := 0
-│       │   │   └── crc <- base.u32be := 2282036552
-│       │   ├── 3 <- png.chunk(...) :=
-│       │   │   ├── length <- assert (length -> length <= 2147483647) base.u32be := 9
-│       │   │   ├── tag <- monad-seq (peek-not [= 73]) (repeat-count 4 base.ascii-char.strict) := "pHYs"
-│       │   │   ├── data <- slice length (match tag { ... }) :=
-│       │   │   │   └── pHYs <- png.phys :=
-│       │   │   │       ├── pixels-per-unit-x <- base.u32be := 2835
-│       │   │   │       ├── pixels-per-unit-y <- base.u32be := 2835
-│       │   │   │       └── unit-specifier <- base.u8 := 1
-│       │   │   └── crc <- base.u32be := 10132504
-│       │   └── 4 <- png.chunk(...) :=
-│       │       ├── length <- assert (length -> length <= 2147483647) base.u32be := 7
-│       │       ├── tag <- monad-seq (peek-not [= 73]) (repeat-count 4 base.ascii-char.strict) := "tIME"
-│       │       ├── data <- slice length (match tag { ... }) :=
-│       │       │   └── tIME <- png.time :=
-│       │       │       ├── year <- base.u16be := 2005
-│       │       │       ├── month <- base.u8 := 11
-│       │       │       ├── day <- base.u8 := 1
-│       │       │       ├── hour <- base.u8 := 23
-│       │       │       ├── minute <- base.u8 := 55
-│       │       │       └── second <- base.u8 := 34
-│       │       └── crc <- base.u32be := 491070829
-│       ├── idat <- let-format idat (map (xs -> flat-map (x -> x.data) xs) (repeat1 png.idat)) (decode-bytes idat zlib.main) :=
-│       │   ├── compression-method-flags <- assert (method-info -> method-info.compression-method == 8) (map (packed_bits -> { ... }) U8) :=
-│       │   │   ├── compression-info := 4
-│       │   │   └── compression-method := 8
-│       │   ├── flags <- map (packed_bits -> { ... }) U8 :=
-│       │   │   ├── flevel := 3
-│       │   │   ├── fdict := false
-│       │   │   └── fcheck := 7
-│       │   ├── dict-id <- maybe (flags.fdict) base.u32be := none
-│       │   ├── data <- bits deflate.main :=
-│       │   │   ├── blocks <- repeat-until-last (x -> x.final == 1) deflate.block :=
-│       │   │   │   └── 0 <- deflate.block :=
-│       │   │   │       ├── final <- base.bit := 1
-│       │   │   │       ├── type <- map (bits -> bits.0 | bits.1 << 1) (...) := 2
-│       │   │   │       └── data <- match type { ... } :=
-│       │   │   │           └── dynamic_huffman <- deflate.dynamic_huffman :=
-│       │   │   │               ├── hlit <- map (bits -> bits.0 | bits.1 << 1 | bits.2 << 2 | bits.3 << 3 | bits.4 << 4) (...) := 20
-│       │   │   │               ├── hdist <- map (bits -> bits.0 | bits.1 << 1 | bits.2 << 2 | bits.3 << 3 | bits.4 << 4) (...) := 21
-│       │   │   │               ├── hclen <- map (bits -> bits.0 | bits.1 << 1 | bits.2 << 2 | bits.3 << 3) (...) := 10
-│       │   │   │               ├── code-length-alphabet-code-lengths <- repeat-count (hclen + 4) (map (bits -> bits.0 | bits.1 << 1 | bits.2 << 2) (...)) :=
-│       │   │   │               │   ├── 0 := 4
-│       │   │   │               │   ├── 1 := 0
-│       │   │   │               │   ├── 2 := 5
-│       │   │   │               │   ├── 3 := 4
-│       │   │   │               │   ├── 4 := 3
-│       │   │   │               │   ├── 5 := 3
-│       │   │   │               │   ├── 6 := 5
-│       │   │   │               │   ├── 7 := 3
-│       │   │   │               │   ├── 8 := 3
-│       │   │   │               │   ├── 9 := 3
-│       │   │   │               │   ~
-│       │   │   │               │   └── 13 := 4
-│       │   │   │               ├── literal-length-distance-alphabet-code-lengths <- dynamic code-length-alphabet-format huffman (repeat-until-seq (y -> seq-length (flat-map-accum (tuple_var -> pat-bind [(last-symbol, cl-code-extra) = tuple_var] match as-u8 (cl-code-extra.code) { ... }, none) y) >= as-u32 (hlit + hdist) + 258) { ... }) :=
-│       │   │   │               │   ├── 0 :=
-│       │   │   │               │   │   ├── code <- apply := 5
-│       │   │   │               │   │   └── extra <- match (as-u8 code) { ... } := 0
-│       │   │   │               │   ├── 1 :=
-│       │   │   │               │   │   ├── code <- apply := 16
-│       │   │   │               │   │   └── extra <- match (as-u8 code) { ... } := 3
-│       │   │   │               │   ├── 2 :=
-│       │   │   │               │   │   ├── code <- apply := 16
-│       │   │   │               │   │   └── extra <- match (as-u8 code) { ... } := 1
-│       │   │   │               │   ├── 3 :=
-│       │   │   │               │   │   ├── code <- apply := 6
-│       │   │   │               │   │   └── extra <- match (as-u8 code) { ... } := 0
-│       │   │   │               │   ├── 4 :=
-│       │   │   │               │   │   ├── code <- apply := 8
-│       │   │   │               │   │   └── extra <- match (as-u8 code) { ... } := 0
-│       │   │   │               │   ├── 5 :=
-│       │   │   │               │   │   ├── code <- apply := 6
-│       │   │   │               │   │   └── extra <- match (as-u8 code) { ... } := 0
-│       │   │   │               │   ├── 6 :=
-│       │   │   │               │   │   ├── code <- apply := 5
-│       │   │   │               │   │   └── extra <- match (as-u8 code) { ... } := 0
-│       │   │   │               │   ├── 7 :=
-│       │   │   │               │   │   ├── code <- apply := 7
-│       │   │   │               │   │   └── extra <- match (as-u8 code) { ... } := 0
-│       │   │   │               │   ├── 8 :=
-│       │   │   │               │   │   ├── code <- apply := 7
-│       │   │   │               │   │   └── extra <- match (as-u8 code) { ... } := 0
-│       │   │   │               │   ├── 9 :=
-│       │   │   │               │   │   ├── code <- apply := 5
-│       │   │   │               │   │   └── extra <- match (as-u8 code) { ... } := 0
-│       │   │   │               │   ~
-│       │   │   │               │   └── 65 :=
-│       │   │   │               │       ├── code <- apply := 5
-│       │   │   │               │       └── extra <- match (as-u8 code) { ... } := 0
-│       │   │   │               ├── literal-length-distance-alphabet-code-lengths-value <- compute flat-map-accum (tuple_var -> pat-bind [(last-symbol, cl-code-extra) = tuple_var] match as-u8 (cl-code-extra.code) { ... }, none) literal-length-distance-alphabet-code-lengths :=
-│       │   │   │               │   ├── 0 := 5
-│       │   │   │               │   ├── 1 := 5
-│       │   │   │               │   ├── 2 := 5
-│       │   │   │               │   ├── 3 := 5
-│       │   │   │               │   ├── 4 := 5
-│       │   │   │               │   ├── 5 := 5
-│       │   │   │               │   ├── 6 := 5
-│       │   │   │               │   ├── 7 := 5
-│       │   │   │               │   ├── 8 := 5
-│       │   │   │               │   ├── 9 := 5
-│       │   │   │               │   ~
-│       │   │   │               │   └── 298 := 5
-│       │   │   │               ├── literal-length-alphabet-code-lengths-value <- compute sub-seq (0, as-u32 hlit + 257) literal-length-distance-alphabet-code-lengths-value :=
-│       │   │   │               │   ├── 0 := 5
-│       │   │   │               │   ├── 1 := 5
-│       │   │   │               │   ├── 2 := 5
-│       │   │   │               │   ├── 3 := 5
-│       │   │   │               │   ├── 4 := 5
-│       │   │   │               │   ├── 5 := 5
-│       │   │   │               │   ├── 6 := 5
-│       │   │   │               │   ├── 7 := 5
-│       │   │   │               │   ├── 8 := 5
-│       │   │   │               │   ├── 9 := 5
-│       │   │   │               │   ~
-│       │   │   │               │   └── 276 := 10
-│       │   │   │               ├── distance-alphabet-code-lengths-value <- compute sub-seq (as-u32 hlit + 257, as-u32 hdist + 1) literal-length-distance-alphabet-code-lengths-value :=
-│       │   │   │               │   ├── 0 := 4
-│       │   │   │               │   ├── 1 := 8
-│       │   │   │               │   ├── 2 := 7
-│       │   │   │               │   ├── 3 := 8
-│       │   │   │               │   ├── 4 := 0
-│       │   │   │               │   ├── 5 := 7
-│       │   │   │               │   ├── 6 := 7
-│       │   │   │               │   ├── 7 := 6
-│       │   │   │               │   ├── 8 := 6
-│       │   │   │               │   ├── 9 := 4
-│       │   │   │               │   ~
-│       │   │   │               │   └── 21 := 5
-│       │   │   │               ├── codes <- dynamic distance-alphabet-format huffman (dynamic literal-length-alphabet-format huffman (repeat-until-last (x -> as-u16 (x.code) == 256) { ... })) :=
-│       │   │   │               │   ├── 0 :=
-│       │   │   │               │   │   ├── code <- apply := 0
-│       │   │   │               │   │   └── extra <- match code { ... } := none
-│       │   │   │               │   ├── 1 :=
-│       │   │   │               │   │   ├── code <- apply := 0
-│       │   │   │               │   │   └── extra <- match code { ... } := none
-│       │   │   │               │   ├── 2 :=
-│       │   │   │               │   │   ├── code <- apply := 18
-│       │   │   │               │   │   └── extra <- match code { ... } := none
-│       │   │   │               │   ├── 3 :=
-│       │   │   │               │   │   ├── code <- apply := 0
-│       │   │   │               │   │   └── extra <- match code { ... } := none
-│       │   │   │               │   ├── 4 :=
-│       │   │   │               │   │   ├── code <- apply := 259
-│       │   │   │               │   │   └── extra <- match code { ... } :=
-│       │   │   │               │   │       └── some <- { ... } :=
-│       │   │   │               │   │           ├── length-extra-bits <- compute 0 := 0
-│       │   │   │               │   │           ├── length <- compute 5 + as-u16 length-extra-bits := 5
-│       │   │   │               │   │           ├── distance-code <- apply := 0
-│       │   │   │               │   │           └── distance-record <- deflate.distance-record(...) :=
-│       │   │   │               │   │               ├── distance-extra-bits <- match extra-bits { ... } := 0
-│       │   │   │               │   │               └── distance <- compute start + distance-extra-bits := 1
-│       │   │   │               │   ├── 5 :=
-│       │   │   │               │   │   ├── code <- apply := 16
-│       │   │   │               │   │   └── extra <- match code { ... } := none
-│       │   │   │               │   ├── 6 :=
-│       │   │   │               │   │   ├── code <- apply := 1
-│       │   │   │               │   │   └── extra <- match code { ... } := none
-│       │   │   │               │   ├── 7 :=
-│       │   │   │               │   │   ├── code <- apply := 8
-│       │   │   │               │   │   └── extra <- match code { ... } := none
-│       │   │   │               │   ├── 8 :=
-│       │   │   │               │   │   ├── code <- apply := 14
-│       │   │   │               │   │   └── extra <- match code { ... } := none
-│       │   │   │               │   ├── 9 :=
-│       │   │   │               │   │   ├── code <- apply := 10
-│       │   │   │               │   │   └── extra <- match code { ... } := none
-│       │   │   │               │   ~
-│       │   │   │               │   └── 1141 :=
-│       │   │   │               │       ├── code <- apply := 256
-│       │   │   │               │       └── extra <- match code { ... } := none
-│       │   │   │               └── codes-values <- compute flat-map (x -> match x.code { ... }) codes :=
-│       │   │   │                   ├── 0 := { literal := 0 }
-│       │   │   │                   ├── 1 := { literal := 0 }
-│       │   │   │                   ├── 2 := { literal := 18 }
-│       │   │   │                   ├── 3 := { literal := 0 }
-│       │   │   │                   ├── 4 :=
-│       │   │   │                   │   └── reference :=
-│       │   │   │                   │       ├── length := 5
-│       │   │   │                   │       └── distance := 1
-│       │   │   │                   ├── 5 := { literal := 16 }
-│       │   │   │                   ├── 6 := { literal := 1 }
-│       │   │   │                   ├── 7 := { literal := 8 }
-│       │   │   │                   ├── 8 := { literal := 14 }
-│       │   │   │                   ├── 9 := { literal := 10 }
-│       │   │   │                   ~
-│       │   │   │                   └── 1140 :=
-│       │   │   │                       └── reference :=
-│       │   │   │                           ├── length := 60
-│       │   │   │                           └── distance := 1
-│       │   │   ├── codes <- compute flat-map (x -> match x.data { ... }) blocks :=
-│       │   │   │   ├── 0 := { literal := 0 }
-│       │   │   │   ├── 1 := { literal := 0 }
-│       │   │   │   ├── 2 := { literal := 18 }
-│       │   │   │   ├── 3 := { literal := 0 }
-│       │   │   │   ├── 4 :=
-│       │   │   │   │   └── reference :=
-│       │   │   │   │       ├── length := 5
-│       │   │   │   │       └── distance := 1
-│       │   │   │   ├── 5 := { literal := 16 }
-│       │   │   │   ├── 6 := { literal := 1 }
-│       │   │   │   ├── 7 := { literal := 8 }
-│       │   │   │   ├── 8 := { literal := 14 }
-│       │   │   │   ├── 9 := { literal := 10 }
-│       │   │   │   ~
-│       │   │   │   └── 1140 :=
-│       │   │   │       └── reference :=
-│       │   │   │           ├── length := 60
-│       │   │   │           └── distance := 1
-│       │   │   └── inflate <- compute flat-map-list (tuple_var -> pat-bind [(buffer, symbol) = tuple_var] match symbol { ... }) codes :=
-│       │   │       ├── 0 := 0
-│       │   │       ├── 1 := 0
-│       │   │       ├── 2 := 18
-│       │   │       ├── 3 := 0
-│       │   │       ├── 4 := 0
-│       │   │       ├── 5 := 0
-│       │   │       ├── 6 := 0
-│       │   │       ├── 7 := 0
-│       │   │       ├── 8 := 0
-│       │   │       ├── 9 := 16
-│       │   │       ~
-│       │   │       └── 2594 := 0
-│       │   └── adler32 <- base.u32be := 1593402930
-│       ├── more-chunks <- repeat png.chunk(...) := []
-│       └── iend <- png.iend :=
-│           ├── length <- assert (length -> length <= 2147483647) base.u32be := 0
-│           ├── tag <- png.iend-tag
-│           ├── data <- slice length png.iend-data
-│           └── crc <- base.u32be := 2923585666
-└── end <- end-of-input
+└── data <- _ |...| _ :=
+    └── png <- png.main :=
+        ├── signature <- png.signature
+        ├── ihdr <- png.ihdr :=
+        │   ├── length <- assert (length -> length <= 2147483647) base.u32be := 13
+        │   ├── tag <- png.ihdr-tag
+        │   ├── data <- slice length png.ihdr-data :=
+        │   │   ├── width <- base.u32be := 50
+        │   │   ├── height <- base.u32be := 50
+        │   │   ├── bit-depth <- base.u8 := 8
+        │   │   ├── color-type <- base.u8 := 3
+        │   │   ├── compression-method <- base.u8 := 0
+        │   │   ├── filter-method <- base.u8 := 0
+        │   │   └── interlace-method <- base.u8 := 1
+        │   └── crc <- base.u32be := 1592150037
+        ├── chunks <- repeat png.chunk(...) :=
+        │   ├── 0 <- png.chunk(...) :=
+        │   │   ├── length <- assert (length -> length <= 2147483647) base.u32be := 87
+        │   │   ├── tag <- monad-seq (peek-not [= 73]) (repeat-count 4 base.ascii-char.strict) := "PLTE"
+        │   │   ├── data <- slice length (match tag { ... }) :=
+        │   │   │   └── PLTE <- png.plte :=
+        │   │   │       └──    r   g   b
+        │   │   │            192 192 192
+        │   │   │            162 161 162
+        │   │   │            158 157 158
+        │   │   │            114 117 117
+        │   │   │            124 126 126
+        │   │   │            132 134 134
+        │   │   │            205 206 206
+        │   │   │            196 197 197
+        │   │   │            173 174 174
+        │   │   │            143 144 144
+        │   │   │            152 150 151
+        │   │   │            149 159 157
+        │   │   │            212 229 225
+        │   │   │             52  56  55
+        │   │   │             88  92  91
+        │   │   │            231 239 237
+        │   │   │            156 170 166
+        │   │   │             72  75  74
+        │   │   │            179 182 181
+        │   │   │            103 105 104
+        │   │   │            191 193 192
+        │   │   │            211 212 211
+        │   │   │            218 218 217
+        │   │   │            226 224 223
+        │   │   │            231 229 229
+        │   │   │            187 186 186
+        │   │   │            168 167 167
+        │   │   │            201 201 201
+        │   │   │            138 138 138
+        │   │   └── crc <- base.u32be := 1943707985
+        │   ├── 1 <- png.chunk(...) :=
+        │   │   ├── length <- assert (length -> length <= 2147483647) base.u32be := 1
+        │   │   ├── tag <- monad-seq (peek-not [= 73]) (repeat-count 4 base.ascii-char.strict) := "tRNS"
+        │   │   ├── data <- slice length (match tag { ... }) :=
+        │   │   │   └── tRNS <- png.trns(...) :=
+        │   │   │       └── color-type-3 <- repeat { ... } :=
+        │   │   │           └──  palette-index
+        │   │   │                            0
+        │   │   └── crc <- base.u32be := 1088870502
+        │   ├── 2 <- png.chunk(...) :=
+        │   │   ├── length <- assert (length -> length <= 2147483647) base.u32be := 1
+        │   │   ├── tag <- monad-seq (peek-not [= 73]) (repeat-count 4 base.ascii-char.strict) := "bKGD"
+        │   │   ├── data <- slice length (match tag { ... }) :=
+        │   │   │   └── bKGD <- png.bkgd(...) :=
+        │   │   │       └── color-type-3 <- { ... } :=
+        │   │   │           └── palette-index <- base.u8 := 0
+        │   │   └── crc <- base.u32be := 2282036552
+        │   ├── 3 <- png.chunk(...) :=
+        │   │   ├── length <- assert (length -> length <= 2147483647) base.u32be := 9
+        │   │   ├── tag <- monad-seq (peek-not [= 73]) (repeat-count 4 base.ascii-char.strict) := "pHYs"
+        │   │   ├── data <- slice length (match tag { ... }) :=
+        │   │   │   └── pHYs <- png.phys :=
+        │   │   │       ├── pixels-per-unit-x <- base.u32be := 2835
+        │   │   │       ├── pixels-per-unit-y <- base.u32be := 2835
+        │   │   │       └── unit-specifier <- base.u8 := 1
+        │   │   └── crc <- base.u32be := 10132504
+        │   └── 4 <- png.chunk(...) :=
+        │       ├── length <- assert (length -> length <= 2147483647) base.u32be := 7
+        │       ├── tag <- monad-seq (peek-not [= 73]) (repeat-count 4 base.ascii-char.strict) := "tIME"
+        │       ├── data <- slice length (match tag { ... }) :=
+        │       │   └── tIME <- png.time :=
+        │       │       ├── year <- base.u16be := 2005
+        │       │       ├── month <- base.u8 := 11
+        │       │       ├── day <- base.u8 := 1
+        │       │       ├── hour <- base.u8 := 23
+        │       │       ├── minute <- base.u8 := 55
+        │       │       └── second <- base.u8 := 34
+        │       └── crc <- base.u32be := 491070829
+        ├── idat <- let-format idat (map (xs -> flat-map (x -> x.data) xs) (repeat1 png.idat)) (decode-bytes idat zlib.main) :=
+        │   ├── compression-method-flags <- assert (method-info -> method-info.compression-method == 8) (map (packed_bits -> { ... }) U8) :=
+        │   │   ├── compression-info := 4
+        │   │   └── compression-method := 8
+        │   ├── flags <- map (packed_bits -> { ... }) U8 :=
+        │   │   ├── flevel := 3
+        │   │   ├── fdict := false
+        │   │   └── fcheck := 7
+        │   ├── dict-id <- maybe (flags.fdict) base.u32be := none
+        │   ├── data <- bits deflate.main :=
+        │   │   ├── blocks <- repeat-until-last (x -> x.final == 1) deflate.block :=
+        │   │   │   └── 0 <- deflate.block :=
+        │   │   │       ├── final <- base.bit := 1
+        │   │   │       ├── type <- map (bits -> bits.0 | bits.1 << 1) (...) := 2
+        │   │   │       └── data <- match type { ... } :=
+        │   │   │           └── dynamic_huffman <- deflate.dynamic_huffman :=
+        │   │   │               ├── hlit <- map (bits -> bits.0 | bits.1 << 1 | bits.2 << 2 | bits.3 << 3 | bits.4 << 4) (...) := 20
+        │   │   │               ├── hdist <- map (bits -> bits.0 | bits.1 << 1 | bits.2 << 2 | bits.3 << 3 | bits.4 << 4) (...) := 21
+        │   │   │               ├── hclen <- map (bits -> bits.0 | bits.1 << 1 | bits.2 << 2 | bits.3 << 3) (...) := 10
+        │   │   │               ├── code-length-alphabet-code-lengths <- repeat-count (hclen + 4) (map (bits -> bits.0 | bits.1 << 1 | bits.2 << 2) (...)) :=
+        │   │   │               │   ├── 0 := 4
+        │   │   │               │   ├── 1 := 0
+        │   │   │               │   ├── 2 := 5
+        │   │   │               │   ├── 3 := 4
+        │   │   │               │   ├── 4 := 3
+        │   │   │               │   ├── 5 := 3
+        │   │   │               │   ├── 6 := 5
+        │   │   │               │   ├── 7 := 3
+        │   │   │               │   ├── 8 := 3
+        │   │   │               │   ├── 9 := 3
+        │   │   │               │   ~
+        │   │   │               │   └── 13 := 4
+        │   │   │               ├── literal-length-distance-alphabet-code-lengths <- dynamic code-length-alphabet-format huffman (repeat-until-seq (y -> seq-length (flat-map-accum (tuple_var -> pat-bind [(last-symbol, cl-code-extra) = tuple_var] match as-u8 (cl-code-extra.code) { ... }, none) y) >= as-u32 (hlit + hdist) + 258) { ... }) :=
+        │   │   │               │   ├── 0 :=
+        │   │   │               │   │   ├── code <- apply := 5
+        │   │   │               │   │   └── extra <- match (as-u8 code) { ... } := 0
+        │   │   │               │   ├── 1 :=
+        │   │   │               │   │   ├── code <- apply := 16
+        │   │   │               │   │   └── extra <- match (as-u8 code) { ... } := 3
+        │   │   │               │   ├── 2 :=
+        │   │   │               │   │   ├── code <- apply := 16
+        │   │   │               │   │   └── extra <- match (as-u8 code) { ... } := 1
+        │   │   │               │   ├── 3 :=
+        │   │   │               │   │   ├── code <- apply := 6
+        │   │   │               │   │   └── extra <- match (as-u8 code) { ... } := 0
+        │   │   │               │   ├── 4 :=
+        │   │   │               │   │   ├── code <- apply := 8
+        │   │   │               │   │   └── extra <- match (as-u8 code) { ... } := 0
+        │   │   │               │   ├── 5 :=
+        │   │   │               │   │   ├── code <- apply := 6
+        │   │   │               │   │   └── extra <- match (as-u8 code) { ... } := 0
+        │   │   │               │   ├── 6 :=
+        │   │   │               │   │   ├── code <- apply := 5
+        │   │   │               │   │   └── extra <- match (as-u8 code) { ... } := 0
+        │   │   │               │   ├── 7 :=
+        │   │   │               │   │   ├── code <- apply := 7
+        │   │   │               │   │   └── extra <- match (as-u8 code) { ... } := 0
+        │   │   │               │   ├── 8 :=
+        │   │   │               │   │   ├── code <- apply := 7
+        │   │   │               │   │   └── extra <- match (as-u8 code) { ... } := 0
+        │   │   │               │   ├── 9 :=
+        │   │   │               │   │   ├── code <- apply := 5
+        │   │   │               │   │   └── extra <- match (as-u8 code) { ... } := 0
+        │   │   │               │   ~
+        │   │   │               │   └── 65 :=
+        │   │   │               │       ├── code <- apply := 5
+        │   │   │               │       └── extra <- match (as-u8 code) { ... } := 0
+        │   │   │               ├── literal-length-distance-alphabet-code-lengths-value <- compute flat-map-accum (tuple_var -> pat-bind [(last-symbol, cl-code-extra) = tuple_var] match as-u8 (cl-code-extra.code) { ... }, none) literal-length-distance-alphabet-code-lengths :=
+        │   │   │               │   ├── 0 := 5
+        │   │   │               │   ├── 1 := 5
+        │   │   │               │   ├── 2 := 5
+        │   │   │               │   ├── 3 := 5
+        │   │   │               │   ├── 4 := 5
+        │   │   │               │   ├── 5 := 5
+        │   │   │               │   ├── 6 := 5
+        │   │   │               │   ├── 7 := 5
+        │   │   │               │   ├── 8 := 5
+        │   │   │               │   ├── 9 := 5
+        │   │   │               │   ~
+        │   │   │               │   └── 298 := 5
+        │   │   │               ├── literal-length-alphabet-code-lengths-value <- compute sub-seq (0, as-u32 hlit + 257) literal-length-distance-alphabet-code-lengths-value :=
+        │   │   │               │   ├── 0 := 5
+        │   │   │               │   ├── 1 := 5
+        │   │   │               │   ├── 2 := 5
+        │   │   │               │   ├── 3 := 5
+        │   │   │               │   ├── 4 := 5
+        │   │   │               │   ├── 5 := 5
+        │   │   │               │   ├── 6 := 5
+        │   │   │               │   ├── 7 := 5
+        │   │   │               │   ├── 8 := 5
+        │   │   │               │   ├── 9 := 5
+        │   │   │               │   ~
+        │   │   │               │   └── 276 := 10
+        │   │   │               ├── distance-alphabet-code-lengths-value <- compute sub-seq (as-u32 hlit + 257, as-u32 hdist + 1) literal-length-distance-alphabet-code-lengths-value :=
+        │   │   │               │   ├── 0 := 4
+        │   │   │               │   ├── 1 := 8
+        │   │   │               │   ├── 2 := 7
+        │   │   │               │   ├── 3 := 8
+        │   │   │               │   ├── 4 := 0
+        │   │   │               │   ├── 5 := 7
+        │   │   │               │   ├── 6 := 7
+        │   │   │               │   ├── 7 := 6
+        │   │   │               │   ├── 8 := 6
+        │   │   │               │   ├── 9 := 4
+        │   │   │               │   ~
+        │   │   │               │   └── 21 := 5
+        │   │   │               ├── codes <- dynamic distance-alphabet-format huffman (dynamic literal-length-alphabet-format huffman (repeat-until-last (x -> as-u16 (x.code) == 256) { ... })) :=
+        │   │   │               │   ├── 0 :=
+        │   │   │               │   │   ├── code <- apply := 0
+        │   │   │               │   │   └── extra <- match code { ... } := none
+        │   │   │               │   ├── 1 :=
+        │   │   │               │   │   ├── code <- apply := 0
+        │   │   │               │   │   └── extra <- match code { ... } := none
+        │   │   │               │   ├── 2 :=
+        │   │   │               │   │   ├── code <- apply := 18
+        │   │   │               │   │   └── extra <- match code { ... } := none
+        │   │   │               │   ├── 3 :=
+        │   │   │               │   │   ├── code <- apply := 0
+        │   │   │               │   │   └── extra <- match code { ... } := none
+        │   │   │               │   ├── 4 :=
+        │   │   │               │   │   ├── code <- apply := 259
+        │   │   │               │   │   └── extra <- match code { ... } :=
+        │   │   │               │   │       └── some <- { ... } :=
+        │   │   │               │   │           ├── length-extra-bits <- compute 0 := 0
+        │   │   │               │   │           ├── length <- compute 5 + as-u16 length-extra-bits := 5
+        │   │   │               │   │           ├── distance-code <- apply := 0
+        │   │   │               │   │           └── distance-record <- deflate.distance-record(...) :=
+        │   │   │               │   │               ├── distance-extra-bits <- match extra-bits { ... } := 0
+        │   │   │               │   │               └── distance <- compute start + distance-extra-bits := 1
+        │   │   │               │   ├── 5 :=
+        │   │   │               │   │   ├── code <- apply := 16
+        │   │   │               │   │   └── extra <- match code { ... } := none
+        │   │   │               │   ├── 6 :=
+        │   │   │               │   │   ├── code <- apply := 1
+        │   │   │               │   │   └── extra <- match code { ... } := none
+        │   │   │               │   ├── 7 :=
+        │   │   │               │   │   ├── code <- apply := 8
+        │   │   │               │   │   └── extra <- match code { ... } := none
+        │   │   │               │   ├── 8 :=
+        │   │   │               │   │   ├── code <- apply := 14
+        │   │   │               │   │   └── extra <- match code { ... } := none
+        │   │   │               │   ├── 9 :=
+        │   │   │               │   │   ├── code <- apply := 10
+        │   │   │               │   │   └── extra <- match code { ... } := none
+        │   │   │               │   ~
+        │   │   │               │   └── 1141 :=
+        │   │   │               │       ├── code <- apply := 256
+        │   │   │               │       └── extra <- match code { ... } := none
+        │   │   │               └── codes-values <- compute flat-map (x -> match x.code { ... }) codes :=
+        │   │   │                   ├── 0 := { literal := 0 }
+        │   │   │                   ├── 1 := { literal := 0 }
+        │   │   │                   ├── 2 := { literal := 18 }
+        │   │   │                   ├── 3 := { literal := 0 }
+        │   │   │                   ├── 4 :=
+        │   │   │                   │   └── reference :=
+        │   │   │                   │       ├── length := 5
+        │   │   │                   │       └── distance := 1
+        │   │   │                   ├── 5 := { literal := 16 }
+        │   │   │                   ├── 6 := { literal := 1 }
+        │   │   │                   ├── 7 := { literal := 8 }
+        │   │   │                   ├── 8 := { literal := 14 }
+        │   │   │                   ├── 9 := { literal := 10 }
+        │   │   │                   ~
+        │   │   │                   └── 1140 :=
+        │   │   │                       └── reference :=
+        │   │   │                           ├── length := 60
+        │   │   │                           └── distance := 1
+        │   │   ├── codes <- compute flat-map (x -> match x.data { ... }) blocks :=
+        │   │   │   ├── 0 := { literal := 0 }
+        │   │   │   ├── 1 := { literal := 0 }
+        │   │   │   ├── 2 := { literal := 18 }
+        │   │   │   ├── 3 := { literal := 0 }
+        │   │   │   ├── 4 :=
+        │   │   │   │   └── reference :=
+        │   │   │   │       ├── length := 5
+        │   │   │   │       └── distance := 1
+        │   │   │   ├── 5 := { literal := 16 }
+        │   │   │   ├── 6 := { literal := 1 }
+        │   │   │   ├── 7 := { literal := 8 }
+        │   │   │   ├── 8 := { literal := 14 }
+        │   │   │   ├── 9 := { literal := 10 }
+        │   │   │   ~
+        │   │   │   └── 1140 :=
+        │   │   │       └── reference :=
+        │   │   │           ├── length := 60
+        │   │   │           └── distance := 1
+        │   │   └── inflate <- compute flat-map-list (tuple_var -> pat-bind [(buffer, symbol) = tuple_var] match symbol { ... }) codes :=
+        │   │       ├── 0 := 0
+        │   │       ├── 1 := 0
+        │   │       ├── 2 := 18
+        │   │       ├── 3 := 0
+        │   │       ├── 4 := 0
+        │   │       ├── 5 := 0
+        │   │       ├── 6 := 0
+        │   │       ├── 7 := 0
+        │   │       ├── 8 := 0
+        │   │       ├── 9 := 16
+        │   │       ~
+        │   │       └── 2594 := 0
+        │   └── adler32 <- base.u32be := 1593402930
+        ├── more-chunks <- repeat png.chunk(...) := []
+        └── iend <- png.iend :=
+            ├── length <- assert (length -> length <= 2147483647) base.u32be := 0
+            ├── tag <- png.iend-tag
+            ├── data <- slice length png.iend-data
+            └── crc <- base.u32be := 2923585666

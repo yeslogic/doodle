@@ -150,7 +150,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
     let header_with_data = module.define_format(
         "tar.header_with_data",
-        record([
+        record_auto([
             ("header", header.call()),
             (
                 "file",

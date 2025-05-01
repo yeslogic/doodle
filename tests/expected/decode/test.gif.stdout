@@ -1,163 +1,162 @@
-├── data <- _ |...| _ :=
-│   └── gif <- gif.main :=
-│       ├── header <- gif.header :=
-│       │   ├── signature <- (...)
-│       │   └── version <- repeat-count 3 base.ascii-char := "89a"
-│       ├── logical-screen <- gif.logical-screen :=
-│       │   ├── descriptor <- gif.logical-screen-descriptor :=
-│       │   │   ├── screen-width <- base.u16le := 50
-│       │   │   ├── screen-height <- base.u16le := 50
-│       │   │   ├── flags <- map (packed_bits -> { ... }) U8 :=
-│       │   │   │   ├── table-flag := 1
-│       │   │   │   ├── color-resolution := 7
-│       │   │   │   ├── sort-flag := 0
-│       │   │   │   └── table-size := 4
-│       │   │   ├── bg-color-index <- base.u8 := 0
-│       │   │   └── pixel-aspect-ratio <- base.u8 := 0
-│       │   └── global-color-table <- maybe (descriptor.flags.table-flag > 0) (repeat-count (2 << as-u16 (descriptor.flags.table-size)) gif.color-table-entry) :=
-│       │       └── some <- repeat-count (2 << as-u16 (descriptor.flags.table-size)) gif.color-table-entry :=
-│       │           └──    r   g   b
-│       │                  0   0   0
-│       │                162 161 162
-│       │                158 157 158
-│       │                114 117 117
-│       │                124 126 126
-│       │                132 134 134
-│       │                205 206 206
-│       │                196 197 197
-│       │                173 174 174
-│       │                143 144 144
-│       │                152 150 151
-│       │                149 159 157
-│       │                212 229 225
-│       │                 52  56  55
-│       │                 88  92  91
-│       │                231 239 237
-│       │                156 170 166
-│       │                 72  75  74
-│       │                179 182 181
-│       │                103 105 104
-│       │                191 193 192
-│       │                211 212 211
-│       │                218 218 217
-│       │                226 224 223
-│       │                231 229 229
-│       │                187 186 186
-│       │                168 167 167
-│       │                201 201 201
-│       │                138 138 138
-│       │                  0   0   0
-│       │                  0   0   0
-│       │                  0   0   0
-│       ├── blocks <- repeat gif.block :=
-│       │   └── 0 <- gif.block :=
-│       │       └── graphic-block <- gif.graphic-block :=
-│       │           ├── graphic-control-extension <- _ |...| _ :=
-│       │           │   └── some <- gif.graphic-control-extension :=
-│       │           │       ├── separator <- [= 33]
-│       │           │       ├── label <- [= 249]
-│       │           │       ├── block-size <- [= 4]
-│       │           │       ├── flags <- map (packed_bits -> { ... }) U8 :=
-│       │           │       │   ├── reserved := 0
-│       │           │       │   ├── disposal-method := 0
-│       │           │       │   ├── user-input-flag := 0
-│       │           │       │   └── transparent-color-flag := 1
-│       │           │       ├── delay-time <- base.u16le := 0
-│       │           │       ├── transparent-color-index <- base.u8 := 0
-│       │           │       └── terminator <- gif.block-terminator
-│       │           └── graphic-rendering-block <- gif.graphic-rendering-block :=
-│       │               └── table-based-image <- gif.table-based-image :=
-│       │                   ├── descriptor <- gif.image-descriptor :=
-│       │                   │   ├── separator <- [= 44]
-│       │                   │   ├── image-left-position <- base.u16le := 0
-│       │                   │   ├── image-top-position <- base.u16le := 0
-│       │                   │   ├── image-width <- base.u16le := 50
-│       │                   │   ├── image-height <- base.u16le := 50
-│       │                   │   └── flags <- map (packed_bits -> { ... }) U8 :=
-│       │                   │       ├── table-flag := 0
-│       │                   │       ├── interlace-flag := 0
-│       │                   │       ├── sort-flag := 0
-│       │                   │       ├── reserved := 0
-│       │                   │       └── table-size := 0
-│       │                   ├── local-color-table <- maybe (descriptor.flags.table-flag > 0) (repeat-count (2 << as-u16 (descriptor.flags.table-size)) gif.color-table-entry) := none
-│       │                   └── data <- gif.table-based-image-data :=
-│       │                       ├── lzw-min-code-size <- base.u8 := 5
-│       │                       ├── image-data <- repeat gif.subblock :=
-│       │                       │   ├── 0 <- gif.subblock :=
-│       │                       │   │   ├── len-bytes <- [!= 0] := 255
-│       │                       │   │   └── data <- repeat-count len-bytes base.u8 :=
-│       │                       │   │       ├── 0 := 32
-│       │                       │   │       ├── 1 := 32
-│       │                       │   │       ├── 2 := 50
-│       │                       │   │       ├── 3 := 217
-│       │                       │   │       ├── 4 := 192
-│       │                       │   │       ├── 5 := 105
-│       │                       │   │       ├── 6 := 210
-│       │                       │   │       ├── 7 := 193
-│       │                       │   │       ├── 8 := 60
-│       │                       │   │       ├── 9 := 172
-│       │                       │   │       ~
-│       │                       │   │       └── 254 := 34
-│       │                       │   ├── 1 <- gif.subblock :=
-│       │                       │   │   ├── len-bytes <- [!= 0] := 255
-│       │                       │   │   └── data <- repeat-count len-bytes base.u8 :=
-│       │                       │   │       ├── 0 := 74
-│       │                       │   │       ├── 1 := 156
-│       │                       │   │       ├── 2 := 120
-│       │                       │   │       ├── 3 := 15
-│       │                       │   │       ├── 4 := 129
-│       │                       │   │       ├── 5 := 197
-│       │                       │   │       ├── 6 := 3
-│       │                       │   │       ├── 7 := 27
-│       │                       │   │       ├── 8 := 252
-│       │                       │   │       ├── 9 := 85
-│       │                       │   │       ~
-│       │                       │   │       └── 254 := 212
-│       │                       │   ├── 2 <- gif.subblock :=
-│       │                       │   │   ├── len-bytes <- [!= 0] := 255
-│       │                       │   │   └── data <- repeat-count len-bytes base.u8 :=
-│       │                       │   │       ├── 0 := 99
-│       │                       │   │       ├── 1 := 234
-│       │                       │   │       ├── 2 := 225
-│       │                       │   │       ├── 3 := 70
-│       │                       │   │       ├── 4 := 150
-│       │                       │   │       ├── 5 := 76
-│       │                       │   │       ├── 6 := 6
-│       │                       │   │       ├── 7 := 164
-│       │                       │   │       ├── 8 := 17
-│       │                       │   │       ├── 9 := 0
-│       │                       │   │       ~
-│       │                       │   │       └── 254 := 195
-│       │                       │   ├── 3 <- gif.subblock :=
-│       │                       │   │   ├── len-bytes <- [!= 0] := 255
-│       │                       │   │   └── data <- repeat-count len-bytes base.u8 :=
-│       │                       │   │       ├── 0 := 9
-│       │                       │   │       ├── 1 := 106
-│       │                       │   │       ├── 2 := 132
-│       │                       │   │       ├── 3 := 1
-│       │                       │   │       ├── 4 := 75
-│       │                       │   │       ├── 5 := 26
-│       │                       │   │       ├── 6 := 122
-│       │                       │   │       ├── 7 := 26
-│       │                       │   │       ├── 8 := 0
-│       │                       │   │       ├── 9 := 192
-│       │                       │   │       ~
-│       │                       │   │       └── 254 := 182
-│       │                       │   └── 4 <- gif.subblock :=
-│       │                       │       ├── len-bytes <- [!= 0] := 81
-│       │                       │       └── data <- repeat-count len-bytes base.u8 :=
-│       │                       │           ├── 0 := 28
-│       │                       │           ├── 1 := 228
-│       │                       │           ├── 2 := 252
-│       │                       │           ├── 3 := 48
-│       │                       │           ├── 4 := 24
-│       │                       │           ├── 5 := 201
-│       │                       │           ├── 6 := 154
-│       │                       │           ├── 7 := 203
-│       │                       │           ├── 8 := 96
-│       │                       │           ├── 9 := 1
-│       │                       │           ~
-│       │                       │           └── 80 := 8
-│       │                       └── terminator <- gif.block-terminator
-│       └── trailer <- gif.trailer
-└── end <- end-of-input
+└── data <- _ |...| _ :=
+    └── gif <- gif.main :=
+        ├── header <- gif.header :=
+        │   ├── signature <- (...)
+        │   └── version <- repeat-count 3 base.ascii-char := "89a"
+        ├── logical-screen <- gif.logical-screen :=
+        │   ├── descriptor <- gif.logical-screen-descriptor :=
+        │   │   ├── screen-width <- base.u16le := 50
+        │   │   ├── screen-height <- base.u16le := 50
+        │   │   ├── flags <- map (packed_bits -> { ... }) U8 :=
+        │   │   │   ├── table-flag := 1
+        │   │   │   ├── color-resolution := 7
+        │   │   │   ├── sort-flag := 0
+        │   │   │   └── table-size := 4
+        │   │   ├── bg-color-index <- base.u8 := 0
+        │   │   └── pixel-aspect-ratio <- base.u8 := 0
+        │   └── global-color-table <- maybe (descriptor.flags.table-flag > 0) (repeat-count (2 << as-u16 (descriptor.flags.table-size)) gif.color-table-entry) :=
+        │       └── some <- repeat-count (2 << as-u16 (descriptor.flags.table-size)) gif.color-table-entry :=
+        │           └──    r   g   b
+        │                  0   0   0
+        │                162 161 162
+        │                158 157 158
+        │                114 117 117
+        │                124 126 126
+        │                132 134 134
+        │                205 206 206
+        │                196 197 197
+        │                173 174 174
+        │                143 144 144
+        │                152 150 151
+        │                149 159 157
+        │                212 229 225
+        │                 52  56  55
+        │                 88  92  91
+        │                231 239 237
+        │                156 170 166
+        │                 72  75  74
+        │                179 182 181
+        │                103 105 104
+        │                191 193 192
+        │                211 212 211
+        │                218 218 217
+        │                226 224 223
+        │                231 229 229
+        │                187 186 186
+        │                168 167 167
+        │                201 201 201
+        │                138 138 138
+        │                  0   0   0
+        │                  0   0   0
+        │                  0   0   0
+        ├── blocks <- repeat gif.block :=
+        │   └── 0 <- gif.block :=
+        │       └── graphic-block <- gif.graphic-block :=
+        │           ├── graphic-control-extension <- _ |...| _ :=
+        │           │   └── some <- gif.graphic-control-extension :=
+        │           │       ├── separator <- [= 33]
+        │           │       ├── label <- [= 249]
+        │           │       ├── block-size <- [= 4]
+        │           │       ├── flags <- map (packed_bits -> { ... }) U8 :=
+        │           │       │   ├── reserved := 0
+        │           │       │   ├── disposal-method := 0
+        │           │       │   ├── user-input-flag := 0
+        │           │       │   └── transparent-color-flag := 1
+        │           │       ├── delay-time <- base.u16le := 0
+        │           │       ├── transparent-color-index <- base.u8 := 0
+        │           │       └── terminator <- gif.block-terminator
+        │           └── graphic-rendering-block <- gif.graphic-rendering-block :=
+        │               └── table-based-image <- gif.table-based-image :=
+        │                   ├── descriptor <- gif.image-descriptor :=
+        │                   │   ├── separator <- [= 44]
+        │                   │   ├── image-left-position <- base.u16le := 0
+        │                   │   ├── image-top-position <- base.u16le := 0
+        │                   │   ├── image-width <- base.u16le := 50
+        │                   │   ├── image-height <- base.u16le := 50
+        │                   │   └── flags <- map (packed_bits -> { ... }) U8 :=
+        │                   │       ├── table-flag := 0
+        │                   │       ├── interlace-flag := 0
+        │                   │       ├── sort-flag := 0
+        │                   │       ├── reserved := 0
+        │                   │       └── table-size := 0
+        │                   ├── local-color-table <- maybe (descriptor.flags.table-flag > 0) (repeat-count (2 << as-u16 (descriptor.flags.table-size)) gif.color-table-entry) := none
+        │                   └── data <- gif.table-based-image-data :=
+        │                       ├── lzw-min-code-size <- base.u8 := 5
+        │                       ├── image-data <- repeat gif.subblock :=
+        │                       │   ├── 0 <- gif.subblock :=
+        │                       │   │   ├── len-bytes <- [!= 0] := 255
+        │                       │   │   └── data <- repeat-count len-bytes base.u8 :=
+        │                       │   │       ├── 0 := 32
+        │                       │   │       ├── 1 := 32
+        │                       │   │       ├── 2 := 50
+        │                       │   │       ├── 3 := 217
+        │                       │   │       ├── 4 := 192
+        │                       │   │       ├── 5 := 105
+        │                       │   │       ├── 6 := 210
+        │                       │   │       ├── 7 := 193
+        │                       │   │       ├── 8 := 60
+        │                       │   │       ├── 9 := 172
+        │                       │   │       ~
+        │                       │   │       └── 254 := 34
+        │                       │   ├── 1 <- gif.subblock :=
+        │                       │   │   ├── len-bytes <- [!= 0] := 255
+        │                       │   │   └── data <- repeat-count len-bytes base.u8 :=
+        │                       │   │       ├── 0 := 74
+        │                       │   │       ├── 1 := 156
+        │                       │   │       ├── 2 := 120
+        │                       │   │       ├── 3 := 15
+        │                       │   │       ├── 4 := 129
+        │                       │   │       ├── 5 := 197
+        │                       │   │       ├── 6 := 3
+        │                       │   │       ├── 7 := 27
+        │                       │   │       ├── 8 := 252
+        │                       │   │       ├── 9 := 85
+        │                       │   │       ~
+        │                       │   │       └── 254 := 212
+        │                       │   ├── 2 <- gif.subblock :=
+        │                       │   │   ├── len-bytes <- [!= 0] := 255
+        │                       │   │   └── data <- repeat-count len-bytes base.u8 :=
+        │                       │   │       ├── 0 := 99
+        │                       │   │       ├── 1 := 234
+        │                       │   │       ├── 2 := 225
+        │                       │   │       ├── 3 := 70
+        │                       │   │       ├── 4 := 150
+        │                       │   │       ├── 5 := 76
+        │                       │   │       ├── 6 := 6
+        │                       │   │       ├── 7 := 164
+        │                       │   │       ├── 8 := 17
+        │                       │   │       ├── 9 := 0
+        │                       │   │       ~
+        │                       │   │       └── 254 := 195
+        │                       │   ├── 3 <- gif.subblock :=
+        │                       │   │   ├── len-bytes <- [!= 0] := 255
+        │                       │   │   └── data <- repeat-count len-bytes base.u8 :=
+        │                       │   │       ├── 0 := 9
+        │                       │   │       ├── 1 := 106
+        │                       │   │       ├── 2 := 132
+        │                       │   │       ├── 3 := 1
+        │                       │   │       ├── 4 := 75
+        │                       │   │       ├── 5 := 26
+        │                       │   │       ├── 6 := 122
+        │                       │   │       ├── 7 := 26
+        │                       │   │       ├── 8 := 0
+        │                       │   │       ├── 9 := 192
+        │                       │   │       ~
+        │                       │   │       └── 254 := 182
+        │                       │   └── 4 <- gif.subblock :=
+        │                       │       ├── len-bytes <- [!= 0] := 81
+        │                       │       └── data <- repeat-count len-bytes base.u8 :=
+        │                       │           ├── 0 := 28
+        │                       │           ├── 1 := 228
+        │                       │           ├── 2 := 252
+        │                       │           ├── 3 := 48
+        │                       │           ├── 4 := 24
+        │                       │           ├── 5 := 201
+        │                       │           ├── 6 := 154
+        │                       │           ├── 7 := 203
+        │                       │           ├── 8 := 96
+        │                       │           ├── 9 := 1
+        │                       │           ~
+        │                       │           └── 80 := 8
+        │                       └── terminator <- gif.block-terminator
+        └── trailer <- gif.trailer

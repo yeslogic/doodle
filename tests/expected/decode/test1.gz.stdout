@@ -1,99 +1,98 @@
-├── data <- _ |...| _ :=
-│   └── gzip <- gzip.main :=
-│       └── 0 :=
-│           ├── header <- gzip.header :=
-│           │   ├── magic <- (...)
-│           │   ├── method <- base.u8 := 8
-│           │   ├── file-flags <- map (packed_bits -> { ... }) U8 := bool-flags[fname]
-│           │   ├── timestamp <- base.u32le := 1683505215
-│           │   ├── compression-flags <- base.u8 := 0
-│           │   └── os-id <- base.u8 := 3
-│           ├── fextra <- maybe (header.file-flags.fextra) gzip.fextra := none
-│           ├── fname <- maybe (header.file-flags.fname) gzip.fname := { some := "test1" }
-│           ├── fcomment <- maybe (header.file-flags.fcomment) gzip.fcomment := none
-│           ├── fhcrc <- maybe (header.file-flags.fhcrc) gzip.fhcrc := none
-│           ├── data <- bits deflate.main :=
-│           │   ├── blocks <- repeat-until-last (x -> x.final == 1) deflate.block :=
-│           │   │   └── 0 <- deflate.block :=
-│           │   │       ├── final <- base.bit := 1
-│           │   │       ├── type <- map (bits -> bits.0 | bits.1 << 1) (...) := 1
-│           │   │       └── data <- match type { ... } :=
-│           │   │           └── fixed_huffman <- deflate.fixed_huffman :=
-│           │   │               ├── codes <- dynamic format huffman (repeat-until-last (x -> as-u16 (x.code) == 256) { ... }) :=
-│           │   │               │   ├── 0 :=
-│           │   │               │   │   ├── code <- apply := 72
-│           │   │               │   │   └── extra <- match code { ... } := none
-│           │   │               │   ├── 1 :=
-│           │   │               │   │   ├── code <- apply := 101
-│           │   │               │   │   └── extra <- match code { ... } := none
-│           │   │               │   ├── 2 :=
-│           │   │               │   │   ├── code <- apply := 108
-│           │   │               │   │   └── extra <- match code { ... } := none
-│           │   │               │   ├── 3 :=
-│           │   │               │   │   ├── code <- apply := 108
-│           │   │               │   │   └── extra <- match code { ... } := none
-│           │   │               │   ├── 4 :=
-│           │   │               │   │   ├── code <- apply := 111
-│           │   │               │   │   └── extra <- match code { ... } := none
-│           │   │               │   ├── 5 :=
-│           │   │               │   │   ├── code <- apply := 44
-│           │   │               │   │   └── extra <- match code { ... } := none
-│           │   │               │   ├── 6 :=
-│           │   │               │   │   ├── code <- apply := 32
-│           │   │               │   │   └── extra <- match code { ... } := none
-│           │   │               │   ├── 7 :=
-│           │   │               │   │   ├── code <- apply := 119
-│           │   │               │   │   └── extra <- match code { ... } := none
-│           │   │               │   ├── 8 :=
-│           │   │               │   │   ├── code <- apply := 111
-│           │   │               │   │   └── extra <- match code { ... } := none
-│           │   │               │   ├── 9 :=
-│           │   │               │   │   ├── code <- apply := 114
-│           │   │               │   │   └── extra <- match code { ... } := none
-│           │   │               │   ~
-│           │   │               │   └── 14 :=
-│           │   │               │       ├── code <- apply := 256
-│           │   │               │       └── extra <- match code { ... } := none
-│           │   │               └── codes-values <- compute flat-map (x -> match x.code { ... }) codes :=
-│           │   │                   ├── 0 := { literal := 72 }
-│           │   │                   ├── 1 := { literal := 101 }
-│           │   │                   ├── 2 := { literal := 108 }
-│           │   │                   ├── 3 := { literal := 108 }
-│           │   │                   ├── 4 := { literal := 111 }
-│           │   │                   ├── 5 := { literal := 44 }
-│           │   │                   ├── 6 := { literal := 32 }
-│           │   │                   ├── 7 := { literal := 119 }
-│           │   │                   ├── 8 := { literal := 111 }
-│           │   │                   ├── 9 := { literal := 114 }
-│           │   │                   ~
-│           │   │                   └── 13 := { literal := 10 }
-│           │   ├── codes <- compute flat-map (x -> match x.data { ... }) blocks :=
-│           │   │   ├── 0 := { literal := 72 }
-│           │   │   ├── 1 := { literal := 101 }
-│           │   │   ├── 2 := { literal := 108 }
-│           │   │   ├── 3 := { literal := 108 }
-│           │   │   ├── 4 := { literal := 111 }
-│           │   │   ├── 5 := { literal := 44 }
-│           │   │   ├── 6 := { literal := 32 }
-│           │   │   ├── 7 := { literal := 119 }
-│           │   │   ├── 8 := { literal := 111 }
-│           │   │   ├── 9 := { literal := 114 }
-│           │   │   ~
-│           │   │   └── 13 := { literal := 10 }
-│           │   └── inflate <- compute flat-map-list (tuple_var -> pat-bind [(buffer, symbol) = tuple_var] match symbol { ... }) codes :=
-│           │       ├── 0 := 72
-│           │       ├── 1 := 101
-│           │       ├── 2 := 108
-│           │       ├── 3 := 108
-│           │       ├── 4 := 111
-│           │       ├── 5 := 44
-│           │       ├── 6 := 32
-│           │       ├── 7 := 119
-│           │       ├── 8 := 111
-│           │       ├── 9 := 114
-│           │       ~
-│           │       └── 13 := 10
-│           └── footer <- gzip.footer :=
-│               ├── crc <- base.u32le := 2069210904
-│               └── length <- base.u32le := 14
-└── end <- end-of-input
+└── data <- _ |...| _ :=
+    └── gzip <- gzip.main :=
+        └── 0 :=
+            ├── header <- gzip.header :=
+            │   ├── magic <- (...)
+            │   ├── method <- base.u8 := 8
+            │   ├── file-flags <- map (packed_bits -> { ... }) U8 := bool-flags[fname]
+            │   ├── timestamp <- base.u32le := 1683505215
+            │   ├── compression-flags <- base.u8 := 0
+            │   └── os-id <- base.u8 := 3
+            ├── fextra <- maybe (header.file-flags.fextra) gzip.fextra := none
+            ├── fname <- maybe (header.file-flags.fname) gzip.fname := { some := "test1" }
+            ├── fcomment <- maybe (header.file-flags.fcomment) gzip.fcomment := none
+            ├── fhcrc <- maybe (header.file-flags.fhcrc) gzip.fhcrc := none
+            ├── data <- bits deflate.main :=
+            │   ├── blocks <- repeat-until-last (x -> x.final == 1) deflate.block :=
+            │   │   └── 0 <- deflate.block :=
+            │   │       ├── final <- base.bit := 1
+            │   │       ├── type <- map (bits -> bits.0 | bits.1 << 1) (...) := 1
+            │   │       └── data <- match type { ... } :=
+            │   │           └── fixed_huffman <- deflate.fixed_huffman :=
+            │   │               ├── codes <- dynamic format huffman (repeat-until-last (x -> as-u16 (x.code) == 256) { ... }) :=
+            │   │               │   ├── 0 :=
+            │   │               │   │   ├── code <- apply := 72
+            │   │               │   │   └── extra <- match code { ... } := none
+            │   │               │   ├── 1 :=
+            │   │               │   │   ├── code <- apply := 101
+            │   │               │   │   └── extra <- match code { ... } := none
+            │   │               │   ├── 2 :=
+            │   │               │   │   ├── code <- apply := 108
+            │   │               │   │   └── extra <- match code { ... } := none
+            │   │               │   ├── 3 :=
+            │   │               │   │   ├── code <- apply := 108
+            │   │               │   │   └── extra <- match code { ... } := none
+            │   │               │   ├── 4 :=
+            │   │               │   │   ├── code <- apply := 111
+            │   │               │   │   └── extra <- match code { ... } := none
+            │   │               │   ├── 5 :=
+            │   │               │   │   ├── code <- apply := 44
+            │   │               │   │   └── extra <- match code { ... } := none
+            │   │               │   ├── 6 :=
+            │   │               │   │   ├── code <- apply := 32
+            │   │               │   │   └── extra <- match code { ... } := none
+            │   │               │   ├── 7 :=
+            │   │               │   │   ├── code <- apply := 119
+            │   │               │   │   └── extra <- match code { ... } := none
+            │   │               │   ├── 8 :=
+            │   │               │   │   ├── code <- apply := 111
+            │   │               │   │   └── extra <- match code { ... } := none
+            │   │               │   ├── 9 :=
+            │   │               │   │   ├── code <- apply := 114
+            │   │               │   │   └── extra <- match code { ... } := none
+            │   │               │   ~
+            │   │               │   └── 14 :=
+            │   │               │       ├── code <- apply := 256
+            │   │               │       └── extra <- match code { ... } := none
+            │   │               └── codes-values <- compute flat-map (x -> match x.code { ... }) codes :=
+            │   │                   ├── 0 := { literal := 72 }
+            │   │                   ├── 1 := { literal := 101 }
+            │   │                   ├── 2 := { literal := 108 }
+            │   │                   ├── 3 := { literal := 108 }
+            │   │                   ├── 4 := { literal := 111 }
+            │   │                   ├── 5 := { literal := 44 }
+            │   │                   ├── 6 := { literal := 32 }
+            │   │                   ├── 7 := { literal := 119 }
+            │   │                   ├── 8 := { literal := 111 }
+            │   │                   ├── 9 := { literal := 114 }
+            │   │                   ~
+            │   │                   └── 13 := { literal := 10 }
+            │   ├── codes <- compute flat-map (x -> match x.data { ... }) blocks :=
+            │   │   ├── 0 := { literal := 72 }
+            │   │   ├── 1 := { literal := 101 }
+            │   │   ├── 2 := { literal := 108 }
+            │   │   ├── 3 := { literal := 108 }
+            │   │   ├── 4 := { literal := 111 }
+            │   │   ├── 5 := { literal := 44 }
+            │   │   ├── 6 := { literal := 32 }
+            │   │   ├── 7 := { literal := 119 }
+            │   │   ├── 8 := { literal := 111 }
+            │   │   ├── 9 := { literal := 114 }
+            │   │   ~
+            │   │   └── 13 := { literal := 10 }
+            │   └── inflate <- compute flat-map-list (tuple_var -> pat-bind [(buffer, symbol) = tuple_var] match symbol { ... }) codes :=
+            │       ├── 0 := 72
+            │       ├── 1 := 101
+            │       ├── 2 := 108
+            │       ├── 3 := 108
+            │       ├── 4 := 111
+            │       ├── 5 := 44
+            │       ├── 6 := 32
+            │       ├── 7 := 119
+            │       ├── 8 := 111
+            │       ├── 9 := 114
+            │       ~
+            │       └── 13 := 10
+            └── footer <- gzip.footer :=
+                ├── crc <- base.u32le := 2069210904
+                └── length <- base.u32le := 14

@@ -1,13 +1,10 @@
-├── data <- _ |...| _ :=
-│   └── waldo <- waldo.main :=
-│       ├── where <- base.u64be := 42
-│       ├── noise <- repeat [= 255]
-│       ├── sep <- [= 0]
-│       ├── here <- pos := 12
-│       └── waldo <- with-relative-offset here (where - here) (...) :=
-│           ├── 0 <- [= 87]
-│           ├── 1 <- [= 97]
-│           ├── 2 <- [= 108]
-│           ├── 3 <- [= 100]
-│           └── 4 <- [= 111]
-└── end <- end-of-input
+└── data <- _ |...| _ :=
+    └── waldo <- waldo.main :=
+        ├── where <- base.u64be := 42
+        ├── noise <- repeat [= 255]
+        └── waldo <- with-relative-offset _here (where - _here) (...) :=
+            ├── 0 <- [= 87]
+            ├── 1 <- [= 97]
+            ├── 2 <- [= 108]
+            ├── 3 <- [= 100]
+            └── 4 <- [= 111]

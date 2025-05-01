@@ -405,7 +405,6 @@ codes_values: Vec<deflate_main_codes>
 /// expected size: 56
 #[derive(Debug, Clone)]
 pub struct deflate_uncompressed {
-align: (),
 len: u16,
 nlen: u16,
 bytes: Vec<u8>,
@@ -3924,8 +3923,7 @@ gvar: Option<opentype_gvar_table>,
 kern: Option<opentype_kern_table>,
 stat: Option<opentype_stat_table>,
 vhea: Option<opentype_hhea_table>,
-vmtx: Option<opentype_hmtx_table>,
-__skip: ()
+vmtx: Option<opentype_hmtx_table>
 }
 
 /// expected size: 2160
@@ -3974,8 +3972,7 @@ pub struct opentype_ttc_header {
 ttc_tag: u32,
 major_version: u16,
 minor_version: u16,
-header: opentype_ttc_header_header,
-__skip: ()
+header: opentype_ttc_header_header
 }
 
 /// expected size: 2168
@@ -4355,8 +4352,7 @@ pad: Vec<u8>
 #[derive(Debug, Clone)]
 pub struct tar_header_with_data {
 header: tar_header,
-file: Vec<u8>,
-__padding: ()
+file: Vec<u8>
 }
 
 /// expected size: 72
@@ -4367,15 +4363,12 @@ __padding: Vec<u8>,
 __trailing: Vec<u8>
 }
 
-/// expected size: 48
+/// expected size: 40
 #[derive(Debug, Clone)]
 pub struct waldo_main {
 r#where: u64,
 noise: Vec<u8>,
-sep: u8,
-here: u64,
-waldo: (u8, u8, u8, u8, u8),
-__rem: ()
+waldo: (u8, u8, u8, u8, u8)
 }
 
 /// expected size: 2184
@@ -4458,11 +4451,10 @@ buf: Vec<u8>
 }
 
 /// expected size: 2184
-/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [InDef(InEnum { variants: [DirectHeap, Noop, Noop, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap] })] })] }, Noop, DirectHeap, Noop, Noop, Noop, Noop, Noop, Noop, Noop] }), Noop] }, Layout { size: 104, align: 8 (1 << 3) })
+/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [InDef(InEnum { variants: [DirectHeap, Noop, Noop, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap] })] })] }, Noop, DirectHeap, Noop, Noop, Noop, Noop, Noop, Noop, Noop] })] }, Layout { size: 104, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
 pub struct main {
-data: main_data,
-end: ()
+data: main_data
 }
 
 fn Decoder_main<>(_input: &mut Parser<'_>) -> Result<main, ParseError> {
@@ -4668,8 +4660,8 @@ return Err(_e);
 }
 };
 })())?;
-let end = _input.finish()?;
-PResult::Ok(main { data, end })
+_input.finish()?;
+PResult::Ok(main { data })
 }
 
 fn Decoder_waldo_main<>(_input: &mut Parser<'_>) -> Result<waldo_main, ParseError> {
@@ -4713,7 +4705,7 @@ break
 }
 accum
 };
-let sep = {
+{
 let b = _input.read_byte()?;
 if b == 0 {
 b
@@ -4721,9 +4713,9 @@ b
 return Err(ParseError::ExcludedBranch(4260205764162136487u64));
 }
 };
-let here = _input.get_offset_u64();
+let _here = _input.get_offset_u64();
 let waldo = {
-let tgt_offset = here + (try_sub!(r#where, here, 13646096770106105413u64));
+let tgt_offset = _here + (try_sub!(r#where, _here, 13646096770106105413u64));
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let field0 = ((|| {
@@ -4771,8 +4763,8 @@ PResult::Ok((field0, field1, field2, field3, field4))
 _input.close_peek_context()?;
 ret
 };
-let __rem = _input.skip_remainder();
-PResult::Ok(waldo_main { r#where, noise, sep, here, waldo, __rem })
+_input.skip_remainder();
+PResult::Ok(waldo_main { r#where, noise, waldo })
 }
 
 fn Decoder3<>(_input: &mut Parser<'_>) -> Result<Vec<u32>, ParseError> {
@@ -6306,8 +6298,8 @@ let inner = unknown.clone();
 opentype_ttc_header_header::UnknownVersion(inner)
 }
 };
-let __skip = _input.skip_remainder();
-PResult::Ok(opentype_ttc_header { ttc_tag, major_version, minor_version, header, __skip })
+_input.skip_remainder();
+PResult::Ok(opentype_ttc_header { ttc_tag, major_version, minor_version, header })
 }
 
 fn Decoder30<>(_input: &mut Parser<'_>) -> Result<u16, ParseError> {
@@ -6861,8 +6853,8 @@ None => {
 None
 }
 };
-let __skip = _input.skip_remainder();
-PResult::Ok(opentype_table_directory_table_links { cmap, head, hhea, maxp, hmtx, name, os2, post, cvt, fpgm, loca, glyf, prep, gasp, base, gdef, gpos, gsub, fvar, gvar, kern, stat, vhea, vmtx, __skip })
+_input.skip_remainder();
+PResult::Ok(opentype_table_directory_table_links { cmap, head, hhea, maxp, hmtx, name, os2, post, cvt, fpgm, loca, glyf, prep, gasp, base, gdef, gpos, gsub, fvar, gvar, kern, stat, vhea, vmtx })
 }
 
 fn Decoder_opentype_cmap_table<>(_input: &mut Parser<'_>) -> Result<opentype_cmap_table, ParseError> {
@@ -16395,8 +16387,8 @@ accum.push((Decoder25(_input))?);
 }
 accum
 };
-let __padding = _input.skip_align(512)?;
-PResult::Ok(tar_header_with_data { header, file, __padding })
+_input.skip_align(512)?;
+PResult::Ok(tar_header_with_data { header, file })
 }
 
 fn Decoder_tar_header<>(_input: &mut Parser<'_>) -> Result<tar_header, ParseError> {
@@ -17883,7 +17875,7 @@ _input.read_byte()
 }
 
 fn Decoder_deflate_uncompressed<>(_input: &mut Parser<'_>) -> Result<deflate_uncompressed, ParseError> {
-let align = _input.skip_align(8)?;
+_input.skip_align(8)?;
 let len = {
 let bits = {
 let field0 = (Decoder174(_input))?;
@@ -17949,7 +17941,7 @@ bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8 | bits.5 
 accum
 };
 let codes_values = (try_flat_map_vec(bytes.iter().cloned(), |x: u8| PResult::Ok([deflate_main_codes::literal(x)].to_vec())))?;
-PResult::Ok(deflate_uncompressed { align, len, nlen, bytes, codes_values })
+PResult::Ok(deflate_uncompressed { len, nlen, bytes, codes_values })
 }
 
 fn Decoder_deflate_fixed_huffman<>(_input: &mut Parser<'_>) -> Result<deflate_fixed_huffman, ParseError> {
