@@ -63,7 +63,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
 
     module.define_format(
         "main",
-        record([
+        record_auto([
             (
                 "data",
                 union_nondet(vec![
@@ -84,7 +84,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                     ("text", text.call()),
                 ]),
             ),
-            ("end", Format::EndOfInput),
+            ("__end", Format::EndOfInput),
         ]),
     )
 }

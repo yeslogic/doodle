@@ -4987,7 +4987,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ValueType::Seq(Box::new(table_type)),
                 ),
             ],
-            record([
+            record_auto([
                 (
                     "cmap",
                     required_table(START_VAR, var("tables"), magic(b"cmap"), cmap_table.call()),
@@ -5219,7 +5219,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         module.define_format_args(
             "opentype.ttc_header",
             vec![START_ARG],
-            record([
+            record_auto([
                 (
                     "ttc_tag",
                     where_lambda(
