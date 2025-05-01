@@ -290,7 +290,6 @@
         │   └── adler32 <- base.u32be := 1593402930
         ├── more-chunks <- repeat png.chunk(...) := []
         └── iend <- png.iend :=
-            ├── length <- assert (length -> length <= 2147483647) base.u32be := 0
+            ├── length <- assert (length -> length == 0) base.u32be := 0
             ├── tag <- png.iend-tag
-            ├── data <- slice length png.iend-data
             └── crc <- base.u32be := 2923585666
