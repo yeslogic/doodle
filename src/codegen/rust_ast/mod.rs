@@ -1977,6 +1977,10 @@ impl ToFragmentExt for RustExpr {
                 .to_fragment_precedence(Precedence::Projection)
                 .cat(Fragment::Char('?')),
             RustExpr::Operation(op) => op.to_fragment_precedence(prec),
+            // REVIEW - special rule for reducing blocks to inline expressions when there are no statements; should this be a simplification rule or a printing rule?
+            RustExpr::BlockScope(stmts, val) if stmts.is_empty() => {
+                val.to_fragment_precedence(prec)
+            }
             RustExpr::BlockScope(stmts, val) => {
                 RustStmt::block(stmts.iter().chain(std::iter::once(&RustStmt::Return(
                     ReturnKind::Implicit,
@@ -3183,3 +3187,388 @@ pub mod short_circuit {
     }
 }
 pub use short_circuit::{ShortCircuit, ValueCheckpoint};
+
+pub mod var_container {
+    use super::{
+        ClosureBody, MatchCaseLHS, RustCatchAll, RustClosure, RustClosureHead, RustControl,
+        RustEntity, RustExpr, RustMacro, RustMatchBody, RustMatchCase, RustOp, RustPattern,
+        RustStmt, StructExpr,
+    };
+
+    pub trait VarBinder {
+        /// Returns `true` if self introduces a binding of `var` that
+        /// shadows the same identifier's bindings from any external scopes.
+        fn binds_var<Name: AsRef<str> + ?Sized>(&self, var: &Name) -> bool;
+    }
+
+    pub trait VarContainer {
+        /// Returns `true` if an unbound (external) reference is made to a variable
+        /// of the specified identifier.
+        fn contains_var_ref<Name>(&self, var: &Name) -> bool
+        where
+            Name: AsRef<str> + ?Sized;
+    }
+
+    impl<'a> VarContainer for [RustStmt] {
+        fn contains_var_ref<Name>(&self, var: &Name) -> bool
+        where
+            Name: AsRef<str> + ?Sized,
+        {
+            for stmt in self.iter() {
+                if stmt.binds_var(var) {
+                    break;
+                }
+                if stmt.contains_var_ref(var) {
+                    return true;
+                }
+            }
+            false
+        }
+    }
+
+    impl VarBinder for [RustStmt] {
+        fn binds_var<Name>(&self, var: &Name) -> bool
+        where
+            Name: AsRef<str> + ?Sized,
+        {
+            for stmt in self.iter() {
+                if stmt.binds_var(var) {
+                    return true;
+                }
+            }
+            false
+        }
+    }
+
+    impl VarContainer for RustStmt {
+        fn contains_var_ref<Name>(&self, var: &Name) -> bool
+        where
+            Name: AsRef<str> + ?Sized,
+        {
+            match self {
+                RustStmt::Let(.., value) => value.contains_var_ref(var),
+                RustStmt::LetPattern(.., value) => value.contains_var_ref(var),
+                RustStmt::Reassign(binding, value) => {
+                    binding == var.as_ref() || value.contains_var_ref(var)
+                }
+                RustStmt::Control(ctrl) => ctrl.contains_var_ref(var),
+                RustStmt::Expr(expr) => expr.contains_var_ref(var),
+                RustStmt::Return(_, expr) => expr.contains_var_ref(var),
+            }
+        }
+    }
+
+    impl VarBinder for RustStmt {
+        fn binds_var<Name>(&self, var: &Name) -> bool
+        where
+            Name: AsRef<str> + ?Sized,
+        {
+            match self {
+                RustStmt::Let(_, name, ..) => name.as_ref() == var.as_ref(),
+                RustStmt::LetPattern(pat, ..) => pat.binds_var(var),
+                _ => false,
+            }
+        }
+    }
+
+    impl VarBinder for RustPattern {
+        fn binds_var<Name>(&self, var: &Name) -> bool
+        where
+            Name: AsRef<str> + ?Sized,
+        {
+            match self {
+                // Non-binding patterns
+                RustPattern::PrimLiteral(..) | RustPattern::PrimRange(..) => false,
+                RustPattern::Fill => false,
+                RustPattern::Option(None) => false,
+                RustPattern::CatchAll(None) => false,
+
+                // nested patterns
+                RustPattern::TupleLiteral(pats) | RustPattern::ArrayLiteral(pats) => {
+                    pats.iter().any(|pat| pat.binds_var(var))
+                }
+                RustPattern::Option(Some(pat)) | RustPattern::Variant(.., pat) => {
+                    pat.binds_var(var)
+                }
+
+                // binding patterns
+                RustPattern::BindRef(lab) | RustPattern::CatchAll(Some(lab)) => {
+                    lab.as_ref() == var.as_ref()
+                }
+            }
+        }
+    }
+
+    impl<'a> VarContainer for [RustExpr] {
+        fn contains_var_ref<Name>(&self, var: &Name) -> bool
+        where
+            Name: AsRef<str> + ?Sized,
+        {
+            for expr in self.iter() {
+                if expr.contains_var_ref(var) {
+                    return true;
+                }
+            }
+            false
+        }
+    }
+
+    impl VarBinder for [RustExpr] {
+        fn binds_var<Name>(&self, _: &Name) -> bool
+        where
+            Name: AsRef<str> + ?Sized,
+        {
+            false
+        }
+    }
+
+    impl VarContainer for StructExpr {
+        fn contains_var_ref<Name>(&self, var: &Name) -> bool
+        where
+            Name: AsRef<str> + ?Sized,
+        {
+            match self {
+                StructExpr::EmptyExpr => false,
+                StructExpr::TupleExpr(elts) => elts.contains_var_ref(var),
+                StructExpr::RecordExpr(flds) => {
+                    for (lab, expr) in flds.iter() {
+                        match expr {
+                            Some(expr) => {
+                                if expr.contains_var_ref(var) {
+                                    return true;
+                                }
+                            }
+                            None => {
+                                if lab.as_ref() == var.as_ref() {
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                    false
+                }
+            }
+        }
+    }
+
+    impl VarBinder for StructExpr {
+        fn binds_var<Name>(&self, _: &Name) -> bool
+        where
+            Name: AsRef<str> + ?Sized,
+        {
+            false
+        }
+    }
+
+    impl VarContainer for RustExpr {
+        fn contains_var_ref<Name>(&self, var: &Name) -> bool
+        where
+            Name: AsRef<str> + ?Sized,
+        {
+            match self {
+                RustExpr::Entity(ent) => ent.contains_var_ref(var),
+                RustExpr::FieldAccess(expr, ..) => expr.contains_var_ref(var),
+                RustExpr::MethodCall(recv, .., args) => {
+                    recv.contains_var_ref(var) || args.iter().any(|arg| arg.contains_var_ref(var))
+                }
+                RustExpr::FunctionCall(fun, args) => {
+                    fun.contains_var_ref(var) || args.iter().any(|arg| arg.contains_var_ref(var))
+                }
+                RustExpr::Tuple(elts) => elts.contains_var_ref(var),
+                RustExpr::Struct(.., struct_expr) => struct_expr.contains_var_ref(var),
+
+                RustExpr::CloneOf(inner)
+                | RustExpr::Deref(inner)
+                | RustExpr::Borrow(inner)
+                | RustExpr::ResultOk(.., inner)
+                | RustExpr::BorrowMut(inner) => inner.contains_var_ref(var),
+
+                RustExpr::Try(inner) => inner.contains_var_ref(var),
+                RustExpr::Operation(op) => op.contains_var_ref(var),
+                RustExpr::BlockScope(stmts, expr) => {
+                    stmts.contains_var_ref(var)
+                        || (!stmts.binds_var(var) && expr.contains_var_ref(var))
+                }
+                RustExpr::Macro(RustMacro::Matches(expr, ..)) => expr.contains_var_ref(var),
+                RustExpr::Control(ctrl) => ctrl.contains_var_ref(var),
+                RustExpr::PrimitiveLit(..) => false,
+                RustExpr::ArrayLit(rust_exprs) => {
+                    rust_exprs.iter().any(|elt| elt.contains_var_ref(var))
+                }
+                RustExpr::Closure(lambda) => lambda.contains_var_ref(var),
+
+                RustExpr::Index(expr, ix) => expr.contains_var_ref(var) || ix.contains_var_ref(var),
+                RustExpr::Slice(expr, ix0, ix1) => {
+                    expr.contains_var_ref(var)
+                        || ix0.contains_var_ref(var)
+                        || ix1.contains_var_ref(var)
+                }
+                RustExpr::RangeExclusive(lo, hi) => {
+                    lo.contains_var_ref(var) || hi.contains_var_ref(var)
+                }
+            }
+        }
+    }
+
+    impl VarContainer for RustClosure {
+        fn contains_var_ref<Name>(&self, var: &Name) -> bool
+        where
+            Name: AsRef<str> + ?Sized,
+        {
+            if self.binds_var(var) {
+                return false;
+            }
+
+            match &self.1 {
+                ClosureBody::Expression(rust_expr) => rust_expr.contains_var_ref(var),
+                ClosureBody::Statements(rust_stmts) => rust_stmts.contains_var_ref(var),
+            }
+        }
+    }
+
+    impl VarBinder for RustClosure {
+        fn binds_var<Name>(&self, var: &Name) -> bool
+        where
+            Name: AsRef<str> + ?Sized,
+        {
+            match &self.0 {
+                RustClosureHead::Thunk => false,
+                RustClosureHead::SimpleVar(head_var, ..) => head_var.as_ref() == var.as_ref(),
+            }
+        }
+    }
+
+    impl VarContainer for RustOp {
+        fn contains_var_ref<Name>(&self, var: &Name) -> bool
+        where
+            Name: AsRef<str> + ?Sized,
+        {
+            match self {
+                RustOp::InfixOp(_, lhs, rhs) => {
+                    lhs.contains_var_ref(var) || rhs.contains_var_ref(var)
+                }
+                RustOp::PrefixOp(_, expr) => expr.contains_var_ref(var),
+                RustOp::AsCast(expr, _) => expr.contains_var_ref(var),
+            }
+        }
+    }
+
+    impl VarContainer for RustEntity {
+        fn contains_var_ref<Name>(&self, var: &Name) -> bool
+        where
+            Name: AsRef<str> + ?Sized,
+        {
+            match self {
+                RustEntity::Local(lab) => lab.as_ref() == var.as_ref(),
+                RustEntity::Scoped(..) => false,
+            }
+        }
+    }
+
+    impl VarContainer for RustControl {
+        fn contains_var_ref<Name>(&self, var: &Name) -> bool
+        where
+            Name: AsRef<str> + ?Sized,
+        {
+            match self {
+                RustControl::Break => false,
+                RustControl::ForIter(_, expr, body) => {
+                    expr.contains_var_ref(var)
+                        || (!self.binds_var(var) && body.contains_var_ref(var))
+                }
+                RustControl::ForRange0(_, lim, body) => {
+                    lim.contains_var_ref(var)
+                        || (!self.binds_var(var) && body.contains_var_ref(var))
+                }
+                RustControl::If(cond, then, o_else) => {
+                    cond.contains_var_ref(var)
+                        || then.contains_var_ref(var)
+                        || o_else
+                            .as_ref()
+                            .is_some_and(|branch| branch.contains_var_ref(var))
+                }
+                RustControl::While(cond, body) => {
+                    cond.contains_var_ref(var) || body.contains_var_ref(var)
+                }
+                RustControl::Loop(body) => body.contains_var_ref(var),
+                RustControl::Match(expr, match_body) => {
+                    expr.contains_var_ref(var) || match_body.contains_var_ref(var)
+                }
+            }
+        }
+    }
+
+    impl VarBinder for RustControl<Vec<RustStmt>> {
+        fn binds_var<Name>(&self, var: &Name) -> bool
+        where
+            Name: AsRef<str> + ?Sized,
+        {
+            match self {
+                RustControl::ForIter(lab, ..) | RustControl::ForRange0(lab, ..) => {
+                    lab.as_ref() == var.as_ref()
+                }
+                RustControl::Break
+                | RustControl::If(..)
+                | RustControl::While(..)
+                | RustControl::Loop(..)
+                | RustControl::Match(..) => false,
+            }
+        }
+    }
+
+    impl VarContainer for RustMatchBody {
+        fn contains_var_ref<Name>(&self, var: &Name) -> bool
+        where
+            Name: AsRef<str> + ?Sized,
+        {
+            match self {
+                RustMatchBody::Irrefutable(items) => {
+                    items.iter().any(|branch| branch.contains_var_ref(var))
+                }
+                RustMatchBody::Refutable(items, catch_all) => {
+                    items.iter().any(|branch| branch.contains_var_ref(var))
+                        || (if let RustCatchAll::ReturnErrorValue { value } = catch_all {
+                            value.contains_var_ref(var)
+                        } else {
+                            false
+                        })
+                }
+            }
+        }
+    }
+
+    impl VarContainer for RustMatchCase {
+        fn contains_var_ref<Name>(&self, var: &Name) -> bool
+        where
+            Name: AsRef<str> + ?Sized,
+        {
+            self.0.contains_var_ref(var) || (!self.0.binds_var(var) && self.1.contains_var_ref(var))
+        }
+    }
+
+    impl VarContainer for MatchCaseLHS {
+        fn contains_var_ref<Name>(&self, var: &Name) -> bool
+        where
+            Name: AsRef<str> + ?Sized,
+        {
+            match self {
+                MatchCaseLHS::Pattern(..) => false,
+                MatchCaseLHS::WithGuard(pat, expr) => {
+                    !pat.binds_var(var) && expr.contains_var_ref(var)
+                }
+            }
+        }
+    }
+
+    impl VarBinder for MatchCaseLHS {
+        fn binds_var<Name>(&self, var: &Name) -> bool
+        where
+            Name: AsRef<str> + ?Sized,
+        {
+            match self {
+                MatchCaseLHS::Pattern(pat) | MatchCaseLHS::WithGuard(pat, ..) => pat.binds_var(var),
+            }
+        }
+    }
+}
+pub(crate) use var_container::VarContainer;
