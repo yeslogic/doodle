@@ -4651,13 +4651,13 @@ PResult::Ok(main_data::text(inner))
 })();
 match res {
 Ok(inner) => {
-return PResult::Ok(inner);
+PResult::Ok(inner)
 },
 
 Err(_e) => {
-return Err(_e);
+Err(_e)
 }
-};
+}
 })())?;
 _input.finish()?;
 PResult::Ok(main { data })
@@ -19954,13 +19954,13 @@ PResult::Ok(png_itxt_text::compressed(inner))
 })();
 match res {
 Ok(inner) => {
-return PResult::Ok(inner);
+PResult::Ok(inner)
 },
 
 Err(_e) => {
-return Err(_e);
+Err(_e)
 }
-};
+}
 })())?
 },
 
