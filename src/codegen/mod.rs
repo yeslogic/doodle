@@ -1714,6 +1714,9 @@ enum GenExpr {
     Control(Box<RustControl<GenBlock>>),
     /// Wrapping a `GenExpr` in an `Ok` value
     ResultOk(Option<Label>, Box<GenExpr>),
+    /// Wrapping a `GenExpr` in an `Err` value
+    #[expect(dead_code)]
+    ResultErr(Box<GenExpr>),
     /// Wrapping a `GenExpr` in a `Some` value
     WrapSome(Box<GenExpr>),
     /// Applies the `?` operator to a given `GenExpr`
@@ -1723,9 +1726,44 @@ enum GenExpr {
 }
 
 impl GenExpr {
-    fn wrap_ok<Name: IntoLabel>(self, qual: Option<Name>) -> GenExpr {
+    fn wrap_ok<Name>(self, qual: Option<Name>) -> GenExpr where Name: IntoLabel + Clone {
         match self {
-            Self::Try(x) => *x,
+            GenExpr::ResultErr(..) => self,
+            GenExpr::Try(x) => *x,
+            GenExpr::Control(ctrl) => match *ctrl {
+                RustControl::Match(head, body) => {
+                    let new_body = {
+                        match body {
+                            RustMatchBody::Irrefutable(cases) => {
+                                let mut new_cases = Vec::with_capacity(cases.len());
+                                for (lhs, GenBlock { stmts, ret }) in cases {
+                                    let new_case = if let Some(expr) = ret {
+                                        (lhs, GenBlock { stmts, ret: Some(expr.wrap_ok(qual.clone()))})
+                                    } else {
+                                        (lhs, GenBlock { stmts, ret })
+                                    };
+                                    new_cases.push(new_case)
+                                }
+                                RustMatchBody::Irrefutable(new_cases)
+                            }
+                            RustMatchBody::Refutable(cases, catchall) => {
+                                let mut new_cases = Vec::with_capacity(cases.len());
+                                for (lhs, GenBlock { stmts, ret }) in cases {
+                                    let new_case = if let Some(expr) = ret {
+                                        (lhs, GenBlock { stmts, ret: Some(expr.wrap_ok(qual.clone()))})
+                                    } else {
+                                        (lhs, GenBlock { stmts, ret })
+                                    };
+                                    new_cases.push(new_case)
+                                }
+                                RustMatchBody::Refutable(new_cases, catchall)
+                            }
+                        }
+                    };
+                    Self::Control(Box::new(RustControl::Match(head, new_body)))
+                }
+                other => Self::ResultOk(qual.map(Name::into), Box::new(Self::Control(Box::new(other)))),
+            }
             other => Self::ResultOk(qual.map(Name::into), Box::new(other)),
         }
     }
@@ -1792,6 +1830,7 @@ impl From<GenExpr> for RustExpr {
             GenExpr::Control(ctrl) => RustExpr::Control(Box::new(RustControl::translate(*ctrl))),
             GenExpr::WrapSome(expr) => RustExpr::from(*expr).wrap_some(),
             GenExpr::ResultOk(qual, expr) => RustExpr::from(*expr).wrap_ok(qual),
+            GenExpr::ResultErr(expr) => RustExpr::from(*expr).err(),
             GenExpr::Try(expr) => RustExpr::from(*expr).wrap_try(),
             GenExpr::CallThunk(thunk) => {
                 let closure = if thunk.thunk_body.ret.is_none() {
@@ -1811,7 +1850,7 @@ impl ShortCircuit for GenExpr {
             GenExpr::Embed(expr) => expr.is_short_circuiting(),
             GenExpr::TyValCon(expr) => expr.is_short_circuiting(),
             GenExpr::Control(ctrl) => ctrl.is_short_circuiting(),
-            GenExpr::ResultOk(.., expr) | GenExpr::WrapSome(expr) => expr.is_short_circuiting(),
+            GenExpr::ResultOk(.., expr) | GenExpr::ResultErr(expr) | GenExpr::WrapSome(expr) => expr.is_short_circuiting(),
             GenExpr::BlockScope(block) => block.is_short_circuiting(),
             GenExpr::Try(..) => true,
             GenExpr::CallThunk(..) => false,
@@ -2027,6 +2066,13 @@ impl GenBlock {
     pub fn explicit_return(expr: RustExpr) -> Self {
         GenBlock {
             stmts: vec![GenStmt::Embed(RustStmt::Return(ReturnKind::Keyword, expr))],
+            ret: None,
+        }
+    }
+
+    pub fn implicit_return(expr: RustExpr) -> Self {
+        GenBlock {
+            stmts: vec![GenStmt::Embed(RustStmt::Return(ReturnKind::Implicit, expr))],
             ret: None,
         }
     }
@@ -3265,54 +3311,66 @@ where
         match self {
             ParallelLogic::Alts(alts) => {
                 let l = alts.len();
+                assert_ne!(alts.len(), 0, "ParallelLogic::Alts found with empty list of parse-alternations");
 
-                let stmts = Iterator::chain(
-                    std::iter::once(GenStmt::Embed(RustStmt::Expr(
+                let mut stmts = Vec::with_capacity(2 * l - 1);
+                let mut last_ctrl = None;
+
+                {
+                    let start_alternation = GenStmt::Embed(RustStmt::Expr(
                         RustExpr::local(ctxt.input_varname.clone()).call_method("start_alt"),
-                    ))),
-                    alts.iter().enumerate().flat_map(|(ix, branch_cl)| {
-                        let on_err = match l - ix {
-                            0 => unreachable!("index matches overall length"),
-                            1 => GenBlock::explicit_return(RustExpr::err(RustExpr::local("_e"))),
-                            2 => GenBlock::mono_statement(RustStmt::Expr(
-                                RustExpr::local(ctxt.input_varname.clone())
-                                    .call_method_with("next_alt", [RustExpr::TRUE])
-                                    .wrap_try(),
-                            )),
-                            3.. => GenBlock::mono_statement(RustStmt::Expr(
-                                RustExpr::local(ctxt.input_varname.clone())
-                                    .call_method_with("next_alt", [RustExpr::FALSE])
-                                    .wrap_try(),
-                            )),
-                        };
-                        let branch_result = branch_cl.to_ast(ctxt).abstracted_try();
-                        let bind_res = GenStmt::assign("res", branch_result);
-                        let ctrl = RustControl::Match(
-                            RustExpr::local("res"),
-                            RustMatchBody::Irrefutable(vec![
-                                (
-                                    MatchCaseLHS::Pattern(RustPattern::Variant(
-                                        Constructor::Simple(Label::from("Ok")),
-                                        Box::new(RustPattern::CatchAll(Some(Label::from("inner")))),
-                                    )),
-                                    GenBlock::explicit_return(
-                                        RustExpr::local("inner").wrap_ok(Some("PResult")),
-                                    ),
-                                ),
-                                (
-                                    MatchCaseLHS::Pattern(RustPattern::Variant(
-                                        Constructor::Simple(Label::from("Err")),
-                                        Box::new(RustPattern::CatchAll(Some(Label::from("_e")))),
-                                    )),
-                                    on_err,
-                                ),
-                            ]),
-                        );
-                        [bind_res, GenStmt::Expr(GenExpr::Control(Box::new(ctrl)))]
-                    }),
-                )
-                .collect();
-                GenBlock::from_parts(stmts, None).local_try()
+                    ));
+
+                    stmts.push(start_alternation);
+                }
+
+                for (ix, branch_cl) in alts.iter().enumerate() {
+                    let on_match = |ret_expr: RustExpr| match l - ix {
+                        0 => unreachable!("index matches overall length"),
+                        1 => GenBlock::implicit_return(ret_expr),
+                        2.. => GenBlock::explicit_return(ret_expr),
+                    };
+                    let on_err = match l - ix {
+                        0 => unreachable!("index matches overall length"),
+                        1 => GenBlock::implicit_return(RustExpr::ResultErr(Box::new(RustExpr::local("_e")))),
+                        2 => GenBlock::mono_statement(RustStmt::Expr(
+                            RustExpr::local(ctxt.input_varname.clone())
+                                .call_method_with("next_alt", [RustExpr::TRUE])
+                                .wrap_try(),
+                        )),
+                        3.. => GenBlock::mono_statement(RustStmt::Expr(
+                            RustExpr::local(ctxt.input_varname.clone())
+                                .call_method_with("next_alt", [RustExpr::FALSE])
+                                .wrap_try(),
+                        )),
+                    };
+                    let branch_result = branch_cl.to_ast(ctxt).abstracted_try();
+                    let bind_res = GenStmt::assign("res", branch_result);
+                    let ctrl = RustControl::Match(
+                        RustExpr::local("res"),
+                        RustMatchBody::Irrefutable(vec![
+                            (
+                                MatchCaseLHS::Pattern(RustPattern::Variant(
+                                    Constructor::Simple(Label::from("Ok")),
+                                    Box::new(RustPattern::CatchAll(Some(Label::from("inner")))),
+                                )),
+                                on_match(RustExpr::local("inner").wrap_ok(Some("PResult")))
+                            ),
+                            (
+                                MatchCaseLHS::Pattern(RustPattern::Variant(
+                                    Constructor::Simple(Label::from("Err")),
+                                    Box::new(RustPattern::CatchAll(Some(Label::from("_e")))),
+                                )),
+                                on_err,
+                            ),
+                        ]),
+                    );
+                    if let Some(expr) = last_ctrl.replace(GenExpr::Control(Box::new(ctrl))) {
+                        stmts.push(GenStmt::Expr(expr));
+                    }
+                    stmts.push(bind_res);
+                }
+                GenBlock::from_parts(stmts, last_ctrl).local_try()
             }
         }
     }
