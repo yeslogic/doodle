@@ -33,11 +33,7 @@ pub fn main(
         record([
             (
                 "length",
-                where_lambda(
-                    base.u32be(),
-                    "length",
-                    expr_eq(var("length"), Expr::U32(0)),
-                ),
+                where_lambda(base.u32be(), "length", expr_eq(var("length"), Expr::U32(0))),
             ),
             ("tag", tag),
             ("crc", base.u32be()), // REVIEW - do we want to attempt to validate this?

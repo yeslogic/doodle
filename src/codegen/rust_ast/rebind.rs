@@ -114,7 +114,7 @@ impl Rebindable for RustExpr {
     fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         match self {
             RustExpr::Entity(ent) => ent.rebind(table),
-            RustExpr::ResultOk(.., inner) => {
+            RustExpr::ResultOk(.., inner) | RustExpr::ResultErr(inner) => {
                 inner.rebind(table);
             }
             RustExpr::PrimitiveLit(..) => (),

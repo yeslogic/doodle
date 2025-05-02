@@ -1336,6 +1336,7 @@ pub(crate) enum RustExpr {
     Slice(Box<RustExpr>, Box<RustExpr>, Box<RustExpr>), // object, start ix, end ix (exclusive)
     RangeExclusive(Box<RustExpr>, Box<RustExpr>),
     ResultOk(Option<Label>, Box<RustExpr>),
+    ResultErr(Box<RustExpr>),
     Macro(RustMacro),
 }
 
@@ -1535,10 +1536,6 @@ impl RustExpr {
         Self::PrimitiveLit(RustPrimLit::String(str.into()))
     }
 
-    pub fn err(err_val: RustExpr) -> RustExpr {
-        Self::local("Err").call_with([err_val])
-    }
-
     /// Attempts to infer and return the (primitive) type of the given `RustExpr`,
     /// returning `None` if the expression is not a primitive type or otherwise
     /// cannot be inferred without further context or more complicated heuristics.
@@ -1655,7 +1652,7 @@ impl RustExpr {
                 // REVIEW - we might want to log the number of times we hit this branch, and with what values, to see if there are any obvious cases to handle
                 None
             }
-            RustExpr::ResultOk(..) => None,
+            RustExpr::ResultOk(..) | RustExpr::ResultErr(..) => None,
             RustExpr::CloneOf(x) | RustExpr::Deref(x) => match &**x {
                 RustExpr::Borrow(y) | RustExpr::BorrowMut(y) => y.try_get_primtype(),
                 other => other.try_get_primtype(),
@@ -1739,7 +1736,7 @@ impl RustExpr {
                 // NOTE - illegal casts like `x as u8` where x >= 256 are language-level errors that are neither pure nor impure
                 RustOp::AsCast(expr, ..) => expr.is_pure() && op.is_sound(),
             },
-            RustExpr::ResultOk(.., inner) => inner.is_pure(),
+            RustExpr::ResultOk(.., inner) | RustExpr::ResultErr(inner) => inner.is_pure(),
             // NOTE - we can have block-scopes with non-empty statements that are pure, but that is a bit too much work for our purposes right now.
             RustExpr::BlockScope(stmts, tail) => stmts.is_empty() && tail.is_pure(),
             // NOTE - there may be some pure control expressions but those will be relatively rare as natural occurrences
@@ -1809,6 +1806,7 @@ impl RustExpr {
             | RustExpr::Deref(expr)
             | RustExpr::Try(expr)
             | RustExpr::ResultOk(.., expr)
+            | RustExpr::ResultErr(expr)
             | RustExpr::FieldAccess(expr, _)
             | RustExpr::Operation(RustOp::PrefixOp(.., expr) | RustOp::AsCast(expr, ..))
             | RustExpr::BorrowMut(expr)
@@ -1841,6 +1839,10 @@ impl RustExpr {
             RustExpr::Try(x) => *x,
             other => RustExpr::ResultOk(qualifier.map(Name::into), Box::new(other)),
         }
+    }
+
+    pub fn err(self) -> RustExpr {
+        RustExpr::ResultErr(Box::new(self))
     }
 
     pub(crate) fn wrap_some(self) -> RustExpr {
@@ -1913,6 +1915,16 @@ impl ToFragmentExt for RustExpr {
                     .cat(ToFragmentExt::paren_list_prec(args, Precedence::Top)),
                 prec,
                 Precedence::Projection,
+            ),
+            RustExpr::ResultErr(inner) => cond_paren(
+                Fragment::group(
+                    Fragment::string("Err").cat(
+                        inner.to_fragment_precedence(Precedence::TOP)
+                            .delimit(Fragment::Char('('), Fragment::Char(')')),
+                    )
+                ),
+                prec,
+                Precedence::INVOKE,
             ),
             RustExpr::ResultOk(opt_qual, inner) => cond_paren(
                 Fragment::group(
@@ -3131,6 +3143,7 @@ pub mod short_circuit {
                 | RustExpr::Deref(inner)
                 | RustExpr::Borrow(inner)
                 | RustExpr::ResultOk(.., inner)
+                | RustExpr::ResultErr(inner)
                 | RustExpr::BorrowMut(inner) => inner.is_short_circuiting(),
                 RustExpr::Try(inner) => match inner.as_ref() {
                     RustExpr::ResultOk(.., expr) => expr.is_short_circuiting(),
@@ -3381,6 +3394,7 @@ pub mod var_container {
                 | RustExpr::Deref(inner)
                 | RustExpr::Borrow(inner)
                 | RustExpr::ResultOk(.., inner)
+                | RustExpr::ResultErr(inner)
                 | RustExpr::BorrowMut(inner) => inner.contains_var_ref(var),
 
                 RustExpr::Try(inner) => inner.contains_var_ref(var),
