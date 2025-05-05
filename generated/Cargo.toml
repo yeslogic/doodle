@@ -3,6 +3,10 @@ name = "doodle_gencode"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+default = []
+rle = []
+
 [lib]
 bench = false
 path = "gencode.rs"
@@ -41,3 +45,4 @@ encoding = "0.2"
 clap = { version = "4.2", features = ["derive"] }
 derive_builder = "0.20.2"
 fixed = "1.28.0"
+cfg-if = "1.0.0"

@@ -239,6 +239,7 @@ impl HeapOptimize for CompType<Box<RustType>> {
             }
             CompType::Result(..) => unreachable!("unexpected result in structural type"),
             CompType::Borrow(..) => unreachable!("unexpected borrow in structural type"),
+            CompType::RawSlice(..) => unreachable!("unexpected raw slice in structural type"),
         }
     }
 }
