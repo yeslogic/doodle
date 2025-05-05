@@ -229,6 +229,7 @@ pub mod elf_info {
     }
 }
 
+#[cfg(feature = "rle")]
 pub mod rle_scan {
     use super::*;
 

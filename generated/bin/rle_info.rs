@@ -1,4 +1,4 @@
-use doodle_gencode::api_helper::rle_scan::analyze_rle;
+use cfg_if::cfg_if;
 
 pub fn main() -> std::io::Result<()> {
     let args = std::env::args().skip(1).collect::<Vec<String>>();
@@ -14,9 +14,16 @@ pub fn main() -> std::io::Result<()> {
 fn do_work(iter: impl Iterator<Item = String>) -> std::io::Result<()> {
     for name in iter {
         if name.ends_with(".rle") {
-            analyze_rle(&name).unwrap_or_else(|e| {
-                eprintln!("[{name}]: Failed! ({e})");
-            });
+            cfg_if! {
+                if #[cfg(feature = "rle")] {
+                    use doodle_gencode::api_helper::rle_scan::analyze_rle;
+                    analyze_rle(&name).unwrap_or_else(|e| {
+                        eprintln!("[{name}]: Failed! ({e})");
+                    });
+                } else {
+                    println!("skipping rle file: {name} [rle feature not enabled]");
+                }
+            }
         } else {
             eprintln!("skipping non-rle file: {name}");
         }
