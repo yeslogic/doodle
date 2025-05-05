@@ -1143,7 +1143,7 @@ fn refutability_check<A: std::fmt::Debug + Clone>(
                             }
                         AtomType::Comp(ct) =>
                             match ct {
-                                CompType::Vec(_) => Refutability::Refutable, // Vec can have any length, so no match can be exhaustive without catchalls
+                                CompType::Vec(_) | CompType::RawSlice(_) => Refutability::Refutable, // Vec can have any length, so no match can be exhaustive without catchalls
                                 CompType::Option(t) => {
                                     let none_covered = cases.iter().any(|(pat, _)| matches!(pat, TypedPattern::Option(_, None)));
                                     if !none_covered {
