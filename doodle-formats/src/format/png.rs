@@ -281,11 +281,7 @@ pub fn main(
         "png.srgb",
         record([(
             "rendering-intent",
-            where_between(
-                base.u8(),
-                Expr::U8(RENDINT_PERCEPTUAL),
-                Expr::U8(RENDINT_ABSCOLOR),
-            ),
+            where_between_u8(base.u8(), RENDINT_PERCEPTUAL, RENDINT_ABSCOLOR),
         )]),
     );
 
