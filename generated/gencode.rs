@@ -6943,7 +6943,7 @@ let units_per_em = {
 let inner = (Decoder30(_input))?;
 let is_valid = {
 let x = inner;
-(x >= 16u16) && (x <= 16384u16)
+matches!(x, 16u16..=16384u16)
 };
 if is_valid {
 inner
@@ -15009,7 +15009,7 @@ let max_zones = {
 let inner = (Decoder30(_input))?;
 let is_valid = {
 let x = inner;
-(x >= 1u16) && (x <= 2u16)
+matches!(x, 1u16..=2u16)
 };
 if is_valid {
 inner
@@ -29936,7 +29936,7 @@ let num_image_components = {
 let inner = (Decoder25(_input))?;
 let is_valid = {
 let x = inner;
-(x >= 1u8) && (x <= 4u8)
+matches!(x, 1u8..=4u8)
 };
 if is_valid {
 inner
@@ -30746,7 +30746,7 @@ let sample_precision = {
 let inner = (Decoder25(_input))?;
 let is_valid = {
 let x = inner;
-(x >= 2u8) && (x <= 16u8)
+matches!(x, 2u8..=16u8)
 };
 if is_valid {
 inner

@@ -1726,7 +1726,10 @@ enum GenExpr {
 }
 
 impl GenExpr {
-    fn wrap_ok<Name>(self, qual: Option<Name>) -> GenExpr where Name: IntoLabel + Clone {
+    fn wrap_ok<Name>(self, qual: Option<Name>) -> GenExpr
+    where
+        Name: IntoLabel + Clone,
+    {
         match self {
             GenExpr::ResultErr(..) => self,
             GenExpr::Try(x) => *x,
@@ -1738,7 +1741,13 @@ impl GenExpr {
                                 let mut new_cases = Vec::with_capacity(cases.len());
                                 for (lhs, GenBlock { stmts, ret }) in cases {
                                     let new_case = if let Some(expr) = ret {
-                                        (lhs, GenBlock { stmts, ret: Some(expr.wrap_ok(qual.clone()))})
+                                        (
+                                            lhs,
+                                            GenBlock {
+                                                stmts,
+                                                ret: Some(expr.wrap_ok(qual.clone())),
+                                            },
+                                        )
                                     } else {
                                         (lhs, GenBlock { stmts, ret })
                                     };
@@ -1750,7 +1759,13 @@ impl GenExpr {
                                 let mut new_cases = Vec::with_capacity(cases.len());
                                 for (lhs, GenBlock { stmts, ret }) in cases {
                                     let new_case = if let Some(expr) = ret {
-                                        (lhs, GenBlock { stmts, ret: Some(expr.wrap_ok(qual.clone()))})
+                                        (
+                                            lhs,
+                                            GenBlock {
+                                                stmts,
+                                                ret: Some(expr.wrap_ok(qual.clone())),
+                                            },
+                                        )
                                     } else {
                                         (lhs, GenBlock { stmts, ret })
                                     };
@@ -1762,8 +1777,11 @@ impl GenExpr {
                     };
                     Self::Control(Box::new(RustControl::Match(head, new_body)))
                 }
-                other => Self::ResultOk(qual.map(Name::into), Box::new(Self::Control(Box::new(other)))),
-            }
+                other => Self::ResultOk(
+                    qual.map(Name::into),
+                    Box::new(Self::Control(Box::new(other))),
+                ),
+            },
             other => Self::ResultOk(qual.map(Name::into), Box::new(other)),
         }
     }
@@ -1850,7 +1868,9 @@ impl ShortCircuit for GenExpr {
             GenExpr::Embed(expr) => expr.is_short_circuiting(),
             GenExpr::TyValCon(expr) => expr.is_short_circuiting(),
             GenExpr::Control(ctrl) => ctrl.is_short_circuiting(),
-            GenExpr::ResultOk(.., expr) | GenExpr::ResultErr(expr) | GenExpr::WrapSome(expr) => expr.is_short_circuiting(),
+            GenExpr::ResultOk(.., expr) | GenExpr::ResultErr(expr) | GenExpr::WrapSome(expr) => {
+                expr.is_short_circuiting()
+            }
             GenExpr::BlockScope(block) => block.is_short_circuiting(),
             GenExpr::Try(..) => true,
             GenExpr::CallThunk(..) => false,
@@ -3311,7 +3331,11 @@ where
         match self {
             ParallelLogic::Alts(alts) => {
                 let l = alts.len();
-                assert_ne!(alts.len(), 0, "ParallelLogic::Alts found with empty list of parse-alternations");
+                assert_ne!(
+                    alts.len(),
+                    0,
+                    "ParallelLogic::Alts found with empty list of parse-alternations"
+                );
 
                 let mut stmts = Vec::with_capacity(2 * l - 1);
                 let mut last_ctrl = None;
@@ -3332,7 +3356,9 @@ where
                     };
                     let on_err = match l - ix {
                         0 => unreachable!("index matches overall length"),
-                        1 => GenBlock::implicit_return(RustExpr::ResultErr(Box::new(RustExpr::local("_e")))),
+                        1 => GenBlock::implicit_return(RustExpr::ResultErr(Box::new(
+                            RustExpr::local("_e"),
+                        ))),
                         2 => GenBlock::mono_statement(RustStmt::Expr(
                             RustExpr::local(ctxt.input_varname.clone())
                                 .call_method_with("next_alt", [RustExpr::TRUE])
@@ -3354,7 +3380,7 @@ where
                                     Constructor::Simple(Label::from("Ok")),
                                     Box::new(RustPattern::CatchAll(Some(Label::from("inner")))),
                                 )),
-                                on_match(RustExpr::local("inner").wrap_ok(Some("PResult")))
+                                on_match(RustExpr::local("inner").wrap_ok(Some("PResult"))),
                             ),
                             (
                                 MatchCaseLHS::Pattern(RustPattern::Variant(

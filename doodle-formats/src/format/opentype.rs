@@ -1126,10 +1126,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ("checksum_adjustment", base.u32be()),
                     ("magic_number", is_bytes(&[0x5F, 0x0F, 0x3C, 0xF5])),
                     ("flags", head_table_flags),
-                    (
-                        "units_per_em",
-                        where_between(base.u16be(), Expr::U16(16), Expr::U16(16384)),
-                    ),
+                    ("units_per_em", where_between_u16(base.u16be(), 16, 16384)),
                     ("created", long_date_time.call()),
                     ("modified", long_date_time.call()),
                     ("glyph_extents", xy_min_max),
@@ -1138,11 +1135,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ("font_direction_hint", glyph_dir_hint),
                     (
                         "index_to_loc_format",
-                        where_between(
-                            base.u16be(),
-                            Expr::U16(SHORT_OFFSET16),
-                            Expr::U16(LONG_OFFSET32),
-                        ),
+                        where_between_u16(base.u16be(), SHORT_OFFSET16, LONG_OFFSET32),
                     ),
                     ("glyph_data_format", expect_u16be(base, 0)),
                 ]),
@@ -1190,10 +1183,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ("max_contours", base.u16be()),
                     ("max_composite_points", base.u16be()),
                     ("max_composite_contours", base.u16be()),
-                    (
-                        "max_zones",
-                        where_between(base.u16be(), Expr::U16(NO_Z0), Expr::U16(YES_Z0)),
-                    ),
+                    ("max_zones", where_between_u16(base.u16be(), NO_Z0, YES_Z0)),
                     ("max_twilight_points", base.u16be()),
                     ("max_storage", base.u16be()),
                     ("max_function_defs", base.u16be()),
@@ -1203,7 +1193,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ("max_component_elements", base.u16be()),
                     (
                         "max_component_depth",
-                        where_between(base.u16be(), Expr::U16(0), Expr::U16(16)),
+                        where_between_u16(base.u16be(), 0, 16),
                     ),
                 ]),
             );
@@ -4236,10 +4226,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 record([
                     ("table_start", pos32()),
                     ("major_version", expect_u16be(base, 1)),
-                    (
-                        "minor_version",
-                        where_between(base.u16be(), Expr::U16(0), Expr::U16(1)),
-                    ), // v1.0 and v1.1
+                    ("minor_version", where_between_u16(base.u16be(), 0, 1)), // v1.0 and v1.1
                     (
                         "horiz_axis_offset",
                         offset16_nullable(var("table_start"), axis_table.call(), base),

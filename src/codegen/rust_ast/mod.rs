@@ -1919,9 +1919,10 @@ impl ToFragmentExt for RustExpr {
             RustExpr::ResultErr(inner) => cond_paren(
                 Fragment::group(
                     Fragment::string("Err").cat(
-                        inner.to_fragment_precedence(Precedence::TOP)
+                        inner
+                            .to_fragment_precedence(Precedence::TOP)
                             .delimit(Fragment::Char('('), Fragment::Char(')')),
-                    )
+                    ),
                 ),
                 prec,
                 Precedence::INVOKE,
