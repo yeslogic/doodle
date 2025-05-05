@@ -2,6 +2,7 @@ use crate::format::BaseModule;
 use doodle::{helper::*, BaseType, Label, ValueType};
 use doodle::{FormatModule, FormatRef};
 
+#[allow(dead_code)]
 pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let run = module.define_format(
         "rle.old-style.run",
