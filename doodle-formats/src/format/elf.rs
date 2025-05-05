@@ -101,7 +101,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     // REVIEW - const-enum construction to promote magic numbers to proper variants?
     let ei_class = module.define_format(
         "elf.header.ident.class",
-        where_between(base.u8(), Expr::U8(ELF_CLASS_NONE), Expr::U8(ELF_CLASS_64)),
+        where_between_u8(base.u8(), ELF_CLASS_NONE, ELF_CLASS_64),
     );
 
     // Invalid Data Encoding
@@ -119,7 +119,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
     let ei_data = module.define_format(
         "elf.header.ident.data",
-        where_between(base.u8(), Expr::U8(ELF_DATA_NONE), Expr::U8(ELF_DATA_2MSB)),
+        where_between_u8(base.u8(), ELF_DATA_NONE, ELF_DATA_2MSB),
     );
 
     // Invalid Version
@@ -130,7 +130,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
     let ei_version = module.define_format(
         "elf.header.ident.version",
-        where_between(base.u8(), Expr::U8(EV_NONE), Expr::U8(EV_CURRENT)),
+        where_between_u8(base.u8(), EV_NONE, EV_CURRENT),
     );
 
     // NOTE: the possible values and interpretations thereof are machine-specific
@@ -212,10 +212,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let e_version = module.define_format_args(
         "elf.header.version",
         vec![(Label::Borrowed("is_be"), ValueType::Base(BaseType::Bool))],
-        where_between(
+        where_between_u32(
             elf_word_endian.call_args(vec![var("is_be")]),
-            Expr::U32(EV_NONE as u32),
-            Expr::U32(EV_CURRENT as u32),
+            EV_NONE as u32,
+            EV_CURRENT as u32,
         ),
     );
 

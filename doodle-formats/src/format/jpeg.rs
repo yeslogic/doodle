@@ -40,10 +40,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
         module.define_format(
             "jpeg.sof-data",
             record([
-                (
-                    "sample-precision",
-                    where_between(base.u8(), Expr::U8(2), Expr::U8(16)),
-                ), // 8 in Sequential DCT (extended allows 12), 8 or 12 in Progressive DCT, 2-16 lossless
+                ("sample-precision", where_between_u8(base.u8(), 2, 16)), // 8 in Sequential DCT (extended allows 12), 8 or 12 in Progressive DCT, 2-16 lossless
                 ("num-lines", base.u16be()),
                 ("num-samples-per-line", where_nonzero::<U16>(base.u16be())),
                 ("num-image-components", where_nonzero::<U8>(base.u8())), // 1..=4 if progressive DCT, 1..=255 otherwise
@@ -132,22 +129,16 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
         module.define_format(
             "jpeg.sos-data",
             record([
-                (
-                    "num-image-components",
-                    where_between(base.u8(), Expr::U8(1), Expr::U8(4)),
-                ), // 1 |..| 4
+                ("num-image-components", where_between_u8(base.u8(), 1, 4)), // 1 |..| 4
                 (
                     "image-components",
                     repeat_count(var("num-image-components"), sos_image_component.call()),
                 ),
                 (
                     "start-spectral-selection",
-                    where_between(base.u8(), Expr::U8(0), Expr::U8(63)),
+                    where_between_u8(base.u8(), 0, 63),
                 ), // FIXME -  0 in sequential DCT, 0..=63 in progressive DCT, 1-7 in lossless but 0 for lossless differential frames in hierarchical mode
-                (
-                    "end-spectral-selection",
-                    where_between(base.u8(), Expr::U8(0), Expr::U8(63)),
-                ), // FIXME - 63 in sequential DCT, start..=63 in in progressive DCT (but 0 if start is 0), 0 in lossless (differential or otherwise)
+                ("end-spectral-selection", where_between_u8(base.u8(), 0, 63)), // FIXME - 63 in sequential DCT, start..=63 in in progressive DCT (but 0 if start is 0), 0 in lossless (differential or otherwise)
                 ("approximation-bit-position", approximation_bit_position),
             ]),
         )
