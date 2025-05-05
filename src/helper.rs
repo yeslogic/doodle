@@ -1,5 +1,7 @@
 use std::collections::BTreeSet;
 
+use num_traits::{ToPrimitive, Zero};
+
 use crate::bounds::Bounds;
 use crate::byte_set::ByteSet;
 use crate::{
@@ -779,13 +781,41 @@ pub fn where_lambda(raw: Format, name: impl IntoLabel, body: Expr) -> Format {
 /// # Notes
 ///
 /// Does not check that `lower <= upper` as that cannot be statically determined.
-pub fn where_between(format: Format, lower: Expr, upper: Expr) -> Format {
-    let cond = if lower.bounds().is_exact().is_some_and(|x| x == 0) {
-        expr_lte(var("x"), upper)
+pub fn where_between<N>(format: Format, lower: N, upper: N, inject: impl Fn(N) -> Expr) -> Format
+where
+    N: ToPrimitive + Zero,
+{
+    let cond = if lower.is_zero() {
+        expr_lte(var("x"), inject(upper))
     } else {
-        and(expr_gte(var("x"), lower), expr_lte(var("x"), upper))
+        expr_match(
+            var("x"),
+            [
+                (
+                    Pattern::Int(Bounds::new(
+                        lower.to_usize().unwrap(),
+                        upper.to_usize().unwrap(),
+                    )),
+                    Expr::Bool(true),
+                ),
+                (Pattern::Wildcard, Expr::Bool(false)),
+            ],
+        )
+        // and(expr_gte(var("x"), lower), expr_lte(var("x"), upper))
     };
     where_lambda(format, "x", cond)
+}
+
+pub fn where_between_u8(format: Format, lower: u8, upper: u8) -> Format {
+    where_between(format, lower, upper, Expr::U8)
+}
+
+pub fn where_between_u16(format: Format, lower: u16, upper: u16) -> Format {
+    where_between(format, lower, upper, Expr::U16)
+}
+
+pub fn where_between_u32(format: Format, lower: u32, upper: u32) -> Format {
+    where_between(format, lower, upper, Expr::U32)
 }
 
 /// Numeric validation helper that constrains a given format to yield a value that falls in an abstract range,
