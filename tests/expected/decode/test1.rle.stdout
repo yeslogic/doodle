@@ -1,0 +1,4 @@
+└── data <- _ |...| _ :=
+    └── rle <- rle.main :=
+        └── new-style <- rle.new-style :=
+            └── data <- ascii-str (compute flat-map (run -> run.buf) _runs) := "AAAAABBBBAAAAAAAAAAABBBBBBBBBBBCCCCCCCDEFFFF"
