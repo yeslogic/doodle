@@ -4404,7 +4404,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ("axis_values", repeat_count(var("axis_count"), axis_value)),
                 ];
                 embedded_variadic_alternation(
-                    [("format", expects_u16be(base, [1, 2, 3, 4]))],
+                    [("format", where_between_u16(base.u16be(), 1, 4))],
                     "format",
                     [
                         (1, "Format1", f1_fields),
