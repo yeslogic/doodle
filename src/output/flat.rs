@@ -322,6 +322,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::Hint(StyleHint::Record { .. }, record_format) => {
                 self.write_record(value, record_format)
             }
+            Format::Hint(StyleHint::AsciiStr, str_format) => self.write_flat(value, str_format),
         }
     }
 
