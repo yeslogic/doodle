@@ -4367,6 +4367,7 @@ impl<'a> Elaborator<'a> {
                             }
                         }
                     }
+                    StyleHint::AsciiStr => (),
                 }
                 TypedFormat::Hint(gt, style_hint.clone(), Box::new(t_inner))
             }

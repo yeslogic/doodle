@@ -647,7 +647,10 @@ pub enum DynFormat {
 pub enum StyleHint {
     /// Old-style: all field-parses are named and persisted in the original order
     /// New-style: not all fields are persisted, and names can be changed as needed
-    Record { old_style: bool },
+    Record {
+        old_style: bool,
+    },
+    AsciiStr,
 }
 
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]

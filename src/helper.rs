@@ -1444,3 +1444,8 @@ pub fn find_by_key(
         Box::new(array),
     )
 }
+
+/// Repackages a `Seq(U8)` format as an ASCII-string format.
+pub fn mk_ascii_string(x: Format) -> Format {
+    Format::Hint(StyleHint::AsciiStr, Box::new(x))
+}
