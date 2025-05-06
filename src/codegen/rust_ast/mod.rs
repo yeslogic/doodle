@@ -3024,9 +3024,61 @@ pub mod short_circuit {
         RustOp, RustStmt, StructExpr,
     };
 
+    #[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
+    pub enum EvalPurity {
+        /// Can never constitute a short-circuit
+        Pure = 0,
+        /// Short-circuit if and only if it is the only non-pure term in a terminal value-producing node
+        SemiPure = 1,
+        /// Constitutes a potential short-circuit regardless of context
+        Impure = 2,
+    }
+
+    impl std::ops::BitOr for EvalPurity {
+        type Output = Self;
+
+        fn bitor(self, rhs: Self) -> Self::Output {
+            match self {
+                EvalPurity::Pure => rhs,
+                EvalPurity::SemiPure => match rhs {
+                    EvalPurity::Pure => self,
+                    _ => EvalPurity::Impure,
+                },
+                EvalPurity::Impure => EvalPurity::Impure,
+            }
+        }
+    }
+
+    impl std::ops::BitOrAssign for EvalPurity {
+        fn bitor_assign(&mut self, rhs: Self) {
+            match (&self, rhs) {
+                (EvalPurity::Pure, _) | (_, EvalPurity::Impure) => *self = rhs,
+                (EvalPurity::Impure, _) | (_, EvalPurity::Pure) => (),
+                (EvalPurity::SemiPure, EvalPurity::SemiPure) => *self = EvalPurity::Impure,
+            }
+        }
+    }
+
     pub trait ShortCircuit {
         /// Returns `true` if `self` might have a (non-panic) short-circuit, as `return` or a Try (`?`) expression.
         fn is_short_circuiting(&self) -> bool;
+    }
+
+    pub trait ShortCircuitExt: ShortCircuit {
+        /// Returns the eval-purity of the given Rust-AST node.
+        fn check_eval_purity(&self) -> EvalPurity;
+
+        /// Returns `true` if there is a 'true' short-circuit before the final value returned by the evaluation of `self`
+        /// as in `BlockScope` with a short-circuiting statement.
+        ///
+        /// Used to determine whether a closure can be beta-reduced.
+        fn has_short_circuit(&self, is_last: bool) -> bool {
+            match self.check_eval_purity() {
+                EvalPurity::Pure => false,
+                EvalPurity::SemiPure => !is_last,
+                EvalPurity::Impure => true,
+            }
+        }
     }
 
     pub trait ValueCheckpoint {
@@ -3099,6 +3151,20 @@ pub mod short_circuit {
         }
     }
 
+    impl ShortCircuitExt for RustStmt {
+        fn check_eval_purity(&self) -> EvalPurity {
+            match self {
+                RustStmt::Expr(expr)
+                | RustStmt::Reassign(.., expr)
+                | RustStmt::Let(.., expr)
+                | RustStmt::LetPattern(.., expr)
+                | RustStmt::Return(ReturnKind::Implicit, expr) => expr.check_eval_purity(),
+                RustStmt::Return(ReturnKind::Keyword, ..) => EvalPurity::SemiPure,
+                RustStmt::Control(ctrl) => ctrl.check_eval_purity(),
+            }
+        }
+    }
+
     impl<T> ShortCircuit for Vec<T>
     where
         T: ShortCircuit,
@@ -3132,9 +3198,42 @@ pub mod short_circuit {
         }
     }
 
+    impl<BlockType> ShortCircuitExt for RustControl<BlockType>
+    where
+        BlockType: ShortCircuitExt,
+    {
+        fn check_eval_purity(&self) -> EvalPurity {
+            match self {
+                RustControl::Loop(stmts) => stmts.check_eval_purity(),
+                RustControl::ForIter(_, expr, stmts)
+                | RustControl::While(expr, stmts)
+                | RustControl::ForRange0(_, expr, stmts) => {
+                    expr.check_eval_purity() | stmts.check_eval_purity()
+                }
+                RustControl::If(cond, then, opt_else) => {
+                    cond.check_eval_purity()
+                        | then.check_eval_purity()
+                        | opt_else
+                            .as_ref()
+                            .map_or(EvalPurity::Pure, BlockType::check_eval_purity)
+                }
+                RustControl::Match(scrutinee, body) => {
+                    scrutinee.check_eval_purity() | body.check_eval_purity()
+                }
+                RustControl::Break => EvalPurity::Pure,
+            }
+        }
+    }
+
     impl<BlockType: ShortCircuit> ShortCircuit for RustMatchCase<BlockType> {
         fn is_short_circuiting(&self) -> bool {
             self.1.is_short_circuiting()
+        }
+    }
+
+    impl<BlockType: ShortCircuitExt> ShortCircuitExt for RustMatchCase<BlockType> {
+        fn check_eval_purity(&self) -> EvalPurity {
+            self.1.check_eval_purity()
         }
     }
 
@@ -3147,6 +3246,27 @@ pub mod short_circuit {
                     RustCatchAll::PanicUnreachable { .. } => branches.is_short_circuiting(),
                 },
             }
+        }
+    }
+
+    impl<BlockType: ShortCircuitExt> ShortCircuitExt for RustMatchBody<BlockType> {
+        fn check_eval_purity(&self) -> EvalPurity {
+            match self {
+                RustMatchBody::Irrefutable(branches) => branches.check_eval_purity(),
+                RustMatchBody::Refutable(branches, rust_catch_all) => match rust_catch_all {
+                    RustCatchAll::ReturnErrorValue { .. } => EvalPurity::SemiPure,
+                    RustCatchAll::PanicUnreachable { .. } => branches.check_eval_purity(),
+                },
+            }
+        }
+    }
+
+    impl<BlockType: ShortCircuitExt> ShortCircuitExt for Vec<RustMatchCase<BlockType>> {
+        fn check_eval_purity(&self) -> EvalPurity {
+            self.iter()
+                .map(<RustMatchCase<BlockType>>::check_eval_purity)
+                .max()
+                .unwrap_or(EvalPurity::Pure)
         }
     }
 
@@ -3195,6 +3315,80 @@ pub mod short_circuit {
         }
     }
 
+    macro_rules! short_circuit_ext_vec {
+        ( $( $t:ty ),+ $(,)? ) => {
+            $(
+                impl ShortCircuitExt for Vec<$t> {
+                    fn check_eval_purity(&self) -> EvalPurity {
+                        let mut acc = EvalPurity::Pure;
+                        for expr in self.iter() {
+                            if acc == EvalPurity::Impure { break; }
+                            acc |= expr.check_eval_purity();
+                        }
+                        acc
+                    }
+                }
+            )+
+        };
+    }
+
+    impl ShortCircuitExt for Vec<RustStmt> {
+        fn check_eval_purity(&self) -> EvalPurity {
+            let mut acc = EvalPurity::Pure;
+            for expr in self.iter() {
+                if matches!(acc, EvalPurity::SemiPure | EvalPurity::Impure) {
+                    return EvalPurity::Impure;
+                }
+                acc |= expr.check_eval_purity();
+            }
+            acc
+        }
+    }
+
+    short_circuit_ext_vec!(RustExpr, (crate::Label, Option<RustExpr>));
+
+    impl ShortCircuitExt for RustExpr {
+        fn check_eval_purity(&self) -> EvalPurity {
+            match self {
+                RustExpr::ArrayLit(exprs) => exprs.check_eval_purity(),
+                RustExpr::Entity(..) | RustExpr::PrimitiveLit(..) => EvalPurity::Pure,
+                RustExpr::Closure(..) => EvalPurity::Pure,
+                RustExpr::MethodCall(recv, _, args) => {
+                    recv.check_eval_purity() | args.check_eval_purity()
+                }
+                RustExpr::FieldAccess(expr, ..) => expr.check_eval_purity(),
+                RustExpr::FunctionCall(.., args) => args.check_eval_purity(),
+                RustExpr::Tuple(elts) => elts.check_eval_purity(),
+                RustExpr::Struct(.., struct_expr) => struct_expr.check_eval_purity(),
+                RustExpr::CloneOf(inner)
+                | RustExpr::Deref(inner)
+                | RustExpr::Borrow(inner)
+                | RustExpr::ResultOk(.., inner)
+                | RustExpr::ResultErr(inner)
+                | RustExpr::BorrowMut(inner) => inner.check_eval_purity(),
+                RustExpr::Try(inner) => match inner.as_ref() {
+                    RustExpr::ResultOk(.., expr) => expr.check_eval_purity(),
+                    _ => EvalPurity::SemiPure,
+                },
+                RustExpr::Operation(op) => op.check_eval_purity(),
+                RustExpr::BlockScope(stmts, expr) => {
+                    stmts.check_eval_purity() | expr.check_eval_purity()
+                }
+                RustExpr::Macro(RustMacro::Matches(expr, ..)) => expr.check_eval_purity(),
+                RustExpr::Control(ctrl) => ctrl.check_eval_purity(),
+                RustExpr::Index(head, index) => {
+                    head.check_eval_purity() | index.check_eval_purity()
+                }
+                RustExpr::Slice(seq, start, stop) => {
+                    seq.check_eval_purity() | start.check_eval_purity() | stop.check_eval_purity()
+                }
+                RustExpr::RangeExclusive(start, stop) => {
+                    start.check_eval_purity() | stop.check_eval_purity()
+                }
+            }
+        }
+    }
+
     impl ShortCircuit for RustOp {
         fn is_short_circuiting(&self) -> bool {
             match self {
@@ -3207,9 +3401,28 @@ pub mod short_circuit {
         }
     }
 
+    impl ShortCircuitExt for RustOp {
+        fn check_eval_purity(&self) -> EvalPurity {
+            match self {
+                RustOp::InfixOp(_, lhs, rhs) => lhs.check_eval_purity() | rhs.check_eval_purity(),
+                RustOp::PrefixOp(_, expr) | RustOp::AsCast(expr, _) => expr.check_eval_purity(),
+            }
+        }
+    }
+
     impl ShortCircuit for (crate::Label, Option<RustExpr>) {
         fn is_short_circuiting(&self) -> bool {
             self.1.as_ref().is_some_and(RustExpr::is_short_circuiting)
+        }
+    }
+
+    impl ShortCircuitExt for (crate::Label, Option<RustExpr>) {
+        fn check_eval_purity(&self) -> EvalPurity {
+            if let Some(expr) = self.1.as_ref() {
+                expr.check_eval_purity()
+            } else {
+                EvalPurity::Pure
+            }
         }
     }
 
@@ -3222,8 +3435,18 @@ pub mod short_circuit {
             }
         }
     }
+
+    impl ShortCircuitExt for StructExpr {
+        fn check_eval_purity(&self) -> EvalPurity {
+            match self {
+                StructExpr::EmptyExpr => EvalPurity::Pure,
+                StructExpr::TupleExpr(elts) => elts.check_eval_purity(),
+                StructExpr::RecordExpr(flds) => flds.check_eval_purity(),
+            }
+        }
+    }
 }
-pub use short_circuit::{ShortCircuit, ValueCheckpoint};
+pub use short_circuit::{ShortCircuit, ShortCircuitExt, ValueCheckpoint};
 
 pub mod var_container {
     use super::{
