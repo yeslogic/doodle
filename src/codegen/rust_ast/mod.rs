@@ -637,7 +637,9 @@ impl RustType {
                     CompType::Borrow(..) => false,
                     CompType::Option(t) => t.should_borrow_for_arg(),
                     CompType::Result(t_ok, _t_err) => t_ok.should_borrow_for_arg(),
-                    CompType::RawSlice(..) => unreachable!("raw slice should always be behind a ref"),
+                    CompType::RawSlice(..) => {
+                        unreachable!("raw slice should always be behind a ref")
+                    }
                 },
                 AtomType::TypeRef(local) => match local {
                     // REVIEW - shallow wrappers around vec should be treated as if vec, but that is difficult to achieve without more state-info from generation process
@@ -708,7 +710,9 @@ impl RustType {
     /// in `[T]` to replace `Vec<T>`.
     fn deref_tgt(self) -> RustType {
         match self {
-            RustType::Atom(AtomType::Comp(CompType::Vec(t))) => RustType::Atom(AtomType::Comp(CompType::RawSlice(t))),
+            RustType::Atom(AtomType::Comp(CompType::Vec(t))) => {
+                RustType::Atom(AtomType::Comp(CompType::RawSlice(t)))
+            }
             this => this,
         }
     }
@@ -732,7 +736,9 @@ impl RustType {
                     CompType::Option(t) => t.can_be_copy(),
                     CompType::Result(t_ok, t_err) => t_ok.can_be_copy() && t_err.can_be_copy(),
                     CompType::Borrow(_lt, m, _t) => !m.is_mutable(),
-                    CompType::RawSlice(_) => unreachable!("raw slice should not exist outside of ref context"),
+                    CompType::RawSlice(_) => {
+                        unreachable!("raw slice should not exist outside of ref context")
+                    }
                 },
             },
             RustType::AnonTuple(args) => args.iter().all(|t| t.can_be_copy()),
@@ -1050,7 +1056,7 @@ where
                 let tmp = inner.to_fragment();
                 tmp.delimit(Fragment::string("Vec<"), Fragment::Char('>'))
             }
-            CompType::RawSlice(inner) =>  {
+            CompType::RawSlice(inner) => {
                 let tmp = inner.to_fragment();
                 tmp.delimit(Fragment::Char('['), Fragment::Char(']'))
             }

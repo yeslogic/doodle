@@ -1,8 +1,7 @@
 use crate::format::BaseModule;
-use doodle::{helper::*, BaseType, Label, ValueType};
+use doodle::helper::*;
 use doodle::{FormatModule, FormatRef};
 
-#[allow(dead_code)]
 pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let run = module.define_format(
         "rle.old-style.run",
@@ -12,24 +11,16 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ("buf", repeat_count(var("len"), compute(var("char")))),
         ]),
     );
-    let ascii_string = module.define_format_args(
-        "base.func.ascii-string",
-        vec![(
-            Label::Borrowed("input"),
-            ValueType::Seq(Box::new(ValueType::Base(BaseType::U8))),
-        )],
-        compute(var("input")),
-    );
     let old_style = module.define_format(
         "rle.old-style",
         record([
             ("runs", repeat(run.call())),
             (
                 "data",
-                ascii_string.call_args(vec![flat_map(
+                mk_ascii_string(compute(flat_map(
                     lambda("run", record_proj(var("run"), "buf")),
                     var("runs"),
-                )]),
+                ))),
             ),
         ]),
     );
@@ -49,10 +40,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ("_runs", repeat(run.call())),
                 (
                     "data",
-                    ascii_string.call_args(vec![flat_map(
+                    mk_ascii_string(compute(flat_map(
                         lambda("run", record_proj(var("run"), "buf")),
                         var("_runs"),
-                    )]),
+                    ))),
                 ),
             ]),
         )
