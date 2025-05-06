@@ -1617,7 +1617,7 @@ impl GenLambda {
         let __body = self.body.clone();
         *self
             .__beta_reducible
-            .get_or_init(move || !embed_expr_dft(__body.as_ref()).is_short_circuiting())
+            .get_or_init(move || !embed_expr_dft(__body.as_ref()).has_short_circuit(true))
     }
 
     /// Indicates whether the body, if it is found to have short-circuiting, needs to be wrapped in `Ok(..)`.
