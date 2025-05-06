@@ -9181,7 +9181,7 @@ let format = {
 let inner = (Decoder29(_input))?;
 let is_valid = {
 let x = inner;
-matches!(x, 1u16 | 2u16 | 3u16 | 4u16)
+matches!(x, 1u16..=4u16)
 };
 if is_valid {
 inner
