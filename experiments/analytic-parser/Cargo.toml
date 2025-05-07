@@ -1,0 +1,13 @@
+[package]
+name = "analytic-parser"
+version = "0.1.0"
+edition = "2021"
+
+[build-dependencies]
+lalrpop = "0.22.0"
+
+[dependencies]
+lalrpop-util = { version = "0.21.0", features = ["lexer", "unicode"] }
+analytic-engine = { path = "../analytic-engine/" }
+num-bigint = "0.4.6"
+linefeed = "0.6.0"
