@@ -884,7 +884,7 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
 
             let range = RustExpr::RangeExclusive(Box::new(RustExpr::local("ix")), Box::new(end_expr));
 
-            RustExpr::BlockScope(vec![bind_ix], Box::new(RustExpr::local("slice_ext").call_with(vec![RustExpr::borrow_of(embed_expr_dft(seq)), range]).call_method("to_vec")))
+            RustExpr::BlockScope(vec![bind_ix], Box::new(RustExpr::local("slice_ext").call_with(vec![embed_expr_dft(seq), range]).call_method("to_vec")))
         }
         TypedExpr::FlatMap(_, f, seq) =>
             RustExpr::local("try_flat_map_vec")

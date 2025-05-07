@@ -17810,7 +17810,7 @@ deflate_main_codes::literal(b) => {
 deflate_main_codes::reference(r) => {
 {
 let ix = (try_sub!((buffer.len()) as u32, (r.distance.clone()) as u32, 4672672775256824980u64)) as usize;
-(slice_ext(&buffer, ix..ix + (((r.length.clone()) as u32) as usize))).to_vec()
+(slice_ext(buffer, ix..ix + (((r.length.clone()) as u32) as usize))).to_vec()
 }
 }
 }
