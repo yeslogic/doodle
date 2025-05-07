@@ -114,7 +114,7 @@ impl Rebindable for RustExpr {
     fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         match self {
             RustExpr::Entity(ent) => ent.rebind(table),
-            RustExpr::ResultOk(.., inner) => {
+            RustExpr::ResultOk(.., inner) | RustExpr::ResultErr(inner) => {
                 inner.rebind(table);
             }
             RustExpr::PrimitiveLit(..) => (),
@@ -371,6 +371,7 @@ impl Rebindable for CompType {
     fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         match self {
             CompType::Vec(t)
+            | CompType::RawSlice(t)
             | CompType::Option(t)
             | CompType::Result(t, ..)
             | CompType::Borrow(.., t) => t.rebind(table),

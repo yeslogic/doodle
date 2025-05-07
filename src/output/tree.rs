@@ -549,6 +549,13 @@ impl<'module> TreePrinter<'module> {
                 }
                 _ => panic!("expected record, found {value}"),
             },
+            Format::Hint(StyleHint::AsciiStr, str_format) => {
+                if self.flags.pretty_ascii_strings {
+                    self.compile_ascii_string(value)
+                } else {
+                    self.compile_decoded_value(value, str_format)
+                }
+            }
             Format::Repeat(format)
             | Format::Repeat1(format)
             | Format::ForEach(_, _, format)
@@ -2211,6 +2218,11 @@ impl<'module> TreePrinter<'module> {
                     _ => unreachable!("unexpected old-style record-hint inner format: {inner:?}"),
                 }
             }
+            Format::Hint(StyleHint::AsciiStr, str_format) => cond_paren(
+                self.compile_nested_format("ascii-str", None, str_format, prec),
+                prec,
+                Precedence::FORMAT_COMPOUND,
+            ),
         }
     }
 }
