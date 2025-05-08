@@ -187,7 +187,7 @@
         │   │       ├── marker <- { ... }
         │   │       ├── length <- base.u16be := 17
         │   │       └── data <- slice (length - 2) jpeg.sof-data :=
-        │   │           ├── sample-precision <- assert (x -> (x >= 2) && (x <= 16)) base.u8 := 8
+        │   │           ├── sample-precision <- assert (x -> match x { ... }) base.u8 := 8
         │   │           ├── num-lines <- base.u16be := 709
         │   │           ├── num-samples-per-line <- assert (x -> x != 0) base.u16be := 709
         │   │           ├── num-image-components <- assert (x -> x != 0) base.u8 := 3
@@ -268,7 +268,7 @@
         │   │   │   ├── marker <- { ... }
         │   │   │   ├── length <- base.u16be := 12
         │   │   │   └── data <- slice (length - 2) jpeg.sos-data :=
-        │   │   │       ├── num-image-components <- assert (x -> (x >= 1) && (x <= 4)) base.u8 := 3
+        │   │   │       ├── num-image-components <- assert (x -> match x { ... }) base.u8 := 3
         │   │   │       ├── image-components <- repeat-count num-image-components jpeg.sos-image-component :=
         │   │   │       │   ├── 0 <- jpeg.sos-image-component :=
         │   │   │       │   │   ├── component-selector <- base.u8 := 1
