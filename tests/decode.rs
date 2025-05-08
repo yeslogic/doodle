@@ -217,3 +217,21 @@ mod tgz {
         check_output(output, expected)
     }
 }
+
+mod rle {
+    use super::*;
+
+    #[test]
+    fn test_decode_test0_rle() {
+        let output = doodle().args(["file", "test0.rle"]).output().unwrap();
+        let expected = expect_test::expect_file!("expected/decode/test0.rle.stdout");
+        check_output(output, expected)
+    }
+
+    #[test]
+    fn test_decode_test1_rle() {
+        let output = doodle().args(["file", "test1.rle"]).output().unwrap();
+        let expected = expect_test::expect_file!("expected/decode/test1.rle.stdout");
+        check_output(output, expected)
+    }
+}
