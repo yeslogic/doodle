@@ -68,7 +68,7 @@ impl Rebindable for RustFn {
             self.name = table.index(&*self.name).clone();
         }
         self.sig.rebind(table);
-        self.body.iter_mut().for_each(|stmt| stmt.rebind(table))
+        self.body.rebind(table)
     }
 }
 
@@ -145,9 +145,9 @@ impl Rebindable for RustExpr {
                     StructExpr::EmptyExpr => (),
                 }
             }
-            RustExpr::CloneOf(inner)
-            | RustExpr::Deref(inner)
-            | RustExpr::Borrow(inner)
+            RustExpr::Owned(owned) => owned.rebind(table),
+
+            RustExpr::Borrow(inner)
             | RustExpr::BorrowMut(inner)
             | RustExpr::Try(inner) => inner.rebind(table),
             RustExpr::Operation(oper) => oper.rebind(table),
@@ -375,6 +375,29 @@ impl Rebindable for CompType {
             | CompType::Option(t)
             | CompType::Result(t, ..)
             | CompType::Borrow(.., t) => t.rebind(table),
+        }
+    }
+}
+
+impl Rebindable for OwnedRustExpr {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
+        match self {
+            OwnedRustExpr { expr, kind: OwnedKind::Unresolved(lens) } => {
+                expr.rebind(table);
+                lens.rebind(table);
+            }
+            OwnedRustExpr { expr, .. } => expr.rebind(table),
+        }
+    }
+}
+
+
+impl<T> Rebindable for Lens<T> where T: Rebindable {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
+        match self {
+            Lens::Ground(typ) => typ.rebind(table),
+            Lens::ElemOf(this) => this.rebind(table),
+            Lens::FieldAccess(.., this) => this.rebind(table),
         }
     }
 }

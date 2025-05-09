@@ -83,6 +83,10 @@ macro_rules! cache_get {
 }
 
 impl SourceContext<'_> {
+    pub fn get_def(&self, ix: usize) -> &RustTypeDef {
+        &self.def_map[ix]
+    }
+
     pub fn get_niches(&self, ix: usize) -> usize {
         cache_get!(self, niches, ix, niches)
     }
