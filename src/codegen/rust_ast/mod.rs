@@ -4,6 +4,7 @@ use std::rc::Rc;
 
 pub(crate) mod analysis;
 pub(crate) mod rebind;
+pub(crate) mod resolve;
 
 use crate::output::{Fragment, FragmentBuilder};
 
@@ -637,6 +638,9 @@ impl RustType {
                     CompType::Borrow(..) => false,
                     CompType::Option(t) => t.should_borrow_for_arg(),
                     CompType::Result(t_ok, _t_err) => t_ok.should_borrow_for_arg(),
+                    CompType::RawSlice(..) => {
+                        unreachable!("raw slice should always be behind a ref")
+                    }
                 },
                 AtomType::TypeRef(local) => match local {
                     // REVIEW - shallow wrappers around vec should be treated as if vec, but that is difficult to achieve without more state-info from generation process
@@ -662,6 +666,7 @@ impl RustType {
     /// Constructs a `RustType` representing `&'a (mut|) T` from parameters representing `'a` (optional),
     /// the mutability of the reference, and `T`, respectively.
     pub fn borrow_of(lt: Option<RustLt>, m: Mut, ty: RustType) -> Self {
+        let ty = if m.is_mutable() { ty } else { ty.deref_tgt() };
         Self::Atom(AtomType::Comp(CompType::Borrow(lt, m, Box::new(ty))))
     }
 
@@ -701,6 +706,17 @@ impl RustType {
             _ => false,
         }
     }
+
+    /// Returns the most natural form of `self` to be used when being borrowed, as
+    /// in `[T]` to replace `Vec<T>`.
+    fn deref_tgt(self) -> RustType {
+        match self {
+            RustType::Atom(AtomType::Comp(CompType::Vec(t))) => {
+                RustType::Atom(AtomType::Comp(CompType::RawSlice(t)))
+            }
+            this => this,
+        }
+    }
 }
 
 impl RustType {
@@ -721,6 +737,9 @@ impl RustType {
                     CompType::Option(t) => t.can_be_copy(),
                     CompType::Result(t_ok, t_err) => t_ok.can_be_copy() && t_err.can_be_copy(),
                     CompType::Borrow(_lt, m, _t) => !m.is_mutable(),
+                    CompType::RawSlice(_) => {
+                        unreachable!("raw slice should not exist outside of ref context")
+                    }
                 },
             },
             RustType::AnonTuple(args) => args.iter().all(|t| t.can_be_copy()),
@@ -1017,6 +1036,7 @@ impl ToFragment for RustLt {
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum CompType<T = Box<RustType>, U = T> {
     Vec(T),
+    RawSlice(T),
     Option(T),
     Result(T, U),
     Borrow(Option<RustLt>, Mut, T),
@@ -1036,6 +1056,10 @@ where
             CompType::Vec(inner) => {
                 let tmp = inner.to_fragment();
                 tmp.delimit(Fragment::string("Vec<"), Fragment::Char('>'))
+            }
+            CompType::RawSlice(inner) => {
+                let tmp = inner.to_fragment();
+                tmp.delimit(Fragment::Char('['), Fragment::Char(']'))
             }
             CompType::Result(ok, err) => {
                 let tmp = ok
@@ -1162,14 +1186,14 @@ impl RustEntity {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum SubIdent {
-    ByIndex(usize),
+    ByPosition(usize),
     ByName(Label),
 }
 
 impl ToFragment for SubIdent {
     fn to_fragment(&self) -> Fragment {
         match self {
-            SubIdent::ByIndex(ix) => Fragment::DisplayAtom(Rc::new(*ix)),
+            SubIdent::ByPosition(ix) => Fragment::DisplayAtom(Rc::new(*ix)),
             SubIdent::ByName(lab) => lab.to_fragment(),
         }
     }
@@ -1311,6 +1335,41 @@ impl ToFragment for StructExpr {
 }
 
 #[derive(Debug, Clone)]
+pub(crate) struct OwnedRustExpr {
+    expr: Box<RustExpr>,
+    kind: OwnedKind,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum OwnedKind {
+    Cloned,
+    Copied,
+    Deref,
+    Unresolved(Lens<RustType>),
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum Lens<T> {
+    Ground(T),
+    ElemOf(Box<Lens<T>>),
+    FieldAccess(SubIdent, Box<Lens<T>>),
+}
+
+impl Lens<RustType> {
+    fn field(&self, field: Label) -> Lens<RustType> {
+        Lens::FieldAccess(SubIdent::ByName(field), Box::new(self.clone()))
+    }
+
+    fn pos(&self, pos: usize) -> Lens<RustType> {
+        Lens::FieldAccess(SubIdent::ByPosition(pos), Box::new(self.clone()))
+    }
+
+    fn elem(&self) -> Lens<RustType> {
+        Lens::ElemOf(Box::new(self.clone()))
+    }
+}
+
+#[derive(Debug, Clone)]
 pub(crate) enum RustExpr {
     Entity(RustEntity),
     PrimitiveLit(RustPrimLit),
@@ -1320,10 +1379,7 @@ pub(crate) enum RustExpr {
     FunctionCall(Box<RustExpr>, Vec<RustExpr>), // can be used for tuple constructors as well
     Tuple(Vec<RustExpr>),
     Struct(Constructor, StructExpr),
-    CloneOf(Box<RustExpr>),
-    // FIXME: this variant is unused
-    #[expect(dead_code)]
-    Deref(Box<RustExpr>),
+    Owned(OwnedRustExpr),
     Borrow(Box<RustExpr>),
     BorrowMut(Box<RustExpr>),
     Try(Box<RustExpr>),
@@ -1431,32 +1487,61 @@ impl RustExpr {
     pub fn borrow_of(self) -> Self {
         match self {
             // REVIEW - we need a more cohesive idea/model for where we want to borrow and what syntax is required for the desired semantics
-            Self::CloneOf(this) => match &*this {
-                Self::FieldAccess(..) => Self::Borrow(this),
-                // NOTE - original behavior
-                _ => *this,
-            },
+            Self::Owned(OwnedRustExpr { expr, .. }) => match &*expr {
+                Self::FieldAccess(..) => Self::Borrow(expr),
+                _ => *expr,
+            }
             other => Self::Borrow(Box::new(other)),
         }
     }
 
-    pub fn field(self, name: impl Into<Label>) -> Self {
+    pub fn field<Name>(self, name: Name) -> Self where Name: Into<Label> + AsRef<str> {
         match self {
-            Self::CloneOf(this) => Self::CloneOf(Box::new(this.field(name))),
+            Self::Owned(OwnedRustExpr { expr, kind }) => {
+                let (expr, kind) = match kind {
+                    OwnedKind::Unresolved(lens) => {
+                        let lab = name.into();
+                        let lens = lens.field(lab.clone());
+                        (Box::new(expr.field(lab)), OwnedKind::Unresolved(lens))
+                    }
+                    _ => (Box::new(expr.field(name)), kind)
+                };
+                Self::Owned(OwnedRustExpr { expr, kind })
+            }
             other => Self::FieldAccess(Box::new(other), SubIdent::ByName(name.into())),
         }
     }
 
-    pub fn nth(self, ix: usize) -> Self {
+    pub fn at_pos(self, n: usize) -> Self {
         match self {
-            Self::CloneOf(this) => Self::CloneOf(Box::new(this.nth(ix))),
-            other => Self::FieldAccess(Box::new(other), SubIdent::ByIndex(ix)),
+            Self::Owned(OwnedRustExpr { expr, kind }) => match kind {
+                OwnedKind::Cloned => unreachable!("tuple-position smart-constructor should not be used on decided-clone expressions"),
+                OwnedKind::Copied | OwnedKind::Deref => expr.at_pos(n),
+                OwnedKind::Unresolved(lens) => {
+                    Self::Owned(OwnedRustExpr {
+                        expr: Box::new(expr.at_pos(n)),
+                        kind: OwnedKind::Unresolved(lens.pos(n)),
+                    })
+                },
+            }
+            other => Self::FieldAccess(Box::new(other), SubIdent::ByPosition(n)),
         }
     }
 
     pub fn index(self, ix: RustExpr) -> RustExpr {
         match self {
-            Self::CloneOf(this) => Self::CloneOf(Box::new(this.index(ix))),
+            Self::Owned(owned) => match owned {
+                OwnedRustExpr { kind: OwnedKind::Copied | OwnedKind::Deref, expr: this } => this.index(ix),
+                OwnedRustExpr { kind: OwnedKind::Unresolved(lens), expr }  => {
+                    Self::Owned(OwnedRustExpr {
+                        expr: Box::new(expr.index(ix)),
+                        kind: OwnedKind::Unresolved(lens.elem()),
+                    })
+                },
+                OwnedRustExpr { kind: OwnedKind::Cloned, .. }  => {
+                    unreachable!("index smart-constructor should only be used on undecided expressions");
+                }
+            }
             other => Self::Index(Box::new(other), Box::new(ix)),
         }
     }
@@ -1478,7 +1563,7 @@ impl RustExpr {
     /// clone-then-borrow constructs in the generated code.
     pub fn vec_as_slice(self) -> Self {
         let this = match self {
-            Self::CloneOf(this) => *this,
+            Self::Owned(OwnedRustExpr {expr, .. }) => *expr,
             other => other,
         };
         this.call_method("as_slice")
@@ -1489,7 +1574,7 @@ impl RustExpr {
     /// clone-then-borrow constructs in the generated code.
     pub fn vec_len(self) -> Self {
         let this = match self {
-            Self::CloneOf(this) => this,
+            Self::Owned(OwnedRustExpr { expr, .. }) => expr,
             other => Box::new(other),
         };
         RustExpr::MethodCall(this, MethodSpecifier::LEN, Vec::new())
@@ -1562,7 +1647,7 @@ impl RustExpr {
                         // REVIEW - the current only CommonMethod, Len, is not well-defined over non-empty argument lists, but we don't check this
                         cm.try_get_return_primtype()
                     }
-                    MethodSpecifier::Arbitrary(SubIdent::ByIndex(_)) => {
+                    MethodSpecifier::Arbitrary(SubIdent::ByPosition(_)) => {
                         unreachable!("unexpected method call using numeric SubIdent")
                     }
                     MethodSpecifier::Arbitrary(SubIdent::ByName(name)) => {
@@ -1582,7 +1667,7 @@ impl RustExpr {
             }
             RustExpr::FieldAccess(obj, ident) => {
                 match ident {
-                    &SubIdent::ByIndex(ix) => match &**obj {
+                    &SubIdent::ByPosition(ix) => match &**obj {
                         RustExpr::Tuple(tuple)
                         | RustExpr::Struct(_, StructExpr::TupleExpr(tuple)) => {
                             if tuple.len() <= ix {
@@ -1653,7 +1738,7 @@ impl RustExpr {
                 None
             }
             RustExpr::ResultOk(..) | RustExpr::ResultErr(..) => None,
-            RustExpr::CloneOf(x) | RustExpr::Deref(x) => match &**x {
+            RustExpr::Owned(OwnedRustExpr { expr, .. }) => match &**expr {
                 RustExpr::Borrow(y) | RustExpr::BorrowMut(y) => y.try_get_primtype(),
                 other => other.try_get_primtype(),
             },
@@ -1706,7 +1791,7 @@ impl RustExpr {
             RustExpr::PrimitiveLit(..) => true,
             RustExpr::ArrayLit(arr) => arr.iter().all(Self::is_pure),
             // REVIEW - over types we have no control over, clone itself can be impure, but it should never be so for the code we ourselves are generating
-            RustExpr::CloneOf(expr) => expr.is_pure(),
+            RustExpr::Owned(OwnedRustExpr { expr, .. }) => expr.is_pure(),
             RustExpr::MethodCall(x, MethodSpecifier::LEN, args) => {
                 if args.is_empty() {
                     x.is_pure()
@@ -1725,7 +1810,7 @@ impl RustExpr {
                 StructExpr::TupleExpr(values) => values.iter().all(|val| val.is_pure()),
                 StructExpr::EmptyExpr => true,
             },
-            RustExpr::Deref(expr) | RustExpr::Borrow(expr) | RustExpr::BorrowMut(expr) => {
+            RustExpr::Borrow(expr) | RustExpr::BorrowMut(expr) => {
                 expr.is_pure()
             }
             // NOTE - while we can construct pure Try-expressions manually, the intent of `?` is to have potential side-effects and so we judge them de-facto impure
@@ -1802,8 +1887,7 @@ impl RustExpr {
                 .any(|(_, val)| val.as_ref().is_some_and(RustExpr::is_complex)),
 
             // single descent cases
-            RustExpr::CloneOf(expr)
-            | RustExpr::Deref(expr)
+            RustExpr::Owned(OwnedRustExpr { expr, .. })
             | RustExpr::Try(expr)
             | RustExpr::ResultOk(.., expr)
             | RustExpr::ResultErr(expr)
@@ -1896,6 +1980,15 @@ impl RustExpr {
             other => RustExpr::BlockScope(vec![value], Box::new(other)),
         }
     }
+
+    pub(crate) fn owned(loc: RustExpr, expr_type: RustType) -> RustExpr {
+        let owned = if expr_type.can_be_copy() {
+            OwnedRustExpr { expr: Box::new(loc), kind: OwnedKind::Copied }
+        } else {
+            OwnedRustExpr { expr: Box::new(loc), kind: OwnedKind::Unresolved(Lens::Ground(expr_type)) }
+        };
+        RustExpr::Owned(owned)
+    }
 }
 
 impl ToFragmentExt for RustExpr {
@@ -1919,9 +2012,10 @@ impl ToFragmentExt for RustExpr {
             RustExpr::ResultErr(inner) => cond_paren(
                 Fragment::group(
                     Fragment::string("Err").cat(
-                        inner.to_fragment_precedence(Precedence::TOP)
+                        inner
+                            .to_fragment_precedence(Precedence::TOP)
                             .delimit(Fragment::Char('('), Fragment::Char(')')),
-                    )
+                    ),
                 ),
                 prec,
                 Precedence::INVOKE,
@@ -1941,12 +2035,21 @@ impl ToFragmentExt for RustExpr {
                 prec,
                 Precedence::INVOKE,
             ),
-            RustExpr::CloneOf(x) => cond_paren(
+            RustExpr::Owned(OwnedRustExpr { expr: x, kind: OwnedKind::Cloned }) => cond_paren(
                 x.to_fragment_precedence(Precedence::Projection)
                     .intervene(Fragment::Char('.'), Fragment::string("clone()")),
                 prec,
                 Precedence::Projection,
             ),
+            RustExpr::Owned(OwnedRustExpr { kind: OwnedKind::Deref, expr}) => {
+                Fragment::Char('*').cat(expr.to_fragment_precedence(Precedence::Prefix))
+            }
+            RustExpr::Owned(OwnedRustExpr { kind: OwnedKind::Copied, expr }) => {
+                expr.to_fragment_precedence(prec)
+            }
+            RustExpr::Owned(OwnedRustExpr { kind: OwnedKind::Unresolved(lens), expr}) => {
+                unreachable!("unresolved ownership: ({expr:?}: {lens:?})")
+            }
             RustExpr::FieldAccess(x, name) => x
                 .to_fragment_precedence(Precedence::Projection)
                 .intervene(Fragment::Char('.'), name.to_fragment()),
@@ -1976,9 +2079,6 @@ impl ToFragmentExt for RustExpr {
             RustExpr::Struct(con, contents) => RustEntity::from(con.clone())
                 .to_fragment()
                 .cat(contents.to_fragment()),
-            RustExpr::Deref(expr) => {
-                Fragment::Char('*').cat(expr.to_fragment_precedence(Precedence::Prefix))
-            }
             RustExpr::Borrow(expr) => {
                 Fragment::Char('&').cat(expr.to_fragment_precedence(Precedence::Prefix))
             }
@@ -2996,13 +3096,64 @@ mod test {
 
 pub mod short_circuit {
     use super::{
-        ReturnKind, RustCatchAll, RustControl, RustExpr, RustMacro, RustMatchBody, RustMatchCase,
-        RustOp, RustStmt, StructExpr,
+        OwnedRustExpr, ReturnKind, RustCatchAll, RustControl, RustExpr, RustMacro, RustMatchBody, RustMatchCase, RustOp, RustStmt, StructExpr
     };
+
+    #[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
+    pub enum EvalPurity {
+        /// Can never constitute a short-circuit
+        Pure = 0,
+        /// Short-circuit if and only if it is the only non-pure term in a terminal value-producing node
+        SemiPure = 1,
+        /// Constitutes a potential short-circuit regardless of context
+        Impure = 2,
+    }
+
+    impl std::ops::BitOr for EvalPurity {
+        type Output = Self;
+
+        fn bitor(self, rhs: Self) -> Self::Output {
+            match self {
+                EvalPurity::Pure => rhs,
+                EvalPurity::SemiPure => match rhs {
+                    EvalPurity::Pure => self,
+                    _ => EvalPurity::Impure,
+                },
+                EvalPurity::Impure => EvalPurity::Impure,
+            }
+        }
+    }
+
+    impl std::ops::BitOrAssign for EvalPurity {
+        fn bitor_assign(&mut self, rhs: Self) {
+            match (&self, rhs) {
+                (EvalPurity::Pure, _) | (_, EvalPurity::Impure) => *self = rhs,
+                (EvalPurity::Impure, _) | (_, EvalPurity::Pure) => (),
+                (EvalPurity::SemiPure, EvalPurity::SemiPure) => *self = EvalPurity::Impure,
+            }
+        }
+    }
 
     pub trait ShortCircuit {
         /// Returns `true` if `self` might have a (non-panic) short-circuit, as `return` or a Try (`?`) expression.
         fn is_short_circuiting(&self) -> bool;
+    }
+
+    pub trait ShortCircuitExt: ShortCircuit {
+        /// Returns the eval-purity of the given Rust-AST node.
+        fn check_eval_purity(&self) -> EvalPurity;
+
+        /// Returns `true` if there is a 'true' short-circuit before the final value returned by the evaluation of `self`
+        /// as in `BlockScope` with a short-circuiting statement.
+        ///
+        /// Used to determine whether a closure can be beta-reduced.
+        fn has_short_circuit(&self, is_last: bool) -> bool {
+            match self.check_eval_purity() {
+                EvalPurity::Pure => false,
+                EvalPurity::SemiPure => !is_last,
+                EvalPurity::Impure => true,
+            }
+        }
     }
 
     pub trait ValueCheckpoint {
@@ -3075,6 +3226,20 @@ pub mod short_circuit {
         }
     }
 
+    impl ShortCircuitExt for RustStmt {
+        fn check_eval_purity(&self) -> EvalPurity {
+            match self {
+                RustStmt::Expr(expr)
+                | RustStmt::Reassign(.., expr)
+                | RustStmt::Let(.., expr)
+                | RustStmt::LetPattern(.., expr)
+                | RustStmt::Return(ReturnKind::Implicit, expr) => expr.check_eval_purity(),
+                RustStmt::Return(ReturnKind::Keyword, ..) => EvalPurity::SemiPure,
+                RustStmt::Control(ctrl) => ctrl.check_eval_purity(),
+            }
+        }
+    }
+
     impl<T> ShortCircuit for Vec<T>
     where
         T: ShortCircuit,
@@ -3108,9 +3273,42 @@ pub mod short_circuit {
         }
     }
 
+    impl<BlockType> ShortCircuitExt for RustControl<BlockType>
+    where
+        BlockType: ShortCircuitExt,
+    {
+        fn check_eval_purity(&self) -> EvalPurity {
+            match self {
+                RustControl::Loop(stmts) => stmts.check_eval_purity(),
+                RustControl::ForIter(_, expr, stmts)
+                | RustControl::While(expr, stmts)
+                | RustControl::ForRange0(_, expr, stmts) => {
+                    expr.check_eval_purity() | stmts.check_eval_purity()
+                }
+                RustControl::If(cond, then, opt_else) => {
+                    cond.check_eval_purity()
+                        | then.check_eval_purity()
+                        | opt_else
+                            .as_ref()
+                            .map_or(EvalPurity::Pure, BlockType::check_eval_purity)
+                }
+                RustControl::Match(scrutinee, body) => {
+                    scrutinee.check_eval_purity() | body.check_eval_purity()
+                }
+                RustControl::Break => EvalPurity::Pure,
+            }
+        }
+    }
+
     impl<BlockType: ShortCircuit> ShortCircuit for RustMatchCase<BlockType> {
         fn is_short_circuiting(&self) -> bool {
             self.1.is_short_circuiting()
+        }
+    }
+
+    impl<BlockType: ShortCircuitExt> ShortCircuitExt for RustMatchCase<BlockType> {
+        fn check_eval_purity(&self) -> EvalPurity {
+            self.1.check_eval_purity()
         }
     }
 
@@ -3123,6 +3321,27 @@ pub mod short_circuit {
                     RustCatchAll::PanicUnreachable { .. } => branches.is_short_circuiting(),
                 },
             }
+        }
+    }
+
+    impl<BlockType: ShortCircuitExt> ShortCircuitExt for RustMatchBody<BlockType> {
+        fn check_eval_purity(&self) -> EvalPurity {
+            match self {
+                RustMatchBody::Irrefutable(branches) => branches.check_eval_purity(),
+                RustMatchBody::Refutable(branches, rust_catch_all) => match rust_catch_all {
+                    RustCatchAll::ReturnErrorValue { .. } => EvalPurity::SemiPure,
+                    RustCatchAll::PanicUnreachable { .. } => branches.check_eval_purity(),
+                },
+            }
+        }
+    }
+
+    impl<BlockType: ShortCircuitExt> ShortCircuitExt for Vec<RustMatchCase<BlockType>> {
+        fn check_eval_purity(&self) -> EvalPurity {
+            self.iter()
+                .map(<RustMatchCase<BlockType>>::check_eval_purity)
+                .max()
+                .unwrap_or(EvalPurity::Pure)
         }
     }
 
@@ -3139,8 +3358,7 @@ pub mod short_circuit {
                 RustExpr::FunctionCall(.., args) => args.is_short_circuiting(),
                 RustExpr::Tuple(elts) => elts.is_short_circuiting(),
                 RustExpr::Struct(.., struct_expr) => struct_expr.is_short_circuiting(),
-                RustExpr::CloneOf(inner)
-                | RustExpr::Deref(inner)
+                RustExpr::Owned(OwnedRustExpr { expr: inner, .. })
                 | RustExpr::Borrow(inner)
                 | RustExpr::ResultOk(.., inner)
                 | RustExpr::ResultErr(inner)
@@ -3171,6 +3389,79 @@ pub mod short_circuit {
         }
     }
 
+    macro_rules! short_circuit_ext_vec {
+        ( $( $t:ty ),+ $(,)? ) => {
+            $(
+                impl ShortCircuitExt for Vec<$t> {
+                    fn check_eval_purity(&self) -> EvalPurity {
+                        let mut acc = EvalPurity::Pure;
+                        for expr in self.iter() {
+                            if acc == EvalPurity::Impure { break; }
+                            acc |= expr.check_eval_purity();
+                        }
+                        acc
+                    }
+                }
+            )+
+        };
+    }
+
+    impl ShortCircuitExt for Vec<RustStmt> {
+        fn check_eval_purity(&self) -> EvalPurity {
+            let mut acc = EvalPurity::Pure;
+            for expr in self.iter() {
+                if matches!(acc, EvalPurity::SemiPure | EvalPurity::Impure) {
+                    return EvalPurity::Impure;
+                }
+                acc |= expr.check_eval_purity();
+            }
+            acc
+        }
+    }
+
+    short_circuit_ext_vec!(RustExpr, (crate::Label, Option<RustExpr>));
+
+    impl ShortCircuitExt for RustExpr {
+        fn check_eval_purity(&self) -> EvalPurity {
+            match self {
+                RustExpr::ArrayLit(exprs) => exprs.check_eval_purity(),
+                RustExpr::Entity(..) | RustExpr::PrimitiveLit(..) => EvalPurity::Pure,
+                RustExpr::Closure(..) => EvalPurity::Pure,
+                RustExpr::MethodCall(recv, _, args) => {
+                    recv.check_eval_purity() | args.check_eval_purity()
+                }
+                RustExpr::FieldAccess(expr, ..) => expr.check_eval_purity(),
+                RustExpr::FunctionCall(.., args) => args.check_eval_purity(),
+                RustExpr::Tuple(elts) => elts.check_eval_purity(),
+                RustExpr::Struct(.., struct_expr) => struct_expr.check_eval_purity(),
+                RustExpr::Owned(OwnedRustExpr { expr: inner, .. })
+                | RustExpr::Borrow(inner)
+                | RustExpr::ResultOk(.., inner)
+                | RustExpr::ResultErr(inner)
+                | RustExpr::BorrowMut(inner) => inner.check_eval_purity(),
+                RustExpr::Try(inner) => match inner.as_ref() {
+                    RustExpr::ResultOk(.., expr) => expr.check_eval_purity(),
+                    _ => EvalPurity::SemiPure,
+                },
+                RustExpr::Operation(op) => op.check_eval_purity(),
+                RustExpr::BlockScope(stmts, expr) => {
+                    stmts.check_eval_purity() | expr.check_eval_purity()
+                }
+                RustExpr::Macro(RustMacro::Matches(expr, ..)) => expr.check_eval_purity(),
+                RustExpr::Control(ctrl) => ctrl.check_eval_purity(),
+                RustExpr::Index(head, index) => {
+                    head.check_eval_purity() | index.check_eval_purity()
+                }
+                RustExpr::Slice(seq, start, stop) => {
+                    seq.check_eval_purity() | start.check_eval_purity() | stop.check_eval_purity()
+                }
+                RustExpr::RangeExclusive(start, stop) => {
+                    start.check_eval_purity() | stop.check_eval_purity()
+                }
+            }
+        }
+    }
+
     impl ShortCircuit for RustOp {
         fn is_short_circuiting(&self) -> bool {
             match self {
@@ -3183,9 +3474,28 @@ pub mod short_circuit {
         }
     }
 
+    impl ShortCircuitExt for RustOp {
+        fn check_eval_purity(&self) -> EvalPurity {
+            match self {
+                RustOp::InfixOp(_, lhs, rhs) => lhs.check_eval_purity() | rhs.check_eval_purity(),
+                RustOp::PrefixOp(_, expr) | RustOp::AsCast(expr, _) => expr.check_eval_purity(),
+            }
+        }
+    }
+
     impl ShortCircuit for (crate::Label, Option<RustExpr>) {
         fn is_short_circuiting(&self) -> bool {
             self.1.as_ref().is_some_and(RustExpr::is_short_circuiting)
+        }
+    }
+
+    impl ShortCircuitExt for (crate::Label, Option<RustExpr>) {
+        fn check_eval_purity(&self) -> EvalPurity {
+            if let Some(expr) = self.1.as_ref() {
+                expr.check_eval_purity()
+            } else {
+                EvalPurity::Pure
+            }
         }
     }
 
@@ -3198,14 +3508,22 @@ pub mod short_circuit {
             }
         }
     }
+
+    impl ShortCircuitExt for StructExpr {
+        fn check_eval_purity(&self) -> EvalPurity {
+            match self {
+                StructExpr::EmptyExpr => EvalPurity::Pure,
+                StructExpr::TupleExpr(elts) => elts.check_eval_purity(),
+                StructExpr::RecordExpr(flds) => flds.check_eval_purity(),
+            }
+        }
+    }
 }
-pub use short_circuit::{ShortCircuit, ValueCheckpoint};
+pub use short_circuit::{ShortCircuit, ShortCircuitExt, ValueCheckpoint};
 
 pub mod var_container {
     use super::{
-        ClosureBody, MatchCaseLHS, RustCatchAll, RustClosure, RustClosureHead, RustControl,
-        RustEntity, RustExpr, RustMacro, RustMatchBody, RustMatchCase, RustOp, RustPattern,
-        RustStmt, StructExpr,
+        ClosureBody, MatchCaseLHS, OwnedRustExpr, RustCatchAll, RustClosure, RustClosureHead, RustControl, RustEntity, RustExpr, RustMacro, RustMatchBody, RustMatchCase, RustOp, RustPattern, RustStmt, StructExpr
     };
 
     pub trait VarBinder {
@@ -3390,11 +3708,10 @@ pub mod var_container {
                 RustExpr::Tuple(elts) => elts.contains_var_ref(var),
                 RustExpr::Struct(.., struct_expr) => struct_expr.contains_var_ref(var),
 
-                RustExpr::CloneOf(inner)
-                | RustExpr::Deref(inner)
-                | RustExpr::Borrow(inner)
+                RustExpr::Owned(OwnedRustExpr { expr: inner, .. })
                 | RustExpr::ResultOk(.., inner)
                 | RustExpr::ResultErr(inner)
+                | RustExpr::Borrow(inner)
                 | RustExpr::BorrowMut(inner) => inner.contains_var_ref(var),
 
                 RustExpr::Try(inner) => inner.contains_var_ref(var),

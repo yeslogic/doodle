@@ -281,11 +281,7 @@ pub fn main(
         "png.srgb",
         record([(
             "rendering-intent",
-            where_between(
-                base.u8(),
-                Expr::U8(RENDINT_PERCEPTUAL),
-                Expr::U8(RENDINT_ABSCOLOR),
-            ),
+            where_between_u8(base.u8(), RENDINT_PERCEPTUAL, RENDINT_ABSCOLOR),
         )]),
     );
 
@@ -465,12 +461,12 @@ pub fn main(
         ]),
     );
 
-    let png_signature = module.define_format("png.signature", is_bytes(b"\x89PNG\r\n\x1A\n"));
+    const PNG_SIGNATURE: &[u8; 8] = b"\x89PNG\r\n\x1A\n";
 
     module.define_format(
         "png.main",
-        record([
-            ("signature", png_signature.call()),
+        record_auto([
+            ("__signature", is_bytes(PNG_SIGNATURE)),
             ("ihdr", ihdr.call()),
             ("chunks", repeat(png_chunk.call_args(vec![var("ihdr")]))),
             (

@@ -83,6 +83,10 @@ macro_rules! cache_get {
 }
 
 impl SourceContext<'_> {
+    pub fn get_def(&self, ix: usize) -> &RustTypeDef {
+        &self.def_map[ix]
+    }
+
     pub fn get_niches(&self, ix: usize) -> usize {
         cache_get!(self, niches, ix, niches)
     }
@@ -331,6 +335,7 @@ where
             }
             CompType::Result(..) => unimplemented!("unexpected result in structural type"),
             CompType::Borrow(..) => unimplemented!("unexpected borrow in structural type"),
+            CompType::RawSlice(..) => unimplemented!("unexpected raw slice in structural type"),
         }
     }
 
@@ -340,6 +345,7 @@ where
             CompType::Option(inner) => inner.align_hint(context),
             CompType::Result(..) => unimplemented!("unexpected result in structural type"),
             CompType::Borrow(..) => unimplemented!("unexpected borrow in structural type"),
+            CompType::RawSlice(..) => unimplemented!("unexpected raw slice in structural type"),
         }
     }
 }
@@ -364,6 +370,7 @@ where
             // Option<&T> cannot be optimized, but &T itself and Option<Option<&T>> (and above) can be
             CompType::Borrow(..) => unreachable!("unexpected borrow in structural type"),
             CompType::Result(..) => unreachable!("unexpected result in structural type"),
+            CompType::RawSlice(..) => unimplemented!("unexpected raw slice in structural type"),
         }
     }
 }
@@ -380,6 +387,7 @@ where
                 unreachable!("unexpected mutable borrow in generative type: {self:?}")
             }
             CompType::Vec(..) => false,
+            CompType::RawSlice(..) => unreachable!("unexpected raw slice in structural type"),
             CompType::Option(inner) => inner.copy_hint(context),
             CompType::Result(ok_t, err_t) => ok_t.copy_hint(context) && err_t.copy_hint(context),
         }
