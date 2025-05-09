@@ -4883,22 +4883,22 @@ break
 } else {
 let next_elem = {
 let header = (Decoder_gzip_header(_input))?;
-let fextra = if header.file_flags.fextra.clone() {
+let fextra = if header.file_flags.fextra {
 Some((Decoder_gzip_fextra(_input))?)
 } else {
 None
 };
-let fname = if header.file_flags.fname.clone() {
+let fname = if header.file_flags.fname {
 Some((Decoder307(_input))?)
 } else {
 None
 };
-let fcomment = if header.file_flags.fcomment.clone() {
+let fcomment = if header.file_flags.fcomment {
 Some((Decoder_gzip_fcomment(_input))?)
 } else {
 None
 };
-let fhcrc = if header.file_flags.fhcrc.clone() {
+let fhcrc = if header.file_flags.fhcrc {
 Some((Decoder_gzip_fhcrc(_input))?)
 } else {
 None
@@ -5052,7 +5052,7 @@ ret
 }
 };
 if matching_ix == 0 {
-let next_elem = (Decoder_png_chunk(_input, ihdr.clone()))?;
+let next_elem = (Decoder_png_chunk(_input, ihdr))?;
 accum.push(next_elem);
 } else {
 break
@@ -5153,7 +5153,7 @@ ret
 }
 };
 if matching_ix == 0 {
-let next_elem = (Decoder_png_chunk(_input, ihdr.clone()))?;
+let next_elem = (Decoder_png_chunk(_input, ihdr))?;
 accum.push(next_elem);
 } else {
 break
@@ -5491,8 +5491,8 @@ PResult::Ok(tar_main { contents, __padding, __trailing })
 fn Decoder_elf_main<>(_input: &mut Parser<'_>) -> Result<elf_main, ParseError> {
 let header = (Decoder_elf_header(_input))?;
 _input.get_offset_u64();
-let program_headers = if !matches!(header.phoff.clone(), elf_types_elf_off::Off32(0u32) | elf_types_elf_off::Off64(0u64)) {
-let tgt_offset = match header.phoff.clone() {
+let program_headers = if !matches!(header.phoff, elf_types_elf_off::Off32(0u32) | elf_types_elf_off::Off64(0u64)) {
+let tgt_offset = match header.phoff {
 elf_types_elf_off::Off32(x32) => {
 x32 as u64
 },
@@ -5502,14 +5502,14 @@ x64
 }
 };
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = (Decoder121(_input, header.ident.data.clone() == 2u8, header.ident.class.clone(), header.phnum.clone()))?;
+let ret = (Decoder121(_input, header.ident.data == 2u8, header.ident.class, header.phnum))?;
 _input.close_peek_context()?;
 Some(ret)
 } else {
 None
 };
-let section_headers = if !matches!(header.shoff.clone(), elf_types_elf_off::Off32(0u32) | elf_types_elf_off::Off64(0u64)) {
-let tgt_offset = match header.shoff.clone() {
+let section_headers = if !matches!(header.shoff, elf_types_elf_off::Off32(0u32) | elf_types_elf_off::Off64(0u64)) {
+let tgt_offset = match header.shoff {
 elf_types_elf_off::Off32(x32) => {
 x32 as u64
 },
@@ -5519,7 +5519,7 @@ x64
 }
 };
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = (Decoder122(_input, header.ident.data.clone() == 2u8, header.ident.class.clone(), header.shnum.clone()))?;
+let ret = (Decoder122(_input, header.ident.data == 2u8, header.ident.class, header.shnum))?;
 _input.close_peek_context()?;
 Some(ret)
 } else {
@@ -5529,8 +5529,8 @@ let sections = match section_headers {
 Some(ref shdrs) => {
 let mut accum = Vec::new();
 for shdr in shdrs.clone() {
-accum.push(if (shdr.r#type.clone() != 8u32) && (shdr.r#type.clone() != 0u32) {
-let tgt_offset = match shdr.offset.clone() {
+accum.push(if (shdr.r#type != 8u32) && (shdr.r#type != 0u32) {
+let tgt_offset = match shdr.offset {
 elf_types_elf_off::Off32(x32) => {
 x32 as u64
 },
@@ -5540,13 +5540,13 @@ x64
 }
 };
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = (Decoder123(_input, shdr.r#type.clone(), match shdr.size.clone() {
+let ret = (Decoder123(_input, shdr.r#type, match shdr.size {
 elf_types_elf_full::Full32(x32) => {
 x32 as u64
 },
 
 elf_types_elf_full::Full64(x64) => {
-x64.clone()
+x64
 }
 }))?;
 _input.close_peek_context()?;
@@ -5579,22 +5579,22 @@ ret
 };
 let directory = match magic {
 65536u32 => {
-let inner = (Decoder_opentype_table_directory(_input, file_start.clone()))?;
+let inner = (Decoder_opentype_table_directory(_input, file_start))?;
 opentype_main_directory::TableDirectory(inner)
 },
 
 1330926671u32 => {
-let inner = (Decoder_opentype_table_directory(_input, file_start.clone()))?;
+let inner = (Decoder_opentype_table_directory(_input, file_start))?;
 opentype_main_directory::TableDirectory(inner)
 },
 
 1953784678u32 => {
-let inner = (Decoder_opentype_ttc_header(_input, file_start.clone()))?;
+let inner = (Decoder_opentype_ttc_header(_input, file_start))?;
 opentype_main_directory::TTCHeader(inner)
 },
 
 1953658213u32 => {
-let inner = (Decoder_opentype_table_directory(_input, file_start.clone()))?;
+let inner = (Decoder_opentype_table_directory(_input, file_start))?;
 opentype_main_directory::TableDirectory(inner)
 },
 
@@ -6209,7 +6209,7 @@ let _char = (Decoder24(_input))?;
 let buf = {
 let mut accum = Vec::new();
 for _ in 0.._len {
-accum.push(_char.clone());
+accum.push(_char);
 }
 accum
 };
@@ -6226,7 +6226,7 @@ let char = (Decoder24(_input))?;
 let buf = {
 let mut accum = Vec::new();
 for _ in 0..len {
-accum.push(char.clone());
+accum.push(char);
 }
 accum
 };
@@ -6268,7 +6268,7 @@ accum.push((Decoder_opentype_table_record(_input))?);
 }
 accum
 };
-let table_links = (Decoder_opentype_table_directory_table_links(_input, font_start.clone(), &table_records))?;
+let table_links = (Decoder_opentype_table_directory_table_links(_input, font_start, &table_records))?;
 PResult::Ok(opentype_table_directory { sfnt_version, num_tables, search_range, entry_selector, range_shift, table_records, table_links })
 }
 
@@ -6300,7 +6300,7 @@ let link = match offset > 0u32 {
 true => {
 let tgt_offset = start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = Some((Decoder_opentype_table_directory(_input, start.clone()))?);
+let ret = Some((Decoder_opentype_table_directory(_input, start))?);
 _input.close_peek_context()?;
 ret
 },
@@ -6331,7 +6331,7 @@ let link = match offset > 0u32 {
 true => {
 let tgt_offset = start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = Some((Decoder_opentype_table_directory(_input, start.clone()))?);
+let ret = Some((Decoder_opentype_table_directory(_input, start))?);
 _input.close_peek_context()?;
 ret
 },
@@ -6354,7 +6354,7 @@ opentype_ttc_header_header::Version2(inner)
 },
 
 unknown => {
-let inner = unknown.clone();
+let inner = unknown;
 opentype_ttc_header_header::UnknownVersion(inner)
 }
 };
@@ -6380,12 +6380,12 @@ PResult::Ok(opentype_table_record { table_id, checksum, offset, length })
 }
 
 fn Decoder_opentype_table_directory_table_links<>(_input: &mut Parser<'_>, start: u32, tables: &[opentype_table_record]) -> Result<opentype_table_directory_table_links, ParseError> {
-let cmap = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1668112752u32, tables)).cloned() {
+let cmap = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1668112752u32, tables)).cloned() {
 Some(ref matching_table) => {
-let tgt_offset = start + matching_table.offset.clone();
+let tgt_offset = start + matching_table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
-let sz = (matching_table.length.clone()) as usize;
+let sz = matching_table.length as usize;
 _input.start_slice(sz)?;
 let ret = (Decoder_opentype_cmap_table(_input))?;
 _input.end_slice()?;
@@ -6399,12 +6399,12 @@ _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
 };
-let head = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1751474532u32, tables)).cloned() {
+let head = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1751474532u32, tables)).cloned() {
 Some(ref matching_table) => {
-let tgt_offset = start + matching_table.offset.clone();
+let tgt_offset = start + matching_table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
-let sz = (matching_table.length.clone()) as usize;
+let sz = matching_table.length as usize;
 _input.start_slice(sz)?;
 let ret = (Decoder_opentype_head_table(_input))?;
 _input.end_slice()?;
@@ -6418,12 +6418,12 @@ _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
 };
-let hhea = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1751672161u32, tables)).cloned() {
+let hhea = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1751672161u32, tables)).cloned() {
 Some(ref matching_table) => {
-let tgt_offset = start + matching_table.offset.clone();
+let tgt_offset = start + matching_table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
-let sz = (matching_table.length.clone()) as usize;
+let sz = matching_table.length as usize;
 _input.start_slice(sz)?;
 let ret = (Decoder_opentype_hhea_table(_input))?;
 _input.end_slice()?;
@@ -6437,12 +6437,12 @@ _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
 };
-let maxp = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1835104368u32, tables)).cloned() {
+let maxp = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1835104368u32, tables)).cloned() {
 Some(ref matching_table) => {
-let tgt_offset = start + matching_table.offset.clone();
+let tgt_offset = start + matching_table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
-let sz = (matching_table.length.clone()) as usize;
+let sz = matching_table.length as usize;
 _input.start_slice(sz)?;
 let ret = (Decoder_opentype_maxp_table(_input))?;
 _input.end_slice()?;
@@ -6456,14 +6456,14 @@ _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
 };
-let hmtx = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1752003704u32, tables)).cloned() {
+let hmtx = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1752003704u32, tables)).cloned() {
 Some(ref matching_table) => {
-let tgt_offset = start + matching_table.offset.clone();
+let tgt_offset = start + matching_table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
-let sz = (matching_table.length.clone()) as usize;
+let sz = matching_table.length as usize;
 _input.start_slice(sz)?;
-let ret = (Decoder_opentype_hmtx_table(_input, hhea.number_of_long_metrics.clone(), maxp.num_glyphs.clone()))?;
+let ret = (Decoder_opentype_hmtx_table(_input, hhea.number_of_long_metrics, maxp.num_glyphs))?;
 _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
@@ -6475,12 +6475,12 @@ _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
 };
-let name = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1851878757u32, tables)).cloned() {
+let name = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1851878757u32, tables)).cloned() {
 Some(ref matching_table) => {
-let tgt_offset = start + matching_table.offset.clone();
+let tgt_offset = start + matching_table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
-let sz = (matching_table.length.clone()) as usize;
+let sz = matching_table.length as usize;
 _input.start_slice(sz)?;
 let ret = (Decoder_opentype_name_table(_input))?;
 _input.end_slice()?;
@@ -6494,15 +6494,15 @@ _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
 };
-let os2 = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1330851634u32, tables)).cloned() {
+let os2 = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1330851634u32, tables)).cloned() {
 Some(ref matching_table) => {
-let tgt_offset = start + matching_table.offset.clone();
+let tgt_offset = start + matching_table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
-let table_len = matching_table.length.clone();
+let table_len = matching_table.length;
 let sz = table_len as usize;
 _input.start_slice(sz)?;
-let ret = (Decoder_opentype_os2_table(_input, table_len.clone()))?;
+let ret = (Decoder_opentype_os2_table(_input, table_len))?;
 _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
@@ -6514,12 +6514,12 @@ _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
 };
-let post = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1886352244u32, tables)).cloned() {
+let post = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1886352244u32, tables)).cloned() {
 Some(ref matching_table) => {
-let tgt_offset = start + matching_table.offset.clone();
+let tgt_offset = start + matching_table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
-let sz = (matching_table.length.clone()) as usize;
+let sz = matching_table.length as usize;
 _input.start_slice(sz)?;
 let ret = (Decoder_opentype_post_table(_input))?;
 _input.end_slice()?;
@@ -6533,12 +6533,12 @@ _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
 };
-let cvt = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1668707360u32, tables)).cloned() {
+let cvt = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1668707360u32, tables)).cloned() {
 Some(ref table) => {
-let tgt_offset = start + table.offset.clone();
+let tgt_offset = start + table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
-let sz = (table.length.clone()) as usize;
+let sz = table.length as usize;
 _input.start_slice(sz)?;
 let ret = ((|| {
 let mut accum = Vec::new();
@@ -6572,12 +6572,12 @@ None => {
 None
 }
 };
-let fpgm = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1718642541u32, tables)).cloned() {
+let fpgm = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1718642541u32, tables)).cloned() {
 Some(ref table) => {
-let tgt_offset = start + table.offset.clone();
+let tgt_offset = start + table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
-let sz = (table.length.clone()) as usize;
+let sz = table.length as usize;
 _input.start_slice(sz)?;
 let ret = ((|| {
 let mut accum = Vec::new();
@@ -6611,14 +6611,14 @@ None => {
 None
 }
 };
-let loca = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1819239265u32, tables)).cloned() {
+let loca = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1819239265u32, tables)).cloned() {
 Some(ref table) => {
-let tgt_offset = start + table.offset.clone();
+let tgt_offset = start + table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
-let sz = (table.length.clone()) as usize;
+let sz = table.length as usize;
 _input.start_slice(sz)?;
-let ret = (Decoder_opentype_loca_table(_input, maxp.num_glyphs.clone(), head.index_to_loc_format.clone()))?;
+let ret = (Decoder_opentype_loca_table(_input, maxp.num_glyphs, head.index_to_loc_format))?;
 _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
@@ -6630,12 +6630,12 @@ None => {
 None
 }
 };
-let glyf = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1735162214u32, tables)).cloned() {
+let glyf = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1735162214u32, tables)).cloned() {
 Some(ref table) => {
-let tgt_offset = start + table.offset.clone();
+let tgt_offset = start + table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
-let sz = (table.length.clone()) as usize;
+let sz = table.length as usize;
 _input.start_slice(sz)?;
 let ret = (Decoder41(_input, match loca {
 Some(ref x) => {
@@ -6657,12 +6657,12 @@ None => {
 None
 }
 };
-let prep = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1886545264u32, tables)).cloned() {
+let prep = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1886545264u32, tables)).cloned() {
 Some(ref table) => {
-let tgt_offset = start + table.offset.clone();
+let tgt_offset = start + table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
-let sz = (table.length.clone()) as usize;
+let sz = table.length as usize;
 _input.start_slice(sz)?;
 let ret = ((|| {
 let mut accum = Vec::new();
@@ -6696,12 +6696,12 @@ None => {
 None
 }
 };
-let gasp = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1734439792u32, tables)).cloned() {
+let gasp = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1734439792u32, tables)).cloned() {
 Some(ref table) => {
-let tgt_offset = start + table.offset.clone();
+let tgt_offset = start + table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
-let sz = (table.length.clone()) as usize;
+let sz = table.length as usize;
 _input.start_slice(sz)?;
 let ret = (Decoder_opentype_gasp_table(_input))?;
 _input.end_slice()?;
@@ -6715,12 +6715,12 @@ None => {
 None
 }
 };
-let base = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1111577413u32, tables)).cloned() {
+let base = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1111577413u32, tables)).cloned() {
 Some(ref table) => {
-let tgt_offset = start + table.offset.clone();
+let tgt_offset = start + table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
-let sz = (table.length.clone()) as usize;
+let sz = table.length as usize;
 _input.start_slice(sz)?;
 let ret = (Decoder_opentype_base_table(_input))?;
 _input.end_slice()?;
@@ -6734,12 +6734,12 @@ None => {
 None
 }
 };
-let gdef = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1195656518u32, tables)).cloned() {
+let gdef = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1195656518u32, tables)).cloned() {
 Some(ref table) => {
-let tgt_offset = start + table.offset.clone();
+let tgt_offset = start + table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
-let sz = (table.length.clone()) as usize;
+let sz = table.length as usize;
 _input.start_slice(sz)?;
 let ret = (Decoder_opentype_gdef_table(_input))?;
 _input.end_slice()?;
@@ -6753,12 +6753,12 @@ None => {
 None
 }
 };
-let gpos = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1196445523u32, tables)).cloned() {
+let gpos = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1196445523u32, tables)).cloned() {
 Some(ref table) => {
-let tgt_offset = start + table.offset.clone();
+let tgt_offset = start + table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
-let sz = (table.length.clone()) as usize;
+let sz = table.length as usize;
 _input.start_slice(sz)?;
 let ret = (Decoder_opentype_gpos_table(_input))?;
 _input.end_slice()?;
@@ -6772,12 +6772,12 @@ None => {
 None
 }
 };
-let gsub = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1196643650u32, tables)).cloned() {
+let gsub = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1196643650u32, tables)).cloned() {
 Some(ref table) => {
-let tgt_offset = start + table.offset.clone();
+let tgt_offset = start + table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
-let sz = (table.length.clone()) as usize;
+let sz = table.length as usize;
 _input.start_slice(sz)?;
 let ret = (Decoder_opentype_gsub_table(_input))?;
 _input.end_slice()?;
@@ -6791,12 +6791,12 @@ None => {
 None
 }
 };
-let fvar = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1719034226u32, tables)).cloned() {
+let fvar = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1719034226u32, tables)).cloned() {
 Some(ref table) => {
-let tgt_offset = start + table.offset.clone();
+let tgt_offset = start + table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
-let sz = (table.length.clone()) as usize;
+let sz = table.length as usize;
 _input.start_slice(sz)?;
 let ret = (Decoder_opentype_fvar_table(_input))?;
 _input.end_slice()?;
@@ -6810,12 +6810,12 @@ None => {
 None
 }
 };
-let gvar = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1735811442u32, tables)).cloned() {
+let gvar = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1735811442u32, tables)).cloned() {
 Some(ref table) => {
-let tgt_offset = start + table.offset.clone();
+let tgt_offset = start + table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
-let sz = (table.length.clone()) as usize;
+let sz = table.length as usize;
 _input.start_slice(sz)?;
 let ret = (Decoder_opentype_gvar_table(_input))?;
 _input.end_slice()?;
@@ -6829,12 +6829,12 @@ None => {
 None
 }
 };
-let kern = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1801810542u32, tables)).cloned() {
+let kern = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1801810542u32, tables)).cloned() {
 Some(ref table) => {
-let tgt_offset = start + table.offset.clone();
+let tgt_offset = start + table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
-let sz = (table.length.clone()) as usize;
+let sz = table.length as usize;
 _input.start_slice(sz)?;
 let ret = (Decoder_opentype_kern_table(_input))?;
 _input.end_slice()?;
@@ -6848,12 +6848,12 @@ None => {
 None
 }
 };
-let stat = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1398030676u32, tables)).cloned() {
+let stat = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1398030676u32, tables)).cloned() {
 Some(ref table) => {
-let tgt_offset = start + table.offset.clone();
+let tgt_offset = start + table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
-let sz = (table.length.clone()) as usize;
+let sz = table.length as usize;
 _input.start_slice(sz)?;
 let ret = (Decoder_opentype_stat_table(_input))?;
 _input.end_slice()?;
@@ -6867,12 +6867,12 @@ None => {
 None
 }
 };
-let vhea = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1986553185u32, tables)).cloned() {
+let vhea = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1986553185u32, tables)).cloned() {
 Some(ref table) => {
-let tgt_offset = start + table.offset.clone();
+let tgt_offset = start + table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
-let sz = (table.length.clone()) as usize;
+let sz = table.length as usize;
 _input.start_slice(sz)?;
 let ret = (Decoder_opentype_hhea_table(_input))?;
 _input.end_slice()?;
@@ -6886,22 +6886,22 @@ None => {
 None
 }
 };
-let vmtx = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id.clone(), 1986884728u32, tables)).cloned() {
+let vmtx = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1986884728u32, tables)).cloned() {
 Some(ref table) => {
-let tgt_offset = start + table.offset.clone();
+let tgt_offset = start + table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
-let sz = (table.length.clone()) as usize;
+let sz = table.length as usize;
 _input.start_slice(sz)?;
 let ret = (Decoder_opentype_hmtx_table(_input, match vhea {
 Some(ref x) => {
-x.clone()
+x
 },
 
 _ => {
 return Err(ParseError::ExcludedBranch(14215639860155940137u64));
 }
-}.number_of_long_metrics, maxp.num_glyphs.clone()))?;
+}.number_of_long_metrics, maxp.num_glyphs))?;
 _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
@@ -6927,7 +6927,7 @@ let num_tables = (Decoder29(_input))?;
 let encoding_records = {
 let mut accum = Vec::new();
 for _ in 0..num_tables {
-accum.push((Decoder_opentype_encoding_record(_input, table_start.clone()))?);
+accum.push((Decoder_opentype_encoding_record(_input, table_start))?);
 }
 accum
 };
@@ -7180,7 +7180,7 @@ opentype_maxp_table_data::MaxpPostScript
 },
 
 unknown => {
-let inner = unknown.clone();
+let inner = unknown;
 opentype_maxp_table_data::MaxpUnknown(inner)
 }
 };
@@ -7273,7 +7273,7 @@ opentype_name_table_data::NameVersion1(inner)
 },
 
 unknown => {
-let inner = unknown.clone();
+let inner = unknown;
 opentype_name_table_data::NameVersionUnknown(inner)
 }
 };
@@ -7406,7 +7406,7 @@ opentype_post_table_names::Version3
 },
 
 unknown => {
-let inner = unknown.clone();
+let inner = unknown;
 opentype_post_table_names::VersionUnknown(inner)
 }
 };
@@ -7455,7 +7455,7 @@ let len = pred((half16s.len()) as u32);
 let mut accum = Vec::new();
 for ix in 0u32..len {
 accum.push({
-let (this_offs, next_offs) = (((half16s[ix as usize].clone()) as u32) * 2u32, ((half16s[(succ(ix)) as usize].clone()) as u32) * 2u32);
+let (this_offs, next_offs) = ((half16s[ix as usize] as u32) * 2u32, (half16s[(succ(ix)) as usize] as u32) * 2u32);
 match next_offs > this_offs {
 true => {
 let tgt_offset = start_offset + this_offs;
@@ -7467,7 +7467,7 @@ let x_min = (Decoder29(_input))?;
 let y_min = (Decoder29(_input))?;
 let x_max = (Decoder29(_input))?;
 let y_max = (Decoder29(_input))?;
-let description = (Decoder_opentype_glyf_description(_input, number_of_contours.clone()))?;
+let description = (Decoder_opentype_glyf_description(_input, number_of_contours))?;
 opentype_glyf_table_Glyph { number_of_contours, x_min, y_min, x_max, y_max, description }
 };
 PResult::Ok(opentype_glyf_table::Glyph(inner))
@@ -7490,7 +7490,7 @@ let len = pred((off32s.len()) as u32);
 let mut accum = Vec::new();
 for ix in 0u32..len {
 accum.push({
-let (this_offs, next_offs) = (off32s[ix as usize].clone(), off32s[(succ(ix)) as usize].clone());
+let (this_offs, next_offs) = (off32s[ix as usize], off32s[(succ(ix)) as usize]);
 match next_offs > this_offs {
 true => {
 let tgt_offset = start_offset + this_offs;
@@ -7502,7 +7502,7 @@ let x_min = (Decoder29(_input))?;
 let y_min = (Decoder29(_input))?;
 let x_max = (Decoder29(_input))?;
 let y_max = (Decoder29(_input))?;
-let description = (Decoder_opentype_glyf_description(_input, number_of_contours.clone()))?;
+let description = (Decoder_opentype_glyf_description(_input, number_of_contours))?;
 opentype_glyf_table_Glyph { number_of_contours, x_min, y_min, x_max, y_max, description }
 };
 PResult::Ok(opentype_glyf_table::Glyph(inner))
@@ -8307,7 +8307,7 @@ opentype_gpos_table_lookup_list_link_lookups_link_subtables_link::PosExtension(i
 },
 
 _ => {
-let inner = (Decoder_opentype_layout_ground_pos(_input, lookup_type.clone()))?;
+let inner = (Decoder_opentype_layout_ground_pos(_input, lookup_type))?;
 opentype_gpos_table_lookup_list_link_lookups_link_subtables_link::GroundPos(inner)
 }
 };
@@ -8327,7 +8327,7 @@ opentype_gpos_table_lookup_list_link_lookups_link_subtables { offset, link }
 }
 accum
 };
-let mark_filtering_set = match lookup_flag.use_mark_filtering_set.clone() {
+let mark_filtering_set = match lookup_flag.use_mark_filtering_set {
 true => {
 Some((Decoder29(_input))?)
 },
@@ -8529,7 +8529,7 @@ opentype_gsub_table_lookup_list_link_lookups_link_subtables_link::SubstExtension
 },
 
 _ => {
-let inner = (Decoder_opentype_layout_ground_subst(_input, lookup_type.clone()))?;
+let inner = (Decoder_opentype_layout_ground_subst(_input, lookup_type))?;
 opentype_gsub_table_lookup_list_link_lookups_link_subtables_link::GroundSubst(inner)
 }
 };
@@ -8549,7 +8549,7 @@ opentype_gsub_table_lookup_list_link_lookups_link_subtables { offset, link }
 }
 accum
 };
-let mark_filtering_set = match lookup_flag.use_mark_filtering_set.clone() {
+let mark_filtering_set = match lookup_flag.use_mark_filtering_set {
 true => {
 Some((Decoder29(_input))?)
 },
@@ -8760,7 +8760,7 @@ inner
 return Err(ParseError::FalsifiedWhere(14931240509007516758u64));
 }
 };
-let coordinates = (Decoder_opentype_var_user_tuple(_input, axis_count.clone()))?;
+let coordinates = (Decoder_opentype_var_user_tuple(_input, axis_count))?;
 let postscript_nameid = if instance_size % 4u16 == 2u16 {
 Some((Decoder29(_input))?)
 } else {
@@ -8820,7 +8820,7 @@ let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let mut accum = Vec::new();
 for _ in 0..shared_tuple_count {
-accum.push((Decoder_opentype_var_tuple_record(_input, axis_count.clone()))?);
+accum.push((Decoder_opentype_var_tuple_record(_input, axis_count))?);
 }
 PResult::Ok(Some(accum))
 })())?;
@@ -8847,7 +8847,7 @@ u16be(x)
 opentype_gvar_table_flags { is_long_offset: packed_bits & 1u16 > 0u16 }
 };
 let glyph_variation_data_array_offset = (Decoder26(_input))?;
-let glyph_variation_data_offsets = match flags.is_long_offset.clone() {
+let glyph_variation_data_offsets = match flags.is_long_offset {
 true => {
 let inner = {
 let mut accum = Vec::new();
@@ -8884,14 +8884,14 @@ let len = pred((half16s.len()) as u32);
 let mut accum = Vec::new();
 for ix in 0u32..len {
 accum.push({
-let (this_offs, next_offs) = (((half16s[ix as usize].clone()) as u32) * 2u32, ((half16s[(succ(ix)) as usize].clone()) as u32) * 2u32);
+let (this_offs, next_offs) = ((half16s[ix as usize] as u32) * 2u32, (half16s[(succ(ix)) as usize] as u32) * 2u32);
 if next_offs > this_offs {
 let tgt_offset = array_start + this_offs;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let sz = (try_sub!(next_offs, this_offs, 11876854719037224982u64)) as usize;
 _input.start_slice(sz)?;
-let ret = (Decoder_opentype_var_glyph_variation_data_table(_input, axis_count.clone()))?;
+let ret = (Decoder_opentype_var_glyph_variation_data_table(_input, axis_count))?;
 _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
@@ -8910,14 +8910,14 @@ let len = pred((off32s.len()) as u32);
 let mut accum = Vec::new();
 for ix in 0u32..len {
 accum.push({
-let (this_offs, next_offs) = (off32s[ix as usize].clone(), off32s[(succ(ix)) as usize].clone());
+let (this_offs, next_offs) = (off32s[ix as usize], off32s[(succ(ix)) as usize]);
 if next_offs > this_offs {
 let tgt_offset = array_start + this_offs;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let sz = (try_sub!(next_offs, this_offs, 18270091135093349626u64)) as usize;
 _input.start_slice(sz)?;
-let ret = (Decoder_opentype_var_glyph_variation_data_table(_input, axis_count.clone()))?;
+let ret = (Decoder_opentype_var_glyph_variation_data_table(_input, axis_count))?;
 _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
@@ -8980,7 +8980,7 @@ u16be(x)
 };
 opentype_kern_table_subtables_coverage { format: packed_bits >> 8u16 & 255u16, r#override: packed_bits >> 3u16 & 1u16 > 0u16, cross_stream: packed_bits >> 2u16 & 1u16 > 0u16, minimum: packed_bits >> 1u16 & 1u16 > 0u16, horizontal: packed_bits & 1u16 > 0u16 }
 };
-let data = match coverage.format.clone() {
+let data = match coverage.format {
 0u16 => {
 let inner = {
 let n_pairs = (Decoder29(_input))?;
@@ -9459,7 +9459,7 @@ return Err(ParseError::FalsifiedWhere(13049534979177835905u64));
 };
 let tuple_variation_headers = {
 let mut accum = Vec::new();
-for _ in 0..tuple_variation_count.tuple_count.clone() {
+for _ in 0..tuple_variation_count.tuple_count {
 accum.push({
 let variation_data_size = (Decoder29(_input))?;
 let tuple_index = {
@@ -9473,14 +9473,14 @@ u16be(x)
 };
 opentype_var_glyph_variation_data_table_tuple_variation_headers_tuple_index { embedded_peak_tuple: packed_bits >> 15u16 & 1u16 > 0u16, intermediate_region: packed_bits >> 14u16 & 1u16 > 0u16, private_point_numbers: packed_bits >> 13u16 & 1u16 > 0u16, tuple_index: packed_bits & 4095u16 }
 };
-let peak_tuple = if tuple_index.embedded_peak_tuple.clone() {
-Some((Decoder_opentype_var_tuple_record(_input, axis_count.clone()))?)
+let peak_tuple = if tuple_index.embedded_peak_tuple {
+Some((Decoder_opentype_var_tuple_record(_input, axis_count))?)
 } else {
 None
 };
-let intermediate_tuples = if tuple_index.intermediate_region.clone() {
-let start_tuple = (Decoder_opentype_var_tuple_record(_input, axis_count.clone()))?;
-let end_tuple = (Decoder_opentype_var_tuple_record(_input, axis_count.clone()))?;
+let intermediate_tuples = if tuple_index.intermediate_region {
+let start_tuple = (Decoder_opentype_var_tuple_record(_input, axis_count))?;
+let end_tuple = (Decoder_opentype_var_tuple_record(_input, axis_count))?;
 Some(opentype_var_glyph_variation_data_table_tuple_variation_headers_intermediate_tuples { start_tuple, end_tuple })
 } else {
 None
@@ -9509,7 +9509,7 @@ return Err(ParseError::FalsifiedWhere(9011855507994367971u64));
 let tgt_offset = table_start + (__data_offset as u32);
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
-let shared_point_numbers = if tuple_variation_count.shared_point_numbers.clone() {
+let shared_point_numbers = if tuple_variation_count.shared_point_numbers {
 let tree_index = {
 _input.open_peek_context();
 {
@@ -9560,7 +9560,7 @@ let mut seq: Vec<opentype_var_glyph_variation_data_table_data_shared_point_numbe
 let mut acc = 0u16;
 loop {
 let tmp_is_done = {
-let totlen = acc.clone();
+let totlen = acc;
 totlen >= (point_count as u16)
 };
 if tmp_is_done {
@@ -9572,8 +9572,8 @@ let packed_bits = _input.read_byte()?;
 opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes_control { points_are_words: packed_bits >> 7u8 & 1u8 > 0u8, point_run_count: packed_bits & 127u8 }
 };
 let points = {
-let run_length = succ(control.point_run_count.clone());
-match control.points_are_words.clone() {
+let run_length = succ(control.point_run_count);
+match control.points_are_words {
 true => {
 let inner = {
 let mut accum = Vec::new();
@@ -9603,7 +9603,7 @@ seq.push(elem.clone());
 acc = {
 let acc = acc;
 let run = elem;
-acc + (succ((run.control.point_run_count.clone()) as u16))
+acc + (succ(run.control.point_run_count as u16))
 };
 }
 (acc, seq)
@@ -9623,7 +9623,7 @@ let mut seq: Vec<opentype_var_glyph_variation_data_table_data_shared_point_numbe
 let mut acc = 0u16;
 loop {
 let tmp_is_done = {
-let totlen = acc.clone();
+let totlen = acc;
 totlen >= ((hi as u16) & 127u16) << 8u16 | (lo as u16)
 };
 if tmp_is_done {
@@ -9635,8 +9635,8 @@ let packed_bits = _input.read_byte()?;
 opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes_control { points_are_words: packed_bits >> 7u8 & 1u8 > 0u8, point_run_count: packed_bits & 127u8 }
 };
 let points = {
-let run_length = succ(control.point_run_count.clone());
-match control.points_are_words.clone() {
+let run_length = succ(control.point_run_count);
+match control.points_are_words {
 true => {
 let inner = {
 let mut accum = Vec::new();
@@ -9666,7 +9666,7 @@ seq.push(elem.clone());
 acc = {
 let acc = acc;
 let run = elem;
-acc + (succ((run.control.point_run_count.clone()) as u16))
+acc + (succ(run.control.point_run_count as u16))
 };
 }
 (acc, seq)
@@ -9683,10 +9683,10 @@ let per_tuple_variation_data = {
 let mut accum = Vec::new();
 for header in tuple_variation_headers.clone() {
 accum.push({
-let sz = (header.variation_data_size.clone()) as usize;
+let sz = header.variation_data_size as usize;
 _input.start_slice(sz)?;
 let ret = ((|| {
-let private_point_numbers = if header.tuple_index.private_point_numbers.clone() {
+let private_point_numbers = if header.tuple_index.private_point_numbers {
 let tree_index = {
 _input.open_peek_context();
 {
@@ -9737,7 +9737,7 @@ let mut seq: Vec<opentype_var_glyph_variation_data_table_data_shared_point_numbe
 let mut acc = 0u16;
 loop {
 let tmp_is_done = {
-let totlen = acc.clone();
+let totlen = acc;
 totlen >= (point_count as u16)
 };
 if tmp_is_done {
@@ -9749,8 +9749,8 @@ let packed_bits = _input.read_byte()?;
 opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes_control { points_are_words: packed_bits >> 7u8 & 1u8 > 0u8, point_run_count: packed_bits & 127u8 }
 };
 let points = {
-let run_length = succ(control.point_run_count.clone());
-match control.points_are_words.clone() {
+let run_length = succ(control.point_run_count);
+match control.points_are_words {
 true => {
 let inner = {
 let mut accum = Vec::new();
@@ -9780,7 +9780,7 @@ seq.push(elem.clone());
 acc = {
 let acc = acc;
 let run = elem;
-acc + (succ((run.control.point_run_count.clone()) as u16))
+acc + (succ(run.control.point_run_count as u16))
 };
 }
 (acc, seq)
@@ -9800,7 +9800,7 @@ let mut seq: Vec<opentype_var_glyph_variation_data_table_data_shared_point_numbe
 let mut acc = 0u16;
 loop {
 let tmp_is_done = {
-let totlen = acc.clone();
+let totlen = acc;
 totlen >= ((hi as u16) & 127u16) << 8u16 | (lo as u16)
 };
 if tmp_is_done {
@@ -9812,8 +9812,8 @@ let packed_bits = _input.read_byte()?;
 opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes_control { points_are_words: packed_bits >> 7u8 & 1u8 > 0u8, point_run_count: packed_bits & 127u8 }
 };
 let points = {
-let run_length = succ(control.point_run_count.clone());
-match control.points_are_words.clone() {
+let run_length = succ(control.point_run_count);
+match control.points_are_words {
 true => {
 let inner = {
 let mut accum = Vec::new();
@@ -9843,7 +9843,7 @@ seq.push(elem.clone());
 acc = {
 let acc = acc;
 let run = elem;
-acc + (succ((run.control.point_run_count.clone()) as u16))
+acc + (succ(run.control.point_run_count as u16))
 };
 }
 (acc, seq)
@@ -9878,7 +9878,7 @@ let mut seq: Vec<opentype_var_glyph_variation_data_table_data_per_tuple_variatio
 let mut acc = 0u16;
 loop {
 let tmp_is_done = {
-let totlen = acc.clone();
+let totlen = acc;
 totlen >= point_count * 2u16
 };
 if tmp_is_done {
@@ -9890,15 +9890,15 @@ let packed_bits = _input.read_byte()?;
 opentype_var_glyph_variation_data_table_data_per_tuple_variation_data_x_and_y_coordinate_deltas_control { deltas_are_zero: packed_bits >> 7u8 & 1u8 > 0u8, deltas_are_words: packed_bits >> 6u8 & 1u8 > 0u8, delta_run_count: packed_bits & 63u8 }
 };
 let deltas = {
-let run_length = succ(control.delta_run_count.clone());
-match control.deltas_are_zero.clone() {
+let run_length = succ(control.delta_run_count);
+match control.deltas_are_zero {
 true => {
-let inner = run_length.clone();
+let inner = run_length;
 opentype_var_glyph_variation_data_table_data_per_tuple_variation_data_x_and_y_coordinate_deltas_deltas::Delta0(inner)
 },
 
 false => {
-match control.deltas_are_words.clone() {
+match control.deltas_are_words {
 true => {
 let inner = {
 let mut accum = Vec::new();
@@ -9930,7 +9930,7 @@ seq.push(elem.clone());
 acc = {
 let acc = acc;
 let run = elem;
-acc + (succ((run.control.delta_run_count.clone()) as u16))
+acc + (succ(run.control.delta_run_count as u16))
 };
 }
 (acc, seq)
@@ -10117,7 +10117,7 @@ let link = match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = Some((Decoder_opentype_layout_ground_subst(_input, extension_lookup_type.clone()))?);
+let ret = Some((Decoder_opentype_layout_ground_subst(_input, extension_lookup_type))?);
 _input.close_peek_context()?;
 ret
 },
@@ -11933,7 +11933,7 @@ let link = match offset > 0u32 {
 true => {
 let tgt_offset = table_start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = Some((Decoder_opentype_layout_ground_pos(_input, extension_lookup_type.clone()))?);
+let ret = Some((Decoder_opentype_layout_ground_pos(_input, extension_lookup_type))?);
 _input.close_peek_context()?;
 ret
 },
@@ -12034,7 +12034,7 @@ None
 opentype_layout_reverse_chain_single_subst_coverage { offset, link }
 };
 let value_format = (Decoder_opentype_common_value_format_flags(_input))?;
-let value_record = (Decoder90(_input, table_start.clone(), value_format.clone()))?;
+let value_record = (Decoder90(_input, table_start, value_format))?;
 opentype_layout_single_pos_subtable_Format1 { coverage_offset, value_format, value_record }
 };
 opentype_layout_single_pos_subtable::Format1(inner)
@@ -12072,7 +12072,7 @@ let value_count = (Decoder29(_input))?;
 let value_records = {
 let mut accum = Vec::new();
 for _ in 0..value_count {
-accum.push((Decoder91(_input, table_start.clone(), value_format.clone()))?);
+accum.push((Decoder91(_input, table_start, value_format))?);
 }
 accum
 };
@@ -12150,13 +12150,13 @@ let mut accum = Vec::new();
 for _ in 0..pair_value_count {
 accum.push({
 let second_glyph = (Decoder29(_input))?;
-let value_record1 = if value_format1.x_placement.clone() || value_format1.y_placement.clone() || value_format1.x_advance.clone() || value_format1.y_advance.clone() || value_format1.x_placement_device.clone() || value_format1.y_placement_device.clone() || value_format1.x_advance_device.clone() || value_format1.y_advance_device.clone() {
-Some((Decoder_opentype_common_value_record(_input, table_start.clone(), value_format1.clone()))?)
+let value_record1 = if value_format1.x_placement || value_format1.y_placement || value_format1.x_advance || value_format1.y_advance || value_format1.x_placement_device || value_format1.y_placement_device || value_format1.x_advance_device || value_format1.y_advance_device {
+Some((Decoder_opentype_common_value_record(_input, table_start, value_format1))?)
 } else {
 None
 };
-let value_record2 = if value_format2.x_placement.clone() || value_format2.y_placement.clone() || value_format2.x_advance.clone() || value_format2.y_advance.clone() || value_format2.x_placement_device.clone() || value_format2.y_placement_device.clone() || value_format2.x_advance_device.clone() || value_format2.y_advance_device.clone() {
-Some((Decoder87(_input, table_start.clone(), value_format2.clone()))?)
+let value_record2 = if value_format2.x_placement || value_format2.y_placement || value_format2.x_advance || value_format2.y_advance || value_format2.x_placement_device || value_format2.y_placement_device || value_format2.x_advance_device || value_format2.y_advance_device {
+Some((Decoder87(_input, table_start, value_format2))?)
 } else {
 None
 };
@@ -12277,13 +12277,13 @@ let class2_records = {
 let mut accum = Vec::new();
 for _ in 0..class2_count {
 accum.push({
-let value_record1 = if value_format1.x_placement.clone() || value_format1.y_placement.clone() || value_format1.x_advance.clone() || value_format1.y_advance.clone() || value_format1.x_placement_device.clone() || value_format1.y_placement_device.clone() || value_format1.x_advance_device.clone() || value_format1.y_advance_device.clone() {
-Some((Decoder88(_input, table_start.clone(), value_format1.clone()))?)
+let value_record1 = if value_format1.x_placement || value_format1.y_placement || value_format1.x_advance || value_format1.y_advance || value_format1.x_placement_device || value_format1.y_placement_device || value_format1.x_advance_device || value_format1.y_advance_device {
+Some((Decoder88(_input, table_start, value_format1))?)
 } else {
 None
 };
-let value_record2 = if value_format2.x_placement.clone() || value_format2.y_placement.clone() || value_format2.x_advance.clone() || value_format2.y_advance.clone() || value_format2.x_placement_device.clone() || value_format2.y_placement_device.clone() || value_format2.x_advance_device.clone() || value_format2.y_advance_device.clone() {
-Some((Decoder89(_input, table_start.clone(), value_format2.clone()))?)
+let value_record2 = if value_format2.x_placement || value_format2.y_placement || value_format2.x_advance || value_format2.y_advance || value_format2.x_placement_device || value_format2.y_placement_device || value_format2.x_advance_device || value_format2.y_advance_device {
+Some((Decoder89(_input, table_start, value_format2))?)
 } else {
 None
 };
@@ -13196,7 +13196,7 @@ other => {
 let inner = {
 let field0 = (Decoder29(_input))?;
 let field1 = (Decoder29(_input))?;
-let delta_format = other.clone();
+let delta_format = other;
 opentype_common_device_or_variation_index_table_OtherTable { field0, field1, delta_format }
 };
 opentype_common_device_or_variation_index_table::OtherTable(inner)
@@ -13217,27 +13217,27 @@ PResult::Ok(opentype_common_value_format_flags { y_advance_device: packed_bits >
 }
 
 fn Decoder_opentype_common_value_record<>(_input: &mut Parser<'_>, table_start: u32, flags: opentype_common_value_format_flags) -> Result<opentype_common_value_record, ParseError> {
-let x_placement = if flags.x_placement.clone() {
+let x_placement = if flags.x_placement {
 Some((Decoder29(_input))?)
 } else {
 None
 };
-let y_placement = if flags.y_placement.clone() {
+let y_placement = if flags.y_placement {
 Some((Decoder29(_input))?)
 } else {
 None
 };
-let x_advance = if flags.x_advance.clone() {
+let x_advance = if flags.x_advance {
 Some((Decoder29(_input))?)
 } else {
 None
 };
-let y_advance = if flags.y_advance.clone() {
+let y_advance = if flags.y_advance {
 Some((Decoder29(_input))?)
 } else {
 None
 };
-let x_placement_device = if flags.x_placement_device.clone() {
+let x_placement_device = if flags.x_placement_device {
 let offset = (Decoder29(_input))?;
 let link = match offset > 0u16 {
 true => {
@@ -13264,7 +13264,7 @@ Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
 };
-let y_placement_device = if flags.y_placement_device.clone() {
+let y_placement_device = if flags.y_placement_device {
 let offset = (Decoder29(_input))?;
 let link = match offset > 0u16 {
 true => {
@@ -13291,7 +13291,7 @@ Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
 };
-let x_advance_device = if flags.x_advance_device.clone() {
+let x_advance_device = if flags.x_advance_device {
 let offset = (Decoder29(_input))?;
 let link = match offset > 0u16 {
 true => {
@@ -13318,7 +13318,7 @@ Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
 };
-let y_advance_device = if flags.y_advance_device.clone() {
+let y_advance_device = if flags.y_advance_device {
 let offset = (Decoder29(_input))?;
 let link = match offset > 0u16 {
 true => {
@@ -13349,27 +13349,27 @@ PResult::Ok(opentype_common_value_record { x_placement, y_placement, x_advance, 
 }
 
 fn Decoder87<>(_input: &mut Parser<'_>, table_start: u32, flags: opentype_common_value_format_flags) -> Result<opentype_common_value_record, ParseError> {
-let x_placement = if flags.x_placement.clone() {
+let x_placement = if flags.x_placement {
 Some((Decoder29(_input))?)
 } else {
 None
 };
-let y_placement = if flags.y_placement.clone() {
+let y_placement = if flags.y_placement {
 Some((Decoder29(_input))?)
 } else {
 None
 };
-let x_advance = if flags.x_advance.clone() {
+let x_advance = if flags.x_advance {
 Some((Decoder29(_input))?)
 } else {
 None
 };
-let y_advance = if flags.y_advance.clone() {
+let y_advance = if flags.y_advance {
 Some((Decoder29(_input))?)
 } else {
 None
 };
-let x_placement_device = if flags.x_placement_device.clone() {
+let x_placement_device = if flags.x_placement_device {
 let offset = (Decoder29(_input))?;
 let link = match offset > 0u16 {
 true => {
@@ -13396,7 +13396,7 @@ Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
 };
-let y_placement_device = if flags.y_placement_device.clone() {
+let y_placement_device = if flags.y_placement_device {
 let offset = (Decoder29(_input))?;
 let link = match offset > 0u16 {
 true => {
@@ -13423,7 +13423,7 @@ Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
 };
-let x_advance_device = if flags.x_advance_device.clone() {
+let x_advance_device = if flags.x_advance_device {
 let offset = (Decoder29(_input))?;
 let link = match offset > 0u16 {
 true => {
@@ -13450,7 +13450,7 @@ Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
 };
-let y_advance_device = if flags.y_advance_device.clone() {
+let y_advance_device = if flags.y_advance_device {
 let offset = (Decoder29(_input))?;
 let link = match offset > 0u16 {
 true => {
@@ -13481,27 +13481,27 @@ PResult::Ok(opentype_common_value_record { x_placement, y_placement, x_advance, 
 }
 
 fn Decoder88<>(_input: &mut Parser<'_>, table_start: u32, flags: opentype_common_value_format_flags) -> Result<opentype_common_value_record, ParseError> {
-let x_placement = if flags.x_placement.clone() {
+let x_placement = if flags.x_placement {
 Some((Decoder29(_input))?)
 } else {
 None
 };
-let y_placement = if flags.y_placement.clone() {
+let y_placement = if flags.y_placement {
 Some((Decoder29(_input))?)
 } else {
 None
 };
-let x_advance = if flags.x_advance.clone() {
+let x_advance = if flags.x_advance {
 Some((Decoder29(_input))?)
 } else {
 None
 };
-let y_advance = if flags.y_advance.clone() {
+let y_advance = if flags.y_advance {
 Some((Decoder29(_input))?)
 } else {
 None
 };
-let x_placement_device = if flags.x_placement_device.clone() {
+let x_placement_device = if flags.x_placement_device {
 let offset = (Decoder29(_input))?;
 let link = match offset > 0u16 {
 true => {
@@ -13528,7 +13528,7 @@ Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
 };
-let y_placement_device = if flags.y_placement_device.clone() {
+let y_placement_device = if flags.y_placement_device {
 let offset = (Decoder29(_input))?;
 let link = match offset > 0u16 {
 true => {
@@ -13555,7 +13555,7 @@ Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
 };
-let x_advance_device = if flags.x_advance_device.clone() {
+let x_advance_device = if flags.x_advance_device {
 let offset = (Decoder29(_input))?;
 let link = match offset > 0u16 {
 true => {
@@ -13582,7 +13582,7 @@ Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
 };
-let y_advance_device = if flags.y_advance_device.clone() {
+let y_advance_device = if flags.y_advance_device {
 let offset = (Decoder29(_input))?;
 let link = match offset > 0u16 {
 true => {
@@ -13613,27 +13613,27 @@ PResult::Ok(opentype_common_value_record { x_placement, y_placement, x_advance, 
 }
 
 fn Decoder89<>(_input: &mut Parser<'_>, table_start: u32, flags: opentype_common_value_format_flags) -> Result<opentype_common_value_record, ParseError> {
-let x_placement = if flags.x_placement.clone() {
+let x_placement = if flags.x_placement {
 Some((Decoder29(_input))?)
 } else {
 None
 };
-let y_placement = if flags.y_placement.clone() {
+let y_placement = if flags.y_placement {
 Some((Decoder29(_input))?)
 } else {
 None
 };
-let x_advance = if flags.x_advance.clone() {
+let x_advance = if flags.x_advance {
 Some((Decoder29(_input))?)
 } else {
 None
 };
-let y_advance = if flags.y_advance.clone() {
+let y_advance = if flags.y_advance {
 Some((Decoder29(_input))?)
 } else {
 None
 };
-let x_placement_device = if flags.x_placement_device.clone() {
+let x_placement_device = if flags.x_placement_device {
 let offset = (Decoder29(_input))?;
 let link = match offset > 0u16 {
 true => {
@@ -13660,7 +13660,7 @@ Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
 };
-let y_placement_device = if flags.y_placement_device.clone() {
+let y_placement_device = if flags.y_placement_device {
 let offset = (Decoder29(_input))?;
 let link = match offset > 0u16 {
 true => {
@@ -13687,7 +13687,7 @@ Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
 };
-let x_advance_device = if flags.x_advance_device.clone() {
+let x_advance_device = if flags.x_advance_device {
 let offset = (Decoder29(_input))?;
 let link = match offset > 0u16 {
 true => {
@@ -13714,7 +13714,7 @@ Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
 };
-let y_advance_device = if flags.y_advance_device.clone() {
+let y_advance_device = if flags.y_advance_device {
 let offset = (Decoder29(_input))?;
 let link = match offset > 0u16 {
 true => {
@@ -13745,27 +13745,27 @@ PResult::Ok(opentype_common_value_record { x_placement, y_placement, x_advance, 
 }
 
 fn Decoder90<>(_input: &mut Parser<'_>, table_start: u32, flags: opentype_common_value_format_flags) -> Result<opentype_common_value_record, ParseError> {
-let x_placement = if flags.x_placement.clone() {
+let x_placement = if flags.x_placement {
 Some((Decoder29(_input))?)
 } else {
 None
 };
-let y_placement = if flags.y_placement.clone() {
+let y_placement = if flags.y_placement {
 Some((Decoder29(_input))?)
 } else {
 None
 };
-let x_advance = if flags.x_advance.clone() {
+let x_advance = if flags.x_advance {
 Some((Decoder29(_input))?)
 } else {
 None
 };
-let y_advance = if flags.y_advance.clone() {
+let y_advance = if flags.y_advance {
 Some((Decoder29(_input))?)
 } else {
 None
 };
-let x_placement_device = if flags.x_placement_device.clone() {
+let x_placement_device = if flags.x_placement_device {
 let offset = (Decoder29(_input))?;
 let link = match offset > 0u16 {
 true => {
@@ -13792,7 +13792,7 @@ Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
 };
-let y_placement_device = if flags.y_placement_device.clone() {
+let y_placement_device = if flags.y_placement_device {
 let offset = (Decoder29(_input))?;
 let link = match offset > 0u16 {
 true => {
@@ -13819,7 +13819,7 @@ Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
 };
-let x_advance_device = if flags.x_advance_device.clone() {
+let x_advance_device = if flags.x_advance_device {
 let offset = (Decoder29(_input))?;
 let link = match offset > 0u16 {
 true => {
@@ -13846,7 +13846,7 @@ Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
 };
-let y_advance_device = if flags.y_advance_device.clone() {
+let y_advance_device = if flags.y_advance_device {
 let offset = (Decoder29(_input))?;
 let link = match offset > 0u16 {
 true => {
@@ -13877,27 +13877,27 @@ PResult::Ok(opentype_common_value_record { x_placement, y_placement, x_advance, 
 }
 
 fn Decoder91<>(_input: &mut Parser<'_>, table_start: u32, flags: opentype_common_value_format_flags) -> Result<opentype_common_value_record, ParseError> {
-let x_placement = if flags.x_placement.clone() {
+let x_placement = if flags.x_placement {
 Some((Decoder29(_input))?)
 } else {
 None
 };
-let y_placement = if flags.y_placement.clone() {
+let y_placement = if flags.y_placement {
 Some((Decoder29(_input))?)
 } else {
 None
 };
-let x_advance = if flags.x_advance.clone() {
+let x_advance = if flags.x_advance {
 Some((Decoder29(_input))?)
 } else {
 None
 };
-let y_advance = if flags.y_advance.clone() {
+let y_advance = if flags.y_advance {
 Some((Decoder29(_input))?)
 } else {
 None
 };
-let x_placement_device = if flags.x_placement_device.clone() {
+let x_placement_device = if flags.x_placement_device {
 let offset = (Decoder29(_input))?;
 let link = match offset > 0u16 {
 true => {
@@ -13924,7 +13924,7 @@ Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
 };
-let y_placement_device = if flags.y_placement_device.clone() {
+let y_placement_device = if flags.y_placement_device {
 let offset = (Decoder29(_input))?;
 let link = match offset > 0u16 {
 true => {
@@ -13951,7 +13951,7 @@ Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
 };
-let x_advance_device = if flags.x_advance_device.clone() {
+let x_advance_device = if flags.x_advance_device {
 let offset = (Decoder29(_input))?;
 let link = match offset > 0u16 {
 true => {
@@ -13978,7 +13978,7 @@ Some(opentype_common_value_record_x_advance_device { offset, link })
 } else {
 None
 };
-let y_advance_device = if flags.y_advance_device.clone() {
+let y_advance_device = if flags.y_advance_device {
 let offset = (Decoder29(_input))?;
 let link = match offset > 0u16 {
 true => {
@@ -14162,7 +14162,7 @@ accum.push((Decoder29(_input))?);
 }
 accum
 };
-let delta_sets = match word_delta_count.long_words.clone() {
+let delta_sets = match word_delta_count.long_words {
 true => {
 let inner = {
 let mut accum = Vec::new();
@@ -14170,14 +14170,14 @@ for _ in 0..item_count {
 accum.push({
 let delta_data_full_word = {
 let mut accum = Vec::new();
-for _ in 0..word_delta_count.word_count.clone() {
+for _ in 0..word_delta_count.word_count {
 accum.push((Decoder26(_input))?);
 }
 accum
 };
 let delta_data_half_word = {
 let mut accum = Vec::new();
-for _ in 0..try_sub!(region_index_count, word_delta_count.word_count.clone(), 5100077783044507986u64) {
+for _ in 0..try_sub!(region_index_count, word_delta_count.word_count, 5100077783044507986u64) {
 accum.push((Decoder29(_input))?);
 }
 accum
@@ -14197,14 +14197,14 @@ for _ in 0..item_count {
 accum.push({
 let delta_data_full_word = {
 let mut accum = Vec::new();
-for _ in 0..word_delta_count.word_count.clone() {
+for _ in 0..word_delta_count.word_count {
 accum.push((Decoder29(_input))?);
 }
 accum
 };
 let delta_data_half_word = {
 let mut accum = Vec::new();
-for _ in 0..try_sub!(region_index_count, word_delta_count.word_count.clone(), 16200207902741715318u64) {
+for _ in 0..try_sub!(region_index_count, word_delta_count.word_count, 16200207902741715318u64) {
 accum.push((Decoder24(_input))?);
 }
 accum
@@ -14666,7 +14666,7 @@ opentype_glyf_description::HeaderOnly
 },
 
 1u16..=32767u16 => {
-let inner = (Decoder_opentype_glyf_simple(_input, n_contours.clone()))?;
+let inner = (Decoder_opentype_glyf_simple(_input, n_contours))?;
 opentype_glyf_description::Simple(inner)
 },
 
@@ -14693,7 +14693,7 @@ accum.push((Decoder24(_input))?);
 }
 accum
 };
-let number_of_coordinates = succ(end_points_of_contour[(pred((end_points_of_contour.len()) as u32)) as usize].clone());
+let number_of_coordinates = succ(end_points_of_contour[(pred((end_points_of_contour.len()) as u32)) as usize]);
 let flags = {
 let arr_flags = {
 let tuple_var = {
@@ -14701,7 +14701,7 @@ let mut seq: Vec<opentype_glyf_simple_flags_raw> = Vec::new();
 let mut acc = 0u16;
 loop {
 let tmp_is_done = {
-let totlen = acc.clone();
+let totlen = acc;
 totlen >= number_of_coordinates
 };
 if tmp_is_done {
@@ -14709,7 +14709,7 @@ break
 }
 let elem = {
 let flags = (Decoder_opentype_glyph_description_simple_flags_raw(_input))?;
-let repeats = match flags.repeat_flag.clone() {
+let repeats = match flags.repeat_flag {
 true => {
 (Decoder24(_input))?
 },
@@ -14718,14 +14718,14 @@ false => {
 0u8
 }
 };
-let field_set = opentype_glyf_simple_flags { on_curve_point: flags.on_curve_point.clone(), x_short_vector: flags.x_short_vector.clone(), y_short_vector: flags.y_short_vector.clone(), x_is_same_or_positive_x_short_vector: flags.x_is_same_or_positive_x_short_vector.clone(), y_is_same_or_positive_y_short_vector: flags.y_is_same_or_positive_y_short_vector.clone(), overlap_simple: flags.overlap_simple.clone() };
+let field_set = opentype_glyf_simple_flags { on_curve_point: flags.on_curve_point, x_short_vector: flags.x_short_vector, y_short_vector: flags.y_short_vector, x_is_same_or_positive_x_short_vector: flags.x_is_same_or_positive_x_short_vector, y_is_same_or_positive_y_short_vector: flags.y_is_same_or_positive_y_short_vector, overlap_simple: flags.overlap_simple };
 opentype_glyf_simple_flags_raw { repeats, field_set }
 };
-seq.push(elem.clone());
+seq.push(elem);
 acc = {
 let acc = acc;
 let flags = elem;
-acc + (succ((flags.repeats.clone()) as u16))
+acc + (succ(flags.repeats as u16))
 };
 }
 (acc, seq)
@@ -14735,15 +14735,15 @@ let (_len, flags) = tuple_var;
 flags
 }
 };
-(try_flat_map_vec(arr_flags.iter().cloned(), |packed: opentype_glyf_simple_flags_raw| PResult::Ok(dup32(((packed.repeats.clone()) as u32) + 1u32, packed.field_set.clone()))))?
+(try_flat_map_vec(arr_flags.iter().cloned(), |packed: opentype_glyf_simple_flags_raw| PResult::Ok(dup32((packed.repeats as u32) + 1u32, packed.field_set))))?
 };
 let x_coordinates = {
 let mut accum = Vec::new();
 for flag_vals in flags.clone() {
-accum.push(match flag_vals.x_short_vector.clone() {
+accum.push(match flag_vals.x_short_vector {
 true => {
 let abs = (Decoder24(_input))?;
-match flag_vals.x_is_same_or_positive_x_short_vector.clone() {
+match flag_vals.x_is_same_or_positive_x_short_vector {
 true => {
 abs as u16
 },
@@ -14763,7 +14763,7 @@ try_sub!(65535u16, pred(n as u16), 2444204717155307095u64)
 },
 
 false => {
-match flag_vals.x_is_same_or_positive_x_short_vector.clone() {
+match flag_vals.x_is_same_or_positive_x_short_vector {
 true => {
 0u16
 },
@@ -14780,10 +14780,10 @@ accum
 let y_coordinates = {
 let mut accum = Vec::new();
 for flag_vals in flags.clone() {
-accum.push(match flag_vals.y_short_vector.clone() {
+accum.push(match flag_vals.y_short_vector {
 true => {
 let abs = (Decoder24(_input))?;
-match flag_vals.y_is_same_or_positive_y_short_vector.clone() {
+match flag_vals.y_is_same_or_positive_y_short_vector {
 true => {
 abs as u16
 },
@@ -14803,7 +14803,7 @@ try_sub!(65535u16, pred(n as u16), 4480225125687487743u64)
 },
 
 false => {
-match flag_vals.y_is_same_or_positive_y_short_vector.clone() {
+match flag_vals.y_is_same_or_positive_y_short_vector {
 true => {
 0u16
 },
@@ -14829,7 +14829,7 @@ let tmp_is_done = {
 let seq = &seq;
 match match ((seq.len()) as u32) != 0u32 {
 true => {
-Some(seq[(pred((seq.len()) as u32)) as usize].clone())
+Some(seq[(pred((seq.len()) as u32)) as usize])
 },
 
 false => {
@@ -14837,7 +14837,7 @@ None
 }
 } {
 Some(ref x) => {
-!x.flags.more_components.clone()
+!x.flags.more_components
 },
 
 None => {
@@ -14861,38 +14861,9 @@ u16be(x)
 opentype_glyf_composite_glyphs_flags { unscaled_component_offset: packed_bits >> 12u16 & 1u16 > 0u16, scaled_component_offset: packed_bits >> 11u16 & 1u16 > 0u16, overlap_compound: packed_bits >> 10u16 & 1u16 > 0u16, use_my_metrics: packed_bits >> 9u16 & 1u16 > 0u16, we_have_instructions: packed_bits >> 8u16 & 1u16 > 0u16, we_have_a_two_by_two: packed_bits >> 7u16 & 1u16 > 0u16, we_have_an_x_and_y_scale: packed_bits >> 6u16 & 1u16 > 0u16, more_components: packed_bits >> 5u16 & 1u16 > 0u16, we_have_a_scale: packed_bits >> 3u16 & 1u16 > 0u16, round_xy_to_grid: packed_bits >> 2u16 & 1u16 > 0u16, args_are_xy_values: packed_bits >> 1u16 & 1u16 > 0u16, arg_1_and_2_are_words: packed_bits & 1u16 > 0u16 }
 };
 let glyph_index = (Decoder29(_input))?;
-let argument1 = match flags.arg_1_and_2_are_words.clone() {
+let argument1 = match flags.arg_1_and_2_are_words {
 true => {
-match flags.args_are_xy_values.clone() {
-true => {
-let inner = (Decoder29(_input))?;
-opentype_glyf_composite_glyphs_argument1::Int16(inner)
-},
-
-false => {
-let inner = (Decoder29(_input))?;
-opentype_glyf_composite_glyphs_argument1::Uint16(inner)
-}
-}
-},
-
-false => {
-match flags.args_are_xy_values.clone() {
-true => {
-let inner = (Decoder24(_input))?;
-opentype_glyf_composite_glyphs_argument1::Int8(inner)
-},
-
-false => {
-let inner = (Decoder24(_input))?;
-opentype_glyf_composite_glyphs_argument1::Uint8(inner)
-}
-}
-}
-};
-let argument2 = match flags.arg_1_and_2_are_words.clone() {
-true => {
-match flags.args_are_xy_values.clone() {
+match flags.args_are_xy_values {
 true => {
 let inner = (Decoder29(_input))?;
 opentype_glyf_composite_glyphs_argument1::Int16(inner)
@@ -14906,7 +14877,7 @@ opentype_glyf_composite_glyphs_argument1::Uint16(inner)
 },
 
 false => {
-match flags.args_are_xy_values.clone() {
+match flags.args_are_xy_values {
 true => {
 let inner = (Decoder24(_input))?;
 opentype_glyf_composite_glyphs_argument1::Int8(inner)
@@ -14919,7 +14890,36 @@ opentype_glyf_composite_glyphs_argument1::Uint8(inner)
 }
 }
 };
-let scale = match flags.we_have_a_scale.clone() {
+let argument2 = match flags.arg_1_and_2_are_words {
+true => {
+match flags.args_are_xy_values {
+true => {
+let inner = (Decoder29(_input))?;
+opentype_glyf_composite_glyphs_argument1::Int16(inner)
+},
+
+false => {
+let inner = (Decoder29(_input))?;
+opentype_glyf_composite_glyphs_argument1::Uint16(inner)
+}
+}
+},
+
+false => {
+match flags.args_are_xy_values {
+true => {
+let inner = (Decoder24(_input))?;
+opentype_glyf_composite_glyphs_argument1::Int8(inner)
+},
+
+false => {
+let inner = (Decoder24(_input))?;
+opentype_glyf_composite_glyphs_argument1::Uint8(inner)
+}
+}
+}
+};
+let scale = match flags.we_have_a_scale {
 true => {
 let inner = {
 let x = (Decoder29(_input))?;
@@ -14929,7 +14929,7 @@ Some(opentype_glyf_composite_glyphs_scale::Scale(inner))
 },
 
 false => {
-match flags.we_have_an_x_and_y_scale.clone() {
+match flags.we_have_an_x_and_y_scale {
 true => {
 let inner = {
 let x_scale = {
@@ -14946,7 +14946,7 @@ Some(opentype_glyf_composite_glyphs_scale::XY(inner))
 },
 
 false => {
-match flags.we_have_a_two_by_two.clone() {
+match flags.we_have_a_two_by_two {
 true => {
 let field0 = ((|| {
 let field0 = ((|| {
@@ -14983,11 +14983,11 @@ None
 };
 opentype_glyf_composite_glyphs { flags, glyph_index, argument1, argument2, scale }
 };
-seq.push(elem.clone());
+seq.push(elem);
 acc = {
 let acc = acc;
 let glyph = elem;
-acc || glyph.flags.we_have_instructions.clone()
+acc || glyph.flags.we_have_instructions
 };
 }
 (acc, seq)
@@ -15128,7 +15128,7 @@ let link = match offset > 0u32 {
 true => {
 let tgt_offset = start + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = Some((Decoder_opentype_cmap_subtable(_input, platform.clone()))?);
+let ret = Some((Decoder_opentype_cmap_subtable(_input, platform))?);
 _input.close_peek_context()?;
 ret
 },
@@ -15155,47 +15155,47 @@ ret
 };
 let data = match format {
 0u16 => {
-let inner = (Decoder_opentype_cmap_subtable_format0(_input, _platform.clone()))?;
+let inner = (Decoder_opentype_cmap_subtable_format0(_input, _platform))?;
 opentype_cmap_subtable_data::Format0(inner)
 },
 
 2u16 => {
-let inner = (Decoder_opentype_cmap_subtable_format2(_input, _platform.clone()))?;
+let inner = (Decoder_opentype_cmap_subtable_format2(_input, _platform))?;
 opentype_cmap_subtable_data::Format2(inner)
 },
 
 4u16 => {
-let inner = (Decoder_opentype_cmap_subtable_format4(_input, _platform.clone()))?;
+let inner = (Decoder_opentype_cmap_subtable_format4(_input, _platform))?;
 opentype_cmap_subtable_data::Format4(inner)
 },
 
 6u16 => {
-let inner = (Decoder_opentype_cmap_subtable_format6(_input, _platform.clone()))?;
+let inner = (Decoder_opentype_cmap_subtable_format6(_input, _platform))?;
 opentype_cmap_subtable_data::Format6(inner)
 },
 
 8u16 => {
-let inner = (Decoder_opentype_cmap_subtable_format8(_input, _platform.clone()))?;
+let inner = (Decoder_opentype_cmap_subtable_format8(_input, _platform))?;
 opentype_cmap_subtable_data::Format8(inner)
 },
 
 10u16 => {
-let inner = (Decoder_opentype_cmap_subtable_format10(_input, _platform.clone()))?;
+let inner = (Decoder_opentype_cmap_subtable_format10(_input, _platform))?;
 opentype_cmap_subtable_data::Format10(inner)
 },
 
 12u16 => {
-let inner = (Decoder_opentype_cmap_subtable_format13(_input, _platform.clone()))?;
+let inner = (Decoder_opentype_cmap_subtable_format13(_input, _platform))?;
 opentype_cmap_subtable_data::Format12(inner)
 },
 
 13u16 => {
-let inner = (Decoder116(_input, _platform.clone()))?;
+let inner = (Decoder116(_input, _platform))?;
 opentype_cmap_subtable_data::Format13(inner)
 },
 
 14u16 => {
-let inner = (Decoder_opentype_cmap_subtable_format14(_input, table_start.clone()))?;
+let inner = (Decoder_opentype_cmap_subtable_format14(_input, table_start))?;
 opentype_cmap_subtable_data::Format14(inner)
 },
 
@@ -15309,12 +15309,12 @@ accum
 let sub_headers = {
 let mut accum = Vec::new();
 for _ in 0..succ(match (try_fold_left_curried(sub_header_keys.iter().cloned(), None, |tuple_var: (Option<u16>, u16)| PResult::Ok({
-let (acc, y) = tuple_var.clone();
+let (acc, y) = tuple_var;
 match acc {
 Some(x) => {
 Some(match x >= y / 8u16 {
 true => {
-x.clone()
+x
 },
 
 false => {
@@ -15883,7 +15883,7 @@ let num_var_selector_records = (Decoder26(_input))?;
 let var_selector = {
 let mut accum = Vec::new();
 for _ in 0..num_var_selector_records {
-accum.push((Decoder_opentype_variation_selector(_input, table_start.clone()))?);
+accum.push((Decoder_opentype_variation_selector(_input, table_start))?);
 }
 accum
 };
@@ -16002,26 +16002,26 @@ let ret = (Decoder_elf_header_ident(_input))?;
 _input.end_slice()?;
 ret
 };
-let r#type = (Decoder142(_input, ident.data.clone() == 2u8))?;
-let machine = (Decoder143(_input, ident.data.clone() == 2u8))?;
-let version = (Decoder144(_input, ident.data.clone() == 2u8))?;
-let entry = (Decoder_elf_types_elf_addr(_input, ident.data.clone() == 2u8, ident.class.clone()))?;
-let phoff = (Decoder_elf_types_elf_off(_input, ident.data.clone() == 2u8, ident.class.clone()))?;
-let shoff = (Decoder_elf_types_elf_off(_input, ident.data.clone() == 2u8, ident.class.clone()))?;
-let flags = (Decoder125(_input, ident.data.clone() == 2u8))?;
-let ehsize = (Decoder145(_input, ident.data.clone() == 2u8))?;
-let phentsize = (Decoder145(_input, ident.data.clone() == 2u8))?;
-let phnum = (Decoder145(_input, ident.data.clone() == 2u8))?;
-let shentsize = (Decoder145(_input, ident.data.clone() == 2u8))?;
-let shnum = (Decoder145(_input, ident.data.clone() == 2u8))?;
-let shstrndx = (Decoder145(_input, ident.data.clone() == 2u8))?;
+let r#type = (Decoder142(_input, ident.data == 2u8))?;
+let machine = (Decoder143(_input, ident.data == 2u8))?;
+let version = (Decoder144(_input, ident.data == 2u8))?;
+let entry = (Decoder_elf_types_elf_addr(_input, ident.data == 2u8, ident.class))?;
+let phoff = (Decoder_elf_types_elf_off(_input, ident.data == 2u8, ident.class))?;
+let shoff = (Decoder_elf_types_elf_off(_input, ident.data == 2u8, ident.class))?;
+let flags = (Decoder125(_input, ident.data == 2u8))?;
+let ehsize = (Decoder145(_input, ident.data == 2u8))?;
+let phentsize = (Decoder145(_input, ident.data == 2u8))?;
+let phnum = (Decoder145(_input, ident.data == 2u8))?;
+let shentsize = (Decoder145(_input, ident.data == 2u8))?;
+let shnum = (Decoder145(_input, ident.data == 2u8))?;
+let shstrndx = (Decoder145(_input, ident.data == 2u8))?;
 PResult::Ok(elf_header { ident, r#type, machine, version, entry, phoff, shoff, flags, ehsize, phentsize, phnum, shentsize, shnum, shstrndx })
 }
 
 fn Decoder121<>(_input: &mut Parser<'_>, is_be: bool, class: u8, phnum: u16) -> Result<Vec<elf_phdr_table>, ParseError> {
 let mut accum = Vec::new();
 for _ in 0..phnum {
-accum.push((Decoder_elf_phdr_table(_input, is_be.clone(), class.clone()))?);
+accum.push((Decoder_elf_phdr_table(_input, is_be, class))?);
 }
 PResult::Ok(accum)
 }
@@ -16029,7 +16029,7 @@ PResult::Ok(accum)
 fn Decoder122<>(_input: &mut Parser<'_>, is_be: bool, class: u8, shnum: u16) -> Result<Vec<elf_shdr_table>, ParseError> {
 let mut accum = Vec::new();
 for _ in 0..shnum {
-accum.push((Decoder_elf_shdr_table(_input, is_be.clone(), class.clone()))?);
+accum.push((Decoder_elf_shdr_table(_input, is_be, class))?);
 }
 PResult::Ok(accum)
 }
@@ -16046,16 +16046,16 @@ accum
 }
 
 fn Decoder_elf_shdr_table<>(_input: &mut Parser<'_>, is_be: bool, class: u8) -> Result<elf_shdr_table, ParseError> {
-let name = (Decoder125(_input, is_be.clone()))?;
-let r#type = (Decoder126(_input, is_be.clone()))?;
-let flags = (Decoder_elf_types_elf_full(_input, is_be.clone(), class.clone()))?;
-let addr = (Decoder_elf_types_elf_addr(_input, is_be.clone(), class.clone()))?;
-let offset = (Decoder_elf_types_elf_off(_input, is_be.clone(), class.clone()))?;
-let size = (Decoder_elf_types_elf_full(_input, is_be.clone(), class.clone()))?;
-let link = (Decoder125(_input, is_be.clone()))?;
-let info = (Decoder130(_input, is_be.clone()))?;
-let addralign = (Decoder_elf_types_elf_full(_input, is_be.clone(), class.clone()))?;
-let entsize = (Decoder_elf_types_elf_full(_input, is_be.clone(), class.clone()))?;
+let name = (Decoder125(_input, is_be))?;
+let r#type = (Decoder126(_input, is_be))?;
+let flags = (Decoder_elf_types_elf_full(_input, is_be, class))?;
+let addr = (Decoder_elf_types_elf_addr(_input, is_be, class))?;
+let offset = (Decoder_elf_types_elf_off(_input, is_be, class))?;
+let size = (Decoder_elf_types_elf_full(_input, is_be, class))?;
+let link = (Decoder125(_input, is_be))?;
+let info = (Decoder130(_input, is_be))?;
+let addralign = (Decoder_elf_types_elf_full(_input, is_be, class))?;
+let entsize = (Decoder_elf_types_elf_full(_input, is_be, class))?;
 PResult::Ok(elf_shdr_table { name, r#type, flags, addr, offset, size, link, info, addralign, entsize })
 }
 
@@ -16073,7 +16073,7 @@ false => {
 }
 
 fn Decoder126<>(_input: &mut Parser<'_>, is_be: bool) -> Result<u32, ParseError> {
-let inner = (Decoder125(_input, is_be.clone()))?;
+let inner = (Decoder125(_input, is_be))?;
 let is_valid = {
 let sh_type = inner;
 matches!(sh_type, 0u32..=11u32 | 14u32..=18u32 | 1610612736u32..=4294967295u32)
@@ -16088,12 +16088,12 @@ return Err(ParseError::FalsifiedWhere(9179996462972575343u64));
 fn Decoder_elf_types_elf_full<>(_input: &mut Parser<'_>, is_be: bool, class: u8) -> Result<elf_types_elf_full, ParseError> {
 PResult::Ok(match class {
 1u8 => {
-let inner = (Decoder125(_input, is_be.clone()))?;
+let inner = (Decoder125(_input, is_be))?;
 elf_types_elf_full::Full32(inner)
 },
 
 2u8 => {
-let inner = (Decoder137(_input, is_be.clone()))?;
+let inner = (Decoder137(_input, is_be))?;
 elf_types_elf_full::Full64(inner)
 },
 
@@ -16106,12 +16106,12 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 fn Decoder_elf_types_elf_addr<>(_input: &mut Parser<'_>, is_be: bool, class: u8) -> Result<elf_types_elf_addr, ParseError> {
 PResult::Ok(match class {
 1u8 => {
-let inner = (Decoder135(_input, is_be.clone()))?;
+let inner = (Decoder135(_input, is_be))?;
 elf_types_elf_addr::Addr32(inner)
 },
 
 2u8 => {
-let inner = (Decoder136(_input, is_be.clone()))?;
+let inner = (Decoder136(_input, is_be))?;
 elf_types_elf_addr::Addr64(inner)
 },
 
@@ -16124,12 +16124,12 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 fn Decoder_elf_types_elf_off<>(_input: &mut Parser<'_>, is_be: bool, class: u8) -> Result<elf_types_elf_off, ParseError> {
 PResult::Ok(match class {
 1u8 => {
-let inner = (Decoder131(_input, is_be.clone()))?;
+let inner = (Decoder131(_input, is_be))?;
 elf_types_elf_off::Off32(inner)
 },
 
 2u8 => {
-let inner = (Decoder132(_input, is_be.clone()))?;
+let inner = (Decoder132(_input, is_be))?;
 elf_types_elf_off::Off64(inner)
 },
 
@@ -16140,7 +16140,7 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 }
 
 fn Decoder130<>(_input: &mut Parser<'_>, is_be: bool) -> Result<u32, ParseError> {
-Decoder125(_input, is_be.clone())
+Decoder125(_input, is_be)
 }
 
 fn Decoder131<>(_input: &mut Parser<'_>, is_be: bool) -> Result<u32, ParseError> {
@@ -16235,21 +16235,21 @@ false => {
 }
 
 fn Decoder_elf_phdr_table<>(_input: &mut Parser<'_>, is_be: bool, class: u8) -> Result<elf_phdr_table, ParseError> {
-let r#type = (Decoder125(_input, is_be.clone()))?;
-let flags64 = (Decoder139(_input, is_be.clone(), class.clone()))?;
-let offset = (Decoder_elf_types_elf_off(_input, is_be.clone(), class.clone()))?;
-let vaddr = (Decoder_elf_types_elf_addr(_input, is_be.clone(), class.clone()))?;
-let paddr = (Decoder_elf_types_elf_addr(_input, is_be.clone(), class.clone()))?;
-let filesz = (Decoder_elf_types_elf_full(_input, is_be.clone(), class.clone()))?;
-let memsz = (Decoder_elf_types_elf_full(_input, is_be.clone(), class.clone()))?;
-let flags32 = (Decoder140(_input, is_be.clone(), class.clone()))?;
-let align = (Decoder_elf_types_elf_full(_input, is_be.clone(), class.clone()))?;
+let r#type = (Decoder125(_input, is_be))?;
+let flags64 = (Decoder139(_input, is_be, class))?;
+let offset = (Decoder_elf_types_elf_off(_input, is_be, class))?;
+let vaddr = (Decoder_elf_types_elf_addr(_input, is_be, class))?;
+let paddr = (Decoder_elf_types_elf_addr(_input, is_be, class))?;
+let filesz = (Decoder_elf_types_elf_full(_input, is_be, class))?;
+let memsz = (Decoder_elf_types_elf_full(_input, is_be, class))?;
+let flags32 = (Decoder140(_input, is_be, class))?;
+let align = (Decoder_elf_types_elf_full(_input, is_be, class))?;
 PResult::Ok(elf_phdr_table { r#type, flags64, offset, vaddr, paddr, filesz, memsz, flags32, align })
 }
 
 fn Decoder139<>(_input: &mut Parser<'_>, is_be: bool, class: u8) -> Result<Option<u32>, ParseError> {
 PResult::Ok(if class == 2u8 {
-Some((Decoder125(_input, is_be.clone()))?)
+Some((Decoder125(_input, is_be))?)
 } else {
 None
 })
@@ -16257,7 +16257,7 @@ None
 
 fn Decoder140<>(_input: &mut Parser<'_>, is_be: bool, class: u8) -> Result<Option<u32>, ParseError> {
 PResult::Ok(if class == 1u8 {
-Some((Decoder125(_input, is_be.clone()))?)
+Some((Decoder125(_input, is_be))?)
 } else {
 None
 })
@@ -16340,7 +16340,7 @@ PResult::Ok(elf_header_ident { class, data, version, os_abi, abi_version })
 }
 
 fn Decoder142<>(_input: &mut Parser<'_>, is_be: bool) -> Result<u16, ParseError> {
-let inner = (Decoder145(_input, is_be.clone()))?;
+let inner = (Decoder145(_input, is_be))?;
 let is_valid = {
 let r#type = inner;
 matches!(r#type, 0u16..=4u16 | 65024u16..=65279u16 | 65280u16..=65535u16)
@@ -16353,11 +16353,11 @@ return Err(ParseError::FalsifiedWhere(16529910322175208638u64));
 }
 
 fn Decoder143<>(_input: &mut Parser<'_>, is_be: bool) -> Result<u16, ParseError> {
-Decoder145(_input, is_be.clone())
+Decoder145(_input, is_be)
 }
 
 fn Decoder144<>(_input: &mut Parser<'_>, is_be: bool) -> Result<u32, ParseError> {
-let inner = (Decoder125(_input, is_be.clone()))?;
+let inner = (Decoder125(_input, is_be))?;
 let is_valid = {
 let x = inner;
 x <= 1u32
@@ -16442,7 +16442,7 @@ fn Decoder_tar_header_with_data<>(_input: &mut Parser<'_>) -> Result<tar_header_
 let header = (Decoder_tar_header(_input))?;
 let file = {
 let mut accum = Vec::new();
-for _ in 0..header.size.clone() {
+for _ in 0..header.size {
 accum.push((Decoder24(_input))?);
 }
 accum
@@ -16734,7 +16734,7 @@ let __nil = (Decoder156(_input))?;
 let value = (((0u8 as u32) << 3u32 | (oA as u32)) << 6u32 | (o9 as u32) << 3u32 | (o8 as u32)) << 24u32 | (((o7 as u32) << 3u32 | (o6 as u32)) << 6u32 | (o5 as u32) << 3u32 | (o4 as u32)) << 12u32 | ((o3 as u32) << 3u32 | (o2 as u32)) << 6u32 | (o1 as u32) << 3u32 | (o0 as u32);
 tar_header_size_raw { oA, o9, o8, o7, o6, o5, o4, o3, o2, o1, o0, __nil, value }
 };
-rec.value.clone()
+rec.value
 };
 let mtime = {
 let sz = 12u16 as usize;
@@ -17554,7 +17554,7 @@ png_chunk_data::PLTE(inner)
 },
 
 [116u8, 82u8, 78u8, 83u8] => {
-let inner = (Decoder_png_trns(_input, ihdr.clone()))?;
+let inner = (Decoder_png_trns(_input, ihdr))?;
 png_chunk_data::tRNS(inner)
 },
 
@@ -17574,7 +17574,7 @@ png_chunk_data::iCCP(inner)
 },
 
 [115u8, 66u8, 73u8, 84u8] => {
-let inner = (Decoder_png_sbit(_input, ihdr.clone()))?;
+let inner = (Decoder_png_sbit(_input, ihdr))?;
 png_chunk_data::sBIT(inner)
 },
 
@@ -17599,7 +17599,7 @@ png_chunk_data::zTXt(inner)
 },
 
 [98u8, 75u8, 71u8, 68u8] => {
-let inner = (Decoder_png_bkgd(_input, ihdr.clone()))?;
+let inner = (Decoder_png_bkgd(_input, ihdr))?;
 png_chunk_data::bKGD(inner)
 },
 
@@ -17688,7 +17688,7 @@ zlib_main_compression_method_flags { compression_info: packed_bits >> 4u8 & 15u8
 };
 let is_valid = {
 let method_info = inner;
-method_info.compression_method.clone() == 8u8
+method_info.compression_method == 8u8
 };
 if is_valid {
 inner
@@ -17700,7 +17700,7 @@ let flags = {
 let packed_bits = _input.read_byte()?;
 zlib_main_flags { flevel: packed_bits >> 6u8 & 3u8, fdict: packed_bits >> 5u8 & 1u8 > 0u8, fcheck: packed_bits & 31u8 }
 };
-let dict_id = if flags.fdict.clone() {
+let dict_id = if flags.fdict {
 Some((Decoder26(_input))?)
 } else {
 None
@@ -17776,7 +17776,7 @@ loop {
 let elem = (Decoder_deflate_block(_input))?;
 let tmp_cond = {
 let x = &elem;
-x.r#final.clone() == 1u8
+x.r#final == 1u8
 };
 if tmp_cond {
 accum.push(elem);
@@ -17809,8 +17809,8 @@ deflate_main_codes::literal(b) => {
 
 deflate_main_codes::reference(r) => {
 {
-let ix = (try_sub!((buffer.len()) as u32, (r.distance.clone()) as u32, 4672672775256824980u64)) as usize;
-(slice_ext(buffer, ix..ix + (((r.length.clone()) as u32) as usize))).to_vec()
+let ix = (try_sub!((buffer.len()) as u32, r.distance as u32, 4672672775256824980u64)) as usize;
+(slice_ext(buffer, ix..ix + ((r.length as u32) as usize))).to_vec()
 }
 }
 }
@@ -17944,7 +17944,7 @@ accum.push((Decoder171(_input))?);
 }
 accum
 };
-bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
+bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
@@ -17961,7 +17961,7 @@ accum.push((Decoder171(_input))?);
 }
 accum
 };
-bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
+bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
@@ -17978,7 +17978,7 @@ accum.push((Decoder171(_input))?);
 }
 accum
 };
-bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
+bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
@@ -17995,7 +17995,7 @@ accum.push((Decoder171(_input))?);
 }
 accum
 };
-bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
+bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
@@ -18012,7 +18012,7 @@ accum.push((Decoder171(_input))?);
 }
 accum
 };
-bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
+bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
@@ -18029,7 +18029,7 @@ accum.push((Decoder171(_input))?);
 }
 accum
 };
-bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
+bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
@@ -18046,7 +18046,7 @@ accum.push((Decoder171(_input))?);
 }
 accum
 };
-bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
+bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
@@ -18063,7 +18063,7 @@ accum.push((Decoder171(_input))?);
 }
 accum
 };
-bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
+bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
@@ -18086,7 +18086,7 @@ accum.push((Decoder171(_input))?);
 }
 accum
 };
-bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
+bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
@@ -18109,7 +18109,7 @@ accum.push((Decoder171(_input))?);
 }
 accum
 };
-bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
+bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
@@ -18132,7 +18132,7 @@ accum.push((Decoder171(_input))?);
 }
 accum
 };
-bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
+bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
@@ -18155,7 +18155,7 @@ accum.push((Decoder171(_input))?);
 }
 accum
 };
-bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
+bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
@@ -18179,7 +18179,7 @@ accum.push((Decoder171(_input))?);
 }
 accum
 };
-bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
+bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
@@ -18203,7 +18203,7 @@ accum.push((Decoder171(_input))?);
 }
 accum
 };
-bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
+bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
@@ -18227,7 +18227,7 @@ accum.push((Decoder171(_input))?);
 }
 accum
 };
-bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
+bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
@@ -18251,7 +18251,7 @@ accum.push((Decoder171(_input))?);
 }
 accum
 };
-bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
+bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
@@ -18276,7 +18276,7 @@ accum.push((Decoder171(_input))?);
 }
 accum
 };
-bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
+bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
@@ -18301,7 +18301,7 @@ accum.push((Decoder171(_input))?);
 }
 accum
 };
-bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
+bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
@@ -18326,7 +18326,7 @@ accum.push((Decoder171(_input))?);
 }
 accum
 };
-bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
+bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
@@ -18351,7 +18351,7 @@ accum.push((Decoder171(_input))?);
 }
 accum
 };
-bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
+bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
@@ -18377,7 +18377,7 @@ accum.push((Decoder171(_input))?);
 }
 accum
 };
-bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
+bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
@@ -18403,7 +18403,7 @@ accum.push((Decoder171(_input))?);
 }
 accum
 };
-bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
+bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
@@ -18429,7 +18429,7 @@ accum.push((Decoder171(_input))?);
 }
 accum
 };
-bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
+bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
@@ -18455,7 +18455,7 @@ accum.push((Decoder171(_input))?);
 }
 accum
 };
-bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
+bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
@@ -18482,7 +18482,7 @@ accum.push((Decoder171(_input))?);
 }
 accum
 };
-bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
+bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
@@ -18509,7 +18509,7 @@ accum.push((Decoder171(_input))?);
 }
 accum
 };
-bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
+bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
@@ -18536,7 +18536,7 @@ accum.push((Decoder171(_input))?);
 }
 accum
 };
-bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
+bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
@@ -18563,7 +18563,7 @@ accum.push((Decoder171(_input))?);
 }
 accum
 };
-bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
+bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
@@ -18580,7 +18580,7 @@ accum.push((Decoder171(_input))?);
 }
 accum
 };
-bits[0u32 as usize].clone() << 4u8 | bits[1u32 as usize].clone() << 3u8 | bits[2u32 as usize].clone() << 2u8 | bits[3u32 as usize].clone() << 1u8 | bits[4u32 as usize].clone()
+bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
 let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
@@ -18598,7 +18598,7 @@ deflate_fixed_huffman_codes { code, extra }
 };
 let tmp_cond = {
 let x = &elem;
-((x.code.clone()) as u16) == 256u16
+(x.code as u16) == 256u16
 };
 if tmp_cond {
 accum.push(elem);
@@ -18609,15 +18609,15 @@ accum.push(elem);
 }
 accum
 };
-let codes_values = (try_flat_map_vec(codes.iter().cloned(), |x: deflate_fixed_huffman_codes| PResult::Ok(match x.code.clone() {
+let codes_values = (try_flat_map_vec(codes.iter().cloned(), |x: deflate_fixed_huffman_codes| PResult::Ok(match x.code {
 256u16 => {
 [].to_vec()
 },
 
 257u16..=285u16 => {
-match x.extra.clone() {
+match x.extra {
 Some(ref rec) => {
-[deflate_main_codes::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
+[deflate_main_codes::reference(deflate_main_codes_reference { length: rec.length, distance: rec.distance_record.distance })].to_vec()
 },
 
 _ => {
@@ -18631,7 +18631,7 @@ return Err(ParseError::ExcludedBranch(98102193810481173u64));
 },
 
 _ => {
-[deflate_main_codes::literal((x.code.clone()) as u8)].to_vec()
+[deflate_main_codes::literal(x.code as u8)].to_vec()
 }
 })))?;
 PResult::Ok(deflate_fixed_huffman { codes, codes_values })
@@ -18735,12 +18735,12 @@ accum.push(elem);
 let tmp_cond = {
 let y = &accum;
 (((try_fold_map_curried(y.iter().cloned(), None, |tuple_var: (Option<u8>, deflate_dynamic_huffman_literal_length_distance_alphabet_code_lengths)| PResult::Ok({
-let (last_symbol, cl_code_extra) = tuple_var.clone();
-match (cl_code_extra.code.clone()) as u8 {
+let (last_symbol, cl_code_extra) = tuple_var;
+match cl_code_extra.code as u8 {
 16u8 => {
-(last_symbol.clone(), dup32((cl_code_extra.extra.clone() + 3u8) as u32, match last_symbol {
+(last_symbol, dup32((cl_code_extra.extra + 3u8) as u32, match last_symbol {
 Some(x) => {
-x.clone()
+x
 },
 
 _ => {
@@ -18750,15 +18750,15 @@ return Err(ParseError::ExcludedBranch(14485842416732585139u64));
 },
 
 17u8 => {
-(Some(0u8), dup32((cl_code_extra.extra.clone() + 3u8) as u32, 0u8))
+(Some(0u8), dup32((cl_code_extra.extra + 3u8) as u32, 0u8))
 },
 
 18u8 => {
-(Some(0u8), dup32((cl_code_extra.extra.clone() + 11u8) as u32, 0u8))
+(Some(0u8), dup32((cl_code_extra.extra + 11u8) as u32, 0u8))
 },
 
 v => {
-(Some(v.clone()), [v.clone()].to_vec())
+(Some(v), [v].to_vec())
 }
 }
 })))?.len()) as u32) >= ((hlit + hdist) as u32) + 258u32
@@ -18770,12 +18770,12 @@ break
 accum
 };
 let literal_length_distance_alphabet_code_lengths_value = (try_fold_map_curried(literal_length_distance_alphabet_code_lengths.iter().cloned(), None, |tuple_var: (Option<u8>, deflate_dynamic_huffman_literal_length_distance_alphabet_code_lengths)| PResult::Ok({
-let (last_symbol, cl_code_extra) = tuple_var.clone();
-match (cl_code_extra.code.clone()) as u8 {
+let (last_symbol, cl_code_extra) = tuple_var;
+match cl_code_extra.code as u8 {
 16u8 => {
-(last_symbol.clone(), dup32((cl_code_extra.extra.clone() + 3u8) as u32, match last_symbol {
+(last_symbol, dup32((cl_code_extra.extra + 3u8) as u32, match last_symbol {
 Some(x) => {
-x.clone()
+x
 },
 
 _ => {
@@ -18785,15 +18785,15 @@ return Err(ParseError::ExcludedBranch(734991270787736827u64));
 },
 
 17u8 => {
-(Some(0u8), dup32((cl_code_extra.extra.clone() + 3u8) as u32, 0u8))
+(Some(0u8), dup32((cl_code_extra.extra + 3u8) as u32, 0u8))
 },
 
 18u8 => {
-(Some(0u8), dup32((cl_code_extra.extra.clone() + 11u8) as u32, 0u8))
+(Some(0u8), dup32((cl_code_extra.extra + 11u8) as u32, 0u8))
 },
 
 v => {
-(Some(v.clone()), [v.clone()].to_vec())
+(Some(v), [v].to_vec())
 }
 }
 })))?;
@@ -18817,7 +18817,7 @@ let extra = match code {
 let length_extra_bits = 0u8;
 let length = 3u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
+let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -18825,7 +18825,7 @@ Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_
 let length_extra_bits = 0u8;
 let length = 4u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
+let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -18833,7 +18833,7 @@ Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_
 let length_extra_bits = 0u8;
 let length = 5u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
+let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -18841,7 +18841,7 @@ Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_
 let length_extra_bits = 0u8;
 let length = 6u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
+let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -18849,7 +18849,7 @@ Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_
 let length_extra_bits = 0u8;
 let length = 7u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
+let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -18857,7 +18857,7 @@ Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_
 let length_extra_bits = 0u8;
 let length = 8u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
+let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -18865,7 +18865,7 @@ Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_
 let length_extra_bits = 0u8;
 let length = 9u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
+let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -18873,7 +18873,7 @@ Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_
 let length_extra_bits = 0u8;
 let length = 10u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
+let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -18887,7 +18887,7 @@ bits.0
 };
 let length = 11u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
+let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -18901,7 +18901,7 @@ bits.0
 };
 let length = 13u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
+let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -18915,7 +18915,7 @@ bits.0
 };
 let length = 15u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
+let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -18929,7 +18929,7 @@ bits.0
 };
 let length = 17u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
+let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -18944,7 +18944,7 @@ bits.0 | bits.1 << 1u8
 };
 let length = 19u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
+let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -18959,7 +18959,7 @@ bits.0 | bits.1 << 1u8
 };
 let length = 23u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
+let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -18974,7 +18974,7 @@ bits.0 | bits.1 << 1u8
 };
 let length = 27u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
+let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -18989,7 +18989,7 @@ bits.0 | bits.1 << 1u8
 };
 let length = 31u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
+let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -19005,7 +19005,7 @@ bits.0 | bits.1 << 1u8 | bits.2 << 2u8
 };
 let length = 35u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
+let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -19021,7 +19021,7 @@ bits.0 | bits.1 << 1u8 | bits.2 << 2u8
 };
 let length = 43u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
+let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -19037,7 +19037,7 @@ bits.0 | bits.1 << 1u8 | bits.2 << 2u8
 };
 let length = 51u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
+let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -19053,7 +19053,7 @@ bits.0 | bits.1 << 1u8 | bits.2 << 2u8
 };
 let length = 59u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
+let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -19070,7 +19070,7 @@ bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8
 };
 let length = 67u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
+let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -19087,7 +19087,7 @@ bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8
 };
 let length = 83u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
+let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -19104,7 +19104,7 @@ bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8
 };
 let length = 99u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
+let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -19121,7 +19121,7 @@ bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8
 };
 let length = 115u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
+let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -19139,7 +19139,7 @@ bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8
 };
 let length = 131u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
+let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -19157,7 +19157,7 @@ bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8
 };
 let length = 163u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
+let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -19175,7 +19175,7 @@ bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8
 };
 let length = 195u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
+let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -19193,7 +19193,7 @@ bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8
 };
 let length = 227u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
+let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -19201,7 +19201,7 @@ Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_
 let length_extra_bits = 0u8;
 let length = 258u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code.clone()))?;
+let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -19217,7 +19217,7 @@ deflate_dynamic_huffman_codes { code, extra }
 };
 let tmp_cond = {
 let x = &elem;
-((x.code.clone()) as u16) == 256u16
+(x.code as u16) == 256u16
 };
 if tmp_cond {
 accum.push(elem);
@@ -19228,15 +19228,15 @@ accum.push(elem);
 }
 accum
 };
-let codes_values = (try_flat_map_vec(codes.iter().cloned(), |x: deflate_dynamic_huffman_codes| PResult::Ok(match x.code.clone() {
+let codes_values = (try_flat_map_vec(codes.iter().cloned(), |x: deflate_dynamic_huffman_codes| PResult::Ok(match x.code {
 256u16 => {
 [].to_vec()
 },
 
 257u16..=285u16 => {
-match x.extra.clone() {
+match x.extra {
 Some(ref rec) => {
-[deflate_main_codes::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
+[deflate_main_codes::reference(deflate_main_codes_reference { length: rec.length, distance: rec.distance_record.distance })].to_vec()
 },
 
 _ => {
@@ -19250,7 +19250,7 @@ return Err(ParseError::ExcludedBranch(18167425999583150549u64));
 },
 
 _ => {
-[deflate_main_codes::literal((x.code.clone()) as u8)].to_vec()
+[deflate_main_codes::literal(x.code as u8)].to_vec()
 }
 })))?;
 PResult::Ok(deflate_dynamic_huffman { hlit, hdist, hclen, code_length_alphabet_code_lengths, literal_length_distance_alphabet_code_lengths, literal_length_distance_alphabet_code_lengths_value, literal_length_alphabet_code_lengths_value, distance_alphabet_code_lengths_value, codes, codes_values })
@@ -19683,7 +19683,7 @@ PResult::Ok(accum)
 }
 
 fn Decoder_png_trns<>(_input: &mut Parser<'_>, ihdr: png_ihdr) -> Result<png_trns, ParseError> {
-PResult::Ok(match ihdr.data.color_type.clone() {
+PResult::Ok(match ihdr.data.color_type {
 0u8 => {
 let inner = {
 let greyscale = (Decoder29(_input))?;
@@ -19783,7 +19783,7 @@ PResult::Ok(png_iccp { profile_name, compression_method, compressed_profile })
 }
 
 fn Decoder_png_sbit<>(_input: &mut Parser<'_>, ihdr: png_ihdr) -> Result<png_sbit, ParseError> {
-PResult::Ok(match ihdr.data.color_type.clone() {
+PResult::Ok(match ihdr.data.color_type {
 0u8 => {
 let inner = {
 let sig_greyscale_bits = (Decoder24(_input))?;
@@ -20036,7 +20036,7 @@ PResult::Ok(png_ztxt { keyword, compression_method, compressed_text })
 }
 
 fn Decoder_png_bkgd<>(_input: &mut Parser<'_>, ihdr: png_ihdr) -> Result<png_bkgd, ParseError> {
-PResult::Ok(match ihdr.data.color_type.clone() {
+PResult::Ok(match ihdr.data.color_type {
 0u8 => {
 let inner = {
 let greyscale = (Decoder29(_input))?;
@@ -22186,7 +22186,7 @@ zlib_main_compression_method_flags { compression_info: packed_bits >> 4u8 & 15u8
 };
 let is_valid = {
 let method_info = inner;
-method_info.compression_method.clone() == 8u8
+method_info.compression_method == 8u8
 };
 if is_valid {
 inner
@@ -22198,7 +22198,7 @@ let flags = {
 let packed_bits = _input.read_byte()?;
 zlib_main_flags { flevel: packed_bits >> 6u8 & 3u8, fdict: packed_bits >> 5u8 & 1u8 > 0u8, fcheck: packed_bits & 31u8 }
 };
-let dict_id = if flags.fdict.clone() {
+let dict_id = if flags.fdict {
 Some((Decoder26(_input))?)
 } else {
 None
@@ -24358,7 +24358,7 @@ zlib_main_compression_method_flags { compression_info: packed_bits >> 4u8 & 15u8
 };
 let is_valid = {
 let method_info = inner;
-method_info.compression_method.clone() == 8u8
+method_info.compression_method == 8u8
 };
 if is_valid {
 inner
@@ -24370,7 +24370,7 @@ let flags = {
 let packed_bits = _input.read_byte()?;
 zlib_main_flags { flevel: packed_bits >> 6u8 & 3u8, fdict: packed_bits >> 5u8 & 1u8 > 0u8, fcheck: packed_bits & 31u8 }
 };
-let dict_id = if flags.fdict.clone() {
+let dict_id = if flags.fdict {
 Some((Decoder26(_input))?)
 } else {
 None
@@ -25499,7 +25499,7 @@ zlib_main_compression_method_flags { compression_info: packed_bits >> 4u8 & 15u8
 };
 let is_valid = {
 let method_info = inner;
-method_info.compression_method.clone() == 8u8
+method_info.compression_method == 8u8
 };
 if is_valid {
 inner
@@ -25511,7 +25511,7 @@ let flags = {
 let packed_bits = _input.read_byte()?;
 zlib_main_flags { flevel: packed_bits >> 6u8 & 3u8, fdict: packed_bits >> 5u8 & 1u8 > 0u8, fcheck: packed_bits & 31u8 }
 };
-let dict_id = if flags.fdict.clone() {
+let dict_id = if flags.fdict {
 Some((Decoder26(_input))?)
 } else {
 None
@@ -27444,7 +27444,7 @@ true => {
 },
 
 false => {
-default_length.clone()
+default_length
 }
 };
 let sample_group_entry = {
@@ -29669,7 +29669,7 @@ accum
 };
 let scan_data_stream = (try_flat_map_vec(scan_data.iter().cloned(), |x: jpeg_scan_data_scan_data| PResult::Ok(match x {
 jpeg_scan_data_scan_data::mcu(v) => {
-[v.clone()].to_vec()
+[v].to_vec()
 },
 
 jpeg_scan_data_scan_data::rst0(..) => {
@@ -29987,7 +29987,7 @@ jpeg_sos_image_component_entropy_coding_table_ids { dc_entropy_coding_table_id: 
 };
 let is_valid = {
 let entropy_coding_table_ids = inner;
-(entropy_coding_table_ids.dc_entropy_coding_table_id.clone() <= 3u8) && (entropy_coding_table_ids.ac_entropy_coding_table_id.clone() <= 3u8)
+(entropy_coding_table_ids.dc_entropy_coding_table_id <= 3u8) && (entropy_coding_table_ids.ac_entropy_coding_table_id <= 3u8)
 };
 if is_valid {
 inner
@@ -30296,7 +30296,7 @@ accum
 };
 let scan_data_stream = (try_flat_map_vec(scan_data.iter().cloned(), |x: jpeg_scan_data_scan_data| PResult::Ok(match x {
 jpeg_scan_data_scan_data::mcu(v) => {
-[v.clone()].to_vec()
+[v].to_vec()
 },
 
 jpeg_scan_data_scan_data::rst0(..) => {
@@ -31732,7 +31732,7 @@ jpeg_dac_data_class_table_id { class: packed_bits >> 4u8 & 15u8, table_id: packe
 };
 let is_valid = {
 let class_table_id = inner;
-(class_table_id.class.clone() < 2u8) && (class_table_id.table_id.clone() < 4u8)
+(class_table_id.class < 2u8) && (class_table_id.table_id < 4u8)
 };
 if is_valid {
 inner
@@ -31752,7 +31752,7 @@ jpeg_dac_data_class_table_id { class: packed_bits >> 4u8 & 15u8, table_id: packe
 };
 let is_valid = {
 let class_table_id = inner;
-(class_table_id.class.clone() < 2u8) && (class_table_id.table_id.clone() < 4u8)
+(class_table_id.class < 2u8) && (class_table_id.table_id < 4u8)
 };
 if is_valid {
 inner
@@ -31791,7 +31791,7 @@ jpeg_dqt_data_precision_table_id { precision: packed_bits >> 4u8 & 15u8, table_i
 };
 let is_valid = {
 let precision_table_id = inner;
-(precision_table_id.precision.clone() <= 1u8) && (precision_table_id.table_id.clone() <= 3u8)
+(precision_table_id.precision <= 1u8) && (precision_table_id.table_id <= 3u8)
 };
 if is_valid {
 inner
@@ -31799,7 +31799,7 @@ inner
 return Err(ParseError::FalsifiedWhere(15065685669539080124u64));
 }
 };
-let elements = match precision_table_id.precision.clone() {
+let elements = match precision_table_id.precision {
 0u8 => {
 let inner = {
 let mut accum = Vec::new();
@@ -32334,22 +32334,22 @@ break
 } else {
 let next_elem = {
 let header = (Decoder_gzip_header(_input))?;
-let fextra = if header.file_flags.fextra.clone() {
+let fextra = if header.file_flags.fextra {
 Some((Decoder_gzip_fextra(_input))?)
 } else {
 None
 };
-let fname = if header.file_flags.fname.clone() {
+let fname = if header.file_flags.fname {
 Some((Decoder315(_input))?)
 } else {
 None
 };
-let fcomment = if header.file_flags.fcomment.clone() {
+let fcomment = if header.file_flags.fcomment {
 Some((Decoder316(_input))?)
 } else {
 None
 };
-let fhcrc = if header.file_flags.fhcrc.clone() {
+let fhcrc = if header.file_flags.fhcrc {
 Some((Decoder_gzip_fhcrc(_input))?)
 } else {
 None
@@ -32520,9 +32520,9 @@ PResult::Ok(gif_header { signature, version })
 
 fn Decoder_gif_logical_screen<>(_input: &mut Parser<'_>) -> Result<gif_logical_screen, ParseError> {
 let descriptor = (Decoder_gif_logical_screen_descriptor(_input))?;
-let global_color_table = if descriptor.flags.table_flag.clone() > 0u8 {
+let global_color_table = if descriptor.flags.table_flag > 0u8 {
 let mut accum = Vec::new();
-for _ in 0..2u16 << ((descriptor.flags.table_size.clone()) as u16) {
+for _ in 0..2u16 << (descriptor.flags.table_size as u16) {
 accum.push((Decoder334(_input))?);
 }
 Some(accum)
@@ -32928,9 +32928,9 @@ return Err(ParseError::ExcludedBranch(6301432137385173939u64));
 
 fn Decoder_gif_table_based_image<>(_input: &mut Parser<'_>) -> Result<gif_table_based_image, ParseError> {
 let descriptor = (Decoder_gif_image_descriptor(_input))?;
-let local_color_table = if descriptor.flags.table_flag.clone() > 0u8 {
+let local_color_table = if descriptor.flags.table_flag > 0u8 {
 let mut accum = Vec::new();
-for _ in 0..2u16 << ((descriptor.flags.table_size.clone()) as u16) {
+for _ in 0..2u16 << (descriptor.flags.table_size as u16) {
 accum.push((Decoder334(_input))?);
 }
 Some(accum)

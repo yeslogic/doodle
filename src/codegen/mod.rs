@@ -6,6 +6,7 @@ pub(crate) mod typed_format;
 mod util;
 
 use rebind::Rebindable;
+use resolve::Resolvable;
 pub use rust_ast::ToFragment;
 
 use crate::{
@@ -329,7 +330,7 @@ impl CodeGen {
                 ),
             TypedDecoder::ForEach(_gt, expr, lbl, single) => {
                 // REVIEW[epic=zealous-clone] - do we need to ensure this is cloned?
-                let cl_expr = embed_expr(expr, ExprInfo::EmbedCloned);
+                let cl_expr = embed_expr(expr, ExprInfo::EmbedOwned);
                 CaseLogic::Repeat(RepeatLogic::ForEach(cl_expr, lbl.clone(), Box::new(self.translate(single.get_dec()))))
             }
             TypedDecoder::DecodeBytes(_gt, expr, inner) => {
@@ -373,8 +374,8 @@ impl CodeGen {
                     RepeatLogic::AccumUntil(
                         GenLambda::from_expr(*f.clone(), ClosureKind::PairOwnedBorrow),
                         GenLambda::from_expr(*g.clone(), ClosureKind::Transform),
-                        embed_expr_dft(init),
-                        Box::new(self.translate(single.get_dec()))
+                        (embed_expr_dft(init), init.get_type().unwrap().into_owned()),
+                        (Box::new(self.translate(single.get_dec())), single.get_dec().get_type().unwrap().into_owned()),
                     )
                 )
             }
@@ -406,14 +407,14 @@ impl CodeGen {
             }
             TypedDecoder::Compute(_t, expr) =>
                 // REVIEW[epic=zealous-clone] - try to gate Clone when Move, Copy or reference is possible
-                CaseLogic::Simple(SimpleLogic::Eval(embed_expr(expr, ExprInfo::EmbedCloned))),
+                CaseLogic::Simple(SimpleLogic::Eval(embed_expr(expr, ExprInfo::EmbedOwned))),
             TypedDecoder::Let(_t, name, expr, inner) => {
                 let cl_inner = self.translate(inner.get_dec());
                 CaseLogic::Derived(
                     DerivedLogic::Let(
                         name.clone(),
                         // REVIEW[epic=zealous-clone] - gate cloning when reference or Copy is possible
-                        embed_expr(expr, ExprInfo::EmbedCloned),
+                        embed_expr(expr, ExprInfo::EmbedOwned),
                         Box::new(cl_inner)
                     )
                 )
@@ -630,7 +631,7 @@ enum ExprInfo {
     /// Uses implicit copy-or-move semantics on referenced local variables (i.e. as opposed to cloning)
     Natural,
     /// Applies a `clone` operation to any referenced local variables
-    EmbedCloned,
+    EmbedOwned,
 }
 
 fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
@@ -718,16 +719,16 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                     .collect()
             ),
         TypedExpr::TupleProj(_, expr_tup, ix) => {
-            embed_expr(expr_tup, info /* ExprInfo::EmbedCloned */).nth(*ix)
+            embed_expr(expr_tup, info /* ExprInfo::EmbedCloned */).at_pos(*ix)
         }
         TypedExpr::SeqIx(_, expr_seq, ix) => {
             let ix_expr = RustExpr::Operation(RustOp::AsCast(Box::new(embed_expr_dft(ix)), PrimType::Usize.into()));
             // REVIEW[epic=zealous-clone] - figure out under what circumstances we can avoid introducing cloning here
-            embed_expr(expr_seq, ExprInfo::EmbedCloned).index(ix_expr)
+            embed_expr(expr_seq, ExprInfo::EmbedOwned).index(ix_expr)
         }
         TypedExpr::RecordProj(_, expr_rec, fld) => {
             // REVIEW[epic=zealous-clone] - figure out under what circumstances we can avoid introducing cloning here
-            embed_expr(expr_rec, ExprInfo::EmbedCloned).field(fld.clone())
+            embed_expr(expr_rec, ExprInfo::EmbedOwned).field(fld.clone())
         }
         TypedExpr::Seq(_, elts) => {
             RustExpr::ArrayLit(
@@ -890,7 +891,7 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
             RustExpr::local("try_flat_map_vec")
                 .call_with([
                     embed_expr_dft(seq).call_method("iter").call_method("cloned"),
-                    embed_lambda(f, ClosureKind::Transform, true, ExprInfo::EmbedCloned),
+                    embed_lambda(f, ClosureKind::Transform, true, ExprInfo::EmbedOwned),
                 ])
                 .wrap_try(),
         TypedExpr::FlatMapAccum(_, f, acc_init, _acc_type, seq) =>
@@ -898,7 +899,7 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                 .call_with([
                     embed_expr_dft(seq).call_method("iter").call_method("cloned"),
                     embed_expr(acc_init, info /* ExprInfo::EmbedCloned */),
-                    embed_lambda(f, ClosureKind::Transform, true, ExprInfo::EmbedCloned),
+                    embed_lambda(f, ClosureKind::Transform, true, ExprInfo::EmbedOwned),
                 ])
                 .wrap_try(),
         TypedExpr::LeftFold(_, f, acc_init, _acc_type, seq) =>
@@ -906,7 +907,7 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                 .call_with([
                     embed_expr_dft(seq).call_method("iter").call_method("cloned"),
                     embed_expr(acc_init, info /* ExprInfo::EmbedCloned */),
-                    embed_lambda(f, ClosureKind::Transform, true, ExprInfo::EmbedCloned),
+                    embed_lambda(f, ClosureKind::Transform, true, ExprInfo::EmbedOwned),
                 ])
                 .wrap_try(),
         TypedExpr::FlatMapList(_, f, _ret_type, seq) =>
@@ -938,15 +939,15 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
             RustExpr::local("dup32").call_with([
                 embed_expr_dft(n),
                 // REVIEW[epc=zealous-clone] - consider under what circumstances the clone can be eliminated
-                embed_expr(expr, ExprInfo::EmbedCloned),
+                embed_expr(expr, ExprInfo::EmbedOwned),
             ])
         }
-        TypedExpr::Var(_, vname) => {
+        TypedExpr::Var(t, vname) => {
             // REVIEW - lexical scopes, shadowing, and variable-name sanitization may not be quite right in the current implementation
             let loc = RustExpr::local(vname.clone());
-            // REVIEW[epic=zealous-clone] - figure out if there is a way to avoid cloning here...
+            let expr_type = t.to_rust_type();
             match info {
-                ExprInfo::EmbedCloned => RustExpr::CloneOf(Box::new(loc)),
+                ExprInfo::EmbedOwned => RustExpr::owned(loc, expr_type),
                 ExprInfo::Natural => loc,
             }
         }
@@ -2319,7 +2320,7 @@ impl ToAst for SimpleLogic<GTExpr> {
                                 if t.to_rust_type().should_borrow_for_arg() {
                                     RustExpr::borrow_of(embed_expr(x, ExprInfo::Natural))
                                 } else {
-                                    embed_expr(x, ExprInfo::EmbedCloned)
+                                    embed_expr(x, ExprInfo::EmbedOwned)
                                 }
                             }))
                             .collect()
@@ -2750,8 +2751,10 @@ enum RepeatLogic<ExprT> {
     /// Fused logic for a left-fold that is updated on each repeat, and contributes to the condition for termination
     ///
     /// Lambda order: termination-predicate, then update-function
-    AccumUntil(GenLambda, GenLambda, RustExpr, Box<CaseLogic<ExprT>>),
+    AccumUntil(GenLambda, GenLambda, Typed<RustExpr>, Typed<Box<CaseLogic<ExprT>>>),
 }
+
+pub(crate) type Typed<T> = (T, GenType);
 
 pub(crate) trait ToAst {
     type AstElem;
@@ -3084,7 +3087,7 @@ where
                 stmts.push(ctrl.into());
                 GenBlock::lift_block(stmts, RustExpr::local("accum"))
             }
-            RepeatLogic::AccumUntil(cond, update, init, elt) => {
+            RepeatLogic::AccumUntil(cond, update, (init, acc_type), (elt, elt_type)) => {
                 let mut stmts = Vec::new();
                 // FIXME[epic=sigbind-missing] - We can't sigbind this due to GenStmt and RustControl being incompatible
                 let elt_expr = elt.to_ast(ctxt).into();
@@ -3107,7 +3110,7 @@ where
 
                     let done_call = cond.apply_pair(
                         // REVIEW[epic=clone-of-copy] - figure out if we can avoid cloning copy-types here
-                        RustExpr::CloneOf(Box::new(RustExpr::local("acc"))),
+                        RustExpr::owned(RustExpr::local("acc"), acc_type.to_rust_type()),
                         RustExpr::local("seq"),
                         ExprInfo::default(),
                     );
@@ -3131,7 +3134,7 @@ where
                     loop_body.push(RustStmt::assign("elem", elt_expr));
                     loop_body.push(RustStmt::Expr(RustExpr::local("seq").call_method_with(
                         "push",
-                        [RustExpr::CloneOf(Box::new(RustExpr::local("elem")))],
+                        [RustExpr::owned(RustExpr::local("elem"), elt_type.to_rust_type())],
                     )));
                     let new_acc = update.apply_pair(
                         RustExpr::local("acc"),
@@ -3442,7 +3445,7 @@ impl ToAst for DynamicLogic<GTExpr> {
     fn to_ast(&self, _ctxt: ProdCtxt<'_>) -> Self::AstElem {
         match self {
             DynamicLogic::Huffman(lbl, code_lengths, opt_values_expr) => {
-                let info = ExprInfo::EmbedCloned;
+                let info = ExprInfo::EmbedOwned;
                 let rhs = {
                     let opt_values_lifted = match opt_values_expr {
                         None => RustExpr::NONE,
@@ -3701,6 +3704,7 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
     content.add_submodule(RustSubmodule::new("codegen_tests"));
     content.add_submodule(RustSubmodule::new_pub("api_helper"));
     content.rebind(&table);
+    content.resolve(&src_context);
     content
 }
 
