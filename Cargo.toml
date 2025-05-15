@@ -2,10 +2,11 @@
 members = [
     ".",
     "generated/",
+    "doodle-numexpr-macro",
     "doodle-formats/",
     "smallsorts",
+    "experiments/doodle-pdf",
     "experiments/analytic-parser",
-    "doodle-numexpr-macro",
     "experiments/doodle-rec/",
 ]
 
