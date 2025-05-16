@@ -184,10 +184,13 @@ pub enum Expr {
     Dup(Box<Expr>, Box<Expr>),
 
     LiftOption(Option<Box<Expr>>),
+    /// [T] -> [T] -> [T] (append operation)
+    Append(Box<Expr>, Box<Expr>),
 }
 
 impl Expr {
     pub const UNIT: Self = Expr::Tuple(Vec::new());
+    pub const NIL: Self = Expr::Seq(Vec::new());
 
     pub fn record_proj(head: impl Into<Box<Expr>>, label: impl IntoLabel) -> Expr {
         let head: Box<Expr> = head.into();
@@ -538,6 +541,16 @@ impl Expr {
                 Some(expr) => Ok(ValueType::Option(Box::new(expr.infer_type(scope)?))),
                 None => Ok(ValueType::Option(Box::new(ValueType::Any))),
             },
+            Expr::Append(lhs, rhs) => {
+                let lhs_type = lhs.infer_type(scope)?;
+                let rhs_type = rhs.infer_type(scope)?;
+                if !matches!(lhs_type, ValueType::Seq(_)) {
+                    return Err(anyhow!("Append: lhs is not Seq: {lhs_type:?}"));
+                } else if !matches!(rhs_type, ValueType::Seq(_)) {
+                    return Err(anyhow!("Append: rhs is not Seq: {rhs_type:?}"));
+                }
+                Ok(ValueType::Seq(Box::new(lhs_type)))
+            }
         }
     }
 
@@ -554,7 +567,7 @@ impl Expr {
                     body.is_shadowed_by(name)
                 }
             }
-            Expr::Arith(_, x, y) | Expr::IntRel(_, x, y) => {
+            Expr::Arith(_, x, y) | Expr::IntRel(_, x, y) | Expr::Append(x, y) => {
                 x.is_shadowed_by(name) || y.is_shadowed_by(name)
             }
             Expr::Unary(_, x) => x.is_shadowed_by(name),
@@ -661,7 +674,6 @@ pub(crate) enum FieldLabel<Name> {
 }
 
 pub(crate) struct RecordFormat<'a> {
-    // First label is the
     flat: Vec<(FieldLabel<&'a Label>, &'a Format)>,
 }
 
@@ -840,6 +852,8 @@ pub enum Format {
     UnionNondet(Vec<Format>),
     /// Matches a sequence of concatenated formats
     Tuple(Vec<Format>),
+    /// Matches a fixed-length sequence of homogeneously-typed formats
+    Sequence(Vec<Format>),
     /// Repeat a format zero-or-more times
     Repeat(Box<Format>),
     /// Repeat a format one-or-more times
@@ -1024,6 +1038,14 @@ impl Format {
                 None => Bounds::exact(0),
                 Some(f) => f.match_bounds(module),
             },
+            Format::Sequence(fmts) => {
+                let mut total = Bounds::exact(0);
+                for fmt in fmts.iter() {
+                    let bounds = fmt.match_bounds(module);
+                    total = total + bounds;
+                }
+                total
+            }
         }
     }
 
@@ -1088,6 +1110,16 @@ impl Format {
                 None => Bounds::exact(0),
                 Some(f) => f.lookahead_bounds(module),
             },
+            Format::Sequence(fmts) => {
+                let mut sum_match = Bounds::exact(0);
+                let mut max_lookahead = Bounds::exact(0);
+                for fmt in fmts.iter() {
+                    max_lookahead =
+                        Bounds::union(max_lookahead, sum_match + fmt.lookahead_bounds(module));
+                    sum_match = sum_match + fmt.match_bounds(module);
+                }
+                max_lookahead
+            }
         }
     }
 
@@ -1110,17 +1142,16 @@ impl Format {
             Format::Union(branches) | Format::UnionNondet(branches) => {
                 Format::union_depends_on_next(branches, module)
             }
-            Format::Tuple(fields) => fields.iter().any(|f| f.depends_on_next(module)),
-            Format::Repeat(..) => true,
-            Format::Repeat1(..) => true,
-            Format::RepeatBetween(..) => true,
-            Format::RepeatCount(..) => false,
-            Format::RepeatUntilLast(..) => false,
-            Format::RepeatUntilSeq(..) => false,
+            Format::Tuple(fmts) | Format::Sequence(fmts) => {
+                fmts.iter().any(|f| f.depends_on_next(module))
+            }
+            Format::Repeat(..) | Format::Repeat1(..) | Format::RepeatBetween(..) => true,
+            Format::RepeatCount(..) | Format::RepeatUntilLast(..) | Format::RepeatUntilSeq(..) => {
+                false
+            }
             Format::AccumUntil(..) => false,
             Format::Maybe(..) => true,
-            Format::Peek(..) => false,
-            Format::PeekNot(..) => false,
+            Format::Peek(..) | Format::PeekNot(..) => false,
             Format::Slice(..) => false,
             Format::Bits(..) => false,
             Format::WithRelativeOffset(..) => false,
@@ -1345,7 +1376,13 @@ impl FormatModule {
                     other => Err(anyhow!("RepeatCount first argument type should be numeric, found {other:?} instead")),
                 }
             }
-
+            Format::Sequence(formats) => {
+                let mut elem_t = ValueType::Any;
+                for f in formats {
+                    elem_t = elem_t.unify(&self.infer_format_type(scope, f)?)?;
+                }
+                Ok(ValueType::Seq(Box::new(elem_t)))
+            }
             Format::RepeatBetween(min, max, a) => {
                 match min.infer_type(scope)? {
                     ref t0 @ ValueType::Base(b0) if b0.is_numeric() => {
@@ -1578,7 +1615,7 @@ enum Next<'a> {
     Empty,
     Union(Rc<Next<'a>>, Rc<Next<'a>>),
     Cat(MTFormatRef<'a>, Rc<Next<'a>>),
-    Tuple(MTFormatSlice<'a>, Rc<Next<'a>>),
+    Sequence(MTFormatSlice<'a>, Rc<Next<'a>>),
     Repeat(MTFormatRef<'a>, Rc<Next<'a>>),
     RepeatCount(usize, MTFormatRef<'a>, Rc<Next<'a>>),
     RepeatMax(usize, MTFormatRef<'a>, Rc<Next<'a>>), // dual to [RepeatCount] for 0..=N repeats
@@ -1719,8 +1756,8 @@ impl<'a> MatchTreeStep<'a> {
         self
     }
 
-    /// Constructs a [MatchTreeStep] that accepts a given tuple of sequential formats, with a trailing sequence of partially-consumed formats ([`Next`]s).
-    fn from_tuple(
+    /// Constructs a [MatchTreeStep] that accepts a given series of sequential formats, with a trailing sequence of partially-consumed formats ([`Next`]s).
+    fn from_sequential(
         module: &'a FormatModule,
         fields: &'a [Format],
         next: Rc<Next<'a>>,
@@ -1730,7 +1767,7 @@ impl<'a> MatchTreeStep<'a> {
             Some((f, fs)) => Self::from_format(
                 module,
                 f,
-                Rc::new(Next::Tuple(MaybeTyped::Untyped(fs), next)),
+                Rc::new(Next::Sequence(MaybeTyped::Untyped(fs), next)),
             ),
         }
     }
@@ -1833,7 +1870,7 @@ impl<'a> MatchTreeStep<'a> {
                 let next0: Rc<Next<'a>> = next.clone();
                 MatchTreeStep::<'a>::from_mt_format(module, *f, next0)
             }
-            Next::Tuple(fields, next) => {
+            Next::Sequence(fields, next) => {
                 let next = next.clone();
                 match fields {
                     MaybeTyped::Untyped(fields) => match fields.split_first() {
@@ -1841,7 +1878,7 @@ impl<'a> MatchTreeStep<'a> {
                         Some((f, fs)) => Self::from_format(
                             module,
                             f,
-                            Rc::new(Next::Tuple(MaybeTyped::Untyped(fs), next)),
+                            Rc::new(Next::Sequence(MaybeTyped::Untyped(fs), next)),
                         ),
                     },
                     MaybeTyped::Typed(fields) => match fields.split_first() {
@@ -1849,7 +1886,7 @@ impl<'a> MatchTreeStep<'a> {
                         Some((f, fs)) => Self::from_gt_format(
                             module,
                             f,
-                            Rc::new(Next::Tuple(MaybeTyped::Typed(fs), next)),
+                            Rc::new(Next::Sequence(MaybeTyped::Typed(fs), next)),
                         ),
                     },
                 }
@@ -1949,15 +1986,16 @@ impl<'a> MatchTreeStep<'a> {
                 }
                 tree
             }
-            TypedFormat::Tuple(_, fields) => match fields.split_first() {
-                None => Self::from_next(module, next),
-                Some((f, fs)) => Self::from_gt_format(
-                    module,
-                    f,
-                    Rc::new(Next::Tuple(MaybeTyped::Typed(fs), next)),
-                ),
-            },
-
+            TypedFormat::Sequence(_, fields) | TypedFormat::Tuple(_, fields) => {
+                match fields.split_first() {
+                    None => Self::from_next(module, next),
+                    Some((f, fs)) => Self::from_gt_format(
+                        module,
+                        f,
+                        Rc::new(Next::Sequence(MaybeTyped::Typed(fs), next)),
+                    ),
+                }
+            }
             TypedFormat::Repeat(_, a) => {
                 let tree = Self::from_next(module, next.clone());
                 tree.union(Self::from_gt_format(
@@ -2169,7 +2207,9 @@ impl<'a> MatchTreeStep<'a> {
                 }
                 tree
             }
-            Format::Tuple(fields) => Self::from_tuple(module, fields, next),
+            Format::Sequence(fields) | Format::Tuple(fields) => {
+                Self::from_sequential(module, fields, next)
+            }
             Format::Repeat(a) => {
                 let tree = Self::from_next(module, next.clone());
                 tree.union(Self::from_format(

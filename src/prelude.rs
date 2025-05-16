@@ -81,6 +81,17 @@ where
     Ok(res)
 }
 
+/// Joins two slices into a single vector via iterator chaining, returning the result
+pub fn seq_append<T, S>(lhs: impl AsRef<S>, rhs: impl AsRef<S>) -> Vec<T>
+where
+    T: Clone,
+    for<'a> &'a S: IntoIterator<Item = &'a T>,
+{
+    let lhs_iter = lhs.as_ref().into_iter().cloned();
+    let rhs_iter = rhs.as_ref().into_iter().cloned();
+    Iterator::chain(lhs_iter, rhs_iter).collect()
+}
+
 /// Performs a fold/reduce-style operation on a given list, starting from an initial accumulator value
 /// and replacing it with the evaluation of `f(accum, elem)` for each element in the iterator, in order.
 ///

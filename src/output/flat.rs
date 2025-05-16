@@ -143,7 +143,7 @@ fn check_covered(
                 check_covered(module, path, format)?;
             }
         }
-        Format::Tuple(formats) => {
+        Format::Tuple(formats) | Format::Sequence(formats) => {
             for format in formats {
                 check_covered(module, path, format)?;
             }
@@ -258,6 +258,16 @@ impl<'module, W: io::Write> Context<'module, W> {
                     Ok(())
                 }
                 _ => panic!("expected tuple, found {value:?}"),
+            },
+            Format::Sequence(formats) => match value {
+                Value::Seq(seq_kind) => {
+                    for (index, value) in seq_kind.iter().enumerate() {
+                        let format = &formats[index];
+                        self.write_flat(value, format)?;
+                    }
+                    Ok(())
+                }
+                _ => panic!("expected sequence, found {value:?}"),
             },
             Format::Repeat(format)
             | Format::Repeat1(format)

@@ -2141,6 +2141,19 @@ impl TypeChecker {
 
                 newvar
             }
+            Expr::Append(seq0, seq1) => {
+                let newvar = self.get_new_uvar();
+                let seq0_var = self.infer_var_expr(seq0.as_ref(), scope)?;
+                let seq1_var = self.infer_var_expr(seq1.as_ref(), scope)?;
+
+                let elem_var = self.get_new_uvar();
+
+                self.unify_var_pair(seq0_var, seq1_var)?;
+                self.unify_var_proj_elem(seq0_var, elem_var)?;
+                self.unify_var_proj_elem(newvar, elem_var)?;
+
+                newvar
+            }
             Expr::FlatMap(f_expr, seq_expr) => {
                 let newvar = self.get_new_uvar();
 
@@ -2740,6 +2753,16 @@ impl TypeChecker {
                     uts.push(self.infer_utype_format(t, ctxt)?);
                 }
                 self.unify_var_utype(newvar, Rc::new(UType::Tuple(uts)))?;
+                Ok(newvar)
+            }
+            Format::Sequence(ts) => {
+                let newvar = self.get_new_uvar();
+                let elem_v = self.get_new_uvar();
+                for t in ts {
+                    let v = self.infer_var_format(t, ctxt)?;
+                    self.unify_var_pair(elem_v, v)?;
+                }
+                self.unify_var_utype(newvar, Rc::new(UType::Seq(Rc::new(UType::Var(elem_v)))))?;
                 Ok(newvar)
             }
             Format::Repeat(inner) | Format::Repeat1(inner) => {

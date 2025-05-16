@@ -685,6 +685,15 @@ impl RustType {
         }
     }
 
+    /// Returns `true` if seq-formats ([`Format::Sequence`]) of type `Seq(<self>)` should prefer to use
+    /// fixed-size arrays (`[T; N]`) over vectors (`Vec<T>`) during construction. An additional parameter,
+    /// the length of the sequence (`len`), is passed in to guide the decision, as simple types can be
+    /// preferable as vectors depending more on the length of the sequence than anything else.
+    pub(crate) fn prefer_array(&self, _n: usize) -> bool {
+        // REVIEW - currently, we would need to orchestrate the correct decision at multiple layers, which would take a lot of work
+        false
+    }
+
     /// Returns `true` if `self` is a known-`Copy` `RustType`.
     ///
     /// # Note
@@ -1336,8 +1345,8 @@ impl ToFragment for StructExpr {
 
 #[derive(Debug, Clone)]
 pub(crate) struct OwnedRustExpr {
-    expr: Box<RustExpr>,
-    kind: OwnedKind,
+    pub expr: Box<RustExpr>,
+    pub kind: OwnedKind,
 }
 
 #[derive(Debug, Clone)]
@@ -1399,6 +1408,17 @@ pub(crate) enum RustExpr {
 #[derive(Debug, Clone)]
 pub(crate) enum RustMacro {
     Matches(Box<RustExpr>, Vec<RustPattern>),
+    Vec(VecExpr),
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum VecExpr {
+    Nil,
+    #[expect(dead_code)]
+    Single(Box<RustExpr>),
+    #[expect(dead_code)]
+    Repeat(Box<RustExpr>, Box<RustExpr>),
+    List(Vec<RustExpr>),
 }
 
 impl RustExpr {
@@ -1409,6 +1429,8 @@ impl RustExpr {
     pub const TRUE: Self = Self::PrimitiveLit(RustPrimLit::Boolean(true));
 
     pub const FALSE: Self = Self::PrimitiveLit(RustPrimLit::Boolean(false));
+
+    pub const VEC_NIL: Self = RustExpr::Macro(RustMacro::Vec(VecExpr::Nil));
 
     /// Returns `Some(varname)` if `self` is a simple entity-reference to identifier `varname`, and
     /// `None` otherwise.
@@ -1490,12 +1512,15 @@ impl RustExpr {
             Self::Owned(OwnedRustExpr { expr, .. }) => match &*expr {
                 Self::FieldAccess(..) => Self::Borrow(expr),
                 _ => *expr,
-            }
+            },
             other => Self::Borrow(Box::new(other)),
         }
     }
 
-    pub fn field<Name>(self, name: Name) -> Self where Name: Into<Label> + AsRef<str> {
+    pub fn field<Name>(self, name: Name) -> Self
+    where
+        Name: Into<Label> + AsRef<str>,
+    {
         match self {
             Self::Owned(OwnedRustExpr { expr, kind }) => {
                 let (expr, kind) = match kind {
@@ -1504,7 +1529,7 @@ impl RustExpr {
                         let lens = lens.field(lab.clone());
                         (Box::new(expr.field(lab)), OwnedKind::Unresolved(lens))
                     }
-                    _ => (Box::new(expr.field(name)), kind)
+                    _ => (Box::new(expr.field(name)), kind),
                 };
                 Self::Owned(OwnedRustExpr { expr, kind })
             }
@@ -1531,17 +1556,26 @@ impl RustExpr {
     pub fn index(self, ix: RustExpr) -> RustExpr {
         match self {
             Self::Owned(owned) => match owned {
-                OwnedRustExpr { kind: OwnedKind::Copied | OwnedKind::Deref, expr: this } => this.index(ix),
-                OwnedRustExpr { kind: OwnedKind::Unresolved(lens), expr }  => {
-                    Self::Owned(OwnedRustExpr {
-                        expr: Box::new(expr.index(ix)),
-                        kind: OwnedKind::Unresolved(lens.elem()),
-                    })
-                },
-                OwnedRustExpr { kind: OwnedKind::Cloned, .. }  => {
-                    unreachable!("index smart-constructor should only be used on undecided expressions");
+                OwnedRustExpr {
+                    kind: OwnedKind::Copied | OwnedKind::Deref,
+                    expr: this,
+                } => this.index(ix),
+                OwnedRustExpr {
+                    kind: OwnedKind::Unresolved(lens),
+                    expr,
+                } => Self::Owned(OwnedRustExpr {
+                    expr: Box::new(expr.index(ix)),
+                    kind: OwnedKind::Unresolved(lens.elem()),
+                }),
+                OwnedRustExpr {
+                    kind: OwnedKind::Cloned,
+                    ..
+                } => {
+                    unreachable!(
+                        "index smart-constructor should only be used on undecided expressions"
+                    );
                 }
-            }
+            },
             other => Self::Index(Box::new(other), Box::new(ix)),
         }
     }
@@ -1563,7 +1597,7 @@ impl RustExpr {
     /// clone-then-borrow constructs in the generated code.
     pub fn vec_as_slice(self) -> Self {
         let this = match self {
-            Self::Owned(OwnedRustExpr {expr, .. }) => *expr,
+            Self::Owned(OwnedRustExpr { expr, .. }) => *expr,
             other => other,
         };
         this.call_method("as_slice")
@@ -1640,6 +1674,7 @@ impl RustExpr {
                 RustPrimLit::String(..) => None,
             },
             RustExpr::Macro(RustMacro::Matches(..)) => Some(PrimType::Bool),
+            RustExpr::Macro(RustMacro::Vec(..)) => None,
             RustExpr::ArrayLit(..) => None,
             RustExpr::MethodCall(_recv, _method, _args) => {
                 match _method {
@@ -1788,6 +1823,12 @@ impl RustExpr {
         match self {
             RustExpr::Entity(..) => true,
             RustExpr::Macro(RustMacro::Matches(expr, ..)) => expr.is_pure(),
+            RustExpr::Macro(RustMacro::Vec(vec_expr)) => match vec_expr {
+                VecExpr::Nil => true,
+                VecExpr::Single(x) => x.is_pure(),
+                VecExpr::Repeat(x, n) => x.is_pure() && n.is_pure(),
+                VecExpr::List(xs) => xs.iter().all(Self::is_pure),
+            },
             RustExpr::PrimitiveLit(..) => true,
             RustExpr::ArrayLit(arr) => arr.iter().all(Self::is_pure),
             // REVIEW - over types we have no control over, clone itself can be impure, but it should never be so for the code we ourselves are generating
@@ -1810,9 +1851,7 @@ impl RustExpr {
                 StructExpr::TupleExpr(values) => values.iter().all(|val| val.is_pure()),
                 StructExpr::EmptyExpr => true,
             },
-            RustExpr::Borrow(expr) | RustExpr::BorrowMut(expr) => {
-                expr.is_pure()
-            }
+            RustExpr::Borrow(expr) | RustExpr::BorrowMut(expr) => expr.is_pure(),
             // NOTE - while we can construct pure Try-expressions manually, the intent of `?` is to have potential side-effects and so we judge them de-facto impure
             RustExpr::Try(..) => false,
             RustExpr::Operation(op) => match op {
@@ -1872,6 +1911,8 @@ impl RustExpr {
 
             // Special case - `matches!` macro is an idiomatic conditional expression
             RustExpr::Macro(RustMacro::Matches(..)) => false,
+            // Special case - `vec!` will typically be constructed only over simple sub-expressions
+            RustExpr::Macro(RustMacro::Vec(..)) => false,
 
             // REVIEW - is there a better heuristic?
             RustExpr::Closure(..) => true,
@@ -1983,11 +2024,36 @@ impl RustExpr {
 
     pub(crate) fn owned(loc: RustExpr, expr_type: RustType) -> RustExpr {
         let owned = if expr_type.can_be_copy() {
-            OwnedRustExpr { expr: Box::new(loc), kind: OwnedKind::Copied }
+            OwnedRustExpr {
+                expr: Box::new(loc),
+                kind: OwnedKind::Copied,
+            }
         } else {
-            OwnedRustExpr { expr: Box::new(loc), kind: OwnedKind::Unresolved(Lens::Ground(expr_type)) }
+            OwnedRustExpr {
+                expr: Box::new(loc),
+                kind: OwnedKind::Unresolved(Lens::Ground(expr_type)),
+            }
         };
         RustExpr::Owned(owned)
+    }
+}
+
+impl ToFragment for VecExpr {
+    fn to_fragment(&self) -> Fragment {
+        let contents = match self {
+            VecExpr::Nil => Fragment::Empty,
+            VecExpr::Single(x) => x.to_fragment_precedence(Precedence::Top),
+            VecExpr::Repeat(x, n) => x.to_fragment_precedence(Precedence::Top).intervene(
+                Fragment::string("; "),
+                n.to_fragment_precedence(Precedence::Top),
+            ),
+            VecExpr::List(elts) => Fragment::seq(
+                elts.iter()
+                    .map(|x| x.to_fragment_precedence(Precedence::Top)),
+                Some(Fragment::string(", ")),
+            ),
+        };
+        contents.delimit(Fragment::Char('['), Fragment::Char(']'))
     }
 }
 
@@ -2035,19 +2101,27 @@ impl ToFragmentExt for RustExpr {
                 prec,
                 Precedence::INVOKE,
             ),
-            RustExpr::Owned(OwnedRustExpr { expr: x, kind: OwnedKind::Cloned }) => cond_paren(
+            RustExpr::Owned(OwnedRustExpr {
+                expr: x,
+                kind: OwnedKind::Cloned,
+            }) => cond_paren(
                 x.to_fragment_precedence(Precedence::Projection)
                     .intervene(Fragment::Char('.'), Fragment::string("clone()")),
                 prec,
                 Precedence::Projection,
             ),
-            RustExpr::Owned(OwnedRustExpr { kind: OwnedKind::Deref, expr}) => {
-                Fragment::Char('*').cat(expr.to_fragment_precedence(Precedence::Prefix))
-            }
-            RustExpr::Owned(OwnedRustExpr { kind: OwnedKind::Copied, expr }) => {
-                expr.to_fragment_precedence(prec)
-            }
-            RustExpr::Owned(OwnedRustExpr { kind: OwnedKind::Unresolved(lens), expr}) => {
+            RustExpr::Owned(OwnedRustExpr {
+                kind: OwnedKind::Deref,
+                expr,
+            }) => Fragment::Char('*').cat(expr.to_fragment_precedence(Precedence::Prefix)),
+            RustExpr::Owned(OwnedRustExpr {
+                kind: OwnedKind::Copied,
+                expr,
+            }) => expr.to_fragment_precedence(prec),
+            RustExpr::Owned(OwnedRustExpr {
+                kind: OwnedKind::Unresolved(lens),
+                expr,
+            }) => {
                 unreachable!("unresolved ownership: ({expr:?}: {lens:?})")
             }
             RustExpr::FieldAccess(x, name) => x
@@ -2070,6 +2144,9 @@ impl ToFragmentExt for RustExpr {
                         .delimit(Fragment::Char('('), Fragment::Char(')')),
                 )
                 .group(),
+            RustExpr::Macro(RustMacro::Vec(vec_expr)) => {
+                Fragment::string("vec!").cat(vec_expr.to_fragment())
+            }
             RustExpr::Tuple(elts) => match elts.as_slice() {
                 [elt] => elt
                     .to_fragment_precedence(Precedence::Top)
@@ -3096,7 +3173,8 @@ mod test {
 
 pub mod short_circuit {
     use super::{
-        OwnedRustExpr, ReturnKind, RustCatchAll, RustControl, RustExpr, RustMacro, RustMatchBody, RustMatchCase, RustOp, RustStmt, StructExpr
+        OwnedRustExpr, ReturnKind, RustCatchAll, RustControl, RustExpr, RustMacro, RustMatchBody,
+        RustMatchCase, RustOp, RustStmt, StructExpr, VecExpr,
     };
 
     #[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
@@ -3104,9 +3182,9 @@ pub mod short_circuit {
         /// Can never constitute a short-circuit
         Pure = 0,
         /// Short-circuit if and only if it is the only non-pure term in a terminal value-producing node
-        SemiPure = 1,
-        /// Constitutes a potential short-circuit regardless of context
-        Impure = 2,
+        Try = 1,
+        /// Explicit `return` keyword -- constitutes a potential short-circuit regardless of context
+        Return = 2,
     }
 
     impl std::ops::BitOr for EvalPurity {
@@ -3115,21 +3193,22 @@ pub mod short_circuit {
         fn bitor(self, rhs: Self) -> Self::Output {
             match self {
                 EvalPurity::Pure => rhs,
-                EvalPurity::SemiPure => match rhs {
-                    EvalPurity::Pure => self,
-                    _ => EvalPurity::Impure,
+                EvalPurity::Try => match rhs {
+                    EvalPurity::Return => EvalPurity::Return,
+                    _ => self,
                 },
-                EvalPurity::Impure => EvalPurity::Impure,
+                EvalPurity::Return => EvalPurity::Return,
             }
         }
     }
 
     impl std::ops::BitOrAssign for EvalPurity {
         fn bitor_assign(&mut self, rhs: Self) {
-            match (&self, rhs) {
-                (EvalPurity::Pure, _) | (_, EvalPurity::Impure) => *self = rhs,
-                (EvalPurity::Impure, _) | (_, EvalPurity::Pure) => (),
-                (EvalPurity::SemiPure, EvalPurity::SemiPure) => *self = EvalPurity::Impure,
+            if matches!(
+                (&self, rhs),
+                (EvalPurity::Pure, _) | (_, EvalPurity::Return)
+            ) {
+                *self = rhs;
             }
         }
     }
@@ -3150,8 +3229,8 @@ pub mod short_circuit {
         fn has_short_circuit(&self, is_last: bool) -> bool {
             match self.check_eval_purity() {
                 EvalPurity::Pure => false,
-                EvalPurity::SemiPure => !is_last,
-                EvalPurity::Impure => true,
+                EvalPurity::Try => !is_last,
+                EvalPurity::Return => true,
             }
         }
     }
@@ -3234,7 +3313,7 @@ pub mod short_circuit {
                 | RustStmt::Let(.., expr)
                 | RustStmt::LetPattern(.., expr)
                 | RustStmt::Return(ReturnKind::Implicit, expr) => expr.check_eval_purity(),
-                RustStmt::Return(ReturnKind::Keyword, ..) => EvalPurity::SemiPure,
+                RustStmt::Return(ReturnKind::Keyword, ..) => EvalPurity::Try,
                 RustStmt::Control(ctrl) => ctrl.check_eval_purity(),
             }
         }
@@ -3329,7 +3408,7 @@ pub mod short_circuit {
             match self {
                 RustMatchBody::Irrefutable(branches) => branches.check_eval_purity(),
                 RustMatchBody::Refutable(branches, rust_catch_all) => match rust_catch_all {
-                    RustCatchAll::ReturnErrorValue { .. } => EvalPurity::SemiPure,
+                    RustCatchAll::ReturnErrorValue { .. } => EvalPurity::Try,
                     RustCatchAll::PanicUnreachable { .. } => branches.check_eval_purity(),
                 },
             }
@@ -3372,6 +3451,7 @@ pub mod short_circuit {
                     stmts.is_short_circuiting() || expr.is_short_circuiting()
                 }
                 RustExpr::Macro(RustMacro::Matches(expr, ..)) => expr.is_short_circuiting(),
+                RustExpr::Macro(RustMacro::Vec(vec_expr)) => vec_expr.is_short_circuiting(),
                 RustExpr::Control(ctrl) => ctrl.is_short_circuiting(),
                 RustExpr::Closure(..) => false,
                 RustExpr::Index(head, index) => {
@@ -3396,7 +3476,7 @@ pub mod short_circuit {
                     fn check_eval_purity(&self) -> EvalPurity {
                         let mut acc = EvalPurity::Pure;
                         for expr in self.iter() {
-                            if acc == EvalPurity::Impure { break; }
+                            if acc == EvalPurity::Return { break; }
                             acc |= expr.check_eval_purity();
                         }
                         acc
@@ -3410,8 +3490,8 @@ pub mod short_circuit {
         fn check_eval_purity(&self) -> EvalPurity {
             let mut acc = EvalPurity::Pure;
             for expr in self.iter() {
-                if matches!(acc, EvalPurity::SemiPure | EvalPurity::Impure) {
-                    return EvalPurity::Impure;
+                if matches!(acc, EvalPurity::Try | EvalPurity::Return) {
+                    return EvalPurity::Return;
                 }
                 acc |= expr.check_eval_purity();
             }
@@ -3441,13 +3521,14 @@ pub mod short_circuit {
                 | RustExpr::BorrowMut(inner) => inner.check_eval_purity(),
                 RustExpr::Try(inner) => match inner.as_ref() {
                     RustExpr::ResultOk(.., expr) => expr.check_eval_purity(),
-                    _ => EvalPurity::SemiPure,
+                    _ => EvalPurity::Try,
                 },
                 RustExpr::Operation(op) => op.check_eval_purity(),
                 RustExpr::BlockScope(stmts, expr) => {
                     stmts.check_eval_purity() | expr.check_eval_purity()
                 }
                 RustExpr::Macro(RustMacro::Matches(expr, ..)) => expr.check_eval_purity(),
+                RustExpr::Macro(RustMacro::Vec(vec_expr)) => vec_expr.check_eval_purity(),
                 RustExpr::Control(ctrl) => ctrl.check_eval_purity(),
                 RustExpr::Index(head, index) => {
                     head.check_eval_purity() | index.check_eval_purity()
@@ -3458,6 +3539,28 @@ pub mod short_circuit {
                 RustExpr::RangeExclusive(start, stop) => {
                     start.check_eval_purity() | stop.check_eval_purity()
                 }
+            }
+        }
+    }
+
+    impl ShortCircuit for VecExpr {
+        fn is_short_circuiting(&self) -> bool {
+            match self {
+                VecExpr::Nil => false,
+                VecExpr::Single(x) => x.is_short_circuiting(),
+                VecExpr::Repeat(x, n) => x.is_short_circuiting() || n.is_short_circuiting(),
+                VecExpr::List(xs) => xs.is_short_circuiting(),
+            }
+        }
+    }
+
+    impl ShortCircuitExt for VecExpr {
+        fn check_eval_purity(&self) -> EvalPurity {
+            match self {
+                VecExpr::Nil => EvalPurity::Pure,
+                VecExpr::Single(x) => x.check_eval_purity(),
+                VecExpr::Repeat(x, n) => x.check_eval_purity() | n.check_eval_purity(),
+                VecExpr::List(xs) => xs.check_eval_purity(),
             }
         }
     }
@@ -3523,7 +3626,9 @@ pub use short_circuit::{ShortCircuit, ShortCircuitExt, ValueCheckpoint};
 
 pub mod var_container {
     use super::{
-        ClosureBody, MatchCaseLHS, OwnedRustExpr, RustCatchAll, RustClosure, RustClosureHead, RustControl, RustEntity, RustExpr, RustMacro, RustMatchBody, RustMatchCase, RustOp, RustPattern, RustStmt, StructExpr
+        ClosureBody, MatchCaseLHS, OwnedRustExpr, RustCatchAll, RustClosure, RustClosureHead,
+        RustControl, RustEntity, RustExpr, RustMacro, RustMatchBody, RustMatchCase, RustOp,
+        RustPattern, RustStmt, StructExpr, VecExpr,
     };
 
     pub trait VarBinder {
@@ -3721,6 +3826,7 @@ pub mod var_container {
                         || (!stmts.binds_var(var) && expr.contains_var_ref(var))
                 }
                 RustExpr::Macro(RustMacro::Matches(expr, ..)) => expr.contains_var_ref(var),
+                RustExpr::Macro(RustMacro::Vec(vec_expr)) => vec_expr.contains_var_ref(var),
                 RustExpr::Control(ctrl) => ctrl.contains_var_ref(var),
                 RustExpr::PrimitiveLit(..) => false,
                 RustExpr::ArrayLit(rust_exprs) => {
@@ -3737,6 +3843,20 @@ pub mod var_container {
                 RustExpr::RangeExclusive(lo, hi) => {
                     lo.contains_var_ref(var) || hi.contains_var_ref(var)
                 }
+            }
+        }
+    }
+
+    impl VarContainer for VecExpr {
+        fn contains_var_ref<Name>(&self, var: &Name) -> bool
+        where
+            Name: AsRef<str> + ?Sized,
+        {
+            match self {
+                VecExpr::Nil => false,
+                VecExpr::Single(x) => x.contains_var_ref(var),
+                VecExpr::Repeat(x, n) => x.contains_var_ref(var) || n.contains_var_ref(var),
+                VecExpr::List(xs) => xs.contains_var_ref(var),
             }
         }
     }

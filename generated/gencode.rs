@@ -4242,9 +4242,10 @@ tag: (u8, u8, u8, u8),
 crc: u32
 }
 
-/// expected size: 184
+/// expected size: 208
 #[derive(Debug, Clone)]
 pub struct png_main {
+signature: Vec<u8>,
 ihdr: png_ihdr,
 chunks: Vec<png_chunk>,
 idat: zlib_main,
@@ -4951,72 +4952,72 @@ PResult::Ok(mpeg4_main { atoms })
 }
 
 fn Decoder_png_main<>(_input: &mut Parser<'_>) -> Result<png_main, ParseError> {
-{
-let field0 = ((|| {
+let signature = {
+let _seq0 = {
 let b = _input.read_byte()?;
-PResult::Ok(if b == 137 {
+if b == 137 {
 b
 } else {
 return Err(ParseError::ExcludedBranch(8253205784254894771u64));
-})
-})())?;
-let field1 = ((|| {
+}
+};
+let _seq1 = {
 let b = _input.read_byte()?;
-PResult::Ok(if b == 80 {
+if b == 80 {
 b
 } else {
 return Err(ParseError::ExcludedBranch(1225514472166157741u64));
-})
-})())?;
-let field2 = ((|| {
+}
+};
+let _seq2 = {
 let b = _input.read_byte()?;
-PResult::Ok(if b == 78 {
+if b == 78 {
 b
 } else {
 return Err(ParseError::ExcludedBranch(1224415506115142500u64));
-})
-})())?;
-let field3 = ((|| {
+}
+};
+let _seq3 = {
 let b = _input.read_byte()?;
-PResult::Ok(if b == 71 {
+if b == 71 {
 b
 } else {
 return Err(ParseError::ExcludedBranch(16859485491091215361u64));
-})
-})())?;
-let field4 = ((|| {
+}
+};
+let _seq4 = {
 let b = _input.read_byte()?;
-PResult::Ok(if b == 13 {
+if b == 13 {
 b
 } else {
 return Err(ParseError::ExcludedBranch(14898840355839773829u64));
-})
-})())?;
-let field5 = ((|| {
+}
+};
+let _seq5 = {
 let b = _input.read_byte()?;
-PResult::Ok(if b == 10 {
+if b == 10 {
 b
 } else {
 return Err(ParseError::ExcludedBranch(9453951600195794313u64));
-})
-})())?;
-let field6 = ((|| {
+}
+};
+let _seq6 = {
 let b = _input.read_byte()?;
-PResult::Ok(if b == 26 {
+if b == 26 {
 b
 } else {
 return Err(ParseError::ExcludedBranch(10036157788440812915u64));
-})
-})())?;
-let field7 = ((|| {
+}
+};
+let _seq7 = {
 let b = _input.read_byte()?;
-PResult::Ok(if b == 10 {
+if b == 10 {
 b
 } else {
 return Err(ParseError::ExcludedBranch(6349531732377484771u64));
-})
-})())?;
-(field0, field1, field2, field3, field4, field5, field6, field7)
+}
+};
+vec![_seq0, _seq1, _seq2, _seq3, _seq4, _seq5, _seq6, _seq7]
 };
 let ihdr = (Decoder_png_ihdr(_input))?;
 let chunks = {
@@ -5162,7 +5163,7 @@ break
 accum
 };
 let iend = (Decoder_png_iend(_input))?;
-PResult::Ok(png_main { ihdr, chunks, idat, more_chunks, iend })
+PResult::Ok(png_main { signature, ihdr, chunks, idat, more_chunks, iend })
 }
 
 fn Decoder_riff_main<>(_input: &mut Parser<'_>) -> Result<riff_main, ParseError> {

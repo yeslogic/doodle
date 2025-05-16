@@ -22,6 +22,23 @@ impl<'a, V: Clone> ValueSeq<'a, V> {
             ValueSeq::IntRange(r) => r.len(),
         }
     }
+
+    pub fn is_empty(&self) -> bool {
+        match self {
+            ValueSeq::ValueSeq(sk) => sk.is_empty(),
+            ValueSeq::IntRange(r) => r.is_empty(),
+        }
+    }
+
+    pub fn append(self, other: Self) -> SeqKind<V> {
+        if matches!(self, ValueSeq::IntRange(..)) | matches!(other, ValueSeq::IntRange(..)) {
+            unimplemented!("appending int ranges");
+        }
+        match (self, other) {
+            (ValueSeq::ValueSeq(v1), ValueSeq::ValueSeq(v2)) => (*v1).clone().append((*v2).clone()),
+            _ => unreachable!(),
+        }
+    }
 }
 
 pub(crate) fn sub_range(
@@ -137,6 +154,20 @@ impl<T: Clone> SeqKind<T> {
         match self {
             SeqKind::Strict(vs) => Iter::Strict(vs.iter()),
             SeqKind::Dup(n, v) => Iter::Dup(std::iter::repeat_n(Box::as_ref(v), *n)),
+        }
+    }
+
+    pub fn append(self, other: SeqKind<T>) -> SeqKind<T> {
+        if self.is_empty() {
+            other
+        } else if other.is_empty() {
+            self
+        } else {
+            // REVIEW - there may be minor optimizations we could leverage, but they would be very marginal yield
+            let mut seq0 = self.into_vec();
+            let mut seq1 = other.into_vec();
+            seq0.append(&mut seq1);
+            SeqKind::Strict(seq0)
         }
     }
 }

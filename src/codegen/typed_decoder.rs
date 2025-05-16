@@ -64,6 +64,7 @@ impl TypedDecoder<GenType> {
             | TypedDecoder::Parallel(t, ..)
             | TypedDecoder::Branch(t, ..)
             | TypedDecoder::Tuple(t, ..)
+            | TypedDecoder::Sequence(t, ..)
             | TypedDecoder::Repeat0While(t, ..)
             | TypedDecoder::Repeat1Until(t, ..)
             | TypedDecoder::RepeatCount(t, ..)
@@ -106,6 +107,7 @@ pub(crate) enum TypedDecoder<TypeRep> {
     Parallel(TypeRep, Vec<TypedDecoderExt<TypeRep>>),
     Branch(TypeRep, MatchTree, Vec<TypedDecoderExt<TypeRep>>),
     Tuple(TypeRep, Vec<TypedDecoderExt<TypeRep>>),
+    Sequence(TypeRep, Vec<TypedDecoderExt<TypeRep>>),
     Repeat0While(TypeRep, MatchTree, Box<TypedDecoderExt<TypeRep>>),
     Repeat1Until(TypeRep, MatchTree, Box<TypedDecoderExt<TypeRep>>),
     RepeatCount(
@@ -386,7 +388,7 @@ impl<'a> GTCompiler<'a> {
                 let mut dfields = Vec::with_capacity(fields.len());
                 let mut fields = fields.iter();
                 while let Some(f) = fields.next() {
-                    let next = Rc::new(Next::Tuple(
+                    let next = Rc::new(Next::Sequence(
                         MaybeTyped::Typed(fields.as_slice()),
                         next.clone(),
                     ));
@@ -394,6 +396,19 @@ impl<'a> GTCompiler<'a> {
                     dfields.push(df);
                 }
                 Ok(TypedDecoder::Tuple(gt.clone(), dfields))
+            }
+            TypedFormat::Sequence(gt, fields) => {
+                let mut dfields = Vec::with_capacity(fields.len());
+                let mut fields = fields.iter();
+                while let Some(f) = fields.next() {
+                    let next = Rc::new(Next::Sequence(
+                        MaybeTyped::Typed(fields.as_slice()),
+                        next.clone(),
+                    ));
+                    let df = self.compile_gt_format(f, None, next)?;
+                    dfields.push(df);
+                }
+                Ok(TypedDecoder::Sequence(gt.clone(), dfields))
             }
             TypedFormat::Repeat(gt, a) => {
                 if a.as_ref().is_nullable() {
