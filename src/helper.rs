@@ -277,6 +277,11 @@ pub fn tuple(formats: impl IntoIterator<Item = Format>) -> Format {
     Format::Tuple(formats.into_iter().collect())
 }
 
+/// Helper-function for [`Format::Sequence`] that can take any iterable container of [`Format`]s.
+pub fn seq(formats: impl IntoIterator<Item = Format>) -> Format {
+    Format::Sequence(formats.into_iter().collect())
+}
+
 /// Helper-function for [`Format::Union`] over branches that are all [`Format::Variant`].
 ///
 /// Accepts any iterable container of tuples `(Name, Format)` for any `Name` that implements [`IntoLabel`].
@@ -566,9 +571,14 @@ pub fn not_byte(b: u8) -> Format {
     Format::Byte(!ByteSet::from([b]))
 }
 
-/// Returns a format that matches a given byte-sequence.
+/// Returns a format that matches a given byte-sequence and returns a tuple.
 pub fn is_bytes(bytes: &[u8]) -> Format {
     tuple(bytes.iter().copied().map(is_byte))
+}
+
+/// Returns a format that matches a given byte-sequence and returns an array/vector.
+pub fn byte_seq(bytes: &[u8]) -> Format {
+    seq(bytes.iter().copied().map(is_byte))
 }
 
 /// Helper const for a format that matches every byte.

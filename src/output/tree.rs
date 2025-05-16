@@ -359,13 +359,23 @@ impl<'module> TreePrinter<'module> {
             },
             Format::Tuple(formats) => match value {
                 ParsedValue::Tuple(parsed_tuple) => {
-                    if self.flags.pretty_ascii_strings && self.is_ascii_tuple_format(formats) {
+                    if self.flags.pretty_ascii_strings && self.are_all_ascii_formats(formats) {
                         self.compile_parsed_ascii_seq(parsed_tuple)
                     } else {
                         self.compile_parsed_tuple(parsed_tuple, Some(formats))
                     }
                 }
                 _ => panic!("expected tuple, found {value:?}"),
+            },
+            Format::Sequence(formats) => match value {
+                ParsedValue::Seq(parsed_seq) => {
+                    if self.flags.pretty_ascii_strings && self.are_all_ascii_formats(formats) {
+                        self.compile_parsed_ascii_seq(parsed_seq)
+                    } else {
+                        self.compile_parsed_seq_formats(parsed_seq, Some(formats.as_slice()))
+                    }
+                }
+                _ => panic!("expected sequence, found {value:?}"),
             },
             Format::Repeat(format)
             | Format::Repeat1(format)
@@ -525,13 +535,23 @@ impl<'module> TreePrinter<'module> {
             },
             Format::Tuple(formats) => match value {
                 Value::Tuple(values) => {
-                    if self.flags.pretty_ascii_strings && self.is_ascii_tuple_format(formats) {
+                    if self.flags.pretty_ascii_strings && self.are_all_ascii_formats(formats) {
                         self.compile_ascii_seq(values)
                     } else {
                         self.compile_tuple(values, Some(formats))
                     }
                 }
                 _ => panic!("expected tuple, found {value}"),
+            },
+            Format::Sequence(formats) => match value {
+                Value::Seq(values) => {
+                    if self.flags.pretty_ascii_strings && self.are_all_ascii_formats(formats) {
+                        self.compile_ascii_seq(values)
+                    } else {
+                        self.compile_seq_formats(values, Some(formats.as_slice()))
+                    }
+                }
+                _ => panic!("expected sequence, found {value}"),
             },
             Format::LiftedOption(fmt) => match value {
                 Value::Option(opt_val) => match (fmt, opt_val) {
@@ -651,10 +671,9 @@ impl<'module> TreePrinter<'module> {
         }
     }
 
-    fn is_ascii_tuple_format(&self, formats: &[Format]) -> bool {
+    fn are_all_ascii_formats(&self, formats: &[Format]) -> bool {
         !formats.is_empty() && formats.iter().all(|f| f.is_ascii_char_format(self.module))
     }
-
     pub fn compile_value(&mut self, value: &Value) -> Fragment {
         match value {
             Value::Bool(true) => Fragment::string("true"),
@@ -900,6 +919,41 @@ impl<'module> TreePrinter<'module> {
         }
     }
 
+    fn compile_seq_formats(
+        &mut self,
+        vals: &SeqKind<Value>,
+        formats: Option<&[Format]>,
+    ) -> Fragment {
+        if vals.is_empty() {
+            Fragment::String("[]".into())
+        } else {
+            let mut frag = Fragment::new();
+            let last_index = vals.len() - 1;
+            let (upper_bound, any_skipped) = match self.preview_len {
+                Some(preview_len) if vals.len() > preview_len => {
+                    (preview_len, preview_len != last_index)
+                }
+                Some(_) | None => (last_index, false),
+            };
+            for index in 0..upper_bound {
+                let val = &vals[index];
+                let format = formats.map(|fs| &fs[index]);
+                frag.append(self.compile_field_value_continue(index, val, format, false));
+            }
+            if any_skipped {
+                frag.append(self.compile_field_skipped());
+            }
+            let format = formats.map(|fs| &fs[last_index]);
+            frag.append(self.compile_field_value_last(
+                last_index,
+                &vals[last_index],
+                format,
+                false,
+            ));
+            frag
+        }
+    }
+
     fn compile_parsed_tuple(
         &mut self,
         vals: &Parsed<Vec<ParsedValue>>,
@@ -956,6 +1010,42 @@ impl<'module> TreePrinter<'module> {
             if any_skipped {
                 frag.append(self.compile_field_skipped());
             }
+            frag.append(self.compile_parsed_field_value_last(
+                last_index,
+                &inner[last_index],
+                format,
+                false,
+            ));
+            frag
+        }
+    }
+
+    fn compile_parsed_seq_formats(
+        &mut self,
+        vals: &Parsed<SeqKind<ParsedValue>>,
+        formats: Option<&[Format]>,
+    ) -> Fragment {
+        let Parsed { inner, .. } = vals;
+        if inner.is_empty() {
+            Fragment::String("[]".into())
+        } else {
+            let mut frag = Fragment::new();
+            let last_index = inner.len() - 1;
+            let (upper_bound, any_skipped) = match self.preview_len {
+                Some(preview_len) if inner.len() > preview_len => {
+                    (preview_len, preview_len != last_index)
+                }
+                Some(_) | None => (last_index, false),
+            };
+            for ix in 0..upper_bound {
+                let val = &inner[ix];
+                let format = formats.map(|fs| &fs[ix]);
+                frag.append(self.compile_parsed_field_value_continue(ix, val, format, false));
+            }
+            if any_skipped {
+                frag.append(self.compile_field_skipped());
+            }
+            let format = formats.map(|fs| &fs[last_index]);
             frag.append(self.compile_parsed_field_value_last(
                 last_index,
                 &inner[last_index],
@@ -1708,6 +1798,11 @@ impl<'module> TreePrinter<'module> {
                 prec,
                 Precedence::BIT_SHIFT,
             ),
+            Expr::Append(lhs, rhs) => cond_paren(
+                self.binary_op(" ++ ", lhs, rhs, Precedence::APPEND, Precedence::APPEND),
+                prec,
+                Precedence::APPEND,
+            ),
             Expr::Unary(UnaryOp::BoolNot, expr) => cond_paren(
                 self.prefix_op("!", None, expr),
                 prec,
@@ -2196,6 +2291,9 @@ impl<'module> TreePrinter<'module> {
             },
             Format::Tuple(formats) if formats.is_empty() => Fragment::String("()".into()),
             Format::Tuple(_) => Fragment::String("(...)".into()),
+
+            Format::Sequence(formats) if formats.is_empty() => Fragment::String("[]".into()),
+            Format::Sequence(_) => Fragment::String("[ ... ]".into()),
 
             Format::Hint(StyleHint::Record { old_style: true }, inner) => match inner.as_ref() {
                 Format::Compute(expr) if matches!(&**expr, Expr::Record(vs) if vs.is_empty()) => {
