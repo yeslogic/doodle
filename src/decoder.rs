@@ -182,10 +182,6 @@ impl Value {
             .then_some(pattern_scope)
     }
 
-    fn collect_fields(fields: Vec<(Label, Self)>) -> Self {
-        Value::Record(fields)
-    }
-
     pub fn coerce_mapped_value(&self) -> &Self {
         match self {
             Value::Mapped(_orig, v) => v.coerce_mapped_value(),
@@ -711,6 +707,22 @@ impl Expr {
                     _ => panic!("SubSeqInflate: expected Seq"),
                 }
             }
+            Expr::Append(seq0, seq1) => {
+                match seq0.eval(scope).coerce_mapped_value().get_sequence() {
+                    Some(val_seq0) => match seq1.eval(scope).coerce_mapped_value().get_sequence() {
+                        Some(val_seq1) => {
+                            if val_seq0.is_empty() {
+                                return Cow::Owned(seq1.eval(scope).coerce_mapped_value().clone());
+                            } else if val_seq1.is_empty() {
+                                return Cow::Owned(seq0.eval(scope).coerce_mapped_value().clone());
+                            }
+                            Cow::Owned(Value::Seq(val_seq0.append(val_seq1)))
+                        }
+                        _ => unreachable!("Append: expected Seq in (lhs)"),
+                    },
+                    _ => unreachable!("Append: expected Seq in (lhs)"),
+                }
+            }
             Expr::FlatMap(expr, seq) => {
                 match seq.eval(scope).coerce_mapped_value().get_sequence() {
                     Some(values) => {
@@ -860,7 +872,7 @@ pub enum Decoder {
     Parallel(Vec<Decoder>),
     Branch(MatchTree, Vec<Decoder>),
     Tuple(Vec<Decoder>),
-    Record(Vec<(Label, Decoder)>),
+    Sequence(Vec<Decoder>),
     While(MatchTree, Box<Decoder>),
     Until(MatchTree, Box<Decoder>),
     RepeatCount(Box<Expr>, Box<Decoder>),
@@ -1013,7 +1025,7 @@ impl<'a> Compiler<'a> {
                 let mut decs = Vec::with_capacity(elems.len());
                 let mut fields = elems.iter();
                 while let Some(f) = fields.next() {
-                    let next = Rc::new(Next::Tuple(
+                    let next = Rc::new(Next::Sequence(
                         MaybeTyped::Untyped(fields.as_slice()),
                         next.clone(),
                     ));
@@ -1021,6 +1033,19 @@ impl<'a> Compiler<'a> {
                     decs.push(df);
                 }
                 Ok(Decoder::Tuple(decs))
+            }
+            Format::Sequence(formats) => {
+                let mut decs = Vec::with_capacity(formats.len());
+                let mut fields = formats.iter();
+                while let Some(f) = fields.next() {
+                    let next = Rc::new(Next::Sequence(
+                        MaybeTyped::Untyped(fields.as_slice()),
+                        next.clone(),
+                    ));
+                    let df = self.compile_format(f, next)?;
+                    decs.push(df);
+                }
+                Ok(Decoder::Sequence(decs))
             }
             Format::Repeat(a) => {
                 if a.is_nullable(self.module) {
@@ -1306,15 +1331,6 @@ impl<'a> MultiScope<'a> {
         }
         self.parent.get_bindings(bindings);
     }
-
-    fn into_record(self) -> Value {
-        Value::collect_fields(
-            self.entries
-                .into_iter()
-                .map(|(name, value)| (name, value.into_owned()))
-                .collect(),
-        )
-    }
 }
 
 impl<'a> SingleScope<'a> {
@@ -1448,15 +1464,15 @@ impl Decoder {
                 }
                 Ok((Value::Tuple(v), input))
             }
-            Decoder::Record(fields) => {
+            Decoder::Sequence(decs) => {
                 let mut input = input;
-                let mut record_scope = MultiScope::with_capacity(scope, fields.len());
-                for (name, f) in fields {
-                    let (vf, next_input) = f.parse(program, &Scope::Multi(&record_scope), input)?;
-                    record_scope.push_owned(name.clone(), vf);
+                let mut v = Vec::with_capacity(decs.len());
+                for d in decs {
+                    let (vf, next_input) = d.parse(program, scope, input)?;
                     input = next_input;
+                    v.push(vf.clone());
                 }
-                Ok((record_scope.into_record(), input))
+                Ok((Value::Seq(SeqKind::Strict(v)), input))
             }
             Decoder::While(tree, a) => {
                 let mut input = input;

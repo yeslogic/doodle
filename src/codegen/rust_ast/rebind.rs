@@ -133,23 +133,32 @@ impl Rebindable for RustExpr {
                 pats.rebind(table);
             }
             RustExpr::Tuple(elts) => elts.rebind(table),
+            RustExpr::Macro(RustMacro::Vec(vec_expr)) => match vec_expr {
+                VecExpr::Nil => (),
+                VecExpr::Single(x) => x.rebind(table),
+                VecExpr::Repeat(x, n) => {
+                    x.rebind(table);
+                    n.rebind(table);
+                }
+                VecExpr::List(rust_exprs) => {
+                    rust_exprs.rebind(table);
+                }
+            },
             RustExpr::Struct(con, expr) => {
                 con.rebind(table);
                 match expr {
+                    StructExpr::EmptyExpr => (),
+                    StructExpr::TupleExpr(vals) => vals.rebind(table),
                     StructExpr::RecordExpr(flds) => {
                         flds.iter_mut().for_each(|(_, fld)| fld.rebind(table))
                     }
-                    StructExpr::TupleExpr(vals) => {
-                        vals.iter_mut().for_each(|val| val.rebind(table))
-                    }
-                    StructExpr::EmptyExpr => (),
                 }
             }
             RustExpr::Owned(owned) => owned.rebind(table),
 
-            RustExpr::Borrow(inner)
-            | RustExpr::BorrowMut(inner)
-            | RustExpr::Try(inner) => inner.rebind(table),
+            RustExpr::Borrow(inner) | RustExpr::BorrowMut(inner) | RustExpr::Try(inner) => {
+                inner.rebind(table)
+            }
             RustExpr::Operation(oper) => oper.rebind(table),
             RustExpr::BlockScope(stmts, ret) => {
                 stmts.rebind(table);
@@ -382,7 +391,10 @@ impl Rebindable for CompType {
 impl Rebindable for OwnedRustExpr {
     fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         match self {
-            OwnedRustExpr { expr, kind: OwnedKind::Unresolved(lens) } => {
+            OwnedRustExpr {
+                expr,
+                kind: OwnedKind::Unresolved(lens),
+            } => {
                 expr.rebind(table);
                 lens.rebind(table);
             }
@@ -391,8 +403,10 @@ impl Rebindable for OwnedRustExpr {
     }
 }
 
-
-impl<T> Rebindable for Lens<T> where T: Rebindable {
+impl<T> Rebindable for Lens<T>
+where
+    T: Rebindable,
+{
     fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         match self {
             Lens::Ground(typ) => typ.rebind(table),

@@ -972,6 +972,31 @@ impl Expr {
                     _ => panic!("SubSeqInflate: expected Seq"),
                 }
             }
+            Expr::Append(seq0, seq1) => {
+                let tmp0 = seq0.eval_with_loc(scope);
+                let val0 = tmp0.coerce_mapped_value();
+                match val0.get_sequence() {
+                    Some(val_seq0) => {
+                        let tmp1 = seq1.eval_with_loc(scope);
+                        let val1 = tmp1.coerce_mapped_value();
+                        match val1.get_sequence() {
+                            Some(val_seq1) => {
+                                if val_seq0.is_empty() {
+                                    return Cow::Owned(val1.clone());
+                                } else if val_seq1.is_empty() {
+                                    return Cow::Owned(val0.clone());
+                                }
+                                Cow::Owned(ParsedValue::Seq(Parsed {
+                                    loc: ParseLoc::Synthesized,
+                                    inner: val_seq0.append(val_seq1),
+                                }))
+                            }
+                            _ => unreachable!("Append: expected Seq in (lhs)"),
+                        }
+                    }
+                    _ => unreachable!("Append: expected Seq in (lhs)"),
+                }
+            }
             Expr::FlatMap(expr, seq) => {
                 match seq
                     .eval_with_loc(scope)
@@ -1235,10 +1260,6 @@ impl<'a> LocMultiScope<'a> {
         }
         self.parent.get_bindings(bindings);
     }
-
-    fn into_record(self) -> ParsedValue {
-        ParsedValue::collect_fields(self.entries)
-    }
 }
 
 impl<'a> LocSingleScope<'a> {
@@ -1416,16 +1437,16 @@ impl Decoder {
                 let total_len = input.offset - start_offset;
                 Ok((ParsedValue::new_tuple(v, start_offset, total_len), input))
             }
-            Decoder::Record(fields) => {
+            Decoder::Sequence(fields) => {
                 let mut input = input;
-                let mut record_scope = LocMultiScope::with_capacity(scope, fields.len());
-                for (name, f) in fields {
-                    let (vf, next_input) =
-                        f.parse_with_loc(program, &LocScope::Multi(&record_scope), input)?;
-                    record_scope.push(name.clone(), vf);
+                let mut v = Vec::with_capacity(fields.len());
+                for f in fields {
+                    let (vf, next_input) = f.parse_with_loc(program, scope, input)?;
                     input = next_input;
+                    v.push(vf.clone());
                 }
-                Ok((record_scope.into_record(), input))
+                let total_len = input.offset - start_offset;
+                Ok((ParsedValue::new_seq(v, start_offset, total_len), input))
             }
             Decoder::While(tree, a) => {
                 let mut input = input;
