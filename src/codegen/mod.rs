@@ -5114,7 +5114,7 @@ mod tests {
                 "{}",
                 lambda
                     .apply_pair(
-                        RustExpr::CloneOf(Box::new(RustExpr::local("acc"))),
+                        RustExpr::Owned(OwnedRustExpr { expr: Box::new(RustExpr::local("acc")), kind: OwnedKind::Cloned }),
                         RustExpr::local("seq"),
                         ExprInfo::default()
                     )
