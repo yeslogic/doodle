@@ -1345,8 +1345,8 @@ impl ToFragment for StructExpr {
 
 #[derive(Debug, Clone)]
 pub(crate) struct OwnedRustExpr {
-    expr: Box<RustExpr>,
-    kind: OwnedKind,
+    pub expr: Box<RustExpr>,
+    pub kind: OwnedKind,
 }
 
 #[derive(Debug, Clone)]
