@@ -949,6 +949,43 @@ impl Format {
         )
     }
 
+    pub(crate) fn __chain_record_mono<Name: IntoLabel>(
+        mut capture: Option<(Label, Expr)>,
+        remaining: &mut Vec<(Option<(Name, bool)>, Format)>,
+    ) -> Format {
+        if remaining.is_empty() {
+            match capture {
+                None => unreachable!("promised single field-return, found nothing"),
+                Some((_, expr)) => Format::Compute(Box::new(expr)),
+            }
+        } else {
+            let this = remaining.pop().unwrap();
+            let (label, format) = this;
+            match label {
+                None => Format::MonadSeq(
+                    Box::new(format),
+                    Box::new(Format::__chain_record_mono(capture, remaining)),
+                ),
+                Some((name, is_persist)) => {
+                    let name: Label = name.into();
+                    if is_persist {
+                        match capture.replace((name.clone(), Expr::Var(name.clone()))) {
+                            None => (),
+                            Some(old) => {
+                                unreachable!("bad capture state: old: {:?}, new: {:?})", old, name)
+                            }
+                        }
+                    }
+                    Format::LetFormat(
+                        Box::new(format),
+                        name,
+                        Box::new(Format::__chain_record_mono(capture, remaining)),
+                    )
+                }
+            }
+        }
+    }
+
     pub(crate) fn __chain_record<Name: IntoLabel>(
         mut captured: Vec<(Label, Expr)>,
         remaining: &mut Vec<(Option<(Name, bool)>, Format)>,

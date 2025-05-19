@@ -12,7 +12,6 @@
 
 The syntax `{ P1; ...; Pn }` can be emulated with `LetFormat`/`MonadSeq`.
 
-
 ### Example Translations
 
 ```ddl
@@ -164,8 +163,6 @@ type-ascriptions need not be a bijection, there would be no implicitly-defined
 alias `type PointX = Point` as would be synthesized by the corresponding
 Daedalus declarations; instead, whichever type-name is preferred would win, and
 both formats would receive verbatim-identical type-ascriptions.
-
-
 
 While tagged unions in general are supportable, the example given for tagged
 unions cannot be constructed in `doodle` because of a lack of support for

@@ -282,6 +282,35 @@ pub fn seq(formats: impl IntoIterator<Item = Format>) -> Format {
     Format::Sequence(formats.into_iter().collect())
 }
 
+/// Helper-function for [`Expr::Append`].
+pub fn append(expr0: Expr, expr1: Expr) -> Expr {
+    Expr::Append(Box::new(expr0), Box::new(expr1))
+}
+
+/// Balanced tree-merge using `Expr::Append` to concatenate N expressions.
+pub fn appends(exprs: impl IntoIterator<Item = Expr>) -> Expr {
+    let nodes = exprs.into_iter().collect();
+    balance_merge_dft((), move |_| nodes, append, || Expr::NIL)
+}
+
+/// Takes `Format(-> T), Format(-> [T])` and returns their mapped concatenation.
+pub fn cons(f_x: Format, f_xs: Format) -> Format {
+    chain(
+        f_x,
+        "x",
+        map(f_xs, lambda("xs", append(singleton(var("x")), var("xs")))),
+    )
+}
+
+/// Takes `Format(-> [T]), Format(-> T)` and returns their mapped concatenation.
+pub fn snoc(f_xs: Format, f_x: Format) -> Format {
+    chain(
+        f_xs,
+        "xs",
+        map(f_x, lambda("x", append(var("xs"), singleton(var("x"))))),
+    )
+}
+
 /// Helper-function for [`Format::Union`] over branches that are all [`Format::Variant`].
 ///
 /// Accepts any iterable container of tuples `(Name, Format)` for any `Name` that implements [`IntoLabel`].
@@ -401,7 +430,7 @@ pub fn record_auto<Name: IntoLabel + AsRef<str>>(
             (Some((label, !is_tmp)), format)
         }
     });
-    record_ext(fields_persist)
+    record_ext(fields_persist, false)
 }
 
 /// Bespoke record-constructor for new-style `Format`-level records.
@@ -417,16 +446,29 @@ pub fn record_ext<Name: IntoLabel>(
         Item = (Option<(Name, bool)>, Format),
         IntoIter: DoubleEndedIterator,
     >,
+    specialize_singletons: bool,
 ) -> Format {
-    let mut rev_fields = fields_persist
-        .into_iter()
-        .rev()
-        .collect::<Vec<(Option<(Name, bool)>, Format)>>();
-    let accum = Vec::with_capacity(rev_fields.len());
-    Format::Hint(
-        StyleHint::Record { old_style: false },
-        Box::new(Format::__chain_record(accum, &mut rev_fields)),
-    )
+    let (n_persist, mut rev_fields) = {
+        let mut tmp = fields_persist.into_iter();
+        let n_persist = tmp
+            .by_ref()
+            .filter(|(l, _)| l.as_ref().is_some_and(|(_, is_persist)| *is_persist))
+            .count();
+        (
+            n_persist,
+            tmp.rev().collect::<Vec<(Option<(Name, bool)>, Format)>>(),
+        )
+    };
+    if n_persist == 1 && specialize_singletons {
+        let accum = None;
+        Format::__chain_record_mono(accum, &mut rev_fields)
+    } else {
+        let accum = Vec::with_capacity(rev_fields.len());
+        Format::Hint(
+            StyleHint::Record { old_style: false },
+            Box::new(Format::__chain_record(accum, &mut rev_fields)),
+        )
+    }
 }
 
 /// Helper function that encloses a Format in an 'optional' context,
@@ -1137,8 +1179,9 @@ pub fn left_fold(f: Expr, init: Expr, init_vt: ValueType, seq: Expr) -> Expr {
 }
 
 /// Helper for constructing an `Expr::Seq` of length == 0
+#[inline]
 pub const fn seq_empty() -> Expr {
-    Expr::Seq(Vec::new())
+    Expr::NIL
 }
 
 /// Helper for constructing an `Expr::Seq` of length == 1
@@ -1152,6 +1195,8 @@ pub fn pair(x: Expr, y: Expr) -> Expr {
 }
 
 /// Computes the larger of two given `Expr`s, left-biased if equal
+///
+/// The expressions must be of the same, numeric ValueType.
 pub fn expr_max(a: Expr, b: Expr) -> Expr {
     expr_if_else(expr_gte(a.clone(), b.clone()), a, b)
 }
@@ -1283,19 +1328,15 @@ pub fn balanced_bitor(nodes: Vec<Expr>) -> Expr {
     balance_merge((), move |_| nodes, bit_or)
 }
 
-/// Generic function for computing an N-way binary operation using a generic seed-value
-/// and generation-function.
+/// Balanced tree-fold, similar to [`balance_merge`], but with a default case
+/// for when the generator returns an empty vector.
 ///
-/// The `combine` operation should ideally be invariant under reordering and regrouping
-/// (i.e. commutative and associative) as the internal tree structure of the Expr is not
-/// specified.
-///
-/// Relies on the guarantee that the given seed and initialization function will together
-/// produce a non-empty Vector, and will panic if the resulting vector is empty.
-pub fn balance_merge<Seed, MkNodes, Combine>(
+/// In order to allow panics in the default-case, the default case is passed as a closure.
+pub fn balance_merge_dft<Seed, MkNodes, Combine>(
     seed: Seed,
     mk_nodes: MkNodes,
     combine: Combine,
+    dft: impl FnOnce() -> Expr,
 ) -> Expr
 where
     MkNodes: FnOnce(Seed) -> Vec<Expr>,
@@ -1310,7 +1351,7 @@ where
     let mut stratum = nodes;
     loop {
         match stratum.len() {
-            0 => unreachable!("stratum cannot be empty"),
+            0 => return dft(),
             1 => return stratum.drain(..).next().unwrap(),
             _ => {
                 let mut tmp = Vec::with_capacity(stratum.len().div_ceil(2));
@@ -1329,6 +1370,29 @@ where
             }
         }
     }
+}
+
+/// Generic function for computing an N-way binary operation using a generic seed-value
+/// and generation-function.
+///
+/// The `combine` operation should ideally be invariant under reordering and regrouping
+/// (i.e. commutative and associative) as the internal tree structure of the Expr is not
+/// specified.
+///
+/// Relies on the guarantee that the given seed and initialization function will together
+/// produce a non-empty Vector, and will panic if the resulting vector is empty.
+pub fn balance_merge<Seed, MkNodes, Combine>(
+    seed: Seed,
+    mk_nodes: MkNodes,
+    combine: Combine,
+) -> Expr
+where
+    MkNodes: FnOnce(Seed) -> Vec<Expr>,
+    Combine: Fn(Expr, Expr) -> Expr,
+{
+    balance_merge_dft(seed, mk_nodes, combine, || {
+        panic!("stratum cannot be empty")
+    })
 }
 
 /// Helper function for `Format::AccumUntil`
