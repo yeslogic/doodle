@@ -389,6 +389,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "doodle-pdf"
+version = "0.1.0"
+dependencies = [
+ "doodle",
+ "doodle-formats",
+]
+
+[[package]]
 name = "doodle_gencode"
 version = "0.1.0"
 dependencies = [

@@ -466,7 +466,7 @@ pub fn main(
     module.define_format(
         "png.main",
         record_auto([
-            ("__signature", is_bytes(PNG_SIGNATURE)),
+            ("signature", byte_seq(PNG_SIGNATURE)),
             ("ihdr", ihdr.call()),
             ("chunks", repeat(png_chunk.call_args(vec![var("ihdr")]))),
             (

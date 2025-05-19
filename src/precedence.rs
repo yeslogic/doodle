@@ -221,6 +221,9 @@ impl Precedence {
 
     pub(crate) const FORMAT_COMPOUND: Self = Self::Top;
 
+    // REVIEW - does list-append need its own precedence or is this good enough?
+    pub(crate) const APPEND: Self = Precedence::ArithInfix(ArithLevel::AddSub);
+
     pub(crate) fn bump_format(&self) -> Self {
         match self {
             Precedence::Top => Precedence::Atomic,

@@ -1,5 +1,5 @@
-use crate::codegen::rust_ast::analysis::SourceContext;
 use super::*;
+use crate::codegen::rust_ast::analysis::SourceContext;
 
 pub(crate) struct Solution {
     is_copy: bool,
@@ -65,7 +65,7 @@ impl Resolvable for RustStmt {
             | RustStmt::Reassign(.., expr)
             | RustStmt::Return(.., expr)
             | RustStmt::Expr(expr) => expr.resolve(ctx),
-            RustStmt::Control(ctrl) => ctrl.resolve(ctx)
+            RustStmt::Control(ctrl) => ctrl.resolve(ctx),
         }
     }
 }
@@ -88,7 +88,9 @@ impl Resolvable for RustControl {
             RustControl::Match(expr, body) => {
                 expr.resolve(ctx);
                 match body {
-                    RustMatchBody::Irrefutable(items) => items.iter_mut().for_each(|(_, item)| item.resolve(ctx)),
+                    RustMatchBody::Irrefutable(items) => {
+                        items.iter_mut().for_each(|(_, item)| item.resolve(ctx))
+                    }
                     RustMatchBody::Refutable(items, rust_catch_all) => match rust_catch_all {
                         RustCatchAll::PanicUnreachable { .. } => {
                             items.iter_mut().for_each(|(_, item)| item.resolve(ctx))
@@ -97,14 +99,13 @@ impl Resolvable for RustControl {
                             value.resolve(ctx);
                             items.iter_mut().for_each(|(_, item)| item.resolve(ctx))
                         }
-                    }
+                    },
                 }
             }
             RustControl::Break => (),
         }
     }
 }
-
 
 impl Resolvable for RustExpr {
     fn resolve(&mut self, ctx: &SourceContext<'_>) {
@@ -131,6 +132,15 @@ impl Resolvable for RustExpr {
             | RustExpr::ResultErr(expr)
             | RustExpr::Macro(RustMacro::Matches(expr, _))
             | RustExpr::BorrowMut(expr) => expr.resolve(ctx),
+            RustExpr::Macro(RustMacro::Vec(v)) => match v {
+                VecExpr::Nil => (),
+                VecExpr::Single(expr) => expr.resolve(ctx),
+                VecExpr::Repeat(expr, count) => {
+                    expr.resolve(ctx);
+                    count.resolve(ctx);
+                }
+                VecExpr::List(exprs) => exprs.resolve(ctx),
+            },
             RustExpr::Operation(op) => op.resolve(ctx),
             RustExpr::BlockScope(stmts, expr) => {
                 stmts.resolve(ctx);
@@ -140,7 +150,7 @@ impl Resolvable for RustExpr {
             RustExpr::Closure(closure) => match &mut closure.1 {
                 ClosureBody::Expression(expr) => expr.resolve(ctx),
                 ClosureBody::Statements(stmts) => stmts.resolve(ctx),
-            }
+            },
             RustExpr::Index(expr, ix) => {
                 expr.resolve(ctx);
                 ix.resolve(ctx);
@@ -165,8 +175,7 @@ impl Resolvable for RustOp {
                 lhs.resolve(ctx);
                 rhs.resolve(ctx);
             }
-            RustOp::PrefixOp(_, expr)
-            | RustOp::AsCast(expr, _) => expr.resolve(ctx),
+            RustOp::PrefixOp(_, expr) | RustOp::AsCast(expr, _) => expr.resolve(ctx),
         }
     }
 }
@@ -204,7 +213,10 @@ impl Resolvable for OwnedRustExpr {
 fn solve_type(ty: &RustType, ctx: &SourceContext<'_>) -> Solution {
     match ty {
         RustType::Atom(at) => match at {
-            AtomType::Prim(_) => Solution { is_copy: true, is_ref: false },
+            AtomType::Prim(_) => Solution {
+                is_copy: true,
+                is_ref: false,
+            },
             AtomType::TypeRef(lt) => match lt {
                 LocalType::LocalDef(ix, ..) => {
                     let is_copy = ctx.get_copy(*ix);
@@ -212,23 +224,35 @@ fn solve_type(ty: &RustType, ctx: &SourceContext<'_>) -> Solution {
                     Solution { is_copy, is_ref }
                 }
                 LocalType::External(..) => unreachable!("external type cannot be solved"),
-            }
+            },
             AtomType::Comp(ct) => match ct {
-                CompType::Vec(..) => Solution { is_copy: false, is_ref: false },
+                CompType::Vec(..) => Solution {
+                    is_copy: false,
+                    is_ref: false,
+                },
                 CompType::RawSlice(elt) => {
                     let Solution { is_copy, .. } = solve_type(&elt, ctx);
-                    Solution { is_copy, is_ref: false }
+                    Solution {
+                        is_copy,
+                        is_ref: false,
+                    }
                 }
                 CompType::Option(inner) | CompType::Result(inner, _) => {
                     let Solution { is_copy, .. } = solve_type(&inner, ctx);
-                    Solution { is_copy, is_ref: false }
+                    Solution {
+                        is_copy,
+                        is_ref: false,
+                    }
                 }
                 CompType::Borrow(.., t) => {
                     let Solution { is_copy, .. } = solve_type(&t, ctx);
-                    Solution { is_copy, is_ref: true }
+                    Solution {
+                        is_copy,
+                        is_ref: true,
+                    }
                 }
-            }
-        }
+            },
+        },
         RustType::AnonTuple(rust_types) => {
             let mut is_copy = true;
             for ty in rust_types.iter() {
@@ -266,10 +290,15 @@ fn get_field_def(def: &RustTypeDef, lab: &str) -> RustType {
     match def {
         RustTypeDef::Enum(..) => unreachable!("bad Field on enum: {def:?}"),
         RustTypeDef::Struct(str) => match str {
-            RustStruct::Record(fields) => fields.iter().find(|f| f.0.as_ref() == lab).cloned().unwrap_or_else(|| {
-                panic!("missing field `{lab}` in {def:?}")
-            }).1
-        }
+            RustStruct::Record(fields) => {
+                fields
+                    .iter()
+                    .find(|f| f.0.as_ref() == lab)
+                    .cloned()
+                    .unwrap_or_else(|| panic!("missing field `{lab}` in {def:?}"))
+                    .1
+            }
+        },
     }
 }
 
@@ -282,13 +311,13 @@ fn get_field(ty: &RustType, lab: &str, ctx: &SourceContext<'_>) -> RustType {
                     get_field_def(def, lab)
                 }
                 LocalType::External(..) => unreachable!("external type cannot be solved: {ty:?}"),
-            }
+            },
             AtomType::Comp(ct) => match ct {
                 CompType::Borrow(.., ty0) => get_field(ty0, lab, ctx),
                 _ => unreachable!("bad Field on non-record: {ty:?}"),
-            }
+            },
             _ => unreachable!("bad Field on non-record: {ty:?}"),
-        }
+        },
         _ => unreachable!("bad Field on non-record: {ty:?}"),
     }
 }
@@ -300,11 +329,11 @@ fn get_elem(ty: &RustType, ctx: &SourceContext<'_>) -> RustType {
                 CompType::RawSlice(ty0) | CompType::Vec(ty0) => ty0.as_ref().clone(),
                 CompType::Borrow(.., ty) => get_elem(ty.as_ref(), ctx),
                 _ => unreachable!("bad ElemOf on non-array: {ty:?}"),
-            }
+            },
             _ => unreachable!("bad ElemOf on non-array: {ty:?}"),
-        }
+        },
         _ => unreachable!("bad ElemOf on non-array: {ty:?}"),
-}
+    }
 }
 
 fn get_pos(ty: &RustType, ix: usize, ctx: &SourceContext<'_>) -> RustType {
@@ -314,9 +343,9 @@ fn get_pos(ty: &RustType, ix: usize, ctx: &SourceContext<'_>) -> RustType {
             AtomType::Comp(ct) => match ct {
                 CompType::Borrow(.., ty) => get_pos(ty.as_ref(), ix, ctx),
                 _ => unreachable!("bad Position on non-tuple: {ty:?}"),
-            }
+            },
             _ => unreachable!("bad Position on non-tuple: {ty:?}"),
-        }
+        },
         _ => unreachable!("bad Position on non-tuple: {ty:?}"),
     }
 }

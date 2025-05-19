@@ -313,6 +313,14 @@ impl CodeGen {
                             "TypedDecoder::Tuple expected to have type RustType::AnonTuple(..) (or UNIT if empty), found {other:?}"
                         ),
                 }
+            TypedDecoder::Sequence(gt, elts) => match gt {
+                GenType::Inline(RustType::Atom(AtomType::Comp(CompType::Vec(_t)))) => {
+                    let as_array = _t.prefer_array(elts.len());
+                    let elements = elts.iter().map(|elt| self.translate(elt.get_dec())).collect();
+                    CaseLogic::Sequential(SequentialLogic::AccumSeq { as_array, elements })
+                },
+                other => unreachable!("TypedDecoder::Sequence expected to have type CompType::Vec(..), found {other:?}"),
+            },
             TypedDecoder::Repeat0While(_gt, tree_continue, single) =>
                 CaseLogic::Repeat(
                     RepeatLogic::Repeat0ContinueOnMatch(
@@ -839,7 +847,11 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                 )
             )
         }
-
+        TypedExpr::Append(_, seq0, seq1) => {
+            let lhs = embed_expr(seq0, info);
+            let rhs = embed_expr(seq1, info);
+            RustExpr::FunctionCall(Box::new(RustExpr::local("seq_append")), vec![lhs, rhs])
+        }
         TypedExpr::SubSeq(_, seq, ix, len) => {
             let start_expr = embed_expr_dft(ix);
             let bind_ix = RustStmt::assign(
@@ -2751,7 +2763,12 @@ enum RepeatLogic<ExprT> {
     /// Fused logic for a left-fold that is updated on each repeat, and contributes to the condition for termination
     ///
     /// Lambda order: termination-predicate, then update-function
-    AccumUntil(GenLambda, GenLambda, Typed<RustExpr>, Typed<Box<CaseLogic<ExprT>>>),
+    AccumUntil(
+        GenLambda,
+        GenLambda,
+        Typed<RustExpr>,
+        Typed<Box<CaseLogic<ExprT>>>,
+    ),
 }
 
 pub(crate) type Typed<T> = (T, GenType);
@@ -3134,7 +3151,10 @@ where
                     loop_body.push(RustStmt::assign("elem", elt_expr));
                     loop_body.push(RustStmt::Expr(RustExpr::local("seq").call_method_with(
                         "push",
-                        [RustExpr::owned(RustExpr::local("elem"), elt_type.to_rust_type())],
+                        [RustExpr::owned(
+                            RustExpr::local("elem"),
+                            elt_type.to_rust_type(),
+                        )],
                     )));
                     let new_acc = update.apply_pair(
                         RustExpr::local("acc"),
@@ -3161,6 +3181,10 @@ enum SequentialLogic<ExprT> {
         constructor: Option<Constructor>,
         elements: Vec<CaseLogic<ExprT>>,
     },
+    AccumSeq {
+        as_array: bool,
+        elements: Vec<CaseLogic<ExprT>>,
+    },
 }
 
 impl<ExprT> ToAst for SequentialLogic<ExprT>
@@ -3171,6 +3195,27 @@ where
 
     fn to_ast(&self, ctxt: ProdCtxt<'_>) -> GenBlock {
         match self {
+            // REVIEW - in certain cases, we may be able to use fixed-sized arrays instead of vec, but that might complicate matters...
+            SequentialLogic::AccumSeq { as_array, elements } => {
+                if elements.is_empty() {
+                    return GenBlock::simple_expr(RustExpr::VEC_NIL);
+                }
+                let mut stmts = Vec::new();
+                let mut terms = Vec::new();
+
+                for (ix, cl) in elements.iter().enumerate() {
+                    const LAB_PREFIX: &str = "_seq";
+                    let lab = Label::Owned(format!("{LAB_PREFIX}{ix}"));
+                    stmts.push(GenStmt::BindOnce(lab.clone(), cl.to_ast(ctxt)));
+                    terms.push(RustExpr::local(lab));
+                }
+                let ret = Some(GenExpr::Embed(if *as_array {
+                    RustExpr::ArrayLit(terms)
+                } else {
+                    RustExpr::Macro(RustMacro::Vec(VecExpr::List(terms)))
+                }));
+                GenBlock { stmts, ret }
+            }
             SequentialLogic::AccumTuple {
                 constructor,
                 elements,
@@ -4141,6 +4186,24 @@ impl<'a> Elaborator<'a> {
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::Tuple(gt, t_elts)
             }
+            Format::Sequence(formats) => {
+                let index = self.get_and_increment_index();
+                self.increment_index();
+                let t_formats = match &formats[..] {
+                    [] => unreachable!("empty list has no unambiguous type"),
+                    [v] => vec![self.elaborate_format(v, dyn_scope)],
+                    formats => {
+                        let mut t_formats = Vec::with_capacity(formats.len());
+                        for t in formats {
+                            let t_format = self.elaborate_format(t, dyn_scope);
+                            t_formats.push(t_format);
+                        }
+                        t_formats
+                    }
+                };
+                let gt = self.get_gt_from_index(index);
+                TypedFormat::Sequence(gt, t_formats)
+            }
             Format::Repeat(inner) => {
                 let index = self.get_and_increment_index();
                 let t_inner = self.elaborate_format(inner, dyn_scope);
@@ -4484,7 +4547,14 @@ impl<'a> Elaborator<'a> {
                 let gt = self.get_gt_from_index(index);
                 TypedExpr::Seq(gt, t_elts)
             }
+            Expr::Append(lhs, rhs) => {
+                let t_lhs = self.elaborate_expr(lhs);
+                let t_rhs = self.elaborate_expr(rhs);
+                self.increment_index();
 
+                let gt = self.get_gt_from_index(index);
+                TypedExpr::Append(gt, Box::new(t_lhs), Box::new(t_rhs))
+            }
             Expr::RecordProj(e, fld) => {
                 self.codegen.name_gen.ctxt.push_atom(NameAtom::DeadEnd);
                 let t_e = self.elaborate_expr(e);
@@ -5044,7 +5114,10 @@ mod tests {
                 "{}",
                 lambda
                     .apply_pair(
-                        RustExpr::CloneOf(Box::new(RustExpr::local("acc"))),
+                        RustExpr::Owned(OwnedRustExpr {
+                            expr: Box::new(RustExpr::local("acc")),
+                            kind: OwnedKind::Cloned
+                        }),
                         RustExpr::local("seq"),
                         ExprInfo::default()
                     )

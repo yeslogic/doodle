@@ -82,6 +82,8 @@ impl<TypeRep> std::hash::Hash for TypedFormat<TypeRep> {
                 branches.hash(state)
             }
             TypedFormat::Tuple(_, elts) => elts.hash(state),
+            // REVIEW - do we want to dodge collision between Tuple and Sequence with a salt, or is this okay?
+            TypedFormat::Sequence(_, elts) => elts.hash(state),
             TypedFormat::RepeatCount(_, n, inner) => {
                 n.hash(state);
                 inner.hash(state);
@@ -185,7 +187,7 @@ pub enum TypedFormat<TypeRep> {
     Union(TypeRep, Vec<TypedFormat<TypeRep>>),
     UnionNondet(TypeRep, Vec<TypedFormat<TypeRep>>),
     Tuple(TypeRep, Vec<TypedFormat<TypeRep>>),
-    // Record(TypeRep, Vec<(Label, TypedFormat<TypeRep>)>),
+    Sequence(TypeRep, Vec<TypedFormat<TypeRep>>),
     Repeat(TypeRep, Box<TypedFormat<TypeRep>>),
     Repeat1(TypeRep, Box<TypedFormat<TypeRep>>),
     RepeatCount(TypeRep, Box<TypedExpr<TypeRep>>, Box<TypedFormat<TypeRep>>),
@@ -281,7 +283,8 @@ impl TypedFormat<GenType> {
                 .map(TypedFormat::lookahead_bounds)
                 .reduce(Bounds::union)
                 .unwrap(),
-            TypedFormat::Tuple(_, elts) => elts
+            // REVIEW - we have a more sophisticated algorithm in Format::lookahead_bounds for Sequence, should we use that here?
+            TypedFormat::Tuple(_, elts) | TypedFormat::Sequence(_, elts) => elts
                 .iter()
                 .map(TypedFormat::lookahead_bounds)
                 .reduce(<Bounds as Add>::add)
@@ -353,7 +356,7 @@ impl TypedFormat<GenType> {
                 .map(TypedFormat::match_bounds)
                 .reduce(Bounds::union)
                 .unwrap(),
-            TypedFormat::Tuple(_, elts) => elts
+            TypedFormat::Sequence(_, elts) | TypedFormat::Tuple(_, elts) => elts
                 .iter()
                 .map(TypedFormat::match_bounds)
                 .reduce(<Bounds as Add>::add)
@@ -439,6 +442,7 @@ impl TypedFormat<GenType> {
             | TypedFormat::Union(gt, ..)
             | TypedFormat::UnionNondet(gt, ..)
             | TypedFormat::Tuple(gt, ..)
+            | TypedFormat::Sequence(gt, ..)
             | TypedFormat::Repeat(gt, ..)
             | TypedFormat::Repeat1(gt, ..)
             | TypedFormat::ForEach(gt, ..)
@@ -622,6 +626,11 @@ where
         TypedPattern<TypeRep>,
         Box<TypedExpr<TypeRep, VarId>>,
     ),
+    Append(
+        TypeRep,
+        Box<TypedExpr<TypeRep, VarId>>,
+        Box<TypedExpr<TypeRep, VarId>>,
+    ),
 }
 
 impl<TypeRep> std::hash::Hash for TypedExpr<TypeRep> {
@@ -730,6 +739,10 @@ impl<TypeRep> std::hash::Hash for TypedExpr<TypeRep> {
                 to.hash(state);
             }
             TypedExpr::LiftOption(_, opt) => opt.hash(state),
+            TypedExpr::Append(_, lhs, rhs) => {
+                lhs.hash(state);
+                rhs.hash(state);
+            }
         }
     }
 }
@@ -785,6 +798,7 @@ impl TypedExpr<GenType> {
             | TypedExpr::Unary(gt, ..)
             | TypedExpr::SubSeq(gt, ..)
             | TypedExpr::SubSeqInflate(gt, ..)
+            | TypedExpr::Append(gt, ..)
             | TypedExpr::FlatMap(gt, ..)
             | TypedExpr::FlatMapAccum(gt, ..)
             | TypedExpr::LeftFold(gt, ..)
@@ -974,6 +988,7 @@ mod __impls {
                     Expr::FlatMapList(rebox(lambda), vt, rebox(seq))
                 }
                 TypedExpr::Dup(_, count, x) => Expr::Dup(rebox(count), rebox(x)),
+                TypedExpr::Append(_, lhs, rhs) => Expr::Append(rebox(lhs), rebox(rhs)),
                 TypedExpr::EnumFromTo(_, start, stop) => {
                     Expr::EnumFromTo(rebox(start), rebox(stop))
                 }
@@ -1015,6 +1030,7 @@ mod __impls {
                     Format::UnionNondet(branches.into_iter().map(Format::from).collect())
                 }
                 TypedFormat::Tuple(_, elts) => Format::Tuple(revec(elts)),
+                TypedFormat::Sequence(_, elts) => Format::Sequence(revec(elts)),
                 TypedFormat::Repeat(_, inner) => Format::Repeat(rebox(inner)),
                 TypedFormat::Repeat1(_, inner) => Format::Repeat1(rebox(inner)),
                 TypedFormat::RepeatCount(_, count, inner) => {
