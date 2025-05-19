@@ -544,12 +544,23 @@ impl Expr {
             Expr::Append(lhs, rhs) => {
                 let lhs_type = lhs.infer_type(scope)?;
                 let rhs_type = rhs.infer_type(scope)?;
-                if !matches!(lhs_type, ValueType::Seq(_)) {
-                    return Err(anyhow!("Append: lhs is not Seq: {lhs_type:?}"));
-                } else if !matches!(rhs_type, ValueType::Seq(_)) {
-                    return Err(anyhow!("Append: rhs is not Seq: {rhs_type:?}"));
+                match (&lhs_type, &rhs_type) {
+                    (ValueType::Seq(t1), ValueType::Seq(t2)) => {
+                        let elem_t = t1.unify(&t2)?;
+                        Ok(ValueType::Seq(Box::new(elem_t)))
+                    }
+                    (ValueType::Seq(..), other) => {
+                        Err(anyhow!("Append: rhs is not Seq: {other:?}"))
+                    }
+                    (other, ValueType::Seq(..)) => {
+                        Err(anyhow!("Append: lhs is not Seq: {other:?}"))
+                    }
+                    (lhs_type, rhs_type) => {
+                        return Err(anyhow!(
+                            "Append: lhs and rhs must be Seq: {lhs_type:?}, {rhs_type:?} !~ Seq(_)"
+                        ));
+                    }
                 }
-                Ok(ValueType::Seq(Box::new(lhs_type)))
             }
         }
     }
