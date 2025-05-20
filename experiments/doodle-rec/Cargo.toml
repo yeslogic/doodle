@@ -1,0 +1,12 @@
+[package]
+name = "doodle-rec"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+path = "src/lib.rs"
+bench = false
+
+[dependencies]
+anyhow = "1.0.98"
+doodle = { path = "../../" }
