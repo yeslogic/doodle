@@ -1,4 +1,4 @@
-use std::{borrow::Cow, cell::OnceCell, collections::{BTreeMap, HashSet}, ops::Range, rc::Rc};
+use std::{borrow::Cow, cell::OnceCell, collections::{BTreeMap, HashSet}, ops::RangeInclusive, rc::Rc};
 use doodle::byte_set::ByteSet;
 use anyhow::{anyhow, Result as AResult};
 
@@ -30,9 +30,9 @@ impl<Idx> Span<Idx> {
     }
 }
 
-impl<Idx> From<Range<Idx>> for Span<Idx> {
-    fn from(value: Range<Idx>) -> Self {
-        Self { start: value.start, end: value.end }
+impl<Idx: Copy> From<RangeInclusive<Idx>> for Span<Idx> {
+    fn from(value: RangeInclusive<Idx>) -> Self {
+        Self { start: *value.start(), end: *value.end() }
     }
 }
 
@@ -84,13 +84,14 @@ impl BaseType {
 pub enum FormatType {
     Any,
     Void,
-    Unit,
     Base(BaseType),
     Ref(FormatId),
     Shape(TypeShape),
 }
 
 impl FormatType {
+    pub const UNIT : FormatType = FormatType::Shape(TypeShape::Tuple(Vec::new()));
+
     pub fn is_numeric(&self) -> bool {
         match self {
             FormatType::Base(base) => base.is_numeric(),
@@ -102,10 +103,14 @@ impl FormatType {
         match (self, other) {
             (FormatType::Any, _) => Ok(other.clone()),
             (_, FormatType::Any) => Ok(self.clone()),
+            (FormatType::Ref(id0), FormatType::Ref(id1)) => {
+                if id0 == id1 {
+                    Ok(FormatType::Ref(*id0))
+                } else {
+                    unimplemented!("cross-ref unification not implemented");
+                }
+            }
             (FormatType::Void, _) | (_, FormatType::Void) => Ok(FormatType::Void),
-            (FormatType::Unit, FormatType::Unit) => Ok(FormatType::Unit),
-            (FormatType::Unit, FormatType::Shape(TypeShape::Tuple(empty)))
-            | (FormatType::Shape(TypeShape::Tuple(empty)), FormatType::Unit) if empty.is_empty() => Ok(FormatType::Unit),
             (FormatType::Base(b1), FormatType::Base(b2)) if b1 == b2 => Ok(FormatType::Base(*b1)),
             (FormatType::Shape(s1), FormatType::Shape(s2)) => {
                 let s = s1.unify(s2)?;
@@ -220,7 +225,7 @@ impl Format {
                 }
             }
             Format::FailWith(_msg) => Ok(FormatType::Void),
-            Format::EndOfInput => Ok(FormatType::Unit),
+            Format::EndOfInput => Ok(FormatType::UNIT),
             Format::Byte(bs) if bs.is_empty() => Ok(FormatType::Void),
             Format::Byte(_) => Ok(FormatType::Base(BaseType::U8)),
             Format::Compute(expr) => expr.as_ref().infer_type(),
@@ -429,7 +434,7 @@ impl FormatModule {
     pub fn declare_rec_formats(&mut self, formats: Vec<(Label, Format)>) -> Vec<FormatRef> {
         let fmt_id = self.decls.len();
         let batch_size = formats.len();
-        let batch_id = Span::from(fmt_id..fmt_id + batch_size);
+        let batch_id = Span::from(fmt_id..=fmt_id + batch_size - 1);
         for (ix, (name, format)) in formats.into_iter().enumerate() {
             let decl = FormatDecl {
                 format,
@@ -492,6 +497,35 @@ mod tests {
         let f = Format::Compute(Box::new(expr));
         let fref = module.declare_format(Label::Borrowed("static_math"), f);
         assert!(matches!(module.get_format_type(fref.get_level()), FormatType::Base(BaseType::Bool)));
+        Ok(())
+    }
+
+    #[test]
+    fn cons_list_any_byte() -> AResult<()> {
+        let mut module = FormatModule::new();
+        let format0 = Format::Union(vec![
+            Format::Variant(Label::Borrowed("Cons"), Box::new(Format::Tuple(vec![
+                Format::Byte(ByteSet::full()),
+                Format::RecVar(0),
+            ]))),
+            Format::Variant(Label::Borrowed("Nil"), Box::new(Format::Tuple(vec![]))),
+        ]);
+        let fref = module.declare_rec_formats(vec![(Label::Borrowed("list_any_byte"), format0)])[0];
+        let expected = FormatType::Shape(TypeShape::Union(BTreeMap::from([
+            (Label::Borrowed("Cons"), FormatType::Shape(TypeShape::Tuple(vec![
+                    FormatType::Base(BaseType::U8),
+                    FormatType::Ref(0),
+                ])
+            )),
+            (Label::Borrowed("Nil"), FormatType::UNIT),
+        ])));
+        let actual = module.get_format_type(fref.get_level());
+        match actual.unify(&expected) {
+            Ok(FormatType::Shape(TypeShape::Union(bs))) => assert_eq!(bs.len(), 2),
+            Err(e) => panic!("unification failed: {e}"),
+            other => panic!("unexpected type: {other:?}"),
+        }
+        eprintln!("cons_list_any_byte :: {actual:?}");
         Ok(())
     }
 }
