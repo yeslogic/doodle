@@ -88,7 +88,7 @@ pub enum Value {
     // Shape-based values
     Tuple(Vec<Value>),
     Seq(Vec<Value>),
-    LiftOption(Option<Box<Value>>),
+    Option(Option<Box<Value>>),
     Variant(Label, Box<Value>),
 }
 
@@ -100,6 +100,13 @@ impl Value {
             Value::U32(n) => (*n as usize, IntWidth::Bits32),
             Value::U64(n) => (*n as usize, IntWidth::Bits64),
             _ => panic!("value is not a number: {self:?}"),
+        }
+    }
+
+    fn unwrap_bool(&self) -> bool {
+        match self {
+            Value::Bool(b) => *b,
+            _ => panic!("value is not a bool"),
         }
     }
 }
@@ -359,8 +366,8 @@ impl Expr {
             },
             Expr::Seq(exprs) => Value::Seq(exprs.iter().map(Expr::eval).collect()),
             Expr::Tuple(exprs) => Value::Tuple(exprs.iter().map(Expr::eval).collect()),
-            Expr::LiftOption(None) => Value::LiftOption(None),
-            Expr::LiftOption(Some(expr)) => Value::LiftOption(Some(Box::new(expr.eval()))),
+            Expr::LiftOption(None) => Value::Option(None),
+            Expr::LiftOption(Some(expr)) => Value::Option(Some(Box::new(expr.eval()))),
             Expr::Variant(lab, expr) => Value::Variant(lab.clone(), Box::new(expr.eval())),
             Expr::IntRel(rel, lhs, rhs) => {
                 let lhs = lhs.eval();
@@ -511,14 +518,66 @@ impl Decoder {
                 }
             }
             Decoder::Call(ix) => program.decoders[*ix].0.parse(program, input),
-            Decoder::CallRec(_, _) => todo!(),
-            Decoder::Compute(expr) => todo!(),
-            Decoder::Variant(cow, decoder) => todo!(),
-            Decoder::Branch(match_tree, decoders) => todo!(),
-            Decoder::While(match_tree, decoder) => todo!(),
-            Decoder::Seq(decoders) => todo!(),
-            Decoder::Tuple(decoders) => todo!(),
-            Decoder::Maybe(expr, decoder) => todo!(),
+            Decoder::CallRec(level, _) => program.decoders[*level].0.parse(program, input),
+            Decoder::Compute(expr) => {
+                let v = expr.eval();
+                Ok((v, input))
+            }
+            Decoder::Variant(lab, da) => {
+                let (v, input) = da.parse(program, input)?;
+                Ok((Value::Variant(lab.clone(), Box::new(v)), input))
+            }
+            Decoder::Branch(tree, branches) => {
+                let index = tree.matches(input).ok_or(DecodeError::NoValidBranch {
+                    offset: input.offset,
+                })?;
+                let d = &branches[index];
+                // let (v, input) = d.parse(program, input)?;
+                // Ok(Value::Branch(index, Box::new(v)), input))
+                d.parse(program, input)
+            }
+            Decoder::Seq(decs) => {
+                let mut input = input;
+                let mut v = Vec::with_capacity(decs.len());
+                for d in decs {
+                    let (va, next_input) = d.parse(program, input)?;
+                    input = next_input;
+                    v.push(va);
+                }
+                Ok((Value::Seq(v), input))
+            }
+            Decoder::Tuple(decs) => {
+                let mut input = input;
+                let mut v = Vec::with_capacity(decs.len());
+                for d in decs {
+                    let (va, next_input) = d.parse(program, input)?;
+                    input = next_input;
+                    v.push(va);
+                }
+                Ok((Value::Tuple(v), input))
+            }
+            Decoder::While(tree, a) => {
+                let mut input = input;
+                let mut v = Vec::new();
+                while tree.matches(input).ok_or(DecodeError::NoValidBranch {
+                    offset: input.offset,
+                })? == 0
+                {
+                    let (va, next_input) = a.parse(program, input)?;
+                    input = next_input;
+                    v.push(va);
+                }
+                Ok((Value::Seq(v), input))
+            }
+            Decoder::Maybe(expr, a) => {
+                let is_present = expr.eval().unwrap_bool();
+                if is_present {
+                    let (v, input) = a.parse(program, input)?;
+                    Ok((Value::Option(Some(Box::new(v))), input))
+                } else {
+                    Ok((Value::Option(None), input))
+                }
+            }
         }
     }
 }
