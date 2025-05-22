@@ -13,7 +13,7 @@ use anyhow::{Result as AResult, anyhow};
 use doodle::{IntWidth, byte_set::ByteSet, read::ReadCtxt};
 
 #[derive(Debug, Clone, Copy, Default)]
-enum RecurseCtx<'a> {
+pub enum RecurseCtx<'a> {
     #[default]
     NonRec,
     Recurse {
@@ -24,7 +24,7 @@ enum RecurseCtx<'a> {
 }
 
 impl<'a> RecurseCtx<'a> {
-    const fn is_recursive(&self) -> bool {
+    pub const fn is_recursive(&self) -> bool {
         matches!(self, RecurseCtx::Recurse { .. })
     }
 
@@ -36,7 +36,7 @@ impl<'a> RecurseCtx<'a> {
     }
 
     /// Returns `(new_ctx, is_auto)`
-    fn enter(&self, ix: RecId) -> (Self, Ordering) {
+    pub fn enter(&self, ix: RecId) -> (Self, Ordering) {
         match self {
             RecurseCtx::NonRec => panic!("cannot recurse into non-recursive context"),
             RecurseCtx::Recurse {
@@ -50,13 +50,13 @@ impl<'a> RecurseCtx<'a> {
                     span: *span,
                     batch,
                 };
-                (ret, entry_id.cmp(&ix))
+                (ret, ix.cmp(entry_id))
             }
         }
     }
 
     /// Returns the global format-level of the closest entry-point
-    fn get_level(&self) -> Option<usize> {
+    pub fn get_level(&self) -> Option<usize> {
         match self {
             RecurseCtx::NonRec => None,
             RecurseCtx::Recurse {
@@ -65,7 +65,7 @@ impl<'a> RecurseCtx<'a> {
         }
     }
 
-    fn get_format(&self) -> Option<&'a Format> {
+    pub fn get_format(&self) -> Option<&'a Format> {
         match self {
             RecurseCtx::NonRec => None,
             RecurseCtx::Recurse {
@@ -163,7 +163,17 @@ impl<'a> Compiler<'a> {
         let t = format.infer_type(&mut visited, module, batch)?;
         compiler.queue_compile(t, format, Rc::new(Next::Empty), batch);
         while let Some((f, next, n, batch)) = compiler.compile_queue.pop() {
-            let d = compiler.compile_format(f, next, ctx)?;
+            let f_ctx = match batch {
+                Some(span) => {
+                    RecurseCtx::Recurse {
+                        span,
+                        batch: &module.decls[span.start..=span.end],
+                        entry_id: n - span.start,
+                    }
+                }
+                None => RecurseCtx::NonRec,
+            };
+            let d = compiler.compile_format(f, next, f_ctx)?;
             compiler.program.decoders[n].0 = d;
         }
         Ok(compiler.program)
@@ -224,7 +234,7 @@ impl<'a> Compiler<'a> {
             Format::RecVar(batch_ix) => {
                 let (new_ctx, cmp) = ctx.enter(*batch_ix);
                 let level = new_ctx.get_level().unwrap();
-                // FIXME - figure out the proper logic
+                // FIXME - figure out the proper logic - so far we are cookie-cutter copying the same logic between each case
                 let n = match cmp {
                     Ordering::Equal => {
                         if let Some(n) = self.decoder_map.get(&(level, next.clone())) {
@@ -237,9 +247,28 @@ impl<'a> Compiler<'a> {
                             n
                         }
                     }
-                    // ???
-                    Ordering::Less => todo!(), // recurse into earlier decoder (which should already be in the map)
-                    Ordering::Greater => todo!(), // recurse into later decoder (which may not yet be in the map)
+                    Ordering::Less => {
+                        if let Some(n) = self.decoder_map.get(&(level, next.clone())) {
+                            *n
+                        } else {
+                            let format = new_ctx.get_format().unwrap();
+                            let t = self.module.get_format_type(level).clone();
+                            let n = self.queue_compile(t, format, next.clone(), new_ctx.as_span());
+                            self.decoder_map.insert((level, next.clone()), n);
+                            n
+                        }
+                    }
+                    Ordering::Greater => {
+                        if let Some(n) = self.decoder_map.get(&(level, next.clone())) {
+                            *n
+                        } else {
+                            let format = new_ctx.get_format().unwrap();
+                            let t = self.module.get_format_type(level).clone();
+                            let n = self.queue_compile(t, format, next.clone(), new_ctx.as_span());
+                            self.decoder_map.insert((level, next.clone()), n);
+                            n
+                        }
+                    }
                 };
                 Ok(Decoder::CallRec(n, *batch_ix))
             }
@@ -579,5 +608,30 @@ impl Decoder {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn not_actually_recursive() -> AResult<()> {
+        let dead_end = Format::Byte(ByteSet::from_bits([1, 0, 0, 0]));
+        let text = Format::Tuple(vec![
+            Format::Repeat(Box::new(Format::Byte(ByteSet::from(0x01..=0x7f)))),
+            Format::RecVar(0),
+        ]);
+        let mut module = FormatModule::new();
+        let frefs = module.declare_rec_formats(vec![
+            (Label::Borrowed("text.null"), dead_end),
+            (Label::Borrowed("text.cstring"), text),
+        ]);
+        let f = Format::ItemVar(frefs[1].get_level());
+        let program = Compiler::compile_program(&module, &f, RecurseCtx::NonRec)?;
+        let input = ReadCtxt::new(b"hello world\x00");
+        let (value, _) = program.run(input)?;
+        eprintln!("{value:?}");
+        Ok(())
     }
 }
