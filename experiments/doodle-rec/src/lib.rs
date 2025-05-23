@@ -1,5 +1,6 @@
 pub mod decoder;
 pub(crate) mod matchtree;
+pub mod helper;
 pub(crate) use matchtree::{MatchTree, Next};
 
 use anyhow::{Result as AResult, anyhow};
@@ -394,8 +395,8 @@ impl Format {
             Format::RecVar(..) => {
                 // REVIEW - are there any recursive formats that *don't* depend on next?
                 // FIXME[epic=hardcoded] - this is a placeholder for future improvements to classification logic
-                false
-                // true
+                // false
+                true
             }
             Format::Variant(_, f) => f.depends_on_next(module, ctx),
             Format::Union(branches) => Format::union_depends_on_next(branches, module, ctx),

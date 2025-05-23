@@ -98,7 +98,7 @@ impl<'a> MatchTreeStep<'a> {
                 let next1 = next.clone();
                 tree.union(MatchTreeStep::<'a>::from_format(module, *a, next1, ctx))
             }
-            Next::DelayRef(_ix) => {
+            Next::DelayRef(_ix /*, next0 */) => {
                 // FIXME - figure out how to resolve this
                 Self::accept()
             }
@@ -147,7 +147,7 @@ impl<'a> MatchTreeStep<'a> {
             Format::Compute(_expr) => Self::from_next(module, next, ctx),
             Format::RecVar(rec_ix) => {
                 // FIXME - we discard the original `next` argument here
-                let next = Rc::new(Next::DelayRef(ctx.convert_rec_var(*rec_ix)));
+                let next = Rc::new(Next::DelayRef(ctx.convert_rec_var(*rec_ix) /* , next.clone() */));
                 Self::from_next(module, next, ctx)
             }
         }
@@ -282,28 +282,16 @@ impl<'a> MatchTreeLevel<'a> {
 
 type LevelBranch<'a> = HashSet<(usize, Rc<Next<'a>>)>;
 
-#[derive(Eq, Hash, Debug)]
+#[derive(PartialEq, Eq, Hash, Debug)]
 pub(crate) enum Next<'a> {
     Empty,
-    DelayRef(usize),
+    DelayRef(usize /* , Rc<Next<'a>> */),
     Union(Rc<Next<'a>>, Rc<Next<'a>>),
     Cat(&'a Format, Rc<Next<'a>>),
     Sequence(&'a [Format], Rc<Next<'a>>),
     Repeat(&'a Format, Rc<Next<'a>>),
 }
 
-impl<'a> PartialEq for Next<'a> {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::DelayRef(l0), Self::DelayRef(r0)) => l0 == r0,
-            (Self::Union(l0, l1), Self::Union(r0, r1)) => l0 == r0 && l1 == r1,
-            (Self::Cat(l0, l1), Self::Cat(r0, r1)) => l0 == r0 && l1 == r1,
-            (Self::Sequence(l0, l1), Self::Sequence(r0, r1)) => l0 == r0 && l1 == r1,
-            (Self::Repeat(l0, l1), Self::Repeat(r0, r1)) => l0 == r0 && l1 == r1,
-            _ => false,
-        }
-    }
-}
 #[derive(Debug, Clone)]
 pub struct MatchTree {
     accept: Option<usize>,
