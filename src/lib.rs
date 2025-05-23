@@ -30,7 +30,7 @@ pub mod prelude;
 pub mod read;
 
 mod typecheck;
-pub use typecheck::{typecheck, TCError, TCResult};
+pub use typecheck::{typecheck, IntWidth, TCError, TCResult};
 
 pub type Label = std::borrow::Cow<'static, str>;
 

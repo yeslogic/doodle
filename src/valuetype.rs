@@ -127,9 +127,9 @@ impl ValueType {
                 let keys1 = bs1.keys().collect::<HashSet<_>>();
                 let keys2 = bs2.keys().collect::<HashSet<_>>();
 
-                let keys_common = HashSet::union(&keys1, &keys2).cloned();
+                let all_keys = HashSet::union(&keys1, &keys2).cloned();
 
-                for key in keys_common.into_iter() {
+                for key in all_keys.into_iter() {
                     match (bs1.get(key), bs2.get(key)) {
                         (Some(t1), Some(t2)) => {
                             let t = t1.unify(t2)?;
