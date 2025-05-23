@@ -3,79 +3,15 @@ use std::{
     collections::{HashMap, HashSet},
     rc::Rc,
 };
+use serde::Serialize;
 
 use crate::{
-    Arith, Expr, Format, FormatDecl, FormatId, FormatModule, FormatType, IntRel, Label, RecId,
-    Span, Unary,
-    matchtree::{MatchTree, Next},
+    matchtree::{MatchTree, Next}, Arith, Expr, Format, FormatDecl, FormatId, FormatModule, FormatType, IntRel, Label, RecId, RecurseCtx, Span, Unary
 };
 use anyhow::{Result as AResult, anyhow};
 use doodle::{IntWidth, byte_set::ByteSet, read::ReadCtxt};
 
-#[derive(Debug, Clone, Copy, Default)]
-pub enum RecurseCtx<'a> {
-    #[default]
-    NonRec,
-    Recurse {
-        entry_id: RecId,
-        span: Span<usize>,
-        batch: &'a [FormatDecl],
-    },
-}
-
-impl<'a> RecurseCtx<'a> {
-    pub const fn is_recursive(&self) -> bool {
-        matches!(self, RecurseCtx::Recurse { .. })
-    }
-
-    pub const fn as_span(&self) -> Option<Span<usize>> {
-        match self {
-            RecurseCtx::NonRec => None,
-            RecurseCtx::Recurse { span, .. } => Some(*span),
-        }
-    }
-
-    /// Returns `(new_ctx, is_auto)`
-    pub fn enter(&self, ix: RecId) -> (Self, Ordering) {
-        match self {
-            RecurseCtx::NonRec => panic!("cannot recurse into non-recursive context"),
-            RecurseCtx::Recurse {
-                batch,
-                span,
-                entry_id,
-            } => {
-                assert!(ix < batch.len(), "batch index out of range");
-                let ret = RecurseCtx::Recurse {
-                    entry_id: ix,
-                    span: *span,
-                    batch,
-                };
-                (ret, ix.cmp(entry_id))
-            }
-        }
-    }
-
-    /// Returns the global format-level of the closest entry-point
-    pub fn get_level(&self) -> Option<usize> {
-        match self {
-            RecurseCtx::NonRec => None,
-            RecurseCtx::Recurse {
-                batch, entry_id, ..
-            } => Some(batch[*entry_id].fmt_id),
-        }
-    }
-
-    pub fn get_format(&self) -> Option<&'a Format> {
-        match self {
-            RecurseCtx::NonRec => None,
-            RecurseCtx::Recurse {
-                batch, entry_id, ..
-            } => Some(&batch[*entry_id].format),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub enum Value {
     // Primitive values
     U8(u8),
@@ -192,6 +128,27 @@ impl<'a> Compiler<'a> {
         n
     }
 
+    fn queue_compile_batch(
+        &mut self,
+        decls: &'a [FormatDecl],
+        which_next: RecId,
+        next: Rc<Next<'a>>,
+        span: Span<FormatId>,
+    ) -> usize {
+        let n = self.program.decoders.len();
+        for (ix, d) in decls.into_iter().enumerate() {
+            let t = d.solve_type(self.module).unwrap().clone();
+            self.program.decoders.push((Decoder::FAIL, t));
+            let next = if ix == which_next {
+                next.clone()
+            } else {
+                Rc::new(Next::Empty)
+            };
+            self.compile_queue.push((&d.format, next, n + ix, Some(span)));
+        }
+        n + which_next
+    }
+
     pub fn compile_one(format: &Format) -> AResult<Decoder> {
         let module = FormatModule::new();
         let mut compiler = Compiler::new(&module);
@@ -208,7 +165,7 @@ impl<'a> Compiler<'a> {
         match format {
             Format::ItemVar(level) => {
                 let f = self.module.get_format(*level);
-                let next = if f.depends_on_next(self.module) {
+                let next = if f.depends_on_next(self.module, ctx) {
                     next
                 } else {
                     Rc::new(Next::Empty)
@@ -217,60 +174,25 @@ impl<'a> Compiler<'a> {
                     *n
                 } else {
                     let t = self.module.get_format_type(*level).clone();
-                    let ctx = match self.module.get_batch(*level) {
-                        Some(span) => RecurseCtx::Recurse {
-                            entry_id: level - span.start,
-                            span,
-                            batch: &self.module.decls[span.start..=span.end],
-                        },
-                        None => RecurseCtx::NonRec,
+                    let n = match self.module.get_batch(*level) {
+                        Some(span) => {
+                            let batch = &self.module.decls[span.start..=span.end];
+                            self.queue_compile_batch(batch, level - span.start, next.clone(), span)
+                        }
+                        None => {
+                            self.queue_compile(t, f, next.clone(), None)
+                        }
                     };
-                    let n = self.queue_compile(t, f, next.clone(), ctx.as_span());
                     self.decoder_map.insert((*level, next.clone()), n);
                     n
                 };
                 Ok(Decoder::Call(n))
             }
             Format::RecVar(batch_ix) => {
-                let (new_ctx, cmp) = ctx.enter(*batch_ix);
+                let (new_ctx, _) = ctx.enter(*batch_ix);
                 let level = new_ctx.get_level().unwrap();
-                // FIXME - figure out the proper logic - so far we are cookie-cutter copying the same logic between each case
-                let n = match cmp {
-                    Ordering::Equal => {
-                        if let Some(n) = self.decoder_map.get(&(level, next.clone())) {
-                            *n
-                        } else {
-                            let format = new_ctx.get_format().unwrap();
-                            let t = self.module.get_format_type(level).clone();
-                            let n = self.queue_compile(t, format, next.clone(), new_ctx.as_span());
-                            self.decoder_map.insert((level, next.clone()), n);
-                            n
-                        }
-                    }
-                    Ordering::Less => {
-                        if let Some(n) = self.decoder_map.get(&(level, next.clone())) {
-                            *n
-                        } else {
-                            let format = new_ctx.get_format().unwrap();
-                            let t = self.module.get_format_type(level).clone();
-                            let n = self.queue_compile(t, format, next.clone(), new_ctx.as_span());
-                            self.decoder_map.insert((level, next.clone()), n);
-                            n
-                        }
-                    }
-                    Ordering::Greater => {
-                        if let Some(n) = self.decoder_map.get(&(level, next.clone())) {
-                            *n
-                        } else {
-                            let format = new_ctx.get_format().unwrap();
-                            let t = self.module.get_format_type(level).clone();
-                            let n = self.queue_compile(t, format, next.clone(), new_ctx.as_span());
-                            self.decoder_map.insert((level, next.clone()), n);
-                            n
-                        }
-                    }
-                };
-                Ok(Decoder::CallRec(n, *batch_ix))
+                // REVIEW - do we need to do any work here?
+                Ok(Decoder::CallRec(level, *batch_ix))
             }
             Format::FailWith(msg) => Ok(Decoder::FailWith(msg.clone())),
             Format::EndOfInput => Ok(Decoder::EndOfInput),
@@ -285,7 +207,7 @@ impl<'a> Compiler<'a> {
                 for f in branches {
                     ds.push(self.compile_format(f, next.clone(), ctx)?);
                 }
-                if let Some(tree) = MatchTree::build(self.module, branches, next) {
+                if let Some(tree) = MatchTree::build(self.module, branches, next, ctx) {
                     Ok(Decoder::Branch(tree, ds))
                 } else {
                     Err(anyhow!("cannot build match tree for {:?}", format))
@@ -319,7 +241,7 @@ impl<'a> Compiler<'a> {
                 let astar = Format::Repeat(a.clone());
                 let fa = Format::Tuple(vec![(**a).clone(), astar]);
                 let fb = Format::EMPTY;
-                if let Some(tree) = MatchTree::build(self.module, &[fa, fb], next) {
+                if let Some(tree) = MatchTree::build(self.module, &[fa, fb], next, ctx) {
                     Ok(Decoder::While(tree, Box::new(da)))
                 } else {
                     Err(anyhow!("cannot build match tree for {:?}", format))
@@ -614,6 +536,7 @@ impl Decoder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::ser::to_string_pretty;
 
     #[test]
     fn not_actually_recursive() -> AResult<()> {
@@ -627,11 +550,29 @@ mod tests {
             (Label::Borrowed("text.null"), dead_end),
             (Label::Borrowed("text.cstring"), text),
         ]);
-        let f = Format::ItemVar(frefs[1].get_level());
+        let f = frefs[1].call();
         let program = Compiler::compile_program(&module, &f, RecurseCtx::NonRec)?;
         let input = ReadCtxt::new(b"hello world\x00");
         let (value, _) = program.run(input)?;
         eprintln!("{value:?}");
+        Ok(())
+    }
+
+    #[test]
+    fn auto_recursive() -> AResult<()> {
+        let peano = Format::Union(vec![
+            Format::Variant(Label::Borrowed("peanoZ"), Box::new(Format::Byte(ByteSet::from([b'Z'])))),
+            Format::Variant(Label::Borrowed("peanoS"), Box::new(Format::Tuple(vec![Format::Byte(ByteSet::from([b'S'])), Format::RecVar(0)]))),
+        ]);
+        let mut module = FormatModule::new();
+        let frefs = module.declare_rec_formats(vec![
+            (Label::Borrowed("test.peano"), peano),
+        ]);
+        let f = Format::Tuple(vec![frefs[0].call(), Format::EndOfInput]);
+        let program = Compiler::compile_program(&module, &f, RecurseCtx::NonRec)?;
+        let input = ReadCtxt::new(b"SSSSZ");
+        let (value, _) = program.run(input)?;
+        eprintln!("{}", to_string_pretty(&value).unwrap());
         Ok(())
     }
 }

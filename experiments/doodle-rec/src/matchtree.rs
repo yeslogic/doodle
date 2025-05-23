@@ -1,6 +1,6 @@
 use std::{collections::HashSet, rc::Rc, vec};
 
-use crate::{Format, FormatModule};
+use crate::{Format, FormatModule, RecurseCtx};
 use doodle::{byte_set::ByteSet, read::ReadCtxt};
 
 #[derive(Clone, Debug)]
@@ -66,36 +66,41 @@ impl<'a> MatchTreeStep<'a> {
         module: &'a FormatModule,
         fields: &'a [Format],
         next: Rc<Next<'a>>,
+        ctx: RecurseCtx<'a>
     ) -> MatchTreeStep<'a> {
         match fields.split_first() {
-            None => Self::from_next(module, next),
-            Some((f, fs)) => Self::from_format(module, f, Rc::new(Next::Sequence(fs, next))),
+            None => Self::from_next(module, next, ctx),
+            Some((f, fs)) => Self::from_format(module, f, Rc::new(Next::Sequence(fs, next)), ctx),
         }
     }
 
     /// Constructs a [MatchTreeStep] from a [`Next`]
-    fn from_next(module: &'a FormatModule, next: Rc<Next<'a>>) -> MatchTreeStep<'a> {
+    fn from_next(module: &'a FormatModule, next: Rc<Next<'a>>, ctx: RecurseCtx<'a>) -> MatchTreeStep<'a> {
         match next.as_ref() {
             Next::Empty => Self::accept(),
             Next::Union(next1, next2) => {
-                let tree1 = Self::from_next(module, next1.clone());
-                let tree2 = Self::from_next(module, next2.clone());
+                let tree1 = Self::from_next(module, next1.clone(), ctx);
+                let tree2 = Self::from_next(module, next2.clone(), ctx);
                 tree1.union(tree2)
             }
-            Next::Cat(f, next) => MatchTreeStep::<'a>::from_format(module, *f, next.clone()),
+            Next::Cat(f, next) => MatchTreeStep::<'a>::from_format(module, *f, next.clone(), ctx),
             Next::Sequence(fields, next) => {
                 let next = next.clone();
                 match fields.split_first() {
-                    None => Self::from_next(module, next),
+                    None => Self::from_next(module, next, ctx),
                     Some((f, fs)) => {
-                        Self::from_format(module, f, Rc::new(Next::Sequence(fs, next)))
+                        Self::from_format(module, f, Rc::new(Next::Sequence(fs, next)), ctx)
                     }
                 }
             }
             Next::Repeat(a, next0) => {
-                let tree = MatchTreeStep::<'a>::from_next(module, next0.clone());
+                let tree = MatchTreeStep::<'a>::from_next(module, next0.clone(), ctx);
                 let next1 = next.clone();
-                tree.union(MatchTreeStep::<'a>::from_format(module, *a, next1))
+                tree.union(MatchTreeStep::<'a>::from_format(module, *a, next1, ctx))
+            }
+            Next::DelayRef(_ix) => {
+                // FIXME - figure out how to resolve this
+                Self::accept()
             }
         }
     }
@@ -104,40 +109,46 @@ impl<'a> MatchTreeStep<'a> {
         module: &'a FormatModule,
         f: &'a Format,
         next: Rc<Next<'a>>,
+        ctx: RecurseCtx<'a>,
     ) -> MatchTreeStep<'a> {
         match f {
-            Format::ItemVar(level) => Self::from_format(module, module.get_format(*level), next),
+            Format::ItemVar(level) => {
+                let ctx = module.get_ctx(*level);
+                Self::from_format(module, module.get_format(*level), next, ctx)
+            }
             Format::FailWith(_) => Self::reject(),
             Format::EndOfInput => Self::accept(),
             Format::Byte(bs) => Self::branch(*bs, next),
-            Format::Variant(_label, f) => Self::from_format(module, f, next.clone()),
+            Format::Variant(_label, f) => Self::from_format(module, f, next.clone(), ctx),
             Format::Union(branches) => {
                 let mut tree = Self::reject();
                 for f in branches {
-                    tree = tree.union(Self::from_format(module, f, next.clone()));
+                    tree = tree.union(Self::from_format(module, f, next.clone(), ctx));
                 }
                 tree
             }
             Format::Seq(fields) | Format::Tuple(fields) => {
-                Self::from_sequential(module, fields, next)
+                Self::from_sequential(module, fields, next, ctx)
             }
             Format::Repeat(a) => {
-                let tree = Self::from_next(module, next.clone());
+                let tree = Self::from_next(module, next.clone(), ctx);
                 tree.union(Self::from_format(
                     module,
                     a,
                     Rc::new(Next::Repeat(a, next.clone())),
+                    ctx,
                 ))
             }
             Format::Maybe(_expr, a) => {
-                let tree_some = Self::from_format(module, a, next.clone());
-                let tree_none = Self::from_next(module, next);
+                let tree_some = Self::from_format(module, a, next.clone(), ctx);
+                let tree_none = Self::from_next(module, next, ctx);
                 tree_some.union(tree_none)
             }
-            Format::Compute(_expr) => Self::from_next(module, next),
-            Format::RecVar(_) => {
-                // TODO - implement proper logic for mut-rec/auto-rec references
-                Self::accept()
+            Format::Compute(_expr) => Self::from_next(module, next, ctx),
+            Format::RecVar(rec_ix) => {
+                // FIXME - we discard the original `next` argument here
+                let next = Rc::new(Next::DelayRef(ctx.convert_rec_var(*rec_ix)));
+                Self::from_next(module, next, ctx)
             }
         }
     }
@@ -243,7 +254,7 @@ impl<'a> MatchTreeLevel<'a> {
     ///
     /// Otherwise, returns a `MatchTree` that is guaranteed to decide on a unique branch for
     /// all input within at most `depth` bytes of lookahead.
-    fn grow(module: &'a FormatModule, nexts: LevelBranch<'a>, depth: usize) -> Option<MatchTree> {
+    fn grow(module: &'a FormatModule, nexts: LevelBranch<'a>, depth: usize, ctx: RecurseCtx<'a>) -> Option<MatchTree> {
         if let Some(tree) = Self::accepts(&nexts) {
             Some(tree)
         } else if depth > 0 {
@@ -251,12 +262,12 @@ impl<'a> MatchTreeLevel<'a> {
             let mut tmp = Vec::from_iter(nexts);
             tmp.sort_by_key(|(ix, _)| *ix);
             for (i, next) in tmp.into_iter() {
-                let subtree = MatchTreeStep::from_next(module, next);
+                let subtree = MatchTreeStep::from_next(module, next, ctx);
                 tree = tree.merge_step(i, subtree).ok()?;
             }
             let mut branches = Vec::new();
             for (bs, nexts) in tree.branches {
-                let t = Self::grow(module, nexts, depth - 1)?;
+                let t = Self::grow(module, nexts, depth - 1, ctx)?;
                 branches.push((bs, t));
             }
             Some(MatchTree {
@@ -271,15 +282,28 @@ impl<'a> MatchTreeLevel<'a> {
 
 type LevelBranch<'a> = HashSet<(usize, Rc<Next<'a>>)>;
 
-#[derive(PartialEq, Eq, Hash, Debug)]
+#[derive(Eq, Hash, Debug)]
 pub(crate) enum Next<'a> {
     Empty,
+    DelayRef(usize),
     Union(Rc<Next<'a>>, Rc<Next<'a>>),
     Cat(&'a Format, Rc<Next<'a>>),
     Sequence(&'a [Format], Rc<Next<'a>>),
     Repeat(&'a Format, Rc<Next<'a>>),
 }
 
+impl<'a> PartialEq for Next<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::DelayRef(l0), Self::DelayRef(r0)) => l0 == r0,
+            (Self::Union(l0, l1), Self::Union(r0, r1)) => l0 == r0 && l1 == r1,
+            (Self::Cat(l0, l1), Self::Cat(r0, r1)) => l0 == r0 && l1 == r1,
+            (Self::Sequence(l0, l1), Self::Sequence(r0, r1)) => l0 == r0 && l1 == r1,
+            (Self::Repeat(l0, l1), Self::Repeat(r0, r1)) => l0 == r0 && l1 == r1,
+            _ => false,
+        }
+    }
+}
 #[derive(Debug, Clone)]
 pub struct MatchTree {
     accept: Option<usize>,
@@ -309,16 +333,40 @@ impl MatchTree {
     /// to within a fixed but externally opaque lookahead-depth.
     ///
     /// A `FormatModule` is also accepted to contextualize any contextually dependent formats, e.g. [`Format::ItemVar`]
-    pub(crate) fn build(
-        module: &FormatModule,
-        branches: &[Format],
-        next: Rc<Next<'_>>,
+    pub(crate) fn build<'a>(
+        module: &'a FormatModule,
+        branches: &'a [Format],
+        next: Rc<Next<'a>>,
+        ctx: RecurseCtx<'a>,
     ) -> Option<MatchTree> {
         let mut nexts = HashSet::new();
         for (i, f) in branches.iter().enumerate() {
             nexts.insert((i, Rc::new(Next::Cat(f, next.clone()))));
         }
         const MAX_DEPTH: usize = 80;
-        MatchTreeLevel::grow(module, nexts, MAX_DEPTH)
+        MatchTreeLevel::grow(module, nexts, MAX_DEPTH, ctx)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::Label;
+
+    use super::*;
+
+    #[test]
+    fn construct_autorec_next() {
+        let peano = Format::Union(vec![
+            Format::Variant(Label::Borrowed("peanoZ"), Box::new(Format::Byte(ByteSet::from([b'Z'])))),
+            Format::Variant(Label::Borrowed("peanoS"), Box::new(Format::Tuple(vec![Format::Byte(ByteSet::from([b'S'])), Format::RecVar(0)]))),
+        ]);
+        let mut module = FormatModule::new();
+        let frefs = module.declare_rec_formats(vec![
+            (Label::Borrowed("test.peano"), peano),
+        ]);
+        let f = Format::Tuple(vec![Format::ItemVar(frefs[0].get_level()), Format::EndOfInput]);
+        let ctx = RecurseCtx::NonRec;
+        let tree = MatchTreeStep::from_format(&module, &f, Rc::new(Next::Empty), ctx);
+        eprintln!("{tree:?}")
     }
 }

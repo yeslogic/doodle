@@ -5,11 +5,7 @@ pub(crate) use matchtree::{MatchTree, Next};
 use anyhow::{Result as AResult, anyhow};
 use doodle::{bounds::Bounds, byte_set::ByteSet};
 use std::{
-    borrow::Cow,
-    cell::OnceCell,
-    collections::{BTreeMap, HashSet},
-    ops::{Add as _, RangeInclusive},
-    rc::Rc,
+    borrow::Cow, cell::OnceCell, cmp::Ordering, collections::{BTreeMap, HashSet}, ops::{Add as _, RangeInclusive}, rc::Rc
 };
 
 pub type Label = Cow<'static, str>;
@@ -19,6 +15,74 @@ pub type FormatId = usize;
 
 /// Local index into a Batch of formats (e.g. 0 would be 'self' in a singleton-batch)
 pub type RecId = usize;
+
+
+#[derive(Debug, Clone, Copy, Default)]
+pub enum RecurseCtx<'a> {
+    #[default]
+    NonRec,
+    Recurse {
+        entry_id: RecId,
+        span: Span<usize>,
+        batch: &'a [FormatDecl],
+    },
+}
+
+impl<'a> RecurseCtx<'a> {
+    pub const fn is_recursive(&self) -> bool {
+        matches!(self, RecurseCtx::Recurse { .. })
+    }
+
+    pub const fn as_span(&self) -> Option<Span<usize>> {
+        match self {
+            RecurseCtx::NonRec => None,
+            RecurseCtx::Recurse { span, .. } => Some(*span),
+        }
+    }
+
+    /// Returns `(new_ctx, is_auto)`
+    pub fn enter(&self, ix: RecId) -> (Self, Ordering) {
+        match self {
+            RecurseCtx::NonRec => panic!("cannot recurse into non-recursive context"),
+            RecurseCtx::Recurse {
+                batch,
+                span,
+                entry_id,
+            } => {
+                assert!(ix < batch.len(), "batch index out of range");
+                let ret = RecurseCtx::Recurse {
+                    entry_id: ix,
+                    span: *span,
+                    batch,
+                };
+                (ret, ix.cmp(entry_id))
+            }
+        }
+    }
+
+    pub fn convert_rec_var(&self, ix: RecId) -> FormatId {
+        self.as_span().unwrap().index(ix)
+    }
+
+    /// Returns the global format-level of the closest entry-point
+    pub fn get_level(&self) -> Option<usize> {
+        match self {
+            RecurseCtx::NonRec => None,
+            RecurseCtx::Recurse {
+                span, entry_id, ..
+            } => Some(span.index(*entry_id)),
+        }
+    }
+
+    pub fn get_format(&self) -> Option<&'a Format> {
+        match self {
+            RecurseCtx::NonRec => None,
+            RecurseCtx::Recurse {
+                batch, entry_id, ..
+            } => Some(&batch[*entry_id].format),
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct FormatRef(FormatId);
@@ -42,6 +106,13 @@ pub struct Span<Idx> {
 impl<Idx> Span<Idx> {
     pub const fn new(start: Idx, end: Idx) -> Self {
         Self { start, end }
+    }
+}
+
+impl Span<usize> {
+    pub fn index(self, ix: usize) -> usize {
+        assert!(ix < (self.end - self.start + 1) as usize);
+        self.start + ix
     }
 }
 
@@ -310,9 +381,12 @@ impl Format {
         }
     }
 
-    fn depends_on_next(&self, module: &FormatModule) -> bool {
+    fn depends_on_next<'a>(&self, module: &'a FormatModule, ctx: RecurseCtx<'a>) -> bool {
         match self {
-            Format::ItemVar(level) => module.get_format(*level).depends_on_next(module),
+            Format::ItemVar(level) => {
+                let ctx = module.get_ctx(*level);
+                module.get_format(*level).depends_on_next(module, ctx)
+            }
             Format::FailWith(..) => false,
             Format::EndOfInput => false,
             Format::Byte(..) => false,
@@ -320,27 +394,28 @@ impl Format {
             Format::RecVar(..) => {
                 // REVIEW - are there any recursive formats that *don't* depend on next?
                 // FIXME[epic=hardcoded] - this is a placeholder for future improvements to classification logic
-                true
+                false
+                // true
             }
-            Format::Variant(_, f) => f.depends_on_next(module),
-            Format::Union(branches) => Format::union_depends_on_next(branches, module),
+            Format::Variant(_, f) => f.depends_on_next(module, ctx),
+            Format::Union(branches) => Format::union_depends_on_next(branches, module, ctx),
             Format::Repeat(..) => true,
             Format::Seq(formats) | Format::Tuple(formats) => {
-                formats.iter().any(|f| f.depends_on_next(module))
+                formats.iter().any(|f| f.depends_on_next(module, ctx))
             }
             Format::Maybe(..) => true,
         }
     }
 
-    fn union_depends_on_next(branches: &[Format], module: &FormatModule) -> bool {
+    fn union_depends_on_next<'a>(branches: &'a [Format], module: &'a FormatModule, ctx: RecurseCtx<'a>) -> bool {
         let mut fs = Vec::with_capacity(branches.len());
         for f in branches {
-            if f.depends_on_next(module) {
+            if f.depends_on_next(module, ctx) {
                 return true;
             }
             fs.push(f.clone());
         }
-        MatchTree::build(module, &fs, Rc::new(Next::Empty)).is_none()
+        MatchTree::build(module, &fs, Rc::new(Next::Empty), ctx).is_none()
     }
 
     fn is_nullable(&self, module: &FormatModule) -> bool {
@@ -553,6 +628,19 @@ impl FormatModule {
             decls: Vec::new(),
         }
     }
+
+    pub fn get_ctx<'a>(&'a self, level: usize) -> RecurseCtx<'a> {
+        let decl = &self.decls[level];
+        match decl.batch {
+            None => RecurseCtx::NonRec,
+            Some(span) => RecurseCtx::Recurse {
+                span,
+                entry_id: decl.fmt_id,
+                batch: &self.decls[span.start..=span.end],
+            },
+        }
+    }
+
 
     pub fn declare_rec_formats(&mut self, formats: Vec<(Label, Format)>) -> Vec<FormatRef> {
         let fmt_id = self.decls.len();
