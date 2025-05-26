@@ -3,6 +3,9 @@ use std::{collections::HashSet, rc::Rc, vec};
 use crate::{Format, FormatModule, RecurseCtx};
 use doodle::{byte_set::ByteSet, read::ReadCtxt};
 
+pub mod forest;
+pub use forest::MatchForest;
+
 #[derive(Clone, Debug)]
 pub(crate) struct MatchTreeStep<'a> {
     accept: bool,
@@ -119,7 +122,7 @@ impl<'a> MatchTreeStep<'a> {
             Format::FailWith(_) => Self::reject(),
             Format::EndOfInput => Self::accept(),
             Format::Byte(bs) => Self::branch(*bs, next),
-            Format::Variant(_label, f) => Self::from_format(module, f, next.clone(), ctx),
+            Format::Variant(_label, f) => Self::from_format(module, f, next, ctx),
             Format::Union(branches) => {
                 let mut tree = Self::reject();
                 for f in branches {
@@ -135,7 +138,7 @@ impl<'a> MatchTreeStep<'a> {
                 tree.union(Self::from_format(
                     module,
                     a,
-                    Rc::new(Next::Repeat(a, next.clone())),
+                    Rc::new(Next::Repeat(a, next)),
                     ctx,
                 ))
             }

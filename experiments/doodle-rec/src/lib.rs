@@ -112,7 +112,7 @@ impl<Idx> Span<Idx> {
 
 impl Span<usize> {
     pub fn index(self, ix: usize) -> usize {
-        assert!(ix < (self.end - self.start + 1) as usize);
+        assert!(self.start + ix <= self.end);
         self.start + ix
     }
 }
@@ -617,6 +617,7 @@ pub enum Unary {
     BoolNot,
 }
 
+#[derive(Debug)]
 pub struct FormatModule {
     names: Vec<Label>,
     decls: Vec<FormatDecl>,
