@@ -705,7 +705,7 @@ impl FormatModule {
         &self.decls[level].format
     }
 
-    fn get_decl(&self, level: usize) -> &FormatDecl {
+    pub fn get_decl(&self, level: usize) -> &FormatDecl {
         &self.decls[level]
     }
 

@@ -4,7 +4,7 @@ use crate::{Format, FormatModule, RecurseCtx};
 use doodle::{byte_set::ByteSet, read::ReadCtxt};
 
 pub mod forest;
-pub use forest::MatchForest;
+// pub use forest::MatchForest;
 
 #[derive(Clone, Debug)]
 pub(crate) struct MatchTreeStep<'a> {

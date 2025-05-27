@@ -27,7 +27,7 @@ fn json_lite(module: &mut FormatModule) -> FormatRef {
         ("JNull", byte_seq(*b"null")),
         ("JTrue", byte_seq(*b"true")),
         ("JFalse", byte_seq(*b"false")),
-        ("JNum", repeat1(Format::Byte(ByteSet::from(b'0'..b'9')))),
+        ("JNum", repeat1(Format::Byte(ByteSet::from(b'0'..=b'9')))),
         ("JObj", Format::RecVar(2)),
         ("JArr", Format::RecVar(3)),
     ]);
@@ -62,9 +62,15 @@ fn main() -> Result<(), Box<dyn Send + Sync + std::error::Error + 'static>> {
         Label::Borrowed("main"),
         Format::Tuple(vec![json.call(), Format::EndOfInput]),
     );
+
+    let first_set = module.get_decl(main.get_level()).first_set(&module)?;
+    println!("jsonValue.first: {first_set:?}");
+
+    /*
     let program = Compiler::compile_program(&module, &main.call(), RecurseCtx::NonRec)?;
     let (v, rest) = program.run(ReadCtxt::new(&buffer))?;
     assert!(rest.remaining().is_empty());
     println!("{v:?}");
+    */
     Ok(())
 }

@@ -1,9 +1,171 @@
-use std::{cell::OnceCell, rc::Rc};
-
 use doodle::prelude::ByteSet;
 
-use crate::{Format, FormatModule, RecurseCtx};
+use crate::{Format, FormatDecl, FormatId, FormatModule, RecId, RecurseCtx};
 
+pub type FirstSet = ByteSet;
+
+#[derive(Debug)]
+pub enum GrammarError {
+    EpsilonLoop { top: FormatId, reentrant: RecId },
+    RepeatNullable { format: Format },
+    MultiNullUnion { format: Format },
+}
+
+impl std::fmt::Display for GrammarError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            GrammarError::EpsilonLoop { top, reentrant } => {
+                write!(
+                    f,
+                    "epsilon-move cycle found in format: #{} -*-> ~{} -*-> ~{}",
+                    top,
+                    reentrant,
+                    reentrant,
+                )
+            }
+            GrammarError::RepeatNullable { format  } => {
+                write!(f, "repeat of nullable format: {:?}", format)
+            }
+            GrammarError::MultiNullUnion { format } => {
+                write!(f, "multiple nullable formats in union: {:?}", format)
+            }
+        }
+    }
+}
+
+impl std::error::Error for GrammarError {}
+
+impl FormatDecl {
+    pub fn first_set(&self, module: &FormatModule) -> Result<FirstSet, GrammarError> {
+        let mut traversal = Traversal::new(self.fmt_id);
+        let ctx = module.get_ctx(self.fmt_id);
+        Ok(self.format.solve_first_set(module, &mut traversal, ctx)?.0)
+    }
+}
+
+impl Format {
+    /// Returns the first-set, along with `true` if the format is nullable and `false` otherwise
+    fn solve_first_set(
+        &self,
+        module: &FormatModule,
+        visited: &mut Traversal,
+        ctx: RecurseCtx<'_>,
+    ) -> Result<(FirstSet, bool), GrammarError> {
+        match self {
+            Format::ItemVar(level) => {
+                let level = *level;
+                let ctx = module.get_ctx(level);
+                let mut visited = Traversal::new(level);
+                module
+                    .get_format(level)
+                    .solve_first_set(module, &mut visited, ctx)
+            },
+            Format::RecVar(rec_ix) => {
+                let level = ctx.convert_rec_var(*rec_ix);
+                if visited.insert(level) {
+                    let ctx = ctx.enter(*rec_ix).0;
+                    ctx.get_format().unwrap().solve_first_set(module, visited, ctx)
+                } else {
+                    Err(GrammarError::EpsilonLoop {
+                        top: visited.orig_level,
+                        reentrant: *rec_ix,
+                    })
+                }
+            }
+            Format::Byte(set) => Ok((*set, false)),
+            Format::FailWith(..) => Ok((FirstSet::empty(), false)),
+            Format::EndOfInput => Ok((FirstSet::empty(), true)),
+            Format::Compute(..) => Ok((FirstSet::empty(), true)),
+            Format::Variant(.., format) => format.solve_first_set(module, visited, ctx),
+            Format::Union(formats) => {
+                let mut ret = ByteSet::empty();
+                let mut any_nullable = false;
+                for format in formats {
+                    let (first_set, is_nullable) = format.solve_first_set(module, visited, ctx)?;
+                    ret = ret.union(&first_set);
+                    if is_nullable {
+                        if any_nullable {
+                            return Err(GrammarError::MultiNullUnion { format: self.clone() });
+                        }
+                        any_nullable = true;
+                    }
+                }
+                Ok((ret, any_nullable))
+            }
+            Format::Repeat(format) => {
+                let (first_set, is_nullable) = format.solve_first_set(module, visited, ctx)?;
+                if is_nullable {
+                    return Err(GrammarError::RepeatNullable { format: format.as_ref().clone() });
+                }
+                Ok((first_set, true))
+            }
+            Format::Tuple(formats) | Format::Seq(formats) => {
+                let mut ret = ByteSet::empty();
+                let mut nullable = true;
+                for format in formats {
+                    if !ret.is_empty() { break; }
+                    let (first_set, is_nullable) = format.solve_first_set(module, visited, ctx)?;
+                    ret = ret.union(&first_set);
+                    nullable &= is_nullable;
+                    if !nullable {
+                        break;
+                    }
+                }
+                Ok((ret, nullable))
+            }
+            Format::Maybe(_cond, format) => {
+                let (first_set, _) = format.solve_first_set(module, visited, ctx)?;
+                Ok((first_set, true))
+            }
+        }
+    }
+}
+
+
+use traversal::Traversal;
+mod traversal {
+    use std::collections::BTreeSet;
+
+    pub(super) struct Traversal {
+        pub(super) orig_level: usize,
+        seen_levels: BTreeSet<usize>,
+    }
+
+    impl Traversal {
+        pub(super) fn new(orig_level: usize) -> Self {
+            Self {
+                orig_level,
+                seen_levels: BTreeSet::new(),
+            }
+        }
+
+        /// Returns `true` if the level has not yet been seen (including the original level)
+        pub(super) fn is_novel(&self, level: usize) -> bool {
+            level != self.orig_level && !self.seen_levels.contains(&level)
+        }
+
+        /// Record a level as being seen, returning `true` if it is novel.
+        pub(super) fn insert(&mut self, level: usize) -> bool {
+            if level == self.orig_level {
+                return false;
+            }
+            self.seen_levels.insert(level)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_follow_set() {
+
+    }
+}
+
+
+/*
 /// A forest of [`FMatchTree`]s, one for each level of a [`FormatModule`] (with directly corresponding indices)
 #[derive(Debug)]
 pub struct MatchForest<'a> {
@@ -95,10 +257,14 @@ impl<'a> MatchBranch<'a> {
         }
     }
 
-    fn delayed(forest: &'a MatchForest<'a>, level: usize, remnant: Rc<PartialFormat<'a>>) -> MatchBranch<'a> {
+    fn delayed(
+        forest: &'a MatchForest<'a>,
+        level: usize,
+        remnant: Rc<PartialFormat<'a>>,
+    ) -> MatchBranch<'a> {
         Self {
             accept: false,
-            branches: vec![FollowSet::Delayed(level, remnant)]
+            branches: vec![FollowSet::Delayed(level, remnant)],
         }
     }
     pub fn from_level(forest: &'a MatchForest<'a>, level: usize) -> MatchBranch<'a> {
@@ -114,12 +280,19 @@ impl<'a> MatchBranch<'a> {
     ) -> MatchBranch<'a> {
         match remnant.as_ref() {
             PartialFormat::Empty => Self::accept(),
-            PartialFormat::Cat(format, remnant) => Self::from_format(forest, *format, remnant.clone(), ctx),
+            PartialFormat::Cat(format, remnant) => {
+                Self::from_format(forest, *format, remnant.clone(), ctx)
+            }
             PartialFormat::Sequence(formats, remnant) => {
                 let remnant = remnant.clone();
                 match formats.split_first() {
                     None => Self::from_partial_format(forest, remnant, ctx),
-                    Some((f, fs)) => Self::from_format(forest, f, Rc::new(PartialFormat::Sequence(fs, remnant)), ctx),
+                    Some((f, fs)) => Self::from_format(
+                        forest,
+                        f,
+                        Rc::new(PartialFormat::Sequence(fs, remnant)),
+                        ctx,
+                    ),
                 }
             }
             PartialFormat::Repeat(format, remnant0) => {
@@ -151,7 +324,8 @@ impl<'a> MatchBranch<'a> {
                             branches.push(FollowSet::Branch(orig, remnant0.clone()));
                         }
                         *bs0 = common;
-                        *remnant0 = Rc::new(PartialFormat::Union(remnant0.clone(), remnant.clone()));
+                        *remnant0 =
+                            Rc::new(PartialFormat::Union(remnant0.clone(), remnant.clone()));
                         bs = bs.difference(bs0);
                     }
                 }
@@ -167,7 +341,6 @@ impl<'a> MatchBranch<'a> {
         let fset = FollowSet::Delayed(level, remnant);
         todo!()
     }
-
 
     fn union(mut self, other: MatchBranch<'a>) -> MatchBranch<'a> {
         self.accept = self.accept || other.accept;
@@ -225,7 +398,6 @@ impl<'a> MatchBranch<'a> {
             Format::Maybe(expr, format) => todo!(),
         }
     }
-
 }
 
 #[derive(Debug)]
@@ -239,34 +411,4 @@ impl FMatchTree {
         todo!()
     }
 }
-
-mod traversal {
-    use std::collections::BTreeSet;
-
-    pub(super) struct Traversal {
-        orig_level: usize,
-        seen_levels: BTreeSet<usize>,
-    }
-
-    impl Traversal {
-        pub(super) fn new(orig_level: usize) -> Self {
-            Self {
-                orig_level,
-                seen_levels: BTreeSet::new(),
-            }
-        }
-
-        /// Returns `true` if the level has not yet been seen (including the original level)
-        pub(super) fn is_novel(&self, level: usize) -> bool {
-            level != self.orig_level && !self.seen_levels.contains(&level)
-        }
-
-        /// Record a level as being seen, returning `true` if it is novel.
-        pub(super) fn insert(&mut self, level: usize) -> bool {
-            if level == self.orig_level {
-                return false;
-            }
-            self.seen_levels.insert(level)
-        }
-    }
-}
+*/
