@@ -166,10 +166,11 @@ impl FormatDecl {
         &self,
         module: &FormatModule,
     ) -> Result<Determinations, GrammarError> {
+        let mut traversal = Traversal::new(self.fmt_id);
         let ctx = module.get_ctx(self.fmt_id);
         Ok(self
             .format
-            .solve_determinations(module, ctx)?)
+            .solve_determinations(module, &mut traversal, ctx)?)
     }
 }
 
@@ -177,11 +178,12 @@ impl Format {
     fn solve_determinations_sequence(
         formats: &[Format],
         module: &FormatModule,
+        visited: &mut Traversal,
         ctx: RecurseCtx,
     ) -> Result<Determinations, GrammarError> {
         let mut det_seq = Determinations::zero();
         for format in formats {
-            let det_format = format.solve_determinations(module, ctx)?;
+            let det_format = format.solve_determinations(module, visited, ctx)?;
             det_seq = det_seq.merge_seq(det_format)?;
         }
         Ok(det_seq)
@@ -191,23 +193,34 @@ impl Format {
     fn solve_determinations(
         &self,
         module: &FormatModule,
+        visited: &mut Traversal,
         ctx: RecurseCtx<'_>,
     ) -> Result<Determinations, GrammarError> {
         match self {
             Format::ItemVar(level) => {
                 let level = *level;
                 let ctx = module.get_ctx(level);
+                let mut visited = Traversal::new(level);
                 module
                     .get_format(level)
-                    .solve_determinations(module,  ctx)
+                    .solve_determinations(module, &mut visited, ctx)
             }
             Format::RecVar(rec_ix) => {
-                let ctx = ctx.enter(*rec_ix).0;
-                let ret = ctx
-                    .get_format()
-                    .unwrap()
-                    .solve_determinations(module, ctx)?;
-                Ok(ret)
+                let level = ctx.convert_rec_var(*rec_ix).unwrap_or_else(|| {
+                    unreachable!("solve_determinations: {ctx:?} has no recursive variable ~{rec_ix} (visited: {:#?})", visited.seen_levels.iter().copied().collect::<Vec<usize>>());
+                });
+                if visited.insert(level) {
+                    let ctx = ctx.enter(*rec_ix).0;
+                    let ret = ctx
+                        .get_format()
+                        .unwrap()
+                        .solve_determinations(module, visited, ctx)?;
+                    visited.escape();
+                    Ok(ret)
+                } else {
+                    // REVIEW - loop-breaker fall-back
+                    Ok(Determinations::zero())
+                }
             }
             Format::Byte(set) => {
                 Ok(Determinations {
@@ -222,17 +235,17 @@ impl Format {
             // NOTE - EOI cannot be followed with other formats, but such cases are unlikely to occur...
             // REVIEW - if we add a should-not-follow or similar, this might need some thinking...
             Format::EndOfInput => Ok(Determinations::zero()),
-            Format::Variant(.., format) => format.solve_determinations(module, ctx),
+            Format::Variant(.., format) => format.solve_determinations(module, visited, ctx),
             Format::Union(formats) => {
                 let mut det = Determinations::one();
                 for format in formats {
-                    let det_format = format.solve_determinations(module,  ctx)?;
+                    let det_format = format.solve_determinations(module, visited, ctx)?;
                     det = det.union(det_format)?;
                 }
                 Ok(det)
             }
             Format::Repeat(format) => {
-                let det_format = format.solve_determinations(module, ctx)?;
+                let det_format = format.solve_determinations(module, visited, ctx)?;
                 if det_format.is_nullable {
                     return Err(GrammarError::RepeatNullable {
                         format: format.as_ref().clone(),
@@ -245,10 +258,10 @@ impl Format {
                 })
             }
             Format::Tuple(formats) | Format::Seq(formats) => {
-                Format::solve_determinations_sequence(formats, module, ctx)
+                Format::solve_determinations_sequence(formats, module, visited, ctx)
             }
             Format::Maybe(_cond, format) => {
-                let det_format = format.solve_determinations(module, ctx)?;
+                let det_format = format.solve_determinations(module, visited, ctx)?;
                 Ok(Determinations {
                     is_nullable: true,
                     ..det_format
@@ -320,29 +333,30 @@ impl<'a> PartialFormat<'a> {
     fn solve_determinations(
         &self,
         module: &'a FormatModule,
+        visited: &mut Traversal,
         ctx: RecurseCtx<'a>,
     ) -> Result<Determinations, GrammarError> {
         match self {
             PartialFormat::Empty => Ok(Determinations::zero()),
             PartialFormat::Cat(format, remnant) => {
-                let det_format = format.solve_determinations(module, ctx)?;
-                let det_remnant = remnant.solve_determinations(module, ctx)?;
+                let det_format = format.solve_determinations(module, visited, ctx)?;
+                let det_remnant = remnant.solve_determinations(module, visited, ctx)?;
                 det_format.merge_seq(det_remnant)
             }
             PartialFormat::Sequence(formats, remnant) => {
                 let det_formats =
-                    Format::solve_determinations_sequence(formats, module, ctx)?;
-                let det_remnant = remnant.solve_determinations(module, ctx)?;
+                    Format::solve_determinations_sequence(formats, module, visited, ctx)?;
+                let det_remnant = remnant.solve_determinations(module, visited, ctx)?;
                 det_formats.merge_seq(det_remnant)
             }
             PartialFormat::Repeat(format, remnant) => {
-                let det_format = format.solve_determinations(module, ctx)?;
+                let det_format = format.solve_determinations(module, visited, ctx)?;
                 if det_format.is_nullable {
                     return Err(GrammarError::RepeatNullable {
                         format: (*format).clone(),
                     });
                 }
-                let det_remnant = remnant.solve_determinations(module, ctx)?;
+                let det_remnant = remnant.solve_determinations(module, visited, ctx)?;
                 det_format.merge_seq(det_remnant)
             }
         }
@@ -370,12 +384,14 @@ pub enum InterpError {
     Fail {
         message: crate::Label,
     },
+    ExpectsEnd,
 }
 
 impl std::fmt::Display for InterpError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             InterpError::NoParse => write!(f, "no format to parse"),
+            InterpError::ExpectsEnd => write!(f, "EOI parse failed"),
             InterpError::DeadEnd {
                 start,
                 trace,
@@ -412,7 +428,7 @@ impl<'a> Interpreter<'a> {
         level: usize,
         input: ReadCtxt<'a>,
     ) -> (PathTrace, ReadCtxt<'a>, Option<InterpError>) {
-        let ctx = self.module.get_ctx(level);
+        let mut ctx = self.module.get_ctx(level);
         let format = self.module.get_format(level);
         let mut parse = Rc::new(PartialFormat::Cat(format, Rc::new(PartialFormat::Empty)));
         let mut trace = Vec::new();
@@ -424,14 +440,17 @@ impl<'a> Interpreter<'a> {
                     self.parse_byte_from_partial_format(parse, byte, &mut trace, &mut visited, ctx);
                 match result {
                     Err(e) => return (trace, input, Some(e)),
-                    Ok(new_parse) => {
+                    Ok((new_ctx, new_parse)) => {
                         input = new_input;
                         parse = new_parse;
+                        // NOTE - this is bugged but it should work for our JSON-lite
+                        ctx = new_ctx;
                         continue;
                     }
                 }
             } else {
-                match parse.solve_determinations(self.module, ctx) {
+                let mut visited = Traversal::new(level);
+                match parse.solve_determinations(self.module, &mut visited, ctx) {
                     Err(_) => panic!("failed to solve determinations: {:?}", parse),
                     Ok(dets) => {
                         if dets.is_nullable {
@@ -451,7 +470,7 @@ impl<'a> Interpreter<'a> {
         }
     }
 
-    pub fn parse_byte_from_format(
+    fn parse_byte_from_format(
         &self,
         f: &'a Format,
         remnant: Rc<PartialFormat<'a>>,
@@ -459,7 +478,7 @@ impl<'a> Interpreter<'a> {
         trace: &mut PathTrace,
         visited: &mut Traversal,
         ctx: RecurseCtx<'a>,
-    ) -> Result<Rc<PartialFormat<'a>>, InterpError> {
+    ) -> Result<(RecurseCtx<'a>, Rc<PartialFormat<'a>>), InterpError> {
         match f {
             Format::ItemVar(level) => {
                 let new_ctx = self.module.get_ctx(*level);
@@ -467,14 +486,16 @@ impl<'a> Interpreter<'a> {
                 self.parse_byte_from_format(format, remnant, byte, trace, visited, new_ctx)
             }
             Format::RecVar(rec_ix) => {
-                let level = ctx.convert_rec_var(*rec_ix);
+                let level = ctx.convert_rec_var(*rec_ix).unwrap_or_else(|| {
+                    panic!("recursion variable not found in {ctx:?}: {rec_ix}")
+                });
                 if visited.insert(level) {
                     let format = &self.module.decls[level].format;
                     let (new_ctx, _) = ctx.enter(*rec_ix);
-                    let ret = self
+                    let (ctx, ret) = self
                         .parse_byte_from_format(format, remnant, byte, trace, visited, new_ctx)?;
                     visited.reset();
-                    Ok(ret)
+                    Ok((ctx, ret))
                 } else {
                     unreachable!("left-recursion")
                 }
@@ -484,10 +505,12 @@ impl<'a> Interpreter<'a> {
                     message: msg.clone(),
                 });
             }
-            Format::EndOfInput => todo!(),
+            Format::EndOfInput => {
+                return Err(InterpError::ExpectsEnd)
+            }
             Format::Byte(bs) => {
                 if bs.contains(byte) {
-                    Ok(remnant)
+                    Ok((ctx, remnant))
                 } else {
                     Err(InterpError::DeadEnd {
                         start: visited.orig_level,
@@ -507,7 +530,7 @@ impl<'a> Interpreter<'a> {
                 let mut accepts = ByteSet::empty();
                 for (ix, branch) in branches.iter().enumerate() {
                     let dets = branch
-                        .solve_determinations(self.module, ctx)
+                        .solve_determinations(self.module, visited, ctx)
                         .unwrap();
                     if dets.first_set.contains(byte) {
                         trace.push(Some(ix));
@@ -526,7 +549,7 @@ impl<'a> Interpreter<'a> {
             }
             Format::Repeat(format) => {
                 let dets = format
-                    .solve_determinations(self.module, ctx)
+                    .solve_determinations(self.module, visited, ctx)
                     .unwrap();
                 if dets.first_set.contains(byte) {
                     let new_remnant = self.parse_byte_from_format(
@@ -564,14 +587,14 @@ impl<'a> Interpreter<'a> {
         }
     }
 
-    pub fn parse_byte_from_partial_format(
+    fn parse_byte_from_partial_format(
         &self,
         parse: Rc<PartialFormat<'a>>,
         byte: u8,
         trace: &mut PathTrace,
         visited: &mut Traversal,
         ctx: RecurseCtx<'a>,
-    ) -> Result<Rc<PartialFormat<'a>>, InterpError> {
+    ) -> Result<(RecurseCtx<'a>, Rc<PartialFormat<'a>>), InterpError> {
         match parse.as_ref() {
             PartialFormat::Empty => return Err(InterpError::NoParse),
             PartialFormat::Cat(f, remnant) => {
@@ -594,7 +617,7 @@ impl<'a> Interpreter<'a> {
             }
             PartialFormat::Repeat(format, remnant) => {
                 let dets = format
-                    .solve_determinations(self.module, ctx)
+                    .solve_determinations(self.module, visited, ctx)
                     .unwrap();
                 if !dets.first_set.contains(byte) {
                     self.parse_byte_from_partial_format(remnant.clone(), byte, trace, visited, ctx)

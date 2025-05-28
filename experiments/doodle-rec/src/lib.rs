@@ -62,8 +62,8 @@ impl<'a> RecurseCtx<'a> {
         }
     }
 
-    pub fn convert_rec_var(&self, ix: RecId) -> FormatId {
-        self.as_span().unwrap().index(ix)
+    pub fn convert_rec_var(&self, ix: RecId) -> Option<FormatId> {
+        self.as_span().map(|span| span.index(ix))
     }
 
     /// Returns the global format-level of the closest entry-point

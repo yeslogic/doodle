@@ -150,7 +150,7 @@ impl<'a> MatchTreeStep<'a> {
             Format::Compute(_expr) => Self::from_next(module, next, ctx),
             Format::RecVar(rec_ix) => {
                 // FIXME - we discard the original `next` argument here
-                let next = Rc::new(Next::DelayRef(ctx.convert_rec_var(*rec_ix) /* , next.clone() */));
+                let next = Rc::new(Next::DelayRef(ctx.convert_rec_var(*rec_ix).unwrap() /* , next.clone() */));
                 Self::from_next(module, next, ctx)
             }
         }
