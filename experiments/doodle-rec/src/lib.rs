@@ -2,6 +2,7 @@ pub mod decoder;
 pub(crate) mod matchtree;
 pub mod helper;
 pub(crate) use matchtree::{MatchTree, Next};
+pub use matchtree::forest::Interpreter;
 
 use anyhow::{Result as AResult, anyhow};
 use doodle::{bounds::Bounds, byte_set::ByteSet};

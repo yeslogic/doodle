@@ -38,7 +38,7 @@ impl Value {
         }
     }
 
-    fn unwrap_bool(&self) -> bool {
+    pub(crate) fn unwrap_bool(&self) -> bool {
         match self {
             Value::Bool(b) => *b,
             _ => panic!("value is not a bool"),

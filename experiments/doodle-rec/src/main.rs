@@ -1,7 +1,7 @@
 use std::{io::Read, path::PathBuf};
 
 use doodle::{prelude::ByteSet, read::ReadCtxt};
-use doodle_rec::{decoder::{Compiler, Value}, helper::*, Format, FormatModule, FormatRef, Label, RecurseCtx};
+use doodle_rec::{helper::*, Format, FormatModule, FormatRef, Interpreter, Label};
 use clap::Parser;
 
 fn surround(before: u8, after: u8, f: Format) -> Format {
@@ -9,7 +9,7 @@ fn surround(before: u8, after: u8, f: Format) -> Format {
 }
 
 fn alpha() -> Format {
-    repeat(Format::Byte(ByteSet::union(&ByteSet::from(b'a'..b'z'), &ByteSet::from(b'A'..b'Z'))))
+    Format::Byte(ByteSet::union(&ByteSet::from(b'a'..b'z'), &ByteSet::from(b'A'..b'Z')))
 }
 
 /// Restricted JSON object
@@ -62,15 +62,21 @@ fn main() -> Result<(), Box<dyn Send + Sync + std::error::Error + 'static>> {
         Label::Borrowed("main"),
         Format::Tuple(vec![json.call(), Format::EndOfInput]),
     );
+    let interpreter = Interpreter::new(&module);
 
-    let first_set = module.get_decl(main.get_level()).first_set(&module)?;
-    println!("jsonValue.first: {first_set:?}");
-
-    /*
-    let program = Compiler::compile_program(&module, &main.call(), RecurseCtx::NonRec)?;
-    let (v, rest) = program.run(ReadCtxt::new(&buffer))?;
-    assert!(rest.remaining().is_empty());
-    println!("{v:?}");
-    */
+    let input = ReadCtxt::new(&buffer);
+    let (trace, rest, opt_err) = interpreter.run_level(main.get_level(), input);
+    match opt_err {
+        None => {
+            println!("input accepted!");
+            println!("trace: {trace:?}");
+            println!("remainder: {:?}", rest.remaining());
+        }
+        Some(err) => {
+            println!("input rejected: {err:?}");
+            println!("trace: {trace:?}");
+            println!("remainder: {:?}", rest.remaining());
+        }
+    }
     Ok(())
 }
