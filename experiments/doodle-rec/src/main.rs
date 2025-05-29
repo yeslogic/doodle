@@ -1,15 +1,18 @@
 use std::{io::Read, path::PathBuf};
 
-use doodle::{prelude::ByteSet, read::ReadCtxt};
-use doodle_rec::{helper::*, Format, FormatModule, FormatRef, Interpreter, Label};
 use clap::Parser;
+use doodle::{prelude::ByteSet, read::ReadCtxt};
+use doodle_rec::{Format, FormatModule, FormatRef, Interpreter, Label, helper::*};
 
 fn surround(before: u8, after: u8, f: Format) -> Format {
     Format::Tuple(vec![is_byte(before), f, is_byte(after)])
 }
 
 fn alpha() -> Format {
-    Format::Byte(ByteSet::union(&ByteSet::from(b'a'..b'z'), &ByteSet::from(b'A'..b'Z')))
+    Format::Byte(ByteSet::union(
+        &ByteSet::from(b'a'..b'z'),
+        &ByteSet::from(b'A'..b'Z'),
+    ))
 }
 
 /// Restricted JSON object
@@ -35,11 +38,13 @@ fn json_lite(module: &mut FormatModule) -> FormatRef {
     let obj2 = surround(b'{', b'}', repeat(tuple([var(1), is_byte(b',')])));
     let arr3 = surround(b'[', b']', repeat(tuple([is_byte(b','), var(0)])));
     let decls = module.declare_rec_formats(
-        [(Label::Borrowed("json.value"), value0),
-         (Label::Borrowed("json.key_value"), kv1),
-         (Label::Borrowed("json.object"), obj2),
-         (Label::Borrowed("json.array"), arr3),
-        ].to_vec()
+        [
+            (Label::Borrowed("json.value"), value0),
+            (Label::Borrowed("json.key_value"), kv1),
+            (Label::Borrowed("json.object"), obj2),
+            (Label::Borrowed("json.array"), arr3),
+        ]
+        .to_vec(),
     );
     decls[0]
 }

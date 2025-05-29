@@ -222,14 +222,12 @@ impl Format {
                     Ok(Determinations::zero())
                 }
             }
-            Format::Byte(set) => {
-                Ok(Determinations {
-                    first_set: *set,
-                    is_productive: true,
-                    is_nullable: false,
-                    should_not_follow_set: ByteSet::empty(),
-                })
-            },
+            Format::Byte(set) => Ok(Determinations {
+                first_set: *set,
+                is_productive: true,
+                is_nullable: false,
+                should_not_follow_set: ByteSet::empty(),
+            }),
             Format::FailWith(..) => Ok(Determinations::one()),
             Format::Compute(..) => Ok(Determinations::zero()),
             // NOTE - EOI cannot be followed with other formats, but such cases are unlikely to occur...
@@ -367,7 +365,14 @@ pub struct Interpreter<'a> {
     module: &'a FormatModule,
 }
 
-pub type PathTrace = Vec<Option<usize>>;
+pub type PathTrace = Vec<Choice>;
+
+#[derive(Debug, Clone)]
+pub enum Choice {
+    UnionBranch(usize),
+    RepeatYes,
+    RepeatNo,
+}
 
 #[derive(Debug)]
 pub enum InterpError {
@@ -486,9 +491,9 @@ impl<'a> Interpreter<'a> {
                 self.parse_byte_from_format(format, remnant, byte, trace, visited, new_ctx)
             }
             Format::RecVar(rec_ix) => {
-                let level = ctx.convert_rec_var(*rec_ix).unwrap_or_else(|| {
-                    panic!("recursion variable not found in {ctx:?}: {rec_ix}")
-                });
+                let level = ctx
+                    .convert_rec_var(*rec_ix)
+                    .unwrap_or_else(|| panic!("recursion variable not found in {ctx:?}: {rec_ix}"));
                 if visited.insert(level) {
                     let format = &self.module.decls[level].format;
                     let (new_ctx, _) = ctx.enter(*rec_ix);
@@ -505,9 +510,7 @@ impl<'a> Interpreter<'a> {
                     message: msg.clone(),
                 });
             }
-            Format::EndOfInput => {
-                return Err(InterpError::ExpectsEnd)
-            }
+            Format::EndOfInput => return Err(InterpError::ExpectsEnd),
             Format::Byte(bs) => {
                 if bs.contains(byte) {
                     Ok((ctx, remnant))
@@ -533,7 +536,7 @@ impl<'a> Interpreter<'a> {
                         .solve_determinations(self.module, visited, ctx)
                         .unwrap();
                     if dets.first_set.contains(byte) {
-                        trace.push(Some(ix));
+                        trace.push(Choice::UnionBranch(ix));
                         return self
                             .parse_byte_from_format(branch, remnant, byte, trace, visited, ctx);
                     } else {
@@ -552,6 +555,7 @@ impl<'a> Interpreter<'a> {
                     .solve_determinations(self.module, visited, ctx)
                     .unwrap();
                 if dets.first_set.contains(byte) {
+                    trace.push(Choice::RepeatYes);
                     let new_remnant = self.parse_byte_from_format(
                         format,
                         Rc::new(PartialFormat::Repeat(format, remnant)),
@@ -562,6 +566,7 @@ impl<'a> Interpreter<'a> {
                     )?;
                     Ok(new_remnant)
                 } else {
+                    trace.push(Choice::RepeatNo);
                     self.parse_byte_from_partial_format(remnant, byte, trace, visited, ctx)
                 }
             }
@@ -620,8 +625,10 @@ impl<'a> Interpreter<'a> {
                     .solve_determinations(self.module, visited, ctx)
                     .unwrap();
                 if !dets.first_set.contains(byte) {
+                    trace.push(Choice::RepeatNo);
                     self.parse_byte_from_partial_format(remnant.clone(), byte, trace, visited, ctx)
                 } else {
+                    trace.push(Choice::RepeatYes);
                     self.parse_byte_from_format(
                         format,
                         Rc::new(PartialFormat::Repeat(format, remnant.clone())),

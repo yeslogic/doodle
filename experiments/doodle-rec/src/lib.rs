@@ -1,13 +1,18 @@
 pub mod decoder;
-pub(crate) mod matchtree;
 pub mod helper;
-pub(crate) use matchtree::{MatchTree, Next};
+pub(crate) mod matchtree;
 pub use matchtree::forest::Interpreter;
+pub(crate) use matchtree::{MatchTree, Next};
 
 use anyhow::{Result as AResult, anyhow};
 use doodle::{bounds::Bounds, byte_set::ByteSet};
 use std::{
-    borrow::Cow, cell::OnceCell, cmp::Ordering, collections::{BTreeMap, HashSet}, ops::{Add as _, RangeInclusive}, rc::Rc
+    borrow::Cow,
+    cell::OnceCell,
+    cmp::Ordering,
+    collections::{BTreeMap, HashSet},
+    ops::{Add as _, RangeInclusive},
+    rc::Rc,
 };
 
 pub type Label = Cow<'static, str>;
@@ -17,7 +22,6 @@ pub type FormatId = usize;
 
 /// Local index into a Batch of formats (e.g. 0 would be 'self' in a singleton-batch)
 pub type RecId = usize;
-
 
 #[derive(Debug, Clone, Copy, Default)]
 pub enum RecurseCtx<'a> {
@@ -70,9 +74,7 @@ impl<'a> RecurseCtx<'a> {
     pub fn get_level(&self) -> Option<usize> {
         match self {
             RecurseCtx::NonRec => None,
-            RecurseCtx::Recurse {
-                span, entry_id, ..
-            } => Some(span.index(*entry_id)),
+            RecurseCtx::Recurse { span, entry_id, .. } => Some(span.index(*entry_id)),
         }
     }
 
@@ -409,7 +411,11 @@ impl Format {
         }
     }
 
-    fn union_depends_on_next<'a>(branches: &'a [Format], module: &'a FormatModule, ctx: RecurseCtx<'a>) -> bool {
+    fn union_depends_on_next<'a>(
+        branches: &'a [Format],
+        module: &'a FormatModule,
+        ctx: RecurseCtx<'a>,
+    ) -> bool {
         let mut fs = Vec::with_capacity(branches.len());
         for f in branches {
             if f.depends_on_next(module, ctx) {
@@ -643,7 +649,6 @@ impl FormatModule {
             },
         }
     }
-
 
     pub fn declare_rec_formats(&mut self, formats: Vec<(Label, Format)>) -> Vec<FormatRef> {
         let fmt_id = self.decls.len();

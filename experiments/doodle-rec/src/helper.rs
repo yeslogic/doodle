@@ -1,5 +1,5 @@
-use doodle::prelude::ByteSet;
 use crate::{Expr, Format, Label};
+use doodle::prelude::ByteSet;
 
 pub fn tuple(formats: impl IntoIterator<Item = Format>) -> Format {
     Format::Tuple(formats.into_iter().collect())
@@ -10,7 +10,12 @@ pub fn is_byte(x: u8) -> Format {
 }
 
 pub fn alts<Name: Into<Label>>(branches: impl IntoIterator<Item = (Name, Format)>) -> Format {
-    Format::Union(branches.into_iter().map(|(name, f)| Format::Variant(name.into(), Box::new(f))).collect())
+    Format::Union(
+        branches
+            .into_iter()
+            .map(|(name, f)| Format::Variant(name.into(), Box::new(f)))
+            .collect(),
+    )
 }
 
 pub fn byte_seq(bytes: impl IntoIterator<Item = u8>) -> Format {

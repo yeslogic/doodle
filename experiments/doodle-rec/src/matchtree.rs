@@ -69,7 +69,7 @@ impl<'a> MatchTreeStep<'a> {
         module: &'a FormatModule,
         fields: &'a [Format],
         next: Rc<Next<'a>>,
-        ctx: RecurseCtx<'a>
+        ctx: RecurseCtx<'a>,
     ) -> MatchTreeStep<'a> {
         match fields.split_first() {
             None => Self::from_next(module, next, ctx),
@@ -78,7 +78,11 @@ impl<'a> MatchTreeStep<'a> {
     }
 
     /// Constructs a [MatchTreeStep] from a [`Next`]
-    fn from_next(module: &'a FormatModule, next: Rc<Next<'a>>, ctx: RecurseCtx<'a>) -> MatchTreeStep<'a> {
+    fn from_next(
+        module: &'a FormatModule,
+        next: Rc<Next<'a>>,
+        ctx: RecurseCtx<'a>,
+    ) -> MatchTreeStep<'a> {
         match next.as_ref() {
             Next::Empty => Self::accept(),
             Next::Union(next1, next2) => {
@@ -150,7 +154,9 @@ impl<'a> MatchTreeStep<'a> {
             Format::Compute(_expr) => Self::from_next(module, next, ctx),
             Format::RecVar(rec_ix) => {
                 // FIXME - we discard the original `next` argument here
-                let next = Rc::new(Next::DelayRef(ctx.convert_rec_var(*rec_ix).unwrap() /* , next.clone() */));
+                let next = Rc::new(Next::DelayRef(
+                    ctx.convert_rec_var(*rec_ix).unwrap(), /* , next.clone() */
+                ));
                 Self::from_next(module, next, ctx)
             }
         }
@@ -257,7 +263,12 @@ impl<'a> MatchTreeLevel<'a> {
     ///
     /// Otherwise, returns a `MatchTree` that is guaranteed to decide on a unique branch for
     /// all input within at most `depth` bytes of lookahead.
-    fn grow(module: &'a FormatModule, nexts: LevelBranch<'a>, depth: usize, ctx: RecurseCtx<'a>) -> Option<MatchTree> {
+    fn grow(
+        module: &'a FormatModule,
+        nexts: LevelBranch<'a>,
+        depth: usize,
+        ctx: RecurseCtx<'a>,
+    ) -> Option<MatchTree> {
         if let Some(tree) = Self::accepts(&nexts) {
             Some(tree)
         } else if depth > 0 {
@@ -348,14 +359,24 @@ mod tests {
     #[test]
     fn construct_autorec_next() {
         let peano = Format::Union(vec![
-            Format::Variant(Label::Borrowed("peanoZ"), Box::new(Format::Byte(ByteSet::from([b'Z'])))),
-            Format::Variant(Label::Borrowed("peanoS"), Box::new(Format::Tuple(vec![Format::Byte(ByteSet::from([b'S'])), Format::RecVar(0)]))),
+            Format::Variant(
+                Label::Borrowed("peanoZ"),
+                Box::new(Format::Byte(ByteSet::from([b'Z']))),
+            ),
+            Format::Variant(
+                Label::Borrowed("peanoS"),
+                Box::new(Format::Tuple(vec![
+                    Format::Byte(ByteSet::from([b'S'])),
+                    Format::RecVar(0),
+                ])),
+            ),
         ]);
         let mut module = FormatModule::new();
-        let frefs = module.declare_rec_formats(vec![
-            (Label::Borrowed("test.peano"), peano),
+        let frefs = module.declare_rec_formats(vec![(Label::Borrowed("test.peano"), peano)]);
+        let f = Format::Tuple(vec![
+            Format::ItemVar(frefs[0].get_level()),
+            Format::EndOfInput,
         ]);
-        let f = Format::Tuple(vec![Format::ItemVar(frefs[0].get_level()), Format::EndOfInput]);
         let ctx = RecurseCtx::NonRec;
         let tree = MatchTreeStep::from_format(&module, &f, Rc::new(Next::Empty), ctx);
         eprintln!("{tree:?}")

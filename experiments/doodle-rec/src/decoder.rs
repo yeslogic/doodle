@@ -1,11 +1,13 @@
+use serde::Serialize;
 use std::{
     collections::{HashMap, HashSet},
     rc::Rc,
 };
-use serde::Serialize;
 
 use crate::{
-    matchtree::{MatchTree, Next}, Arith, Expr, Format, FormatDecl, FormatId, FormatModule, FormatType, IntRel, Label, RecId, RecurseCtx, Span, Unary
+    Arith, Expr, Format, FormatDecl, FormatId, FormatModule, FormatType, IntRel, Label, RecId,
+    RecurseCtx, Span, Unary,
+    matchtree::{MatchTree, Next},
 };
 use anyhow::{Result as AResult, anyhow};
 use doodle::{IntWidth, byte_set::ByteSet, read::ReadCtxt};
@@ -99,13 +101,11 @@ impl<'a> Compiler<'a> {
         compiler.queue_compile(t, format, Rc::new(Next::Empty), batch);
         while let Some((f, next, n, batch)) = compiler.compile_queue.pop() {
             let f_ctx = match batch {
-                Some(span) => {
-                    RecurseCtx::Recurse {
-                        span,
-                        batch: &module.decls[span.start..=span.end],
-                        entry_id: n - span.start,
-                    }
-                }
+                Some(span) => RecurseCtx::Recurse {
+                    span,
+                    batch: &module.decls[span.start..=span.end],
+                    entry_id: n - span.start,
+                },
                 None => RecurseCtx::NonRec,
             };
             let d = compiler.compile_format(f, next, f_ctx)?;
@@ -143,7 +143,8 @@ impl<'a> Compiler<'a> {
             } else {
                 Rc::new(Next::Empty)
             };
-            self.compile_queue.push((&d.format, next, n + ix, Some(span)));
+            self.compile_queue
+                .push((&d.format, next, n + ix, Some(span)));
         }
         n + which_next
     }
@@ -178,9 +179,7 @@ impl<'a> Compiler<'a> {
                             let batch = &self.module.decls[span.start..=span.end];
                             self.queue_compile_batch(batch, level - span.start, next.clone(), span)
                         }
-                        None => {
-                            self.queue_compile(t, f, next.clone(), None)
-                        }
+                        None => self.queue_compile(t, f, next.clone(), None),
                     };
                     self.decoder_map.insert((*level, next.clone()), n);
                     n
@@ -560,13 +559,20 @@ mod tests {
     #[test]
     fn auto_recursive() -> AResult<()> {
         let peano = Format::Union(vec![
-            Format::Variant(Label::Borrowed("peanoZ"), Box::new(Format::Byte(ByteSet::from([b'Z'])))),
-            Format::Variant(Label::Borrowed("peanoS"), Box::new(Format::Tuple(vec![Format::Byte(ByteSet::from([b'S'])), Format::RecVar(0)]))),
+            Format::Variant(
+                Label::Borrowed("peanoZ"),
+                Box::new(Format::Byte(ByteSet::from([b'Z']))),
+            ),
+            Format::Variant(
+                Label::Borrowed("peanoS"),
+                Box::new(Format::Tuple(vec![
+                    Format::Byte(ByteSet::from([b'S'])),
+                    Format::RecVar(0),
+                ])),
+            ),
         ]);
         let mut module = FormatModule::new();
-        let frefs = module.declare_rec_formats(vec![
-            (Label::Borrowed("test.peano"), peano),
-        ]);
+        let frefs = module.declare_rec_formats(vec![(Label::Borrowed("test.peano"), peano)]);
         let f = Format::Tuple(vec![frefs[0].call(), Format::EndOfInput]);
         let program = Compiler::compile_program(&module, &f, RecurseCtx::NonRec)?;
         let input = ReadCtxt::new(b"SSSSZ");
