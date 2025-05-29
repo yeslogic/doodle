@@ -5,16 +5,264 @@ use doodle::{prelude::ByteSet, read::ReadCtxt};
 use crate::{Format, FormatDecl, FormatId, FormatModule, RecId, RecurseCtx};
 
 #[derive(Debug)]
-pub enum GrammarError {
-    LeftRecursion { top: FormatId, cycle: Vec<FormatId> },
-    RepeatNullable { format: Format },
-    AmbiguousFirst { left: ByteSet, right: ByteSet },
-    MultiNullUnion,
-    AmbiguousFollow { left: ByteSet, right: ByteSet },
+pub enum GrammarError<CtxValue: std::fmt::Debug + Sized = ()> {
+    LeftRecursion {
+        top: FormatId,
+        cycle: Vec<FormatId>,
+        context: CtxValue,
+    },
+    RepeatNullable {
+        format: Format,
+        context: CtxValue,
+    },
+    AmbiguousFirst {
+        left: ByteSet,
+        right: ByteSet,
+        context: CtxValue,
+    },
+    MultiNullUnion {
+        context: CtxValue,
+    },
+    AmbiguousFollow {
+        left: ByteSet,
+        right: ByteSet,
+        context: CtxValue,
+    },
+}
+
+mod private {
+    pub trait Sealed {}
+    impl Sealed for crate::Format {}
+    impl<'a> Sealed for std::rc::Rc<super::PartialFormat<'a>> {}
+    impl<'a> Sealed for super::FormatKind<'a> {}
+}
+
+trait IsFormat: private::Sealed + Clone + std::fmt::Debug + Sized {}
+
+impl IsFormat for Format {}
+impl<'a> IsFormat for Rc<PartialFormat<'a>> {}
+impl<'a> IsFormat for FormatKind<'a> {}
+
+#[derive(Clone)]
+enum FormatKind<'a> {
+    Total(Format),
+    Partial(Rc<PartialFormat<'a>>),
+}
+
+impl<'a> std::fmt::Debug for FormatKind<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FormatKind::Total(format) => write!(f, "{:?}", format),
+            FormatKind::Partial(partial_format) => write!(f, "{:?}", partial_format),
+        }
+    }
+}
+
+impl<'a> From<Format> for FormatKind<'a> {
+    fn from(format: Format) -> Self {
+        FormatKind::Total(format)
+    }
+}
+
+impl<'a> From<Rc<PartialFormat<'a>>> for FormatKind<'a> {
+    fn from(partial_format: Rc<PartialFormat<'a>>) -> Self {
+        FormatKind::Partial(partial_format)
+    }
+}
+
+impl<'a> From<GrammarError<Format>> for GrammarError<FormatKind<'a>> {
+    fn from(err: GrammarError<Format>) -> Self {
+        match err {
+            GrammarError::LeftRecursion {
+                top,
+                cycle,
+                context,
+            } => GrammarError::LeftRecursion {
+                top,
+                cycle,
+                context: context.into(),
+            },
+            GrammarError::RepeatNullable { format, context } => GrammarError::RepeatNullable {
+                format,
+                context: context.into(),
+            },
+            GrammarError::AmbiguousFirst {
+                left,
+                right,
+                context,
+            } => GrammarError::AmbiguousFirst {
+                left,
+                right,
+                context: context.into(),
+            },
+            GrammarError::MultiNullUnion { context } => GrammarError::MultiNullUnion {
+                context: context.into(),
+            },
+            GrammarError::AmbiguousFollow {
+                left,
+                right,
+                context,
+            } => GrammarError::AmbiguousFollow {
+                left,
+                right,
+                context: context.into(),
+            },
+        }
+    }
+}
+
+impl<'a> From<GrammarError<Rc<PartialFormat<'a>>>> for GrammarError<FormatKind<'a>> {
+    fn from(err: GrammarError<Rc<PartialFormat<'a>>>) -> Self {
+        match err {
+            GrammarError::LeftRecursion {
+                top,
+                cycle,
+                context,
+            } => GrammarError::LeftRecursion {
+                top,
+                cycle,
+                context: context.into(),
+            },
+            GrammarError::RepeatNullable { format, context } => GrammarError::RepeatNullable {
+                format,
+                context: context.into(),
+            },
+            GrammarError::AmbiguousFirst {
+                left,
+                right,
+                context,
+            } => GrammarError::AmbiguousFirst {
+                left,
+                right,
+                context: context.into(),
+            },
+            GrammarError::MultiNullUnion { context } => GrammarError::MultiNullUnion {
+                context: context.into(),
+            },
+            GrammarError::AmbiguousFollow {
+                left,
+                right,
+                context,
+            } => GrammarError::AmbiguousFollow {
+                left,
+                right,
+                context: context.into(),
+            },
+        }
+    }
+}
+
+impl<F: IsFormat> std::fmt::Display for GrammarError<F> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            GrammarError::LeftRecursion {
+                top,
+                cycle,
+                context,
+            } => {
+                write!(
+                    f,
+                    "left-recursion found in format ({context:?}): #{} -> {:#?}",
+                    top, cycle,
+                )
+            }
+            GrammarError::RepeatNullable { format, context } => {
+                write!(f, "repeat of nullable format ({context:?}): {:?}", format)
+            }
+            GrammarError::MultiNullUnion { context } => {
+                write!(f, "multiple nullable formats in union ({context:?}")
+            }
+            GrammarError::AmbiguousFirst {
+                left,
+                right,
+                context,
+            } => {
+                write!(
+                    f,
+                    "ambiguity introduced by union of non-disjoint first sets ({context:?}): {:?} <|> {:?}",
+                    left, right
+                )
+            }
+            GrammarError::AmbiguousFollow {
+                left,
+                right,
+                context,
+            } => {
+                write!(
+                    f,
+                    "follow set and first set conflict ({context:?}): {:?} & {:?} ",
+                    left, right
+                )
+            }
+        }
+    }
+}
+
+impl std::fmt::Display for GrammarError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            GrammarError::LeftRecursion { top, cycle, .. } => {
+                write!(
+                    f,
+                    "left-recursion found in format: #{} -> {:#?}",
+                    top, cycle,
+                )
+            }
+            GrammarError::RepeatNullable { format, .. } => {
+                write!(f, "repeat of nullable format: {:?}", format)
+            }
+            GrammarError::MultiNullUnion { .. } => {
+                write!(f, "multiple nullable formats in union")
+            }
+            GrammarError::AmbiguousFirst { left, right, .. } => {
+                write!(
+                    f,
+                    "ambiguity introduced by union of non-disjoint first sets: {:?} <|> {:?}",
+                    left, right
+                )
+            }
+            GrammarError::AmbiguousFollow { left, right, .. } => {
+                write!(
+                    f,
+                    "follow set and first set conflict: {:?} & {:?} ",
+                    left, right
+                )
+            }
+        }
+    }
+}
+
+impl std::error::Error for GrammarError {}
+impl<F: IsFormat> std::error::Error for GrammarError<F> {}
+
+impl GrammarError<()> {
+    fn add_context<F: IsFormat>(self, context: F) -> GrammarError<F> {
+        match self {
+            GrammarError::LeftRecursion { top, cycle, .. } => GrammarError::LeftRecursion {
+                top,
+                cycle,
+                context,
+            },
+            GrammarError::RepeatNullable { format, .. } => {
+                GrammarError::RepeatNullable { format, context }
+            }
+            GrammarError::AmbiguousFirst { left, right, .. } => GrammarError::AmbiguousFirst {
+                left,
+                right,
+                context,
+            },
+            GrammarError::MultiNullUnion { .. } => GrammarError::MultiNullUnion { context },
+            GrammarError::AmbiguousFollow { left, right, .. } => GrammarError::AmbiguousFollow {
+                left,
+                right,
+                context,
+            },
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(crate) struct Determinations {
+pub struct Determinations {
     pub is_nullable: bool,
     pub is_productive: bool,
     pub first_set: ByteSet,
@@ -48,6 +296,7 @@ impl Determinations {
             return Err(GrammarError::AmbiguousFollow {
                 left: self.should_not_follow_set,
                 right: other.first_set,
+                context: (),
             });
         }
         let is_nullable = self.is_nullable && other.is_nullable;
@@ -88,12 +337,13 @@ impl Determinations {
 
     pub fn union(self, other: Self) -> Result<Self, GrammarError> {
         if self.is_nullable && other.is_nullable {
-            return Err(GrammarError::MultiNullUnion);
+            return Err(GrammarError::MultiNullUnion { context: () });
         }
         if !self.first_set.is_disjoint(&other.first_set) {
             return Err(GrammarError::AmbiguousFirst {
                 left: self.first_set,
                 right: other.first_set,
+                context: (),
             });
         }
         let first_set = self.first_set.union(&other.first_set);
@@ -117,55 +367,19 @@ impl Determinations {
     }
 }
 
-impl std::fmt::Display for GrammarError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            GrammarError::LeftRecursion { top, cycle } => {
-                write!(
-                    f,
-                    "left-recursion found in format: #{} -> {:#?}",
-                    top, cycle,
-                )
-            }
-            GrammarError::RepeatNullable { format } => {
-                write!(f, "repeat of nullable format: {:?}", format)
-            }
-            GrammarError::MultiNullUnion => {
-                write!(f, "multiple nullable formats in union")
-            }
-            GrammarError::AmbiguousFirst { left, right } => {
-                write!(
-                    f,
-                    "ambiguity introduced by union of non-disjoint first sets: {:?} <|> {:?}",
-                    left, right
-                )
-            }
-            GrammarError::AmbiguousFollow { left, right } => {
-                write!(
-                    f,
-                    "follow set and first set conflict: {:?} & {:?} ",
-                    left, right
-                )
-            }
-        }
-    }
-}
-
-impl std::error::Error for GrammarError {}
-
 impl FormatDecl {
-    pub fn first_set(&self, module: &FormatModule) -> Result<ByteSet, GrammarError> {
+    pub fn first_set(&self, module: &FormatModule) -> Result<ByteSet, GrammarError<Format>> {
         Ok(self.determinations(module)?.first_set)
     }
 
-    pub fn is_nullable(&self, module: &FormatModule) -> Result<bool, GrammarError> {
+    pub fn is_nullable(&self, module: &FormatModule) -> Result<bool, GrammarError<Format>> {
         Ok(self.determinations(module)?.is_nullable)
     }
 
-    pub(crate) fn determinations(
+    pub fn determinations(
         &self,
         module: &FormatModule,
-    ) -> Result<Determinations, GrammarError> {
+    ) -> Result<Determinations, GrammarError<Format>> {
         let mut traversal = Traversal::new(self.fmt_id);
         let ctx = module.get_ctx(self.fmt_id);
         Ok(self
@@ -175,27 +389,13 @@ impl FormatDecl {
 }
 
 impl Format {
-    fn solve_determinations_sequence(
-        formats: &[Format],
-        module: &FormatModule,
-        visited: &mut Traversal,
-        ctx: RecurseCtx,
-    ) -> Result<Determinations, GrammarError> {
-        let mut det_seq = Determinations::zero();
-        for format in formats {
-            let det_format = format.solve_determinations(module, visited, ctx)?;
-            det_seq = det_seq.merge_seq(det_format)?;
-        }
-        Ok(det_seq)
-    }
-
     /// Returns the first-set, along with `true` if the format is nullable and `false` otherwise
     fn solve_determinations(
         &self,
         module: &FormatModule,
         visited: &mut Traversal,
         ctx: RecurseCtx<'_>,
-    ) -> Result<Determinations, GrammarError> {
+    ) -> Result<Determinations, GrammarError<Format>> {
         match self {
             Format::ItemVar(level) => {
                 let level = *level;
@@ -219,7 +419,7 @@ impl Format {
                     Ok(ret)
                 } else {
                     // REVIEW - loop-breaker fall-back
-                    Ok(Determinations::zero())
+                    Ok(Determinations::one())
                 }
             }
             Format::Byte(set) => Ok(Determinations {
@@ -238,7 +438,9 @@ impl Format {
                 let mut det = Determinations::one();
                 for format in formats {
                     let det_format = format.solve_determinations(module, visited, ctx)?;
-                    det = det.union(det_format)?;
+                    det = det
+                        .union(det_format)
+                        .map_err(|e| e.add_context(self.clone()))?;
                 }
                 Ok(det)
             }
@@ -247,6 +449,7 @@ impl Format {
                 if det_format.is_nullable {
                     return Err(GrammarError::RepeatNullable {
                         format: format.as_ref().clone(),
+                        context: self.clone(),
                     });
                 }
                 Ok(Determinations {
@@ -256,7 +459,14 @@ impl Format {
                 })
             }
             Format::Tuple(formats) | Format::Seq(formats) => {
-                Format::solve_determinations_sequence(formats, module, visited, ctx)
+                let mut det_seq = Determinations::zero();
+                for format in formats {
+                    let det_format = format.solve_determinations(module, visited, ctx)?;
+                    det_seq = det_seq
+                        .merge_seq(det_format)
+                        .map_err(|e| e.add_context(self.clone()))?;
+                }
+                Ok(det_seq)
             }
             Format::Maybe(_cond, format) => {
                 let det_format = format.solve_determinations(module, visited, ctx)?;
@@ -329,33 +539,48 @@ enum PartialFormat<'a> {
 
 impl<'a> PartialFormat<'a> {
     fn solve_determinations(
-        &self,
+        self: Rc<Self>,
         module: &'a FormatModule,
         visited: &mut Traversal,
         ctx: RecurseCtx<'a>,
-    ) -> Result<Determinations, GrammarError> {
-        match self {
+    ) -> Result<Determinations, GrammarError<FormatKind<'a>>> {
+        match self.as_ref() {
             PartialFormat::Empty => Ok(Determinations::zero()),
             PartialFormat::Cat(format, remnant) => {
                 let det_format = format.solve_determinations(module, visited, ctx)?;
-                let det_remnant = remnant.solve_determinations(module, visited, ctx)?;
-                det_format.merge_seq(det_remnant)
+                let det_remnant = remnant.clone().solve_determinations(module, visited, ctx)?;
+                det_format
+                    .merge_seq(det_remnant)
+                    .map_err(|e| e.add_context(self.clone().into()))
             }
             PartialFormat::Sequence(formats, remnant) => {
-                let det_formats =
-                    Format::solve_determinations_sequence(formats, module, visited, ctx)?;
-                let det_remnant = remnant.solve_determinations(module, visited, ctx)?;
-                det_formats.merge_seq(det_remnant)
+                let det_formats = {
+                    let mut det_seq = Determinations::zero();
+                    for format in *formats {
+                        let det_format = format.solve_determinations(module, visited, ctx)?;
+                        det_seq = det_seq
+                            .merge_seq(det_format)
+                            .map_err(|e| e.add_context(self.clone()))?;
+                    }
+                    det_seq
+                };
+                let det_remnant = remnant.clone().solve_determinations(module, visited, ctx)?;
+                det_formats
+                    .merge_seq(det_remnant)
+                    .map_err(|e| e.add_context(self.clone().into()))
             }
             PartialFormat::Repeat(format, remnant) => {
                 let det_format = format.solve_determinations(module, visited, ctx)?;
                 if det_format.is_nullable {
                     return Err(GrammarError::RepeatNullable {
                         format: (*format).clone(),
+                        context: self.clone().into(),
                     });
                 }
-                let det_remnant = remnant.solve_determinations(module, visited, ctx)?;
-                det_format.merge_seq(det_remnant)
+                let det_remnant = remnant.clone().solve_determinations(module, visited, ctx)?;
+                det_format
+                    .merge_seq(det_remnant)
+                    .map_err(|e| e.add_context(self.clone().into()))
             }
         }
     }
@@ -455,7 +680,10 @@ impl<'a> Interpreter<'a> {
                 }
             } else {
                 let mut visited = Traversal::new(level);
-                match parse.solve_determinations(self.module, &mut visited, ctx) {
+                match parse
+                    .clone()
+                    .solve_determinations(self.module, &mut visited, ctx)
+                {
                     Err(_) => panic!("failed to solve determinations: {:?}", parse),
                     Ok(dets) => {
                         if dets.is_nullable {

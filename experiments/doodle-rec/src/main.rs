@@ -2,10 +2,18 @@ use std::{io::Read, path::PathBuf};
 
 use clap::Parser;
 use doodle::{prelude::ByteSet, read::ReadCtxt};
-use doodle_rec::{Format, FormatModule, FormatRef, Interpreter, Label, helper::*};
+use doodle_rec::{Format, FormatModule, FormatRef, Label, determinations::Interpreter, helper::*};
 
 fn surround(before: u8, after: u8, f: Format) -> Format {
     Format::Tuple(vec![is_byte(before), f, is_byte(after)])
+}
+
+fn once_then_repeat(a: Format, b: Format) -> Format {
+    Format::Tuple(vec![a, Format::Repeat(Box::new(b))])
+}
+
+fn repeat1(a: Format) -> Format {
+    once_then_repeat(a.clone(), a)
 }
 
 fn alpha() -> Format {
@@ -35,8 +43,16 @@ fn json_lite(module: &mut FormatModule) -> FormatRef {
         ("JArr", Format::RecVar(3)),
     ]);
     let kv1 = tuple([key_prefix, var(0)]);
-    let obj2 = surround(b'{', b'}', repeat(tuple([var(1), is_byte(b',')])));
-    let arr3 = surround(b'[', b']', repeat(tuple([is_byte(b','), var(0)])));
+    let obj2 = surround(
+        b'{',
+        b'}',
+        optional(once_then_repeat(var(1), tuple([is_byte(b','), var(1)]))),
+    );
+    let arr3 = surround(
+        b'[',
+        b']',
+        optional(once_then_repeat(var(0), tuple([is_byte(b','), var(0)]))),
+    );
     let decls = module.declare_rec_formats(
         [
             (Label::Borrowed("json.value"), value0),

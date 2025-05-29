@@ -1,7 +1,7 @@
 pub mod decoder;
-pub mod helper;
 pub(crate) mod matchtree;
-pub use matchtree::forest::Interpreter;
+pub use matchtree::determinations;
+pub mod helper;
 pub(crate) use matchtree::{MatchTree, Next};
 
 use anyhow::{Result as AResult, anyhow};
@@ -132,7 +132,7 @@ impl<Idx: Copy> From<RangeInclusive<Idx>> for Span<Idx> {
 #[derive(Debug, Clone)]
 pub struct FormatDecl {
     format: Format,
-    fmt_id: FormatId,
+    pub fmt_id: FormatId,
     f_type: Rc<OnceCell<FormatType>>,
     batch: Option<Span<FormatId>>,
 }

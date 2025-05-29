@@ -3,7 +3,7 @@ use std::{collections::HashSet, rc::Rc, vec};
 use crate::{Format, FormatModule, RecurseCtx};
 use doodle::{byte_set::ByteSet, read::ReadCtxt};
 
-pub mod forest;
+pub mod determinations;
 // pub use forest::MatchForest;
 
 #[derive(Clone, Debug)]

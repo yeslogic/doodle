@@ -1,4 +1,4 @@
-use crate::{Expr, Format, Label};
+use crate::{Format, Label};
 use doodle::prelude::ByteSet;
 
 pub fn tuple(formats: impl IntoIterator<Item = Format>) -> Format {
@@ -30,6 +30,13 @@ pub fn var(ix: usize) -> Format {
     Format::RecVar(ix)
 }
 
-pub fn repeat1(format: Format) -> Format {
-    tuple([format.clone(), repeat(format.clone())])
+pub fn fmt_variant<Name: Into<Label>>(name: Name, format: Format) -> Format {
+    Format::Variant(name.into(), Box::new(format))
+}
+
+pub fn optional(format: Format) -> Format {
+    Format::Union(vec![
+        fmt_variant("no", Format::EMPTY),
+        fmt_variant("yes", format),
+    ])
 }
