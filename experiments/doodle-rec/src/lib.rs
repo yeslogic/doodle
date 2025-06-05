@@ -3,13 +3,13 @@ pub(crate) mod matchtree;
 pub use matchtree::determinations;
 pub mod helper;
 pub(crate) use matchtree::{MatchTree, Next};
+pub mod output;
 
 use anyhow::{Result as AResult, anyhow};
 use doodle::{bounds::Bounds, byte_set::ByteSet};
 use std::{
     borrow::Cow,
     cell::OnceCell,
-    cmp::Ordering,
     collections::{BTreeMap, HashSet},
     ops::{Add as _, RangeInclusive},
     rc::Rc,
@@ -47,21 +47,16 @@ impl<'a> RecurseCtx<'a> {
     }
 
     /// Returns `(new_ctx, is_auto)`
-    pub fn enter(&self, ix: RecId) -> (Self, Ordering) {
+    pub fn enter(&self, ix: RecId) -> Self {
         match self {
             RecurseCtx::NonRec => panic!("cannot recurse into non-recursive context"),
-            RecurseCtx::Recurse {
-                batch,
-                span,
-                entry_id,
-            } => {
+            RecurseCtx::Recurse { batch, span, .. } => {
                 assert!(ix < batch.len(), "batch index out of range");
-                let ret = RecurseCtx::Recurse {
+                RecurseCtx::Recurse {
                     entry_id: ix,
                     span: *span,
                     batch,
-                };
-                (ret, ix.cmp(entry_id))
+                }
             }
         }
     }
@@ -717,6 +712,10 @@ impl FormatModule {
 
     fn get_batch(&self, level: usize) -> Option<Span<FormatId>> {
         self.decls[level].batch
+    }
+
+    fn get_name(&self, level: usize) -> &Label {
+        &self.names[level]
     }
 }
 

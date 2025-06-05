@@ -12,6 +12,9 @@ use crate::{
 use anyhow::{Result as AResult, anyhow};
 use doodle::{IntWidth, byte_set::ByteSet, read::ReadCtxt};
 
+mod ll1;
+pub use ll1::LL1Interpreter;
+
 #[derive(Debug, Clone, Serialize)]
 pub enum Value {
     // Primitive values
@@ -27,9 +30,66 @@ pub enum Value {
     Seq(Vec<Value>),
     Option(Option<Box<Value>>),
     Variant(Label, Box<Value>),
+
+    Branch(usize, Box<Value>),
+}
+
+const MAX_SEQ_LEN: usize = 64;
+
+impl std::fmt::Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Value::Bool(b) => write!(f, "{}", b),
+            Value::U8(i) => write!(f, "{}", i),
+            Value::U16(i) => write!(f, "{}", i),
+            Value::U32(i) => write!(f, "{}", i),
+            Value::U64(i) => write!(f, "{}", i),
+            Value::Char(c) => write!(f, "{:?}", c),
+
+            Value::Option(v) => match v {
+                None => write!(f, "None"),
+                Some(v) => write!(f, "Some({})", v),
+            },
+            Value::Tuple(vs) => {
+                write!(
+                    f,
+                    "({})",
+                    vs.iter()
+                        .map(|v| v.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            }
+            Value::Variant(label, value) => {
+                write!(f, "`{}({})", label, value)
+            }
+            Value::Seq(vs) => {
+                if vs.len() > MAX_SEQ_LEN {
+                    write!(f, "[...; {}]", vs.len())
+                } else {
+                    write!(
+                        f,
+                        "[{}]",
+                        vs.iter()
+                            .map(|v| v.to_string())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )
+                }
+            }
+            Value::Branch(_, v) => write!(f, "{}", v),
+        }
+    }
 }
 
 impl Value {
+    pub fn coerce_value(&self) -> &Value {
+        match self {
+            Value::Branch(_, v) => v.coerce_value(),
+            _ => self,
+        }
+    }
+
     fn get_usize_with_precision(&self) -> (usize, IntWidth) {
         match self {
             Value::U8(n) => (*n as usize, IntWidth::Bits8),
@@ -64,7 +124,7 @@ impl Program {
     }
 }
 
-type Batch = Option<Span<usize>>;
+pub(crate) type Batch = Option<Span<usize>>;
 
 pub struct Compiler<'a> {
     module: &'a FormatModule,
@@ -187,7 +247,7 @@ impl<'a> Compiler<'a> {
                 Ok(Decoder::Call(n))
             }
             Format::RecVar(batch_ix) => {
-                let (new_ctx, _) = ctx.enter(*batch_ix);
+                let new_ctx = ctx.enter(*batch_ix);
                 let level = new_ctx.get_level().unwrap();
                 // REVIEW - do we need to do any work here?
                 Ok(Decoder::CallRec(level, *batch_ix))

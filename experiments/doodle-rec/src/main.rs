@@ -2,7 +2,9 @@ use std::{io::Read, path::PathBuf};
 
 use clap::Parser;
 use doodle::{prelude::ByteSet, read::ReadCtxt};
-use doodle_rec::{Format, FormatModule, FormatRef, Label, determinations::Interpreter, helper::*};
+use doodle_rec::{
+    Format, FormatModule, FormatRef, Label, decoder::LL1Interpreter, helper::*, output::PPrinter,
+};
 
 fn surround(before: u8, after: u8, f: Format) -> Format {
     Format::Tuple(vec![is_byte(before), f, is_byte(after)])
@@ -32,7 +34,7 @@ fn alpha() -> Format {
 /// - all numbers are natural
 /// - trailing commas are mandatory
 fn json_lite(module: &mut FormatModule) -> FormatRef {
-    let key = surround(b'"', b'"', repeat1(alpha()));
+    let key = surround(b'"', b'"', repeat(alpha()));
     let key_prefix = tuple([key, is_byte(b':')]);
     let value0 = alts([
         ("JNull", byte_seq(*b"null")),
@@ -83,21 +85,13 @@ fn main() -> Result<(), Box<dyn Send + Sync + std::error::Error + 'static>> {
         Label::Borrowed("main"),
         Format::Tuple(vec![json.call(), Format::EndOfInput]),
     );
-    let interpreter = Interpreter::new(&module);
+    let interpreter = LL1Interpreter::new(&module);
 
     let input = ReadCtxt::new(&buffer);
-    let (trace, rest, opt_err) = interpreter.run_level(main.get_level(), input);
-    match opt_err {
-        None => {
-            println!("input accepted!");
-            println!("trace: {trace:?}");
-            println!("remainder: {:?}", rest.remaining());
-        }
-        Some(err) => {
-            println!("input rejected: {err:?}");
-            println!("trace: {trace:?}");
-            println!("remainder: {:?}", rest.remaining());
-        }
-    }
+    let (val, _) = interpreter.parse_level(main.get_level(), input)?;
+    let mut printer = PPrinter::new(&module);
+    let ctx = module.get_ctx(main.get_level());
+    let oput = printer.compile_decoded_value(&val, &main.call(), ctx);
+    println!("{}", oput);
     Ok(())
 }

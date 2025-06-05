@@ -25,7 +25,7 @@ pub mod loc_decoder;
 
 pub mod output;
 pub mod parser;
-mod precedence;
+pub mod precedence;
 pub mod prelude;
 pub mod read;
 

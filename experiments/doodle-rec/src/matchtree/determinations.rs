@@ -1,8 +1,8 @@
-use std::{collections::HashSet, rc::Rc};
+use std::rc::Rc;
 
 use doodle::{prelude::ByteSet, read::ReadCtxt};
 
-use crate::{Format, FormatDecl, FormatId, FormatModule, RecId, RecurseCtx};
+use crate::{Format, FormatDecl, FormatId, FormatModule, RecurseCtx};
 
 #[derive(Debug)]
 pub enum GrammarError<CtxValue: std::fmt::Debug + Sized = ()> {
@@ -44,7 +44,7 @@ impl<'a> IsFormat for Rc<PartialFormat<'a>> {}
 impl<'a> IsFormat for FormatKind<'a> {}
 
 #[derive(Clone)]
-enum FormatKind<'a> {
+pub(crate) enum FormatKind<'a> {
     Total(Format),
     Partial(Rc<PartialFormat<'a>>),
 }
@@ -390,7 +390,7 @@ impl FormatDecl {
 
 impl Format {
     /// Returns the first-set, along with `true` if the format is nullable and `false` otherwise
-    fn solve_determinations(
+    pub(crate) fn solve_determinations(
         &self,
         module: &FormatModule,
         visited: &mut Traversal,
@@ -410,7 +410,7 @@ impl Format {
                     unreachable!("solve_determinations: {ctx:?} has no recursive variable ~{rec_ix} (visited: {:#?})", visited.seen_levels.iter().copied().collect::<Vec<usize>>());
                 });
                 if visited.insert(level) {
-                    let ctx = ctx.enter(*rec_ix).0;
+                    let ctx = ctx.enter(*rec_ix);
                     let ret = ctx
                         .get_format()
                         .unwrap()
@@ -479,12 +479,12 @@ impl Format {
     }
 }
 
-use traversal::Traversal;
+pub(crate) use traversal::Traversal;
 mod traversal {
     use linked_hash_set::LinkedHashSet;
     /// Semi-mutable traversal state for tracking which format-levels have been seen before and which are novel
     pub struct Traversal {
-        pub(super) orig_level: usize,
+        pub(crate) orig_level: usize,
         pub(super) seen_levels: LinkedHashSet<usize>,
     }
 
@@ -496,6 +496,7 @@ mod traversal {
             }
         }
 
+        #[expect(dead_code)]
         /// Returns `true` if the level has not yet been seen (including the original level)
         pub fn is_novel(&self, level: usize) -> bool {
             level != self.orig_level && !self.seen_levels.contains(&level)
@@ -511,10 +512,8 @@ mod traversal {
 
         /// Removes the most-recently inserted level, to avoid double-counting between branches rather than
         /// merely witnessing true cycles on a singular path.
-        pub fn escape(&mut self) {
-            let Some(_) = self.seen_levels.pop_back() else {
-                panic!("traversal stack is empty");
-            };
+        pub fn escape(&mut self) -> Option<usize> {
+            self.seen_levels.pop_back()
         }
 
         pub fn reset(&mut self) {
@@ -526,7 +525,7 @@ mod traversal {
 /// Representation of the right-justified remainder of a [`Format`] we have already
 /// consumed some number (possibly 0) bytes of.
 #[derive(PartialEq, Eq, Hash, Debug)]
-enum PartialFormat<'a> {
+pub(crate) enum PartialFormat<'a> {
     /// `ε`
     Empty,
     /// A full-format followed by a remnant
@@ -538,7 +537,7 @@ enum PartialFormat<'a> {
 }
 
 impl<'a> PartialFormat<'a> {
-    fn solve_determinations(
+    pub(crate) fn solve_determinations(
         self: Rc<Self>,
         module: &'a FormatModule,
         visited: &mut Traversal,
@@ -648,6 +647,8 @@ impl std::fmt::Display for InterpError {
     }
 }
 
+impl std::error::Error for InterpError {}
+
 impl<'a> Interpreter<'a> {
     pub fn new(module: &'a FormatModule) -> Self {
         Self { module }
@@ -724,7 +725,7 @@ impl<'a> Interpreter<'a> {
                     .unwrap_or_else(|| panic!("recursion variable not found in {ctx:?}: {rec_ix}"));
                 if visited.insert(level) {
                     let format = &self.module.decls[level].format;
-                    let (new_ctx, _) = ctx.enter(*rec_ix);
+                    let new_ctx = ctx.enter(*rec_ix);
                     let (ctx, ret) = self
                         .parse_byte_from_format(format, remnant, byte, trace, visited, new_ctx)?;
                     visited.reset();
