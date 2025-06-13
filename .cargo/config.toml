@@ -1,5 +1,6 @@
 [alias]
 cg = "run --bin doodle -- format --output rust --dest generated/gencode.rs"
+cgstat = "run --bin doodle -- format --output rust --stat-only --dest experiments/gencode_stat.rs"
 
 [profile.profiling]
 inherits = "release"

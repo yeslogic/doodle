@@ -21,6 +21,13 @@ pub mod tiff;
 pub mod waldo;
 pub mod zlib;
 
+pub fn main_stat(module: &mut FormatModule) -> FormatRef {
+    let base = base::main(module);
+    let tag = opentype::opentype_tag(module, &base);
+    let stat = opentype::stat_table(module, &base, tag);
+    stat
+}
+
 pub fn main(module: &mut FormatModule) -> FormatRef {
     let base = base::main(module);
 

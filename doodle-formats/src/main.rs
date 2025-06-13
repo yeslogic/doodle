@@ -46,6 +46,8 @@ enum Command {
         output: FormatOutput,
         #[arg(long, default_value = None)]
         dest: Option<PathBuf>,
+        #[arg(long)]
+        stat_only: bool,
     },
     /// Decode a binary file
     File {
@@ -116,9 +118,18 @@ thread_local! {
 
 fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
     match Command::parse() {
-        Command::Format { output, dest } => {
+        Command::Format {
+            output,
+            dest,
+            stat_only,
+        } => {
             let mut module = FormatModule::new();
-            let format = format::main(&mut module).call();
+
+            let format = if stat_only {
+                format::main_stat(&mut module).call()
+            } else {
+                format::main(&mut module).call()
+            };
 
             match output {
                 FormatOutput::Debug => println!("{module:?}"),
