@@ -4,7 +4,7 @@ use crate::output::Fragment;
 ///
 ///
 #[derive(Copy, Clone, Debug, Default)]
-pub(crate) enum Precedence {
+pub enum Precedence {
     /// Highest precedence, as if implicitly (if not actually) parenthesized
     Atomic,
     /// Post-fix projection such as method call, field access, or Try (`?`)
@@ -27,20 +27,20 @@ pub(crate) enum Precedence {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub(crate) enum CalculusLevel {
+pub enum CalculusLevel {
     Invoke, // Highest calculus precedence
     Lambda,
     Match,
 }
 
 #[derive(Copy, Clone, Debug)]
-pub(crate) enum CompareLevel {
+pub enum CompareLevel {
     Comparison = 0, // Highest comparative precedence
     Equality,
 }
 
 #[derive(Copy, Clone, Debug)]
-pub(crate) enum ArithLevel {
+pub enum ArithLevel {
     DivRem = 0, // Highest arithmetic precedence
     Mul,
     AddSub,
@@ -48,14 +48,14 @@ pub(crate) enum ArithLevel {
 
 #[derive(Copy, Clone, Debug)]
 #[repr(u8)]
-pub(crate) enum BitwiseLevel {
+pub enum BitwiseLevel {
     Shift = 0, // Highest bitwise precedence
     And = 1,
     Or = 2,
 }
 
 #[derive(Copy, Clone, Debug)]
-pub(crate) enum LogicalLevel {
+pub enum LogicalLevel {
     And = 0,
     Or = 1,
 }
@@ -73,7 +73,7 @@ impl IntransitiveOrd for LogicalLevel {
 
 /// Intransitive partial relation over operator subclasses
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub(crate) enum Relation {
+pub enum Relation {
     /// `.<`
     Inferior,
     /// `.=`
@@ -84,7 +84,7 @@ pub(crate) enum Relation {
     Disjoint,
 }
 
-pub(crate) trait IntransitiveOrd {
+pub trait IntransitiveOrd {
     fn relate(&self, other: &Self) -> Relation;
 }
 
@@ -197,34 +197,34 @@ impl IntransitiveOrd for Precedence {
 }
 
 impl Precedence {
-    pub(crate) const TOP: Self = Precedence::Top;
-    pub(crate) const ARROW: Self = Precedence::Calculus(CalculusLevel::Lambda);
-    pub(crate) const MATCH: Self = Precedence::Calculus(CalculusLevel::Match);
-    pub(crate) const INVOKE: Self = Precedence::Calculus(CalculusLevel::Invoke);
-    pub(crate) const COMPARE: Self = Precedence::Comparison(CompareLevel::Comparison);
-    pub(crate) const EQUALITY: Self = Precedence::Comparison(CompareLevel::Equality);
-    pub(crate) const BITOR: Self = Precedence::BitwiseInfix(BitwiseLevel::Or);
-    pub(crate) const ADD_SUB: Self = Precedence::ArithInfix(ArithLevel::AddSub);
-    pub(crate) const DIV_REM: Self = Precedence::ArithInfix(ArithLevel::DivRem);
-    pub(crate) const BITAND: Self = Precedence::BitwiseInfix(BitwiseLevel::And);
-    pub(crate) const LOGICAL_AND: Self = Precedence::LogicalInfix(LogicalLevel::And);
-    pub(crate) const LOGICAL_OR: Self = Precedence::LogicalInfix(LogicalLevel::Or);
-    pub(crate) const LOGICAL_NEGATE: Self = Precedence::Prefix;
-    pub(crate) const NUMERIC_PREFIX: Self = Precedence::Prefix;
-    pub(crate) const MUL: Self = Precedence::ArithInfix(ArithLevel::Mul);
-    pub(crate) const BIT_SHIFT: Self = Precedence::BitwiseInfix(BitwiseLevel::Shift);
-    pub(crate) const FUN_APPLICATION: Self = Precedence::Prefix;
-    pub(crate) const CAST_INFIX: Self = Precedence::Calculus(CalculusLevel::Invoke);
-    pub(crate) const CAST_PREFIX: Self = Precedence::Prefix;
-    pub(crate) const PROJ: Self = Precedence::Projection;
-    pub(crate) const ATOM: Self = Precedence::Atomic;
+    pub const TOP: Self = Precedence::Top;
+    pub const ARROW: Self = Precedence::Calculus(CalculusLevel::Lambda);
+    pub const MATCH: Self = Precedence::Calculus(CalculusLevel::Match);
+    pub const INVOKE: Self = Precedence::Calculus(CalculusLevel::Invoke);
+    pub const COMPARE: Self = Precedence::Comparison(CompareLevel::Comparison);
+    pub const EQUALITY: Self = Precedence::Comparison(CompareLevel::Equality);
+    pub const BITOR: Self = Precedence::BitwiseInfix(BitwiseLevel::Or);
+    pub const ADD_SUB: Self = Precedence::ArithInfix(ArithLevel::AddSub);
+    pub const DIV_REM: Self = Precedence::ArithInfix(ArithLevel::DivRem);
+    pub const BITAND: Self = Precedence::BitwiseInfix(BitwiseLevel::And);
+    pub const LOGICAL_AND: Self = Precedence::LogicalInfix(LogicalLevel::And);
+    pub const LOGICAL_OR: Self = Precedence::LogicalInfix(LogicalLevel::Or);
+    pub const LOGICAL_NEGATE: Self = Precedence::Prefix;
+    pub const NUMERIC_PREFIX: Self = Precedence::Prefix;
+    pub const MUL: Self = Precedence::ArithInfix(ArithLevel::Mul);
+    pub const BIT_SHIFT: Self = Precedence::BitwiseInfix(BitwiseLevel::Shift);
+    pub const FUN_APPLICATION: Self = Precedence::Prefix;
+    pub const CAST_INFIX: Self = Precedence::Calculus(CalculusLevel::Invoke);
+    pub const CAST_PREFIX: Self = Precedence::Prefix;
+    pub const PROJ: Self = Precedence::Projection;
+    pub const ATOM: Self = Precedence::Atomic;
 
-    pub(crate) const FORMAT_COMPOUND: Self = Self::Top;
+    pub const FORMAT_COMPOUND: Self = Self::Top;
 
     // REVIEW - does list-append need its own precedence or is this good enough?
-    pub(crate) const APPEND: Self = Precedence::ArithInfix(ArithLevel::AddSub);
+    pub const APPEND: Self = Precedence::ArithInfix(ArithLevel::AddSub);
 
-    pub(crate) fn bump_format(&self) -> Self {
+    pub fn bump_format(&self) -> Self {
         match self {
             Precedence::Top => Precedence::Atomic,
             Precedence::Atomic => Precedence::Atomic,
@@ -233,7 +233,7 @@ impl Precedence {
     }
 }
 
-pub(crate) fn cond_paren(frag: Fragment, current: Precedence, cutoff: Precedence) -> Fragment {
+pub fn cond_paren(frag: Fragment, current: Precedence, cutoff: Precedence) -> Fragment {
     match current.relate(&cutoff) {
         Relation::Disjoint | Relation::Superior => {
             Fragment::Char('(').cat(frag).cat(Fragment::Char(')'))

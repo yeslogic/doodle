@@ -1460,7 +1460,7 @@ impl Decoder {
                 for f in fields {
                     let (vf, next_input) = f.parse(program, scope, input)?;
                     input = next_input;
-                    v.push(vf.clone());
+                    v.push(vf);
                 }
                 Ok((Value::Tuple(v), input))
             }
@@ -1470,7 +1470,7 @@ impl Decoder {
                 for d in decs {
                     let (vf, next_input) = d.parse(program, scope, input)?;
                     input = next_input;
-                    v.push(vf.clone());
+                    v.push(vf);
                 }
                 Ok((Value::Seq(SeqKind::Strict(v)), input))
             }

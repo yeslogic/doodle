@@ -107,7 +107,9 @@ impl<'module> TreePrinter<'module> {
             }
             Format::EndOfInput => true,
             Format::Byte(bs) => bs.len() == 1,
-            Format::Tuple(fields) => fields.iter().all(|f| self.is_implied_value_format(f)),
+            Format::Sequence(formats) | Format::Tuple(formats) => {
+                formats.iter().all(|f| self.is_implied_value_format(f))
+            }
             Format::Hint(StyleHint::Record { old_style }, inner) => {
                 if *old_style {
                     self.is_implied_value_format_old_style_record(inner)

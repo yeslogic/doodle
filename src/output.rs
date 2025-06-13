@@ -230,12 +230,12 @@ impl Fragment {
     /// There are currently no display rules that differentiate [`Fragment::Group`](x) from `x` itself, but
     /// it is defined anyway and supported with this helper to allow for cleaner adoption of a more nuanced
     /// model in which logically-grouped fragments have their own display rules.
-    pub(crate) fn group(self) -> Self {
+    pub fn group(self) -> Self {
         Self::Group(Box::new(self))
     }
 
     /// Like [Fragment::group], except that it modifies a mutable reference in-place and passes it back to the caller
-    pub(crate) fn enclose(&mut self) -> &mut Self {
+    pub fn enclose(&mut self) -> &mut Self {
         let this = Box::new(std::mem::take(self));
         *self = Self::Group(this);
         self
@@ -251,12 +251,12 @@ impl Fragment {
     ///
     /// Returns the same mutable reference as was passed in, to allow chaining of similar operations.
     #[inline]
-    fn append_break(&mut self) -> &mut Self {
+    pub fn append_break(&mut self) -> &mut Self {
         self.append(Fragment::Char('\n'))
     }
 
     /// Returns an empty fragment
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self::Empty
     }
 
@@ -266,7 +266,7 @@ impl Fragment {
     /// rather than whether inline concatenations are possible.
     ///
     /// Importantly, a single trailing newline character is permitted, and `Symbols` care allowed to appear anywhere
-    pub(crate) fn is_single_line(&self, is_final: bool) -> bool {
+    pub fn is_single_line(&self, is_final: bool) -> bool {
         match self {
             Fragment::Empty => true,
             Fragment::Char('\n') => is_final,
@@ -307,7 +307,7 @@ impl Fragment {
     /// Returns `false` if any of the following are true:
     ///   - The Display form of `self` contains any newline characters
     ///   - `self` contains any `Symbol` sub-fragments
-    fn fits_inline(&self) -> bool {
+    pub fn fits_inline(&self) -> bool {
         match self {
             Fragment::Empty => true,
             Fragment::Char(c) => *c != '\n',
@@ -333,7 +333,7 @@ impl Fragment {
     /// Joins two fragments with appropriate whitespace:
     ///   - If `other` fits on a single line with no trailing newline, joins with `' '`, with a newline at the very end
     ///   - Otherwise, joins with `'\n'`
-    pub(crate) fn join_with_wsp(self, other: Self) -> Self {
+    pub fn join_with_wsp(self, other: Self) -> Self {
         if other.fits_inline() {
             self.cat(Self::Char(' ')).cat(other).cat_break()
         } else {
@@ -344,7 +344,7 @@ impl Fragment {
     /// Joins two fragments with the appropriate whitespace and a conditional line-ending `trailer`:
     ///    - If `other` does not require more than one line to print, joins with `' '`, with a newline at the very end (and without `trailer`).
     ///    - Otherwise, joins `self` and `trailer` with no separation, followed by `other` on the following line
-    pub(crate) fn join_with_wsp_eol(self, other: Self, trailer: Self) -> Self {
+    pub fn join_with_wsp_eol(self, other: Self, trailer: Self) -> Self {
         if other.fits_inline() {
             self.cat(Self::Char(' ')).cat(other).cat_break()
         } else {
@@ -354,7 +354,7 @@ impl Fragment {
 }
 
 /// Builder pattern helper-struct for accumulating up longer sequences of [Fragment]s.
-pub(crate) struct FragmentBuilder {
+pub struct FragmentBuilder {
     frozen: Vec<Fragment>,
     active: Fragment,
 }
