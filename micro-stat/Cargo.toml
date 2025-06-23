@@ -1,0 +1,13 @@
+[package]
+name = "micro-stat"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "micro_stat"
+path = "src/ideal_stat.rs"
+# path = "src/gencode_stat.rs"
+bench = false
+
+[dependencies]
+doodle = { path = "../", version = "0.1.0" }

@@ -1,0 +1,11 @@
+[package]
+name = "smallsorts"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "smallsorts"
+path = "src/lib.rs"
+bench = false
+
+[dependencies]

@@ -4,10 +4,26 @@ pub mod offset;
 use error::{PResult, ParseError, StateError};
 use offset::{BufferOffset, ByteOffset};
 
+#[cfg(feature = "parser_from_read_ctxt")]
+use crate::read::ReadCtxt;
+
 /// Stateful parser with an associated buffer and offset-tracker.
 pub struct Parser<'a> {
     pub(crate) buffer: &'a [u8],
     pub(crate) offset: BufferOffset,
+}
+
+#[cfg(feature = "parser_from_read_ctxt")]
+impl<'a> From<ReadCtxt<'a>> for Parser<'a> {
+    fn from(read: ReadCtxt<'a>) -> Self {
+        let buf_len = read.input.len();
+        let max_offset = read.offset + buf_len;
+        let offset = BufferOffset::with_offset(ByteOffset::from_bytes(read.offset), ByteOffset::from_bytes(max_offset));
+        Self {
+            buffer: read.input,
+            offset,
+        }
+    }
 }
 
 impl<'a> Parser<'a> {

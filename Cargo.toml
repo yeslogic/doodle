@@ -1,10 +1,13 @@
 [workspace]
-members = [".", "generated/", "doodle-formats/"]
+members = [".", "generated/", "doodle-formats/", "micro-stat/", "smallsorts"]
 
 [package]
 name = "doodle"
 version = "0.1.0"
 edition = "2021"
+
+[features]
+parser_from_read_ctxt = []
 
 [[bin]]
 name = "doodle"
@@ -24,3 +27,4 @@ clap = { version = "4.2", features = ["derive"] }
 num-traits = "0.2"
 rustc-hash = "2.1.1"
 cons-rs = "0.7.3"
+smallsorts = { path = "smallsorts/", version = "0.1.0" }
