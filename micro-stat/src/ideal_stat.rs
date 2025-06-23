@@ -3,8 +3,14 @@
 #![allow(dead_code)]
 // #![cfg_attr(rustfmt, rustfmt::skip)]
 
+use allsorts::{
+    binary::{
+        read::{ReadArray, ReadBinary, ReadCtxt, ReadScope},
+        U16Be,
+    },
+    error::ParseError,
+};
 use doodle::alt::prelude::*;
-use allsorts::{binary::{read::{ReadArray, ReadBinary, ReadCtxt, ReadScope}, U16Be}, error::ParseError};
 
 /// expected size: 8
 #[derive(Debug, Copy, Clone)]
@@ -149,7 +155,9 @@ pub struct opentype_stat_table<'a> {
     elided_fallback_name_id: u16,
 }
 
-fn Decoder_opentype_stat_table<'a>(_input: &mut ReadCtxt<'a>) -> Result<opentype_stat_table<'a>, ParseError> {
+fn Decoder_opentype_stat_table<'a>(
+    _input: &mut ReadCtxt<'a>,
+) -> Result<opentype_stat_table<'a>, ParseError> {
     opentype_stat_table::read(_input)
 }
 
@@ -203,7 +211,10 @@ impl<'b> ReadBinary for opentype_stat_table<'b> {
         let design_axes = {
             let offset = (Decoder3(ctxt))?;
             let design_axes_length = (design_axis_size as usize) * (design_axis_count as usize);
-            scope.offset(offset as usize).ctxt().read_slice(design_axes_length)?
+            scope
+                .offset(offset as usize)
+                .ctxt()
+                .read_slice(design_axes_length)?
         };
         let axis_value_count = (Decoder2(ctxt))?;
         let offset_to_axis_value_offsets = {

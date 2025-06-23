@@ -18,7 +18,10 @@ impl<'a> From<ReadCtxt<'a>> for Parser<'a> {
     fn from(read: ReadCtxt<'a>) -> Self {
         let buf_len = read.input.len();
         let max_offset = read.offset + buf_len;
-        let offset = BufferOffset::with_offset(ByteOffset::from_bytes(read.offset), ByteOffset::from_bytes(max_offset));
+        let offset = BufferOffset::with_offset(
+            ByteOffset::from_bytes(read.offset),
+            ByteOffset::from_bytes(max_offset),
+        );
         Self {
             buffer: read.input,
             offset,
