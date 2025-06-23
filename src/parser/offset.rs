@@ -178,18 +178,6 @@ impl PartialOrd for ByteOffset {
     }
 }
 
-/// Comined state that tracks an index, or offset, into a buffer being parsed,
-/// and stores a [`ViewStack`] to manage meta-contextual state about subarray-limited (Slice)
-/// and speculative parsing (Peek, PeekNot, Alts/UnionNondet).
-pub(crate) struct BufferOffset {
-    /// The current value of the offset being tracked
-    current_offset: ByteOffset,
-    /// The stack of `Lens` objects in LIFO order
-    view_stack: ViewStack,
-    /// The maximum legal offset, which is one logical position past the final legal index of the buffer (i.e. equal to the buffer length when measured in bytes)
-    max_offset: ByteOffset,
-}
-
 /// Wrapper for a `Vec`-based FILO stack of [`Lens`]es
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ViewStack {
@@ -391,12 +379,33 @@ impl Lens {
     }
 }
 
+/// Comined state that tracks an index, or offset, into a buffer being parsed,
+/// and stores a [`ViewStack`] to manage meta-contextual state about subarray-limited (Slice)
+/// and speculative parsing (Peek, PeekNot, Alts/UnionNondet).
+pub(crate) struct BufferOffset {
+    /// The current value of the offset being tracked
+    current_offset: ByteOffset,
+    /// The stack of `Lens` objects in LIFO order
+    view_stack: ViewStack,
+    /// The maximum legal offset, which is one logical position past the final legal index of the buffer (i.e. equal to the buffer length when measured in bytes)
+    max_offset: ByteOffset,
+}
+
 impl BufferOffset {
     /// Takes the maximum legal value for the offset (equal to the buffer's total length in bytes)
     /// and returns a new BufferOffset starting from 0.
     pub(crate) fn new(max_offset: ByteOffset) -> Self {
         Self {
             current_offset: ByteOffset::default(),
+            view_stack: ViewStack::new(),
+            max_offset,
+        }
+    }
+
+    #[cfg(feature = "parser_from_read_ctxt")]
+    pub(crate) fn with_offset(current_offset: ByteOffset, max_offset: ByteOffset) -> Self {
+        Self {
+            current_offset,
             view_stack: ViewStack::new(),
             max_offset,
         }

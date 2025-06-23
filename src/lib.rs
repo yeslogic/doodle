@@ -14,6 +14,7 @@ use crate::bounds::Bounds;
 use crate::byte_set::ByteSet;
 use crate::read::ReadCtxt;
 
+pub mod alt;
 pub mod bounds;
 pub mod byte_set;
 pub mod codegen;
