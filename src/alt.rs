@@ -1,8 +1,12 @@
 pub mod prelude;
 
+use std::{collections::BTreeMap, rc::Rc};
+
 use crate::{
-    ByteSet, DynFormat, Expr, Format, FormatModule, Label, Pattern, StyleHint, TypeHint, ValueType,
+    BaseType, ByteSet, DynFormat, Expr, Format, FormatModule, FormatRef, IntoLabel, Label, Pattern,
+    StyleHint, TypeHint, TypeScope, ValueKind, ValueType,
 };
+use anyhow::{anyhow, Result as AResult};
 use serde::Serialize;
 
 pub mod marker {
@@ -264,6 +268,358 @@ impl FormatModuleExt {
             args: self.args,
             formats,
             format_types: self.format_types,
+        }
+    }
+
+    pub fn define_format<Name: IntoLabel>(
+        &mut self,
+        name: Name,
+        format_ext: FormatExt,
+    ) -> FormatRef {
+        self.define_format_args(name, vec![], format_ext)
+    }
+
+    pub fn define_format_args<Name: IntoLabel>(
+        &mut self,
+        name: Name,
+        args: Vec<(Label, ValueType)>,
+        format_ext: FormatExt,
+    ) -> FormatRef {
+        let mut scope = TypeScope::new();
+        for (arg_name, arg_type) in &args {
+            scope.push(arg_name.clone(), arg_type.clone());
+        }
+        let format_type = match self.infer_format_type(&scope, &format_ext) {
+            Ok(t) => t,
+            Err(msg) => panic!("{msg}"),
+        };
+        let level = self.names.len();
+        self.names.push(name.into());
+        self.args.push(args);
+        self.formats.push(format_ext);
+        self.format_types.push(format_type);
+        FormatRef(level)
+    }
+
+    fn get_args(&self, level: usize) -> &[(Label, ValueType)] {
+        &self.args[level]
+    }
+
+    pub fn get_format_type(&self, level: usize) -> &ValueType {
+        &self.format_types[level]
+    }
+}
+
+impl FormatModuleExt {
+    pub(crate) fn infer_format_type(
+        &self,
+        scope: &TypeScope<'_>,
+        f: &FormatExt,
+    ) -> AResult<ValueType> {
+        match f {
+            FormatExt::Ground(ground_format) => match ground_format {
+                GroundFormat::ItemVar(level, args) => {
+                    let arg_names = self.get_args(*level);
+                    if arg_names.len() != args.len() {
+                        return Err(anyhow!(
+                            "Expected {} arguments, found {}",
+                            arg_names.len(),
+                            args.len()
+                        ));
+                    }
+                    for ((_name, arg_type), expr) in Iterator::zip(arg_names.iter(), args.iter()) {
+                        let t = expr.infer_type(scope)?;
+                        let _t = arg_type.unify(&t)?;
+                    }
+                    Ok(self.get_format_type(*level).clone())
+                }
+                GroundFormat::Fail => Ok(ValueType::Empty),
+
+                GroundFormat::SkipRemainder | GroundFormat::EndOfInput | GroundFormat::Align(_) => {
+                    Ok(ValueType::UNIT)
+                }
+
+                GroundFormat::Byte(_bs) => Ok(ValueType::Base(BaseType::U8)),
+                GroundFormat::Compute(expr) => expr.infer_type(scope),
+
+                // REVIEW - do we want to hard-code this as U64 or make it a flexibly abstract integer type?
+                GroundFormat::Pos => Ok(ValueType::Base(BaseType::U64)),
+
+                GroundFormat::Apply(name) => match scope.get_type_by_name(name) {
+                    ValueKind::Format(t) => Ok(t.clone()),
+                    ValueKind::Value(t) => Err(anyhow!("Apply: expected format, found {t:?}")),
+                },
+            },
+            FormatExt::Epi(epi_format) => match epi_format {
+                EpiFormat::Mono(mono_kind, f) => {
+                    match mono_kind {
+                        MonoKind::Variant(label) => {
+                            let t = self.infer_format_type(scope, f)?;
+                            Ok(ValueType::Union(BTreeMap::from([(label.clone(), t)])))
+                        }
+                        MonoKind::Repeat | MonoKind::Repeat1 => {
+                            let t = self.infer_format_type(scope, f)?;
+                            Ok(ValueType::Seq(Box::new(t)))
+                        }
+
+                        MonoKind::RepeatCount(count) => {
+                            match count.infer_type(scope)? {
+                                ValueType::Base(b) if b.is_numeric() => {
+                                    let t = self.infer_format_type(scope, f)?;
+                                    Ok(ValueType::Seq(Box::new(t)))
+                                }
+                                other => Err(anyhow!("RepeatCount first argument type should be numeric, found {other:?} instead")),
+                            }
+                        }
+                        MonoKind::RepeatBetween(min, max) => {
+                            match min.infer_type(scope)? {
+                                ref t0 @ ValueType::Base(b0) if b0.is_numeric() => {
+                                    match max.infer_type(scope)? {
+                                        ValueType::Base(b1) if b0 == b1 => {
+                                            let t = self.infer_format_type(scope, f)?;
+                                            Ok(ValueType::Seq(Box::new(t)))
+                                        }
+                                        other => Err(anyhow!("RepeatBetween second argument type should be the same as the first, found {other:?} (!= {t0:?})")),
+                                    }
+                                }
+                                other => Err(anyhow!("RepeatBetween first argument type should be numeric, found {other:?} instead")),
+                            }
+                        }
+                        MonoKind::RepeatUntilLast(lambda_elem) => {
+                            match lambda_elem.as_ref() {
+                                Expr::Lambda(head, expr) => {
+                                    let t = self.infer_format_type(scope, f)?;
+                                    let mut child_scope = TypeScope::child(scope);
+                                    child_scope.push(head.clone(), t.clone());
+                                    let ret_type = expr.infer_type(&child_scope)?;
+                                    match ret_type {
+                                        ValueType::Base(BaseType::Bool) => Ok(ValueType::Seq(Box::new(t))),
+                                        other => Err(anyhow!("RepeatUntilLast first argument (lambda) return type should be Bool, found {other:?} instead")),
+                                    }
+                                }
+                                other => Err(anyhow!("RepeatUntilLast first argument type should be lambda, found {other:?} instead")),
+                            }
+                        }
+                        MonoKind::RepeatUntilSeq(lambda_seq) => {
+                            match lambda_seq.as_ref() {
+                                Expr::Lambda(head, expr) => {
+                                    let t = self.infer_format_type(scope, f)?;
+                                    let mut child_scope = TypeScope::child(scope);
+                                    child_scope.push(head.clone(), ValueType::Seq(Box::new(t.clone())));
+                                    let ret_type = expr.infer_type(&child_scope)?;
+                                    match ret_type {
+                                        ValueType::Base(BaseType::Bool) => Ok(ValueType::Seq(Box::new(t))),
+                                        other => Err(anyhow!("RepeatUntilSeq first argument (lambda) return type should be Bool, found {other:?} instead")),
+                                    }
+                                }
+                                other => Err(anyhow!("RepeatUntilSeq first argument type should be lambda, found {other:?} instead")),
+                            }
+                        }
+                        MonoKind::AccumUntil(lambda_acc_seq, lambda_acc_val, init, vt) => {
+                            match lambda_acc_seq.as_ref() {
+                                Expr::Lambda(head, expr) => {
+                                    let t = self.infer_format_type(scope, f)?;
+                                    // Check that the initial accumulator value's type unifies with the type-claim
+                                    let _acc_type = init.infer_type(&scope)?.unify(vt.as_ref())?;
+                                    let mut child_scope = TypeScope::child(scope);
+                                    let t_seq = ValueType::Seq(Box::new(t.clone()));
+                                    let vt_acc_seq = ValueType::Tuple(vec![vt.as_ref().clone(), t_seq.clone()]);
+                                    child_scope.push(head.clone(), vt_acc_seq.clone());
+                                    let ret_type = expr.infer_type(&child_scope)?;
+                                    match ret_type {
+                                        ValueType::Base(BaseType::Bool) => {
+                                            match lambda_acc_val.as_ref() {
+                                                Expr::Lambda(head, expr) => {
+                                                    let mut child_scope = TypeScope::child(&child_scope);
+                                                    let vt_acc_elem = ValueType::Tuple(vec![vt.as_ref().clone(), t.clone()]);
+                                                    child_scope.push(head.clone(), vt_acc_elem);
+                                                    // we just need to check that these types unify, the value is unimportant
+                                                    let _ret_type = expr.infer_type(&child_scope)?.unify(vt.as_ref())?;
+                                                    Ok(vt_acc_seq)
+                                                }
+                                                other => return Err(anyhow!("AccumUntil second argument type should be lambda, found {other:?} instead")),
+                                            }
+                                        }
+                                        other => Err(anyhow!("AccumUntil first argument (lambda) return type should be Bool, found {other:?} instead")),
+                                    }
+
+                                }
+                                other => Err(anyhow!("AccumUntil first argument type should be lambda, found {other:?} instead")),
+                            }
+                        }
+                        MonoKind::ForEach(expr, lbl) => {
+                            let expr_t = expr.infer_type(scope)?;
+                            let elem_t = match expr_t {
+                                ValueType::Seq(elem_t) => (*elem_t).clone(),
+                                _ => return Err(anyhow!("ForEach: expected Seq, found {expr_t:?}")),
+                            };
+                            let mut child_scope = TypeScope::child(scope);
+                            child_scope.push(lbl.clone(), elem_t);
+                            let inner_t = self.infer_format_type(&child_scope, f)?;
+                            Ok(ValueType::Seq(Box::new(inner_t)))
+                        }
+                        MonoKind::Maybe(x) => match x.infer_type(scope)? {
+                            ValueType::Base(BaseType::Bool) => {
+                                let t = self.infer_format_type(scope, f)?;
+                                Ok(ValueType::Option(Box::new(t)))
+                            }
+                            other => Err(anyhow!(
+                                "Maybe-predicate is not a bool-type: {x:?} ~ {other:?}"
+                            )),
+                        },
+                        MonoKind::Peek => self.infer_format_type(scope, f),
+                        MonoKind::PeekNot => Ok(ValueType::UNIT),
+                        MonoKind::Slice(expr) => {
+                            debug_assert!(expr.infer_type(scope).is_ok_and(|vt| vt.as_base().is_some_and(BaseType::is_numeric)));
+                            self.infer_format_type(scope, f)
+                        }
+                        MonoKind::Bits => self.infer_format_type(scope, f),
+                        MonoKind::WithRelativeOffset(_base_addr, _offs) => {
+                            self.infer_format_type(scope, f)
+                        }
+                        MonoKind::Map(expr) => {
+                            let arg_t = self.infer_format_type(scope, f)?;
+                            match expr.as_ref() {
+                                Expr::Lambda(name, body) => {
+                                    let mut child_scope = TypeScope::child(scope);
+                                    child_scope.push(name.clone(), arg_t);
+                                    body.infer_type(&child_scope)
+                                }
+                                other => Err(anyhow!("Map: expected lambda, found {other:?}")),
+                            }
+                        }
+                        MonoKind::Where(expr) => {
+                            let arg_type = self.infer_format_type(scope, f)?;
+                            match expr.as_ref() {
+                                Expr::Lambda(name, body) => {
+                                    let mut child_scope = TypeScope::child(scope);
+                                    child_scope.push(name.clone(), arg_type.clone());
+                                    let t = body.infer_type(&child_scope)?;
+                                    if t != ValueType::Base(BaseType::Bool) {
+                                        return Err(anyhow!("Where: expected bool lambda, found {t:?}"));
+                                    }
+                                    Ok(arg_type)
+                                }
+                                other => Err(anyhow!("Where: expected lambda, found {other:?}")),
+                            }
+                        }
+                        MonoKind::Let(name, expr) => {
+                            let t = expr.infer_type(scope)?;
+                            let mut child_scope = TypeScope::child(scope);
+                            child_scope.push(name.clone(), t);
+                            self.infer_format_type(&child_scope, f)
+                        }
+                        MonoKind::Dynamic(name, dyn_format) => {
+                            match dyn_format {
+                                DynFormat::Huffman(lengths_expr, _opt_values_expr) => match lengths_expr.infer_type(scope)? {
+                                    ValueType::Seq(t) => match &*t {
+                                        ValueType::Base(BaseType::U8 | BaseType::U16) => {
+                                            let mut child_scope = TypeScope::child(scope);
+                                            child_scope.push(name.clone(), ValueType::Base(BaseType::U16));
+                                            self.infer_format_type(&child_scope, f)
+                                        }
+                                        other => Err(anyhow!("Huffman: expected U8 or U16, found {other:?}")),
+                                    }
+                                    other => Err(anyhow!("Huffman: expected Seq, found {other:?}")),
+                                }
+                            }
+                        }
+                        MonoKind::DecodeBytes(bytes) => {
+                            let bytes_type = bytes.infer_type(scope)?;
+                            match bytes_type {
+                                ValueType::Seq(bt) if matches!(*bt, ValueType::Base(BaseType::U8)) => {
+                                    self.infer_format_type(scope, f)
+                                }
+                                other => Err(anyhow!("DecodeBytes first argument type should be Seq(U8), found {other:?} instead")),
+                            }
+                        }
+                        MonoKind::Hint(_) => {
+                            self.infer_format_type(scope, f)
+                        }
+                    }
+                }
+                EpiFormat::Duo(duo_kind, f0, f1) => match duo_kind {
+                    DuoKind::MonadSeq => {
+                        let _ = self.infer_format_type(scope, f0)?;
+                        self.infer_format_type(scope, f1)
+                    }
+                    DuoKind::LetFormat(name) => {
+                        let t0 = self.infer_format_type(scope, f0)?;
+                        let mut new_scope = TypeScope::child(scope);
+                        new_scope.push(name.clone(), t0);
+                        self.infer_format_type(&new_scope, f1)
+                    }
+                },
+                EpiFormat::Poly(poly_kind, fs) => match poly_kind {
+                    PolyKind::Union | PolyKind::UnionNondet => {
+                        let mut t = ValueType::Empty;
+                        for f in fs {
+                            t = t.unify(&self.infer_format_type(scope, f)?)?;
+                        }
+                        Ok(t)
+                    }
+                    PolyKind::Tuple => {
+                        let mut ts = Vec::new();
+                        for f in fs {
+                            ts.push(self.infer_format_type(scope, f)?);
+                        }
+                        Ok(ValueType::Tuple(ts))
+                    }
+                    PolyKind::Sequence => {
+                        let mut elem_t = ValueType::Any;
+                        for f in fs {
+                            elem_t = elem_t.unify(&self.infer_format_type(scope, f)?)?;
+                        }
+                        Ok(ValueType::Seq(Box::new(elem_t)))
+                    }
+                },
+                EpiFormat::Pat(pat_kind, pat_fs) => match pat_kind {
+                    PatKind::Match(head) => {
+                        if pat_fs.is_empty() {
+                            return Err(anyhow!("infer_format_type: empty Match"));
+                        }
+                        let head_type = Rc::new(head.infer_type(scope)?);
+                        let mut t = ValueType::Any;
+                        for (pattern, branch) in pat_fs {
+                            t = t.unify(&pattern.infer_format_branch_type_ext(
+                                scope,
+                                head_type.clone(),
+                                self,
+                                branch,
+                            )?)?;
+                        }
+                        Ok(t)
+                    }
+                },
+                EpiFormat::Opt(opt_kind, opt_f) => match opt_kind {
+                    OptKind::LiftedOption => match opt_f {
+                        None => Ok(ValueType::Option(Box::new(ValueType::Any))),
+                        Some(f) => {
+                            let t = self.infer_format_type(scope, f)?;
+                            Ok(ValueType::Option(Box::new(t)))
+                        }
+                    },
+                },
+            },
+            FormatExt::Meta(meta_format) => {
+                match meta_format {
+                    MetaFormat::BindScopeTo(_ident) => Ok(ValueType::UNIT),
+                    MetaFormat::WithScope(_ident, scope_format) => match scope_format {
+                        ScopeFormat::ReadArray(_base_kind) => {
+                            todo!("type inference does not support ReadArray")
+                        }
+                        ScopeFormat::ReadSliceLen(expr) => {
+                            // TODO: check that _ident is bound to a scope
+                            let t = expr.infer_type(scope)?;
+                            if t.as_base().is_some_and(BaseType::is_numeric) {
+                                Ok(ValueType::Seq(Box::new(ValueType::Base(BaseType::U8))))
+                            } else {
+                                Err(anyhow!("ReadSliceLen: expected numeric type, found {t:?}"))
+                            }
+                        }
+                    },
+                }
+            }
         }
     }
 }
