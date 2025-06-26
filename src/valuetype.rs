@@ -44,6 +44,13 @@ impl ValueType {
 
     pub const UNIT: ValueType = ValueType::Tuple(Vec::new());
 
+    pub(crate) fn as_base(&self) -> Option<&BaseType> {
+        match self {
+            ValueType::Base(b) => Some(b),
+            _ => None,
+        }
+    }
+
     pub(crate) fn record_proj(&self, label: &str) -> ValueType {
         match self {
             ValueType::Record(fields) => match fields.iter().find(|(l, _)| label == l) {

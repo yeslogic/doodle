@@ -1,3 +1,4 @@
+use crate::alt::{FormatExt, FormatModuleExt};
 use crate::bounds::Bounds;
 use crate::{BaseType, Expr, Format, FormatModule, IntoLabel, Label, TypeScope, ValueType};
 use anyhow::Result as AResult;
@@ -99,6 +100,18 @@ impl Pattern {
         head_type: Rc<ValueType>,
         module: &FormatModule,
         format: &Format,
+    ) -> AResult<ValueType> {
+        let mut pattern_scope = TypeScope::child(scope);
+        self.build_scope(&mut pattern_scope, head_type);
+        module.infer_format_type(&pattern_scope, format)
+    }
+
+    pub(crate) fn infer_format_branch_type_ext(
+        &self,
+        scope: &TypeScope<'_>,
+        head_type: Rc<ValueType>,
+        module: &FormatModuleExt,
+        format: &FormatExt,
     ) -> AResult<ValueType> {
         let mut pattern_scope = TypeScope::child(scope);
         self.build_scope(&mut pattern_scope, head_type);
