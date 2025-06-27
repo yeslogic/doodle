@@ -2,6 +2,7 @@
 #![deny(rust_2018_idioms)]
 
 use anyhow::{anyhow, Result as AResult};
+use doodle::alt::{CompilerParams, FormatCompiler, FormatModuleExt};
 use doodle::codegen::{generate_code, ToFragment};
 use doodle::Format;
 use std::fs;
@@ -123,22 +124,33 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
             dest,
             stat_only,
         } => {
-            let mut module = FormatModule::new();
-
-            let format = if stat_only {
-                format::main_stat(&mut module).call()
+            if stat_only {
+                let mut module = FormatModuleExt::new();
+                let format = format::main_stat_ext(&mut module).call();
+                let compiler = FormatCompiler::new(CompilerParams::default());
+                let module = module.compile(&compiler);
+                match output {
+                    FormatOutput::Debug => println!("{module:?}"),
+                    FormatOutput::Json => {
+                        serde_json::to_writer(std::io::stdout(), &module).unwrap()
+                    }
+                    FormatOutput::Rust => {
+                        print_generated_code(&module, &format, dest);
+                    }
+                }
             } else {
-                format::main(&mut module).call()
-            };
-
-            match output {
-                FormatOutput::Debug => println!("{module:?}"),
-                FormatOutput::Json => serde_json::to_writer(std::io::stdout(), &module).unwrap(),
-                FormatOutput::Rust => {
-                    print_generated_code(&module, &format, dest);
+                let mut module = FormatModule::new();
+                let format = format::main(&mut module).call();
+                match output {
+                    FormatOutput::Debug => println!("{module:?}"),
+                    FormatOutput::Json => {
+                        serde_json::to_writer(std::io::stdout(), &module).unwrap()
+                    }
+                    FormatOutput::Rust => {
+                        print_generated_code(&module, &format, dest);
+                    }
                 }
             }
-
             Ok(())
         }
         Command::File {
@@ -282,7 +294,7 @@ fn print_generated_code(
                 || (path.is_file()
                     && path
                         .file_name()
-                        .is_some_and(|s| s.to_string_lossy().contains("gencode.rs")))
+                        .is_some_and(|s| s.to_string_lossy().contains("gencode")))
             {
                 let f = std::fs::File::create(path).unwrap_or_else(|err| panic!("error: {err}"));
                 write_to(f, content).expect("failed to write");

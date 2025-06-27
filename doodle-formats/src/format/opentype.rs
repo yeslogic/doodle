@@ -5287,6 +5287,123 @@ pub(crate) fn stat_table(
     )
 }
 
+pub(crate) mod alt {
+    use super::*;
+    use doodle::alt::FormatModuleExt;
+
+    pub(crate) fn opentype_tag(module: &mut FormatModuleExt, base: &BaseModule) -> FormatRef {
+        module.define_format("opentype.types.tag", base.u32be())
+    }
+
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/stat#style-attributes-header
+    pub(crate) fn stat_table(
+        module: &mut FormatModuleExt,
+        base: &BaseModule,
+        tag: FormatRef,
+    ) -> FormatRef {
+        let axis_record = {
+            record([
+                ("axis_tag", tag.call()),
+                ("axis_name_id", base.u16be()),
+                ("axis_ordering", base.u16be()),
+            ])
+        };
+        let axis_value_table = {
+            use BitFieldKind::*;
+            let axis_flags = bit_fields_u16([
+                Reserved {
+                    bit_width: 14,
+                    check_zero: false,
+                },
+                FlagBit("elidable_axis_value_name"), // Bit 1 - When set, indicates the 'normal' value for this axis and implies it may be omitted when composing name-strings
+                FlagBit("older_sibling_font_attribute"), // Bit 0 - When set, indicates that the axis information applies to previously released fonts in the same font-family
+            ]);
+            let axis_value = record([("axis_index", base.u16be()), ("value", fixed32be(base))]);
+            let f1_fields = vec![
+                ("axis_index", base.u16be()),
+                ("flags", axis_flags.clone()),
+                ("value_name_id", base.u16be()), // NameId for entries in 'name' table that provide display-string for this attribute value
+                ("value", fixed32be(base)),
+            ];
+            let f2_fields = vec![
+                ("axis_index", base.u16be()),
+                ("flags", axis_flags.clone()),
+                ("value_name_id", base.u16be()), // NameId for entries in 'name' table that provide display-string for this attribute value
+                ("nominal_value", fixed32be(base)),
+                ("range_min_value", fixed32be(base)),
+                ("range_max_value", fixed32be(base)),
+            ];
+            let f3_fields = vec![
+                ("axis_index", base.u16be()),
+                ("flags", axis_flags.clone()),
+                ("value_name_id", base.u16be()), // NameId for entries in 'name' table that provide display-string for this attribute value
+                ("value", fixed32be(base)),
+                ("linked_value", fixed32be(base)),
+            ];
+            let f4_fields = vec![
+                ("axis_count", base.u16be()),
+                ("flags", axis_flags.clone()),
+                ("value_name_id", base.u16be()), // NameId for entries in 'name' table that provide display-string for this combination of axis values
+                ("axis_values", repeat_count(var("axis_count"), axis_value)),
+            ];
+            embedded_variadic_alternation(
+                [("format", where_between_u16(base.u16be(), 1, 4))],
+                "format",
+                [
+                    (1, "Format1", f1_fields),
+                    (2, "Format2", f2_fields),
+                    (3, "Format3", f3_fields),
+                    (4, "Format4", f4_fields),
+                ],
+                "data",
+                NestingKind::MinimalVariation,
+            )
+        };
+        let design_axes_array = |design_axis_count: Expr| {
+            record([("design_axes", repeat_count(design_axis_count, axis_record))])
+        };
+        let axis_value_offsets_array = |axis_value_count: Expr| {
+            record([
+                ("table_start", pos32()),
+                (
+                    "axis_value_offsets",
+                    repeat_count(
+                        axis_value_count,
+                        offset16_mandatory(var("table_start"), axis_value_table, base),
+                    ),
+                ),
+            ])
+        };
+        module.define_format(
+            "opentype.stat_table",
+            record([
+                ("table_start", pos32()),
+                ("major_version", expect_u16be(base, 1)),
+                ("minor_version", expects_u16be(base, [1, 2])), // Version 1.0 is deprecated
+                ("design_axis_size", base.u16be()),             // size (in bytes) of each axis record
+                ("design_axis_count", base.u16be()),            // number of axis records
+                (
+                    "design_axes_offset",
+                    offset32(
+                        var("table_start"),
+                        design_axes_array(var("design_axis_count")),
+                        base,
+                    ),
+                ), // offset is 0 iff design_axis_count is 0
+                ("axis_value_count", base.u16be()),
+                (
+                    "offset_to_axis_value_offsets",
+                    offset32(
+                        var("table_start"),
+                        axis_value_offsets_array(var("axis_value_count")),
+                        base,
+                    ),
+                ), // offset is 0 iff axis_value_count is 0
+                ("elided_fallback_name_id", base.u16be()), // omitted in version 1.0, but said version is deprecated
+            ]),
+        )
+    }
+}
 /*
     //! # OpenType Font File Format
 

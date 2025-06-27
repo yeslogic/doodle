@@ -1,3 +1,4 @@
+use doodle::alt::FormatModuleExt;
 use doodle::byte_set::ByteSet;
 use doodle::helper::*;
 use doodle::{Expr, Format, FormatModule, FormatRef};
@@ -76,6 +77,115 @@ impl BaseModule {
     pub fn ascii_hex_upper(&self) -> Format { self.ascii_hex_upper.call() }
     #[allow(dead_code)]
     pub fn ascii_hex_any(&self) -> Format { self.ascii_hex_any.call() }
+}
+
+pub fn main_ext(module: &mut FormatModuleExt) -> BaseModule {
+    let bit = module.define_format("base.bit", Format::Byte(ByteSet::full()));
+
+    let u8 = module.define_format("base.u8", Format::Byte(ByteSet::full()));
+
+    let u16be = module.define_format(
+        "base.u16be",
+        map(
+            tuple_repeat(2, u8.call()),
+            lambda("x", Expr::U16Be(Box::new(var("x")))),
+        ),
+    );
+
+    let u16le = module.define_format(
+        "base.u16le",
+        map(
+            tuple_repeat(2, u8.call()),
+            lambda("x", Expr::U16Le(Box::new(var("x")))),
+        ),
+    );
+
+    let u32be = module.define_format(
+        "base.u32be",
+        map(
+            tuple_repeat(4, u8.call()),
+            lambda("x", Expr::U32Be(Box::new(var("x")))),
+        ),
+    );
+
+    let u32le = module.define_format(
+        "base.u32le",
+        map(
+            tuple_repeat(4, u8.call()),
+            lambda("x", Expr::U32Le(Box::new(var("x")))),
+        ),
+    );
+
+    let u64be = module.define_format(
+        "base.u64be",
+        map(
+            tuple_repeat(8, u8.call()),
+            lambda("x", Expr::U64Be(Box::new(var("x")))),
+        ),
+    );
+
+    let u64le = module.define_format(
+        "base.u64le",
+        map(
+            tuple_repeat(8, u8.call()),
+            lambda("x", Expr::U64Le(Box::new(var("x")))),
+        ),
+    );
+
+    let ascii_char = module.define_format("base.ascii-char", Format::Byte(ByteSet::full()));
+
+    let mut bs = ByteSet::from(32..=127);
+    bs.insert(b'\t');
+    bs.insert(b'\n');
+    bs.insert(b'\r');
+    let ascii_char_strict = module.define_format("base.ascii-char.strict", Format::Byte(bs));
+
+    let asciiz_string = module.define_format(
+        "base.asciiz-string",
+        record([("string", repeat(not_byte(0x00))), ("null", is_byte(0x00))]),
+    );
+
+    let ascii_octal_digit = module.define_format(
+        "base.ascii-char.octal",
+        Format::Byte(ByteSet::from(BaseModule::ASCII_OCTAL_DIGIT)),
+    );
+
+    let ascii_decimal_digit = module.define_format(
+        "base.ascii-char.decimal",
+        Format::Byte(ByteSet::from(BaseModule::ASCII_DECIMAL_DIGIT)),
+    );
+
+    let ascii_hex_lower = module.define_format(
+        "base.ascii-char.hex.lower",
+        Format::Byte(ByteSet::from(BaseModule::ASCII_HEX_LOWER)),
+    );
+    let ascii_hex_upper = module.define_format(
+        "base.ascii-char.hex.upper",
+        Format::Byte(ByteSet::from(BaseModule::ASCII_HEX_UPPER)),
+    );
+    let ascii_hex_any = module.define_format(
+        "base.ascii-char.hex.any",
+        Format::Byte(ByteSet::from(BaseModule::ASCII_HEX_ANY)),
+    );
+
+    BaseModule {
+        bit,
+        u8,
+        u16be,
+        u16le,
+        u32be,
+        u32le,
+        u64be,
+        u64le,
+        ascii_char,
+        ascii_char_strict,
+        asciiz_string,
+        ascii_octal_digit,
+        ascii_decimal_digit,
+        ascii_hex_lower,
+        ascii_hex_upper,
+        ascii_hex_any,
+    }
 }
 
 pub fn main(module: &mut FormatModule) -> BaseModule {
