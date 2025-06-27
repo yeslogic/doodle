@@ -261,6 +261,15 @@ pub struct FormatModuleExt {
 }
 
 impl FormatModuleExt {
+    pub fn new() -> FormatModuleExt {
+        FormatModuleExt {
+            names: Vec::new(),
+            args: Vec::new(),
+            formats: Vec::new(),
+            format_types: Vec::new(),
+        }
+    }
+
     pub fn compile(self, compiler: &FormatCompiler) -> FormatModule {
         let formats = self.formats.iter().map(|f| compiler.compile(f)).collect();
         FormatModule {
@@ -271,7 +280,14 @@ impl FormatModuleExt {
         }
     }
 
-    pub fn define_format<Name: IntoLabel>(
+    pub fn define_format<Name: IntoLabel, F>(&mut self, name: Name, format: F) -> FormatRef
+    where
+        FormatExt: From<F>,
+    {
+        self.define_format_ext(name, FormatExt::from(format))
+    }
+
+    pub fn define_format_ext<Name: IntoLabel>(
         &mut self,
         name: Name,
         format_ext: FormatExt,
@@ -642,6 +658,150 @@ mod __impls {
     impl From<MetaFormat> for FormatExt {
         fn from(f: MetaFormat) -> Self {
             FormatExt::Meta(f)
+        }
+    }
+
+    impl From<Format> for FormatExt {
+        fn from(value: Format) -> Self {
+            match value {
+                Format::ItemVar(level, exprs) => {
+                    FormatExt::Ground(GroundFormat::ItemVar(level, exprs))
+                }
+                Format::Fail => FormatExt::Ground(GroundFormat::Fail),
+                Format::EndOfInput => FormatExt::Ground(GroundFormat::EndOfInput),
+                Format::Align(n) => FormatExt::Ground(GroundFormat::Align(n)),
+                Format::Byte(byte_set) => FormatExt::Ground(GroundFormat::Byte(byte_set)),
+                Format::Variant(name, format) => FormatExt::Epi(EpiFormat::Mono(
+                    MonoKind::Variant(name),
+                    Box::new(FormatExt::from(*format)),
+                )),
+                Format::Union(formats) => FormatExt::Epi(EpiFormat::Poly(
+                    PolyKind::Union,
+                    formats.into_iter().map(FormatExt::from).collect(),
+                )),
+                Format::UnionNondet(formats) => FormatExt::Epi(EpiFormat::Poly(
+                    PolyKind::UnionNondet,
+                    formats.into_iter().map(FormatExt::from).collect(),
+                )),
+                Format::Tuple(formats) => FormatExt::Epi(EpiFormat::Poly(
+                    PolyKind::Tuple,
+                    formats.into_iter().map(FormatExt::from).collect(),
+                )),
+                Format::Sequence(formats) => FormatExt::Epi(EpiFormat::Poly(
+                    PolyKind::Sequence,
+                    formats.into_iter().map(FormatExt::from).collect(),
+                )),
+                Format::Repeat(format) => FormatExt::Epi(EpiFormat::Mono(
+                    MonoKind::Repeat,
+                    Box::new(FormatExt::from(*format)),
+                )),
+                Format::Repeat1(format) => FormatExt::Epi(EpiFormat::Mono(
+                    MonoKind::Repeat1,
+                    Box::new(FormatExt::from(*format)),
+                )),
+                Format::RepeatCount(expr, format) => FormatExt::Epi(EpiFormat::Mono(
+                    MonoKind::RepeatCount(expr),
+                    Box::new(FormatExt::from(*format)),
+                )),
+                Format::RepeatBetween(expr, expr1, format) => FormatExt::Epi(EpiFormat::Mono(
+                    MonoKind::RepeatBetween(expr, expr1),
+                    Box::new(FormatExt::from(*format)),
+                )),
+                Format::RepeatUntilLast(expr, format) => FormatExt::Epi(EpiFormat::Mono(
+                    MonoKind::RepeatUntilLast(expr),
+                    Box::new(FormatExt::from(*format)),
+                )),
+                Format::RepeatUntilSeq(expr, format) => FormatExt::Epi(EpiFormat::Mono(
+                    MonoKind::RepeatUntilSeq(expr),
+                    Box::new(FormatExt::from(*format)),
+                )),
+                Format::AccumUntil(expr, expr1, expr2, type_hint, format) => {
+                    FormatExt::Epi(EpiFormat::Mono(
+                        MonoKind::AccumUntil(expr, expr1, expr2, type_hint),
+                        Box::new(FormatExt::from(*format)),
+                    ))
+                }
+                Format::ForEach(expr, name, format) => FormatExt::Epi(EpiFormat::Mono(
+                    MonoKind::ForEach(expr, name),
+                    Box::new(FormatExt::from(*format)),
+                )),
+                Format::Maybe(expr, format) => FormatExt::Epi(EpiFormat::Mono(
+                    MonoKind::Maybe(expr),
+                    Box::new(FormatExt::from(*format)),
+                )),
+                Format::Peek(format) => FormatExt::Epi(EpiFormat::Mono(
+                    MonoKind::Peek,
+                    Box::new(FormatExt::from(*format)),
+                )),
+                Format::PeekNot(format) => FormatExt::Epi(EpiFormat::Mono(
+                    MonoKind::PeekNot,
+                    Box::new(FormatExt::from(*format)),
+                )),
+                Format::Slice(expr, format) => FormatExt::Epi(EpiFormat::Mono(
+                    MonoKind::Slice(expr),
+                    Box::new(FormatExt::from(*format)),
+                )),
+                Format::Bits(format) => FormatExt::Epi(EpiFormat::Mono(
+                    MonoKind::Bits,
+                    Box::new(FormatExt::from(*format)),
+                )),
+                Format::WithRelativeOffset(expr, expr1, format) => FormatExt::Epi(EpiFormat::Mono(
+                    MonoKind::WithRelativeOffset(expr, expr1),
+                    Box::new(FormatExt::from(*format)),
+                )),
+                Format::Map(format, expr) => FormatExt::Epi(EpiFormat::Mono(
+                    MonoKind::Map(expr),
+                    Box::new(FormatExt::from(*format)),
+                )),
+                Format::Where(format, expr) => FormatExt::Epi(EpiFormat::Mono(
+                    MonoKind::Where(expr),
+                    Box::new(FormatExt::from(*format)),
+                )),
+                Format::Compute(expr) => FormatExt::Ground(GroundFormat::Compute(expr)),
+                Format::Let(name, expr, format) => FormatExt::Epi(EpiFormat::Mono(
+                    MonoKind::Let(name, expr),
+                    Box::new(FormatExt::from(*format)),
+                )),
+                Format::Match(expr, items) => FormatExt::Epi(EpiFormat::Pat(
+                    PatKind::Match(expr),
+                    items
+                        .into_iter()
+                        .map(|(p, f)| (p, FormatExt::from(f)))
+                        .collect(),
+                )),
+                Format::Dynamic(name, dyn_format, format) => FormatExt::Epi(EpiFormat::Mono(
+                    MonoKind::Dynamic(name, dyn_format),
+                    Box::new(FormatExt::from(*format)),
+                )),
+                Format::Apply(name) => FormatExt::Ground(GroundFormat::Apply(name)),
+                Format::Pos => FormatExt::Ground(GroundFormat::Pos),
+                Format::SkipRemainder => FormatExt::Ground(GroundFormat::SkipRemainder),
+                Format::DecodeBytes(expr, format) => FormatExt::Epi(EpiFormat::Mono(
+                    MonoKind::DecodeBytes(expr),
+                    Box::new(FormatExt::from(*format)),
+                )),
+                Format::LetFormat(format, name, format1) => FormatExt::Epi(EpiFormat::Duo(
+                    DuoKind::LetFormat(name),
+                    Box::new(FormatExt::from(*format)),
+                    Box::new(FormatExt::from(*format1)),
+                )),
+                Format::MonadSeq(format, format1) => FormatExt::Epi(EpiFormat::Duo(
+                    DuoKind::MonadSeq,
+                    Box::new(FormatExt::from(*format)),
+                    Box::new(FormatExt::from(*format1)),
+                )),
+                Format::Hint(style_hint, format) => FormatExt::Epi(EpiFormat::Mono(
+                    MonoKind::Hint(style_hint),
+                    Box::new(FormatExt::from(*format)),
+                )),
+                Format::LiftedOption(Some(format)) => FormatExt::Epi(EpiFormat::Opt(
+                    OptKind::LiftedOption,
+                    Some(Box::new(FormatExt::from(*format))),
+                )),
+                Format::LiftedOption(None) => {
+                    FormatExt::Epi(EpiFormat::Opt(OptKind::LiftedOption, None))
+                }
+            }
         }
     }
 
