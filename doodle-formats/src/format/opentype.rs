@@ -5380,8 +5380,8 @@ pub(crate) mod alt {
                 ("table_start", pos32()),
                 ("major_version", expect_u16be(base, 1)),
                 ("minor_version", expects_u16be(base, [1, 2])), // Version 1.0 is deprecated
-                ("design_axis_size", base.u16be()),             // size (in bytes) of each axis record
-                ("design_axis_count", base.u16be()),            // number of axis records
+                ("design_axis_size", base.u16be()), // size (in bytes) of each axis record
+                ("design_axis_count", base.u16be()), // number of axis records
                 (
                     "design_axes_offset",
                     offset32(

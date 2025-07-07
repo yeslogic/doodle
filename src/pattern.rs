@@ -1,4 +1,4 @@
-use crate::alt::{FormatExt, FormatModuleExt};
+use crate::alt::{FormatExt, FormatModuleExt, ValueTypeExt};
 use crate::bounds::Bounds;
 use crate::{BaseType, Expr, Format, FormatModule, IntoLabel, Label, TypeScope, ValueType};
 use anyhow::Result as AResult;
@@ -83,6 +83,53 @@ impl Pattern {
         }
     }
 
+    pub(crate) fn build_scope_ext(
+        &self,
+        scope: &mut TypeScope<'_, ValueTypeExt>,
+        t: Rc<ValueTypeExt>,
+    ) {
+        match (self, t.as_ref()) {
+            (Pattern::Binding(name), t) => {
+                scope.push(name.clone(), t.clone());
+            }
+            (Pattern::Wildcard, _) => {}
+            (Pattern::Bool(..), ValueTypeExt::Base(BaseType::Bool)) => {}
+            (Pattern::U8(..), ValueTypeExt::Base(BaseType::U8)) => {}
+            (Pattern::U16(..), ValueTypeExt::Base(BaseType::U16)) => {}
+            (Pattern::U32(..), ValueTypeExt::Base(BaseType::U32)) => {}
+            (Pattern::U64(..), ValueTypeExt::Base(BaseType::U64)) => {}
+            (
+                Pattern::Int(..),
+                ValueTypeExt::Base(BaseType::U8 | BaseType::U16 | BaseType::U32 | BaseType::U64),
+            ) => {}
+            (Pattern::Tuple(ps), ValueTypeExt::Tuple(ts)) if ps.len() == ts.len() => {
+                for (p, t) in Iterator::zip(ps.iter(), ts.iter()) {
+                    p.build_scope_ext(scope, Rc::new(t.clone()));
+                }
+            }
+            (Pattern::Seq(ps), ValueTypeExt::Seq(t)) => {
+                for p in ps {
+                    p.build_scope_ext(scope, Rc::new((**t).clone()));
+                }
+            }
+            (Pattern::Option(None), ValueTypeExt::Option(_)) => {
+                // do nothing
+            }
+            (Pattern::Option(Some(p)), ValueTypeExt::Option(t)) => {
+                p.build_scope_ext(scope, Rc::new((**t).clone()))
+            }
+            (Pattern::Variant(label, p), ValueTypeExt::Union(branches)) => {
+                if let Some(t) = branches.get(label) {
+                    // FIXME - this is pretty bad, but it is hard to do better without more destructive changes
+                    let tmp = Rc::new(t.clone());
+                    p.build_scope_ext(scope, tmp);
+                } else {
+                    panic!("no {label} in {branches:?}");
+                }
+            }
+            (l, r) => panic!("pattern build_scope_ext failed: ({l:?}, {r:?})"),
+        }
+    }
     pub(crate) fn infer_expr_branch_type(
         &self,
         scope: &TypeScope<'_>,
@@ -94,6 +141,16 @@ impl Pattern {
         expr.infer_type(&pattern_scope)
     }
 
+    pub(crate) fn infer_expr_branch_type_ext(
+        &self,
+        scope: &TypeScope<'_, ValueTypeExt>,
+        head_type: Rc<ValueTypeExt>,
+        expr: &Expr,
+    ) -> AResult<ValueTypeExt> {
+        let mut pattern_scope = TypeScope::child(scope);
+        self.build_scope_ext(&mut pattern_scope, head_type);
+        expr.infer_type_ext(&pattern_scope)
+    }
     pub(crate) fn infer_format_branch_type(
         &self,
         scope: &TypeScope<'_>,
@@ -108,14 +165,14 @@ impl Pattern {
 
     pub(crate) fn infer_format_branch_type_ext(
         &self,
-        scope: &TypeScope<'_>,
-        head_type: Rc<ValueType>,
+        scope: &TypeScope<'_, ValueTypeExt>,
+        head_type: Rc<ValueTypeExt>,
         module: &FormatModuleExt,
         format: &FormatExt,
-    ) -> AResult<ValueType> {
+    ) -> AResult<ValueTypeExt> {
         let mut pattern_scope = TypeScope::child(scope);
-        self.build_scope(&mut pattern_scope, head_type);
-        module.infer_format_type(&pattern_scope, format)
+        self.build_scope_ext(&mut pattern_scope, head_type);
+        module.infer_format_ext_type(&pattern_scope, format)
     }
 
     /// Returns `true` if the pattern shadows the given name.
