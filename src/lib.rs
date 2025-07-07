@@ -42,9 +42,9 @@ impl<T> IntoLabel for T where T: Into<Label> {}
 pub(crate) mod pattern;
 pub use pattern::Pattern;
 
-pub enum ValueKind {
-    Value(ValueType),
-    Format(ValueType),
+pub enum ValueKind<T> {
+    Value(T),
+    Format(T),
 }
 
 pub(crate) mod valuetype;
@@ -209,7 +209,7 @@ pub enum ProjKind {
 
 impl Expr {
     // FIXME: is this still an inherent method, or should we have a UD -> TC phase and use get_type_info instead?
-    fn infer_type(&self, scope: &TypeScope<'_>) -> AResult<ValueType> {
+    fn infer_type(&self, scope: &TypeScope<'_, ValueType>) -> AResult<ValueType> {
         match self {
             Expr::Var(name) => match scope.get_type_by_name(name) {
                 ValueKind::Value(t) => Ok(t.clone()),
@@ -2524,13 +2524,13 @@ impl MatchTree {
     }
 }
 
-pub struct TypeScope<'a> {
-    parent: Option<&'a TypeScope<'a>>,
+pub struct TypeScope<'a, T = ValueType> {
+    parent: Option<&'a TypeScope<'a, T>>,
     names: Vec<Label>,
-    types: Vec<ValueKind>,
+    types: Vec<ValueKind<T>>,
 }
 
-impl<'a> TypeScope<'a> {
+impl<'a, T> TypeScope<'a, T> {
     fn new() -> Self {
         let parent = None;
         let names = Vec::new();
@@ -2542,7 +2542,7 @@ impl<'a> TypeScope<'a> {
         }
     }
 
-    fn child(parent: &'a TypeScope<'a>) -> Self {
+    fn child(parent: &'a TypeScope<'a, T>) -> Self {
         let parent = Some(parent);
         let names = Vec::new();
         let types = Vec::new();
@@ -2553,17 +2553,17 @@ impl<'a> TypeScope<'a> {
         }
     }
 
-    fn push(&mut self, name: Label, t: ValueType) {
+    fn push(&mut self, name: Label, t: T) {
         self.names.push(name);
         self.types.push(ValueKind::Value(t));
     }
 
-    fn push_format(&mut self, name: Label, t: ValueType) {
+    fn push_format(&mut self, name: Label, t: T) {
         self.names.push(name);
         self.types.push(ValueKind::Format(t));
     }
 
-    fn get_type_by_name(&self, name: &str) -> &ValueKind {
+    fn get_type_by_name(&self, name: &str) -> &ValueKind<T> {
         for (i, n) in self.names.iter().enumerate().rev() {
             if n == name {
                 return &self.types[i];

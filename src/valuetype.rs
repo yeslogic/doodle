@@ -44,13 +44,6 @@ impl ValueType {
 
     pub const UNIT: ValueType = ValueType::Tuple(Vec::new());
 
-    pub(crate) fn as_base(&self) -> Option<&BaseType> {
-        match self {
-            ValueType::Base(b) => Some(b),
-            _ => None,
-        }
-    }
-
     pub(crate) fn record_proj(&self, label: &str) -> ValueType {
         match self {
             ValueType::Record(fields) => match fields.iter().find(|(l, _)| label == l) {
@@ -162,7 +155,7 @@ impl ValueType {
 
 /// Alias to reduce the number of code-sites we need to update if we pick a different Smart-Pointer type
 /// as the backer of `TypeHint`
-type Container<T> = std::rc::Rc<T>; // Box<T>;
+pub(crate) type Container<T> = std::rc::Rc<T>; // Box<T>;
 
 #[repr(transparent)]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
