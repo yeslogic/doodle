@@ -7,8 +7,9 @@ use std::{
 };
 
 use crate::{
-    typecheck::UnificationError, valuetype::Container, BaseType, ByteSet, DynFormat, Expr, Format,
-    FormatModule, FormatRef, IntoLabel, Label, Pattern, StyleHint, TypeScope, ValueKind, ValueType,
+    alt::marker::BaseKind, typecheck::UnificationError, valuetype::Container, BaseType, ByteSet,
+    DynFormat, Expr, Format, FormatModule, FormatRef, IntoLabel, Label, Pattern, StyleHint,
+    TypeScope, ValueKind, ValueType,
 };
 use anyhow::{anyhow, Result as AResult};
 use serde::Serialize;
@@ -129,8 +130,8 @@ pub enum EpiFormat<B = Box<FormatExt>, V = Vec<FormatExt>, P = Vec<(Pattern, For
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 #[serde(tag = "tag", content = "data")]
 pub enum MetaFormat {
-    BindScopeTo(Label),
-    WithScope(Label, ScopeFormat),
+    LetView(Label, Box<FormatExt>),
+    WithView(Label, ViewFormat),
     EngineSpecific {
         base_model: Box<FormatExt>,
         alt_model: Box<FormatExt>,
@@ -139,9 +140,16 @@ pub enum MetaFormat {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 #[serde(tag = "tag", content = "data")]
-pub enum ScopeFormat {
-    ReadArray(marker::BaseKind),
-    ReadSliceLen(Expr),
+pub enum ReadKind {
+    ByteSlice,
+    ArrayOf(marker::BaseKind),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
+#[serde(tag = "tag", content = "data")]
+pub enum ViewFormat {
+    /// ReadOffsetLen(Offset, Len, ReadKind)
+    ReadOffsetLen(Box<Expr>, Box<Expr>, ReadKind),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
@@ -252,15 +260,13 @@ impl FormatCompiler {
 
     pub fn compile_meta(&self, mf: &MetaFormat) -> Format {
         match mf {
-            MetaFormat::BindScopeTo(_lbl) => {
-                todo!("implement compilation logic for MetaFormat::BindScopeTo");
+            MetaFormat::LetView(ident, inner) => {
+                let inner = Box::new(self.compile(inner));
+                Format::LetView(ident.clone(), inner)
             }
-            MetaFormat::WithScope(_lbl, scope_format) => match scope_format {
-                ScopeFormat::ReadArray(_base_kind) => {
-                    todo!("implement compilation logic for ScopeFormat::ReadArray")
-                }
-                ScopeFormat::ReadSliceLen(_expr) => {
-                    todo!("implement compilation logic for ScopeFormat::ReadSliceLen")
+            MetaFormat::WithView(_ident, view_format) => match view_format {
+                ViewFormat::ReadOffsetLen { .. } => {
+                    todo!("implement ViewFormat read offset+len");
                 }
             },
             MetaFormat::EngineSpecific {
@@ -885,6 +891,7 @@ impl FormatModuleExt {
                 GroundFormat::Apply(name) => match scope.get_type_by_name(name) {
                     ValueKind::Format(t) => Ok(t.clone().into()),
                     ValueKind::Value(t) => Err(anyhow!("Apply: expected format, found {t:?}")),
+                    ValueKind::View => Err(anyhow!("Apply: expected format, found View")),
                 },
             },
             FormatExt::Epi(epi_format) => match epi_format {
@@ -1149,23 +1156,60 @@ impl FormatModuleExt {
             },
             FormatExt::Meta(meta_format) => {
                 match meta_format {
-                    MetaFormat::BindScopeTo(_ident) => Ok(ValueTypeExt::UNIT),
-                    MetaFormat::WithScope(_ident, scope_format) => match scope_format {
-                        ScopeFormat::ReadArray(_base_kind) => {
-                            todo!("type inference does not support ReadArray")
-                        }
-                        ScopeFormat::ReadSliceLen(expr) => {
-                            // TODO: check that _ident is bound to a scope
-                            let t = expr.infer_type_ext(scope)?;
-                            if t.is_numeric() {
-                                Ok(ValueTypeExt::Seq(Box::new(ValueTypeExt::Base(
-                                    BaseType::U8,
-                                ))))
-                            } else {
-                                Err(anyhow!("ReadSliceLen: expected numeric type, found {t:?}"))
+                    MetaFormat::LetView(ident, inner) => {
+                        let mut child_scope = TypeScope::child(scope);
+                        child_scope.push_view(ident.clone());
+                        self.infer_format_ext_type(scope, inner)
+                    }
+                    MetaFormat::WithView(ident, scope_format) => {
+                        match scope.get_type_by_name(ident) {
+                            ValueKind::View => {}
+                            ValueKind::Value(t) => {
+                                return Err(anyhow!("WithView: expected view, found value {t:?}"))
+                            }
+                            ValueKind::Format(t) => {
+                                return Err(anyhow!("WithView: expected view, found format {t:?}"))
                             }
                         }
-                    },
+                        match scope_format {
+                            ViewFormat::ReadOffsetLen(offset, len, read_kind) => {
+                                // confirm that offset is of a numeric type
+                                match offset.infer_type_ext(scope)? {
+                                    t if t.is_numeric() => {}
+                                    other => return Err(anyhow!(
+                                        "ReadOffsetLen: expected numeric offset, found {other:?}"
+                                    )),
+                                }
+                                // confirm that length is of a numeric type
+                                match len.infer_type_ext(scope)? {
+                                    t if t.is_numeric() => {}
+                                    other => {
+                                        return Err(anyhow!(
+                                            "ReadOffsetLen: expected numeric len, found {other:?}"
+                                        ))
+                                    }
+                                }
+                                match read_kind {
+                                    ReadKind::ByteSlice => {
+                                        // TODO - consider if we need to add a valuetype for borrowed u8 slice in APM (?)
+                                        Ok(ValueTypeExt::Seq(Box::new(ValueTypeExt::Base(
+                                            BaseType::U8,
+                                        ))))
+                                    }
+                                    ReadKind::ArrayOf(bk) => {
+                                        let elt = match bk {
+                                            BaseKind::U8 => ValueTypeExt::Base(BaseType::U8),
+                                            BaseKind::U16 => ValueTypeExt::Base(BaseType::U16),
+                                            BaseKind::U32 => ValueTypeExt::Base(BaseType::U32),
+                                            BaseKind::U64 => ValueTypeExt::Base(BaseType::U32),
+                                        };
+                                        // TODO - consider if we need to add a valuetype for ReadArray in APM (?)
+                                        Ok(ValueTypeExt::Seq(Box::new(elt)))
+                                    }
+                                }
+                            }
+                        }
+                    }
                     MetaFormat::EngineSpecific {
                         base_model,
                         alt_model,
@@ -1201,6 +1245,9 @@ mod __impls {
                     ValueKind::Value(t) => Ok(t.clone()),
                     ValueKind::Format(_t) => Err(anyhow!(
                         "expected ValueKind::Value, found ValueKind::Format for var {name}"
+                    )),
+                    ValueKind::View => Err(anyhow!(
+                        "expected ValueKind::Value, found ValueKind::View for var {name}"
                     )),
                 },
                 Expr::Bool(_b) => Ok(ValueTypeExt::Base(BaseType::Bool)),
@@ -1698,6 +1745,11 @@ mod __impls {
                 Format::Compute(expr) => FormatExt::Ground(GroundFormat::Compute(expr)),
                 Format::Let(name, expr, format) => FormatExt::Epi(EpiFormat::Mono(
                     MonoKind::Let(name, expr),
+                    Box::new(FormatExt::from(*format)),
+                )),
+                // FIXME - LetView is currently in Format natively, but in FormatExt it is Meta (and not epi)
+                Format::LetView(name, format) => FormatExt::Meta(MetaFormat::LetView(
+                    name,
                     Box::new(FormatExt::from(*format)),
                 )),
                 Format::Match(expr, items) => FormatExt::Epi(EpiFormat::Pat(

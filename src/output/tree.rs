@@ -471,6 +471,7 @@ impl<'module> TreePrinter<'module> {
             Format::Where(format, _expr) => self.compile_parsed_decoded_value(value, format),
             Format::Compute(_expr) => self.compile_parsed_value(value),
             Format::Let(_name, _expr, format) => self.compile_parsed_decoded_value(value, format),
+            Format::LetView(_name, format) => self.compile_parsed_decoded_value(value, format),
             Format::Match(_head, branches) => match value {
                 ParsedValue::Branch(index, value) => {
                     let (_pattern, format) = &branches[*index];
@@ -655,6 +656,7 @@ impl<'module> TreePrinter<'module> {
             Format::Where(format, _expr) => self.compile_decoded_value(value, format),
             Format::Compute(_expr) => self.compile_value(value),
             Format::Let(_name, _expr, format) => self.compile_decoded_value(value, format),
+            Format::LetView(_name, format) => self.compile_decoded_value(value, format),
             Format::Match(_head, branches) => match value {
                 Value::Branch(index, value) => {
                     let (_pattern, format) = &branches[*index];
@@ -2203,6 +2205,16 @@ impl<'module> TreePrinter<'module> {
                     Precedence::FORMAT_COMPOUND,
                 )
             }
+            Format::LetView(name, format) => cond_paren(
+                self.compile_nested_format(
+                    "let-view",
+                    Some(&[Fragment::String(name.clone())]),
+                    format,
+                    prec,
+                ),
+                prec,
+                Precedence::FORMAT_COMPOUND,
+            ),
             Format::MonadSeq(f0, f) => {
                 let fmt_frag = self.compile_format(f0, Precedence::ATOM);
                 cond_paren(

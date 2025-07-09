@@ -4,6 +4,17 @@ pub struct ReadCtxt<'a> {
     pub offset: usize,
 }
 
+impl<'a> std::fmt::Debug for ReadCtxt<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "ReadCtxt {{ input: [_; {}], offset: {} }}",
+            self.input.len(),
+            self.offset
+        )
+    }
+}
+
 impl<'a> ReadCtxt<'a> {
     pub fn new(input: &'a [u8]) -> ReadCtxt<'a> {
         let offset = 0;

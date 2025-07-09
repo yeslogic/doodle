@@ -80,6 +80,7 @@ impl TypedDecoder<GenType> {
             | TypedDecoder::Where(t, ..)
             | TypedDecoder::Compute(t, ..)
             | TypedDecoder::Let(t, ..)
+            | TypedDecoder::LetView(t, ..)
             | TypedDecoder::Match(t, ..)
             | TypedDecoder::Dynamic(t, ..)
             | TypedDecoder::Apply(t, ..)
@@ -213,6 +214,7 @@ pub(crate) enum TypedDecoder<TypeRep> {
     ),
     Hint(TypeRep, StyleHint, Box<TypedDecoderExt<TypeRep>>),
     LiftedOption(TypeRep, Option<Box<TypedDecoderExt<TypeRep>>>),
+    LetView(TypeRep, Label, Box<TypedDecoderExt<TypeRep>>),
 }
 
 #[derive(Clone, Debug)]
@@ -575,6 +577,10 @@ impl<'a> GTCompiler<'a> {
                     expr.clone(),
                     da,
                 ))
+            }
+            TypedFormat::LetView(gt, name, a) => {
+                let da = Box::new(self.compile_gt_format(a, None, next.clone())?);
+                Ok(TypedDecoder::LetView(gt.clone(), name.clone(), da))
             }
             TypedFormat::Match(gt, head, branches) => {
                 let branches = branches

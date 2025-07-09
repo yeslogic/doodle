@@ -132,6 +132,10 @@ impl<TypeRep> std::hash::Hash for TypedFormat<TypeRep> {
                 f.hash(state);
             }
             TypedFormat::Compute(_, expr) => expr.hash(state),
+            TypedFormat::LetView(_, lb, inner) => {
+                lb.hash(state);
+                inner.hash(state);
+            }
             TypedFormat::Let(_, lb, x, inner) => {
                 lb.hash(state);
                 x.hash(state);
@@ -255,6 +259,7 @@ pub enum TypedFormat<TypeRep> {
         Box<TypedFormat<TypeRep>>,
     ),
     LiftedOption(TypeRep, Option<Box<TypedFormat<TypeRep>>>),
+    LetView(TypeRep, Label, Box<TypedFormat<TypeRep>>),
 }
 
 impl TypedFormat<GenType> {
@@ -316,7 +321,8 @@ impl TypedFormat<GenType> {
             TypedFormat::Map(_, f, _)
             | TypedFormat::Where(_, f, _)
             | TypedFormat::Dynamic(_, _, _, f)
-            | TypedFormat::Let(_, _, _, f) => f.lookahead_bounds(),
+            | TypedFormat::Let(_, _, _, f)
+            | TypedFormat::LetView(_, _, f) => f.lookahead_bounds(),
 
             TypedFormat::Match(_, _, branches) => branches
                 .iter()
@@ -388,7 +394,8 @@ impl TypedFormat<GenType> {
             TypedFormat::Map(_, f, _)
             | TypedFormat::Where(_, f, _)
             | TypedFormat::Dynamic(_, _, _, f)
-            | TypedFormat::Let(_, _, _, f) => f.match_bounds(),
+            | TypedFormat::Let(_, _, _, f)
+            | TypedFormat::LetView(_, _, f) => f.match_bounds(),
 
             TypedFormat::Match(_, _, branches) => branches
                 .iter()
@@ -461,6 +468,7 @@ impl TypedFormat<GenType> {
             | TypedFormat::Where(gt, ..)
             | TypedFormat::Compute(gt, ..)
             | TypedFormat::Let(gt, ..)
+            | TypedFormat::LetView(gt, ..)
             | TypedFormat::Match(gt, ..)
             | TypedFormat::Dynamic(gt, ..)
             | TypedFormat::LiftedOption(gt, ..)
@@ -1067,6 +1075,7 @@ mod __impls {
                 TypedFormat::Let(_, name, val, inner) => {
                     Format::Let(name, rebox(val), rebox(inner))
                 }
+                TypedFormat::LetView(_, name, inner) => Format::LetView(name, rebox(inner)),
                 TypedFormat::Match(_, head, t_branches) => {
                     let branches = t_branches
                         .into_iter()

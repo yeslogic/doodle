@@ -125,7 +125,7 @@ impl UType {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub(crate) enum UScope<'a> {
     #[default]
     Empty,
@@ -134,8 +134,16 @@ pub(crate) enum UScope<'a> {
 }
 
 impl<'a> UScope<'a> {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self::Empty
+    }
+
+    fn get_uvar_by_name(&self, name: &str) -> Option<UVar> {
+        match self {
+            UScope::Empty => None,
+            UScope::Multi(multi) => multi.get_uvar_by_name(name),
+            UScope::Single(single) => single.get_uvar_by_name(name),
+        }
     }
 }
 
@@ -181,11 +189,61 @@ pub(crate) struct USingleScope<'a> {
     uvar: UVar,
 }
 
+impl<'a> USingleScope<'a> {
+    pub const fn new(parent: &'a UScope<'a>, name: &'a str, uvar: UVar) -> USingleScope<'a> {
+        Self { parent, name, uvar }
+    }
+
+    fn get_uvar_by_name(&self, name: &str) -> Option<UVar> {
+        if self.name == name {
+            return Some(self.uvar);
+        }
+        self.parent.get_uvar_by_name(name)
+    }
+}
+
 #[derive(Clone, Copy)]
 pub(crate) struct Ctxt<'a> {
     pub(crate) module: &'a FormatModule,
     pub(crate) scope: &'a UScope<'a>,
     pub(crate) dyn_s: DynScope<'a>,
+    pub(crate) views: ViewScope<'a>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub(crate) enum ViewScope<'a> {
+    #[default]
+    Empty,
+    Single(ViewSingleScope<'a>),
+}
+
+impl<'a> ViewScope<'a> {
+    pub const fn new() -> Self {
+        Self::Empty
+    }
+
+    fn includes_name(&self, name: &str) -> bool {
+        match self {
+            ViewScope::Empty => false,
+            ViewScope::Single(s) => s.includes_name(name),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ViewSingleScope<'a> {
+    parent: &'a ViewScope<'a>,
+    name: &'a str,
+}
+
+impl<'a> ViewSingleScope<'a> {
+    pub const fn new(parent: &'a ViewScope<'a>, name: &'a str) -> ViewSingleScope<'a> {
+        Self { parent, name }
+    }
+
+    fn includes_name(&self, name: &str) -> bool {
+        self.name == name || self.parent.includes_name(name)
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -238,7 +296,17 @@ impl<'a> Ctxt<'a> {
         Self {
             module: self.module,
             dyn_s: self.dyn_s,
+            views: self.views,
             scope,
+        }
+    }
+
+    pub(crate) fn with_view_binding(&'a self, name: &'a str) -> Ctxt<'a> {
+        Self {
+            module: self.module,
+            dyn_s: self.dyn_s,
+            scope: self.scope,
+            views: ViewScope::Single(ViewSingleScope::new(&self.views, name)),
         }
     }
 
@@ -247,6 +315,7 @@ impl<'a> Ctxt<'a> {
             module: self.module,
             dyn_s: DynScope::Single(DynSingleScope::new(&self.dyn_s, name, dynf_var)),
             scope: self.scope,
+            views: self.views,
         }
     }
 
@@ -255,29 +324,7 @@ impl<'a> Ctxt<'a> {
             module,
             scope,
             dyn_s: DynScope::new(),
-        }
-    }
-}
-
-impl<'a> USingleScope<'a> {
-    pub const fn new(parent: &'a UScope<'a>, name: &'a str, uvar: UVar) -> USingleScope<'a> {
-        Self { parent, name, uvar }
-    }
-
-    fn get_uvar_by_name(&self, name: &str) -> Option<UVar> {
-        if self.name == name {
-            return Some(self.uvar);
-        }
-        self.parent.get_uvar_by_name(name)
-    }
-}
-
-impl<'a> UScope<'a> {
-    fn get_uvar_by_name(&self, name: &str) -> Option<UVar> {
-        match self {
-            UScope::Empty => None,
-            UScope::Multi(multi) => multi.get_uvar_by_name(name),
-            UScope::Single(single) => single.get_uvar_by_name(name),
+            views: ViewScope::new(),
         }
     }
 }
@@ -2919,6 +2966,13 @@ impl TypeChecker {
                 let xvar = self.infer_var_expr(x, ctxt.scope)?;
                 let new_scope = UScope::Single(USingleScope::new(ctxt.scope, lab, xvar));
                 let new_ctxt = ctxt.with_scope(&new_scope);
+                let inner_t = self.infer_utype_format(inner, new_ctxt)?;
+                self.unify_var_utype(newvar, inner_t)?;
+                Ok(newvar)
+            }
+            Format::LetView(lab, inner) => {
+                let newvar = self.get_new_uvar();
+                let new_ctxt = ctxt.with_view_binding(lab);
                 let inner_t = self.infer_utype_format(inner, new_ctxt)?;
                 self.unify_var_utype(newvar, inner_t)?;
                 Ok(newvar)

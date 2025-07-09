@@ -899,6 +899,7 @@ pub enum Decoder {
     MonadSeq(Box<Decoder>, Box<Decoder>),
     AccumUntil(Box<Expr>, Box<Expr>, Box<Expr>, TypeHint, Box<Decoder>),
     LiftedOption(Option<Box<Decoder>>),
+    LetView(Label, Box<Decoder>),
 }
 
 #[derive(Clone, Debug)]
@@ -994,6 +995,10 @@ impl<'a> Compiler<'a> {
                 Ok(Decoder::DecodeBytes(expr.clone(), Box::new(d)))
             }
             Format::Pos => Ok(Decoder::Pos),
+            Format::LetView(ident, a) => {
+                let d = self.compile_format(a, next.clone())?;
+                Ok(Decoder::LetView(ident.clone(), Box::new(d)))
+            }
             Format::EndOfInput => Ok(Decoder::EndOfInput),
             Format::Align(n) => Ok(Decoder::Align(*n)),
             Format::Byte(bs) => Ok(Decoder::Byte(*bs)),
@@ -1236,10 +1241,12 @@ impl<'a> Compiler<'a> {
     }
 }
 
+// REVIEW - View cannot be added to ScopeEntry without hiding the `View<'a>` or adding lifetime parameters
 #[derive(Clone, Debug)]
 pub enum ScopeEntry<Value: Clone> {
     Value(Value),
     Decoder(Decoder),
+    View(usize),
 }
 
 pub enum Scope<'a> {
@@ -1247,6 +1254,7 @@ pub enum Scope<'a> {
     Multi(&'a MultiScope<'a>),
     Single(SingleScope<'a>),
     Decoder(DecoderScope<'a>),
+    View(ViewScope<'a>),
 }
 
 pub struct MultiScope<'a> {
@@ -1266,6 +1274,15 @@ pub struct DecoderScope<'a> {
     decoder: Decoder,
 }
 
+pub struct ViewScope<'a> {
+    parent: &'a Scope<'a>,
+    name: &'a str,
+    view: View<'a>,
+}
+
+// REVIEW - do we want a specialized type for holding views?
+pub type View<'a> = ReadCtxt<'a>;
+
 impl<'a> Scope<'a> {
     fn get_value_by_name(&self, name: &str) -> &Value {
         match self {
@@ -1273,6 +1290,7 @@ impl<'a> Scope<'a> {
             Scope::Multi(multi) => multi.get_value_by_name(name),
             Scope::Single(single) => single.get_value_by_name(name),
             Scope::Decoder(decoder) => decoder.parent.get_value_by_name(name),
+            Scope::View(view) => view.parent.get_value_by_name(name),
         }
     }
 
@@ -1282,6 +1300,17 @@ impl<'a> Scope<'a> {
             Scope::Multi(multi) => multi.parent.get_decoder_by_name(name),
             Scope::Single(single) => single.parent.get_decoder_by_name(name),
             Scope::Decoder(decoder) => decoder.get_decoder_by_name(name),
+            Scope::View(view) => view.parent.get_decoder_by_name(name),
+        }
+    }
+
+    fn get_view_by_name(&self, name: &str) -> View<'a> {
+        match self {
+            Scope::Empty => panic!("view not found: {name}"),
+            Scope::Multi(multi) => multi.parent.get_view_by_name(name),
+            Scope::Single(single) => single.parent.get_view_by_name(name),
+            Scope::Decoder(decoder) => decoder.parent.get_view_by_name(name),
+            Scope::View(view) => view.get_view_by_name(name),
         }
     }
 
@@ -1291,6 +1320,7 @@ impl<'a> Scope<'a> {
             Scope::Multi(multi) => multi.get_bindings(bindings),
             Scope::Single(single) => single.get_bindings(bindings),
             Scope::Decoder(decoder) => decoder.get_bindings(bindings),
+            Scope::View(view) => view.get_bindings(bindings),
         }
     }
 }
@@ -1380,6 +1410,28 @@ impl<'a> DecoderScope<'a> {
         bindings.push((
             self.name.to_string().into(),
             ScopeEntry::Decoder(self.decoder.clone()),
+        ));
+        self.parent.get_bindings(bindings);
+    }
+}
+
+impl<'a> ViewScope<'a> {
+    fn new(parent: &'a Scope<'a>, name: &'a str, view: View<'a>) -> ViewScope<'a> {
+        ViewScope { parent, name, view }
+    }
+
+    fn get_view_by_name(&self, name: &str) -> View<'a> {
+        if self.name == name {
+            self.view
+        } else {
+            self.parent.get_view_by_name(name)
+        }
+    }
+
+    fn get_bindings(&self, bindings: &mut Vec<(Label, ScopeEntry<Value>)>) {
+        bindings.push((
+            self.name.to_string().into(),
+            ScopeEntry::View(self.view.offset),
         ));
         self.parent.get_bindings(bindings);
     }
@@ -1706,6 +1758,11 @@ impl Decoder {
                 let v = expr.eval_value(scope);
                 let let_scope = SingleScope::new(scope, name, &v);
                 d.parse(program, &Scope::Single(let_scope), input)
+            }
+            Decoder::LetView(name, d) => {
+                let view = input;
+                let let_scope = ViewScope::new(scope, name, view);
+                d.parse(program, &Scope::View(let_scope), input)
             }
             Decoder::Match(head, branches) => {
                 let head = head.eval(scope);
