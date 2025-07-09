@@ -1,4 +1,5 @@
 use crate::byte_set::ByteSet;
+use crate::decoder::View;
 use crate::decoder::{
     cow_map, cow_remap, extract_pair,
     search::{find_index_by_key_sorted, find_index_by_key_unsorted},
@@ -1182,6 +1183,7 @@ pub enum LocScope<'a> {
     Multi(&'a LocMultiScope<'a>),
     Single(LocSingleScope<'a>),
     Decoder(LocDecoderScope<'a>),
+    View(LocViewScope<'a>),
 }
 
 pub struct LocMultiScope<'a> {
@@ -1201,6 +1203,12 @@ pub struct LocDecoderScope<'a> {
     decoder: Decoder,
 }
 
+pub struct LocViewScope<'a> {
+    parent: &'a LocScope<'a>,
+    name: &'a str,
+    view: View<'a>,
+}
+
 impl<'a> LocScope<'a> {
     fn get_value_by_name(&self, name: &str) -> &ParsedValue {
         match self {
@@ -1208,6 +1216,7 @@ impl<'a> LocScope<'a> {
             LocScope::Multi(multi) => multi.get_value_by_name(name),
             LocScope::Single(single) => single.get_value_by_name(name),
             LocScope::Decoder(decoder) => decoder.parent.get_value_by_name(name),
+            LocScope::View(view) => view.parent.get_value_by_name(name),
         }
     }
 
@@ -1217,6 +1226,17 @@ impl<'a> LocScope<'a> {
             LocScope::Multi(multi) => multi.parent.get_decoder_by_name(name),
             LocScope::Single(single) => single.parent.get_decoder_by_name(name),
             LocScope::Decoder(decoder) => decoder.get_decoder_by_name(name),
+            LocScope::View(view) => view.parent.get_decoder_by_name(name),
+        }
+    }
+
+    fn get_view_by_name(&self, name: &str) -> View<'a> {
+        match self {
+            LocScope::Empty => panic!("view not found: {name}"),
+            LocScope::Multi(multi) => multi.parent.get_view_by_name(name),
+            LocScope::Single(single) => single.parent.get_view_by_name(name),
+            LocScope::Decoder(decoder) => decoder.parent.get_view_by_name(name),
+            LocScope::View(view) => view.get_view_by_name(name),
         }
     }
 
@@ -1226,6 +1246,7 @@ impl<'a> LocScope<'a> {
             LocScope::Multi(multi) => multi.get_bindings(bindings),
             LocScope::Single(single) => single.get_bindings(bindings),
             LocScope::Decoder(decoder) => decoder.get_bindings(bindings),
+            LocScope::View(view) => view.get_bindings(bindings),
         }
     }
 }
@@ -1313,6 +1334,28 @@ impl<'a> LocDecoderScope<'a> {
         bindings.push((
             self.name.to_string().into(),
             LocScopeEntry::Decoder(self.decoder.clone()),
+        ));
+        self.parent.get_bindings(bindings);
+    }
+}
+
+impl<'a> LocViewScope<'a> {
+    fn new(parent: &'a LocScope<'a>, name: &'a str, view: View<'a>) -> Self {
+        LocViewScope { parent, name, view }
+    }
+
+    fn get_view_by_name(&self, name: &str) -> View<'a> {
+        if self.name == name {
+            self.view
+        } else {
+            self.parent.get_view_by_name(name)
+        }
+    }
+
+    fn get_bindings(&self, bindings: &mut Vec<(Label, LocScopeEntry)>) {
+        bindings.push((
+            self.name.to_string().into(),
+            LocScopeEntry::View(self.view.offset),
         ));
         self.parent.get_bindings(bindings);
     }
@@ -1669,6 +1712,11 @@ impl Decoder {
                 let v = expr.eval_with_loc(scope).as_ref().clone();
                 let let_scope = LocSingleScope::new(scope, name, &v);
                 d.parse_with_loc(program, &LocScope::Single(let_scope), input)
+            }
+            Decoder::LetView(name, d) => {
+                let view = input;
+                let let_scope = LocViewScope::new(scope, name, view);
+                d.parse_with_loc(program, &LocScope::View(let_scope), input)
             }
             Decoder::Match(head, branches) => {
                 let head = head.eval_with_loc(scope);

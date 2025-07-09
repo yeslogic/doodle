@@ -42,7 +42,10 @@ impl<T> IntoLabel for T where T: Into<Label> {}
 pub(crate) mod pattern;
 pub use pattern::Pattern;
 
+#[derive(Debug, Clone)]
 pub enum ValueKind<T> {
+    /// A local 'view' of an input buffer (e.g. `ReadScope`).
+    View,
     Value(T),
     Format(T),
 }
@@ -213,6 +216,9 @@ impl Expr {
         match self {
             Expr::Var(name) => match scope.get_type_by_name(name) {
                 ValueKind::Value(t) => Ok(t.clone()),
+                ValueKind::View => Err(anyhow!(
+                    "expected ValueKind::Value, found ValueKind::View for var {name}"
+                )),
                 ValueKind::Format(_t) => Err(anyhow!(
                     "expected ValueKind::Value, found ValueKind::Format for var {name}"
                 )),
@@ -923,6 +929,10 @@ pub enum Format {
     Hint(StyleHint, Box<Format>),
     /// Wrap the result of `format` in `Some` if `Some(format)`, yield `None` if `None`
     LiftedOption(Option<Box<Format>>),
+    // SECTION - APM-backing formats
+    /// Binds a View to the specfied label and processes a format in the ensuing context
+    LetView(Label, Box<Format>),
+    // !SECTION
 }
 
 impl Format {
@@ -1031,6 +1041,7 @@ impl Format {
             Format::Where(f, _expr) => f.match_bounds(module),
             Format::Compute(_) | Format::Pos => Bounds::exact(0),
             Format::Let(_name, _expr, f) => f.match_bounds(module),
+            Format::LetView(_name, f) => f.match_bounds(module),
             Format::Match(_, branches) => branches
                 .iter()
                 .map(|(_, f)| f.match_bounds(module))
@@ -1105,6 +1116,7 @@ impl Format {
             Format::Where(f, _expr) => f.lookahead_bounds(module),
             Format::Compute(_) | Format::Pos => Bounds::exact(0),
             Format::Let(_name, _expr, f) => f.lookahead_bounds(module),
+            Format::LetView(_name, f) => f.lookahead_bounds(module),
             Format::Match(_, branches) => branches
                 .iter()
                 .map(|(_, f)| f.lookahead_bounds(module))
@@ -1171,6 +1183,7 @@ impl Format {
             Format::Where(f, _expr) => f.depends_on_next(module),
             Format::Compute(..) | Format::Pos => false,
             Format::Let(_name, _expr, f) => f.depends_on_next(module),
+            Format::LetView(_name, f) => f.depends_on_next(module),
             Format::Match(_, branches) => branches.iter().any(|(_, f)| f.depends_on_next(module)),
             Format::Dynamic(_name, _dynformat, f) => f.depends_on_next(module),
             Format::Apply(..) => false,
@@ -1518,6 +1531,11 @@ impl FormatModule {
                 child_scope.push(name.clone(), t);
                 self.infer_format_type(&child_scope, format)
             }
+            Format::LetView(name, format) => {
+                let mut child_scope = TypeScope::child(scope);
+                child_scope.push_view(name.clone());
+                self.infer_format_type(&child_scope, format)
+            }
             Format::LetFormat(f0, name, f) => {
                 let t0 = self.infer_format_type(scope, f0)?;
                 let mut new_scope = TypeScope::child(scope);
@@ -1573,6 +1591,7 @@ impl FormatModule {
             }
             Format::Apply(name) => match scope.get_type_by_name(name) {
                 ValueKind::Format(t) => Ok(t.clone()),
+                ValueKind::View => Err(anyhow!("Apply: expected format, found View")),
                 ValueKind::Value(t) => Err(anyhow!("Apply: expected format, found {t:?}")),
             },
             // REVIEW - do we want to hard-code this as U64 or make it a flexibly abstract integer type?
@@ -2178,6 +2197,7 @@ impl<'a> MatchTreeStep<'a> {
             }
             TypedFormat::Pos => Self::from_next(module, next),
             TypedFormat::Let(_, _name, _expr, f) => Self::from_gt_format(module, f, next),
+            TypedFormat::LetView(_, _name, f) => Self::from_gt_format(module, f, next),
             TypedFormat::Match(_, _, branches) => {
                 let mut tree = Self::reject();
                 for (_, f) in branches {
@@ -2330,6 +2350,10 @@ impl<'a> MatchTreeStep<'a> {
             Format::Pos => Self::from_next(module, next),
             Format::Compute(_expr) => Self::from_next(module, next),
             Format::Let(_name, _expr, f) => Self::from_format(module, f, next),
+            Format::LetView(_name, f) => {
+                // FIXME - does the construction of a view-binding affect our matchtree?
+                Self::from_format(module, f, next)
+            }
             Format::Match(_, branches) => {
                 let mut tree = Self::reject();
                 for (_, f) in branches {
@@ -2561,6 +2585,11 @@ impl<'a, T> TypeScope<'a, T> {
     fn push_format(&mut self, name: Label, t: T) {
         self.names.push(name);
         self.types.push(ValueKind::Format(t));
+    }
+
+    fn push_view(&mut self, name: Label) {
+        self.names.push(name);
+        self.types.push(ValueKind::View);
     }
 
     fn get_type_by_name(&self, name: &str) -> &ValueKind<T> {

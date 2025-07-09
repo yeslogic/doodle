@@ -187,6 +187,7 @@ fn check_covered(
         Format::Where(format, _expr) => check_covered(module, path, format)?,
         Format::Compute(_expr) => {}
         Format::Let(_name, _expr, format) => check_covered(module, path, format)?,
+        Format::LetView(_name, format) => check_covered(module, path, format)?,
         Format::Match(_head, branches) => {
             for (_pattern, format) in branches {
                 check_covered(module, path, format)?;
@@ -317,6 +318,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::Where(_format, _expr) => Ok(()),
             Format::Compute(_expr) => Ok(()),
             Format::Let(_name, _expr, format) => self.write_flat(value, format),
+            Format::LetView(_name, format) => self.write_flat(value, format),
             Format::Match(_head, branches) => match value {
                 Value::Branch(index, value) => {
                     let (_pattern, format) = &branches[*index];

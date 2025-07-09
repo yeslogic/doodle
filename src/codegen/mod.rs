@@ -421,10 +421,15 @@ impl CodeGen {
                 CaseLogic::Derived(
                     DerivedLogic::Let(
                         name.clone(),
-                        // REVIEW[epic=zealous-clone] - gate cloning when reference or Copy is possible
                         embed_expr(expr, ExprInfo::EmbedOwned),
                         Box::new(cl_inner)
                     )
+                )
+            }
+            TypedDecoder::LetView(_t, name, inner) => {
+                let cl_inner = self.translate(inner.get_dec());
+                CaseLogic::View(
+                    ViewLogic::LetView(name.clone(), Box::new(cl_inner))
                 )
             }
             TypedDecoder::LetFormat(_t, f0, name, f) => {
@@ -2290,6 +2295,7 @@ macro_rules! impl_toast_caselogic {
                     CaseLogic::Repeat(r) => r.to_ast(ctxt),
                     CaseLogic::Sequential(sq) => sq.to_ast(ctxt),
                     CaseLogic::Simple(s) => s.to_ast(ctxt),
+                    CaseLogic::View(v) => v.to_ast(ctxt),
                 }
             }
         }
@@ -2612,7 +2618,37 @@ enum CaseLogic<ExprT = Expr> {
     Parallel(ParallelLogic<ExprT>),
     Repeat(RepeatLogic<ExprT>),
     Engine(EngineLogic<ExprT>),
+    View(ViewLogic<ExprT>),
     Other(OtherLogic<ExprT>),
+}
+
+#[derive(Clone, Debug)]
+enum ViewLogic<ExprT> {
+    LetView(Label, Box<CaseLogic<ExprT>>),
+}
+
+impl ToAst for ViewLogic<GTExpr> {
+    type AstElem = GenBlock;
+
+    fn to_ast(&self, ctxt: ProdCtxt<'_>) -> GenBlock {
+        match self {
+            ViewLogic::LetView(name, inner_cl) => {
+                // FIXME[epic=view-format] - implement base-model codegen for LetView
+                let _bind_view = GenStmt::Embed(RustStmt::assign(
+                    name.clone(),
+                    // FIXME[epic=view-format] - implement base-model engine  (Parser) support for view
+                    RustExpr::local(ctxt.input_varname.clone()).call_method("view"),
+                ));
+                /*
+
+                let ctxt = ctxt.with_view(&name);
+
+                */
+                let _inner = inner_cl.to_ast(ctxt);
+                todo!("implement BASEMODEL codegen for LetView")
+            }
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -4349,6 +4385,12 @@ impl<'a> Elaborator<'a> {
                 let t_inner = self.elaborate_format(inner, dyn_scope);
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::Let(gt, lbl.clone(), Box::new(t_expr), Box::new(t_inner))
+            }
+            Format::LetView(ident, inner) => {
+                let index = self.get_and_increment_index();
+                let t_inner = self.elaborate_format(inner, dyn_scope);
+                let gt = self.get_gt_from_index(index);
+                TypedFormat::LetView(gt, ident.clone(), Box::new(t_inner))
             }
             Format::Match(x, branches) => {
                 let index = self.get_and_increment_index();
