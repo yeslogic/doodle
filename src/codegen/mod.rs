@@ -2639,23 +2639,22 @@ impl ToAst for ViewLogic<GTExpr> {
     fn to_ast(&self, ctxt: ProdCtxt<'_>) -> GenBlock {
         match self {
             ViewLogic::LetView(name, inner_cl) => {
-                // FIXME[epic=view-format] - implement base-model codegen for LetView
-                let _bind_view = GenStmt::Embed(RustStmt::assign(
+                let bind_view = GenStmt::Embed(RustStmt::assign(
                     name.clone(),
-                    // FIXME[epic=view-format] - implement base-model engine  (Parser) support for .view() method, and adapters to re-parse
                     RustExpr::local(ctxt.input_varname.clone()).call_method("view"),
                 ));
-                /*
-
-                let ctxt = ctxt.with_view(&name);
-
-                */
-                let _inner = inner_cl.to_ast(ctxt);
-                todo!("implement BASEMODEL codegen for LetView")
+                let mut inner = inner_cl.to_ast(ctxt);
+                inner.prepend_stmt(bind_view);
+                inner
             }
-            ViewLogic::ReadViewOffsetLen(_name, _offset, _len) => {
-                todo!("implement BASEMODEL codegen for ReadViewOffsetLen")
-            }
+            ViewLogic::ReadViewOffsetLen(name, offset, len) => GenBlock::simple_expr(
+                RustExpr::local(name.clone())
+                    .call_method_with(
+                        "read_offset_len",
+                        [offset.clone().as_usize(), len.clone().as_usize()],
+                    )
+                    .call_method("to_vec"),
+            ),
         }
     }
 }

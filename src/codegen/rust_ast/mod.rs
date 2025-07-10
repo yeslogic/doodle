@@ -1498,6 +1498,13 @@ impl RustExpr {
         Self::PrimitiveLit(RustPrimLit::Numeric(RustNumLit::U64(num)))
     }
 
+    pub fn as_usize(self) -> Self {
+        Self::Operation(RustOp::AsCast(
+            Box::new(self),
+            RustType::from(PrimType::Usize),
+        ))
+    }
+
     pub fn scoped<Name: Into<Label>>(
         path: impl IntoIterator<Item = Name>,
         name: impl Into<Label>,
