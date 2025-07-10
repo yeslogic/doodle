@@ -7,6 +7,7 @@ use std::rc::Rc;
 
 use crate::codegen::typed_format::{GenType, TypedPattern};
 
+use super::typed_format::TypedViewFormat;
 use super::{
     typed_format::{TypedDynFormat, TypedExpr, TypedFormat},
     GTFormat,
@@ -81,6 +82,7 @@ impl TypedDecoder<GenType> {
             | TypedDecoder::Compute(t, ..)
             | TypedDecoder::Let(t, ..)
             | TypedDecoder::LetView(t, ..)
+            | TypedDecoder::ReadViewOffsetLen(t, ..)
             | TypedDecoder::Match(t, ..)
             | TypedDecoder::Dynamic(t, ..)
             | TypedDecoder::Apply(t, ..)
@@ -215,6 +217,12 @@ pub(crate) enum TypedDecoder<TypeRep> {
     Hint(TypeRep, StyleHint, Box<TypedDecoderExt<TypeRep>>),
     LiftedOption(TypeRep, Option<Box<TypedDecoderExt<TypeRep>>>),
     LetView(TypeRep, Label, Box<TypedDecoderExt<TypeRep>>),
+    ReadViewOffsetLen(
+        TypeRep,
+        Label,
+        Box<TypedExpr<TypeRep>>,
+        Box<TypedExpr<TypeRep>>,
+    ),
 }
 
 #[derive(Clone, Debug)]
@@ -630,6 +638,14 @@ impl<'a> GTCompiler<'a> {
                 };
                 Ok(TypedDecoder::LiftedOption(gt.clone(), inner_dec))
             }
+            TypedFormat::WithView(gt, ident, vf) => match vf {
+                TypedViewFormat::ReadOffsetLen(offs, len) => Ok(TypedDecoder::ReadViewOffsetLen(
+                    gt.clone(),
+                    ident.clone(),
+                    offs.clone(),
+                    len.clone(),
+                )),
+            },
         }?;
         Ok(TypedDecoderExt::new(dec, args))
     }

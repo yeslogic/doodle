@@ -1,5 +1,6 @@
 use crate::{
     Arith, BaseType, DynFormat, Expr, Format, FormatModule, Label, Pattern, UnaryOp, ValueType,
+    ViewFormat,
 };
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
@@ -1134,6 +1135,28 @@ impl TypeChecker {
             let ret = self.infer_var_format(ctxt.module.get_format(level), ctxt)?;
             self.level_vars.insert(level, ret);
             Ok(ret)
+        }
+    }
+
+    fn infer_var_view_format(
+        &mut self,
+        view_format: &ViewFormat,
+        ctxt: Ctxt<'_>,
+    ) -> TCResult<UVar> {
+        match view_format {
+            ViewFormat::ReadOffsetLen(offset, len) => {
+                let newvar = self.get_new_uvar();
+                let offset_var = self.infer_var_expr(offset, ctxt.scope)?;
+                let len_var = self.infer_var_expr(len, ctxt.scope)?;
+                self.unify_var_baseset(offset_var, BaseSet::U(UintSet::ANY))?;
+                self.unify_var_baseset(len_var, BaseSet::U(UintSet::ANY))?;
+                // REVIEW - should we have a special UType for captured View-window reads?
+                self.unify_var_utype(
+                    newvar,
+                    Rc::new(UType::Seq(Rc::new(UType::Base(BaseType::U8)))),
+                )?;
+                Ok(newvar)
+            }
         }
     }
 
@@ -3036,6 +3059,12 @@ impl TypeChecker {
                     Some(inner_f) => self.infer_var_format(inner_f, ctxt)?,
                 };
                 self.unify_var_utype(newvar, Rc::new(UType::Option(inner_var.into())))?;
+                Ok(newvar)
+            }
+            Format::WithView(_ident, vf) => {
+                let newvar = self.get_new_uvar();
+                let vf_var = self.infer_var_view_format(vf, ctxt)?;
+                self.unify_var_pair(newvar, vf_var)?;
                 Ok(newvar)
             }
         }

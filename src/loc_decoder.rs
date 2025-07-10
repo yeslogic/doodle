@@ -1764,6 +1764,41 @@ impl Decoder {
                 let some_v = ParsedValue::Option(Some(Box::new(v)));
                 Ok((some_v, input))
             }
+            Decoder::ReadViewOffsetLen(ident, offset, len) => {
+                let view = scope.get_view_by_name(&ident);
+                let offset = offset.eval_value_with_loc(scope).unwrap_usize();
+                let len = len.eval_value_with_loc(scope).unwrap_usize();
+
+                // offsets the view by the specified amount to obtain the proper window to read from
+                let view_window = if offset > 0 {
+                    let Some((_, view_window)) = view.split_at(offset) else {
+                        return Err(DecodeError::overrun(offset, view.offset));
+                    };
+                    view_window
+                } else {
+                    view
+                };
+
+                // accumulate `len` bytes into a Vec<Value>
+                let mut accum = Vec::with_capacity(len);
+                let mut buf = view_window;
+                for i in 0..len {
+                    let Some((byte, new_buf)) = buf.read_byte() else {
+                        return Err(DecodeError::overbyte(buf.offset));
+                    };
+                    accum.push(ParsedValue::Flat(Parsed {
+                        inner: Value::U8(byte),
+                        loc: ParseLoc::InBuffer {
+                            offset: view_window.offset + i,
+                            length: 1,
+                        },
+                    }));
+                    buf = new_buf;
+                }
+
+                // return the accumulated bytes, along with the original input
+                Ok((ParsedValue::new_seq(accum, view_window.offset, len), input))
+            }
         }
     }
 }

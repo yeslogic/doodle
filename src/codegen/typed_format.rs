@@ -165,6 +165,10 @@ impl<TypeRep> std::hash::Hash for TypedFormat<TypeRep> {
                 f.hash(state);
             }
             TypedFormat::LiftedOption(_, opt_f) => opt_f.hash(state),
+            TypedFormat::WithView(_, ident, vf) => {
+                ident.hash(state);
+                vf.hash(state);
+            }
         }
     }
 }
@@ -260,6 +264,7 @@ pub enum TypedFormat<TypeRep> {
     ),
     LiftedOption(TypeRep, Option<Box<TypedFormat<TypeRep>>>),
     LetView(TypeRep, Label, Box<TypedFormat<TypeRep>>),
+    WithView(TypeRep, Label, TypedViewFormat<TypeRep>),
 }
 
 impl TypedFormat<GenType> {
@@ -339,6 +344,8 @@ impl TypedFormat<GenType> {
             TypedFormat::LiftedOption(_, f) => f
                 .as_ref()
                 .map_or(Bounds::exact(0), |f| f.lookahead_bounds()),
+            // REVIEW[epic=view-format] - is this correct?
+            TypedFormat::WithView(_, _ident, _vf) => Bounds::exact(0),
         }
     }
 
@@ -411,6 +418,8 @@ impl TypedFormat<GenType> {
             TypedFormat::LiftedOption(_, f) => {
                 f.as_ref().map_or(Bounds::exact(0), |f| f.match_bounds())
             }
+            // REVIEW[epic=view-format] - is this correct?
+            TypedFormat::WithView(_, _ident, _vf) => Bounds::exact(0),
         }
     }
 
@@ -469,6 +478,7 @@ impl TypedFormat<GenType> {
             | TypedFormat::Compute(gt, ..)
             | TypedFormat::Let(gt, ..)
             | TypedFormat::LetView(gt, ..)
+            | TypedFormat::WithView(gt, ..)
             | TypedFormat::Match(gt, ..)
             | TypedFormat::Dynamic(gt, ..)
             | TypedFormat::LiftedOption(gt, ..)
@@ -494,6 +504,22 @@ impl<TypeRep> std::hash::Hash for TypedDynFormat<TypeRep> {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TypedViewFormat<TypeRep> {
+    ReadOffsetLen(Box<TypedExpr<TypeRep>>, Box<TypedExpr<TypeRep>>),
+}
+
+impl<TypeRep> std::hash::Hash for TypedViewFormat<TypeRep> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        core::mem::discriminant(self).hash(state);
+        match self {
+            TypedViewFormat::ReadOffsetLen(offset, len) => {
+                offset.hash(state);
+                len.hash(state);
+            }
+        }
+    }
+}
 mod private {
     pub trait Sealed {}
 
@@ -883,13 +909,13 @@ impl<TypeRep> std::hash::Hash for TypedPattern<TypeRep> {
 }
 
 mod __impls {
-    use super::{GenType, TypedDynFormat, TypedExpr, TypedFormat, TypedPattern};
+    use super::{GenType, TypedDynFormat, TypedExpr, TypedFormat, TypedPattern, TypedViewFormat};
     use crate::{
         codegen::{
             rust_ast::{AtomType, CompType, PrimType, RustType, RustTypeDef},
             IxLabel,
         },
-        DynFormat, Expr, Format, Pattern,
+        DynFormat, Expr, Format, Pattern, ViewFormat,
     };
 
     impl From<RustType> for GenType {
@@ -1076,6 +1102,7 @@ mod __impls {
                     Format::Let(name, rebox(val), rebox(inner))
                 }
                 TypedFormat::LetView(_, name, inner) => Format::LetView(name, rebox(inner)),
+                TypedFormat::WithView(_, name, vf) => Format::WithView(name, ViewFormat::from(vf)),
                 TypedFormat::Match(_, head, t_branches) => {
                     let branches = t_branches
                         .into_iter()
@@ -1097,6 +1124,16 @@ mod __impls {
             match value {
                 TypedDynFormat::Huffman(code_values, opt_code_lengths) => {
                     DynFormat::Huffman(rebox(code_values), opt_code_lengths.map(rebox))
+                }
+            }
+        }
+    }
+
+    impl<TypeRep> From<TypedViewFormat<TypeRep>> for ViewFormat {
+        fn from(value: TypedViewFormat<TypeRep>) -> Self {
+            match value {
+                TypedViewFormat::ReadOffsetLen(offset, len) => {
+                    ViewFormat::ReadOffsetLen(rebox(offset), rebox(len))
                 }
             }
         }

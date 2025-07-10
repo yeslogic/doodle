@@ -200,6 +200,7 @@ fn check_covered(
             check_covered(module, path, f)?;
         }
         Format::Hint(_hint, format) => check_covered(module, path, format)?,
+        Format::WithView(_ident, _vf) => {} // FIXME
     }
     Ok(())
 }
@@ -335,6 +336,8 @@ impl<'module, W: io::Write> Context<'module, W> {
                 self.write_record(value, record_format)
             }
             Format::Hint(StyleHint::AsciiStr, str_format) => self.write_flat(value, str_format),
+            // REVIEW - is this the most sensible implementation?
+            Format::WithView(_ident, _vf) => Ok(()),
         }
     }
 

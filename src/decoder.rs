@@ -5,7 +5,7 @@ use crate::{
     pattern::Pattern, Arith, DynFormat, Expr, Format, FormatModule, IntRel, MatchTree, Next,
     TypeScope, ValueType,
 };
-use crate::{IntoLabel, Label, MaybeTyped, TypeHint, UnaryOp};
+use crate::{IntoLabel, Label, MaybeTyped, TypeHint, UnaryOp, ViewFormat};
 use anyhow::{anyhow, Result as AResult};
 use serde::Serialize;
 use std::borrow::Cow;
@@ -245,14 +245,14 @@ impl Value {
     /// # Panics
     ///
     /// Panics if the value is not numeric.
-    pub(crate) fn unwrap_usize(self) -> usize {
+    pub(crate) fn unwrap_usize(&self) -> usize {
         match self {
-            Value::U8(n) => usize::from(n),
-            Value::U16(n) => usize::from(n),
-            Value::U32(n) => usize::try_from(n).unwrap(),
-            Value::U64(n) => usize::try_from(n).unwrap(),
-            Value::Usize(n) => n,
-            _ => panic!("value is not a number"),
+            Value::U8(n) => usize::from(*n),
+            Value::U16(n) => usize::from(*n),
+            Value::U32(n) => usize::try_from(*n).unwrap(),
+            Value::U64(n) => usize::try_from(*n).unwrap(),
+            Value::Usize(n) => *n,
+            other => panic!("value is not a number: {other:?}"),
         }
     }
 
@@ -900,6 +900,7 @@ pub enum Decoder {
     AccumUntil(Box<Expr>, Box<Expr>, Box<Expr>, TypeHint, Box<Decoder>),
     LiftedOption(Option<Box<Decoder>>),
     LetView(Label, Box<Decoder>),
+    ReadViewOffsetLen(Label, Box<Expr>, Box<Expr>),
 }
 
 #[derive(Clone, Debug)]
@@ -1237,6 +1238,16 @@ impl<'a> Compiler<'a> {
             Format::LiftedOption(Some(a)) => Ok(Decoder::LiftedOption(Some(Box::new(
                 self.compile_format(a, next)?,
             )))),
+            Format::WithView(ident, vf) => match vf {
+                ViewFormat::ReadOffsetLen(offs, len) => {
+                    // REVIEW - do we want to fuse WithView and ViewFormat, or keep them separate?
+                    Ok(Decoder::ReadViewOffsetLen(
+                        ident.clone(),
+                        offs.clone(),
+                        len.clone(),
+                    ))
+                }
+            },
         }
     }
 }
@@ -1805,6 +1816,35 @@ impl Decoder {
             Decoder::LiftedOption(Some(dec)) => {
                 let (v, input) = dec.parse(program, scope, input)?;
                 Ok((Value::Option(Some(Box::new(v))), input))
+            }
+            Decoder::ReadViewOffsetLen(ident, offset, len) => {
+                let view = scope.get_view_by_name(&ident);
+                let offset = offset.eval_value(scope).unwrap_usize();
+                let len = len.eval_value(scope).unwrap_usize();
+
+                // offsets the view by the specified amount to obtain the proper window to read from
+                let view_window = if offset > 0 {
+                    let Some((_, view_window)) = view.split_at(offset) else {
+                        return Err(DecodeError::overrun(offset, view.offset));
+                    };
+                    view_window
+                } else {
+                    view
+                };
+
+                // accumulate `len` bytes into a Vec<Value>
+                let mut accum = Vec::with_capacity(len);
+                let mut buf = view_window;
+                for _ in 0..len {
+                    let Some((byte, new_buf)) = buf.read_byte() else {
+                        return Err(DecodeError::overbyte(buf.offset));
+                    };
+                    accum.push(Value::U8(byte));
+                    buf = new_buf;
+                }
+
+                // return the accumulated bytes, along with the original input
+                Ok((Value::Seq(SeqKind::Strict(accum)), input))
             }
         }
     }

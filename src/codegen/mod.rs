@@ -15,7 +15,7 @@ use crate::{
     parser::error::TraceHash,
     typecheck::{TypeChecker, UScope, UVar},
     Arith, BaseType, DynFormat, Expr, Format, FormatModule, IntRel, IntoLabel, Label, MatchTree,
-    Pattern, StyleHint, UnaryOp, ValueType,
+    Pattern, StyleHint, UnaryOp, ValueType, ViewFormat,
 };
 
 use std::{
@@ -40,7 +40,9 @@ use util::{BTree, MapLike, StableMap};
 
 use trace::get_and_increment_seed;
 use typed_decoder::{GTCompiler, GTDecoder, TypedDecoder};
-use typed_format::{GenType, TypedDynFormat, TypedExpr, TypedFormat, TypedPattern};
+use typed_format::{
+    GenType, TypedDynFormat, TypedExpr, TypedFormat, TypedPattern, TypedViewFormat,
+};
 
 /// Produces a probabilistically unique TraceHash based on the value of a thread-local counter-state
 /// (and post-increments the counter).
@@ -524,6 +526,9 @@ impl CodeGen {
             TypedDecoder::LiftedOption(_, Some(da)) => {
                 let cl_inner = self.translate(da.get_dec());
                 CaseLogic::Derived(DerivedLogic::WrapSome(Box::new(cl_inner)))
+            }
+            TypedDecoder::ReadViewOffsetLen(_, ident, offset, len) => {
+                CaseLogic::View(ViewLogic::ReadViewOffsetLen(ident.clone(), embed_expr_dft(offset), embed_expr_dft(len)))
             }
         }
     }
@@ -2625,6 +2630,7 @@ enum CaseLogic<ExprT = Expr> {
 #[derive(Clone, Debug)]
 enum ViewLogic<ExprT> {
     LetView(Label, Box<CaseLogic<ExprT>>),
+    ReadViewOffsetLen(Label, RustExpr, RustExpr),
 }
 
 impl ToAst for ViewLogic<GTExpr> {
@@ -2636,7 +2642,7 @@ impl ToAst for ViewLogic<GTExpr> {
                 // FIXME[epic=view-format] - implement base-model codegen for LetView
                 let _bind_view = GenStmt::Embed(RustStmt::assign(
                     name.clone(),
-                    // FIXME[epic=view-format] - implement base-model engine  (Parser) support for view
+                    // FIXME[epic=view-format] - implement base-model engine  (Parser) support for .view() method, and adapters to re-parse
                     RustExpr::local(ctxt.input_varname.clone()).call_method("view"),
                 ));
                 /*
@@ -2646,6 +2652,9 @@ impl ToAst for ViewLogic<GTExpr> {
                 */
                 let _inner = inner_cl.to_ast(ctxt);
                 todo!("implement BASEMODEL codegen for LetView")
+            }
+            ViewLogic::ReadViewOffsetLen(_name, _offset, _len) => {
+                todo!("implement BASEMODEL codegen for ReadViewOffsetLen")
             }
         }
     }
@@ -3989,6 +3998,18 @@ impl<'a> Elaborator<'a> {
         }
     }
 
+    fn elaborate_view_format(&mut self, view_format: &ViewFormat) -> TypedViewFormat<GenType> {
+        match view_format {
+            ViewFormat::ReadOffsetLen(offset, len) => {
+                // for view_format itself
+                self.increment_index();
+                let t_offset = self.elaborate_expr(offset);
+                let t_len = self.elaborate_expr(len);
+                TypedViewFormat::ReadOffsetLen(Box::new(t_offset), Box::new(t_len))
+            }
+        }
+    }
+
     fn elaborate_pattern(&mut self, pat: &Pattern) -> TypedPattern<GenType> {
         let index = self.get_and_increment_index();
 
@@ -4492,6 +4513,12 @@ impl<'a> Elaborator<'a> {
                 };
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::LiftedOption(gt, inner)
+            }
+            Format::WithView(ident, view_format) => {
+                let index = self.get_and_increment_index();
+                let t_view_format = self.elaborate_view_format(view_format);
+                let gt = self.get_gt_from_index(index);
+                TypedFormat::WithView(gt, ident.clone(), t_view_format)
             }
         }
     }

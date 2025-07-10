@@ -151,6 +151,13 @@ impl ValueType {
             (t1, t2) => Err(UnificationError::Unsatisfiable(t1.clone(), t2.clone())),
         }
     }
+
+    pub(crate) fn is_numeric(&self) -> bool {
+        match self {
+            ValueType::Base(b) => b.is_numeric(),
+            _ => false,
+        }
+    }
 }
 
 /// Alias to reduce the number of code-sites we need to update if we pick a different Smart-Pointer type
