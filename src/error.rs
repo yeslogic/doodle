@@ -180,13 +180,13 @@ impl<V: Clone> DecodeError<V> {
         }
     }
 
-    pub fn overrun(skip: usize, offset: usize) -> Self {
-        Self::Overrun {
-            nbytes: skip,
-            offset,
-        }
+    /// Constructs a DecodeError that indicates that a split attempt (of `nbytes` bytes) would overrun the buffer based
+    /// on the immediate offset (`offset`)
+    pub fn overrun(nbytes: usize, offset: usize) -> Self {
+        Self::Overrun { nbytes, offset }
     }
 
+    /// Constructs a DecodeError that indicates that a (one-byte) read attempt would overrun the buffer based on the immediate offset (`offset`)
     pub fn overbyte(offset: usize) -> Self {
         Self::Overbyte { offset }
     }

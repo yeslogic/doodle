@@ -672,6 +672,11 @@ pub enum DynFormat {
     Huffman(Box<Expr>, Option<Box<Expr>>),
 }
 
+#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
+pub enum ViewFormat {
+    ReadOffsetLen(Box<Expr>, Box<Expr>),
+}
+
 // NOTE - as currently defined, StyleHint could easily be Copy, but it would be a breaking change if we later had to remove that trait
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(tag = "tag", content = "args")]
@@ -932,6 +937,8 @@ pub enum Format {
     // SECTION - APM-backing formats
     /// Binds a View to the specfied label and processes a format in the ensuing context
     LetView(Label, Box<Format>),
+    /// Using a View bound in the context under the given name, apply a View-based parse or capture
+    WithView(Label, ViewFormat),
     // !SECTION
 }
 
@@ -1069,6 +1076,9 @@ impl Format {
                 }
                 total
             }
+            Format::WithView(_ident, vf) => match vf {
+                ViewFormat::ReadOffsetLen(_offs, _len) => Bounds::exact(0),
+            },
         }
     }
 
@@ -1144,6 +1154,10 @@ impl Format {
                 }
                 max_lookahead
             }
+            Format::WithView(_ident, vf) => match vf {
+                // REVIEW - sanity-check this rule
+                ViewFormat::ReadOffsetLen(_offs, _len) => Bounds::exact(0),
+            },
         }
     }
 
@@ -1162,6 +1176,7 @@ impl Format {
             Format::SkipRemainder => false,
             Format::Align(..) => false,
             Format::Byte(..) => false,
+            Format::WithView(..) => false,
             Format::Variant(_label, f) => f.depends_on_next(module),
             Format::Union(branches) | Format::UnionNondet(branches) => {
                 Format::union_depends_on_next(branches, module)
@@ -1613,6 +1628,24 @@ impl FormatModule {
                     Some(inner_f) => self.infer_format_type(scope, inner_f)?,
                 };
                 Ok(ValueType::Option(Box::new(inner_type)))
+            }
+            Format::WithView(_name, v_format) => match v_format {
+                ViewFormat::ReadOffsetLen(offs, len) => {
+                    match offs.infer_type(scope)? {
+                        t if t.is_numeric() => {},
+                        other => {
+                            return Err(anyhow!("ReadOffsetLen@0: expected numeric, found {other:?}"));
+                        }
+                    }
+                    match len.infer_type(scope)? {
+                        t if t.is_numeric() => {},
+                        other => {
+                            return Err(anyhow!("ReadOffsetLen@1: expected numeric, found {other:?}"));
+                        }
+                    }
+                    // NOTE[epic=view-format] - in the current base-model design and implementation, ReadOffsetLen captures a `Seq<U8>`
+                    Ok(ValueType::Seq(Box::new(ValueType::Base(BaseType::U8))))
+                }
             }
         }
     }
@@ -2212,6 +2245,7 @@ impl<'a> MatchTreeStep<'a> {
                 Self::from_gt_format(module, f0, next0)
             }
             TypedFormat::Hint(_, _hint, f) => Self::from_gt_format(module, f, next),
+            TypedFormat::WithView(_, _ident, _vf) => Self::from_next(module, next),
         }
     }
 
@@ -2370,6 +2404,8 @@ impl<'a> MatchTreeStep<'a> {
             Format::Hint(_hint, f) => Self::from_format(module, f, next),
             Format::LiftedOption(None) => Self::from_next(module, next),
             Format::LiftedOption(Some(f)) => Self::from_format(module, f, next),
+            // REVIEW - is this a sound implementation?
+            Format::WithView(_ident, _vf) => Self::from_next(module, next),
         }
     }
 

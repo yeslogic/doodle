@@ -8,7 +8,7 @@ use crate::{
 };
 use crate::{
     Arith, DynFormat, Expr, FieldLabel, Format, FormatModule, IntRel, Pattern, RecordFormat,
-    StyleHint,
+    StyleHint, ViewFormat,
 };
 use crate::{Label, UnaryOp};
 
@@ -487,6 +487,8 @@ impl<'module> TreePrinter<'module> {
             Format::LetFormat(_f0, _name, f) => self.compile_parsed_decoded_value(value, f),
             Format::MonadSeq(_f0, f) => self.compile_parsed_decoded_value(value, f),
             Format::Hint(_hint, f) => self.compile_parsed_decoded_value(value, f),
+            // REVIEW[epic=view-format] - is this correct?
+            Format::WithView(_ident, _vf) => self.compile_parsed_value(value),
         }
     }
 
@@ -670,6 +672,8 @@ impl<'module> TreePrinter<'module> {
             Format::LetFormat(.., f) | Format::MonadSeq(_, f) => {
                 self.compile_decoded_value(value, f)
             }
+            // REVIEW[epic=view-format] - is this correct?
+            Format::WithView(_ident, _vf) => self.compile_value(value),
         }
     }
 
@@ -2333,6 +2337,29 @@ impl<'module> TreePrinter<'module> {
                 prec,
                 Precedence::FORMAT_COMPOUND,
             ),
+            Format::WithView(ident, view_format) => {
+                let view_frag = match view_format {
+                    ViewFormat::ReadOffsetLen(offset, len) => {
+                        let offset_frag = self.compile_expr(offset, Precedence::Top);
+                        let len_frag = self.compile_expr(len, Precedence::Top);
+                        let mut builder = FragmentBuilder::new();
+                        builder.push(Fragment::string("read-offset-len"));
+                        builder.push(Fragment::Char('('));
+                        builder.push(offset_frag);
+                        builder.push(Fragment::string(", "));
+                        builder.push(len_frag);
+                        builder.push(Fragment::Char(')'));
+                        builder.finalize()
+                    }
+                };
+                cond_paren(
+                    Fragment::string("with-view")
+                        .intervene(Fragment::Char(' '), Fragment::String(ident.clone()))
+                        .intervene(Fragment::Char(' '), view_frag),
+                    prec,
+                    Precedence::FORMAT_COMPOUND,
+                )
+            }
         }
     }
 }

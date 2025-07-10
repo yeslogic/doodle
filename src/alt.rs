@@ -131,7 +131,7 @@ pub enum EpiFormat<B = Box<FormatExt>, V = Vec<FormatExt>, P = Vec<(Pattern, For
 #[serde(tag = "tag", content = "data")]
 pub enum MetaFormat {
     LetView(Label, Box<FormatExt>),
-    WithView(Label, ViewFormat),
+    WithView(Label, ViewFormatExt),
     EngineSpecific {
         base_model: Box<FormatExt>,
         alt_model: Box<FormatExt>,
@@ -147,7 +147,7 @@ pub enum ReadKind {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 #[serde(tag = "tag", content = "data")]
-pub enum ViewFormat {
+pub enum ViewFormatExt {
     /// ReadOffsetLen(Offset, Len, ReadKind)
     ReadOffsetLen(Box<Expr>, Box<Expr>, ReadKind),
 }
@@ -265,7 +265,7 @@ impl FormatCompiler {
                 Format::LetView(ident.clone(), inner)
             }
             MetaFormat::WithView(_ident, view_format) => match view_format {
-                ViewFormat::ReadOffsetLen { .. } => {
+                ViewFormatExt::ReadOffsetLen { .. } => {
                     todo!("implement ViewFormat read offset+len");
                 }
             },
@@ -1172,13 +1172,15 @@ impl FormatModuleExt {
                             }
                         }
                         match scope_format {
-                            ViewFormat::ReadOffsetLen(offset, len, read_kind) => {
+                            ViewFormatExt::ReadOffsetLen(offset, len, read_kind) => {
                                 // confirm that offset is of a numeric type
                                 match offset.infer_type_ext(scope)? {
                                     t if t.is_numeric() => {}
-                                    other => return Err(anyhow!(
+                                    other => {
+                                        return Err(anyhow!(
                                         "ReadOffsetLen: expected numeric offset, found {other:?}"
-                                    )),
+                                    ))
+                                    }
                                 }
                                 // confirm that length is of a numeric type
                                 match len.infer_type_ext(scope)? {
@@ -1231,7 +1233,7 @@ mod __impls {
 
     use std::rc::Rc;
 
-    use crate::{Arith, TypeHint, UnaryOp};
+    use crate::{Arith, TypeHint, UnaryOp, ViewFormat};
 
     use super::*;
 
@@ -1790,6 +1792,20 @@ mod __impls {
                 )),
                 Format::LiftedOption(None) => {
                     FormatExt::Epi(EpiFormat::Opt(OptKind::LiftedOption, None))
+                }
+                Format::WithView(name, view_format) => {
+                    let view_format_ext = ViewFormatExt::from(view_format);
+                    FormatExt::Meta(MetaFormat::WithView(name, view_format_ext))
+                }
+            }
+        }
+    }
+
+    impl From<ViewFormat> for ViewFormatExt {
+        fn from(value: ViewFormat) -> Self {
+            match value {
+                ViewFormat::ReadOffsetLen(offs, len) => {
+                    ViewFormatExt::ReadOffsetLen(offs, len, ReadKind::ByteSlice)
                 }
             }
         }
