@@ -114,9 +114,10 @@ fn test_decoder_waldo() -> TestResult {
     let parsed_data = Decoder1(&mut input)?.data;
     match parsed_data {
         Top::waldo(x) => println!(
-            "Waldo: Found at offset {} (noise length: {})",
+            "Waldo: Found at offset {} (noise length: {}): \"{}\"",
             x.r#where,
-            x.noise.len()
+            x.noise.len(),
+            String::from_utf8_lossy(&x.waldo),
         ),
         other => unreachable!("expected waldo, found {other:?}"),
     }
@@ -177,11 +178,7 @@ fn test_decoder_tar() -> TestResult {
     let mut input = Parser::new(&buffer);
     let parsed_data = Decoder_tar_header_with_data(&mut input)?;
     match parsed_data {
-        TarBlock {
-            header,
-            file,
-            __padding,
-        } => {
+        TarBlock { header, file } => {
             println!("HEADER\n{header:?}");
             println!("\nFILE\n{file:?}");
         }
@@ -243,15 +240,15 @@ fn test_decoder_text_mixed() -> TestResult {
 mod test_files {
     use super::*;
 
-    fn mk_sig_hex(sig: (u8, u8, u8, u8, u8, u8, u8, u8)) -> String {
+    fn mk_sig_hex(sig: &[u8]) -> String {
         format!(
             "{:02X} {:02X} {:02X} {:02X} {:02X} {:02X} {:02X} {:02X}",
-            sig.0, sig.1, sig.2, sig.3, sig.4, sig.5, sig.6, sig.7
+            sig[0], sig[1], sig[2], sig[3], sig[4], sig[5], sig[6], sig[7]
         )
     }
 
     fn print_png_breadcrumb(png_data: PngData) {
-        let sig_hex = mk_sig_hex(png_data.signature);
+        let sig_hex = mk_sig_hex(&png_data.signature);
         println!(
             "SIG ({}) | IHDR (h {}px * w {}px)",
             sig_hex, png_data.ihdr.data.height, png_data.ihdr.data.width,

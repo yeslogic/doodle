@@ -402,7 +402,6 @@ impl BufferOffset {
         }
     }
 
-    #[cfg(feature = "parser_from_read_ctxt")]
     pub(crate) fn with_offset(current_offset: ByteOffset, max_offset: ByteOffset) -> Self {
         Self {
             current_offset,

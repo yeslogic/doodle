@@ -5,7 +5,7 @@ use std::ops::{Bound, RangeBounds};
 pub use crate::byte_set::ByteSet;
 pub use crate::parser::{
     error::{PResult, ParseError},
-    Parser,
+    Parser, View,
 };
 
 /// Performs a checked_sub operation, returning an error if the result would be negative

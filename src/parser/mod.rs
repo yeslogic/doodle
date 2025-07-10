@@ -1,11 +1,10 @@
 pub mod error;
 pub mod offset;
+pub mod view;
 
 use error::{PResult, ParseError, StateError};
 use offset::{BufferOffset, ByteOffset};
-
-#[cfg(feature = "parser_from_read_ctxt")]
-use crate::read::ReadCtxt;
+pub use view::View;
 
 /// Stateful parser with an associated buffer and offset-tracker.
 pub struct Parser<'a> {
@@ -13,17 +12,18 @@ pub struct Parser<'a> {
     pub(crate) offset: BufferOffset,
 }
 
-#[cfg(feature = "parser_from_read_ctxt")]
-impl<'a> From<ReadCtxt<'a>> for Parser<'a> {
-    fn from(read: ReadCtxt<'a>) -> Self {
-        let buf_len = read.input.len();
-        let max_offset = read.offset + buf_len;
+impl<'a> Parser<'a> {}
+
+impl<'a> From<View<'a>> for Parser<'a> {
+    fn from(view: View<'a>) -> Self {
+        let buf_len = view.buffer.len();
+        let max_offset = view.start_offset + buf_len;
         let offset = BufferOffset::with_offset(
-            ByteOffset::from_bytes(read.offset),
+            ByteOffset::from_bytes(view.start_offset),
             ByteOffset::from_bytes(max_offset),
         );
         Self {
-            buffer: read.input,
+            buffer: view.buffer,
             offset,
         }
     }
@@ -36,6 +36,22 @@ impl<'a> Parser<'a> {
         Self {
             buffer,
             offset: BufferOffset::new(max_offset),
+        }
+    }
+
+    /// Creates a [`View`] starting from the current position in the Parser,
+    /// provided it is in Bytes-mode.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if the Parser is currently in bits-mode.
+    pub fn view(&self) -> View<'a> {
+        let (cur_offset, None) = self.offset.get_current_offset().as_bytes() else {
+            panic!("cannot open view while in bits-mode processing");
+        };
+        View {
+            buffer: &self.buffer[cur_offset..],
+            start_offset: cur_offset,
         }
     }
 
