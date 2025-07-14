@@ -21,6 +21,23 @@ impl BaseType {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Default, Serialize)]
+pub enum SeqBorrowHint {
+    #[default]
+    Constructed,
+    BufferView,
+}
+
+impl SeqBorrowHint {
+    pub fn is_constructed(&self) -> bool {
+        matches!(self, Self::Constructed)
+    }
+
+    pub fn is_buffer_view(&self) -> bool {
+        matches!(self, Self::BufferView)
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub enum ValueType {
     Any,
@@ -192,5 +209,65 @@ impl Serialize for TypeHint {
 impl From<ValueType> for TypeHint {
     fn from(t: ValueType) -> Self {
         Self(Container::new(t))
+    }
+}
+
+pub(crate) mod augmented {
+    use super::*;
+
+    #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
+    pub enum AugValueType {
+        Any,
+        Empty,
+        Base(BaseType),
+        Tuple(Vec<AugValueType>),
+        Record(Vec<(Label, AugValueType)>),
+        Union(BTreeMap<Label, AugValueType>),
+        Seq(Box<AugValueType>, SeqBorrowHint),
+        Option(Box<AugValueType>),
+    }
+
+    impl From<ValueType> for AugValueType {
+        fn from(t: ValueType) -> Self {
+            match t {
+                ValueType::Any => AugValueType::Any,
+                ValueType::Empty => AugValueType::Empty,
+                ValueType::Base(b) => AugValueType::Base(b),
+                ValueType::Tuple(ts) => {
+                    AugValueType::Tuple(ts.into_iter().map(From::from).collect())
+                }
+                ValueType::Record(fs) => {
+                    AugValueType::Record(fs.into_iter().map(|(l, t)| (l, From::from(t))).collect())
+                }
+                ValueType::Union(bs) => {
+                    AugValueType::Union(bs.into_iter().map(|(l, t)| (l, From::from(t))).collect())
+                }
+                ValueType::Seq(t) => {
+                    AugValueType::Seq(Box::new(From::from(*t)), SeqBorrowHint::default())
+                }
+                ValueType::Option(t) => AugValueType::Option(Box::new(From::from(*t))),
+            }
+        }
+    }
+
+    impl From<AugValueType> for ValueType {
+        fn from(t: AugValueType) -> Self {
+            match t {
+                AugValueType::Any => ValueType::Any,
+                AugValueType::Empty => ValueType::Empty,
+                AugValueType::Base(b) => ValueType::Base(b),
+                AugValueType::Tuple(ts) => {
+                    ValueType::Tuple(ts.into_iter().map(From::from).collect())
+                }
+                AugValueType::Record(fs) => {
+                    ValueType::Record(fs.into_iter().map(|(l, t)| (l, From::from(t))).collect())
+                }
+                AugValueType::Union(bs) => {
+                    ValueType::Union(bs.into_iter().map(|(l, t)| (l, From::from(t))).collect())
+                }
+                AugValueType::Seq(t, _) => ValueType::Seq(Box::new(From::from(*t))),
+                AugValueType::Option(t) => ValueType::Option(Box::new(From::from(*t))),
+            }
+        }
     }
 }

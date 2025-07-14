@@ -399,23 +399,32 @@ impl ToFragment for DeclDerives {
 
 #[derive(Clone, Debug)]
 pub(crate) enum RustDecl {
-    TypeDef(Label, RustTypeDef),
+    TypeDef(Label, RustTypeDecl),
     Function(RustFn),
 }
 
 impl RustDecl {
     pub fn type_def(lab: impl IntoLabel, def: RustTypeDef) -> Self {
-        Self::TypeDef(lab.into(), def)
+        Self::TypeDef(lab.into(), RustTypeDecl { def, lt: None })
     }
 }
 
 impl ToFragment for RustDecl {
     fn to_fragment(&self) -> Fragment {
         match self {
-            RustDecl::TypeDef(name, type_def) => {
-                let keyword = Fragment::string(type_def.keyword_for());
-                Fragment::intervene(keyword, Fragment::Char(' '), name.to_fragment())
-                    .intervene(Fragment::Char(' '), type_def.to_fragment())
+            RustDecl::TypeDef(name, RustTypeDecl { def, lt }) => {
+                let identifier = if let Some(lt) = lt {
+                    name.to_fragment().cat(
+                        lt.to_fragment()
+                            .delimit(Fragment::Char('<'), Fragment::Char('>')),
+                    )
+                } else {
+                    name.to_fragment()
+                };
+                let keyword = Fragment::string(def.keyword_for());
+                keyword
+                    .intervene(Fragment::Char(' '), identifier)
+                    .intervene(Fragment::Char(' '), def.to_fragment())
             }
             RustDecl::Function(fn_def) => fn_def.to_fragment(),
         }
@@ -426,8 +435,8 @@ impl ToFragment for RustDecl {
 /// each of those two components
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct RustParams<Lt, Ty> {
-    lt_params: Vec<Lt>,
-    ty_params: Vec<Ty>,
+    pub(crate) lt_params: Vec<Lt>,
+    pub(crate) ty_params: Vec<Ty>,
 }
 
 impl<Lt, Ty> Default for RustParams<Lt, Ty> {
@@ -448,6 +457,17 @@ impl<Lt, Ty> RustParams<Lt, Ty> {
     pub fn new() -> Self {
         Self {
             lt_params: Vec::new(),
+            ty_params: Vec::new(),
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.lt_params.is_empty() && self.ty_params.is_empty()
+    }
+
+    pub(crate) fn from_lt(lt: Lt) -> Self {
+        Self {
+            lt_params: vec![lt],
             ty_params: Vec::new(),
         }
     }
@@ -550,6 +570,18 @@ impl ToFragment for RustFn {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) struct RustTypeDecl {
+    pub(crate) def: RustTypeDef,
+    pub(crate) lt: Option<RustLt>,
+}
+
+impl RustTypeDecl {
+    pub(crate) fn lt_param(&self) -> Option<&RustLt> {
+        self.lt.as_ref()
+    }
+}
+
 /// Representation for both `struct` and `enum`-keyword declarations.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum RustTypeDef {
@@ -606,8 +638,12 @@ impl RustType {
 
     /// Returns the RustType representation of a locally-defined type whose index in the code-generation table
     /// is `ix` and whose identifier is `name`.
-    pub fn defined(ix: usize, name: impl Into<Label>) -> Self {
-        Self::Atom(AtomType::TypeRef(LocalType::LocalDef(ix, name.into())))
+    pub fn defined(ix: usize, name: impl Into<Label>, params: UseParams) -> Self {
+        Self::Atom(AtomType::TypeRef(LocalType::LocalDef(
+            ix,
+            name.into(),
+            params,
+        )))
     }
 
     /// Maps the provided RustType according to the transformation `T -> Vec<T>`
@@ -724,6 +760,14 @@ impl RustType {
                 RustType::Atom(AtomType::Comp(CompType::RawSlice(t)))
             }
             this => this,
+        }
+    }
+
+    pub(crate) fn lt_param(&self) -> Option<&RustLt> {
+        match self {
+            RustType::Atom(atom_type) => atom_type.lt_param(),
+            RustType::AnonTuple(rust_types) => rust_types.iter().find_map(|t| t.lt_param()),
+            RustType::Verbatim(_, rust_params) => rust_params.lt_params.first(),
         }
     }
 }
@@ -895,6 +939,13 @@ impl RustVariant {
             RustVariant::Tuple(_, elts) => elts.iter().all(RustType::can_be_copy),
         }
     }
+
+    pub(crate) fn lt_param(&self) -> Option<&RustLt> {
+        match self {
+            RustVariant::Unit(_) => None,
+            RustVariant::Tuple(_, elts) => elts.iter().find_map(RustType::lt_param),
+        }
+    }
 }
 
 impl ToFragment for RustVariant {
@@ -919,24 +970,44 @@ where
     Comp(CompType<T, U>),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub(crate) enum LocalType {
-    LocalDef(usize, Label),
-    External(Label),
-}
-
-impl AsRef<Label> for LocalType {
-    fn as_ref(&self) -> &Label {
+impl AtomType {
+    fn lt_param(&self) -> Option<&RustLt> {
         match self {
-            LocalType::External(lab) | LocalType::LocalDef(_, lab) => lab,
+            AtomType::TypeRef(local_type) => match local_type {
+                LocalType::LocalDef(_, _, params) => params.lt_params.first(),
+                _ => None,
+            },
+            AtomType::Prim(..) => None,
+            AtomType::Comp(ct) => ct.lt_param(),
         }
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) enum LocalType {
+    LocalDef(usize, Label, UseParams),
+    External(Label),
+}
+
+// impl AsRef<Label> for LocalType {
+//     fn as_ref(&self) -> &Label {
+//         match self {
+//             LocalType::External(lab) | LocalType::LocalDef(_, lab) => lab,
+//         }
+//     }
+// }
+
 impl ToFragment for LocalType {
     fn to_fragment(&self) -> Fragment {
         match self {
-            Self::LocalDef(_, lab) | Self::External(lab) => lab.to_fragment(),
+            Self::LocalDef(_, lab, params) => {
+                if params.is_empty() {
+                    lab.to_fragment()
+                } else {
+                    lab.to_fragment().cat(params.to_fragment())
+                }
+            }
+            Self::External(lab) => lab.to_fragment(),
         }
     }
 }
@@ -1031,6 +1102,14 @@ pub enum RustLt {
     Parametric(Label),
 }
 
+impl AsRef<Label> for RustLt {
+    fn as_ref(&self) -> &Label {
+        match self {
+            RustLt::Parametric(lab) => lab,
+        }
+    }
+}
+
 impl ToFragment for RustLt {
     fn to_fragment(&self) -> Fragment {
         match self {
@@ -1049,6 +1128,18 @@ pub(crate) enum CompType<T = Box<RustType>, U = T> {
     Option(T),
     Result(T, U),
     Borrow(Option<RustLt>, Mut, T),
+}
+
+impl CompType {
+    fn lt_param(&self) -> Option<&RustLt> {
+        match self {
+            CompType::Vec(t) => t.lt_param(),
+            CompType::RawSlice(t) => t.lt_param(),
+            CompType::Option(t) => t.lt_param(),
+            CompType::Result(t, _) => t.lt_param(),
+            CompType::Borrow(rust_lt, _, t) => rust_lt.as_ref().or_else(|| t.lt_param()),
+        }
+    }
 }
 
 impl<T, U> ToFragment for CompType<T, U>

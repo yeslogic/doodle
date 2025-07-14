@@ -3,7 +3,7 @@ use super::*;
 pub type TestResult<T = ()> = Result<T, Box<dyn Send + Sync + std::error::Error>>;
 
 // Stabilization aliases to avoid hard-coding shifting numbers as formats are enriched with more possibilities
-pub type Top = main_data;
+pub type Top<'a> = main_data<'a>;
 pub type OpentypeData = opentype_main;
 pub type TarBlock = tar_header_with_data;
 pub type PngData = png_main;

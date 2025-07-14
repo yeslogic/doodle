@@ -1,5 +1,5 @@
 mod name;
-mod rust_ast;
+pub(crate) mod rust_ast;
 mod trace;
 mod typed_decoder;
 pub(crate) mod typed_format;
@@ -14,8 +14,9 @@ use crate::{
     decoder::extract_pair,
     parser::error::TraceHash,
     typecheck::{TypeChecker, UScope, UVar},
+    valuetype::{augmented::AugValueType, SeqBorrowHint},
     Arith, BaseType, DynFormat, Expr, Format, FormatModule, IntRel, IntoLabel, Label, MatchTree,
-    Pattern, StyleHint, UnaryOp, ValueType, ViewFormat,
+    Pattern, StyleHint, UnaryOp, ViewFormat,
 };
 
 use std::{
@@ -65,7 +66,7 @@ fn get_trace(_salt: &impl std::hash::Hash) -> TraceHash {
 
 pub struct CodeGen {
     name_gen: NameGen,
-    defined_types: Vec<RustTypeDef>,
+    defined_types: Vec<RustTypeDecl>,
 }
 
 impl CodeGen {
@@ -81,19 +82,19 @@ impl CodeGen {
     /// Converts a `ValueType` to a `GenType`, potentially creating new ad-hoc names
     /// for any records or unions encountered, and registering any new ad-hoc type definitions
     /// in `self`.
-    fn lift_type(&mut self, vt: &ValueType) -> GenType {
+    fn lift_type(&mut self, vt: &AugValueType) -> GenType {
         match vt {
-            ValueType::Empty => RustType::UNIT.into(),
-            ValueType::Base(BaseType::Bool) => PrimType::Bool.into(),
-            ValueType::Base(BaseType::U8) => PrimType::U8.into(),
-            ValueType::Base(BaseType::U16) => PrimType::U16.into(),
-            ValueType::Base(BaseType::U32) => PrimType::U32.into(),
-            ValueType::Base(BaseType::U64) => PrimType::U64.into(),
-            ValueType::Base(BaseType::Char) => PrimType::Char.into(),
-            ValueType::Option(param_t) => GenType::Inline(
+            AugValueType::Empty => RustType::UNIT.into(),
+            AugValueType::Base(BaseType::Bool) => PrimType::Bool.into(),
+            AugValueType::Base(BaseType::U8) => PrimType::U8.into(),
+            AugValueType::Base(BaseType::U16) => PrimType::U16.into(),
+            AugValueType::Base(BaseType::U32) => PrimType::U32.into(),
+            AugValueType::Base(BaseType::U64) => PrimType::U64.into(),
+            AugValueType::Base(BaseType::Char) => PrimType::Char.into(),
+            AugValueType::Option(param_t) => GenType::Inline(
                 CompType::Option(Box::new(self.lift_type(param_t).to_rust_type())).into(),
             ),
-            ValueType::Tuple(vs) => match &vs[..] {
+            AugValueType::Tuple(vs) => match &vs[..] {
                 [] => RustType::AnonTuple(Vec::new()).into(),
                 [v] => RustType::AnonTuple(vec![self.lift_type(v).to_rust_type()]).into(),
                 _ => {
@@ -107,38 +108,57 @@ impl CodeGen {
                     RustType::AnonTuple(buf).into()
                 }
             },
-            ValueType::Seq(t) => {
+            AugValueType::Seq(t, hint) => {
+                const DEFAULT_LT: RustLt = RustLt::Parametric(Label::Borrowed("'input"));
                 let inner = self.lift_type(t.as_ref()).to_rust_type();
-                CompType::Vec(Box::new(inner)).into()
+                match hint {
+                    SeqBorrowHint::Constructed => CompType::Vec(Box::new(inner)).into(),
+                    SeqBorrowHint::BufferView => CompType::Borrow(
+                        Some(DEFAULT_LT),
+                        Mut::Immutable,
+                        Box::new(CompType::RawSlice(Box::new(inner)).into()),
+                    )
+                    .into(),
+                }
             }
-            ValueType::Any => panic!("ValueType::Any"),
-            ValueType::Record(fields) => {
+            AugValueType::Any => panic!("AugValueType::Any"),
+            AugValueType::Record(fields) => {
+                let mut lt_bound = None;
                 let mut rt_fields = Vec::new();
                 for (lab, ty) in fields.iter() {
                     self.name_gen
                         .ctxt
                         .push_atom(NameAtom::RecordField(lab.clone()));
                     let rt_field = self.lift_type(ty);
+                    if let Some(lt) = rt_field.lt_param() {
+                        // REVIEW - is it likely to have clasihing lifetimes?
+                        let _ = lt_bound.get_or_insert(lt.clone());
+                    }
                     rt_fields.push((lab.clone(), rt_field.to_rust_type()));
                     self.name_gen.ctxt.escape();
                 }
                 let rt_def = RustTypeDef::Struct(RustStruct::Record(rt_fields));
-                let (type_name, (ix, is_new)) = self.name_gen.get_name(&rt_def);
+                let rt_decl = RustTypeDecl {
+                    def: rt_def,
+                    lt: lt_bound,
+                };
+                let (type_name, (ix, is_new)) = self.name_gen.get_name(&rt_decl);
                 if is_new {
-                    self.defined_types.push(rt_def.clone());
+                    self.defined_types.push(rt_decl.clone());
                 }
-                GenType::Def((ix, type_name), rt_def)
+                GenType::Def((ix, type_name), rt_decl)
             }
-            ValueType::Union(vars) => {
+            AugValueType::Union(vars) => {
                 let mut rt_vars = Vec::new();
+                let mut lt_bound = None;
                 for (name, def) in vars.iter() {
                     self.name_gen
                         .ctxt
                         .push_atom(NameAtom::Variant(name.clone()));
                     let name = name.clone();
                     let var = match def {
-                        ValueType::Empty => RustVariant::Unit(name),
-                        ValueType::Tuple(args) => match &args[..] {
+                        AugValueType::Empty => RustVariant::Unit(name),
+                        AugValueType::Tuple(args) => match &args[..] {
                             [] => RustVariant::Unit(name),
                             [arg] => {
                                 RustVariant::Tuple(name, vec![self.lift_type(arg).to_rust_type()])
@@ -159,15 +179,22 @@ impl CodeGen {
                             RustVariant::Tuple(name, vec![inner])
                         }
                     };
+                    if let Some(lt) = var.lt_param() {
+                        let _ = lt_bound.get_or_insert(lt.clone());
+                    }
                     rt_vars.push(var);
                     self.name_gen.ctxt.escape();
                 }
                 let rt_def = RustTypeDef::Enum(rt_vars);
-                let (tname, (ix, is_new)) = self.name_gen.get_name(&rt_def);
+                let rt_decl = RustTypeDecl {
+                    def: rt_def,
+                    lt: lt_bound,
+                };
+                let (tname, (ix, is_new)) = self.name_gen.get_name(&rt_decl);
                 if is_new {
-                    self.defined_types.push(rt_def.clone());
+                    self.defined_types.push(rt_decl.clone());
                 }
-                GenType::Def((ix, tname), rt_def)
+                GenType::Def((ix, tname), rt_decl)
             }
         }
     }
@@ -184,11 +211,11 @@ impl CodeGen {
             TypedDecoder::Byte(bs) => CaseLogic::Simple(SimpleLogic::ByteIn(*bs)),
             TypedDecoder::Variant(gt, name, inner) => {
                 let (type_name, def) = {
-                    let Some((ix, lab)) = gt.try_as_adhoc() else { panic!("unexpected type_hint for Decoder::Variant: {:?}", gt) };
+                    let Some((ix, lab, _)) = gt.try_as_adhoc() else { panic!("unexpected type_hint for Decoder::Variant: {:?}", gt) };
                     (lab.clone(), &self.defined_types[ix])
                 };
                 let constr = Constructor::Compound(type_name.clone(), name.clone());
-                match def {
+                match &def.def {
                     RustTypeDef::Enum(vars) => {
                         let matching = vars
                             .iter()
@@ -658,7 +685,7 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
             let tname = match gt {
                 GenType::Def((_, tname), _) => tname,
                 GenType::Inline(
-                    RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(_ix, tname))),
+                    RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(_ix, tname, _))),
                 ) => tname,
                 other =>
                     unreachable!(
@@ -682,7 +709,7 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
         TypedExpr::Variant(gt, vname, inner) => {
             match gt {
                 GenType::Def((_ix, tname), def) => {
-                    match def {
+                    match &def.def {
                         RustTypeDef::Enum(vars) => {
                             let Some(this) = vars.iter().find(|var| var.get_label() == vname) else {
                                 unreachable!("Variant not found: {:?}::{:?}", tname, vname)
@@ -1116,7 +1143,7 @@ fn refutability_check<A: std::fmt::Debug + Clone>(
                     match at {
                         AtomType::TypeRef(lt) =>
                             match lt {
-                                LocalType::LocalDef(ix, lbl) =>
+                                LocalType::LocalDef(ix, lbl, _) =>
                                     unreachable!(
                                         "inline LocalDef ({ix}, {lbl}) cannot be resolved abstractly, use GenType::Def instead"
                                     ),
@@ -1196,7 +1223,7 @@ fn refutability_check<A: std::fmt::Debug + Clone>(
                     unreachable!("verbatim types not expected in generated match-expressions"),
             }
         GenType::Def(_, def) => {
-            match def {
+            match &def.def {
                 RustTypeDef::Enum(vars) => {
                     // NOTE - we encounter badness when attempting to check full-variant coverage using subtyped partial unions
                     // NOTE - we can only check for every possible value being covered for every possible variant
@@ -1246,7 +1273,7 @@ fn is_pattern_irrefutable(pat: &TypedPattern<GenType>) -> bool {
             // a variant pattern is irrefutable if there are no other variants and the inner expression is also irrefutable
             is_pattern_irrefutable(inner)
                 && (match gt {
-                    GenType::Def(_, def) => match def {
+                    GenType::Def(_, def) => match &def.def {
                         RustTypeDef::Enum(vars) => vars.len() == 1 && vars[0].get_label() == lab,
                         _ => unreachable!("variant pattern will never match struct-typed value"),
                     },
@@ -2647,14 +2674,12 @@ impl ToAst for ViewLogic<GTExpr> {
                 inner.prepend_stmt(bind_view);
                 inner
             }
-            ViewLogic::ReadViewOffsetLen(name, offset, len) => GenBlock::simple_expr(
-                RustExpr::local(name.clone())
-                    .call_method_with(
-                        "read_offset_len",
-                        [offset.clone().as_usize(), len.clone().as_usize()],
-                    )
-                    .call_method("to_vec"),
-            ),
+            ViewLogic::ReadViewOffsetLen(name, offset, len) => {
+                GenBlock::simple_expr(RustExpr::local(name.clone()).call_method_with(
+                    "read_offset_len",
+                    [offset.clone().as_usize(), len.clone().as_usize()],
+                ))
+            }
         }
     }
 }
@@ -3700,7 +3725,7 @@ impl ToAst for DerivedLogic<GTExpr> {
     }
 }
 
-// ANCHOR[main-fn] - `generate_code` function
+// ANCHOR[epic=main-fn] - `generate_code` function
 pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragment {
     let mut items = Vec::new();
 
@@ -3713,41 +3738,41 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
     let mut fn_renames = BTreeSet::<Label>::new();
     let type_context = &elaborator.codegen.defined_types[..];
     let src_context = rust_ast::analysis::SourceContext::from(type_context);
-    let mut type_defs = Vec::from_iter(elaborator.codegen.defined_types.iter().map(|type_def| {
+    let mut type_decls = Vec::from_iter(elaborator.codegen.defined_types.iter().map(|type_decl| {
         elaborator
             .codegen
             .name_gen
             .rev_map
-            .get_key_value(type_def)
+            .get_key_value(type_decl)
             .unwrap()
     }));
-    type_defs.sort_by_key(|(_, (ix, _))| ix);
+    type_decls.sort_by_key(|(_, (ix, _))| ix);
     const HEAP_STRATEGY: HeapStrategy =
         HeapStrategy::new().variant_cutoff(128)
         // .absolute_cutoff(128)
         ;
 
-    for (type_def, (_ix, path)) in type_defs.into_iter() {
+    for (type_decl, (_ix, path)) in type_decls.into_iter() {
         let name = elaborator
             .codegen
             .name_gen
             .ctxt
             .find_name_for(path)
             .expect("no name found");
-        let traits = if type_def.copy_hint(&src_context) {
+        let traits = if type_decl.def.copy_hint(&src_context) {
             // Derive `Copy` if we can statically infer the definition to be compatible with `Copy`
             // TODO - it might be possible to track which LocalDef items have already been marked Copy, but even that isn't perfect if the def follows its first reference
             TraitSet::DebugCopy
         } else {
             TraitSet::DebugClone
         };
-        let it = RustItem::pub_decl_with_traits(RustDecl::type_def(name, type_def.clone()), traits);
+        let it = RustItem::pub_decl_with_traits(RustDecl::TypeDef(name, type_decl.clone()), traits);
         let comments = {
             let sz_comment = format!(
                 "expected size: {}",
-                rust_ast::analysis::MemSize::size_hint(type_def, &src_context)
+                rust_ast::analysis::MemSize::size_hint(type_decl, &src_context)
             );
-            let outcome = HeapOptimize::heap_hint(type_def, HEAP_STRATEGY, &src_context);
+            let outcome = HeapOptimize::heap_hint(type_decl, HEAP_STRATEGY, &src_context);
             if outcome.0.is_noop() {
                 vec![sz_comment]
             } else {
@@ -3829,14 +3854,25 @@ where
 
     fn to_ast(&self, _ctxt: ProdCtxt<'_>) -> RustFn {
         let name = decoder_fname(self.ixlabel);
-        let params = DefParams::new();
+
+        let params = if let Some(lt) = self.ret_type.lt_param() {
+            Some(DefParams::from_lt(lt.as_ref().clone()))
+        } else {
+            Some(DefParams::new())
+            // None
+        };
+
         let sig = {
             let args = {
                 let arg0 = {
                     let name = "_input".into();
                     let ty = {
                         let mut params = RustParams::<RustLt, RustType>::new();
-                        params.push_lifetime(RustLt::Parametric("'_".into()));
+                        if let Some(lt) = self.ret_type.lt_param() {
+                            params.push_lifetime(lt.clone());
+                        } else {
+                            params.push_lifetime(RustLt::Parametric("'_".into()));
+                        }
                         RustType::borrow_of(
                             None,
                             Mut::Mutable,
@@ -3888,7 +3924,7 @@ where
             stmts
         };
 
-        RustFn::new(name, Some(params), sig, body)
+        RustFn::new(name, params, sig, body)
     }
 }
 

@@ -2,10 +2,11 @@ use std::borrow::Cow;
 use std::ops::Add;
 use std::rc::Rc;
 
-use super::rust_ast::{PrimType, RustType, RustTypeDef};
+use super::rust_ast::{PrimType, RustType, RustTypeDecl};
 use super::{AtomType, LocalType};
 use crate::bounds::Bounds;
 use crate::byte_set::ByteSet;
+use crate::codegen::rust_ast::{RustLt, RustParams, UseParams};
 use crate::{Arith, IntRel, Label, StyleHint, TypeHint, UnaryOp};
 
 pub(crate) mod variables;
@@ -13,14 +14,23 @@ pub(crate) mod variables;
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum GenType {
     Inline(RustType),
-    Def((usize, Label), RustTypeDef),
+    Def((usize, Label), RustTypeDecl),
 }
 
 impl GenType {
     pub(crate) fn to_rust_type(&self) -> RustType {
         match self {
             GenType::Inline(rt) => rt.clone(),
-            GenType::Def((ix, lbl), _) => RustType::defined(*ix, lbl.clone()),
+            GenType::Def((ix, lbl), RustTypeDecl { lt, .. }) => {
+                let params = match lt {
+                    Some(lt) => RustParams {
+                        lt_params: vec![lt.clone()],
+                        ..Default::default()
+                    },
+                    None => Default::default(),
+                };
+                RustType::defined(*ix, lbl.clone(), params)
+            }
         }
     }
 
@@ -35,12 +45,18 @@ impl GenType {
     ///
     /// Returns `None` if the type in question is not itself a concrete definition (`GenType::Def`)
     /// or an abstract reference to a locally-defined adhoc type (`GenType::Inline` of nested `LocalType::LocalDef`).
-    pub(crate) fn try_as_adhoc(&self) -> Option<(usize, &Label)> {
+    pub(crate) fn try_as_adhoc(&self) -> Option<(usize, &Label, UseParams)> {
         match self {
-            GenType::Def((ix, lbl), ..)
-            | GenType::Inline(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(ix, lbl)))) => {
-                Some((*ix, lbl))
-            }
+            GenType::Def((ix, lbl), RustTypeDecl { lt, .. }) => Some((
+                *ix,
+                lbl,
+                lt.clone().map(RustParams::from_lt).unwrap_or_default(),
+            )),
+            GenType::Inline(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(
+                ix,
+                lbl,
+                params,
+            )))) => Some((*ix, lbl, params.clone())),
             _ => None,
         }
     }
@@ -50,7 +66,14 @@ impl GenType {
         match self {
             GenType::Inline(rust_type) => rust_type.can_be_copy(),
             // TODO - infer recursive Copy of local definitions, if possible
-            GenType::Def(_, rust_type_def) => rust_type_def.can_be_copy(),
+            GenType::Def(_, rust_type_decl) => rust_type_decl.def.can_be_copy(),
+        }
+    }
+
+    pub(crate) fn lt_param(&self) -> Option<&RustLt> {
+        match self {
+            GenType::Inline(rust_type) => rust_type.lt_param(),
+            GenType::Def(_, rust_type_decl) => rust_type_decl.lt_param(),
         }
     }
 }
@@ -912,7 +935,7 @@ mod __impls {
     use super::{GenType, TypedDynFormat, TypedExpr, TypedFormat, TypedPattern, TypedViewFormat};
     use crate::{
         codegen::{
-            rust_ast::{AtomType, CompType, PrimType, RustType, RustTypeDef},
+            rust_ast::{AtomType, CompType, PrimType, RustType, RustTypeDecl},
             IxLabel,
         },
         DynFormat, Expr, Format, Pattern, ViewFormat,
@@ -924,8 +947,8 @@ mod __impls {
         }
     }
 
-    impl From<(IxLabel, RustTypeDef)> for GenType {
-        fn from(value: (IxLabel, RustTypeDef)) -> Self {
+    impl From<(IxLabel, RustTypeDecl)> for GenType {
+        fn from(value: (IxLabel, RustTypeDecl)) -> Self {
             let ix = value.0.to_usize();
             let lbl = value.0.into();
             GenType::Def((ix, lbl), value.1)

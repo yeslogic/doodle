@@ -53,6 +53,12 @@ impl Rebindable for RustDecl {
     }
 }
 
+impl Rebindable for RustTypeDecl {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
+        self.def.rebind(table);
+    }
+}
+
 impl Rebindable for RustTypeDef {
     fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         match self {
@@ -366,7 +372,7 @@ impl Rebindable for AtomType {
 impl Rebindable for LocalType {
     fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         match self {
-            LocalType::LocalDef(_ix, lab) => {
+            LocalType::LocalDef(_ix, lab, _) => {
                 if table.contains_key(lab) {
                     *lab = table.index(lab).clone();
                 }

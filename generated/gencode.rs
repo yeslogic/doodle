@@ -4362,18 +4362,18 @@ __padding: Vec<u8>,
 __trailing: Vec<u8>
 }
 
-/// expected size: 56
+/// expected size: 40
 #[derive(Debug, Clone)]
-pub struct waldo_main {
+pub struct waldo_main<'input> {
 r#where: u64,
 noise: Vec<u8>,
-waldo: Vec<u8>
+waldo: &'input [u8]
 }
 
 /// expected size: 2184
 /// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InEnum { variants: [DirectHeap, Noop, Noop, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap] })] })] }, Noop, DirectHeap, Noop, Noop, Noop, Noop, Noop, Noop, Noop] }, Layout { size: 104, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
-pub enum main_data { elf(elf_main), gif(gif_main), gzip(Vec<gzip_main>), jpeg(jpeg_main), mpeg4(mpeg4_main), opentype(opentype_main), peano(Vec<u32>), png(png_main), riff(riff_main), rle(rle_main), tar(tar_main), text(Vec<char>), tgz(Vec<tar_main>), tiff(tiff_main), waldo(waldo_main) }
+pub enum main_data<'input> { elf(elf_main), gif(gif_main), gzip(Vec<gzip_main>), jpeg(jpeg_main), mpeg4(mpeg4_main), opentype(opentype_main), peano(Vec<u32>), png(png_main), riff(riff_main), rle(rle_main), tar(tar_main), text(Vec<char>), tgz(Vec<tar_main>), tiff(tiff_main), waldo(waldo_main<'input>) }
 
 /// expected size: 16
 #[derive(Debug, Copy, Clone)]
@@ -4452,15 +4452,15 @@ buf: Vec<u8>
 /// expected size: 2184
 /// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [InDef(InEnum { variants: [DirectHeap, Noop, Noop, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap] })] })] }, Noop, DirectHeap, Noop, Noop, Noop, Noop, Noop, Noop, Noop] })] }, Layout { size: 104, align: 8 (1 << 3) })
 #[derive(Debug, Clone)]
-pub struct main {
-data: main_data
+pub struct main<'input> {
+data: main_data<'input>
 }
 
-fn Decoder_main<>(_input: &mut Parser<'_>) -> Result<main, ParseError> {
+fn Decoder_main<'input>(_input: &mut Parser<'input>) -> Result<main<'input>, ParseError> {
 Decoder1(_input)
 }
 
-fn Decoder1<>(_input: &mut Parser<'_>) -> Result<main, ParseError> {
+fn Decoder1<'input>(_input: &mut Parser<'input>) -> Result<main<'input>, ParseError> {
 let data = ((|| {
 _input.start_alt();
 let res = (|| {
@@ -4663,7 +4663,7 @@ _input.finish()?;
 PResult::Ok(main { data })
 }
 
-fn Decoder_waldo_main<>(_input: &mut Parser<'_>) -> Result<waldo_main, ParseError> {
+fn Decoder_waldo_main<'input>(_input: &mut Parser<'input>) -> Result<waldo_main<'input>, ParseError> {
 let r#where = (Decoder106(_input))?;
 let noise = {
 let mut accum = Vec::new();
@@ -4715,7 +4715,7 @@ return Err(ParseError::ExcludedBranch(4260205764162136487u64));
 let _here = _input.get_offset_u64();
 let waldo = {
 let scope = _input.view();
-scope.read_offset_len((try_sub!(r#where, _here, 13646096770106105413u64)) as usize, 5u8 as usize).to_vec()
+scope.read_offset_len((try_sub!(r#where, _here, 13646096770106105413u64)) as usize, 5u8 as usize)
 };
 _input.skip_remainder();
 PResult::Ok(waldo_main { r#where, noise, waldo })
