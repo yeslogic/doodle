@@ -1,7 +1,7 @@
 use super::util::{FxHash, StableMap};
 use super::{
     name::{pick_best_path, NameCtxt, PathLabel},
-    rust_ast::RustTypeDef,
+    rust_ast::RustTypeDecl,
 };
 use crate::Label;
 
@@ -9,7 +9,7 @@ pub struct NameGen {
     pub(super) ctxt: NameCtxt,
     ctr: usize,
     // Reverse mapping from a RustTypeDef to its index in the ad-hoc type inventory and the PathLabel it is to be assigned
-    pub(super) rev_map: StableMap<RustTypeDef, (usize, PathLabel), FxHash>,
+    pub(super) rev_map: StableMap<RustTypeDecl, (usize, PathLabel), FxHash>,
     // Reassociation table for converting first-pass name selections into their ideal seed-PathLabel
     pub(super) name_remap: StableMap<Label, PathLabel, FxHash>,
 }
@@ -38,7 +38,7 @@ impl NameGen {
     /// Returns `(old, (ix, false))` if the RustTypeDef was already given a name `old`, where `ix` is the index of the definition in the overall order of ad-hoc types that were defined thus-far.
     ///
     /// Returns `(new, (ix, true))` otherwise, where `ix` is the uniquely-identifying index of the newly defined type at time-of-invocation, and `new` is a fresh path-based name for the type.
-    pub fn get_name(&mut self, def: &RustTypeDef) -> (Label, (usize, bool)) {
+    pub fn get_name(&mut self, def: &RustTypeDecl) -> (Label, (usize, bool)) {
         match self.rev_map.get(def) {
             Some((ix, path)) => match self.ctxt.find_name_for(path).ok() {
                 Some(name) => {

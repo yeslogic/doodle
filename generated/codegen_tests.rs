@@ -117,7 +117,7 @@ fn test_decoder_waldo() -> TestResult {
             "Waldo: Found at offset {} (noise length: {}): \"{}\"",
             x.r#where,
             x.noise.len(),
-            String::from_utf8_lossy(&x.waldo),
+            String::from_utf8_lossy(x.waldo),
         ),
         other => unreachable!("expected waldo, found {other:?}"),
     }

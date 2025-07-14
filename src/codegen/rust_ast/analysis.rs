@@ -50,7 +50,7 @@ struct CacheEntry {
 }
 
 pub(crate) struct SourceContext<'a> {
-    def_map: &'a [RustTypeDef],
+    def_map: &'a [RustTypeDecl],
     cache: Rc<RefCell<HashMap<usize, CacheEntry>>>,
 }
 
@@ -83,7 +83,7 @@ macro_rules! cache_get {
 }
 
 impl SourceContext<'_> {
-    pub fn get_def(&self, ix: usize) -> &RustTypeDef {
+    pub fn get_def(&self, ix: usize) -> &RustTypeDecl {
         &self.def_map[ix]
     }
 
@@ -112,8 +112,8 @@ impl SourceContext<'_> {
     }
 }
 
-impl<'a> From<&'a [RustTypeDef]> for SourceContext<'a> {
-    fn from(def_map: &'a [RustTypeDef]) -> Self {
+impl<'a> From<&'a [RustTypeDecl]> for SourceContext<'a> {
+    fn from(def_map: &'a [RustTypeDecl]) -> Self {
         SourceContext {
             def_map,
             cache: Rc::new(RefCell::new(HashMap::new())),
@@ -334,7 +334,7 @@ where
                 }
             }
             CompType::Result(..) => unimplemented!("unexpected result in structural type"),
-            CompType::Borrow(..) => unimplemented!("unexpected borrow in structural type"),
+            CompType::Borrow(..) => size_of::<usize>(),
             CompType::RawSlice(..) => unimplemented!("unexpected raw slice in structural type"),
         }
     }
@@ -344,7 +344,7 @@ where
             CompType::Vec(..) => align_of::<Vec<VecFiller>>(),
             CompType::Option(inner) => inner.align_hint(context),
             CompType::Result(..) => unimplemented!("unexpected result in structural type"),
-            CompType::Borrow(..) => unimplemented!("unexpected borrow in structural type"),
+            CompType::Borrow(..) => align_of::<usize>(),
             CompType::RawSlice(..) => unimplemented!("unexpected raw slice in structural type"),
         }
     }
@@ -368,7 +368,7 @@ where
                 n => n - 1,
             },
             // Option<&T> cannot be optimized, but &T itself and Option<Option<&T>> (and above) can be
-            CompType::Borrow(..) => unreachable!("unexpected borrow in structural type"),
+            CompType::Borrow(..) => 1,
             CompType::Result(..) => unreachable!("unexpected result in structural type"),
             CompType::RawSlice(..) => unimplemented!("unexpected raw slice in structural type"),
         }
@@ -402,7 +402,7 @@ impl CanOptimize for LocalType {
     fn niches(&self, context: &SourceContext<'_>) -> usize {
         match self {
             // Note - this can be circular if we are not careful, but we don't expect circularity in practice
-            LocalType::LocalDef(ix, _) => context.get_niches(*ix),
+            LocalType::LocalDef(ix, ..) => context.get_niches(*ix),
             LocalType::External(_) => {
                 unreachable!("unexpected external type-reference in structural type")
             }
@@ -413,7 +413,7 @@ impl CanOptimize for LocalType {
 impl MemSize for LocalType {
     fn size_hint(&self, context: &SourceContext<'_>) -> usize {
         match self {
-            LocalType::LocalDef(ix, _) => context.get_size(*ix),
+            LocalType::LocalDef(ix, ..) => context.get_size(*ix),
             LocalType::External(_) => {
                 unreachable!("unexpected external type-reference in structural type")
             }
@@ -422,7 +422,7 @@ impl MemSize for LocalType {
 
     fn align_hint(&self, context: &SourceContext<'_>) -> usize {
         match self {
-            LocalType::LocalDef(ix, _) => context.get_align(*ix),
+            LocalType::LocalDef(ix, ..) => context.get_align(*ix),
             LocalType::External(_) => {
                 unreachable!("unexpected external type-reference in structural type")
             }
@@ -433,11 +433,37 @@ impl MemSize for LocalType {
 impl CopyEligible for LocalType {
     fn copy_hint(&self, context: &SourceContext<'_>) -> bool {
         match self {
-            LocalType::LocalDef(ix, _) => context.get_copy(*ix),
+            LocalType::LocalDef(ix, ..) => context.get_copy(*ix),
             LocalType::External(ext_type) => {
                 unreachable!("unexpected external type-reference encountered during copy-analysis: {ext_type}")
             }
         }
+    }
+}
+
+impl ASTContext for RustTypeDecl {
+    type Context<'a> = &'a SourceContext<'a>;
+}
+
+impl CanOptimize for RustTypeDecl {
+    fn niches(&self, context: &SourceContext<'_>) -> usize {
+        self.def.niches(context)
+    }
+}
+
+impl MemSize for RustTypeDecl {
+    fn size_hint(&self, context: &SourceContext<'_>) -> usize {
+        self.def.size_hint(context)
+    }
+
+    fn align_hint(&self, context: &SourceContext<'_>) -> usize {
+        self.def.align_hint(context)
+    }
+}
+
+impl CopyEligible for RustTypeDecl {
+    fn copy_hint(&self, context: &SourceContext<'_>) -> bool {
+        self.def.copy_hint(context)
     }
 }
 

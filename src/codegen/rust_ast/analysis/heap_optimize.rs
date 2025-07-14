@@ -1,6 +1,7 @@
 use super::{aligned_size, MemSize};
 use crate::codegen::rust_ast::{
-    AtomType, CompType, LocalType, PrimType, RustStruct, RustType, RustTypeDef, RustVariant,
+    AtomType, CompType, LocalType, PrimType, RustStruct, RustType, RustTypeDecl, RustTypeDef,
+    RustVariant,
 };
 use core::alloc::Layout;
 use std::num::NonZeroUsize;
@@ -238,7 +239,8 @@ impl HeapOptimize for CompType<Box<RustType>> {
                 }
             }
             CompType::Result(..) => unreachable!("unexpected result in structural type"),
-            CompType::Borrow(..) => unreachable!("unexpected borrow in structural type"),
+            // REVIEW - is this an accurate claim, or do we need a bespoke variant for this case?
+            CompType::Borrow(..) => (HeapAction::Noop, mk_layout(self, context)),
             CompType::RawSlice(..) => unreachable!("unexpected raw slice in structural type"),
         }
     }
@@ -247,7 +249,7 @@ impl HeapOptimize for CompType<Box<RustType>> {
 impl HeapOptimize for LocalType {
     fn heap_hint(&self, strategy: HeapStrategy, context: Self::Context<'_>) -> HeapOutcome {
         match self {
-            LocalType::LocalDef(ix, _) => {
+            LocalType::LocalDef(ix, ..) => {
                 let (action, layout) = context.get_heap(strategy, *ix);
                 let size = layout.size();
                 if strategy.min_heap_size().is_some_and(|sz| size >= sz) {
@@ -279,6 +281,12 @@ impl HeapOptimize for LocalType {
                 unreachable!("unexpected external type-reference in structural type")
             }
         }
+    }
+}
+
+impl HeapOptimize for RustTypeDecl {
+    fn heap_hint(&self, strategy: HeapStrategy, context: Self::Context<'_>) -> HeapOutcome {
+        self.def.heap_hint(strategy, context)
     }
 }
 

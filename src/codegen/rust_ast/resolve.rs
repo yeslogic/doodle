@@ -286,8 +286,8 @@ fn expand_lens<'a>(lens: &'a Lens<RustType>, ctx: &SourceContext<'_>) -> Cow<'a,
     }
 }
 
-fn get_field_def(def: &RustTypeDef, lab: &str) -> RustType {
-    match def {
+fn get_field_def(def: &RustTypeDecl, lab: &str) -> RustType {
+    match &def.def {
         RustTypeDef::Enum(..) => unreachable!("bad Field on enum: {def:?}"),
         RustTypeDef::Struct(str) => match str {
             RustStruct::Record(fields) => {

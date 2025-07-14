@@ -1,3 +1,4 @@
+use crate::valuetype::{augmented::AugValueType, SeqBorrowHint};
 use crate::{
     Arith, BaseType, DynFormat, Expr, Format, FormatModule, Label, Pattern, UnaryOp, ValueType,
     ViewFormat,
@@ -55,9 +56,19 @@ pub enum UType {
     Base(BaseType),
     Tuple(Vec<Rc<UType>>),
     Record(Vec<(Label, Rc<UType>)>),
-    Seq(Rc<UType>),
+    Seq(Rc<UType>, SeqBorrowHint),
     /// For `std::option::Option<InnerType>`
     Option(Rc<UType>),
+}
+
+impl UType {
+    pub fn seq(self: Rc<Self>) -> Self {
+        Self::Seq(self, SeqBorrowHint::Constructed)
+    }
+
+    pub fn seq_view(self: Rc<Self>) -> Self {
+        Self::Seq(self, SeqBorrowHint::BufferView)
+    }
 }
 
 impl From<BaseType> for UType {
@@ -121,7 +132,7 @@ impl UType {
                 let inner_t = Self::from_valuetype(inner)?;
                 Some(UType::Option(Rc::new(inner_t)))
             }
-            ValueType::Seq(inner) => Some(Self::Seq(Rc::new(Self::from_valuetype(inner)?))),
+            ValueType::Seq(inner) => Some(Self::seq(Rc::new(Self::from_valuetype(inner)?))),
         }
     }
 }
@@ -342,7 +353,7 @@ impl UType {
             }
             UType::Tuple(ts) => Box::new(ts.iter().cloned()),
             UType::Record(fs) => Box::new(fs.iter().map(|(_l, t)| t.clone())),
-            UType::Seq(t) | UType::Option(t) => Box::new(std::iter::once(t.clone())),
+            UType::Seq(t, _) | UType::Option(t) => Box::new(std::iter::once(t.clone())),
         }
     }
 }
@@ -1032,7 +1043,7 @@ impl TypeChecker {
                 }
                 self.unify_var_utype(
                     seq_uvar,
-                    Rc::new(UType::Seq(Rc::new(UType::Var(elem_uvar)))),
+                    Rc::new(UType::seq(Rc::new(UType::Var(elem_uvar)))),
                 )?;
                 Ok(seq_uvar)
             }
@@ -1153,7 +1164,7 @@ impl TypeChecker {
                 // REVIEW - should we have a special UType for captured View-window reads?
                 self.unify_var_utype(
                     newvar,
-                    Rc::new(UType::Seq(Rc::new(UType::Base(BaseType::U8)))),
+                    Rc::new(UType::seq_view(Rc::new(UType::Base(BaseType::U8)))),
                 )?;
                 Ok(newvar)
             }
@@ -1277,7 +1288,7 @@ impl TypeChecker {
                 }
                 Ok(())
             }
-            UType::Seq(inner) | UType::Option(inner) => {
+            UType::Seq(inner, _) | UType::Option(inner) => {
                 self.occurs_in(v, inner.clone())?;
                 Ok(())
             }
@@ -1519,7 +1530,7 @@ impl TypeChecker {
             Constraints::Invariant(c) => match c {
                 Constraint::Elem(_) => unreachable!("cannot solve record projection on base-set"),
                 Constraint::Equiv(ut) => match ut.as_ref() {
-                    UType::Seq(inner) => {
+                    UType::Seq(inner, _) => {
                         let elem_t = inner.clone();
                         self.unify_var_utype(elem_v, elem_t)?;
                         Ok(())
@@ -1557,7 +1568,7 @@ impl TypeChecker {
                 }
                 VType::ImplicitRecord(flat)
             }
-            ProjShape::SeqOf(v) => VType::Abstract(Rc::new(UType::Seq((*v).into()))),
+            ProjShape::SeqOf(v) => VType::Abstract(Rc::new(UType::seq((*v).into()))),
         }
     }
 
@@ -1581,12 +1592,16 @@ impl TypeChecker {
             (_, UType::Hole) => Ok(left),
             (UType::Empty, _) => Ok(right),
             (_, UType::Empty) => Ok(left),
-            (UType::Seq(e1), UType::Seq(e2)) => {
+            (UType::Seq(e1, h1), UType::Seq(e2, h2)) => {
                 if e1 == e2 {
-                    Ok(left)
+                    if h1 <= h2 {
+                        Ok(left)
+                    } else {
+                        Ok(right)
+                    }
                 } else {
                     let inner = self.unify_utype(e1.clone(), e2.clone())?;
-                    Ok(Rc::new(UType::Seq(inner)))
+                    Ok(Rc::new(UType::Seq(inner, Ord::min(*h1, *h2))))
                 }
             }
             (UType::Option(o1), UType::Option(o2)) => {
@@ -1870,7 +1885,7 @@ impl TypeChecker {
                             Err(UnificationError::Unsatisfiable(c1.clone(), c2.clone()).into())
                         }
                     }
-                    (ProjShape::SeqOf(elem_v), UType::Seq(elem_t)) => {
+                    (ProjShape::SeqOf(elem_v), UType::Seq(elem_t, _)) => {
                         self.unify_var_utype(*elem_v, elem_t.clone())?;
                         Ok(Constraint::Equiv(ut.clone()))
                     }
@@ -2022,7 +2037,7 @@ impl TypeChecker {
                 }
                 self.unify_var_utype(
                     seq_uvar,
-                    Rc::new(UType::Seq(Rc::new(UType::Var(elem_uvar)))),
+                    Rc::new(UType::seq(Rc::new(UType::Var(elem_uvar)))),
                 )?;
                 seq_uvar
             }
@@ -2774,7 +2789,7 @@ impl TypeChecker {
                 let new_scope = UScope::Single(USingleScope::new(ctxt.scope, lbl, v_elem));
                 let new_ctxt = ctxt.with_scope(&new_scope);
                 let t_inner = self.infer_utype_format(inner.as_ref(), new_ctxt)?;
-                self.unify_var_utype(newvar, Rc::new(UType::Seq(t_inner)))?;
+                self.unify_var_utype(newvar, Rc::new(UType::seq(t_inner)))?;
                 Ok(newvar)
             }
             Format::Fail => Ok(self.init_var_simple(UType::Empty)?.0),
@@ -2790,7 +2805,7 @@ impl TypeChecker {
                 // we can only apply DecodeBytes to expressions of type `Seq(U8)`.
                 self.unify_var_utype(
                     v_expr,
-                    Rc::new(UType::Seq(Rc::new(UType::Base(BaseType::U8)))),
+                    Rc::new(UType::seq(Rc::new(UType::Base(BaseType::U8)))),
                 )?;
 
                 // provided the previous unification succeeded, our output type is equivalent to the inferred type of the inner format
@@ -2832,13 +2847,13 @@ impl TypeChecker {
                     let v = self.infer_var_format(t, ctxt)?;
                     self.unify_var_pair(elem_v, v)?;
                 }
-                self.unify_var_utype(newvar, Rc::new(UType::Seq(Rc::new(UType::Var(elem_v)))))?;
+                self.unify_var_utype(newvar, Rc::new(UType::seq(Rc::new(UType::Var(elem_v)))))?;
                 Ok(newvar)
             }
             Format::Repeat(inner) | Format::Repeat1(inner) => {
                 let newvar = self.get_new_uvar();
                 let t = self.infer_utype_format(inner, ctxt)?;
-                self.unify_var_utype(newvar, Rc::new(UType::Seq(t)))?;
+                self.unify_var_utype(newvar, Rc::new(UType::seq(t)))?;
                 Ok(newvar)
             }
             Format::RepeatCount(n, inner) => {
@@ -2847,7 +2862,7 @@ impl TypeChecker {
                 // NOTE - we don't care about the constraint, only whether it was successfully computed
                 let _constraint = self.unify_utype_baseset(n_type, BaseSet::UAny)?;
                 let inner_t = self.infer_utype_format(inner, ctxt)?;
-                self.unify_var_utype(newvar, Rc::new(UType::Seq(inner_t)))?;
+                self.unify_var_utype(newvar, Rc::new(UType::seq(inner_t)))?;
                 Ok(newvar)
             }
             Format::RepeatBetween(min, max, inner) => {
@@ -2858,7 +2873,7 @@ impl TypeChecker {
                     self.unify_utype_baseset(Rc::new(UType::Var(min_var)), BaseSet::UAny)?;
                 self.unify_var_pair(min_var, max_var)?;
                 let inner_t = self.infer_utype_format(inner, ctxt)?;
-                self.unify_var_utype(newvar, Rc::new(UType::Seq(inner_t)))?;
+                self.unify_var_utype(newvar, Rc::new(UType::seq(inner_t)))?;
                 Ok(newvar)
             }
             Format::RepeatUntilLast(f, inner) => {
@@ -2867,16 +2882,16 @@ impl TypeChecker {
                 let inner_t = self.infer_utype_format(inner, ctxt)?;
                 self.unify_var_utype(in_var, inner_t.clone())?;
                 self.unify_var_utype(out_var, Rc::new(UType::Base(BaseType::Bool)))?;
-                self.unify_var_utype(newvar, Rc::new(UType::Seq(inner_t)))?;
+                self.unify_var_utype(newvar, Rc::new(UType::seq(inner_t)))?;
                 Ok(newvar)
             }
             Format::RepeatUntilSeq(f, inner) => {
                 let newvar = self.get_new_uvar();
                 let (in_var, out_var) = self.infer_vars_expr_lambda(f, ctxt.scope)?;
                 let inner_t = self.infer_utype_format(inner, ctxt)?;
-                self.unify_var_utype(in_var, Rc::new(UType::Seq(inner_t.clone())))?;
+                self.unify_var_utype(in_var, Rc::new(UType::seq(inner_t.clone())))?;
                 self.unify_var_utype(out_var, Rc::new(UType::Base(BaseType::Bool)))?;
-                self.unify_var_utype(newvar, Rc::new(UType::Seq(inner_t)))?;
+                self.unify_var_utype(newvar, Rc::new(UType::seq(inner_t)))?;
                 Ok(newvar)
             }
             Format::AccumUntil(lambda_acc_seq, lambda_acc_elt, init_acc, vt_acc, inner) => {
@@ -2899,7 +2914,7 @@ impl TypeChecker {
                     acc_seq_var,
                     Rc::new(UType::tuple([
                         UType::Var(acc_var),
-                        UType::Seq(inner_t.clone()),
+                        UType::seq(inner_t.clone()),
                     ])),
                 )?;
                 self.unify_var_utype(done_var, Rc::new(UType::Base(BaseType::Bool)))?;
@@ -3095,7 +3110,7 @@ impl TypeChecker {
     /// # Panics
     ///
     /// Will panic if [`UType::Hole`] is encountered, or if any `UVar` has an unresolved record- or tuple- `ProjShape` constraint.
-    pub fn reify(&self, t: Rc<UType>) -> Option<ValueType> {
+    pub fn reify(&self, t: Rc<UType>) -> Option<AugValueType> {
         match t.as_ref() {
             UType::Hole => {
                 // REVIEW - should this simply return None instead? or maybe ValueType::Any?
@@ -3108,7 +3123,7 @@ impl TypeChecker {
                         match t0 {
                             VType::Base(bs) =>
                                 match bs.get_unique_solution(uv).as_deref() {
-                                    Ok(UType::Base(b)) => Some(ValueType::Base(*b)),
+                                    Ok(UType::Base(b)) => Some(AugValueType::Base(*b)),
                                     Ok(other) => unreachable!("base-set {bs:?} yielded unexpected solution {other:?}"),
                                     Err(_e) => None,
                                 }
@@ -3129,38 +3144,38 @@ impl TypeChecker {
                     }
                 }
             }
-            UType::Base(g) => Some(ValueType::Base(*g)),
-            UType::Empty => Some(ValueType::Empty),
+            UType::Base(g) => Some(AugValueType::Base(*g)),
+            UType::Empty => Some(AugValueType::Empty),
             UType::Tuple(ts) => {
                 let mut vts = Vec::with_capacity(ts.len());
                 for elt in ts.iter() {
                     vts.push(self.reify(elt.clone())?);
                 }
-                Some(ValueType::Tuple(vts))
+                Some(AugValueType::Tuple(vts))
             }
             UType::Record(fs) => {
                 let mut vfs = Vec::with_capacity(fs.len());
                 for (lab, ft) in fs.iter() {
                     vfs.push((lab.clone(), self.reify(ft.clone())?));
                 }
-                Some(ValueType::Record(vfs))
+                Some(AugValueType::Record(vfs))
             }
-            UType::Seq(t0) => Some(ValueType::Seq(Box::new(self.reify(t0.clone())?))),
-            UType::Option(t0) => Some(ValueType::Option(Box::new(self.reify(t0.clone())?))),
+            UType::Seq(t0, h) => Some(AugValueType::Seq(Box::new(self.reify(t0.clone())?), *h)),
+            UType::Option(t0) => Some(AugValueType::Option(Box::new(self.reify(t0.clone())?))),
         }
     }
 
-    fn reify_union(&self, vmid: VMId) -> Option<ValueType> {
+    fn reify_union(&self, vmid: VMId) -> Option<AugValueType> {
         let vm = self.varmaps.get_varmap(vmid);
         let mut branches = BTreeMap::new();
         for (label, ut) in vm.iter() {
             let variant_type = self.reify(ut.clone())?;
             // NOTE - only add a variant to the union-type if its inner type is inhabitable
-            if !matches!(variant_type, ValueType::Empty) {
+            if !matches!(variant_type, AugValueType::Empty) {
                 branches.insert(label.clone(), variant_type);
             }
         }
-        Some(ValueType::Union(branches))
+        Some(AugValueType::Union(branches))
     }
 }
 // !SECTION
@@ -3373,7 +3388,7 @@ pub fn typecheck(module: &FormatModule, f: &Format) -> TCResult<Option<ValueType
     let ctxt = Ctxt::new(module, &scope);
     let _ut = tc.infer_utype_format(f, ctxt)?;
     // FIXME - there should be a lot more that goes on under the covers here, especially since we want to detect errors
-    let ret = Ok(tc.reify(_ut));
+    let ret = Ok(tc.reify(_ut).map(|aug_t| aug_t.into()));
     tc.check_uvar_sanity();
     ret
 }
