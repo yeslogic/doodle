@@ -3858,8 +3858,8 @@ where
         let params = if let Some(lt) = self.ret_type.lt_param() {
             Some(DefParams::from_lt(lt.as_ref().clone()))
         } else {
-            Some(DefParams::new())
-            // None
+            // Some(DefParams::new())
+            None
         };
 
         let sig = {
