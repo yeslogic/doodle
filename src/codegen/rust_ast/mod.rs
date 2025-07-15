@@ -404,6 +404,7 @@ pub(crate) enum RustDecl {
 }
 
 impl RustDecl {
+    #[expect(dead_code)]
     pub fn type_def(lab: impl IntoLabel, def: RustTypeDef) -> Self {
         Self::TypeDef(lab.into(), RustTypeDecl { def, lt: None })
     }
