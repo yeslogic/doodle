@@ -214,14 +214,6 @@ impl<'a> USingleScope<'a> {
     }
 }
 
-#[derive(Clone, Copy)]
-pub(crate) struct Ctxt<'a> {
-    pub(crate) module: &'a FormatModule,
-    pub(crate) scope: &'a UScope<'a>,
-    pub(crate) dyn_s: DynScope<'a>,
-    pub(crate) views: ViewScope<'a>,
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub(crate) enum ViewScope<'a> {
     #[default]
@@ -302,6 +294,14 @@ impl<'a> DynSingleScope<'a> {
     }
 }
 
+#[derive(Clone, Copy)]
+pub(crate) struct Ctxt<'a> {
+    pub(crate) module: &'a FormatModule,
+    pub(crate) scope: &'a UScope<'a>,
+    pub(crate) dyn_s: DynScope<'a>,
+    pub(crate) views: ViewScope<'a>,
+}
+
 impl<'a> Ctxt<'a> {
     /// Returns a copy of `self` with the given `UScope` instead of `self.scope`.
     pub(crate) fn with_scope(&'a self, scope: &'a UScope<'a>) -> Ctxt<'a> {
@@ -337,6 +337,14 @@ impl<'a> Ctxt<'a> {
             scope,
             dyn_s: DynScope::new(),
             views: ViewScope::new(),
+        }
+    }
+
+    fn check_view_is_bound(&self, ident: &Label) -> TCResult<()> {
+        if self.views.includes_name(ident) {
+            Ok(())
+        } else {
+            Err(TCError::from(TCErrorKind::MissingView(ident.clone())))
         }
     }
 }
@@ -3076,8 +3084,10 @@ impl TypeChecker {
                 self.unify_var_utype(newvar, Rc::new(UType::Option(inner_var.into())))?;
                 Ok(newvar)
             }
-            Format::WithView(_ident, vf) => {
+            Format::WithView(ident, vf) => {
                 let newvar = self.get_new_uvar();
+                // Sanity-check the presence of ident in ViewScope
+                ctxt.check_view_is_bound(ident)?;
                 let vf_var = self.infer_var_view_format(vf, ctxt)?;
                 self.unify_var_pair(newvar, vf_var)?;
                 Ok(newvar)
@@ -3178,6 +3188,7 @@ impl TypeChecker {
         Some(AugValueType::Union(branches))
     }
 }
+
 // !SECTION
 
 pub(crate) type TypeError = UnificationError<Rc<UType>>;
@@ -3186,11 +3197,6 @@ pub(crate) type ConstraintError = UnificationError<Constraint>;
 impl From<TypeError> for ConstraintError {
     fn from(value: TypeError) -> Self {
         match value {
-            // UnificationError::Incompatible(ix, lt, rt) => {
-            //     let lc = Constraint::Equiv(lt);
-            //     let rc = Constraint::Equiv(rt);
-            //     UnificationError::Incompatible(ix, lc, rc)
-            // }
             UnificationError::Unsatisfiable(lt, rt) => {
                 let lc = Constraint::Equiv(lt);
                 let rc = Constraint::Equiv(rt);
@@ -3259,6 +3265,7 @@ pub enum TCErrorKind {
     InfiniteType(UVar, Constraints),
     MultipleSolutions(UVar, BaseSet),
     NoSolution(UVar),
+    MissingView(Label),
 }
 
 impl From<TypeError> for TCErrorKind {
@@ -3341,6 +3348,8 @@ impl std::fmt::Display for TCErrorKind {
                 write!(f, "no unique solution for `{uv} {}`", bs.to_constraint()),
             Self::NoSolution(uv) =>
                 write!(f, "no valid solutions for `{uv}`"),
+            Self::MissingView(lbl) =>
+                write!(f, "view-based parse depends on unbound identifier `{lbl}`"),
         }
     }
 }
