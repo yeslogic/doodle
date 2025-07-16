@@ -4,7 +4,7 @@ use crate::{
     ViewExpr, ViewFormat,
 };
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     rc::Rc,
 };
 
@@ -3132,6 +3132,33 @@ impl TypeChecker {
     ) -> TCResult<Rc<UType>> {
         let uv = self.infer_var_format(format, ctxt)?;
         Ok(uv.into())
+    }
+
+    pub(crate) fn infer_module(module: &FormatModule, top_format: &Format) -> TCResult<Self> {
+        let mut this = Self::new();
+        let scope = UScope::Empty;
+        let ctxt = Ctxt::new(module, &scope);
+
+        let mut unexplored = BTreeSet::from_iter(0..module.formats.len());
+
+        let _ = this.infer_var_format(top_format, ctxt)?;
+        let mut seen_levels = this.level_vars.keys().copied().collect::<BTreeSet<usize>>();
+        for just_seen in seen_levels.iter() {
+            unexplored.remove(just_seen);
+        }
+
+        while !unexplored.is_empty() {
+            let Some(next_level) = unexplored.pop_first() else {
+                break;
+            };
+            let _ = this.infer_var_format(module.get_format(next_level), ctxt)?;
+            let tmp = this.level_vars.keys().copied().collect::<BTreeSet<usize>>();
+            for just_seen in tmp.difference(&seen_levels) {
+                unexplored.remove(&just_seen);
+            }
+            seen_levels = tmp;
+        }
+        Ok(this)
     }
 
     pub fn lookup_level_var(&self, level: usize) -> Option<UVar> {
