@@ -3986,11 +3986,8 @@ pub struct Generator<'a> {
 
 impl<'a> Generator<'a> {
     pub fn compile(module: &'a FormatModule, top_format: &Format) -> Self {
-        let mut tc = TypeChecker::new();
-        let ctxt = crate::typecheck::Ctxt::new(module, &UScope::Empty);
-        let _ = tc
-            .infer_utype_format(top_format, ctxt)
-            .unwrap_or_else(|err| panic!("Failed to infer top-level format type: {err}"));
+        let tc = TypeChecker::infer_module(module, top_format)
+            .unwrap_or_else(|err| panic!("Failed to infer module-wide type annotations: {err}"));
         let mut cgen = Self {
             elaborator: Elaborator::new(module, tc, CodeGen::new()),
             sourcemap: SourceMap::new(),
@@ -4244,9 +4241,7 @@ impl<'a> Elaborator<'a> {
             Format::ParseFromView(view, inner) => {
                 let index = self.get_and_increment_index();
 
-                self.codegen.name_gen.ctxt.push_atom(NameAtom::DeadEnd);
                 let t_view = self.elaborate_view_expr(view);
-                self.codegen.name_gen.ctxt.escape();
 
                 let t_inner = self.elaborate_format(inner, dyn_scope);
                 let gt = self.get_gt_from_index(index);
