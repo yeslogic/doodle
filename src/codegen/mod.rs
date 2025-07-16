@@ -11,12 +11,13 @@ pub use rust_ast::ToFragment;
 
 use crate::{
     byte_set::ByteSet,
+    codegen::typed_format::TypedViewExpr,
     decoder::extract_pair,
     parser::error::TraceHash,
     typecheck::{TypeChecker, UScope, UVar},
     valuetype::{augmented::AugValueType, SeqBorrowHint},
     Arith, BaseType, DynFormat, Expr, Format, FormatModule, IntRel, IntoLabel, Label, MatchTree,
-    Pattern, StyleHint, UnaryOp, ViewFormat,
+    Pattern, StyleHint, UnaryOp, ViewExpr, ViewFormat,
 };
 
 use std::{
@@ -372,7 +373,13 @@ impl CodeGen {
             }
             TypedDecoder::DecodeBytes(_gt, expr, inner) => {
                 let cl_expr = embed_expr_dft(expr);
-                CaseLogic::Derived(DerivedLogic::DecodeBytes(cl_expr, Box::new(self.translate(inner.get_dec()))))
+                let cl_inner = self.translate(inner.get_dec());
+                CaseLogic::Derived(DerivedLogic::DecodeBytes(cl_expr, Box::new(cl_inner)))
+            }
+            TypedDecoder::ParseFromView(_t, view, inner) => {
+                let cl_view = embed_view_expr(view);
+                let cl_inner = self.translate(inner.get_dec());
+                CaseLogic::Derived(DerivedLogic::ParseView(cl_view, Box::new(cl_inner)))
             }
             TypedDecoder::RepeatCount(_gt, expr_count, single) =>
                 CaseLogic::Repeat(
@@ -554,9 +561,19 @@ impl CodeGen {
                 let cl_inner = self.translate(da.get_dec());
                 CaseLogic::Derived(DerivedLogic::WrapSome(Box::new(cl_inner)))
             }
-            TypedDecoder::ReadViewOffsetLen(_, ident, offset, len) => {
-                CaseLogic::View(ViewLogic::ReadViewOffsetLen(ident.clone(), embed_expr_dft(offset), embed_expr_dft(len)))
+            TypedDecoder::CaptureBytes(_, view, len) => {
+                CaseLogic::View(ViewLogic::CaptureBytes(embed_view_expr(view), embed_expr_dft(len)))
             }
+        }
+    }
+}
+
+fn embed_view_expr(view: &TypedViewExpr<GenType>) -> RustExpr {
+    match view {
+        TypedViewExpr::Var(name) => RustExpr::local(name.clone()),
+        TypedViewExpr::Offset(base, offset) => {
+            let offset = embed_expr_dft(offset);
+            embed_view_expr(base).call_method_with("offset", [offset.as_usize()])
         }
     }
 }
@@ -2657,7 +2674,7 @@ enum CaseLogic<ExprT = Expr> {
 #[derive(Clone, Debug)]
 enum ViewLogic<ExprT> {
     LetView(Label, Box<CaseLogic<ExprT>>),
-    ReadViewOffsetLen(Label, RustExpr, RustExpr),
+    CaptureBytes(RustExpr, RustExpr),
 }
 
 impl ToAst for ViewLogic<GTExpr> {
@@ -2674,12 +2691,10 @@ impl ToAst for ViewLogic<GTExpr> {
                 inner.prepend_stmt(bind_view);
                 inner
             }
-            ViewLogic::ReadViewOffsetLen(name, offset, len) => {
-                GenBlock::simple_expr(RustExpr::local(name.clone()).call_method_with(
-                    "read_offset_len",
-                    [offset.clone().as_usize(), len.clone().as_usize()],
-                ))
-            }
+            ViewLogic::CaptureBytes(view, len) => GenBlock::simple_expr(
+                view.clone()
+                    .call_method_with("read_len", [len.clone().as_usize()]),
+            ),
         }
     }
 }
@@ -3546,6 +3561,7 @@ enum DerivedLogic<ExprT> {
     Where(GenLambda, Box<CaseLogic<ExprT>>),
     Maybe(RustExpr, Box<CaseLogic<ExprT>>),
     DecodeBytes(RustExpr, Box<CaseLogic<ExprT>>),
+    ParseView(RustExpr, Box<CaseLogic<ExprT>>),
 }
 
 #[derive(Clone, Debug)]
@@ -3602,6 +3618,28 @@ impl ToAst for DerivedLogic<GTExpr> {
                     "tmp",
                     RustExpr::scoped(["Parser"], "new")
                         .call_with([RustExpr::vec_as_slice(bytes_expr.clone())]),
+                ));
+                let bind_ref_mut_parser = GenStmt::Embed(RustStmt::assign(
+                    INNER_NAME,
+                    RustExpr::BorrowMut(Box::new(RustExpr::local("tmp"))),
+                ));
+
+                inner_block.prepend_stmts([persist_parser, bind_ref_mut_parser]);
+                inner_block
+            }
+            DerivedLogic::ParseView(view, inner_cl) => {
+                const INNER_NAME: &str = "view_parser";
+
+                // pre-generate local byte-context to parse, and logic to parse inner_cl within it
+                let bytes_ctxt = ProdCtxt {
+                    input_varname: &Cow::Borrowed(INNER_NAME),
+                };
+                let mut inner_block = inner_cl.to_ast(bytes_ctxt);
+
+                // prepend boilerplate for second-phase byte-parsing
+                let persist_parser = GenStmt::Embed(RustStmt::assign_mut(
+                    "tmp",
+                    RustExpr::scoped(["Parser"], "from").call_with([view.clone()]),
                 ));
                 let bind_ref_mut_parser = GenStmt::Embed(RustStmt::assign(
                     INNER_NAME,
@@ -4035,12 +4073,11 @@ impl<'a> Elaborator<'a> {
 
     fn elaborate_view_format(&mut self, view_format: &ViewFormat) -> TypedViewFormat<GenType> {
         match view_format {
-            ViewFormat::ReadOffsetLen(offset, len) => {
+            ViewFormat::CaptureBytes(len) => {
                 // for view_format itself
                 self.increment_index();
-                let t_offset = self.elaborate_expr(offset);
                 let t_len = self.elaborate_expr(len);
-                TypedViewFormat::ReadOffsetLen(Box::new(t_offset), Box::new(t_len))
+                TypedViewFormat::CaptureBytes(Box::new(t_len))
             }
         }
     }
@@ -4203,6 +4240,17 @@ impl<'a> Elaborator<'a> {
                 let t_inner = self.elaborate_format(inner, dyn_scope);
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::DecodeBytes(gt, Box::new(t_expr), Box::new(t_inner))
+            }
+            Format::ParseFromView(view, inner) => {
+                let index = self.get_and_increment_index();
+
+                self.codegen.name_gen.ctxt.push_atom(NameAtom::DeadEnd);
+                let t_view = self.elaborate_view_expr(view);
+                self.codegen.name_gen.ctxt.escape();
+
+                let t_inner = self.elaborate_format(inner, dyn_scope);
+                let gt = self.get_gt_from_index(index);
+                TypedFormat::ParseFromView(gt, t_view, Box::new(t_inner))
             }
             Format::Fail => {
                 self.increment_index();
@@ -4549,11 +4597,12 @@ impl<'a> Elaborator<'a> {
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::LiftedOption(gt, inner)
             }
-            Format::WithView(ident, view_format) => {
+            Format::WithView(view, view_format) => {
                 let index = self.get_and_increment_index();
+                let t_view = self.elaborate_view_expr(view);
                 let t_view_format = self.elaborate_view_format(view_format);
                 let gt = self.get_gt_from_index(index);
-                TypedFormat::WithView(gt, ident.clone(), t_view_format)
+                TypedFormat::WithView(gt, t_view, t_view_format)
             }
         }
     }
@@ -4951,6 +5000,17 @@ impl<'a> Elaborator<'a> {
                 TypedExpr::Lambda((gt_head, gt_body), head.clone(), Box::new(t_body))
             }
             _ => unreachable!("elaborate_expr_lambda: unexpected non-lambda {expr:?}"),
+        }
+    }
+
+    fn elaborate_view_expr(&mut self, view: &ViewExpr) -> TypedViewExpr<GenType> {
+        match view {
+            ViewExpr::Var(lbl) => TypedViewExpr::Var(lbl.clone()),
+            ViewExpr::Offset(base, offs) => {
+                let t_base = self.elaborate_view_expr(base);
+                let t_offs = self.elaborate_expr(offs);
+                TypedViewExpr::Offset(Box::new(t_base), Box::new(t_offs))
+            }
         }
     }
 }

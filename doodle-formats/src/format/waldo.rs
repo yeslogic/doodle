@@ -1,4 +1,4 @@
-use doodle::{helper::*, StyleHint};
+use doodle::{helper::*, StyleHint, ViewExpr};
 use doodle::{Expr, Format, FormatModule, FormatRef, Label, ViewFormat};
 
 use super::base::BaseModule;
@@ -17,12 +17,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     Label::Borrowed("scope"),
                     Box::new(Format::Hint(
                         StyleHint::AsciiStr,
-                        Box::new(Format::WithView(
-                            Label::Borrowed("scope"),
-                            ViewFormat::ReadOffsetLen(
-                                Box::new(sub(var("where"), var("_here"))),
-                                Box::new(Expr::U8(5)),
-                            ),
+                        Box::new(with_view(
+                            ViewExpr::var("scope").offset(sub(var("where"), var("_here"))),
+                            ViewFormat::CaptureBytes(Box::new(Expr::U8(5))),
                         )),
                     )),
                 ),

@@ -2,11 +2,12 @@ use std::collections::BTreeSet;
 
 use num_traits::{ToPrimitive, Zero};
 
+pub use crate::alt::marker::BaseKind;
 use crate::bounds::Bounds;
 use crate::byte_set::ByteSet;
 use crate::{
     Arith, BaseType, Expr, Format, IntRel, IntoLabel, Label, Pattern, StyleHint, TypeHint, UnaryOp,
-    ValueType,
+    ValueType, ViewExpr, ViewFormat,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -1458,4 +1459,24 @@ pub fn find_by_key(
 /// Repackages a `Seq(U8)` format as an ASCII-string format.
 pub fn mk_ascii_string(x: Format) -> Format {
     Format::Hint(StyleHint::AsciiStr, Box::new(x))
+}
+
+/// Helper for [`Format::LetView`]
+pub fn let_view<Name: IntoLabel>(name: Name, format: Format) -> Format {
+    Format::LetView(name.into(), Box::new(format))
+}
+
+/// Helper for [`Format::WithView`]
+pub fn with_view(view: ViewExpr, view_format: ViewFormat) -> Format {
+    Format::WithView(view, view_format)
+}
+
+/// Helper for [`Format::ParseFromView`]
+pub fn parse_from_view(view: ViewExpr, format: Format) -> Format {
+    Format::ParseFromView(view, Box::new(format))
+}
+
+/// Helper for [`ViewFormat::ReadOffsetLen`]
+pub fn capture_bytes(len: Expr) -> ViewFormat {
+    ViewFormat::CaptureBytes(Box::new(len))
 }

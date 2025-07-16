@@ -3,7 +3,7 @@ use crate::error::{DecodeError, DecodeResult};
 use crate::read::ReadCtxt;
 use crate::{
     pattern::Pattern, Arith, DynFormat, Expr, Format, FormatModule, IntRel, MatchTree, Next,
-    TypeScope, ValueType,
+    TypeScope, ValueType, ViewExpr,
 };
 use crate::{IntoLabel, Label, MaybeTyped, TypeHint, UnaryOp, ViewFormat};
 use anyhow::{anyhow, Result as AResult};
@@ -895,12 +895,13 @@ pub enum Decoder {
     ForEach(Box<Expr>, Label, Box<Decoder>),
     SkipRemainder,
     DecodeBytes(Box<Expr>, Box<Decoder>),
+    ParseFromView(ViewExpr, Box<Decoder>),
     LetFormat(Box<Decoder>, Label, Box<Decoder>),
     MonadSeq(Box<Decoder>, Box<Decoder>),
     AccumUntil(Box<Expr>, Box<Expr>, Box<Expr>, TypeHint, Box<Decoder>),
     LiftedOption(Option<Box<Decoder>>),
     LetView(Label, Box<Decoder>),
-    ReadViewOffsetLen(Label, Box<Expr>, Box<Expr>),
+    CaptureBytes(ViewExpr, Box<Expr>),
 }
 
 #[derive(Clone, Debug)]
@@ -992,8 +993,12 @@ impl<'a> Compiler<'a> {
             }
             Format::Fail => Ok(Decoder::Fail),
             Format::DecodeBytes(expr, inner) => {
-                let d = self.compile_format(inner, next.clone())?;
+                let d = self.compile_format(inner, Rc::new(Next::Empty))?;
                 Ok(Decoder::DecodeBytes(expr.clone(), Box::new(d)))
+            }
+            Format::ParseFromView(v_expr, inner) => {
+                let d = self.compile_format(inner, Rc::new(Next::Empty))?;
+                Ok(Decoder::ParseFromView(v_expr.clone(), Box::new(d)))
             }
             Format::Pos => Ok(Decoder::Pos),
             Format::LetView(ident, a) => {
@@ -1238,14 +1243,10 @@ impl<'a> Compiler<'a> {
             Format::LiftedOption(Some(a)) => Ok(Decoder::LiftedOption(Some(Box::new(
                 self.compile_format(a, next)?,
             )))),
-            Format::WithView(ident, vf) => match vf {
-                ViewFormat::ReadOffsetLen(offs, len) => {
+            Format::WithView(v_expr, vf) => match vf {
+                ViewFormat::CaptureBytes(len) => {
                     // REVIEW - do we want to fuse WithView and ViewFormat, or keep them separate?
-                    Ok(Decoder::ReadViewOffsetLen(
-                        ident.clone(),
-                        offs.clone(),
-                        len.clone(),
-                    ))
+                    Ok(Decoder::CaptureBytes(v_expr.clone(), len.clone()))
                 }
             },
         }
@@ -1589,6 +1590,11 @@ impl Decoder {
                     None => Ok((va, input)),
                 }
             }
+            Decoder::ParseFromView(v_expr, a) => {
+                let view_window = self.eval_view_expr(scope, v_expr)?;
+                let (va, _) = a.parse(program, scope, view_window)?;
+                Ok((va, input))
+            }
             Decoder::LetFormat(da, name, db) => {
                 let (va, input) = da.parse(program, scope, input)?;
                 let new_scope = Scope::Single(SingleScope::new(scope, name, &va));
@@ -1817,20 +1823,11 @@ impl Decoder {
                 let (v, input) = dec.parse(program, scope, input)?;
                 Ok((Value::Option(Some(Box::new(v))), input))
             }
-            Decoder::ReadViewOffsetLen(ident, offset, len) => {
-                let view = scope.get_view_by_name(&ident);
-                let offset = offset.eval_value(scope).unwrap_usize();
+            Decoder::CaptureBytes(v_expr, len) => {
                 let len = len.eval_value(scope).unwrap_usize();
 
                 // offsets the view by the specified amount to obtain the proper window to read from
-                let view_window = if offset > 0 {
-                    let Some((_, view_window)) = view.split_at(offset) else {
-                        return Err(DecodeError::overrun(offset, view.offset));
-                    };
-                    view_window
-                } else {
-                    view
-                };
+                let view_window = self.eval_view_expr(scope, v_expr)?;
 
                 // accumulate `len` bytes into a Vec<Value>
                 let mut accum = Vec::with_capacity(len);
@@ -1845,6 +1842,27 @@ impl Decoder {
 
                 // return the accumulated bytes, along with the original input
                 Ok((Value::Seq(SeqKind::Strict(accum)), input))
+            }
+        }
+    }
+
+    fn eval_view_expr<'a>(
+        &self,
+        scope: &Scope<'a>,
+        v_expr: &ViewExpr,
+    ) -> Result<View<'a>, DecodeError> {
+        match v_expr {
+            ViewExpr::Var(ident) => {
+                let view = scope.get_view_by_name(&ident);
+                Ok(view)
+            }
+            ViewExpr::Offset(base, offset) => {
+                let offset = offset.eval_value(scope).unwrap_usize();
+                let base_view = self.eval_view_expr(scope, base)?;
+                let Some((_, view_window)) = base_view.split_at(offset) else {
+                    return Err(DecodeError::overrun(offset, base_view.offset));
+                };
+                Ok(view_window)
             }
         }
     }

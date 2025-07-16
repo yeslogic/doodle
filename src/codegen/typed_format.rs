@@ -95,6 +95,10 @@ impl<TypeRep> std::hash::Hash for TypedFormat<TypeRep> {
                 expr.hash(state);
                 inner.hash(state);
             }
+            TypedFormat::ParseFromView(_, view, inner) => {
+                view.hash(state);
+                inner.hash(state);
+            }
             TypedFormat::Align(n) => n.hash(state),
             TypedFormat::Byte(bs) => bs.hash(state),
             TypedFormat::Variant(_tr, lbl, inner) => {
@@ -265,6 +269,7 @@ pub enum TypedFormat<TypeRep> {
     Pos,
     SkipRemainder,
     DecodeBytes(TypeRep, Box<TypedExpr<TypeRep>>, Box<TypedFormat<TypeRep>>),
+    ParseFromView(TypeRep, TypedViewExpr<TypeRep>, Box<TypedFormat<TypeRep>>),
     LetFormat(
         TypeRep,
         Box<TypedFormat<TypeRep>>,
@@ -287,7 +292,7 @@ pub enum TypedFormat<TypeRep> {
     ),
     LiftedOption(TypeRep, Option<Box<TypedFormat<TypeRep>>>),
     LetView(TypeRep, Label, Box<TypedFormat<TypeRep>>),
-    WithView(TypeRep, Label, TypedViewFormat<TypeRep>),
+    WithView(TypeRep, TypedViewExpr<TypeRep>, TypedViewFormat<TypeRep>),
 }
 
 impl TypedFormat<GenType> {
@@ -302,6 +307,7 @@ impl TypedFormat<GenType> {
             | TypedFormat::Pos
             | TypedFormat::Compute(_, _)
             | TypedFormat::EndOfInput
+            | TypedFormat::ParseFromView(_, _, _)
             | TypedFormat::Fail => Bounds::exact(0),
 
             TypedFormat::Peek(_, inner) | TypedFormat::PeekNot(_, inner) => {
@@ -377,6 +383,7 @@ impl TypedFormat<GenType> {
             TypedFormat::FormatCall(_gt, _lvl, _args, def) => def.match_bounds(),
 
             TypedFormat::DecodeBytes(_, _, _)
+            | TypedFormat::ParseFromView(_, _, _)
             | TypedFormat::Compute(_, _)
             | TypedFormat::Peek(_, _)
             | TypedFormat::PeekNot(_, _)
@@ -476,6 +483,7 @@ impl TypedFormat<GenType> {
             | TypedFormat::MonadSeq(gt, ..)
             | TypedFormat::Hint(gt, ..)
             | TypedFormat::DecodeBytes(gt, ..)
+            | TypedFormat::ParseFromView(gt, ..)
             | TypedFormat::FormatCall(gt, ..)
             | TypedFormat::Variant(gt, ..)
             | TypedFormat::Union(gt, ..)
@@ -529,20 +537,39 @@ impl<TypeRep> std::hash::Hash for TypedDynFormat<TypeRep> {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TypedViewFormat<TypeRep> {
-    ReadOffsetLen(Box<TypedExpr<TypeRep>>, Box<TypedExpr<TypeRep>>),
+    CaptureBytes(Box<TypedExpr<TypeRep>>),
 }
 
 impl<TypeRep> std::hash::Hash for TypedViewFormat<TypeRep> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         core::mem::discriminant(self).hash(state);
         match self {
-            TypedViewFormat::ReadOffsetLen(offset, len) => {
-                offset.hash(state);
+            TypedViewFormat::CaptureBytes(len) => {
                 len.hash(state);
             }
         }
     }
 }
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TypedViewExpr<TypeRep> {
+    Var(Label),
+    Offset(Box<TypedViewExpr<TypeRep>>, Box<TypedExpr<TypeRep>>),
+}
+
+impl<TypeRep> std::hash::Hash for TypedViewExpr<TypeRep> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        core::mem::discriminant(self).hash(state);
+        match self {
+            TypedViewExpr::Var(l) => l.hash(state),
+            TypedViewExpr::Offset(base, offs) => {
+                base.hash(state);
+                offs.hash(state);
+            }
+        }
+    }
+}
+
 mod private {
     pub trait Sealed {}
 
@@ -936,9 +963,10 @@ mod __impls {
     use crate::{
         codegen::{
             rust_ast::{AtomType, CompType, PrimType, RustType, RustTypeDecl},
+            typed_format::TypedViewExpr,
             IxLabel,
         },
-        DynFormat, Expr, Format, Pattern, ViewFormat,
+        DynFormat, Expr, Format, Pattern, ViewExpr, ViewFormat,
     };
 
     impl From<RustType> for GenType {
@@ -1068,6 +1096,9 @@ mod __impls {
                 TypedFormat::DecodeBytes(_, expr, inner) => {
                     Format::DecodeBytes(rebox(expr), rebox(inner))
                 }
+                TypedFormat::ParseFromView(_, view, inner) => {
+                    Format::ParseFromView(ViewExpr::from(view), rebox(inner))
+                }
                 TypedFormat::SkipRemainder => Format::SkipRemainder,
                 TypedFormat::Pos => Format::Pos,
                 TypedFormat::Fail => Format::Fail,
@@ -1125,7 +1156,9 @@ mod __impls {
                     Format::Let(name, rebox(val), rebox(inner))
                 }
                 TypedFormat::LetView(_, name, inner) => Format::LetView(name, rebox(inner)),
-                TypedFormat::WithView(_, name, vf) => Format::WithView(name, ViewFormat::from(vf)),
+                TypedFormat::WithView(_, view, vf) => {
+                    Format::WithView(ViewExpr::from(view), ViewFormat::from(vf))
+                }
                 TypedFormat::Match(_, head, t_branches) => {
                     let branches = t_branches
                         .into_iter()
@@ -1155,9 +1188,7 @@ mod __impls {
     impl<TypeRep> From<TypedViewFormat<TypeRep>> for ViewFormat {
         fn from(value: TypedViewFormat<TypeRep>) -> Self {
             match value {
-                TypedViewFormat::ReadOffsetLen(offset, len) => {
-                    ViewFormat::ReadOffsetLen(rebox(offset), rebox(len))
-                }
+                TypedViewFormat::CaptureBytes(len) => ViewFormat::CaptureBytes(rebox(len)),
             }
         }
     }
@@ -1179,6 +1210,15 @@ mod __impls {
                 TypedPattern::Seq(_, elts) => Pattern::Seq(revec(elts)),
                 TypedPattern::Option(_, Some(inner)) => Pattern::Option(Some(rebox(inner))),
                 TypedPattern::Option(_, None) => Pattern::Option(None),
+            }
+        }
+    }
+
+    impl<TypeRep> From<TypedViewExpr<TypeRep>> for ViewExpr {
+        fn from(value: TypedViewExpr<TypeRep>) -> Self {
+            match value {
+                TypedViewExpr::Var(ident) => ViewExpr::Var(ident),
+                TypedViewExpr::Offset(base, offs) => ViewExpr::Offset(rebox(base), rebox(offs)),
             }
         }
     }

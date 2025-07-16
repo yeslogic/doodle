@@ -130,7 +130,7 @@ fn check_covered(
         Format::Byte(_) => {
             return Err(format!("uncovered byte: {:?}", path));
         }
-        Format::DecodeBytes(_, format) => {
+        Format::ParseFromView(_, format) | Format::DecodeBytes(_, format) => {
             check_covered(module, path, format)?;
         }
         Format::Variant(label, format) => {
@@ -310,6 +310,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                 other => unreachable!("expected Option, found {other:?}"),
             },
             Format::DecodeBytes(_bytes, format) => self.write_flat(value, format),
+            Format::ParseFromView(_view, format) => self.write_flat(value, format),
             Format::Peek(format) => self.write_flat(value, format),
             Format::PeekNot(format) => self.write_flat(value, format),
             Format::Slice(_, format) => self.write_flat(value, format),

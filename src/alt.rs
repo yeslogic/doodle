@@ -7,9 +7,9 @@ use std::{
 };
 
 use crate::{
-    alt::marker::BaseKind, typecheck::UnificationError, valuetype::Container, BaseType, ByteSet,
-    DynFormat, Expr, Format, FormatModule, FormatRef, IntoLabel, Label, Pattern, StyleHint,
-    TypeScope, ValueKind, ValueType,
+    typecheck::UnificationError, valuetype::Container, BaseType, ByteSet, DynFormat, Expr, Format,
+    FormatModule, FormatRef, IntoLabel, Label, Pattern, StyleHint, TypeScope, ValueKind, ValueType,
+    ViewExpr,
 };
 use anyhow::{anyhow, Result as AResult};
 use serde::Serialize;
@@ -39,6 +39,7 @@ pub mod marker {
         }
     }
 }
+// use marker::BaseKind;
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 #[serde(tag = "tag", content = "data")]
@@ -61,8 +62,8 @@ pub enum GroundFormat {
     SkipRemainder,
     /// Compute a value
     Compute(Box<Expr>),
-    /// Apply a ViewFOrmat to a named view
-    WithView(Label, ViewFormatExt),
+    /// Apply a ViewFormat(Ext) to a specified view-level expression
+    WithView(ViewExpr, ViewFormatExt),
 }
 
 /// Descent-patterns for Formats that hold a single `Box<Format>`
@@ -89,6 +90,7 @@ pub enum MonoKind {
     LetView(Label),
     Dynamic(Label, DynFormat),
     DecodeBytes(Box<Expr>),
+    ParseFromView(ViewExpr),
     Hint(StyleHint),
 }
 
@@ -151,8 +153,8 @@ pub enum ReadKind {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 #[serde(tag = "tag", content = "data")]
 pub enum ViewFormatExt {
-    /// ReadOffsetLen(Offset, Len, ReadKind)
-    ReadOffsetLen(Box<Expr>, Box<Expr>, ReadKind),
+    /// ReadLen(Len),
+    CaptureBytes(Box<Expr>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
@@ -888,26 +890,9 @@ impl FormatModuleExt {
                     ValueKind::View => Err(anyhow!("Apply: expected format, found View")),
                 },
                 GroundFormat::WithView(ident, vf) => {
-                    match scope.get_type_by_name(ident) {
-                        ValueKind::View => {}
-                        ValueKind::Value(t) => {
-                            return Err(anyhow!("WithView: expected view, found value {t:?}"))
-                        }
-                        ValueKind::Format(t) => {
-                            return Err(anyhow!("WithView: expected view, found format {t:?}"))
-                        }
-                    }
+                    ident.check_type_ext(scope)?;
                     match vf {
-                        ViewFormatExt::ReadOffsetLen(offset, len, read_kind) => {
-                            // confirm that offset is of a numeric type
-                            match offset.infer_type_ext(scope)? {
-                                t if t.is_numeric() => {}
-                                other => {
-                                    return Err(anyhow!(
-                                        "ReadOffsetLen: expected numeric offset, found {other:?}"
-                                    ))
-                                }
-                            }
+                        ViewFormatExt::CaptureBytes(len) => {
                             // confirm that length is of a numeric type
                             match len.infer_type_ext(scope)? {
                                 t if t.is_numeric() => {}
@@ -917,24 +902,10 @@ impl FormatModuleExt {
                                     ))
                                 }
                             }
-                            match read_kind {
-                                ReadKind::ByteSlice => {
-                                    // TODO - consider if we need to add a valuetype for borrowed u8 slice in APM (?)
-                                    Ok(ValueTypeExt::Seq(Box::new(ValueTypeExt::Base(
-                                        BaseType::U8,
-                                    ))))
-                                }
-                                ReadKind::ArrayOf(bk) => {
-                                    let elt = match bk {
-                                        BaseKind::U8 => ValueTypeExt::Base(BaseType::U8),
-                                        BaseKind::U16 => ValueTypeExt::Base(BaseType::U16),
-                                        BaseKind::U32 => ValueTypeExt::Base(BaseType::U32),
-                                        BaseKind::U64 => ValueTypeExt::Base(BaseType::U32),
-                                    };
-                                    // TODO - consider if we need to add a valuetype for ReadArray in APM (?)
-                                    Ok(ValueTypeExt::Seq(Box::new(elt)))
-                                }
-                            }
+                            // TODO - consider if we need to add a valuetype for borrowed u8 slice in APM (?)
+                            Ok(ValueTypeExt::Seq(Box::new(ValueTypeExt::Base(
+                                BaseType::U8,
+                            ))))
                         }
                     }
                 }
@@ -1131,6 +1102,10 @@ impl FormatModuleExt {
                                 }
                                 other => Err(anyhow!("DecodeBytes first argument type should be Seq(U8), found {other:?} instead")),
                             }
+                        }
+                        MonoKind::ParseFromView(v_expr) => {
+                            v_expr.check_type_ext(scope)?;
+                            self.infer_format_ext_type(scope, f)
                         }
                         MonoKind::Hint(_) => {
                             self.infer_format_ext_type(scope, f)
@@ -1760,6 +1735,10 @@ mod __impls {
                     MonoKind::DecodeBytes(expr),
                     Box::new(FormatExt::from(*format)),
                 )),
+                Format::ParseFromView(v_expr, format) => FormatExt::Epi(EpiFormat::Mono(
+                    MonoKind::ParseFromView(v_expr),
+                    Box::new(FormatExt::from(*format)),
+                )),
                 Format::LetFormat(format, name, format1) => FormatExt::Epi(EpiFormat::Duo(
                     DuoKind::LetFormat(name),
                     Box::new(FormatExt::from(*format)),
@@ -1792,36 +1771,22 @@ mod __impls {
     impl From<ViewFormat> for ViewFormatExt {
         fn from(value: ViewFormat) -> Self {
             match value {
-                ViewFormat::ReadOffsetLen(offs, len) => {
-                    ViewFormatExt::ReadOffsetLen(offs, len, ReadKind::ByteSlice)
-                }
+                ViewFormat::CaptureBytes(len) => ViewFormatExt::CaptureBytes(len),
             }
         }
     }
 
-    impl TryFrom<ViewFormatExt> for ViewFormat {
-        type Error = anyhow::Error;
-
-        fn try_from(value: ViewFormatExt) -> Result<Self, Self::Error> {
+    impl From<ViewFormatExt> for ViewFormat {
+        fn from(value: ViewFormatExt) -> Self {
             match value {
-                ViewFormatExt::ReadOffsetLen(offs, len, kind) => {
-                    match kind {
-                        ReadKind::ByteSlice => Ok(ViewFormat::ReadOffsetLen(offs, len)),
-                        ReadKind::ArrayOf(_kind) => {
-                            // FIXME - implement ViewFormat backing for ArrayOf
-                            Err(anyhow!("no equivalent ViewFormat for ReadKind::ArrayOf(_)"))
-                        }
-                    }
-                }
+                ViewFormatExt::CaptureBytes(len) => ViewFormat::CaptureBytes(len),
             }
         }
     }
 
-    impl TryFrom<GroundFormat> for Format {
-        type Error = <ViewFormat as TryFrom<ViewFormatExt>>::Error;
-
-        fn try_from(f: GroundFormat) -> Result<Self, Self::Error> {
-            Ok(match f {
+    impl From<GroundFormat> for Format {
+        fn from(f: GroundFormat) -> Self {
+            match f {
                 GroundFormat::Fail => Format::Fail,
                 GroundFormat::Pos => Format::Pos,
                 GroundFormat::EndOfInput => Format::EndOfInput,
@@ -1831,8 +1796,8 @@ mod __impls {
                 GroundFormat::Apply(lbl) => Format::Apply(lbl),
                 GroundFormat::ItemVar(level, exprs) => Format::ItemVar(level, exprs),
                 GroundFormat::Compute(expr) => Format::Compute(expr),
-                GroundFormat::WithView(ident, vfx) => Format::WithView(ident, vfx.try_into()?),
-            })
+                GroundFormat::WithView(v_expr, vfx) => Format::WithView(v_expr, vfx.into()),
+            }
         }
     }
 
@@ -1868,6 +1833,7 @@ mod __impls {
                 MonoKind::Let(lab, expr) => Format::Let(lab, expr, inner),
                 MonoKind::Dynamic(lab, dyn_format) => Format::Dynamic(lab, dyn_format, inner),
                 MonoKind::DecodeBytes(expr) => Format::DecodeBytes(expr, inner),
+                MonoKind::ParseFromView(v_expr) => Format::ParseFromView(v_expr, inner),
                 MonoKind::Hint(style_hint) => Format::Hint(style_hint, inner),
                 MonoKind::LetView(ident) => Format::LetView(ident, inner),
             }
