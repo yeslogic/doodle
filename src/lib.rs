@@ -674,7 +674,70 @@ pub enum DynFormat {
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub enum ViewFormat {
-    ReadOffsetLen(Box<Expr>, Box<Expr>),
+    CaptureBytes(Box<Expr>),
+}
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
+pub enum ViewExpr {
+    Var(Label),
+    Offset(Box<ViewExpr>, Box<Expr>),
+}
+
+impl ViewExpr {
+    pub fn get_base(&self) -> &Label {
+        match self {
+            ViewExpr::Var(name) => name,
+            ViewExpr::Offset(base, _) => base.get_base(),
+        }
+    }
+
+    pub fn var(name: impl IntoLabel) -> Self {
+        ViewExpr::Var(name.into())
+    }
+
+    pub fn offset(self, offset: Expr) -> Self {
+        ViewExpr::Offset(Box::new(self), Box::new(offset))
+    }
+
+    pub fn check_type(&self, scope: &TypeScope<'_, ValueType>) -> AResult<()> {
+        match self {
+            ViewExpr::Var(ident) => match scope.get_type_by_name(ident) {
+                ValueKind::View => Ok(()),
+                ValueKind::Value(_t) => Err(anyhow!("expected View, found Value({_t:?}")),
+                ValueKind::Format(_t) => Err(anyhow!("expected View, found FOrmat({_t:?}")),
+            },
+            ViewExpr::Offset(view_expr, expr) => {
+                let t = expr.infer_type(scope)?;
+                if t.is_numeric() {
+                    view_expr.check_type(scope)
+                } else {
+                    Err(anyhow!(
+                        "non-numeric type for offset-expr in ViewExpr: {t:?}"
+                    ))
+                }
+            }
+        }
+    }
+
+    pub fn check_type_ext(&self, scope: &TypeScope<'_, alt::ValueTypeExt>) -> AResult<()> {
+        match self {
+            ViewExpr::Var(ident) => match scope.get_type_by_name(ident) {
+                ValueKind::View => Ok(()),
+                ValueKind::Value(_t) => Err(anyhow!("expected View, found Value({_t:?}")),
+                ValueKind::Format(_t) => Err(anyhow!("expected View, found FOrmat({_t:?}")),
+            },
+            ViewExpr::Offset(view_expr, expr) => {
+                let t = expr.infer_type_ext(scope)?;
+                if t.is_numeric() {
+                    view_expr.check_type_ext(scope)
+                } else {
+                    Err(anyhow!(
+                        "non-numeric type for offset-expr in ViewExpr: {t:?}"
+                    ))
+                }
+            }
+        }
+    }
 }
 
 // NOTE - as currently defined, StyleHint could easily be Copy, but it would be a breaking change if we later had to remove that trait
@@ -937,8 +1000,10 @@ pub enum Format {
     // SECTION - APM-backing formats
     /// Binds a View to the specfied label and processes a format in the ensuing context
     LetView(Label, Box<Format>),
-    /// Using a View bound in the context under the given name, apply a View-based parse or capture
-    WithView(Label, ViewFormat),
+    /// Using a ViewExpr, apply a View-based parse or capture
+    WithView(ViewExpr, ViewFormat),
+    /// Parses a given format within the context of a View
+    ParseFromView(ViewExpr, Box<Format>),
     // !SECTION
 }
 
@@ -1076,9 +1141,10 @@ impl Format {
                 }
                 total
             }
-            Format::WithView(_ident, vf) => match vf {
-                ViewFormat::ReadOffsetLen(_offs, _len) => Bounds::exact(0),
+            Format::WithView(_v_expr, vf) => match vf {
+                ViewFormat::CaptureBytes(_len) => Bounds::exact(0),
             },
+            Format::ParseFromView(_v_expr, _inner) => Bounds::exact(0),
         }
     }
 
@@ -1154,10 +1220,11 @@ impl Format {
                 }
                 max_lookahead
             }
-            Format::WithView(_ident, vf) => match vf {
+            Format::WithView(_v_expr, vf) => match vf {
                 // REVIEW - sanity-check this rule
-                ViewFormat::ReadOffsetLen(_offs, _len) => Bounds::exact(0),
+                ViewFormat::CaptureBytes(_len) => Bounds::exact(0),
             },
+            Format::ParseFromView(_v_expr, _f) => Bounds::exact(0),
         }
     }
 
@@ -1203,7 +1270,7 @@ impl Format {
             Format::Dynamic(_name, _dynformat, f) => f.depends_on_next(module),
             Format::Apply(..) => false,
             Format::ForEach(_expr, _lbl, f) => f.depends_on_next(module),
-            Format::DecodeBytes(_bytes, _f) => false,
+            Format::DecodeBytes(..) | Format::ParseFromView(..) => false,
             Format::MonadSeq(first, second) | Format::LetFormat(first, _, second) => {
                 first.depends_on_next(module) || second.depends_on_next(module)
             }
@@ -1380,6 +1447,10 @@ impl FormatModule {
                     }
                     other => Err(anyhow!("DecodeBytes first argument type should be Seq(U8), found {other:?} instead")),
                 }
+            }
+            Format::ParseFromView(view, f) => {
+                view.check_type(scope)?;
+                self.infer_format_type(scope, f)
             }
             Format::Fail => Ok(ValueType::Empty),
             Format::SkipRemainder | Format::EndOfInput => Ok(ValueType::Tuple(vec![])),
@@ -1629,14 +1700,9 @@ impl FormatModule {
                 };
                 Ok(ValueType::Option(Box::new(inner_type)))
             }
-            Format::WithView(_name, v_format) => match v_format {
-                ViewFormat::ReadOffsetLen(offs, len) => {
-                    match offs.infer_type(scope)? {
-                        t if t.is_numeric() => {},
-                        other => {
-                            return Err(anyhow!("ReadOffsetLen@0: expected numeric, found {other:?}"));
-                        }
-                    }
+            Format::WithView(view, v_format) => match v_format {
+                ViewFormat::CaptureBytes(len) => {
+                    view.check_type(scope)?;
                     match len.infer_type(scope)? {
                         t if t.is_numeric() => {},
                         other => {
@@ -2225,9 +2291,11 @@ impl<'a> MatchTreeStep<'a> {
             TypedFormat::Map(_, f, _expr) | TypedFormat::Where(_, f, _expr) => {
                 Self::from_gt_format(module, f, next)
             }
-            TypedFormat::DecodeBytes(..) | TypedFormat::Compute(..) => {
-                Self::from_next(module, next)
-            }
+
+            TypedFormat::DecodeBytes(..)
+            | TypedFormat::ParseFromView(..)
+            | TypedFormat::Compute(..) => Self::from_next(module, next),
+
             TypedFormat::Pos => Self::from_next(module, next),
             TypedFormat::Let(_, _name, _expr, f) => Self::from_gt_format(module, f, next),
             TypedFormat::LetView(_, _name, f) => Self::from_gt_format(module, f, next),
@@ -2264,6 +2332,7 @@ impl<'a> MatchTreeStep<'a> {
             Format::SkipRemainder => Self::accept(),
             Format::Align(n) => Self::from_align(module, next, *n),
             Format::DecodeBytes(_bytes, _f) => Self::from_next(module, next),
+            Format::ParseFromView(_view, _f) => Self::from_next(module, next),
             Format::Byte(bs) => Self::branch(*bs, next),
             Format::Variant(_label, f) => Self::from_format(module, f, next.clone()),
             Format::Union(branches) | Format::UnionNondet(branches) => {

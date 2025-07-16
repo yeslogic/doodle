@@ -1,7 +1,7 @@
 use crate::valuetype::{augmented::AugValueType, SeqBorrowHint};
 use crate::{
     Arith, BaseType, DynFormat, Expr, Format, FormatModule, Label, Pattern, UnaryOp, ValueType,
-    ViewFormat,
+    ViewExpr, ViewFormat,
 };
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
@@ -337,14 +337,6 @@ impl<'a> Ctxt<'a> {
             scope,
             dyn_s: DynScope::new(),
             views: ViewScope::new(),
-        }
-    }
-
-    fn check_view_is_bound(&self, ident: &Label) -> TCResult<()> {
-        if self.views.includes_name(ident) {
-            Ok(())
-        } else {
-            Err(TCError::from(TCErrorKind::MissingView(ident.clone())))
         }
     }
 }
@@ -1163,11 +1155,9 @@ impl TypeChecker {
         ctxt: Ctxt<'_>,
     ) -> TCResult<UVar> {
         match view_format {
-            ViewFormat::ReadOffsetLen(offset, len) => {
+            ViewFormat::CaptureBytes(len) => {
                 let newvar = self.get_new_uvar();
-                let offset_var = self.infer_var_expr(offset, ctxt.scope)?;
                 let len_var = self.infer_var_expr(len, ctxt.scope)?;
-                self.unify_var_baseset(offset_var, BaseSet::U(UintSet::ANY))?;
                 self.unify_var_baseset(len_var, BaseSet::U(UintSet::ANY))?;
                 // REVIEW - should we have a special UType for captured View-window reads?
                 self.unify_var_utype(
@@ -1206,6 +1196,24 @@ impl TypeChecker {
                     Constraint::Elem(BaseSet::U(UintSet::any_default(IntWidth::Bits16))),
                 )?;
                 Ok(newvar)
+            }
+        }
+    }
+
+    fn traverse_view_expr(&mut self, view: &ViewExpr, ctxt: Ctxt<'_>) -> TCResult<()> {
+        match view {
+            ViewExpr::Var(ident) => {
+                if ctxt.views.includes_name(&ident) {
+                    Ok(())
+                } else {
+                    Err(TCError::from(TCErrorKind::MissingView(ident.clone())))
+                }
+            }
+            ViewExpr::Offset(base, offs) => {
+                self.traverse_view_expr(base.as_ref(), ctxt)?;
+                let v_offs = self.infer_var_expr(offs, &ctxt.scope)?;
+                self.unify_var_baseset(v_offs, BaseSet::U(UintSet::ANY))?;
+                Ok(())
             }
         }
     }
@@ -2043,10 +2051,18 @@ impl TypeChecker {
                     let elem_t = self.infer_utype_expr(elem, scope)?;
                     self.unify_var_utype(elem_uvar, elem_t)?;
                 }
-                self.unify_var_utype(
-                    seq_uvar,
-                    Rc::new(UType::seq(Rc::new(UType::Var(elem_uvar)))),
-                )?;
+                // FIXME - to allow empty-seq to not clobber views, we use a slight hack here
+                if elems.is_empty() {
+                    self.unify_var_utype(
+                        seq_uvar,
+                        Rc::new(UType::seq_view(Rc::new(UType::Var(elem_uvar)))),
+                    )?;
+                } else {
+                    self.unify_var_utype(
+                        seq_uvar,
+                        Rc::new(UType::seq(Rc::new(UType::Var(elem_uvar)))),
+                    )?;
+                }
                 seq_uvar
             }
             Expr::Match(head, branches) => {
@@ -2821,6 +2837,18 @@ impl TypeChecker {
 
                 Ok(newvar)
             }
+            Format::ParseFromView(view, inner) => {
+                let newvar = self.get_new_uvar();
+
+                // view requires discovery but will always have View-kind
+                self.traverse_view_expr(view, ctxt)?;
+
+                // infer inner-format type and equate it with newvar
+                let v_inner = self.infer_var_format(inner.as_ref(), ctxt)?;
+                self.unify_var_pair(newvar, v_inner)?;
+
+                Ok(newvar)
+            }
             Format::Byte(_set) => {
                 // REVIEW - is there a better approach when matching an empty set of bytes?
                 if _set.is_empty() {
@@ -3084,10 +3112,12 @@ impl TypeChecker {
                 self.unify_var_utype(newvar, Rc::new(UType::Option(inner_var.into())))?;
                 Ok(newvar)
             }
-            Format::WithView(ident, vf) => {
+            Format::WithView(view, vf) => {
                 let newvar = self.get_new_uvar();
-                // Sanity-check the presence of ident in ViewScope
-                ctxt.check_view_is_bound(ident)?;
+
+                // fully explore the ViewExpr
+                self.traverse_view_expr(view, ctxt)?;
+
                 let vf_var = self.infer_var_view_format(vf, ctxt)?;
                 self.unify_var_pair(newvar, vf_var)?;
                 Ok(newvar)

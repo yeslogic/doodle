@@ -4715,7 +4715,7 @@ return Err(ParseError::ExcludedBranch(4260205764162136487u64));
 let _here = _input.get_offset_u64();
 let waldo = {
 let scope = _input.view();
-scope.read_offset_len((try_sub!(r#where, _here, 13646096770106105413u64)) as usize, 5u8 as usize)
+scope.offset((try_sub!(r#where, _here, 13646096770106105413u64)) as usize).read_len(5u8 as usize)
 };
 _input.skip_remainder();
 PResult::Ok(waldo_main { r#where, noise, waldo })
@@ -4751,7 +4751,7 @@ return Err(ParseError::InsufficientRepeats);
 break
 }
 } else {
-let next_elem = (Decoder337(_input))?;
+let next_elem = (Decoder338(_input))?;
 accum.push(next_elem);
 }
 }
@@ -4808,7 +4808,7 @@ for item in gzip_raw.clone() {
 accum.push({
 let mut tmp = Parser::new(item.data.inflate.as_slice());
 let reparser = &mut tmp;
-(Decoder_tar_main(reparser))?
+(Decoder315(reparser))?
 });
 }
 PResult::Ok(accum)
@@ -32296,12 +32296,12 @@ Some((Decoder_gzip_fextra(_input))?)
 None
 };
 let fname = if header.file_flags.fname {
-Some((Decoder315(_input))?)
+Some((Decoder316(_input))?)
 } else {
 None
 };
 let fcomment = if header.file_flags.fcomment {
-Some((Decoder316(_input))?)
+Some((Decoder317(_input))?)
 } else {
 None
 };
@@ -32325,34 +32325,68 @@ accum.push(next_elem);
 PResult::Ok(accum)
 }
 
-fn Decoder315(_input: &mut Parser<'_>) -> Result<base_asciiz_string, ParseError> {
-Decoder318(_input)
-}
-
-fn Decoder316(_input: &mut Parser<'_>) -> Result<gzip_fcomment, ParseError> {
-let comment = (Decoder317(_input))?;
-PResult::Ok(gzip_fcomment { comment })
-}
-
-fn Decoder317(_input: &mut Parser<'_>) -> Result<base_asciiz_string, ParseError> {
-let string = {
+fn Decoder315(_input: &mut Parser<'_>) -> Result<tar_main, ParseError> {
+let contents = {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
 let matching_ix = {
 _input.open_peek_context();
 {
 let ret = match _input.read_byte()? {
-byte if (byte != 0) => {
+0u8 => {
 0
 },
 
-0u8 => {
+byte if (byte != 0) => {
 1
 },
 
 _ => {
+return Err(ParseError::ExcludedBranch(14962551735998681614u64));
+}
+};
+_input.close_peek_context()?;
+ret
+}
+};
+if matching_ix == 0 {
+if accum.is_empty() {
+return Err(ParseError::InsufficientRepeats);
+} else {
+break
+}
+} else {
+let next_elem = (Decoder_tar_header_with_data(_input))?;
+accum.push(next_elem);
+}
+}
+accum
+};
+let __padding = {
+let mut accum = Vec::new();
+for _ in 0..1024u32 {
+accum.push({
+let b = _input.read_byte()?;
+if b == 0 {
+b
+} else {
 return Err(ParseError::ExcludedBranch(2007599397777734421u64));
 }
+});
+}
+accum
+};
+let __trailing = {
+let mut accum = Vec::new();
+while _input.remaining() > 0 {
+let matching_ix = {
+_input.open_peek_context();
+let b = _input.read_byte()?;
+{
+let ret = if b == 0 {
+0
+} else {
+1
 };
 _input.close_peek_context()?;
 ret
@@ -32361,10 +32395,10 @@ ret
 if matching_ix == 0 {
 let next_elem = {
 let b = _input.read_byte()?;
-if b != 0 {
+if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(14962551735998681614u64));
+return Err(ParseError::ExcludedBranch(18069850277258932991u64));
 }
 };
 accum.push(next_elem);
@@ -32374,15 +32408,16 @@ break
 }
 accum
 };
-let null = {
-let b = _input.read_byte()?;
-if b == 0 {
-b
-} else {
-return Err(ParseError::ExcludedBranch(18069850277258932991u64));
+PResult::Ok(tar_main { contents, __padding, __trailing })
 }
-};
-PResult::Ok(base_asciiz_string { string, null })
+
+fn Decoder316(_input: &mut Parser<'_>) -> Result<base_asciiz_string, ParseError> {
+Decoder319(_input)
+}
+
+fn Decoder317(_input: &mut Parser<'_>) -> Result<gzip_fcomment, ParseError> {
+let comment = (Decoder318(_input))?;
+PResult::Ok(gzip_fcomment { comment })
 }
 
 fn Decoder318(_input: &mut Parser<'_>) -> Result<base_asciiz_string, ParseError> {
@@ -32436,6 +32471,57 @@ return Err(ParseError::ExcludedBranch(6110942357212830202u64));
 PResult::Ok(base_asciiz_string { string, null })
 }
 
+fn Decoder319(_input: &mut Parser<'_>) -> Result<base_asciiz_string, ParseError> {
+let string = {
+let mut accum = Vec::new();
+while _input.remaining() > 0 {
+let matching_ix = {
+_input.open_peek_context();
+{
+let ret = match _input.read_byte()? {
+byte if (byte != 0) => {
+0
+},
+
+0u8 => {
+1
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(16339654162669176472u64));
+}
+};
+_input.close_peek_context()?;
+ret
+}
+};
+if matching_ix == 0 {
+let next_elem = {
+let b = _input.read_byte()?;
+if b != 0 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(6596410053543851077u64));
+}
+};
+accum.push(next_elem);
+} else {
+break
+}
+}
+accum
+};
+let null = {
+let b = _input.read_byte()?;
+if b == 0 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(1886358831178290550u64));
+}
+};
+PResult::Ok(base_asciiz_string { string, null })
+}
+
 fn Decoder_gif_header(_input: &mut Parser<'_>) -> Result<gif_header, ParseError> {
 let signature = {
 let field0 = ((|| {
@@ -32443,7 +32529,7 @@ let b = _input.read_byte()?;
 PResult::Ok(if b == 71 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(6596410053543851077u64));
+return Err(ParseError::ExcludedBranch(17004441093219507547u64));
 })
 })())?;
 let field1 = ((|| {
@@ -32451,7 +32537,7 @@ let b = _input.read_byte()?;
 PResult::Ok(if b == 73 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(16339654162669176472u64));
+return Err(ParseError::ExcludedBranch(3168197157646945762u64));
 })
 })())?;
 let field2 = ((|| {
@@ -32459,7 +32545,7 @@ let b = _input.read_byte()?;
 PResult::Ok(if b == 70 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(1886358831178290550u64));
+return Err(ParseError::ExcludedBranch(360138127928998237u64));
 })
 })())?;
 (field0, field1, field2)
@@ -32479,7 +32565,7 @@ let descriptor = (Decoder_gif_logical_screen_descriptor(_input))?;
 let global_color_table = if descriptor.flags.table_flag > 0u8 {
 let mut accum = Vec::new();
 for _ in 0..2u16 << (descriptor.flags.table_size as u16) {
-accum.push((Decoder334(_input))?);
+accum.push((Decoder335(_input))?);
 }
 Some(accum)
 } else {
@@ -32512,7 +32598,7 @@ match _input.read_byte()? {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(17004441093219507547u64));
+return Err(ParseError::ExcludedBranch(9092411637461100444u64));
 }
 }
 },
@@ -32522,7 +32608,7 @@ return Err(ParseError::ExcludedBranch(17004441093219507547u64));
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(3168197157646945762u64));
+return Err(ParseError::ExcludedBranch(15117497265985508077u64));
 }
 };
 _input.close_peek_context()?;
@@ -32541,7 +32627,7 @@ gif_block::special_purpose_block(inner)
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(360138127928998237u64));
+return Err(ParseError::ExcludedBranch(11247369915737850258u64));
 }
 })
 }
@@ -32552,7 +32638,7 @@ let b = _input.read_byte()?;
 if b == 59 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9092411637461100444u64));
+return Err(ParseError::ExcludedBranch(7546547171508918509u64));
 }
 };
 PResult::Ok(gif_trailer { separator })
@@ -32575,7 +32661,7 @@ match _input.read_byte()? {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(15117497265985508077u64));
+return Err(ParseError::ExcludedBranch(14304129837244038526u64));
 }
 }
 },
@@ -32585,7 +32671,7 @@ return Err(ParseError::ExcludedBranch(15117497265985508077u64));
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11247369915737850258u64));
+return Err(ParseError::ExcludedBranch(15347994581840044382u64));
 }
 };
 _input.close_peek_context()?;
@@ -32602,7 +32688,7 @@ None
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(7546547171508918509u64));
+return Err(ParseError::ExcludedBranch(18237415135895269790u64));
 }
 }
 };
@@ -32626,11 +32712,11 @@ match _input.read_byte()? {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14304129837244038526u64));
+return Err(ParseError::ExcludedBranch(4706601668945989307u64));
 }
 }
 } else {
-return Err(ParseError::ExcludedBranch(15347994581840044382u64));
+return Err(ParseError::ExcludedBranch(1678201523848816632u64));
 };
 _input.close_peek_context()?;
 ret
@@ -32648,7 +32734,7 @@ gif_special_purpose_block::comment_extension(inner)
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(18237415135895269790u64));
+return Err(ParseError::ExcludedBranch(13246474195614162055u64));
 }
 })
 }
@@ -32659,7 +32745,7 @@ let b = _input.read_byte()?;
 if b == 33 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(4706601668945989307u64));
+return Err(ParseError::ExcludedBranch(8414108255387456730u64));
 }
 };
 let label = {
@@ -32667,7 +32753,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(1678201523848816632u64));
+return Err(ParseError::ExcludedBranch(1432698095084823598u64));
 }
 };
 let block_size = {
@@ -32675,7 +32761,7 @@ let b = _input.read_byte()?;
 if b == 11 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(13246474195614162055u64));
+return Err(ParseError::ExcludedBranch(9372987348964131232u64));
 }
 };
 let identifier = {
@@ -32708,7 +32794,7 @@ byte if (byte != 0) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(8414108255387456730u64));
+return Err(ParseError::ExcludedBranch(8473414866110322269u64));
 }
 };
 _input.close_peek_context()?;
@@ -32724,7 +32810,7 @@ break
 }
 accum
 };
-let terminator = (Decoder328(_input))?;
+let terminator = (Decoder329(_input))?;
 PResult::Ok(gif_application_extension { separator, label, block_size, identifier, authentication_code, application_data, terminator })
 }
 
@@ -32734,7 +32820,7 @@ let b = _input.read_byte()?;
 if b == 33 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(1432698095084823598u64));
+return Err(ParseError::ExcludedBranch(671785503440284610u64));
 }
 };
 let label = {
@@ -32742,7 +32828,7 @@ let b = _input.read_byte()?;
 if b == 254 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9372987348964131232u64));
+return Err(ParseError::ExcludedBranch(2651182070283403637u64));
 }
 };
 let comment_data = {
@@ -32761,7 +32847,7 @@ byte if (byte != 0) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(8473414866110322269u64));
+return Err(ParseError::ExcludedBranch(8284996377131534070u64));
 }
 };
 _input.close_peek_context()?;
@@ -32777,7 +32863,7 @@ break
 }
 accum
 };
-let terminator = (Decoder328(_input))?;
+let terminator = (Decoder329(_input))?;
 PResult::Ok(gif_comment_extension { separator, label, comment_data, terminator })
 }
 
@@ -32787,7 +32873,7 @@ let b = _input.read_byte()?;
 if b != 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(671785503440284610u64));
+return Err(ParseError::ExcludedBranch(16948595091237008543u64));
 }
 };
 let data = {
@@ -32800,12 +32886,12 @@ accum
 PResult::Ok(gif_subblock { len_bytes, data })
 }
 
-fn Decoder328(_input: &mut Parser<'_>) -> Result<u8, ParseError> {
+fn Decoder329(_input: &mut Parser<'_>) -> Result<u8, ParseError> {
 let b = _input.read_byte()?;
 PResult::Ok(if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(2651182070283403637u64));
+return Err(ParseError::ExcludedBranch(108256050843388088u64));
 })
 }
 
@@ -32815,7 +32901,7 @@ let b = _input.read_byte()?;
 if b == 33 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(8284996377131534070u64));
+return Err(ParseError::ExcludedBranch(7834223795690054720u64));
 }
 };
 let label = {
@@ -32823,7 +32909,7 @@ let b = _input.read_byte()?;
 if b == 249 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(16948595091237008543u64));
+return Err(ParseError::ExcludedBranch(787921071240225899u64));
 }
 };
 let block_size = {
@@ -32831,7 +32917,7 @@ let b = _input.read_byte()?;
 if b == 4 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(108256050843388088u64));
+return Err(ParseError::ExcludedBranch(11557974043504662535u64));
 }
 };
 let flags = {
@@ -32840,7 +32926,7 @@ gif_graphic_control_extension_flags { reserved: packed_bits >> 5u8 & 7u8, dispos
 };
 let delay_time = (Decoder146(_input))?;
 let transparent_color_index = (Decoder24(_input))?;
-let terminator = (Decoder328(_input))?;
+let terminator = (Decoder329(_input))?;
 PResult::Ok(gif_graphic_control_extension { separator, label, block_size, flags, delay_time, transparent_color_index, terminator })
 }
 
@@ -32858,7 +32944,7 @@ let ret = match _input.read_byte()? {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(7834223795690054720u64));
+return Err(ParseError::ExcludedBranch(14238499412440345954u64));
 }
 };
 _input.close_peek_context()?;
@@ -32877,7 +32963,7 @@ gif_graphic_rendering_block::plain_text_extension(inner)
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(787921071240225899u64));
+return Err(ParseError::ExcludedBranch(14703397633096852322u64));
 }
 })
 }
@@ -32887,7 +32973,7 @@ let descriptor = (Decoder_gif_image_descriptor(_input))?;
 let local_color_table = if descriptor.flags.table_flag > 0u8 {
 let mut accum = Vec::new();
 for _ in 0..2u16 << (descriptor.flags.table_size as u16) {
-accum.push((Decoder334(_input))?);
+accum.push((Decoder335(_input))?);
 }
 Some(accum)
 } else {
@@ -32903,7 +32989,7 @@ let b = _input.read_byte()?;
 if b == 33 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(11557974043504662535u64));
+return Err(ParseError::ExcludedBranch(268478239438800266u64));
 }
 };
 let label = {
@@ -32911,7 +32997,7 @@ let b = _input.read_byte()?;
 if b == 1 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(14238499412440345954u64));
+return Err(ParseError::ExcludedBranch(6301432137385173939u64));
 }
 };
 let block_size = {
@@ -32919,7 +33005,7 @@ let b = _input.read_byte()?;
 if b == 12 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(14703397633096852322u64));
+return Err(ParseError::ExcludedBranch(17762152702085771435u64));
 }
 };
 let text_grid_left_position = (Decoder146(_input))?;
@@ -32946,7 +33032,7 @@ byte if (byte != 0) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(268478239438800266u64));
+return Err(ParseError::ExcludedBranch(6803443871185192093u64));
 }
 };
 _input.close_peek_context()?;
@@ -32962,7 +33048,7 @@ break
 }
 accum
 };
-let terminator = (Decoder328(_input))?;
+let terminator = (Decoder329(_input))?;
 PResult::Ok(gif_plain_text_extension { separator, label, block_size, text_grid_left_position, text_grid_top_position, text_grid_width, text_grid_height, character_cell_width, character_cell_height, text_foreground_color_index, text_background_color_index, plain_text_data, terminator })
 }
 
@@ -32972,7 +33058,7 @@ let b = _input.read_byte()?;
 if b == 44 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(6301432137385173939u64));
+return Err(ParseError::ExcludedBranch(204361505388532862u64));
 }
 };
 let image_left_position = (Decoder146(_input))?;
@@ -32986,7 +33072,7 @@ gif_image_descriptor_flags { table_flag: packed_bits >> 7u8 & 1u8, interlace_fla
 PResult::Ok(gif_image_descriptor { separator, image_left_position, image_top_position, image_width, image_height, flags })
 }
 
-fn Decoder334(_input: &mut Parser<'_>) -> Result<png_plte, ParseError> {
+fn Decoder335(_input: &mut Parser<'_>) -> Result<png_plte, ParseError> {
 let r = (Decoder24(_input))?;
 let g = (Decoder24(_input))?;
 let b = (Decoder24(_input))?;
@@ -33011,7 +33097,7 @@ byte if (byte != 0) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(17762152702085771435u64));
+return Err(ParseError::ExcludedBranch(11161970641928094938u64));
 }
 };
 _input.close_peek_context()?;
@@ -33027,7 +33113,7 @@ break
 }
 accum
 };
-let terminator = (Decoder328(_input))?;
+let terminator = (Decoder329(_input))?;
 PResult::Ok(gif_table_based_image_data { lzw_min_code_size, image_data, terminator })
 }
 
@@ -33043,7 +33129,7 @@ let pixel_aspect_ratio = (Decoder24(_input))?;
 PResult::Ok(gif_logical_screen_descriptor { screen_width, screen_height, flags, bg_color_index, pixel_aspect_ratio })
 }
 
-fn Decoder337(_input: &mut Parser<'_>) -> Result<u32, ParseError> {
+fn Decoder338(_input: &mut Parser<'_>) -> Result<u32, ParseError> {
 let tuple_var = {
 let field0 = ((|| {
 let mut accum = Vec::new();
@@ -33109,24 +33195,6 @@ match _input.read_byte()? {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(204361505388532862u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(11161970641928094938u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(8787536656121914522u64));
-}
-}
-},
-
-_ => {
 return Err(ParseError::ExcludedBranch(18210277358428599455u64));
 }
 }
@@ -33159,6 +33227,24 @@ return Err(ParseError::ExcludedBranch(1845850007550452160u64));
 _ => {
 return Err(ParseError::ExcludedBranch(7779176190297216638u64));
 }
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(1016564408906296566u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(1591903561633999639u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(9590821821210520154u64));
+}
 };
 _input.close_peek_context()?;
 ret
@@ -33172,7 +33258,7 @@ let b = _input.read_byte()?;
 if b == 83 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(6803443871185192093u64));
+return Err(ParseError::ExcludedBranch(8787536656121914522u64));
 }
 };
 accum.push(next_elem);
@@ -33185,7 +33271,7 @@ let b = _input.read_byte()?;
 PResult::Ok(if b == 90 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(1016564408906296566u64));
+return Err(ParseError::ExcludedBranch(6175893723851407495u64));
 })
 })())?;
 (field0, field1)

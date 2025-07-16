@@ -6,7 +6,14 @@ pub struct View<'a> {
 
 impl<'a> View<'a> {
     /// Reads a slice of `len` bytes from the View, offset by `offset`.
-    pub fn read_offset_len(&self, offset: usize, len: usize) -> &'a [u8] {
-        &self.buffer[offset..(offset + len)]
+    pub fn read_len(&self, len: usize) -> &'a [u8] {
+        &self.buffer[..len]
+    }
+
+    pub fn offset(&self, offset: usize) -> Self {
+        View {
+            buffer: &self.buffer[offset..],
+            start_offset: self.start_offset + offset,
+        }
     }
 }

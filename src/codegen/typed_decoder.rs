@@ -5,7 +5,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::codegen::typed_format::{GenType, TypedPattern};
+use crate::codegen::typed_format::{GenType, TypedPattern, TypedViewExpr};
 
 use super::typed_format::TypedViewFormat;
 use super::{
@@ -82,7 +82,8 @@ impl TypedDecoder<GenType> {
             | TypedDecoder::Compute(t, ..)
             | TypedDecoder::Let(t, ..)
             | TypedDecoder::LetView(t, ..)
-            | TypedDecoder::ReadViewOffsetLen(t, ..)
+            | TypedDecoder::CaptureBytes(t, ..)
+            | TypedDecoder::ParseFromView(t, ..)
             | TypedDecoder::Match(t, ..)
             | TypedDecoder::Dynamic(t, ..)
             | TypedDecoder::Apply(t, ..)
@@ -217,11 +218,11 @@ pub(crate) enum TypedDecoder<TypeRep> {
     Hint(TypeRep, StyleHint, Box<TypedDecoderExt<TypeRep>>),
     LiftedOption(TypeRep, Option<Box<TypedDecoderExt<TypeRep>>>),
     LetView(TypeRep, Label, Box<TypedDecoderExt<TypeRep>>),
-    ReadViewOffsetLen(
+    CaptureBytes(TypeRep, TypedViewExpr<TypeRep>, Box<TypedExpr<TypeRep>>),
+    ParseFromView(
         TypeRep,
-        Label,
-        Box<TypedExpr<TypeRep>>,
-        Box<TypedExpr<TypeRep>>,
+        TypedViewExpr<TypeRep>,
+        Box<TypedDecoderExt<TypeRep>>,
     ),
 }
 
@@ -343,8 +344,12 @@ impl<'a> GTCompiler<'a> {
                 Ok(TypedDecoder::Call(gt.clone(), n, this_args))
             }
             TypedFormat::DecodeBytes(gt, expr, f) => {
-                let da = Box::new(self.compile_gt_format(f, None, next)?);
+                let da = Box::new(self.compile_gt_format(f, None, Rc::new(Next::Empty))?);
                 Ok(TypedDecoder::DecodeBytes(gt.clone(), expr.clone(), da))
+            }
+            TypedFormat::ParseFromView(gt, view, f) => {
+                let da = Box::new(self.compile_gt_format(f, None, Rc::new(Next::Empty))?);
+                Ok(TypedDecoder::ParseFromView(gt.clone(), view.clone(), da))
             }
             TypedFormat::ForEach(gt, expr, lbl, f) => {
                 let da = Box::new(self.compile_gt_format(f, None, next)?);
@@ -638,11 +643,10 @@ impl<'a> GTCompiler<'a> {
                 };
                 Ok(TypedDecoder::LiftedOption(gt.clone(), inner_dec))
             }
-            TypedFormat::WithView(gt, ident, vf) => match vf {
-                TypedViewFormat::ReadOffsetLen(offs, len) => Ok(TypedDecoder::ReadViewOffsetLen(
+            TypedFormat::WithView(gt, view, vf) => match vf {
+                TypedViewFormat::CaptureBytes(len) => Ok(TypedDecoder::CaptureBytes(
                     gt.clone(),
-                    ident.clone(),
-                    offs.clone(),
+                    view.clone(),
                     len.clone(),
                 )),
             },

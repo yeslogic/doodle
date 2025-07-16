@@ -1,7 +1,7 @@
 use crate::format::BaseModule;
 use doodle::bounds::Bounds;
 use doodle::{helper::*, Expr, IntoLabel, Label};
-use doodle::{BaseType, Format, FormatModule, FormatRef, Pattern, ValueType};
+use doodle::{BaseType, Format, FormatModule, FormatRef, Pattern, ValueType, ViewExpr};
 
 fn id<T>(x: T) -> T {
     x
@@ -5301,14 +5301,17 @@ pub(crate) mod alt {
         base: &BaseModule,
         tag: FormatRef,
     ) -> FormatRef {
-        let axis_record = {
-            record([
-                ("axis_tag", tag.call()),
-                ("axis_name_id", base.u16be()),
-                ("axis_ordering", base.u16be()),
-            ])
+        let _axis_record = {
+            module.define_format(
+                "opentype.stat.axis_record",
+                record([
+                    ("axis_tag", tag.call()),
+                    ("axis_name_id", base.u16be()),
+                    ("axis_ordering", base.u16be()),
+                ]),
+            )
         };
-        let axis_value_table = {
+        let _axis_value_table = {
             use BitFieldKind::*;
             let axis_flags = bit_fields_u16([
                 Reserved {
@@ -5346,61 +5349,89 @@ pub(crate) mod alt {
                 ("value_name_id", base.u16be()), // NameId for entries in 'name' table that provide display-string for this combination of axis values
                 ("axis_values", repeat_count(var("axis_count"), axis_value)),
             ];
-            embedded_variadic_alternation(
-                [("format", where_between_u16(base.u16be(), 1, 4))],
-                "format",
-                [
-                    (1, "Format1", f1_fields),
-                    (2, "Format2", f2_fields),
-                    (3, "Format3", f3_fields),
-                    (4, "Format4", f4_fields),
-                ],
-                "data",
-                NestingKind::MinimalVariation,
+            module.define_format(
+                "opentype.stat.axis_value_table",
+                embedded_variadic_alternation(
+                    [("format", where_between_u16(base.u16be(), 1, 4))],
+                    "format",
+                    [
+                        (1, "Format1", f1_fields),
+                        (2, "Format2", f2_fields),
+                        (3, "Format3", f3_fields),
+                        (4, "Format4", f4_fields),
+                    ],
+                    "data",
+                    NestingKind::MinimalVariation,
+                ),
             )
         };
-        let design_axes_array = |design_axis_count: Expr| {
-            record([("design_axes", repeat_count(design_axis_count, axis_record))])
-        };
-        let axis_value_offsets_array = |axis_value_count: Expr| {
-            record([
-                ("table_start", pos32()),
-                (
-                    "axis_value_offsets",
-                    repeat_count(
-                        axis_value_count,
-                        offset16_mandatory(var("table_start"), axis_value_table, base),
+        let design_axes_array = |view_var: &'static str, size: Expr, count: Expr, offs: Expr| {
+            /* offset32(var("table_start"), record([("design_axes", repeat_count(count, axis_record))]), base) */
+            fmt_let(
+                "len",
+                mul(size, count),
+                if_then_else(
+                    // NOTE - offset is 0 iff design_axis_count is 0 (=> len is 0)
+                    is_nonzero_u32(offs.clone()),
+                    with_view(
+                        ViewExpr::var(view_var).offset(offs),
+                        capture_bytes(var("len")),
                     ),
+                    compute(Expr::NIL),
                 ),
-            ])
+            )
         };
+        let axis_value_offsets_array =
+            |top_view: &'static str, count: Expr, offset_to_start: Expr| {
+                parse_from_view(
+                    ViewExpr::var(top_view).offset(offset_to_start),
+                    let_view(
+                        "axis_value_scope",
+                        record([
+                            (
+                                "axis_value_offsets",
+                                with_view(
+                                    ViewExpr::var("axis_value_scope"),
+                                    // FIXME - ReadArray<'_, U16BE> support (instead of &'a [u8; count * 2])
+                                    capture_bytes(mul(Expr::U16(2), count)),
+                                ),
+                            ), // TODO - ForEach(offset: u16) -> offsetu16(offset, axis_value_table)
+                        ]),
+                    ),
+                )
+            };
         module.define_format(
-            "opentype.stat_table",
-            record([
-                ("table_start", pos32()),
-                ("major_version", expect_u16be(base, 1)),
-                ("minor_version", expects_u16be(base, [1, 2])), // Version 1.0 is deprecated
-                ("design_axis_size", base.u16be()), // size (in bytes) of each axis record
-                ("design_axis_count", base.u16be()), // number of axis records
-                (
-                    "design_axes_offset",
-                    offset32(
-                        var("table_start"),
-                        design_axes_array(var("design_axis_count")),
-                        base,
+            "opentype.stat.table",
+            let_view(
+                "table_scope",
+                record_auto([
+                    ("major_version", expect_u16be(base, 1)),
+                    ("minor_version", expects_u16be(base, [1, 2])), // Version 1.0 is deprecated
+                    ("design_axis_size", base.u16be()), // size (in bytes) of each axis record
+                    ("design_axis_count", base.u16be()), // number of axis records
+                    ("_design_axes_offset", base.u32be()),
+                    (
+                        "design_axes_array",
+                        design_axes_array(
+                            "table_scope",
+                            var("design_axis_size"),
+                            var("design_axis_count"),
+                            var("_design_axes_offset"),
+                        ),
                     ),
-                ), // offset is 0 iff design_axis_count is 0
-                ("axis_value_count", base.u16be()),
-                (
-                    "offset_to_axis_value_offsets",
-                    offset32(
-                        var("table_start"),
-                        axis_value_offsets_array(var("axis_value_count")),
-                        base,
-                    ),
-                ), // offset is 0 iff axis_value_count is 0
-                ("elided_fallback_name_id", base.u16be()), // omitted in version 1.0, but said version is deprecated
-            ]),
+                    ("axis_value_count", base.u16be()),
+                    ("_offset_to_axis_value_offsets", base.u32be()),
+                    (
+                        "axis_value_offsets",
+                        axis_value_offsets_array(
+                            "table_scope",
+                            var("axis_value_count"),
+                            var("_offset_to_axis_value_offsets"),
+                        ),
+                    ), // offset is 0 iff axis_value_count is 0
+                    ("elided_fallback_name_id", base.u16be()), // omitted in version 1.0, but said version is deprecated
+                ]),
+            ),
         )
     }
 }

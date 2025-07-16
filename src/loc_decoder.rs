@@ -8,7 +8,7 @@ use crate::decoder::{
 };
 use crate::error::{DecodeError, LocDecodeError};
 use crate::read::ReadCtxt;
-use crate::{Arith, DynFormat, Expr, Format, IntRel, Label, Pattern, UnaryOp};
+use crate::{Arith, DynFormat, Expr, Format, IntRel, Label, Pattern, UnaryOp, ViewExpr};
 use std::borrow::Cow;
 use std::cmp::Ordering;
 
@@ -1438,6 +1438,11 @@ impl Decoder {
                     None => Ok((va, input)),
                 }
             }
+            Decoder::ParseFromView(v_expr, a) => {
+                let view = self.eval_view_expr_with_loc(scope, v_expr)?;
+                let (va, _) = a.parse_with_loc(program, scope, view)?;
+                Ok((va, input))
+            }
             Decoder::Byte(bs) => {
                 let (b, input) = input
                     .read_byte()
@@ -1764,21 +1769,10 @@ impl Decoder {
                 let some_v = ParsedValue::Option(Some(Box::new(v)));
                 Ok((some_v, input))
             }
-            Decoder::ReadViewOffsetLen(ident, offset, len) => {
-                let view = scope.get_view_by_name(&ident);
-                let offset = offset.eval_value_with_loc(scope).unwrap_usize();
+            Decoder::CaptureBytes(v_expr, len) => {
                 let len = len.eval_value_with_loc(scope).unwrap_usize();
 
-                // offsets the view by the specified amount to obtain the proper window to read from
-                let view_window = if offset > 0 {
-                    let Some((_, view_window)) = view.split_at(offset) else {
-                        return Err(DecodeError::overrun(offset, view.offset));
-                    };
-                    view_window
-                } else {
-                    view
-                };
-
+                let view_window = self.eval_view_expr_with_loc(scope, v_expr)?;
                 // accumulate `len` bytes into a Vec<Value>
                 let mut accum = Vec::with_capacity(len);
                 let mut buf = view_window;
@@ -1798,6 +1792,27 @@ impl Decoder {
 
                 // return the accumulated bytes, along with the original input
                 Ok((ParsedValue::new_seq(accum, view_window.offset, len), input))
+            }
+        }
+    }
+
+    fn eval_view_expr_with_loc<'a>(
+        &self,
+        scope: &LocScope<'a>,
+        v_expr: &ViewExpr,
+    ) -> Result<View<'a>, DecodeError<ParsedValue>> {
+        match v_expr {
+            ViewExpr::Var(ident) => {
+                let view = scope.get_view_by_name(&ident);
+                Ok(view)
+            }
+            ViewExpr::Offset(base, offset) => {
+                let offset = offset.eval_value_with_loc(scope).unwrap_usize();
+                let base_view = self.eval_view_expr_with_loc(scope, base)?;
+                let Some((_, view_window)) = base_view.split_at(offset) else {
+                    return Err(DecodeError::overrun(offset, base_view.offset));
+                };
+                Ok(view_window)
             }
         }
     }
