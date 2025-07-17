@@ -125,10 +125,8 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
             stat_only,
         } => {
             if stat_only {
-                let mut module = FormatModuleExt::new();
-                let format = format::main_stat_ext(&mut module).call();
-                let compiler = FormatCompiler::new(CompilerParams::default());
-                let module = module.compile(&compiler);
+                let mut module = FormatModule::new();
+                let format = format::main_stat(&mut module).call();
                 match output {
                     FormatOutput::Debug => println!("{module:?}"),
                     FormatOutput::Json => {
