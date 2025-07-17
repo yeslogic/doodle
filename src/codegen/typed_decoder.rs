@@ -271,20 +271,37 @@ impl<'a> GTCompiler<'a> {
     pub(crate) fn compile_program(
         module: &FormatModule,
         format: &GTFormat,
+        extra: impl IntoIterator<Item = &'a GTFormat>,
     ) -> AResult<TypedProgram<GenType>> {
         let mut compiler = GTCompiler::new(module);
-        // type
+
+        compiler.compile_local_root(format, false)?;
+
+        for extra_f in extra {
+            compiler.compile_local_root(extra_f, true)?;
+        }
+
+        Ok(compiler.program)
+    }
+
+    fn compile_local_root(&mut self, format: &'a GTFormat, is_extra: bool) -> AResult<()> {
         let t = match format.get_type() {
-            None => unreachable!("cannot compile program from Void top-level format-type"),
+            None => unreachable!("cannot compile program from local-root format with Void type"),
             Some(t) => t.into_owned(),
         };
-        // decoder
-        compiler.queue_compile(t, format, None, Rc::new(Next::Empty));
-        while let Some((f, args, next, n)) = compiler.compile_queue.pop() {
-            let d = compiler.compile_gt_format(f, args, next)?;
-            compiler.program.decoders[n].0 = d;
+
+        // skip extra formats that are not ad-hoc
+        if is_extra && t.try_as_adhoc().is_none() {
+            return Ok(());
         }
-        Ok(compiler.program)
+
+        self.queue_compile(t, format, None, Rc::new(Next::Empty));
+        Ok(
+            while let Some((f, args, next, n)) = self.compile_queue.pop() {
+                let d = self.compile_gt_format(f, args, next)?;
+                self.program.decoders[n].0 = d;
+            },
+        )
     }
 
     fn queue_compile(
