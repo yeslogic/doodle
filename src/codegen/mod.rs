@@ -14,7 +14,7 @@ use crate::{
     codegen::typed_format::TypedViewExpr,
     decoder::extract_pair,
     parser::error::TraceHash,
-    typecheck::{TypeChecker, UScope, UVar},
+    typecheck::{TypeChecker, UVar},
     valuetype::{augmented::AugValueType, SeqBorrowHint},
     Arith, BaseType, DynFormat, Expr, Format, FormatModule, IntRel, IntoLabel, Label, MatchTree,
     Pattern, StyleHint, UnaryOp, ViewExpr, ViewFormat,
@@ -3995,7 +3995,6 @@ impl<'a> Generator<'a> {
         let elab = &mut cgen.elaborator;
 
         let (top, extra) = elab.elaborate_module(module, top_format);
-        // assert_eq!(elab.next_index, elab.tc.size());
         let prog =
             GTCompiler::compile_program(module, &top, &extra).expect("failed to compile program");
         for (ix, (dec_ext, t)) in prog.decoders.iter().enumerate() {

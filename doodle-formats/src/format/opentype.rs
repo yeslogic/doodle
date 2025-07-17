@@ -5289,11 +5289,6 @@ pub(crate) fn stat_table(
 
 pub(crate) mod alt {
     use super::*;
-    use doodle::alt::FormatModuleExt;
-
-    pub(crate) fn opentype_tag(module: &mut FormatModuleExt, base: &BaseModule) -> FormatRef {
-        module.define_format("opentype.types.tag", base.u32be())
-    }
 
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/stat#style-attributes-header
     pub(crate) fn stat_table(

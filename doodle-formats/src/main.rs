@@ -2,7 +2,6 @@
 #![deny(rust_2018_idioms)]
 
 use anyhow::{anyhow, Result as AResult};
-use doodle::alt::{CompilerParams, FormatCompiler, FormatModuleExt};
 use doodle::codegen::{generate_code, ToFragment};
 use doodle::Format;
 use std::fs;

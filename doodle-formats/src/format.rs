@@ -1,5 +1,4 @@
 use crate::format::base::BaseModule;
-use doodle::alt::FormatModuleExt;
 use doodle::helper::*;
 use doodle::{Format, FormatModule, FormatRef};
 
