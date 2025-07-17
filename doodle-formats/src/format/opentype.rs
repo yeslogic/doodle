@@ -5297,7 +5297,7 @@ pub(crate) mod alt {
 
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/stat#style-attributes-header
     pub(crate) fn stat_table(
-        module: &mut FormatModuleExt,
+        module: &mut FormatModule,
         base: &BaseModule,
         tag: FormatRef,
     ) -> FormatRef {
