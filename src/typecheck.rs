@@ -3143,20 +3143,20 @@ impl TypeChecker {
 
         let _ = this.infer_var_format(top_format, ctxt)?;
         let mut seen_levels = this.level_vars.keys().copied().collect::<BTreeSet<usize>>();
-        for just_seen in seen_levels.iter() {
-            unexplored.remove(just_seen);
+        for already_seen in seen_levels.iter() {
+            unexplored.remove(already_seen);
         }
 
-        while !unexplored.is_empty() {
+        loop {
             let Some(next_level) = unexplored.pop_first() else {
                 break;
             };
             let _ = this.infer_var_format(module.get_format(next_level), ctxt)?;
-            let tmp = this.level_vars.keys().copied().collect::<BTreeSet<usize>>();
-            for just_seen in tmp.difference(&seen_levels) {
+            let all_seen_levels = this.level_vars.keys().copied().collect::<BTreeSet<usize>>();
+            for just_seen in all_seen_levels.difference(&seen_levels) {
                 unexplored.remove(&just_seen);
             }
-            seen_levels = tmp;
+            seen_levels = all_seen_levels;
         }
         Ok(this)
     }

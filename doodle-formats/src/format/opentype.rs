@@ -5370,14 +5370,9 @@ pub(crate) mod alt {
             fmt_let(
                 "len",
                 mul(size, count),
-                if_then_else(
-                    // NOTE - offset is 0 iff design_axis_count is 0 (=> len is 0)
-                    is_nonzero_u32(offs.clone()),
-                    with_view(
-                        ViewExpr::var(view_var).offset(offs),
-                        capture_bytes(var("len")),
-                    ),
-                    compute(Expr::NIL),
+                with_view(
+                    ViewExpr::var(view_var).offset(offs),
+                    capture_bytes(var("len")),
                 ),
             )
         };

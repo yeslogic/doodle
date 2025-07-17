@@ -3994,9 +3994,10 @@ impl<'a> Generator<'a> {
         };
         let elab = &mut cgen.elaborator;
 
-        let top = elab.elaborate_format(top_format, &TypedDynScope::Empty);
+        let (top, extra) = elab.elaborate_module(module, top_format);
         // assert_eq!(elab.next_index, elab.tc.size());
-        let prog = GTCompiler::compile_program(module, &top).expect("failed to compile program");
+        let prog =
+            GTCompiler::compile_program(module, &top, &extra).expect("failed to compile program");
         for (ix, (dec_ext, t)) in prog.decoders.iter().enumerate() {
             let dec_fn = {
                 let dec = dec_ext.get_dec();
@@ -5008,7 +5009,49 @@ impl<'a> Elaborator<'a> {
             }
         }
     }
+
+    /// NOTE - this *MUST* be kept in lockstep with [`TypeChecker::infer_module`]
+    fn elaborate_module(&mut self, module: &'a FormatModule, top_format: &Format) -> ElabForest {
+        let dyn_s = TypedDynScope::Empty;
+
+        let mut unexplored = BTreeSet::from_iter(0..module.formats.len());
+        let top = self.elaborate_format(top_format, &dyn_s);
+
+        let mut seen_levels = self.t_formats.keys().copied().collect::<BTreeSet<usize>>();
+        for already_seen in seen_levels.iter() {
+            unexplored.remove(already_seen);
+        }
+
+        let mut extra = Vec::new();
+
+        loop {
+            let Some(next_level) = unexplored.pop_first() else {
+                break;
+            };
+
+            // instantiate proper name-scope for extra levels
+            self.codegen
+                .name_gen
+                .ctxt
+                .push_atom(NameAtom::Explicit(Label::from(
+                    self.module.get_name(next_level).to_string(),
+                )));
+            let local_root = self.elaborate_format(module.get_format(next_level), &dyn_s);
+            // clean-up
+            self.codegen.name_gen.ctxt.escape();
+
+            extra.push(local_root);
+            let all_seen_levels = self.t_formats.keys().copied().collect::<BTreeSet<usize>>();
+            for just_seen in all_seen_levels.difference(&seen_levels) {
+                unexplored.remove(&just_seen);
+            }
+            seen_levels = all_seen_levels;
+        }
+        (top, extra)
+    }
 }
+
+type ElabForest = (GTFormat, Vec<GTFormat>);
 
 type GTFormat = TypedFormat<GenType>;
 type GTExpr = TypedExpr<GenType>;
