@@ -3,6 +3,7 @@ pub(crate) mod rust_ast;
 mod trace;
 mod typed_decoder;
 pub(crate) mod typed_format;
+pub(crate) mod model;
 mod util;
 
 use rebind::Rebindable;
@@ -2359,37 +2360,35 @@ impl ToAst for SimpleLogic<GTExpr> {
 
     fn to_ast(&self, ctxt: ProdCtxt<'_>) -> GenBlock {
         match self {
-            SimpleLogic::Fail => GenBlock::explicit_return(RustExpr::err(
-                RustExpr::scoped(["ParseError"], "FailToken")
-                    .call_with([RustExpr::u64lit(get_trace(&()))]),
-            )),
+            SimpleLogic::Fail => GenBlock::explicit_return(
+                model::err_fail(get_trace(&()))
+            ),
             SimpleLogic::ExpectEnd => GenBlock::simple_expr(
-                RustExpr::local(ctxt.input_varname.clone())
-                    .call_method("finish")
-                    .wrap_try(),
+                model::parser_expect_eos(RustExpr::local(ctxt.input_varname.clone()))
             ),
             SimpleLogic::SkipRemainder => GenBlock::simple_expr(
-                RustExpr::local(ctxt.input_varname.clone()).call_method("skip_remainder"),
+                model::skip_remainder(RustExpr::local(ctxt.input_varname.clone()))
             ),
             SimpleLogic::Invoke(ix_dec, args) => {
                 let fname = format!("Decoder{ix_dec}");
                 let call_args = {
                     let base_args = [RustExpr::local(ctxt.input_varname.clone())];
+                    let dep_args = args.iter().map(|(_lab, x)| {
+                        let Some(t) = x.get_type() else {
+                            panic!("unexpected lambda in arg-list of SimpleLogic::Invoke")
+                        };
+                        if t.to_rust_type().should_borrow_for_arg() {
+                            RustExpr::borrow_of(embed_expr(x, ExprInfo::Natural))
+                        } else {
+                            embed_expr(x, ExprInfo::EmbedOwned)
+                        }
+                    });
                     if args.is_empty() {
                         base_args.to_vec()
                     } else {
                         base_args
                             .into_iter()
-                            .chain(args.iter().map(|(_lab, x)| {
-                                let Some(t) = x.get_type() else {
-                                    panic!("unexpected lambda in arg-list of SimpleLogic::Invoke")
-                                };
-                                if t.to_rust_type().should_borrow_for_arg() {
-                                    RustExpr::borrow_of(embed_expr(x, ExprInfo::Natural))
-                                } else {
-                                    embed_expr(x, ExprInfo::EmbedOwned)
-                                }
-                            }))
+                            .chain(dep_args)
                             .collect()
                     }
                 };
@@ -2402,12 +2401,10 @@ impl ToAst for SimpleLogic<GTExpr> {
                 GenBlock::simple_expr(call.wrap_try())
             }
             SimpleLogic::SkipToNextMultiple(n) => GenBlock::simple_expr(
-                RustExpr::local(ctxt.input_varname.clone())
-                    .call_method_with("skip_align", [RustExpr::num_lit(*n)])
-                    .wrap_try(),
+                model::skip_until_aligned(RustExpr::local(ctxt.input_varname.clone()), *n)
             ),
             SimpleLogic::YieldCurrentOffset => GenBlock::simple_expr(
-                RustExpr::local(ctxt.input_varname.clone()).call_method("get_offset_u64"),
+                model::yield_offset_as_u64(RustExpr::local(ctxt.input_varname.clone()))
             ),
             SimpleLogic::ByteIn(bs) => {
                 let call = RustExpr::local(ctxt.input_varname.clone())
@@ -2718,17 +2715,13 @@ where
     fn to_ast(&self, ctxt: ProdCtxt<'_>) -> GenBlock {
         match self {
             EngineLogic::Slice(sz, cl_inner) => {
-                let bind_sz_var = RustStmt::assign(
-                    Label::from("sz"),
-                    RustExpr::Operation(RustOp::AsCast(
-                        Box::new(sz.clone()),
-                        RustType::from(PrimType::Usize),
-                    )),
-                )
-                .into();
+                let bind_sz_var = GenStmt::Embed(RustStmt::assign(
+                    Label::Borrowed(model::SLICE_LEN_BIND_IDENT),
+                    sz.clone().as_usize(),
+                ));
                 let try_open_peek = GenStmt::Embed(RustStmt::Expr(
                     RustExpr::local(ctxt.input_varname.clone())
-                        .call_method_with("start_slice", [RustExpr::local("sz")])
+                        .call_method_with("start_slice", [RustExpr::local(model::SLICE_LEN_BIND_IDENT)])
                         .wrap_try(),
                 ));
                 let bind_ret = GenStmt::assign("ret", cl_inner.to_ast(ctxt).local_try());
