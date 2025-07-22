@@ -283,6 +283,10 @@ fn expand_lens<'a>(lens: &'a Lens<RustType>, ctx: &SourceContext<'_>) -> Cow<'a,
             let ty0 = expand_lens(lens.as_ref(), ctx);
             Cow::Owned(get_pos(ty0.as_ref(), *ix, ctx))
         }
+        Lens::ParamOf(lens) => {
+            let ty0 = expand_lens(lens.as_ref(), ctx);
+            Cow::Owned(get_param(ty0.as_ref(), ctx))
+        }
     }
 }
 
@@ -322,17 +326,31 @@ fn get_field(ty: &RustType, lab: &str, ctx: &SourceContext<'_>) -> RustType {
     }
 }
 
-fn get_elem(ty: &RustType, ctx: &SourceContext<'_>) -> RustType {
+fn get_elem(ty: &RustType, _ctx: &SourceContext<'_>) -> RustType {
     match ty {
         RustType::Atom(at) => match at {
             AtomType::Comp(ct) => match ct {
                 CompType::RawSlice(ty0) | CompType::Vec(ty0) => ty0.as_ref().clone(),
-                CompType::Borrow(.., ty) => get_elem(ty.as_ref(), ctx),
+                CompType::Borrow(.., ty) => get_elem(ty.as_ref(), _ctx),
                 _ => unreachable!("bad ElemOf on non-array: {ty:?}"),
             },
             _ => unreachable!("bad ElemOf on non-array: {ty:?}"),
         },
         _ => unreachable!("bad ElemOf on non-array: {ty:?}"),
+    }
+}
+
+fn get_param(ty: &RustType, _ctx: &SourceContext<'_>) -> RustType {
+    match ty {
+        RustType::Atom(at) => match at {
+            AtomType::Comp(ct) => match ct {
+                CompType::Option(ty0) => ty0.as_ref().clone(),
+                CompType::Borrow(.., ty) => get_param(ty.as_ref(), _ctx),
+                _ => unreachable!("bad ParamOf on non-generic: {ty:?}"),
+            },
+            _ => unreachable!("bad ParamOf on non-generic: {ty:?}"),
+        },
+        _ => unreachable!("bad ParamOf on non-generic: {ty:?}"),
     }
 }
 

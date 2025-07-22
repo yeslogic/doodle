@@ -119,6 +119,7 @@ pub(crate) enum TypedDecoder<TypeRep> {
         Box<TypedExpr<TypeRep>>,
         Box<TypedDecoderExt<TypeRep>>,
     ),
+    /// RepeatBetween: the MatchTree is an N-ary decision-tree where the matching index corresponds to the number of unparsed repetitions left in the limited LL(k) window.
     RepeatBetween(
         TypeRep,
         MatchTree,
@@ -503,7 +504,7 @@ impl<'a> GTCompiler<'a> {
                     )),
                 )?;
 
-                let tree = {
+                let reps_left_tree = {
                     let mut branches: Vec<Format> = Vec::new();
                     // FIXME: this is inefficient but probably works
                     for count in 0..=max {
@@ -521,7 +522,7 @@ impl<'a> GTCompiler<'a> {
                 };
                 Ok(TypedDecoder::RepeatBetween(
                     gt.clone(),
-                    tree,
+                    reps_left_tree,
                     min_expr.clone(),
                     max_expr.clone(),
                     Box::new(da),

@@ -450,13 +450,27 @@ pub fn slice_ext<T: Copy>(vs: &[T], range: std::ops::Range<usize>) -> Cow<'_, [T
 
 #[inline]
 /// Returns a boolean indicating whether we are finished processing a bounded repetition ([`Format::RepeatBetween`])
-/// given whether the following element matches (`next_match`), whether we have repeated at least the minimum required
-/// number of times (`ge_min`), and whether we have repeated exactly the maximum required number of times (`eq_max`).
+/// given whether we are out of available repeats (`out_of_reps`), and based on whether the current length (repetition count)
+/// is in the half-open range `[min, max)`, or otherwise under `min` or exactly at `max`.
 ///
-/// Will return an error if we have run out of elements but the minimum repetition requirement is not met.
-pub fn repeat_between_finished(next_match: bool, ge_min: bool, eq_max: bool) -> PResult<bool> {
-    if next_match && !ge_min {
+/// Will return an error if `out_of_reps` is true and `len < min`.
+pub fn repeat_between_finished(
+    out_of_reps: bool,
+    len: usize,
+    min: usize,
+    max: usize,
+) -> PResult<bool> {
+    assert!(
+        min <= max,
+        "bad repeat-count instance: min is greater than max: ({min} > {max})"
+    );
+    assert!(
+        len <= max,
+        "bad repeat-count state: len has exceeded max ({len} > {max})"
+    );
+
+    if out_of_reps && len < min {
         return Err(ParseError::InsufficientRepeats);
     };
-    Ok(next_match || eq_max)
+    Ok(out_of_reps || len == max)
 }

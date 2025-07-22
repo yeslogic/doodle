@@ -418,6 +418,7 @@ where
             Lens::Ground(typ) => typ.rebind(table),
             Lens::ElemOf(this) => this.rebind(table),
             Lens::FieldAccess(.., this) => this.rebind(table),
+            Lens::ParamOf(this) => this.rebind(table),
         }
     }
 }
