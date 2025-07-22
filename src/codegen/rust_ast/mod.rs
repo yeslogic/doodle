@@ -1362,6 +1362,7 @@ pub(crate) enum MethodSpecifier {
 
 impl MethodSpecifier {
     pub const LEN: Self = Self::Common(CommonMethod::Len);
+    pub const IS_EMPTY: Self = Self::Common(CommonMethod::IsEmpty);
 }
 
 impl From<SubIdent> for MethodSpecifier {
@@ -1379,12 +1380,14 @@ impl From<CommonMethod> for MethodSpecifier {
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum CommonMethod {
     Len,
+    IsEmpty,
 }
 
 impl CommonMethod {
     pub(crate) fn try_get_return_primtype(&self) -> Option<PrimType> {
         match self {
             CommonMethod::Len => Some(PrimType::Usize),
+            CommonMethod::IsEmpty => Some(PrimType::Bool),
         }
     }
 }
@@ -1393,6 +1396,7 @@ impl ToFragment for CommonMethod {
     fn to_fragment(&self) -> Fragment {
         match self {
             CommonMethod::Len => Fragment::string("len"),
+            CommonMethod::IsEmpty => Fragment::string("is_empty"),
         }
     }
 }
@@ -1451,9 +1455,20 @@ pub(crate) enum OwnedKind {
 
 #[derive(Debug, Clone)]
 pub(crate) enum Lens<T> {
+    /// Type of 'this'-object is directly known
     Ground(T),
+    /// Type of 'this' is the element-type of the given lens-type
+    ///
+    /// (e.g. `ElemOf(Seq(T)) => this :: T`)
     ElemOf(Box<Lens<T>>),
+    /// Type of 'this' is the type of the given field in the provided lens-type
+    ///
+    /// (e.g. `FieldAccess(ByPosition(0), (T, U)) => this :: T`)
     FieldAccess(SubIdent, Box<Lens<T>>),
+    /// Type of 'this' is the parameter of the given lens-type which is implicitly a generic builtin type like `Option<T>`
+    ///
+    /// (e.g. `ParamOf(Option(T)) => this :: T`)
+    ParamOf(Box<Lens<T>>),
 }
 
 impl Lens<RustType> {
@@ -1467,6 +1482,10 @@ impl Lens<RustType> {
 
     fn elem(&self) -> Lens<RustType> {
         Lens::ElemOf(Box::new(self.clone()))
+    }
+
+    fn param(&self) -> Lens<RustType> {
+        Lens::ParamOf(Box::new(self.clone()))
     }
 }
 
@@ -1570,23 +1589,28 @@ impl RustExpr {
         Self::PrimitiveLit(RustPrimLit::Numeric(RustNumLit::Usize(num.into())))
     }
 
-    pub fn bool_lit(b: bool) -> Self {
+    #[inline]
+    pub const fn bool_lit(b: bool) -> Self {
         Self::PrimitiveLit(RustPrimLit::Boolean(b))
     }
 
-    pub fn u8lit(num: u8) -> Self {
+    #[inline]
+    pub const fn u8lit(num: u8) -> Self {
         Self::PrimitiveLit(RustPrimLit::Numeric(RustNumLit::U8(num)))
     }
 
-    pub fn u16lit(num: u16) -> Self {
+    #[inline]
+    pub const fn u16lit(num: u16) -> Self {
         Self::PrimitiveLit(RustPrimLit::Numeric(RustNumLit::U16(num)))
     }
 
-    pub fn u32lit(num: u32) -> Self {
+    #[inline]
+    pub const fn u32lit(num: u32) -> Self {
         Self::PrimitiveLit(RustPrimLit::Numeric(RustNumLit::U32(num)))
     }
 
-    pub fn u64lit(num: u64) -> RustExpr {
+    #[inline]
+    pub const fn u64lit(num: u64) -> RustExpr {
         Self::PrimitiveLit(RustPrimLit::Numeric(RustNumLit::U64(num)))
     }
 
@@ -1691,6 +1715,24 @@ impl RustExpr {
         RustExpr::Operation(RustOp::PrefixOp(PrefixOperator::BoolNot, Box::new(self)))
     }
 
+    #[expect(dead_code)]
+    pub fn gte(self, other: Self) -> Self {
+        RustExpr::Operation(RustOp::InfixOp(
+            InfixOperator::Gte,
+            Box::new(self),
+            Box::new(other),
+        ))
+    }
+
+    #[expect(dead_code)]
+    pub fn eq_to(self, other: Self) -> Self {
+        RustExpr::Operation(RustOp::InfixOp(
+            InfixOperator::Eq,
+            Box::new(self),
+            Box::new(other),
+        ))
+    }
+
     /// Helper method that calls the `as_slice` method on the expression passed in,
     /// unpacking any top-level `RustExpr::CloneOf` variants to avoid inefficient (and unnecessary)
     /// clone-then-borrow constructs in the generated code.
@@ -1711,6 +1753,14 @@ impl RustExpr {
             other => Box::new(other),
         };
         RustExpr::MethodCall(this, MethodSpecifier::LEN, Vec::new())
+    }
+
+    pub fn vec_is_empty(self) -> Self {
+        let this = match self {
+            Self::Owned(OwnedRustExpr { expr, .. }) => expr,
+            other => Box::new(other),
+        };
+        RustExpr::MethodCall(this, MethodSpecifier::IS_EMPTY, Vec::new())
     }
 
     /// Invokes `<self>.<name>` as a callable method, passing in an empty list of arguments.
@@ -1993,6 +2043,17 @@ impl RustExpr {
         }
     }
 
+    pub(crate) fn use_as_persistent(self, f: impl FnOnce(Self) -> Self) -> Self {
+        const NAME: &'static str = "tmp";
+        match self {
+            this @ RustExpr::Entity(..) => f(this),
+            _ => RustExpr::BlockScope(
+                vec![RustStmt::assign(NAME, self)],
+                Box::new(f(RustExpr::local(NAME))),
+            ),
+        }
+    }
+
     /// Determines whether a given [`RustExpr`] is "complex" in the sense of
     /// preferentially requiring a temporary assignment rather than being directly
     /// used as an `if` or `match` expression scrutinee.
@@ -2134,6 +2195,48 @@ impl RustExpr {
             }
         };
         RustExpr::Owned(owned)
+    }
+
+    /// Takes a AST-expression with virtual type `Option<&U>` and a type
+    /// representing `Option<U>`, and returns an expression of type `Option<U>`,
+    /// avoiding explicit cloning when unnecessary.
+    pub(crate) fn owned_opt_ref(self, opt_type: RustType) -> RustExpr {
+        fn borrow_param(rt: RustType) -> RustType {
+            match rt {
+                RustType::Atom(at) => match at {
+                    AtomType::Comp(ct) => match ct {
+                        CompType::Option(inner) => CompType::Option(Box::new(
+                            CompType::Borrow(None, Mut::Immutable, inner).into(),
+                        ))
+                        .into(),
+                        other => other.into(),
+                    },
+                    other => other.into(),
+                },
+                other => other,
+            }
+        }
+
+        let f = if opt_type.can_be_copy() {
+            RustClosure::new_predicate(
+                "x",
+                None,
+                RustExpr::Owned(OwnedRustExpr {
+                    expr: Box::new(RustExpr::local("x")),
+                    kind: OwnedKind::Deref,
+                }),
+            )
+        } else {
+            RustClosure::new_predicate(
+                "x",
+                None,
+                RustExpr::Owned(OwnedRustExpr {
+                    expr: Box::new(RustExpr::local("x")),
+                    kind: OwnedKind::Unresolved(Lens::Ground(borrow_param(opt_type)).param()),
+                }),
+            )
+        };
+        self.call_method_with("map", [RustExpr::Closure(f)])
     }
 }
 

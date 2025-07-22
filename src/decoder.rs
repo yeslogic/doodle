@@ -891,6 +891,7 @@ pub enum Decoder {
     Match(Box<Expr>, Vec<(Pattern, Decoder)>),
     Dynamic(Label, DynFormat, Box<Decoder>),
     Apply(Label),
+    /// RepeatBetween: the MatchTree is an N-ary decision-tree where the matching index corresponds to the number of unparsed repetitions left in the limited LL(k) window.
     RepeatBetween(MatchTree, Box<Expr>, Box<Expr>, Box<Decoder>),
     ForEach(Box<Expr>, Label, Box<Decoder>),
     SkipRemainder,
@@ -1628,15 +1629,18 @@ impl Decoder {
                 }
                 Ok((Value::Seq(v.into()), input))
             }
-            Decoder::RepeatBetween(tree, min, max, a) => {
+            Decoder::RepeatBetween(reps_left_tree, min, max, a) => {
                 let mut input = input;
                 let min = min.eval_value(scope).unwrap_usize();
                 let max = max.eval_value(scope).unwrap_usize();
                 let mut v = Vec::new();
                 loop {
-                    if tree.matches(input).ok_or(DecodeError::NoValidBranch {
-                        offset: input.offset,
-                    })? == 0
+                    if reps_left_tree
+                        .matches(input)
+                        .ok_or(DecodeError::NoValidBranch {
+                            offset: input.offset,
+                        })?
+                        == 0
                         || v.len() == max
                     {
                         if v.len() < min {
