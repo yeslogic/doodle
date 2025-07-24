@@ -82,7 +82,6 @@ impl Rebindable for RustStmt {
     fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         match self {
             RustStmt::Expr(expr) => expr.rebind(table),
-            RustStmt::Control(ctrl) => ctrl.rebind(table),
             RustStmt::LetPattern(pat, rhs) => {
                 pat.rebind(table);
                 rhs.rebind(table)
@@ -93,6 +92,7 @@ impl Rebindable for RustStmt {
             }
             RustStmt::Reassign(_, rhs) => rhs.rebind(table),
             RustStmt::Return(_, rhs) => rhs.rebind(table),
+            // RustStmt::Control(ctrl) => ctrl.rebind(table),
         }
     }
 }

@@ -3579,9 +3579,9 @@ mod tests {
         let output = tc
             .reify(ut)
             .unwrap_or_else(|| panic!("reify returned None"));
-        let expected = ValueType::Union(BTreeMap::from([
-            ("A".into(), ValueType::Base(BaseType::U8)),
-            ("B".into(), ValueType::Tuple(vec![])),
+        let expected = AugValueType::Union(BTreeMap::from([
+            ("A".into(), AugValueType::Base(BaseType::U8)),
+            ("B".into(), AugValueType::Tuple(vec![])),
         ]));
         assert_eq!(output, expected);
         Ok(())
@@ -3616,9 +3616,9 @@ mod tests {
         let output = tc
             .reify(ut)
             .unwrap_or_else(|| panic!("reify returned None"));
-        let expected = ValueType::Record(vec![
-            ("number".into(), ValueType::Base(BaseType::U8)),
-            ("isEven".into(), ValueType::Base(BaseType::Bool)),
+        let expected = AugValueType::Record(vec![
+            ("number".into(), AugValueType::Base(BaseType::U8)),
+            ("isEven".into(), AugValueType::Base(BaseType::Bool)),
         ]);
         assert_eq!(output, expected);
         Ok(())
@@ -3659,13 +3659,13 @@ mod tests {
         let output = tc
             .reify(ut)
             .unwrap_or_else(|| panic!("reify returned None"));
-        let expected = ValueType::Record(vec![
-            ("number".into(), ValueType::Base(BaseType::U8)),
+        let expected = AugValueType::Record(vec![
+            ("number".into(), AugValueType::Base(BaseType::U8)),
             (
                 "parity".into(),
-                ValueType::Union(BTreeMap::from([
-                    ("Even".into(), ValueType::UNIT),
-                    ("Odd".into(), ValueType::UNIT),
+                AugValueType::Union(BTreeMap::from([
+                    ("Even".into(), AugValueType::UNIT),
+                    ("Odd".into(), AugValueType::UNIT),
                 ])),
             ),
         ]);
@@ -3730,7 +3730,7 @@ mod tests {
         let output = tc
             .reify(ut)
             .unwrap_or_else(|| panic!("reify returned None"));
-        let expected = ValueType::Seq(Box::new(ValueType::Base(BaseType::U32)));
+        let expected = AugValueType::Seq(Box::new(AugValueType::Base(BaseType::U32)), SeqBorrowHint::Constructed);
         assert_eq!(output, expected);
         Ok(())
     }

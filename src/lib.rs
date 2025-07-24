@@ -948,9 +948,9 @@ pub enum Format {
     RepeatCount(Box<Expr>, Box<Format>),
     /// Repeat a format at least N and at most M times
     RepeatBetween(Box<Expr>, Box<Expr>, Box<Format>),
-    /// Repeat a format until a condition is satisfied by its last item
+    /// Repeat a format until a condition is satisfied by its last item (condition is only checked post-append)
     RepeatUntilLast(Box<Expr>, Box<Format>),
-    /// Repeat a format until a condition is satisfied by the sequence
+    /// Repeat a format until a condition is satisfied by the sequence (condition is only checked post-append)
     RepeatUntilSeq(Box<Expr>, Box<Format>),
     /// Repeat a format until a condition is satisfied by a tuple constructed from a left-fold accumulator and the sequence, returning both
     /// AccumUntil :: ((A, [T]) -> bool) -> ((A, T) -> A) -> A -> Vt(A) -> T -> (A, [T])

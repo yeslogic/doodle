@@ -65,7 +65,7 @@ impl Resolvable for RustStmt {
             | RustStmt::Reassign(.., expr)
             | RustStmt::Return(.., expr)
             | RustStmt::Expr(expr) => expr.resolve(ctx),
-            RustStmt::Control(ctrl) => ctrl.resolve(ctx),
+            // RustStmt::Control(ctrl) => ctrl.resolve(ctx),
         }
     }
 }
