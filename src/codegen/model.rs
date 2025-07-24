@@ -1,7 +1,7 @@
 use crate::Label;
 
 use super::rust_ast::*;
-// use super::{GenBlock, GenExpr, GenStmt, ProdCtxt};
+use super::{GenBlock, GenExpr, GenStmt};
 #[allow(unused_imports)]
 use crate::Format as _;
 
@@ -20,11 +20,22 @@ macro_rules! call {
             vec![$($arg),+]
         )
     };
+    ( fn $ident:ident $(, $arg:expr)* ) => {
+        RustExpr::FunctionCall(
+            Box::new(RustExpr::Entity(RustEntity::Local(lbl(stringify!($ident))))),
+            vec![$($arg),*],
+        )
+    };
 }
 
 macro_rules! try_call {
     ( $x:expr, $y:ident $(, $z:expr )* $(,)? ) => {
         RustExpr::Try(Box::new(call!( $x, $y $(, $z)* )))
+    };
+    ( fn $ident:ident  $(, $arg:expr )*  ) => {
+        RustExpr::Try(Box::new(
+            call!( fn $ident $(, $arg)* )
+        ))
     };
 }
 
@@ -35,34 +46,85 @@ pub const fn lbl(x: &'static str) -> Label {
 // SECTION - magic strings for fixed identifiers as codegen artifacts
 
 /// General-purpose magic identifier for embedded-MatchTree branch-id bindings.
-pub const MATCH_BRANCH_IX: &'static str = "matching_ix";
+pub const MATCH_BRANCH_IX: &str = "matching_ix";
 
-pub const SLICE_LEN: &'static str = "sz";
-pub const SLICE_RET: &'static str = "ret";
-pub const PEEK_RET: &'static str = "ret";
-pub const OFFS_PEEK_TARGET: &'static str = "tgt_offset";
-pub const OFFS_PEEK_DBG_ADV: &'static str = "_is_advance";
-pub const OFFS_PEEK_RET: &'static str = "ret";
-pub const PEEK_NOT_RES: &'static str = "res";
-pub const BITS_RET: &'static str = "ret";
+/// Magic identifier for temporary bindings used
+pub const COMPLEX_COND_TMP: &str = "tmp_cond";
+
+// SECTION - magic strings related to EngineLogic
+pub const SLICE_LEN: &str = "sz";
+pub const SLICE_RET: &str = "ret";
+
+pub const OFFS_PEEK_TARGET: &str = "tgt_offset";
+pub const OFFS_PEEK_DBG_ADV: &str = "_is_advance";
+pub const OFFS_PEEK_RET: &str = "ret";
+
+pub const PEEK_RET: &str = "ret";
+
+/// Magic string for the `Result<_, E>` value produced and inspected during `Format::PeekNot` processing
+pub const PEEK_NOT_RES: &str = "res";
 
 /// Magic identifier used to record the number of bits read (upon escaping bits-mode), for debugging purposes
-pub const BITS_NREAD: &'static str = "_bits_read";
+pub const BITS_NREAD: &str = "_bits_read";
+pub const BITS_RET: &str = "ret";
+// !SECTION
 
-pub const R0COM_ACCUM: &'static str = "accum";
-pub const R0COM_ELEM: &'static str = "next_elem";
+/// SECTION - magic strings related to RepeatLogic
+pub const R0COM_ACCUM: &str = "accum";
+pub const R0COM_ELEM: &str = "next_elem";
 
-pub const R1BOM_ACCUM: &'static str = "accum";
-pub const R1BOM_ELEM: &'static str = "next_elem";
-
-pub const BETWEEN_ACCUM: &'static str = "accum";
-pub const BETWEEN_NEXT: &'static str = "next_elem";
+pub const R1BOM_ACCUM: &str = "accum";
+pub const R1BOM_ELEM: &str = "next_elem";
 
 /// Special variation of `MATCH_BRANCH_IX` for `RepeatLogic::BetweenCounts` due to the unique semantics of the branch-index
-pub const BETWEEN_REPS_LEFT: &'static str = "reps_left";
+pub const BETWEEN_REPS_LEFT: &str = "reps_left";
+pub const BETWEEN_ACCUM: &str = "accum";
+pub const BETWEEN_ELEM: &str = "next_elem";
 
-pub const UNFOLD_DONE: &'static str = "is_done";
-pub const UNFOLD_ELEM: &'static str = "elem";
+pub const FOREACH_ACCUM: &str = "accum";
+pub const FOREACH_ELEM: &str = "next_elem";
+
+pub const UNFOLD_SEQ: &str = "seq";
+pub const UNFOLD_ACC: &str = "acc";
+pub const UNFOLD_ELEM: &str = "elem";
+
+pub const EXACT_ACCUM: &str = "accum";
+pub const EXACT_ELEM: &str = "next_elem";
+
+pub const UNTIL_LAST_ACCUM: &str = "accum";
+pub const UNTIL_LAST_ELEM: &str = "next_elem";
+
+pub const UNTIL_SEQ_ACCUM: &str = "accum";
+pub const UNTIL_SEQ_ELEM: &str = "next_elem";
+// !SECTION
+
+// SECTION - magic strings related to SequentialLogic
+pub const ACCUM_SEQ_PREFIX: &str = "ix";
+pub const ACCUM_TUP_PREFIX: &str = "arg";
+// !SECTION
+
+// SECTION - magic strings related to OtherLogic
+pub const DESCEND_IX: &str = "tree_index";
+// !SECTION
+
+// SECTION - magic strings related to ParallelLogic
+pub const ALT_RES: &str = "res";
+pub const ALT_OK_BIND: &str = "inner";
+pub const ALT_ERR_BIND: &str = "_e";
+// !SECTION
+
+// SECTION - magic strings related to DerivedLogic
+pub const DECODE_BUF_PARSER_OBJ: &str = "buf_parser";
+pub const DECODE_BUF_PARSER_REF: &str = "buf_input";
+
+pub const PARSE_VIEW_PARSER_OBJ: &str = "view_parser";
+pub const PARSE_VIEW_PARSER_REF: &str = "view_input";
+
+pub const VARIANT_INNER: &str = "inner";
+
+pub const WHERE_INNER: &str = "inner";
+pub const WHERE_CHECK: &str = "is_valid";
+// !SECTION
 
 // !SECTION
 
@@ -99,6 +161,27 @@ pub fn err_too_few() -> RustExpr {
         lbl("InsufficientRepeats"),
     ))))
 }
+
+pub fn err_fallthrough(trace: u64) -> RustExpr {
+    RustExpr::ResultErr(Box::new(RustExpr::FunctionCall(
+        Box::new(RustExpr::Entity(RustEntity::Scoped(
+            vec![lbl("ParseError")],
+            lbl("ExcludedBranch"),
+        ))),
+        vec![RustExpr::u64lit(trace)],
+    )))
+}
+
+pub fn err_where_unsatisfied(trace: u64) -> RustExpr {
+    RustExpr::ResultErr(Box::new(RustExpr::FunctionCall(
+        Box::new(RustExpr::Entity(RustEntity::Scoped(
+            vec![lbl("ParseError")],
+            lbl("FalsifiedWhere"),
+        ))),
+        vec![RustExpr::u64lit(trace)],
+    )))
+}
+
 // !SECTION
 
 // SECTION - Helper functions for prelude-specific AST-constructions
@@ -181,6 +264,115 @@ pub fn rem_bytes(parser: RustExpr) -> RustExpr {
     call!(parser, remaining)
 }
 
+/// Model RustExpr for setup of `Format::UnionNondet` parse-context in the Parser model.
+pub fn start_alt(parser: RustExpr) -> RustExpr {
+    call!(parser, start_alt)
+}
+
+pub fn try_next_alt(parser: RustExpr, next_is_final: bool) -> RustExpr {
+    try_call!(parser, next_alt, RustExpr::bool_lit(next_is_final))
+}
+
+// !SECTION
+
+// SECTION - boilerplate patterns based on incidental implementation details of codegen process
+pub(super) fn simplifying_if(
+    predicate: RustExpr,
+    then_branch: GenBlock,
+    else_branch: Option<GenBlock>,
+) -> GenExpr {
+    if !predicate.is_complex() {
+        GenExpr::Control(Box::new(RustControl::If(
+            predicate,
+            then_branch,
+            else_branch,
+        )))
+    } else {
+        // REVIEW - we might need a strategy to avoid the temporary variable accidentally shadowing locally-external bindings
+        GenExpr::BlockScope(Box::new(GenBlock::from(vec![
+            GenStmt::Embed(RustStmt::assign(COMPLEX_COND_TMP, predicate)),
+            RustControl::If(RustExpr::local(COMPLEX_COND_TMP), then_branch, else_branch).into(),
+        ])))
+    }
+}
+
+/// Pushes a `GenBlock` to the end of a sequence of terms, possibly via a local variable-assignment if it is too complex
+/// to inline (via pushing an assignment to a list of statements and referring to the lhs-bound variable instead of pushing
+/// directly to `terms`).
+///
+/// If a name is required for the lhs-bound variable, it is generated via the `mk_name` closure.
+pub(super) fn push_seq_term(
+    term: GenBlock,
+    stmts: &mut Vec<GenStmt>,
+    terms: &mut Vec<RustExpr>,
+    mk_name: impl FnOnce() -> Label,
+) {
+    if term.is_simple() {
+        let expr = RustExpr::from(term);
+        terms.push(expr);
+    } else {
+        let name = mk_name();
+        stmts.push(GenStmt::BindOnce(name.clone(), term));
+        terms.push(RustExpr::local(name));
+    }
+}
+
+pub const fn match_case_usize(n: usize) -> MatchCaseLHS {
+    MatchCaseLHS::Pattern(RustPattern::PrimLiteral(RustPrimLit::Numeric(
+        RustNumLit::Usize(n),
+    )))
+}
+
+pub fn match_case_ok_bind(lab: &'static str) -> MatchCaseLHS {
+    MatchCaseLHS::Pattern(RustPattern::Variant(
+        Constructor::Simple(lbl("Ok")),
+        Box::new(RustPattern::CatchAll(Some(lbl(lab)))),
+    ))
+}
+
+pub fn match_case_err_bind(lab: &'static str) -> MatchCaseLHS {
+    MatchCaseLHS::Pattern(RustPattern::Variant(
+        Constructor::Simple(lbl("Err")),
+        Box::new(RustPattern::CatchAll(Some(lbl(lab)))),
+    ))
+}
+
+/// RustExpr for `Parser::new(<buffer>)`
+///
+/// `buffer` should already be appropriately coerced into `&[u8]` (not `Vec<u8>` or `&Vec<u8>`).
+pub fn parser_new(buffer: RustExpr) -> RustExpr {
+    RustExpr::FunctionCall(
+        Box::new(RustExpr::Entity(RustEntity::Scoped(
+            vec![lbl("Parser")],
+            lbl("new"),
+        ))),
+        vec![buffer],
+    )
+}
+
+/// RustStmt for `let mut <ident> = Parser::new(<buffer>)`.
+///
+/// The argument `buffer` should already be appropriately coerced into `&[u8]` (not `Vec<u8>` or `&Vec<u8>`).
+pub fn let_mut_parser_new(ident: &'static str, buffer: RustExpr) -> RustStmt {
+    RustStmt::Let(Mut::Mutable, lbl(ident), None, parser_new(buffer))
+}
+
+/// RustExpr for `Parser::from(<view>)`
+pub fn parser_from(view: RustExpr) -> RustExpr {
+    RustExpr::FunctionCall(
+        Box::new(RustExpr::Entity(RustEntity::Scoped(
+            vec![lbl("Parser")],
+            lbl("from"),
+        ))),
+        vec![view],
+    )
+}
+
+/// RustStmt for `let mut <ident> = Parser::from(<view>)`.
+pub fn let_mut_parser_from(ident: &'static str, view: RustExpr) -> RustStmt {
+    RustStmt::Let(Mut::Mutable, lbl(ident), None, parser_from(view))
+}
+
 // !SECTION
 
 // SECTION - corollary functions for prelude-defined helpers
@@ -196,13 +388,14 @@ pub fn repeat_between_finished(
     min: RustExpr,
     max: RustExpr,
 ) -> RustExpr {
-    RustExpr::Try(Box::new(RustExpr::FunctionCall(
-        Box::new(RustExpr::Entity(RustEntity::Local(lbl(
-            "repeat_between_finished",
-        )))),
-        vec![out_of_reps, len, min, max],
-    )))
+    try_call!(fn repeat_between_finished, out_of_reps, len, min, max )
 }
+
+pub fn parse_huffman(code_lengths: RustExpr, opt_values_expr: Option<RustExpr>) -> RustExpr {
+    let values = RustExpr::lift_option(opt_values_expr);
+    call!(fn parse_huffman, code_lengths, values)
+}
+
 // !SECTION
 
 // SECTION - helpers that are used in the model but themselves do not depend on the model
@@ -221,6 +414,11 @@ pub fn vec_new() -> RustExpr {
 /// RustStmt for `let mut <ident> = Vec::new()`
 pub fn let_mut_vec_new(ident: &'static str) -> RustStmt {
     RustStmt::Let(Mut::Mutable, lbl(ident), None, vec_new())
+}
+
+/// RustStmt for `let mut <ident> = Vec::new()`
+pub fn let_mut_sig_vec_new(ident: &'static str, seq_ty: RustType) -> RustStmt {
+    RustStmt::Let(Mut::Mutable, lbl(ident), Some(seq_ty), vec_new())
 }
 
 /// RustExpr for `Vec::push(self, elem)`

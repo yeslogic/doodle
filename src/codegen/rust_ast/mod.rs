@@ -1539,9 +1539,12 @@ impl RustExpr {
 
     pub const TRUE: Self = Self::PrimitiveLit(RustPrimLit::Boolean(true));
 
+    #[expect(dead_code)]
     pub const FALSE: Self = Self::PrimitiveLit(RustPrimLit::Boolean(false));
 
     pub const VEC_NIL: Self = RustExpr::Macro(RustMacro::Vec(VecExpr::Nil));
+
+    pub const ARR_NIL: Self = RustExpr::ArrayLit(Vec::new());
 
     /// Returns `Some(varname)` if `self` is a simple entity-reference to identifier `varname`, and
     /// `None` otherwise.
@@ -1549,6 +1552,13 @@ impl RustExpr {
         match self {
             RustExpr::Entity(RustEntity::Local(v)) => Some(v),
             _ => None,
+        }
+    }
+
+    pub fn lift_option(expr: Option<Self>) -> Self {
+        match expr {
+            Some(expr) => expr.wrap_some(),
+            None => Self::NONE,
         }
     }
 
@@ -1575,10 +1585,6 @@ impl RustExpr {
 
     pub(crate) fn local_tuple<Name: IntoLabel>(locals: impl IntoIterator<Item = Name>) -> Self {
         Self::Tuple(locals.into_iter().map(Self::local).collect())
-    }
-
-    pub fn some(inner: Self) -> Self {
-        Self::local("Some").call_with([inner])
     }
 
     pub fn local(name: impl Into<Label>) -> Self {
@@ -2044,7 +2050,7 @@ impl RustExpr {
     }
 
     pub(crate) fn use_as_persistent(self, f: impl FnOnce(Self) -> Self) -> Self {
-        const NAME: &'static str = "tmp";
+        const NAME: &str = "tmp";
         match self {
             this @ RustExpr::Entity(..) => f(this),
             _ => RustExpr::BlockScope(
@@ -2160,13 +2166,13 @@ impl RustExpr {
         }
     }
 
-    pub(crate) fn add(lhs: RustExpr, rhs: RustExpr) -> RustExpr {
-        if lhs.is_pure_numeric_const() && matches!(lhs.get_const(), Some(0)) {
-            rhs
-        } else if rhs.is_pure_numeric_const() && matches!(rhs.get_const(), Some(0)) {
-            lhs
+    pub(crate) fn add(self, other: Self) -> RustExpr {
+        if self.is_pure_numeric_const() && matches!(self.get_const(), Some(0)) {
+            other
+        } else if other.is_pure_numeric_const() && matches!(other.get_const(), Some(0)) {
+            self
         } else {
-            RustExpr::infix(lhs, InfixOperator::Add, rhs)
+            RustExpr::infix(self, InfixOperator::Add, other)
         }
     }
 
@@ -2182,15 +2188,20 @@ impl RustExpr {
         }
     }
 
-    pub(crate) fn owned(loc: RustExpr, expr_type: RustType) -> RustExpr {
+    /// Applies a type-sensitive ownership model to an expression, given its exact type.
+    ///
+    /// For known-`Copy` types, this amounts to a no-op.
+    /// For references to known-`Copy` types, this amounts to a simple deref.
+    /// For owned or referenced `Clone`-but-not-`Copy` types, this amounts to a clone operation.
+    pub(crate) fn owned(self, expr_type: RustType) -> RustExpr {
         let owned = if expr_type.can_be_copy() {
             OwnedRustExpr {
-                expr: Box::new(loc),
+                expr: Box::new(self),
                 kind: OwnedKind::Copied,
             }
         } else {
             OwnedRustExpr {
-                expr: Box::new(loc),
+                expr: Box::new(self),
                 kind: OwnedKind::Unresolved(Lens::Ground(expr_type)),
             }
         };
@@ -2443,11 +2454,10 @@ pub(crate) fn slice_stmts_to_block(stmts: &[RustStmt]) -> Option<(&[RustStmt], C
             RustStmt::Return(ReturnKind::Keyword, ..) => None,
             RustStmt::LetPattern(..) | RustStmt::Let(..) | RustStmt::Reassign(..) => {
                 Some((stmts, Cow::Owned(RustExpr::UNIT)))
-            }
-            // REVIEW - is unguarded inheritance of a Control block always correct?
-            RustStmt::Control(ctrl) => {
-                Some((init, Cow::Owned(RustExpr::Control(Box::new(ctrl.clone())))))
-            }
+            } // REVIEW - is unguarded inheritance of a Control block always correct?
+              // RustStmt::Control(ctrl) => {
+              //     Some((init, Cow::Owned(RustExpr::Control(Box::new(ctrl.clone())))))
+              // }
         }
     } else {
         Some((stmts, Cow::Owned(RustExpr::UNIT)))
@@ -2463,7 +2473,7 @@ pub(crate) fn vec_stmts_to_block(stmts: Vec<RustStmt>) -> Option<(Vec<RustStmt>,
             RustStmt::Return(_, expr) | RustStmt::Expr(expr) => expr,
             RustStmt::LetPattern(..) | RustStmt::Let(..) | RustStmt::Reassign(..) => RustExpr::UNIT,
             // REVIEW - is unguarded inheritance of a Control block always correct?
-            RustStmt::Control(ctrl) => RustExpr::Control(Box::new(ctrl.clone())),
+            // RustStmt::Control(ctrl) => RustExpr::Control(Box::new(ctrl.clone())),
         },
     };
     Some((init, last))
@@ -2850,11 +2860,11 @@ pub(crate) enum RustStmt {
     Reassign(Label, RustExpr),
     Expr(RustExpr),
     Return(ReturnKind, RustExpr),
-    Control(RustControl),
+    // Control(RustControl),
 }
 
 impl RustStmt {
-    pub const BREAK: Self = Self::Control(RustControl::Break);
+    // pub const BREAK: Self = Self::Control(RustControl::Break);
 
     pub fn assign(name: impl Into<Label>, rhs: RustExpr) -> Self {
         Self::Let(Mut::Immutable, name.into(), None, rhs)
@@ -2881,19 +2891,6 @@ impl RustStmt {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) enum RustControl<BlockType = Vec<RustStmt>> {
-    Loop(BlockType),
-    While(RustExpr, BlockType),
-    ForIter(Label, RustExpr, BlockType), // element variable name, iterator expression (verbatim), loop contents
-    ForRange0(Label, RustExpr, BlockType), // index variable name, upper bound (exclusive), loop contents (0..N)
-    If(RustExpr, BlockType, Option<BlockType>),
-    Match(RustExpr, RustMatchBody<BlockType>),
-    Break, // no support for break values or loop labels, yet
-}
-
-pub(crate) type RustMatchCase<BlockType = Vec<RustStmt>> = (MatchCaseLHS, BlockType);
-
-#[derive(Clone, Debug)]
 pub(crate) enum RustCatchAll {
     PanicUnreachable { message: Label },
     ReturnErrorValue { value: RustExpr },
@@ -2916,6 +2913,19 @@ impl RustCatchAll {
                 [RustStmt::Return(ReturnKind::Keyword, value.clone())].to_vec(),
             ),
         }
+    }
+}
+
+pub(crate) type RustMatchCase<BlockType = Vec<RustStmt>> = (MatchCaseLHS, BlockType);
+
+impl<T> From<Vec<RustMatchCase<T>>> for RustMatchBody<T> {
+    fn from(value: Vec<RustMatchCase<T>>) -> Self {
+        RustMatchBody::Refutable(
+            value,
+            RustCatchAll::ReturnErrorValue {
+                value: RustExpr::scoped(["ParseError"], "ExcludedBranch"),
+            },
+        )
     }
 }
 
@@ -2965,15 +2975,32 @@ impl ToFragment for RustMatchBody {
     }
 }
 
-impl<T> From<Vec<RustMatchCase<T>>> for RustMatchBody<T> {
-    fn from(value: Vec<RustMatchCase<T>>) -> Self {
-        RustMatchBody::Refutable(
-            value,
-            RustCatchAll::ReturnErrorValue {
-                value: RustExpr::scoped(["ParseError"], "ExcludedBranch"),
-            },
-        )
+impl<T> RustMatchBody<T> {
+    fn translate<U: From<T>>(self) -> RustMatchBody<U> {
+        fn from_branches<T, U: From<T>>(branches: Vec<RustMatchCase<T>>) -> Vec<RustMatchCase<U>> {
+            branches
+                .into_iter()
+                .map(|(pat, rhs)| (pat, rhs.into()))
+                .collect()
+        }
+        match self {
+            RustMatchBody::Irrefutable(block) => RustMatchBody::Irrefutable(from_branches(block)),
+            RustMatchBody::Refutable(block, catchall) => {
+                RustMatchBody::Refutable(from_branches(block), catchall)
+            }
+        }
     }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) enum RustControl<BlockType = Vec<RustStmt>> {
+    Loop(BlockType),
+    While(RustExpr, BlockType),
+    ForIter(Label, RustExpr, BlockType), // element variable name, iterator expression (verbatim), loop contents
+    ForRange0(Label, RustExpr, BlockType), // index variable name, upper bound (exclusive), loop contents (0..N)
+    If(RustExpr, BlockType, Option<BlockType>),
+    Match(RustExpr, RustMatchBody<BlockType>),
+    Break, // no support for break values or loop labels, yet
 }
 
 impl<T> RustControl<T> {
@@ -2992,23 +3019,6 @@ impl<T> RustControl<T> {
             }
             RustControl::Match(scrutinee, body) => RustControl::Match(scrutinee, body.translate()),
             RustControl::Break => RustControl::Break,
-        }
-    }
-}
-
-impl<T> RustMatchBody<T> {
-    fn translate<U: From<T>>(self) -> RustMatchBody<U> {
-        fn from_branches<T, U: From<T>>(branches: Vec<RustMatchCase<T>>) -> Vec<RustMatchCase<U>> {
-            branches
-                .into_iter()
-                .map(|(pat, rhs)| (pat, rhs.into()))
-                .collect()
-        }
-        match self {
-            RustMatchBody::Irrefutable(block) => RustMatchBody::Irrefutable(from_branches(block)),
-            RustMatchBody::Refutable(block, catchall) => {
-                RustMatchBody::Refutable(from_branches(block), catchall)
-            }
         }
     }
 }
@@ -3242,9 +3252,7 @@ impl ToFragment for RustStmt {
                 };
                 expr.to_fragment_precedence(Precedence::TOP)
                     .delimit(before, after)
-            }
-            RustStmt::Control(ctrl) => ctrl.to_fragment(),
-            // RustStmt::LocalFn(f) => f.to_fragment(),
+            } // RustStmt::Control(ctrl) => ctrl.to_fragment(),
         }
     }
 }
@@ -3487,7 +3495,7 @@ pub mod short_circuit {
                 Some(stmt) => match stmt {
                     RustStmt::Let(..) | RustStmt::LetPattern(..) | RustStmt::Reassign(..) => true,
                     RustStmt::Expr(expr) | RustStmt::Return(_, expr) => expr.needs_ok(),
-                    RustStmt::Control(ctrl) => ctrl.needs_ok(),
+                    // RustStmt::Control(ctrl) => ctrl.needs_ok(),
                 },
             }
         }
@@ -3502,7 +3510,7 @@ pub mod short_circuit {
                 | RustStmt::LetPattern(.., expr)
                 | RustStmt::Return(ReturnKind::Implicit, expr) => expr.is_short_circuiting(),
                 RustStmt::Return(ReturnKind::Keyword, ..) => true,
-                RustStmt::Control(ctrl) => ctrl.is_short_circuiting(),
+                // RustStmt::Control(ctrl) => ctrl.is_short_circuiting(),
             }
         }
     }
@@ -3516,7 +3524,7 @@ pub mod short_circuit {
                 | RustStmt::LetPattern(.., expr)
                 | RustStmt::Return(ReturnKind::Implicit, expr) => expr.check_eval_purity(),
                 RustStmt::Return(ReturnKind::Keyword, ..) => EvalPurity::Try,
-                RustStmt::Control(ctrl) => ctrl.check_eval_purity(),
+                // RustStmt::Control(ctrl) => ctrl.check_eval_purity(),
             }
         }
     }
@@ -3889,9 +3897,9 @@ pub mod var_container {
                 RustStmt::Reassign(binding, value) => {
                     binding == var.as_ref() || value.contains_var_ref(var)
                 }
-                RustStmt::Control(ctrl) => ctrl.contains_var_ref(var),
                 RustStmt::Expr(expr) => expr.contains_var_ref(var),
                 RustStmt::Return(_, expr) => expr.contains_var_ref(var),
+                // RustStmt::Control(ctrl) => ctrl.contains_var_ref(var),
             }
         }
     }

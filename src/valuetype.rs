@@ -227,6 +227,10 @@ pub(crate) mod augmented {
         Option(Box<AugValueType>),
     }
 
+    impl AugValueType {
+        pub const UNIT: Self = AugValueType::Tuple(Vec::new());
+    }
+
     impl From<ValueType> for AugValueType {
         fn from(t: ValueType) -> Self {
             match t {
