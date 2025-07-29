@@ -6,6 +6,7 @@ pub(crate) mod analysis;
 pub(crate) mod rebind;
 pub(crate) mod resolve;
 
+use crate::codegen::model::READ_ARRAY_IS_COPY;
 use crate::output::{Fragment, FragmentBuilder};
 
 use crate::precedence::{cond_paren, Precedence};
@@ -687,7 +688,7 @@ impl RustType {
             RustType::AnonTuple(_elts) => false,
             RustType::Verbatim(..) => false,
             // FIXME - is this correct?
-            RustType::ReadArray(..) => false,
+            RustType::ReadArray(..) => !READ_ARRAY_IS_COPY,
         }
     }
 
@@ -799,7 +800,7 @@ impl RustType {
             RustType::AnonTuple(args) => args.iter().all(|t| t.can_be_copy()),
             // Without lexical analysis rules, we have no good way to determine whether a verbatim-injected type-name is Copy-safe or not
             RustType::Verbatim(..) => false,
-            RustType::ReadArray(..) => true,
+            RustType::ReadArray(..) => READ_ARRAY_IS_COPY,
         }
     }
 }

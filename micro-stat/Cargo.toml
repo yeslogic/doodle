@@ -5,8 +5,8 @@ edition = "2021"
 
 [lib]
 name = "micro_stat"
-path = "src/ideal_stat.rs"
-# path = "src/gencode_stat.rs"
+# path = "src/ideal_stat.rs"
+path = "src/gencode_stat.rs"
 bench = false
 
 [dependencies]

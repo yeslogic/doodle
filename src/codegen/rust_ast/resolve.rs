@@ -1,5 +1,5 @@
 use super::*;
-use crate::codegen::rust_ast::analysis::SourceContext;
+use crate::codegen::{model::READ_ARRAY_IS_COPY, rust_ast::analysis::SourceContext};
 
 pub(crate) struct Solution {
     is_copy: bool,
@@ -265,7 +265,7 @@ fn solve_type(ty: &RustType, ctx: &SourceContext<'_>) -> Solution {
             }
         }
         RustType::ReadArray(..) => Solution {
-            is_copy: true,
+            is_copy: READ_ARRAY_IS_COPY,
             is_ref: false,
         },
         RustType::Verbatim(..) => unreachable!("unsolvable verbatim type: {ty:?}"),
