@@ -1476,7 +1476,12 @@ pub fn parse_from_view(view: ViewExpr, format: Format) -> Format {
     Format::ParseFromView(view, Box::new(format))
 }
 
-/// Helper for [`ViewFormat::ReadOffsetLen`]
+/// Helper for [`ViewFormat::CaptureBytes`]
 pub fn capture_bytes(len: Expr) -> ViewFormat {
     ViewFormat::CaptureBytes(Box::new(len))
+}
+
+/// Helper for [`ViewFormat::ReadArray`]
+pub fn read_array(len: Expr, kind: BaseKind) -> ViewFormat {
+    ViewFormat::ReadArray(Box::new(len), kind)
 }
