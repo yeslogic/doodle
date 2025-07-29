@@ -23,7 +23,8 @@ pub mod disjoint;
 pub mod error;
 pub mod helper;
 pub mod loc_decoder;
-
+pub mod marker;
+pub use marker::BaseKind;
 pub mod output;
 pub mod parser;
 mod precedence;
@@ -674,7 +675,10 @@ pub enum DynFormat {
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub enum ViewFormat {
+    /// CaptureBytes(N): captures a slice of N bytes from the start of the View
     CaptureBytes(Box<Expr>),
+    /// ReadArray(M, Kind): captures an array of M elements of the indicate Kind
+    ReadArray(Box<Expr>, BaseKind),
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
@@ -1143,6 +1147,7 @@ impl Format {
             }
             Format::WithView(_v_expr, vf) => match vf {
                 ViewFormat::CaptureBytes(_len) => Bounds::exact(0),
+                ViewFormat::ReadArray(_len, _kind) => Bounds::exact(0),
             },
             Format::ParseFromView(_v_expr, _inner) => Bounds::exact(0),
         }
@@ -1223,6 +1228,7 @@ impl Format {
             Format::WithView(_v_expr, vf) => match vf {
                 // REVIEW - sanity-check this rule
                 ViewFormat::CaptureBytes(_len) => Bounds::exact(0),
+                ViewFormat::ReadArray(_len, _kind) => Bounds::exact(0),
             },
             Format::ParseFromView(_v_expr, _f) => Bounds::exact(0),
         }
@@ -1706,11 +1712,22 @@ impl FormatModule {
                     match len.infer_type(scope)? {
                         t if t.is_numeric() => {},
                         other => {
-                            return Err(anyhow!("ReadOffsetLen@1: expected numeric, found {other:?}"));
+                            return Err(anyhow!("CaptureBytes@0: expected numeric, found {other:?}"));
                         }
                     }
-                    // NOTE[epic=view-format] - in the current base-model design and implementation, ReadOffsetLen captures a `Seq<U8>`
+                    // NOTE[epic=view-format] - in the current base-model design and implementation, CaptureBytes captures a `Seq<U8>`
                     Ok(ValueType::Seq(Box::new(ValueType::Base(BaseType::U8))))
+                }
+                ViewFormat::ReadArray(len, kind) => {
+                    view.check_type(scope)?;
+                    match len.infer_type(scope)? {
+                        t if t.is_numeric() => {},
+                        other => {
+                            return Err(anyhow!("ReadArray@0: expected numeric, found {other:?}"));
+                        }
+                    }
+                    // NOTE[epic=view-format] - in the current base-model design and implementation, ReadArray captures a `Seq<K>` where K is informed by `kind`
+                    Ok(ValueType::Seq(Box::new(ValueType::Base(BaseType::from(*kind)))))
                 }
             }
         }

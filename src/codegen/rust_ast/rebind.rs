@@ -354,7 +354,8 @@ impl Rebindable for RustType {
         match self {
             RustType::Atom(at) => at.rebind(table),
             RustType::AnonTuple(args) => args.iter_mut().for_each(|arg| arg.rebind(table)),
-            RustType::Verbatim(..) => (),
+            // NOTE: provided ReadArray only holds MarkerType, it doesn't need any recursion
+            RustType::ReadArray(..) | RustType::Verbatim(..) => (),
         }
     }
 }

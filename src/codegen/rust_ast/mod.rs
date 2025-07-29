@@ -9,7 +9,7 @@ pub(crate) mod resolve;
 use crate::output::{Fragment, FragmentBuilder};
 
 use crate::precedence::{cond_paren, Precedence};
-use crate::{BaseType, IntoLabel, Label, ValueType};
+use crate::{BaseKind, BaseType, IntoLabel, Label, ValueType};
 
 /// Enum-type (currently degenerate) for specifying the visibility of a top-level item
 #[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
@@ -480,21 +480,17 @@ impl<Lt, Ty> RustParams<Lt, Ty> {
     }
 }
 
-impl ToFragment for RustParams<Label, Label> {
-    fn to_fragment(&self) -> Fragment {
-        let all = self.lt_params.iter().chain(self.ty_params.iter());
-        Fragment::seq(all.map(Label::to_fragment), Some(Fragment::string(", ")))
-            .delimit(Fragment::Char('<'), Fragment::Char('>'))
-    }
-}
-
-impl ToFragment for RustParams<RustLt, RustType> {
+impl<Lt, Ty> ToFragment for RustParams<Lt, Ty>
+where
+    Lt: ToFragment,
+    Ty: ToFragment,
+{
     fn to_fragment(&self) -> Fragment {
         let all = self
             .lt_params
             .iter()
-            .map(RustLt::to_fragment)
-            .chain(self.ty_params.iter().map(RustType::to_fragment));
+            .map(Lt::to_fragment)
+            .chain(self.ty_params.iter().map(Ty::to_fragment));
         Fragment::seq(all, Some(Fragment::string(", ")))
             .delimit(Fragment::Char('<'), Fragment::Char('>'))
     }
@@ -627,6 +623,7 @@ pub(crate) enum RustType {
     AnonTuple(Vec<RustType>),
     /// Catch-all for generics that we may not be able or willing to hardcode
     Verbatim(Label, UseParams),
+    ReadArray(RustLt, MarkerType),
 }
 
 impl RustType {
@@ -689,6 +686,8 @@ impl RustType {
             // REVIEW - are there cases where we want to selectively borrow anon-tuples (and if so, distributive or unified)?
             RustType::AnonTuple(_elts) => false,
             RustType::Verbatim(..) => false,
+            // FIXME - is this correct?
+            RustType::ReadArray(..) => false,
         }
     }
 
@@ -715,7 +714,7 @@ impl RustType {
         )))
     }
 
-    fn try_as_prim(&self) -> Option<PrimType> {
+    pub fn try_as_prim(&self) -> Option<PrimType> {
         match self {
             RustType::Atom(AtomType::Prim(pt)) => Some(*pt),
             _ => None,
@@ -769,6 +768,7 @@ impl RustType {
             RustType::Atom(atom_type) => atom_type.lt_param(),
             RustType::AnonTuple(rust_types) => rust_types.iter().find_map(|t| t.lt_param()),
             RustType::Verbatim(_, rust_params) => rust_params.lt_params.first(),
+            RustType::ReadArray(lt, _) => Some(lt),
         }
     }
 }
@@ -799,6 +799,7 @@ impl RustType {
             RustType::AnonTuple(args) => args.iter().all(|t| t.can_be_copy()),
             // Without lexical analysis rules, we have no good way to determine whether a verbatim-injected type-name is Copy-safe or not
             RustType::Verbatim(..) => false,
+            RustType::ReadArray(..) => true,
         }
     }
 }
@@ -817,6 +818,13 @@ impl ToFragment for RustType {
                 elems.delimit(Fragment::Char('('), Fragment::Char(')'))
             }
             RustType::Verbatim(con, params) => con.to_fragment().cat(params.to_fragment()),
+            RustType::ReadArray(lt, mt) => {
+                let params = RustParams {
+                    lt_params: vec![lt.clone()],
+                    ty_params: vec![mt.clone()],
+                };
+                Fragment::string("ReadArray").cat(params.to_fragment())
+            }
         }
     }
 }
@@ -1023,6 +1031,62 @@ where
             AtomType::TypeRef(local_type) => local_type.to_fragment(),
             AtomType::Prim(pt) => pt.to_fragment(),
             AtomType::Comp(ct) => ct.to_fragment(),
+        }
+    }
+}
+
+/// Representatives for `smallsorts::binary::*` marker-types.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, PartialOrd, Ord, Hash)]
+pub(crate) enum MarkerType {
+    U8,
+    U16Be,
+    U32Be,
+    U64Be,
+}
+
+impl From<BaseKind> for MarkerType {
+    fn from(bk: BaseKind) -> Self {
+        match bk {
+            BaseKind::U8 => MarkerType::U8,
+            BaseKind::U16 => MarkerType::U16Be,
+            BaseKind::U32 => MarkerType::U32Be,
+            BaseKind::U64 => MarkerType::U64Be,
+        }
+    }
+}
+
+impl ToFragment for MarkerType {
+    fn to_fragment(&self) -> Fragment {
+        match self {
+            MarkerType::U8 => Fragment::string("U8"),
+            MarkerType::U16Be => Fragment::string("U16Be"),
+            MarkerType::U32Be => Fragment::string("U32Be"),
+            MarkerType::U64Be => Fragment::string("U64Be"),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct InvalidMarkerTypeError(PrimType);
+
+impl std::fmt::Display for InvalidMarkerTypeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "invalid marker type: {:?}", self.0)
+    }
+}
+
+impl std::error::Error for InvalidMarkerTypeError {}
+
+impl TryFrom<PrimType> for MarkerType {
+    type Error = InvalidMarkerTypeError;
+
+    fn try_from(pt: PrimType) -> Result<Self, Self::Error> {
+        match pt {
+            PrimType::U8 => Ok(MarkerType::U8),
+            PrimType::U16 => Ok(MarkerType::U16Be),
+            PrimType::U32 => Ok(MarkerType::U32Be),
+            PrimType::U64 => Ok(MarkerType::U64Be),
+            _ => Err(InvalidMarkerTypeError(pt)),
         }
     }
 }

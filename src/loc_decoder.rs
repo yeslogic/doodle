@@ -8,7 +8,7 @@ use crate::decoder::{
 };
 use crate::error::{DecodeError, LocDecodeError};
 use crate::read::ReadCtxt;
-use crate::{Arith, DynFormat, Expr, Format, IntRel, Label, Pattern, UnaryOp, ViewExpr};
+use crate::{Arith, BaseKind, DynFormat, Expr, Format, IntRel, Label, Pattern, UnaryOp, ViewExpr};
 use std::borrow::Cow;
 use std::cmp::Ordering;
 
@@ -1793,6 +1793,24 @@ impl Decoder {
                 // return the accumulated bytes, along with the original input
                 Ok((ParsedValue::new_seq(accum, view_window.offset, len), input))
             }
+            Decoder::ReadArray(v_expr, len, kind) => {
+                let len = len.eval_value_with_loc(scope).unwrap_usize();
+                let view_window = self.eval_view_expr_with_loc(scope, v_expr)?;
+
+                // REVIEW - hardcoded big-endianness
+                let mut accum = Vec::with_capacity(len);
+                let mut buf = view_window;
+                for _ in 0..len {
+                    let (val, new_buf) = read_base(buf, *kind)?;
+                    accum.push(val);
+                    buf = new_buf;
+                }
+
+                Ok((
+                    ParsedValue::new_seq(accum, view_window.offset, len * kind.size()),
+                    input,
+                ))
+            }
         }
     }
 
@@ -1816,6 +1834,39 @@ impl Decoder {
             }
         }
     }
+}
+
+fn read_base(
+    buf: ReadCtxt<'_>,
+    kind: BaseKind,
+) -> Result<(ParsedValue, ReadCtxt<'_>), DecodeError<ParsedValue>> {
+    let (val, new_buf) = match kind {
+        BaseKind::U8 => {
+            let Some((byte, new_buf)) = buf.read_byte() else {
+                return Err(DecodeError::overbyte(buf.offset));
+            };
+            (Value::U8(byte), new_buf)
+        }
+        BaseKind::U16 => {
+            let Some((val, new_buf)) = buf.read_u16be() else {
+                return Err(DecodeError::overrun(kind.size(), buf.offset));
+            };
+            (Value::U16(val), new_buf)
+        }
+        BaseKind::U32 => {
+            let Some((val, new_buf)) = buf.read_u32be() else {
+                return Err(DecodeError::overrun(kind.size(), buf.offset));
+            };
+            (Value::U32(val), new_buf)
+        }
+        BaseKind::U64 => {
+            let Some((val, new_buf)) = buf.read_u64be() else {
+                return Err(DecodeError::overrun(kind.size(), buf.offset));
+            };
+            (Value::U64(val), new_buf)
+        }
+    };
+    Ok((ParsedValue::new_flat(val, buf.offset, kind.size()), new_buf))
 }
 
 fn value_to_vec_usize(v: &ParsedValue) -> Vec<usize> {

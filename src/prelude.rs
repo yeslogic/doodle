@@ -7,6 +7,10 @@ pub use crate::parser::{
     error::{PResult, ParseError},
     Parser, View,
 };
+pub use smallsorts::{
+    self as allsorts,
+    binary::{read::ReadArray, U16Be, U32Be, U64Be, U8},
+};
 
 /// Performs a checked_sub operation, returning an error if the result would be negative
 #[macro_export]

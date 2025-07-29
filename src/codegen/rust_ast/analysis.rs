@@ -132,6 +132,8 @@ impl CanOptimize for RustType {
             RustType::AnonTuple(ts) => niche_product(ts.iter().map(|t| t.niches(context))),
             // conservative estimate based on our assumption we won't see any Verbatim types in gencode structs
             RustType::Verbatim(..) => 0,
+            // in actuality, ReadArray has many more niches, but we cannot calculate it reliably because it is an external definition
+            RustType::ReadArray(..) => 1,
         }
     }
 }
@@ -152,6 +154,17 @@ impl MemSize for RustType {
             RustType::Verbatim(..) => {
                 unreachable!("unexpected RustType::Verbatim in structural type")
             }
+            RustType::ReadArray(..) => {
+                // FIXME - this is subject to external implementation details
+                let sz_scope = {
+                    let sz_slice = std::mem::size_of::<&[u8]>();
+                    let sz_base = std::mem::size_of::<usize>();
+                    sz_slice + sz_base
+                };
+                let sz_length = std::mem::size_of::<usize>();
+                let sz_stride = std::mem::size_of::<usize>();
+                sz_scope + sz_length + sz_stride
+            }
         }
     }
 
@@ -169,6 +182,10 @@ impl MemSize for RustType {
             RustType::Verbatim(..) => {
                 unreachable!("unexpected RustType::Verbatim in structural type")
             }
+            RustType::ReadArray(..) => {
+                // FIXME - this is subject to external implementation details
+                std::mem::align_of::<usize>()
+            }
         }
     }
 }
@@ -181,6 +198,7 @@ impl CopyEligible for RustType {
             RustType::Verbatim(..) => {
                 unreachable!("unexpected RustType::Verbatim in structural type")
             }
+            RustType::ReadArray(..) => true,
         }
     }
 }

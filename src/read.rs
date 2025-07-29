@@ -24,22 +24,6 @@ impl<'a> ReadCtxt<'a> {
     pub fn remaining(&self) -> &'a [u8] {
         &self.input[self.offset..]
     }
-
-    pub fn read_byte(&self) -> Option<(u8, ReadCtxt<'a>)> {
-        if self.offset < self.input.len() {
-            let b = self.input[self.offset];
-            Some((
-                b,
-                ReadCtxt {
-                    offset: self.offset + 1,
-                    ..*self
-                },
-            ))
-        } else {
-            None
-        }
-    }
-
     /// Creates a new `ReadCtxt` with the same `input` as the current `ReadCtxt`, but with an `offset` of `n`.
     ///
     /// The new `ReadCtxt` is only created if `n` is a valid offset into the `input` slice.
@@ -80,6 +64,71 @@ impl<'a> ReadCtxt<'a> {
         ReadCtxt {
             input: self.input,
             offset,
+        }
+    }
+}
+
+impl<'a> ReadCtxt<'a> {
+    pub fn read_byte(&self) -> Option<(u8, ReadCtxt<'a>)> {
+        if self.offset + 1 <= self.input.len() {
+            let b = self.input[self.offset];
+            Some((
+                b,
+                ReadCtxt {
+                    offset: self.offset + 1,
+                    ..*self
+                },
+            ))
+        } else {
+            None
+        }
+    }
+
+    pub fn read_u16be(&self) -> Option<(u16, ReadCtxt<'a>)> {
+        const SZ: usize = std::mem::size_of::<u16>();
+        if self.offset + SZ <= self.input.len() {
+            let raw = &self.input[self.offset..self.offset + SZ];
+            Some((
+                u16::from_be_bytes(raw.try_into().unwrap()),
+                ReadCtxt {
+                    offset: self.offset + SZ,
+                    ..*self
+                },
+            ))
+        } else {
+            None
+        }
+    }
+
+    pub fn read_u32be(&self) -> Option<(u32, ReadCtxt<'a>)> {
+        const SZ: usize = std::mem::size_of::<u32>();
+        if self.offset + SZ <= self.input.len() {
+            let raw = &self.input[self.offset..self.offset + SZ];
+            Some((
+                u32::from_be_bytes(raw.try_into().unwrap()),
+                ReadCtxt {
+                    offset: self.offset + SZ,
+                    ..*self
+                },
+            ))
+        } else {
+            None
+        }
+    }
+
+    pub fn read_u64be(&self) -> Option<(u64, ReadCtxt<'a>)> {
+        const SZ: usize = std::mem::size_of::<u64>();
+        if self.offset + SZ <= self.input.len() {
+            let raw = &self.input[self.offset..self.offset + SZ];
+            Some((
+                u64::from_be_bytes(raw.try_into().unwrap()),
+                ReadCtxt {
+                    offset: self.offset + SZ,
+                    ..*self
+                },
+            ))
+        } else {
+            None
         }
     }
 }

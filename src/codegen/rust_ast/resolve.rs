@@ -264,6 +264,10 @@ fn solve_type(ty: &RustType, ctx: &SourceContext<'_>) -> Solution {
                 is_ref: false,
             }
         }
+        RustType::ReadArray(..) => Solution {
+            is_copy: true,
+            is_ref: false,
+        },
         RustType::Verbatim(..) => unreachable!("unsolvable verbatim type: {ty:?}"),
     }
 }

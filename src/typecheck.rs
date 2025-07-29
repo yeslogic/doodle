@@ -69,6 +69,10 @@ impl UType {
     pub fn seq_view(self: Rc<Self>) -> Self {
         Self::Seq(self, SeqBorrowHint::BufferView)
     }
+
+    pub fn seq_array(self: Rc<Self>) -> Self {
+        Self::Seq(self, SeqBorrowHint::ReadArray)
+    }
 }
 
 impl From<BaseType> for UType {
@@ -1163,6 +1167,20 @@ impl TypeChecker {
                 self.unify_var_utype(
                     newvar,
                     Rc::new(UType::seq_view(Rc::new(UType::Base(BaseType::U8)))),
+                )?;
+                Ok(newvar)
+            }
+            ViewFormat::ReadArray(len, kind) => {
+                let newvar = self.get_new_uvar();
+                let len_var = self.infer_var_expr(len, ctxt.scope)?;
+                self.unify_var_baseset(len_var, BaseSet::U(UintSet::ANY))?;
+                // REVIEW - should we have a special UType for captured View-window reads?
+                self.unify_var_utype(
+                    newvar,
+                    // REVIEW - how do we distinguish CaptureBytes (seq_view ~> &'a [u8]) from ReadArray (seq_view ~> ReadArray<'a, K>)?
+                    Rc::new(UType::seq_array(Rc::new(UType::Base(BaseType::from(
+                        *kind,
+                    ))))),
                 )?;
                 Ok(newvar)
             }
@@ -3730,7 +3748,10 @@ mod tests {
         let output = tc
             .reify(ut)
             .unwrap_or_else(|| panic!("reify returned None"));
-        let expected = AugValueType::Seq(Box::new(AugValueType::Base(BaseType::U32)), SeqBorrowHint::Constructed);
+        let expected = AugValueType::Seq(
+            Box::new(AugValueType::Base(BaseType::U32)),
+            SeqBorrowHint::Constructed,
+        );
         assert_eq!(output, expected);
         Ok(())
     }

@@ -2361,6 +2361,18 @@ impl<'module> TreePrinter<'module> {
                         builder.push(Fragment::Char(']'));
                         builder.finalize()
                     }
+                    ViewFormat::ReadArray(len, kind) => {
+                        let len_frag = self.compile_expr(len, Precedence::Top);
+                        let mut builder = FragmentBuilder::new();
+                        builder.push(Fragment::string("read-array"));
+                        builder.push(Fragment::Char('('));
+                        builder.push(Fragment::string(kind.name()));
+                        builder.push(Fragment::Char(')'));
+                        builder.push(Fragment::Char('['));
+                        builder.push(len_frag);
+                        builder.push(Fragment::Char(']'));
+                        builder.finalize()
+                    }
                 };
                 cond_paren(
                     Fragment::string("with-view")

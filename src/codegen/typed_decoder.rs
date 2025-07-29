@@ -1,5 +1,5 @@
 use crate::byte_set::ByteSet;
-use crate::{Format, FormatModule, Label, MatchTree, MaybeTyped, Next, StyleHint};
+use crate::{BaseKind, Format, FormatModule, Label, MatchTree, MaybeTyped, Next, StyleHint};
 use anyhow::{anyhow, Result as AResult};
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -83,6 +83,7 @@ impl TypedDecoder<GenType> {
             | TypedDecoder::Let(t, ..)
             | TypedDecoder::LetView(t, ..)
             | TypedDecoder::CaptureBytes(t, ..)
+            | TypedDecoder::ReadArray(t, ..)
             | TypedDecoder::ParseFromView(t, ..)
             | TypedDecoder::Match(t, ..)
             | TypedDecoder::Dynamic(t, ..)
@@ -224,6 +225,12 @@ pub(crate) enum TypedDecoder<TypeRep> {
         TypeRep,
         TypedViewExpr<TypeRep>,
         Box<TypedDecoderExt<TypeRep>>,
+    ),
+    ReadArray(
+        TypeRep,
+        TypedViewExpr<TypeRep>,
+        Box<TypedExpr<TypeRep>>,
+        BaseKind,
     ),
 }
 
@@ -666,6 +673,12 @@ impl<'a> GTCompiler<'a> {
                     gt.clone(),
                     view.clone(),
                     len.clone(),
+                )),
+                TypedViewFormat::ReadArray(len, kind) => Ok(TypedDecoder::ReadArray(
+                    gt.clone(),
+                    view.clone(),
+                    len.clone(),
+                    *kind,
                 )),
             },
         }?;

@@ -251,6 +251,10 @@ impl<'a> ReadScope<'a> {
         ReadScope { base, data }
     }
 
+    pub fn from_parts(data: &'a [u8], base: usize) -> ReadScope<'a> {
+        ReadScope { base, data }
+    }
+
     pub fn data(&self) -> &'a [u8] {
         self.data
     }

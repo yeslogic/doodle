@@ -6,9 +6,6 @@ name = "doodle"
 version = "0.1.0"
 edition = "2021"
 
-[features]
-parser_from_read_ctxt = []
-
 [[bin]]
 name = "doodle"
 path = "doodle-formats/src/main.rs"
