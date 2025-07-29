@@ -5,6 +5,9 @@ use super::{GenBlock, GenExpr, GenStmt};
 #[allow(unused_imports)]
 use crate::Format as _;
 
+// NOTE - this marks whether `allsorts::binary::read::ReadArray` is `Copy`
+pub(crate) const READ_ARRAY_IS_COPY: bool = false;
+
 macro_rules! call {
     ( $parser:expr, $method:ident ) => {
         RustExpr::MethodCall(
@@ -218,11 +221,12 @@ pub fn read_from_view(view: RustExpr, len: RustExpr) -> RustExpr {
 
 /// Model RustExpr for handling `ViewFormat::ReadArray(len, kind)` in the Parser (View) model.
 pub fn read_array_from_view(view: RustExpr, len: RustExpr, kind: BaseKind) -> RustExpr {
+    // NOTE - we need these separate methods because RustExpr::MethodCall doesn't allow turbo-fish type-parameters
     match kind {
-        BaseKind::U8 => call!(view, read_array_u8, len),
-        BaseKind::U16 => call!(view, read_array_u16be, len),
-        BaseKind::U32 => call!(view, read_array_u32be, len),
-        BaseKind::U64 => call!(view, read_array_u64be, len),
+        BaseKind::U8 => try_call!(view, read_array_u8, len),
+        BaseKind::U16 => try_call!(view, read_array_u16be, len),
+        BaseKind::U32 => try_call!(view, read_array_u32be, len),
+        BaseKind::U64 => try_call!(view, read_array_u64be, len),
     }
 }
 

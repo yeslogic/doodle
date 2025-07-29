@@ -1,6 +1,8 @@
 use std::{cell::RefCell, collections::HashMap};
 
 pub(crate) mod heap_optimize;
+use crate::codegen::model::READ_ARRAY_IS_COPY;
+
 use super::*;
 use heap_optimize::{HeapOptimize, HeapOutcome, HeapStrategy};
 
@@ -198,7 +200,7 @@ impl CopyEligible for RustType {
             RustType::Verbatim(..) => {
                 unreachable!("unexpected RustType::Verbatim in structural type")
             }
-            RustType::ReadArray(..) => true,
+            RustType::ReadArray(..) => READ_ARRAY_IS_COPY,
         }
     }
 }

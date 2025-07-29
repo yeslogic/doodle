@@ -10,13 +10,13 @@ use doodle::prelude::*;
 use doodle::try_sub;
 
 /// expected size: 40
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub struct opentype_stat_table_axis_value_offsets<'input> {
 axis_value_offsets: ReadArray<'input, U16Be>
 }
 
 /// expected size: 64
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub struct opentype_stat_table<'input> {
 major_version: u16,
 minor_version: u16,
@@ -154,7 +154,7 @@ let axis_value_offsets = {
 let mut view_parser = Parser::from(table_scope.offset(_offset_to_axis_value_offsets as usize));
 let view_input = &mut view_parser;
 let axis_value_scope = view_input.view();
-let axis_value_offsets = axis_value_scope.read_array_u16be(axis_value_count as usize);
+let axis_value_offsets = axis_value_scope.read_array_u16be(axis_value_count as usize)?;
 opentype_stat_table_axis_value_offsets { axis_value_offsets }
 };
 let elided_fallback_name_id = (Decoder2(_input))?;
@@ -360,4 +360,3 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 };
 PResult::Ok(opentype_stat_axis_value_table { format, data })
 }
-
