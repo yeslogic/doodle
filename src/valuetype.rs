@@ -25,6 +25,7 @@ impl BaseType {
 pub enum SeqBorrowHint {
     #[default]
     Constructed,
+    ReadArray,
     BufferView,
 }
 
@@ -35,6 +36,10 @@ impl SeqBorrowHint {
 
     pub fn is_buffer_view(&self) -> bool {
         matches!(self, Self::BufferView)
+    }
+
+    pub fn is_read_array(&self) -> bool {
+        matches!(self, Self::ReadArray)
     }
 }
 

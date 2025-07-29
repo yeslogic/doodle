@@ -159,6 +159,7 @@ impl HeapOptimize for RustStruct {
 impl HeapOptimize for RustType {
     fn heap_hint(&self, strategy: HeapStrategy, context: Self::Context<'_>) -> HeapOutcome {
         match self {
+            RustType::ReadArray(..) => (HeapAction::Noop, mk_layout(self, context)),
             RustType::Atom(at) => at.heap_hint(strategy, context),
             RustType::AnonTuple(ts) => {
                 if strategy.is_never() {

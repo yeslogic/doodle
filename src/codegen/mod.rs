@@ -112,12 +112,19 @@ impl CodeGen {
                 }
             },
             AugValueType::Seq(t, hint) => {
-                const DEFAULT_LT: RustLt = RustLt::Parametric(Label::Borrowed("'input"));
+                use model::DEFAULT_LT;
+                const LT: RustLt = RustLt::Parametric(Label::Borrowed(DEFAULT_LT));
                 let inner = self.lift_type(t.as_ref()).to_rust_type();
                 match hint {
+                    SeqBorrowHint::ReadArray => {
+                        let Some(p) = inner.try_as_prim() else {
+                            unreachable!("unsound ReadArray over non-prim type `{inner:?}`")
+                        };
+                        RustType::ReadArray(LT, MarkerType::try_from(p).unwrap()).into()
+                    }
                     SeqBorrowHint::Constructed => CompType::Vec(Box::new(inner)).into(),
                     SeqBorrowHint::BufferView => CompType::Borrow(
-                        Some(DEFAULT_LT),
+                        Some(LT),
                         Mut::Immutable,
                         Box::new(CompType::RawSlice(Box::new(inner)).into()),
                     )
@@ -565,6 +572,9 @@ impl CodeGen {
             }
             TypedDecoder::CaptureBytes(_, view, len) => {
                 CaseLogic::View(ViewLogic::CaptureBytes(embed_view_expr(view), embed_expr_nat(len)))
+            }
+            TypedDecoder::ReadArray(_, view, len, kind) => {
+                CaseLogic::View(ViewLogic::ReadArray(embed_view_expr(view), embed_expr_nat(len), *kind))
             }
         }
     }
@@ -1433,6 +1443,7 @@ fn refutability_check<A: std::fmt::Debug + Clone>(
                 }
                 RustType::Verbatim(_, _) =>
                     unreachable!("verbatim types not expected in generated match-expressions"),
+                RustType::ReadArray(..) => unreachable!("ReadArray not expected in generated match-expressions"),
             }
         GenType::Def(_, def) => {
             match &def.def {
@@ -2616,6 +2627,7 @@ impl ToAst for SimpleLogic<GTExpr> {
 enum ViewLogic<ExprT> {
     LetView(Label, Box<CaseLogic<ExprT>>),
     CaptureBytes(RustExpr, RustExpr),
+    ReadArray(RustExpr, RustExpr, crate::BaseKind),
 }
 
 impl ToAst for ViewLogic<GTExpr> {
@@ -2635,6 +2647,9 @@ impl ToAst for ViewLogic<GTExpr> {
             ViewLogic::CaptureBytes(view, len) => {
                 GenBlock::simple_expr(model::read_from_view(view.clone(), len.clone().as_usize()))
             }
+            ViewLogic::ReadArray(view, len, kind) => GenBlock::simple_expr(
+                model::read_array_from_view(view.clone(), len.clone().as_usize(), *kind),
+            ),
         }
     }
 }
@@ -3556,6 +3571,10 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
         path: vec!["doodle".into(), "prelude".into()],
         uses: RustImportItems::Wildcard,
     });
+    // content.add_import(RustImport {
+    //     path: vec!["doodle".into(), "alt".into(), "prelude".into()],
+    //     uses: RustImportItems::Wildcard,
+    // });
     content.add_import(RustImport {
         path: vec!["doodle".into()],
         uses: RustImportItems::Singleton(Label::Borrowed("try_sub")),
@@ -3776,6 +3795,11 @@ impl<'a> Elaborator<'a> {
                 self.increment_index();
                 let t_len = self.elaborate_expr(len);
                 TypedViewFormat::CaptureBytes(Box::new(t_len))
+            }
+            ViewFormat::ReadArray(len, kind) => {
+                self.increment_index();
+                let t_len = self.elaborate_expr(len);
+                TypedViewFormat::ReadArray(Box::new(t_len), *kind)
             }
         }
     }

@@ -7,9 +7,9 @@ use std::{
 };
 
 use crate::{
-    typecheck::UnificationError, valuetype::Container, BaseType, ByteSet, DynFormat, Expr, Format,
-    FormatModule, FormatRef, IntoLabel, Label, Pattern, StyleHint, TypeScope, ValueKind, ValueType,
-    ViewExpr,
+    typecheck::UnificationError, valuetype::Container, BaseKind, BaseType, ByteSet, DynFormat,
+    Expr, Format, FormatModule, FormatRef, IntoLabel, Label, Pattern, StyleHint, TypeScope,
+    ValueKind, ValueType, ViewExpr,
 };
 use anyhow::{anyhow, Result as AResult};
 use serde::Serialize;
@@ -20,26 +20,6 @@ pub enum ModelKind {
     BaseModel = 0,
     AltModel = 1,
 }
-
-pub mod marker {
-    use super::*;
-
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
-    pub enum BaseKind {
-        U8 = 1,
-        U16 = 2,
-        U32 = 4,
-        U64 = 8,
-    }
-
-    impl BaseKind {
-        /// Returns the size for the given base-kind in bytes.
-        pub const fn size(self) -> usize {
-            self as usize
-        }
-    }
-}
-// use marker::BaseKind;
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 #[serde(tag = "tag", content = "data")]
@@ -145,16 +125,11 @@ pub enum MetaFormat {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 #[serde(tag = "tag", content = "data")]
-pub enum ReadKind {
-    ByteSlice,
-    ArrayOf(marker::BaseKind),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
-#[serde(tag = "tag", content = "data")]
 pub enum ViewFormatExt {
-    /// ReadLen(Len),
+    /// Captures a byte-slice of a View, given an expression for the byte-length of the slice
     CaptureBytes(Box<Expr>),
+    /// ScanArray - captures an scoped ReadArray of the given unit, given an expression for element-count (*NOT* byte-length)
+    ReadArray(Box<Expr>, BaseKind),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
@@ -906,6 +881,19 @@ impl FormatModuleExt {
                             Ok(ValueTypeExt::Seq(Box::new(ValueTypeExt::Base(
                                 BaseType::U8,
                             ))))
+                        }
+                        ViewFormatExt::ReadArray(len, kind) => {
+                            match len.infer_type_ext(scope)? {
+                                t if t.is_numeric() => {}
+                                other => {
+                                    return Err(anyhow!(
+                                        "ReadOffsetLen: expected numeric len, found {other:?}"
+                                    ))
+                                }
+                            }
+                            let elt = ValueTypeExt::Base((*kind).into());
+                            // TODO - consider if we need to add a valuetype for ReadArray in APM (?)
+                            Ok(ValueTypeExt::Seq(Box::new(elt)))
                         }
                     }
                 }
@@ -1772,6 +1760,7 @@ mod __impls {
         fn from(value: ViewFormat) -> Self {
             match value {
                 ViewFormat::CaptureBytes(len) => ViewFormatExt::CaptureBytes(len),
+                ViewFormat::ReadArray(len, kind) => ViewFormatExt::ReadArray(len, kind),
             }
         }
     }
@@ -1780,6 +1769,7 @@ mod __impls {
         fn from(value: ViewFormatExt) -> Self {
             match value {
                 ViewFormatExt::CaptureBytes(len) => ViewFormat::CaptureBytes(len),
+                ViewFormatExt::ReadArray(len, kind) => ViewFormat::ReadArray(len, kind),
             }
         }
     }

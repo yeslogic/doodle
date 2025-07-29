@@ -1,4 +1,4 @@
-use crate::Label;
+use crate::{BaseKind, Label};
 
 use super::rust_ast::*;
 use super::{GenBlock, GenExpr, GenStmt};
@@ -44,6 +44,7 @@ pub const fn lbl(x: &'static str) -> Label {
 }
 
 // SECTION - magic strings for fixed identifiers as codegen artifacts
+pub const DEFAULT_LT: &str = "'input";
 
 /// General-purpose magic identifier for embedded-MatchTree branch-id bindings.
 pub const MATCH_BRANCH_IX: &str = "matching_ix";
@@ -213,6 +214,16 @@ pub fn get_view(parser: RustExpr) -> RustExpr {
 /// Model RustExpr for handling `ViewFormat::CaptureBytes(len)` in the Parser (View) model.
 pub fn read_from_view(view: RustExpr, len: RustExpr) -> RustExpr {
     call!(view, read_len, len)
+}
+
+/// Model RustExpr for handling `ViewFormat::ReadArray(len, kind)` in the Parser (View) model.
+pub fn read_array_from_view(view: RustExpr, len: RustExpr, kind: BaseKind) -> RustExpr {
+    match kind {
+        BaseKind::U8 => call!(view, read_array_u8, len),
+        BaseKind::U16 => call!(view, read_array_u16be, len),
+        BaseKind::U32 => call!(view, read_array_u32be, len),
+        BaseKind::U64 => call!(view, read_array_u64be, len),
+    }
 }
 
 /// Model RustExpr for setup of `Format::Slice` parse-context in the Parser model.

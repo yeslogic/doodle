@@ -5,7 +5,7 @@ use crate::{
     pattern::Pattern, Arith, DynFormat, Expr, Format, FormatModule, IntRel, MatchTree, Next,
     TypeScope, ValueType, ViewExpr,
 };
-use crate::{IntoLabel, Label, MaybeTyped, TypeHint, UnaryOp, ViewFormat};
+use crate::{BaseKind, IntoLabel, Label, MaybeTyped, TypeHint, UnaryOp, ViewFormat};
 use anyhow::{anyhow, Result as AResult};
 use serde::Serialize;
 use std::borrow::Cow;
@@ -903,6 +903,7 @@ pub enum Decoder {
     LiftedOption(Option<Box<Decoder>>),
     LetView(Label, Box<Decoder>),
     CaptureBytes(ViewExpr, Box<Expr>),
+    ReadArray(ViewExpr, Box<Expr>, BaseKind),
 }
 
 #[derive(Clone, Debug)]
@@ -1248,6 +1249,9 @@ impl<'a> Compiler<'a> {
                 ViewFormat::CaptureBytes(len) => {
                     // REVIEW - do we want to fuse WithView and ViewFormat, or keep them separate?
                     Ok(Decoder::CaptureBytes(v_expr.clone(), len.clone()))
+                }
+                ViewFormat::ReadArray(len, k) => {
+                    Ok(Decoder::ReadArray(v_expr.clone(), len.clone(), *k))
                 }
             },
         }
@@ -1830,7 +1834,6 @@ impl Decoder {
             Decoder::CaptureBytes(v_expr, len) => {
                 let len = len.eval_value(scope).unwrap_usize();
 
-                // offsets the view by the specified amount to obtain the proper window to read from
                 let view_window = self.eval_view_expr(scope, v_expr)?;
 
                 // accumulate `len` bytes into a Vec<Value>
@@ -1845,6 +1848,21 @@ impl Decoder {
                 }
 
                 // return the accumulated bytes, along with the original input
+                Ok((Value::Seq(SeqKind::Strict(accum)), input))
+            }
+            Decoder::ReadArray(v_expr, len, kind) => {
+                let len = len.eval_value(scope).unwrap_usize();
+                let view_window = self.eval_view_expr(scope, v_expr)?;
+
+                // REVIEW - hardcoded big-endianness
+                let mut accum = Vec::with_capacity(len);
+                let mut buf = view_window;
+                for _ in 0..len {
+                    let (val, new_buf) = read_base(buf, *kind)?;
+                    accum.push(val);
+                    buf = new_buf;
+                }
+
                 Ok((Value::Seq(SeqKind::Strict(accum)), input))
             }
         }
@@ -1868,6 +1886,35 @@ impl Decoder {
                 };
                 Ok(view_window)
             }
+        }
+    }
+}
+
+fn read_base(buf: ReadCtxt<'_>, kind: BaseKind) -> Result<(Value, ReadCtxt<'_>), DecodeError> {
+    match kind {
+        BaseKind::U8 => {
+            let Some((byte, new_buf)) = buf.read_byte() else {
+                return Err(DecodeError::overbyte(buf.offset));
+            };
+            Ok((Value::U8(byte), new_buf))
+        }
+        BaseKind::U16 => {
+            let Some((val, new_buf)) = buf.read_u16be() else {
+                return Err(DecodeError::overrun(kind.size(), buf.offset));
+            };
+            Ok((Value::U16(val), new_buf))
+        }
+        BaseKind::U32 => {
+            let Some((val, new_buf)) = buf.read_u32be() else {
+                return Err(DecodeError::overrun(kind.size(), buf.offset));
+            };
+            Ok((Value::U32(val), new_buf))
+        }
+        BaseKind::U64 => {
+            let Some((val, new_buf)) = buf.read_u64be() else {
+                return Err(DecodeError::overrun(kind.size(), buf.offset));
+            };
+            Ok((Value::U64(val), new_buf))
         }
     }
 }

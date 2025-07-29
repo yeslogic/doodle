@@ -2,9 +2,9 @@ use std::collections::BTreeSet;
 
 use num_traits::{ToPrimitive, Zero};
 
-pub use crate::alt::marker::BaseKind;
 use crate::bounds::Bounds;
 use crate::byte_set::ByteSet;
+pub use crate::marker::BaseKind;
 use crate::{
     Arith, BaseType, Expr, Format, IntRel, IntoLabel, Label, Pattern, StyleHint, TypeHint, UnaryOp,
     ValueType, ViewExpr, ViewFormat,
