@@ -5382,8 +5382,7 @@ pub(crate) mod alt {
                                 "axis_value_offsets",
                                 with_view(
                                     ViewExpr::var("axis_value_scope"),
-                                    // FIXME - ReadArray<'_, U16BE> support (instead of &'a [u8; count * 2])
-                                    capture_bytes(mul(Expr::U16(2), count)),
+                                    read_array(count, BaseKind::U16),
                                 ),
                             ), // TODO - ForEach(offset: u16) -> offsetu16(offset, axis_value_table)
                         ]),
