@@ -1,5 +1,5 @@
-// mod gencode_stat;
+use micro_stat::api_helper::dump_axis_value_offsets;
 
 fn main() {
-    println!("Hello, world!");
+    dump_axis_value_offsets("test-fonts/Podkova[wght].ttf");
 }
