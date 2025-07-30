@@ -23,9 +23,8 @@ pub mod zlib;
 
 pub fn main_stat(module: &mut FormatModule) -> FormatRef {
     let base = base::main(module);
-    let tag = opentype::opentype_tag(module, &base);
-    let stat = opentype::alt::stat_table(module, &base, tag);
-    stat
+    let otf_stat = opentype::alt::main(module, &base);
+    otf_stat
 }
 
 pub fn main(module: &mut FormatModule) -> FormatRef {

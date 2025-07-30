@@ -28,6 +28,11 @@ pub enum ParseError {
     ExcludedBranch(TraceHash),
     /// Attempted offset-increment would run past the last legal offset of either the overall buffer, or a context-local `Format::Slice`.
     Overrun(OverrunKind),
+    /// Attempted random-access seek cannot be performed due to view-based truncation past the destination
+    NegativeIndex {
+        abs_target: usize,
+        abs_buf_start: usize,
+    },
     /// A `Format::EndOfInput` token occurring anywhere except the final offset of a Slice or the overall buffer.
     IncompleteParse { bytes_remaining: usize },
     /// Any unrecoverable error in the state of the Parser itself.
@@ -64,6 +69,7 @@ impl std::fmt::Display for ParseError {
             ),
             ParseError::ExcludedBranch(trace) => write!(f, "buffer contents does not correspond to an expected branch of a MatchTree or Expr::Match (trace-hash: {trace})"),
             ParseError::NegatedSuccess => write!(f, "sub-parse succeeded in negated context"),
+            ParseError::NegativeIndex { abs_target, abs_buf_start } => write!(f, "attempted to seek to negative index (target: {abs_target}, buffer-start: {abs_buf_start})"),
             ParseError::IncompleteParse { bytes_remaining: n } => write!(
                 f,
                 "incomplete parse: expected end-of-stream, but {n} bytes remain unconsumed"

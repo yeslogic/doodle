@@ -5289,6 +5289,207 @@ pub(crate) fn stat_table(
 
 pub(crate) mod alt {
     use super::*;
+    pub(crate) fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
+        // NOTE - Microsoft defines a tag as consisting on printable ascii characters in the range 0x20 -- 0x7E (inclusive), but some vendors are non-standard so we accept anything
+        let tag = opentype_tag(module, base);
+
+        let table_record = module.define_format(
+            "opentype.table_record",
+            record([
+                ("table_id", tag.call()), // should be ascending within the repetition "table_records" field in table_directory
+                ("checksum", base.u32be()),
+                ("offset", base.u32be()),
+                ("length", base.u32be()),
+            ]),
+        );
+
+        let table_type = module.get_format_type(table_record.get_level()).clone();
+
+        // let stub_table = module.define_format("opentype.table_stub", Format::EMPTY);
+
+        let table_links = {
+            fn optional_table(
+                sof_offset: Expr,
+                table_records: Expr,
+                id: u32,
+                table_format: Format,
+            ) -> Format {
+                let cond_fmt = |table_match: Expr| -> Format {
+                    linked_offset32(
+                        sof_offset,
+                        record_proj(table_match.clone(), "offset"),
+                        slice(record_proj(table_match, "length"), table_format),
+                    )
+                };
+                let dep_format = move |opt_table_match: Expr| -> Format {
+                    map_option(opt_table_match, "table", cond_fmt)
+                };
+                with_table(table_records, id, dep_format)
+            }
+
+            let stat_table = stat_table(module, base, tag);
+
+            module.define_format_args(
+                "opentype.table_directory.table_links",
+                vec![
+                    START_ARG,
+                    (
+                        Label::Borrowed("tables"),
+                        ValueType::Seq(Box::new(table_type)),
+                    ),
+                ],
+                record_auto([
+                    (
+                        "stat",
+                        optional_table(START_VAR, var("tables"), magic(b"STAT"), stat_table.call()),
+                    ),
+                    ("__skip", Format::SkipRemainder),
+                ]),
+            )
+        };
+
+        let table_directory = module.define_format_args(
+            "opentype.table_directory",
+            vec![(
+                Label::Borrowed("font_start"),
+                ValueType::Base(BaseType::U32),
+            )],
+            record([
+                (
+                    "sfnt_version",
+                    where_lambda(
+                        base.u32be(),
+                        "version",
+                        expr_match(
+                            var("version"),
+                            [
+                                (Pattern::U32(0x0001_0000), Expr::Bool(true)),
+                                (Pattern::U32(magic(b"OTTO")), Expr::Bool(true)),
+                                (Pattern::U32(magic(b"true")), Expr::Bool(true)),
+                                (Pattern::Wildcard, Expr::Bool(false)),
+                            ],
+                        ),
+                    ),
+                ),
+                ("num_tables", base.u16be()), // number of tables in directory
+                ("search_range", base.u16be()), // TODO[validation] - should be (maximum power of 2 <= num_tables) x 16
+                ("entry_selector", base.u16be()), // TODO[validation] - should be Log2(maximum power of 2 <= num_tables)
+                ("range_shift", base.u16be()), // TODO[validation] - should be (NumTables x 16) - searchRange
+                (
+                    "table_records",
+                    repeat_count(var("num_tables"), table_record.call()),
+                ),
+                (
+                    "table_links",
+                    table_links.call_args(vec![var("font_start"), var("table_records")]),
+                ),
+            ]),
+        );
+
+        let ttc_header = {
+            // Version 1.0
+            let ttc_header1 = |start: Expr| {
+                record([
+                    ("num_fonts", base.u32be()),
+                    (
+                        "table_directories",
+                        repeat_count(
+                            var("num_fonts"),
+                            offset32(start.clone(), table_directory.call_args(vec![start]), base),
+                        ),
+                    ),
+                ])
+            };
+
+            // Version 2.0
+            let ttc_header2 = |start: Expr| {
+                record([
+                    ("num_fonts", base.u32be()),
+                    (
+                        "table_directories",
+                        repeat_count(
+                            var("num_fonts"),
+                            offset32(start.clone(), table_directory.call_args(vec![start]), base),
+                        ),
+                    ),
+                    ("dsig_tag", base.u32be()), // either b"DSIG" or 0 if none
+                    ("dsig_length", base.u32be()), // byte-length or 0 if none
+                    ("dsig_offset", base.u32be()), // byte-offset or 0 if none
+                ])
+            };
+
+            module.define_format_args(
+                "opentype.ttc_header",
+                vec![START_ARG],
+                record_auto([
+                    (
+                        "ttc_tag",
+                        where_lambda(
+                            base.u32be(),
+                            "tag",
+                            expr_eq(var("tag"), Expr::U32(magic(b"ttcf"))),
+                        ),
+                    ),
+                    ("major_version", base.u16be()),
+                    ("minor_version", base.u16be()),
+                    (
+                        "header",
+                        match_variant(
+                            var("major_version"),
+                            [
+                                (Pattern::U16(1), "Version1", ttc_header1(START_VAR)),
+                                (Pattern::U16(2), "Version2", ttc_header2(START_VAR)),
+                                // REVIEW - is this the preferred pattern (i.e. apply broadly) or do we want to fail here as well?
+                                (bind("unknown"), "UnknownVersion", compute(var("unknown"))),
+                            ],
+                        ),
+                    ),
+                    ("__skip", Format::SkipRemainder),
+                ]),
+            )
+        };
+
+        // NOTE - we have to fail to let text have its chance to parse
+        let unknown_table = Format::Fail;
+
+        module.define_format(
+            "opentype.main",
+            record([
+                ("file_start", pos32()),
+                ("magic", Format::Peek(Box::new(base.u32be()))),
+                (
+                    "directory",
+                    match_variant(
+                        var("magic"),
+                        [
+                            (
+                                Pattern::U32(0x00010000),
+                                "TableDirectory",
+                                table_directory.call_args(vec![var("file_start")]),
+                            ),
+                            (
+                                Pattern::U32(magic(b"OTTO")),
+                                "TableDirectory",
+                                table_directory.call_args(vec![var("file_start")]),
+                            ),
+                            (
+                                Pattern::U32(magic(b"ttcf")),
+                                "TTCHeader",
+                                ttc_header.call_args(vec![var("file_start")]),
+                            ),
+                            // TODO - not yet sure if TrueType fonts will parse correctly under our current table_directory implementation...
+                            (
+                                Pattern::U32(magic(b"true")),
+                                "TableDirectory",
+                                table_directory.call_args(vec![var("file_start")]),
+                            ),
+                            (Pattern::Wildcard, "UnknownTable", unknown_table),
+                        ],
+                    ),
+                ),
+            ]),
+        )
+    }
 
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/stat#style-attributes-header
     pub(crate) fn stat_table(

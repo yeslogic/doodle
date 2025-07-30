@@ -8,7 +8,7 @@ pub use view::View;
 
 /// Stateful parser with an associated buffer and offset-tracker.
 pub struct Parser<'a> {
-    pub(crate) buffer: &'a [u8],
+    pub(crate) buffer: View<'a>,
     pub(crate) offset: BufferOffset,
 }
 
@@ -16,15 +16,10 @@ impl<'a> Parser<'a> {}
 
 impl<'a> From<View<'a>> for Parser<'a> {
     fn from(view: View<'a>) -> Self {
-        let buf_len = view.buffer.len();
-        let max_offset = view.start_offset + buf_len;
-        let offset = BufferOffset::with_offset(
-            ByteOffset::from_bytes(view.start_offset),
-            ByteOffset::from_bytes(max_offset),
-        );
+        let max_offset = ByteOffset::from_bytes(view.buffer.len());
         Self {
-            buffer: view.buffer,
-            offset,
+            buffer: view,
+            offset: BufferOffset::new(max_offset),
         }
     }
 }
@@ -34,7 +29,7 @@ impl<'a> Parser<'a> {
     pub fn new(buffer: &'a [u8]) -> Parser<'a> {
         let max_offset = ByteOffset::from_bytes(buffer.len());
         Self {
-            buffer,
+            buffer: View::new(buffer),
             offset: BufferOffset::new(max_offset),
         }
     }
@@ -49,10 +44,7 @@ impl<'a> Parser<'a> {
         let (cur_offset, None) = self.offset.get_current_offset().as_bytes() else {
             panic!("cannot open view while in bits-mode processing");
         };
-        View {
-            buffer: &self.buffer[cur_offset..],
-            start_offset: cur_offset,
-        }
+        self.buffer.offset(cur_offset)
     }
 
     /// Advances the offset by `offset` positions, as if calling [`Self::read_byte`] that many
@@ -94,14 +86,21 @@ impl<'a> Parser<'a> {
         N: TryInto<usize, Error: std::fmt::Debug> + Copy,
     {
         let dest = dest_offset.try_into().unwrap();
-        let dest_offset = ByteOffset::from_bytes(dest);
+        if dest < self.buffer.start_offset {
+            return Err(ParseError::NegativeIndex {
+                abs_target: dest,
+                abs_buf_start: self.buffer.start_offset,
+            });
+        }
+        let o_dest = dest - self.buffer.start_offset;
+        let dest_offset = ByteOffset::from_bytes(o_dest);
         let is_advance =
             if let Some(delta) = self.offset.get_current_offset().checked_delta(dest_offset) {
                 self.offset.open_peek();
                 self.offset.try_increment(delta)?;
                 true
             } else {
-                self.offset.seek_to_offset(dest, false)?;
+                self.offset.seek_to_offset(o_dest, false)?;
                 false
             };
         Ok(is_advance)
@@ -123,7 +122,7 @@ impl<'a> Parser<'a> {
     /// Otherwise, it will be an entire byte.
     pub fn read_byte(&mut self) -> Result<u8, ParseError> {
         let (ix, sub_bit) = self.offset.try_increment(1)?.as_bytes();
-        let Some(&byte) = self.buffer.get(ix) else {
+        let Some(&byte) = self.buffer.buffer.get(ix) else {
             return Err(ParseError::InternalError(StateError::OutOfBoundsRead));
         };
         let ret = if let Some(n) = sub_bit {

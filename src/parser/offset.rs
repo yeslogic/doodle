@@ -402,14 +402,6 @@ impl BufferOffset {
         }
     }
 
-    pub(crate) fn with_offset(current_offset: ByteOffset, max_offset: ByteOffset) -> Self {
-        Self {
-            current_offset,
-            view_stack: ViewStack::new(),
-            max_offset,
-        }
-    }
-
     /// Returns the value of the offset being tracked
     pub(crate) fn get_current_offset(&self) -> ByteOffset {
         self.current_offset
