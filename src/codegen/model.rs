@@ -6,7 +6,7 @@ use super::{GenBlock, GenExpr, GenStmt};
 use crate::Format as _;
 
 // NOTE - this marks whether `allsorts::binary::read::ReadArray` is `Copy`
-pub(crate) const READ_ARRAY_IS_COPY: bool = false;
+pub(crate) const READ_ARRAY_IS_COPY: bool = true;
 
 macro_rules! call {
     ( $parser:expr, $method:ident ) => {

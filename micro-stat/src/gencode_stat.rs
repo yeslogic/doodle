@@ -10,13 +10,13 @@ use doodle::prelude::*;
 use doodle::try_sub;
 
 /// expected size: 40
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct opentype_stat_table_axis_value_offsets<'input> {
 axis_value_offsets: ReadArray<'input, U16Be>
 }
 
 /// expected size: 64
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct opentype_stat_table<'input> {
 major_version: u16,
 minor_version: u16,
@@ -360,3 +360,4 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 };
 PResult::Ok(opentype_stat_axis_value_table { format, data })
 }
+
