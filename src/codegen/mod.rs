@@ -88,6 +88,8 @@ impl CodeGen {
     fn lift_type(&mut self, vt: &AugValueType) -> GenType {
         match vt {
             AugValueType::Empty => RustType::UNIT.into(),
+            // FIXME - we have to hack in the appropriate lifetime
+            AugValueType::ViewObj => GenType::Inline(model::view_obj_type()),
             AugValueType::Base(BaseType::Bool) => PrimType::Bool.into(),
             AugValueType::Base(BaseType::U8) => PrimType::U8.into(),
             AugValueType::Base(BaseType::U16) => PrimType::U16.into(),
@@ -575,6 +577,9 @@ impl CodeGen {
             }
             TypedDecoder::ReadArray(_, view, len, kind) => {
                 CaseLogic::View(ViewLogic::ReadArray(embed_view_expr(view), embed_expr_nat(len), *kind))
+            }
+            TypedDecoder::ReifyView(_, view) => {
+                CaseLogic::View(ViewLogic::ReifyView(embed_view_expr(view)))
             }
         }
     }
@@ -1444,6 +1449,7 @@ fn refutability_check<A: std::fmt::Debug + Clone>(
                 RustType::Verbatim(_, _) =>
                     unreachable!("verbatim types not expected in generated match-expressions"),
                 RustType::ReadArray(..) => unreachable!("ReadArray not expected in generated match-expressions"),
+                RustType::ViewObject(..) => unreachable!("ViewObject not expected in generated match-expressions"),
             }
         GenType::Def(_, def) => {
             match &def.def {
@@ -2628,6 +2634,7 @@ enum ViewLogic<ExprT> {
     LetView(Label, Box<CaseLogic<ExprT>>),
     CaptureBytes(RustExpr, RustExpr),
     ReadArray(RustExpr, RustExpr, crate::BaseKind),
+    ReifyView(RustExpr),
 }
 
 impl ToAst for ViewLogic<GTExpr> {
@@ -2650,6 +2657,7 @@ impl ToAst for ViewLogic<GTExpr> {
             ViewLogic::ReadArray(view, len, kind) => GenBlock::simple_expr(
                 model::read_array_from_view(view.clone(), len.clone().as_usize(), *kind),
             ),
+            ViewLogic::ReifyView(view) => GenBlock::simple_expr(model::reify_view(view.clone())),
         }
     }
 }
@@ -3800,6 +3808,10 @@ impl<'a> Elaborator<'a> {
                 self.increment_index();
                 let t_len = self.elaborate_expr(len);
                 TypedViewFormat::ReadArray(Box::new(t_len), *kind)
+            }
+            ViewFormat::ReifyView => {
+                self.increment_index();
+                TypedViewFormat::ReifyView
             }
         }
     }

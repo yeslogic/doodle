@@ -18,13 +18,14 @@ offset: u32,
 length: u32
 }
 
-/// expected size: 40
+/// expected size: 64
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_stat_table_axis_value_offsets<'input> {
+axis_value_view: View<'input>,
 axis_value_offsets: ReadArray<'input, U16Be>
 }
 
-/// expected size: 64
+/// expected size: 88
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_stat_table<'input> {
 major_version: u16,
@@ -37,13 +38,13 @@ axis_value_offsets: opentype_stat_table_axis_value_offsets<'input>,
 elided_fallback_name_id: u16
 }
 
-/// expected size: 64
+/// expected size: 88
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_table_directory_table_links<'input> {
 stat: Option<opentype_stat_table<'input>>
 }
 
-/// expected size: 104
+/// expected size: 128
 #[derive(Debug, Clone)]
 pub struct opentype_table_directory<'input> {
 sfnt_version: u32,
@@ -55,7 +56,7 @@ table_records: Vec<opentype_table_record>,
 table_links: opentype_table_directory_table_links<'input>
 }
 
-/// expected size: 112
+/// expected size: 136
 #[derive(Debug, Clone)]
 pub struct opentype_ttc_header_header_Version1_table_directories<'input> {
 offset: u32,
@@ -92,11 +93,11 @@ minor_version: u16,
 header: opentype_ttc_header_header<'input>
 }
 
-/// expected size: 112
+/// expected size: 136
 #[derive(Debug, Clone)]
 pub enum opentype_main_directory<'input> { TTCHeader(opentype_ttc_header<'input>), TableDirectory(opentype_table_directory<'input>) }
 
-/// expected size: 120
+/// expected size: 144
 #[derive(Debug, Clone)]
 pub struct opentype_main<'input> {
 file_start: u32,
@@ -436,8 +437,9 @@ let axis_value_offsets = {
 let mut view_parser = Parser::from(table_scope.offset(_offset_to_axis_value_offsets as usize));
 let view_input = &mut view_parser;
 let axis_value_scope = view_input.view();
+let axis_value_view = axis_value_scope;
 let axis_value_offsets = axis_value_scope.read_array_u16be(axis_value_count as usize)?;
-opentype_stat_table_axis_value_offsets { axis_value_offsets }
+opentype_stat_table_axis_value_offsets { axis_value_view, axis_value_offsets }
 };
 let elided_fallback_name_id = (Decoder5(_input))?;
 PResult::Ok(opentype_stat_table { major_version, minor_version, design_axis_size, design_axis_count, design_axes_array, axis_value_count, axis_value_offsets, elided_fallback_name_id })

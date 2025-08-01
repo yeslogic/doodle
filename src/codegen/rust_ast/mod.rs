@@ -6,7 +6,7 @@ pub(crate) mod analysis;
 pub(crate) mod rebind;
 pub(crate) mod resolve;
 
-use crate::codegen::model::READ_ARRAY_IS_COPY;
+use crate::codegen::model::{DEFAULT_LT, READ_ARRAY_IS_COPY, VIEW_OBJECT_IS_COPY};
 use crate::output::{Fragment, FragmentBuilder};
 
 use crate::precedence::{cond_paren, Precedence};
@@ -625,6 +625,7 @@ pub(crate) enum RustType {
     /// Catch-all for generics that we may not be able or willing to hardcode
     Verbatim(Label, UseParams),
     ReadArray(RustLt, MarkerType),
+    ViewObject(RustLt),
 }
 
 impl RustType {
@@ -689,6 +690,7 @@ impl RustType {
             RustType::Verbatim(..) => false,
             // FIXME - is this correct?
             RustType::ReadArray(..) => !READ_ARRAY_IS_COPY,
+            RustType::ViewObject(..) => false,
         }
     }
 
@@ -769,7 +771,7 @@ impl RustType {
             RustType::Atom(atom_type) => atom_type.lt_param(),
             RustType::AnonTuple(rust_types) => rust_types.iter().find_map(|t| t.lt_param()),
             RustType::Verbatim(_, rust_params) => rust_params.lt_params.first(),
-            RustType::ReadArray(lt, _) => Some(lt),
+            RustType::ReadArray(lt, _) | RustType::ViewObject(lt) => Some(lt),
         }
     }
 }
@@ -801,6 +803,7 @@ impl RustType {
             // Without lexical analysis rules, we have no good way to determine whether a verbatim-injected type-name is Copy-safe or not
             RustType::Verbatim(..) => false,
             RustType::ReadArray(..) => READ_ARRAY_IS_COPY,
+            RustType::ViewObject(..) => VIEW_OBJECT_IS_COPY,
         }
     }
 }
@@ -825,6 +828,11 @@ impl ToFragment for RustType {
                     ty_params: vec![mt.clone()],
                 };
                 Fragment::string("ReadArray").cat(params.to_fragment())
+            }
+            RustType::ViewObject(lt) => {
+                let params = UseParams::from_lt(lt.clone());
+                // REVIEW[epic=hardcoded] - using crate::parser::view::View for View-Objects
+                Fragment::string("View").cat(params.to_fragment())
             }
         }
     }
@@ -1280,6 +1288,10 @@ impl TryFrom<ValueType> for RustType {
     fn try_from(value: ValueType) -> Result<Self, Self::Error> {
         match value {
             ValueType::Empty => Ok(RustType::UNIT),
+            // REVIEW[epic=hardcoded] - we have to hardcode a lifetime for now
+            ValueType::ViewObj => Ok(RustType::ViewObject(RustLt::Parametric(Label::Borrowed(
+                DEFAULT_LT,
+            )))),
             ValueType::Base(BaseType::Bool) => Ok(PrimType::Bool.into()),
             ValueType::Base(BaseType::U8) => Ok(PrimType::U8.into()),
             ValueType::Base(BaseType::U16) => Ok(PrimType::U16.into()),

@@ -47,6 +47,7 @@ impl SeqBorrowHint {
 pub enum ValueType {
     Any,
     Empty,
+    ViewObj,
     Base(BaseType),
     Tuple(Vec<ValueType>),
     Record(Vec<(Label, ValueType)>),
@@ -109,6 +110,7 @@ impl ValueType {
             (ValueType::Empty, rhs) => Ok(rhs.clone()),
             (lhs, ValueType::Empty) => Ok(lhs.clone()),
 
+            (ValueType::ViewObj, ValueType::ViewObj) => Ok(ValueType::ViewObj),
             (ValueType::Base(b1), ValueType::Base(b2)) => {
                 if b1 == b2 {
                     Ok(ValueType::Base(*b1))
@@ -224,6 +226,7 @@ pub(crate) mod augmented {
     pub enum AugValueType {
         Any,
         Empty,
+        ViewObj,
         Base(BaseType),
         Tuple(Vec<AugValueType>),
         Record(Vec<(Label, AugValueType)>),
@@ -241,6 +244,7 @@ pub(crate) mod augmented {
             match t {
                 ValueType::Any => AugValueType::Any,
                 ValueType::Empty => AugValueType::Empty,
+                ValueType::ViewObj => AugValueType::ViewObj,
                 ValueType::Base(b) => AugValueType::Base(b),
                 ValueType::Tuple(ts) => {
                     AugValueType::Tuple(ts.into_iter().map(From::from).collect())
@@ -264,6 +268,7 @@ pub(crate) mod augmented {
             match t {
                 AugValueType::Any => ValueType::Any,
                 AugValueType::Empty => ValueType::Empty,
+                AugValueType::ViewObj => ValueType::ViewObj,
                 AugValueType::Base(b) => ValueType::Base(b),
                 AugValueType::Tuple(ts) => {
                     ValueType::Tuple(ts.into_iter().map(From::from).collect())

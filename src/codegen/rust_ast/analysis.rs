@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::HashMap};
 
 pub(crate) mod heap_optimize;
-use crate::codegen::model::READ_ARRAY_IS_COPY;
+use crate::codegen::model::{READ_ARRAY_IS_COPY, VIEW_OBJECT_IS_COPY};
 
 use super::*;
 use heap_optimize::{HeapOptimize, HeapOutcome, HeapStrategy};
@@ -136,6 +136,8 @@ impl CanOptimize for RustType {
             RustType::Verbatim(..) => 0,
             // in actuality, ReadArray has many more niches, but we cannot calculate it reliably because it is an external definition
             RustType::ReadArray(..) => 1,
+            // in actuality, ViewObject has many more niches, but we can't predictably calculate them without locking in the backing-type implementation
+            RustType::ViewObject(..) => 1,
         }
     }
 }
@@ -167,6 +169,11 @@ impl MemSize for RustType {
                 let sz_stride = std::mem::size_of::<usize>();
                 sz_scope + sz_length + sz_stride
             }
+            RustType::ViewObject(..) => {
+                let sz_buffer = std::mem::size_of::<&[u8]>();
+                let sz_start_offs = std::mem::size_of::<usize>();
+                sz_buffer + sz_start_offs
+            }
         }
     }
 
@@ -184,7 +191,7 @@ impl MemSize for RustType {
             RustType::Verbatim(..) => {
                 unreachable!("unexpected RustType::Verbatim in structural type")
             }
-            RustType::ReadArray(..) => {
+            RustType::ReadArray(..) | RustType::ViewObject(..) => {
                 // FIXME - this is subject to external implementation details
                 std::mem::align_of::<usize>()
             }
@@ -201,6 +208,7 @@ impl CopyEligible for RustType {
                 unreachable!("unexpected RustType::Verbatim in structural type")
             }
             RustType::ReadArray(..) => READ_ARRAY_IS_COPY,
+            RustType::ViewObject(..) => VIEW_OBJECT_IS_COPY,
         }
     }
 }
