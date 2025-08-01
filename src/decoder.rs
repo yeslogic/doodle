@@ -38,6 +38,7 @@ pub enum Value {
     U64(u64),
     Char(char),
     Usize(usize),
+    View { offset: usize },
     EnumFromTo(std::ops::Range<usize>),
     Option(Option<Box<Value>>),
     Tuple(Vec<Value>),
@@ -66,6 +67,7 @@ impl std::fmt::Display for Value {
             Value::U64(i) => write!(f, "{}", i),
             Value::Char(c) => write!(f, "{:?}", c),
             Value::Usize(i) => write!(f, "{}", i),
+            Value::View { offset } => write!(f, "View[+{}]", offset),
             Value::EnumFromTo(r) => write!(f, "{:?}", r),
             Value::Option(v) => match v {
                 None => write!(f, "None"),
@@ -904,6 +906,7 @@ pub enum Decoder {
     LetView(Label, Box<Decoder>),
     CaptureBytes(ViewExpr, Box<Expr>),
     ReadArray(ViewExpr, Box<Expr>, BaseKind),
+    ReifyView(ViewExpr),
 }
 
 #[derive(Clone, Debug)]
@@ -1253,6 +1256,7 @@ impl<'a> Compiler<'a> {
                 ViewFormat::ReadArray(len, k) => {
                     Ok(Decoder::ReadArray(v_expr.clone(), len.clone(), *k))
                 }
+                ViewFormat::ReifyView => Ok(Decoder::ReifyView(v_expr.clone())),
             },
         }
     }
@@ -1864,6 +1868,15 @@ impl Decoder {
                 }
 
                 Ok((Value::Seq(SeqKind::Strict(accum)), input))
+            }
+            Decoder::ReifyView(v_expr) => {
+                let view = self.eval_view_expr(scope, v_expr)?;
+                Ok((
+                    Value::View {
+                        offset: view.offset,
+                    },
+                    input,
+                ))
             }
         }
     }

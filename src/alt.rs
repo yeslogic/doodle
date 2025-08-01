@@ -128,8 +128,10 @@ pub enum MetaFormat {
 pub enum ViewFormatExt {
     /// Captures a byte-slice of a View, given an expression for the byte-length of the slice
     CaptureBytes(Box<Expr>),
-    /// ScanArray - captures an scoped ReadArray of the given unit, given an expression for element-count (*NOT* byte-length)
+    /// Captures a scoped ReadArray of the given unit, given an expression for element-count (*NOT* byte-length)
     ReadArray(Box<Expr>, BaseKind),
+    /// Constructs a View-object in the value layer
+    ReifyView,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
@@ -268,6 +270,7 @@ impl TypeHintExt {
 pub enum ValueTypeExt {
     Any,
     Empty,
+    ViewObj,
     Base(BaseType),
     Tuple(Vec<ValueTypeExt>),
     Record(Vec<(Label, ValueTypeExt)>),
@@ -285,6 +288,7 @@ impl From<ValueType> for ValueTypeExt {
         match v {
             ValueType::Any => ValueTypeExt::Any,
             ValueType::Empty => ValueTypeExt::Empty,
+            ValueType::ViewObj => ValueTypeExt::ViewObj,
             ValueType::Base(b) => ValueTypeExt::Base(b),
             ValueType::Tuple(v) => {
                 ValueTypeExt::Tuple(v.into_iter().map(ValueTypeExt::from).collect())
@@ -322,11 +326,13 @@ impl ValueTypeExt {
         }
     }
 
-    /// Returns `true` if the actual value type depends on the processing model.
+    /// Returns `true` if the conversion to [`ValueType`] depends on the processing model.
     pub fn depends_on_model(&self) -> bool {
         match self {
             ValueTypeExt::Any => false,
             ValueTypeExt::Empty => false,
+            // NOTE - potentially misleading case
+            ValueTypeExt::ViewObj => false,
             ValueTypeExt::Base(_) => false,
             ValueTypeExt::Tuple(ts) => ts.iter().any(|t| t.depends_on_model()),
             ValueTypeExt::Record(items) => items.iter().any(|(_, t)| t.depends_on_model()),
@@ -485,7 +491,10 @@ impl ValueTypeExt {
                 ModelKind::BaseModel => base_model.normalize(model),
                 ModelKind::AltModel => alt_model.normalize(model),
             },
-            ValueTypeExt::Any | ValueTypeExt::Empty | ValueTypeExt::Base(_) => Cow::Borrowed(self),
+            ValueTypeExt::Any
+            | ValueTypeExt::ViewObj
+            | ValueTypeExt::Empty
+            | ValueTypeExt::Base(_) => Cow::Borrowed(self),
             ValueTypeExt::Tuple(ts) => Cow::Owned(ValueTypeExt::Tuple(
                 ts.iter().map(|t| t.normalize(model).into_owned()).collect(),
             )),
@@ -521,6 +530,7 @@ impl ValueTypeExt {
             (ValueTypeExt::Empty, rhs) => Ok(rhs.clone()),
             (lhs, ValueTypeExt::Empty) => Ok(lhs.clone()),
 
+            (ValueTypeExt::ViewObj, ValueTypeExt::ViewObj) => Ok(ValueTypeExt::ViewObj),
             (
                 ValueTypeExt::EngineSpecific {
                     base_model,
@@ -659,6 +669,7 @@ impl ValueTypeExt {
         match self {
             ValueTypeExt::Any => Some(ValueType::Any),
             ValueTypeExt::Empty => Some(ValueType::Empty),
+            ValueTypeExt::ViewObj => Some(ValueType::ViewObj),
             ValueTypeExt::Base(b) => Some(ValueType::Base(b.clone())),
             ValueTypeExt::Tuple(v) => {
                 let mut vs = Vec::with_capacity(v.len());
@@ -701,6 +712,7 @@ impl ValueTypeExt {
             }
             ValueTypeExt::Any => ValueType::Any,
             ValueTypeExt::Empty => ValueType::Empty,
+            ValueTypeExt::ViewObj => ValueType::ViewObj,
             ValueTypeExt::Base(b) => ValueType::Base(b),
             ValueTypeExt::Tuple(v) => {
                 let mut vs = Vec::with_capacity(v.len());
@@ -895,6 +907,7 @@ impl FormatModuleExt {
                             // TODO - consider if we need to add a valuetype for ReadArray in APM (?)
                             Ok(ValueTypeExt::Seq(Box::new(elt)))
                         }
+                        ViewFormatExt::ReifyView => Ok(ValueTypeExt::ViewObj),
                     }
                 }
             },
@@ -1761,6 +1774,7 @@ mod __impls {
             match value {
                 ViewFormat::CaptureBytes(len) => ViewFormatExt::CaptureBytes(len),
                 ViewFormat::ReadArray(len, kind) => ViewFormatExt::ReadArray(len, kind),
+                ViewFormat::ReifyView => ViewFormatExt::ReifyView,
             }
         }
     }
@@ -1768,6 +1782,7 @@ mod __impls {
     impl From<ViewFormatExt> for ViewFormat {
         fn from(value: ViewFormatExt) -> Self {
             match value {
+                ViewFormatExt::ReifyView => ViewFormat::ReifyView,
                 ViewFormatExt::CaptureBytes(len) => ViewFormat::CaptureBytes(len),
                 ViewFormatExt::ReadArray(len, kind) => ViewFormat::ReadArray(len, kind),
             }

@@ -434,6 +434,7 @@ impl ParsedValue {
             | Value::U16(_)
             | Value::U32(_)
             | Value::U64(_)
+            | Value::View { .. }
             | Value::Usize(_)
             | Value::EnumFromTo(_)
             | Value::Char(_) => ParsedValue::Flat(Parsed {
@@ -1810,6 +1811,13 @@ impl Decoder {
                     ParsedValue::new_seq(accum, view_window.offset, len * kind.size()),
                     input,
                 ))
+            }
+            Decoder::ReifyView(v_expr) => {
+                let view = self.eval_view_expr_with_loc(scope, v_expr)?;
+                let v = ParsedValue::from_evaluated(Value::View {
+                    offset: view.offset,
+                });
+                Ok((v, input))
             }
         }
     }

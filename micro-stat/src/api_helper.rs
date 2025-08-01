@@ -7,6 +7,7 @@ pub type TableDir<'a> = opentype_table_directory<'a>;
 pub type TTCHeader<'a> = opentype_ttc_header_header<'a>;
 pub type HeaderV1<'a> = opentype_ttc_header_header_Version1<'a>;
 pub type HeaderV2<'a> = opentype_ttc_header_header_Version2<'a>;
+pub type AxisRecord = opentype_stat_axis_record;
 
 pub fn parse_otf<'input>(buf: &'input [u8]) -> PResult<OpenType<'input>> {
     let mut input = Parser::new(buf);
@@ -24,7 +25,17 @@ pub fn dump_axis_value_offsets(filename: &str) {
             .iter()
             .enumerate()
         {
-            println!("{}: {}", ix, offs);
+            let region = stat
+                .axis_value_offsets
+                .axis_value_view
+                .offset(offs as usize);
+            let mut parser = Parser::from(region);
+            let AxisRecord {
+                axis_tag,
+                axis_name_id,
+                axis_ordering,
+            } = Decoder_opentype_stat_axis_record(&mut parser).expect("bad view-offset parse");
+            println!("{ix}: axis-tag={axis_tag} axis-name-id={axis_name_id} axis-ordering={axis_ordering}");
         }
     } else {
         println!("{filename}: no stat table");

@@ -176,6 +176,7 @@ impl<'module> TreePrinter<'module> {
             Value::Bool(_) => true,
             Value::U8(_) | Value::U16(_) | Value::U32(_) | Value::U64(_) => true,
             Value::Usize(_) => true,
+            Value::View { .. } => true,
             Value::Tuple(values) => values.is_empty(),
             Value::Record(fields) => fields.is_empty(),
             Value::Seq(values) => values.is_empty(),
@@ -694,6 +695,7 @@ impl<'module> TreePrinter<'module> {
             Value::U64(i) => Fragment::DisplayAtom(Rc::new(*i)),
             Value::Usize(i) => Fragment::DisplayAtom(Rc::new(*i)),
             Value::Char(c) => Fragment::DebugAtom(Rc::new(*c)),
+            Value::View { offset } => Fragment::string(format!("VIEW[+{offset}]")),
             Value::Tuple(vals) => self.compile_tuple(vals, None),
             Value::Seq(vals) => self.compile_seq(vals, None),
             Value::EnumFromTo(range) => Fragment::intervene(
@@ -2373,6 +2375,7 @@ impl<'module> TreePrinter<'module> {
                         builder.push(Fragment::Char(']'));
                         builder.finalize()
                     }
+                    ViewFormat::ReifyView => Fragment::string("reify"),
                 };
                 cond_paren(
                     Fragment::string("with-view")

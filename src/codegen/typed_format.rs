@@ -539,6 +539,7 @@ impl<TypeRep> std::hash::Hash for TypedDynFormat<TypeRep> {
 pub enum TypedViewFormat<TypeRep> {
     CaptureBytes(Box<TypedExpr<TypeRep>>),
     ReadArray(Box<TypedExpr<TypeRep>>, BaseKind),
+    ReifyView,
 }
 
 impl<TypeRep> std::hash::Hash for TypedViewFormat<TypeRep> {
@@ -552,6 +553,7 @@ impl<TypeRep> std::hash::Hash for TypedViewFormat<TypeRep> {
                 len.hash(state);
                 kind.hash(state);
             }
+            TypedViewFormat::ReifyView => (),
         }
     }
 }
@@ -1195,6 +1197,7 @@ mod __impls {
             match value {
                 TypedViewFormat::CaptureBytes(len) => ViewFormat::CaptureBytes(rebox(len)),
                 TypedViewFormat::ReadArray(len, kind) => ViewFormat::ReadArray(rebox(len), kind),
+                TypedViewFormat::ReifyView => ViewFormat::ReifyView,
             }
         }
     }

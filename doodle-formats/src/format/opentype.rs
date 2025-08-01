@@ -5288,6 +5288,8 @@ pub(crate) fn stat_table(
 }
 
 pub(crate) mod alt {
+    use doodle::ViewFormat;
+
     use super::*;
     pub(crate) fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         // NOTE - Microsoft defines a tag as consisting on printable ascii characters in the range 0x20 -- 0x7E (inclusive), but some vendors are non-standard so we accept anything
@@ -5579,6 +5581,10 @@ pub(crate) mod alt {
                     let_view(
                         "axis_value_scope",
                         record([
+                            (
+                                "axis_value_view",
+                                with_view(ViewExpr::var("axis_value_scope"), ViewFormat::ReifyView),
+                            ),
                             (
                                 "axis_value_offsets",
                                 with_view(

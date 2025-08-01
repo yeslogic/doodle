@@ -85,6 +85,7 @@ impl TypedDecoder<GenType> {
             | TypedDecoder::CaptureBytes(t, ..)
             | TypedDecoder::ReadArray(t, ..)
             | TypedDecoder::ParseFromView(t, ..)
+            | TypedDecoder::ReifyView(t, ..)
             | TypedDecoder::Match(t, ..)
             | TypedDecoder::Dynamic(t, ..)
             | TypedDecoder::Apply(t, ..)
@@ -232,6 +233,7 @@ pub(crate) enum TypedDecoder<TypeRep> {
         Box<TypedExpr<TypeRep>>,
         BaseKind,
     ),
+    ReifyView(TypeRep, TypedViewExpr<TypeRep>),
 }
 
 #[derive(Clone, Debug)]
@@ -680,6 +682,7 @@ impl<'a> GTCompiler<'a> {
                     len.clone(),
                     *kind,
                 )),
+                TypedViewFormat::ReifyView => Ok(TypedDecoder::ReifyView(gt.clone(), view.clone())),
             },
         }?;
         Ok(TypedDecoderExt::new(dec, args))

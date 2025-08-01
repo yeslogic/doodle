@@ -1,5 +1,8 @@
-#[derive(Copy, Clone)]
+use serde::Serialize;
+
+#[derive(Copy, Clone, Serialize)]
 pub struct ReadCtxt<'a> {
+    #[serde(skip)]
     pub input: &'a [u8],
     pub offset: usize,
 }

@@ -8,6 +8,10 @@ use crate::Format as _;
 // NOTE - this marks whether `allsorts::binary::read::ReadArray` is `Copy`
 pub(crate) const READ_ARRAY_IS_COPY: bool = true;
 
+// NOTE - based on the (temporary) hardcoding of `crate::parser::view::View` for target view-objects
+// we wish to record certain properties of it abstractly without difficult-to-track hardcoding
+pub(crate) const VIEW_OBJECT_IS_COPY: bool = true;
+
 macro_rules! call {
     ( $parser:expr, $method:ident ) => {
         RustExpr::MethodCall(
@@ -131,6 +135,10 @@ pub const WHERE_CHECK: &str = "is_valid";
 // !SECTION
 
 // !SECTION
+
+pub fn view_obj_type() -> RustType {
+    RustType::ViewObject(RustLt::Parametric(lbl(DEFAULT_LT)))
+}
 
 /// Helper function for promoting string-constants to method specifiers
 const fn mk_method(ident: &'static str) -> MethodSpecifier {
@@ -386,6 +394,11 @@ pub fn parser_from(view: RustExpr) -> RustExpr {
 /// RustStmt for `let mut <ident> = Parser::from(<view>)`.
 pub fn let_mut_parser_from(ident: &'static str, view: RustExpr) -> RustStmt {
     RustStmt::Let(Mut::Mutable, lbl(ident), None, parser_from(view))
+}
+
+pub fn reify_view(view_raw: RustExpr) -> RustExpr {
+    // NOTE - View used both for transient parses and persisted values
+    view_raw
 }
 
 // !SECTION

@@ -51,6 +51,8 @@ pub enum UType {
     Empty,
     /// Anonymous type-hole for shape-only unifications (i.e. where we would want to use a meta-variable but don't have one available).
     Hole,
+    /// Reserved case for View-Objects manifest through ViewFormat::ReifyView
+    ViewObj,
     /// Indexed type-hole acting as a unification metavariable
     Var(UVar),
     Base(BaseType),
@@ -116,6 +118,7 @@ impl UType {
         match vt {
             ValueType::Any => Some(Self::Hole),
             ValueType::Empty => Some(Self::Empty),
+            ValueType::ViewObj => Some(Self::ViewObj),
             ValueType::Base(b) => Some(Self::Base(*b)),
             ValueType::Tuple(vts) => {
                 let mut uts = Vec::with_capacity(vts.len());
@@ -352,7 +355,7 @@ impl UType {
     /// the receiver are all returned eventually, and in whatever order is most convenient.
     pub fn iter_embedded<'a>(&'a self) -> Box<dyn Iterator<Item = Rc<UType>> + 'a> {
         match self {
-            UType::Empty | UType::Hole | UType::Var(..) | UType::Base(..) => {
+            UType::Empty | UType::ViewObj | UType::Hole | UType::Var(..) | UType::Base(..) => {
                 Box::new(std::iter::empty())
             }
             UType::Tuple(ts) => Box::new(ts.iter().cloned()),
@@ -1184,6 +1187,10 @@ impl TypeChecker {
                 )?;
                 Ok(newvar)
             }
+            ViewFormat::ReifyView => {
+                let (newvar, _) = self.init_var_simple(UType::ViewObj)?;
+                Ok(newvar)
+            }
         }
     }
 
@@ -1301,7 +1308,7 @@ impl TypeChecker {
 
     fn occurs_in(&self, v: UVar, t: impl AsRef<UType>) -> TCResult<()> {
         match t.as_ref() {
-            UType::Hole | UType::Empty | UType::Base(_) => Ok(()),
+            UType::Hole | UType::Empty | UType::ViewObj | UType::Base(_) => Ok(()),
             &UType::Var(v1) => {
                 if self.is_aliased(v, v1) {
                     Err(TCErrorKind::InfiniteType(v, self.constraints[v.0].clone()).into())
@@ -3201,6 +3208,7 @@ impl TypeChecker {
                 // REVIEW - should this simply return None instead? or maybe ValueType::Any?
                 unreachable!("reify: UType::Hole should be erased by any non-Hole unification!");
             }
+            UType::ViewObj => Some(AugValueType::ViewObj),
             &UType::Var(uv) => {
                 let v = self.get_canonical_uvar(uv);
                 match self.substitute_uvar_vtype(v) {

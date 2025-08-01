@@ -57,6 +57,7 @@ pub use valuetype::{BaseType, TypeHint, ValueType};
 fn mk_value_expr(vt: &ValueType) -> Option<Expr> {
     match vt {
         ValueType::Any | ValueType::Empty => None,
+        ValueType::ViewObj => None,
         ValueType::Base(b) => Some(match b {
             BaseType::Bool => Expr::Bool(false),
             BaseType::U8 => Expr::U8(0),
@@ -679,6 +680,8 @@ pub enum ViewFormat {
     CaptureBytes(Box<Expr>),
     /// ReadArray(M, Kind): captures an array of M elements of the indicate Kind
     ReadArray(Box<Expr>, BaseKind),
+    /// ReifyView: produces a value-element that encapsulates the View-object
+    ReifyView,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
@@ -1148,6 +1151,7 @@ impl Format {
             Format::WithView(_v_expr, vf) => match vf {
                 ViewFormat::CaptureBytes(_len) => Bounds::exact(0),
                 ViewFormat::ReadArray(_len, _kind) => Bounds::exact(0),
+                ViewFormat::ReifyView => Bounds::exact(0),
             },
             Format::ParseFromView(_v_expr, _inner) => Bounds::exact(0),
         }
@@ -1226,9 +1230,9 @@ impl Format {
                 max_lookahead
             }
             Format::WithView(_v_expr, vf) => match vf {
-                // REVIEW - sanity-check this rule
                 ViewFormat::CaptureBytes(_len) => Bounds::exact(0),
                 ViewFormat::ReadArray(_len, _kind) => Bounds::exact(0),
+                ViewFormat::ReifyView => Bounds::exact(0),
             },
             Format::ParseFromView(_v_expr, _f) => Bounds::exact(0),
         }
@@ -1728,6 +1732,10 @@ impl FormatModule {
                     }
                     // NOTE[epic=view-format] - in the current base-model design and implementation, ReadArray captures a `Seq<K>` where K is informed by `kind`
                     Ok(ValueType::Seq(Box::new(ValueType::Base(BaseType::from(*kind)))))
+                }
+                ViewFormat::ReifyView => {
+                    view.check_type(scope)?;
+                    Ok(ValueType::ViewObj)
                 }
             }
         }
