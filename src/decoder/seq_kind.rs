@@ -177,7 +177,7 @@ impl<T: Clone> Index<usize> for SeqKind<T> {
 
     fn index(&self, index: usize) -> &Self::Output {
         self.get(index)
-            .expect(format!("out of bounds indexing {index:?} (len: {})", self.len()).as_str())
+            .unwrap_or_else(|| panic!("out of bounds indexing {index:?} (len: {})", self.len()))
     }
 }
 

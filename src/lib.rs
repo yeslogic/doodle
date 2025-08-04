@@ -555,7 +555,7 @@ impl Expr {
                 let rhs_type = rhs.infer_type(scope)?;
                 match (&lhs_type, &rhs_type) {
                     (ValueType::Seq(t1), ValueType::Seq(t2)) => {
-                        let elem_t = t1.unify(&t2)?;
+                        let elem_t = t1.unify(t2)?;
                         Ok(ValueType::Seq(Box::new(elem_t)))
                     }
                     (ValueType::Seq(..), other) => {
@@ -564,11 +564,9 @@ impl Expr {
                     (other, ValueType::Seq(..)) => {
                         Err(anyhow!("Append: lhs is not Seq: {other:?}"))
                     }
-                    (lhs_type, rhs_type) => {
-                        return Err(anyhow!(
-                            "Append: lhs and rhs must be Seq: {lhs_type:?}, {rhs_type:?} !~ Seq(_)"
-                        ));
-                    }
+                    (lhs_type, rhs_type) => Err(anyhow!(
+                        "Append: lhs and rhs must be Seq: {lhs_type:?}, {rhs_type:?} !~ Seq(_)"
+                    )),
                 }
             }
         }
@@ -1338,10 +1336,7 @@ impl Format {
 
     pub fn is_record_format(&self) -> bool {
         // we take it on faith that a format is a record iff it is hinted as such
-        match self {
-            Format::Hint(StyleHint::Record { .. }, _) => true,
-            _ => false,
-        }
+        matches!(self, Format::Hint(StyleHint::Record { .. }, _))
     }
 }
 
@@ -1553,7 +1548,7 @@ impl FormatModule {
                     Expr::Lambda(head, expr) => {
                         let t = self.infer_format_type(scope, a)?;
                         // Check that the initial accumulator value's type unifies with the type-claim
-                        let _acc_type = init.infer_type(&scope)?.unify(vt.as_ref())?;
+                        let _acc_type = init.infer_type(scope)?.unify(vt.as_ref())?;
                         let mut child_scope = TypeScope::child(scope);
                         let t_seq = ValueType::Seq(Box::new(t.clone()));
                         let vt_acc_seq = ValueType::Tuple(vec![vt.as_ref().clone(), t_seq.clone()]);
@@ -1570,7 +1565,7 @@ impl FormatModule {
                                         let _ret_type = expr.infer_type(&child_scope)?.unify(vt.as_ref())?;
                                         Ok(vt_acc_seq)
                                     }
-                                    other => return Err(anyhow!("AccumUntil second argument type should be lambda, found {other:?} instead")),
+                                    other => Err(anyhow!("AccumUntil second argument type should be lambda, found {other:?} instead")),
                                 }
                             }
                             other => Err(anyhow!("AccumUntil first argument (lambda) return type should be Bool, found {other:?} instead")),
@@ -1959,9 +1954,7 @@ impl<'a> MatchTreeStep<'a> {
         let (min, max) = min_max;
         assert!(
             min <= max,
-            "min-max pair ({}, {}) incoherent (min > max)",
-            min,
-            max
+            "min-max pair ({min}, {max}) incoherent (min > max)",
         );
         if min == max {
             Self::from_repeat_count(module, min, format, next)
@@ -2261,7 +2254,7 @@ impl<'a> MatchTreeStep<'a> {
                             }
                         }
                         Ordering::Greater => {
-                            panic!("incoherent repeat-between: min {} > max {}", min, max)
+                            panic!("incoherent repeat-between: min {min} > max {max}")
                         }
                     },
                     _ => {
@@ -2422,7 +2415,7 @@ impl<'a> MatchTreeStep<'a> {
                         }
                         Ordering::Equal => Self::from_repeat_count(module, min, a, next.clone()),
                         Ordering::Greater => {
-                            panic!("incoherent repeat-between: min {} > max {}", min, max)
+                            panic!("incoherent repeat-between: min {min} > max {max}")
                         }
                     },
                     _ => {

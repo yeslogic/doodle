@@ -182,8 +182,8 @@ impl Bounds {
     /// of byte-precision values.
     pub fn bits_to_bytes(&self) -> Bounds {
         Bounds {
-            min: (self.min + 7) / 8,
-            max: self.max.map(|n| (n + 7) / 8),
+            min: self.min.div_ceil(8),
+            max: self.max.map(|n| n.div_ceil(8)),
         }
     }
 

@@ -186,29 +186,26 @@ impl Resolvable for RustOp {
 impl Resolvable for StructExpr {
     fn resolve(&mut self, ctx: &SourceContext<'_>) {
         match self {
-            StructExpr::EmptyExpr => (),
-            StructExpr::TupleExpr(elts) => elts.resolve(ctx),
-            StructExpr::RecordExpr(flds) => flds.iter_mut().for_each(|(_, fld)| fld.resolve(ctx)),
+            StructExpr::Empty => (),
+            StructExpr::Tuple(elts) => elts.resolve(ctx),
+            StructExpr::Record(flds) => flds.iter_mut().for_each(|(_, fld)| fld.resolve(ctx)),
         }
     }
 }
 
 impl Resolvable for OwnedRustExpr {
     fn resolve(&mut self, ctx: &SourceContext<'_>) {
-        match &mut self.kind {
-            OwnedKind::Unresolved(lens) => {
-                let sol = solve_lens(&lens, ctx);
-                if sol.is_copy {
-                    if sol.is_ref {
-                        self.kind = OwnedKind::Deref;
-                    } else {
-                        self.kind = OwnedKind::Copied;
-                    }
+        if let OwnedKind::Unresolved(lens) = &mut self.kind {
+            let sol = solve_lens(lens, ctx);
+            if sol.is_copy {
+                if sol.is_ref {
+                    self.kind = OwnedKind::Deref;
                 } else {
-                    self.kind = OwnedKind::Cloned;
+                    self.kind = OwnedKind::Copied;
                 }
+            } else {
+                self.kind = OwnedKind::Cloned;
             }
-            _ => (),
         }
     }
 }
@@ -234,21 +231,21 @@ fn solve_type(ty: &RustType, ctx: &SourceContext<'_>) -> Solution {
                     is_ref: false,
                 },
                 CompType::RawSlice(elt) => {
-                    let Solution { is_copy, .. } = solve_type(&elt, ctx);
+                    let Solution { is_copy, .. } = solve_type(elt, ctx);
                     Solution {
                         is_copy,
                         is_ref: false,
                     }
                 }
                 CompType::Option(inner) | CompType::Result(inner, _) => {
-                    let Solution { is_copy, .. } = solve_type(&inner, ctx);
+                    let Solution { is_copy, .. } = solve_type(inner, ctx);
                     Solution {
                         is_copy,
                         is_ref: false,
                     }
                 }
                 CompType::Borrow(.., t) => {
-                    let Solution { is_copy, .. } = solve_type(&t, ctx);
+                    let Solution { is_copy, .. } = solve_type(t, ctx);
                     Solution {
                         is_copy,
                         is_ref: true,
@@ -292,7 +289,7 @@ fn expand_lens<'a>(lens: &'a Lens<RustType>, ctx: &SourceContext<'_>) -> Cow<'a,
         }
         Lens::FieldAccess(SubIdent::ByPosition(ix), lens) => {
             let ty0 = expand_lens(lens.as_ref(), ctx);
-            Cow::Owned(get_pos(ty0.as_ref(), *ix, ctx))
+            Cow::Owned(get_pos(ty0.as_ref(), *ix))
         }
         Lens::ParamOf(lens) => {
             let ty0 = expand_lens(lens.as_ref(), ctx);
@@ -327,10 +324,7 @@ fn get_field(ty: &RustType, lab: &str, ctx: &SourceContext<'_>) -> RustType {
                 }
                 LocalType::External(..) => unreachable!("external type cannot be solved: {ty:?}"),
             },
-            AtomType::Comp(ct) => match ct {
-                CompType::Borrow(.., ty0) => get_field(ty0, lab, ctx),
-                _ => unreachable!("bad Field on non-record: {ty:?}"),
-            },
+            AtomType::Comp(CompType::Borrow(.., ty0)) => get_field(ty0, lab, ctx),
             _ => unreachable!("bad Field on non-record: {ty:?}"),
         },
         _ => unreachable!("bad Field on non-record: {ty:?}"),
@@ -339,42 +333,33 @@ fn get_field(ty: &RustType, lab: &str, ctx: &SourceContext<'_>) -> RustType {
 
 fn get_elem(ty: &RustType, _ctx: &SourceContext<'_>) -> RustType {
     match ty {
-        RustType::Atom(at) => match at {
-            AtomType::Comp(ct) => match ct {
-                CompType::RawSlice(ty0) | CompType::Vec(ty0) => ty0.as_ref().clone(),
-                CompType::Borrow(.., ty) => get_elem(ty.as_ref(), _ctx),
-                _ => unreachable!("bad ElemOf on non-array: {ty:?}"),
-            },
+        RustType::Atom(AtomType::Comp(ct)) => match ct {
+            CompType::RawSlice(ty0) | CompType::Vec(ty0) => ty0.as_ref().clone(),
+            CompType::Borrow(.., ty) => get_elem(ty.as_ref(), _ctx),
             _ => unreachable!("bad ElemOf on non-array: {ty:?}"),
         },
+        RustType::ReadArray(_, _mt0) => {
+            unimplemented!("[HOLE]: no set logic for get_elem@ReadArray")
+        }
         _ => unreachable!("bad ElemOf on non-array: {ty:?}"),
     }
 }
 
 fn get_param(ty: &RustType, _ctx: &SourceContext<'_>) -> RustType {
     match ty {
-        RustType::Atom(at) => match at {
-            AtomType::Comp(ct) => match ct {
-                CompType::Option(ty0) => ty0.as_ref().clone(),
-                CompType::Borrow(.., ty) => get_param(ty.as_ref(), _ctx),
-                _ => unreachable!("bad ParamOf on non-generic: {ty:?}"),
-            },
+        RustType::Atom(AtomType::Comp(ct)) => match ct {
+            CompType::Option(ty0) => ty0.as_ref().clone(),
+            CompType::Borrow(.., ty) => get_param(ty.as_ref(), _ctx),
             _ => unreachable!("bad ParamOf on non-generic: {ty:?}"),
         },
         _ => unreachable!("bad ParamOf on non-generic: {ty:?}"),
     }
 }
 
-fn get_pos(ty: &RustType, ix: usize, ctx: &SourceContext<'_>) -> RustType {
+fn get_pos(ty: &RustType, ix: usize) -> RustType {
     match ty {
         RustType::AnonTuple(elts) => elts[ix].clone(),
-        RustType::Atom(at) => match at {
-            AtomType::Comp(ct) => match ct {
-                CompType::Borrow(.., ty) => get_pos(ty.as_ref(), ix, ctx),
-                _ => unreachable!("bad Position on non-tuple: {ty:?}"),
-            },
-            _ => unreachable!("bad Position on non-tuple: {ty:?}"),
-        },
+        RustType::Atom(AtomType::Comp(CompType::Borrow(.., ty))) => get_pos(ty.as_ref(), ix),
         _ => unreachable!("bad Position on non-tuple: {ty:?}"),
     }
 }

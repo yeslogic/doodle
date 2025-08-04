@@ -623,7 +623,7 @@ pub(crate) enum RustType {
     Atom(AtomType),
     AnonTuple(Vec<RustType>),
     /// Catch-all for generics that we may not be able or willing to hardcode
-    Verbatim(Label, UseParams),
+    Verbatim(Label, Option<Box<UseParams>>),
     ReadArray(RustLt, MarkerType),
     ViewObject(RustLt),
 }
@@ -639,6 +639,11 @@ impl RustType {
     /// Returns the RustType representation of a locally-defined type whose index in the code-generation table
     /// is `ix` and whose identifier is `name`.
     pub fn defined(ix: usize, name: impl Into<Label>, params: UseParams) -> Self {
+        let params = if params.is_empty() {
+            None
+        } else {
+            Some(Box::new(params))
+        };
         Self::Atom(AtomType::TypeRef(LocalType::LocalDef(
             ix,
             name.into(),
@@ -660,7 +665,7 @@ impl RustType {
     /// Returns a RustType given a verbatim string-form of the type-level constructor to use,
     /// with an optional list of generic arguments to parameterize it with.
     pub fn verbatim(con: impl Into<Label>, params: Option<UseParams>) -> Self {
-        Self::Verbatim(con.into(), params.unwrap_or_default())
+        Self::Verbatim(con.into(), params.map(Box::new))
     }
 
     /// Predicate function that determines whether values of RustType `self` should be borrowed
@@ -770,7 +775,7 @@ impl RustType {
         match self {
             RustType::Atom(atom_type) => atom_type.lt_param(),
             RustType::AnonTuple(rust_types) => rust_types.iter().find_map(|t| t.lt_param()),
-            RustType::Verbatim(_, rust_params) => rust_params.lt_params.first(),
+            RustType::Verbatim(_, rust_params) => rust_params.as_deref()?.lt_params.first(),
             RustType::ReadArray(lt, _) | RustType::ViewObject(lt) => Some(lt),
         }
     }
@@ -821,11 +826,13 @@ impl ToFragment for RustType {
                 }
                 elems.delimit(Fragment::Char('('), Fragment::Char(')'))
             }
-            RustType::Verbatim(con, params) => con.to_fragment().cat(params.to_fragment()),
+            RustType::Verbatim(con, params) => con
+                .to_fragment()
+                .cat(Fragment::opt(params.as_deref(), RustParams::to_fragment)),
             RustType::ReadArray(lt, mt) => {
                 let params = RustParams {
                     lt_params: vec![lt.clone()],
-                    ty_params: vec![mt.clone()],
+                    ty_params: vec![*mt],
                 };
                 Fragment::string("ReadArray").cat(params.to_fragment())
             }
@@ -898,7 +905,7 @@ fn remap(input: Label) -> Label {
         | "static" | "struct" | "super" | "trait" | "true" | "type" | "unsafe" | "use"
         | "where" | "while" | "abstract" | "become" | "box" | "do" | "final" | "macro"
         | "override" | "priv" | "try" | "typeof" | "unsized" | "virtual" | "yield" => {
-            Label::from(format!("r#{}", input))
+            Label::from(format!("r#{input}"))
         }
         _ => input,
     }
@@ -992,7 +999,7 @@ impl AtomType {
     fn lt_param(&self) -> Option<&RustLt> {
         match self {
             AtomType::TypeRef(local_type) => match local_type {
-                LocalType::LocalDef(_, _, params) => params.lt_params.first(),
+                LocalType::LocalDef(_, _, params) => params.as_deref()?.lt_params.first(),
                 _ => None,
             },
             AtomType::Prim(..) => None,
@@ -1003,7 +1010,7 @@ impl AtomType {
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum LocalType {
-    LocalDef(usize, Label, UseParams),
+    LocalDef(usize, Label, Option<Box<UseParams>>),
     External(Label),
 }
 
@@ -1018,13 +1025,10 @@ pub(crate) enum LocalType {
 impl ToFragment for LocalType {
     fn to_fragment(&self) -> Fragment {
         match self {
-            Self::LocalDef(_, lab, params) => {
-                if params.is_empty() {
-                    lab.to_fragment()
-                } else {
-                    lab.to_fragment().cat(params.to_fragment())
-                }
-            }
+            Self::LocalDef(_, lab, params) => match params {
+                Some(params) if !params.is_empty() => lab.to_fragment().cat(params.to_fragment()),
+                _ => lab.to_fragment(),
+            },
             Self::External(lab) => lab.to_fragment(),
         }
     }
@@ -1489,15 +1493,15 @@ impl ToFragment for MethodSpecifier {
 
 #[derive(Debug, Clone)]
 pub(crate) enum StructExpr {
-    EmptyExpr,
-    RecordExpr(Vec<(Label, Option<RustExpr>)>),
-    TupleExpr(Vec<RustExpr>),
+    Empty,
+    Record(Vec<(Label, Option<RustExpr>)>),
+    Tuple(Vec<RustExpr>),
 }
 
 impl ToFragment for StructExpr {
     fn to_fragment(&self) -> Fragment {
         match self {
-            StructExpr::RecordExpr(fields) => Fragment::seq(
+            StructExpr::Record(fields) => Fragment::seq(
                 fields.iter().map(|(lab, expr)| {
                     Fragment::intervene(
                         lab.to_fragment(),
@@ -1510,8 +1514,8 @@ impl ToFragment for StructExpr {
                 Some(Fragment::string(", ")),
             )
             .delimit(Fragment::string(" { "), Fragment::string(" }")),
-            StructExpr::TupleExpr(elts) => RustExpr::paren_list_prec(elts, Precedence::Top),
-            StructExpr::EmptyExpr => Fragment::Empty,
+            StructExpr::Tuple(elts) => RustExpr::paren_list_prec(elts, Precedence::Top),
+            StructExpr::Empty => Fragment::Empty,
         }
     }
 }
@@ -1654,7 +1658,7 @@ impl RustExpr {
                 }
             }
             _ => {
-                let match_item = RustControl::Match(scrutinee, body);
+                let match_item = RustControl::Match(Box::new(scrutinee), body);
                 Self::Control(Box::new(match_item))
             }
         }
@@ -1697,7 +1701,7 @@ impl RustExpr {
         Self::PrimitiveLit(RustPrimLit::Numeric(RustNumLit::U64(num)))
     }
 
-    pub fn as_usize(self) -> Self {
+    pub fn cast_as_usize(self) -> Self {
         Self::Operation(RustOp::AsCast(
             Box::new(self),
             RustType::from(PrimType::Usize),
@@ -1935,8 +1939,7 @@ impl RustExpr {
             RustExpr::FieldAccess(obj, ident) => {
                 match ident {
                     &SubIdent::ByPosition(ix) => match &**obj {
-                        RustExpr::Tuple(tuple)
-                        | RustExpr::Struct(_, StructExpr::TupleExpr(tuple)) => {
+                        RustExpr::Tuple(tuple) | RustExpr::Struct(_, StructExpr::Tuple(tuple)) => {
                             if tuple.len() <= ix {
                                 unreachable!(
                                     "bad tuple-index `_.{ix}` on {}-tuple {:?}",
@@ -1952,7 +1955,7 @@ impl RustExpr {
                         }
                     },
                     SubIdent::ByName(name) => match &**obj {
-                        RustExpr::Struct(_con, StructExpr::RecordExpr(fields)) => {
+                        RustExpr::Struct(_con, StructExpr::Record(fields)) => {
                             for (field, val) in fields {
                                 if field == name {
                                     if let Some(val) = val {
@@ -2029,7 +2032,7 @@ impl RustExpr {
                     if expr
                         .try_get_primtype()
                         .as_ref()
-                        .map_or(false, PrimType::is_numeric)
+                        .is_some_and(PrimType::is_numeric)
                         && out_typ.is_numeric()
                     {
                         Some(out_typ)
@@ -2077,11 +2080,11 @@ impl RustExpr {
             RustExpr::FieldAccess(expr, ..) => expr.is_pure(),
             RustExpr::Tuple(tuple) => tuple.iter().all(Self::is_pure),
             RustExpr::Struct(_, assigns) => match assigns {
-                StructExpr::RecordExpr(assigns) => assigns
+                StructExpr::Record(assigns) => assigns
                     .iter()
-                    .all(|(_, val)| val.as_ref().map_or(true, Self::is_pure)),
-                StructExpr::TupleExpr(values) => values.iter().all(|val| val.is_pure()),
-                StructExpr::EmptyExpr => true,
+                    .all(|(_, val)| val.as_ref().is_none_or(Self::is_pure)),
+                StructExpr::Tuple(values) => values.iter().all(|val| val.is_pure()),
+                StructExpr::Empty => true,
             },
             RustExpr::Borrow(expr) | RustExpr::BorrowMut(expr) => expr.is_pure(),
             // NOTE - while we can construct pure Try-expressions manually, the intent of `?` is to have potential side-effects and so we judge them de-facto impure
@@ -2150,7 +2153,7 @@ impl RustExpr {
             RustExpr::PrimitiveLit(..) => false,
             RustExpr::BlockScope(stmts, _) => !stmts.is_empty(),
             RustExpr::Control(..) => true,
-            RustExpr::Struct(_, StructExpr::EmptyExpr) => false,
+            RustExpr::Struct(_, StructExpr::Empty) => false,
 
             // Special case - `matches!` macro is an idiomatic conditional expression
             RustExpr::Macro(RustMacro::Matches(..)) => false,
@@ -2161,12 +2164,12 @@ impl RustExpr {
             RustExpr::Closure(..) => true,
 
             // '.any(..)' cases
-            RustExpr::Struct(_, StructExpr::TupleExpr(exprs))
+            RustExpr::Struct(_, StructExpr::Tuple(exprs))
             | RustExpr::ArrayLit(exprs)
             | RustExpr::Tuple(exprs) => exprs.iter().any(RustExpr::is_complex),
 
             // special cases
-            RustExpr::Struct(.., StructExpr::RecordExpr(flds)) => flds
+            RustExpr::Struct(.., StructExpr::Record(flds)) => flds
                 .iter()
                 .any(|(_, val)| val.as_ref().is_some_and(RustExpr::is_complex)),
 
@@ -2970,7 +2973,7 @@ impl RustStmt {
 #[derive(Clone, Debug)]
 pub(crate) enum RustCatchAll {
     PanicUnreachable { message: Label },
-    ReturnErrorValue { value: RustExpr },
+    ReturnErrorValue { value: Box<RustExpr> },
 }
 
 impl RustCatchAll {
@@ -2987,7 +2990,7 @@ impl RustCatchAll {
             ),
             RustCatchAll::ReturnErrorValue { value } => (
                 MatchCaseLHS::Pattern(RustPattern::CatchAll(None)),
-                [RustStmt::Return(ReturnKind::Keyword, value.clone())].to_vec(),
+                [RustStmt::Return(ReturnKind::Keyword, (**value).clone())].to_vec(),
             ),
         }
     }
@@ -3000,7 +3003,7 @@ impl<T> From<Vec<RustMatchCase<T>>> for RustMatchBody<T> {
         RustMatchBody::Refutable(
             value,
             RustCatchAll::ReturnErrorValue {
-                value: RustExpr::scoped(["ParseError"], "ExcludedBranch"),
+                value: Box::new(RustExpr::scoped(["ParseError"], "ExcludedBranch")),
             },
         )
     }
@@ -3072,11 +3075,11 @@ impl<T> RustMatchBody<T> {
 #[derive(Clone, Debug)]
 pub(crate) enum RustControl<BlockType = Vec<RustStmt>> {
     Loop(BlockType),
-    While(RustExpr, BlockType),
-    ForIter(Label, RustExpr, BlockType), // element variable name, iterator expression (verbatim), loop contents
-    ForRange0(Label, RustExpr, BlockType), // index variable name, upper bound (exclusive), loop contents (0..N)
-    If(RustExpr, BlockType, Option<BlockType>),
-    Match(RustExpr, RustMatchBody<BlockType>),
+    While(Box<RustExpr>, BlockType),
+    ForIter(Label, Box<RustExpr>, BlockType), // element variable name, iterator expression (verbatim), loop contents
+    ForRange0(Label, Box<RustExpr>, BlockType), // index variable name, upper bound (exclusive), loop contents (0..N)
+    If(Box<RustExpr>, BlockType, Option<BlockType>),
+    Match(Box<RustExpr>, RustMatchBody<BlockType>),
     Break, // no support for break values or loop labels, yet
 }
 
@@ -3892,9 +3895,9 @@ pub mod short_circuit {
     impl ShortCircuit for StructExpr {
         fn is_short_circuiting(&self) -> bool {
             match self {
-                StructExpr::EmptyExpr => false,
-                StructExpr::TupleExpr(elts) => elts.is_short_circuiting(),
-                StructExpr::RecordExpr(flds) => flds.is_short_circuiting(),
+                StructExpr::Empty => false,
+                StructExpr::Tuple(elts) => elts.is_short_circuiting(),
+                StructExpr::Record(flds) => flds.is_short_circuiting(),
             }
         }
     }
@@ -3902,9 +3905,9 @@ pub mod short_circuit {
     impl ShortCircuitExt for StructExpr {
         fn check_eval_purity(&self) -> EvalPurity {
             match self {
-                StructExpr::EmptyExpr => EvalPurity::Pure,
-                StructExpr::TupleExpr(elts) => elts.check_eval_purity(),
-                StructExpr::RecordExpr(flds) => flds.check_eval_purity(),
+                StructExpr::Empty => EvalPurity::Pure,
+                StructExpr::Tuple(elts) => elts.check_eval_purity(),
+                StructExpr::Record(flds) => flds.check_eval_purity(),
             }
         }
     }
@@ -3932,7 +3935,7 @@ pub mod var_container {
             Name: AsRef<str> + ?Sized;
     }
 
-    impl<'a> VarContainer for [RustStmt] {
+    impl VarContainer for [RustStmt] {
         fn contains_var_ref<Name>(&self, var: &Name) -> bool
         where
             Name: AsRef<str> + ?Sized,
@@ -4022,7 +4025,7 @@ pub mod var_container {
         }
     }
 
-    impl<'a> VarContainer for [RustExpr] {
+    impl VarContainer for [RustExpr] {
         fn contains_var_ref<Name>(&self, var: &Name) -> bool
         where
             Name: AsRef<str> + ?Sized,
@@ -4051,9 +4054,9 @@ pub mod var_container {
             Name: AsRef<str> + ?Sized,
         {
             match self {
-                StructExpr::EmptyExpr => false,
-                StructExpr::TupleExpr(elts) => elts.contains_var_ref(var),
-                StructExpr::RecordExpr(flds) => {
+                StructExpr::Empty => false,
+                StructExpr::Tuple(elts) => elts.contains_var_ref(var),
+                StructExpr::Record(flds) => {
                     for (lab, expr) in flds.iter() {
                         match expr {
                             Some(expr) => {

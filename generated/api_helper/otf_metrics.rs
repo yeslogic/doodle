@@ -141,7 +141,7 @@ impl std::fmt::Display for Tag {
                 use std::fmt::Write;
                 f.write_char(b as char)
             } else {
-                write!(f, "\\x{:02x}", b)
+                write!(f, "\\x{b:02x}")
             }
         };
         for byte in bytes {
@@ -4511,7 +4511,7 @@ fn format_magic(magic: u32) -> String {
         if b.is_ascii_alphanumeric() {
             String::from(b as char)
         } else {
-            format!("{:02x}", b)
+            format!("{b:02x}")
         }
     };
     format!(
@@ -4609,13 +4609,13 @@ fn show_fvar_metrics(fvar: Option<&FvarMetrics>, conf: &Config) {
                 instance.subfamily_nameid,
                 match instance.postscript_nameid {
                     None => String::new(),
-                    Some(name_id) => format!(" Postscript={:?};", name_id),
+                    Some(name_id) => format!(" Postscript={name_id:?};"),
                 },
                 format_items_inline(
                     &instance.coordinates,
-                    |coord| format!("{:+}", coord),
+                    |coord| format!("{coord:+}"),
                     conf.inline_bookend,
-                    |n_skipped| format!("..(skipping {} coordinates)..", n_skipped),
+                    |n_skipped| format!("..(skipping {n_skipped} coordinates).."),
                 )
             )
         }
@@ -4781,7 +4781,7 @@ fn show_script_list(script_list: &ScriptList, conf: &Config) {
                 show_lang_sys_records(lang_sys_records, conf)
             },
             conf.bookend_size,
-            |start, stop| format!("skipping ScriptRecords {}..{}", start, stop),
+            |start, stop| format!("skipping ScriptRecords {start}..{stop}"),
         );
     }
 }
@@ -4798,7 +4798,7 @@ fn show_lang_sys_records(lang_sys_records: &[LangSysRecord], conf: &Config) {
                 show_langsys(&item.lang_sys, conf);
             },
             conf.bookend_size,
-            |start, stop| format!("\t\t    (skipping LangSysRecords {}..{})", start, stop),
+            |start, stop| format!("\t\t    (skipping LangSysRecords {start}..{stop})"),
         )
     }
 }
@@ -4815,13 +4815,13 @@ fn show_langsys(lang_sys: &Link<LangSys>, conf: &Config) {
     debug_assert_eq!(*lookup_order_offset, 0);
     match required_feature_index {
         0xFFFF => print!("feature-indices: "),
-        other => print!("feature-indices (required: {}): ", other),
+        other => print!("feature-indices (required: {other}): "),
     }
     show_items_inline(
         feature_indices,
-        |ix: &u16| format!("{}", ix),
+        |ix: &u16| format!("{ix}"),
         conf.inline_bookend,
-        |num_skipped: usize| format!("...({} skipped)...", num_skipped),
+        |num_skipped: usize| format!("...({num_skipped} skipped)..."),
     );
 }
 
@@ -4837,14 +4837,14 @@ fn show_feature_list(feature_list: &FeatureList, conf: &Config) {
                     feature_tag,
                     feature,
                 } = item;
-                print!("\t\t[{ix}]: {}", feature_tag);
+                print!("\t\t[{ix}]: {feature_tag}");
                 let feature = feature.as_ref().unwrap_or_else(|| {
-                    unreachable!("bad feature link (tag: {})", feature_tag);
+                    unreachable!("bad feature link (tag: {feature_tag})");
                 });
                 show_feature_table(feature, conf);
             },
             conf.bookend_size,
-            |start, stop| format!("\t    (skipping FeatureIndices {}..{})", start, stop),
+            |start, stop| format!("\t    (skipping FeatureIndices {start}..{stop})"),
         );
     }
 }
@@ -4856,13 +4856,13 @@ fn show_feature_table(table: &FeatureTable, conf: &Config) {
     } = table;
     match feature_params {
         0 => (),
-        offset => print!("[parameters located at SoF+{}B]", offset),
+        offset => print!("[parameters located at SoF+{offset}B]"),
     }
     show_items_inline(
         lookup_list_indices,
-        |index| format!("{}", index),
+        |index| format!("{index}"),
         conf.inline_bookend,
-        |num_skipped| format!("...({} skipped)...", num_skipped),
+        |num_skipped| format!("...({num_skipped} skipped)..."),
     );
 }
 
@@ -4878,7 +4878,7 @@ fn show_lookup_list(lookup_list: &LookupList, ctxt: Ctxt, conf: &Config) {
             }
         },
         conf.bookend_size,
-        |start, stop| format!("\t    (skipping LookupTables {}..{})", start, stop),
+        |start, stop| format!("\t    (skipping LookupTables {start}..{stop})"),
     );
 }
 
@@ -4891,7 +4891,7 @@ fn show_lookup_table(table: &LookupTable, ctxt: Ctxt, conf: &Config) {
     );
     show_lookup_flag(&table.lookup_flag);
     if let Some(filtering_set) = table.mark_filtering_set {
-        print!(", markFilteringSet=GDEF->MarkGlyphSet[{}]", filtering_set)
+        print!(", markFilteringSet=GDEF->MarkGlyphSet[{filtering_set}]")
     }
     print!(": ");
     show_items_inline(
@@ -5350,7 +5350,7 @@ fn show_stat_metrics(stat: Option<&StatMetrics>, conf: &Config) {
             match stat.design_axes.len() {
                 0 => (),
                 n => {
-                    println!("\tDesignAxes: {} total", n);
+                    println!("\tDesignAxes: {n} total");
                     show_items_elided(
                         &stat.design_axes,
                         |ix, d_axis| println!("\t\t[{ix}]: {}", format_design_axis(d_axis, conf)),
@@ -5364,7 +5364,7 @@ fn show_stat_metrics(stat: Option<&StatMetrics>, conf: &Config) {
             match stat.axis_values.len() {
                 0 => (),
                 n => {
-                    println!("\tAxisValues: {} total", n);
+                    println!("\tAxisValues: {n} total");
                     show_items_elided(
                         &stat.axis_values,
                         |ix, a_value| println!("\t\t[{ix}]: {}", format_axis_value(a_value, conf)),
@@ -5442,7 +5442,7 @@ fn show_kern_metrics(kern: &Option<KernMetrics>, conf: &Config) {
                             print!("\t\t[{ix}]: ");
                             show_items_inline(
                                 row,
-                                |kern_val| format!("{:+}", kern_val),
+                                |kern_val| format!("{kern_val:+}"),
                                 conf.inline_bookend,
                                 |n| format!("(..{n}..)"),
                             )
@@ -5720,7 +5720,7 @@ fn format_alternate_sets(alt_sets: &[AlternateSet]) -> String {
         const ALT_GLYPH_BOOKEND: usize = 2;
         format_items_inline(
             &alt_set.alternate_glyph_ids,
-            |glyph_id| format!("{}", glyph_id),
+            |glyph_id| format_glyphid_hex(*glyph_id, true),
             ALT_GLYPH_BOOKEND,
             |_| "..".to_string(),
         )
@@ -5740,7 +5740,7 @@ fn format_sequence_lookup(sl: &SequenceLookup) -> String {
     let s_ix = sl.sequence_index;
     let ll_ix = sl.lookup_list_index;
     // NOTE - the number in `\[_\]` is meant to mimic the index display of the show_items_elided formatting of LookupList, so it is the lookup index. The number after `@` is the positional index to apply the lookup to
-    format!("[{}]@{}", ll_ix, s_ix)
+    format!("[{ll_ix}]@{s_ix}")
 }
 
 /// Checks that the given ClassDef (assumed to be Some) contains the expected number of classes.
@@ -5933,7 +5933,7 @@ fn show_mark_glyph_set(mgs: &MarkGlyphSet, conf: &Config) {
             }
         },
         conf.bookend_size,
-        |start, stop| format!("\t    (skipping coverage tables {}..{})", start, stop),
+        |start, stop| format!("\t    (skipping coverage tables {start}..{stop})"),
     )
 }
 
@@ -6074,7 +6074,7 @@ fn show_lig_caret_list(lig_caret_list: &LigCaretList, conf: &Config) {
             )
         },
         conf.bookend_size,
-        |start, stop| format!("\t    (skipping LigGlyphs {}..{})", start, stop),
+        |start, stop| format!("\t    (skipping LigGlyphs {start}..{stop})"),
     )
 }
 
@@ -6134,26 +6134,21 @@ fn show_attach_list(attach_list: &AttachList, conf: &Config) {
             print!("\t\t[{ix}]:");
             show_items_inline(
                 point_indices,
-                |point_ix| format!("{}", point_ix),
+                |point_ix| format!("{point_ix}"),
                 conf.inline_bookend,
                 |num_skipped| format!("...({num_skipped})..."),
             );
         },
         conf.bookend_size,
-        |start, stop| {
-            format!(
-                "\t    (skipping attach points for glyphs {}..{})",
-                start, stop
-            )
-        },
+        |start, stop| format!("\t    (skipping attach points for glyphs {start}..{stop})"),
     )
 }
 
 fn format_glyphid_hex(glyph: u16, is_standalone: bool) -> String {
     if is_standalone {
-        format!("#{:04x}", glyph)
+        format!("#{glyph:04x}")
     } else {
-        format!("{:04x}", glyph)
+        format!("{glyph:04x}")
     }
 }
 
@@ -6241,7 +6236,7 @@ fn show_coverage_table(cov: &CoverageTable, conf: &Config) {
             print!("Glyphs Covered: ");
             show_items_inline(
                 glyph_array,
-                |item| format!("{}", item),
+                |item| format!("{item}"),
                 conf.inline_bookend,
                 |num_skipped| format!("...({num_skipped})..."),
             );
@@ -6265,7 +6260,7 @@ fn show_mark_attach_class_def(mark_attach_class_def: &ClassDef, conf: &Config) {
 
 fn format_mark_attach_class(mark_attach_class: &u16) -> String {
     // STUB - if we come up with a semantic association for specific numbers, add branches here
-    format!("{}", mark_attach_class)
+    format!("{mark_attach_class}")
 }
 
 fn show_glyph_class_def(class_def: &ClassDef, conf: &Config) {
@@ -6321,10 +6316,7 @@ fn show_class_def<S: std::fmt::Display>(
             |start, stop| {
                 let low_end = class_range_records[start].start_glyph_id;
                 let high_end = class_range_records[stop - 1].end_glyph_id;
-                format!(
-                    "\t    (skipping ranges covering glyphs {}..={})",
-                    low_end, high_end
-                )
+                format!("\t    (skipping ranges covering glyphs {low_end}..={high_end})",)
             },
         ),
     }
@@ -6383,9 +6375,9 @@ fn show_gasp_metrics(gasp: &Option<GaspMetrics>, conf: &Config) {
                 }
             };
             if _ix == 0 && range.range_max_ppem == 0xFFFF {
-                println!("\t[∀ PPEM] {}", disp);
+                println!("\t[∀ PPEM] {disp}");
             } else {
-                println!("\t[PPEM <= {}]  {}", range.range_max_ppem, disp)
+                println!("\t[PPEM <= {}]  {disp}", range.range_max_ppem)
             }
         };
         println!("gasp: version {version}, {num_ranges} ranges");
@@ -6534,7 +6526,7 @@ fn format_version16dot16(v: u32) -> String {
 }
 
 fn format_version_major_minor(major: u16, minor: u16) -> String {
-    format!("{}.{}", major, minor)
+    format!("{major}.{minor}")
 }
 
 fn show_cmap_metrics(cmap: &Cmap, conf: &Config) {
@@ -6548,7 +6540,7 @@ fn show_cmap_metrics(cmap: &Cmap, conf: &Config) {
                 encoding,
                 subtable: _subtable,
             } = record;
-            println!("\t[{ix}]: platform={}, encoding={}", platform, encoding);
+            println!("\t[{ix}]: platform={platform}, encoding={encoding}");
         };
         show_items_elided(
             &cmap.encoding_records,
@@ -6711,7 +6703,7 @@ fn show_name_metrics(name: &NameMetrics, conf: &Config) {
                     ref buf,
                 } => {
                     if no_name_yet && plat_encoding_lang.matches_locale(buf) {
-                        println!("\tFull Font Name: {}", buf);
+                        println!("\tFull Font Name: {buf}");
                         no_name_yet = false;
                     }
                 }

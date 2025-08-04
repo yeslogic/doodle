@@ -219,7 +219,7 @@ impl ViewStack {
     pub(crate) fn get_limit(&self) -> Option<ByteOffset> {
         let ret = Self::get_limit_from_slice(self.stack.as_slice());
         // FIXME - introduce caching mechanic
-        ret.as_option()
+        ret.to_option()
     }
 
     /// Performs a stack-pop operation on an owned `ViewStack`, returning the
@@ -330,7 +330,8 @@ impl<T> Answer<T> {
         }
     }
 
-    fn as_option(self) -> Option<T> {
+    #[allow(clippy::wrong_self_convention)]
+    fn to_option(self) -> Option<T> {
         self.val_or_keep_going.ok()
     }
 }

@@ -45,12 +45,12 @@ impl GenType {
     ///
     /// Returns `None` if the type in question is not itself a concrete definition (`GenType::Def`)
     /// or an abstract reference to a locally-defined adhoc type (`GenType::Inline` of nested `LocalType::LocalDef`).
-    pub(crate) fn try_as_adhoc(&self) -> Option<(usize, &Label, UseParams)> {
+    pub(crate) fn try_as_adhoc(&self) -> Option<(usize, &Label, Option<Box<UseParams>>)> {
         match self {
             GenType::Def((ix, lbl), RustTypeDecl { lt, .. }) => Some((
                 *ix,
                 lbl,
-                lt.clone().map(RustParams::from_lt).unwrap_or_default(),
+                lt.clone().map(|lt| Box::new(RustParams::from_lt(lt))),
             )),
             GenType::Inline(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(
                 ix,
@@ -1018,6 +1018,7 @@ mod __impls {
             .collect()
     }
 
+    #[allow(clippy::boxed_local)]
     fn rebox<T, U: From<T>>(b: Box<T>) -> Box<U> {
         Box::new(U::from(*b))
     }

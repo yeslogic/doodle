@@ -1079,7 +1079,7 @@ impl Expr {
                             |lambda: &Expr, v: &ParsedValue| lambda.eval_lambda_with_loc(scope, v);
                         let query = query_key.eval_value_with_loc(scope);
                         if *is_sorted {
-                            match find_index_by_key_sorted(f_get_key, &query, &values, eval) {
+                            match find_index_by_key_sorted(f_get_key, &query, values, eval) {
                                 Some(ix) => Cow::Owned(ParsedValue::Option(Some(Box::new(
                                     values[ix].clone(),
                                 )))),
@@ -1088,7 +1088,7 @@ impl Expr {
                                 }
                             }
                         } else {
-                            match find_index_by_key_unsorted(f_get_key, &query, &values, eval) {
+                            match find_index_by_key_unsorted(f_get_key, &query, values, eval) {
                                 Some(ix) => Cow::Owned(ParsedValue::Option(Some(Box::new(
                                     values[ix].clone(),
                                 )))),
@@ -1440,7 +1440,7 @@ impl Decoder {
                 }
             }
             Decoder::ParseFromView(v_expr, a) => {
-                let view = self.eval_view_expr_with_loc(scope, v_expr)?;
+                let view = Self::eval_view_expr_with_loc(scope, v_expr)?;
                 let (va, _) = a.parse_with_loc(program, scope, view)?;
                 Ok((va, input))
             }
@@ -1608,7 +1608,7 @@ impl Decoder {
                         ParsedValue::new_seq(v.clone(), start_offset, input.offset - start_offset)
                             .clone_into_value(),
                     ]));
-                    let is_done = f_done.eval_lambda_with_loc(&scope, &done_arg).unwrap_bool();
+                    let is_done = f_done.eval_lambda_with_loc(scope, &done_arg).unwrap_bool();
                     if is_done {
                         break;
                     }
@@ -1707,7 +1707,7 @@ impl Decoder {
                 let (v, input) = d.parse_with_loc(program, scope, input)?;
                 match expr.eval_lambda_with_loc(scope, &v).unwrap_bool() {
                     true => Ok((v, input)),
-                    false => Err(DecodeError::loc_bad_where(scope, *expr.clone(), v)),
+                    false => Err(DecodeError::loc_bad_where(scope, expr.clone(), Box::new(v))),
                 }
             }
             Decoder::Compute(expr) => {
@@ -1773,7 +1773,7 @@ impl Decoder {
             Decoder::CaptureBytes(v_expr, len) => {
                 let len = len.eval_value_with_loc(scope).unwrap_usize();
 
-                let view_window = self.eval_view_expr_with_loc(scope, v_expr)?;
+                let view_window = Self::eval_view_expr_with_loc(scope, v_expr)?;
                 // accumulate `len` bytes into a Vec<Value>
                 let mut accum = Vec::with_capacity(len);
                 let mut buf = view_window;
@@ -1796,7 +1796,7 @@ impl Decoder {
             }
             Decoder::ReadArray(v_expr, len, kind) => {
                 let len = len.eval_value_with_loc(scope).unwrap_usize();
-                let view_window = self.eval_view_expr_with_loc(scope, v_expr)?;
+                let view_window = Self::eval_view_expr_with_loc(scope, v_expr)?;
 
                 // REVIEW - hardcoded big-endianness
                 let mut accum = Vec::with_capacity(len);
@@ -1813,7 +1813,7 @@ impl Decoder {
                 ))
             }
             Decoder::ReifyView(v_expr) => {
-                let view = self.eval_view_expr_with_loc(scope, v_expr)?;
+                let view = Self::eval_view_expr_with_loc(scope, v_expr)?;
                 let v = ParsedValue::from_evaluated(Value::View {
                     offset: view.offset,
                 });
@@ -1823,18 +1823,17 @@ impl Decoder {
     }
 
     fn eval_view_expr_with_loc<'a>(
-        &self,
         scope: &LocScope<'a>,
         v_expr: &ViewExpr,
     ) -> Result<View<'a>, DecodeError<ParsedValue>> {
         match v_expr {
             ViewExpr::Var(ident) => {
-                let view = scope.get_view_by_name(&ident);
+                let view = scope.get_view_by_name(ident);
                 Ok(view)
             }
             ViewExpr::Offset(base, offset) => {
                 let offset = offset.eval_value_with_loc(scope).unwrap_usize();
-                let base_view = self.eval_view_expr_with_loc(scope, base)?;
+                let base_view = Self::eval_view_expr_with_loc(scope, base)?;
                 let Some((_, view_window)) = base_view.split_at(offset) else {
                     return Err(DecodeError::overrun(offset, base_view.offset));
                 };

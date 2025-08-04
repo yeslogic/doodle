@@ -46,11 +46,11 @@ pub(crate) enum NameAtom {
 impl std::fmt::Display for NameAtom {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            NameAtom::Explicit(name) => write!(f, "{}", name),
-            NameAtom::Positional(pos) => write!(f, "ix{}", pos),
-            NameAtom::RecordField(fld) => write!(f, "{}", fld),
-            NameAtom::Bind(bind) => write!(f, "{}", bind),
-            NameAtom::Variant(vn) => write!(f, "{}", vn),
+            NameAtom::Explicit(name) => write!(f, "{name}"),
+            NameAtom::Positional(pos) => write!(f, "ix{pos}"),
+            NameAtom::RecordField(fld) => write!(f, "{fld}"),
+            NameAtom::Bind(bind) => write!(f, "{bind}"),
+            NameAtom::Variant(vn) => write!(f, "{vn}"),
             NameAtom::Derived(dev) => write!(f, "{}", dev.token()),
             NameAtom::DeadEnd => write!(f, "POISON"),
         }
@@ -100,7 +100,7 @@ pub(crate) fn is_refinement(x: &PathLabel, y: &PathLabel) -> bool {
         }
     }
     // NOTE - we would normally just return false, but to allow conditional bypass of backup heuristics for DeadEnd, we pply them outside the loop
-    y.len() < x.len() || NameCtxt::generate_name(&y).len() < NameCtxt::generate_name(x).len()
+    y.len() < x.len() || NameCtxt::generate_name(y).len() < NameCtxt::generate_name(x).len()
 }
 
 /// If `y` is a refinement over `x`, then `x` is replaced with `y`
@@ -300,7 +300,7 @@ fn dedup(rawname: Label, ix: usize) -> Label {
     if ix == 0 {
         rawname
     } else {
-        Label::Owned(format!("{}__dupX{}", rawname, ix))
+        Label::Owned(format!("{rawname}__dupX{ix}"))
     }
 }
 
@@ -308,7 +308,7 @@ fn dedup(rawname: Label, ix: usize) -> Label {
 fn underscore_join(tail: &mut Fragment, prefix: impl std::fmt::Display) {
     let tmp = std::mem::replace(tail, Fragment::Empty);
     *tail = Fragment::intervene(
-        Fragment::String(Label::Owned(format!("{}", prefix))),
+        Fragment::String(Label::Owned(format!("{prefix}"))),
         Fragment::Char('_'),
         tmp,
     );

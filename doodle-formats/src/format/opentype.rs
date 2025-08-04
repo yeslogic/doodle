@@ -24,23 +24,24 @@ enum NestingKind {
 }
 
 /// Helper function for generically constructing a Format that consists of a
-/// set of invariant fields, a discriminant field, and an alternation over
-/// exactly one inhabited sub-format based on the value of the discriminant.
+///   set of invariant fields, a discriminant field, and an alternation over
+///   exactly one inhabited sub-format based on the value of the discriminant.
 ///
 /// - `outer_fields` is a list of the `(name, format)` pairs that are invariant and precede
-/// the dependent field-set.
+///   the dependent field-set.
 /// - `discriminant` consists of the name of the discriminant field and its sole value.
-/// The field-name in question must be present in `outer_fields`, and this function
-/// will panic if it is missing.
+///   The field-name in question must be present in `outer_fields`, and this function
+///   will panic if it is missing.
 /// - `inner_fields` is the list of fields that belong to the sub-format dependent on `discriminant`.
 /// - `intermediate` is the name of the field that will be used to hold the `inner_fields` ADT when
-/// not flattened (see `nesting kind`)
+///   not flattened (see `nesting kind`)
 /// - `variant_name` is the constructor-name for the sole variant of the enum that holds the `inner_fields` record
 /// - `nesting_kind` is a template-selector that determines how to construct the return-value from the given arguments.
+///
 /// We have two choices: `SingletonADT`, which constructs an embedded ADT using `intermediate` and `variant_name`; and `FlattenInner`,
-/// which ignores those fields and instead constructs a single flattened record, concatenating `outer_fields` and `inner_fields`
-/// in the expected order, and wrapping the discriminant-field in a `Format::Where` context that ensures that the
-/// field in question has the appropriate value.
+///   which ignores those fields and instead constructs a single flattened record, concatenating `outer_fields` and `inner_fields`
+///   in the expected order, and wrapping the discriminant-field in a `Format::Where` context that ensures that the
+///   field in question has the appropriate value.
 ///
 /// # Panics
 ///
@@ -329,7 +330,7 @@ where
     chain(
         Format::Peek(Box::new(monad_seq(
             // Process all the fields before the one we care about and discard their cumulative value
-            record(init.into_iter().cloned()),
+            record(init.iter().cloned()),
             // Process the field we *do* care about, while still in the peek context, and yield its value as the result of the entire parse
             field_format.clone(),
         ))),

@@ -60,18 +60,18 @@ const MAX_SEQ_LEN: usize = 64;
 impl std::fmt::Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Value::Bool(b) => write!(f, "{}", b),
-            Value::U8(i) => write!(f, "{}", i),
-            Value::U16(i) => write!(f, "{}", i),
-            Value::U32(i) => write!(f, "{}", i),
-            Value::U64(i) => write!(f, "{}", i),
-            Value::Char(c) => write!(f, "{:?}", c),
-            Value::Usize(i) => write!(f, "{}", i),
-            Value::View { offset } => write!(f, "View[+{}]", offset),
-            Value::EnumFromTo(r) => write!(f, "{:?}", r),
+            Value::Bool(b) => write!(f, "{b}"),
+            Value::U8(i) => write!(f, "{i}"),
+            Value::U16(i) => write!(f, "{i}"),
+            Value::U32(i) => write!(f, "{i}"),
+            Value::U64(i) => write!(f, "{i}"),
+            Value::Char(c) => write!(f, "{c:?}"),
+            Value::Usize(i) => write!(f, "{i}"),
+            Value::View { offset } => write!(f, "View[+{offset}]"),
+            Value::EnumFromTo(r) => write!(f, "{r:?}"),
             Value::Option(v) => match v {
                 None => write!(f, "None"),
-                Some(v) => write!(f, "Some({})", v),
+                Some(v) => write!(f, "Some({v})"),
             },
             Value::Tuple(vs) => {
                 write!(
@@ -89,13 +89,13 @@ impl std::fmt::Display for Value {
                     "{{ {} }}",
                     fields
                         .iter()
-                        .map(|(f, v)| format!("{}: {}", f, v))
+                        .map(|(f, v)| format!("{f}: {v}"))
                         .collect::<Vec<_>>()
                         .join(", ")
                 )
             }
             Value::Variant(label, value) => {
-                write!(f, "`{}({})", label, value)
+                write!(f, "`{label}({value})")
             }
             Value::Seq(s_kind) => match s_kind {
                 SeqKind::Dup(n, v) => write!(f, "[{v}; {n}]"),
@@ -115,9 +115,9 @@ impl std::fmt::Display for Value {
                 }
             },
             Value::Mapped(orig, image) => {
-                write!(f, "({} => {})", orig, image)
+                write!(f, "({orig} => {image})")
             }
-            Value::Branch(n, value) => write!(f, "({n} :~ {})", value),
+            Value::Branch(n, value) => write!(f, "({n} :~ {value})"),
         }
     }
 }
@@ -219,10 +219,7 @@ impl Value {
     }
 
     pub(crate) fn is_boolean(&self) -> bool {
-        match self.coerce_mapped_value() {
-            Value::Bool(_) => true,
-            _ => false,
-        }
+        matches!(self.coerce_mapped_value(), Value::Bool(_))
     }
 }
 
@@ -334,7 +331,7 @@ impl Expr {
                 let head = head.eval(scope);
                 if let Some(pattern_scope) = head.matches(scope, pat) {
                     let value = expr.eval_value(&Scope::Multi(&pattern_scope));
-                    return Cow::Owned(value);
+                    Cow::Owned(value)
                 } else {
                     panic!("refutable pattern failed to match: {pat:?} :~ {head:?}");
                 }
@@ -1130,7 +1127,7 @@ impl<'a> Compiler<'a> {
                         branches.push(f_count);
                     }
                     let Some(tree) = MatchTree::build(self.module, &branches[..], next) else {
-                        panic!("cannot build match tree for {:?}", format)
+                        panic!("cannot build match tree for {format:?}")
                     };
                     tree
                 };
@@ -1600,7 +1597,7 @@ impl Decoder {
                 }
             }
             Decoder::ParseFromView(v_expr, a) => {
-                let view_window = self.eval_view_expr(scope, v_expr)?;
+                let view_window = Self::eval_view_expr(scope, v_expr)?;
                 let (va, _) = a.parse(program, scope, view_window)?;
                 Ok((va, input))
             }
@@ -1710,7 +1707,7 @@ impl Decoder {
                 let mut accum = init.eval_value(scope);
                 loop {
                     let done_arg = Value::Tuple(vec![accum.clone(), Value::Seq(v.clone().into())]);
-                    let is_done = f_done.eval_lambda(&scope, &done_arg).unwrap_bool();
+                    let is_done = f_done.eval_lambda(scope, &done_arg).unwrap_bool();
                     if is_done {
                         break;
                     }
@@ -1776,7 +1773,7 @@ impl Decoder {
                 let (v, input) = d.parse(program, scope, input)?;
                 match expr.eval_lambda(scope, &v).unwrap_bool() {
                     true => Ok((v, input)),
-                    false => Err(DecodeError::bad_where(scope, *expr.clone(), v)),
+                    false => Err(DecodeError::bad_where(scope, expr.clone(), Box::new(v))),
                 }
             }
             Decoder::Compute(expr) => {
@@ -1838,7 +1835,7 @@ impl Decoder {
             Decoder::CaptureBytes(v_expr, len) => {
                 let len = len.eval_value(scope).unwrap_usize();
 
-                let view_window = self.eval_view_expr(scope, v_expr)?;
+                let view_window = Self::eval_view_expr(scope, v_expr)?;
 
                 // accumulate `len` bytes into a Vec<Value>
                 let mut accum = Vec::with_capacity(len);
@@ -1856,7 +1853,7 @@ impl Decoder {
             }
             Decoder::ReadArray(v_expr, len, kind) => {
                 let len = len.eval_value(scope).unwrap_usize();
-                let view_window = self.eval_view_expr(scope, v_expr)?;
+                let view_window = Self::eval_view_expr(scope, v_expr)?;
 
                 // REVIEW - hardcoded big-endianness
                 let mut accum = Vec::with_capacity(len);
@@ -1870,7 +1867,7 @@ impl Decoder {
                 Ok((Value::Seq(SeqKind::Strict(accum)), input))
             }
             Decoder::ReifyView(v_expr) => {
-                let view = self.eval_view_expr(scope, v_expr)?;
+                let view = Self::eval_view_expr(scope, v_expr)?;
                 Ok((
                     Value::View {
                         offset: view.offset,
@@ -1881,19 +1878,15 @@ impl Decoder {
         }
     }
 
-    fn eval_view_expr<'a>(
-        &self,
-        scope: &Scope<'a>,
-        v_expr: &ViewExpr,
-    ) -> Result<View<'a>, DecodeError> {
+    fn eval_view_expr<'a>(scope: &Scope<'a>, v_expr: &ViewExpr) -> Result<View<'a>, DecodeError> {
         match v_expr {
             ViewExpr::Var(ident) => {
-                let view = scope.get_view_by_name(&ident);
+                let view = scope.get_view_by_name(ident);
                 Ok(view)
             }
             ViewExpr::Offset(base, offset) => {
                 let offset = offset.eval_value(scope).unwrap_usize();
-                let base_view = self.eval_view_expr(scope, base)?;
+                let base_view = Self::eval_view_expr(scope, base)?;
                 let Some((_, view_window)) = base_view.split_at(offset) else {
                     return Err(DecodeError::overrun(offset, base_view.offset));
                 };

@@ -197,7 +197,7 @@ pub fn u64be(input: (u8, u8, u8, u8, u8, u8, u8, u8)) -> u64 {
 /// For compatibility reasons with the code-generator layer, `count` is a `u32`
 /// to avoid having to cast it to `usize` in advance.
 pub fn dup32<T: Clone>(count: u32, value: T) -> Vec<T> {
-    Vec::from_iter(std::iter::repeat(value).take(count as usize))
+    Vec::from_iter(std::iter::repeat_n(value, count as usize))
 }
 
 /// Parses a DEFLATE-style huffman code-length table, with optional code-value table to reconsider the lengths
@@ -330,7 +330,7 @@ pub(crate) mod huffman {
                     match children[b as usize].insert(&suffix[1..], value) {
                         Ok(()) => {}
                         Err(_e) => {
-                            eprintln!("{:?}", this);
+                            eprintln!("{this:?}");
                             return Err(_e);
                         }
                     }

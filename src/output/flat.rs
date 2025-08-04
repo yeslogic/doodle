@@ -128,7 +128,7 @@ fn check_covered(
         Format::Pos => {}
         Format::Align(_) => {}
         Format::Byte(_) => {
-            return Err(format!("uncovered byte: {:?}", path));
+            return Err(format!("uncovered byte: {path:?}"));
         }
         Format::ParseFromView(_, format) | Format::DecodeBytes(_, format) => {
             check_covered(module, path, format)?;
