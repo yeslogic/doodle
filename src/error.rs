@@ -16,8 +16,8 @@ pub enum DecodeError<V: Clone = Value> {
     },
     BadWhere {
         bindings: Vec<(Label, ScopeEntry<V>)>,
-        assertion: Expr,
-        exception: V,
+        assertion: Box<Expr>,
+        exception: Box<V>,
     },
     Trailing {
         byte: u8,
@@ -129,7 +129,11 @@ impl DecodeError<Value> {
         }
     }
 
-    pub fn bad_where(scope: &Scope<'_>, assertion: Expr, exception: Value) -> DecodeError<Value> {
+    pub fn bad_where(
+        scope: &Scope<'_>,
+        assertion: Box<Expr>,
+        exception: Box<Value>,
+    ) -> DecodeError<Value> {
         let mut bindings = Vec::new();
         scope.get_bindings(&mut bindings);
         DecodeError::BadWhere {
@@ -155,8 +159,8 @@ impl DecodeError<ParsedValue> {
 
     pub fn loc_bad_where(
         scope: &LocScope<'_>,
-        assertion: Expr,
-        exception: ParsedValue,
+        assertion: Box<Expr>,
+        exception: Box<ParsedValue>,
     ) -> DecodeError<ParsedValue> {
         let mut bindings = Vec::new();
         scope.get_bindings(&mut bindings);

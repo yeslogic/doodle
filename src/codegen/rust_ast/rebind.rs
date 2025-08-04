@@ -153,9 +153,9 @@ impl Rebindable for RustExpr {
             RustExpr::Struct(con, expr) => {
                 con.rebind(table);
                 match expr {
-                    StructExpr::EmptyExpr => (),
-                    StructExpr::TupleExpr(vals) => vals.rebind(table),
-                    StructExpr::RecordExpr(flds) => {
+                    StructExpr::Empty => (),
+                    StructExpr::Tuple(vals) => vals.rebind(table),
+                    StructExpr::Record(flds) => {
                         flds.iter_mut().for_each(|(_, fld)| fld.rebind(table))
                     }
                 }
@@ -342,9 +342,8 @@ impl Rebindable for RustStruct {
 impl Rebindable for FnSig {
     fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         self.args.iter_mut().for_each(|(_, arg)| arg.rebind(table));
-        match self.ret.as_mut() {
-            Some(ret) => ret.rebind(table),
-            None => (),
+        if let Some(ret) = self.ret.as_mut() {
+            ret.rebind(table)
         }
     }
 }

@@ -674,7 +674,7 @@ impl std::fmt::Display for UintSet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let this = self.normalize();
         if this.is_empty() {
-            return write!(f, "{{}}");
+            write!(f, "{{}}")
         } else {
             write!(f, "{{ ")?;
             let labels = ["U8", "U16", "U32", "U64"];
@@ -722,13 +722,13 @@ impl UintSet {
 
     pub fn normalize(self) -> Self {
         let mut ranks = self.ranks;
-        for ix in 0..4 {
-            if self.ranks[ix] == Rank::Excluded {
+        for rank in ranks.iter_mut() {
+            let orig_val = *rank;
+            if orig_val == Rank::Excluded {
                 continue;
             }
-            let orig_val = self.ranks[ix];
             let count_gte = (self.ranks.iter().filter(|r| **r >= orig_val).count() - 1) as u8;
-            ranks[ix] = Rank::At(count_gte);
+            *rank = Rank::At(count_gte);
         }
         Self { ranks }
     }
@@ -1228,7 +1228,7 @@ impl TypeChecker {
     fn traverse_view_expr(&mut self, view: &ViewExpr, ctxt: Ctxt<'_>) -> TCResult<()> {
         match view {
             ViewExpr::Var(ident) => {
-                if ctxt.views.includes_name(&ident) {
+                if ctxt.views.includes_name(ident) {
                     Ok(())
                 } else {
                     Err(TCError::from(TCErrorKind::MissingView(ident.clone())))
@@ -1236,7 +1236,7 @@ impl TypeChecker {
             }
             ViewExpr::Offset(base, offs) => {
                 self.traverse_view_expr(base.as_ref(), ctxt)?;
-                let v_offs = self.infer_var_expr(offs, &ctxt.scope)?;
+                let v_offs = self.infer_var_expr(offs, ctxt.scope)?;
                 self.unify_var_baseset(v_offs, BaseSet::U(UintSet::ANY))?;
                 Ok(())
             }
@@ -2983,7 +2983,7 @@ impl TypeChecker {
                 // update function is (acc, x) -> acc
                 self.unify_var_utype(
                     acc_elt_var,
-                    Rc::new(UType::tuple([UType::Var(acc_var), (&*inner_t).clone()])),
+                    Rc::new(UType::tuple([UType::Var(acc_var), (*inner_t).clone()])),
                 )?;
                 self.unify_var_pair(update_var, acc_var)?;
 
@@ -3179,7 +3179,7 @@ impl TypeChecker {
             let _ = this.infer_var_format(module.get_format(next_level), ctxt)?;
             let all_seen_levels = this.level_vars.keys().copied().collect::<BTreeSet<usize>>();
             for just_seen in all_seen_levels.difference(&seen_levels) {
-                unexplored.remove(&just_seen);
+                unexplored.remove(just_seen);
             }
             seen_levels = all_seen_levels;
         }
@@ -3307,14 +3307,14 @@ pub enum Polarity {
 
 #[derive(Debug)]
 pub struct TCError {
-    err: TCErrorKind,
+    err: Box<TCErrorKind>,
     _trace: Vec<Box<dyn std::fmt::Debug + 'static + Send + Sync>>,
 }
 
 impl From<TCErrorKind> for TCError {
     fn from(value: TCErrorKind) -> Self {
         Self {
-            err: value,
+            err: Box::new(value),
             _trace: Vec::new(),
         }
     }
@@ -3375,7 +3375,7 @@ where
 {
     fn from(value: (ConstraintError, T)) -> Self {
         Self {
-            err: TCErrorKind::Unification(value.0),
+            err: Box::new(TCErrorKind::Unification(value.0)),
             _trace: vec![Box::new(value.1)],
         }
     }

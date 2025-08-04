@@ -205,7 +205,7 @@ impl FormatCompiler {
 
     pub fn compile(&self, f: &FormatExt) -> Format {
         match f {
-            FormatExt::Ground(gf) => Format::try_from(gf.clone()).expect("bad conversion"),
+            FormatExt::Ground(gf) => Format::from(gf.clone()),
             FormatExt::Epi(ef) => self.compile_epi(ef),
             FormatExt::Meta(mf) => self.compile_meta(mf),
         }
@@ -670,7 +670,7 @@ impl ValueTypeExt {
             ValueTypeExt::Any => Some(ValueType::Any),
             ValueTypeExt::Empty => Some(ValueType::Empty),
             ValueTypeExt::ViewObj => Some(ValueType::ViewObj),
-            ValueTypeExt::Base(b) => Some(ValueType::Base(b.clone())),
+            ValueTypeExt::Base(b) => Some(ValueType::Base(*b)),
             ValueTypeExt::Tuple(v) => {
                 let mut vs = Vec::with_capacity(v.len());
                 for v in v {
@@ -872,7 +872,7 @@ impl FormatModuleExt {
                 GroundFormat::Pos => Ok(ValueTypeExt::Base(BaseType::U64)),
 
                 GroundFormat::Apply(name) => match scope.get_type_by_name(name) {
-                    ValueKind::Format(t) => Ok(t.clone().into()),
+                    ValueKind::Format(t) => Ok(t.clone()),
                     ValueKind::Value(t) => Err(anyhow!("Apply: expected format, found {t:?}")),
                     ValueKind::View => Err(anyhow!("Apply: expected format, found View")),
                 },
@@ -990,7 +990,7 @@ impl FormatModuleExt {
                                 Expr::Lambda(head, expr) => {
                                     let t = self.infer_format_ext_type(scope, f)?;
                                     // Check that the initial accumulator value's type unifies with the type-claim
-                                    let _acc_type = init.infer_type_ext(&scope)?.unify(vt.as_ref())?;
+                                    let _acc_type = init.infer_type_ext(scope)?.unify(vt.as_ref())?;
                                     let mut child_scope = TypeScope::child(scope);
                                     let t_seq = ValueTypeExt::Seq(Box::new(t.clone()));
                                     let vt_acc_seq = ValueTypeExt::Tuple(vec![vt.as_ref().clone(), t_seq.clone()]);
@@ -1575,7 +1575,7 @@ mod __impls {
                     let rhs_type = rhs.infer_type_ext(scope)?;
                     match (&lhs_type, &rhs_type) {
                         (ValueTypeExt::Seq(t1), ValueTypeExt::Seq(t2)) => {
-                            let elem_t = t1.unify(&t2)?;
+                            let elem_t = t1.unify(t2)?;
                             Ok(ValueTypeExt::Seq(Box::new(elem_t)))
                         }
                         (ValueTypeExt::Seq(..), other) => {
@@ -1584,11 +1584,9 @@ mod __impls {
                         (other, ValueTypeExt::Seq(..)) => {
                             Err(anyhow!("Append: lhs is not Seq: {other:?}"))
                         }
-                        (lhs_type, rhs_type) => {
-                            return Err(anyhow!(
-                                "Append: lhs and rhs must be Seq: {lhs_type:?}, {rhs_type:?} !~ Seq(_)"
-                            ));
-                        }
+                        (lhs_type, rhs_type) => Err(anyhow!(
+                            "Append: lhs and rhs must be Seq: {lhs_type:?}, {rhs_type:?} !~ Seq(_)"
+                        )),
                     }
                 }
             }

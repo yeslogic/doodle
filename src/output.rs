@@ -55,11 +55,11 @@ impl fmt::Debug for Fragment {
             Self::String(s) => f.debug_tuple("String").field(s).finish(),
             Self::DebugAtom(at) => f
                 .debug_tuple("DebugAtom")
-                .field(&format!("{:?}", at))
+                .field(&format!("{at:?}"))
                 .finish(),
             Self::DisplayAtom(at) => f
                 .debug_tuple("DisplayAtom")
-                .field(&format!("{}", at))
+                .field(&format!("{at}"))
                 .finish(),
             Self::Group(grp) => f.debug_tuple("Group").field(grp).finish(),
             Self::Cat(x, y) => f.debug_tuple("Cat").field(x).field(y).finish(),
@@ -108,7 +108,7 @@ impl Fragment {
                     0 => true,
                     1 => items[0].is_vacuous(), // sep can be non-vacuous if there is only one item
                     _ => {
-                        sep.as_ref().map_or(true, |frag| frag.is_vacuous())
+                        sep.as_deref().is_none_or(Fragment::is_vacuous)
                             && items.iter().all(Fragment::is_vacuous)
                     }
                 }

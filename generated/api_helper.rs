@@ -44,15 +44,15 @@ pub mod png_metrics {
             let trail = &data[data.len() - MARGIN..];
             let skip = data.len() - 2 * MARGIN;
             for byte in lead {
-                write!(buf, "{:02x}", byte)?;
+                write!(buf, "{byte:02x}")?;
             }
-            write!(buf, "...({} bytes skipped)...", skip)?;
+            write!(buf, "...({skip} bytes skipped)...")?;
             for byte in trail {
-                write!(buf, "{:02x}", byte)?;
+                write!(buf, "{byte:02x}")?;
             }
         } else {
             for byte in data {
-                write!(buf, "{:02x}", byte)?;
+                write!(buf, "{byte:02x}")?;
             }
         }
         write!(buf, "]")
@@ -218,7 +218,7 @@ pub mod elf_info {
         input.read_to_end(&mut buf)?;
         let mut parser = Parser::new(&buf);
         let elf = Decoder_elf_main(&mut parser)?;
-        println!("{:?}", elf);
+        println!("{elf:?}");
         Ok(())
     }
 

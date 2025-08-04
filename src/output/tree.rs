@@ -25,9 +25,8 @@ pub fn print_decoded_value(module: &FormatModule, value: &Value, format: &Format
     use std::io::Write;
     let frag = TreePrinter::new(module).compile_decoded_value(value, format);
     let mut lock = io::stdout().lock();
-    match write!(&mut lock, "{}", frag) {
-        Ok(_) => (),
-        Err(e) => eprintln!("error: {e}"),
+    if let Err(e) = write!(&mut lock, "{frag}") {
+        eprintln!("error: {e}");
     }
 }
 
@@ -35,9 +34,8 @@ pub fn print_parsed_decoded_value(module: &FormatModule, p_value: &ParsedValue, 
     use std::io::Write;
     let frag = TreePrinter::new(module).compile_parsed_decoded_value(p_value, format);
     let mut lock = io::stdout().lock();
-    match write!(&mut lock, "{}", frag) {
-        Ok(_) => (),
-        Err(e) => eprintln!("error: {e}"),
+    if let Err(e) = write!(&mut lock, "{frag}") {
+        eprintln!("error: {e}");
     }
 }
 
@@ -88,13 +86,10 @@ impl<'module> TreePrinter<'module> {
     fn is_implied_value_format_new_style_record(&self, format: &Format) -> bool {
         let record_format = format.to_record_format();
         for (field_label, format) in record_format.iter() {
-            match field_label {
-                FieldLabel::Permanent { .. } => {
-                    if !self.is_implied_value_format(format) {
-                        return false;
-                    }
+            if let FieldLabel::Permanent { .. } = field_label {
+                if !self.is_implied_value_format(format) {
+                    return false;
                 }
-                _ => (),
             }
         }
         true
@@ -1646,31 +1641,31 @@ impl<'module> TreePrinter<'module> {
     }
 
     // NOTE - currently used only for `Expr::Destructure, otherwise patterns are not shown`.
-    fn compile_pattern(&mut self, pat: &Pattern) -> Fragment {
+    fn compile_pattern(pat: &Pattern) -> Fragment {
         match pat {
             Pattern::Binding(name) => Fragment::String(name.clone()),
             Pattern::Tuple(elts) => Fragment::seq(
-                elts.iter().map(|e| self.compile_pattern(e)),
+                elts.iter().map(Self::compile_pattern),
                 Some(Fragment::String(", ".into())),
             )
             .delimit(Fragment::Char('('), Fragment::Char(')'))
             .group(),
             Pattern::Option(Some(pat)) => Fragment::string("Some")
                 .cat(Fragment::Char('('))
-                .cat(self.compile_pattern(pat))
+                .cat(Self::compile_pattern(pat))
                 .cat(Fragment::Char(')'))
                 .group(),
             Pattern::Option(None) => Fragment::string("None"),
             Pattern::Wildcard => Fragment::string("_"),
             Pattern::Seq(pats) => Fragment::seq(
-                pats.iter().map(|e| self.compile_pattern(e)),
+                pats.iter().map(Self::compile_pattern),
                 Some(Fragment::String(", ".into())),
             )
             .delimit(Fragment::Char('['), Fragment::Char(']'))
             .group(),
             Pattern::Variant(name, pat) => Fragment::String(name.clone())
                 .cat(Fragment::Char('('))
-                .cat(self.compile_pattern(pat))
+                .cat(Self::compile_pattern(pat))
                 .cat(Fragment::Char(')'))
                 .group(),
             Pattern::Int(..)
@@ -1696,7 +1691,7 @@ impl<'module> TreePrinter<'module> {
             Expr::Destructure(head, pat, expr) => cond_paren(
                 Fragment::String("pat-bind ".into())
                     .cat(Fragment::Char('['))
-                    .cat(self.compile_pattern(pat))
+                    .cat(Self::compile_pattern(pat))
                     .cat(Fragment::String(" = ".into()))
                     .cat(self.compile_expr(head, Precedence::TOP))
                     .cat(Fragment::string("] "))

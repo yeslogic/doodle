@@ -94,7 +94,7 @@ where
     let last_ix = len - 1;
     let upper_bound = get_key_at_index(last_ix);
 
-    match query.compare_as_key(&upper_bound) {
+    match query.compare_as_key(upper_bound) {
         Ordering::Greater => return None,
         Ordering::Equal => return Some(last_ix),
         Ordering::Less => {
@@ -117,7 +117,7 @@ where
         let mid = (lower_bound_ix + upper_bound_ix) / 2;
 
         let mid_key = get_key_at_index(mid);
-        match query.compare_as_key(&mid_key) {
+        match query.compare_as_key(mid_key) {
             Ordering::Less => upper_bound_ix = mid - 1,
             Ordering::Equal => return Some(mid),
             Ordering::Greater => lower_bound_ix = mid + 1,

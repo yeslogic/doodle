@@ -13,7 +13,7 @@ impl<Rep: Clone> TypedExpr<Rep, Label> {
         match self {
             TypedExpr::Var(gt, var) => {
                 let Some(index) = vars.get_index(var) else {
-                    panic!("reference to var {:?} not found in env: {:?}", var, vars)
+                    panic!("reference to var {var:?} not found in env: {vars:?}")
                 };
                 TypedExpr::Var(gt.clone(), index as u32)
             }
@@ -64,7 +64,7 @@ impl<'a> VarStack<'a> {
                 return Some(dist);
             }
         }
-        return None;
+        None
     }
 }
 
@@ -72,7 +72,7 @@ impl<'a> std::fmt::Debug for VarStack<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "VarStack: ")?;
         for (dist, var) in self.vars.iter().copied().enumerate() {
-            write!(f, "${}: {}, ", dist, var)?
+            write!(f, "${dist}: {var}, ")?
         }
         Ok(())
     }

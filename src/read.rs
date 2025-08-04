@@ -73,7 +73,7 @@ impl<'a> ReadCtxt<'a> {
 
 impl<'a> ReadCtxt<'a> {
     pub fn read_byte(&self) -> Option<(u8, ReadCtxt<'a>)> {
-        if self.offset + 1 <= self.input.len() {
+        if self.offset < self.input.len() {
             let b = self.input[self.offset];
             Some((
                 b,

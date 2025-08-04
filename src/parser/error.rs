@@ -78,7 +78,7 @@ impl std::fmt::Display for ParseError {
                 OverrunKind::EndOfStream { offset, max_offset }=> write!(f, "attempted offset-advance to {offset} would overrun end of stream[max-offset: {max_offset}]"),
                 OverrunKind::EndOfSlice { offset, max_offset } => write!(f, "attempted offset-advance to {offset} would overrun end of slice[max-offset: {max_offset}]"),
             },
-            ParseError::InternalError(e) => write!(f, "unrecoverable internal error: {}", e)
+            ParseError::InternalError(e) => write!(f, "unrecoverable internal error: {e}")
         }
     }
 }

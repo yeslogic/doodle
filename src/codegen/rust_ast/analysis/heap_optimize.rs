@@ -129,9 +129,7 @@ impl HeapOptimize for RustStruct {
             (HeapAction::Noop, mk_layout(self, context))
         } else {
             // NOTE - a rust struct, as a standalone object, cannot be wrapped in a heap allocation; only its fields can be individually heap-allocated
-            let fields = match &self {
-                RustStruct::Record(fields) => fields,
-            };
+            let RustStruct::Record(fields) = &self;
             let mut raw_size = 0;
             let mut max_align = 1;
             let mut field_actions = Vec::with_capacity(fields.len());
@@ -334,19 +332,17 @@ impl HeapOptimize for RustTypeDef {
                             },
                             Layout::from_size_align(max_var_size, HEAP_ALIGN).unwrap(),
                         )
-                    } else {
-                        if is_productive {
-                            (
-                                HeapAction::NonLocal,
-                                Layout::from_size_align(
-                                    aligned_size(max_var_size + 1, max_align),
-                                    max_align,
-                                )
-                                .unwrap(),
+                    } else if is_productive {
+                        (
+                            HeapAction::NonLocal,
+                            Layout::from_size_align(
+                                aligned_size(max_var_size + 1, max_align),
+                                max_align,
                             )
-                        } else {
-                            (HeapAction::Noop, mk_layout(self, context))
-                        }
+                            .unwrap(),
+                        )
+                    } else {
+                        (HeapAction::Noop, mk_layout(self, context))
                     }
                 } else if let Some(_abs_cutoff) = strategy.min_heap_size() {
                     let mut var_actions = Vec::with_capacity(vars.len());

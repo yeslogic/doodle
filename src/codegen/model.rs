@@ -136,8 +136,8 @@ pub const WHERE_CHECK: &str = "is_valid";
 
 // !SECTION
 
-pub fn view_obj_type() -> RustType {
-    RustType::ViewObject(RustLt::Parametric(lbl(DEFAULT_LT)))
+pub fn view_obj_type(lt: RustLt) -> RustType {
+    RustType::ViewObject(lt)
 }
 
 /// Helper function for promoting string-constants to method specifiers
@@ -306,7 +306,7 @@ pub(super) fn simplifying_if(
 ) -> GenExpr {
     if !predicate.is_complex() {
         GenExpr::Control(Box::new(RustControl::If(
-            predicate,
+            Box::new(predicate),
             then_branch,
             else_branch,
         )))
@@ -314,7 +314,12 @@ pub(super) fn simplifying_if(
         // REVIEW - we might need a strategy to avoid the temporary variable accidentally shadowing locally-external bindings
         GenExpr::BlockScope(Box::new(GenBlock::from(vec![
             GenStmt::Embed(RustStmt::assign(COMPLEX_COND_TMP, predicate)),
-            RustControl::If(RustExpr::local(COMPLEX_COND_TMP), then_branch, else_branch).into(),
+            RustControl::If(
+                Box::new(RustExpr::local(COMPLEX_COND_TMP)),
+                then_branch,
+                else_branch,
+            )
+            .into(),
         ])))
     }
 }

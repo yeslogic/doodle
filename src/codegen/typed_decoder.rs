@@ -306,12 +306,11 @@ impl<'a> GTCompiler<'a> {
         }
 
         self.queue_compile(t, format, None, Rc::new(Next::Empty));
-        Ok(
-            while let Some((f, args, next, n)) = self.compile_queue.pop() {
-                let d = self.compile_gt_format(f, args, next)?;
-                self.program.decoders[n].0 = d;
-            },
-        )
+        while let Some((f, args, next, n)) = self.compile_queue.pop() {
+            let d = self.compile_gt_format(f, args, next)?;
+            self.program.decoders[n].0 = d;
+        }
+        Ok(())
     }
 
     fn queue_compile(
@@ -525,7 +524,7 @@ impl<'a> GTCompiler<'a> {
                         branches.push(f_count.into());
                     }
                     let Some(tree) = MatchTree::build(self.module, &branches[..], next) else {
-                        panic!("cannot build match tree for {:?}", format)
+                        panic!("cannot build match tree for {format:?}")
                     };
                     tree
                 };

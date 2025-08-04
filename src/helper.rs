@@ -126,10 +126,8 @@ pub fn bit_fields_u8<const N: usize>(bit_fields: [BitFieldKind; N]) -> Format {
                 raw
             };
             fields.push((Label::Borrowed(name), field_value));
-        } else {
-            if bit_field.check_zero() {
-                _zero_mask &= ((1u8 << nbits) - 1) << (8 - (high_bits_used + nbits));
-            }
+        } else if bit_field.check_zero() {
+            _zero_mask &= ((1u8 << nbits) - 1) << (8 - (high_bits_used + nbits));
         }
         high_bits_used += nbits;
     }
@@ -214,10 +212,8 @@ pub fn bit_fields_u16<const N: usize>(bit_fields: [BitFieldKind; N]) -> Format {
                 raw
             };
             fields.push((Label::Borrowed(name), field_value));
-        } else {
-            if bit_field.check_zero() {
-                _zero_mask &= ((1u16 << nbits) - 1) << (16 - (high_bits_used + nbits));
-            }
+        } else if bit_field.check_zero() {
+            _zero_mask &= ((1u16 << nbits) - 1) << (16 - (high_bits_used + nbits));
         }
         high_bits_used += nbits;
     }
@@ -855,7 +851,7 @@ where
 
 /// Homogenous-format tuple whose elements are all `format`, repeating `count` times
 pub fn tuple_repeat(count: usize, format: Format) -> Format {
-    let iter = std::iter::repeat(format).take(count);
+    let iter = std::iter::repeat_n(format, count);
     Format::Tuple(iter.collect())
 }
 
