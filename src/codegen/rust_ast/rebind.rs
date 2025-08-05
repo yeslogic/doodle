@@ -161,6 +161,13 @@ impl Rebindable for RustExpr {
                 }
             }
             RustExpr::Owned(owned) => owned.rebind(table),
+            RustExpr::OwnedOption(expr, kind) => match kind {
+                OwnedKind::Unresolved(lens) => {
+                    expr.rebind(table);
+                    lens.rebind(table);
+                }
+                _ => expr.rebind(table),
+            },
 
             RustExpr::Borrow(inner) | RustExpr::BorrowMut(inner) | RustExpr::Try(inner) => {
                 inner.rebind(table)

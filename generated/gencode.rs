@@ -6343,7 +6343,7 @@ PResult::Ok(opentype_table_record { table_id, checksum, offset, length })
 }
 
 fn Decoder_opentype_table_directory_table_links(_input: &mut Parser<'_>, start: u32, tables: &[opentype_table_record]) -> Result<opentype_table_directory_table_links, ParseError> {
-let cmap = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1668112752u32, tables)).map(|x| *x) {
+let cmap = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1668112752u32, tables)).copied() {
 Some(ref matching_table) => {
 let tgt_offset = start + matching_table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6362,7 +6362,7 @@ _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
 };
-let head = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1751474532u32, tables)).map(|x| *x) {
+let head = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1751474532u32, tables)).copied() {
 Some(ref matching_table) => {
 let tgt_offset = start + matching_table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6381,7 +6381,7 @@ _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
 };
-let hhea = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1751672161u32, tables)).map(|x| *x) {
+let hhea = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1751672161u32, tables)).copied() {
 Some(ref matching_table) => {
 let tgt_offset = start + matching_table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6400,7 +6400,7 @@ _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
 };
-let maxp = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1835104368u32, tables)).map(|x| *x) {
+let maxp = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1835104368u32, tables)).copied() {
 Some(ref matching_table) => {
 let tgt_offset = start + matching_table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6419,7 +6419,7 @@ _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
 };
-let hmtx = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1752003704u32, tables)).map(|x| *x) {
+let hmtx = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1752003704u32, tables)).copied() {
 Some(ref matching_table) => {
 let tgt_offset = start + matching_table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6438,7 +6438,7 @@ _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
 };
-let name = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1851878757u32, tables)).map(|x| *x) {
+let name = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1851878757u32, tables)).copied() {
 Some(ref matching_table) => {
 let tgt_offset = start + matching_table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6457,7 +6457,7 @@ _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
 };
-let os2 = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1330851634u32, tables)).map(|x| *x) {
+let os2 = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1330851634u32, tables)).copied() {
 Some(ref matching_table) => {
 let tgt_offset = start + matching_table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6477,7 +6477,7 @@ _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
 };
-let post = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1886352244u32, tables)).map(|x| *x) {
+let post = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1886352244u32, tables)).copied() {
 Some(ref matching_table) => {
 let tgt_offset = start + matching_table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6496,7 +6496,7 @@ _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
 };
-let cvt = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1668707360u32, tables)).map(|x| *x) {
+let cvt = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1668707360u32, tables)).copied() {
 Some(ref table) => {
 let tgt_offset = start + table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6535,7 +6535,7 @@ None => {
 None
 }
 };
-let fpgm = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1718642541u32, tables)).map(|x| *x) {
+let fpgm = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1718642541u32, tables)).copied() {
 Some(ref table) => {
 let tgt_offset = start + table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6574,7 +6574,7 @@ None => {
 None
 }
 };
-let loca = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1819239265u32, tables)).map(|x| *x) {
+let loca = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1819239265u32, tables)).copied() {
 Some(ref table) => {
 let tgt_offset = start + table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6593,7 +6593,7 @@ None => {
 None
 }
 };
-let glyf = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1735162214u32, tables)).map(|x| *x) {
+let glyf = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1735162214u32, tables)).copied() {
 Some(ref table) => {
 let tgt_offset = start + table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6620,7 +6620,7 @@ None => {
 None
 }
 };
-let prep = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1886545264u32, tables)).map(|x| *x) {
+let prep = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1886545264u32, tables)).copied() {
 Some(ref table) => {
 let tgt_offset = start + table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6659,7 +6659,7 @@ None => {
 None
 }
 };
-let gasp = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1734439792u32, tables)).map(|x| *x) {
+let gasp = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1734439792u32, tables)).copied() {
 Some(ref table) => {
 let tgt_offset = start + table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6678,7 +6678,7 @@ None => {
 None
 }
 };
-let base = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1111577413u32, tables)).map(|x| *x) {
+let base = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1111577413u32, tables)).copied() {
 Some(ref table) => {
 let tgt_offset = start + table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6697,7 +6697,7 @@ None => {
 None
 }
 };
-let gdef = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1195656518u32, tables)).map(|x| *x) {
+let gdef = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1195656518u32, tables)).copied() {
 Some(ref table) => {
 let tgt_offset = start + table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6716,7 +6716,7 @@ None => {
 None
 }
 };
-let gpos = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1196445523u32, tables)).map(|x| *x) {
+let gpos = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1196445523u32, tables)).copied() {
 Some(ref table) => {
 let tgt_offset = start + table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6735,7 +6735,7 @@ None => {
 None
 }
 };
-let gsub = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1196643650u32, tables)).map(|x| *x) {
+let gsub = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1196643650u32, tables)).copied() {
 Some(ref table) => {
 let tgt_offset = start + table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6754,7 +6754,7 @@ None => {
 None
 }
 };
-let fvar = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1719034226u32, tables)).map(|x| *x) {
+let fvar = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1719034226u32, tables)).copied() {
 Some(ref table) => {
 let tgt_offset = start + table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6773,7 +6773,7 @@ None => {
 None
 }
 };
-let gvar = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1735811442u32, tables)).map(|x| *x) {
+let gvar = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1735811442u32, tables)).copied() {
 Some(ref table) => {
 let tgt_offset = start + table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6792,7 +6792,7 @@ None => {
 None
 }
 };
-let kern = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1801810542u32, tables)).map(|x| *x) {
+let kern = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1801810542u32, tables)).copied() {
 Some(ref table) => {
 let tgt_offset = start + table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6811,7 +6811,7 @@ None => {
 None
 }
 };
-let stat = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1398030676u32, tables)).map(|x| *x) {
+let stat = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1398030676u32, tables)).copied() {
 Some(ref table) => {
 let tgt_offset = start + table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6830,7 +6830,7 @@ None => {
 None
 }
 };
-let vhea = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1986553185u32, tables)).map(|x| *x) {
+let vhea = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1986553185u32, tables)).copied() {
 Some(ref table) => {
 let tgt_offset = start + table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
@@ -6849,7 +6849,7 @@ None => {
 None
 }
 };
-let vmtx = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1986884728u32, tables)).map(|x| *x) {
+let vmtx = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1986884728u32, tables)).copied() {
 Some(ref table) => {
 let tgt_offset = start + table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
