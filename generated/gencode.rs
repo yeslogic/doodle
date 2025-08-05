@@ -4736,7 +4736,7 @@ return Err(ParseError::ExcludedBranch(1453530207670075215u64));
 let _here = _input.get_offset_u64();
 let waldo = {
 let scope = _input.view();
-scope.offset((try_sub!(r#where, _here, 13646096770106105413u64)) as usize).read_len(5u8 as usize)
+scope.offset((try_sub!(r#where, _here, 13646096770106105413u64)) as usize)?.read_len(5u8 as usize)
 };
 _input.skip_remainder();
 PResult::Ok(waldo_main { r#where, noise, waldo })

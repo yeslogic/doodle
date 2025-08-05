@@ -406,6 +406,11 @@ pub fn reify_view(view_raw: RustExpr) -> RustExpr {
     view_raw
 }
 
+/// RustExpr for `<view>.offset(<offset>)?`
+pub fn view_offset(view: RustExpr, offset: RustExpr) -> RustExpr {
+    view.call_method_with("offset", [offset]).wrap_try()
+}
+
 // !SECTION
 
 // SECTION - corollary functions for prelude-defined helpers

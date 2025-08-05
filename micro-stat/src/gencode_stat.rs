@@ -429,12 +429,12 @@ let design_axis_count = (Decoder5(_input))?;
 let _design_axes_offset = (Decoder2(_input))?;
 let design_axes_array = {
 let len = design_axis_size * design_axis_count;
-table_scope.offset(_design_axes_offset as usize).read_len(len as usize)
+table_scope.offset(_design_axes_offset as usize)?.read_len(len as usize)
 };
 let axis_value_count = (Decoder5(_input))?;
 let _offset_to_axis_value_offsets = (Decoder2(_input))?;
 let axis_value_offsets = {
-let mut view_parser = Parser::from(table_scope.offset(_offset_to_axis_value_offsets as usize));
+let mut view_parser = Parser::from(table_scope.offset(_offset_to_axis_value_offsets as usize)?);
 let view_input = &mut view_parser;
 let axis_value_scope = view_input.view();
 let axis_value_view = axis_value_scope;

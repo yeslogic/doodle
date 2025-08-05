@@ -776,7 +776,7 @@ fn embed_view_expr(view: &TypedViewExpr<GenType>) -> RustExpr {
         TypedViewExpr::Var(name) => RustExpr::local(name.clone()),
         TypedViewExpr::Offset(base, offset) => {
             let offset = embed_expr_nat(offset);
-            embed_view_expr(base).call_method_with("offset", [offset.cast_as_usize()])
+            model::view_offset(embed_view_expr(base), offset.cast_as_usize())
         }
     }
 }
