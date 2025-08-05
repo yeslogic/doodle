@@ -375,7 +375,7 @@ PResult::Ok(opentype_table_record { table_id, checksum, offset, length })
 }
 
 fn Decoder_opentype_table_directory_table_links<'input>(_input: &mut Parser<'input>, start: u32, tables: &[opentype_table_record]) -> Result<opentype_table_directory_table_links<'input>, ParseError> {
-let stat = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1398030676u32, tables)).map(|x| *x) {
+let stat = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1398030676u32, tables)).copied() {
 Some(ref table) => {
 let tgt_offset = start + table.offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;

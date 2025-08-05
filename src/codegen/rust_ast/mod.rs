@@ -1572,6 +1572,8 @@ impl Lens<RustType> {
 
 #[derive(Debug, Clone)]
 pub(crate) enum RustExpr {
+    /// Vacuous expression used in place of hardcoded `()`
+    Void,
     Entity(RustEntity),
     PrimitiveLit(RustPrimLit),
     ArrayLit(Vec<RustExpr>),
@@ -1897,6 +1899,7 @@ impl RustExpr {
     /// cannot be inferred without further context or more complicated heuristics.
     pub fn try_get_primtype(&self) -> Option<PrimType> {
         match self {
+            RustExpr::Void => Some(PrimType::Unit),
             RustExpr::Entity(_) => None,
             RustExpr::PrimitiveLit(p_lit) => match p_lit {
                 RustPrimLit::Boolean(..) => Some(PrimType::Bool),
@@ -2058,6 +2061,7 @@ impl RustExpr {
     /// if its direct evaluation would be immediately discarded (as with [`RustStmt::Expr`],  or [`RustStmt::Let`] with the `_` identifier).
     pub fn is_pure(&self) -> bool {
         match self {
+            RustExpr::Void => true,
             RustExpr::Entity(..) => true,
             RustExpr::Macro(RustMacro::Matches(expr, ..)) => expr.is_pure(),
             RustExpr::Macro(RustMacro::Vec(vec_expr)) => match vec_expr {
@@ -2122,25 +2126,30 @@ impl RustExpr {
     }
 
     /// Embed a RustExpr into a new non-temporary value, or return it if it is already non-temporary
-    pub(crate) fn make_persistent(&self) -> Cow<'_, Self> {
+    pub(crate) fn make_persistent<Name: IntoLabel + Clone>(&self, mk_name: impl FnOnce() -> Name) -> Cow<'_, Self> {
         match self {
             RustExpr::Entity(..) => Cow::Borrowed(self),
             // REVIEW - consider which non-entity cases are already 'persistent'
-            _ => Cow::Owned(RustExpr::BlockScope(
-                vec![RustStmt::assign("tmp", self.clone())],
-                Box::new(RustExpr::local("tmp")),
-            )),
+            _ => {
+                let name = mk_name();
+                Cow::Owned(RustExpr::BlockScope(
+                    vec![RustStmt::assign(name.clone(), self.clone())],
+                    Box::new(RustExpr::local(name)),
+                ))
+            }
         }
     }
 
-    pub(crate) fn use_as_persistent(self, f: impl FnOnce(Self) -> Self) -> Self {
-        const NAME: &str = "tmp";
+    pub(crate) fn use_as_persistent<Name: IntoLabel + Clone>(self, f: impl FnOnce(Self) -> Self, mk_name: impl FnOnce() -> Name) -> Self {
         match self {
             this @ RustExpr::Entity(..) => f(this),
-            _ => RustExpr::BlockScope(
-                vec![RustStmt::assign(NAME, self)],
-                Box::new(f(RustExpr::local(NAME))),
-            ),
+            _ => {
+                let name = mk_name();
+                RustExpr::BlockScope(
+                    vec![RustStmt::assign(name.clone(), self)],
+                    Box::new(f(RustExpr::local(name))),
+                )
+            }
         }
     }
 
@@ -2153,6 +2162,10 @@ impl RustExpr {
     pub(crate) fn is_complex(&self) -> bool {
         match self {
             // base cases
+            RustExpr::Void => {
+                // NOTE - we don't expect to encounter void expressions except recursively over expansions
+                false
+            },
             RustExpr::Entity(..) => false,
             RustExpr::PrimitiveLit(..) => false,
             RustExpr::BlockScope(stmts, _) => !stmts.is_empty(),
@@ -2213,7 +2226,23 @@ impl RustExpr {
     pub(crate) fn wrap_ok<Name: IntoLabel>(self, qualifier: Option<Name>) -> RustExpr {
         match self {
             RustExpr::Try(x) => *x,
+            RustExpr::Void => RustExpr::UNIT.wrap_ok(qualifier),
             other => RustExpr::ResultOk(qualifier.map(Name::into), Box::new(other)),
+        }
+    }
+
+    #[expect(dead_code)]
+    pub fn normalize(&self) -> Cow<'_, Self> {
+        match self {
+            RustExpr::Void => Cow::Owned(RustExpr::UNIT),
+            other => Cow::Borrowed(other),
+        }
+    }
+
+    pub fn into_normal(self) -> Self {
+        match self {
+            RustExpr::Void => RustExpr::UNIT,
+            other => other,
         }
     }
 
@@ -2222,11 +2251,10 @@ impl RustExpr {
     }
 
     pub(crate) fn wrap_some(self) -> RustExpr {
-        match self {
-            RustExpr::BlockScope(stmts, tail) => {
-                RustExpr::BlockScope(stmts, Box::new(tail.wrap_some()))
-            }
-            _ => RustExpr::local("Some").call_with([self]),
+        match self.into_normal() {
+            RustExpr::BlockScope(stmts, tail) => RustExpr::BlockScope(stmts, Box::new(tail.wrap_some())),
+            // REVIEW - should we have a standalone primitive for Some?
+            this => RustExpr::local("Some").call_with([this])
         }
     }
 
@@ -2339,6 +2367,7 @@ impl ToFragment for VecExpr {
 impl ToFragmentExt for RustExpr {
     fn to_fragment_precedence(&self, prec: Precedence) -> Fragment {
         match self {
+            RustExpr::Void => Fragment::Empty,
             RustExpr::Entity(e) => e.to_fragment(),
             RustExpr::PrimitiveLit(pl) => pl.to_fragment(),
             RustExpr::ArrayLit(elts) => Fragment::seq(
@@ -2528,25 +2557,32 @@ pub(crate) fn slice_stmts_to_block(stmts: &[RustStmt]) -> Option<(&[RustStmt], C
             }
             RustStmt::Return(ReturnKind::Keyword, ..) => None,
             RustStmt::LetPattern(..) | RustStmt::Let(..) | RustStmt::Reassign(..) => {
-                Some((stmts, Cow::Owned(RustExpr::UNIT)))
+                Some((stmts, Cow::Owned(RustExpr::Void)))
             } // REVIEW - is unguarded inheritance of a Control block always correct?
               // RustStmt::Control(ctrl) => {
               //     Some((init, Cow::Owned(RustExpr::Control(Box::new(ctrl.clone())))))
               // }
         }
     } else {
-        Some((stmts, Cow::Owned(RustExpr::UNIT)))
+        Some((stmts, Cow::Owned(RustExpr::Void)))
     }
 }
 
+
+/// Given a block of `RustStmt` that do not have any explicit `return` keywords anywhere within,
+/// extract the value of the statement-block as a `RustExpr` (or Void/Unit, if this is the implicit evaluation),
+/// and return it.
+///
+/// Returns `None` if the query is ill-founded, i.e. the block can short-circuit (without `try`).
 pub(crate) fn vec_stmts_to_block(stmts: Vec<RustStmt>) -> Option<(Vec<RustStmt>, RustExpr)> {
     let mut init = stmts;
     let last = match init.pop() {
-        None => RustExpr::UNIT,
+        // if stmts is empty, return Void
+        None => RustExpr::Void,
         Some(stmt) => match stmt {
             RustStmt::Return(ReturnKind::Keyword, ..) => return None,
             RustStmt::Return(_, expr) | RustStmt::Expr(expr) => expr,
-            RustStmt::LetPattern(..) | RustStmt::Let(..) | RustStmt::Reassign(..) => RustExpr::UNIT,
+            RustStmt::LetPattern(..) | RustStmt::Let(..) | RustStmt::Reassign(..) => RustExpr::Void,
             // REVIEW - is unguarded inheritance of a Control block always correct?
             // RustStmt::Control(ctrl) => RustExpr::Control(Box::new(ctrl.clone())),
         },
@@ -3712,6 +3748,7 @@ pub mod short_circuit {
     impl ShortCircuit for RustExpr {
         fn is_short_circuiting(&self) -> bool {
             match self {
+                RustExpr::Void => false,
                 RustExpr::ArrayLit(exprs) => exprs.is_short_circuiting(),
                 RustExpr::Entity(..) => false,
                 RustExpr::PrimitiveLit(..) => false,
@@ -3790,6 +3827,7 @@ pub mod short_circuit {
     impl ShortCircuitExt for RustExpr {
         fn check_eval_purity(&self) -> EvalPurity {
             match self {
+                RustExpr::Void => EvalPurity::Pure,
                 RustExpr::ArrayLit(exprs) => exprs.check_eval_purity(),
                 RustExpr::Entity(..) | RustExpr::PrimitiveLit(..) => EvalPurity::Pure,
                 RustExpr::Closure(..) => EvalPurity::Pure,
@@ -4089,6 +4127,7 @@ pub mod var_container {
             Name: AsRef<str> + ?Sized,
         {
             match self {
+                RustExpr::Void => false,
                 RustExpr::Entity(ent) => ent.contains_var_ref(var),
                 RustExpr::FieldAccess(expr, ..) => expr.contains_var_ref(var),
                 RustExpr::MethodCall(recv, .., args) => {

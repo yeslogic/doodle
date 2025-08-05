@@ -1190,6 +1190,7 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
             } else {
                 "find_by_key_unsorted"
             };
+            fn mk_name() -> &'static str { "tmp" }
             embed_expr_nat(seq).use_as_persistent(|seq| {
                 RustExpr::local(method)
                     .call_with([
@@ -1197,7 +1198,7 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                         embed_expr(query, ExprInfo::Natural),
                         seq,
                     ]).owned_opt_ref(ty.to_rust_type())
-            })
+            }, mk_name)
         }
         TypedExpr::Dup(_, n, expr) => {
             // NOTE - the dup count should be simple, but the duplicated expression must be move-safe
@@ -1237,10 +1238,11 @@ fn embed_match_expr(
     cases: &Vec<(GTPattern, GTExpr)>,
     info: ExprInfo,
 ) -> RustExpr {
+    fn mk_name() -> &'static str { "tmp" }
     let scrutinized = embed_expr_nat(scrutinee);
     let head = match scrutinee.get_type().unwrap().as_ref() {
         GenType::Inline(RustType::Atom(AtomType::Comp(CompType::Vec(..)))) => {
-            scrutinized.make_persistent().into_owned().vec_as_slice()
+            scrutinized.make_persistent(mk_name).into_owned().vec_as_slice()
         }
         _ => scrutinized,
     };
@@ -2264,10 +2266,8 @@ impl GenBlock {
     }
 
     pub fn wrap_some_final_value(&mut self) {
-        let fallback = || {
-            Result::<_, std::convert::Infallible>::Ok(Some(GenExpr::from(
-                RustExpr::UNIT.wrap_some(),
-            )))
+        let fallback = || -> Result::<_, std::convert::Infallible> {
+            Ok(Some(GenExpr::from(RustExpr::UNIT.wrap_some())))
         };
         self.transform_return_value(GenExpr::wrap_some, fallback)
             .unwrap()
@@ -5154,7 +5154,7 @@ mod __impls {
             let (stmts, ret) = value.synthesize();
 
             // REVIEW - do we always want an explicit Unit here?
-            let val = ret.unwrap_or(RustExpr::UNIT);
+            let val = ret.unwrap_or(RustExpr::Void);
 
             if stmts.is_empty() {
                 val
