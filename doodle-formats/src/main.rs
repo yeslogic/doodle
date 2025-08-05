@@ -4,6 +4,7 @@
 use anyhow::{anyhow, Result as AResult};
 use doodle::codegen::{generate_code, ToFragment};
 use doodle::Format;
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 
@@ -63,6 +64,7 @@ enum Command {
     },
     /// Typecheck the main FormatModule
     TypeCheck,
+    Census,
 }
 
 const SELECTORS: &[(&[&str], FormatSelector)] = &[
@@ -118,6 +120,20 @@ thread_local! {
 
 fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
     match Command::parse() {
+        Command::Census => {
+            let mut module = FormatModule::new();
+            let format = format::main(&mut module).call();
+            let results = run_census(&format, &module);
+            let mut data = Vec::new();
+            if let Some(res) = results {
+                for (name, contents) in res {
+                    let accum: Vec<&'static str> = contents.store.into_iter().collect();
+                    data.push((name.to_string(), accum));
+                }
+            }
+            println!("{}", serde_json::to_string_pretty(&data).unwrap());
+            Ok(())
+        }
         Command::Format {
             output,
             dest,
@@ -310,4 +326,177 @@ fn test_codegen() {
     let mut module = FormatModule::new();
     let format = format::main(&mut module).call();
     let _ = generate_code(&module, &format);
+}
+
+mod census {
+    use doodle::ViewFormat;
+
+    use super::*;
+    use std::collections::BTreeSet;
+
+    pub struct FormatPop {
+        pub store: BTreeSet<&'static str>,
+    }
+
+    impl FormatPop {
+        pub fn new() -> Self {
+            FormatPop {
+                store: BTreeSet::new(),
+            }
+        }
+
+        fn add_format(&mut self, format: &'static str) {
+            self.store.insert(format);
+        }
+    }
+
+    pub fn crawl(format: &Format, module: &FormatModule, pop: &mut FormatPop) {
+        match format {
+            Format::ItemVar(level, ..) => {
+                let format = module.get_format(*level);
+                crawl(format, module, pop);
+            }
+            Format::Fail => (),
+            Format::EndOfInput => (),
+            Format::Align(_) => (),
+            Format::Byte(..) => (),
+            Format::Variant(_, format) => {
+                crawl(format, module, pop);
+            }
+            Format::Union(formats) => {
+                for f in formats {
+                    crawl(f, module, pop);
+                }
+            }
+            Format::UnionNondet(formats) => {
+                pop.add_format("UnionNondet");
+                for f in formats {
+                    crawl(f, module, pop);
+                }
+            }
+            Format::Tuple(formats) | Format::Sequence(formats) => {
+                for f in formats {
+                    crawl(f, module, pop);
+                }
+            }
+            Format::Repeat(format) => crawl(format, module, pop),
+            Format::Repeat1(format) => crawl(format, module, pop),
+            Format::RepeatCount(_, format) => crawl(format, module, pop),
+            Format::RepeatBetween(.., format) => {
+                pop.add_format("RepeatBetween");
+                crawl(format, module, pop);
+            }
+            Format::RepeatUntilLast(_, format) => {
+                pop.add_format("RepeatUntilLast");
+                crawl(format, module, pop);
+            }
+            Format::RepeatUntilSeq(_, format) => {
+                pop.add_format("RepeatUntilSeq");
+                crawl(format, module, pop);
+            }
+            Format::AccumUntil(.., format) => {
+                pop.add_format("AccumUntil");
+                crawl(format, module, pop);
+            }
+            Format::ForEach(.., format) => {
+                pop.add_format("ForEach");
+                crawl(format, module, pop);
+            }
+            Format::Maybe(_, format) => {
+                pop.add_format("Maybe");
+                crawl(format, module, pop);
+            }
+            Format::Peek(format) => {
+                pop.add_format("Peek");
+                crawl(format, module, pop);
+            }
+            Format::PeekNot(format) => {
+                pop.add_format("PeekNot");
+                crawl(format, module, pop);
+            }
+            Format::Slice(_, format) => {
+                pop.add_format("Slice");
+                crawl(format, module, pop);
+            }
+            Format::Bits(format) => {
+                pop.add_format("Bits");
+                crawl(format, module, pop);
+            }
+            Format::WithRelativeOffset(.., format) => {
+                pop.add_format("WithRelativeOffset");
+                crawl(format, module, pop);
+            }
+            Format::Map(format, ..) => crawl(format, module, pop),
+            Format::Where(format, ..) => crawl(format, module, pop),
+            Format::Compute(_) => (),
+            Format::Let(.., format) => crawl(format, module, pop),
+            Format::Match(.., items) => {
+                for (_, f) in items {
+                    crawl(f, module, pop);
+                }
+            }
+            Format::Dynamic(_, dyn_format, format) => {
+                match dyn_format {
+                    doodle::DynFormat::Huffman(..) => pop.add_format("Dynamic@Huffman"),
+                };
+                crawl(format, module, pop);
+            }
+            Format::Apply(..) => (),
+            Format::Pos => (),
+            Format::SkipRemainder => (),
+            Format::DecodeBytes(.., format) => {
+                pop.add_format("DecodeBytes");
+                crawl(format, module, pop);
+            }
+            Format::LetFormat(f0, _, f1) | Format::MonadSeq(f0, f1) => {
+                crawl(f0, module, pop);
+                crawl(f1, module, pop);
+            }
+            Format::Hint(.., format) => crawl(format, module, pop),
+            Format::LiftedOption(Some(format)) => crawl(format, module, pop),
+            Format::LiftedOption(None) => (),
+            Format::LetView(.., format) => crawl(format, module, pop),
+            Format::WithView(.., view_format) => match view_format {
+                ViewFormat::CaptureBytes(..) => pop.add_format("WithView@CaptureBytes"),
+                ViewFormat::ReadArray(..) => pop.add_format("WithView@ReadArray"),
+                ViewFormat::ReifyView => pop.add_format("WithView@ReifyView"),
+            }
+            Format::ParseFromView(.., format) => {
+                pop.add_format("ParseFromView");
+                crawl(format, module, pop);
+            }
+        }
+    }
+}
+
+fn get_name<'a>(f: &Format, module: &'a FormatModule) -> &'a str {
+    match f {
+        Format::ItemVar(level, ..) => module.get_name(*level),
+        Format::Variant(_, f) => get_name(f, module),
+        _ => unreachable!("unexpected branch"),
+    }
+}
+
+fn run_census<'a>(entrypoint: &Format, module: &'a FormatModule) -> Option<BTreeMap<&'a str, census::FormatPop>> {
+    match entrypoint {
+        Format::ItemVar(level, ..) => {
+            let format = module.get_format(*level);
+            run_census(format, module)
+        }
+        Format::UnionNondet(formats) => {
+            let mut pops = std::collections::BTreeMap::new();
+            for f in formats {
+                let name = get_name(f, module);
+                let mut pop = census::FormatPop::new();
+                census::crawl(f, module, &mut pop);
+                pops.insert(name, pop);
+            }
+            Some(pops)
+        }
+        Format::LetFormat(f0, _, f1) => {
+            run_census(f0, module).or_else(|| run_census(f1, module))
+        }
+        Format::Hint(_, f) => run_census(f, module),
+        _ => None,
+    }
 }
