@@ -113,9 +113,8 @@ impl Resolvable for RustControl {
 impl Resolvable for RustExpr {
     fn resolve(&mut self, ctx: &SourceContext<'_>) {
         match self {
-            RustExpr::Owned(owned) => {
-                owned.resolve(ctx);
-            }
+            RustExpr::Void => (),
+            RustExpr::Owned(owned) => owned.resolve(ctx),
             RustExpr::OwnedOption(_, owned_kind) => {
                 if let OwnedKind::Unresolved(lens) = owned_kind {
                     let sol = solve_lens(lens, ctx);

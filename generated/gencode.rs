@@ -9517,7 +9517,7 @@ totlen >= (point_count as u16)
 if tmp_cond {
 break
 };
-()
+
 };
 let elem = {
 let control = {
@@ -9585,7 +9585,7 @@ totlen >= ((hi as u16) & 127u16) << 8u16 | (lo as u16)
 if tmp_cond {
 break
 };
-()
+
 };
 let elem = {
 let control = {
@@ -9704,7 +9704,7 @@ totlen >= (point_count as u16)
 if tmp_cond {
 break
 };
-()
+
 };
 let elem = {
 let control = {
@@ -9772,7 +9772,7 @@ totlen >= ((hi as u16) & 127u16) << 8u16 | (lo as u16)
 if tmp_cond {
 break
 };
-()
+
 };
 let elem = {
 let control = {
@@ -9855,7 +9855,7 @@ totlen >= point_count * 2u16
 if tmp_cond {
 break
 };
-()
+
 };
 let elem = {
 let control = {
@@ -14755,7 +14755,7 @@ totlen >= number_of_coordinates
 if tmp_cond {
 break
 };
-()
+
 };
 let elem = {
 let flags = (Decoder_opentype_glyph_description_simple_flags_raw(_input))?;
@@ -14901,7 +14901,7 @@ false
 if tmp_cond {
 break
 };
-()
+
 };
 let elem = {
 let flags = {
@@ -17809,7 +17809,7 @@ break
 } else {
 accum.push(next_elem)
 };
-()
+
 }
 };
 accum
@@ -18514,7 +18514,7 @@ break
 } else {
 accum.push(next_elem)
 };
-()
+
 }
 };
 accum
@@ -18635,7 +18635,7 @@ v => {
 if tmp_cond {
 break
 };
-()
+
 }
 };
 accum
@@ -18997,7 +18997,7 @@ break
 } else {
 accum.push(next_elem)
 };
-()
+
 }
 };
 accum
