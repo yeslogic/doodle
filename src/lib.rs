@@ -1419,7 +1419,7 @@ impl FormatModule {
         &self.args[level]
     }
 
-    fn get_format(&self, level: usize) -> &Format {
+    pub fn get_format(&self, level: usize) -> &Format {
         &self.formats[level]
     }
 
