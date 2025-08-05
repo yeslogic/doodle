@@ -44,7 +44,7 @@ impl<'a> Parser<'a> {
         let (cur_offset, None) = self.offset.get_current_offset().as_bytes() else {
             panic!("cannot open view while in bits-mode processing");
         };
-        self.buffer.offset(cur_offset)
+        self.buffer.offset(cur_offset).unwrap()
     }
 
     /// Advances the offset by `offset` positions, as if calling [`Self::read_byte`] that many

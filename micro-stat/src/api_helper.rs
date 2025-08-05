@@ -28,7 +28,8 @@ pub fn dump_axis_value_offsets(filename: &str) {
             let region = stat
                 .axis_value_offsets
                 .axis_value_view
-                .offset(offs as usize);
+                .offset(offs as usize)
+                .expect("bad offset");
             let mut parser = Parser::from(region);
             let AxisRecord {
                 axis_tag,

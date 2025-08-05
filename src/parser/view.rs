@@ -29,10 +29,17 @@ impl<'a> View<'a> {
         &self.buffer[..len]
     }
 
-    pub fn offset(&self, offset: usize) -> Self {
-        View {
-            buffer: &self.buffer[offset..],
-            start_offset: self.start_offset + offset,
+    pub fn offset(&self, offset: usize) -> Result<Self, DoodleParseError> {
+        if offset > self.buffer.len() {
+            Err(DoodleParseError::Overrun(OverrunKind::EndOfStream {
+                offset: ByteOffset::from_bytes(self.start_offset + offset),
+                max_offset: ByteOffset::from_bytes(self.start_offset + self.buffer.len()),
+            }))
+        } else {
+            Ok(View {
+                buffer: &self.buffer[offset..],
+                start_offset: self.start_offset + offset,
+            })
         }
     }
 
