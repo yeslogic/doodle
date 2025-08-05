@@ -329,19 +329,22 @@ pub(super) fn simplifying_if(
 /// directly to `terms`).
 ///
 /// If a name is required for the lhs-bound variable, it is generated via the `mk_name` closure.
-pub(super) fn push_seq_term(
-    term: GenBlock,
-    stmts: &mut Vec<GenStmt>,
-    terms: &mut Vec<RustExpr>,
-    mk_name: impl FnOnce() -> Label,
-) {
-    if term.is_simple() {
-        let expr = RustExpr::from(term);
-        terms.push(expr);
+pub(super) fn accum_seq_terms(
+    blocks: Vec<GenBlock>,
+    mk_name: impl Fn(usize) -> Label,
+) -> (Vec<GenStmt>, Vec<RustExpr>) {
+    if blocks.iter().all(|b| b.is_simple()) {
+        let terms = blocks.into_iter().map(RustExpr::from).collect();
+        (Vec::new(), terms)
     } else {
-        let name = mk_name();
-        stmts.push(GenStmt::BindOnce(name.clone(), term));
-        terms.push(RustExpr::local(name));
+        let mut stmts = Vec::with_capacity(blocks.len());
+        let mut terms = Vec::with_capacity(blocks.len());
+        for (ix, term) in blocks.into_iter().enumerate() {
+            let name = mk_name(ix);
+            stmts.push(GenStmt::BindOnce(name.clone(), term));
+            terms.push(RustExpr::local(name));
+        }
+        (stmts, terms)
     }
 }
 

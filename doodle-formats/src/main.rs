@@ -460,7 +460,7 @@ mod census {
                 ViewFormat::CaptureBytes(..) => pop.add_format("WithView@CaptureBytes"),
                 ViewFormat::ReadArray(..) => pop.add_format("WithView@ReadArray"),
                 ViewFormat::ReifyView => pop.add_format("WithView@ReifyView"),
-            }
+            },
             Format::ParseFromView(.., format) => {
                 pop.add_format("ParseFromView");
                 crawl(format, module, pop);
@@ -477,7 +477,10 @@ fn get_name<'a>(f: &Format, module: &'a FormatModule) -> &'a str {
     }
 }
 
-fn run_census<'a>(entrypoint: &Format, module: &'a FormatModule) -> Option<BTreeMap<&'a str, census::FormatPop>> {
+fn run_census<'a>(
+    entrypoint: &Format,
+    module: &'a FormatModule,
+) -> Option<BTreeMap<&'a str, census::FormatPop>> {
     match entrypoint {
         Format::ItemVar(level, ..) => {
             let format = module.get_format(*level);
@@ -493,9 +496,7 @@ fn run_census<'a>(entrypoint: &Format, module: &'a FormatModule) -> Option<BTree
             }
             Some(pops)
         }
-        Format::LetFormat(f0, _, f1) => {
-            run_census(f0, module).or_else(|| run_census(f1, module))
-        }
+        Format::LetFormat(f0, _, f1) => run_census(f0, module).or_else(|| run_census(f1, module)),
         Format::Hint(_, f) => run_census(f, module),
         _ => None,
     }

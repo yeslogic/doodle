@@ -404,7 +404,9 @@ impl Expr {
                     (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_add(x, y).unwrap()),
                     (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_add(x, y).unwrap()),
                     (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_add(x, y).unwrap()),
-                    (Value::Usize(x), Value::Usize(y)) => Value::Usize(usize::checked_add(x, y).unwrap()),
+                    (Value::Usize(x), Value::Usize(y)) => {
+                        Value::Usize(usize::checked_add(x, y).unwrap())
+                    }
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
                 })
             }
@@ -414,7 +416,9 @@ impl Expr {
                     (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_sub(x, y).unwrap()),
                     (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_sub(x, y).unwrap()),
                     (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_sub(x, y).unwrap()),
-                    (Value::Usize(x), Value::Usize(y)) => Value::Usize(usize::checked_sub(x, y).unwrap()),
+                    (Value::Usize(x), Value::Usize(y)) => {
+                        Value::Usize(usize::checked_sub(x, y).unwrap())
+                    }
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
                 })
             }
@@ -424,7 +428,9 @@ impl Expr {
                     (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_mul(x, y).unwrap()),
                     (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_mul(x, y).unwrap()),
                     (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_mul(x, y).unwrap()),
-                    (Value::Usize(x), Value::Usize(y)) => Value::Usize(usize::checked_mul(x, y).unwrap()),
+                    (Value::Usize(x), Value::Usize(y)) => {
+                        Value::Usize(usize::checked_mul(x, y).unwrap())
+                    }
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
                 })
             }
@@ -434,7 +440,9 @@ impl Expr {
                     (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_div(x, y).unwrap()),
                     (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_div(x, y).unwrap()),
                     (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_div(x, y).unwrap()),
-                    (Value::Usize(x), Value::Usize(y)) => Value::Usize(usize::checked_div(x, y).unwrap()),
+                    (Value::Usize(x), Value::Usize(y)) => {
+                        Value::Usize(usize::checked_div(x, y).unwrap())
+                    }
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
                 })
             }
@@ -444,7 +452,9 @@ impl Expr {
                     (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_rem(x, y).unwrap()),
                     (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_rem(x, y).unwrap()),
                     (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_rem(x, y).unwrap()),
-                    (Value::Usize(x), Value::Usize(y)) => Value::Usize(usize::checked_rem(x, y).unwrap()),
+                    (Value::Usize(x), Value::Usize(y)) => {
+                        Value::Usize(usize::checked_rem(x, y).unwrap())
+                    }
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
                 })
             }
@@ -494,7 +504,9 @@ impl Expr {
                     (Value::U64(x), Value::U64(y)) => {
                         Value::U64(u64::checked_shl(x, u32::try_from(y).unwrap()).unwrap())
                     }
-                    (Value::Usize(x), Value::Usize(y)) => Value::Usize(usize::checked_shl(x, u32::try_from(y).unwrap()).unwrap()),
+                    (Value::Usize(x), Value::Usize(y)) => {
+                        Value::Usize(usize::checked_shl(x, u32::try_from(y).unwrap()).unwrap())
+                    }
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
                 })
             }
@@ -510,7 +522,9 @@ impl Expr {
                     (Value::U64(x), Value::U64(y)) => {
                         Value::U64(u64::checked_shr(x, u32::try_from(y).unwrap()).unwrap())
                     }
-                    (Value::Usize(x), Value::Usize(y)) => Value::Usize(usize::checked_shr(x, u32::try_from(y).unwrap()).unwrap()),
+                    (Value::Usize(x), Value::Usize(y)) => {
+                        Value::Usize(usize::checked_shr(x, u32::try_from(y).unwrap()).unwrap())
+                    }
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
                 })
             }

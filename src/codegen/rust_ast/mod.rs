@@ -2126,7 +2126,10 @@ impl RustExpr {
     }
 
     /// Embed a RustExpr into a new non-temporary value, or return it if it is already non-temporary
-    pub(crate) fn make_persistent<Name: IntoLabel + Clone>(&self, mk_name: impl FnOnce() -> Name) -> Cow<'_, Self> {
+    pub(crate) fn make_persistent<Name: IntoLabel + Clone>(
+        &self,
+        mk_name: impl FnOnce() -> Name,
+    ) -> Cow<'_, Self> {
         match self {
             RustExpr::Entity(..) => Cow::Borrowed(self),
             // REVIEW - consider which non-entity cases are already 'persistent'
@@ -2140,7 +2143,11 @@ impl RustExpr {
         }
     }
 
-    pub(crate) fn use_as_persistent<Name: IntoLabel + Clone>(self, f: impl FnOnce(Self) -> Self, mk_name: impl FnOnce() -> Name) -> Self {
+    pub(crate) fn use_as_persistent<Name: IntoLabel + Clone>(
+        self,
+        f: impl FnOnce(Self) -> Self,
+        mk_name: impl FnOnce() -> Name,
+    ) -> Self {
         match self {
             this @ RustExpr::Entity(..) => f(this),
             _ => {
@@ -2165,7 +2172,7 @@ impl RustExpr {
             RustExpr::Void => {
                 // NOTE - we don't expect to encounter void expressions except recursively over expansions
                 false
-            },
+            }
             RustExpr::Entity(..) => false,
             RustExpr::PrimitiveLit(..) => false,
             RustExpr::BlockScope(stmts, _) => !stmts.is_empty(),
@@ -2252,9 +2259,11 @@ impl RustExpr {
 
     pub(crate) fn wrap_some(self) -> RustExpr {
         match self.into_normal() {
-            RustExpr::BlockScope(stmts, tail) => RustExpr::BlockScope(stmts, Box::new(tail.wrap_some())),
+            RustExpr::BlockScope(stmts, tail) => {
+                RustExpr::BlockScope(stmts, Box::new(tail.wrap_some()))
+            }
             // REVIEW - should we have a standalone primitive for Some?
-            this => RustExpr::local("Some").call_with([this])
+            this => RustExpr::local("Some").call_with([this]),
         }
     }
 
@@ -2567,7 +2576,6 @@ pub(crate) fn slice_stmts_to_block(stmts: &[RustStmt]) -> Option<(&[RustStmt], C
         Some((stmts, Cow::Owned(RustExpr::Void)))
     }
 }
-
 
 /// Given a block of `RustStmt` that do not have any explicit `return` keywords anywhere within,
 /// extract the value of the statement-block as a `RustExpr` (or Void/Unit, if this is the implicit evaluation),

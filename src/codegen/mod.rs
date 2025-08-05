@@ -1238,12 +1238,15 @@ fn embed_match_expr(
     cases: &Vec<(GTPattern, GTExpr)>,
     info: ExprInfo,
 ) -> RustExpr {
-    fn mk_name() -> &'static str { "tmp" }
+    fn mk_name() -> &'static str {
+        "tmp"
+    }
     let scrutinized = embed_expr_nat(scrutinee);
     let head = match scrutinee.get_type().unwrap().as_ref() {
-        GenType::Inline(RustType::Atom(AtomType::Comp(CompType::Vec(..)))) => {
-            scrutinized.make_persistent(mk_name).into_owned().vec_as_slice()
-        }
+        GenType::Inline(RustType::Atom(AtomType::Comp(CompType::Vec(..)))) => scrutinized
+            .make_persistent(mk_name)
+            .into_owned()
+            .vec_as_slice(),
         _ => scrutinized,
     };
 
@@ -2266,7 +2269,7 @@ impl GenBlock {
     }
 
     pub fn wrap_some_final_value(&mut self) {
-        let fallback = || -> Result::<_, std::convert::Infallible> {
+        let fallback = || -> Result<_, std::convert::Infallible> {
             Ok(Some(GenExpr::from(RustExpr::UNIT.wrap_some())))
         };
         self.transform_return_value(GenExpr::wrap_some, fallback)
@@ -3068,20 +3071,14 @@ where
                         GenBlock::simple_expr(RustExpr::VEC_NIL)
                     };
                 }
-                let mut stmts = Vec::new();
-                let mut terms = Vec::new();
 
-                for (ix, cl) in elements.iter().enumerate() {
+                let mk_name = {
                     use model::ACCUM_SEQ_PREFIX;
-                    let mk_name = move || Label::Owned(format!("{ACCUM_SEQ_PREFIX}{ix}"));
-
-                    model::push_seq_term(
-                        cl.to_ast(ctxt), // .local_try()
-                        &mut stmts,
-                        &mut terms,
-                        mk_name,
-                    );
-                }
+                    move |ix| Label::Owned(format!("{ACCUM_SEQ_PREFIX}{ix}"))
+                };
+                // REVIEW - do we need `.local_try()` here?
+                let blocks = elements.iter().map(|cl| cl.to_ast(ctxt)).collect();
+                let (stmts, terms) = model::accum_seq_terms(blocks, mk_name);
 
                 let ret = Some(GenExpr::Embed(if *as_array {
                     RustExpr::ArrayLit(terms)
@@ -3107,20 +3104,14 @@ where
                     };
                 }
 
-                let mut stmts = Vec::new();
-                let mut terms = Vec::new();
-
-                for (ix, elt_cl) in elements.iter().enumerate() {
+                let mk_name = {
                     use model::ACCUM_TUP_PREFIX;
-                    let mk_name = move || Label::Owned(format!("{ACCUM_TUP_PREFIX}{ix}"));
+                    move |ix| Label::Owned(format!("{ACCUM_TUP_PREFIX}{ix}"))
+                };
 
-                    model::push_seq_term(
-                        elt_cl.to_ast(ctxt), // .local_try(),
-                        &mut stmts,
-                        &mut terms,
-                        mk_name,
-                    );
-                }
+                // REVIEW - do we need `.local_try()` here?
+                let blocks = elements.iter().map(|elt_cl| elt_cl.to_ast(ctxt)).collect();
+                let (stmts, terms) = model::accum_seq_terms(blocks, mk_name);
 
                 if let Some(con) = constructor {
                     // FIXME - In addition to local rule-interpretation for each tuple positional, we also want to selectively box the elements, either at site-of-binding or in the struct expr

@@ -5862,7 +5862,8 @@ return Err(ParseError::ExcludedBranch(9665974566873665536u64));
 };
 raw & 31u8
 };
-(arg0, (Decoder20(_input))?)
+let arg1 = (Decoder20(_input))?;
+(arg0, arg1)
 };
 {
 let (x1, x0) = tuple_var;
@@ -5924,7 +5925,8 @@ return Err(ParseError::ExcludedBranch(658824046370133753u64));
 };
 raw & 63u8
 };
-(arg0, arg1, (Decoder20(_input))?)
+let arg2 = (Decoder20(_input))?;
+(arg0, arg1, arg2)
 },
 
 1 => {
@@ -5939,7 +5941,9 @@ return Err(ParseError::ExcludedBranch(3725673472712527969u64));
 };
 raw & 15u8
 };
-(arg0, (Decoder20(_input))?, (Decoder20(_input))?)
+let arg1 = (Decoder20(_input))?;
+let arg2 = (Decoder20(_input))?;
+(arg0, arg1, arg2)
 },
 
 2 => {
@@ -5965,7 +5969,8 @@ return Err(ParseError::ExcludedBranch(15741082764016749161u64));
 };
 raw & 63u8
 };
-(arg0, arg1, (Decoder20(_input))?)
+let arg2 = (Decoder20(_input))?;
+(arg0, arg1, arg2)
 },
 
 3 => {
@@ -5980,7 +5985,9 @@ return Err(ParseError::ExcludedBranch(9967703502401950260u64));
 };
 raw & 15u8
 };
-(arg0, (Decoder20(_input))?, (Decoder20(_input))?)
+let arg1 = (Decoder20(_input))?;
+let arg2 = (Decoder20(_input))?;
+(arg0, arg1, arg2)
 },
 
 _ => {
@@ -6044,7 +6051,9 @@ return Err(ParseError::ExcludedBranch(15080388466336998873u64));
 };
 raw & 63u8
 };
-(arg0, arg1, (Decoder20(_input))?, (Decoder20(_input))?)
+let arg2 = (Decoder20(_input))?;
+let arg3 = (Decoder20(_input))?;
+(arg0, arg1, arg2, arg3)
 },
 
 1 => {
@@ -6059,7 +6068,10 @@ return Err(ParseError::ExcludedBranch(6070260202873699214u64));
 };
 raw & 7u8
 };
-(arg0, (Decoder20(_input))?, (Decoder20(_input))?, (Decoder20(_input))?)
+let arg1 = (Decoder20(_input))?;
+let arg2 = (Decoder20(_input))?;
+let arg3 = (Decoder20(_input))?;
+(arg0, arg1, arg2, arg3)
 },
 
 2 => {
@@ -6085,7 +6097,9 @@ return Err(ParseError::ExcludedBranch(11786939113783016634u64));
 };
 raw & 63u8
 };
-(arg0, arg1, (Decoder20(_input))?, (Decoder20(_input))?)
+let arg2 = (Decoder20(_input))?;
+let arg3 = (Decoder20(_input))?;
+(arg0, arg1, arg2, arg3)
 },
 
 _ => {
@@ -25290,6 +25304,7 @@ mpeg4_atom_data::mdat
 },
 
 (109u8, 101u8, 116u8, 97u8) => {
+let arg0 = (Decoder26(_input))?;
 let arg1 = {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -25311,7 +25326,7 @@ break
 };
 accum
 };
-mpeg4_atom_data::meta((Decoder26(_input))?, arg1)
+mpeg4_atom_data::meta(arg0, arg1)
 },
 
 (109u8, 111u8, 111u8, 118u8) => {
@@ -26177,6 +26192,7 @@ let sz = size as usize;
 _input.start_slice(sz)?;
 let ret = match r#type {
 (109u8, 101u8, 116u8, 97u8) => {
+let arg0 = (Decoder26(_input))?;
 let arg1 = {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -26198,7 +26214,7 @@ break
 };
 accum
 };
-mpeg4_udta_atom_data::meta((Decoder26(_input))?, arg1)
+mpeg4_udta_atom_data::meta(arg0, arg1)
 },
 
 _ => {
