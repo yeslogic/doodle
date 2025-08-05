@@ -116,6 +116,20 @@ impl Resolvable for RustExpr {
             RustExpr::Owned(owned) => {
                 owned.resolve(ctx);
             }
+            RustExpr::OwnedOption(_, owned_kind) => {
+                if let OwnedKind::Unresolved(lens) = owned_kind {
+                    let sol = solve_lens(lens, ctx);
+                    if sol.is_copy {
+                        if sol.is_ref {
+                            *owned_kind = OwnedKind::Deref;
+                        } else {
+                            *owned_kind = OwnedKind::Copied;
+                        }
+                    } else {
+                        *owned_kind = OwnedKind::Cloned;
+                    }
+                }
+            }
             RustExpr::ArrayLit(arr) => arr.resolve(ctx),
             RustExpr::PrimitiveLit(..) | RustExpr::Entity(..) => (),
             RustExpr::MethodCall(recv, .., args) => {

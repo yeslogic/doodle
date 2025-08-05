@@ -1595,6 +1595,7 @@ pub(crate) enum RustExpr {
     ResultOk(Option<Label>, Box<RustExpr>),
     ResultErr(Box<RustExpr>),
     Macro(RustMacro),
+    OwnedOption(Box<RustExpr>, OwnedKind),
 }
 
 #[derive(Debug, Clone)]
@@ -2048,6 +2049,7 @@ impl RustExpr {
             RustExpr::Control(..)
             | RustExpr::Closure(..)
             | RustExpr::Slice(..)
+            | RustExpr::OwnedOption(..)
             | RustExpr::RangeExclusive(..) => None,
         }
     }
@@ -2067,7 +2069,9 @@ impl RustExpr {
             RustExpr::PrimitiveLit(..) => true,
             RustExpr::ArrayLit(arr) => arr.iter().all(Self::is_pure),
             // REVIEW - over types we have no control over, clone itself can be impure, but it should never be so for the code we ourselves are generating
-            RustExpr::Owned(OwnedRustExpr { expr, .. }) => expr.is_pure(),
+            RustExpr::OwnedOption(expr, ..) | RustExpr::Owned(OwnedRustExpr { expr, .. }) => {
+                expr.is_pure()
+            }
             RustExpr::MethodCall(x, MethodSpecifier::LEN, args) => {
                 if args.is_empty() {
                     x.is_pure()
@@ -2175,6 +2179,7 @@ impl RustExpr {
 
             // single descent cases
             RustExpr::Owned(OwnedRustExpr { expr, .. })
+            | RustExpr::OwnedOption(expr, ..)
             | RustExpr::Try(expr)
             | RustExpr::ResultOk(.., expr)
             | RustExpr::ResultErr(expr)
@@ -2294,40 +2299,21 @@ impl RustExpr {
     pub(crate) fn owned_opt_ref(self, opt_type: RustType) -> RustExpr {
         fn borrow_param(rt: RustType) -> RustType {
             match rt {
-                RustType::Atom(at) => match at {
-                    AtomType::Comp(ct) => match ct {
-                        CompType::Option(inner) => CompType::Option(Box::new(
-                            CompType::Borrow(None, Mut::Immutable, inner).into(),
-                        ))
-                        .into(),
-                        other => other.into(),
-                    },
-                    other => other.into(),
-                },
+                RustType::Atom(AtomType::Comp(CompType::Option(inner))) => CompType::Option(
+                    Box::new(CompType::Borrow(None, Mut::Immutable, inner).into()),
+                )
+                .into(),
                 other => other,
             }
         }
 
-        let f = if opt_type.can_be_copy() {
-            RustClosure::new_predicate(
-                "x",
-                None,
-                RustExpr::Owned(OwnedRustExpr {
-                    expr: Box::new(RustExpr::local("x")),
-                    kind: OwnedKind::Deref,
-                }),
-            )
+        let kind = if opt_type.can_be_copy() {
+            OwnedKind::Deref
         } else {
-            RustClosure::new_predicate(
-                "x",
-                None,
-                RustExpr::Owned(OwnedRustExpr {
-                    expr: Box::new(RustExpr::local("x")),
-                    kind: OwnedKind::Unresolved(Lens::Ground(borrow_param(opt_type)).param()),
-                }),
-            )
+            OwnedKind::Unresolved(Lens::Ground(borrow_param(opt_type)).param())
         };
-        self.call_method_with("map", [RustExpr::Closure(f)])
+
+        RustExpr::OwnedOption(Box::new(self), kind)
     }
 }
 
@@ -2395,11 +2381,17 @@ impl ToFragmentExt for RustExpr {
                 Precedence::INVOKE,
             ),
             RustExpr::Owned(OwnedRustExpr {
-                expr: x,
+                expr,
                 kind: OwnedKind::Cloned,
             }) => cond_paren(
-                x.to_fragment_precedence(Precedence::Projection)
+                expr.to_fragment_precedence(Precedence::Projection)
                     .intervene(Fragment::Char('.'), Fragment::string("clone()")),
+                prec,
+                Precedence::Projection,
+            ),
+            RustExpr::OwnedOption(expr, OwnedKind::Cloned) => cond_paren(
+                expr.to_fragment_precedence(Precedence::Projection)
+                    .intervene(Fragment::Char('.'), Fragment::string("cloned()")),
                 prec,
                 Precedence::Projection,
             ),
@@ -2407,16 +2399,19 @@ impl ToFragmentExt for RustExpr {
                 kind: OwnedKind::Deref,
                 expr,
             }) => Fragment::Char('*').cat(expr.to_fragment_precedence(Precedence::Prefix)),
-            RustExpr::Owned(OwnedRustExpr {
+            RustExpr::OwnedOption(expr, OwnedKind::Deref) => expr
+                .to_fragment_precedence(Precedence::Projection)
+                .intervene(Fragment::Char('.'), Fragment::string("copied()")),
+            RustExpr::OwnedOption(expr, OwnedKind::Copied)
+            | RustExpr::Owned(OwnedRustExpr {
                 kind: OwnedKind::Copied,
                 expr,
             }) => expr.to_fragment_precedence(prec),
-            RustExpr::Owned(OwnedRustExpr {
+            RustExpr::OwnedOption(expr, OwnedKind::Unresolved(lens))
+            | RustExpr::Owned(OwnedRustExpr {
                 kind: OwnedKind::Unresolved(lens),
                 expr,
-            }) => {
-                unreachable!("unresolved ownership: ({expr:?}: {lens:?})")
-            }
+            }) => unreachable!("unresolved ownership: ({expr:?}: {lens:?})"),
             RustExpr::FieldAccess(x, name) => x
                 .to_fragment_precedence(Precedence::Projection)
                 .intervene(Fragment::Char('.'), name.to_fragment()),
@@ -3728,6 +3723,7 @@ pub mod short_circuit {
                 RustExpr::Tuple(elts) => elts.is_short_circuiting(),
                 RustExpr::Struct(.., struct_expr) => struct_expr.is_short_circuiting(),
                 RustExpr::Owned(OwnedRustExpr { expr: inner, .. })
+                | RustExpr::OwnedOption(inner, ..)
                 | RustExpr::Borrow(inner)
                 | RustExpr::ResultOk(.., inner)
                 | RustExpr::ResultErr(inner)
@@ -3805,6 +3801,7 @@ pub mod short_circuit {
                 RustExpr::Tuple(elts) => elts.check_eval_purity(),
                 RustExpr::Struct(.., struct_expr) => struct_expr.check_eval_purity(),
                 RustExpr::Owned(OwnedRustExpr { expr: inner, .. })
+                | RustExpr::OwnedOption(inner, ..)
                 | RustExpr::Borrow(inner)
                 | RustExpr::ResultOk(.., inner)
                 | RustExpr::ResultErr(inner)
@@ -4104,6 +4101,7 @@ pub mod var_container {
                 RustExpr::Struct(.., struct_expr) => struct_expr.contains_var_ref(var),
 
                 RustExpr::Owned(OwnedRustExpr { expr: inner, .. })
+                | RustExpr::OwnedOption(inner, ..)
                 | RustExpr::ResultOk(.., inner)
                 | RustExpr::ResultErr(inner)
                 | RustExpr::Borrow(inner)
