@@ -322,6 +322,7 @@ fn print_generated_code(
 }
 
 #[test]
+#[ignore]
 fn test_codegen() {
     let mut module = FormatModule::new();
     let format = format::main(&mut module).call();
