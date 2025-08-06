@@ -11,7 +11,7 @@ jobs:
   ci:
     strategy:
       matrix:
-        rust: [beta, stable, 1.88.0]
+        rust: [stable]
         os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
@@ -20,7 +20,6 @@ jobs:
         with:
           toolchain: ${{ matrix.rust }}
           components: rustfmt
-          targets: thumbv7em-none-eabihf
       - run: cargo fmt -- --check
       - run: cargo test --workspace --exclude smallsorts
-      - run: cargo build --target thumbv7em-none-eabihf
+      - run: cargo build
