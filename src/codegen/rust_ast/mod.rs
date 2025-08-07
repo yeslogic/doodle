@@ -9,7 +9,7 @@ pub(crate) mod resolve;
 use crate::codegen::model::{DEFAULT_LT, READ_ARRAY_IS_COPY, VIEW_OBJECT_IS_COPY};
 use crate::output::{Fragment, FragmentBuilder};
 
-use crate::precedence::{cond_paren, Precedence};
+use crate::precedence::{Precedence, cond_paren};
 use crate::{BaseKind, BaseType, IntoLabel, Label, ValueType};
 
 /// Enum-type (currently degenerate) for specifying the visibility of a top-level item
@@ -672,7 +672,7 @@ impl RustType {
     /// before being used in signatures of, or when passed in as arguments to, top-level decoder functions.
     pub fn should_borrow_for_arg(&self) -> bool {
         match self {
-            RustType::Atom(ref atom_type) => match atom_type {
+            RustType::Atom(atom_type) => match atom_type {
                 AtomType::Comp(ct) => match ct {
                     // REVIEW - this may lead to code divergence and may not be stable...
                     CompType::Vec(..) => true,
@@ -1025,10 +1025,15 @@ pub(crate) enum LocalType {
 impl ToFragment for LocalType {
     fn to_fragment(&self) -> Fragment {
         match self {
-            Self::LocalDef(_, lab, params) => match params {
-                Some(params) if !params.is_empty() => lab.to_fragment().cat(params.to_fragment()),
-                _ => lab.to_fragment(),
-            },
+            Self::LocalDef(_, lab, params) => {
+                if let Some(params) = params
+                    && !params.is_empty()
+                {
+                    lab.to_fragment().cat(params.to_fragment())
+                } else {
+                    lab.to_fragment()
+                }
+            }
             Self::External(lab) => lab.to_fragment(),
         }
     }
@@ -1753,15 +1758,15 @@ impl RustExpr {
     pub fn at_pos(self, n: usize) -> Self {
         match self {
             Self::Owned(OwnedRustExpr { expr, kind }) => match kind {
-                OwnedKind::Cloned => unreachable!("tuple-position smart-constructor should not be used on decided-clone expressions"),
+                OwnedKind::Cloned => unreachable!(
+                    "tuple-position smart-constructor should not be used on decided-clone expressions"
+                ),
                 OwnedKind::Copied | OwnedKind::Deref => expr.at_pos(n),
-                OwnedKind::Unresolved(lens) => {
-                    Self::Owned(OwnedRustExpr {
-                        expr: Box::new(expr.at_pos(n)),
-                        kind: OwnedKind::Unresolved(lens.pos(n)),
-                    })
-                },
-            }
+                OwnedKind::Unresolved(lens) => Self::Owned(OwnedRustExpr {
+                    expr: Box::new(expr.at_pos(n)),
+                    kind: OwnedKind::Unresolved(lens.pos(n)),
+                }),
+            },
             other => Self::FieldAccess(Box::new(other), SubIdent::ByPosition(n)),
         }
     }
@@ -1929,7 +1934,9 @@ impl RustExpr {
                         if name.as_ref() == "len" && _args.is_empty() {
                             if cfg!(debug_assertions) {
                                 // REVIEW - is this worth warning about or should it be an acceptable invocation?
-                                eprintln!("WARNING: `.len()` method should be specified as a `MethodSpecifier::Common`, but was called via `Arbitrary(SubIdent::ByName)` instead...");
+                                eprintln!(
+                                    "WARNING: `.len()` method should be specified as a `MethodSpecifier::Common`, but was called via `Arbitrary(SubIdent::ByName)` instead..."
+                                );
                             }
                             // REVIEW - we don't really check anything about `_recv`, and really just assume that a `.len()` method will always return `usize`
                             Some(PrimType::Usize)
@@ -2963,11 +2970,7 @@ impl ReturnKind {
 
 impl From<bool> for ReturnKind {
     fn from(value: bool) -> Self {
-        if value {
-            Self::Keyword
-        } else {
-            Self::Implicit
-        }
+        if value { Self::Keyword } else { Self::Implicit }
     }
 }
 

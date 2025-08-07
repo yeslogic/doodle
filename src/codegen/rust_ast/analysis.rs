@@ -463,7 +463,9 @@ impl CopyEligible for LocalType {
         match self {
             LocalType::LocalDef(ix, ..) => context.get_copy(*ix),
             LocalType::External(ext_type) => {
-                unreachable!("unexpected external type-reference encountered during copy-analysis: {ext_type}")
+                unreachable!(
+                    "unexpected external type-reference encountered during copy-analysis: {ext_type}"
+                )
             }
         }
     }

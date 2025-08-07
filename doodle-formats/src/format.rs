@@ -145,15 +145,18 @@ mod test {
         let (output, _) = program.run(ReadCtxt::new(&data))?;
         match output {
             Value::Record(ref fields) => match fields.as_slice() {
-                &[(Cow::Borrowed("len"), ref len), (Cow::Borrowed("mask"), ref mask), (Cow::Borrowed("data"), ref data)] =>
-                {
+                &[
+                    (Cow::Borrowed("len"), ref len),
+                    (Cow::Borrowed("mask"), ref mask),
+                    (Cow::Borrowed("data"), ref data),
+                ] => {
                     match len.coerce_mapped_value() {
                         &Value::U32(n) => assert_eq!(n, 32),
                         other => panic!("Unexpected Value for `len` field: {other:?}"),
                     }
                     assert!(matches!(mask, Value::U8(0x7f)));
                     match data {
-                        Value::Seq(ref seq) => {
+                        Value::Seq(seq) => {
                             assert_eq!(seq.len(), 32);
                             for i in 0..32u8 {
                                 match seq[i as usize] {

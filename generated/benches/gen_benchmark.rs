@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use doodle_gencode::api_helper::try_decode_gzip;
 
 pub fn inflate_benchmark(c: &mut Criterion) {

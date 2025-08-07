@@ -1,12 +1,12 @@
-use super::util::{trisect_unchecked, EnumLen, U16Set, Wec};
+use super::util::{EnumLen, U16Set, Wec, trisect_unchecked};
 use super::*;
 use derive_builder::Builder;
 use doodle::Label;
 use encoding::{
-    all::{MAC_ROMAN, UTF_16BE},
     DecoderTrap, Encoding,
+    all::{MAC_ROMAN, UTF_16BE},
 };
-use fixed::types::{I16F16, I2F14};
+use fixed::types::{I2F14, I16F16};
 
 // SECTION - Command-line configurable options for what to show
 
@@ -842,7 +842,9 @@ impl Promote<OpentypeAxisValueOffset> for AxisValue {
                 "empty link with non-zero offset (={})",
                 orig.offset
             );
-            panic!("[HACK] encountered bad link (offset=0) when promoting OpentypeAxisValueOffset to AxisValue");
+            panic!(
+                "[HACK] encountered bad link (offset=0) when promoting OpentypeAxisValueOffset to AxisValue"
+            );
         };
         AxisValue::promote(raw)
     }
@@ -1212,7 +1214,7 @@ impl TryFrom<u16> for WindowsEncodingId {
                 return Err(UnknownValueError {
                     what: String::from("Windows Encoding ID"),
                     bad_value,
-                })
+                });
             }
         })
     }
@@ -2198,7 +2200,10 @@ impl std::fmt::Display for BadExtensionError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             BadExtensionError::InconsistentLookup(expected, actual) => {
-                write!(f, "layout extension subtable has inconsistent extension_lookup_type (expecting {expected}, found {actual})")
+                write!(
+                    f,
+                    "layout extension subtable has inconsistent extension_lookup_type (expecting {expected}, found {actual})"
+                )
             }
         }
     }
@@ -3607,7 +3612,8 @@ impl TryPromote<OpentypeGposLookupTable> for LookupTable {
                     match &offset.link {
                         None => eprintln!("empty subtable at lookup {_ix}"),
                         Some(subtable @ OpentypeGposLookupSubtableExt::PosExtension(ext)) => {
-                            if let Some(tmp) = extension_lookup_type.replace(ext.extension_lookup_type)
+                            if let Some(tmp) =
+                                extension_lookup_type.replace(ext.extension_lookup_type)
                             {
                                 if tmp != ext.extension_lookup_type {
                                     // FIXME - we don't have an error type that makes this easy to fold into the returned error, so we panic for now
@@ -3667,7 +3673,8 @@ impl TryPromote<OpentypeGsubLookupTable> for LookupTable {
                     match &offset.link {
                         None => eprintln!("empty subtable at lookup {_ix}"),
                         Some(subtable @ OpentypeGsubLookupSubtableExt::SubstExtension(ext)) => {
-                            if let Some(tmp) = extension_lookup_type.replace(ext.extension_lookup_type)
+                            if let Some(tmp) =
+                                extension_lookup_type.replace(ext.extension_lookup_type)
                             {
                                 if tmp != ext.extension_lookup_type {
                                     // FIXME - we don't have an error type that makes this easy to fold into the returned error, so we panic for now
@@ -4204,7 +4211,7 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
                         return Err(Box::new(UnknownValueError {
                             what: "name table version".to_string(),
                             bad_value: *ver,
-                        }))
+                        }));
                     }
                 }
             };
@@ -5103,9 +5110,9 @@ fn format_lookup_subtable(
         }
         LookupSubtable::ReverseChainSingleSubst(ReverseChainSingleSubst {
             coverage,
-            ref backtrack_coverages,
-            ref lookahead_coverages,
-            ref substitute_glyph_ids,
+            backtrack_coverages,
+            lookahead_coverages,
+            substitute_glyph_ids,
             ..
         }) => {
             let contents = {
@@ -5654,14 +5661,20 @@ fn format_anchor_table(anchor: &AnchorTable) -> String {
             y_device,
         }) => {
             let extra = match (x_device, y_device) {
-                (None, None) => unreachable!("unexpected both-Null DeviceOrVariationIndexTable-offsets in AnchorTable::Format3"),
-                (Some(ref x), Some(ref y)) => {
-                    format!("×({}, {})", format_device_or_variation_index_table(x), format_device_or_variation_index_table(y))
+                (None, None) => unreachable!(
+                    "unexpected both-Null DeviceOrVariationIndexTable-offsets in AnchorTable::Format3"
+                ),
+                (Some(x), Some(y)) => {
+                    format!(
+                        "×({}, {})",
+                        format_device_or_variation_index_table(x),
+                        format_device_or_variation_index_table(y)
+                    )
                 }
-                (Some(ref x), None) => {
+                (Some(x), None) => {
                     format!("×({}, ⅈ)", format_device_or_variation_index_table(x))
                 }
-                (None, Some(ref y)) => {
+                (None, Some(y)) => {
                     format!("×(ⅈ, {})", format_device_or_variation_index_table(y))
                 }
             };
@@ -5701,7 +5714,7 @@ fn format_ligature_sets(
         )
     }
     match lig_sets {
-        [ref set] => format_ligature_set(set, coverage.next().expect("missing coverage")),
+        [set] => format_ligature_set(set, coverage.next().expect("missing coverage")),
         more => {
             const LIG_SET_BOOKEND: usize = 1;
             format_coverage_linked_array(
@@ -5726,7 +5739,7 @@ fn format_alternate_sets(alt_sets: &[AlternateSet]) -> String {
         )
     }
     match alt_sets {
-        [ref set] => format_alternate_set(set),
+        [set] => format_alternate_set(set),
         more => {
             const ALT_SET_BOOKEND: usize = 1;
             format_items_inline(more, format_alternate_set, ALT_SET_BOOKEND, |count| {
@@ -5757,7 +5770,10 @@ fn validate_class_count(class_def: &ClassDef, expected_classes: usize) {
             actual_set.insert(0);
             for (_ix, value) in class_value_array.iter().enumerate() {
                 if *value >= max {
-                    panic!("expecting {expected_classes} starting at 0, found ClassValue {value} (>= {max}) at index {_ix} (glyph id: {})", *_start_id + _ix as u16);
+                    panic!(
+                        "expecting {expected_classes} starting at 0, found ClassValue {value} (>= {max}) at index {_ix} (glyph id: {})",
+                        *_start_id + _ix as u16
+                    );
                 }
                 let _ = actual_set.insert(*value);
             }
@@ -5778,7 +5794,10 @@ fn validate_class_count(class_def: &ClassDef, expected_classes: usize) {
             for (_ix, rr) in class_range_records.iter().enumerate() {
                 let value = rr.value;
                 if value >= max {
-                    panic!("expecting {expected_classes} starting at 0, found ClassValue {value} (>= {max}) at index {_ix} (glyph range: {} -> {})", rr.start_glyph_id, rr.end_glyph_id);
+                    panic!(
+                        "expecting {expected_classes} starting at 0, found ClassValue {value} (>= {max}) at index {_ix} (glyph range: {} -> {})",
+                        rr.start_glyph_id, rr.end_glyph_id
+                    );
                 }
                 let _ = actual_set.insert(value);
             }
@@ -6205,7 +6224,7 @@ fn format_glyphid_array_hex(glyphs: &impl AsRef<[u16]>, is_standalone: bool) -> 
 // FIXME - we might want a more flexible model where the `show_XYZZY`/`format_XYZZY` dichotomy is erased, such as a generic Writer or Fragment-producer...
 fn format_coverage_table(cov: &CoverageTable) -> String {
     match cov {
-        CoverageTable::Format1 { ref glyph_array } => {
+        CoverageTable::Format1 { glyph_array } => {
             let num_glyphs = glyph_array.len();
             match glyph_array.as_slice() {
                 [] => "∅".to_string(),
@@ -6213,7 +6232,7 @@ fn format_coverage_table(cov: &CoverageTable) -> String {
                 [first, .., last] => format!("[{num_glyphs} ∈ [{first},{last}]]"),
             }
         }
-        CoverageTable::Format2 { ref range_records } => match range_records.as_slice() {
+        CoverageTable::Format2 { range_records } => match range_records.as_slice() {
             [] => "∅".to_string(),
             [rr] => format!("[∀: {}..={}]", rr.start_glyph_id, rr.end_glyph_id),
             [first, .., last] => {
@@ -6232,7 +6251,7 @@ fn format_coverage_table(cov: &CoverageTable) -> String {
 
 fn show_coverage_table(cov: &CoverageTable, conf: &Config) {
     match cov {
-        CoverageTable::Format1 { ref glyph_array } => {
+        CoverageTable::Format1 { glyph_array } => {
             print!("Glyphs Covered: ");
             show_items_inline(
                 glyph_array,
@@ -6241,7 +6260,7 @@ fn show_coverage_table(cov: &CoverageTable, conf: &Config) {
                 |num_skipped| format!("...({num_skipped})..."),
             );
         }
-        CoverageTable::Format2 { ref range_records } => {
+        CoverageTable::Format2 { range_records } => {
             print!("Glyph Ranges Covered: ");
             show_items_inline(
                 range_records,
@@ -6777,7 +6796,7 @@ pub mod lookup_subtable {
         OpentypeGposLookupSubtable, OpentypeGposLookupSubtableExt, OpentypeGsubLookupSubtable,
         OpentypeGsubLookupSubtableExt, Parser, TestResult, UnknownValueError,
     };
-    use crate::{opentype_main_directory, opentype_ttc_header_header, Decoder_opentype_main};
+    use crate::{Decoder_opentype_main, opentype_main_directory, opentype_ttc_header_header};
 
     #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Default)]
     struct Both {

@@ -1,5 +1,5 @@
-use crate::codegen::util::MapLike;
 use crate::Label;
+use crate::codegen::util::MapLike;
 
 use super::*;
 

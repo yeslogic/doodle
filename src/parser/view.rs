@@ -2,8 +2,8 @@ use crate::parser::error::ParseError as DoodleParseError;
 use crate::{
     alt::prelude::allsorts::{
         binary::{
+            U8, U16Be, U32Be, U64Be,
             read::{self, ReadArray, ReadScope},
-            U16Be, U32Be, U64Be, U8,
         },
         error::ParseError as AllSortsParseError,
     },

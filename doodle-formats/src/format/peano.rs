@@ -1,4 +1,4 @@
-use doodle::{helper::*, Expr};
+use doodle::{Expr, helper::*};
 use doodle::{Format, FormatModule, FormatRef};
 
 pub fn main(module: &mut FormatModule) -> FormatRef {

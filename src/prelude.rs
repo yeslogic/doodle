@@ -1,21 +1,21 @@
-use num_traits::{one, One};
+use num_traits::{One, one};
 use std::borrow::Cow;
 use std::ops::{Bound, RangeBounds};
 
 pub use crate::byte_set::ByteSet;
 pub use crate::parser::{
-    error::{PResult, ParseError},
     Parser, View,
+    error::{PResult, ParseError},
 };
 pub use smallsorts::{
     self as allsorts,
-    binary::{read::ReadArray, U16Be, U32Be, U64Be, U8},
+    binary::{U8, U16Be, U32Be, U64Be, read::ReadArray},
 };
 
 /// Performs a checked_sub operation, returning an error if the result would be negative
 #[macro_export]
 macro_rules! try_sub {
-    ( $x:expr, $y:expr, $trace:expr ) => {
+    ( $x:expr_2021, $y:expr_2021, $trace:expr_2021 ) => {
         match $x.checked_sub($y) {
             Some(z) => z,
             None => {
@@ -251,7 +251,7 @@ where
 /// to the canonical prefix-code reconstruction algorithm used in DEFLATE.
 pub fn make_huffman_decoder(
     lengths: &[usize],
-) -> PResult<impl for<'a> Fn(&mut Parser<'a>) -> PResult<u16>> {
+) -> PResult<impl for<'a> Fn(&mut Parser<'a>) -> PResult<u16> + use<>> {
     let max_length = *lengths.iter().max().unwrap();
     let mut bl_count = [0].repeat(max_length + 1);
 
@@ -392,7 +392,7 @@ pub(crate) mod huffman {
                     Err(e) => {
                         return Err(ParseError::InternalError(StateError::HuffmanDescentError(
                             e,
-                        )))
+                        )));
                     }
                 }
             }
@@ -412,11 +412,7 @@ fn bit_range(nbits: usize, value: usize) -> Vec<u8> {
 }
 
 fn bit_as_u8(b: bool) -> u8 {
-    if b {
-        1
-    } else {
-        0
-    }
+    if b { 1 } else { 0 }
 }
 
 pub fn extend_from_within_ext(vs: &mut Vec<u8>, range: std::ops::Range<usize>) {

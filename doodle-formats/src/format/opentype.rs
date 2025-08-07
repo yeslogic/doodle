@@ -1,7 +1,7 @@
 use crate::format::BaseModule;
 use doodle::bounds::Bounds;
-use doodle::{helper::*, Expr, IntoLabel, Label};
 use doodle::{BaseType, Format, FormatModule, FormatRef, Pattern, ValueType, ViewExpr};
+use doodle::{Expr, IntoLabel, Label, helper::*};
 
 fn id<T>(x: T) -> T {
     x

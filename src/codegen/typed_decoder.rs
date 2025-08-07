@@ -1,6 +1,6 @@
 use crate::byte_set::ByteSet;
 use crate::{BaseKind, Format, FormatModule, Label, MatchTree, MaybeTyped, Next, StyleHint};
-use anyhow::{anyhow, Result as AResult};
+use anyhow::{Result as AResult, anyhow};
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -9,8 +9,8 @@ use crate::codegen::typed_format::{GenType, TypedPattern, TypedViewExpr};
 
 use super::typed_format::TypedViewFormat;
 use super::{
-    typed_format::{TypedDynFormat, TypedExpr, TypedFormat},
     GTFormat,
+    typed_format::{TypedDynFormat, TypedExpr, TypedFormat},
 };
 use super::{PrimType, RustType};
 

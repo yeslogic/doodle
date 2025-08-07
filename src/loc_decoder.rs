@@ -1,10 +1,10 @@
 use crate::byte_set::ByteSet;
 use crate::decoder::View;
 use crate::decoder::{
-    cow_map, cow_remap, extract_pair,
+    Compiler, Decoder, Program, ScopeEntry, SeqKind, Value, ValueSeq, cow_map, cow_remap,
+    extract_pair,
     search::{find_index_by_key_sorted, find_index_by_key_unsorted},
     seq_kind::sub_range,
-    Compiler, Decoder, Program, ScopeEntry, SeqKind, Value, ValueSeq,
 };
 use crate::error::{DecodeError, LocDecodeError};
 use crate::read::ReadCtxt;
@@ -854,21 +854,35 @@ impl Expr {
             }
             Expr::U64Be(bytes) => {
                 match bytes.eval_value_with_loc(scope).unwrap_tuple().as_slice() {
-                    [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d), Value::U8(e), Value::U8(f), Value::U8(g), Value::U8(h)] => {
-                        Cow::Owned(ParsedValue::from_evaluated(Value::U64(u64::from_be_bytes(
-                            [*a, *b, *c, *d, *e, *f, *g, *h],
-                        ))))
-                    }
+                    [
+                        Value::U8(a),
+                        Value::U8(b),
+                        Value::U8(c),
+                        Value::U8(d),
+                        Value::U8(e),
+                        Value::U8(f),
+                        Value::U8(g),
+                        Value::U8(h),
+                    ] => Cow::Owned(ParsedValue::from_evaluated(Value::U64(u64::from_be_bytes(
+                        [*a, *b, *c, *d, *e, *f, *g, *h],
+                    )))),
                     _ => panic!("U32Be: expected (U8, U8, U8, U8, U8, U8, U8, U8)"),
                 }
             }
             Expr::U64Le(bytes) => {
                 match bytes.eval_value_with_loc(scope).unwrap_tuple().as_slice() {
-                    [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d), Value::U8(e), Value::U8(f), Value::U8(g), Value::U8(h)] => {
-                        Cow::Owned(ParsedValue::from_evaluated(Value::U64(u64::from_le_bytes(
-                            [*a, *b, *c, *d, *e, *f, *g, *h],
-                        ))))
-                    }
+                    [
+                        Value::U8(a),
+                        Value::U8(b),
+                        Value::U8(c),
+                        Value::U8(d),
+                        Value::U8(e),
+                        Value::U8(f),
+                        Value::U8(g),
+                        Value::U8(h),
+                    ] => Cow::Owned(ParsedValue::from_evaluated(Value::U64(u64::from_le_bytes(
+                        [*a, *b, *c, *d, *e, *f, *g, *h],
+                    )))),
                     _ => panic!("U32Le: expected (U8, U8, U8, U8, U8, U8, U8, U8)"),
                 }
             }

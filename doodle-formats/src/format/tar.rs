@@ -1,6 +1,6 @@
 use crate::format::BaseModule;
 use doodle::helper::*;
-use doodle::{byte_set::ByteSet, Expr, Format, FormatModule, FormatRef};
+use doodle::{Expr, Format, FormatModule, FormatRef, byte_set::ByteSet};
 
 const BLOCK_SIZE: u32 = 512;
 

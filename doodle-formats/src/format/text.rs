@@ -1,5 +1,5 @@
-use crate::format::base::VALID_ASCII;
 use crate::format::BaseModule;
+use crate::format::base::VALID_ASCII;
 use doodle::byte_set::ByteSet;
 use doodle::helper::*;
 use doodle::{Expr, Format, FormatModule, FormatRef};

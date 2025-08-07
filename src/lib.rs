@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, HashSet};
 use std::ops::Add;
 use std::rc::Rc;
 
-use anyhow::{anyhow, Result as AResult};
+use anyhow::{Result as AResult, anyhow};
 use codegen::typed_format::{GenType, TypedFormat};
 use serde::Serialize;
 
@@ -32,7 +32,7 @@ pub mod prelude;
 pub mod read;
 
 mod typecheck;
-pub use typecheck::{typecheck, TCError, TCResult};
+pub use typecheck::{TCError, TCResult, typecheck};
 
 pub type Label = std::borrow::Cow<'static, str>;
 
@@ -360,27 +360,40 @@ impl Expr {
             Expr::U32Be(bytes) => {
                 let _t = bytes.infer_type(scope)?;
                 match _t.as_tuple_type() {
-                    [ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8)] => {
-                        Ok(ValueType::Base(BaseType::U32))
-                    }
+                    [
+                        ValueType::Base(BaseType::U8),
+                        ValueType::Base(BaseType::U8),
+                        ValueType::Base(BaseType::U8),
+                        ValueType::Base(BaseType::U8),
+                    ] => Ok(ValueType::Base(BaseType::U32)),
                     _ => Err(anyhow!("unsound byte-level type cast U32Be(_ : {_t:?})")),
                 }
             }
             Expr::U32Le(bytes) => {
                 let _t = bytes.infer_type(scope)?;
                 match _t.as_tuple_type() {
-                    [ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8)] => {
-                        Ok(ValueType::Base(BaseType::U32))
-                    }
+                    [
+                        ValueType::Base(BaseType::U8),
+                        ValueType::Base(BaseType::U8),
+                        ValueType::Base(BaseType::U8),
+                        ValueType::Base(BaseType::U8),
+                    ] => Ok(ValueType::Base(BaseType::U32)),
                     _ => Err(anyhow!("unsound byte-level type cast U32Le(_ : {_t:?})")),
                 }
             }
             Expr::U64Be(bytes) | Expr::U64Le(bytes) => {
                 let _t = bytes.infer_type(scope)?;
                 match _t.as_tuple_type() {
-                    [ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8)] => {
-                        Ok(ValueType::Base(BaseType::U64))
-                    }
+                    [
+                        ValueType::Base(BaseType::U8),
+                        ValueType::Base(BaseType::U8),
+                        ValueType::Base(BaseType::U8),
+                        ValueType::Base(BaseType::U8),
+                        ValueType::Base(BaseType::U8),
+                        ValueType::Base(BaseType::U8),
+                        ValueType::Base(BaseType::U8),
+                        ValueType::Base(BaseType::U8),
+                    ] => Ok(ValueType::Base(BaseType::U64)),
                     other => Err(anyhow!(
                         "U64Be/Le: expected (U8, U8, U8, U8, U8, U8, U8, U8), found {other:#?}"
                     )),
@@ -1450,7 +1463,9 @@ impl FormatModule {
                     ValueType::Seq(bt) if matches!(*bt, ValueType::Base(BaseType::U8)) => {
                         self.infer_format_type(scope, f)
                     }
-                    other => Err(anyhow!("DecodeBytes first argument type should be Seq(U8), found {other:?} instead")),
+                    other => Err(anyhow!(
+                        "DecodeBytes first argument type should be Seq(U8), found {other:?} instead"
+                    )),
                 }
             }
             Format::ParseFromView(view, f) => {
@@ -1483,15 +1498,15 @@ impl FormatModule {
                 let t = self.infer_format_type(scope, a)?;
                 Ok(ValueType::Seq(Box::new(t)))
             }
-            Format::RepeatCount(count, a) => {
-                match count.infer_type(scope)? {
-                    ValueType::Base(b) if b.is_numeric() => {
-                        let t = self.infer_format_type(scope, a)?;
-                        Ok(ValueType::Seq(Box::new(t)))
-                    }
-                    other => Err(anyhow!("RepeatCount first argument type should be numeric, found {other:?} instead")),
+            Format::RepeatCount(count, a) => match count.infer_type(scope)? {
+                ValueType::Base(b) if b.is_numeric() => {
+                    let t = self.infer_format_type(scope, a)?;
+                    Ok(ValueType::Seq(Box::new(t)))
                 }
-            }
+                other => Err(anyhow!(
+                    "RepeatCount first argument type should be numeric, found {other:?} instead"
+                )),
+            },
             Format::Sequence(formats) => {
                 let mut elem_t = ValueType::Any;
                 for f in formats {
@@ -1499,50 +1514,54 @@ impl FormatModule {
                 }
                 Ok(ValueType::Seq(Box::new(elem_t)))
             }
-            Format::RepeatBetween(min, max, a) => {
-                match min.infer_type(scope)? {
-                    ref t0 @ ValueType::Base(b0) if b0.is_numeric() => {
-                        match max.infer_type(scope)? {
-                            ValueType::Base(b1) if b0 == b1 => {
-                                let t = self.infer_format_type(scope, a)?;
-                                Ok(ValueType::Seq(Box::new(t)))
-                            }
-                            other => Err(anyhow!("RepeatBetween second argument type should be the same as the first, found {other:?} (!= {t0:?})")),
-                        }
-                    }
-                    other => Err(anyhow!("RepeatBetween first argument type should be numeric, found {other:?} instead")),
-                }
-            }
-            Format::RepeatUntilLast(lambda_elem, a) => {
-                match lambda_elem.as_ref() {
-                    Expr::Lambda(head, expr) => {
+            Format::RepeatBetween(min, max, a) => match min.infer_type(scope)? {
+                ref t0 @ ValueType::Base(b0) if b0.is_numeric() => match max.infer_type(scope)? {
+                    ValueType::Base(b1) if b0 == b1 => {
                         let t = self.infer_format_type(scope, a)?;
-                        let mut child_scope = TypeScope::child(scope);
-                        child_scope.push(head.clone(), t.clone());
-                        let ret_type = expr.infer_type(&child_scope)?;
-                        match ret_type {
-                            ValueType::Base(BaseType::Bool) => Ok(ValueType::Seq(Box::new(t))),
-                            other => Err(anyhow!("RepeatUntilLast first argument (lambda) return type should be Bool, found {other:?} instead")),
-                        }
+                        Ok(ValueType::Seq(Box::new(t)))
                     }
-                    other => Err(anyhow!("RepeatUntilLast first argument type should be lambda, found {other:?} instead")),
-                }
-            }
-            Format::RepeatUntilSeq(lambda_seq, a) => {
-                match lambda_seq.as_ref() {
-                    Expr::Lambda(head, expr) => {
-                        let t = self.infer_format_type(scope, a)?;
-                        let mut child_scope = TypeScope::child(scope);
-                        child_scope.push(head.clone(), ValueType::Seq(Box::new(t.clone())));
-                        let ret_type = expr.infer_type(&child_scope)?;
-                        match ret_type {
-                            ValueType::Base(BaseType::Bool) => Ok(ValueType::Seq(Box::new(t))),
-                            other => Err(anyhow!("RepeatUntilSeq first argument (lambda) return type should be Bool, found {other:?} instead")),
-                        }
+                    other => Err(anyhow!(
+                        "RepeatBetween second argument type should be the same as the first, found {other:?} (!= {t0:?})"
+                    )),
+                },
+                other => Err(anyhow!(
+                    "RepeatBetween first argument type should be numeric, found {other:?} instead"
+                )),
+            },
+            Format::RepeatUntilLast(lambda_elem, a) => match lambda_elem.as_ref() {
+                Expr::Lambda(head, expr) => {
+                    let t = self.infer_format_type(scope, a)?;
+                    let mut child_scope = TypeScope::child(scope);
+                    child_scope.push(head.clone(), t.clone());
+                    let ret_type = expr.infer_type(&child_scope)?;
+                    match ret_type {
+                        ValueType::Base(BaseType::Bool) => Ok(ValueType::Seq(Box::new(t))),
+                        other => Err(anyhow!(
+                            "RepeatUntilLast first argument (lambda) return type should be Bool, found {other:?} instead"
+                        )),
                     }
-                    other => Err(anyhow!("RepeatUntilSeq first argument type should be lambda, found {other:?} instead")),
                 }
-            }
+                other => Err(anyhow!(
+                    "RepeatUntilLast first argument type should be lambda, found {other:?} instead"
+                )),
+            },
+            Format::RepeatUntilSeq(lambda_seq, a) => match lambda_seq.as_ref() {
+                Expr::Lambda(head, expr) => {
+                    let t = self.infer_format_type(scope, a)?;
+                    let mut child_scope = TypeScope::child(scope);
+                    child_scope.push(head.clone(), ValueType::Seq(Box::new(t.clone())));
+                    let ret_type = expr.infer_type(&child_scope)?;
+                    match ret_type {
+                        ValueType::Base(BaseType::Bool) => Ok(ValueType::Seq(Box::new(t))),
+                        other => Err(anyhow!(
+                            "RepeatUntilSeq first argument (lambda) return type should be Bool, found {other:?} instead"
+                        )),
+                    }
+                }
+                other => Err(anyhow!(
+                    "RepeatUntilSeq first argument type should be lambda, found {other:?} instead"
+                )),
+            },
             Format::AccumUntil(lambda_acc_seq, lambda_acc_val, init, vt, a) => {
                 match lambda_acc_seq.as_ref() {
                     Expr::Lambda(head, expr) => {
@@ -1559,20 +1578,27 @@ impl FormatModule {
                                 match lambda_acc_val.as_ref() {
                                     Expr::Lambda(head, expr) => {
                                         let mut child_scope = TypeScope::child(&child_scope);
-                                        let vt_acc_elem = ValueType::Tuple(vec![vt.as_ref().clone(), t.clone()]);
+                                        let vt_acc_elem =
+                                            ValueType::Tuple(vec![vt.as_ref().clone(), t.clone()]);
                                         child_scope.push(head.clone(), vt_acc_elem);
                                         // we just need to check that these types unify, the value is unimportant
-                                        let _ret_type = expr.infer_type(&child_scope)?.unify(vt.as_ref())?;
+                                        let _ret_type =
+                                            expr.infer_type(&child_scope)?.unify(vt.as_ref())?;
                                         Ok(vt_acc_seq)
                                     }
-                                    other => Err(anyhow!("AccumUntil second argument type should be lambda, found {other:?} instead")),
+                                    other => Err(anyhow!(
+                                        "AccumUntil second argument type should be lambda, found {other:?} instead"
+                                    )),
                                 }
                             }
-                            other => Err(anyhow!("AccumUntil first argument (lambda) return type should be Bool, found {other:?} instead")),
+                            other => Err(anyhow!(
+                                "AccumUntil first argument (lambda) return type should be Bool, found {other:?} instead"
+                            )),
                         }
-
                     }
-                    other => Err(anyhow!("AccumUntil first argument type should be lambda, found {other:?} instead")),
+                    other => Err(anyhow!(
+                        "AccumUntil first argument type should be lambda, found {other:?} instead"
+                    )),
                 }
             }
             Format::Maybe(x, a) => match x.infer_type(scope)? {
@@ -1638,9 +1664,7 @@ impl FormatModule {
                 self.infer_format_type(scope, f0)?;
                 self.infer_format_type(scope, f)
             }
-            Format::Hint(_hint, f) => {
-                self.infer_format_type(scope, f)
-            }
+            Format::Hint(_hint, f) => self.infer_format_type(scope, f),
             Format::Match(head, branches) => {
                 if branches.is_empty() {
                     return Err(anyhow!("infer_format_type: empty Match"));
@@ -1709,9 +1733,11 @@ impl FormatModule {
                 ViewFormat::CaptureBytes(len) => {
                     view.check_type(scope)?;
                     match len.infer_type(scope)? {
-                        t if t.is_numeric() => {},
+                        t if t.is_numeric() => {}
                         other => {
-                            return Err(anyhow!("CaptureBytes@0: expected numeric, found {other:?}"));
+                            return Err(anyhow!(
+                                "CaptureBytes@0: expected numeric, found {other:?}"
+                            ));
                         }
                     }
                     // NOTE[epic=view-format] - in the current base-model design and implementation, CaptureBytes captures a `Seq<U8>`
@@ -1720,19 +1746,21 @@ impl FormatModule {
                 ViewFormat::ReadArray(len, kind) => {
                     view.check_type(scope)?;
                     match len.infer_type(scope)? {
-                        t if t.is_numeric() => {},
+                        t if t.is_numeric() => {}
                         other => {
                             return Err(anyhow!("ReadArray@0: expected numeric, found {other:?}"));
                         }
                     }
                     // NOTE[epic=view-format] - in the current base-model design and implementation, ReadArray captures a `Seq<K>` where K is informed by `kind`
-                    Ok(ValueType::Seq(Box::new(ValueType::Base(BaseType::from(*kind)))))
+                    Ok(ValueType::Seq(Box::new(ValueType::Base(BaseType::from(
+                        *kind,
+                    )))))
                 }
                 ViewFormat::ReifyView => {
                     view.check_type(scope)?;
                     Ok(ValueType::ViewObj)
                 }
-            }
+            },
         }
     }
 }
@@ -1995,7 +2023,7 @@ impl<'a> MatchTreeStep<'a> {
                 let next = Rc::new(Next::Slice(n - 1, Rc::new(Next::Empty), next.clone()));
                 tree.branches.push((ByteSet::full(), next));
             } else {
-                for (_bs, ref mut inside) in tree.branches.iter_mut() {
+                for (_bs, inside) in tree.branches.iter_mut() {
                     *inside = Rc::new(Next::Slice(n - 1, inside.clone(), next.clone()));
                 }
             }
@@ -2258,7 +2286,9 @@ impl<'a> MatchTreeStep<'a> {
                         }
                     },
                     _ => {
-                        unreachable!("inexact repeat-between bounds (not technically a problem but not what the combinator was designed for...");
+                        unreachable!(
+                            "inexact repeat-between bounds (not technically a problem but not what the combinator was designed for..."
+                        );
                     }
                 }
             }
@@ -2420,7 +2450,9 @@ impl<'a> MatchTreeStep<'a> {
                     },
                     _ => {
                         // FIXME: if there is a cleaner way to address this case, attempt to apply it
-                        unreachable!("inexact repeat-between bounds (not technically a problem but not what the combinator was designed for...");
+                        unreachable!(
+                            "inexact repeat-between bounds (not technically a problem but not what the combinator was designed for..."
+                        );
                     }
                 }
             }

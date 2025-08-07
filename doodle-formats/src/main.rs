@@ -1,18 +1,18 @@
 #![allow(clippy::new_without_default)]
 #![deny(rust_2018_idioms)]
 
-use anyhow::{anyhow, Result as AResult};
-use doodle::codegen::{generate_code, ToFragment};
+use anyhow::{Result as AResult, anyhow};
 use doodle::Format;
+use doodle::codegen::{ToFragment, generate_code};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 
 use clap::{Parser, ValueEnum};
+use doodle::FormatModule;
 use doodle::decoder::Compiler;
 use doodle::read::ReadCtxt;
 use doodle::typecheck;
-use doodle::FormatModule;
 
 mod format;
 

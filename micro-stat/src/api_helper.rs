@@ -36,7 +36,9 @@ pub fn dump_axis_value_offsets(filename: &str) {
                 axis_name_id,
                 axis_ordering,
             } = Decoder_opentype_stat_axis_record(&mut parser).expect("bad view-offset parse");
-            println!("{ix}: axis-tag={axis_tag} axis-name-id={axis_name_id} axis-ordering={axis_ordering}");
+            println!(
+                "{ix}: axis-tag={axis_tag} axis-name-id={axis_name_id} axis-ordering={axis_ordering}"
+            );
         }
     } else {
         println!("{filename}: no stat table");

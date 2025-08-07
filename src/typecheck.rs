@@ -1,4 +1,4 @@
-use crate::valuetype::{augmented::AugValueType, SeqBorrowHint};
+use crate::valuetype::{SeqBorrowHint, augmented::AugValueType};
 use crate::{
     Arith, BaseType, DynFormat, Expr, Format, FormatModule, Label, Pattern, UnaryOp, ValueType,
     ViewExpr, ViewFormat,
@@ -18,13 +18,13 @@ use std::{
 /// ```
 #[allow(unused_macros)]
 macro_rules! try_with {
-    ($x:expr => $y:expr) => {
+    ($x:expr_2021 => $y:expr_2021) => {
         match $x {
             Ok(val) => val,
             Err(e) => return Err(e.with_trace($y)),
         }
     };
-    ($x:expr $(=> ())?) => {
+    ($x:expr_2021 $(=> ())?) => {
         $x?
     };
 }
@@ -1397,7 +1397,9 @@ impl TypeChecker {
                 // we only care about old if it is still an extant varmap
                 if let Some(old_vm) = self.varmaps.as_inner().get(&old.0) {
                     let Some(new_vm) = self.varmaps.as_inner().get(&vmid.0) else {
-                        unreachable!("HashMap::get returned None for {vmid} even though assertion on HashMap::contains_key succeeded")
+                        unreachable!(
+                            "HashMap::get returned None for {vmid} even though assertion on HashMap::contains_key succeeded"
+                        )
                     };
                     for key in old_vm.keys() {
                         // NOTE: this check may be costly so we are gating it for non-release builds
@@ -1635,11 +1637,7 @@ impl TypeChecker {
             (_, UType::Empty) => Ok(left),
             (UType::Seq(e1, h1), UType::Seq(e2, h2)) => {
                 if e1 == e2 {
-                    if h1 <= h2 {
-                        Ok(left)
-                    } else {
-                        Ok(right)
-                    }
+                    if h1 <= h2 { Ok(left) } else { Ok(right) }
                 } else {
                     let inner = self.unify_utype(e1.clone(), e2.clone())?;
                     Ok(Rc::new(UType::Seq(inner, Ord::min(*h1, *h2))))
@@ -2590,10 +2588,9 @@ impl TypeChecker {
                     (true, true) => {
                         return Ok(&self.constraints[v2.0]);
                     }
-                    (true, false) | (false, true) =>
-                        unreachable!(
-                            "mismatched back- and forward-references for {v1} ({a1:?}) and {v2} ({a2:?})"
-                        ),
+                    (true, false) | (false, true) => unreachable!(
+                        "mismatched back- and forward-references for {v1} ({a1:?}) and {v2} ({a2:?})"
+                    ),
                     (false, false) => (),
                 }
 
@@ -2615,10 +2612,9 @@ impl TypeChecker {
                     (true, true) => {
                         return Ok(&self.constraints[v1.0]);
                     }
-                    (true, false) | (false, true) =>
-                        unreachable!(
-                            "mismatched forward- and back-references for {v1} ({a1:?}) and {v2} ({a2:?})"
-                        ),
+                    (true, false) | (false, true) => unreachable!(
+                        "mismatched forward- and back-references for {v1} ({a1:?}) and {v2} ({a2:?})"
+                    ),
                     (false, false) => (),
                 }
 
@@ -2663,10 +2659,10 @@ impl TypeChecker {
                 !self.aliases[a1].contains_fwd_ref(a),
                 "forward ref of ?{a2} is also a forward ref of ?{a1}, somehow"
             );
-            self.repoint(a1, a);
+            unsafe { self.repoint(a1, a) };
         }
         self.aliases[a1].add_forward_ref(a2);
-        self.transfer_constraints(a1, a2)
+        unsafe { self.transfer_constraints(a1, a2) }
     }
 
     /// Rewrites the aliasing of `self` so that `lo<->hi` is enforced, without any other changes.
@@ -3212,21 +3208,20 @@ impl TypeChecker {
             &UType::Var(uv) => {
                 let v = self.get_canonical_uvar(uv);
                 match self.substitute_uvar_vtype(v) {
-                    Ok(Some(t0)) =>
-                        match t0 {
-                            VType::Base(bs) =>
-                                match bs.get_unique_solution(uv).as_deref() {
-                                    Ok(UType::Base(b)) => Some(AugValueType::Base(*b)),
-                                    Ok(other) => unreachable!("base-set {bs:?} yielded unexpected solution {other:?}"),
-                                    Err(_e) => None,
-                                }
-                            VType::Abstract(ut) => self.reify(ut),
-                            VType::IndefiniteUnion(vmid) => self.reify_union(vmid),
-                            VType::ImplicitRecord(..) | VType::ImplicitTuple(..) =>
-                                unreachable!(
-                                    "Unsolved implicit Tuple or Record leftover from un-unified projection: {t0:?}"
-                                ),
-                        }
+                    Ok(Some(t0)) => match t0 {
+                        VType::Base(bs) => match bs.get_unique_solution(uv).as_deref() {
+                            Ok(UType::Base(b)) => Some(AugValueType::Base(*b)),
+                            Ok(other) => unreachable!(
+                                "base-set {bs:?} yielded unexpected solution {other:?}"
+                            ),
+                            Err(_e) => None,
+                        },
+                        VType::Abstract(ut) => self.reify(ut),
+                        VType::IndefiniteUnion(vmid) => self.reify_union(vmid),
+                        VType::ImplicitRecord(..) | VType::ImplicitTuple(..) => unreachable!(
+                            "Unsolved implicit Tuple or Record leftover from un-unified projection: {t0:?}"
+                        ),
+                    },
                     Err(_) => None,
                     Ok(None) => {
                         // substitute_uvar_utype returns none for assumed-partial union types, so handle that case proactively
@@ -3390,49 +3385,45 @@ impl From<ConstraintError> for TCErrorKind {
 impl std::fmt::Display for TCErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::VarianceMismatch(uv, vmid, vm, constraint, pol) =>
-                match pol {
-                    Polarity::PriorInvariant =>
-                        write!(
-                            f,
-                            "prior constraint `{uv} {constraint}` precludes attempted unification `{uv} ⊇ {vmid} (:= {vm:?})`"
-                        ),
-                    Polarity::PriorVariant =>
-                        write!(
-                            f,
-                            "attempted unification `{uv} {constraint}` precluded by prior constraint `{uv} ⊇ {vmid} (:= {vm:?})`"
-                        ),
-                }
+            Self::VarianceMismatch(uv, vmid, vm, constraint, pol) => match pol {
+                Polarity::PriorInvariant => write!(
+                    f,
+                    "prior constraint `{uv} {constraint}` precludes attempted unification `{uv} ⊇ {vmid} (:= {vm:?})`"
+                ),
+                Polarity::PriorVariant => write!(
+                    f,
+                    "attempted unification `{uv} {constraint}` precluded by prior constraint `{uv} ⊇ {vmid} (:= {vm:?})`"
+                ),
+            },
             Self::Unification(c_err) => write!(f, "{c_err}"),
-            Self::InfiniteType(v, constraints) =>
-                match constraints {
-                    Constraints::Indefinite =>
-                        unreachable!("indefinite constraint `{v} = ??` is not infinite"),
-                    Constraints::Variant(vmid) =>
-                        write!(
-                            f,
-                            "`{v} ⊇ {vmid}` constitutes an infinite type ({v} or alias occurs within {vmid})"
-                        ),
-                    Constraints::Invariant(inv) =>
-                        match inv {
-                            Constraint::Equiv(t) =>
-                                write!(
-                                    f,
-                                    "`{v} = {t:?}` is an infinite type ({v} or alias occurs within the rhs utype)"
-                                ),
-                            Constraint::Elem(_) =>
-                                unreachable!("`{v} {inv}` is not infinite, but we thought it was"),
-                            Constraint::Proj(ps) => {
-                                write!(f, "`{v} ~ {ps:?}` constitutes an infinite type")
-                            }
-                        }
+            Self::InfiniteType(v, constraints) => match constraints {
+                Constraints::Indefinite => {
+                    unreachable!("indefinite constraint `{v} = ??` is not infinite")
                 }
-            Self::MultipleSolutions(uv, bs) =>
-                write!(f, "no unique solution for `{uv} {}`", bs.to_constraint()),
-            Self::NoSolution(uv) =>
-                write!(f, "no valid solutions for `{uv}`"),
-            Self::MissingView(lbl) =>
-                write!(f, "view-based parse depends on unbound identifier `{lbl}`"),
+                Constraints::Variant(vmid) => write!(
+                    f,
+                    "`{v} ⊇ {vmid}` constitutes an infinite type ({v} or alias occurs within {vmid})"
+                ),
+                Constraints::Invariant(inv) => match inv {
+                    Constraint::Equiv(t) => write!(
+                        f,
+                        "`{v} = {t:?}` is an infinite type ({v} or alias occurs within the rhs utype)"
+                    ),
+                    Constraint::Elem(_) => {
+                        unreachable!("`{v} {inv}` is not infinite, but we thought it was")
+                    }
+                    Constraint::Proj(ps) => {
+                        write!(f, "`{v} ~ {ps:?}` constitutes an infinite type")
+                    }
+                },
+            },
+            Self::MultipleSolutions(uv, bs) => {
+                write!(f, "no unique solution for `{uv} {}`", bs.to_constraint())
+            }
+            Self::NoSolution(uv) => write!(f, "no valid solutions for `{uv}`"),
+            Self::MissingView(lbl) => {
+                write!(f, "view-based parse depends on unbound identifier `{lbl}`")
+            }
         }
     }
 }

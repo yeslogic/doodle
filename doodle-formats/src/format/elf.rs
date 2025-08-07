@@ -2,8 +2,8 @@ use std::mem::size_of;
 
 use crate::format::BaseModule;
 use doodle::bounds::Bounds;
-use doodle::{helper::*, IntoLabel, Label};
 use doodle::{BaseType, Expr, Format, FormatModule, FormatRef, Pattern, ValueType};
+use doodle::{IntoLabel, Label, helper::*};
 
 const ISBE_ARG: (Label, ValueType) = (Label::Borrowed("is_be"), ValueType::Base(BaseType::Bool));
 const CLASS_ARG: (Label, ValueType) = (Label::Borrowed("class"), ValueType::Base(BaseType::U8));
@@ -354,7 +354,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     const SHT_SHLIB: u32 = 10; // reserved, unspecified semantics
     #[allow(dead_code)]
     const SHT_DYNSYM: u32 = 11; // symbol hash table (multiple disallowed)
-                                // NOTE - range-gap for [12,13]
+    // NOTE - range-gap for [12,13]
     #[allow(dead_code)]
     const SHT_INIT_ARRAY: u32 = 14; // array of pointers to initialization functions
     #[allow(dead_code)]

@@ -7,11 +7,11 @@ use std::{
 };
 
 use crate::{
-    typecheck::UnificationError, valuetype::Container, BaseKind, BaseType, ByteSet, DynFormat,
-    Expr, Format, FormatModule, FormatRef, IntoLabel, Label, Pattern, StyleHint, TypeScope,
-    ValueKind, ValueType, ViewExpr,
+    BaseKind, BaseType, ByteSet, DynFormat, Expr, Format, FormatModule, FormatRef, IntoLabel,
+    Label, Pattern, StyleHint, TypeScope, ValueKind, ValueType, ViewExpr,
+    typecheck::UnificationError, valuetype::Container,
 };
-use anyhow::{anyhow, Result as AResult};
+use anyhow::{Result as AResult, anyhow};
 use serde::Serialize;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Eq, Ord, Hash)]
@@ -886,7 +886,7 @@ impl FormatModuleExt {
                                 other => {
                                     return Err(anyhow!(
                                         "ReadOffsetLen: expected numeric len, found {other:?}"
-                                    ))
+                                    ));
                                 }
                             }
                             // TODO - consider if we need to add a valuetype for borrowed u8 slice in APM (?)
@@ -900,7 +900,7 @@ impl FormatModuleExt {
                                 other => {
                                     return Err(anyhow!(
                                         "ReadOffsetLen: expected numeric len, found {other:?}"
-                                    ))
+                                    ));
                                 }
                             }
                             let elt = ValueTypeExt::Base((*kind).into());
@@ -922,107 +922,147 @@ impl FormatModuleExt {
                             let t = self.infer_format_ext_type(scope, f)?;
                             Ok(ValueTypeExt::Seq(Box::new(t)))
                         }
-                        MonoKind::RepeatCount(count) => {
-                            match count.infer_type_ext(scope)? {
-                                ValueTypeExt::Base(b) if b.is_numeric() => {
-                                    let t = self.infer_format_ext_type(scope, f)?;
-                                    Ok(ValueTypeExt::Seq(Box::new(t)))
-                                }
-                                ValueTypeExt::EngineSpecific { .. } => unreachable!("RepeatCount: unexpected engine-specific type in numeric position"),
-                                other => Err(anyhow!("RepeatCount first argument type should be numeric, found {other:?} instead")),
+                        MonoKind::RepeatCount(count) => match count.infer_type_ext(scope)? {
+                            ValueTypeExt::Base(b) if b.is_numeric() => {
+                                let t = self.infer_format_ext_type(scope, f)?;
+                                Ok(ValueTypeExt::Seq(Box::new(t)))
                             }
-                        }
-                        MonoKind::RepeatBetween(min, max) => {
-                            match min.infer_type_ext(scope)? {
-                                ref t0 @ ValueTypeExt::Base(b0) if b0.is_numeric() => {
-                                    match max.infer_type_ext(scope)? {
-                                        ValueTypeExt::Base(b1) if b0 == b1 => {
-                                            let t = self.infer_format_ext_type(scope, f)?;
-                                            Ok(ValueTypeExt::Seq(Box::new(t)))
-                                        }
-                                    ValueTypeExt::EngineSpecific { .. } => unreachable!("RepeatBetween@1: unexpected engine-specific type in numeric position"),
-                                        other => Err(anyhow!("RepeatBetween second argument type should be the same as the first, found {other:?} (!= {t0:?})")),
+                            ValueTypeExt::EngineSpecific { .. } => unreachable!(
+                                "RepeatCount: unexpected engine-specific type in numeric position"
+                            ),
+                            other => Err(anyhow!(
+                                "RepeatCount first argument type should be numeric, found {other:?} instead"
+                            )),
+                        },
+                        MonoKind::RepeatBetween(min, max) => match min.infer_type_ext(scope)? {
+                            ref t0 @ ValueTypeExt::Base(b0) if b0.is_numeric() => {
+                                match max.infer_type_ext(scope)? {
+                                    ValueTypeExt::Base(b1) if b0 == b1 => {
+                                        let t = self.infer_format_ext_type(scope, f)?;
+                                        Ok(ValueTypeExt::Seq(Box::new(t)))
                                     }
+                                    ValueTypeExt::EngineSpecific { .. } => unreachable!(
+                                        "RepeatBetween@1: unexpected engine-specific type in numeric position"
+                                    ),
+                                    other => Err(anyhow!(
+                                        "RepeatBetween second argument type should be the same as the first, found {other:?} (!= {t0:?})"
+                                    )),
                                 }
-                                ValueTypeExt::EngineSpecific { .. } => unreachable!("RepeatBetween@0: unexpected engine-specific type in numeric position"),
-                                other => Err(anyhow!("RepeatBetween first argument type should be numeric, found {other:?} instead")),
                             }
-                        }
+                            ValueTypeExt::EngineSpecific { .. } => unreachable!(
+                                "RepeatBetween@0: unexpected engine-specific type in numeric position"
+                            ),
+                            other => Err(anyhow!(
+                                "RepeatBetween first argument type should be numeric, found {other:?} instead"
+                            )),
+                        },
                         MonoKind::LetView(ident) => {
                             let mut child_scope = TypeScope::child(scope);
                             child_scope.push_view(ident.clone());
                             self.infer_format_ext_type(scope, f)
                         }
-                        MonoKind::RepeatUntilLast(lambda_elem) => {
-                            match lambda_elem.as_ref() {
-                                Expr::Lambda(head, expr) => {
-                                    let t = self.infer_format_ext_type(scope, f)?;
-                                    let mut child_scope = TypeScope::child(scope);
-                                    child_scope.push(head.clone(), t.clone());
-                                    let ret_type = expr.infer_type_ext(&child_scope)?;
-                                    match ret_type {
-                                        ValueTypeExt::Base(BaseType::Bool) => Ok(ValueTypeExt::Seq(Box::new(t))),
-                                        ValueTypeExt::EngineSpecific { .. } => unreachable!("RepeatUntilLast@0.out: unexpected engine-specific type in boolean position"),
-                                        other => Err(anyhow!("RepeatUntilLast first argument (lambda) return type should be Bool, found {other:?} instead")),
+                        MonoKind::RepeatUntilLast(lambda_elem) => match lambda_elem.as_ref() {
+                            Expr::Lambda(head, expr) => {
+                                let t = self.infer_format_ext_type(scope, f)?;
+                                let mut child_scope = TypeScope::child(scope);
+                                child_scope.push(head.clone(), t.clone());
+                                let ret_type = expr.infer_type_ext(&child_scope)?;
+                                match ret_type {
+                                    ValueTypeExt::Base(BaseType::Bool) => {
+                                        Ok(ValueTypeExt::Seq(Box::new(t)))
                                     }
+                                    ValueTypeExt::EngineSpecific { .. } => unreachable!(
+                                        "RepeatUntilLast@0.out: unexpected engine-specific type in boolean position"
+                                    ),
+                                    other => Err(anyhow!(
+                                        "RepeatUntilLast first argument (lambda) return type should be Bool, found {other:?} instead"
+                                    )),
                                 }
-                                other => Err(anyhow!("RepeatUntilLast first argument type should be lambda, found {other:?} instead")),
                             }
-                        }
-                        MonoKind::RepeatUntilSeq(lambda_seq) => {
-                            match lambda_seq.as_ref() {
-                                Expr::Lambda(head, expr) => {
-                                    let t = self.infer_format_ext_type(scope, f)?;
-                                    let mut child_scope = TypeScope::child(scope);
-                                    child_scope.push(head.clone(), ValueTypeExt::Seq(Box::new(t.clone())));
-                                    let ret_type = expr.infer_type_ext(&child_scope)?;
-                                    match ret_type {
-                                        ValueTypeExt::Base(BaseType::Bool) => Ok(ValueTypeExt::Seq(Box::new(t))),
-                                        ValueTypeExt::EngineSpecific { .. } => unreachable!("RepeatUntilSeq@0.out: unexpected engine-specific type in boolean position"),
-                                        other => Err(anyhow!("RepeatUntilSeq first argument (lambda) return type should be Bool, found {other:?} instead")),
+                            other => Err(anyhow!(
+                                "RepeatUntilLast first argument type should be lambda, found {other:?} instead"
+                            )),
+                        },
+                        MonoKind::RepeatUntilSeq(lambda_seq) => match lambda_seq.as_ref() {
+                            Expr::Lambda(head, expr) => {
+                                let t = self.infer_format_ext_type(scope, f)?;
+                                let mut child_scope = TypeScope::child(scope);
+                                child_scope
+                                    .push(head.clone(), ValueTypeExt::Seq(Box::new(t.clone())));
+                                let ret_type = expr.infer_type_ext(&child_scope)?;
+                                match ret_type {
+                                    ValueTypeExt::Base(BaseType::Bool) => {
+                                        Ok(ValueTypeExt::Seq(Box::new(t)))
                                     }
+                                    ValueTypeExt::EngineSpecific { .. } => unreachable!(
+                                        "RepeatUntilSeq@0.out: unexpected engine-specific type in boolean position"
+                                    ),
+                                    other => Err(anyhow!(
+                                        "RepeatUntilSeq first argument (lambda) return type should be Bool, found {other:?} instead"
+                                    )),
                                 }
-                                other => Err(anyhow!("RepeatUntilSeq first argument type should be lambda, found {other:?} instead")),
                             }
-                        }
+                            other => Err(anyhow!(
+                                "RepeatUntilSeq first argument type should be lambda, found {other:?} instead"
+                            )),
+                        },
                         MonoKind::AccumUntil(lambda_acc_seq, lambda_acc_val, init, vt) => {
                             match lambda_acc_seq.as_ref() {
                                 Expr::Lambda(head, expr) => {
                                     let t = self.infer_format_ext_type(scope, f)?;
                                     // Check that the initial accumulator value's type unifies with the type-claim
-                                    let _acc_type = init.infer_type_ext(scope)?.unify(vt.as_ref())?;
+                                    let _acc_type =
+                                        init.infer_type_ext(scope)?.unify(vt.as_ref())?;
                                     let mut child_scope = TypeScope::child(scope);
                                     let t_seq = ValueTypeExt::Seq(Box::new(t.clone()));
-                                    let vt_acc_seq = ValueTypeExt::Tuple(vec![vt.as_ref().clone(), t_seq.clone()]);
+                                    let vt_acc_seq = ValueTypeExt::Tuple(vec![
+                                        vt.as_ref().clone(),
+                                        t_seq.clone(),
+                                    ]);
                                     child_scope.push(head.clone(), vt_acc_seq.clone());
                                     let ret_type = expr.infer_type_ext(&child_scope)?;
                                     match ret_type {
                                         ValueTypeExt::Base(BaseType::Bool) => {
                                             match lambda_acc_val.as_ref() {
                                                 Expr::Lambda(head, expr) => {
-                                                    let mut child_scope = TypeScope::child(&child_scope);
-                                                    let vt_acc_elem = ValueTypeExt::Tuple(vec![vt.as_ref().clone(), t.clone()]);
+                                                    let mut child_scope =
+                                                        TypeScope::child(&child_scope);
+                                                    let vt_acc_elem = ValueTypeExt::Tuple(vec![
+                                                        vt.as_ref().clone(),
+                                                        t.clone(),
+                                                    ]);
                                                     child_scope.push(head.clone(), vt_acc_elem);
                                                     // we just need to check that these types unify, the value is unimportant
-                                                    let _ret_type = expr.infer_type_ext(&child_scope)?.unify(vt.as_ref())?;
+                                                    let _ret_type = expr
+                                                        .infer_type_ext(&child_scope)?
+                                                        .unify(vt.as_ref())?;
                                                     Ok(vt_acc_seq)
                                                 }
-                                                other => Err(anyhow!("AccumUntil second argument type should be lambda, found {other:?} instead")),
+                                                other => Err(anyhow!(
+                                                    "AccumUntil second argument type should be lambda, found {other:?} instead"
+                                                )),
                                             }
                                         }
-                                        ValueTypeExt::EngineSpecific { .. } => unreachable!("AccumUntil@0.out: unexpected engine-specific type in boolean position"),
-                                        other => Err(anyhow!("AccumUntil first argument (lambda) return type should be Bool, found {other:?} instead")),
+                                        ValueTypeExt::EngineSpecific { .. } => unreachable!(
+                                            "AccumUntil@0.out: unexpected engine-specific type in boolean position"
+                                        ),
+                                        other => Err(anyhow!(
+                                            "AccumUntil first argument (lambda) return type should be Bool, found {other:?} instead"
+                                        )),
                                     }
-
                                 }
-                                other => Err(anyhow!("AccumUntil first argument type should be lambda, found {other:?} instead")),
+                                other => Err(anyhow!(
+                                    "AccumUntil first argument type should be lambda, found {other:?} instead"
+                                )),
                             }
                         }
                         MonoKind::ForEach(expr, lbl) => {
                             let expr_t = expr.infer_type_ext(scope)?;
                             let elem_t = match expr_t.simplify().as_ref() {
                                 ValueTypeExt::Seq(elem_t) => (**elem_t).clone(),
-                                _ => return Err(anyhow!("ForEach: expected Seq, found {expr_t:?}")),
+                                _ => {
+                                    return Err(anyhow!("ForEach: expected Seq, found {expr_t:?}"));
+                                }
                             };
                             let mut child_scope = TypeScope::child(scope);
                             child_scope.push(lbl.clone(), elem_t);
@@ -1041,7 +1081,9 @@ impl FormatModuleExt {
                         MonoKind::Peek => self.infer_format_ext_type(scope, f),
                         MonoKind::PeekNot => Ok(ValueTypeExt::UNIT),
                         MonoKind::Slice(expr) => {
-                            debug_assert!(expr.infer_type_ext(scope).is_ok_and(|vt| vt.is_numeric()));
+                            debug_assert!(
+                                expr.infer_type_ext(scope).is_ok_and(|vt| vt.is_numeric())
+                            );
                             self.infer_format_ext_type(scope, f)
                         }
                         MonoKind::Bits => self.infer_format_ext_type(scope, f),
@@ -1067,7 +1109,9 @@ impl FormatModuleExt {
                                     child_scope.push(name.clone(), arg_type.clone());
                                     let t = body.infer_type_ext(&child_scope)?;
                                     if t != ValueTypeExt::Base(BaseType::Bool) {
-                                        return Err(anyhow!("Where: expected bool lambda, found {t:?}"));
+                                        return Err(anyhow!(
+                                            "Where: expected bool lambda, found {t:?}"
+                                        ));
                                     }
                                     Ok(arg_type)
                                 }
@@ -1080,37 +1124,44 @@ impl FormatModuleExt {
                             child_scope.push(name.clone(), t);
                             self.infer_format_ext_type(&child_scope, f)
                         }
-                        MonoKind::Dynamic(name, dyn_format) => {
-                            match dyn_format {
-                                DynFormat::Huffman(lengths_expr, _opt_values_expr) => match lengths_expr.infer_type_ext(scope)? {
+                        MonoKind::Dynamic(name, dyn_format) => match dyn_format {
+                            DynFormat::Huffman(lengths_expr, _opt_values_expr) => {
+                                match lengths_expr.infer_type_ext(scope)? {
                                     ValueTypeExt::Seq(t) => match &*t {
                                         ValueTypeExt::Base(BaseType::U8 | BaseType::U16) => {
                                             let mut child_scope = TypeScope::child(scope);
-                                            child_scope.push(name.clone(), ValueTypeExt::Base(BaseType::U16));
+                                            child_scope.push(
+                                                name.clone(),
+                                                ValueTypeExt::Base(BaseType::U16),
+                                            );
                                             self.infer_format_ext_type(&child_scope, f)
                                         }
-                                        other => Err(anyhow!("Huffman: expected U8 or U16, found {other:?}")),
-                                    }
+                                        other => Err(anyhow!(
+                                            "Huffman: expected U8 or U16, found {other:?}"
+                                        )),
+                                    },
                                     other => Err(anyhow!("Huffman: expected Seq, found {other:?}")),
                                 }
                             }
-                        }
+                        },
                         MonoKind::DecodeBytes(bytes) => {
                             let bytes_type = bytes.infer_type_ext(scope)?;
                             match bytes_type {
-                                ValueTypeExt::Seq(bt) if matches!(*bt, ValueTypeExt::Base(BaseType::U8)) => {
+                                ValueTypeExt::Seq(bt)
+                                    if matches!(*bt, ValueTypeExt::Base(BaseType::U8)) =>
+                                {
                                     self.infer_format_ext_type(scope, f)
                                 }
-                                other => Err(anyhow!("DecodeBytes first argument type should be Seq(U8), found {other:?} instead")),
+                                other => Err(anyhow!(
+                                    "DecodeBytes first argument type should be Seq(U8), found {other:?} instead"
+                                )),
                             }
                         }
                         MonoKind::ParseFromView(v_expr) => {
                             v_expr.check_type_ext(scope)?;
                             self.infer_format_ext_type(scope, f)
                         }
-                        MonoKind::Hint(_) => {
-                            self.infer_format_ext_type(scope, f)
-                        }
+                        MonoKind::Hint(_) => self.infer_format_ext_type(scope, f),
                     }
                 }
                 EpiFormat::Duo(duo_kind, f0, f1) => match duo_kind {
@@ -1351,45 +1402,60 @@ mod __impls {
                 Expr::U16Be(bytes) => {
                     let _t = bytes.infer_type_ext(scope)?;
                     match _t.as_tuple_type() {
-                        [ValueTypeExt::Base(BaseType::U8), ValueTypeExt::Base(BaseType::U8)] => {
-                            Ok(ValueTypeExt::Base(BaseType::U16))
-                        }
+                        [
+                            ValueTypeExt::Base(BaseType::U8),
+                            ValueTypeExt::Base(BaseType::U8),
+                        ] => Ok(ValueTypeExt::Base(BaseType::U16)),
                         _ => Err(anyhow!("unsound byte-level type cast U16Be(_ : {_t:?})")),
                     }
                 }
                 Expr::U16Le(bytes) => {
                     let _t = bytes.infer_type_ext(scope)?;
                     match _t.as_tuple_type() {
-                        [ValueTypeExt::Base(BaseType::U8), ValueTypeExt::Base(BaseType::U8)] => {
-                            Ok(ValueTypeExt::Base(BaseType::U16))
-                        }
+                        [
+                            ValueTypeExt::Base(BaseType::U8),
+                            ValueTypeExt::Base(BaseType::U8),
+                        ] => Ok(ValueTypeExt::Base(BaseType::U16)),
                         _ => Err(anyhow!("unsound byte-level type cast U16Le(_ : {_t:?})")),
                     }
                 }
                 Expr::U32Be(bytes) => {
                     let _t = bytes.infer_type_ext(scope)?;
                     match _t.as_tuple_type() {
-                        [ValueTypeExt::Base(BaseType::U8), ValueTypeExt::Base(BaseType::U8), ValueTypeExt::Base(BaseType::U8), ValueTypeExt::Base(BaseType::U8)] => {
-                            Ok(ValueTypeExt::Base(BaseType::U32))
-                        }
+                        [
+                            ValueTypeExt::Base(BaseType::U8),
+                            ValueTypeExt::Base(BaseType::U8),
+                            ValueTypeExt::Base(BaseType::U8),
+                            ValueTypeExt::Base(BaseType::U8),
+                        ] => Ok(ValueTypeExt::Base(BaseType::U32)),
                         _ => Err(anyhow!("unsound byte-level type cast U32Be(_ : {_t:?})")),
                     }
                 }
                 Expr::U32Le(bytes) => {
                     let _t = bytes.infer_type_ext(scope)?;
                     match _t.as_tuple_type() {
-                        [ValueTypeExt::Base(BaseType::U8), ValueTypeExt::Base(BaseType::U8), ValueTypeExt::Base(BaseType::U8), ValueTypeExt::Base(BaseType::U8)] => {
-                            Ok(ValueTypeExt::Base(BaseType::U32))
-                        }
+                        [
+                            ValueTypeExt::Base(BaseType::U8),
+                            ValueTypeExt::Base(BaseType::U8),
+                            ValueTypeExt::Base(BaseType::U8),
+                            ValueTypeExt::Base(BaseType::U8),
+                        ] => Ok(ValueTypeExt::Base(BaseType::U32)),
                         _ => Err(anyhow!("unsound byte-level type cast U32Le(_ : {_t:?})")),
                     }
                 }
                 Expr::U64Be(bytes) | Expr::U64Le(bytes) => {
                     let _t = bytes.infer_type_ext(scope)?;
                     match _t.as_tuple_type() {
-                        [ValueTypeExt::Base(BaseType::U8), ValueTypeExt::Base(BaseType::U8), ValueTypeExt::Base(BaseType::U8), ValueTypeExt::Base(BaseType::U8), ValueTypeExt::Base(BaseType::U8), ValueTypeExt::Base(BaseType::U8), ValueTypeExt::Base(BaseType::U8), ValueTypeExt::Base(BaseType::U8)] => {
-                            Ok(ValueTypeExt::Base(BaseType::U64))
-                        }
+                        [
+                            ValueTypeExt::Base(BaseType::U8),
+                            ValueTypeExt::Base(BaseType::U8),
+                            ValueTypeExt::Base(BaseType::U8),
+                            ValueTypeExt::Base(BaseType::U8),
+                            ValueTypeExt::Base(BaseType::U8),
+                            ValueTypeExt::Base(BaseType::U8),
+                            ValueTypeExt::Base(BaseType::U8),
+                            ValueTypeExt::Base(BaseType::U8),
+                        ] => Ok(ValueTypeExt::Base(BaseType::U64)),
                         other => Err(anyhow!(
                             "U64Be/Le: expected (U8, U8, U8, U8, U8, U8, U8, U8), found {other:#?}"
                         )),

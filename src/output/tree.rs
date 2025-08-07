@@ -1,16 +1,16 @@
 use std::{fmt, io, rc::Rc};
 
 use crate::decoder::SeqKind;
-use crate::precedence::{cond_paren, Precedence};
-use crate::{
-    decoder::Value,
-    loc_decoder::{ParseLoc, Parsed, ParsedValue},
-};
+use crate::precedence::{Precedence, cond_paren};
 use crate::{
     Arith, DynFormat, Expr, FieldLabel, Format, FormatModule, IntRel, Pattern, RecordFormat,
     StyleHint, ViewExpr, ViewFormat,
 };
 use crate::{Label, UnaryOp};
+use crate::{
+    decoder::Value,
+    loc_decoder::{ParseLoc, Parsed, ParsedValue},
+};
 
 use super::{Fragment, FragmentBuilder, Symbol};
 
@@ -966,7 +966,7 @@ impl<'module> TreePrinter<'module> {
         vals: &Parsed<Vec<ParsedValue>>,
         formats: Option<&[Format]>,
     ) -> Fragment {
-        let Parsed { inner, .. } = vals;
+        let Parsed { inner, loc } = vals;
         let frag_value = if inner.is_empty() {
             Fragment::String("()".into())
         } else {
@@ -988,9 +988,7 @@ impl<'module> TreePrinter<'module> {
             ));
             frag
         };
-        // FIXME - does location information for the overall tuple give us anything notable?
-        // self.compile_with_location(symbol, *loc)
-        frag_value
+        self.compile_with_location(frag_value, *loc)
     }
 
     fn compile_parsed_seq(

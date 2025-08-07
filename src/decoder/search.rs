@@ -1,5 +1,5 @@
-use crate::decoder::{seq_kind::SeqKind, Value};
 use crate::Expr;
+use crate::decoder::{Value, seq_kind::SeqKind};
 
 /// Helper trait to apply find_index_by_key_sorted to ParsedValue and Value generically
 pub(crate) trait AsKey {

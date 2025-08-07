@@ -124,7 +124,10 @@ impl<T> Wec<T> {
         {
             let _len = store.len();
             let _rem = _len % width;
-            assert_eq!(_rem, 0, "{_len}-element vector would have {_rem} extra elements during conversion to {width}-column matrix");
+            assert_eq!(
+                _rem, 0,
+                "{_len}-element vector would have {_rem} extra elements during conversion to {width}-column matrix"
+            );
         }
         Wec {
             _store: store,
@@ -230,8 +233,8 @@ pub unsafe fn trisect_unchecked<T>(
     suffix_len: usize,
 ) -> (&[T], &[T], &[T]) {
     let len = slice.len();
-    let (lead, suffix) = slice.split_at_unchecked(len - suffix_len);
-    let (prefix, middle) = lead.split_at_unchecked(prefix_len);
+    let (lead, suffix) = unsafe { slice.split_at_unchecked(len - suffix_len) };
+    let (prefix, middle) = unsafe { lead.split_at_unchecked(prefix_len) };
     (prefix, middle, suffix)
 }
 
@@ -274,8 +277,14 @@ pub enum EnumLenError<T> {
 impl<T: std::fmt::Display> std::fmt::Display for EnumLenError<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            EnumLenError::TooShort { len, yielded } => write!(f, "value iteration stopped early (after {yielded} of {len} elements)"),
-            EnumLenError::TooLong { len, next } => write!(f, "value iterator not fully-consumed (next value: {next}) after yielding all {len} elements requested"),
+            EnumLenError::TooShort { len, yielded } => write!(
+                f,
+                "value iteration stopped early (after {yielded} of {len} elements)"
+            ),
+            EnumLenError::TooLong { len, next } => write!(
+                f,
+                "value iterator not fully-consumed (next value: {next}) after yielding all {len} elements requested"
+            ),
         }
     }
 }
