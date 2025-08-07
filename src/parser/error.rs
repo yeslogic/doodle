@@ -60,25 +60,48 @@ impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ParseError::FailToken(trace) => write!(f, "reached Fail token (trace-hash: {trace})"),
-            ParseError::UnsoundOperation(Some(mesg), trace) => write!(f, "attempted unsound operation: {mesg} (trace-hash: {trace})"),
-            ParseError::UnsoundOperation(None, trace) => write!(f, "attempted unsound operation (trace-hash: {trace})"),
-            ParseError::FalsifiedWhere(trace) => write!(f, "parsed value deemed invalid by Where lambda (trace-hash: {trace})"),
+            ParseError::UnsoundOperation(Some(mesg), trace) => write!(
+                f,
+                "attempted unsound operation: {mesg} (trace-hash: {trace})"
+            ),
+            ParseError::UnsoundOperation(None, trace) => {
+                write!(f, "attempted unsound operation (trace-hash: {trace})")
+            }
+            ParseError::FalsifiedWhere(trace) => write!(
+                f,
+                "parsed value deemed invalid by Where lambda (trace-hash: {trace})"
+            ),
             ParseError::InsufficientRepeats => write!(
                 f,
                 "failed to find enough format repeats to satisfy requirement"
             ),
-            ParseError::ExcludedBranch(trace) => write!(f, "buffer contents does not correspond to an expected branch of a MatchTree or Expr::Match (trace-hash: {trace})"),
+            ParseError::ExcludedBranch(trace) => write!(
+                f,
+                "buffer contents does not correspond to an expected branch of a MatchTree or Expr::Match (trace-hash: {trace})"
+            ),
             ParseError::NegatedSuccess => write!(f, "sub-parse succeeded in negated context"),
-            ParseError::NegativeIndex { abs_target, abs_buf_start } => write!(f, "attempted to seek to negative index (target: {abs_target}, buffer-start: {abs_buf_start})"),
+            ParseError::NegativeIndex {
+                abs_target,
+                abs_buf_start,
+            } => write!(
+                f,
+                "attempted to seek to negative index (target: {abs_target}, buffer-start: {abs_buf_start})"
+            ),
             ParseError::IncompleteParse { bytes_remaining: n } => write!(
                 f,
                 "incomplete parse: expected end-of-stream, but {n} bytes remain unconsumed"
             ),
             ParseError::Overrun(k) => match k {
-                OverrunKind::EndOfStream { offset, max_offset }=> write!(f, "attempted offset-advance to {offset} would overrun end of stream[max-offset: {max_offset}]"),
-                OverrunKind::EndOfSlice { offset, max_offset } => write!(f, "attempted offset-advance to {offset} would overrun end of slice[max-offset: {max_offset}]"),
+                OverrunKind::EndOfStream { offset, max_offset } => write!(
+                    f,
+                    "attempted offset-advance to {offset} would overrun end of stream[max-offset: {max_offset}]"
+                ),
+                OverrunKind::EndOfSlice { offset, max_offset } => write!(
+                    f,
+                    "attempted offset-advance to {offset} would overrun end of slice[max-offset: {max_offset}]"
+                ),
             },
-            ParseError::InternalError(e) => write!(f, "unrecoverable internal error: {e}")
+            ParseError::InternalError(e) => write!(f, "unrecoverable internal error: {e}"),
         }
     }
 }

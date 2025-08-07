@@ -1,5 +1,5 @@
 use crate::typecheck::UnificationError;
-use anyhow::{anyhow, Result as AResult};
+use anyhow::{Result as AResult, anyhow};
 use serde::Serialize;
 use std::collections::{BTreeMap, HashSet};
 

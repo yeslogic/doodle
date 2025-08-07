@@ -1,5 +1,5 @@
-use doodle::{helper::*, StyleHint, ViewExpr};
 use doodle::{Expr, Format, FormatModule, FormatRef, Label, ViewFormat};
+use doodle::{StyleHint, ViewExpr, helper::*};
 
 use super::base::BaseModule;
 

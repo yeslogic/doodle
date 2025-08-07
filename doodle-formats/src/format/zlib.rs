@@ -1,4 +1,4 @@
-use doodle::{helper::*, Expr, Format, FormatModule, FormatRef};
+use doodle::{Expr, Format, FormatModule, FormatRef, helper::*};
 
 use crate::format::BaseModule;
 

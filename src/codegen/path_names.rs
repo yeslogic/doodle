@@ -1,6 +1,6 @@
 use super::util::{FxHash, StableMap};
 use super::{
-    name::{pick_best_path, NameCtxt, PathLabel},
+    name::{NameCtxt, PathLabel, pick_best_path},
     rust_ast::RustTypeDecl,
 };
 use crate::Label;

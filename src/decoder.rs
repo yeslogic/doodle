@@ -2,11 +2,11 @@ use crate::byte_set::ByteSet;
 use crate::error::{DecodeError, DecodeResult};
 use crate::read::ReadCtxt;
 use crate::{
-    pattern::Pattern, Arith, DynFormat, Expr, Format, FormatModule, IntRel, MatchTree, Next,
-    TypeScope, ValueType, ViewExpr,
+    Arith, DynFormat, Expr, Format, FormatModule, IntRel, MatchTree, Next, TypeScope, ValueType,
+    ViewExpr, pattern::Pattern,
 };
 use crate::{BaseKind, IntoLabel, Label, MaybeTyped, TypeHint, UnaryOp, ViewFormat};
-use anyhow::{anyhow, Result as AResult};
+use anyhow::{Result as AResult, anyhow};
 use serde::Serialize;
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -259,7 +259,9 @@ impl Value {
     pub(crate) fn get_as_u8(&self) -> u8 {
         match self {
             Value::U8(n) => *n,
-            Value::U16(..) | Value::U32(..) | Value::U64(..) | Value::Usize(..) => panic!("value is numeric but not u8 (this may be a soft error, or even success, in future)"),
+            Value::U16(..) | Value::U32(..) | Value::U64(..) | Value::Usize(..) => panic!(
+                "value is numeric but not u8 (this may be a soft error, or even success, in future)"
+            ),
             _ => panic!("value is not a number"),
         }
     }
@@ -647,19 +649,33 @@ impl Expr {
                 _ => panic!("U32Le: expected (U8, U8, U8, U8)"),
             },
             Expr::U64Be(bytes) => match bytes.eval_value(scope).unwrap_tuple().as_slice() {
-                [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d), Value::U8(e), Value::U8(f), Value::U8(g), Value::U8(h)] => {
-                    Cow::Owned(Value::U64(u64::from_be_bytes([
-                        *a, *b, *c, *d, *e, *f, *g, *h,
-                    ])))
-                }
+                [
+                    Value::U8(a),
+                    Value::U8(b),
+                    Value::U8(c),
+                    Value::U8(d),
+                    Value::U8(e),
+                    Value::U8(f),
+                    Value::U8(g),
+                    Value::U8(h),
+                ] => Cow::Owned(Value::U64(u64::from_be_bytes([
+                    *a, *b, *c, *d, *e, *f, *g, *h,
+                ]))),
                 _ => panic!("U32Be: expected (U8, U8, U8, U8, U8, U8, U8, U8)"),
             },
             Expr::U64Le(bytes) => match bytes.eval_value(scope).unwrap_tuple().as_slice() {
-                [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d), Value::U8(e), Value::U8(f), Value::U8(g), Value::U8(h)] => {
-                    Cow::Owned(Value::U64(u64::from_le_bytes([
-                        *a, *b, *c, *d, *e, *f, *g, *h,
-                    ])))
-                }
+                [
+                    Value::U8(a),
+                    Value::U8(b),
+                    Value::U8(c),
+                    Value::U8(d),
+                    Value::U8(e),
+                    Value::U8(f),
+                    Value::U8(g),
+                    Value::U8(h),
+                ] => Cow::Owned(Value::U64(u64::from_le_bytes([
+                    *a, *b, *c, *d, *e, *f, *g, *h,
+                ]))),
                 _ => panic!("U32Le: expected (U8, U8, U8, U8, U8, U8, U8, U8)"),
             },
             Expr::AsChar(bytes) => Cow::Owned(match bytes.eval_value(scope) {
@@ -1226,7 +1242,7 @@ impl<'a> Compiler<'a> {
                     Some(n) if n > MAX_LOOKAHEAD => {
                         return Err(anyhow!(
                             "PeekNot cannot require > {MAX_LOOKAHEAD} bytes lookahead"
-                        ))
+                        ));
                     }
                     _ => {}
                 }
@@ -2082,9 +2098,10 @@ mod tests {
 
     fn rejects(d: &Decoder, input: &[u8]) {
         let program = Program::new();
-        assert!(d
-            .parse(&program, &Scope::Empty, ReadCtxt::new(input))
-            .is_err());
+        assert!(
+            d.parse(&program, &Scope::Empty, ReadCtxt::new(input))
+                .is_err()
+        );
     }
 
     fn value_some(x: Value) -> Value {

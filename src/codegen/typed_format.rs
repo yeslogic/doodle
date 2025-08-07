@@ -968,12 +968,12 @@ impl<TypeRep> std::hash::Hash for TypedPattern<TypeRep> {
 mod __impls {
     use super::{GenType, TypedDynFormat, TypedExpr, TypedFormat, TypedPattern, TypedViewFormat};
     use crate::{
+        DynFormat, Expr, Format, Pattern, ViewExpr, ViewFormat,
         codegen::{
+            IxLabel,
             rust_ast::{AtomType, CompType, PrimType, RustType, RustTypeDecl},
             typed_format::TypedViewExpr,
-            IxLabel,
         },
-        DynFormat, Expr, Format, Pattern, ViewExpr, ViewFormat,
     };
 
     impl From<RustType> for GenType {

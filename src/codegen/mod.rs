@@ -11,13 +11,13 @@ use resolve::Resolvable;
 pub use rust_ast::ToFragment;
 
 use crate::{
+    Arith, BaseType, DynFormat, Expr, Format, FormatModule, IntRel, IntoLabel, Label, MatchTree,
+    Pattern, StyleHint, UnaryOp, ViewExpr, ViewFormat,
     byte_set::ByteSet,
     decoder::extract_pair,
     parser::error::TraceHash,
     typecheck::{TypeChecker, UVar},
-    valuetype::{augmented::AugValueType, SeqBorrowHint},
-    Arith, BaseType, DynFormat, Expr, Format, FormatModule, IntRel, IntoLabel, Label, MatchTree,
-    Pattern, StyleHint, UnaryOp, ViewExpr, ViewFormat,
+    valuetype::{SeqBorrowHint, augmented::AugValueType},
 };
 
 use std::{
@@ -34,8 +34,8 @@ use ixlabel::IxLabel;
 use name::{Derivation, NameAtom};
 use path_names::NameGen;
 use rust_ast::analysis::{
-    heap_optimize::{HeapOptimize, HeapStrategy},
     CopyEligible,
+    heap_optimize::{HeapOptimize, HeapStrategy},
 };
 use rust_ast::*;
 use util::{BTree, MapLike, StableMap};
@@ -211,8 +211,9 @@ impl CodeGen {
 
     fn translate(&self, decoder: &GTDecoder) -> CaseLogic<GTExpr> {
         match decoder {
-            TypedDecoder::Call(_gt, ix, args) =>
-                CaseLogic::Simple(SimpleLogic::Invoke(*ix, args.clone())),
+            TypedDecoder::Call(_gt, ix, args) => {
+                CaseLogic::Simple(SimpleLogic::Invoke(*ix, args.clone()))
+            }
             TypedDecoder::Fail => CaseLogic::Simple(SimpleLogic::Fail),
             TypedDecoder::EndOfInput => CaseLogic::Simple(SimpleLogic::ExpectEnd),
             TypedDecoder::Align(n) => CaseLogic::Simple(SimpleLogic::SkipToNextMultiple(*n)),
@@ -221,7 +222,9 @@ impl CodeGen {
             TypedDecoder::Byte(bs) => CaseLogic::Simple(SimpleLogic::ByteIn(*bs)),
             TypedDecoder::Variant(gt, name, inner) => {
                 let (type_name, def) = {
-                    let Some((ix, lab, _)) = gt.try_as_adhoc() else { panic!("unexpected type_hint for Decoder::Variant: {gt:?}") };
+                    let Some((ix, lab, _)) = gt.try_as_adhoc() else {
+                        panic!("unexpected type_hint for Decoder::Variant: {gt:?}")
+                    };
                     (lab.clone(), &self.defined_types[ix])
                 };
                 let constr = Constructor::Compound(type_name.clone(), name.clone());
@@ -233,12 +236,10 @@ impl CodeGen {
                         // REVIEW - should we enforce exact matches (i.e. `inner` must conform to the exact specification of the defined type)?
                         match matching {
                             Some(RustVariant::Unit(_)) => {
-                                CaseLogic::Derived(
-                                    DerivedLogic::UnitVariantOf(
-                                        constr,
-                                        Box::new(self.translate(inner.get_dec()))
-                                    )
-                                )
+                                CaseLogic::Derived(DerivedLogic::UnitVariantOf(
+                                    constr,
+                                    Box::new(self.translate(inner.get_dec())),
+                                ))
                             }
                             Some(RustVariant::Tuple(_, types)) => {
                                 if types.is_empty() {
@@ -253,20 +254,16 @@ impl CodeGen {
                                                 // REVIEW - allowance for 1-tuple variant whose argument type is itself an n-tuple
                                                 match &types[0] {
                                                     RustType::AnonTuple(..) => {
-                                                        let cl_mono_tuple = self.translate(
-                                                            inner.get_dec()
-                                                        );
-                                                        CaseLogic::Derived(
-                                                            DerivedLogic::VariantOf(
-                                                                constr,
-                                                                Box::new(cl_mono_tuple)
-                                                            )
-                                                        )
+                                                        let cl_mono_tuple =
+                                                            self.translate(inner.get_dec());
+                                                        CaseLogic::Derived(DerivedLogic::VariantOf(
+                                                            constr,
+                                                            Box::new(cl_mono_tuple),
+                                                        ))
                                                     }
-                                                    other =>
-                                                        panic!(
-                                                            "unable to translate Decoder::Tuple with hint ({other:?}) implied by {type_name}::{name}"
-                                                        ),
+                                                    other => panic!(
+                                                        "unable to translate Decoder::Tuple with hint ({other:?}) implied by {type_name}::{name}"
+                                                    ),
                                                 }
                                             } else {
                                                 unreachable!(
@@ -290,9 +287,10 @@ impl CodeGen {
                                     _ => {
                                         if types.len() == 1 {
                                             let cl_mono = self.translate(inner.get_dec());
-                                            CaseLogic::Derived(
-                                                DerivedLogic::VariantOf(constr, Box::new(cl_mono))
-                                            )
+                                            CaseLogic::Derived(DerivedLogic::VariantOf(
+                                                constr,
+                                                Box::new(cl_mono),
+                                            ))
                                         } else {
                                             panic!(
                                                 "Variant {type_name}::{name}({types:#?}) mismatches non-tuple Decoder {inner:?}"
@@ -301,10 +299,9 @@ impl CodeGen {
                                     }
                                 }
                             }
-                            None =>
-                                unreachable!(
-                                    "VariantOf called for nonexistent variant `{name}` of enum-type `{type_name}`"
-                                ),
+                            None => unreachable!(
+                                "VariantOf called for nonexistent variant `{name}` of enum-type `{type_name}`"
+                            ),
                         }
                     }
                     RustTypeDef::Struct(_) => {
@@ -312,191 +309,184 @@ impl CodeGen {
                     }
                 }
             }
-            TypedDecoder::Parallel(_, alts) =>
-                CaseLogic::Parallel(
-                    ParallelLogic::Alts(
-                        alts
+            TypedDecoder::Parallel(_, alts) => CaseLogic::Parallel(ParallelLogic::Alts(
+                alts.iter()
+                    .map(|alt| self.translate(alt.get_dec()))
+                    .collect(),
+            )),
+            TypedDecoder::Branch(_, tree, flat) => CaseLogic::Other(OtherLogic::Descend(
+                tree.clone(),
+                flat.iter()
+                    .map(|alt| self.translate(alt.get_dec()))
+                    .collect(),
+            )),
+            TypedDecoder::Tuple(gt, elts) => match gt {
+                GenType::Inline(RustType::AnonTuple(_tys)) => {
+                    CaseLogic::Sequential(SequentialLogic::AccumTuple {
+                        constructor: None,
+                        elements: elts
                             .iter()
-                            .map(|alt| self.translate(alt.get_dec()))
-                            .collect()
-                    )
-                ),
-            TypedDecoder::Branch(_, tree, flat) =>
-                CaseLogic::Other(
-                    OtherLogic::Descend(
-                        tree.clone(),
-                        flat
-                            .iter()
-                            .map(|alt| self.translate(alt.get_dec()))
-                            .collect()
-                    )
-                ),
-            TypedDecoder::Tuple(gt, elts) =>
-                match gt {
-                    GenType::Inline(RustType::AnonTuple(_tys)) => {
-                        CaseLogic::Sequential(SequentialLogic::AccumTuple {
-                            constructor: None,
-                            elements: elts
-                                .iter()
-                                .map(|elt| self.translate(elt.get_dec()))
-                                .collect(),
-                        })
-                    }
-                    GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::Unit))) if
-                        elts.is_empty()
-                    => {
-                        CaseLogic::Simple(SimpleLogic::Eval(RustExpr::UNIT))
-                    }
-                    other =>
-                        unreachable!(
-                            "TypedDecoder::Tuple expected to have type RustType::AnonTuple(..) (or UNIT if empty), found {other:?}"
-                        ),
+                            .map(|elt| self.translate(elt.get_dec()))
+                            .collect(),
+                    })
                 }
+                GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::Unit)))
+                    if elts.is_empty() =>
+                {
+                    CaseLogic::Simple(SimpleLogic::Eval(RustExpr::UNIT))
+                }
+                other => unreachable!(
+                    "TypedDecoder::Tuple expected to have type RustType::AnonTuple(..) (or UNIT if empty), found {other:?}"
+                ),
+            },
             TypedDecoder::Sequence(gt, elts) => match gt {
                 GenType::Inline(RustType::Atom(AtomType::Comp(CompType::Vec(_t)))) => {
                     let as_array = _t.prefer_array(elts.len());
-                    let elements = elts.iter().map(|elt| self.translate(elt.get_dec())).collect();
+                    let elements = elts
+                        .iter()
+                        .map(|elt| self.translate(elt.get_dec()))
+                        .collect();
                     CaseLogic::Sequential(SequentialLogic::AccumSeq { as_array, elements })
-                },
-                other => unreachable!("TypedDecoder::Sequence expected to have type CompType::Vec(..), found {other:?}"),
+                }
+                other => unreachable!(
+                    "TypedDecoder::Sequence expected to have type CompType::Vec(..), found {other:?}"
+                ),
             },
-            TypedDecoder::Repeat0While(_gt, tree_continue, single) =>
-                CaseLogic::Repeat(
-                    RepeatLogic::Repeat0ContinueOnMatch(
-                        tree_continue.clone(),
-                        Box::new(self.translate(single.get_dec()))
-                    )
-                ),
+            TypedDecoder::Repeat0While(_gt, tree_continue, single) => {
+                CaseLogic::Repeat(RepeatLogic::Repeat0ContinueOnMatch(
+                    tree_continue.clone(),
+                    Box::new(self.translate(single.get_dec())),
+                ))
+            }
 
-            TypedDecoder::Repeat1Until(_gt, tree_break, single) =>
-                CaseLogic::Repeat(
-                    RepeatLogic::Repeat1BreakOnMatch(
-                        tree_break.clone(),
-                        Box::new(self.translate(single.get_dec()))
-                    )
-                ),
+            TypedDecoder::Repeat1Until(_gt, tree_break, single) => {
+                CaseLogic::Repeat(RepeatLogic::Repeat1BreakOnMatch(
+                    tree_break.clone(),
+                    Box::new(self.translate(single.get_dec())),
+                ))
+            }
             TypedDecoder::ForEach(_gt, expr, lbl, single) => {
                 // REVIEW[epic=zealous-clone] - do we need to ensure this is cloned?
                 let cl_expr = embed_expr_owned(expr);
-                CaseLogic::Repeat(RepeatLogic::ForEach(Box::new(cl_expr), lbl.clone(), Box::new(self.translate(single.get_dec()))))
+                CaseLogic::Repeat(RepeatLogic::ForEach(
+                    Box::new(cl_expr),
+                    lbl.clone(),
+                    Box::new(self.translate(single.get_dec())),
+                ))
             }
             TypedDecoder::DecodeBytes(_gt, expr, inner) => {
                 let cl_expr = embed_expr_nat(expr);
                 let cl_inner = self.translate(inner.get_dec());
-                CaseLogic::Derived(DerivedLogic::DecodeBytes(Box::new(cl_expr), Box::new(cl_inner)))
+                CaseLogic::Derived(DerivedLogic::DecodeBytes(
+                    Box::new(cl_expr),
+                    Box::new(cl_inner),
+                ))
             }
             TypedDecoder::ParseFromView(_t, view, inner) => {
                 let cl_view = embed_view_expr(view);
                 let cl_inner = self.translate(inner.get_dec());
-                CaseLogic::Derived(DerivedLogic::ParseView(Box::new(cl_view), Box::new(cl_inner)))
+                CaseLogic::Derived(DerivedLogic::ParseView(
+                    Box::new(cl_view),
+                    Box::new(cl_inner),
+                ))
             }
-            TypedDecoder::RepeatCount(_gt, expr_count, single) =>
-                CaseLogic::Repeat(
-                    RepeatLogic::ExactCount(
-                        Box::new(embed_expr_nat(expr_count)),
-                        Box::new(self.translate(single.get_dec()))
-                    )
-                ),
+            TypedDecoder::RepeatCount(_gt, expr_count, single) => {
+                CaseLogic::Repeat(RepeatLogic::ExactCount(
+                    Box::new(embed_expr_nat(expr_count)),
+                    Box::new(self.translate(single.get_dec())),
+                ))
+            }
             TypedDecoder::RepeatBetween(_gt, tree, expr_min, expr_max, single) => {
-                CaseLogic::Repeat(
-                    RepeatLogic::BetweenCounts(
-                        tree.clone(),
-                        Box::new(embed_expr_nat(expr_min)),
-                        Box::new(embed_expr_nat(expr_max)),
-                        Box::new(self.translate(single.get_dec()))
-                    )
-                )
+                CaseLogic::Repeat(RepeatLogic::BetweenCounts(
+                    tree.clone(),
+                    Box::new(embed_expr_nat(expr_min)),
+                    Box::new(embed_expr_nat(expr_max)),
+                    Box::new(self.translate(single.get_dec())),
+                ))
             }
-            TypedDecoder::RepeatUntilLast(_gt, pred_terminal, single) =>
-                CaseLogic::Repeat(
-                    RepeatLogic::ConditionTerminal(
-                        Box::new(GenLambda::from_expr(*pred_terminal.clone(), ClosureKind::Predicate)),
-                        Box::new(self.translate(single.get_dec()))
-                    )
-                ),
+            TypedDecoder::RepeatUntilLast(_gt, pred_terminal, single) => {
+                CaseLogic::Repeat(RepeatLogic::ConditionTerminal(
+                    Box::new(GenLambda::from_expr(
+                        *pred_terminal.clone(),
+                        ClosureKind::Predicate,
+                    )),
+                    Box::new(self.translate(single.get_dec())),
+                ))
+            }
             TypedDecoder::RepeatUntilSeq(_gt, pred_complete, single) => {
-                CaseLogic::Repeat(
-                    RepeatLogic::ConditionComplete(
-                        Box::new(GenLambda::from_expr(*pred_complete.clone(), ClosureKind::Predicate)),
-                        Box::new(self.translate(single.get_dec()))
-                    )
-                )
+                CaseLogic::Repeat(RepeatLogic::ConditionComplete(
+                    Box::new(GenLambda::from_expr(
+                        *pred_complete.clone(),
+                        ClosureKind::Predicate,
+                    )),
+                    Box::new(self.translate(single.get_dec())),
+                ))
             }
             TypedDecoder::AccumUntil(_gt, f, g, init, single) => {
-                CaseLogic::Repeat(
-                    RepeatLogic::AccumUntil(
-                        Box::new(GenLambda::from_expr(*f.clone(), ClosureKind::PairOwnedBorrow)),
-                        Box::new(GenLambda::from_expr(*g.clone(), ClosureKind::Transform)),
-                        (Box::new(embed_expr_nat(init)), init.get_type().unwrap().into_owned()),
-                        (Box::new(self.translate(single.get_dec())), single.get_dec().get_type().unwrap().into_owned()),
-                    )
-                )
+                CaseLogic::Repeat(RepeatLogic::AccumUntil(
+                    Box::new(GenLambda::from_expr(
+                        *f.clone(),
+                        ClosureKind::PairOwnedBorrow,
+                    )),
+                    Box::new(GenLambda::from_expr(*g.clone(), ClosureKind::Transform)),
+                    (
+                        Box::new(embed_expr_nat(init)),
+                        init.get_type().unwrap().into_owned(),
+                    ),
+                    (
+                        Box::new(self.translate(single.get_dec())),
+                        single.get_dec().get_type().unwrap().into_owned(),
+                    ),
+                ))
             }
-            TypedDecoder::Maybe(_gt, cond, inner) => {
-                CaseLogic::Derived(
-                    DerivedLogic::Maybe(
-                        Box::new(embed_expr_nat(cond)),
-                        Box::new(self.translate(inner.get_dec()))
-                    )
-                )
-            }
+            TypedDecoder::Maybe(_gt, cond, inner) => CaseLogic::Derived(DerivedLogic::Maybe(
+                Box::new(embed_expr_nat(cond)),
+                Box::new(self.translate(inner.get_dec())),
+            )),
             TypedDecoder::Map(_gt, inner, f) => {
                 let cl_inner = self.translate(inner.get_dec());
-                CaseLogic::Derived(
-                    DerivedLogic::MapOf(
-                        Box::new(GenLambda::from_expr(*f.clone(), ClosureKind::Transform)),
-                        Box::new(cl_inner)
-                    )
-                )
+                CaseLogic::Derived(DerivedLogic::MapOf(
+                    Box::new(GenLambda::from_expr(*f.clone(), ClosureKind::Transform)),
+                    Box::new(cl_inner),
+                ))
             }
             TypedDecoder::Where(_gt, inner, f) => {
                 let cl_inner = self.translate(inner.get_dec());
-                CaseLogic::Derived(
-                    DerivedLogic::Where(
-                        Box::new(GenLambda::from_expr(*f.clone(), ClosureKind::Transform)),
-                        Box::new(cl_inner)
-                    )
-                )
+                CaseLogic::Derived(DerivedLogic::Where(
+                    Box::new(GenLambda::from_expr(*f.clone(), ClosureKind::Transform)),
+                    Box::new(cl_inner),
+                ))
             }
             TypedDecoder::Compute(_t, expr) =>
-                // REVIEW[epic=zealous-clone] - try to gate Clone when Move, Copy or reference is possible
-                CaseLogic::Simple(SimpleLogic::Eval(embed_expr_owned(expr))),
+            // REVIEW[epic=zealous-clone] - try to gate Clone when Move, Copy or reference is possible
+            {
+                CaseLogic::Simple(SimpleLogic::Eval(embed_expr_owned(expr)))
+            }
             TypedDecoder::Let(_t, name, expr, inner) => {
                 let cl_inner = self.translate(inner.get_dec());
-                CaseLogic::Derived(
-                    DerivedLogic::Let(
-                        name.clone(),
-                        Box::new(embed_expr_owned(expr)),
-                        Box::new(cl_inner)
-                    )
-                )
+                CaseLogic::Derived(DerivedLogic::Let(
+                    name.clone(),
+                    Box::new(embed_expr_owned(expr)),
+                    Box::new(cl_inner),
+                ))
             }
             TypedDecoder::LetView(_t, name, inner) => {
                 let cl_inner = self.translate(inner.get_dec());
-                CaseLogic::View(
-                    ViewLogic::LetView(name.clone(), Box::new(cl_inner))
-                )
+                CaseLogic::View(ViewLogic::LetView(name.clone(), Box::new(cl_inner)))
             }
             TypedDecoder::LetFormat(_t, f0, name, f) => {
                 let cl_f0 = self.translate(f0.get_dec());
                 let cl_f = self.translate(f.get_dec());
-                CaseLogic::Other(
-                    OtherLogic::LetFormat(
-                        Box::new(cl_f0),
-                        name.clone(),
-                        Box::new(cl_f),
-                    )
-                )
+                CaseLogic::Other(OtherLogic::LetFormat(
+                    Box::new(cl_f0),
+                    name.clone(),
+                    Box::new(cl_f),
+                ))
             }
             TypedDecoder::MonadSeq(_t, f0, f) => {
                 let cl_f0 = self.translate(f0.get_dec());
                 let cl_f = self.translate(f.get_dec());
-                CaseLogic::Other(
-                    OtherLogic::MonadSeq(
-                        Box::new(cl_f0),
-                        Box::new(cl_f),
-                    )
-                )
+                CaseLogic::Other(OtherLogic::MonadSeq(Box::new(cl_f0), Box::new(cl_f)))
             }
             TypedDecoder::Hint(_t, hint, inner) => {
                 let cl_inner = self.translate(inner.get_dec());
@@ -505,8 +495,9 @@ impl CodeGen {
             TypedDecoder::Match(_t, scrutinee, cases) => {
                 let scrutinized = embed_expr_nat(scrutinee);
                 let head = match scrutinee.get_type().unwrap().as_ref() {
-                    GenType::Inline(RustType::Atom(AtomType::Comp(CompType::Vec(..)))) =>
-                        scrutinized.vec_as_slice(),
+                    GenType::Inline(RustType::Atom(AtomType::Comp(CompType::Vec(..)))) => {
+                        scrutinized.vec_as_slice()
+                    }
                     _ => scrutinized,
                 };
                 let mut cl_cases = Vec::new();
@@ -517,8 +508,11 @@ impl CodeGen {
                     ));
                 }
                 let ck = refutability_check(
-                    scrutinee.get_type().expect("bad lambda in scrutinee position").as_ref(),
-                    cases
+                    scrutinee
+                        .get_type()
+                        .expect("bad lambda in scrutinee position")
+                        .as_ref(),
+                    cases,
                 );
                 CaseLogic::Other(OtherLogic::ExprMatch(head, cl_cases, ck))
             }
@@ -529,12 +523,14 @@ impl CodeGen {
                 inner,
             ) => {
                 let cl_inner = self.translate(inner.get_dec());
-                CaseLogic::Derived(
-                    DerivedLogic::Dynamic(
-                        DynamicLogic::Huffman(name.clone(), lengths.as_ref().clone(), opt_values.as_deref().cloned()),
-                        Box::new(cl_inner)
-                    )
-                )
+                CaseLogic::Derived(DerivedLogic::Dynamic(
+                    DynamicLogic::Huffman(
+                        name.clone(),
+                        lengths.as_ref().clone(),
+                        opt_values.as_deref().cloned(),
+                    ),
+                    Box::new(cl_inner),
+                ))
             }
             TypedDecoder::Apply(_t, lab) => {
                 CaseLogic::Simple(SimpleLogic::CallDynamic(lab.clone()))
@@ -560,7 +556,11 @@ impl CodeGen {
                 let re_base_addr = embed_expr_nat(base_addr);
                 let re_offset = embed_expr_nat(offset);
                 let cl_inner = self.translate(inner.get_dec());
-                CaseLogic::Engine(EngineLogic::OffsetPeek(re_base_addr, re_offset, Box::new(cl_inner)))
+                CaseLogic::Engine(EngineLogic::OffsetPeek(
+                    re_base_addr,
+                    re_offset,
+                    Box::new(cl_inner),
+                ))
             }
             TypedDecoder::LiftedOption(_, None) => {
                 // REVIEW - do we ever need to preserve the type of the None value?
@@ -570,12 +570,15 @@ impl CodeGen {
                 let cl_inner = self.translate(da.get_dec());
                 CaseLogic::Derived(DerivedLogic::WrapSome(Box::new(cl_inner)))
             }
-            TypedDecoder::CaptureBytes(_, view, len) => {
-                CaseLogic::View(ViewLogic::CaptureBytes(embed_view_expr(view), embed_expr_nat(len)))
-            }
-            TypedDecoder::ReadArray(_, view, len, kind) => {
-                CaseLogic::View(ViewLogic::ReadArray(embed_view_expr(view), embed_expr_nat(len), *kind))
-            }
+            TypedDecoder::CaptureBytes(_, view, len) => CaseLogic::View(ViewLogic::CaptureBytes(
+                embed_view_expr(view),
+                embed_expr_nat(len),
+            )),
+            TypedDecoder::ReadArray(_, view, len, kind) => CaseLogic::View(ViewLogic::ReadArray(
+                embed_view_expr(view),
+                embed_expr_nat(len),
+                *kind,
+            )),
             TypedDecoder::ReifyView(_, view) => {
                 CaseLogic::View(ViewLogic::ReifyView(embed_view_expr(view)))
             }
@@ -845,7 +848,9 @@ fn embed_pattern(pat: &GTPattern) -> RustPattern {
                 GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::U8))) => {
                     let Ok((min, opt_max)): Result<(u8, Option<u8>), _> = (*bounds).try_into()
                     else {
-                        panic!("ascribed type PrimType::U8 does not match with inherent value-range of bounds: {bounds:?}")
+                        panic!(
+                            "ascribed type PrimType::U8 does not match with inherent value-range of bounds: {bounds:?}"
+                        )
                     };
                     RustPattern::PrimRange(
                         RustPrimLit::Numeric(RustNumLit::U8(min)),
@@ -855,7 +860,9 @@ fn embed_pattern(pat: &GTPattern) -> RustPattern {
                 GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::U16))) => {
                     let Ok((min, opt_max)): Result<(u16, Option<u16>), _> = (*bounds).try_into()
                     else {
-                        panic!("ascribed type PrimType::U16 does not match with inherent value-range of bounds: {bounds:?}")
+                        panic!(
+                            "ascribed type PrimType::U16 does not match with inherent value-range of bounds: {bounds:?}"
+                        )
                     };
                     RustPattern::PrimRange(
                         RustPrimLit::Numeric(RustNumLit::U16(min)),
@@ -865,7 +872,9 @@ fn embed_pattern(pat: &GTPattern) -> RustPattern {
                 GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::U32))) => {
                     let Ok((min, opt_max)): Result<(u32, Option<u32>), _> = (*bounds).try_into()
                     else {
-                        panic!("ascribed type PrimType::U32 does not match with inherent value-range of bounds: {bounds:?}")
+                        panic!(
+                            "ascribed type PrimType::U32 does not match with inherent value-range of bounds: {bounds:?}"
+                        )
                     };
                     RustPattern::PrimRange(
                         RustPrimLit::Numeric(RustNumLit::U32(min)),
@@ -875,7 +884,9 @@ fn embed_pattern(pat: &GTPattern) -> RustPattern {
                 GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::U64))) => {
                     let Ok((min, opt_max)): Result<(u64, Option<u64>), _> = (*bounds).try_into()
                     else {
-                        panic!("ascribed type PrimType::U64 does not match with inherent value-range of bounds: {bounds:?}")
+                        panic!(
+                            "ascribed type PrimType::U64 does not match with inherent value-range of bounds: {bounds:?}"
+                        )
                     };
                     RustPattern::PrimRange(
                         RustPrimLit::Numeric(RustNumLit::U64(min)),
@@ -904,26 +915,29 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
         TypedExpr::Record(gt, fields) => {
             let tname = match gt {
                 GenType::Def((_, tname), _) => tname,
-                GenType::Inline(
-                    RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(_ix, tname, _))),
-                ) => tname,
-                other =>
-                    unreachable!(
-                        "TypedExpr::Record has unexpected type (looking for Def or Inline LocalDef): {other:?}"
-                    ),
+                GenType::Inline(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(
+                    _ix,
+                    tname,
+                    _,
+                )))) => tname,
+                other => unreachable!(
+                    "TypedExpr::Record has unexpected type (looking for Def or Inline LocalDef): {other:?}"
+                ),
             };
             RustExpr::Struct(
                 Constructor::Simple(tname.clone()),
-                StructExpr::Record(fields
-                    .iter()
-                    .map(|(name, val)| {
-                        let value = match embed_expr_nat(val) {
-                            RustExpr::Entity(RustEntity::Local(ref v)) if v == name => None,
-                            other => Some(other),
-                        };
-                        (name.clone(), value)
-                    }).collect()
-                )
+                StructExpr::Record(
+                    fields
+                        .iter()
+                        .map(|(name, val)| {
+                            let value = match embed_expr_nat(val) {
+                                RustExpr::Entity(RustEntity::Local(ref v)) if v == name => None,
+                                other => Some(other),
+                            };
+                            (name.clone(), value)
+                        })
+                        .collect(),
+                ),
             )
         }
         TypedExpr::Variant(gt, vname, inner) => {
@@ -931,7 +945,8 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                 GenType::Def((_ix, tname), def) => {
                     match &def.def {
                         RustTypeDef::Enum(vars) => {
-                            let Some(this) = vars.iter().find(|var| var.get_label() == vname) else {
+                            let Some(this) = vars.iter().find(|var| var.get_label() == vname)
+                            else {
                                 unreachable!("Variant not found: {:?}::{:?}", tname, vname)
                             };
                             let constr = Constructor::Compound(tname.clone(), vname.clone());
@@ -941,12 +956,15 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                                     RustExpr::BlockScope(
                                         // REVIEW - we only need EmbedCloned if there are any potential reuse-after-move patterns within the `_ : ()` preamble...
                                         vec![RustStmt::Expr(embed_expr_nat(inner))],
-                                        Box::new(RustExpr::Struct(constr, StructExpr::Empty))
+                                        Box::new(RustExpr::Struct(constr, StructExpr::Empty)),
                                     )
                                 }
                                 RustVariant::Tuple(_vname, _elts) => {
                                     // FIXME - not sure how to avoid 1 x N (unary-over-tuple) if inner becomes RustExpr::Tuple...
-                                    RustExpr::Struct(constr, StructExpr::Tuple(vec![embed_expr_nat(inner)]))
+                                    RustExpr::Struct(
+                                        constr,
+                                        StructExpr::Tuple(vec![embed_expr_nat(inner)]),
+                                    )
                                 }
                             }
                         }
@@ -955,10 +973,9 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                         }
                     }
                 }
-                other =>
-                    unreachable!(
-                        "Cannot embed variant expression with inlined (abstract) GenType: {other:?}"
-                    ),
+                other => unreachable!(
+                    "Cannot embed variant expression with inlined (abstract) GenType: {other:?}"
+                ),
             }
         }
         TypedExpr::Destructure(_t, bound_value, pattern, inner) => {
@@ -976,30 +993,21 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
         TypedExpr::Match(t, scrutinee, cases) => {
             embed_match_expr(expr, t, scrutinee.as_ref(), cases, info)
         }
-        TypedExpr::Tuple(_t, tup) =>
-            RustExpr::Tuple(
-                tup
-                    .iter()
-                    .map(|x| embed_expr(x, info))
-                    .collect()
-            ),
-        TypedExpr::TupleProj(_, expr_tup, ix) => {
-            embed_expr(expr_tup, info).at_pos(*ix)
+        TypedExpr::Tuple(_t, tup) => {
+            RustExpr::Tuple(tup.iter().map(|x| embed_expr(x, info)).collect())
         }
+        TypedExpr::TupleProj(_, expr_tup, ix) => embed_expr(expr_tup, info).at_pos(*ix),
         TypedExpr::SeqIx(_, expr_seq, ix) => {
-            let ix_expr = RustExpr::Operation(RustOp::AsCast(Box::new(embed_expr_nat(ix)), PrimType::Usize.into()));
+            let ix_expr = RustExpr::Operation(RustOp::AsCast(
+                Box::new(embed_expr_nat(ix)),
+                PrimType::Usize.into(),
+            ));
             embed_expr(expr_seq, info).index(ix_expr)
         }
-        TypedExpr::RecordProj(_, expr_rec, fld) => {
-            embed_expr(expr_rec, info).field(fld.clone())
-        }
+        TypedExpr::RecordProj(_, expr_rec, fld) => embed_expr(expr_rec, info).field(fld.clone()),
         TypedExpr::Seq(_, elts) => {
-            RustExpr::ArrayLit(
-                elts
-                    .iter()
-                    .map(|x| embed_expr(x, info))
-                    .collect()
-            ).call_method("to_vec")
+            RustExpr::ArrayLit(elts.iter().map(|x| embed_expr(x, info)).collect())
+                .call_method("to_vec")
         }
         TypedExpr::Arith(_gt, arith, lhs, rhs) => {
             // NOTE - because arith only deals with Copy types, we oughtn't need any embedded clones
@@ -1013,7 +1021,11 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                 Arith::BoolOr => InfixOperator::BoolOr,
                 Arith::Add => InfixOperator::Add,
                 Arith::Sub => {
-                    alt.replace(RustExpr::local("try_sub!").call_with([x.clone(), y.clone(), RustExpr::u64lit(get_trace(&()))]));
+                    alt.replace(RustExpr::local("try_sub!").call_with([
+                        x.clone(),
+                        y.clone(),
+                        RustExpr::u64lit(get_trace(&())),
+                    ]));
                     InfixOperator::Sub
                 }
                 Arith::Mul => InfixOperator::Mul,
@@ -1069,38 +1081,49 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                 }
             }
         }
-        TypedExpr::AsU8(x) =>
-            RustExpr::Operation(RustOp::AsCast(Box::new(embed_expr_nat(x)), PrimType::U8.into())),
-        TypedExpr::AsU16(x) =>
-            RustExpr::Operation(RustOp::AsCast(Box::new(embed_expr_nat(x)), PrimType::U16.into())),
-        TypedExpr::AsU32(x) =>
-            RustExpr::Operation(RustOp::AsCast(Box::new(embed_expr_nat(x)), PrimType::U32.into())),
-        TypedExpr::AsU64(x) =>
-            RustExpr::Operation(RustOp::AsCast(Box::new(embed_expr_nat(x)), PrimType::U64.into())),
-        TypedExpr::U16Be(be_bytes) =>
-            RustExpr::local("u16be").call_with([embed_expr_nat(be_bytes)]),
-        TypedExpr::U16Le(le_bytes) =>
-            RustExpr::local("u16le").call_with([embed_expr_nat(le_bytes)]),
-        TypedExpr::U32Be(be_bytes) =>
-            RustExpr::local("u32be").call_with([embed_expr_nat(be_bytes)]),
-        TypedExpr::U32Le(le_bytes) =>
-            RustExpr::local("u32le").call_with([embed_expr_nat(le_bytes)]),
-        TypedExpr::U64Be(be_bytes) =>
-            RustExpr::local("u64be").call_with([embed_expr_nat(be_bytes)]),
-        TypedExpr::U64Le(le_bytes) =>
-            RustExpr::local("u64le").call_with([embed_expr_nat(le_bytes)]),
-        TypedExpr::AsChar(codepoint) =>
-            RustExpr::scoped(["char"], "from_u32")
-                .call_with([embed_expr_nat(codepoint)])
-                .call_method("unwrap"),
+        TypedExpr::AsU8(x) => RustExpr::Operation(RustOp::AsCast(
+            Box::new(embed_expr_nat(x)),
+            PrimType::U8.into(),
+        )),
+        TypedExpr::AsU16(x) => RustExpr::Operation(RustOp::AsCast(
+            Box::new(embed_expr_nat(x)),
+            PrimType::U16.into(),
+        )),
+        TypedExpr::AsU32(x) => RustExpr::Operation(RustOp::AsCast(
+            Box::new(embed_expr_nat(x)),
+            PrimType::U32.into(),
+        )),
+        TypedExpr::AsU64(x) => RustExpr::Operation(RustOp::AsCast(
+            Box::new(embed_expr_nat(x)),
+            PrimType::U64.into(),
+        )),
+        TypedExpr::U16Be(be_bytes) => {
+            RustExpr::local("u16be").call_with([embed_expr_nat(be_bytes)])
+        }
+        TypedExpr::U16Le(le_bytes) => {
+            RustExpr::local("u16le").call_with([embed_expr_nat(le_bytes)])
+        }
+        TypedExpr::U32Be(be_bytes) => {
+            RustExpr::local("u32be").call_with([embed_expr_nat(be_bytes)])
+        }
+        TypedExpr::U32Le(le_bytes) => {
+            RustExpr::local("u32le").call_with([embed_expr_nat(le_bytes)])
+        }
+        TypedExpr::U64Be(be_bytes) => {
+            RustExpr::local("u64be").call_with([embed_expr_nat(be_bytes)])
+        }
+        TypedExpr::U64Le(le_bytes) => {
+            RustExpr::local("u64le").call_with([embed_expr_nat(le_bytes)])
+        }
+        TypedExpr::AsChar(codepoint) => RustExpr::scoped(["char"], "from_u32")
+            .call_with([embed_expr_nat(codepoint)])
+            .call_method("unwrap"),
         TypedExpr::SeqLength(seq) => {
             // NOTE - SeqLength is treated as U32 in Format context, so any operations on it have to be done on a U32 value rather than the natural `.len(): _ -> usize` return-value
-            RustExpr::Operation(
-                RustOp::AsCast(
-                    Box::new(embed_expr_nat(seq).vec_len()),
-                    RustType::Atom(AtomType::Prim(PrimType::U32))
-                )
-            )
+            RustExpr::Operation(RustOp::AsCast(
+                Box::new(embed_expr_nat(seq).vec_len()),
+                RustType::Atom(AtomType::Prim(PrimType::U32)),
+            ))
         }
         TypedExpr::Append(_, seq0, seq1) => {
             let lhs = embed_expr(seq0, info);
@@ -1111,101 +1134,121 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
             let start_expr = embed_expr_nat(ix);
             let bind_ix = RustStmt::assign(
                 "ix",
-                RustExpr::Operation(RustOp::AsCast(Box::new(start_expr), PrimType::Usize.into()))
+                RustExpr::Operation(RustOp::AsCast(Box::new(start_expr), PrimType::Usize.into())),
             );
             let end_expr = RustExpr::infix(
                 RustExpr::local("ix"),
                 InfixOperator::Add,
-                RustExpr::Operation(
-                    RustOp::AsCast(Box::new(embed_expr_nat(len)), PrimType::Usize.into())
-                )
+                RustExpr::Operation(RustOp::AsCast(
+                    Box::new(embed_expr_nat(len)),
+                    PrimType::Usize.into(),
+                )),
             );
             RustExpr::BlockScope(
                 vec![bind_ix],
                 Box::new(
                     // REVIEW - in some cases, we might be able to get away with slice-typed expressions, but in practice it is easier to vec everything for now and worry about performance later
-                    RustExpr::scoped(["Vec"], "from").call_with([
-                        RustExpr::Borrow(
-                            Box::new(
-                                RustExpr::Slice(
-                                    Box::new(embed_expr_nat(seq)),
-                                    Box::new(RustExpr::local("ix")),
-                                    Box::new(end_expr)
-                                )
-                            )
+                    RustExpr::scoped(["Vec"], "from").call_with([RustExpr::Borrow(Box::new(
+                        RustExpr::Slice(
+                            Box::new(embed_expr_nat(seq)),
+                            Box::new(RustExpr::local("ix")),
+                            Box::new(end_expr),
                         ),
-                    ])
-                )
+                    ))]),
+                ),
             )
         }
         TypedExpr::SubSeqInflate(_, seq, ix, len) => {
             let start_expr = embed_expr_nat(ix);
 
-            let bind_ix = RustStmt::assign("ix", RustExpr::Operation(RustOp::AsCast(Box::new(start_expr), PrimType::Usize.into())));
+            let bind_ix = RustStmt::assign(
+                "ix",
+                RustExpr::Operation(RustOp::AsCast(Box::new(start_expr), PrimType::Usize.into())),
+            );
             let end_expr = RustExpr::infix(
                 RustExpr::local("ix"),
                 InfixOperator::Add,
-                RustExpr::Operation(
-                    RustOp::AsCast(Box::new(embed_expr_nat(len)), PrimType::Usize.into())
-                )
+                RustExpr::Operation(RustOp::AsCast(
+                    Box::new(embed_expr_nat(len)),
+                    PrimType::Usize.into(),
+                )),
             );
 
-            let range = RustExpr::RangeExclusive(Box::new(RustExpr::local("ix")), Box::new(end_expr));
+            let range =
+                RustExpr::RangeExclusive(Box::new(RustExpr::local("ix")), Box::new(end_expr));
 
-            RustExpr::BlockScope(vec![bind_ix], Box::new(RustExpr::local("slice_ext").call_with(vec![embed_expr_nat(seq), range]).call_method("to_vec")))
+            RustExpr::BlockScope(
+                vec![bind_ix],
+                Box::new(
+                    RustExpr::local("slice_ext")
+                        .call_with(vec![embed_expr_nat(seq), range])
+                        .call_method("to_vec"),
+                ),
+            )
         }
-        TypedExpr::FlatMap(_, f, seq) =>
-            RustExpr::local("try_flat_map_vec")
-                .call_with([
-                    embed_expr_nat(seq).call_method("iter").call_method("cloned"),
-                    embed_lambda(f, ClosureKind::Transform, true, ExprInfo::EmbedOwned),
-                ])
-                .wrap_try(),
-        TypedExpr::FlatMapAccum(_, f, acc_init, _acc_type, seq) =>
+        TypedExpr::FlatMap(_, f, seq) => RustExpr::local("try_flat_map_vec")
+            .call_with([
+                embed_expr_nat(seq)
+                    .call_method("iter")
+                    .call_method("cloned"),
+                embed_lambda(f, ClosureKind::Transform, true, ExprInfo::EmbedOwned),
+            ])
+            .wrap_try(),
+        TypedExpr::FlatMapAccum(_, f, acc_init, _acc_type, seq) => {
             RustExpr::local("try_fold_map_curried")
                 .call_with([
-                    embed_expr_nat(seq).call_method("iter").call_method("cloned"),
+                    embed_expr_nat(seq)
+                        .call_method("iter")
+                        .call_method("cloned"),
                     embed_expr(acc_init, info /* ExprInfo::EmbedCloned */),
                     embed_lambda(f, ClosureKind::Transform, true, ExprInfo::EmbedOwned),
                 ])
-                .wrap_try(),
-        TypedExpr::LeftFold(_, f, acc_init, _acc_type, seq) =>
+                .wrap_try()
+        }
+        TypedExpr::LeftFold(_, f, acc_init, _acc_type, seq) => {
             RustExpr::local("try_fold_left_curried")
                 .call_with([
-                    embed_expr_nat(seq).call_method("iter").call_method("cloned"),
+                    embed_expr_nat(seq)
+                        .call_method("iter")
+                        .call_method("cloned"),
                     embed_expr(acc_init, info /* ExprInfo::EmbedCloned */),
                     embed_lambda(f, ClosureKind::Transform, true, ExprInfo::EmbedOwned),
                 ])
-                .wrap_try(),
-        TypedExpr::FlatMapList(_, f, _ret_type, seq) =>
-            RustExpr::local("try_flat_map_append_vec")
-                .call_with([
-                    embed_expr_nat(seq).call_method("iter").call_method("cloned"),
-                    embed_lambda_dft(f, ClosureKind::PairBorrowOwned, true),
-                ])
-                .wrap_try(),
+                .wrap_try()
+        }
+        TypedExpr::FlatMapList(_, f, _ret_type, seq) => RustExpr::local("try_flat_map_append_vec")
+            .call_with([
+                embed_expr_nat(seq)
+                    .call_method("iter")
+                    .call_method("cloned"),
+                embed_lambda_dft(f, ClosureKind::PairBorrowOwned, true),
+            ])
+            .wrap_try(),
         TypedExpr::FindByKey(ty, is_sorted, f, query, seq) => {
             let method = if *is_sorted {
                 "find_by_key_sorted"
             } else {
                 "find_by_key_unsorted"
             };
-            fn mk_name() -> &'static str { "tmp" }
-            embed_expr_nat(seq).use_as_persistent(|seq| {
-                RustExpr::local(method)
-                    .call_with([
-                        embed_lambda_dft(f, ClosureKind::ExtractKey, false),
-                        embed_expr(query, ExprInfo::Natural),
-                        seq,
-                    ]).owned_opt_ref(ty.to_rust_type())
-            }, mk_name)
+            fn mk_name() -> &'static str {
+                "tmp"
+            }
+            embed_expr_nat(seq).use_as_persistent(
+                |seq| {
+                    RustExpr::local(method)
+                        .call_with([
+                            embed_lambda_dft(f, ClosureKind::ExtractKey, false),
+                            embed_expr(query, ExprInfo::Natural),
+                            seq,
+                        ])
+                        .owned_opt_ref(ty.to_rust_type())
+                },
+                mk_name,
+            )
         }
         TypedExpr::Dup(_, n, expr) => {
             // NOTE - the dup count should be simple, but the duplicated expression must be move-safe
-            RustExpr::local("dup32").call_with([
-                embed_expr_nat(n),
-                embed_expr_owned(expr),
-            ])
+            RustExpr::local("dup32").call_with([embed_expr_nat(n), embed_expr_owned(expr)])
         }
         TypedExpr::Var(t, vname) => {
             // REVIEW - lexical scopes, shadowing, and variable-name sanitization may not be quite right in the current implementation
@@ -1221,10 +1264,9 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
         TypedExpr::U16(n) => RustExpr::u16lit(*n),
         TypedExpr::U32(n) => RustExpr::u32lit(*n),
         TypedExpr::U64(n) => RustExpr::u64lit(*n),
-        TypedExpr::Lambda(_, _, _) =>
-            unreachable!(
-                "TypedExpr::Lambda unsupported as first-class embed (requires embed_lambda with proper ClosureKind argument)"
-            ),
+        TypedExpr::Lambda(_, _, _) => unreachable!(
+            "TypedExpr::Lambda unsupported as first-class embed (requires embed_lambda with proper ClosureKind argument)"
+        ),
         // TODO - determine if we need to type-annotate the Some call based on the gt we are currently ignoring
         TypedExpr::LiftOption(_, Some(x)) => embed_expr(x, info).wrap_some(),
         TypedExpr::LiftOption(_, None) => RustExpr::option_none(),
@@ -1358,103 +1400,111 @@ fn refutability_check<A: std::fmt::Debug + Clone>(
         return Refutability::Irrefutable;
     }
     match head_type {
-        GenType::Inline(rt) =>
-            match rt {
-                RustType::Atom(at) =>
-                    match at {
-                        AtomType::TypeRef(lt) =>
-                            match lt {
-                                LocalType::LocalDef(ix, lbl, _) =>
-                                    unreachable!(
-                                        "inline LocalDef ({ix}, {lbl}) cannot be resolved abstractly, use GenType::Def instead"
-                                    ),
-                                LocalType::External(t) =>
-                                    unreachable!(
-                                        "external type '{t}' cannot be resolved without further information"
-                                    ),
-                            }
-                        AtomType::Prim(pt) =>
-                            match pt {
-                                PrimType::Unit => {
-                                    if cases.is_empty() {
-                                        Refutability::Refutable
-                                    } else {
-                                        Refutability::Irrefutable
-                                    }
+        GenType::Inline(rt) => match rt {
+            RustType::Atom(at) => match at {
+                AtomType::TypeRef(lt) => match lt {
+                    LocalType::LocalDef(ix, lbl, _) => unreachable!(
+                        "inline LocalDef ({ix}, {lbl}) cannot be resolved abstractly, use GenType::Def instead"
+                    ),
+                    LocalType::External(t) => unreachable!(
+                        "external type '{t}' cannot be resolved without further information"
+                    ),
+                },
+                AtomType::Prim(pt) => match pt {
+                    PrimType::Unit => {
+                        if cases.is_empty() {
+                            Refutability::Refutable
+                        } else {
+                            Refutability::Irrefutable
+                        }
+                    }
+                    // these cases have too many values to practically cover...
+                    PrimType::U8
+                    | PrimType::U16
+                    | PrimType::U32
+                    | PrimType::U64
+                    | PrimType::Char => Refutability::Indeterminate,
+                    //
+                    PrimType::Bool => {
+                        // mask for inclusion with indices 0: false, 1: true
+                        let mut cover_mask = [false, false];
+                        for (pat, _) in cases {
+                            match pat {
+                                TypedPattern::Bool(b) => {
+                                    let ix = if *b { 1 } else { 0 };
+                                    cover_mask[ix] = true;
                                 }
-                                // these cases have too many values to practically cover...
-                                | PrimType::U8
-                                | PrimType::U16
-                                | PrimType::U32
-                                | PrimType::U64
-                                | PrimType::Char => Refutability::Indeterminate,
-                                //
-                                PrimType::Bool => {
-                                    // mask for inclusion with indices 0: false, 1: true
-                                    let mut cover_mask = [false, false];
-                                    for (pat, _) in cases {
-                                        match pat {
-                                            TypedPattern::Bool(b) => {
-                                                let ix = if *b { 1 } else { 0 };
-                                                cover_mask[ix] = true;
-                                            }
-                                            _ => {
-                                                continue;
-                                            }
-                                        }
-                                    }
-                                    if cover_mask[0] && cover_mask[1] {
-                                        Refutability::Irrefutable
-                                    } else {
-                                        Refutability::Refutable
-                                    }
+                                _ => {
+                                    continue;
                                 }
-                                // any match on usize is only exhaustive with a catch-all, which we have precluded above
-                                PrimType::Usize => Refutability::Refutable,
                             }
-                        AtomType::Comp(ct) =>
-                            match ct {
-                                CompType::Vec(_) | CompType::RawSlice(_) => Refutability::Refutable, // Vec can have any length, so no match can be exhaustive without catchalls
-                                CompType::Option(t) => {
-                                    let none_covered = cases.iter().any(|(pat, _)| matches!(pat, TypedPattern::Option(_, None)));
-                                    if !none_covered {
-                                        return Refutability::Refutable;
-                                    }
+                        }
+                        if cover_mask[0] && cover_mask[1] {
+                            Refutability::Irrefutable
+                        } else {
+                            Refutability::Refutable
+                        }
+                    }
+                    // any match on usize is only exhaustive with a catch-all, which we have precluded above
+                    PrimType::Usize => Refutability::Refutable,
+                },
+                AtomType::Comp(ct) => match ct {
+                    CompType::Vec(_) | CompType::RawSlice(_) => Refutability::Refutable, // Vec can have any length, so no match can be exhaustive without catchalls
+                    CompType::Option(t) => {
+                        let none_covered = cases
+                            .iter()
+                            .any(|(pat, _)| matches!(pat, TypedPattern::Option(_, None)));
+                        if !none_covered {
+                            return Refutability::Refutable;
+                        }
 
-                                    let some_cases: Vec<(TypedPattern<GenType>, A)> = cases.iter().filter_map(|(pat, rhs)| match pat { TypedPattern::Option(_, Some(x)) => Some(((**x).clone(), rhs.clone())), _ => None}).collect();
-                                    let rust_type = (**t).clone();
-                                    refutability_check(&GenType::Inline(rust_type), &some_cases)
+                        let some_cases: Vec<(TypedPattern<GenType>, A)> = cases
+                            .iter()
+                            .filter_map(|(pat, rhs)| match pat {
+                                TypedPattern::Option(_, Some(x)) => {
+                                    Some(((**x).clone(), rhs.clone()))
                                 }
-                                CompType::Result(_, _) =>
-                                    unreachable!("unexpected result in pattern head-type"),
-                                CompType::Borrow(_, _, t) => {
-                                    refutability_check(&GenType::Inline((**t).clone()), cases)
-                                }
-                            }
+                                _ => None,
+                            })
+                            .collect();
+                        let rust_type = (**t).clone();
+                        refutability_check(&GenType::Inline(rust_type), &some_cases)
                     }
-                RustType::AnonTuple(ts) => {
-                    // we have already checked in contains_irrefutable_pattern that there is no (_x0, ..., _xN) pattern
-                    if ts.is_empty() && !cases.is_empty() {
-                        Refutability::Irrefutable
-                    } else {
-                        Refutability::Indeterminate
+                    CompType::Result(_, _) => {
+                        unreachable!("unexpected result in pattern head-type")
                     }
+                    CompType::Borrow(_, _, t) => {
+                        refutability_check(&GenType::Inline((**t).clone()), cases)
+                    }
+                },
+            },
+            RustType::AnonTuple(ts) => {
+                // we have already checked in contains_irrefutable_pattern that there is no (_x0, ..., _xN) pattern
+                if ts.is_empty() && !cases.is_empty() {
+                    Refutability::Irrefutable
+                } else {
+                    Refutability::Indeterminate
                 }
-                RustType::Verbatim(_, _) =>
-                    unreachable!("verbatim types not expected in generated match-expressions"),
-                RustType::ReadArray(..) => unreachable!("ReadArray not expected in generated match-expressions"),
-                RustType::ViewObject(..) => unreachable!("ViewObject not expected in generated match-expressions"),
             }
+            RustType::Verbatim(_, _) => {
+                unreachable!("verbatim types not expected in generated match-expressions")
+            }
+            RustType::ReadArray(..) => {
+                unreachable!("ReadArray not expected in generated match-expressions")
+            }
+            RustType::ViewObject(..) => {
+                unreachable!("ViewObject not expected in generated match-expressions")
+            }
+        },
         GenType::Def(_, def) => {
             match &def.def {
                 RustTypeDef::Enum(vars) => {
                     // NOTE - we encounter badness when attempting to check full-variant coverage using subtyped partial unions
                     // NOTE - we can only check for every possible value being covered for every possible variant
-                    let mut variant_coverage: StableMap<Label, Refutability, BTree> =
-                        vars
-                            .iter()
-                            .map(|x| (x.get_label().clone(), Refutability::Refutable))
-                            .collect();
+                    let mut variant_coverage: StableMap<Label, Refutability, BTree> = vars
+                        .iter()
+                        .map(|x| (x.get_label().clone(), Refutability::Refutable))
+                        .collect();
                     for (pat, _) in cases {
                         match pat {
                             TypedPattern::Variant(_, vname, inner_pat) => {
@@ -1475,7 +1525,11 @@ fn refutability_check<A: std::fmt::Debug + Clone>(
                             }
                         }
                     }
-                    variant_coverage.values().cloned().reduce(Refutability::and).unwrap()
+                    variant_coverage
+                        .values()
+                        .cloned()
+                        .reduce(Refutability::and)
+                        .unwrap()
                 }
                 RustTypeDef::Struct(st) => {
                     unreachable!(
@@ -1792,37 +1846,60 @@ impl GenLambda {
             RustExpr::Control(ctrl) => match ctrl.as_ref() {
                 RustControl::Match(scrutinee, match_body) => {
                     if scrutinee.as_local() != Some(&self.head) {
-                        unreachable!("unexpected outer scrutinee in expansion of pair-lambda (head: {}): {scrutinee:?}", &self.head);
+                        unreachable!(
+                            "unexpected outer scrutinee in expansion of pair-lambda (head: {}): {scrutinee:?}",
+                            &self.head
+                        );
                     }
                     match match_body {
                         RustMatchBody::Irrefutable(cases) => match &cases[..] {
                             [(lhs, rhs)] => match lhs {
-                                MatchCaseLHS::Pattern(RustPattern::TupleLiteral(pair)) => match &pair[..] {
-                                    [fst, snd] => match (fst, snd) {
-                                        (RustPattern::CatchAll(Some(fst_lbl)), RustPattern::CatchAll(Some(snd_lbl))) => {
-                                            let fst_bind = RustStmt::assign(fst_lbl.clone(), param0);
-                                            let snd_bind = RustStmt::assign(snd_lbl.clone(), param1);
-                                            match stmts_to_block(Cow::Borrowed(rhs)) {
-                                                Some((block, ret)) => {
-                                                    let all_stmts = [fst_bind, snd_bind].into_iter().chain(block.iter().cloned()).collect();
-                                                    RustExpr::BlockScope(
-                                                        all_stmts,
-                                                        Box::new(ret.into_owned())
-                                                    )
+                                MatchCaseLHS::Pattern(RustPattern::TupleLiteral(pair)) => {
+                                    match &pair[..] {
+                                        [fst, snd] => match (fst, snd) {
+                                            (
+                                                RustPattern::CatchAll(Some(fst_lbl)),
+                                                RustPattern::CatchAll(Some(snd_lbl)),
+                                            ) => {
+                                                let fst_bind =
+                                                    RustStmt::assign(fst_lbl.clone(), param0);
+                                                let snd_bind =
+                                                    RustStmt::assign(snd_lbl.clone(), param1);
+                                                match stmts_to_block(Cow::Borrowed(rhs)) {
+                                                    Some((block, ret)) => {
+                                                        let all_stmts = [fst_bind, snd_bind]
+                                                            .into_iter()
+                                                            .chain(block.iter().cloned())
+                                                            .collect();
+                                                        RustExpr::BlockScope(
+                                                            all_stmts,
+                                                            Box::new(ret.into_owned()),
+                                                        )
+                                                    }
+                                                    None => unreachable!(
+                                                        "unexpected short-circuit: {rhs:?}"
+                                                    ),
                                                 }
-                                                None => unreachable!("unexpected short-circuit: {rhs:?}"),
                                             }
-                                        }
-                                        other => unreachable!("expected pair-var capture pattern in lhs, found {other:?}"),
+                                            other => unreachable!(
+                                                "expected pair-var capture pattern in lhs, found {other:?}"
+                                            ),
+                                        },
+                                        other => unreachable!("expected 2-tuple, found {other:?}"),
                                     }
-                                    other => unreachable!("expected 2-tuple, found {other:?}"),
                                 }
-                                other => unreachable!("unexpected if-guarded or non-tuple MatchCaseLHS {other:?}"),
-                            }
+                                other => unreachable!(
+                                    "unexpected if-guarded or non-tuple MatchCaseLHS {other:?}"
+                                ),
+                            },
                             [] => unreachable!("unexpected empty match-block"),
-                            other => unreachable!("unexpected multi-branch RustMatchBody in pair-lambda expansion: {other:?}"),
-                        }
-                        other => unreachable!("unexpected non-irrefutable RustMatchBody in pair-lambda expansion: {other:?}"),
+                            other => unreachable!(
+                                "unexpected multi-branch RustMatchBody in pair-lambda expansion: {other:?}"
+                            ),
+                        },
+                        other => unreachable!(
+                            "unexpected non-irrefutable RustMatchBody in pair-lambda expansion: {other:?}"
+                        ),
                     }
                 }
                 _ => {
@@ -1871,11 +1948,7 @@ impl GenLambda {
         } else {
             let raw = self.embed(body_info).call_with([param]);
             // REVIEW - double-check this is the right predicate to apply
-            if self.needs_ok() {
-                raw.wrap_try()
-            } else {
-                raw
-            }
+            if self.needs_ok() { raw.wrap_try() } else { raw }
         }
     }
 
@@ -2936,11 +3009,13 @@ where
                             ExprInfo::default(),
                         );
                         let b_terminal = GenBlock::from_parts(
-                            vec![model::vec_push(
-                                RustExpr::local(model::UNTIL_LAST_ACCUM),
-                                RustExpr::local(model::UNTIL_LAST_ELEM),
-                            )
-                            .into()],
+                            vec![
+                                model::vec_push(
+                                    RustExpr::local(model::UNTIL_LAST_ACCUM),
+                                    RustExpr::local(model::UNTIL_LAST_ELEM),
+                                )
+                                .into(),
+                            ],
                             Some(GenControl::Break.into()),
                         );
                         let b_else = GenBlock::simple_expr(model::vec_push(
@@ -3373,7 +3448,9 @@ impl ToAst for DerivedLogic<GTExpr> {
             DerivedLogic::Maybe(is_present, inner_cl) => {
                 let mut if_true = inner_cl.to_ast(ctxt);
                 match if_true.ret {
-                    None => unreachable!("UNEXPECTED: inner logic of Format::Maybe context does not have return-value"),
+                    None => unreachable!(
+                        "UNEXPECTED: inner logic of Format::Maybe context does not have return-value"
+                    ),
                     Some(expr) => if_true.ret = Some(expr.wrap_some()),
                 }
                 let if_false = GenBlock::simple_expr(RustExpr::local("None"));
@@ -3404,7 +3481,10 @@ impl ToAst for DerivedLogic<GTExpr> {
                 if inner_block.stmts.last().is_some_and(|s| {
                     matches!(s, GenStmt::Embed(RustStmt::Return(ReturnKind::Keyword, _)))
                 }) {
-                    debug_assert!(inner_block.ret.is_none(), "explicit return precedes implicitly returned value in block-scope expression");
+                    debug_assert!(
+                        inner_block.ret.is_none(),
+                        "explicit return precedes implicitly returned value in block-scope expression"
+                    );
                     // NOTE - if the last statement is an explicit return, pass-through as-is because there is no variant to construct
                     // REVIEW - are all such cases (if any exist) properly considered here?
                     inner_block
@@ -3486,7 +3566,7 @@ impl ToAst for DynamicLogic<GTExpr> {
 }
 
 // ANCHOR[epic=main-fn] - `generate_code` function
-pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragment {
+pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragment + use<> {
     let mut items = Vec::new();
 
     let Generator {
@@ -4286,7 +4366,9 @@ impl<'a> Elaborator<'a> {
                             None => {
                                 let before = self.get_gt_from_index(index - 1);
                                 let after = self.get_gt_from_index(index + 1);
-                                eprintln!("Possible frame-shift error around {index} (looking for Struct)");
+                                eprintln!(
+                                    "Possible frame-shift error around {index} (looking for Struct)"
+                                );
                                 eprintln!("[{}]: {before:?}", index - 1);
                                 eprintln!("[index]: {gt:?}");
                                 eprintln!("[{}]: {after:?}", index + 1);
@@ -4825,8 +4907,8 @@ impl<'a> TypedDynScope<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::helper::{compute, record, ANY_BYTE};
     use crate::TypeHint;
+    use crate::helper::{ANY_BYTE, compute, record};
 
     fn population_check(module: &FormatModule, f: &Format, label: Option<&'static str>) {
         let tc = TypeChecker::infer_module(module, f).unwrap();

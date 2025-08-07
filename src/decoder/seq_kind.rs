@@ -144,7 +144,9 @@ impl<T: Clone> SeqKind<T> {
                     SeqKind::Dup(len, v.clone())
                 } else {
                     // REVIEW - we can either enforce `T: Debug` above, to add in the T-param, or keep it abstract
-                    panic!("sub-seq out of bounds: start-index={start}, len={len} on SeqKind::Dup({n}, _)")
+                    panic!(
+                        "sub-seq out of bounds: start-index={start}, len={len} on SeqKind::Dup({n}, _)"
+                    )
                 }
             }
         }

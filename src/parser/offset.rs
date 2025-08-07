@@ -207,7 +207,7 @@ impl ViewStack {
             None => {
                 return Answer {
                     val_or_keep_going: Err(true),
-                }
+                };
             }
         };
         // NOTE - because slices must nest, if we find one at any point, nothing further down will occur earlier in the buffer, so we can short-circuit
@@ -518,16 +518,17 @@ impl BufferOffset {
 
     /// Pushes a new `Lens::Slice` to the top of the `ViewStack` that ends at offset-delta `slice_len`,
     /// without validating the upper-bound of said slice against either the most restrictive Slice on the
-    /// ViewStack thusfar, or even the `max_offset` of the `BufferOffset` in question.
+    /// ViewStack as-is, or even the `max_offset` of the `BufferOffset` in question.
     ///
     /// # Note
     ///
     /// In bits-mode, the slice-len is implicitly assumed to specify a number of bits; in bytes-mode,
     /// it is implicitly assumed to specify a number of bytes.
     pub(crate) unsafe fn open_slice_unchecked(&mut self, slice_len: usize) {
-        self.push_lens(Lens::Slice {
+        let lens = Lens::Slice {
             endpoint: self.current_offset.increment_by(slice_len),
-        })
+        };
+        unsafe { self.push_lens(lens) }
     }
 
     /// Skips to the end of the most recently opened slice (if not there already) and removes

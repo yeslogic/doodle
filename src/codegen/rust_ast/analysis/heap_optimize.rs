@@ -1,4 +1,4 @@
-use super::{aligned_size, MemSize};
+use super::{MemSize, aligned_size};
 use crate::codegen::rust_ast::{
     AtomType, CompType, LocalType, PrimType, RustStruct, RustType, RustTypeDecl, RustTypeDef,
     RustVariant,

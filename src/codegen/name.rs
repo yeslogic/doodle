@@ -3,8 +3,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::anyhow;
 
-use crate::output::Fragment;
 use crate::Label;
+use crate::output::Fragment;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum Derivation {
@@ -189,7 +189,7 @@ impl NameCtxt {
     /// Returns a reborrow of the receiver, for chaining with other operations.
     pub fn increment_index(&mut self) -> &mut Self {
         match self.stack.last_mut() {
-            Some(NameAtom::Positional(ref mut ix)) => *ix += 1,
+            Some(NameAtom::Positional(ix)) => *ix += 1,
             _ => self.stack.push(NameAtom::Positional(0)),
         }
         self
