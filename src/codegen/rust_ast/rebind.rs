@@ -49,6 +49,26 @@ impl Rebindable for RustDecl {
                 tdef.rebind(table)
             }
             RustDecl::Function(fn_def) => fn_def.rebind(table),
+            RustDecl::TraitImpl(trait_impl) => trait_impl.rebind(table),
+        }
+    }
+}
+
+impl Rebindable for RustTraitImpl {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
+        // REVIEW - do we need to rebind unbound trait-parameters?
+        // self.trait_params.rebind(table);
+        self.on_type.rebind(table);
+        self.body.rebind(table);
+    }
+}
+
+impl Rebindable for TraitItem {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
+        match self {
+            // REVIEW - though unlikely, we may need to guard against certain rebindings here
+            TraitItem::Method(fn_def) => fn_def.rebind(table),
+            TraitItem::AssocType(.., rhs) => rhs.rebind(table),
         }
     }
 }

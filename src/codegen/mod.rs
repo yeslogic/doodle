@@ -3652,7 +3652,14 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
         path: vec!["doodle".into()],
         uses: RustImportItems::Singleton(Label::Borrowed("try_sub")),
     });
-    for attr_string in ["non_camel_case_types", "non_snake_case", "dead_code"].into_iter() {
+    for attr_string in [
+        "unused_imports",
+        "non_camel_case_types",
+        "non_snake_case",
+        "dead_code",
+    ]
+    .into_iter()
+    {
         content.add_module_attr(ModuleAttr::Allow(AllowAttr::from(Label::from(attr_string))));
     }
     content.add_module_attr(ModuleAttr::RustFmtSkip);

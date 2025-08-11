@@ -50,6 +50,22 @@ impl Resolvable for RustDecl {
         match self {
             RustDecl::Function(f) => f.resolve(ctx),
             RustDecl::TypeDef(..) => (),
+            RustDecl::TraitImpl(t) => t.resolve(ctx),
+        }
+    }
+}
+
+impl Resolvable for RustTraitImpl {
+    fn resolve(&mut self, ctx: &SourceContext<'_>) {
+        self.body.resolve(ctx)
+    }
+}
+
+impl Resolvable for TraitItem {
+    fn resolve(&mut self, ctx: &SourceContext<'_>) {
+        match self {
+            TraitItem::Method(f) => f.resolve(ctx),
+            TraitItem::AssocType(..) => (),
         }
     }
 }
