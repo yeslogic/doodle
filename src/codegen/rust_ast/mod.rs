@@ -262,19 +262,23 @@ impl std::ops::BitOr<TraitSet> for TraitSet {
 }
 
 impl TraitSet {
+    /// Returns true if `self` contains all traits in `subset`
+    pub fn contains(self, subset: TraitSet) -> bool {
+        self & subset == subset
+    }
+
     pub fn into_label_vec(self) -> Vec<Label> {
-        match self {
-            TraitSet::Empty => vec![],
-            TraitSet::Debug => vec![Label::from("Debug")],
-            TraitSet::Clone => vec![Label::from("Clone")],
-            TraitSet::DebugClone => vec![Label::from("Debug"), Label::from("Clone")],
-            TraitSet::Copy => vec![Label::from("Copy"), Label::from("Clone")],
-            TraitSet::DebugCopy => vec![
-                Label::from("Debug"),
-                Label::from("Copy"),
-                Label::from("Clone"),
-            ],
+        let mut labels = Vec::with_capacity((self as u8).count_ones() as usize);
+        if self.contains(Self::Debug) {
+            labels.push(Label::from("Debug"));
         }
+        if self.contains(Self::Copy) {
+            labels.push(Label::from("Copy"));
+        }
+        if self.contains(Self::Clone) {
+            labels.push(Label::from("Clone"));
+        }
+        labels
     }
 
     pub fn into_attr(self) -> RustAttr {
@@ -283,22 +287,23 @@ impl TraitSet {
 }
 
 impl RustItem {
+    /// Returns the attributes to be attached to the declaration `decl` based on the traits in `traits`
+    fn generate_attrs(decl: &RustDecl, traits: TraitSet) -> Vec<RustAttr> {
+        match decl {
+            RustDecl::TypeDef(..) => vec![traits.into_attr()],
+            RustDecl::Function(_) => Vec::new(),
+            RustDecl::TraitImpl(_) => Vec::new(),
+        }
+    }
+
     /// Promotes a standalone declaration to a top-level item with implicitly 'default' visibility (i.e. `pub(self)`).
     ///
     /// Attaches the specified set of derive-traits `traits` to the declaration if it is a type definition.
     ///
     /// Currently, this argument is ignored for functions.
     pub fn from_decl_with_traits(decl: RustDecl, traits: TraitSet) -> Self {
-        let attrs = match decl {
-            RustDecl::TypeDef(..) => vec![traits.into_attr()],
-            RustDecl::Function(_) => Vec::new(),
-        };
-        Self {
-            attrs,
-            vis: Default::default(),
-            doc_comment: None,
-            decl,
-        }
+        let attrs = Self::generate_attrs(&decl, traits);
+        Self::from_parts_no_doc(decl, Default::default(), attrs)
     }
 
     /// Promotes a standalone declaration to a top-level item with explicit 'pub' visibility.
@@ -307,13 +312,15 @@ impl RustItem {
     ///
     /// Currently, this argument is ignored for functions.
     pub fn pub_decl_with_traits(decl: RustDecl, traits: TraitSet) -> Self {
-        let attrs = match decl {
-            RustDecl::TypeDef(..) => vec![traits.into_attr()],
-            RustDecl::Function(_) => Vec::new(),
-        };
+        let attrs = Self::generate_attrs(&decl, traits);
+        Self::from_parts_no_doc(decl, Visibility::Public, attrs)
+    }
+
+    /// Promotes a standalone declaration to a top-level item with the specified visibility and attributes.
+    fn from_parts_no_doc(decl: RustDecl, vis: Visibility, attrs: Vec<RustAttr>) -> Self {
         Self {
             attrs,
-            vis: Visibility::Public,
+            vis,
             doc_comment: None,
             decl,
         }
@@ -399,9 +406,70 @@ impl ToFragment for DeclDerives {
 }
 
 #[derive(Clone, Debug)]
+pub enum TraitItem {
+    #[expect(dead_code)]
+    AssocType(Label, Option<Box<DefParams>>, Box<RustType>),
+    Method(RustFn),
+}
+
+impl ToFragment for TraitItem {
+    fn to_fragment(&self) -> Fragment {
+        match self {
+            TraitItem::AssocType(name, params, ty) => Fragment::string("type ")
+                .cat(name.to_fragment())
+                .cat(Fragment::opt(params.as_deref(), DefParams::to_fragment))
+                .cat(Fragment::string(" = "))
+                .cat(ty.to_fragment())
+                .cat(Fragment::Char(';')),
+            TraitItem::Method(method) => method.to_fragment(),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct RustTraitImpl {
+    pub(crate) param_bindings: Option<Box<DefParams>>,
+    pub(crate) trait_name: TraitName,
+    pub(crate) trait_params: Option<Box<UseParams>>,
+    pub(crate) on_type: Box<RustType>,
+    pub(crate) body: Vec<TraitItem>,
+}
+
+impl ToFragment for RustTraitImpl {
+    fn to_fragment(&self) -> Fragment {
+        let RustTraitImpl {
+            param_bindings,
+            trait_name,
+            trait_params,
+            on_type,
+            body,
+        } = self;
+        let mut builder = FragmentBuilder::new();
+        builder.push(Fragment::string("impl"));
+        if let Some(bindings) = param_bindings {
+            builder.push(bindings.to_fragment());
+        }
+        builder.push(Fragment::Char(' '));
+        builder.push(trait_name.to_fragment());
+        if let Some(params) = trait_params {
+            builder.push(params.to_fragment());
+        }
+        builder.push(Fragment::Char(' '));
+        builder.push(on_type.to_fragment());
+        builder.push(Fragment::Char(' '));
+        builder.push(<TraitItem as ToFragment>::block_sep(
+            body,
+            Fragment::Char('\n'),
+        ));
+        builder.finalize()
+    }
+}
+
+#[derive(Clone, Debug)]
 pub(crate) enum RustDecl {
     TypeDef(Label, RustTypeDecl),
     Function(RustFn),
+    TraitImpl(RustTraitImpl),
 }
 
 impl RustDecl {
@@ -429,6 +497,7 @@ impl ToFragment for RustDecl {
                     .intervene(Fragment::Char(' '), def.to_fragment())
             }
             RustDecl::Function(fn_def) => fn_def.to_fragment(),
+            RustDecl::TraitImpl(trait_impl) => trait_impl.to_fragment(),
         }
     }
 }
@@ -543,9 +612,14 @@ pub(crate) struct RustFn {
 }
 
 impl RustFn {
-    pub fn new(name: Label, params: Option<DefParams>, sig: FnSig, body: Vec<RustStmt>) -> Self {
+    pub fn new<L: IntoLabel>(
+        name: L,
+        params: Option<DefParams>,
+        sig: FnSig,
+        body: Vec<RustStmt>,
+    ) -> Self {
         Self {
-            name,
+            name: name.into(),
             params,
             sig,
             body,
@@ -1062,6 +1136,18 @@ pub(crate) enum MarkerType {
     U64Be,
 }
 
+impl MarkerType {
+    #[expect(unused)]
+    pub const fn get_fixed_size(self) -> usize {
+        match self {
+            MarkerType::U8 => size_of::<u8>(),
+            MarkerType::U16Be => size_of::<u16>(),
+            MarkerType::U32Be => size_of::<u32>(),
+            MarkerType::U64Be => size_of::<u64>(),
+        }
+    }
+}
+
 impl From<BaseKind> for MarkerType {
     fn from(bk: BaseKind) -> Self {
         match bk {
@@ -1183,6 +1269,10 @@ impl ToFragment for PrimType {
 pub enum RustLt {
     /// Label contents should contain leading `'`
     Parametric(Label),
+}
+
+impl RustLt {
+    pub const WILD: Self = RustLt::Parametric(Label::Borrowed("'_"));
 }
 
 impl AsRef<Label> for RustLt {

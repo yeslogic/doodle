@@ -1,10 +1,12 @@
 use std::{cell::RefCell, collections::HashMap};
 
 pub(crate) mod heap_optimize;
+pub(crate) mod read_width;
 use crate::codegen::model::{READ_ARRAY_IS_COPY, VIEW_OBJECT_IS_COPY};
 
 use super::*;
 use heap_optimize::{HeapOptimize, HeapOutcome, HeapStrategy};
+use read_width::{ReadWidth, ValueWidth};
 
 /// Helper trait for any AST model-type that represents a type-construct in Rust that may rely on non-local
 /// context to properly analyze certain static properties of.
@@ -46,7 +48,10 @@ pub trait CopyEligible: ASTContext {
 struct CacheEntry {
     copy: Option<bool>,
     niches: Option<usize>,
+    /// Number of machine-bytes a stored type-value takes up, or best approximation
     size: Option<usize>,
+    /// Number of buffer-bytes that will be advanced after fully parsing a single value of this type
+    width: Option<ValueWidth>,
     align: Option<usize>,
     heap: Option<HeapOutcome>,
 }
@@ -95,6 +100,10 @@ impl SourceContext<'_> {
 
     pub fn get_size(&self, ix: usize) -> usize {
         cache_get!(self, size, ix, size_hint)
+    }
+
+    pub fn get_width(&self, ix: usize) -> ValueWidth {
+        cache_get!(self, width, ix, read_width)
     }
 
     pub fn get_align(&self, ix: usize) -> usize {
