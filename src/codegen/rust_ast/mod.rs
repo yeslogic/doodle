@@ -725,6 +725,13 @@ impl RustType {
         )))
     }
 
+    pub fn as_decl_index(&self) -> Option<usize> {
+        match self {
+            RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(ix, ..))) => Some(*ix),
+            _ => None,
+        }
+    }
+
     /// Maps the provided RustType according to the transformation `T -> Vec<T>`
     #[cfg_attr(not(test), allow(dead_code))]
     pub fn vec_of(inner: Self) -> Self {

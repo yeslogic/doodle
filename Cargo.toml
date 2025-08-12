@@ -25,3 +25,6 @@ num-traits = "0.2"
 rustc-hash = "2.1.1"
 cons-rs = "0.7.3"
 smallsorts = { path = "smallsorts/", version = "0.1.0" }
+intmap = "3.1.2"
+smallvec = "1.15.1"
+vec-collections = "0.4.3"
