@@ -1,3 +1,4 @@
+pub(crate) mod catalog;
 pub(crate) mod model;
 mod name;
 pub(crate) mod rust_ast;
@@ -140,7 +141,7 @@ impl CodeGen {
                         .push_atom(NameAtom::RecordField(lab.clone()));
                     let rt_field = self.lift_type(ty, lt);
                     if let Some(lt) = rt_field.lt_param() {
-                        // REVIEW - is it likely to have clasihing lifetimes?
+                        // REVIEW - is it likely to have clashing lifetimes?
                         let _ = lt_bound.get_or_insert(lt.clone());
                     }
                     rt_fields.push((lab.clone(), rt_field.to_rust_type()));
@@ -2164,7 +2165,7 @@ impl GenExpr {
     fn embed_match(expr: RustExpr, body: RustMatchBody<GenBlock>) -> Self {
         match body {
             RustMatchBody::Irrefutable(mut cases) if cases.len() == 1 && cases[0].0.is_simple() => {
-                // unwwrap is safe because we checked cases above
+                // unwrap is safe because we checked cases above
                 let Some((MatchCaseLHS::Pattern(pat), mut block)) = cases.pop() else {
                     panic!("bad guard")
                 };
@@ -2565,14 +2566,14 @@ pub(crate) trait ToAst {
 /// and downstream (in the API made available for generated code to use)
 #[derive(Clone, Debug)]
 enum CaseLogic<ExprT = Expr> {
-    Simple(SimpleLogic<ExprT>),
     Derived(DerivedLogic<ExprT>),
-    Sequential(SequentialLogic<ExprT>),
+    Engine(EngineLogic<ExprT>),
+    Other(OtherLogic<ExprT>),
     Parallel(ParallelLogic<ExprT>),
     Repeat(RepeatLogic<ExprT>),
-    Engine(EngineLogic<ExprT>),
+    Sequential(SequentialLogic<ExprT>),
+    Simple(SimpleLogic<ExprT>),
     View(ViewLogic<ExprT>),
-    Other(OtherLogic<ExprT>),
 }
 
 macro_rules! impl_toast_caselogic {
@@ -3591,8 +3592,9 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
         HeapStrategy::new().variant_cutoff(128)
         // .absolute_cutoff(128)
         ;
+    let catalog = catalog::make_index(&type_decls, &sourcemap.decoder_skels);
 
-    for (type_decl, (_ix, path)) in type_decls.into_iter() {
+    for (type_decl, (ix, path)) in type_decls.into_iter() {
         let name = elaborator
             .codegen
             .name_gen
@@ -3608,17 +3610,33 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
         };
         let it = RustItem::pub_decl_with_traits(RustDecl::TypeDef(name, type_decl.clone()), traits);
         let comments = {
+            let mut tmp = Vec::new();
             let sz_comment = format!(
                 "expected size: {}",
                 rust_ast::analysis::MemSize::size_hint(type_decl, &src_context)
             );
+            tmp.push(sz_comment);
             let outcome = HeapOptimize::heap_hint(type_decl, HEAP_STRATEGY, &src_context);
-            if outcome.0.is_noop() {
-                vec![sz_comment]
-            } else {
+            if !outcome.0.is_noop() {
                 let heap_comment = format!("heap outcome ({HEAP_STRATEGY:?}): {outcome:?}");
-                vec![sz_comment, heap_comment]
+                tmp.push(heap_comment);
             }
+            let trait_comment = match catalog.get(*ix) {
+                None => unreachable!("missing key in catalog: {ix}"),
+                Some(dec_ixs) => match dec_ixs.len() {
+                    0 => format!("trait-orphaned: no decoder functions provided"),
+                    1 => format!(
+                        "trait-ready: unique decoder function (d#{})",
+                        dec_ixs.as_ref()[0]
+                    ),
+                    n => format!(
+                        "trait-unready: multiple ({n}) decoders exist (d#{:?})",
+                        dec_ixs
+                    ),
+                },
+            };
+            tmp.push(trait_comment);
+            tmp
         };
         items.push(it.with_comment(comments));
     }
@@ -5072,7 +5090,7 @@ mod tests {
     fn test_lambda_sanity() {
         const TU16: RustType = RustType::Atom(AtomType::Prim(PrimType::U16));
         const TU8: GenType = GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::U8)));
-        const GTBOOL: GenType = GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::Bool)));
+        const GEN_BOOL: GenType = GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::Bool)));
         let lambda = {
             let names = ["totlen", "seq"];
             let body = {
@@ -5081,7 +5099,7 @@ mod tests {
                     TU8,
                     Label::Borrowed("point_count"),
                 )));
-                TypedExpr::IntRel(GTBOOL, IntRel::Gte, Box::new(x), Box::new(y))
+                TypedExpr::IntRel(GEN_BOOL, IntRel::Gte, Box::new(x), Box::new(y))
             };
             const HEAD_VAR: &str = "tuple_var";
             {
@@ -5103,7 +5121,7 @@ mod tests {
                         ),
                         body,
                     )];
-                    TypedExpr::Match(GTBOOL, Box::new(head), Vec::from_iter(branches))
+                    TypedExpr::Match(GEN_BOOL, Box::new(head), Vec::from_iter(branches))
                 };
 
                 GenLambda::new(
