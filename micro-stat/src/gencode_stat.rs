@@ -11,6 +11,7 @@ use doodle::prelude::*;
 use doodle::try_sub;
 
 /// expected size: 16
+/// trait-ready: unique decoder function (d#7)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_table_record {
 table_id: u32,
@@ -20,6 +21,7 @@ length: u32
 }
 
 /// expected size: 64
+/// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_stat_table_axis_value_offsets<'input> {
 axis_value_view: View<'input>,
@@ -27,6 +29,7 @@ axis_value_offsets: ReadArray<'input, U16Be>
 }
 
 /// expected size: 88
+/// trait-ready: unique decoder function (d#9)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_stat_table<'input> {
 major_version: u16,
@@ -40,12 +43,14 @@ elided_fallback_name_id: u16
 }
 
 /// expected size: 88
+/// trait-ready: unique decoder function (d#8)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_table_directory_table_links<'input> {
 stat: Option<opentype_stat_table<'input>>
 }
 
 /// expected size: 128
+/// trait-ready: unique decoder function (d#3)
 #[derive(Debug, Clone)]
 pub struct opentype_table_directory<'input> {
 sfnt_version: u32,
@@ -58,6 +63,7 @@ table_links: opentype_table_directory_table_links<'input>
 }
 
 /// expected size: 136
+/// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
 pub struct opentype_ttc_header_header_Version1_table_directories<'input> {
 offset: u32,
@@ -65,6 +71,7 @@ link: Option<opentype_table_directory<'input>>
 }
 
 /// expected size: 32
+/// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
 pub struct opentype_ttc_header_header_Version1<'input> {
 num_fonts: u32,
@@ -72,6 +79,7 @@ table_directories: Vec<opentype_ttc_header_header_Version1_table_directories<'in
 }
 
 /// expected size: 40
+/// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
 pub struct opentype_ttc_header_header_Version2<'input> {
 num_fonts: u32,
@@ -82,10 +90,12 @@ dsig_offset: u32
 }
 
 /// expected size: 48
+/// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
 pub enum opentype_ttc_header_header<'input> { UnknownVersion(u16), Version1(opentype_ttc_header_header_Version1<'input>), Version2(opentype_ttc_header_header_Version2<'input>) }
 
 /// expected size: 56
+/// trait-ready: unique decoder function (d#4)
 #[derive(Debug, Clone)]
 pub struct opentype_ttc_header<'input> {
 ttc_tag: u32,
@@ -95,10 +105,12 @@ header: opentype_ttc_header_header<'input>
 }
 
 /// expected size: 136
+/// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
 pub enum opentype_main_directory<'input> { TTCHeader(opentype_ttc_header<'input>), TableDirectory(opentype_table_directory<'input>) }
 
 /// expected size: 144
+/// trait-unready: multiple (2) decoders exist (d#{0, 1})
 #[derive(Debug, Clone)]
 pub struct opentype_main<'input> {
 file_start: u32,
@@ -107,6 +119,7 @@ directory: opentype_main_directory<'input>
 }
 
 /// expected size: 32
+/// trait-ready: unique decoder function (d#11)
 #[derive(Debug, Clone)]
 pub struct base_asciiz_string {
 string: Vec<u8>,
@@ -114,6 +127,7 @@ null: u8
 }
 
 /// expected size: 8
+/// trait-ready: unique decoder function (d#12)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_stat_axis_record {
 axis_tag: u32,
@@ -122,6 +136,7 @@ axis_ordering: u16
 }
 
 /// expected size: 2
+/// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_stat_axis_value_table_data_Format1_flags {
 elidable_axis_value_name: bool,
@@ -129,10 +144,12 @@ older_sibling_font_attribute: bool
 }
 
 /// expected size: 8
+/// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
 pub enum opentype_stat_axis_value_table_data_Format1_value { Fixed32(u32) }
 
 /// expected size: 16
+/// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_stat_axis_value_table_data_Format1 {
 axis_index: u16,
@@ -142,6 +159,7 @@ value: opentype_stat_axis_value_table_data_Format1_value
 }
 
 /// expected size: 32
+/// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_stat_axis_value_table_data_Format2 {
 axis_index: u16,
@@ -153,6 +171,7 @@ range_max_value: opentype_stat_axis_value_table_data_Format1_value
 }
 
 /// expected size: 24
+/// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_stat_axis_value_table_data_Format3 {
 axis_index: u16,
@@ -163,6 +182,7 @@ linked_value: opentype_stat_axis_value_table_data_Format1_value
 }
 
 /// expected size: 12
+/// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_stat_axis_value_table_data_Format4_axis_values {
 axis_index: u16,
@@ -170,6 +190,7 @@ value: opentype_stat_axis_value_table_data_Format1_value
 }
 
 /// expected size: 32
+/// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
 pub struct opentype_stat_axis_value_table_data_Format4 {
 axis_count: u16,
@@ -179,20 +200,24 @@ axis_values: Vec<opentype_stat_axis_value_table_data_Format4_axis_values>
 }
 
 /// expected size: 40
+/// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
 pub enum opentype_stat_axis_value_table_data { Format1(opentype_stat_axis_value_table_data_Format1), Format2(opentype_stat_axis_value_table_data_Format2), Format3(opentype_stat_axis_value_table_data_Format3), Format4(opentype_stat_axis_value_table_data_Format4) }
 
 /// expected size: 48
+/// trait-ready: unique decoder function (d#13)
 #[derive(Debug, Clone)]
 pub struct opentype_stat_axis_value_table {
 format: u16,
 data: opentype_stat_axis_value_table_data
 }
 
+/// d#0
 fn Decoder_opentype_main<'input>(_input: &mut Parser<'input>) -> Result<opentype_main<'input>, ParseError> {
 Decoder1(_input)
 }
 
+/// d#1
 fn Decoder1<'input>(_input: &mut Parser<'input>) -> Result<opentype_main<'input>, ParseError> {
 let file_start = {
 let x = _input.get_offset_u64();
@@ -232,11 +257,13 @@ return Err(ParseError::FailToken(13646096770106105413u64));
 PResult::Ok(opentype_main { file_start, magic, directory })
 }
 
+/// d#2
 fn Decoder2(_input: &mut Parser<'_>) -> Result<u32, ParseError> {
 let x = ((Decoder6(_input))?, (Decoder6(_input))?, (Decoder6(_input))?, (Decoder6(_input))?);
 PResult::Ok(u32be(x))
 }
 
+/// d#3
 fn Decoder_opentype_table_directory<'input>(_input: &mut Parser<'input>, font_start: u32) -> Result<opentype_table_directory<'input>, ParseError> {
 let sfnt_version = {
 let inner = (Decoder2(_input))?;
@@ -266,6 +293,7 @@ let table_links = (Decoder_opentype_table_directory_table_links(_input, font_sta
 PResult::Ok(opentype_table_directory { sfnt_version, num_tables, search_range, entry_selector, range_shift, table_records, table_links })
 }
 
+/// d#4
 fn Decoder_opentype_ttc_header<'input>(_input: &mut Parser<'input>, start: u32) -> Result<opentype_ttc_header<'input>, ParseError> {
 let ttc_tag = {
 let inner = (Decoder2(_input))?;
@@ -358,15 +386,18 @@ _input.skip_remainder();
 PResult::Ok(opentype_ttc_header { ttc_tag, major_version, minor_version, header })
 }
 
+/// d#5
 fn Decoder5(_input: &mut Parser<'_>) -> Result<u16, ParseError> {
 let x = ((Decoder6(_input))?, (Decoder6(_input))?);
 PResult::Ok(u16be(x))
 }
 
+/// d#6
 fn Decoder6(_input: &mut Parser<'_>) -> Result<u8, ParseError> {
 _input.read_byte()
 }
 
+/// d#7
 fn Decoder_opentype_table_record(_input: &mut Parser<'_>) -> Result<opentype_table_record, ParseError> {
 let table_id = (Decoder10(_input))?;
 let checksum = (Decoder2(_input))?;
@@ -375,6 +406,7 @@ let length = (Decoder2(_input))?;
 PResult::Ok(opentype_table_record { table_id, checksum, offset, length })
 }
 
+/// d#8
 fn Decoder_opentype_table_directory_table_links<'input>(_input: &mut Parser<'input>, start: u32, tables: &[opentype_table_record]) -> Result<opentype_table_directory_table_links<'input>, ParseError> {
 let stat = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1398030676u32, tables)).copied() {
 Some(ref table) => {
@@ -399,6 +431,7 @@ _input.skip_remainder();
 PResult::Ok(opentype_table_directory_table_links { stat })
 }
 
+/// d#9
 fn Decoder_opentype_stat_table<'input>(_input: &mut Parser<'input>) -> Result<opentype_stat_table<'input>, ParseError> {
 let table_scope = _input.view();
 let major_version = {
@@ -446,10 +479,12 @@ let elided_fallback_name_id = (Decoder5(_input))?;
 PResult::Ok(opentype_stat_table { major_version, minor_version, design_axis_size, design_axis_count, design_axes_array, axis_value_count, axis_value_offsets, elided_fallback_name_id })
 }
 
+/// d#10
 fn Decoder10(_input: &mut Parser<'_>) -> Result<u32, ParseError> {
 Decoder2(_input)
 }
 
+/// d#11
 fn Decoder_base_asciiz_string(_input: &mut Parser<'_>) -> Result<base_asciiz_string, ParseError> {
 let string = {
 let mut accum = Vec::new();
@@ -501,6 +536,7 @@ return Err(ParseError::ExcludedBranch(7364705619221056123u64));
 PResult::Ok(base_asciiz_string { string, null })
 }
 
+/// d#12
 fn Decoder_opentype_stat_axis_record(_input: &mut Parser<'_>) -> Result<opentype_stat_axis_record, ParseError> {
 let axis_tag = (Decoder10(_input))?;
 let axis_name_id = (Decoder5(_input))?;
@@ -508,6 +544,7 @@ let axis_ordering = (Decoder5(_input))?;
 PResult::Ok(opentype_stat_axis_record { axis_tag, axis_name_id, axis_ordering })
 }
 
+/// d#13
 fn Decoder_opentype_stat_axis_value_table(_input: &mut Parser<'_>) -> Result<opentype_stat_axis_value_table, ParseError> {
 let format = {
 let inner = (Decoder5(_input))?;
