@@ -3641,7 +3641,7 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
         items.push(it.with_comment(comments));
     }
 
-    for mut decoder_fn in sourcemap.decoder_skels {
+    for (ix, ref mut decoder_fn) in sourcemap.decoder_skels.into_iter().enumerate() {
         decoder_fn.rebind(&table);
         if let Some(name) = &decoder_fn.adhoc_name {
             let replacement_name = Label::from(format!("Decoder_{}", sanitize_label(name)));
@@ -3654,7 +3654,7 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
             }
         };
         let func = decoder_fn.to_ast(ProdCtxt::default());
-        items.push(RustItem::from_decl(RustDecl::Function(func)));
+        items.push(RustItem::from_decl(RustDecl::Function(func)).with_comment([format!("d#{ix}")]));
     }
 
     let mut content = RustProgram::from_iter(items);
