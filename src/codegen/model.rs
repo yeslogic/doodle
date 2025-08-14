@@ -1,4 +1,4 @@
-use crate::{BaseKind, Label};
+use crate::{BaseKind, Endian, Label};
 
 use super::rust_ast::*;
 use super::{GenBlock, GenExpr, GenStmt};
@@ -343,13 +343,16 @@ pub fn read_from_view(view: RustExpr, len: RustExpr) -> RustExpr {
 }
 
 /// Model RustExpr for handling `ViewFormat::ReadArray(len, kind)` in the Parser (View) model.
-pub fn read_array_from_view(view: RustExpr, len: RustExpr, kind: BaseKind) -> RustExpr {
+pub fn read_array_from_view(view: RustExpr, len: RustExpr, kind: BaseKind<Endian>) -> RustExpr {
     // NOTE - we need these separate methods because RustExpr::MethodCall doesn't allow turbo-fish type-parameters
     match kind {
         BaseKind::U8 => try_call!(view, read_array_u8, len),
-        BaseKind::U16 => try_call!(view, read_array_u16be, len),
-        BaseKind::U32 => try_call!(view, read_array_u32be, len),
-        BaseKind::U64 => try_call!(view, read_array_u64be, len),
+        BaseKind::U16BE => try_call!(view, read_array_u16be, len),
+        BaseKind::U32BE => try_call!(view, read_array_u32be, len),
+        BaseKind::U64BE => try_call!(view, read_array_u64be, len),
+        BaseKind::U16LE | BaseKind::U32LE | BaseKind::U64LE => {
+            unimplemented!("little-endian read-array parses not yet implemented")
+        }
     }
 }
 

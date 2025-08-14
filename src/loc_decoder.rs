@@ -8,7 +8,9 @@ use crate::decoder::{
 };
 use crate::error::{DecodeError, LocDecodeError};
 use crate::read::ReadCtxt;
-use crate::{Arith, BaseKind, DynFormat, Expr, Format, IntRel, Label, Pattern, UnaryOp, ViewExpr};
+use crate::{
+    Arith, BaseKind, DynFormat, Endian, Expr, Format, IntRel, Label, Pattern, UnaryOp, ViewExpr,
+};
 use std::borrow::Cow;
 use std::cmp::Ordering;
 
@@ -1859,7 +1861,7 @@ impl Decoder {
 
 fn read_base(
     buf: ReadCtxt<'_>,
-    kind: BaseKind,
+    kind: BaseKind<Endian>,
 ) -> Result<(ParsedValue, ReadCtxt<'_>), DecodeError<ParsedValue>> {
     let (val, new_buf) = match kind {
         BaseKind::U8 => {
@@ -1868,23 +1870,26 @@ fn read_base(
             };
             (Value::U8(byte), new_buf)
         }
-        BaseKind::U16 => {
+        BaseKind::U16BE => {
             let Some((val, new_buf)) = buf.read_u16be() else {
                 return Err(DecodeError::overrun(kind.size(), buf.offset));
             };
             (Value::U16(val), new_buf)
         }
-        BaseKind::U32 => {
+        BaseKind::U32BE => {
             let Some((val, new_buf)) = buf.read_u32be() else {
                 return Err(DecodeError::overrun(kind.size(), buf.offset));
             };
             (Value::U32(val), new_buf)
         }
-        BaseKind::U64 => {
+        BaseKind::U64BE => {
             let Some((val, new_buf)) = buf.read_u64be() else {
                 return Err(DecodeError::overrun(kind.size(), buf.offset));
             };
             (Value::U64(val), new_buf)
+        }
+        BaseKind::U16LE | BaseKind::U32LE | BaseKind::U64LE => {
+            unimplemented!("little-endian read-base parses not yet implemented")
         }
     };
     Ok((ParsedValue::new_flat(val, buf.offset, kind.size()), new_buf))

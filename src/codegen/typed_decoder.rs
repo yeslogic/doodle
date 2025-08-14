@@ -1,5 +1,7 @@
 use crate::byte_set::ByteSet;
-use crate::{BaseKind, Format, FormatModule, Label, MatchTree, MaybeTyped, Next, StyleHint};
+use crate::{
+    BaseKind, Endian, Format, FormatModule, Label, MatchTree, MaybeTyped, Next, StyleHint,
+};
 use anyhow::{Result as AResult, anyhow};
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -231,7 +233,7 @@ pub(crate) enum TypedDecoder<TypeRep> {
         TypeRep,
         TypedViewExpr<TypeRep>,
         Box<TypedExpr<TypeRep>>,
-        BaseKind,
+        BaseKind<Endian>,
     ),
     ReifyView(TypeRep, TypedViewExpr<TypeRep>),
 }

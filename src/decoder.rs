@@ -5,7 +5,7 @@ use crate::{
     Arith, DynFormat, Expr, Format, FormatModule, IntRel, MatchTree, Next, TypeScope, ValueType,
     ViewExpr, pattern::Pattern,
 };
-use crate::{BaseKind, IntoLabel, Label, MaybeTyped, TypeHint, UnaryOp, ViewFormat};
+use crate::{BaseKind, Endian, IntoLabel, Label, MaybeTyped, TypeHint, UnaryOp, ViewFormat};
 use anyhow::{Result as AResult, anyhow};
 use serde::Serialize;
 use std::borrow::Cow;
@@ -965,7 +965,7 @@ pub enum Decoder {
     LiftedOption(Option<Box<Decoder>>),
     LetView(Label, Box<Decoder>),
     CaptureBytes(ViewExpr, Box<Expr>),
-    ReadArray(ViewExpr, Box<Expr>, BaseKind),
+    ReadArray(ViewExpr, Box<Expr>, BaseKind<Endian>),
     ReifyView(ViewExpr),
 }
 
@@ -1959,7 +1959,10 @@ impl Decoder {
     }
 }
 
-fn read_base(buf: ReadCtxt<'_>, kind: BaseKind) -> Result<(Value, ReadCtxt<'_>), DecodeError> {
+fn read_base(
+    buf: ReadCtxt<'_>,
+    kind: BaseKind<Endian>,
+) -> Result<(Value, ReadCtxt<'_>), DecodeError> {
     match kind {
         BaseKind::U8 => {
             let Some((byte, new_buf)) = buf.read_byte() else {
@@ -1967,23 +1970,26 @@ fn read_base(buf: ReadCtxt<'_>, kind: BaseKind) -> Result<(Value, ReadCtxt<'_>),
             };
             Ok((Value::U8(byte), new_buf))
         }
-        BaseKind::U16 => {
+        BaseKind::U16BE => {
             let Some((val, new_buf)) = buf.read_u16be() else {
                 return Err(DecodeError::overrun(kind.size(), buf.offset));
             };
             Ok((Value::U16(val), new_buf))
         }
-        BaseKind::U32 => {
+        BaseKind::U32BE => {
             let Some((val, new_buf)) = buf.read_u32be() else {
                 return Err(DecodeError::overrun(kind.size(), buf.offset));
             };
             Ok((Value::U32(val), new_buf))
         }
-        BaseKind::U64 => {
+        BaseKind::U64BE => {
             let Some((val, new_buf)) = buf.read_u64be() else {
                 return Err(DecodeError::overrun(kind.size(), buf.offset));
             };
             Ok((Value::U64(val), new_buf))
+        }
+        BaseKind::U16LE | BaseKind::U32LE | BaseKind::U64LE => {
+            unimplemented!("little-endian read-base parses not yet implemented")
         }
     }
 }

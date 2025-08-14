@@ -7,8 +7,8 @@ use std::{
 };
 
 use crate::{
-    BaseKind, BaseType, ByteSet, DynFormat, Expr, Format, FormatModule, FormatRef, IntoLabel,
-    Label, Pattern, StyleHint, TypeScope, ValueKind, ValueType, ViewExpr,
+    BaseKind, BaseType, ByteSet, DynFormat, Endian, Expr, Format, FormatModule, FormatRef,
+    IntoLabel, Label, Pattern, StyleHint, TypeScope, ValueKind, ValueType, ViewExpr,
     typecheck::UnificationError, valuetype::Container,
 };
 use anyhow::{Result as AResult, anyhow};
@@ -129,7 +129,7 @@ pub enum ViewFormatExt {
     /// Captures a byte-slice of a View, given an expression for the byte-length of the slice
     CaptureBytes(Box<Expr>),
     /// Captures a scoped ReadArray of the given unit, given an expression for element-count (*NOT* byte-length)
-    ReadArray(Box<Expr>, BaseKind),
+    ReadArray(Box<Expr>, BaseKind<Endian>),
     /// Constructs a View-object in the value layer
     ReifyView,
 }
