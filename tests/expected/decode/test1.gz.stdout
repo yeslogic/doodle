@@ -3,11 +3,11 @@
         └── 0 :=
             ├── header <- gzip.header :=
             │   ├── magic <- (...)
-            │   ├── method <- base.u8 := 8
+            │   ├── method <- ReadU8 := 8
             │   ├── file-flags <- map (packed_bits -> { ... }) U8 := bool-flags[fname]
-            │   ├── timestamp <- base.u32le := 1683505215
-            │   ├── compression-flags <- base.u8 := 0
-            │   └── os-id <- base.u8 := 3
+            │   ├── timestamp <- ReadU32Le := 1683505215
+            │   ├── compression-flags <- ReadU8 := 0
+            │   └── os-id <- ReadU8 := 3
             ├── fextra <- maybe (header.file-flags.fextra) gzip.fextra := none
             ├── fname <- maybe (header.file-flags.fname) gzip.fname := { some := "test1" }
             ├── fcomment <- maybe (header.file-flags.fcomment) gzip.fcomment := none
@@ -15,7 +15,7 @@
             ├── data <- bits deflate.main :=
             │   ├── blocks <- repeat-until-last (x -> x.final == 1) deflate.block :=
             │   │   └── 0 <- deflate.block :=
-            │   │       ├── final <- base.bit := 1
+            │   │       ├── final <- U8 := 1
             │   │       ├── type <- map (bits -> bits.0 | bits.1 << 1) (...) := 1
             │   │       └── data <- match type { ... } :=
             │   │           └── fixed_huffman <- deflate.fixed_huffman :=
@@ -94,5 +94,5 @@
             │       ~
             │       └── 13 := 10
             └── footer <- gzip.footer :=
-                ├── crc <- base.u32le := 2069210904
-                └── length <- base.u32le := 14
+                ├── crc <- ReadU32Le := 2069210904
+                └── length <- ReadU32Le := 14

@@ -22,8 +22,7 @@ pub mod waldo;
 pub mod zlib;
 
 pub fn main_stat(module: &mut FormatModule) -> FormatRef {
-    let base = base::main(module);
-    opentype::alt::main(module, &base)
+    opentype::alt::main(module)
 }
 
 pub fn main(module: &mut FormatModule) -> FormatRef {
@@ -31,9 +30,9 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
 
     let deflate = deflate::main(module);
 
-    let zlib = zlib::main(module, &base, deflate);
+    let zlib = zlib::main(module, deflate);
 
-    let tiff = tiff::main(module, &base);
+    let tiff = tiff::main(module);
     let (text, utf8nz) = text::main(module, &base);
     let gif = gif::main(module, &base);
     let gzip = gzip::main(module, deflate, &base);
@@ -43,10 +42,10 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
     let png = png::main(module, zlib, text, utf8nz, &base);
     let riff = riff::main(module, &base);
     let tar = tar::main(module, &base);
-    let elf = elf::main(module, &base);
-    let waldo = waldo::main(module, &base);
-    let rle = run_length::main(module, &base);
-    let opentype = opentype::main(module, &base);
+    let elf = elf::main(module);
+    let waldo = waldo::main(module);
+    let rle = run_length::main(module);
+    let opentype = opentype::main(module);
 
     let tgz = {
         module.define_format(
@@ -113,7 +112,7 @@ mod test {
         };
 
         let f = record([
-            ("len", base.u32be()),
+            ("len", u32be()),
             (
                 "mask",
                 with_relative_offset(None, var("len"), Format::Byte(mask_bytes)),
@@ -123,7 +122,7 @@ mod test {
                 repeat_count(
                     var("len"),
                     Format::Map(
-                        Box::new(base.u8()),
+                        Box::new(doodle::helper::u8()),
                         Box::new(lambda("byte", bit_and(var("mask"), var("byte")))),
                     ),
                 ),

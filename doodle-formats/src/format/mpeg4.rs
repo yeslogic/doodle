@@ -1,5 +1,5 @@
 use crate::format::BaseModule;
-use doodle::helper::*;
+use doodle::helper::{u8, *};
 use doodle::{Expr, Format, FormatModule, FormatRef, Pattern};
 
 fn tag_pattern(tag: [char; 4]) -> Pattern {
@@ -31,9 +31,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         ]),
     );
 
-    fn make_atom(base: &BaseModule, tag: FormatRef, data: Format) -> Format {
+    fn make_atom(tag: FormatRef, data: Format) -> Format {
         record([
-            ("size-field", base.u32be()),
+            ("size-field", u32be()),
             ("type", tag.call()),
             (
                 "size",
@@ -43,7 +43,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         (Pattern::U32(0), compute(Expr::U64(0))), // FIXME
                         (
                             Pattern::U32(1),
-                            map(base.u64be(), lambda("x", sub(var("x"), Expr::U64(16)))),
+                            map(u64be(), lambda("x", sub(var("x"), Expr::U64(16)))),
                         ),
                         (
                             Pattern::Wildcard,
@@ -58,56 +58,49 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
     let ftyp_data = record([
         ("major_brand", tag.call()),
-        ("minor_version", base.u32be()),
-        ("compatible_brands", Format::Repeat(Box::new(tag.call()))),
+        ("minor_version", u32be()),
+        ("compatible_brands", repeat(tag.call())),
     ]);
 
     let mdia_hdlr_data = record([
-        ("version", base.u8()),
-        ("flags", tuple([base.u8(), base.u8(), base.u8()])),
-        ("component_type", base.u32be()),
+        ("version", u8()),
+        ("flags", tuple_repeat(3, u8())),
+        ("component_type", u32be()),
         ("component_subtype", tag.call()),
-        ("component_manufacturer", base.u32be()),
-        ("component_flags", base.u32be()),
-        ("component_flags_mask", base.u32be()),
+        ("component_manufacturer", u32be()),
+        ("component_flags", u32be()),
+        ("component_flags_mask", u32be()),
         ("component_name", base.asciiz_string()),
     ]);
 
     let meta_hdlr_data = record([
-        ("version", base.u8()),
-        ("flags", tuple([base.u8(), base.u8(), base.u8()])),
-        ("predefined", base.u32be()),
+        ("version", u8()),
+        ("flags", tuple_repeat(3, u8())),
+        ("predefined", u32be()),
         ("handler_type", tag.call()),
-        (
-            "reserved",
-            tuple([base.u32be(), base.u32be(), base.u32be()]),
-        ),
+        ("reserved", tuple_repeat(3, u32be())),
         ("name", base.asciiz_string()),
     ]);
 
     let pitm_data = record([
-        ("version", base.u8()),
-        ("flags", tuple([base.u8(), base.u8(), base.u8()])),
+        ("version", u8()),
+        ("flags", tuple_repeat(3, u8())),
         (
             "item_ID",
-            if_then_else_variant(
-                expr_eq(var("version"), Expr::U8(0)),
-                base.u16be(),
-                base.u32be(),
-            ),
+            if_then_else_variant(expr_eq(var("version"), Expr::U8(0)), u16be(), u32be()),
         ),
     ]);
 
     let infe_data = record([
-        ("version", base.u8()),
-        ("flags", tuple([base.u8(), base.u8(), base.u8()])),
+        ("version", u8()),
+        ("flags", tuple_repeat(3, u8())),
         (
             "fields",
             if_then_else_variant(
                 expr_lt(var("version"), Expr::U8(2)),
                 record([
-                    ("item_ID", base.u16be()),
-                    ("item_protection_index", base.u16be()),
+                    ("item_ID", u16be()),
+                    ("item_protection_index", u16be()),
                     ("item_name", base.asciiz_string()),
                     ("content_type", base.asciiz_string()),
                     ("content_encoding", base.asciiz_string()),
@@ -118,11 +111,11 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         "item_ID",
                         if_then_else(
                             expr_eq(var("version"), Expr::U8(2)),
-                            map(base.u16be(), lambda("x", as_u32(var("x")))),
-                            base.u32be(),
+                            map(u16be(), lambda("x", as_u32(var("x")))),
+                            u32be(),
                         ),
                     ),
-                    ("item_protection_index", base.u16be()),
+                    ("item_protection_index", u16be()),
                     ("item_type", tag.call()),
                     ("item_name", base.asciiz_string()),
                     (
@@ -159,31 +152,26 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let iinf_atom = module.define_format(
         "mpeg4.iinf-atom",
         make_atom(
-            base,
             tag,
             match_variant(
                 var("type"),
                 vec![
                     (tag_pattern(['i', 'n', 'f', 'e']), "infe", infe_data),
-                    (
-                        Pattern::Wildcard,
-                        "unknown",
-                        Format::Repeat(Box::new(base.u8())),
-                    ),
+                    (Pattern::Wildcard, "unknown", opaque_bytes()),
                 ],
             ),
         ),
     );
 
     let iinf_data = record([
-        ("version", base.u8()),
-        ("flags", tuple([base.u8(), base.u8(), base.u8()])),
+        ("version", u8()),
+        ("flags", tuple_repeat(3, u8())),
         (
             "entry_count",
             if_then_else(
                 expr_eq(var("version"), Expr::U8(0)),
-                map(base.u16be(), lambda("x", as_u32(var("x")))),
-                base.u32be(),
+                map(u16be(), lambda("x", as_u32(var("x")))),
+                u32be(),
             ),
         ),
         (
@@ -193,26 +181,20 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     ]);
 
     let single_item_reference_data = record([
-        ("from_item_ID", base.u16be()),
-        ("reference_count", base.u16be()),
-        (
-            "to_item_ID",
-            repeat_count(var("reference_count"), base.u16be()),
-        ),
+        ("from_item_ID", u16be()),
+        ("reference_count", u16be()),
+        ("to_item_ID", repeat_count(var("reference_count"), u16be())),
     ]);
 
     let single_item_reference_large_data = record([
-        ("from_item_ID", base.u32be()),
-        ("reference_count", base.u16be()),
-        (
-            "to_item_ID",
-            repeat_count(var("reference_count"), base.u32be()),
-        ),
+        ("from_item_ID", u32be()),
+        ("reference_count", u16be()),
+        ("to_item_ID", repeat_count(var("reference_count"), u32be())),
     ]);
 
     let iref_data = record([
-        ("version", base.u8()),
-        ("flags", tuple([base.u8(), base.u8(), base.u8()])),
+        ("version", u8()),
+        ("flags", tuple_repeat(3, u8())),
         (
             "single_item_reference",
             match_variant(
@@ -221,16 +203,12 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     (
                         Pattern::U8(0),
                         "small",
-                        Format::Repeat(Box::new(make_atom(base, tag, single_item_reference_data))),
+                        repeat(make_atom(tag, single_item_reference_data)),
                     ),
                     (
                         Pattern::U8(1),
                         "large",
-                        Format::Repeat(Box::new(make_atom(
-                            base,
-                            tag,
-                            single_item_reference_large_data,
-                        ))),
+                        Format::Repeat(Box::new(make_atom(tag, single_item_reference_large_data))),
                     ),
                 ],
             ),
@@ -238,10 +216,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     ]);
 
     let iloc_data = record([
-        ("version", base.u8()),
-        ("flags", tuple([base.u8(), base.u8(), base.u8()])),
-        ("offset_size_length_size", base.u8()), // two four-bit fields
-        ("base_offset_size_index_size", base.u8()), // two four-bit fields
+        ("version", u8()),
+        ("flags", tuple_repeat(3, u8())),
+        ("offset_size_length_size", u8()), // two four-bit fields
+        ("base_offset_size_index_size", u8()), // two four-bit fields
         (
             "offset_size",
             compute(shr(var("offset_size_length_size"), Expr::U8(4))),
@@ -266,8 +244,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             "item_count",
             if_then_else(
                 expr_lt(var("version"), Expr::U8(2)),
-                map(base.u16be(), lambda("x", as_u32(var("x")))),
-                base.u32be(),
+                map(u16be(), lambda("x", as_u32(var("x")))),
+                u32be(),
             ),
         ),
         (
@@ -279,30 +257,27 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         "item_ID",
                         if_then_else(
                             expr_lt(var("version"), Expr::U8(2)),
-                            map(base.u16be(), lambda("x", as_u32(var("x")))),
-                            base.u32be(),
+                            map(u16be(), lambda("x", as_u32(var("x")))),
+                            u32be(),
                         ),
                     ),
                     (
                         "construction_method",
-                        cond_maybe(expr_gt(var("version"), Expr::U8(0)), base.u16be()),
+                        cond_maybe(expr_gt(var("version"), Expr::U8(0)), u16be()),
                     ),
-                    ("data_reference_index", base.u16be()),
+                    ("data_reference_index", u16be()),
                     (
                         "base_offset",
                         Format::Match(
                             Box::new(var("base_offset_size")),
                             vec![
                                 (Pattern::U8(0), compute(Expr::U64(0))),
-                                (
-                                    Pattern::U8(4),
-                                    map(base.u32be(), lambda("x", as_u64(var("x")))),
-                                ),
-                                (Pattern::U8(8), base.u64be()),
+                                (Pattern::U8(4), map(u32be(), lambda("x", as_u64(var("x"))))),
+                                (Pattern::U8(8), u64be()),
                             ],
                         ),
                     ),
-                    ("extent_count", base.u16be()),
+                    ("extent_count", u16be()),
                     (
                         "extents",
                         repeat_count(
@@ -316,9 +291,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                             (Pattern::U8(0), compute(Expr::U64(0))),
                                             (
                                                 Pattern::U8(4),
-                                                map(base.u32be(), lambda("x", as_u64(var("x")))),
+                                                map(u32be(), lambda("x", as_u64(var("x")))),
                                             ),
-                                            (Pattern::U8(8), base.u64be()),
+                                            (Pattern::U8(8), u64be()),
                                         ],
                                     ),
                                 ),
@@ -330,9 +305,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                             (Pattern::U8(0), compute(Expr::U64(0))),
                                             (
                                                 Pattern::U8(4),
-                                                map(base.u32be(), lambda("x", as_u64(var("x")))),
+                                                map(u32be(), lambda("x", as_u64(var("x")))),
                                             ),
-                                            (Pattern::U8(8), base.u64be()),
+                                            (Pattern::U8(8), u64be()),
                                         ],
                                     ),
                                 ),
@@ -344,9 +319,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                             (Pattern::U8(0), compute(Expr::U64(0))),
                                             (
                                                 Pattern::U8(4),
-                                                map(base.u32be(), lambda("x", as_u64(var("x")))),
+                                                map(u32be(), lambda("x", as_u64(var("x")))),
                                             ),
-                                            (Pattern::U8(8), base.u64be()),
+                                            (Pattern::U8(8), u64be()),
                                         ],
                                     ),
                                 ),
@@ -359,150 +334,128 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     ]);
 
     let dref_data = record([
-        ("version", base.u8()),
-        ("flags", tuple([base.u8(), base.u8(), base.u8()])),
-        ("number_of_entries", base.u32be()),
-        (
-            "data",
-            Format::Repeat(Box::new(make_atom(
-                base,
-                tag,
-                Format::Repeat(Box::new(base.u8())),
-            ))),
-        ),
+        ("version", u8()),
+        ("flags", tuple_repeat(3, u8())),
+        ("number_of_entries", u32be()),
+        ("data", repeat(make_atom(tag, opaque_bytes()))),
     ]);
 
     let elst_data = record([
-        ("version", base.u8()),
-        ("flags", tuple([base.u8(), base.u8(), base.u8()])),
-        ("number_of_entries", base.u32be()),
+        ("version", u8()),
+        ("flags", tuple_repeat(3, u8())),
+        ("number_of_entries", u32be()),
         (
             "edit_list_table",
             repeat_count(
                 var("number_of_entries"),
                 record([
-                    ("track_duration", base.u32be()),
-                    ("media_time", base.u32be()),
-                    ("media_rate", base.u32be()),
+                    ("track_duration", u32be()),
+                    ("media_time", u32be()),
+                    ("media_rate", u32be()),
                 ]),
             ),
         ),
     ]);
 
     let stsd_data = record([
-        ("version", base.u8()),
-        ("flags", tuple([base.u8(), base.u8(), base.u8()])),
-        ("entry_count", base.u32be()),
+        ("version", u8()),
+        ("flags", tuple_repeat(3, u8())),
+        ("entry_count", u32be()),
         (
             "sample_entries",
-            repeat_count(
-                var("entry_count"),
-                make_atom(base, tag, Format::Repeat(Box::new(base.u8()))),
-            ),
+            repeat_count(var("entry_count"), make_atom(tag, opaque_bytes())),
         ),
     ]);
 
     let stts_data = record([
-        ("version", base.u8()),
-        ("flags", tuple([base.u8(), base.u8(), base.u8()])),
-        ("entry_count", base.u32be()),
+        ("version", u8()),
+        ("flags", tuple_repeat(3, u8())),
+        ("entry_count", u32be()),
         (
             "sample_entries",
             repeat_count(
                 var("entry_count"),
-                record([
-                    ("sample_count", base.u32be()),
-                    ("sample_delta", base.u32be()),
-                ]),
+                record([("sample_count", u32be()), ("sample_delta", u32be())]),
             ),
         ),
     ]);
 
     let ctts_data = record([
-        ("version", base.u8()),
-        ("flags", tuple([base.u8(), base.u8(), base.u8()])),
-        ("entry_count", base.u32be()),
+        ("version", u8()),
+        ("flags", tuple_repeat(3, u8())),
+        ("entry_count", u32be()),
         (
             "sample_entries",
             repeat_count(
                 var("entry_count"),
                 record([
-                    ("sample_count", base.u32be()),
+                    ("sample_count", u32be()),
                     // FIXME signed if version == 1
-                    ("sample_offset", base.u32be()),
+                    ("sample_offset", u32be()),
                 ]),
             ),
         ),
     ]);
 
     let stss_data = record([
-        ("version", base.u8()),
-        ("flags", tuple([base.u8(), base.u8(), base.u8()])),
-        ("entry_count", base.u32be()),
-        (
-            "sample_number",
-            repeat_count(var("entry_count"), base.u32be()),
-        ),
+        ("version", u8()),
+        ("flags", tuple_repeat(3, u8())),
+        ("entry_count", u32be()),
+        ("sample_number", repeat_count(var("entry_count"), u32be())),
     ]);
 
     let stsc_data = record([
-        ("version", base.u8()),
-        ("flags", tuple([base.u8(), base.u8(), base.u8()])),
-        ("entry_count", base.u32be()),
+        ("version", u8()),
+        ("flags", tuple_repeat(3, u8())),
+        ("entry_count", u32be()),
         (
             "chunk_entries",
             repeat_count(
                 var("entry_count"),
                 record([
-                    ("first_chunk", base.u32be()),
-                    ("samples_per_chunk", base.u32be()),
-                    ("sample_description_index", base.u32be()),
+                    ("first_chunk", u32be()),
+                    ("samples_per_chunk", u32be()),
+                    ("sample_description_index", u32be()),
                 ]),
             ),
         ),
     ]);
 
     let stsz_data = record([
-        ("version", base.u8()),
-        ("flags", tuple([base.u8(), base.u8(), base.u8()])),
-        ("sample_size", base.u32be()),
-        ("sample_count", base.u32be()),
+        ("version", u8()),
+        ("flags", tuple_repeat(3, u8())),
+        ("sample_size", u32be()),
+        ("sample_count", u32be()),
         (
             "entry_size",
             cond_maybe(
                 expr_eq(var("sample_size"), Expr::U32(0)),
-                repeat_count(var("sample_count"), base.u32be()),
+                repeat_count(var("sample_count"), u32be()),
             ),
         ),
     ]);
 
     let stco_data = record([
-        ("version", base.u8()),
-        ("flags", tuple([base.u8(), base.u8(), base.u8()])),
-        ("entry_count", base.u32be()),
-        (
-            "chunk_offset",
-            repeat_count(var("entry_count"), base.u32be()),
-        ),
+        ("version", u8()),
+        ("flags", tuple_repeat(3, u8())),
+        ("entry_count", u32be()),
+        ("chunk_offset", repeat_count(var("entry_count"), u32be())),
     ]);
 
     let co64_data = record([
-        ("version", base.u8()),
-        ("flags", tuple([base.u8(), base.u8(), base.u8()])),
-        ("entry_count", base.u32be()),
-        (
-            "chunk_offset",
-            repeat_count(var("entry_count"), base.u64be()),
-        ),
+        ("version", u8()),
+        ("flags", tuple_repeat(3, u8())),
+        ("entry_count", u32be()),
+        ("chunk_offset", repeat_count(var("entry_count"), u64be())),
     ]);
 
     let sgpd_data = record([
-        ("version", base.u8()),
-        ("flags", tuple([base.u8(), base.u8(), base.u8()])),
-        ("grouping_type", base.u32be()),
+        ("version", u8()),
+        ("flags", tuple_repeat(3, u8())),
+        ("grouping_type", u32be()),
         // FIXME handle version >= 2
-        ("default_length", base.u32be()),
-        ("entry_count", base.u32be()),
+        ("default_length", u32be()),
+        ("entry_count", u32be()),
         (
             "sample_groups",
             repeat_count(
@@ -512,13 +465,13 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         "description_length",
                         if_then_else(
                             expr_eq(var("default_length"), Expr::U32(0)),
-                            base.u32be(),
+                            u32be(),
                             compute(var("default_length")),
                         ),
                     ),
                     (
                         "sample_group_entry",
-                        repeat_count(var("description_length"), base.u8()),
+                        repeat_count(var("description_length"), u8()),
                     ),
                 ]),
             ),
@@ -526,43 +479,43 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     ]);
 
     let sbgp_data = record([
-        ("version", base.u8()),
-        ("flags", tuple([base.u8(), base.u8(), base.u8()])),
-        ("grouping_type", base.u32be()),
+        ("version", u8()),
+        ("flags", tuple_repeat(3, u8())),
+        ("grouping_type", u32be()),
         (
             "grouping_type_parameter",
-            cond_maybe(expr_eq(var("version"), Expr::U8(1)), base.u32be()),
+            cond_maybe(expr_eq(var("version"), Expr::U8(1)), u32be()),
         ),
-        ("entry_count", base.u32be()),
+        ("entry_count", u32be()),
         (
             "sample_groups",
             repeat_count(
                 var("entry_count"),
                 record([
-                    ("sample_count", base.u32be()),
-                    ("group_description_index", base.u32be()),
+                    ("sample_count", u32be()),
+                    ("group_description_index", u32be()),
                 ]),
             ),
         ),
     ]);
 
     let vmhd_data = record([
-        ("version", base.u8()),
-        ("flags", tuple([base.u8(), base.u8(), base.u8()])),
-        ("graphicsmode", base.u16be()),
-        ("opcolor", repeat_count(Expr::U8(3), base.u16be())),
+        ("version", u8()),
+        ("flags", tuple_repeat(3, u8())),
+        ("graphicsmode", u16be()),
+        ("opcolor", repeat_count(Expr::U8(3), u16be())),
     ]);
 
     let smhd_data = record([
-        ("version", base.u8()),
-        ("flags", tuple([base.u8(), base.u8(), base.u8()])),
-        ("balance", base.u16be()),
-        ("reserved", base.u16be()),
+        ("version", u8()),
+        ("flags", tuple_repeat(3, u8())),
+        ("balance", u16be()),
+        ("reserved", u16be()),
     ]);
 
     let mdhd_data = record([
-        ("version", base.u8()),
-        ("flags", tuple([base.u8(), base.u8(), base.u8()])),
+        ("version", u8()),
+        ("flags", tuple_repeat(3, u8())),
         (
             "fields",
             match_variant(
@@ -572,32 +525,32 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         Pattern::U8(0),
                         "version0",
                         record([
-                            ("creation_time", base.u32be()),
-                            ("modification_time", base.u32be()),
-                            ("timescale", base.u32be()),
-                            ("duration", base.u32be()),
+                            ("creation_time", u32be()),
+                            ("modification_time", u32be()),
+                            ("timescale", u32be()),
+                            ("duration", u32be()),
                         ]),
                     ),
                     (
                         Pattern::U8(1),
                         "version1",
                         record([
-                            ("creation_time", base.u64be()),
-                            ("modification_time", base.u64be()),
-                            ("timescale", base.u32be()),
-                            ("duration", base.u64be()),
+                            ("creation_time", u64be()),
+                            ("modification_time", u64be()),
+                            ("timescale", u32be()),
+                            ("duration", u64be()),
                         ]),
                     ),
                 ],
             ),
         ),
-        ("language", base.u16be()),
-        ("pre_defined", base.u16be()),
+        ("language", u16be()),
+        ("pre_defined", u16be()),
     ]);
 
     let mvhd_data = record([
-        ("version", base.u8()),
-        ("flags", tuple([base.u8(), base.u8(), base.u8()])),
+        ("version", u8()),
+        ("flags", tuple_repeat(3, u8())),
         (
             "fields",
             match_variant(
@@ -607,37 +560,37 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         Pattern::U8(0),
                         "version0",
                         record([
-                            ("creation_time", base.u32be()),
-                            ("modification_time", base.u32be()),
-                            ("timescale", base.u32be()),
-                            ("duration", base.u32be()),
+                            ("creation_time", u32be()),
+                            ("modification_time", u32be()),
+                            ("timescale", u32be()),
+                            ("duration", u32be()),
                         ]),
                     ),
                     (
                         Pattern::U8(1),
                         "version1",
                         record([
-                            ("creation_time", base.u64be()),
-                            ("modification_time", base.u64be()),
-                            ("timescale", base.u32be()),
-                            ("duration", base.u64be()),
+                            ("creation_time", u64be()),
+                            ("modification_time", u64be()),
+                            ("timescale", u32be()),
+                            ("duration", u64be()),
                         ]),
                     ),
                 ],
             ),
         ),
-        ("rate", base.u32be()),
-        ("volume", base.u16be()),
-        ("reserved1", base.u16be()),
-        ("reserved2", tuple([base.u32be(), base.u32be()])),
-        ("matrix", repeat_count(Expr::U8(9), base.u32be())),
-        ("pre_defined", repeat_count(Expr::U8(6), base.u32be())),
-        ("next_track_ID", base.u32be()),
+        ("rate", u32be()),
+        ("volume", u16be()),
+        ("reserved1", u16be()),
+        ("reserved2", tuple([u32be(), u32be()])),
+        ("matrix", repeat_count(Expr::U8(9), u32be())),
+        ("pre_defined", repeat_count(Expr::U8(6), u32be())),
+        ("next_track_ID", u32be()),
     ]);
 
     let tkhd_data = record([
-        ("version", base.u8()),
-        ("flags", tuple([base.u8(), base.u8(), base.u8()])),
+        ("version", u8()),
+        ("flags", tuple_repeat(3, u8())),
         (
             "fields",
             match_variant(
@@ -647,57 +600,52 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         Pattern::U8(0),
                         "version0",
                         record([
-                            ("creation_time", base.u32be()),
-                            ("modification_time", base.u32be()),
-                            ("track_ID", base.u32be()),
-                            ("reserved", base.u32be()),
-                            ("duration", base.u32be()),
+                            ("creation_time", u32be()),
+                            ("modification_time", u32be()),
+                            ("track_ID", u32be()),
+                            ("reserved", u32be()),
+                            ("duration", u32be()),
                         ]),
                     ),
                     (
                         Pattern::U8(1),
                         "version1",
                         record([
-                            ("creation_time", base.u64be()),
-                            ("modification_time", base.u64be()),
-                            ("track_ID", base.u32be()),
-                            ("reserved", base.u32be()),
-                            ("duration", base.u64be()),
+                            ("creation_time", u64be()),
+                            ("modification_time", u64be()),
+                            ("track_ID", u32be()),
+                            ("reserved", u32be()),
+                            ("duration", u64be()),
                         ]),
                     ),
                 ],
             ),
         ),
-        ("reserved2", tuple([base.u32be(), base.u32be()])),
-        ("layer", base.u16be()),
-        ("alternate_group", base.u16be()),
-        ("volume", base.u16be()),
-        ("reserved1", base.u16be()),
-        ("matrix", repeat_count(Expr::U8(9), base.u32be())),
-        ("width", base.u32be()),
-        ("height", base.u32be()),
+        ("reserved2", tuple_repeat(2, u32be())),
+        ("layer", u16be()),
+        ("alternate_group", u16be()),
+        ("volume", u16be()),
+        ("reserved1", u16be()),
+        ("matrix", repeat_count(Expr::U8(9), u32be())),
+        ("width", u32be()),
+        ("height", u32be()),
     ]);
 
     let data_data = record([
-        ("type_indicator", base.u32be()),
-        ("locale_indicator", base.u32be()),
-        ("value", Format::Repeat(Box::new(base.ascii_char()))),
+        ("type_indicator", u32be()),
+        ("locale_indicator", u32be()),
+        ("value", repeat(base.ascii_char())),
     ]);
 
     let edts_atom = module.define_format(
         "mpeg4.edts-atom",
         make_atom(
-            base,
             tag,
             match_variant(
                 var("type"),
                 vec![
                     (tag_pattern(['e', 'l', 's', 't']), "elst", elst_data),
-                    (
-                        Pattern::Wildcard,
-                        "unknown",
-                        Format::Repeat(Box::new(base.u8())),
-                    ),
+                    (Pattern::Wildcard, "unknown", opaque_bytes()),
                 ],
             ),
         ),
@@ -706,17 +654,12 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let dinf_atom = module.define_format(
         "mpeg4.dinf-atom",
         make_atom(
-            base,
             tag,
             match_variant(
                 var("type"),
                 vec![
                     (tag_pattern(['d', 'r', 'e', 'f']), "dref", dref_data),
-                    (
-                        Pattern::Wildcard,
-                        "unknown",
-                        Format::Repeat(Box::new(base.u8())),
-                    ),
+                    (Pattern::Wildcard, "unknown", opaque_bytes()),
                 ],
             ),
         ),
@@ -725,7 +668,6 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let stbl_atom = module.define_format(
         "mpeg4.stbl-atom",
         make_atom(
-            base,
             tag,
             match_variant(
                 var("type"),
@@ -740,11 +682,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     (tag_pattern(['c', 'o', '6', '4']), "co64", co64_data),
                     (tag_pattern(['s', 'g', 'p', 'd']), "sgpd", sgpd_data),
                     (tag_pattern(['s', 'b', 'g', 'p']), "sbgp", sbgp_data),
-                    (
-                        Pattern::Wildcard,
-                        "unknown",
-                        Format::Repeat(Box::new(base.u8())),
-                    ),
+                    (Pattern::Wildcard, "unknown", opaque_bytes()),
                 ],
             ),
         ),
@@ -753,7 +691,6 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let minf_atom = module.define_format(
         "mpeg4.minf-atom",
         make_atom(
-            base,
             tag,
             match_variant(
                 var("type"),
@@ -763,18 +700,14 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     (
                         tag_pattern(['d', 'i', 'n', 'f']),
                         "dinf",
-                        Format::Repeat(Box::new(dinf_atom.call())),
+                        repeat(dinf_atom.call()),
                     ),
                     (
                         tag_pattern(['s', 't', 'b', 'l']),
                         "stbl",
-                        Format::Repeat(Box::new(stbl_atom.call())),
+                        repeat(stbl_atom.call()),
                     ),
-                    (
-                        Pattern::Wildcard,
-                        "unknown",
-                        Format::Repeat(Box::new(base.u8())),
-                    ),
+                    (Pattern::Wildcard, "unknown", opaque_bytes()),
                 ],
             ),
         ),
@@ -783,7 +716,6 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let mdia_atom = module.define_format(
         "mpeg4.mdia-atom",
         make_atom(
-            base,
             tag,
             match_variant(
                 var("type"),
@@ -793,13 +725,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     (
                         tag_pattern(['m', 'i', 'n', 'f']),
                         "minf",
-                        Format::Repeat(Box::new(minf_atom.call())),
+                        repeat(minf_atom.call()),
                     ),
-                    (
-                        Pattern::Wildcard,
-                        "unknown",
-                        Format::Repeat(Box::new(base.u8())),
-                    ),
+                    (Pattern::Wildcard, "unknown", opaque_bytes()),
                 ],
             ),
         ),
@@ -808,7 +736,6 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let trak_atom = module.define_format(
         "mpeg4.trak-atom",
         make_atom(
-            base,
             tag,
             match_variant(
                 var("type"),
@@ -817,18 +744,14 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     (
                         tag_pattern(['e', 'd', 't', 's']),
                         "edts",
-                        Format::Repeat(Box::new(edts_atom.call())),
+                        repeat(edts_atom.call()),
                     ),
                     (
                         tag_pattern(['m', 'd', 'i', 'a']),
                         "mdia",
-                        Format::Repeat(Box::new(mdia_atom.call())),
+                        repeat(mdia_atom.call()),
                     ),
-                    (
-                        Pattern::Wildcard,
-                        "unknown",
-                        Format::Repeat(Box::new(base.u8())),
-                    ),
+                    (Pattern::Wildcard, "unknown", opaque_bytes()),
                 ],
             ),
         ),
@@ -837,17 +760,12 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let tool_atom = module.define_format(
         "mpeg4.tool-atom",
         make_atom(
-            base,
             tag,
             match_variant(
                 var("type"),
                 vec![
                     (tag_pattern(['d', 'a', 't', 'a']), "data", data_data),
-                    (
-                        Pattern::Wildcard,
-                        "unknown",
-                        Format::Repeat(Box::new(base.u8())),
-                    ),
+                    (Pattern::Wildcard, "unknown", opaque_bytes()),
                 ],
             ),
         ),
@@ -856,7 +774,6 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let ilst_atom = module.define_format(
         "mpeg4.ilst-atom",
         make_atom(
-            base,
             tag,
             match_variant(
                 var("type"),
@@ -864,13 +781,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     (
                         tag_pattern3(['t', 'o', 'o']),
                         "tool",
-                        Format::Repeat(Box::new(tool_atom.call())),
+                        repeat(tool_atom.call()),
                     ),
-                    (
-                        Pattern::Wildcard,
-                        "unknown",
-                        Format::Repeat(Box::new(base.u8())),
-                    ),
+                    (Pattern::Wildcard, "unknown", opaque_bytes()),
                 ],
             ),
         ),
@@ -879,7 +792,6 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let meta_atom = module.define_format(
         "mpeg4.meta-atom",
         make_atom(
-            base,
             tag,
             match_variant(
                 var("type"),
@@ -887,7 +799,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     (
                         tag_pattern(['d', 'i', 'n', 'f']),
                         "dinf",
-                        Format::Repeat(Box::new(dinf_atom.call())),
+                        repeat(dinf_atom.call()),
                     ),
                     (tag_pattern(['h', 'd', 'l', 'r']), "hdlr", meta_hdlr_data),
                     (tag_pattern(['p', 'i', 't', 'm']), "pitm", pitm_data),
@@ -897,18 +809,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     (
                         tag_pattern(['i', 'l', 's', 't']),
                         "ilst",
-                        Format::Repeat(Box::new(ilst_atom.call())),
+                        repeat(ilst_atom.call()),
                     ),
-                    (
-                        tag_pattern(['i', 'd', 'a', 't']),
-                        "idat",
-                        Format::Repeat(Box::new(base.u8())),
-                    ),
-                    (
-                        Pattern::Wildcard,
-                        "unknown",
-                        Format::Repeat(Box::new(base.u8())),
-                    ),
+                    (tag_pattern(['i', 'd', 'a', 't']), "idat", opaque_bytes()),
+                    (Pattern::Wildcard, "unknown", opaque_bytes()),
                 ],
             ),
         ),
@@ -917,7 +821,6 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let udta_atom = module.define_format(
         "mpeg4.udta-atom",
         make_atom(
-            base,
             tag,
             match_variant(
                 var("type"),
@@ -926,15 +829,11 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         tag_pattern(['m', 'e', 't', 'a']),
                         "meta",
                         tuple(vec![
-                            base.u32be(), // 8-bit version, 24-bit flags
-                            Format::Repeat(Box::new(meta_atom.call())),
+                            u32be(), // 8-bit version, 24-bit flags
+                            repeat(meta_atom.call()),
                         ]),
                     ),
-                    (
-                        Pattern::Wildcard,
-                        "unknown",
-                        Format::Repeat(Box::new(base.u8())),
-                    ),
+                    (Pattern::Wildcard, "unknown", opaque_bytes()),
                 ],
             ),
         ),
@@ -943,7 +842,6 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let moov_atom = module.define_format(
         "mpeg4.moov-atom",
         make_atom(
-            base,
             tag,
             match_variant(
                 var("type"),
@@ -952,19 +850,15 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     (
                         tag_pattern(['t', 'r', 'a', 'k']),
                         "trak",
-                        Format::Repeat(Box::new(trak_atom.call())),
+                        repeat(trak_atom.call()),
                     ),
                     (
                         tag_pattern(['u', 'd', 't', 'a']),
                         "udta",
-                        Format::Repeat(Box::new(udta_atom.call())),
+                        repeat(udta_atom.call()),
                         // FIXME can be followed by optional 32-bit zero value
                     ),
-                    (
-                        Pattern::Wildcard,
-                        "unknown",
-                        Format::Repeat(Box::new(base.u8())),
-                    ),
+                    (Pattern::Wildcard, "unknown", opaque_bytes()),
                 ],
             ),
         ),
@@ -973,7 +867,6 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let atom = module.define_format(
         "mpeg4.atom",
         make_atom(
-            base,
             tag,
             match_variant(
                 var("type"),
@@ -989,20 +882,16 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         tag_pattern(['m', 'e', 't', 'a']),
                         "meta",
                         tuple(vec![
-                            base.u32be(), // 8-bit version, 24-bit flags
-                            Format::Repeat(Box::new(meta_atom.call())),
+                            u32be(), // 8-bit version, 24-bit flags
+                            repeat(meta_atom.call()),
                         ]),
                     ),
                     (
                         tag_pattern(['m', 'o', 'o', 'v']),
                         "moov",
-                        Format::Repeat(Box::new(moov_atom.call())),
+                        repeat(moov_atom.call()),
                     ),
-                    (
-                        Pattern::Wildcard,
-                        "unknown",
-                        Format::Repeat(Box::new(base.u8())),
-                    ),
+                    (Pattern::Wildcard, "unknown", opaque_bytes()),
                 ],
             ),
         ),
@@ -1011,9 +900,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     module.define_format(
         "mpeg4.main",
         record([
-            ("atoms", Format::Repeat(Box::new(atom.call()))),
+            ("atoms", repeat(atom.call())),
             //("atoms", repeat_count(Expr::U8(4), atom.call())),
-            //("trailer", Format::Repeat(Box::new(base.u8())))
+            //("trailer", opaque_bytes())
         ]),
     )
 }

@@ -1,4 +1,7 @@
-use doodle::{bounds::Bounds, helper::*, BaseType, DynFormat, Expr, Format, FormatModule, FormatRef, Pattern, ValueType};
+use doodle::{
+    BaseType, DynFormat, Expr, Format, FormatModule, FormatRef, Pattern, ValueType, bounds::Bounds,
+    helper::*,
+};
 
 fn shl_u8(x: Expr, r: u8) -> Expr {
     if r == 0 { x } else { shl(x, Expr::U8(r)) }

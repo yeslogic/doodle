@@ -22,14 +22,6 @@ pub struct BaseModule {
 #[rustfmt::skip]
 #[allow(dead_code)]
 impl BaseModule {
-
-    pub fn u8(&self) -> Format { doodle::helper::u8() }
-    pub fn u16be(&self) -> Format { doodle::helper::u16be() }
-    pub fn u16le(&self) -> Format { doodle::helper::u16le() }
-    pub fn u32be(&self) -> Format { doodle::helper::u32be() }
-    pub fn u32le(&self) -> Format { doodle::helper::u32le() }
-    pub fn u64be(&self) -> Format { doodle::helper::u64be() }
-    pub fn u64le(&self) -> Format { doodle::helper::u64le() }
     pub fn ascii_char(&self) -> Format { self.ascii_char.call() }
     pub fn ascii_char_strict(&self) -> Format { self.ascii_char_strict.call() }
     pub fn asciiz_string(&self) -> Format { self.asciiz_string.call() }
@@ -71,8 +63,6 @@ impl BaseModule {
 }
 
 pub fn main(module: &mut FormatModule) -> BaseModule {
-
-
     let ascii_char = module.define_format("base.ascii-char", Format::Byte(ByteSet::full()));
 
     let mut bs = ByteSet::from(32..=127);
@@ -132,6 +122,6 @@ mod tests {
 
         assert!(base.ascii_char().is_ascii_char_format(&module));
         assert!(base.ascii_char_strict().is_ascii_char_format(&module));
-        assert!(!base.u8().is_ascii_char_format(&module));
+        assert!(!u8().is_ascii_char_format(&module));
     }
 }

@@ -1328,6 +1328,8 @@ impl Format {
         match self {
             // NOTE - currently only true for named formats matching 'base\.ascii-char.*'
             Format::ItemVar(level, _args) => module.get_name(*level).starts_with("base.ascii-char"),
+            // NOTE - this is a placeholder for future Hints that may obviate the name-based check
+            Format::Hint(StyleHint::AsciiStr, _) => false,
             _ => false,
         }
     }

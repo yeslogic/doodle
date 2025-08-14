@@ -1,13 +1,12 @@
-use crate::format::BaseModule;
 use doodle::helper::*;
 use doodle::{FormatModule, FormatRef};
 
-pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
+pub fn main(module: &mut FormatModule) -> FormatRef {
     let run = module.define_format(
         "rle.old-style.run",
         record([
-            ("len", base.u8()),
-            ("char", base.u8()),
+            ("len", u8()),
+            ("char", u8()),
             ("buf", repeat_count(var("len"), compute(var("char")))),
         ]),
     );
@@ -29,8 +28,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         let run = module.define_format(
             "rle.new-style.run",
             record([
-                ("_len", base.u8()),
-                ("_char", base.u8()),
+                ("_len", u8()),
+                ("_char", u8()),
                 ("buf", repeat_count(var("_len"), compute(var("_char")))),
             ]),
         );

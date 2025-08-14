@@ -1,6 +1,5 @@
 use crate::format::BaseModule;
-use doodle::helper::*;
-use doodle::{Expr, Format, FormatModule, FormatRef, Pattern};
+use doodle::{Expr, Format, FormatModule, FormatRef, Pattern, helper::*};
 
 /// JPEG File Interchange Format
 ///
@@ -14,7 +13,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
     let marker_segment = |id: u8, data: Format| {
         record([
             ("marker", marker(id)),
-            ("length", base.u16be()),
+            ("length", u16be()),
             ("data", slice(sub(var("length"), Expr::U16(2)), data)),
         ])
     };
@@ -28,11 +27,11 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
         let sof_image_component = module.define_format(
             "jpeg.sof-image-component",
             record([
-                ("id", base.u8()), // NOTE: should be distinct from all other ids in the repetition
+                ("id", u8()), // NOTE: should be distinct from all other ids in the repetition
                 ("sampling-factor", sampling_factor),
                 (
                     "quantization-table-id",
-                    where_lambda(base.u8(), "x", expr_lte(var("x"), Expr::U8(3))),
+                    where_lambda(u8(), "x", expr_lte(var("x"), Expr::U8(3))),
                 ), // 0..=3 if DQT, 0 if lossless
             ]),
         );
@@ -40,10 +39,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
         module.define_format(
             "jpeg.sof-data",
             record([
-                ("sample-precision", where_between_u8(base.u8(), 2, 16)), // 8 in Sequential DCT (extended allows 12), 8 or 12 in Progressive DCT, 2-16 lossless
-                ("num-lines", base.u16be()),
-                ("num-samples-per-line", where_nonzero::<U16>(base.u16be())),
-                ("num-image-components", where_nonzero::<U8>(base.u8())), // 1..=4 if progressive DCT, 1..=255 otherwise
+                ("sample-precision", where_between_u8(u8(), 2, 16)), // 8 in Sequential DCT (extended allows 12), 8 or 12 in Progressive DCT, 2-16 lossless
+                ("num-lines", u16be()),
+                ("num-samples-per-line", where_nonzero::<U16>(u16be())),
+                ("num-image-components", where_nonzero::<U8>(u8())), // 1..=4 if progressive DCT, 1..=255 otherwise
                 (
                     "image-components",
                     repeat_count(var("num-image-components"), sof_image_component.call()),
@@ -70,10 +69,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
         "jpeg.dht-data",
         record([
             ("class-table-id", class_table_id.clone()),
-            ("num-codes", repeat_count(Expr::U8(16), base.u8())),
+            ("num-codes", repeat_count(Expr::U8(16), u8())),
             (
                 "values",
-                for_each(var("num-codes"), "n", repeat_count(var("n"), base.u8())),
+                for_each(var("num-codes"), "n", repeat_count(var("n"), u8())),
             ),
         ]),
     );
@@ -81,7 +80,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
     // DAC: Define arithmetic conditioning table (See ITU T.81 Section B.2.4.3)
     let dac_data = module.define_format(
         "jpeg.dac-data",
-        record([("class-table-id", class_table_id), ("value", base.u8())]),
+        record([("class-table-id", class_table_id), ("value", u8())]),
     );
 
     // NOTE - packed-bits field
@@ -117,7 +116,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
         let sos_image_component = module.define_format(
             "jpeg.sos-image-component",
             record([
-                ("component-selector", base.u8()), // NOTE: should all be distinct members of the set of `id` values in `jpeg.sof-image-component`
+                ("component-selector", u8()), // NOTE: should all be distinct members of the set of `id` values in `jpeg.sof-image-component`
                 ("entropy-coding-table-ids", entropy_coding_table_ids),
             ]),
         );
@@ -129,16 +128,13 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
         module.define_format(
             "jpeg.sos-data",
             record([
-                ("num-image-components", where_between_u8(base.u8(), 1, 4)), // 1 |..| 4
+                ("num-image-components", where_between_u8(u8(), 1, 4)), // 1 |..| 4
                 (
                     "image-components",
                     repeat_count(var("num-image-components"), sos_image_component.call()),
                 ),
-                (
-                    "start-spectral-selection",
-                    where_between_u8(base.u8(), 0, 63),
-                ), // FIXME -  0 in sequential DCT, 0..=63 in progressive DCT, 1-7 in lossless but 0 for lossless differential frames in hierarchical mode
-                ("end-spectral-selection", where_between_u8(base.u8(), 0, 63)), // FIXME - 63 in sequential DCT, start..=63 in in progressive DCT (but 0 if start is 0), 0 in lossless (differential or otherwise)
+                ("start-spectral-selection", where_between_u8(u8(), 0, 63)), // FIXME -  0 in sequential DCT, 0..=63 in progressive DCT, 1-7 in lossless but 0 for lossless differential frames in hierarchical mode
+                ("end-spectral-selection", where_between_u8(u8(), 0, 63)), // FIXME - 63 in sequential DCT, start..=63 in in progressive DCT (but 0 if start is 0), 0 in lossless (differential or otherwise)
                 ("approximation-bit-position", approximation_bit_position),
             ]),
         )
@@ -178,15 +174,11 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
                 match_variant(
                     record_proj(var("precision-table-id"), "precision"),
                     [
-                        (
-                            Pattern::U8(0),
-                            "Bytes",
-                            repeat_count(Expr::U32(64), base.u8()),
-                        ),
+                        (Pattern::U8(0), "Bytes", repeat_count(Expr::U32(64), u8())),
                         (
                             Pattern::U8(1),
                             "Shorts",
-                            repeat_count(Expr::U32(64), base.u16be()),
+                            repeat_count(Expr::U32(64), u16be()),
                         ),
                     ],
                 ),
@@ -197,14 +189,11 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
     // DNL: Define number of lines (See ITU T.81 Section B.2.5)
     let dnl_data = module.define_format(
         "jpeg.dnl-data",
-        record([("num-lines", where_nonzero::<U16>(base.u16be()))]),
+        record([("num-lines", where_nonzero::<U16>(u16be()))]),
     );
 
     // DRI: Define restart interval (See ITU T.81 Section B.2.4.4)
-    let dri_data = module.define_format(
-        "jpeg.dri-data",
-        record([("restart-interval", base.u16be())]),
-    );
+    let dri_data = module.define_format("jpeg.dri-data", record([("restart-interval", u16be())]));
 
     // NOTE: Bit data: { horizontal <- u4, vertical <- u4 }
     // FIXME[epic=refactor] - replace with bit_fields_u8
@@ -216,7 +205,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
         let dhp_image_component = module.define_format(
             "jpeg.dhp-image-component",
             record([
-                ("id", base.u8()),
+                ("id", u8()),
                 ("sampling-factor", sampling_factor),
                 ("quantization-table-id", is_byte(0)),
             ]),
@@ -225,10 +214,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
         module.define_format(
             "jpeg.dhp-data",
             record([
-                ("sample-precision", base.u8()),
-                ("num-lines", base.u16be()),
-                ("num-samples-per-line", where_nonzero::<U16>(base.u16be())), // != 0
-                ("num-image-components", where_nonzero::<U8>(base.u8())),     // != 0
+                ("sample-precision", u8()),
+                ("num-lines", u16be()),
+                ("num-samples-per-line", where_nonzero::<U16>(u16be())), // != 0
+                ("num-image-components", where_nonzero::<U8>(u8())),     // != 0
                 (
                     "image-components",
                     repeat_count(var("num-image-components"), dhp_image_component.call()),
@@ -258,24 +247,22 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
 
     // APP0: Application segment 0 (JFIF)
     let app0_jfif = {
-        let thumbnail_pixel = module.define_format(
-            "jpeg.thumbnail-pixel",
-            record([("r", base.u8()), ("g", base.u8()), ("b", base.u8())]),
-        );
+        let thumbnail_pixel =
+            module.define_format("jpeg.thumbnail-pixel", record_repeat(["r", "g", "b"], u8()));
 
         module.define_format(
             "jpeg.app0-jfif",
             record([
-                ("version-major", base.u8()),
-                ("version-minor", base.u8()),
+                ("version-major", u8()),
+                ("version-minor", u8()),
                 (
                     "density-units",
-                    where_lambda(base.u8(), "x", expr_lte(var("x"), Expr::U8(2))),
+                    where_lambda(u8(), "x", expr_lte(var("x"), Expr::U8(2))),
                 ), // 0 | 1 | 2
-                ("density-x", where_nonzero::<U16>(base.u16be())), // != 0
-                ("density-y", where_nonzero::<U16>(base.u16be())), // != 0
-                ("thumbnail-width", base.u8()),
-                ("thumbnail-height", base.u8()),
+                ("density-x", where_nonzero::<U16>(u16be())), // != 0
+                ("density-y", where_nonzero::<U16>(u16be())), // != 0
+                ("thumbnail-width", u8()),
+                ("thumbnail-height", u8()),
                 (
                     "thumbnail-pixels",
                     repeat_count(
@@ -300,7 +287,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
                         // FIXME: there are other APP0 formats
                         // TODO: implement JFXX, CIFF, AVI1, Ocad
                         // see https://exiftool.org/TagNames/JPEG.html
-                        (Pattern::Wildcard, "other", repeat(base.u8())),
+                        (Pattern::Wildcard, "other", opaque_bytes()),
                     ],
                 ),
             ),
@@ -317,8 +304,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
 
     // APP1: Application segment 1 (XMP)
     // TODO[epic=refinement] - implement APP1 XMP header as non-opaque format, if feasible
-    let app1_xmp = module.define_format("jpeg.app1-xmp", record([("xmp", repeat(base.u8()))]));
-
+    let app1_xmp = module.define_format("jpeg.app1-xmp", record([("xmp", opaque_bytes())]));
     let app1_data = module.define_format(
         "jpeg.app1-data",
         record([
@@ -337,7 +323,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
                         // FIXME: there are other APP1 formats
                         // TODO: implement
                         // see https://exiftool.org/TagNames/JPEG.html
-                        (Pattern::Wildcard, "other", repeat(base.u8())),
+                        (Pattern::Wildcard, "other", opaque_bytes()),
                     ],
                 ),
             ),
@@ -352,7 +338,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
     let sof5 = module.define_format("jpeg.sof5", marker_segment(0xC5, sof_data.call())); // Start of frame (differential sequential, huffman)
     let sof6 = module.define_format("jpeg.sof6", marker_segment(0xC6, sof_data.call())); // Start of frame (differential progressive, huffman)
     let sof7 = module.define_format("jpeg.sof7", marker_segment(0xC7, sof_data.call())); // Start of frame (differential lossless, huffman)
-    let _jpeg = module.define_format("jpeg.jpeg", marker_segment(0xC8, repeat(base.u8()))); // Reserved for JPEG extension
+    let _jpeg = module.define_format("jpeg.jpeg", marker_segment(0xC8, opaque_bytes())); // Reserved for JPEG extension
     let sof9 = module.define_format("jpeg.sof9", marker_segment(0xC9, sof_data.call())); // Start of frame (extended sequential, arithmetic)
     let sof10 = module.define_format("jpeg.sof10", marker_segment(0xCA, sof_data.call())); // Start of frame (progressive, arithmetic)
     let sof11 = module.define_format("jpeg.sof11", marker_segment(0xCB, sof_data.call())); // Start of frame (lossless, arithmetic)
@@ -378,21 +364,21 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
     let _exp = module.define_format("jpeg.exp", marker_segment(0xDF, exp_data.call())); // Expand reference components
     let app0 = module.define_format("jpeg.app0", marker_segment(0xE0, app0_data.call())); // Application segment 0 (JFIF/JFXX/AVI1/...)
     let app1 = module.define_format("jpeg.app1", marker_segment(0xE1, app1_data.call())); // Application segment 1 (EXIF/XMP/XAP/...)
-    let app2 = module.define_format("jpeg.app2", marker_segment(0xE2, repeat(base.u8()))); // Application segment 2 (FlashPix/ICC/...)
-    let app3 = module.define_format("jpeg.app3", marker_segment(0xE3, repeat(base.u8()))); // Application segment 3 (Kodak/...)
-    let app4 = module.define_format("jpeg.app4", marker_segment(0xE4, repeat(base.u8()))); // Application segment 4 (FlashPix/...)
-    let app5 = module.define_format("jpeg.app5", marker_segment(0xE5, repeat(base.u8()))); // Application segment 5 (Ricoh/...)
-    let app6 = module.define_format("jpeg.app6", marker_segment(0xE6, repeat(base.u8()))); // Application segment 6 (GoPro/...)
-    let app7 = module.define_format("jpeg.app7", marker_segment(0xE7, repeat(base.u8()))); // Application segment 7 (Pentax/Qualcomm/...)
-    let app8 = module.define_format("jpeg.app8", marker_segment(0xE8, repeat(base.u8()))); // Application segment 8 (Spiff/...)
-    let app9 = module.define_format("jpeg.app9", marker_segment(0xE9, repeat(base.u8()))); // Application segment 9 (MediaJukebox/...)
-    let app10 = module.define_format("jpeg.app10", marker_segment(0xEA, repeat(base.u8()))); // Application segment 10 (PhotoStudio)
-    let app11 = module.define_format("jpeg.app11", marker_segment(0xEB, repeat(base.u8()))); // Application segment 11 (HDR)
-    let app12 = module.define_format("jpeg.app12", marker_segment(0xEC, repeat(base.u8()))); // Application segment 12 (PictureInfo/Ducky)
-    let app13 = module.define_format("jpeg.app13", marker_segment(0xED, repeat(base.u8()))); // Application segment 13 (PhotoShop/Adobe_CM)
-    let app14 = module.define_format("jpeg.app14", marker_segment(0xEE, repeat(base.u8()))); // Application segment 14 (Adobe)
-    let app15 = module.define_format("jpeg.app15", marker_segment(0xEF, repeat(base.u8()))); // Application segment 15 (GraphicConverter)
-    let com = module.define_format("jpeg.com", marker_segment(0xFE, repeat(base.u8()))); // Extension data (comment)
+    let app2 = module.define_format("jpeg.app2", marker_segment(0xE2, opaque_bytes())); // Application segment 2 (FlashPix/ICC/...)
+    let app3 = module.define_format("jpeg.app3", marker_segment(0xE3, opaque_bytes())); // Application segment 3 (Kodak/...)
+    let app4 = module.define_format("jpeg.app4", marker_segment(0xE4, opaque_bytes())); // Application segment 4 (FlashPix/...)
+    let app5 = module.define_format("jpeg.app5", marker_segment(0xE5, opaque_bytes())); // Application segment 5 (Ricoh/...)
+    let app6 = module.define_format("jpeg.app6", marker_segment(0xE6, opaque_bytes())); // Application segment 6 (GoPro/...)
+    let app7 = module.define_format("jpeg.app7", marker_segment(0xE7, opaque_bytes())); // Application segment 7 (Pentax/Qualcomm/...)
+    let app8 = module.define_format("jpeg.app8", marker_segment(0xE8, opaque_bytes())); // Application segment 8 (Spiff/...)
+    let app9 = module.define_format("jpeg.app9", marker_segment(0xE9, opaque_bytes())); // Application segment 9 (MediaJukebox/...)
+    let app10 = module.define_format("jpeg.app10", marker_segment(0xEA, opaque_bytes())); // Application segment 10 (PhotoStudio)
+    let app11 = module.define_format("jpeg.app11", marker_segment(0xEB, opaque_bytes())); // Application segment 11 (HDR)
+    let app12 = module.define_format("jpeg.app12", marker_segment(0xEC, opaque_bytes())); // Application segment 12 (PictureInfo/Ducky)
+    let app13 = module.define_format("jpeg.app13", marker_segment(0xED, opaque_bytes())); // Application segment 13 (PhotoShop/Adobe_CM)
+    let app14 = module.define_format("jpeg.app14", marker_segment(0xEE, opaque_bytes())); // Application segment 14 (Adobe)
+    let app15 = module.define_format("jpeg.app15", marker_segment(0xEF, opaque_bytes())); // Application segment 15 (GraphicConverter)
+    let com = module.define_format("jpeg.com", marker_segment(0xFE, opaque_bytes())); // Extension data (comment)
 
     let table_or_misc = module.define_format(
         "jpeg.table-or-misc",

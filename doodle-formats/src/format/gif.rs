@@ -1,6 +1,5 @@
 use crate::format::BaseModule;
-use doodle::helper::*;
-use doodle::{Expr, FormatModule, FormatRef};
+use doodle::{Expr, FormatModule, FormatRef, helper::*};
 
 /// Graphics Interchange Format (GIF)
 ///
@@ -19,7 +18,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
     let color_table_entry = module.define_format(
         "gif.color-table-entry",
-        record([("r", base.u8()), ("g", base.u8()), ("b", base.u8())]),
+        record_repeat(["r", "g", "b"], u8()),
     );
 
     let color_table = |flags: Expr| {
@@ -34,7 +33,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         "gif.subblock",
         record([
             ("len-bytes", not_byte(0x00)),
-            ("data", repeat_count(var("len-bytes"), base.u8())),
+            ("data", repeat_count(var("len-bytes"), u8())),
         ]),
     );
 
@@ -46,7 +45,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         "gif.header",
         record([
             ("signature", is_bytes(b"GIF")),
-            ("version", repeat_count(Expr::U8(3), base.ascii_char())), // "87a" | "89a" | ...
+            ("version", seq_repeat(3, base.ascii_char())),
         ]),
     );
 
@@ -68,11 +67,11 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let logical_screen_descriptor = module.define_format(
         "gif.logical-screen-descriptor",
         record([
-            ("screen-width", base.u16le()),
-            ("screen-height", base.u16le()),
+            ("screen-width", u16le()),
+            ("screen-height", u16le()),
             ("flags", logical_screen_descriptor_flags),
-            ("bg-color-index", base.u8()),
-            ("pixel-aspect-ratio", base.u8()),
+            ("bg-color-index", u8()),
+            ("pixel-aspect-ratio", u8()),
         ]),
     );
 
@@ -105,10 +104,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         "gif.image-descriptor",
         record([
             ("separator", is_byte(0x2C)),
-            ("image-left-position", base.u16le()),
-            ("image-top-position", base.u16le()),
-            ("image-width", base.u16le()),
-            ("image-height", base.u16le()),
+            ("image-left-position", u16le()),
+            ("image-top-position", u16le()),
+            ("image-width", u16le()),
+            ("image-height", u16le()),
             ("flags", image_descriptor_flags),
         ]),
     );
@@ -120,7 +119,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let table_based_image_data = module.define_format(
         "gif.table-based-image-data",
         record([
-            ("lzw-min-code-size", base.u8()),
+            ("lzw-min-code-size", u8()),
             ("image-data", repeat(subblock.call())),
             ("terminator", block_terminator.call()),
         ]),
@@ -150,8 +149,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ("label", is_byte(0xF9)),
             ("block-size", is_byte(4)),
             ("flags", graphic_control_extension_flags),
-            ("delay-time", base.u16le()),
-            ("transparent-color-index", base.u8()),
+            ("delay-time", u16le()),
+            ("transparent-color-index", u8()),
             ("terminator", block_terminator.call()),
         ]),
     );
@@ -174,14 +173,14 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ("separator", is_byte(0x21)),
             ("label", is_byte(0x01)),
             ("block-size", is_byte(12)),
-            ("text-grid-left-position", base.u16le()),
-            ("text-grid-top-position", base.u16le()),
-            ("text-grid-width", base.u16le()),
-            ("text-grid-height", base.u16le()),
-            ("character-cell-width", base.u8()),
-            ("character-cell-height", base.u8()),
-            ("text-foreground-color-index", base.u8()),
-            ("text-background-color-index", base.u8()),
+            ("text-grid-left-position", u16le()),
+            ("text-grid-top-position", u16le()),
+            ("text-grid-width", u16le()),
+            ("text-grid-height", u16le()),
+            ("character-cell-width", u8()),
+            ("character-cell-height", u8()),
+            ("text-foreground-color-index", u8()),
+            ("text-background-color-index", u8()),
             ("plain-text-data", repeat(subblock.call())),
             ("terminator", block_terminator.call()),
         ]),
@@ -194,8 +193,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ("separator", is_byte(0x21)),
             ("label", is_byte(0xFF)),
             ("block-size", is_byte(11)),
-            ("identifier", repeat_count(Expr::U8(8), base.u8())),
-            ("authentication-code", repeat_count(Expr::U8(3), base.u8())),
+            ("identifier", repeat_count(Expr::U8(8), u8())),
+            ("authentication-code", seq_repeat(3, u8())),
             ("application-data", repeat(subblock.call())),
             ("terminator", block_terminator.call()),
         ]),

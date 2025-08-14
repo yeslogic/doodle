@@ -3,11 +3,11 @@
         └── 0 :=
             ├── header <- gzip.header :=
             │   ├── magic <- (...)
-            │   ├── method <- base.u8 := 8
+            │   ├── method <- ReadU8 := 8
             │   ├── file-flags <- map (packed_bits -> { ... }) U8 := bool-flags[fname]
-            │   ├── timestamp <- base.u32le := 1687676820
-            │   ├── compression-flags <- base.u8 := 0
-            │   └── os-id <- base.u8 := 3
+            │   ├── timestamp <- ReadU32Le := 1687676820
+            │   ├── compression-flags <- ReadU8 := 0
+            │   └── os-id <- ReadU8 := 3
             ├── fextra <- maybe (header.file-flags.fextra) gzip.fextra := none
             ├── fname <- maybe (header.file-flags.fname) gzip.fname := { some := "test5" }
             ├── fcomment <- maybe (header.file-flags.fcomment) gzip.fcomment := none
@@ -15,7 +15,7 @@
             ├── data <- bits deflate.main :=
             │   ├── blocks <- repeat-until-last (x -> x.final == 1) deflate.block :=
             │   │   ├── 0 <- deflate.block :=
-            │   │   │   ├── final <- base.bit := 0
+            │   │   │   ├── final <- U8 := 0
             │   │   │   ├── type <- map (bits -> bits.0 | bits.1 << 1) (...) := 2
             │   │   │   └── data <- match type { ... } :=
             │   │   │       └── dynamic_huffman <- deflate.dynamic_huffman :=
@@ -158,7 +158,7 @@
             │   │   │               ~
             │   │   │               └── 4095 := { literal := 48 }
             │   │   └── 1 <- deflate.block :=
-            │   │       ├── final <- base.bit := 1
+            │   │       ├── final <- U8 := 1
             │   │       ├── type <- map (bits -> bits.0 | bits.1 << 1) (...) := 2
             │   │       └── data <- match type { ... } :=
             │   │           └── dynamic_huffman <- deflate.dynamic_huffman :=
@@ -353,5 +353,5 @@
             │       ~
             │       └── 18401 := 10
             └── footer <- gzip.footer :=
-                ├── crc <- base.u32le := 2024258113
-                └── length <- base.u32le := 18402
+                ├── crc <- ReadU32Le := 2024258113
+                └── length <- ReadU32Le := 18402

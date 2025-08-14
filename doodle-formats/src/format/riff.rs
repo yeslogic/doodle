@@ -11,23 +11,15 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let chunk = |tag: Format, data: Format| {
         record([
             ("tag", tag),
-            ("length", base.u32le()),
+            ("length", u32le()),
             ("data", slice(var("length"), data)),
             ("pad", cond_maybe(is_odd(var("length")), is_byte(0x00))),
         ])
     };
 
-    let any_tag = module.define_format(
-        "riff.tag",
-        tuple([
-            base.ascii_char(),
-            base.ascii_char(),
-            base.ascii_char(),
-            base.ascii_char(),
-        ]),
-    );
+    let any_tag = module.define_format("riff.tag", tuple_repeat(4, base.ascii_char()));
 
-    let any_chunk = module.define_format("riff.chunk", chunk(any_tag.call(), repeat(base.u8())));
+    let any_chunk = module.define_format("riff.chunk", chunk(any_tag.call(), opaque_bytes()));
 
     let subchunks = module.define_format(
         "riff.subchunks",

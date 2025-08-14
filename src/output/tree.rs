@@ -124,6 +124,7 @@ impl<'module> TreePrinter<'module> {
         match format {
             Format::ItemVar(level, _args) => self.is_atomic_format(self.module.get_format(*level)),
             Format::Byte(_) => true,
+            Format::Hint(StyleHint::Common(..), inner) => self.is_atomic_format(inner),
             _ => false,
         }
     }

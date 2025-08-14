@@ -28,7 +28,7 @@
                     │   │   └── string <- repeat base.ascii-char.octal := "0000000"
                     │   ├── prefix <- slice 155 tar.ascii-string.opt0 := ""
                     │   └── pad <- repeat-count 12 [= 0]
-                    └── file <- repeat-count (header.size) base.u8 :=
+                    └── file <- repeat-count (header.size) ReadU8 :=
                         ├── 0 := 72
                         ├── 1 := 101
                         ├── 2 := 108
