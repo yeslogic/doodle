@@ -29,7 +29,7 @@ pub fn main_stat(module: &mut FormatModule) -> FormatRef {
 pub fn main(module: &mut FormatModule) -> FormatRef {
     let base = base::main(module);
 
-    let deflate = deflate::main(module, &base);
+    let deflate = deflate::main(module);
 
     let zlib = zlib::main(module, &base, deflate);
 

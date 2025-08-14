@@ -1,7 +1,4 @@
-use crate::format::BaseModule;
-use doodle::{bounds::Bounds, helper::*};
-
-use doodle::{BaseType, DynFormat, Expr, Format, FormatModule, FormatRef, Pattern, ValueType};
+use doodle::{bounds::Bounds, helper::*, BaseType, DynFormat, Expr, Format, FormatModule, FormatRef, Pattern, ValueType};
 
 fn shl_u8(x: Expr, r: u8) -> Expr {
     if r == 0 { x } else { shl(x, Expr::U8(r)) }
@@ -80,47 +77,42 @@ fn bits_value_u16(name: &'static str, n: usize) -> Expr {
 }
 
 /// Parse a 5-bit Fixed Huffman distance-code and map it into its corresponding distance-symbol
-fn dist8(base: &BaseModule) -> Format {
+fn dist8() -> Format {
     map(
-        repeat_count(Expr::U32(5), base.bit()),
+        repeat_count(Expr::U32(5), bit()),
         lambda("bits", dist_value_u8("bits")),
     )
 }
 
 /// Parses `n` bits and maps them into a `u8`-typed Value according to the
 /// standard LSB-to-MSB write order for numeric values in the DEFLATE specification.
-fn bits8(n: usize, base: &BaseModule) -> Format {
+fn bits8(n: usize) -> Format {
     if n == 0 {
         return compute(Expr::U8(0));
     }
 
     map(
-        tuple_repeat(n, base.bit()),
+        tuple_repeat(n, bit()),
         lambda("bits", bits_value_u8("bits", n)),
     )
 }
 
 /// Parses `n` bits and maps them into a `u16`-typed Value according to the
 /// standard LSB-to-MSB write order for numeric values in the DEFLATE specification.
-fn bits16(n: usize, base: &BaseModule) -> Format {
+fn bits16(n: usize) -> Format {
     if n == 0 {
         return compute(Expr::U16(0));
     }
 
     map(
-        tuple_repeat(n, base.bit()),
+        tuple_repeat(n, bit()),
         lambda("bits", bits_value_u16("bits", n)),
     )
 }
 
-fn length_record(
-    start: usize,
-    base: &BaseModule,
-    extra_bits: usize,
-    distance_record: FormatRef,
-) -> Format {
+fn length_record(start: usize, extra_bits: usize, distance_record: FormatRef) -> Format {
     record([
-        ("length-extra-bits", bits8(extra_bits, base)),
+        ("length-extra-bits", bits8(extra_bits)),
         (
             "length",
             compute(add(
@@ -139,14 +131,9 @@ fn length_record(
     ])
 }
 
-fn length_record_fixed(
-    start: usize,
-    base: &BaseModule,
-    extra_bits: usize,
-    distance_record: FormatRef,
-) -> Format {
+fn length_record_fixed(start: usize, extra_bits: usize, distance_record: FormatRef) -> Format {
     record([
-        ("length-extra-bits", bits8(extra_bits, base)),
+        ("length-extra-bits", bits8(extra_bits)),
         (
             "length",
             compute(add(
@@ -154,7 +141,7 @@ fn length_record_fixed(
                 as_u16(var("length-extra-bits")),
             )),
         ),
-        ("distance-code", dist8(base)),
+        ("distance-code", dist8()),
         (
             "distance-record",
             distance_record.call_args(vec![as_u16(var("distance-code"))]),
@@ -201,12 +188,12 @@ fn fixed_code_lengths() -> Expr {
 /// Deflate
 ///
 #[allow(clippy::redundant_clone)]
-pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
-    let bits2 = bits8(2, base);
-    let bits3 = bits8(3, base);
-    let bits4 = bits8(4, base);
-    let bits5 = bits8(5, base);
-    let bits7 = bits8(7, base);
+pub fn main(module: &mut FormatModule) -> FormatRef {
+    let bits2 = bits8(2);
+    let bits3 = bits8(3);
+    let bits4 = bits8(4);
+    let bits5 = bits8(5);
+    let bits7 = bits8(7);
 
     let distance_record0 = module.define_format_args(
         "deflate.distance-record0",
@@ -220,20 +207,20 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 Format::Match(
                     Box::new(var("extra-bits")),
                     vec![
-                        (Pattern::U8(0), bits16(0, base)),
-                        (Pattern::U8(1), bits16(1, base)),
-                        (Pattern::U8(2), bits16(2, base)),
-                        (Pattern::U8(3), bits16(3, base)),
-                        (Pattern::U8(4), bits16(4, base)),
-                        (Pattern::U8(5), bits16(5, base)),
-                        (Pattern::U8(6), bits16(6, base)),
-                        (Pattern::U8(7), bits16(7, base)),
-                        (Pattern::U8(8), bits16(8, base)),
-                        (Pattern::U8(9), bits16(9, base)),
-                        (Pattern::U8(10), bits16(10, base)),
-                        (Pattern::U8(11), bits16(11, base)),
-                        (Pattern::U8(12), bits16(12, base)),
-                        (Pattern::U8(13), bits16(13, base)),
+                        (Pattern::U8(0), bits16(0)),
+                        (Pattern::U8(1), bits16(1)),
+                        (Pattern::U8(2), bits16(2)),
+                        (Pattern::U8(3), bits16(3)),
+                        (Pattern::U8(4), bits16(4)),
+                        (Pattern::U8(5), bits16(5)),
+                        (Pattern::U8(6), bits16(6)),
+                        (Pattern::U8(7), bits16(7)),
+                        (Pattern::U8(8), bits16(8)),
+                        (Pattern::U8(9), bits16(9)),
+                        (Pattern::U8(10), bits16(10)),
+                        (Pattern::U8(11), bits16(11)),
+                        (Pattern::U8(12), bits16(12)),
+                        (Pattern::U8(13), bits16(13)),
                     ],
                 ),
             ),
@@ -379,9 +366,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         "deflate.uncompressed",
         record_auto([
             ("__align", Format::Align(8)),
-            ("len", bits16(16, base)),
-            ("nlen", bits16(16, base)),
-            ("bytes", repeat_count(var("len"), bits8(8, base))),
+            ("len", bits16(16)),
+            ("nlen", bits16(16)),
+            ("bytes", repeat_count(var("len"), bits8(8))),
             (
                 "codes-values",
                 compute(flat_map(
@@ -414,264 +401,119 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                     vec![
                                         (
                                             Pattern::U16(257),
-                                            fmt_some(length_record_fixed(
-                                                3,
-                                                base,
-                                                0,
-                                                distance_record,
-                                            )),
+                                            fmt_some(length_record_fixed(3, 0, distance_record)),
                                         ),
                                         (
                                             Pattern::U16(258),
-                                            fmt_some(length_record_fixed(
-                                                4,
-                                                base,
-                                                0,
-                                                distance_record,
-                                            )),
+                                            fmt_some(length_record_fixed(4, 0, distance_record)),
                                         ),
                                         (
                                             Pattern::U16(259),
-                                            fmt_some(length_record_fixed(
-                                                5,
-                                                base,
-                                                0,
-                                                distance_record,
-                                            )),
+                                            fmt_some(length_record_fixed(5, 0, distance_record)),
                                         ),
                                         (
                                             Pattern::U16(260),
-                                            fmt_some(length_record_fixed(
-                                                6,
-                                                base,
-                                                0,
-                                                distance_record,
-                                            )),
+                                            fmt_some(length_record_fixed(6, 0, distance_record)),
                                         ),
                                         (
                                             Pattern::U16(261),
-                                            fmt_some(length_record_fixed(
-                                                7,
-                                                base,
-                                                0,
-                                                distance_record,
-                                            )),
+                                            fmt_some(length_record_fixed(7, 0, distance_record)),
                                         ),
                                         (
                                             Pattern::U16(262),
-                                            fmt_some(length_record_fixed(
-                                                8,
-                                                base,
-                                                0,
-                                                distance_record,
-                                            )),
+                                            fmt_some(length_record_fixed(8, 0, distance_record)),
                                         ),
                                         (
                                             Pattern::U16(263),
-                                            fmt_some(length_record_fixed(
-                                                9,
-                                                base,
-                                                0,
-                                                distance_record,
-                                            )),
+                                            fmt_some(length_record_fixed(9, 0, distance_record)),
                                         ),
                                         (
                                             Pattern::U16(264),
-                                            fmt_some(length_record_fixed(
-                                                10,
-                                                base,
-                                                0,
-                                                distance_record,
-                                            )),
+                                            fmt_some(length_record_fixed(10, 0, distance_record)),
                                         ),
                                         (
                                             Pattern::U16(265),
-                                            fmt_some(length_record_fixed(
-                                                11,
-                                                base,
-                                                1,
-                                                distance_record,
-                                            )),
+                                            fmt_some(length_record_fixed(11, 1, distance_record)),
                                         ),
                                         (
                                             Pattern::U16(266),
-                                            fmt_some(length_record_fixed(
-                                                13,
-                                                base,
-                                                1,
-                                                distance_record,
-                                            )),
+                                            fmt_some(length_record_fixed(13, 1, distance_record)),
                                         ),
                                         (
                                             Pattern::U16(267),
-                                            fmt_some(length_record_fixed(
-                                                15,
-                                                base,
-                                                1,
-                                                distance_record,
-                                            )),
+                                            fmt_some(length_record_fixed(15, 1, distance_record)),
                                         ),
                                         (
                                             Pattern::U16(268),
-                                            fmt_some(length_record_fixed(
-                                                17,
-                                                base,
-                                                1,
-                                                distance_record,
-                                            )),
+                                            fmt_some(length_record_fixed(17, 1, distance_record)),
                                         ),
                                         (
                                             Pattern::U16(269),
-                                            fmt_some(length_record_fixed(
-                                                19,
-                                                base,
-                                                2,
-                                                distance_record,
-                                            )),
+                                            fmt_some(length_record_fixed(19, 2, distance_record)),
                                         ),
                                         (
                                             Pattern::U16(270),
-                                            fmt_some(length_record_fixed(
-                                                23,
-                                                base,
-                                                2,
-                                                distance_record,
-                                            )),
+                                            fmt_some(length_record_fixed(23, 2, distance_record)),
                                         ),
                                         (
                                             Pattern::U16(271),
-                                            fmt_some(length_record_fixed(
-                                                27,
-                                                base,
-                                                2,
-                                                distance_record,
-                                            )),
+                                            fmt_some(length_record_fixed(27, 2, distance_record)),
                                         ),
                                         (
                                             Pattern::U16(272),
-                                            fmt_some(length_record_fixed(
-                                                31,
-                                                base,
-                                                2,
-                                                distance_record,
-                                            )),
+                                            fmt_some(length_record_fixed(31, 2, distance_record)),
                                         ),
                                         (
                                             Pattern::U16(273),
-                                            fmt_some(length_record_fixed(
-                                                35,
-                                                base,
-                                                3,
-                                                distance_record,
-                                            )),
+                                            fmt_some(length_record_fixed(35, 3, distance_record)),
                                         ),
                                         (
                                             Pattern::U16(274),
-                                            fmt_some(length_record_fixed(
-                                                43,
-                                                base,
-                                                3,
-                                                distance_record,
-                                            )),
+                                            fmt_some(length_record_fixed(43, 3, distance_record)),
                                         ),
                                         (
                                             Pattern::U16(275),
-                                            fmt_some(length_record_fixed(
-                                                51,
-                                                base,
-                                                3,
-                                                distance_record,
-                                            )),
+                                            fmt_some(length_record_fixed(51, 3, distance_record)),
                                         ),
                                         (
                                             Pattern::U16(276),
-                                            fmt_some(length_record_fixed(
-                                                59,
-                                                base,
-                                                3,
-                                                distance_record,
-                                            )),
+                                            fmt_some(length_record_fixed(59, 3, distance_record)),
                                         ),
                                         (
                                             Pattern::U16(277),
-                                            fmt_some(length_record_fixed(
-                                                67,
-                                                base,
-                                                4,
-                                                distance_record,
-                                            )),
+                                            fmt_some(length_record_fixed(67, 4, distance_record)),
                                         ),
                                         (
                                             Pattern::U16(278),
-                                            fmt_some(length_record_fixed(
-                                                83,
-                                                base,
-                                                4,
-                                                distance_record,
-                                            )),
+                                            fmt_some(length_record_fixed(83, 4, distance_record)),
                                         ),
                                         (
                                             Pattern::U16(279),
-                                            fmt_some(length_record_fixed(
-                                                99,
-                                                base,
-                                                4,
-                                                distance_record,
-                                            )),
+                                            fmt_some(length_record_fixed(99, 4, distance_record)),
                                         ),
                                         (
                                             Pattern::U16(280),
-                                            fmt_some(length_record_fixed(
-                                                115,
-                                                base,
-                                                4,
-                                                distance_record,
-                                            )),
+                                            fmt_some(length_record_fixed(115, 4, distance_record)),
                                         ),
                                         (
                                             Pattern::U16(281),
-                                            fmt_some(length_record_fixed(
-                                                131,
-                                                base,
-                                                5,
-                                                distance_record,
-                                            )),
+                                            fmt_some(length_record_fixed(131, 5, distance_record)),
                                         ),
                                         (
                                             Pattern::U16(282),
-                                            fmt_some(length_record_fixed(
-                                                163,
-                                                base,
-                                                5,
-                                                distance_record,
-                                            )),
+                                            fmt_some(length_record_fixed(163, 5, distance_record)),
                                         ),
                                         (
                                             Pattern::U16(283),
-                                            fmt_some(length_record_fixed(
-                                                195,
-                                                base,
-                                                5,
-                                                distance_record,
-                                            )),
+                                            fmt_some(length_record_fixed(195, 5, distance_record)),
                                         ),
                                         (
                                             Pattern::U16(284),
-                                            fmt_some(length_record_fixed(
-                                                227,
-                                                base,
-                                                5,
-                                                distance_record,
-                                            )),
+                                            fmt_some(length_record_fixed(227, 5, distance_record)),
                                         ),
                                         (
                                             Pattern::U16(285),
-                                            fmt_some(length_record_fixed(
-                                                258,
-                                                base,
-                                                0,
-                                                distance_record,
-                                            )),
+                                            fmt_some(length_record_fixed(258, 0, distance_record)),
                                         ),
                                         // REVIEW - consider whether we want to use Format::Fail instead
                                         (Pattern::Int(Bounds::new(286, 287)), fmt_none()),
@@ -947,264 +789,119 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         vec![
                                             (
                                                 Pattern::U16(257),
-                                                fmt_some(length_record(
-                                                    3,
-                                                    base,
-                                                    0,
-                                                    distance_record,
-                                                )),
+                                                fmt_some(length_record(3, 0, distance_record)),
                                             ),
                                             (
                                                 Pattern::U16(258),
-                                                fmt_some(length_record(
-                                                    4,
-                                                    base,
-                                                    0,
-                                                    distance_record,
-                                                )),
+                                                fmt_some(length_record(4, 0, distance_record)),
                                             ),
                                             (
                                                 Pattern::U16(259),
-                                                fmt_some(length_record(
-                                                    5,
-                                                    base,
-                                                    0,
-                                                    distance_record,
-                                                )),
+                                                fmt_some(length_record(5, 0, distance_record)),
                                             ),
                                             (
                                                 Pattern::U16(260),
-                                                fmt_some(length_record(
-                                                    6,
-                                                    base,
-                                                    0,
-                                                    distance_record,
-                                                )),
+                                                fmt_some(length_record(6, 0, distance_record)),
                                             ),
                                             (
                                                 Pattern::U16(261),
-                                                fmt_some(length_record(
-                                                    7,
-                                                    base,
-                                                    0,
-                                                    distance_record,
-                                                )),
+                                                fmt_some(length_record(7, 0, distance_record)),
                                             ),
                                             (
                                                 Pattern::U16(262),
-                                                fmt_some(length_record(
-                                                    8,
-                                                    base,
-                                                    0,
-                                                    distance_record,
-                                                )),
+                                                fmt_some(length_record(8, 0, distance_record)),
                                             ),
                                             (
                                                 Pattern::U16(263),
-                                                fmt_some(length_record(
-                                                    9,
-                                                    base,
-                                                    0,
-                                                    distance_record,
-                                                )),
+                                                fmt_some(length_record(9, 0, distance_record)),
                                             ),
                                             (
                                                 Pattern::U16(264),
-                                                fmt_some(length_record(
-                                                    10,
-                                                    base,
-                                                    0,
-                                                    distance_record,
-                                                )),
+                                                fmt_some(length_record(10, 0, distance_record)),
                                             ),
                                             (
                                                 Pattern::U16(265),
-                                                fmt_some(length_record(
-                                                    11,
-                                                    base,
-                                                    1,
-                                                    distance_record,
-                                                )),
+                                                fmt_some(length_record(11, 1, distance_record)),
                                             ),
                                             (
                                                 Pattern::U16(266),
-                                                fmt_some(length_record(
-                                                    13,
-                                                    base,
-                                                    1,
-                                                    distance_record,
-                                                )),
+                                                fmt_some(length_record(13, 1, distance_record)),
                                             ),
                                             (
                                                 Pattern::U16(267),
-                                                fmt_some(length_record(
-                                                    15,
-                                                    base,
-                                                    1,
-                                                    distance_record,
-                                                )),
+                                                fmt_some(length_record(15, 1, distance_record)),
                                             ),
                                             (
                                                 Pattern::U16(268),
-                                                fmt_some(length_record(
-                                                    17,
-                                                    base,
-                                                    1,
-                                                    distance_record,
-                                                )),
+                                                fmt_some(length_record(17, 1, distance_record)),
                                             ),
                                             (
                                                 Pattern::U16(269),
-                                                fmt_some(length_record(
-                                                    19,
-                                                    base,
-                                                    2,
-                                                    distance_record,
-                                                )),
+                                                fmt_some(length_record(19, 2, distance_record)),
                                             ),
                                             (
                                                 Pattern::U16(270),
-                                                fmt_some(length_record(
-                                                    23,
-                                                    base,
-                                                    2,
-                                                    distance_record,
-                                                )),
+                                                fmt_some(length_record(23, 2, distance_record)),
                                             ),
                                             (
                                                 Pattern::U16(271),
-                                                fmt_some(length_record(
-                                                    27,
-                                                    base,
-                                                    2,
-                                                    distance_record,
-                                                )),
+                                                fmt_some(length_record(27, 2, distance_record)),
                                             ),
                                             (
                                                 Pattern::U16(272),
-                                                fmt_some(length_record(
-                                                    31,
-                                                    base,
-                                                    2,
-                                                    distance_record,
-                                                )),
+                                                fmt_some(length_record(31, 2, distance_record)),
                                             ),
                                             (
                                                 Pattern::U16(273),
-                                                fmt_some(length_record(
-                                                    35,
-                                                    base,
-                                                    3,
-                                                    distance_record,
-                                                )),
+                                                fmt_some(length_record(35, 3, distance_record)),
                                             ),
                                             (
                                                 Pattern::U16(274),
-                                                fmt_some(length_record(
-                                                    43,
-                                                    base,
-                                                    3,
-                                                    distance_record,
-                                                )),
+                                                fmt_some(length_record(43, 3, distance_record)),
                                             ),
                                             (
                                                 Pattern::U16(275),
-                                                fmt_some(length_record(
-                                                    51,
-                                                    base,
-                                                    3,
-                                                    distance_record,
-                                                )),
+                                                fmt_some(length_record(51, 3, distance_record)),
                                             ),
                                             (
                                                 Pattern::U16(276),
-                                                fmt_some(length_record(
-                                                    59,
-                                                    base,
-                                                    3,
-                                                    distance_record,
-                                                )),
+                                                fmt_some(length_record(59, 3, distance_record)),
                                             ),
                                             (
                                                 Pattern::U16(277),
-                                                fmt_some(length_record(
-                                                    67,
-                                                    base,
-                                                    4,
-                                                    distance_record,
-                                                )),
+                                                fmt_some(length_record(67, 4, distance_record)),
                                             ),
                                             (
                                                 Pattern::U16(278),
-                                                fmt_some(length_record(
-                                                    83,
-                                                    base,
-                                                    4,
-                                                    distance_record,
-                                                )),
+                                                fmt_some(length_record(83, 4, distance_record)),
                                             ),
                                             (
                                                 Pattern::U16(279),
-                                                fmt_some(length_record(
-                                                    99,
-                                                    base,
-                                                    4,
-                                                    distance_record,
-                                                )),
+                                                fmt_some(length_record(99, 4, distance_record)),
                                             ),
                                             (
                                                 Pattern::U16(280),
-                                                fmt_some(length_record(
-                                                    115,
-                                                    base,
-                                                    4,
-                                                    distance_record,
-                                                )),
+                                                fmt_some(length_record(115, 4, distance_record)),
                                             ),
                                             (
                                                 Pattern::U16(281),
-                                                fmt_some(length_record(
-                                                    131,
-                                                    base,
-                                                    5,
-                                                    distance_record,
-                                                )),
+                                                fmt_some(length_record(131, 5, distance_record)),
                                             ),
                                             (
                                                 Pattern::U16(282),
-                                                fmt_some(length_record(
-                                                    163,
-                                                    base,
-                                                    5,
-                                                    distance_record,
-                                                )),
+                                                fmt_some(length_record(163, 5, distance_record)),
                                             ),
                                             (
                                                 Pattern::U16(283),
-                                                fmt_some(length_record(
-                                                    195,
-                                                    base,
-                                                    5,
-                                                    distance_record,
-                                                )),
+                                                fmt_some(length_record(195, 5, distance_record)),
                                             ),
                                             (
                                                 Pattern::U16(284),
-                                                fmt_some(length_record(
-                                                    227,
-                                                    base,
-                                                    5,
-                                                    distance_record,
-                                                )),
+                                                fmt_some(length_record(227, 5, distance_record)),
                                             ),
                                             (
                                                 Pattern::U16(285),
-                                                fmt_some(length_record(
-                                                    258,
-                                                    base,
-                                                    0,
-                                                    distance_record,
-                                                )),
+                                                fmt_some(length_record(258, 0, distance_record)),
                                             ),
                                             // NOTE - currently no difference in behavior compared to wildcard pattern, but adds specificity/clarity, and gives us an easy hook to treat as erroneous
                                             (Pattern::Int(Bounds::new(286, 287)), fmt_none()),
@@ -1248,7 +945,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let block = module.define_format(
         "deflate.block",
         record([
-            ("final", base.bit()),
+            ("final", bit()),
             ("type", bits2.clone()),
             ("data", {
                 Format::Match(
