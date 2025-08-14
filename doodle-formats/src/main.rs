@@ -191,9 +191,9 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
                         FormatSelector::Deflate => format::deflate::main(&mut module).call(),
                         FormatSelector::Zlib => {
                             let deflate = format::deflate::main(&mut module);
-                            format::zlib::main(&mut module, &base, deflate).call()
+                            format::zlib::main(&mut module, deflate).call()
                         }
-                        FormatSelector::Tiff => format::tiff::main(&mut module, &base).call(),
+                        FormatSelector::Tiff => format::tiff::main(&mut module).call(),
                         FormatSelector::Utf8Text => format::text::main(&mut module, &base).0.call(),
                         FormatSelector::Gif => format::gif::main(&mut module, &base).call(),
                         FormatSelector::Gzip => {
@@ -201,19 +201,19 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
                             format::gzip::main(&mut module, deflate, &base).call()
                         }
                         FormatSelector::Jpeg => {
-                            let tiff = format::tiff::main(&mut module, &base);
+                            let tiff = format::tiff::main(&mut module);
                             format::jpeg::main(&mut module, &base, &tiff).call()
                         }
                         FormatSelector::Mp4 => format::mpeg4::main(&mut module, &base).call(),
                         FormatSelector::Peano => format::peano::main(&mut module).call(),
                         FormatSelector::Png => {
                             let deflate = format::deflate::main(&mut module);
-                            let zlib = format::zlib::main(&mut module, &base, deflate);
+                            let zlib = format::zlib::main(&mut module, deflate);
                             let (text, utf8nz) = format::text::main(&mut module, &base);
                             format::png::main(&mut module, zlib, text, utf8nz, &base).call()
                         }
                         FormatSelector::Riff => format::riff::main(&mut module, &base).call(),
-                        FormatSelector::Rle => format::run_length::main(&mut module, &base).call(),
+                        FormatSelector::Rle => format::run_length::main(&mut module).call(),
                         FormatSelector::Tar => format::tar::main(&mut module, &base).call(),
                         FormatSelector::TarGz => {
                             let deflate = format::deflate::main(&mut module);
@@ -241,11 +241,9 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
                                 )
                                 .call()
                         }
-                        FormatSelector::Elf => format::elf::main(&mut module, &base).call(),
-                        FormatSelector::Waldo => format::waldo::main(&mut module, &base).call(),
-                        FormatSelector::Opentype => {
-                            format::opentype::main(&mut module, &base).call()
-                        }
+                        FormatSelector::Elf => format::elf::main(&mut module).call(),
+                        FormatSelector::Waldo => format::waldo::main(&mut module).call(),
+                        FormatSelector::Opentype => format::opentype::main(&mut module).call(),
                     }
                 }
             };

@@ -23,9 +23,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     // CString values. All unused bytes following the terminal NUL must also be NUL
     let tar_asciiz = module.define_format(
         "tar.ascii-string",
-        record([
-            ("string", repeat(not_byte(0x00))),
-            ("padding", repeat1(is_byte(0x00))),
+        record_auto([
+            ("string", mk_ascii_string(repeat(not_byte(0x00)))),
+            ("__padding", repeat1(is_byte(0x00))),
         ]),
     );
 
@@ -40,13 +40,13 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
     // Octal-encoded numeric value (as of UStar) fitting in N bytes, terminated by the space character or NUL
     let o_numeric = |len: u16| {
-        Format::Slice(
-            Box::new(Expr::U16(len)),
-            Box::new(record([
+        slice(
+            Expr::U16(len),
+            record_auto([
                 ("string", repeat(base.ascii_octal_digit())),
                 ("__nul_or_wsp", nul_or_wsp.call()),
                 ("__padding", repeat(is_byte(0x00))),
-            ])),
+            ]),
         )
     };
 
@@ -59,32 +59,33 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         );
 
         map(
-            record([
-                ("oA", octal_digit.clone()),
-                ("o9", octal_digit.clone()),
-                ("o8", octal_digit.clone()),
-                ("o7", octal_digit.clone()),
-                ("o6", octal_digit.clone()),
-                ("o5", octal_digit.clone()),
-                ("o4", octal_digit.clone()),
-                ("o3", octal_digit.clone()),
-                ("o2", octal_digit.clone()),
-                ("o1", octal_digit.clone()),
-                ("o0", octal_digit.clone()),
+            // REVIEW - since record_auto is already a monadic chain, we might consider a non-record final-value alternative with similar syntax
+            record_auto([
+                ("_oA", octal_digit.clone()),
+                ("_o9", octal_digit.clone()),
+                ("_o8", octal_digit.clone()),
+                ("_o7", octal_digit.clone()),
+                ("_o6", octal_digit.clone()),
+                ("_o5", octal_digit.clone()),
+                ("_o4", octal_digit.clone()),
+                ("_o3", octal_digit.clone()),
+                ("_o2", octal_digit.clone()),
+                ("_o1", octal_digit.clone()),
+                ("_o0", octal_digit.clone()),
                 ("__nil", nul_or_wsp.call()),
                 (
                     "value",
                     compute(bit_or(
                         shl(
-                            o4u32(Expr::U8(0), var("oA"), var("o9"), var("o8")),
+                            o4u32(Expr::U8(0), var("_oA"), var("_o9"), var("_o8")),
                             Expr::U32(24),
                         ),
                         bit_or(
                             shl(
-                                o4u32(var("o7"), var("o6"), var("o5"), var("o4")),
+                                o4u32(var("_o7"), var("_o6"), var("_o5"), var("_o4")),
                                 Expr::U32(12),
                             ),
-                            o4u32(var("o3"), var("o2"), var("o1"), var("o0")),
+                            o4u32(var("_o3"), var("_o2"), var("_o1"), var("_o0")),
                         ),
                     )),
                 ),
@@ -100,16 +101,16 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     // if any, after reaching the end of the first parse, are all NUL
     let tar_str_optz = module.define_format(
         "tar.ascii-string.opt0",
-        record([
-            ("string", repeat(not_byte(0x00))),
+        record_auto([
+            ("string", mk_ascii_string(repeat(not_byte(0x00)))),
             ("__padding", repeat(is_byte(0x00))),
         ]),
     );
 
     let tar_str_optz_ne = module.define_format(
         "tar.ascii-string.opt0.nonempty",
-        record([
-            ("string", repeat1(not_byte(0x00))),
+        record_auto([
+            ("string", mk_ascii_string(repeat1(not_byte(0x00)))),
             ("__padding", repeat(is_byte(0x00))),
         ]),
     );
@@ -124,9 +125,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     // by happenstance but may fail just as easily.
     let header = module.define_format(
         "tar.header",
-        Format::Slice(
-            Box::new(Expr::U32(BLOCK_SIZE)),
-            Box::new(record([
+        slice(
+            Expr::U32(BLOCK_SIZE),
+            record([
                 ("name", filename),              // bytes 0 - 99
                 ("mode", o_numeric(8)),          // bytes 100 - 107
                 ("uid", o_numeric(8)),           // bytes 108 - 115
@@ -144,7 +145,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ("devminor", o_numeric(8)),      // bytes 337 - 344
                 ("prefix", prefix),              // bytes 345 - 499
                 ("pad", repeat_byte(12, 0x00)),  // bytes 500 - 511
-            ])),
+            ]),
         ),
     );
 
@@ -154,7 +155,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ("header", header.call()),
             (
                 "file",
-                repeat_count(record_proj(var("header"), "size"), base.u8()),
+                repeat_count(record_proj(var("header"), "size"), u8()),
             ),
             ("__padding", Format::Align(512)),
         ]),
@@ -162,7 +163,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
     module.define_format(
         "tar.main",
-        record([
+        record_auto([
             ("contents", repeat1(header_with_data.call())),
             (
                 "__padding",

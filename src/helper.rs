@@ -279,6 +279,13 @@ pub fn seq(formats: impl IntoIterator<Item = Format>) -> Format {
     Format::Sequence(formats.into_iter().collect())
 }
 
+/// Sequence composed of the same format processed a constant number of times
+///
+/// Suitable as an alternative to `repeat_count` for small, constant counts.
+pub fn seq_repeat(count: usize, format: Format) -> Format {
+    Format::Sequence(std::iter::repeat_n(format, count).collect())
+}
+
 /// Helper-function for [`Format::Union`] over branches that are all [`Format::Variant`].
 ///
 /// Accepts any iterable container of tuples `(Name, Format)` for any `Name` that implements [`IntoLabel`].
@@ -1532,4 +1539,10 @@ pub mod base {
         u64le, U64LE, 8, U64Le;
     }
 }
-pub use base::{bit, u16be, u16le, u32be, u32le, u64be, u64le, u8};
+pub use base::{bit, u8, u16be, u16le, u32be, u32le, u64be, u64le};
+
+/// Helper for opaque byte-sequences standing in for data that we do not currently
+/// have an description for
+pub fn opaque_bytes() -> Format {
+    repeat(u8())
+}

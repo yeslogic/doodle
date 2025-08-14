@@ -1,8 +1,6 @@
 use doodle::{Expr, Format, FormatModule, FormatRef, helper::*};
 
-use crate::format::BaseModule;
-
-pub fn main(module: &mut FormatModule, base: &BaseModule, deflate: FormatRef) -> FormatRef {
+pub fn main(module: &mut FormatModule, deflate: FormatRef) -> FormatRef {
     let method_and_flags = where_lambda(
         // FIXME[epic=refactor] - replace with bit_fields_u8
         packed_bits_u8([4, 4], ["compression-info", "compression-method"]),
@@ -38,10 +36,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, deflate: FormatRef) ->
                 ]),
             ),
             // TODO - this should be a 'known' dictionary if it appears, but that is domain-specific and hard to get a handle on
-            ("dict-id", cond_maybe(has_dict(var("flags")), base.u32be())),
+            ("dict-id", cond_maybe(has_dict(var("flags")), u32be())),
             ("data", Format::Bits(Box::new(deflate.call()))),
             // NOTE - adler32 is supposed to be an Adler-32 checksum of the decompressed bytes
-            ("adler32", base.u32be()),
+            ("adler32", u32be()),
         ]),
     )
 }

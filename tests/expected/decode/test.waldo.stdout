@@ -1,5 +1,5 @@
 └── data <- _ |...| _ :=
     └── waldo <- waldo.main :=
-        ├── where <- base.u64be := 42
+        ├── where <- ReadU64Be := 42
         ├── noise <- repeat [= 255]
         └── waldo <- let-view scope (ascii-str (with-view (scope+where - _here) capture-bytes[5])) := "Waldo"

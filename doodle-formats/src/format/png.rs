@@ -19,24 +19,24 @@ pub fn main(
             (
                 "length",
                 where_lambda(
-                    base.u32be(),
+                    u32be(),
                     "length",
                     expr_lte(var("length"), Expr::U32(0x7fff_ffff)),
                 ),
             ), // NOTE: < 2^31
             ("tag", tag),
             ("data", slice(var("length"), data)),
-            ("crc", base.u32be()), // REVIEW - do we want to attempt to validate this?
+            ("crc", u32be()), // REVIEW - do we want to attempt to validate this?
         ])
     };
     let chunk_unit = |tag: Format| {
         record([
             (
                 "length",
-                where_lambda(base.u32be(), "length", expr_eq(var("length"), Expr::U32(0))),
+                where_lambda(u32be(), "length", expr_eq(var("length"), Expr::U32(0))),
             ),
             ("tag", tag),
-            ("crc", base.u32be()), // REVIEW - do we want to attempt to validate this?
+            ("crc", u32be()), // REVIEW - do we want to attempt to validate this?
         ])
     };
 
@@ -48,6 +48,7 @@ pub fn main(
     let keyword = module.define_format(
         "png.keyword",
         // TODO - all we can enforce for now without more complex logic is the character set, space-rules are not something we can enforce easily
+        // REVIEW - should we wrap this in mk_ascii_str (?)
         repeat_between(
             Expr::U32(1),
             Expr::U32(79),
@@ -60,27 +61,27 @@ pub fn main(
 
     // let any_tag = module.define_format(
     //     "png.any-tag",
-    //     tuple([base.u8(), base.u8(), base.u8(), base.u8()]), // FIXME: ASCII
+    //     tuple([u8(), u8(), u8(), u8()]), // FIXME: ASCII
     // );
 
     let ihdr_tag = module.define_format("png.ihdr-tag", is_bytes(b"IHDR"));
     let ihdr_data = module.define_format(
         "png.ihdr-data",
         record([
-            ("width", base.u32be()),
-            ("height", base.u32be()),
-            ("bit-depth", base.u8()),
-            ("color-type", base.u8()),
-            ("compression-method", base.u8()),
-            ("filter-method", base.u8()),
-            ("interlace-method", base.u8()),
+            ("width", u32be()),
+            ("height", u32be()),
+            ("bit-depth", u8()),
+            ("color-type", u8()),
+            ("compression-method", u8()),
+            ("filter-method", u8()),
+            ("interlace-method", u8()),
         ]),
     );
     let ihdr = module.define_format("png.ihdr", chunk(ihdr_tag.call(), ihdr_data.call()));
     let ihdr_type = module.get_format_type(ihdr.get_level()).clone();
 
     let idat_tag = module.define_format("png.idat-tag", is_bytes(b"IDAT"));
-    let idat_data = module.define_format("png.idat-data", repeat(base.u8()));
+    let idat_data = module.define_format("png.idat-data", opaque_bytes());
     let idat = module.define_format("png.idat", chunk(idat_tag.call(), idat_data.call()));
 
     let iend_tag = module.define_format("png.iend-tag", is_bytes(b"IEND"));
@@ -95,35 +96,27 @@ pub fn main(
                 (
                     Pattern::U8(0),
                     "color-type-0",
-                    record([("greyscale", base.u16be())]),
+                    record([("greyscale", u16be())]),
                 ),
                 (
                     Pattern::U8(4),
                     "color-type-4",
-                    record([("greyscale", base.u16be())]),
+                    record([("greyscale", u16be())]),
                 ),
                 (
                     Pattern::U8(2),
                     "color-type-2",
-                    record([
-                        ("red", base.u16be()),
-                        ("green", base.u16be()),
-                        ("blue", base.u16be()),
-                    ]),
+                    record_repeat(["red", "green", "blue"], u16be()),
                 ),
                 (
                     Pattern::U8(6),
                     "color-type-6",
-                    record([
-                        ("red", base.u16be()),
-                        ("green", base.u16be()),
-                        ("blue", base.u16be()),
-                    ]),
+                    record_repeat(["red", "green", "blue"], u16be()),
                 ),
                 (
                     Pattern::U8(3),
                     "color-type-3",
-                    record([("palette-index", base.u8())]),
+                    record([("palette-index", u8())]),
                 ),
             ],
         ),
@@ -132,19 +125,19 @@ pub fn main(
     let chrm = module.define_format(
         "png.chrm",
         record(vec![
-            ("whitepoint-x", base.u32be()),
-            ("whitepoint-y", base.u32be()),
-            ("red-x", base.u32be()),
-            ("red-y", base.u32be()),
-            ("green-x", base.u32be()),
-            ("green-y", base.u32be()),
-            ("blue-x", base.u32be()),
-            ("blue-y", base.u32be()),
+            ("whitepoint-x", u32be()),
+            ("whitepoint-y", u32be()),
+            ("red-x", u32be()),
+            ("red-y", u32be()),
+            ("green-x", u32be()),
+            ("green-y", u32be()),
+            ("blue-x", u32be()),
+            ("blue-y", u32be()),
         ]),
     );
 
     // REVIEW: do we want to map the value to its intended scale (y := x / 100_000)?
-    let gama = module.define_format("png.gama", record(vec![("gamma", base.u32be())]));
+    let gama = module.define_format("png.gama", record(vec![("gamma", u32be())]));
 
     let zlib_utf8text = chain(
         zlib.call(),
@@ -172,7 +165,7 @@ pub fn main(
                     ),
                     Format::UnionNondet(vec![
                         fmt_variant("compressed", fmt_variant("valid", zlib_utf8text)),
-                        fmt_variant("compressed", fmt_variant("invalid", repeat(base.u8()))),
+                        fmt_variant("compressed", fmt_variant("invalid", opaque_bytes())),
                     ]),
                     Format::Variant("uncompressed".into(), Box::new(utf8text.call())),
                 )
@@ -184,10 +177,7 @@ pub fn main(
         "png.iccp",
         record(vec![
             ("profile-name", null_terminated(keyword.call())),
-            (
-                "compression-method",
-                where_lambda(base.u8(), "x", expr_eq(var("x"), Expr::U8(0))),
-            ), // NOTE: 0 := deflate is the only defined value
+            ("compression-method", is_byte(0)), // NOTE: 0 := deflate is the only defined value
             ("compressed-profile", zlib.call()),
         ]),
     );
@@ -195,38 +185,31 @@ pub fn main(
     let phys = module.define_format(
         "png.phys",
         record([
-            ("pixels-per-unit-x", base.u32be()),
-            ("pixels-per-unit-y", base.u32be()),
-            ("unit-specifier", base.u8()),
+            ("pixels-per-unit-x", u32be()),
+            ("pixels-per-unit-y", u32be()),
+            ("unit-specifier", u8()),
         ]),
     );
 
-    let plte = module.define_format(
-        "png.plte",
-        repeat1(record([
-            ("r", base.u8()),
-            ("g", base.u8()),
-            ("b", base.u8()),
-        ])),
-    );
+    let plte = module.define_format("png.plte", repeat1(record_repeat(["r", "g", "b"], u8())));
 
     let text = module.define_format(
         "png.text",
         record([
             ("keyword", null_terminated(keyword.call())),
-            ("text", repeat(base.ascii_char())),
+            ("text", mk_ascii_string(repeat(base.ascii_char()))),
         ]),
     );
 
     let time = module.define_format(
         "png.time",
         record([
-            ("year", base.u16be()),
-            ("month", base.u8()),
-            ("day", base.u8()),
-            ("hour", base.u8()),
-            ("minute", base.u8()),
-            ("second", base.u8()),
+            ("year", u16be()),
+            ("month", u8()),
+            ("day", u8()),
+            ("hour", u8()),
+            ("minute", u8()),
+            ("second", u8()),
         ]),
     );
 
@@ -239,21 +222,17 @@ pub fn main(
                 (
                     Pattern::U8(0),
                     "color-type-0",
-                    record([("greyscale", base.u16be())]),
+                    record([("greyscale", u16be())]),
                 ),
                 (
                     Pattern::U8(2),
                     "color-type-2",
-                    record([
-                        ("red", base.u16be()),
-                        ("green", base.u16be()),
-                        ("blue", base.u16be()),
-                    ]),
+                    record_repeat(["red", "green", "blue"], u16be()),
                 ),
                 (
                     Pattern::U8(3),
                     "color-type-3",
-                    repeat(record([("palette-index", base.u8())])),
+                    repeat(record([("palette-index", u8())])),
                 ),
             ],
         ),
@@ -281,7 +260,7 @@ pub fn main(
         "png.srgb",
         record([(
             "rendering-intent",
-            where_between_u8(base.u8(), RENDINT_PERCEPTUAL, RENDINT_ABSCOLOR),
+            where_between_u8(u8(), RENDINT_PERCEPTUAL, RENDINT_ABSCOLOR),
         )]),
     );
 
@@ -294,42 +273,39 @@ pub fn main(
                 (
                     Pattern::U8(0),
                     "color-type-0",
-                    record([("sig-greyscale-bits", base.u8())]),
+                    record([("sig-greyscale-bits", u8())]),
                 ),
                 (
                     Pattern::U8(2),
                     "color-type-2",
                     record([
-                        ("sig-red-bits", base.u8()),
-                        ("sig-green-bits", base.u8()),
-                        ("sig-blue-bits", base.u8()),
+                        ("sig-red-bits", u8()),
+                        ("sig-green-bits", u8()),
+                        ("sig-blue-bits", u8()),
                     ]),
                 ),
                 (
                     Pattern::U8(3),
                     "color-type-3",
                     record([
-                        ("sig-red-bits", base.u8()),
-                        ("sig-green-bits", base.u8()),
-                        ("sig-blue-bits", base.u8()),
+                        ("sig-red-bits", u8()),
+                        ("sig-green-bits", u8()),
+                        ("sig-blue-bits", u8()),
                     ]),
                 ),
                 (
                     Pattern::U8(4),
                     "color-type-4",
-                    record([
-                        ("sig-greyscale-bits", base.u8()),
-                        ("sig-alpha-bits", base.u8()),
-                    ]),
+                    record([("sig-greyscale-bits", u8()), ("sig-alpha-bits", u8())]),
                 ),
                 (
                     Pattern::U8(6),
                     "color-type-6",
                     record([
-                        ("sig-red-bits", base.u8()),
-                        ("sig-green-bits", base.u8()),
-                        ("sig-blue-bits", base.u8()),
-                        ("sig-alpha-bits", base.u8()),
+                        ("sig-red-bits", u8()),
+                        ("sig-green-bits", u8()),
+                        ("sig-blue-bits", u8()),
+                        ("sig-alpha-bits", u8()),
                     ]),
                 ),
             ],
@@ -346,7 +322,7 @@ pub fn main(
     );
 
     // NOTE - intended to correspond to PLTE data (?)
-    let hist = module.define_format("png.hist", record([("histogram", repeat(base.u16be()))]));
+    let hist = module.define_format("png.hist", record([("histogram", repeat(u16be()))]));
 
     let palette_entries = |depth: Expr| {
         // NOTE - the only constraint on the sequence of entries (aside from implicitly sharing the same depth) is that they are in descending frequency order
@@ -357,22 +333,22 @@ pub fn main(
                     Pattern::U8(8),
                     "sample-depth-u8",
                     repeat(record([
-                        ("red", base.u8()),
-                        ("green", base.u8()),
-                        ("blue", base.u8()),
-                        ("alpha", base.u8()),
-                        ("frequency", base.u16be()),
+                        ("red", u8()),
+                        ("green", u8()),
+                        ("blue", u8()),
+                        ("alpha", u8()),
+                        ("frequency", u16be()),
                     ])),
                 ),
                 (
                     Pattern::U8(16),
                     "sample-depth-u16",
                     repeat(record([
-                        ("red", base.u16be()),
-                        ("green", base.u16be()),
-                        ("blue", base.u16be()),
-                        ("alpha", base.u16be()),
-                        ("frequency", base.u16be()),
+                        ("red", u16be()),
+                        ("green", u16be()),
+                        ("blue", u16be()),
+                        ("alpha", u16be()),
+                        ("frequency", u16be()),
                     ])),
                 ),
             ],
@@ -384,18 +360,8 @@ pub fn main(
         record([
             ("palette-name", null_terminated(keyword.call())),
             // Sample depth is 8 or 16
-            (
-                "sample-depth",
-                where_lambda(
-                    base.u8(),
-                    "x",
-                    or(
-                        expr_eq(var("x"), Expr::U8(8)),
-                        expr_eq(var("x"), Expr::U8(16)),
-                    ),
-                ),
-            ),
-            ("pallette", palette_entries(var("sample-depth"))),
+            ("sample-depth", byte_in([8, 16])),
+            ("palette", palette_entries(var("sample-depth"))),
         ]),
     );
 
@@ -406,7 +372,7 @@ pub fn main(
             (
                 "length",
                 where_lambda(
-                    base.u32be(),
+                    u32be(),
                     "length",
                     expr_lte(var("length"), Expr::U32(0x7fff_ffff)),
                 ),
@@ -452,12 +418,12 @@ pub fn main(
                             (pattern_bytestring(b"pHYs"), "pHYs", phys.call()),
                             (pattern_bytestring(b"sPLT"), "sPLT", splt.call()),
                             (pattern_bytestring(b"tIME"), "tIME", time.call()),
-                            (Pattern::Wildcard, "unknown", repeat(base.u8())), // TODO - preserve an artefact of the unknown tag
+                            (Pattern::Wildcard, "unknown", opaque_bytes()), // TODO - preserve an artefact of the unknown tag
                         ],
                     )),
                 ),
             ),
-            ("crc", base.u32be()), // REVIEW - do we want to attempt to validate this?
+            ("crc", u32be()), // REVIEW - do we want to attempt to validate this?
         ]),
     );
 

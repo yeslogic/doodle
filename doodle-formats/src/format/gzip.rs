@@ -29,17 +29,17 @@ pub fn main(module: &mut FormatModule, deflate: FormatRef, base: &BaseModule) ->
         "gzip.header",
         record([
             ("magic", is_bytes(b"\x1F\x8B")),
-            ("method", base.u8()),
+            ("method", u8()),
             ("file-flags", flg),
-            ("timestamp", base.u32le()),
-            ("compression-flags", base.u8()),
-            ("os-id", base.u8()),
+            ("timestamp", u32le()),
+            ("compression-flags", u8()),
+            ("os-id", u8()),
         ]),
     );
 
     let footer = module.define_format(
         "gzip.footer",
-        record([("crc", base.u32le()), ("length", base.u32le())]),
+        record([("crc", u32le()), ("length", u32le())]),
     );
 
     let fname_flag = record_lens(var("header"), &["file-flags", "fname"]);
@@ -51,14 +51,14 @@ pub fn main(module: &mut FormatModule, deflate: FormatRef, base: &BaseModule) ->
         record([
             ("si1", base.ascii_char()),
             ("si2", base.ascii_char()),
-            ("len", base.u16le()),
-            ("data", repeat_count(var("len"), base.u8())),
+            ("len", u16le()),
+            ("data", repeat_count(var("len"), u8())),
         ]),
     );
     let fextra = module.define_format(
         "gzip.fextra",
         record([
-            ("xlen", base.u16le()),
+            ("xlen", u16le()),
             (
                 "subfields",
                 Format::Slice(
@@ -82,7 +82,7 @@ pub fn main(module: &mut FormatModule, deflate: FormatRef, base: &BaseModule) ->
     let fhcrc = module.define_format(
         "gzip.fhcrc",
         record([
-            ("crc", base.u16le()), // two least significant bytes of CRC32 of all prior bytes in the header
+            ("crc", u16le()), // two least significant bytes of CRC32 of all prior bytes in the header
         ]),
     );
 
