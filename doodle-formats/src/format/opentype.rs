@@ -5590,7 +5590,7 @@ pub(crate) mod alt {
                                 "axis_value_offsets",
                                 with_view(
                                     ViewExpr::var("axis_value_scope"),
-                                    read_array(count, BaseKind::U16),
+                                    read_array(count, BaseKind::U16BE),
                                 ),
                             ), // TODO - ForEach(offset: u16) -> offsetu16(offset, axis_value_table)
                         ]),

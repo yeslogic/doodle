@@ -2,13 +2,13 @@ use std::collections::BTreeSet;
 
 use num_traits::{ToPrimitive, Zero};
 
-use crate::bounds::Bounds;
 use crate::byte_set::ByteSet;
 pub use crate::marker::BaseKind;
 use crate::{
     Arith, BaseType, Expr, Format, IntRel, IntoLabel, Label, Pattern, StyleHint, TypeHint, UnaryOp,
     ValueType, ViewExpr, ViewFormat,
 };
+use crate::{Endian, bounds::Bounds};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BitFieldKind {
@@ -1478,6 +1478,44 @@ pub fn capture_bytes(len: Expr) -> ViewFormat {
 }
 
 /// Helper for [`ViewFormat::ReadArray`]
-pub fn read_array(len: Expr, kind: BaseKind) -> ViewFormat {
+pub fn read_array(len: Expr, kind: BaseKind<Endian>) -> ViewFormat {
     ViewFormat::ReadArray(Box::new(len), kind)
 }
+
+pub mod base {
+    use super::*;
+    use crate::CommonOp;
+
+    macro_rules! endian {
+        ( $( $fname:ident, $kind_endian:ident, $size:expr, $op:ident );* $(;)? ) => {
+            $(
+                pub fn $fname() -> Format {
+                    Format::Hint(
+                        StyleHint::Common(CommonOp::EndianParse(BaseKind::$kind_endian)),
+                        Box::new(map(
+                            tuple_repeat($size, Format::ANY_BYTE),
+                            lambda("x", Expr::$op(Box::new(var("x")))),
+                        ))
+                    )
+                }
+            )*
+        };
+    }
+
+    pub fn u8() -> Format {
+        Format::Hint(
+            StyleHint::Common(CommonOp::EndianParse(BaseKind::U8)),
+            Box::new(Format::ANY_BYTE),
+        )
+    }
+
+    endian! {
+        u16be, U16BE, 2, U16Be;
+        u16le, U16LE, 2, U16Le;
+        u32be, U32BE, 4, U32Be;
+        u32le, U32LE, 4, U32Le;
+        u64be, U64BE, 8, U64Be;
+        u64le, U64LE, 8, U64Le;
+    }
+}
+pub use base::*;

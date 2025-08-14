@@ -3,8 +3,8 @@ use std::{fmt, io, rc::Rc};
 use crate::decoder::SeqKind;
 use crate::precedence::{Precedence, cond_paren};
 use crate::{
-    Arith, DynFormat, Expr, FieldLabel, Format, FormatModule, IntRel, Pattern, RecordFormat,
-    StyleHint, ViewExpr, ViewFormat,
+    Arith, CommonOp, DynFormat, Expr, FieldLabel, Format, FormatModule, IntRel, Pattern,
+    RecordFormat, StyleHint, ViewExpr, ViewFormat,
 };
 use crate::{Label, UnaryOp};
 use crate::{
@@ -578,6 +578,10 @@ impl<'module> TreePrinter<'module> {
                 } else {
                     self.compile_decoded_value(value, str_format)
                 }
+            }
+            Format::Hint(StyleHint::Common(CommonOp::EndianParse(..)), inner) => {
+                // REVIEW - do we want to modify the output based on the hint?
+                self.compile_decoded_value(value, inner)
             }
             Format::Repeat(format)
             | Format::Repeat1(format)
@@ -2344,6 +2348,16 @@ impl<'module> TreePrinter<'module> {
                 prec,
                 Precedence::FORMAT_COMPOUND,
             ),
+            Format::Hint(StyleHint::Common(CommonOp::EndianParse(kind_endian)), _format) => {
+                let kind_fragment = Fragment::string(kind_endian.name());
+                Fragment::string("Read").cat(kind_fragment)
+
+                // cond_paren(
+                //     self.compile_nested_format("endian-parse", Some(&[kind_fragment.cat(endian_fragment)]), _format, prec),
+                //     prec,
+                //     Precedence::FORMAT_COMPOUND,
+                // )
+            }
             Format::WithView(view, view_format) => {
                 let view_frag = self.compile_view_expr(view, Precedence::Atomic);
                 let view_fmt_frag = match view_format {

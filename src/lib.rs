@@ -24,7 +24,7 @@ pub mod error;
 pub mod helper;
 pub mod loc_decoder;
 pub mod marker;
-pub use marker::BaseKind;
+pub use marker::{BaseKind, Endian};
 pub mod output;
 pub mod parser;
 mod precedence;
@@ -690,7 +690,7 @@ pub enum ViewFormat {
     /// CaptureBytes(N): captures a slice of N bytes from the start of the View
     CaptureBytes(Box<Expr>),
     /// ReadArray(M, Kind): captures an array of M elements of the indicate Kind
-    ReadArray(Box<Expr>, BaseKind),
+    ReadArray(Box<Expr>, BaseKind<Endian>),
     /// ReifyView: produces a value-element that encapsulates the View-object
     ReifyView,
 }
@@ -758,6 +758,15 @@ impl ViewExpr {
     }
 }
 
+/// Operations we want to treat as semi-first-class in downstream processing,
+/// without forcing us to add new primitives into the Format layer.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+#[serde(tag = "tag", content = "args")]
+pub enum CommonOp {
+    EndianParse(BaseKind<Endian>),
+}
+
+/// The input is a UTF-8 encoded string, and the output is a UTF-8 encoded string
 // NOTE - as currently defined, StyleHint could easily be Copy, but it would be a breaking change if we later had to remove that trait
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(tag = "tag", content = "args")]
@@ -768,6 +777,7 @@ pub enum StyleHint {
         old_style: bool,
     },
     AsciiStr,
+    Common(CommonOp),
 }
 
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]

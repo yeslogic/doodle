@@ -7,7 +7,7 @@ use super::{AtomType, LocalType};
 use crate::bounds::Bounds;
 use crate::byte_set::ByteSet;
 use crate::codegen::rust_ast::{RustLt, RustParams, UseParams};
-use crate::{Arith, BaseKind, IntRel, Label, StyleHint, TypeHint, UnaryOp};
+use crate::{Arith, BaseKind, Endian, IntRel, Label, StyleHint, TypeHint, UnaryOp};
 
 pub(crate) mod variables;
 
@@ -538,7 +538,7 @@ impl<TypeRep> std::hash::Hash for TypedDynFormat<TypeRep> {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TypedViewFormat<TypeRep> {
     CaptureBytes(Box<TypedExpr<TypeRep>>),
-    ReadArray(Box<TypedExpr<TypeRep>>, BaseKind),
+    ReadArray(Box<TypedExpr<TypeRep>>, BaseKind<Endian>),
     ReifyView,
 }
 
