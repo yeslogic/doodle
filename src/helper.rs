@@ -1489,6 +1489,8 @@ pub mod base {
     macro_rules! endian {
         ( $( $fname:ident, $kind_endian:ident, $size:expr, $op:ident );* $(;)? ) => {
             $(
+                #[doc = concat!("Stand-in for `BaseKind::", stringify!($kind_endian), "`")]
+                #[doc = concat!("Reads a ", stringify!($op), " value in a neutral context")]
                 pub fn $fname() -> Format {
                     Format::Hint(
                         StyleHint::Common(CommonOp::EndianParse(BaseKind::$kind_endian)),
@@ -1502,6 +1504,18 @@ pub mod base {
         };
     }
 
+    #[inline(always)]
+    /// Stand-in for `BaseKind::bit`
+    ///
+    /// Reads a single-bit value (as a u8) in a [`Format::Bits`] context.
+    pub const fn bit() -> Format {
+        // REVIEW - do we want a CommonOp for this?
+        Format::ANY_BYTE
+    }
+
+    /// Stand-in for `BaseKind::U8`
+    ///
+    /// Reads a U8 value in a neutral context
     pub fn u8() -> Format {
         Format::Hint(
             StyleHint::Common(CommonOp::EndianParse(BaseKind::U8)),
@@ -1518,4 +1532,4 @@ pub mod base {
         u64le, U64LE, 8, U64Le;
     }
 }
-pub use base::*;
+pub use base::{bit, u16be, u16le, u32be, u32le, u64be, u64le, u8};

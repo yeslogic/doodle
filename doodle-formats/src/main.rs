@@ -188,16 +188,16 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
                         return Err(anyhow!("Unknown format specifier `{normalized}`").into());
                     };
                     match selected {
-                        FormatSelector::Deflate => format::deflate::main(&mut module, &base).call(),
+                        FormatSelector::Deflate => format::deflate::main(&mut module).call(),
                         FormatSelector::Zlib => {
-                            let deflate = format::deflate::main(&mut module, &base);
+                            let deflate = format::deflate::main(&mut module);
                             format::zlib::main(&mut module, &base, deflate).call()
                         }
                         FormatSelector::Tiff => format::tiff::main(&mut module, &base).call(),
                         FormatSelector::Utf8Text => format::text::main(&mut module, &base).0.call(),
                         FormatSelector::Gif => format::gif::main(&mut module, &base).call(),
                         FormatSelector::Gzip => {
-                            let deflate = format::deflate::main(&mut module, &base);
+                            let deflate = format::deflate::main(&mut module);
                             format::gzip::main(&mut module, deflate, &base).call()
                         }
                         FormatSelector::Jpeg => {
@@ -207,7 +207,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
                         FormatSelector::Mp4 => format::mpeg4::main(&mut module, &base).call(),
                         FormatSelector::Peano => format::peano::main(&mut module).call(),
                         FormatSelector::Png => {
-                            let deflate = format::deflate::main(&mut module, &base);
+                            let deflate = format::deflate::main(&mut module);
                             let zlib = format::zlib::main(&mut module, &base, deflate);
                             let (text, utf8nz) = format::text::main(&mut module, &base);
                             format::png::main(&mut module, zlib, text, utf8nz, &base).call()
@@ -216,7 +216,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
                         FormatSelector::Rle => format::run_length::main(&mut module, &base).call(),
                         FormatSelector::Tar => format::tar::main(&mut module, &base).call(),
                         FormatSelector::TarGz => {
-                            let deflate = format::deflate::main(&mut module, &base);
+                            let deflate = format::deflate::main(&mut module);
                             let gzip = format::gzip::main(&mut module, deflate, &base);
                             let tar = format::tar::main(&mut module, &base);
                             use doodle::helper::*;
