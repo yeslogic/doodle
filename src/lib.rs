@@ -1327,11 +1327,12 @@ impl Format {
     /// Returns `true` if values associated to this format should be handled as single ASCII characters
     pub fn is_ascii_char_format(&self, module: &FormatModule) -> bool {
         match self {
-            // NOTE - currently only true for named formats matching 'base\.ascii-char.*'
-            Format::ItemVar(level, _args) => module.get_name(*level).starts_with("base.ascii-char"),
-            // NOTE - this is a placeholder for future Hints that may obviate the name-based check
-            Format::Hint(StyleHint::AsciiStr, _) => false,
             Format::Hint(StyleHint::AsciiChar, _) => true,
+            Format::ItemVar(level, _) => module.get_format(*level).is_ascii_char_format(module),
+            Format::Let(.., f) | Format::LetFormat(.., f) | Format::MonadSeq(_, f) => {
+                f.is_ascii_char_format(module)
+            }
+            // FIXME - there may be other recursive cases to consider
             _ => false,
         }
     }
@@ -1339,24 +1340,22 @@ impl Format {
     /// Returns `true` if values associated to this format should be handled as multi-character ASCII strings
     pub fn is_ascii_string_format(&self, module: &FormatModule) -> bool {
         match self {
-            Format::ItemVar(level, _args) => {
-                let fmt_name = module.get_name(*level);
-                // REVIEW - consider different heuristic for short-circuit
-                if fmt_name.contains("ascii-string") || fmt_name.contains("asciiz-string") {
-                    return true;
-                }
-                module.get_format(*level).is_ascii_string_format(module)
-            }
+            Format::Hint(StyleHint::AsciiStr, _) => true,
+            Format::ItemVar(level, _) => module.get_format(*level).is_ascii_string_format(module),
             Format::Tuple(formats) | Format::Sequence(formats) => {
                 !formats.is_empty() && formats.iter().all(|f| f.is_ascii_char_format(module))
             }
             Format::Repeat(format)
             | Format::Repeat1(format)
             | Format::RepeatCount(_, format)
+            | Format::RepeatBetween(_, _, format)
             | Format::RepeatUntilLast(_, format)
             | Format::RepeatUntilSeq(_, format) => format.is_ascii_char_format(module),
+            Format::Let(.., f) | Format::LetFormat(.., f) | Format::MonadSeq(_, f) => {
+                f.is_ascii_string_format(module)
+            }
             Format::Slice(_, format) => format.is_ascii_string_format(module),
-            // NOTE there may be other cases we should consider ASCII
+            // FIXME - there may be other cases we should consider ASCII
             _ => false,
         }
     }
