@@ -147,7 +147,7 @@ impl ByteSet {
                 });
             } else {
                 for lo in mins {
-                    let hi = lo + rank - 1;
+                    let hi = lo + (rank - 1);
                     for i in lo..=hi {
                         overflow.insert(i);
                     }
@@ -198,5 +198,18 @@ impl ByteSet {
 impl std::fmt::Display for ByteSet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.to_best_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_print_partition() {
+        let outlier = ByteSet::singleton(255);
+        let low_range = ByteSet::from(0..=127);
+        let set = low_range.union(&outlier);
+        assert_eq!(set.to_string(), "⟦0,127⟧ ∪ [= 255]");
     }
 }
