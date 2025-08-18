@@ -9,8 +9,7 @@
         │   │   ├── compression-flags <- ReadU8 := 0
         │   │   └── os-id <- ReadU8 := 3
         │   ├── fextra <- maybe (header.file-flags.fextra) gzip.fextra := none
-        │   ├── fname <- maybe (header.file-flags.fname) gzip.fname :=
-        │   │   └── some <- gzip.fname := "test1"
+        │   ├── fname <- maybe (header.file-flags.fname) gzip.fname := { some := "test1" }
         │   ├── fcomment <- maybe (header.file-flags.fcomment) gzip.fcomment := none
         │   ├── fhcrc <- maybe (header.file-flags.fhcrc) gzip.fhcrc := none
         │   ├── data <- bits deflate.main :=
@@ -106,8 +105,7 @@
             │   ├── compression-flags <- ReadU8 := 0
             │   └── os-id <- ReadU8 := 3
             ├── fextra <- maybe (header.file-flags.fextra) gzip.fextra := none
-            ├── fname <- maybe (header.file-flags.fname) gzip.fname :=
-            │   └── some <- gzip.fname := "test2"
+            ├── fname <- maybe (header.file-flags.fname) gzip.fname := { some := "test2" }
             ├── fcomment <- maybe (header.file-flags.fcomment) gzip.fcomment := none
             ├── fhcrc <- maybe (header.file-flags.fhcrc) gzip.fhcrc := none
             ├── data <- bits deflate.main :=
