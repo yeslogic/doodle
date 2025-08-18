@@ -7,8 +7,8 @@
         │   │       ├── marker <- { ... }
         │   │       ├── length <- ReadU16Be := 5426
         │   │       └── data <- slice (length - 2) jpeg.app1-data :=
-        │   │           ├── identifier <- base.asciiz-string := "Exif"
-        │   │           └── data <- match identifier.string { ... } :=
+        │   │           ├── identifier <- ascii-str (let-format chars (repeat [!= 0]) (monad-seq [= 0] (compute chars))) := "Exif"
+        │   │           └── data <- match identifier { ... } :=
         │   │               └── exif <- jpeg.app1-exif :=
         │   │                   ├── padding <- [= 0]
         │   │                   └── exif <- tiff.main :=
@@ -91,8 +91,8 @@
         │   │   │       ├── marker <- { ... }
         │   │   │       ├── length <- ReadU16Be := 4429
         │   │   │       └── data <- slice (length - 2) jpeg.app1-data :=
-        │   │   │           ├── identifier <- base.asciiz-string := "http://ns.adobe.com/xap/1.0/"
-        │   │   │           └── data <- match identifier.string { ... } :=
+        │   │   │           ├── identifier <- ascii-str (let-format chars (repeat [!= 0]) (monad-seq [= 0] (compute chars))) := "http://ns.adobe.com/xap/1.0/"
+        │   │   │           └── data <- match identifier { ... } :=
         │   │   │               └── xmp <- jpeg.app1-xmp :=
         │   │   │                   └── xmp <- repeat ReadU8 :=
         │   │   │                       ├── 0 := 60

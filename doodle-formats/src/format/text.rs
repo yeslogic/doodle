@@ -1,5 +1,3 @@
-use crate::format::BaseModule;
-use crate::format::base::VALID_ASCII;
 use doodle::byte_set::ByteSet;
 use doodle::helper::*;
 use doodle::{Expr, Format, FormatModule, FormatRef};
@@ -22,7 +20,7 @@ fn drop_n_msb(n: usize, format: Format) -> Format {
     )
 }
 
-pub fn main(module: &mut FormatModule, _base: &BaseModule) -> (FormatRef, FormatRef) {
+pub fn main(module: &mut FormatModule) -> (FormatRef, FormatRef) {
     let utf8_tail = module.define_format("utf8.byte.trailing", drop_n_msb(2, byte_in(0x80..=0xBF)));
 
     let ascii_nz: ByteSet = ByteSet::intersection(&VALID_ASCII, &!(ByteSet::singleton(0)));

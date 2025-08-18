@@ -1,8 +1,5 @@
-use crate::format::base::BaseModule;
 use doodle::helper::*;
 use doodle::{Format, FormatModule, FormatRef};
-
-pub mod base;
 
 pub mod deflate;
 pub mod elf;
@@ -26,22 +23,20 @@ pub fn main_stat(module: &mut FormatModule) -> FormatRef {
 }
 
 pub fn main(module: &mut FormatModule) -> FormatRef {
-    let base = base::main(module);
-
     let deflate = deflate::main(module);
 
     let zlib = zlib::main(module, deflate);
 
     let tiff = tiff::main(module);
-    let (text, utf8nz) = text::main(module, &base);
-    let gif = gif::main(module, &base);
-    let gzip = gzip::main(module, deflate, &base);
-    let jpeg = jpeg::main(module, &base, &tiff);
-    let mpeg4 = mpeg4::main(module, &base);
+    let (text, utf8nz) = text::main(module);
+    let gif = gif::main(module);
+    let gzip = gzip::main(module, deflate);
+    let jpeg = jpeg::main(module, tiff);
+    let mpeg4 = mpeg4::main(module);
     let peano = peano::main(module);
-    let png = png::main(module, zlib, text, utf8nz, &base);
-    let riff = riff::main(module, &base);
-    let tar = tar::main(module, &base);
+    let png = png::main(module, zlib, text, utf8nz);
+    let riff = riff::main(module);
+    let tar = tar::main(module);
     let elf = elf::main(module);
     let waldo = waldo::main(module);
     let rle = run_length::main(module);

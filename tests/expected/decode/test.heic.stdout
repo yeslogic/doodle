@@ -39,7 +39,7 @@
             │               │           │   ├── 0 <- ReadU32Be := 0
             │               │           │   ├── 1 <- ReadU32Be := 0
             │               │           │   └── 2 <- ReadU32Be := 0
-            │               │           └── name <- base.asciiz-string := ""
+            │               │           └── name <- ascii-str (let-format chars (repeat [!= 0]) (monad-seq [= 0] (compute chars))) := ""
             │               ├── 1 <- mpeg4.meta-atom :=
             │               │   ├── size-field <- ReadU32Be := 36
             │               │   ├── type <- mpeg4.tag := "dinf"
@@ -109,7 +109,7 @@
             │               │               │                   ├── item_ID <- match (version == 2) { ... } := 1
             │               │               │                   ├── item_protection_index <- ReadU16Be := 0
             │               │               │                   ├── item_type <- mpeg4.tag := "hvc1"
-            │               │               │                   ├── item_name <- base.asciiz-string := ""
+            │               │               │                   ├── item_name <- ascii-str (let-format chars (repeat [!= 0]) (monad-seq [= 0] (compute chars))) := ""
             │               │               │                   └── extra_fields <- match item_type { ... } := unknown
             │               │               ├── 1 <- mpeg4.iinf-atom :=
             │               │               │   ├── size-field <- ReadU32Be := 21
@@ -127,7 +127,7 @@
             │               │               │                   ├── item_ID <- match (version == 2) { ... } := 2
             │               │               │                   ├── item_protection_index <- ReadU16Be := 0
             │               │               │                   ├── item_type <- mpeg4.tag := "hvc1"
-            │               │               │                   ├── item_name <- base.asciiz-string := ""
+            │               │               │                   ├── item_name <- ascii-str (let-format chars (repeat [!= 0]) (monad-seq [= 0] (compute chars))) := ""
             │               │               │                   └── extra_fields <- match item_type { ... } := unknown
             │               │               ├── 2 <- mpeg4.iinf-atom :=
             │               │               │   ├── size-field <- ReadU32Be := 21
@@ -145,7 +145,7 @@
             │               │               │                   ├── item_ID <- match (version == 2) { ... } := 3
             │               │               │                   ├── item_protection_index <- ReadU16Be := 0
             │               │               │                   ├── item_type <- mpeg4.tag := "hvc1"
-            │               │               │                   ├── item_name <- base.asciiz-string := ""
+            │               │               │                   ├── item_name <- ascii-str (let-format chars (repeat [!= 0]) (monad-seq [= 0] (compute chars))) := ""
             │               │               │                   └── extra_fields <- match item_type { ... } := unknown
             │               │               ├── 3 <- mpeg4.iinf-atom :=
             │               │               │   ├── size-field <- ReadU32Be := 21
@@ -163,7 +163,7 @@
             │               │               │                   ├── item_ID <- match (version == 2) { ... } := 4
             │               │               │                   ├── item_protection_index <- ReadU16Be := 0
             │               │               │                   ├── item_type <- mpeg4.tag := "hvc1"
-            │               │               │                   ├── item_name <- base.asciiz-string := ""
+            │               │               │                   ├── item_name <- ascii-str (let-format chars (repeat [!= 0]) (monad-seq [= 0] (compute chars))) := ""
             │               │               │                   └── extra_fields <- match item_type { ... } := unknown
             │               │               ├── 4 <- mpeg4.iinf-atom :=
             │               │               │   ├── size-field <- ReadU32Be := 21
@@ -181,7 +181,7 @@
             │               │               │                   ├── item_ID <- match (version == 2) { ... } := 5
             │               │               │                   ├── item_protection_index <- ReadU16Be := 0
             │               │               │                   ├── item_type <- mpeg4.tag := "hvc1"
-            │               │               │                   ├── item_name <- base.asciiz-string := ""
+            │               │               │                   ├── item_name <- ascii-str (let-format chars (repeat [!= 0]) (monad-seq [= 0] (compute chars))) := ""
             │               │               │                   └── extra_fields <- match item_type { ... } := unknown
             │               │               ├── 5 <- mpeg4.iinf-atom :=
             │               │               │   ├── size-field <- ReadU32Be := 21
@@ -199,7 +199,7 @@
             │               │               │                   ├── item_ID <- match (version == 2) { ... } := 6
             │               │               │                   ├── item_protection_index <- ReadU16Be := 0
             │               │               │                   ├── item_type <- mpeg4.tag := "hvc1"
-            │               │               │                   ├── item_name <- base.asciiz-string := ""
+            │               │               │                   ├── item_name <- ascii-str (let-format chars (repeat [!= 0]) (monad-seq [= 0] (compute chars))) := ""
             │               │               │                   └── extra_fields <- match item_type { ... } := unknown
             │               │               ├── 6 <- mpeg4.iinf-atom :=
             │               │               │   ├── size-field <- ReadU32Be := 21
@@ -217,7 +217,7 @@
             │               │               │                   ├── item_ID <- match (version == 2) { ... } := 7
             │               │               │                   ├── item_protection_index <- ReadU16Be := 0
             │               │               │                   ├── item_type <- mpeg4.tag := "grid"
-            │               │               │                   ├── item_name <- base.asciiz-string := ""
+            │               │               │                   ├── item_name <- ascii-str (let-format chars (repeat [!= 0]) (monad-seq [= 0] (compute chars))) := ""
             │               │               │                   └── extra_fields <- match item_type { ... } := unknown
             │               │               ├── 7 <- mpeg4.iinf-atom :=
             │               │               │   ├── size-field <- ReadU32Be := 21
@@ -235,7 +235,7 @@
             │               │               │                   ├── item_ID <- match (version == 2) { ... } := 8
             │               │               │                   ├── item_protection_index <- ReadU16Be := 0
             │               │               │                   ├── item_type <- mpeg4.tag := "Exif"
-            │               │               │                   ├── item_name <- base.asciiz-string := ""
+            │               │               │                   ├── item_name <- ascii-str (let-format chars (repeat [!= 0]) (monad-seq [= 0] (compute chars))) := ""
             │               │               │                   └── extra_fields <- match item_type { ... } := unknown
             │               │               └── 8 <- mpeg4.iinf-atom :=
             │               │                   ├── size-field <- ReadU32Be := 41
@@ -253,10 +253,10 @@
             │               │                                   ├── item_ID <- match (version == 2) { ... } := 9
             │               │                                   ├── item_protection_index <- ReadU16Be := 0
             │               │                                   ├── item_type <- mpeg4.tag := "mime"
-            │               │                                   ├── item_name <- base.asciiz-string := ""
+            │               │                                   ├── item_name <- ascii-str (let-format chars (repeat [!= 0]) (monad-seq [= 0] (compute chars))) := ""
             │               │                                   └── extra_fields <- match item_type { ... } :=
             │               │                                       └── mime <- { ... } :=
-            │               │                                           └── content_type <- base.asciiz-string := "application/rdf+xml"
+            │               │                                           └── content_type <- ascii-str (let-format chars (repeat [!= 0]) (monad-seq [= 0] (compute chars))) := "application/rdf+xml"
             │               ├── 4 <- mpeg4.meta-atom :=
             │               │   ├── size-field <- ReadU32Be := 64
             │               │   ├── type <- mpeg4.tag := "iref"

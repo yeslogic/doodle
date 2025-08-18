@@ -1,4 +1,3 @@
-use crate::format::BaseModule;
 use doodle::byte_set::ByteSet;
 use doodle::helper::*;
 use doodle::{Expr, Format, FormatModule, FormatRef, Pattern};
@@ -12,7 +11,6 @@ pub fn main(
     zlib: FormatRef,
     utf8text: FormatRef,
     utf8text_nz: FormatRef,
-    base: &BaseModule,
 ) -> FormatRef {
     let chunk = |tag: Format, data: Format| {
         record([
@@ -52,10 +50,7 @@ pub fn main(
         repeat_between(
             Expr::U32(1),
             Expr::U32(79),
-            byte_in(ByteSet::union(
-                &ByteSet::from(32..=126),
-                &ByteSet::from(161..=255),
-            )),
+            byte_in(ByteSet::from(32..=126).union(&ByteSet::from(161..=255))),
         ),
     );
 
@@ -154,7 +149,7 @@ pub fn main(
             ("keyword", null_terminated(keyword.call())),
             ("compression-flag", byte_in([0, 1])),
             ("compression-method", is_byte(0)),
-            ("language-tag", base.asciiz_string()), // REVIEW - there are specific rules to this (1-8--character ascii-only words separated by hyphens)
+            ("language-tag", asciiz_string()), // REVIEW - there are specific rules to this (1-8--character ascii-only words separated by hyphens)
             ("translated-keyword", null_terminated(utf8text_nz.call())),
             ("text", {
                 if_then_else(
@@ -197,7 +192,7 @@ pub fn main(
         "png.text",
         record([
             ("keyword", null_terminated(keyword.call())),
-            ("text", mk_ascii_string(repeat(base.ascii_char()))),
+            ("text", mk_ascii_string(repeat(ascii_char()))),
         ]),
     );
 
@@ -381,7 +376,7 @@ pub fn main(
                 "tag",
                 monad_seq(
                     Format::PeekNot(Box::new(is_byte(b'I'))),
-                    repeat_count(Expr::U32(4), base.ascii_char_strict()),
+                    repeat_count(Expr::U32(4), ascii_char_strict()),
                 ),
             ),
             (

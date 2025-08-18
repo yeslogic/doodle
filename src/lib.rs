@@ -777,6 +777,7 @@ pub enum StyleHint {
         old_style: bool,
     },
     AsciiStr,
+    AsciiChar,
     Common(CommonOp),
 }
 
@@ -1330,6 +1331,7 @@ impl Format {
             Format::ItemVar(level, _args) => module.get_name(*level).starts_with("base.ascii-char"),
             // NOTE - this is a placeholder for future Hints that may obviate the name-based check
             Format::Hint(StyleHint::AsciiStr, _) => false,
+            Format::Hint(StyleHint::AsciiChar, _) => true,
             _ => false,
         }
     }
@@ -1345,7 +1347,7 @@ impl Format {
                 }
                 module.get_format(*level).is_ascii_string_format(module)
             }
-            Format::Tuple(formats) => {
+            Format::Tuple(formats) | Format::Sequence(formats) => {
                 !formats.is_empty() && formats.iter().all(|f| f.is_ascii_char_format(module))
             }
             Format::Repeat(format)

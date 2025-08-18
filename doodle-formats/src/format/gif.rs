@@ -1,11 +1,10 @@
-use crate::format::BaseModule;
 use doodle::{Expr, FormatModule, FormatRef, helper::*};
 
 /// Graphics Interchange Format (GIF)
 ///
 /// - [Graphics Interchange Format Version 89a](https://www.w3.org/Graphics/GIF/spec-gif89a.txt)
 #[allow(clippy::redundant_clone)]
-pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
+pub fn main(module: &mut FormatModule) -> FormatRef {
     fn has_color_table(flags: Expr) -> Expr {
         // (flags->table-flag) != 0
         is_nonzero_u8(record_proj(flags, "table-flag"))
@@ -45,7 +44,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         "gif.header",
         record([
             ("signature", is_bytes(b"GIF")),
-            ("version", seq_repeat(3, base.ascii_char())),
+            ("version", seq_repeat(3, ascii_char())),
         ]),
     );
 
