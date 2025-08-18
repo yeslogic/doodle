@@ -1,14 +1,12 @@
 use std::{fmt, io, rc::Rc};
 
-use crate::decoder::SeqKind;
 use crate::precedence::{Precedence, cond_paren};
 use crate::{
-    Arith, CommonOp, DynFormat, Expr, FieldLabel, Format, FormatModule, IntRel, Pattern,
-    RecordFormat, StyleHint, ViewExpr, ViewFormat,
+    Arith, CommonOp, DynFormat, Expr, FieldLabel, Format, FormatModule, IntRel, Label, Pattern,
+    RecordFormat, StyleHint, UnaryOp, ViewExpr, ViewFormat, byte_set::ByteSet,
 };
-use crate::{Label, UnaryOp};
 use crate::{
-    decoder::Value,
+    decoder::{SeqKind, Value},
     loc_decoder::{ParseLoc, Parsed, ParsedValue},
 };
 
@@ -103,6 +101,9 @@ impl<'module> TreePrinter<'module> {
             Format::EndOfInput => true,
             Format::Byte(bs) => bs.len() == 1,
             Format::Tuple(fields) => fields.iter().all(|f| self.is_implied_value_format(f)),
+            Format::Hint(StyleHint::Common(_), inner) => self.is_implied_value_format(inner),
+            Format::Hint(StyleHint::AsciiChar, inner) => self.is_implied_value_format(inner),
+            Format::Hint(StyleHint::AsciiStr, inner) => self.is_implied_value_format(inner),
             Format::Hint(StyleHint::Record { old_style }, inner) => {
                 if *old_style {
                     self.is_implied_value_format_old_style_record(inner)
@@ -114,9 +115,45 @@ impl<'module> TreePrinter<'module> {
             | Format::Repeat1(format)
             | Format::RepeatCount(_, format)
             | Format::RepeatUntilSeq(_, format)
+            | Format::RepeatBetween(_, _, format)
             | Format::RepeatUntilLast(_, format) => self.is_implied_value_format(format),
             Format::Slice(_, format) => self.is_implied_value_format(format),
-            _ => false,
+            // REVIEW - vvv these cases were previously covered by catch-all false vvv
+            Format::Fail => true,
+            Format::Align(_) => true,
+            Format::Variant(_, inner) => self.is_implied_value_format(inner),
+            Format::Union(formats) | Format::UnionNondet(formats) => {
+                formats.len() == 1 && self.is_implied_value_format(&formats[0])
+            }
+            Format::Sequence(formats) => formats.iter().all(|f| self.is_implied_value_format(f)),
+            Format::AccumUntil(..) => false,
+            Format::ForEach(..) => false,
+            Format::Maybe(..) => false,
+            Format::Peek(format) => self.is_implied_value_format(format),
+            Format::PeekNot(_) => true,
+            Format::Bits(format) => self.is_implied_value_format(format),
+            Format::WithRelativeOffset(.., format) => self.is_implied_value_format(format),
+            Format::Map(format, ..) => self.is_implied_value_format(format),
+            Format::Where(format, ..) => self.is_implied_value_format(format),
+            // NOTE - without knowing whether _expr is a const-expr, we can't know whether the value is implied by the format
+            Format::Compute(_expr) => false,
+            Format::Let(.., format) => self.is_implied_value_format(format),
+            Format::Match(..) => false,
+            Format::Dynamic(.., format) => self.is_implied_value_format(format),
+            Format::Apply(_) => false,
+            Format::Pos => false,
+            Format::SkipRemainder => true,
+            Format::DecodeBytes(_, format) => self.is_implied_value_format(format),
+            Format::LetFormat(.., format) | Format::MonadSeq(_, format) => {
+                self.is_implied_value_format(format)
+            }
+            Format::LiftedOption(opt_format) => opt_format
+                .as_ref()
+                .is_none_or(|f| self.is_implied_value_format(f)),
+            Format::WithView(..) => false,
+            Format::LetView(_, format) | Format::ParseFromView(_, format) => {
+                self.is_implied_value_format(format)
+            }
         }
     }
 
@@ -125,6 +162,7 @@ impl<'module> TreePrinter<'module> {
             Format::ItemVar(level, _args) => self.is_atomic_format(self.module.get_format(*level)),
             Format::Byte(_) => true,
             Format::Hint(StyleHint::Common(..), inner) => self.is_atomic_format(inner),
+            Format::Hint(StyleHint::AsciiChar, inner) => self.is_atomic_format(inner),
             _ => false,
         }
     }
@@ -285,6 +323,14 @@ impl<'module> TreePrinter<'module> {
             ParsedValue::Branch(_n, value) => self.compile_parsed_value(value),
             ParsedValue::Option(None) => Fragment::string("none"),
             ParsedValue::Option(Some(value)) => self.compile_parsed_variant("some", value, None),
+        }
+    }
+
+    fn compile_byteset(&self, bs: &ByteSet) -> Fragment {
+        if bs.is_empty() {
+            unreachable!("matches against empty byteset are unsatisfiable")
+        } else {
+            Fragment::String(bs.to_best_string())
         }
     }
 }
@@ -578,6 +624,13 @@ impl<'module> TreePrinter<'module> {
                     self.compile_ascii_string(value)
                 } else {
                     self.compile_decoded_value(value, str_format)
+                }
+            }
+            Format::Hint(StyleHint::AsciiChar, char_format) => {
+                if self.flags.pretty_ascii_strings {
+                    self.compile_ascii_char(value)
+                } else {
+                    self.compile_decoded_value(value, char_format)
                 }
             }
             Format::Hint(StyleHint::Common(CommonOp::EndianParse(..)), inner) => {
@@ -2294,29 +2347,7 @@ impl<'module> TreePrinter<'module> {
             Format::Pos => Fragment::string("pos"),
             Format::Align(n) => Fragment::String(format!("align {n}").into()),
 
-            Format::Byte(bs) => match bs.len() {
-                0 => unreachable!("matches against the empty byteset are unsatisfiable"),
-                1..=127 => {
-                    let mut frags = FragmentBuilder::new();
-                    frags.push(Fragment::String("[=".into()));
-                    for b in bs.iter() {
-                        frags.push(Fragment::String(format!(" {b}").into()));
-                    }
-                    frags.push(Fragment::Char(']'));
-                    frags.finalize()
-                }
-                128..=255 => {
-                    let mut frags = FragmentBuilder::new();
-                    frags.push(Fragment::String("[!=".into()));
-                    for b in (!bs).iter() {
-                        frags.push(Fragment::String(format!(" {b}").into()));
-                    }
-                    frags.push(Fragment::Char(']'));
-                    frags.finalize()
-                }
-                256 => Fragment::String("U8".into()),
-                _n => unreachable!("impossible ByteSet size {_n}"),
-            },
+            Format::Byte(bs) => self.compile_byteset(bs),
             Format::Tuple(formats) if formats.is_empty() => Fragment::String("()".into()),
             Format::Tuple(_) => Fragment::String("(...)".into()),
 
@@ -2346,6 +2377,11 @@ impl<'module> TreePrinter<'module> {
             }
             Format::Hint(StyleHint::AsciiStr, str_format) => cond_paren(
                 self.compile_nested_format("ascii-str", None, str_format, prec),
+                prec,
+                Precedence::FORMAT_COMPOUND,
+            ),
+            Format::Hint(StyleHint::AsciiChar, char_format) => cond_paren(
+                self.compile_nested_format("ascii-char", None, char_format, prec),
                 prec,
                 Precedence::FORMAT_COMPOUND,
             ),

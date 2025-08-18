@@ -1,9 +1,8 @@
-use crate::format::BaseModule;
 use doodle::helper::{BitFieldKind::*, *};
 use doodle::{Format, FormatModule, FormatRef};
 
 /// gzip
-pub fn main(module: &mut FormatModule, deflate: FormatRef, base: &BaseModule) -> FormatRef {
+pub fn main(module: &mut FormatModule, deflate: FormatRef) -> FormatRef {
     // NOTE: Packed bits
     //   0 0 0 x x x x x
     // [|7 6 5 4 3 2 1 0|]
@@ -43,14 +42,14 @@ pub fn main(module: &mut FormatModule, deflate: FormatRef, base: &BaseModule) ->
     );
 
     let fname_flag = record_lens(var("header"), &["file-flags", "fname"]);
-    let fname = module.define_format("gzip.fname", base.asciiz_string());
+    let fname = module.define_format("gzip.fname", asciiz_string());
 
     let fextra_flag = record_lens(var("header"), &["file-flags", "fextra"]);
     let fextra_subfield = module.define_format(
         "gzip.fextra.subfield",
         record([
-            ("si1", base.ascii_char()),
-            ("si2", base.ascii_char()),
+            ("si1", ascii_char()),
+            ("si2", ascii_char()),
             ("len", u16le()),
             ("data", repeat_count(var("len"), u8())),
         ]),
@@ -74,7 +73,7 @@ pub fn main(module: &mut FormatModule, deflate: FormatRef, base: &BaseModule) ->
     let fcomment = module.define_format(
         "gzip.fcomment",
         record([
-            ("comment", base.asciiz_string()), // actually LATIN-1 but asciiz is good enough for now
+            ("comment", asciiz_string()), // actually LATIN-1 but asciiz is good enough for now
         ]),
     );
 

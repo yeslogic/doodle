@@ -1,11 +1,10 @@
-use crate::format::BaseModule;
 use doodle::{Expr, Format, FormatModule, FormatRef, Pattern, helper::*};
 
 /// JPEG File Interchange Format
 ///
 /// - [JPEG File Interchange Format Version 1.02](https://www.w3.org/Graphics/JPEG/jfif3.pdf)
 /// - [ITU T.81 | ISO IEC 10918-1](https://www.w3.org/Graphics/JPEG/itu-t81.pdf)
-pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> FormatRef {
+pub fn main(module: &mut FormatModule, tiff: FormatRef) -> FormatRef {
     fn marker(id: u8) -> Format {
         record([("ff", is_byte(0xFF)), ("marker", is_byte(id))])
     }
@@ -277,11 +276,11 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
     let app0_data = module.define_format(
         "jpeg.app0-data",
         record([
-            ("identifier", base.asciiz_string()),
+            ("identifier", asciiz_string()),
             (
                 "data",
                 match_variant(
-                    record_proj(var("identifier"), "string"),
+                    var("identifier"),
                     vec![
                         (Pattern::from_bytes(b"JFIF"), "jfif", app0_jfif.call()),
                         // FIXME: there are other APP0 formats
@@ -308,11 +307,11 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
     let app1_data = module.define_format(
         "jpeg.app1-data",
         record([
-            ("identifier", base.asciiz_string()),
+            ("identifier", asciiz_string()),
             (
                 "data",
                 match_variant(
-                    record_proj(var("identifier"), "string"),
+                    var("identifier"),
                     vec![
                         (Pattern::from_bytes(b"Exif"), "exif", app1_exif.call()),
                         (

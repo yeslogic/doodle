@@ -176,8 +176,6 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
             let format = match as_format {
                 None => format::main(&mut module).call(),
                 Some(selector) => {
-                    let base = format::base::main(&mut module);
-
                     let normalized = selector.to_lowercase();
                     let Some(selected) = SELECTOR_MAP
                         .try_with(|map| map.get(normalized.as_str()).copied())
@@ -194,31 +192,31 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
                             format::zlib::main(&mut module, deflate).call()
                         }
                         FormatSelector::Tiff => format::tiff::main(&mut module).call(),
-                        FormatSelector::Utf8Text => format::text::main(&mut module, &base).0.call(),
-                        FormatSelector::Gif => format::gif::main(&mut module, &base).call(),
+                        FormatSelector::Utf8Text => format::text::main(&mut module).0.call(),
+                        FormatSelector::Gif => format::gif::main(&mut module).call(),
                         FormatSelector::Gzip => {
                             let deflate = format::deflate::main(&mut module);
-                            format::gzip::main(&mut module, deflate, &base).call()
+                            format::gzip::main(&mut module, deflate).call()
                         }
                         FormatSelector::Jpeg => {
                             let tiff = format::tiff::main(&mut module);
-                            format::jpeg::main(&mut module, &base, &tiff).call()
+                            format::jpeg::main(&mut module, tiff).call()
                         }
-                        FormatSelector::Mp4 => format::mpeg4::main(&mut module, &base).call(),
+                        FormatSelector::Mp4 => format::mpeg4::main(&mut module).call(),
                         FormatSelector::Peano => format::peano::main(&mut module).call(),
                         FormatSelector::Png => {
                             let deflate = format::deflate::main(&mut module);
                             let zlib = format::zlib::main(&mut module, deflate);
-                            let (text, utf8nz) = format::text::main(&mut module, &base);
-                            format::png::main(&mut module, zlib, text, utf8nz, &base).call()
+                            let (text, utf8nz) = format::text::main(&mut module);
+                            format::png::main(&mut module, zlib, text, utf8nz).call()
                         }
-                        FormatSelector::Riff => format::riff::main(&mut module, &base).call(),
+                        FormatSelector::Riff => format::riff::main(&mut module).call(),
                         FormatSelector::Rle => format::run_length::main(&mut module).call(),
-                        FormatSelector::Tar => format::tar::main(&mut module, &base).call(),
+                        FormatSelector::Tar => format::tar::main(&mut module).call(),
                         FormatSelector::TarGz => {
                             let deflate = format::deflate::main(&mut module);
-                            let gzip = format::gzip::main(&mut module, deflate, &base);
-                            let tar = format::tar::main(&mut module, &base);
+                            let gzip = format::gzip::main(&mut module, deflate);
+                            let tar = format::tar::main(&mut module);
                             use doodle::helper::*;
                             module
                                 .define_format(

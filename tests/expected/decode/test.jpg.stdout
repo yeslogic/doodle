@@ -7,8 +7,8 @@
         │   │       ├── marker <- { ... }
         │   │       ├── length <- ReadU16Be := 16
         │   │       └── data <- slice (length - 2) jpeg.app0-data :=
-        │   │           ├── identifier <- base.asciiz-string := "JFIF"
-        │   │           └── data <- match identifier.string { ... } :=
+        │   │           ├── identifier <- ascii-str (let-format chars (repeat [!= 0]) (monad-seq [= 0] (compute chars))) := "JFIF"
+        │   │           └── data <- match identifier { ... } :=
         │   │               └── jfif <- jpeg.app0-jfif :=
         │   │                   ├── version-major <- ReadU8 := 1
         │   │                   ├── version-minor <- ReadU8 := 1

@@ -168,7 +168,7 @@
             │           │                       │           ├── component_manufacturer <- ReadU32Be := 0
             │           │                       │           ├── component_flags <- ReadU32Be := 0
             │           │                       │           ├── component_flags_mask <- ReadU32Be := 0
-            │           │                       │           └── component_name <- base.asciiz-string := "Bento4 Video Handler"
+            │           │                       │           └── component_name <- ascii-str (let-format chars (repeat [!= 0]) (monad-seq [= 0] (compute chars))) := "Bento4 Video Handler"
             │           │                       └── 2 <- mpeg4.mdia-atom :=
             │           │                           ├── size-field <- ReadU32Be := 1833
             │           │                           ├── type <- mpeg4.tag := "minf"
@@ -464,7 +464,7 @@
             │           │                       │           ├── component_manufacturer <- ReadU32Be := 0
             │           │                       │           ├── component_flags <- ReadU32Be := 0
             │           │                       │           ├── component_flags_mask <- ReadU32Be := 0
-            │           │                       │           └── component_name <- base.asciiz-string := "Bento4 Sound Handler"
+            │           │                       │           └── component_name <- ascii-str (let-format chars (repeat [!= 0]) (monad-seq [= 0] (compute chars))) := "Bento4 Sound Handler"
             │           │                       └── 2 <- mpeg4.mdia-atom :=
             │           │                           ├── size-field <- ReadU32Be := 4084
             │           │                           ├── type <- mpeg4.tag := "minf"
@@ -743,7 +743,7 @@
             │                                       │           │   ├── 0 <- ReadU32Be := 1634758764
             │                                       │           │   ├── 1 <- ReadU32Be := 0
             │                                       │           │   └── 2 <- ReadU32Be := 0
-            │                                       │           └── name <- base.asciiz-string := ""
+            │                                       │           └── name <- ascii-str (let-format chars (repeat [!= 0]) (monad-seq [= 0] (compute chars))) := ""
             │                                       └── 1 <- mpeg4.meta-atom :=
             │                                           ├── size-field <- ReadU32Be := 45
             │                                           ├── type <- mpeg4.tag := "ilst"
@@ -764,7 +764,7 @@
             │                                                                       └── data <- { ... } :=
             │                                                                           ├── type_indicator <- ReadU32Be := 1
             │                                                                           ├── locale_indicator <- ReadU32Be := 0
-            │                                                                           └── value <- repeat base.ascii-char := "Lavf59.27.100"
+            │                                                                           └── value <- repeat (ascii-char U8) := "Lavf59.27.100"
             ├── 2 <- mpeg4.atom :=
             │   ├── size-field <- ReadU32Be := 8
             │   ├── type <- mpeg4.tag := "free"

@@ -1,8 +1,7 @@
-use crate::format::BaseModule;
 use doodle::helper::*;
 use doodle::{Expr, Format, FormatModule, FormatRef};
 
-pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
+pub fn main(module: &mut FormatModule) -> FormatRef {
     fn is_odd(num: Expr) -> Expr {
         // (num % 2) == 1
         expr_eq(rem(num, Expr::U32(2)), Expr::U32(1))
@@ -17,7 +16,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         ])
     };
 
-    let any_tag = module.define_format("riff.tag", tuple_repeat(4, base.ascii_char()));
+    let any_tag = module.define_format("riff.tag", tuple_repeat(4, ascii_char()));
 
     let any_chunk = module.define_format("riff.chunk", chunk(any_tag.call(), opaque_bytes()));
 

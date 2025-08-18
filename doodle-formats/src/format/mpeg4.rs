@@ -1,4 +1,3 @@
-use crate::format::BaseModule;
 use doodle::helper::{u8, *};
 use doodle::{Expr, Format, FormatModule, FormatRef, Pattern};
 
@@ -20,16 +19,8 @@ fn tag_pattern3(tag: [char; 3]) -> Pattern {
     ])
 }
 
-pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
-    let tag = module.define_format(
-        "mpeg4.tag",
-        tuple([
-            base.ascii_char(),
-            base.ascii_char(),
-            base.ascii_char(),
-            base.ascii_char(),
-        ]),
-    );
+pub fn main(module: &mut FormatModule) -> FormatRef {
+    let tag = module.define_format("mpeg4.tag", tuple_repeat(4, ascii_char()));
 
     fn make_atom(tag: FormatRef, data: Format) -> Format {
         record([
@@ -70,7 +61,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         ("component_manufacturer", u32be()),
         ("component_flags", u32be()),
         ("component_flags_mask", u32be()),
-        ("component_name", base.asciiz_string()),
+        ("component_name", asciiz_string()),
     ]);
 
     let meta_hdlr_data = record([
@@ -79,7 +70,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         ("predefined", u32be()),
         ("handler_type", tag.call()),
         ("reserved", tuple_repeat(3, u32be())),
-        ("name", base.asciiz_string()),
+        ("name", asciiz_string()),
     ]);
 
     let pitm_data = record([
@@ -101,9 +92,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 record([
                     ("item_ID", u16be()),
                     ("item_protection_index", u16be()),
-                    ("item_name", base.asciiz_string()),
-                    ("content_type", base.asciiz_string()),
-                    ("content_encoding", base.asciiz_string()),
+                    ("item_name", asciiz_string()),
+                    ("content_type", asciiz_string()),
+                    ("content_encoding", asciiz_string()),
                     // FIXME unfinished
                 ]),
                 record([
@@ -117,7 +108,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ),
                     ("item_protection_index", u16be()),
                     ("item_type", tag.call()),
-                    ("item_name", base.asciiz_string()),
+                    ("item_name", asciiz_string()),
                     (
                         "extra_fields",
                         match_variant(
@@ -127,14 +118,14 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                     tag_pattern(['m', 'i', 'm', 'e']),
                                     "mime",
                                     record([
-                                        ("content_type", base.asciiz_string()),
-                                        //FIXME optional ("content_encoding", base.asciiz_string()),
+                                        ("content_type", asciiz_string()),
+                                        //FIXME optional ("content_encoding", asciiz_string()),
                                     ]),
                                 ),
                                 (
                                     tag_pattern(['u', 'r', 'i', ' ']),
                                     "uri",
-                                    record([("item_uri_type", base.asciiz_string())]),
+                                    record([("item_uri_type", asciiz_string())]),
                                 ),
                                 (
                                     Pattern::Wildcard,
@@ -634,7 +625,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let data_data = record([
         ("type_indicator", u32be()),
         ("locale_indicator", u32be()),
-        ("value", repeat(base.ascii_char())),
+        ("value", repeat(ascii_char())),
     ]);
 
     let edts_atom = module.define_format(

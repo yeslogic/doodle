@@ -1489,6 +1489,11 @@ pub fn read_array(len: Expr, kind: BaseKind<Endian>) -> ViewFormat {
     ViewFormat::ReadArray(Box::new(len), kind)
 }
 
+/// Helper for [`Format::Hint`]
+pub fn hint(hint: StyleHint, format: Format) -> Format {
+    Format::Hint(hint, Box::new(format))
+}
+
 pub mod base {
     use super::*;
     use crate::CommonOp;
@@ -1541,8 +1546,134 @@ pub mod base {
 }
 pub use base::{bit, u8, u16be, u16le, u32be, u32le, u64be, u64le};
 
-/// Helper for opaque byte-sequences standing in for data that we do not currently
-/// have an description for
+pub mod ascii {
+    use super::{mk_ascii_string, *};
+    use std::ops::RangeInclusive;
+
+    /// ByteSet consisting of 0..=127, or the valid ASCII range (including control characters)
+    pub const VALID_ASCII: ByteSet = ByteSet::from_bits([u64::MAX, u64::MAX, 0, 0]);
+
+    /// Range-based definition of ASCII octal digits (0-7).
+    pub const ASCII_OCTAL_RANGE: RangeInclusive<u8> = b'0'..=b'7';
+    // /// Array-base definition of ASCIIo octal digits (0-7.)
+    // pub const ASCII_OCTAL_ARRAY: [u8; 8] = [b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7'];
+
+    /// Range-based definition of ASCII decimal digits (0-9).
+    pub const ASCII_DECIMAL_RANGE: RangeInclusive<u8> = b'0'..=b'9';
+    // /// Array-base definition of ASCII decimal digits (0-9).
+    // pub const ASCII_DECIMAL_ARRAY: [u8; 10] = [b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9'];
+
+    /// Array-based definition of ASCII lower-case hexadecimal digits (0-9, a-f).
+    pub const ASCII_HEX_LOWER: [u8; 16] = [
+        b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9', b'a', b'b', b'c', b'd', b'e',
+        b'f',
+    ];
+
+    /// Array-based definition of ASCII upper-case hexadecimal digits (0-9, A-F).
+    pub const ASCII_HEX_UPPER: [u8; 16] = [
+        b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9', b'A', b'B', b'C', b'D', b'E',
+        b'F',
+    ];
+
+    /// Array-based definition of ASCII hexadecimal digits (0-9, a-f, A-F).
+    pub const ASCII_HEX_ANY: [u8; 22] = [
+        b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9', b'A', b'B', b'C', b'D', b'E',
+        b'F', b'a', b'b', b'c', b'd', b'e', b'f',
+    ];
+
+    /// Enumeration of ASCII characters that are considered "printable" (i.e. all non-control, plus tabs and newlines).
+    pub const ASCII_CHAR_STRICT: ByteSet = const {
+        // low-low mask covering range 32..64
+        let ll_mask: u64 = 0xffff_ffff_0000_0000;
+        // low-high mask covering range 64..=127
+        let lh_mask: u64 = 0xffff_ffff_ffff_ffff;
+
+        let nl_mask: u64 = 1 << b'\n';
+        let cr_mask: u64 = 1 << b'\r';
+        let tab_mask: u64 = 1 << b'\t';
+
+        let ctrl_mask: u64 = nl_mask | cr_mask | tab_mask;
+
+        let bits = [ll_mask | ctrl_mask, lh_mask, 0, 0];
+
+        ByteSet::from_bits(bits)
+    };
+
+    pub const ASCII_CHAR_NON_STRICT: ByteSet = ByteSet::full();
+
+    pub fn ascii_char() -> Format {
+        hint(StyleHint::AsciiChar, Format::Byte(ASCII_CHAR_NON_STRICT))
+    }
+
+    pub fn ascii_char_strict() -> Format {
+        hint(StyleHint::AsciiChar, Format::Byte(ASCII_CHAR_STRICT))
+    }
+
+    pub fn asciiz_string() -> Format {
+        mk_ascii_string(chain(
+            repeat(not_byte(0x00)),
+            "chars",
+            monad_seq(is_byte(0x00), compute(var("chars"))),
+        ))
+    }
+
+    pub fn ascii_octal_digit() -> Format {
+        hint(
+            StyleHint::AsciiChar,
+            Format::Byte(ByteSet::from(ASCII_OCTAL_RANGE)),
+        )
+    }
+
+    pub fn ascii_decimal_digit() -> Format {
+        hint(
+            StyleHint::AsciiChar,
+            Format::Byte(ByteSet::from(ASCII_DECIMAL_RANGE)),
+        )
+    }
+
+    pub fn ascii_hex_lower() -> Format {
+        hint(
+            StyleHint::AsciiChar,
+            Format::Byte(ByteSet::from(ASCII_HEX_LOWER)),
+        )
+    }
+
+    pub fn ascii_hex_upper() -> Format {
+        hint(
+            StyleHint::AsciiChar,
+            Format::Byte(ByteSet::from(ASCII_HEX_UPPER)),
+        )
+    }
+
+    pub fn ascii_hex_any() -> Format {
+        hint(
+            StyleHint::AsciiChar,
+            Format::Byte(ByteSet::from(ASCII_HEX_ANY)),
+        )
+    }
+}
+pub use ascii::{
+    VALID_ASCII, ascii_char, ascii_char_strict, ascii_decimal_digit, ascii_hex_any,
+    ascii_hex_lower, ascii_hex_upper, ascii_octal_digit, asciiz_string,
+};
+
+/// Helper for opaque byte-sequences that stand in for uninterpreted or delayed-interpretation
+/// data.
 pub fn opaque_bytes() -> Format {
     repeat(u8())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::FormatModule;
+
+    #[test]
+    fn is_ascii_char_sanity() {
+        let module = FormatModule::new();
+
+        assert!(ascii_char().is_ascii_char_format(&module));
+        assert!(ascii_char_strict().is_ascii_char_format(&module));
+        assert!(!u8().is_ascii_char_format(&module));
+    }
 }
