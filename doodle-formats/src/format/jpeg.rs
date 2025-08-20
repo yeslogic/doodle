@@ -1,5 +1,19 @@
 use doodle::{Expr, Format, FormatModule, FormatRef, Pattern, helper::*};
 
+fn u4_pair(hi: &'static str, lo: &'static str) -> Format {
+    use BitFieldKind::*;
+    bit_fields_u8([
+        BitsField {
+            field_name: hi,
+            bit_width: 4,
+        },
+        BitsField {
+            field_name: lo,
+            bit_width: 4,
+        },
+    ])
+}
+
 /// JPEG File Interchange Format
 ///
 /// - [JPEG File Interchange Format Version 1.02](https://www.w3.org/Graphics/JPEG/jfif3.pdf)
@@ -18,8 +32,7 @@ pub fn main(module: &mut FormatModule, tiff: FormatRef) -> FormatRef {
     };
 
     // NOTE -  Bit data: { horizontal <- u4, vertical <- u4 }
-    // FIXME[epic=refactor] - replace with bit_fields_u8
-    let sampling_factor = packed_bits_u8([4, 4], ["horizontal", "vertical"]);
+    let sampling_factor = u4_pair("horizontal", "vertical");
 
     // SOF_n: Frame header (See ITU T.81 Section B.2.2)
     let sof_data = {
@@ -54,8 +67,7 @@ pub fn main(module: &mut FormatModule, tiff: FormatRef) -> FormatRef {
     // class <- u4 = 0 | 1;
     // table-id <- u4 = 0 |..| 3;
     let class_table_id = where_lambda(
-        // FIXME[epic=refactor] - replace with bit_fields_u8
-        packed_bits_u8([4, 4], ["class", "table-id"]),
+        u4_pair("class", "table-id"),
         "class-table-id",
         and(
             expr_lt(record_proj(var("class-table-id"), "class"), Expr::U8(2)),
@@ -86,11 +98,7 @@ pub fn main(module: &mut FormatModule, tiff: FormatRef) -> FormatRef {
     // dc-entropy-coding-table-id <- u4 //= 0 | .. | 3 (restricted to 0 | 1 when baseline sequential DCT)
     // ac-entropy-coding-table-id <- u4 //= 0 | .. | 3 (restricted to 0 | 1 when baseline sequential DCT, or simply 0 when lossless)
     let entropy_coding_table_ids = where_lambda(
-        // FIXME[epic=refactor] - replace with bit_fields_u8
-        packed_bits_u8(
-            [4, 4],
-            ["dc-entropy-coding-table-id", "ac-entropy-coding-table-id"],
-        ),
+        u4_pair("dc-entropy-coding-table-id", "ac-entropy-coding-table-id"),
         "entropy-coding-table-ids",
         and(
             expr_lte(
@@ -121,8 +129,7 @@ pub fn main(module: &mut FormatModule, tiff: FormatRef) -> FormatRef {
         );
 
         // NOTE: Bit data: { high <- u4, low <- u4 }
-        // FIXME[epic=refactor] - replace with bit_fields_u8
-        let approximation_bit_position = packed_bits_u8([4, 4], ["high", "low"]);
+        let approximation_bit_position = u4_pair("high", "low");
 
         module.define_format(
             "jpeg.sos-data",
@@ -143,8 +150,7 @@ pub fn main(module: &mut FormatModule, tiff: FormatRef) -> FormatRef {
     // precision <- u4 //= 0 | 1;
     // table-id <- u4 //= 0 |..| 3;
     let precision_table_id = where_lambda(
-        // FIXME[epic=refactor] - replace with bit_fields_u8
-        packed_bits_u8([4, 4], ["precision", "table-id"]),
+        u4_pair("precision", "table-id"),
         "precision-table-id",
         and(
             expr_lte(
@@ -195,8 +201,7 @@ pub fn main(module: &mut FormatModule, tiff: FormatRef) -> FormatRef {
     let dri_data = module.define_format("jpeg.dri-data", record([("restart-interval", u16be())]));
 
     // NOTE: Bit data: { horizontal <- u4, vertical <- u4 }
-    // FIXME[epic=refactor] - replace with bit_fields_u8
-    let sampling_factor = packed_bits_u8([4, 4], ["horizontal", "vertical"]);
+    let sampling_factor = u4_pair("horizontal", "vertical");
 
     // DHP: Define hierarchial progression (See ITU T.81 Section B.3.2)
     // NOTE: Same as SOF except for quantization-table-id
@@ -229,8 +234,7 @@ pub fn main(module: &mut FormatModule, tiff: FormatRef) -> FormatRef {
     // expand-horizontal <- u4 // 0 | 1;
     // expand-vertical <- u4 // 0 | 1;
     let expand_horizontal_vertical = where_lambda(
-        // FIXME[epic=refactor] - replace with bit_fields_u8
-        packed_bits_u8([4, 4], ["expand-horizontal", "expand-vertical"]),
+        u4_pair("expand-horizontal", "expand-vertical"),
         "x",
         and(
             expr_lte(record_proj(var("x"), "expand-horizontal"), Expr::U8(1)),

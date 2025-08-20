@@ -1,15 +1,26 @@
 use doodle::{Expr, Format, FormatModule, FormatRef, helper::*};
 
 pub fn main(module: &mut FormatModule, deflate: FormatRef) -> FormatRef {
-    let method_and_flags = where_lambda(
-        // FIXME[epic=refactor] - replace with bit_fields_u8
-        packed_bits_u8([4, 4], ["compression-info", "compression-method"]),
-        "method-info",
-        expr_eq(
-            record_proj(var("method-info"), "compression-method"),
-            Expr::U8(8),
-        ),
-    );
+    let method_and_flags = {
+        use BitFieldKind::*;
+        where_lambda(
+            bit_fields_u8([
+                BitsField {
+                    field_name: "compression-info",
+                    bit_width: 4,
+                },
+                BitsField {
+                    field_name: "compression-method",
+                    bit_width: 4,
+                },
+            ]),
+            "method-info",
+            expr_eq(
+                record_proj(var("method-info"), "compression-method"),
+                Expr::U8(8),
+            ),
+        )
+    };
 
     // helper for checking whether a dictionary is present according to the flags
     let has_dict = |flags: Expr| record_proj(flags, "fdict");
