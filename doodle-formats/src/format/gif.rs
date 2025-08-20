@@ -7,7 +7,7 @@ use doodle::{Expr, FormatModule, FormatRef, helper::*};
 pub fn main(module: &mut FormatModule) -> FormatRef {
     fn has_color_table(flags: Expr) -> Expr {
         // (flags->table-flag) != 0
-        is_nonzero_u8(record_proj(flags, "table-flag"))
+        record_proj(flags, "table-flag")
     }
 
     fn color_table_len(flags: Expr) -> Expr {
@@ -56,11 +56,24 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
     // NOTE: Global and local Color Tables have to have the same field-names for
     // common fields in order to ensure that the helpers that extract those values
     // are applicable to both cases without any extra work.
-    // FIXME[epic=refactor] - replace with bit_fields_u8
-    let logical_screen_descriptor_flags = packed_bits_u8(
-        [1, 3, 1, 3],
-        ["table-flag", "color-resolution", "sort-flag", "table-size"],
-    );
+    let logical_screen_descriptor_flags = {
+        use BitFieldKind::*;
+        module.define_format(
+            "gif.logical-screen-descriptor.flags",
+            bit_fields_u8([
+                FlagBit("table-flag"), // Global Color Table (a Global Color Table will follow iff this flag is set)
+                BitsField {
+                    field_name: "color-resolution",
+                    bit_width: 3,
+                }, // Number of bits per primary color available to original image, minus 1
+                FlagBit("sort-flag"), // Indicates whether global color table is sorted (1=true) or unsorted (0=false)
+                BitsField {
+                    field_name: "table-size",
+                    bit_width: 3,
+                }, // Used to determine the number of bytes in the global color table via `2^(n+1)`, which should be specified whether or not GCT flag is set
+            ]),
+        )
+    };
 
     // 18. Logical Screen Descriptor
     let logical_screen_descriptor = module.define_format(
@@ -68,7 +81,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
         record([
             ("screen-width", u16le()),
             ("screen-height", u16le()),
-            ("flags", logical_screen_descriptor_flags),
+            ("flags", logical_screen_descriptor_flags.call()),
             ("bg-color-index", u8()),
             ("pixel-aspect-ratio", u8()),
         ]),
@@ -86,17 +99,25 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
     // NOTE: Global and local Color Tables have to have the same field-names for
     // common fields in order to ensure that the helpers that extract those values
     // are applicable to both cases without any extra work.
-    // FIXME[epic=refactor] - replace with bit_fields_u8
-    let image_descriptor_flags = packed_bits_u8(
-        [1, 1, 1, 2, 3],
-        [
-            "table-flag",
-            "interlace-flag",
-            "sort-flag",
-            "reserved",
-            "table-size",
-        ],
-    );
+    let image_descriptor_flags = {
+        use BitFieldKind::*;
+        module.define_format(
+            "gif.image-descriptor.flags",
+            bit_fields_u8([
+                FlagBit("table-flag"),
+                FlagBit("interlace-flag"),
+                FlagBit("sort-flag"),
+                Reserved {
+                    bit_width: 2,
+                    check_zero: false,
+                },
+                BitsField {
+                    field_name: "table-size",
+                    bit_width: 3,
+                },
+            ]),
+        )
+    };
 
     // 20. Image Descriptor
     let image_descriptor = module.define_format(
@@ -107,7 +128,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
             ("image-top-position", u16le()),
             ("image-width", u16le()),
             ("image-height", u16le()),
-            ("flags", image_descriptor_flags),
+            ("flags", image_descriptor_flags.call()),
         ]),
     );
 
@@ -129,16 +150,24 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
     //                        Disposal Method               3 Bits
     //                        User Input Flag               1 Bit
     //                        Transparent Color Flag        1 Bit
-    // FIXME[epic=refactor] - replace with bit_fields_u8
-    let graphic_control_extension_flags = packed_bits_u8(
-        [3, 3, 1, 1],
-        [
-            "reserved",
-            "disposal-method",
-            "user-input-flag",
-            "transparent-color-flag",
-        ],
-    );
+    let graphic_control_extension_flags = {
+        use BitFieldKind::*;
+        module.define_format(
+            "gif.graphic-control-extension.flags",
+            bit_fields_u8([
+                Reserved {
+                    bit_width: 3,
+                    check_zero: false,
+                },
+                BitsField {
+                    field_name: "disposal-method",
+                    bit_width: 3,
+                },
+                FlagBit("user-input-flag"),
+                FlagBit("transparent-color-flag"),
+            ]),
+        )
+    };
 
     // 23. Graphic Control Extension
     let graphic_control_extension = module.define_format(
@@ -147,7 +176,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
             ("separator", is_byte(0x21)),
             ("label", is_byte(0xF9)),
             ("block-size", is_byte(4)),
-            ("flags", graphic_control_extension_flags),
+            ("flags", graphic_control_extension_flags.call()),
             ("delay-time", u16le()),
             ("transparent-color-index", u8()),
             ("terminator", block_terminator.call()),
