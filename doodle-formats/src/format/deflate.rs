@@ -1,6 +1,6 @@
 use doodle::{
-    BaseType, DynFormat, Expr, Format, FormatModule, FormatRef, Pattern, ValueType, bounds::Bounds,
-    helper::*,
+    BaseType, DynFormat, Expr, Format, FormatModule, FormatRef, Label, Pattern, ValueType,
+    bounds::Bounds, helper::*,
 };
 
 fn shl_u8(x: Expr, r: u8) -> Expr {
@@ -190,7 +190,7 @@ fn fixed_code_lengths() -> Expr {
 
 /// Deflate
 ///
-#[allow(clippy::redundant_clone)]
+// #[allow(clippy::redundant_clone)]
 pub fn main(module: &mut FormatModule) -> FormatRef {
     let bits2 = bits8(2);
     let bits3 = bits8(3);
@@ -538,7 +538,8 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                             vec![
                                 (Pattern::U16(256), Expr::Seq(vec![])),
                                 (Pattern::Int(Bounds::new(257, 285)), reference_record()),
-                                (Pattern::Int(Bounds::new(286, 287)), Expr::Seq(vec![])), // 286, 287 are illegal but we don't want to fail completely
+                                // NOTE - whether or not we might see 286 or 287, we should elide them for code-value interpretation purposes
+                                (Pattern::Int(Bounds::new(286, 287)), Expr::Seq(vec![])),
                                 (
                                     Pattern::Wildcard,
                                     Expr::Seq(vec![variant(
@@ -555,6 +556,123 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
         ]),
     );
 
+    // code length alphabet code lengths
+    const CLA_CODE_LENGTHS: [u8; 19] = [
+        16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15,
+    ];
+
+    // NOTE - this format can't work standalone because it has an Apply...only use in the appropriate Dynamic environment.
+    let lld_alphabet_code_lengths = {
+        /*
+         * update function for flat_map_accum used below
+         *   last-symbol [accum :~ Option<u8>] := the last symbol, used when the code is 16
+         *   cl-code-extra := record storing a `code` in the code-length-alphabet, and potentially some additional data `extra`
+         */
+        let expand_cl_code = lambda_tuple(
+            ["last-symbol", "cl-code-extra"],
+            expr_match(
+                as_u8(record_proj(var("cl-code-extra"), "code")),
+                vec![
+                    (
+                        Pattern::U8(16),
+                        Expr::Tuple(vec![
+                            var("last-symbol"),
+                            dup(
+                                // FIXME[epic=dup32]: we ought to be able to use dup without an explicit u32 cast
+                                as_u32(add(
+                                    record_proj(var("cl-code-extra"), "extra"),
+                                    Expr::U8(3),
+                                )),
+                                expr_unwrap(var("last-symbol")),
+                            ),
+                        ]),
+                    ),
+                    (
+                        Pattern::U8(17),
+                        Expr::Tuple(vec![
+                            expr_some(Expr::U8(0)),
+                            dup(
+                                // FIXME[epic=dup32]: we ought to be able to use dup without an explicit u32 cast
+                                as_u32(add(
+                                    record_proj(var("cl-code-extra"), "extra"),
+                                    Expr::U8(3),
+                                )),
+                                Expr::U8(0),
+                            ),
+                        ]),
+                    ),
+                    (
+                        Pattern::U8(18),
+                        Expr::Tuple(vec![
+                            expr_some(Expr::U8(0)),
+                            dup(
+                                as_u32(add(
+                                    record_proj(var("cl-code-extra"), "extra"),
+                                    Expr::U8(11),
+                                )),
+                                Expr::U8(0),
+                            ),
+                        ]),
+                    ),
+                    (
+                        Pattern::binding("v"),
+                        Expr::Tuple(vec![expr_some(var("v")), Expr::Seq(vec![var("v")])]),
+                    ),
+                ],
+            ),
+        );
+        module.define_format_args(
+            "deflate.dynamic-huffman.literal-length-distance-alphabet-code-lengths",
+            vec![
+                (Label::Borrowed("hlit"), ValueType::Base(BaseType::U8)),
+                (Label::Borrowed("hdist"), ValueType::Base(BaseType::U8)),
+                (
+                    Label::Borrowed("code-length-alphabet-code-lengths"),
+                    ValueType::Seq(Box::new(ValueType::Base(BaseType::U8))),
+                ),
+            ],
+            Format::Dynamic(
+                Label::Borrowed("code-length-alphabet-format"),
+                DynFormat::Huffman(
+                    Box::new(var("code-length-alphabet-code-lengths")),
+                    Some(Box::new(expr_lift_seq(CLA_CODE_LENGTHS, Expr::U8))),
+                ),
+                Box::new(repeat_until_seq(
+                    lambda(
+                        "y",
+                        expr_gte(
+                            seq_length(flat_map_accum(
+                                expand_cl_code,
+                                expr_none(),
+                                ValueType::Option(Box::new(ValueType::Base(BaseType::U8))),
+                                var("y"),
+                            )),
+                            add(as_u32(add(var("hlit"), var("hdist"))), Expr::U32(258)),
+                        ),
+                    ),
+                    record([
+                        (
+                            "code",
+                            Format::Apply(Label::Borrowed("code-length-alphabet-format")),
+                        ),
+                        (
+                            "extra",
+                            fmt_match(
+                                as_u8(var("code")),
+                                [
+                                    (Pattern::U8(16), bits2.clone()),
+                                    (Pattern::U8(17), bits3.clone()),
+                                    (Pattern::U8(18), bits7.clone()),
+                                    (Pattern::Wildcard, compute(Expr::U8(0))),
+                                ],
+                            ),
+                        ),
+                    ]),
+                )),
+            ),
+        )
+    };
+
     let dynamic_huffman = module.define_format(
         "deflate.dynamic_huffman",
         record([
@@ -567,124 +685,11 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
             ),
             (
                 "literal-length-distance-alphabet-code-lengths",
-                Format::Dynamic(
-                    "code-length-alphabet-format".into(),
-                    DynFormat::Huffman(
-                        Box::new(var("code-length-alphabet-code-lengths")),
-                        Some(Box::new(Expr::Seq(vec![
-                            Expr::U8(16),
-                            Expr::U8(17),
-                            Expr::U8(18),
-                            Expr::U8(0),
-                            Expr::U8(8),
-                            Expr::U8(7),
-                            Expr::U8(9),
-                            Expr::U8(6),
-                            Expr::U8(10),
-                            Expr::U8(5),
-                            Expr::U8(11),
-                            Expr::U8(4),
-                            Expr::U8(12),
-                            Expr::U8(3),
-                            Expr::U8(13),
-                            Expr::U8(2),
-                            Expr::U8(14),
-                            Expr::U8(1),
-                            Expr::U8(15),
-                        ]))),
-                    ),
-                    Box::new(repeat_until_seq(
-                        lambda(
-                            "y",
-                            expr_gte(
-                                seq_length(flat_map_accum(
-                                    lambda_tuple(
-                                        ["last-symbol", "cl-code-extra"],
-                                        expr_match(
-                                            as_u8(record_proj(var("cl-code-extra"), "code")),
-                                            vec![
-                                                (
-                                                    Pattern::U8(16),
-                                                    Expr::Tuple(vec![
-                                                        var("last-symbol"),
-                                                        dup(
-                                                            as_u32(add(
-                                                                record_proj(
-                                                                    var("cl-code-extra"),
-                                                                    "extra",
-                                                                ),
-                                                                Expr::U8(3),
-                                                            )),
-                                                            expr_unwrap(var("last-symbol")),
-                                                        ),
-                                                    ]),
-                                                ),
-                                                (
-                                                    Pattern::U8(17),
-                                                    Expr::Tuple(vec![
-                                                        expr_some(Expr::U8(0)),
-                                                        dup(
-                                                            as_u32(add(
-                                                                record_proj(
-                                                                    var("cl-code-extra"),
-                                                                    "extra",
-                                                                ),
-                                                                Expr::U8(3),
-                                                            )),
-                                                            Expr::U8(0),
-                                                        ),
-                                                    ]),
-                                                ),
-                                                (
-                                                    Pattern::U8(18),
-                                                    Expr::Tuple(vec![
-                                                        expr_some(Expr::U8(0)),
-                                                        dup(
-                                                            as_u32(add(
-                                                                record_proj(
-                                                                    var("cl-code-extra"),
-                                                                    "extra",
-                                                                ),
-                                                                Expr::U8(11),
-                                                            )),
-                                                            Expr::U8(0),
-                                                        ),
-                                                    ]),
-                                                ),
-                                                (
-                                                    Pattern::binding("v"),
-                                                    Expr::Tuple(vec![
-                                                        expr_some(var("v")),
-                                                        Expr::Seq(vec![var("v")]),
-                                                    ]),
-                                                ),
-                                            ],
-                                        ),
-                                    ),
-                                    expr_none(),
-                                    ValueType::Option(Box::new(ValueType::Base(BaseType::U8))),
-                                    var("y"),
-                                )),
-                                add(as_u32(add(var("hlit"), var("hdist"))), Expr::U32(258)),
-                            ),
-                        ),
-                        record([
-                            ("code", Format::Apply("code-length-alphabet-format".into())),
-                            (
-                                "extra",
-                                Format::Match(
-                                    Box::new(as_u8(var("code"))),
-                                    vec![
-                                        (Pattern::U8(16), bits2.clone()),
-                                        (Pattern::U8(17), bits3.clone()),
-                                        (Pattern::U8(18), bits7.clone()),
-                                        (Pattern::Wildcard, compute(Expr::U8(0))),
-                                    ],
-                                ),
-                            ),
-                        ]),
-                    )),
-                ),
+                lld_alphabet_code_lengths.call_args(vec![
+                    var("hlit"),
+                    var("hdist"),
+                    var("code-length-alphabet-code-lengths"),
+                ]),
             ),
             (
                 "literal-length-distance-alphabet-code-lengths-value",
