@@ -694,6 +694,10 @@ pub fn seq_length(seq: Expr) -> Expr {
     Expr::SeqLength(Box::new(seq))
 }
 
+pub fn expr_lift_seq<T>(elems: impl IntoIterator<Item = T>, f: impl Fn(T) -> Expr) -> Expr {
+    Expr::Seq(elems.into_iter().map(f).collect())
+}
+
 pub fn sub_seq(seq: Expr, start: Expr, length: Expr) -> Expr {
     Expr::SubSeq(Box::new(seq), Box::new(start), Box::new(length))
 }

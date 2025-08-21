@@ -1,4 +1,4 @@
-use doodle::helper::{BitFieldKind::*, *};
+use doodle::helper::*;
 use doodle::{Format, FormatModule, FormatRef};
 
 /// gzip
@@ -12,24 +12,30 @@ pub fn main(module: &mut FormatModule, deflate: FormatRef) -> FormatRef {
     //             ^ | |   FEXTRA
     //               ^ |   FHCRC
     //                 ^   FTEXT
-    let flg = bit_fields_u8([
-        Reserved {
-            bit_width: 3,
-            check_zero: true,
-        },
-        FlagBit("fcomment"),
-        FlagBit("fname"),
-        FlagBit("fextra"),
-        FlagBit("fhcrc"),
-        FlagBit("ftext"),
-    ]);
+    let file_flags = {
+        use BitFieldKind::*;
+        module.define_format(
+            "gzip.header.file-flags",
+            bit_fields_u8([
+                Reserved {
+                    bit_width: 3,
+                    check_zero: true,
+                },
+                FlagBit("fcomment"),
+                FlagBit("fname"),
+                FlagBit("fextra"),
+                FlagBit("fhcrc"),
+                FlagBit("ftext"),
+            ]),
+        )
+    };
 
     let header = module.define_format(
         "gzip.header",
         record([
             ("magic", is_bytes(b"\x1F\x8B")),
             ("method", u8()),
-            ("file-flags", flg),
+            ("file-flags", file_flags.call()),
             ("timestamp", u32le()),
             ("compression-flags", u8()),
             ("os-id", u8()),
@@ -60,10 +66,7 @@ pub fn main(module: &mut FormatModule, deflate: FormatRef) -> FormatRef {
             ("xlen", u16le()),
             (
                 "subfields",
-                Format::Slice(
-                    Box::new(var("xlen")),
-                    Box::new(repeat(fextra_subfield.call())),
-                ),
+                slice(var("xlen"), repeat(fextra_subfield.call())),
             ),
         ]),
     );
@@ -73,7 +76,8 @@ pub fn main(module: &mut FormatModule, deflate: FormatRef) -> FormatRef {
     let fcomment = module.define_format(
         "gzip.fcomment",
         record([
-            ("comment", asciiz_string()), // actually LATIN-1 but asciiz is good enough for now
+            // NOTE - The actual string is Latin-1 but asciiz seems to work (for now)
+            ("comment", asciiz_string()),
         ]),
     );
 
