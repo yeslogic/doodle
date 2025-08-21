@@ -11,7 +11,7 @@ use doodle::prelude::*;
 use doodle::try_sub;
 
 /// expected size: 16
-/// trait-ready: unique decoder function (d#7)
+/// trait-ready: unique decoder function (d#4)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_table_record {
 table_id: u32,
@@ -29,7 +29,7 @@ axis_value_offsets: ReadArray<'input, U16Be>
 }
 
 /// expected size: 88
-/// trait-ready: unique decoder function (d#9)
+/// trait-ready: unique decoder function (d#6)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_stat_table<'input> {
 major_version: u16,
@@ -43,14 +43,14 @@ elided_fallback_name_id: u16
 }
 
 /// expected size: 88
-/// trait-ready: unique decoder function (d#8)
+/// trait-ready: unique decoder function (d#5)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_table_directory_table_links<'input> {
 stat: Option<opentype_stat_table<'input>>
 }
 
 /// expected size: 128
-/// trait-ready: unique decoder function (d#3)
+/// trait-ready: unique decoder function (d#2)
 #[derive(Debug, Clone)]
 pub struct opentype_table_directory<'input> {
 sfnt_version: u32,
@@ -95,7 +95,7 @@ dsig_offset: u32
 pub enum opentype_ttc_header_header<'input> { UnknownVersion(u16), Version1(opentype_ttc_header_header_Version1<'input>), Version2(opentype_ttc_header_header_Version2<'input>) }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#4)
+/// trait-ready: unique decoder function (d#3)
 #[derive(Debug, Clone)]
 pub struct opentype_ttc_header<'input> {
 ttc_tag: u32,
@@ -118,16 +118,8 @@ magic: u32,
 directory: opentype_main_directory<'input>
 }
 
-/// expected size: 32
-/// trait-ready: unique decoder function (d#11)
-#[derive(Debug, Clone)]
-pub struct base_asciiz_string {
-string: Vec<u8>,
-null: u8
-}
-
 /// expected size: 8
-/// trait-ready: unique decoder function (d#12)
+/// trait-ready: unique decoder function (d#8)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_stat_axis_record {
 axis_tag: u32,
@@ -205,7 +197,7 @@ axis_values: Vec<opentype_stat_axis_value_table_data_Format4_axis_values>
 pub enum opentype_stat_axis_value_table_data { Format1(opentype_stat_axis_value_table_data_Format1), Format2(opentype_stat_axis_value_table_data_Format2), Format3(opentype_stat_axis_value_table_data_Format3), Format4(opentype_stat_axis_value_table_data_Format4) }
 
 /// expected size: 48
-/// trait-ready: unique decoder function (d#13)
+/// trait-ready: unique decoder function (d#9)
 #[derive(Debug, Clone)]
 pub struct opentype_stat_axis_value_table {
 format: u16,
@@ -225,7 +217,10 @@ x as u32
 };
 let magic = {
 _input.open_peek_context();
-let ret = (Decoder2(_input))?;
+let ret = ((|| {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+PResult::Ok(u32be(x))
+})())?;
 _input.close_peek_context()?;
 ret
 };
@@ -258,15 +253,12 @@ PResult::Ok(opentype_main { file_start, magic, directory })
 }
 
 /// d#2
-fn Decoder2(_input: &mut Parser<'_>) -> Result<u32, ParseError> {
-let x = ((Decoder6(_input))?, (Decoder6(_input))?, (Decoder6(_input))?, (Decoder6(_input))?);
-PResult::Ok(u32be(x))
-}
-
-/// d#3
 fn Decoder_opentype_table_directory<'input>(_input: &mut Parser<'input>, font_start: u32) -> Result<opentype_table_directory<'input>, ParseError> {
 let sfnt_version = {
-let inner = (Decoder2(_input))?;
+let inner = {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u32be(x)
+};
 let is_valid = {
 let version = inner;
 matches!(version, 65536u32 | 1330926671u32 | 1953658213u32)
@@ -277,10 +269,22 @@ inner
 return Err(ParseError::FalsifiedWhere(2206609067086327257u64));
 }
 };
-let num_tables = (Decoder5(_input))?;
-let search_range = (Decoder5(_input))?;
-let entry_selector = (Decoder5(_input))?;
-let range_shift = (Decoder5(_input))?;
+let num_tables = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+let search_range = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+let entry_selector = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+let range_shift = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
 let table_records = {
 let mut accum = Vec::new();
 for _ in 0..num_tables {
@@ -293,10 +297,13 @@ let table_links = (Decoder_opentype_table_directory_table_links(_input, font_sta
 PResult::Ok(opentype_table_directory { sfnt_version, num_tables, search_range, entry_selector, range_shift, table_records, table_links })
 }
 
-/// d#4
+/// d#3
 fn Decoder_opentype_ttc_header<'input>(_input: &mut Parser<'input>, start: u32) -> Result<opentype_ttc_header<'input>, ParseError> {
 let ttc_tag = {
-let inner = (Decoder2(_input))?;
+let inner = {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u32be(x)
+};
 let is_valid = {
 let tag = inner;
 tag == 1953784678u32
@@ -307,17 +314,29 @@ inner
 return Err(ParseError::FalsifiedWhere(11876854719037224982u64));
 }
 };
-let major_version = (Decoder5(_input))?;
-let minor_version = (Decoder5(_input))?;
+let major_version = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+let minor_version = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
 let header = match major_version {
 1u16 => {
 let inner = {
-let num_fonts = (Decoder2(_input))?;
+let num_fonts = {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u32be(x)
+};
 let table_directories = {
 let mut accum = Vec::new();
 for _ in 0..num_fonts {
 let next_elem = {
-let offset = (Decoder2(_input))?;
+let offset = {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u32be(x)
+};
 let link = match offset > 0u32 {
 true => {
 let tgt_offset = start + offset;
@@ -344,12 +363,18 @@ opentype_ttc_header_header::Version1(inner)
 
 2u16 => {
 let inner = {
-let num_fonts = (Decoder2(_input))?;
+let num_fonts = {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u32be(x)
+};
 let table_directories = {
 let mut accum = Vec::new();
 for _ in 0..num_fonts {
 let next_elem = {
-let offset = (Decoder2(_input))?;
+let offset = {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u32be(x)
+};
 let link = match offset > 0u32 {
 true => {
 let tgt_offset = start + offset;
@@ -369,9 +394,18 @@ accum.push(next_elem)
 };
 accum
 };
-let dsig_tag = (Decoder2(_input))?;
-let dsig_length = (Decoder2(_input))?;
-let dsig_offset = (Decoder2(_input))?;
+let dsig_tag = {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u32be(x)
+};
+let dsig_length = {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u32be(x)
+};
+let dsig_offset = {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u32be(x)
+};
 opentype_ttc_header_header_Version2 { num_fonts, table_directories, dsig_tag, dsig_length, dsig_offset }
 };
 opentype_ttc_header_header::Version2(inner)
@@ -386,27 +420,25 @@ _input.skip_remainder();
 PResult::Ok(opentype_ttc_header { ttc_tag, major_version, minor_version, header })
 }
 
-/// d#5
-fn Decoder5(_input: &mut Parser<'_>) -> Result<u16, ParseError> {
-let x = ((Decoder6(_input))?, (Decoder6(_input))?);
-PResult::Ok(u16be(x))
-}
-
-/// d#6
-fn Decoder6(_input: &mut Parser<'_>) -> Result<u8, ParseError> {
-_input.read_byte()
-}
-
-/// d#7
+/// d#4
 fn Decoder_opentype_table_record(_input: &mut Parser<'_>) -> Result<opentype_table_record, ParseError> {
-let table_id = (Decoder10(_input))?;
-let checksum = (Decoder2(_input))?;
-let offset = (Decoder2(_input))?;
-let length = (Decoder2(_input))?;
+let table_id = (Decoder7(_input))?;
+let checksum = {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u32be(x)
+};
+let offset = {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u32be(x)
+};
+let length = {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u32be(x)
+};
 PResult::Ok(opentype_table_record { table_id, checksum, offset, length })
 }
 
-/// d#8
+/// d#5
 fn Decoder_opentype_table_directory_table_links<'input>(_input: &mut Parser<'input>, start: u32, tables: &[opentype_table_record]) -> Result<opentype_table_directory_table_links<'input>, ParseError> {
 let stat = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1398030676u32, tables)).copied() {
 Some(ref table) => {
@@ -431,11 +463,14 @@ _input.skip_remainder();
 PResult::Ok(opentype_table_directory_table_links { stat })
 }
 
-/// d#9
+/// d#6
 fn Decoder_opentype_stat_table<'input>(_input: &mut Parser<'input>) -> Result<opentype_stat_table<'input>, ParseError> {
 let table_scope = _input.view();
 let major_version = {
-let inner = (Decoder5(_input))?;
+let inner = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
 let is_valid = {
 let x = inner;
 x == 1u16
@@ -447,7 +482,10 @@ return Err(ParseError::FalsifiedWhere(18270091135093349626u64));
 }
 };
 let minor_version = {
-let inner = (Decoder5(_input))?;
+let inner = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
 let is_valid = {
 let x = inner;
 matches!(x, 1u16 | 2u16)
@@ -458,15 +496,30 @@ inner
 return Err(ParseError::FalsifiedWhere(6185506036438099345u64));
 }
 };
-let design_axis_size = (Decoder5(_input))?;
-let design_axis_count = (Decoder5(_input))?;
-let _design_axes_offset = (Decoder2(_input))?;
+let design_axis_size = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+let design_axis_count = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+let _design_axes_offset = {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u32be(x)
+};
 let design_axes_array = {
 let len = design_axis_size * design_axis_count;
 table_scope.offset(_design_axes_offset as usize)?.read_len(len as usize)
 };
-let axis_value_count = (Decoder5(_input))?;
-let _offset_to_axis_value_offsets = (Decoder2(_input))?;
+let axis_value_count = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+let _offset_to_axis_value_offsets = {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u32be(x)
+};
 let axis_value_offsets = {
 let mut view_parser = Parser::from(table_scope.offset(_offset_to_axis_value_offsets as usize)?);
 let view_input = &mut view_parser;
@@ -475,79 +528,40 @@ let axis_value_view = axis_value_scope;
 let axis_value_offsets = axis_value_scope.read_array_u16be(axis_value_count as usize)?;
 opentype_stat_table_axis_value_offsets { axis_value_view, axis_value_offsets }
 };
-let elided_fallback_name_id = (Decoder5(_input))?;
+let elided_fallback_name_id = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
 PResult::Ok(opentype_stat_table { major_version, minor_version, design_axis_size, design_axis_count, design_axes_array, axis_value_count, axis_value_offsets, elided_fallback_name_id })
 }
 
-/// d#10
-fn Decoder10(_input: &mut Parser<'_>) -> Result<u32, ParseError> {
-Decoder2(_input)
+/// d#7
+fn Decoder7(_input: &mut Parser<'_>) -> Result<u32, ParseError> {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+PResult::Ok(u32be(x))
 }
 
-/// d#11
-fn Decoder_base_asciiz_string(_input: &mut Parser<'_>) -> Result<base_asciiz_string, ParseError> {
-let string = {
-let mut accum = Vec::new();
-while _input.remaining() > 0 {
-let matching_ix = {
-_input.open_peek_context();
-{
-let ret = match _input.read_byte()? {
-byte if (byte != 0) => {
-0
-},
-
-0u8 => {
-1
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(15794382300316794652u64));
-}
-};
-_input.close_peek_context()?;
-ret
-}
-};
-if matching_ix == 0 {
-let next_elem = {
-let b = _input.read_byte()?;
-if b != 0 {
-b
-} else {
-return Err(ParseError::ExcludedBranch(18147521187885925800u64));
-}
-};
-accum.push(next_elem)
-} else {
-break
-}
-};
-accum
-};
-let null = {
-let b = _input.read_byte()?;
-if b == 0 {
-b
-} else {
-return Err(ParseError::ExcludedBranch(7364705619221056123u64));
-}
-};
-PResult::Ok(base_asciiz_string { string, null })
-}
-
-/// d#12
+/// d#8
 fn Decoder_opentype_stat_axis_record(_input: &mut Parser<'_>) -> Result<opentype_stat_axis_record, ParseError> {
-let axis_tag = (Decoder10(_input))?;
-let axis_name_id = (Decoder5(_input))?;
-let axis_ordering = (Decoder5(_input))?;
+let axis_tag = (Decoder7(_input))?;
+let axis_name_id = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+let axis_ordering = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
 PResult::Ok(opentype_stat_axis_record { axis_tag, axis_name_id, axis_ordering })
 }
 
-/// d#13
+/// d#9
 fn Decoder_opentype_stat_axis_value_table(_input: &mut Parser<'_>) -> Result<opentype_stat_axis_value_table, ParseError> {
 let format = {
-let inner = (Decoder5(_input))?;
+let inner = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
 let is_valid = {
 let x = inner;
 matches!(x, 1u16..=4u16)
@@ -555,13 +569,16 @@ matches!(x, 1u16..=4u16)
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(2404222719611925354u64));
+return Err(ParseError::FalsifiedWhere(15794382300316794652u64));
 }
 };
 let data = match format {
 1u16 => {
 let inner = {
-let axis_index = (Decoder5(_input))?;
+let axis_index = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
 let flags = {
 let packed_bits = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -569,10 +586,16 @@ u16be(x)
 };
 opentype_stat_axis_value_table_data_Format1_flags { elidable_axis_value_name: packed_bits >> 1u16 & 1u16 > 0u16, older_sibling_font_attribute: packed_bits & 1u16 > 0u16 }
 };
-let value_name_id = (Decoder5(_input))?;
+let value_name_id = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
 let value = {
-let x = (Decoder2(_input))?;
-opentype_stat_axis_value_table_data_Format1_value::Fixed32(x)
+let inner = {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u32be(x)
+};
+opentype_stat_axis_value_table_data_Format1_value::Fixed32(inner)
 };
 opentype_stat_axis_value_table_data_Format1 { axis_index, flags, value_name_id, value }
 };
@@ -581,7 +604,10 @@ opentype_stat_axis_value_table_data::Format1(inner)
 
 2u16 => {
 let inner = {
-let axis_index = (Decoder5(_input))?;
+let axis_index = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
 let flags = {
 let packed_bits = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -589,18 +615,30 @@ u16be(x)
 };
 opentype_stat_axis_value_table_data_Format1_flags { elidable_axis_value_name: packed_bits >> 1u16 & 1u16 > 0u16, older_sibling_font_attribute: packed_bits & 1u16 > 0u16 }
 };
-let value_name_id = (Decoder5(_input))?;
+let value_name_id = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
 let nominal_value = {
-let x = (Decoder2(_input))?;
-opentype_stat_axis_value_table_data_Format1_value::Fixed32(x)
+let inner = {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u32be(x)
+};
+opentype_stat_axis_value_table_data_Format1_value::Fixed32(inner)
 };
 let range_min_value = {
-let x = (Decoder2(_input))?;
-opentype_stat_axis_value_table_data_Format1_value::Fixed32(x)
+let inner = {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u32be(x)
+};
+opentype_stat_axis_value_table_data_Format1_value::Fixed32(inner)
 };
 let range_max_value = {
-let x = (Decoder2(_input))?;
-opentype_stat_axis_value_table_data_Format1_value::Fixed32(x)
+let inner = {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u32be(x)
+};
+opentype_stat_axis_value_table_data_Format1_value::Fixed32(inner)
 };
 opentype_stat_axis_value_table_data_Format2 { axis_index, flags, value_name_id, nominal_value, range_min_value, range_max_value }
 };
@@ -609,7 +647,10 @@ opentype_stat_axis_value_table_data::Format2(inner)
 
 3u16 => {
 let inner = {
-let axis_index = (Decoder5(_input))?;
+let axis_index = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
 let flags = {
 let packed_bits = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -617,14 +658,23 @@ u16be(x)
 };
 opentype_stat_axis_value_table_data_Format1_flags { elidable_axis_value_name: packed_bits >> 1u16 & 1u16 > 0u16, older_sibling_font_attribute: packed_bits & 1u16 > 0u16 }
 };
-let value_name_id = (Decoder5(_input))?;
+let value_name_id = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
 let value = {
-let x = (Decoder2(_input))?;
-opentype_stat_axis_value_table_data_Format1_value::Fixed32(x)
+let inner = {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u32be(x)
+};
+opentype_stat_axis_value_table_data_Format1_value::Fixed32(inner)
 };
 let linked_value = {
-let x = (Decoder2(_input))?;
-opentype_stat_axis_value_table_data_Format1_value::Fixed32(x)
+let inner = {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u32be(x)
+};
+opentype_stat_axis_value_table_data_Format1_value::Fixed32(inner)
 };
 opentype_stat_axis_value_table_data_Format3 { axis_index, flags, value_name_id, value, linked_value }
 };
@@ -633,7 +683,10 @@ opentype_stat_axis_value_table_data::Format3(inner)
 
 4u16 => {
 let inner = {
-let axis_count = (Decoder5(_input))?;
+let axis_count = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
 let flags = {
 let packed_bits = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -641,15 +694,24 @@ u16be(x)
 };
 opentype_stat_axis_value_table_data_Format1_flags { elidable_axis_value_name: packed_bits >> 1u16 & 1u16 > 0u16, older_sibling_font_attribute: packed_bits & 1u16 > 0u16 }
 };
-let value_name_id = (Decoder5(_input))?;
+let value_name_id = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
 let axis_values = {
 let mut accum = Vec::new();
 for _ in 0..axis_count {
 let next_elem = {
-let axis_index = (Decoder5(_input))?;
+let axis_index = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
 let value = {
-let x = (Decoder2(_input))?;
-opentype_stat_axis_value_table_data_Format1_value::Fixed32(x)
+let inner = {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u32be(x)
+};
+opentype_stat_axis_value_table_data_Format1_value::Fixed32(inner)
 };
 opentype_stat_axis_value_table_data_Format4_axis_values { axis_index, value }
 };
