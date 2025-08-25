@@ -360,6 +360,8 @@ pub fn main(
         ]),
     );
 
+    let png_tag = png_tag(module);
+
     let png_chunk = module.define_format_args(
         "png.chunk",
         vec![("ihdr".into(), ihdr_type)],
@@ -374,10 +376,7 @@ pub fn main(
             ),
             (
                 "tag",
-                monad_seq(
-                    Format::PeekNot(Box::new(is_byte(b'I'))),
-                    repeat_count(Expr::U32(4), ascii_char_strict()),
-                ),
+                png_tag.call()
             ),
             (
                 "data",
@@ -451,4 +450,13 @@ pub fn main(
             ("iend", iend.call()),
         ]),
     )
+}
+
+pub fn png_tag(module: &mut FormatModule) -> FormatRef {
+    let anti_pattern = monad_seq(is_byte(b'I'), any_of([is_bytes(b"DAT"), is_bytes(b"END")]));
+    // let anti_pattern = is_byte(b'I');
+    module.define_format("png.tag", excluding(
+        anti_pattern,
+        fixed_len_string(ascii_alpha(), 4),
+    ))
 }
