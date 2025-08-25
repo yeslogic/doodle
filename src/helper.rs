@@ -953,6 +953,16 @@ pub fn monad_seq(f0: Format, f: Format) -> Format {
     Format::MonadSeq(Box::new(f0), Box::new(f))
 }
 
+/// Parses a format but discards its value, returning `()`.
+///
+/// This can be used to use heterogeneously typed formats in contexts
+/// that normally require homogeneous types, if the value is irrelevant
+/// (e.g. applying `peek` or `peek_not` over a union of individual formats that would
+/// not typecheck as-is).
+pub fn void(f: Format) -> Format {
+    monad_seq(f, compute(Expr::UNIT))
+}
+
 /// Helper for destructuring an `Expr`-level tuple-value into a set of locally bound variables.
 ///
 /// # Notes
@@ -1258,6 +1268,23 @@ pub fn slice(len: Expr, inner: Format) -> Format {
     Format::Slice(Box::new(len), Box::new(inner))
 }
 
+pub fn any_of(formats: impl IntoIterator<Item = Format>) -> Format {
+    Format::UnionNondet(formats.into_iter().map(void).collect())
+}
+
+/// Helper for parsing a given Format `inner` in such a way that none of the formats
+/// in the list of `negative` are matched.
+///
+/// Can be used for filtering out a specific subset of exceptions to a general rule
+/// without designing a format that explicitly excludes such exceptions in its
+/// definition.
+pub fn excluding(negative: Format, inner: Format) -> Format {
+    monad_seq(
+        Format::PeekNot(Box::new(negative)),
+        inner,
+    )
+}
+
 /// Constructs a balanced (i.e. minimized max depth) tree of `bitor`-joined
 /// nodes of type Expr.
 ///
@@ -1560,6 +1587,36 @@ pub mod ascii {
         b'F', b'a', b'b', b'c', b'd', b'e', b'f',
     ];
 
+    pub const ASCII_ALPHA_UPPER: RangeInclusive<u8> = b'A'..=b'Z';
+    pub const ASCII_ALPHA_LOWER: RangeInclusive<u8> = b'a'..=b'z';
+
+    /// [`ByteSet`] consisting of ASCII char-codes for `'A'..='Z'` and `'a..='z'`.
+    ///
+    /// ```
+    /// # use doodle::helper::ascii::*;
+    /// # use doodle::byte_set::ByteSet;
+    /// assert_eq!(ASCII_ALPHA_ANY, ByteSet::union(&ByteSet::from(ASCII_ALPHA_UPPER), &ByteSet::from(ASCII_ALPHA_LOWER)));
+    /// ```
+    pub const ASCII_ALPHA_ANY: ByteSet = const {
+        // mask consisting of 26 set bits, for selecting an alphabet-sized range of bytes
+        const ALPHA_MASK: u64 = 0x3FFFFFF;
+
+        // all alphabetic characters live in the range 64..=127,
+        // which is index 1 of the `[u64; 4]` we are building
+
+        // therefore, the lowest byte in the mask we are setting is nominally shifted by 0x40,
+        // so we use this to relativize our 'A'/'a' shift-values,
+        const LH_START: u32 = 0x40;
+
+        const LOWER_A: u32 = 0x61;
+        const UPPER_A: u32 = 0x41;
+
+        const ALPHA_LC: u64 = ALPHA_MASK << (LOWER_A - LH_START);
+        const ALPHA_UC: u64 = ALPHA_MASK << (UPPER_A - LH_START);
+
+        ByteSet::from_bits([0, ALPHA_LC | ALPHA_UC, 0, 0])
+    };
+
     /// Enumeration of ASCII characters that are considered "printable" (i.e. all non-control, plus tabs and newlines).
     pub const ASCII_CHAR_STRICT: ByteSet = const {
         // low-low mask covering range 32..64
@@ -1580,14 +1637,28 @@ pub mod ascii {
 
     pub const ASCII_CHAR_NON_STRICT: ByteSet = ByteSet::full();
 
+    /// A single-byte parse that is hinted to display as ASCII.
+    ///
+    /// Does not enforce that the byte is a valid ASCII character; all bytes will succeed.
     pub fn ascii_char() -> Format {
         hint(StyleHint::AsciiChar, Format::Byte(ASCII_CHAR_NON_STRICT))
     }
 
-    pub fn ascii_char_strict() -> Format {
-        hint(StyleHint::AsciiChar, Format::Byte(ASCII_CHAR_STRICT))
+    /// A single-byte parse over non-control characters in the valid ASCII range.
+    ///
+    /// Includes newline, tab, and carriage return, as well as all printable ASCII characters
+    /// (32..=126)
+    pub fn ascii_alpha() -> Format {
+        hint(StyleHint::AsciiChar, Format::Byte(ASCII_ALPHA_ANY))
     }
 
+    /// C-style string format: a NUL-terminated byte-sequence that is hinted to display as ASCII
+    ///
+    /// Even though the name implies the byte-contents is ascii, ASCII validity is not enforced;
+    /// as long as the buffer uses one byte per character (e.g. ISO 8859-1/Latin-1), this format
+    /// can only fail if a terminal NUL is not present.
+    ///
+    /// The raw parse corresponds to `([^\x00]*)\x00`; that is, a possibly-empty run of non-NUL bytes followed by a single null byte, which is consumed but omitted from the parsed value)
     pub fn asciiz_string() -> Format {
         mk_ascii_string(chain(
             repeat(not_byte(0x00)),
@@ -1630,10 +1701,23 @@ pub mod ascii {
             Format::Byte(ByteSet::from(ASCII_HEX_ANY)),
         )
     }
+
+    /// Given a format that parses a single character (byte),
+    /// returns a format that parses strings of those characters (which can be empty).
+    pub fn string_of(char_f: Format) -> Format {
+        hint(StyleHint::AsciiStr, repeat(char_f))
+    }
+
+    /// Given a format that parses a single character (byte) and a constant length,
+    /// returns a format that parses `char_f` exactly `len` times with a hint that
+    /// it is nominally an ASCII string.
+    pub fn fixed_len_string(char_f: Format, len: u32) -> Format {
+        hint(StyleHint::AsciiStr, repeat_count(Expr::U32(len), char_f))
+    }
 }
 pub use ascii::{
-    VALID_ASCII, ascii_char, ascii_char_strict, ascii_decimal_digit, ascii_hex_any,
-    ascii_hex_lower, ascii_hex_upper, ascii_octal_digit, asciiz_string,
+    VALID_ASCII, ascii_alpha, ascii_char, ascii_decimal_digit, ascii_hex_any, ascii_hex_lower,
+    ascii_hex_upper, ascii_octal_digit, asciiz_string, fixed_len_string, string_of,
 };
 
 /// Helper for opaque byte-sequences that stand in for uninterpreted or delayed-interpretation

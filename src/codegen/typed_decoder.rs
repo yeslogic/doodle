@@ -416,7 +416,7 @@ impl<'a> GTCompiler<'a> {
                 if let Some(tree) = MatchTree::build(self.module, &fs, next) {
                     Ok(TypedDecoder::Branch(gt.clone(), tree, ds))
                 } else {
-                    Err(anyhow!("cannot build match tree for {:?}", format))
+                    Err(anyhow!("cannot build match tree for {}", serde_json::to_string_pretty(&Format::from(format.clone())).unwrap()))
                 }
             }
             TypedFormat::UnionNondet(gt, branches) => {
@@ -468,7 +468,7 @@ impl<'a> GTCompiler<'a> {
                 if let Some(tree) = MatchTree::build(self.module, &[fa.into(), fb.into()], next) {
                     Ok(TypedDecoder::Repeat0While(gt.clone(), tree, Box::new(da)))
                 } else {
-                    Err(anyhow!("cannot build match tree for {:?}", format))
+                    Err(anyhow!("cannot build match tree for {}", serde_json::to_string_pretty(&Format::from(format.clone())).unwrap()))
                 }
             }
             TypedFormat::Repeat1(gt, a) => {
@@ -486,7 +486,7 @@ impl<'a> GTCompiler<'a> {
                 if let Some(tree) = MatchTree::build(self.module, &[fa.into(), fb.into()], next) {
                     Ok(TypedDecoder::Repeat1Until(gt.clone(), tree, Box::new(da)))
                 } else {
-                    Err(anyhow!("cannot build match tree for {:?}", format))
+                    Err(anyhow!("cannot build match tree for {}", serde_json::to_string_pretty(&Format::from(format.clone())).unwrap()))
                 }
             }
             TypedFormat::RepeatCount(gt, expr, a) => {
@@ -526,7 +526,7 @@ impl<'a> GTCompiler<'a> {
                         branches.push(f_count.into());
                     }
                     let Some(tree) = MatchTree::build(self.module, &branches[..], next) else {
-                        panic!("cannot build match tree for {format:?}")
+                        return Err(anyhow!("cannot build match tree for {}", serde_json::to_string_pretty(&Format::from(format.clone())).unwrap()))
                     };
                     tree
                 };

@@ -49,6 +49,8 @@ enum Command {
         dest: Option<PathBuf>,
         #[arg(long)]
         stat_only: bool,
+        #[arg(long)]
+        png_tag_only: bool,
     },
     /// Decode a binary file
     File {
@@ -138,8 +140,21 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
             output,
             dest,
             stat_only,
+            png_tag_only,
         } => {
-            if stat_only {
+            if png_tag_only {
+                let mut module = FormatModule::new();
+                let format = format::png::png_tag(&mut module).call();
+                match output {
+                    FormatOutput::Debug => println!("{module:?}"),
+                    FormatOutput::Json => {
+                        serde_json::to_writer(std::io::stdout(), &module).unwrap()
+                    }
+                    FormatOutput::Rust => {
+                        print_generated_code(&module, &format, dest);
+                    }
+                }
+            } else if stat_only {
                 let mut module = FormatModule::new();
                 let format = format::main_stat(&mut module).call();
                 match output {
