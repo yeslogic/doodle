@@ -1930,16 +1930,17 @@ impl<'a> MatchTreeStep<'a> {
         } else {
             let mut branches = Vec::new();
             for (bs1, next1) in self.branches.into_iter() {
+                let mut diff = bs1;
                 for (bs2, next2) in &peek.branches {
                     let common = bs1.intersection(bs2);
-                    let diff = bs1.difference(bs2);
                     if !common.is_empty() {
                         let next = Rc::new(Next::PeekNot(next1.clone(), next2.clone()));
                         branches.push((common, next));
                     }
-                    if !diff.is_empty() {
-                        branches.push((diff, next1.clone()));
-                    }
+                    diff = diff.difference(bs2);
+                }
+                if !diff.is_empty() {
+                    branches.push((diff, next1.clone()));
                 }
             }
             self.branches = branches;

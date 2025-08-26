@@ -374,10 +374,7 @@ pub fn main(
                     expr_lte(var("length"), Expr::U32(0x7fff_ffff)),
                 ),
             ),
-            (
-                "tag",
-                png_tag.call()
-            ),
+            ("tag", png_tag.call()),
             (
                 "data",
                 Format::Slice(
@@ -453,10 +450,9 @@ pub fn main(
 }
 
 pub fn png_tag(module: &mut FormatModule) -> FormatRef {
-    let anti_pattern = monad_seq(is_byte(b'I'), any_of([is_bytes(b"DAT"), is_bytes(b"END")]));
-    // let anti_pattern = is_byte(b'I');
-    module.define_format("png.tag", excluding(
-        anti_pattern,
-        fixed_len_string(ascii_alpha(), 4),
-    ))
+    let anti_pattern = any_of([is_bytes(b"IDAT"), is_bytes(b"IEND")]);
+    module.define_format(
+        "png.tag",
+        excluding(anti_pattern, fixed_len_string(ascii_alpha(), 4)),
+    )
 }

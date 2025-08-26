@@ -98,7 +98,7 @@ sections: Option<Vec<Option<Vec<u8>>>>
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#296)
+/// trait-ready: unique decoder function (d#297)
 #[derive(Debug, Clone)]
 pub struct gif_header {
 signature: (u8, u8, u8),
@@ -106,7 +106,7 @@ version: Vec<u8>
 }
 
 /// expected size: 4
-/// trait-ready: unique decoder function (d#316)
+/// trait-ready: unique decoder function (d#317)
 #[derive(Debug, Copy, Clone)]
 pub struct gif_logical_screen_descriptor_flags {
 table_flag: bool,
@@ -116,7 +116,7 @@ table_size: u8
 }
 
 /// expected size: 10
-/// trait-ready: unique decoder function (d#315)
+/// trait-ready: unique decoder function (d#316)
 #[derive(Debug, Copy, Clone)]
 pub struct gif_logical_screen_descriptor {
 screen_width: u16,
@@ -127,7 +127,7 @@ pixel_aspect_ratio: u8
 }
 
 /// expected size: 3
-/// trait-unready: multiple (2) decoders exist (d#{283, 311})
+/// trait-unready: multiple (2) decoders exist (d#{284, 312})
 #[derive(Debug, Copy, Clone)]
 pub struct png_plte {
 r: u8,
@@ -136,7 +136,7 @@ b: u8
 }
 
 /// expected size: 40
-/// trait-ready: unique decoder function (d#297)
+/// trait-ready: unique decoder function (d#298)
 #[derive(Debug, Clone)]
 pub struct gif_logical_screen {
 descriptor: gif_logical_screen_descriptor,
@@ -144,7 +144,7 @@ global_color_table: Option<Vec<png_plte>>
 }
 
 /// expected size: 3
-/// trait-ready: unique decoder function (d#314)
+/// trait-ready: unique decoder function (d#315)
 #[derive(Debug, Copy, Clone)]
 pub struct gif_graphic_control_extension_flags {
 disposal_method: u8,
@@ -153,7 +153,7 @@ transparent_color_flag: bool
 }
 
 /// expected size: 10
-/// trait-ready: unique decoder function (d#306)
+/// trait-ready: unique decoder function (d#307)
 #[derive(Debug, Copy, Clone)]
 pub struct gif_graphic_control_extension {
 separator: u8,
@@ -166,7 +166,7 @@ terminator: u8
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#304)
+/// trait-ready: unique decoder function (d#305)
 #[derive(Debug, Clone)]
 pub struct gif_subblock {
 len_bytes: u8,
@@ -174,7 +174,7 @@ data: Vec<u8>
 }
 
 /// expected size: 40
-/// trait-ready: unique decoder function (d#309)
+/// trait-ready: unique decoder function (d#310)
 #[derive(Debug, Clone)]
 pub struct gif_plain_text_extension {
 separator: u8,
@@ -193,7 +193,7 @@ terminator: u8
 }
 
 /// expected size: 4
-/// trait-ready: unique decoder function (d#313)
+/// trait-ready: unique decoder function (d#314)
 #[derive(Debug, Copy, Clone)]
 pub struct gif_image_descriptor_flags {
 table_flag: bool,
@@ -203,7 +203,7 @@ table_size: u8
 }
 
 /// expected size: 14
-/// trait-ready: unique decoder function (d#310)
+/// trait-ready: unique decoder function (d#311)
 #[derive(Debug, Copy, Clone)]
 pub struct gif_image_descriptor {
 separator: u8,
@@ -215,7 +215,7 @@ flags: gif_image_descriptor_flags
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#312)
+/// trait-ready: unique decoder function (d#313)
 #[derive(Debug, Clone)]
 pub struct gif_table_based_image_data {
 lzw_min_code_size: u8,
@@ -224,7 +224,7 @@ terminator: u8
 }
 
 /// expected size: 72
-/// trait-ready: unique decoder function (d#308)
+/// trait-ready: unique decoder function (d#309)
 #[derive(Debug, Clone)]
 pub struct gif_table_based_image {
 descriptor: gif_image_descriptor,
@@ -233,12 +233,12 @@ data: gif_table_based_image_data
 }
 
 /// expected size: 80
-/// trait-ready: unique decoder function (d#307)
+/// trait-ready: unique decoder function (d#308)
 #[derive(Debug, Clone)]
 pub enum gif_graphic_rendering_block { plain_text_extension(gif_plain_text_extension), table_based_image(gif_table_based_image) }
 
 /// expected size: 96
-/// trait-ready: unique decoder function (d#300)
+/// trait-ready: unique decoder function (d#301)
 #[derive(Debug, Clone)]
 pub struct gif_graphic_block {
 graphic_control_extension: Option<gif_graphic_control_extension>,
@@ -246,7 +246,7 @@ graphic_rendering_block: gif_graphic_rendering_block
 }
 
 /// expected size: 80
-/// trait-ready: unique decoder function (d#302)
+/// trait-ready: unique decoder function (d#303)
 #[derive(Debug, Clone)]
 pub struct gif_application_extension {
 separator: u8,
@@ -259,7 +259,7 @@ terminator: u8
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#303)
+/// trait-ready: unique decoder function (d#304)
 #[derive(Debug, Clone)]
 pub struct gif_comment_extension {
 separator: u8,
@@ -269,17 +269,17 @@ terminator: u8
 }
 
 /// expected size: 88
-/// trait-ready: unique decoder function (d#301)
+/// trait-ready: unique decoder function (d#302)
 #[derive(Debug, Clone)]
 pub enum gif_special_purpose_block { application_extension(gif_application_extension), comment_extension(gif_comment_extension) }
 
 /// expected size: 104
-/// trait-ready: unique decoder function (d#298)
+/// trait-ready: unique decoder function (d#299)
 #[derive(Debug, Clone)]
 pub enum gif_block { graphic_block(gif_graphic_block), special_purpose_block(gif_special_purpose_block) }
 
 /// expected size: 1
-/// trait-ready: unique decoder function (d#299)
+/// trait-ready: unique decoder function (d#300)
 #[derive(Debug, Copy, Clone)]
 pub struct gif_trailer {
 separator: u8
@@ -296,7 +296,7 @@ trailer: gif_trailer
 }
 
 /// expected size: 5
-/// trait-ready: unique decoder function (d#291)
+/// trait-ready: unique decoder function (d#292)
 #[derive(Debug, Copy, Clone)]
 pub struct gzip_header_file_flags {
 fcomment: bool,
@@ -307,7 +307,7 @@ ftext: bool
 }
 
 /// expected size: 16
-/// trait-ready: unique decoder function (d#284)
+/// trait-ready: unique decoder function (d#285)
 #[derive(Debug, Copy, Clone)]
 pub struct gzip_header {
 magic: (u8, u8),
@@ -319,7 +319,7 @@ os_id: u8
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#290)
+/// trait-ready: unique decoder function (d#291)
 #[derive(Debug, Clone)]
 pub struct gzip_fextra_subfield {
 si1: u8,
@@ -329,7 +329,7 @@ data: Vec<u8>
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#285)
+/// trait-ready: unique decoder function (d#286)
 #[derive(Debug, Clone)]
 pub struct gzip_fextra {
 xlen: u16,
@@ -337,14 +337,14 @@ subfields: Vec<gzip_fextra_subfield>
 }
 
 /// expected size: 24
-/// trait-unready: multiple (2) decoders exist (d#{287, 295})
+/// trait-unready: multiple (2) decoders exist (d#{288, 296})
 #[derive(Debug, Clone)]
 pub struct gzip_fcomment {
 comment: Vec<u8>
 }
 
 /// expected size: 2
-/// trait-ready: unique decoder function (d#288)
+/// trait-ready: unique decoder function (d#289)
 #[derive(Debug, Copy, Clone)]
 pub struct gzip_fhcrc {
 crc: u16
@@ -475,7 +475,7 @@ inflate: Vec<u8>
 }
 
 /// expected size: 8
-/// trait-ready: unique decoder function (d#289)
+/// trait-ready: unique decoder function (d#290)
 #[derive(Debug, Copy, Clone)]
 pub struct gzip_footer {
 crc: u32,
@@ -496,7 +496,7 @@ footer: gzip_footer
 }
 
 /// expected size: 2
-/// trait-unready: multiple (10) decoders exist (d#{215, 217, 228, 229, 230, 231, 232, 233, 234, 235})
+/// trait-unready: multiple (10) decoders exist (d#{216, 218, 229, 230, 231, 232, 233, 234, 235, 236})
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_eoi {
 ff: u8,
@@ -504,7 +504,7 @@ marker: u8
 }
 
 /// expected size: 40
-/// trait-ready: unique decoder function (d#282)
+/// trait-ready: unique decoder function (d#283)
 #[derive(Debug, Clone)]
 pub struct jpeg_app0_jfif {
 version_major: u8,
@@ -523,7 +523,7 @@ thumbnail_pixels: Vec<Vec<png_plte>>
 pub enum jpeg_app0_data_data { jfif(jpeg_app0_jfif), other(Vec<u8>) }
 
 /// expected size: 72
-/// trait-ready: unique decoder function (d#281)
+/// trait-ready: unique decoder function (d#282)
 #[derive(Debug, Clone)]
 pub struct jpeg_app0_data {
 identifier: Vec<u8>,
@@ -531,7 +531,7 @@ data: jpeg_app0_data_data
 }
 
 /// expected size: 80
-/// trait-ready: unique decoder function (d#218)
+/// trait-ready: unique decoder function (d#219)
 #[derive(Debug, Clone)]
 pub struct jpeg_app0 {
 marker: jpeg_eoi,
@@ -576,7 +576,7 @@ ifd: tiff_main_ifd
 }
 
 /// expected size: 80
-/// trait-ready: unique decoder function (d#279)
+/// trait-ready: unique decoder function (d#280)
 #[derive(Debug, Clone)]
 pub struct jpeg_app1_exif {
 padding: u8,
@@ -584,7 +584,7 @@ exif: tiff_main
 }
 
 /// expected size: 24
-/// trait-ready: unique decoder function (d#280)
+/// trait-ready: unique decoder function (d#281)
 #[derive(Debug, Clone)]
 pub struct jpeg_app1_xmp {
 xmp: Vec<u8>
@@ -596,7 +596,7 @@ xmp: Vec<u8>
 pub enum jpeg_app1_data_data { exif(jpeg_app1_exif), other(Vec<u8>), xmp(jpeg_app1_xmp) }
 
 /// expected size: 112
-/// trait-ready: unique decoder function (d#278)
+/// trait-ready: unique decoder function (d#279)
 #[derive(Debug, Clone)]
 pub struct jpeg_app1_data {
 identifier: Vec<u8>,
@@ -604,7 +604,7 @@ data: jpeg_app1_data_data
 }
 
 /// expected size: 120
-/// trait-ready: unique decoder function (d#219)
+/// trait-ready: unique decoder function (d#220)
 #[derive(Debug, Clone)]
 pub struct jpeg_app1 {
 marker: jpeg_eoi,
@@ -618,7 +618,7 @@ data: jpeg_app1_data
 pub enum jpeg_frame_initial_segment { app0(jpeg_app0), app1(jpeg_app1) }
 
 /// expected size: 32
-/// trait-unready: multiple (16) decoders exist (d#{259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 271, 272, 273, 322})
+/// trait-unready: multiple (16) decoders exist (d#{260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 271, 272, 273, 274, 323})
 #[derive(Debug, Clone)]
 pub struct jpeg_jpeg {
 marker: jpeg_eoi,
@@ -635,7 +635,7 @@ table_id: u8
 }
 
 /// expected size: 3
-/// trait-ready: unique decoder function (d#275)
+/// trait-ready: unique decoder function (d#276)
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_dac_data {
 class_table_id: jpeg_dac_data_class_table_id,
@@ -643,7 +643,7 @@ value: u8
 }
 
 /// expected size: 8
-/// trait-ready: unique decoder function (d#257)
+/// trait-ready: unique decoder function (d#258)
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_dac {
 marker: jpeg_eoi,
@@ -652,7 +652,7 @@ data: jpeg_dac_data
 }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#276)
+/// trait-ready: unique decoder function (d#277)
 #[derive(Debug, Clone)]
 pub struct jpeg_dht_data {
 class_table_id: jpeg_dac_data_class_table_id,
@@ -661,7 +661,7 @@ values: Vec<Vec<u8>>
 }
 
 /// expected size: 64
-/// trait-ready: unique decoder function (d#256)
+/// trait-ready: unique decoder function (d#257)
 #[derive(Debug, Clone)]
 pub struct jpeg_dht {
 marker: jpeg_eoi,
@@ -683,7 +683,7 @@ table_id: u8
 pub enum jpeg_dqt_data_elements { Bytes(Vec<u8>), Shorts(Vec<u16>) }
 
 /// expected size: 40
-/// trait-ready: unique decoder function (d#277)
+/// trait-ready: unique decoder function (d#278)
 #[derive(Debug, Clone)]
 pub struct jpeg_dqt_data {
 precision_table_id: jpeg_dqt_data_precision_table_id,
@@ -691,7 +691,7 @@ elements: jpeg_dqt_data_elements
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#255)
+/// trait-ready: unique decoder function (d#256)
 #[derive(Debug, Clone)]
 pub struct jpeg_dqt {
 marker: jpeg_eoi,
@@ -700,14 +700,14 @@ data: Vec<jpeg_dqt_data>
 }
 
 /// expected size: 2
-/// trait-ready: unique decoder function (d#274)
+/// trait-ready: unique decoder function (d#275)
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_dri_data {
 restart_interval: u16
 }
 
 /// expected size: 6
-/// trait-ready: unique decoder function (d#258)
+/// trait-ready: unique decoder function (d#259)
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_dri {
 marker: jpeg_eoi,
@@ -716,7 +716,7 @@ data: jpeg_dri_data
 }
 
 /// expected size: 128
-/// trait-ready: unique decoder function (d#220)
+/// trait-ready: unique decoder function (d#221)
 #[derive(Debug, Clone)]
 pub enum jpeg_table_or_misc { app0(jpeg_app0), app1(jpeg_app1), app10(jpeg_jpeg), app11(jpeg_jpeg), app12(jpeg_jpeg), app13(jpeg_jpeg), app14(jpeg_jpeg), app15(jpeg_jpeg), app2(jpeg_jpeg), app3(jpeg_jpeg), app4(jpeg_jpeg), app5(jpeg_jpeg), app6(jpeg_jpeg), app7(jpeg_jpeg), app8(jpeg_jpeg), app9(jpeg_jpeg), com(jpeg_jpeg), dac(jpeg_dac), dht(jpeg_dht), dqt(jpeg_dqt), dri(jpeg_dri) }
 
@@ -729,7 +729,7 @@ vertical: u8
 }
 
 /// expected size: 4
-/// trait-unready: multiple (3) decoders exist (d#{254, 318, 320})
+/// trait-unready: multiple (3) decoders exist (d#{255, 319, 321})
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_dhp_image_component {
 id: u8,
@@ -738,7 +738,7 @@ quantization_table_id: u8
 }
 
 /// expected size: 32
-/// trait-unready: multiple (3) decoders exist (d#{253, 319, 324})
+/// trait-unready: multiple (3) decoders exist (d#{254, 320, 325})
 #[derive(Debug, Clone)]
 pub struct jpeg_dhp_data {
 sample_precision: u8,
@@ -749,7 +749,7 @@ image_components: Vec<jpeg_dhp_image_component>
 }
 
 /// expected size: 40
-/// trait-unready: multiple (14) decoders exist (d#{240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 323})
+/// trait-unready: multiple (14) decoders exist (d#{241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 324})
 #[derive(Debug, Clone)]
 pub struct jpeg_dhp {
 marker: jpeg_eoi,
@@ -758,7 +758,7 @@ data: jpeg_dhp_data
 }
 
 /// expected size: 48
-/// trait-ready: unique decoder function (d#221)
+/// trait-ready: unique decoder function (d#222)
 #[derive(Debug, Clone)]
 pub enum jpeg_frame_header { sof0(jpeg_dhp), sof1(jpeg_dhp), sof10(jpeg_dhp), sof11(jpeg_dhp), sof13(jpeg_dhp), sof14(jpeg_dhp), sof15(jpeg_dhp), sof2(jpeg_dhp), sof3(jpeg_dhp), sof5(jpeg_dhp), sof6(jpeg_dhp), sof7(jpeg_dhp), sof9(jpeg_dhp) }
 
@@ -771,7 +771,7 @@ ac_entropy_coding_table_id: u8
 }
 
 /// expected size: 3
-/// trait-ready: unique decoder function (d#237)
+/// trait-ready: unique decoder function (d#238)
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_sos_image_component {
 component_selector: u8,
@@ -787,7 +787,7 @@ low: u8
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#236)
+/// trait-ready: unique decoder function (d#237)
 #[derive(Debug, Clone)]
 pub struct jpeg_sos_data {
 num_image_components: u8,
@@ -798,7 +798,7 @@ approximation_bit_position: jpeg_sos_data_approximation_bit_position
 }
 
 /// expected size: 40
-/// trait-ready: unique decoder function (d#225)
+/// trait-ready: unique decoder function (d#226)
 #[derive(Debug, Clone)]
 pub struct jpeg_sos {
 marker: jpeg_eoi,
@@ -812,7 +812,7 @@ data: jpeg_sos_data
 pub enum jpeg_scan_data_scan_data { mcu(u8), rst0(jpeg_eoi), rst1(jpeg_eoi), rst2(jpeg_eoi), rst3(jpeg_eoi), rst4(jpeg_eoi), rst5(jpeg_eoi), rst6(jpeg_eoi), rst7(jpeg_eoi) }
 
 /// expected size: 48
-/// trait-unready: multiple (2) decoders exist (d#{226, 239})
+/// trait-unready: multiple (2) decoders exist (d#{227, 240})
 #[derive(Debug, Clone)]
 pub struct jpeg_scan_data {
 scan_data: Vec<jpeg_scan_data_scan_data>,
@@ -820,7 +820,7 @@ scan_data_stream: Vec<u8>
 }
 
 /// expected size: 112
-/// trait-unready: multiple (2) decoders exist (d#{222, 224})
+/// trait-unready: multiple (2) decoders exist (d#{223, 225})
 #[derive(Debug, Clone)]
 pub struct jpeg_scan {
 segments: Vec<jpeg_table_or_misc>,
@@ -829,14 +829,14 @@ data: jpeg_scan_data
 }
 
 /// expected size: 2
-/// trait-ready: unique decoder function (d#238)
+/// trait-ready: unique decoder function (d#239)
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_dnl_data {
 num_lines: u16
 }
 
 /// expected size: 6
-/// trait-ready: unique decoder function (d#223)
+/// trait-ready: unique decoder function (d#224)
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_dnl {
 marker: jpeg_eoi,
@@ -845,7 +845,7 @@ data: jpeg_dnl_data
 }
 
 /// expected size: 344
-/// trait-ready: unique decoder function (d#216)
+/// trait-ready: unique decoder function (d#217)
 #[derive(Debug, Clone)]
 pub struct jpeg_frame {
 initial_segment: jpeg_frame_initial_segment,
@@ -900,7 +900,7 @@ data: Vec<mpeg4_stbl_atom_data_stsd_sample_entries>
 pub enum mpeg4_dinf_atom_data { dref(mpeg4_dinf_atom_data_dref), unknown(Vec<u8>) }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#210)
+/// trait-ready: unique decoder function (d#211)
 #[derive(Debug, Clone)]
 pub struct mpeg4_dinf_atom {
 size_field: u32,
@@ -982,7 +982,7 @@ fields: mpeg4_iinf_atom_data_infe_fields
 pub enum mpeg4_iinf_atom_data { infe(mpeg4_iinf_atom_data_infe), unknown(Vec<u8>) }
 
 /// expected size: 120
-/// trait-ready: unique decoder function (d#212)
+/// trait-ready: unique decoder function (d#213)
 #[derive(Debug, Clone)]
 pub struct mpeg4_iinf_atom {
 size_field: u32,
@@ -1053,7 +1053,7 @@ value: Vec<u8>
 pub enum mpeg4_tool_atom_data { data(mpeg4_tool_atom_data_data), unknown(Vec<u8>) }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#214)
+/// trait-ready: unique decoder function (d#215)
 #[derive(Debug, Clone)]
 pub struct mpeg4_tool_atom {
 size_field: u32,
@@ -1068,7 +1068,7 @@ data: mpeg4_tool_atom_data
 pub enum mpeg4_ilst_atom_data { tool(Vec<mpeg4_tool_atom>), unknown(Vec<u8>) }
 
 /// expected size: 48
-/// trait-ready: unique decoder function (d#213)
+/// trait-ready: unique decoder function (d#214)
 #[derive(Debug, Clone)]
 pub struct mpeg4_ilst_atom {
 size_field: u32,
@@ -1149,7 +1149,7 @@ item_ID: mpeg4_meta_atom_data_pitm_item_ID
 pub enum mpeg4_meta_atom_data { dinf(Vec<mpeg4_dinf_atom>), hdlr(mpeg4_meta_atom_data_hdlr), idat(Vec<u8>), iinf(mpeg4_meta_atom_data_iinf), iloc(mpeg4_meta_atom_data_iloc), ilst(Vec<mpeg4_ilst_atom>), iref(mpeg4_meta_atom_data_iref), pitm(mpeg4_meta_atom_data_pitm), unknown(Vec<u8>) }
 
 /// expected size: 72
-/// trait-ready: unique decoder function (d#203)
+/// trait-ready: unique decoder function (d#204)
 #[derive(Debug, Clone)]
 pub struct mpeg4_meta_atom {
 size_field: u32,
@@ -1224,7 +1224,7 @@ edit_list_table: Vec<mpeg4_edts_atom_data_elst_edit_list_table>
 pub enum mpeg4_edts_atom_data { elst(mpeg4_edts_atom_data_elst), unknown(Vec<u8>) }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#207)
+/// trait-ready: unique decoder function (d#208)
 #[derive(Debug, Clone)]
 pub struct mpeg4_edts_atom {
 size_field: u32,
@@ -1420,7 +1420,7 @@ sample_entries: Vec<mpeg4_stbl_atom_data_stts_sample_entries>
 pub enum mpeg4_stbl_atom_data { co64(mpeg4_stbl_atom_data_co64), ctts(mpeg4_stbl_atom_data_ctts), sbgp(mpeg4_stbl_atom_data_sbgp), sgpd(mpeg4_stbl_atom_data_sgpd), stco(mpeg4_stbl_atom_data_stco), stsc(mpeg4_stbl_atom_data_stsc), stsd(mpeg4_stbl_atom_data_stsd), stss(mpeg4_stbl_atom_data_stss), stsz(mpeg4_stbl_atom_data_stsz), stts(mpeg4_stbl_atom_data_stts), unknown(Vec<u8>) }
 
 /// expected size: 72
-/// trait-ready: unique decoder function (d#211)
+/// trait-ready: unique decoder function (d#212)
 #[derive(Debug, Clone)]
 pub struct mpeg4_stbl_atom {
 size_field: u32,
@@ -1445,7 +1445,7 @@ opcolor: Vec<u16>
 pub enum mpeg4_minf_atom_data { dinf(Vec<mpeg4_dinf_atom>), smhd(mpeg4_minf_atom_data_smhd), stbl(Vec<mpeg4_stbl_atom>), unknown(Vec<u8>), vmhd(mpeg4_minf_atom_data_vmhd) }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#209)
+/// trait-ready: unique decoder function (d#210)
 #[derive(Debug, Clone)]
 pub struct mpeg4_minf_atom {
 size_field: u32,
@@ -1460,7 +1460,7 @@ data: mpeg4_minf_atom_data
 pub enum mpeg4_mdia_atom_data { hdlr(mpeg4_mdia_atom_data_hdlr), mdhd(mpeg4_mdia_atom_data_mdhd), minf(Vec<mpeg4_minf_atom>), unknown(Vec<u8>) }
 
 /// expected size: 72
-/// trait-ready: unique decoder function (d#208)
+/// trait-ready: unique decoder function (d#209)
 #[derive(Debug, Clone)]
 pub struct mpeg4_mdia_atom {
 size_field: u32,
@@ -1519,7 +1519,7 @@ height: u32
 pub enum mpeg4_trak_atom_data { edts(Vec<mpeg4_edts_atom>), mdia(Vec<mpeg4_mdia_atom>), tkhd(mpeg4_trak_atom_data_tkhd), unknown(Vec<u8>) }
 
 /// expected size: 120
-/// trait-ready: unique decoder function (d#205)
+/// trait-ready: unique decoder function (d#206)
 #[derive(Debug, Clone)]
 pub struct mpeg4_trak_atom {
 size_field: u32,
@@ -1534,7 +1534,7 @@ data: mpeg4_trak_atom_data
 pub enum mpeg4_udta_atom_data { meta(u32, Vec<mpeg4_meta_atom>), unknown(Vec<u8>) }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#206)
+/// trait-ready: unique decoder function (d#207)
 #[derive(Debug, Clone)]
 pub struct mpeg4_udta_atom {
 size_field: u32,
@@ -1549,7 +1549,7 @@ data: mpeg4_udta_atom_data
 pub enum mpeg4_moov_atom_data { mvhd(mpeg4_moov_atom_data_mvhd), trak(Vec<mpeg4_trak_atom>), udta(Vec<mpeg4_udta_atom>), unknown(Vec<u8>) }
 
 /// expected size: 136
-/// trait-ready: unique decoder function (d#204)
+/// trait-ready: unique decoder function (d#205)
 #[derive(Debug, Clone)]
 pub struct mpeg4_moov_atom {
 size_field: u32,
@@ -1564,7 +1564,7 @@ data: mpeg4_moov_atom_data
 pub enum mpeg4_atom_data { free, ftyp(mpeg4_atom_data_ftyp), mdat, meta(u32, Vec<mpeg4_meta_atom>), moov(Vec<mpeg4_moov_atom>), unknown(Vec<u8>) }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#201)
+/// trait-ready: unique decoder function (d#202)
 #[derive(Debug, Clone)]
 pub struct mpeg4_atom {
 size_field: u32,
@@ -4475,7 +4475,7 @@ directory: opentype_main_directory
 }
 
 /// expected size: 16
-/// trait-ready: unique decoder function (d#200)
+/// trait-ready: unique decoder function (d#201)
 #[derive(Debug, Copy, Clone)]
 pub struct png_ihdr_data {
 width: u32,
@@ -4521,12 +4521,12 @@ palette_index: u8
 }
 
 /// expected size: 8
-/// trait-ready: unique decoder function (d#180)
+/// trait-ready: unique decoder function (d#181)
 #[derive(Debug, Copy, Clone)]
 pub enum png_bkgd { color_type_0(png_bkgd_color_type_0), color_type_2(png_bkgd_color_type_2), color_type_3(png_bkgd_color_type_3), color_type_4(png_bkgd_color_type_0), color_type_6(png_bkgd_color_type_2) }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#172)
+/// trait-ready: unique decoder function (d#173)
 #[derive(Debug, Copy, Clone)]
 pub struct png_chrm {
 whitepoint_x: u32,
@@ -4540,14 +4540,14 @@ blue_y: u32
 }
 
 /// expected size: 4
-/// trait-ready: unique decoder function (d#173)
+/// trait-ready: unique decoder function (d#174)
 #[derive(Debug, Copy, Clone)]
 pub struct png_gama {
 gamma: u32
 }
 
 /// expected size: 24
-/// trait-ready: unique decoder function (d#181)
+/// trait-ready: unique decoder function (d#182)
 #[derive(Debug, Clone)]
 pub struct png_hist {
 histogram: Vec<u16>
@@ -4571,7 +4571,7 @@ fcheck: u8
 }
 
 /// expected size: 96
-/// trait-unready: multiple (4) decoders exist (d#{157, 187, 193, 198})
+/// trait-unready: multiple (4) decoders exist (d#{157, 188, 194, 199})
 #[derive(Debug, Clone)]
 pub struct zlib_main {
 compression_method_flags: zlib_main_compression_method_flags,
@@ -4582,7 +4582,7 @@ adler32: u32
 }
 
 /// expected size: 128
-/// trait-ready: unique decoder function (d#174)
+/// trait-ready: unique decoder function (d#175)
 #[derive(Debug, Clone)]
 pub struct png_iccp {
 profile_name: Vec<u8>,
@@ -4601,7 +4601,7 @@ pub enum png_itxt_text_compressed { invalid(Vec<u8>), valid(Vec<char>) }
 pub enum png_itxt_text { compressed(png_itxt_text_compressed), uncompressed(Vec<char>) }
 
 /// expected size: 120
-/// trait-ready: unique decoder function (d#177)
+/// trait-ready: unique decoder function (d#178)
 #[derive(Debug, Clone)]
 pub struct png_itxt {
 keyword: Vec<u8>,
@@ -4613,7 +4613,7 @@ text: png_itxt_text
 }
 
 /// expected size: 12
-/// trait-ready: unique decoder function (d#182)
+/// trait-ready: unique decoder function (d#183)
 #[derive(Debug, Copy, Clone)]
 pub struct png_phys {
 pixels_per_unit_x: u32,
@@ -4656,7 +4656,7 @@ sig_alpha_bits: u8
 }
 
 /// expected size: 5
-/// trait-ready: unique decoder function (d#175)
+/// trait-ready: unique decoder function (d#176)
 #[derive(Debug, Copy, Clone)]
 pub enum png_sbit { color_type_0(png_sbit_color_type_0), color_type_2(png_sbit_color_type_2), color_type_3(png_sbit_color_type_2), color_type_4(png_sbit_color_type_4), color_type_6(png_sbit_color_type_6) }
 
@@ -4688,7 +4688,7 @@ frequency: u16
 pub enum png_splt_palette { sample_depth_u16(Vec<png_splt_palette_sample_depth_u16>), sample_depth_u8(Vec<png_splt_palette_sample_depth_u8>) }
 
 /// expected size: 64
-/// trait-ready: unique decoder function (d#183)
+/// trait-ready: unique decoder function (d#184)
 #[derive(Debug, Clone)]
 pub struct png_splt {
 palette_name: Vec<u8>,
@@ -4697,14 +4697,14 @@ palette: png_splt_palette
 }
 
 /// expected size: 1
-/// trait-ready: unique decoder function (d#176)
+/// trait-ready: unique decoder function (d#177)
 #[derive(Debug, Copy, Clone)]
 pub struct png_srgb {
 rendering_intent: u8
 }
 
 /// expected size: 48
-/// trait-ready: unique decoder function (d#178)
+/// trait-ready: unique decoder function (d#179)
 #[derive(Debug, Clone)]
 pub struct png_text {
 keyword: Vec<u8>,
@@ -4712,7 +4712,7 @@ text: Vec<u8>
 }
 
 /// expected size: 8
-/// trait-ready: unique decoder function (d#184)
+/// trait-ready: unique decoder function (d#185)
 #[derive(Debug, Copy, Clone)]
 pub struct png_time {
 year: u16,
@@ -4724,12 +4724,12 @@ second: u8
 }
 
 /// expected size: 32
-/// trait-ready: unique decoder function (d#171)
+/// trait-ready: unique decoder function (d#172)
 #[derive(Debug, Clone)]
 pub enum png_trns { color_type_0(png_bkgd_color_type_0), color_type_2(png_bkgd_color_type_2), color_type_3(Vec<png_bkgd_color_type_3>) }
 
 /// expected size: 56
-/// trait-ready: unique decoder function (d#179)
+/// trait-ready: unique decoder function (d#180)
 #[derive(Debug, Clone)]
 pub struct png_ztxt {
 keyword: Vec<u8>,
@@ -4869,7 +4869,7 @@ file: Vec<u8>
 }
 
 /// expected size: 24
-/// trait-unready: multiple (2) decoders exist (d#{12, 293})
+/// trait-unready: multiple (2) decoders exist (d#{12, 294})
 #[derive(Debug, Clone)]
 pub struct tar_main {
 contents: Vec<tar_header_with_data>
@@ -4977,14 +4977,14 @@ expand_vertical: u8
 }
 
 /// expected size: 2
-/// trait-unready: multiple (2) decoders exist (d#{321, 326})
+/// trait-unready: multiple (2) decoders exist (d#{322, 327})
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_exp_data__dupX1 {
 expand_horizontal_vertical: jpeg_exp_data_expand_horizontal_vertical__dupX1
 }
 
 /// expected size: 6
-/// trait-ready: unique decoder function (d#325)
+/// trait-ready: unique decoder function (d#326)
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_exp {
 marker: jpeg_eoi,
@@ -5294,7 +5294,7 @@ return Err(ParseError::InsufficientRepeats);
 break
 }
 } else {
-let next_elem = (Decoder317(_input))?;
+let next_elem = (Decoder318(_input))?;
 accum.push(next_elem)
 }
 };
@@ -5347,13 +5347,13 @@ PResult::Ok(gif_main { header, logical_screen, blocks, trailer })
 
 /// d#5
 fn Decoder5(_input: &mut Parser<'_>) -> Result<Vec<tar_main>, ParseError> {
-let gzip_raw = (Decoder292(_input))?;
+let gzip_raw = (Decoder293(_input))?;
 let mut accum = Vec::new();
 for item in gzip_raw.clone() {
 let next_elem = {
 let mut buf_parser = Parser::new(item.data.inflate.as_slice());
 let buf_input = &mut buf_parser;
-(Decoder293(buf_input))?
+(Decoder294(buf_input))?
 };
 accum.push(next_elem)
 };
@@ -5392,7 +5392,7 @@ Some((Decoder_gzip_fextra(_input))?)
 None
 };
 let fname = if header.file_flags.fname {
-Some((Decoder286(_input))?)
+Some((Decoder287(_input))?)
 } else {
 None
 };
@@ -5425,7 +5425,7 @@ PResult::Ok(accum)
 fn Decoder_jpeg_main(_input: &mut Parser<'_>) -> Result<jpeg_main, ParseError> {
 let soi = (Decoder_jpeg_eoi(_input))?;
 let frame = (Decoder_jpeg_frame(_input))?;
-let eoi = (Decoder217(_input))?;
+let eoi = (Decoder218(_input))?;
 PResult::Ok(jpeg_main { soi, frame, eoi })
 }
 
@@ -5537,11 +5537,46 @@ _input.read_byte()?;
 {
 let ret = match _input.read_byte()? {
 73u8 => {
-let b = _input.read_byte()?;
-if b == 68 {
+match _input.read_byte()? {
+68u8 => {
+match _input.read_byte()? {
+65u8 => {
+match _input.read_byte()? {
+84u8 => {
 1
-} else {
+},
+
+byte if ((ByteSet::from_bits([0u64, 576460743846658046u64, 0u64, 0u64])).contains(byte)) => {
+0
+},
+
+_ => {
 return Err(ParseError::ExcludedBranch(10036157788440812915u64));
+}
+}
+},
+
+byte if ((ByteSet::from_bits([0u64, 576460743847706620u64, 0u64, 0u64])).contains(byte)) => {
+0
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(6349531732377484771u64));
+}
+}
+},
+
+69u8 => {
+0
+},
+
+byte if ((ByteSet::from_bits([0u64, 576460743847706574u64, 0u64, 0u64])).contains(byte)) => {
+0
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(13785646910930464515u64));
+}
 }
 },
 
@@ -5550,7 +5585,7 @@ byte if ((ByteSet::from_bits([0u64, 576460743847706110u64, 0u64, 0u64])).contain
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6349531732377484771u64));
+return Err(ParseError::ExcludedBranch(5323644471994966730u64));
 }
 };
 _input.close_peek_context()?;
@@ -5586,11 +5621,39 @@ match _input.read_byte()? {
 },
 
 68u8 => {
+match _input.read_byte()? {
+65u8 => {
+match _input.read_byte()? {
+84u8 => {
 1
 },
 
+byte if ((ByteSet::from_bits([0u64, 576460743846658046u64, 0u64, 0u64])).contains(byte)) => {
+0
+},
+
 _ => {
-return Err(ParseError::ExcludedBranch(13785646910930464515u64));
+return Err(ParseError::ExcludedBranch(13278122992382147879u64));
+}
+}
+},
+
+byte if ((ByteSet::from_bits([0u64, 576460743847706620u64, 0u64, 0u64])).contains(byte)) => {
+0
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(18159646757349796721u64));
+}
+}
+},
+
+byte if ((ByteSet::from_bits([0u64, 576460743847706574u64, 0u64, 0u64])).contains(byte)) => {
+0
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(7124606020426797957u64));
 }
 }
 },
@@ -5600,7 +5663,7 @@ byte if ((ByteSet::from_bits([0u64, 576460743847706110u64, 0u64, 0u64])).contain
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(5323644471994966730u64));
+return Err(ParseError::ExcludedBranch(15116592996336247086u64));
 }
 };
 _input.close_peek_context()?;
@@ -5638,11 +5701,47 @@ _input.read_byte()?;
 {
 let ret = match _input.read_byte()? {
 73u8 => {
-let b = _input.read_byte()?;
-if b == 69 {
+match _input.read_byte()? {
+68u8 => {
+0
+},
+
+69u8 => {
+match _input.read_byte()? {
+78u8 => {
+match _input.read_byte()? {
+68u8 => {
+_input.read_byte()?;
 1
-} else {
-return Err(ParseError::ExcludedBranch(13278122992382147879u64));
+},
+
+byte if ((ByteSet::from_bits([0u64, 576460743847706606u64, 0u64, 0u64])).contains(byte)) => {
+0
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(10346499338674982396u64));
+}
+}
+},
+
+byte if ((ByteSet::from_bits([0u64, 576460743847690238u64, 0u64, 0u64])).contains(byte)) => {
+0
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(10951432197815892834u64));
+}
+}
+},
+
+byte if ((ByteSet::from_bits([0u64, 576460743847706574u64, 0u64, 0u64])).contains(byte)) => {
+0
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(14864597187136898256u64));
+}
 }
 },
 
@@ -5651,7 +5750,7 @@ byte if ((ByteSet::from_bits([0u64, 576460743847706110u64, 0u64, 0u64])).contain
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(18159646757349796721u64));
+return Err(ParseError::ExcludedBranch(15238960955167157760u64));
 }
 };
 _input.close_peek_context()?;
@@ -5679,7 +5778,7 @@ let b = _input.read_byte()?;
 if b == 82 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(7124606020426797957u64));
+return Err(ParseError::ExcludedBranch(17527274083228188873u64));
 }
 };
 let arg1 = {
@@ -5687,7 +5786,7 @@ let b = _input.read_byte()?;
 if b == 73 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(15116592996336247086u64));
+return Err(ParseError::ExcludedBranch(17855530393917176367u64));
 }
 };
 let arg2 = {
@@ -5695,7 +5794,7 @@ let b = _input.read_byte()?;
 if b == 70 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(10346499338674982396u64));
+return Err(ParseError::ExcludedBranch(11054356281452530428u64));
 }
 };
 let arg3 = {
@@ -5703,7 +5802,7 @@ let b = _input.read_byte()?;
 if b == 70 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(10951432197815892834u64));
+return Err(ParseError::ExcludedBranch(17406968167054271466u64));
 }
 };
 (arg0, arg1, arg2, arg3)
@@ -5724,7 +5823,7 @@ let b = _input.read_byte()?;
 Some(if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(14864597187136898256u64));
+return Err(ParseError::ExcludedBranch(11100042044514704042u64));
 })
 } else {
 None
@@ -5752,7 +5851,7 @@ let ret = match _input.read_byte()? {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(17406968167054271466u64));
+return Err(ParseError::ExcludedBranch(11460567998186064482u64));
 }
 };
 _input.close_peek_context()?;
@@ -5766,7 +5865,7 @@ let b = _input.read_byte()?;
 if b == 73 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(15238960955167157760u64));
+return Err(ParseError::ExcludedBranch(5409189036752851054u64));
 }
 };
 let arg1 = {
@@ -5774,7 +5873,7 @@ let b = _input.read_byte()?;
 if b == 73 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(17527274083228188873u64));
+return Err(ParseError::ExcludedBranch(4726315105662630465u64));
 }
 };
 tiff_main_byte_order::le(arg0, arg1)
@@ -5786,7 +5885,7 @@ let b = _input.read_byte()?;
 if b == 77 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(17855530393917176367u64));
+return Err(ParseError::ExcludedBranch(10036638040555853769u64));
 }
 };
 let arg1 = {
@@ -5794,14 +5893,14 @@ let b = _input.read_byte()?;
 if b == 77 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(11054356281452530428u64));
+return Err(ParseError::ExcludedBranch(13230337088401352826u64));
 }
 };
 tiff_main_byte_order::be(arg0, arg1)
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11100042044514704042u64));
+return Err(ParseError::ExcludedBranch(6223008304848233301u64));
 }
 }
 };
@@ -5973,7 +6072,7 @@ byte if (byte != 0) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(5409189036752851054u64));
+return Err(ParseError::ExcludedBranch(14550754927305275517u64));
 }
 };
 _input.close_peek_context()?;
@@ -6001,7 +6100,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(4726315105662630465u64));
+return Err(ParseError::ExcludedBranch(10197098993763395417u64));
 }
 };
 accum.push(next_elem)
@@ -6030,7 +6129,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(10036638040555853769u64));
+return Err(ParseError::ExcludedBranch(15631554783732883240u64));
 }
 };
 accum.push(next_elem)
@@ -6160,7 +6259,7 @@ opentype_main_directory::TableDirectory(inner)
 },
 
 _ => {
-return Err(ParseError::FailToken(13230337088401352826u64));
+return Err(ParseError::FailToken(2391834656526534993u64));
 }
 };
 PResult::Ok(opentype_main { file_start, magic, directory })
@@ -6181,7 +6280,7 @@ let ret = match _input.read_byte()? {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14550754927305275517u64));
+return Err(ParseError::ExcludedBranch(179268011689651936u64));
 }
 };
 _input.close_peek_context()?;
@@ -6195,7 +6294,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(11460567998186064482u64));
+return Err(ParseError::ExcludedBranch(9422510723961972169u64));
 }
 };
 let inner = (Decoder_rle_old_style(_input))?;
@@ -6208,7 +6307,7 @@ let b = _input.read_byte()?;
 if b == 1 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(6223008304848233301u64));
+return Err(ParseError::ExcludedBranch(10940017698627680568u64));
 }
 };
 let inner = (Decoder_rle_new_style(_input))?;
@@ -6216,7 +6315,7 @@ rle_main::new_style(inner)
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10197098993763395417u64));
+return Err(ParseError::ExcludedBranch(9665974566873665536u64));
 }
 })
 }
@@ -6275,7 +6374,7 @@ byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 3940649673949184u64])).contains(
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(15631554783732883240u64));
+return Err(ParseError::ExcludedBranch(374064178837027275u64));
 }
 };
 _input.close_peek_context()?;
@@ -6339,7 +6438,7 @@ byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 3940649673949184u64])).contains(
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(9422510723961972169u64));
+return Err(ParseError::ExcludedBranch(3725673472712527969u64));
 }
 };
 _input.close_peek_context()?;
@@ -6353,7 +6452,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(2391834656526534993u64));
+return Err(ParseError::ExcludedBranch(658824046370133753u64));
 }
 };
 (char::from_u32(0u32)).unwrap()
@@ -6364,7 +6463,7 @@ return Err(ParseError::ExcludedBranch(2391834656526534993u64));
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10940017698627680568u64));
+return Err(ParseError::ExcludedBranch(12728843535195535635u64));
 }
 })
 }
@@ -6413,7 +6512,7 @@ byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 3940649673949184u64])).contains(
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(9220862562374507822u64));
+return Err(ParseError::ExcludedBranch(1457499133218925748u64));
 }
 };
 _input.close_peek_context()?;
@@ -6427,7 +6526,7 @@ let b = _input.read_byte()?;
 if (ByteSet::from_bits([18446744073709551614u64, 18446744073709551615u64, 0u64, 0u64])).contains(b) {
 b
 } else {
-return Err(ParseError::ExcludedBranch(179268011689651936u64));
+return Err(ParseError::ExcludedBranch(15741082764016749161u64));
 }
 };
 byte as u32
@@ -6441,7 +6540,7 @@ let b = _input.read_byte()?;
 if (ByteSet::from_bits([0u64, 0u64, 0u64, 4294967292u64])).contains(b) {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9665974566873665536u64));
+return Err(ParseError::ExcludedBranch(9967703502401950260u64));
 }
 };
 raw & 31u8
@@ -6478,7 +6577,7 @@ byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 211106232532992u64])).contains(b
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(8376883036401934317u64));
+return Err(ParseError::ExcludedBranch(11786939113783016634u64));
 }
 };
 _input.close_peek_context()?;
@@ -6493,7 +6592,7 @@ let b = _input.read_byte()?;
 if b == 224 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(374064178837027275u64));
+return Err(ParseError::ExcludedBranch(8376883036401934317u64));
 }
 };
 raw & 15u8
@@ -6504,7 +6603,7 @@ let b = _input.read_byte()?;
 if (ByteSet::from_bits([0u64, 0u64, 18446744069414584320u64, 0u64])).contains(b) {
 b
 } else {
-return Err(ParseError::ExcludedBranch(658824046370133753u64));
+return Err(ParseError::ExcludedBranch(9069368457806005425u64));
 }
 };
 raw & 63u8
@@ -6520,7 +6619,7 @@ let b = _input.read_byte()?;
 if (ByteSet::from_bits([0u64, 0u64, 0u64, 35175782154240u64])).contains(b) {
 b
 } else {
-return Err(ParseError::ExcludedBranch(3725673472712527969u64));
+return Err(ParseError::ExcludedBranch(3179861450314844647u64));
 }
 };
 raw & 15u8
@@ -6537,7 +6636,7 @@ let b = _input.read_byte()?;
 if b == 237 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(12728843535195535635u64));
+return Err(ParseError::ExcludedBranch(15080388466336998873u64));
 }
 };
 raw & 15u8
@@ -6548,7 +6647,7 @@ let b = _input.read_byte()?;
 if (ByteSet::from_bits([0u64, 0u64, 4294967295u64, 0u64])).contains(b) {
 b
 } else {
-return Err(ParseError::ExcludedBranch(15741082764016749161u64));
+return Err(ParseError::ExcludedBranch(6070260202873699214u64));
 }
 };
 raw & 63u8
@@ -6564,7 +6663,7 @@ let b = _input.read_byte()?;
 if (ByteSet::from_bits([0u64, 0u64, 0u64, 211106232532992u64])).contains(b) {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9967703502401950260u64));
+return Err(ParseError::ExcludedBranch(8986322043713516692u64));
 }
 };
 raw & 15u8
@@ -6575,7 +6674,7 @@ let arg2 = (Decoder20(_input))?;
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(9069368457806005425u64));
+return Err(ParseError::ExcludedBranch(3852079030227774582u64));
 }
 }
 };
@@ -6604,7 +6703,7 @@ byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 3940649673949184u64])).contains(
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(3852079030227774582u64));
+return Err(ParseError::ExcludedBranch(10688770705819276010u64));
 }
 };
 _input.close_peek_context()?;
@@ -6619,7 +6718,7 @@ let b = _input.read_byte()?;
 if b == 240 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(3179861450314844647u64));
+return Err(ParseError::ExcludedBranch(5176232487486782188u64));
 }
 };
 raw & 7u8
@@ -6630,7 +6729,7 @@ let b = _input.read_byte()?;
 if (ByteSet::from_bits([0u64, 0u64, 18446744073709486080u64, 0u64])).contains(b) {
 b
 } else {
-return Err(ParseError::ExcludedBranch(15080388466336998873u64));
+return Err(ParseError::ExcludedBranch(9220862562374507822u64));
 }
 };
 raw & 63u8
@@ -6647,7 +6746,7 @@ let b = _input.read_byte()?;
 if (ByteSet::from_bits([0u64, 0u64, 0u64, 3940649673949184u64])).contains(b) {
 b
 } else {
-return Err(ParseError::ExcludedBranch(6070260202873699214u64));
+return Err(ParseError::ExcludedBranch(8772793160380380086u64));
 }
 };
 raw & 7u8
@@ -6665,7 +6764,7 @@ let b = _input.read_byte()?;
 if b == 244 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(8986322043713516692u64));
+return Err(ParseError::ExcludedBranch(2605623462625042002u64));
 }
 };
 raw & 7u8
@@ -6676,7 +6775,7 @@ let b = _input.read_byte()?;
 if (ByteSet::from_bits([0u64, 0u64, 65535u64, 0u64])).contains(b) {
 b
 } else {
-return Err(ParseError::ExcludedBranch(11786939113783016634u64));
+return Err(ParseError::ExcludedBranch(18164850183020044607u64));
 }
 };
 raw & 63u8
@@ -6687,7 +6786,7 @@ let arg3 = (Decoder20(_input))?;
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(5176232487486782188u64));
+return Err(ParseError::ExcludedBranch(10416240583538343445u64));
 }
 }
 };
@@ -6698,7 +6797,7 @@ let (x3, x2, x1, x0) = tuple_var;
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(8772793160380380086u64));
+return Err(ParseError::ExcludedBranch(14215639860155940137u64));
 }
 }
 };
@@ -6712,7 +6811,7 @@ let b = _input.read_byte()?;
 if (ByteSet::from_bits([0u64, 0u64, 18446744073709551615u64, 0u64])).contains(b) {
 b
 } else {
-return Err(ParseError::ExcludedBranch(2605623462625042002u64));
+return Err(ParseError::ExcludedBranch(5584166819955891466u64));
 }
 };
 PResult::Ok(raw & 63u8)
@@ -6816,7 +6915,7 @@ matches!(version, 65536u32 | 1330926671u32 | 1953658213u32)
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(18164850183020044607u64));
+return Err(ParseError::FalsifiedWhere(11133239979815295357u64));
 }
 };
 let num_tables = {
@@ -6861,7 +6960,7 @@ tag == 1953784678u32
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(10688770705819276010u64));
+return Err(ParseError::FalsifiedWhere(1275286460638129217u64));
 }
 };
 let major_version = {
@@ -7512,7 +7611,7 @@ x
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10416240583538343445u64));
+return Err(ParseError::ExcludedBranch(386759067598651566u64));
 }
 }.number_of_long_metrics, maxp.num_glyphs))?;
 _input.end_slice()?;
@@ -7569,7 +7668,7 @@ x == 1u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(1457499133218925748u64));
+return Err(ParseError::FalsifiedWhere(13527164188224560282u64));
 }
 };
 let minor_version = {
@@ -7584,7 +7683,7 @@ x == 0u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(14215639860155940137u64));
+return Err(ParseError::FalsifiedWhere(240888096670347429u64));
 }
 };
 let font_revision = {
@@ -7604,7 +7703,7 @@ let b = _input.read_byte()?;
 if b == 95 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(5584166819955891466u64));
+return Err(ParseError::ExcludedBranch(11936787736236307191u64));
 }
 };
 let arg1 = {
@@ -7612,7 +7711,7 @@ let b = _input.read_byte()?;
 if b == 15 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(11133239979815295357u64));
+return Err(ParseError::ExcludedBranch(5215619712890029856u64));
 }
 };
 let arg2 = {
@@ -7620,7 +7719,7 @@ let b = _input.read_byte()?;
 if b == 60 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(1275286460638129217u64));
+return Err(ParseError::ExcludedBranch(3167775832820164678u64));
 }
 };
 let arg3 = {
@@ -7628,7 +7727,7 @@ let b = _input.read_byte()?;
 if b == 245 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(386759067598651566u64));
+return Err(ParseError::ExcludedBranch(7215050775822222282u64));
 }
 };
 (arg0, arg1, arg2, arg3)
@@ -7649,7 +7748,7 @@ matches!(x, 16u16..=16384u16)
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(13527164188224560282u64));
+return Err(ParseError::FalsifiedWhere(3743786174148899814u64));
 }
 };
 let created = (Decoder102(_input))?;
@@ -7700,7 +7799,7 @@ x <= 1u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(240888096670347429u64));
+return Err(ParseError::FalsifiedWhere(12652804269632162478u64));
 }
 };
 let glyph_data_format = {
@@ -7715,7 +7814,7 @@ x == 0u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(11936787736236307191u64));
+return Err(ParseError::FalsifiedWhere(18134882366868794706u64));
 }
 };
 PResult::Ok(opentype_head_table { major_version, minor_version, font_revision, checksum_adjustment, magic_number, flags, units_per_em, created, modified, glyph_extents, mac_style, lowest_rec_ppem, font_direction_hint, index_to_loc_format, glyph_data_format })
@@ -7735,7 +7834,7 @@ x == 1u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(5215619712890029856u64));
+return Err(ParseError::FalsifiedWhere(7155653122005708978u64));
 }
 };
 let minor_version = {
@@ -7750,7 +7849,7 @@ matches!(x, 0u16 | 4096u16)
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(3167775832820164678u64));
+return Err(ParseError::FalsifiedWhere(17920584887603040596u64));
 }
 };
 let ascent = {
@@ -7809,7 +7908,7 @@ x == 0u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(7215050775822222282u64));
+return Err(ParseError::FalsifiedWhere(5673845796627816005u64));
 }
 };
 let arg1 = {
@@ -7824,7 +7923,7 @@ x == 0u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(3743786174148899814u64));
+return Err(ParseError::FalsifiedWhere(14591018267292443527u64));
 }
 };
 let arg2 = {
@@ -7839,7 +7938,7 @@ x == 0u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(12652804269632162478u64));
+return Err(ParseError::FalsifiedWhere(4762692522317026931u64));
 }
 };
 let arg3 = {
@@ -7854,7 +7953,7 @@ x == 0u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(18134882366868794706u64));
+return Err(ParseError::FalsifiedWhere(9630069758457681762u64));
 }
 };
 (arg0, arg1, arg2, arg3)
@@ -7871,7 +7970,7 @@ x == 0u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(7155653122005708978u64));
+return Err(ParseError::FalsifiedWhere(908377722732597655u64));
 }
 };
 let number_of_long_metrics = {
@@ -8522,7 +8621,7 @@ opentype_gasp_table_gasp_ranges_range_gasp_behavior::Version1(inner)
 },
 
 _ => {
-return Err(ParseError::FailToken(17920584887603040596u64));
+return Err(ParseError::FailToken(3203034260088513018u64));
 }
 };
 opentype_gasp_table_gasp_ranges { range_max_ppem, range_gasp_behavior }
@@ -8552,7 +8651,7 @@ x == 1u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(5673845796627816005u64));
+return Err(ParseError::FalsifiedWhere(14677505873656710393u64));
 }
 };
 let minor_version = {
@@ -8567,7 +8666,7 @@ x <= 1u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(14591018267292443527u64));
+return Err(ParseError::FalsifiedWhere(10102114574336663273u64));
 }
 };
 let horiz_axis_offset = {
@@ -8669,7 +8768,7 @@ x == 1u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(4762692522317026931u64));
+return Err(ParseError::FalsifiedWhere(4386762582485017400u64));
 }
 };
 let minor_version = {
@@ -8988,7 +9087,7 @@ opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link
 },
 
 _ => {
-return Err(ParseError::FailToken(9630069758457681762u64));
+return Err(ParseError::FailToken(8893850231119365992u64));
 }
 };
 PResult::Ok(opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link { table_start, caret_value_format, data })
@@ -9078,7 +9177,7 @@ opentype_gdef_table_data::Version1_0
 },
 
 1u16 => {
-return Err(ParseError::FailToken(908377722732597655u64));
+return Err(ParseError::FailToken(7659860344311718435u64));
 },
 
 2u16 => {
@@ -9247,7 +9346,7 @@ x == 1u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(3203034260088513018u64));
+return Err(ParseError::FalsifiedWhere(11052099086134529863u64));
 }
 };
 let minor_version = {
@@ -9502,7 +9601,7 @@ x == 1u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(14677505873656710393u64));
+return Err(ParseError::FalsifiedWhere(1079884235207081886u64));
 }
 };
 let minor_version = {
@@ -9757,7 +9856,7 @@ x == 1u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(10102114574336663273u64));
+return Err(ParseError::FalsifiedWhere(980800817911480223u64));
 }
 };
 let minor_version = {
@@ -9772,7 +9871,7 @@ x == 0u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(4386762582485017400u64));
+return Err(ParseError::FalsifiedWhere(9042484249406774160u64));
 }
 };
 let __offset_axes = {
@@ -9787,7 +9886,7 @@ raw > 0u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(8893850231119365992u64));
+return Err(ParseError::FalsifiedWhere(7801539417877429212u64));
 }
 };
 let __reserved = {
@@ -9802,7 +9901,7 @@ x == 2u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(7659860344311718435u64));
+return Err(ParseError::FalsifiedWhere(14931240509007516758u64));
 }
 };
 let axis_count = {
@@ -9821,7 +9920,7 @@ x == 20u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(11052099086134529863u64));
+return Err(ParseError::FalsifiedWhere(11328034188734904930u64));
 }
 };
 let instance_count = {
@@ -9846,7 +9945,7 @@ table_start + (__offset_axes as u32) >= __here
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(1079884235207081886u64));
+return Err(ParseError::FalsifiedWhere(1338347005175300217u64));
 }
 };
 let tgt_offset = table_start + (__offset_axes as u32);
@@ -9887,7 +9986,7 @@ table_start + ((__offset_axes + __axes_length) as u32) >= __here
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(980800817911480223u64));
+return Err(ParseError::FalsifiedWhere(15432825464810477099u64));
 }
 };
 let tgt_offset = table_start + ((__offset_axes + __axes_length) as u32);
@@ -9915,7 +10014,7 @@ x == 0u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(9042484249406774160u64));
+return Err(ParseError::FalsifiedWhere(8987822076696059625u64));
 }
 };
 let coordinates = (Decoder_opentype_var_user_tuple(_input, axis_count))?;
@@ -9958,7 +10057,7 @@ x == 1u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(7801539417877429212u64));
+return Err(ParseError::FalsifiedWhere(10078755145706786000u64));
 }
 };
 let minor_version = {
@@ -9973,7 +10072,7 @@ x == 0u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(14931240509007516758u64));
+return Err(ParseError::FalsifiedWhere(1977899765720151190u64));
 }
 };
 let axis_count = {
@@ -10141,7 +10240,7 @@ x == 0u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(11328034188734904930u64));
+return Err(ParseError::FalsifiedWhere(7343323033370781545u64));
 }
 };
 let n_tables = {
@@ -10164,7 +10263,7 @@ x == 0u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(1338347005175300217u64));
+return Err(ParseError::FalsifiedWhere(12890902517277365935u64));
 }
 };
 let length = {
@@ -10399,7 +10498,7 @@ opentype_kern_table_subtables_data::Format2(inner)
 },
 
 _ => {
-return Err(ParseError::FailToken(15432825464810477099u64));
+return Err(ParseError::FailToken(13049534979177835905u64));
 }
 };
 opentype_kern_table_subtables { version, length, coverage, data }
@@ -10429,7 +10528,7 @@ x == 1u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(8987822076696059625u64));
+return Err(ParseError::FalsifiedWhere(9011855507994367971u64));
 }
 };
 let minor_version = {
@@ -10444,7 +10543,7 @@ matches!(x, 1u16 | 2u16)
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(10078755145706786000u64));
+return Err(ParseError::FalsifiedWhere(14796083725261108356u64));
 }
 };
 let design_axis_size = {
@@ -10544,7 +10643,7 @@ matches!(x, 1u16..=4u16)
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(1977899765720151190u64));
+return Err(ParseError::FalsifiedWhere(2879885114680241844u64));
 }
 };
 let data = match format {
@@ -10791,7 +10890,7 @@ x != 0u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(7343323033370781545u64));
+return Err(ParseError::FalsifiedWhere(14009314771729697611u64));
 }
 };
 let tuple_variation_headers = {
@@ -10840,7 +10939,7 @@ table_start + (__data_offset as u32) >= __here
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(12890902517277365935u64));
+return Err(ParseError::FalsifiedWhere(10973085168168570837u64));
 }
 };
 let tgt_offset = table_start + (__data_offset as u32);
@@ -10864,7 +10963,7 @@ byte if ((ByteSet::from_bits([0u64, 0u64, 18446744073709551615u64, 1844674407370
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(2879885114680241844u64));
+return Err(ParseError::ExcludedBranch(16128388243093908143u64));
 }
 };
 _input.close_peek_context()?;
@@ -10878,7 +10977,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(13049534979177835905u64));
+return Err(ParseError::ExcludedBranch(10603707580403307601u64));
 }
 };
 (0u16, [].to_vec())
@@ -10890,7 +10989,7 @@ let b = _input.read_byte()?;
 if (ByteSet::from_bits([18446744073709551614u64, 18446744073709551615u64, 0u64, 0u64])).contains(b) {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9011855507994367971u64));
+return Err(ParseError::ExcludedBranch(18065118697073160549u64));
 }
 };
 let mut seq: Vec<opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes> = Vec::new();
@@ -10960,7 +11059,7 @@ let b = _input.read_byte()?;
 if (ByteSet::from_bits([0u64, 0u64, 18446744073709551615u64, 18446744073709551615u64])).contains(b) {
 b
 } else {
-return Err(ParseError::ExcludedBranch(14796083725261108356u64));
+return Err(ParseError::ExcludedBranch(10686389193617118447u64));
 }
 };
 let lo = _input.read_byte()?;
@@ -11026,7 +11125,7 @@ seq.push(elem)
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14009314771729697611u64));
+return Err(ParseError::ExcludedBranch(2818918064991511645u64));
 }
 })
 } else {
@@ -11057,7 +11156,7 @@ byte if ((ByteSet::from_bits([0u64, 0u64, 18446744073709551615u64, 1844674407370
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10686389193617118447u64));
+return Err(ParseError::ExcludedBranch(4418518334087228745u64));
 }
 };
 _input.close_peek_context()?;
@@ -11071,7 +11170,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(10973085168168570837u64));
+return Err(ParseError::ExcludedBranch(14082539304789607227u64));
 }
 };
 (0u16, [].to_vec())
@@ -11083,7 +11182,7 @@ let b = _input.read_byte()?;
 if (ByteSet::from_bits([18446744073709551614u64, 18446744073709551615u64, 0u64, 0u64])).contains(b) {
 b
 } else {
-return Err(ParseError::ExcludedBranch(10603707580403307601u64));
+return Err(ParseError::ExcludedBranch(11072034178440885507u64));
 }
 };
 let mut seq: Vec<opentype_var_glyph_variation_data_table_data_shared_point_numbers_yes> = Vec::new();
@@ -11153,7 +11252,7 @@ let b = _input.read_byte()?;
 if (ByteSet::from_bits([0u64, 0u64, 18446744073709551615u64, 18446744073709551615u64])).contains(b) {
 b
 } else {
-return Err(ParseError::ExcludedBranch(18065118697073160549u64));
+return Err(ParseError::ExcludedBranch(4608405370414018463u64));
 }
 };
 let lo = _input.read_byte()?;
@@ -11219,7 +11318,7 @@ seq.push(elem)
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(16128388243093908143u64));
+return Err(ParseError::ExcludedBranch(7086880279337729577u64));
 }
 })
 } else {
@@ -11508,7 +11607,7 @@ format == 1u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(2818918064991511645u64));
+return Err(ParseError::FalsifiedWhere(7511456693437940214u64));
 }
 };
 let extension_lookup_type = {
@@ -11523,7 +11622,7 @@ matches!(x, 1u16..=6u16 | 8)
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(14082539304789607227u64));
+return Err(ParseError::FalsifiedWhere(973408085875818710u64));
 }
 };
 let extension_offset = {
@@ -11588,11 +11687,11 @@ opentype_layout_ground_subst::ReverseChainSingleSubst(inner)
 },
 
 7u16 => {
-return Err(ParseError::FailToken(11072034178440885507u64));
+return Err(ParseError::FailToken(15557503981608772456u64));
 },
 
 _ => {
-return Err(ParseError::FailToken(4608405370414018463u64));
+return Err(ParseError::FailToken(2154669163482751322u64));
 }
 })
 }
@@ -11615,7 +11714,7 @@ x == 1u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(4418518334087228745u64));
+return Err(ParseError::FalsifiedWhere(10263667190582992611u64));
 }
 };
 let minor_version = {
@@ -11630,7 +11729,7 @@ x == 0u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(7086880279337729577u64));
+return Err(ParseError::FalsifiedWhere(5482396765248532989u64));
 }
 };
 let feature_variation_record_count = {
@@ -11684,7 +11783,7 @@ format == 1u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(7511456693437940214u64));
+return Err(ParseError::FalsifiedWhere(12275201028130973875u64));
 }
 };
 let axis_index = {
@@ -11759,7 +11858,7 @@ x == 1u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(973408085875818710u64));
+return Err(ParseError::FalsifiedWhere(16097120758067046920u64));
 }
 };
 let minor_version = {
@@ -11774,7 +11873,7 @@ x == 0u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(15557503981608772456u64));
+return Err(ParseError::FalsifiedWhere(9331632426086095927u64));
 }
 };
 let substitution_count = {
@@ -11965,7 +12064,7 @@ opentype_layout_single_subst_subst::Format2(inner)
 },
 
 _ => {
-return Err(ParseError::FailToken(2154669163482751322u64));
+return Err(ParseError::FailToken(14959848987246965519u64));
 }
 };
 PResult::Ok(opentype_layout_single_subst { table_start, subst_format, subst })
@@ -12098,7 +12197,7 @@ subst_format == 1u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(10263667190582992611u64));
+return Err(ParseError::FalsifiedWhere(9092905213558799443u64));
 }
 };
 let coverage = {
@@ -12206,7 +12305,7 @@ subst_format == 1u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(5482396765248532989u64));
+return Err(ParseError::FalsifiedWhere(17544092807091201u64));
 }
 };
 let coverage = {
@@ -12446,7 +12545,7 @@ x != 0u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(12275201028130973875u64));
+return Err(ParseError::FalsifiedWhere(10502127387712395480u64));
 }
 };
 let seq_lookup_count = {
@@ -12633,7 +12732,7 @@ x != 0u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(16097120758067046920u64));
+return Err(ParseError::FalsifiedWhere(14454034443522724586u64));
 }
 };
 let seq_lookup_count = {
@@ -12761,7 +12860,7 @@ opentype_common_sequence_context_subst::Format3(inner)
 },
 
 _ => {
-return Err(ParseError::FailToken(9331632426086095927u64));
+return Err(ParseError::FailToken(5322124757500927073u64));
 }
 };
 PResult::Ok(opentype_common_sequence_context { table_start, format, subst })
@@ -13355,7 +13454,7 @@ opentype_common_chained_sequence_context_subst::Format3(inner)
 },
 
 _ => {
-return Err(ParseError::FailToken(14959848987246965519u64));
+return Err(ParseError::FailToken(17869550927478639832u64));
 }
 };
 PResult::Ok(opentype_common_chained_sequence_context { table_start, format, subst })
@@ -13379,7 +13478,7 @@ subst_format == 1u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(9092905213558799443u64));
+return Err(ParseError::FalsifiedWhere(13431462572241034712u64));
 }
 };
 let coverage = {
@@ -13569,7 +13668,7 @@ opentype_coverage_table_data::Format2(inner)
 },
 
 _ => {
-return Err(ParseError::FailToken(17544092807091201u64));
+return Err(ParseError::FailToken(3433937857563719729u64));
 }
 };
 PResult::Ok(opentype_coverage_table { coverage_format, data })
@@ -13655,7 +13754,7 @@ opentype_class_def_data::Format2(inner)
 },
 
 _ => {
-return Err(ParseError::FailToken(10502127387712395480u64));
+return Err(ParseError::FailToken(13516986665125759073u64));
 }
 };
 PResult::Ok(opentype_class_def { class_format, data })
@@ -13755,7 +13854,7 @@ x == 0u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(14454034443522724586u64));
+return Err(ParseError::FalsifiedWhere(14751251992141172493u64));
 }
 };
 let required_feature_index = {
@@ -13798,7 +13897,7 @@ format == 1u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(5322124757500927073u64));
+return Err(ParseError::FalsifiedWhere(5733880678136728614u64));
 }
 };
 let extension_lookup_type = {
@@ -13813,7 +13912,7 @@ matches!(x, 1u16..=8u16)
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(17869550927478639832u64));
+return Err(ParseError::FalsifiedWhere(8997881400116719018u64));
 }
 };
 let extension_offset = {
@@ -13883,11 +13982,11 @@ opentype_layout_ground_pos::ChainedSequenceContext(inner)
 },
 
 9u16 => {
-return Err(ParseError::FailToken(13431462572241034712u64));
+return Err(ParseError::FailToken(13614619987783239962u64));
 },
 
 _ => {
-return Err(ParseError::FailToken(3433937857563719729u64));
+return Err(ParseError::FailToken(6915530142412472120u64));
 }
 })
 }
@@ -13989,7 +14088,7 @@ opentype_layout_single_pos_subtable::Format2(inner)
 },
 
 _ => {
-return Err(ParseError::FailToken(13516986665125759073u64));
+return Err(ParseError::FailToken(6949960292533894002u64));
 }
 };
 PResult::Ok(opentype_layout_single_pos { table_start, pos_format, subtable })
@@ -14248,7 +14347,7 @@ opentype_layout_pair_pos_subtable::Format2(inner)
 },
 
 _ => {
-return Err(ParseError::FailToken(14751251992141172493u64));
+return Err(ParseError::FailToken(1347174710810305478u64));
 }
 };
 PResult::Ok(opentype_layout_pair_pos { table_start, pos_format, subtable })
@@ -14272,7 +14371,7 @@ pos_format == 1u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(5733880678136728614u64));
+return Err(ParseError::FalsifiedWhere(8958899994948144829u64));
 }
 };
 let coverage = {
@@ -14394,7 +14493,7 @@ format == 1u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(8997881400116719018u64));
+return Err(ParseError::FalsifiedWhere(15803403730818557393u64));
 }
 };
 let mark_coverage_offset = {
@@ -14589,7 +14688,7 @@ format == 1u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(13614619987783239962u64));
+return Err(ParseError::FalsifiedWhere(8390724546948265409u64));
 }
 };
 let mark_coverage_offset = {
@@ -14829,7 +14928,7 @@ format == 1u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(6915530142412472120u64));
+return Err(ParseError::FalsifiedWhere(6347242493551283856u64));
 }
 };
 let mark1_coverage_offset = {
@@ -15178,7 +15277,7 @@ opentype_common_anchor_table_table::Format3(inner)
 },
 
 _ => {
-return Err(ParseError::FailToken(6949960292533894002u64));
+return Err(ParseError::FailToken(4251627061094365437u64));
 }
 };
 PResult::Ok(opentype_common_anchor_table { table_start, anchor_format, table })
@@ -15293,7 +15392,7 @@ let b = _input.read_byte()?;
 if b == 128 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(1347174710810305478u64));
+return Err(ParseError::ExcludedBranch(11915580511665106140u64));
 }
 };
 let arg1 = {
@@ -15301,7 +15400,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(8958899994948144829u64));
+return Err(ParseError::ExcludedBranch(17324980155911269375u64));
 }
 };
 (arg0, arg1)
@@ -16250,7 +16349,7 @@ x == 1u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(15803403730818557393u64));
+return Err(ParseError::FalsifiedWhere(17670535809278048255u64));
 }
 };
 let mark_glyph_set_count = {
@@ -16305,7 +16404,7 @@ x == 1u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(8390724546948265409u64));
+return Err(ParseError::FalsifiedWhere(2444204717155307095u64));
 }
 };
 let variation_region_list_offset = {
@@ -16334,7 +16433,7 @@ matches!(x, 0u16..=32767u16)
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(6347242493551283856u64));
+return Err(ParseError::FalsifiedWhere(1278184758971178969u64));
 }
 };
 let variation_regions = {
@@ -17016,7 +17115,7 @@ opentype_layout_base_coord_hint::DeviceHint(inner)
 },
 
 _ => {
-return Err(ParseError::FailToken(4251627061094365437u64));
+return Err(ParseError::FailToken(4480225125687487743u64));
 }
 };
 PResult::Ok(opentype_layout_base_coord { table_start, format, coordinate, hint })
@@ -17131,7 +17230,7 @@ match abs {
 },
 
 n => {
-try_sub!(65535u16, pred(n as u16), 17324980155911269375u64)
+try_sub!(65535u16, pred(n as u16), 3426398976290336157u64)
 }
 }
 }
@@ -17173,7 +17272,7 @@ match abs {
 },
 
 n => {
-try_sub!(65535u16, pred(n as u16), 2444204717155307095u64)
+try_sub!(65535u16, pred(n as u16), 17349123374714965876u64)
 }
 }
 }
@@ -17524,7 +17623,7 @@ matches!(x, 1u16..=2u16)
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(1278184758971178969u64));
+return Err(ParseError::FalsifiedWhere(2153064741293804702u64));
 }
 };
 let max_twilight_points = {
@@ -17567,7 +17666,7 @@ x <= 16u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(4480225125687487743u64));
+return Err(ParseError::FalsifiedWhere(1588651938759015246u64));
 }
 };
 PResult::Ok(opentype_maxp_table_version1 { max_points, max_contours, max_composite_points, max_composite_contours, max_zones, max_twilight_points, max_storage, max_function_defs, max_instruction_defs, max_stack_elements, max_size_of_instructions, max_component_elements, max_component_depth })
@@ -17745,7 +17844,7 @@ x == 2u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(12879845237981630531u64));
+return Err(ParseError::FalsifiedWhere(3249387167439447765u64));
 }
 };
 opentype_cmap_subtable_format14_length_raw { format }
@@ -17761,7 +17860,7 @@ let l = inner;
 PResult::Ok(if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(3426398976290336157u64));
+return Err(ParseError::FalsifiedWhere(7744051144774795087u64));
 })
 })())?;
 _input.close_peek_context()?;
@@ -17782,7 +17881,7 @@ x == 2u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(11250208753083412758u64));
+return Err(ParseError::FalsifiedWhere(8700288293163706751u64));
 }
 };
 let length = {
@@ -17797,7 +17896,7 @@ let l = inner;
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(17349123374714965876u64));
+return Err(ParseError::FalsifiedWhere(16771529512960957239u64));
 }
 };
 let language = {
@@ -17916,7 +18015,7 @@ x == 4u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(2153064741293804702u64));
+return Err(ParseError::FalsifiedWhere(13846498452079501214u64));
 }
 };
 opentype_cmap_subtable_format14_length_raw { format }
@@ -17942,7 +18041,7 @@ x == 4u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(1588651938759015246u64));
+return Err(ParseError::FalsifiedWhere(9798710097031164942u64));
 }
 };
 let length = {
@@ -17995,7 +18094,7 @@ x == 0u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(3249387167439447765u64));
+return Err(ParseError::FalsifiedWhere(9819345728844658158u64));
 }
 };
 let start_code = {
@@ -18075,7 +18174,7 @@ x == 6u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(7744051144774795087u64));
+return Err(ParseError::FalsifiedWhere(18279137173405083757u64));
 }
 };
 let length = {
@@ -18126,7 +18225,7 @@ x == 8u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(8700288293163706751u64));
+return Err(ParseError::FalsifiedWhere(14954891776835932150u64));
 }
 };
 let __reserved = {
@@ -18141,7 +18240,7 @@ x == 0u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(16771529512960957239u64));
+return Err(ParseError::FalsifiedWhere(11046436797737227751u64));
 }
 };
 opentype_cmap_subtable_format13_length_raw { format, __reserved }
@@ -18167,7 +18266,7 @@ x == 8u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(13846498452079501214u64));
+return Err(ParseError::FalsifiedWhere(14984809111992638634u64));
 }
 };
 let __reserved = {
@@ -18182,7 +18281,7 @@ x == 0u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(9798710097031164942u64));
+return Err(ParseError::FalsifiedWhere(9342187932533045817u64));
 }
 };
 let length = {
@@ -18237,7 +18336,7 @@ x == 10u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(9819345728844658158u64));
+return Err(ParseError::FalsifiedWhere(13404710972790825894u64));
 }
 };
 let __reserved = {
@@ -18252,7 +18351,7 @@ x == 0u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(18279137173405083757u64));
+return Err(ParseError::FalsifiedWhere(2688427941405105545u64));
 }
 };
 opentype_cmap_subtable_format13_length_raw { format, __reserved }
@@ -18278,7 +18377,7 @@ x == 10u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(14954891776835932150u64));
+return Err(ParseError::FalsifiedWhere(6279463968646665849u64));
 }
 };
 let __reserved = {
@@ -18293,7 +18392,7 @@ x == 0u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(11046436797737227751u64));
+return Err(ParseError::FalsifiedWhere(10875553067752207222u64));
 }
 };
 let length = {
@@ -18347,7 +18446,7 @@ x == 12u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(14984809111992638634u64));
+return Err(ParseError::FalsifiedWhere(11323981950571132721u64));
 }
 };
 let __reserved = {
@@ -18362,7 +18461,7 @@ x == 0u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(9342187932533045817u64));
+return Err(ParseError::FalsifiedWhere(1179945139148562335u64));
 }
 };
 opentype_cmap_subtable_format13_length_raw { format, __reserved }
@@ -18388,7 +18487,7 @@ x == 12u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(13404710972790825894u64));
+return Err(ParseError::FalsifiedWhere(3270685119814653163u64));
 }
 };
 let __reserved = {
@@ -18403,7 +18502,7 @@ x == 0u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(2688427941405105545u64));
+return Err(ParseError::FalsifiedWhere(6821845925776570829u64));
 }
 };
 let length = {
@@ -18450,7 +18549,7 @@ x == 13u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(6279463968646665849u64));
+return Err(ParseError::FalsifiedWhere(15898809900392744567u64));
 }
 };
 let __reserved = {
@@ -18465,7 +18564,7 @@ x == 0u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(10875553067752207222u64));
+return Err(ParseError::FalsifiedWhere(5653230390980289841u64));
 }
 };
 opentype_cmap_subtable_format13_length_raw { format, __reserved }
@@ -18491,7 +18590,7 @@ x == 13u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(11323981950571132721u64));
+return Err(ParseError::FalsifiedWhere(9179996462972575343u64));
 }
 };
 let __reserved = {
@@ -18506,7 +18605,7 @@ x == 0u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(1179945139148562335u64));
+return Err(ParseError::FalsifiedWhere(3675496117133668659u64));
 }
 };
 let length = {
@@ -18553,7 +18652,7 @@ x == 14u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(3270685119814653163u64));
+return Err(ParseError::FalsifiedWhere(6495907546257147840u64));
 }
 };
 opentype_cmap_subtable_format14_length_raw { format }
@@ -18579,7 +18678,7 @@ x == 14u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(6821845925776570829u64));
+return Err(ParseError::FalsifiedWhere(8327471529801851430u64));
 }
 };
 let length = {
@@ -18814,7 +18913,7 @@ matches!(sh_type, 0u32..=11u32 | 14u32..=18u32 | 1610612736u32..=4294967295u32)
 PResult::Ok(if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(15898809900392744567u64));
+return Err(ParseError::FalsifiedWhere(10310785543736156275u64));
 })
 }
 
@@ -19000,7 +19099,7 @@ let b = _input.read_byte()?;
 if b == 127 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(5653230390980289841u64));
+return Err(ParseError::ExcludedBranch(16594239496794104967u64));
 }
 };
 let arg1 = {
@@ -19008,7 +19107,7 @@ let b = _input.read_byte()?;
 if b == 69 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9179996462972575343u64));
+return Err(ParseError::ExcludedBranch(16529910322175208638u64));
 }
 };
 let arg2 = {
@@ -19016,7 +19115,7 @@ let b = _input.read_byte()?;
 if b == 76 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(3675496117133668659u64));
+return Err(ParseError::ExcludedBranch(12187643960709778443u64));
 }
 };
 let arg3 = {
@@ -19024,7 +19123,7 @@ let b = _input.read_byte()?;
 if b == 70 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(6495907546257147840u64));
+return Err(ParseError::ExcludedBranch(8766708729375264031u64));
 }
 };
 (arg0, arg1, arg2, arg3)
@@ -19056,7 +19155,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(8327471529801851430u64));
+return Err(ParseError::ExcludedBranch(1369437808023015077u64));
 }
 };
 accum.push(next_elem)
@@ -19079,7 +19178,7 @@ matches!(r#type, 0u16..=4u16 | 65024u16..=65279u16 | 65280u16..=65535u16)
 PResult::Ok(if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(10310785543736156275u64));
+return Err(ParseError::FalsifiedWhere(163858356033350300u64));
 })
 }
 
@@ -19098,7 +19197,7 @@ x <= 1u32
 PResult::Ok(if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(16594239496794104967u64));
+return Err(ParseError::FalsifiedWhere(888161872995526095u64));
 })
 }
 
@@ -19128,7 +19227,7 @@ x <= 2u8
 PResult::Ok(if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(16529910322175208638u64));
+return Err(ParseError::FalsifiedWhere(4770836931378141069u64));
 })
 }
 
@@ -19142,7 +19241,7 @@ x <= 2u8
 PResult::Ok(if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(12187643960709778443u64));
+return Err(ParseError::FalsifiedWhere(9976720501248819272u64));
 })
 }
 
@@ -19156,7 +19255,7 @@ x <= 1u8
 PResult::Ok(if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(8766708729375264031u64));
+return Err(ParseError::FalsifiedWhere(3595277668730903043u64));
 })
 }
 
@@ -19198,168 +19297,6 @@ _input.end_slice()?;
 ret
 };
 let mode = {
-let sz = 8u16 as usize;
-_input.start_slice(sz)?;
-let ret = ((|| {
-let string = {
-let mut accum = Vec::new();
-while _input.remaining() > 0 {
-let matching_ix = {
-_input.open_peek_context();
-{
-let ret = match _input.read_byte()? {
-byte if ((ByteSet::from_bits([71776119061217280u64, 0u64, 0u64, 0u64])).contains(byte)) => {
-0
-},
-
-byte if ((ByteSet::from_bits([4294967297u64, 0u64, 0u64, 0u64])).contains(byte)) => {
-1
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(1369437808023015077u64));
-}
-};
-_input.close_peek_context()?;
-ret
-}
-};
-if matching_ix == 0 {
-let next_elem = {
-let b = _input.read_byte()?;
-if (ByteSet::from_bits([71776119061217280u64, 0u64, 0u64, 0u64])).contains(b) {
-b
-} else {
-return Err(ParseError::ExcludedBranch(163858356033350300u64));
-}
-};
-accum.push(next_elem)
-} else {
-break
-}
-};
-accum
-};
-(Decoder148(_input))?;
-{
-let mut accum = Vec::new();
-while _input.remaining() > 0 {
-let matching_ix = {
-_input.open_peek_context();
-let b = _input.read_byte()?;
-{
-let ret = if b == 0 {
-0
-} else {
-1
-};
-_input.close_peek_context()?;
-ret
-}
-};
-if matching_ix == 0 {
-let next_elem = {
-let b = _input.read_byte()?;
-if b == 0 {
-b
-} else {
-return Err(ParseError::ExcludedBranch(888161872995526095u64));
-}
-};
-accum.push(next_elem)
-} else {
-break
-}
-};
-accum
-};
-PResult::Ok(tar_ascii_string_opt0 { string })
-})())?;
-_input.end_slice()?;
-ret
-};
-let uid = {
-let sz = 8u16 as usize;
-_input.start_slice(sz)?;
-let ret = ((|| {
-let string = {
-let mut accum = Vec::new();
-while _input.remaining() > 0 {
-let matching_ix = {
-_input.open_peek_context();
-{
-let ret = match _input.read_byte()? {
-byte if ((ByteSet::from_bits([71776119061217280u64, 0u64, 0u64, 0u64])).contains(byte)) => {
-0
-},
-
-byte if ((ByteSet::from_bits([4294967297u64, 0u64, 0u64, 0u64])).contains(byte)) => {
-1
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(4770836931378141069u64));
-}
-};
-_input.close_peek_context()?;
-ret
-}
-};
-if matching_ix == 0 {
-let next_elem = {
-let b = _input.read_byte()?;
-if (ByteSet::from_bits([71776119061217280u64, 0u64, 0u64, 0u64])).contains(b) {
-b
-} else {
-return Err(ParseError::ExcludedBranch(9976720501248819272u64));
-}
-};
-accum.push(next_elem)
-} else {
-break
-}
-};
-accum
-};
-(Decoder148(_input))?;
-{
-let mut accum = Vec::new();
-while _input.remaining() > 0 {
-let matching_ix = {
-_input.open_peek_context();
-let b = _input.read_byte()?;
-{
-let ret = if b == 0 {
-0
-} else {
-1
-};
-_input.close_peek_context()?;
-ret
-}
-};
-if matching_ix == 0 {
-let next_elem = {
-let b = _input.read_byte()?;
-if b == 0 {
-b
-} else {
-return Err(ParseError::ExcludedBranch(3595277668730903043u64));
-}
-};
-accum.push(next_elem)
-} else {
-break
-}
-};
-accum
-};
-PResult::Ok(tar_ascii_string_opt0 { string })
-})())?;
-_input.end_slice()?;
-ret
-};
-let gid = {
 let sz = 8u16 as usize;
 _input.start_slice(sz)?;
 let ret = ((|| {
@@ -19440,137 +19377,8 @@ PResult::Ok(tar_ascii_string_opt0 { string })
 _input.end_slice()?;
 ret
 };
-let size = {
-let rec = {
-let _oA = {
-let bit = {
-let b = _input.read_byte()?;
-if (ByteSet::from_bits([71776119061217280u64, 0u64, 0u64, 0u64])).contains(b) {
-b
-} else {
-return Err(ParseError::ExcludedBranch(4795509455376621436u64));
-}
-};
-try_sub!(bit as u8, 48u8, 5174369311102857850u64)
-};
-let _o9 = {
-let bit = {
-let b = _input.read_byte()?;
-if (ByteSet::from_bits([71776119061217280u64, 0u64, 0u64, 0u64])).contains(b) {
-b
-} else {
-return Err(ParseError::ExcludedBranch(15995337135637623051u64));
-}
-};
-try_sub!(bit as u8, 48u8, 10243418979491025991u64)
-};
-let _o8 = {
-let bit = {
-let b = _input.read_byte()?;
-if (ByteSet::from_bits([71776119061217280u64, 0u64, 0u64, 0u64])).contains(b) {
-b
-} else {
-return Err(ParseError::ExcludedBranch(6726475111737435495u64));
-}
-};
-try_sub!(bit as u8, 48u8, 14926982082392674388u64)
-};
-let _o7 = {
-let bit = {
-let b = _input.read_byte()?;
-if (ByteSet::from_bits([71776119061217280u64, 0u64, 0u64, 0u64])).contains(b) {
-b
-} else {
-return Err(ParseError::ExcludedBranch(13281230340934385869u64));
-}
-};
-try_sub!(bit as u8, 48u8, 8862619478422395719u64)
-};
-let _o6 = {
-let bit = {
-let b = _input.read_byte()?;
-if (ByteSet::from_bits([71776119061217280u64, 0u64, 0u64, 0u64])).contains(b) {
-b
-} else {
-return Err(ParseError::ExcludedBranch(7200474585457206375u64));
-}
-};
-try_sub!(bit as u8, 48u8, 13264741506377240721u64)
-};
-let _o5 = {
-let bit = {
-let b = _input.read_byte()?;
-if (ByteSet::from_bits([71776119061217280u64, 0u64, 0u64, 0u64])).contains(b) {
-b
-} else {
-return Err(ParseError::ExcludedBranch(16152968816646114000u64));
-}
-};
-try_sub!(bit as u8, 48u8, 2508979988921372290u64)
-};
-let _o4 = {
-let bit = {
-let b = _input.read_byte()?;
-if (ByteSet::from_bits([71776119061217280u64, 0u64, 0u64, 0u64])).contains(b) {
-b
-} else {
-return Err(ParseError::ExcludedBranch(10057441536650509049u64));
-}
-};
-try_sub!(bit as u8, 48u8, 829032137919921844u64)
-};
-let _o3 = {
-let bit = {
-let b = _input.read_byte()?;
-if (ByteSet::from_bits([71776119061217280u64, 0u64, 0u64, 0u64])).contains(b) {
-b
-} else {
-return Err(ParseError::ExcludedBranch(5170050512307443704u64));
-}
-};
-try_sub!(bit as u8, 48u8, 11309019127259385425u64)
-};
-let _o2 = {
-let bit = {
-let b = _input.read_byte()?;
-if (ByteSet::from_bits([71776119061217280u64, 0u64, 0u64, 0u64])).contains(b) {
-b
-} else {
-return Err(ParseError::ExcludedBranch(5159371628350638829u64));
-}
-};
-try_sub!(bit as u8, 48u8, 16134612799304961491u64)
-};
-let _o1 = {
-let bit = {
-let b = _input.read_byte()?;
-if (ByteSet::from_bits([71776119061217280u64, 0u64, 0u64, 0u64])).contains(b) {
-b
-} else {
-return Err(ParseError::ExcludedBranch(5308477118997970057u64));
-}
-};
-try_sub!(bit as u8, 48u8, 173922233423713068u64)
-};
-let _o0 = {
-let bit = {
-let b = _input.read_byte()?;
-if (ByteSet::from_bits([71776119061217280u64, 0u64, 0u64, 0u64])).contains(b) {
-b
-} else {
-return Err(ParseError::ExcludedBranch(12540117573097456360u64));
-}
-};
-try_sub!(bit as u8, 48u8, 9277543013594125416u64)
-};
-(Decoder148(_input))?;
-let value = (((0u8 as u32) << 3u32 | (_oA as u32)) << 6u32 | (_o9 as u32) << 3u32 | (_o8 as u32)) << 24u32 | (((_o7 as u32) << 3u32 | (_o6 as u32)) << 6u32 | (_o5 as u32) << 3u32 | (_o4 as u32)) << 12u32 | ((_o3 as u32) << 3u32 | (_o2 as u32)) << 6u32 | (_o1 as u32) << 3u32 | (_o0 as u32);
-tar_header_size_raw { value }
-};
-rec.value
-};
-let mtime = {
-let sz = 12u16 as usize;
+let uid = {
+let sz = 8u16 as usize;
 _input.start_slice(sz)?;
 let ret = ((|| {
 let string = {
@@ -19589,7 +19397,7 @@ byte if ((ByteSet::from_bits([4294967297u64, 0u64, 0u64, 0u64])).contains(byte))
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(5955168674639093440u64));
+return Err(ParseError::ExcludedBranch(4795509455376621436u64));
 }
 };
 _input.close_peek_context()?;
@@ -19602,7 +19410,7 @@ let b = _input.read_byte()?;
 if (ByteSet::from_bits([71776119061217280u64, 0u64, 0u64, 0u64])).contains(b) {
 b
 } else {
-return Err(ParseError::ExcludedBranch(4471438437047399494u64));
+return Err(ParseError::ExcludedBranch(3923207427992258326u64));
 }
 };
 accum.push(next_elem)
@@ -19635,7 +19443,298 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(13319523888327217639u64));
+return Err(ParseError::ExcludedBranch(5174369311102857850u64));
+}
+};
+accum.push(next_elem)
+} else {
+break
+}
+};
+accum
+};
+PResult::Ok(tar_ascii_string_opt0 { string })
+})())?;
+_input.end_slice()?;
+ret
+};
+let gid = {
+let sz = 8u16 as usize;
+_input.start_slice(sz)?;
+let ret = ((|| {
+let string = {
+let mut accum = Vec::new();
+while _input.remaining() > 0 {
+let matching_ix = {
+_input.open_peek_context();
+{
+let ret = match _input.read_byte()? {
+byte if ((ByteSet::from_bits([71776119061217280u64, 0u64, 0u64, 0u64])).contains(byte)) => {
+0
+},
+
+byte if ((ByteSet::from_bits([4294967297u64, 0u64, 0u64, 0u64])).contains(byte)) => {
+1
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(15995337135637623051u64));
+}
+};
+_input.close_peek_context()?;
+ret
+}
+};
+if matching_ix == 0 {
+let next_elem = {
+let b = _input.read_byte()?;
+if (ByteSet::from_bits([71776119061217280u64, 0u64, 0u64, 0u64])).contains(b) {
+b
+} else {
+return Err(ParseError::ExcludedBranch(4063460887563813446u64));
+}
+};
+accum.push(next_elem)
+} else {
+break
+}
+};
+accum
+};
+(Decoder148(_input))?;
+{
+let mut accum = Vec::new();
+while _input.remaining() > 0 {
+let matching_ix = {
+_input.open_peek_context();
+let b = _input.read_byte()?;
+{
+let ret = if b == 0 {
+0
+} else {
+1
+};
+_input.close_peek_context()?;
+ret
+}
+};
+if matching_ix == 0 {
+let next_elem = {
+let b = _input.read_byte()?;
+if b == 0 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(10243418979491025991u64));
+}
+};
+accum.push(next_elem)
+} else {
+break
+}
+};
+accum
+};
+PResult::Ok(tar_ascii_string_opt0 { string })
+})())?;
+_input.end_slice()?;
+ret
+};
+let size = {
+let rec = {
+let _oA = {
+let bit = {
+let b = _input.read_byte()?;
+if (ByteSet::from_bits([71776119061217280u64, 0u64, 0u64, 0u64])).contains(b) {
+b
+} else {
+return Err(ParseError::ExcludedBranch(6726475111737435495u64));
+}
+};
+try_sub!(bit as u8, 48u8, 14926982082392674388u64)
+};
+let _o9 = {
+let bit = {
+let b = _input.read_byte()?;
+if (ByteSet::from_bits([71776119061217280u64, 0u64, 0u64, 0u64])).contains(b) {
+b
+} else {
+return Err(ParseError::ExcludedBranch(13281230340934385869u64));
+}
+};
+try_sub!(bit as u8, 48u8, 8862619478422395719u64)
+};
+let _o8 = {
+let bit = {
+let b = _input.read_byte()?;
+if (ByteSet::from_bits([71776119061217280u64, 0u64, 0u64, 0u64])).contains(b) {
+b
+} else {
+return Err(ParseError::ExcludedBranch(7200474585457206375u64));
+}
+};
+try_sub!(bit as u8, 48u8, 13264741506377240721u64)
+};
+let _o7 = {
+let bit = {
+let b = _input.read_byte()?;
+if (ByteSet::from_bits([71776119061217280u64, 0u64, 0u64, 0u64])).contains(b) {
+b
+} else {
+return Err(ParseError::ExcludedBranch(16152968816646114000u64));
+}
+};
+try_sub!(bit as u8, 48u8, 2508979988921372290u64)
+};
+let _o6 = {
+let bit = {
+let b = _input.read_byte()?;
+if (ByteSet::from_bits([71776119061217280u64, 0u64, 0u64, 0u64])).contains(b) {
+b
+} else {
+return Err(ParseError::ExcludedBranch(10057441536650509049u64));
+}
+};
+try_sub!(bit as u8, 48u8, 829032137919921844u64)
+};
+let _o5 = {
+let bit = {
+let b = _input.read_byte()?;
+if (ByteSet::from_bits([71776119061217280u64, 0u64, 0u64, 0u64])).contains(b) {
+b
+} else {
+return Err(ParseError::ExcludedBranch(5170050512307443704u64));
+}
+};
+try_sub!(bit as u8, 48u8, 11309019127259385425u64)
+};
+let _o4 = {
+let bit = {
+let b = _input.read_byte()?;
+if (ByteSet::from_bits([71776119061217280u64, 0u64, 0u64, 0u64])).contains(b) {
+b
+} else {
+return Err(ParseError::ExcludedBranch(5159371628350638829u64));
+}
+};
+try_sub!(bit as u8, 48u8, 16134612799304961491u64)
+};
+let _o3 = {
+let bit = {
+let b = _input.read_byte()?;
+if (ByteSet::from_bits([71776119061217280u64, 0u64, 0u64, 0u64])).contains(b) {
+b
+} else {
+return Err(ParseError::ExcludedBranch(5308477118997970057u64));
+}
+};
+try_sub!(bit as u8, 48u8, 173922233423713068u64)
+};
+let _o2 = {
+let bit = {
+let b = _input.read_byte()?;
+if (ByteSet::from_bits([71776119061217280u64, 0u64, 0u64, 0u64])).contains(b) {
+b
+} else {
+return Err(ParseError::ExcludedBranch(12540117573097456360u64));
+}
+};
+try_sub!(bit as u8, 48u8, 9277543013594125416u64)
+};
+let _o1 = {
+let bit = {
+let b = _input.read_byte()?;
+if (ByteSet::from_bits([71776119061217280u64, 0u64, 0u64, 0u64])).contains(b) {
+b
+} else {
+return Err(ParseError::ExcludedBranch(5955168674639093440u64));
+}
+};
+try_sub!(bit as u8, 48u8, 13319523888327217639u64)
+};
+let _o0 = {
+let bit = {
+let b = _input.read_byte()?;
+if (ByteSet::from_bits([71776119061217280u64, 0u64, 0u64, 0u64])).contains(b) {
+b
+} else {
+return Err(ParseError::ExcludedBranch(824589811577025210u64));
+}
+};
+try_sub!(bit as u8, 48u8, 16096650375442290768u64)
+};
+(Decoder148(_input))?;
+let value = (((0u8 as u32) << 3u32 | (_oA as u32)) << 6u32 | (_o9 as u32) << 3u32 | (_o8 as u32)) << 24u32 | (((_o7 as u32) << 3u32 | (_o6 as u32)) << 6u32 | (_o5 as u32) << 3u32 | (_o4 as u32)) << 12u32 | ((_o3 as u32) << 3u32 | (_o2 as u32)) << 6u32 | (_o1 as u32) << 3u32 | (_o0 as u32);
+tar_header_size_raw { value }
+};
+rec.value
+};
+let mtime = {
+let sz = 12u16 as usize;
+_input.start_slice(sz)?;
+let ret = ((|| {
+let string = {
+let mut accum = Vec::new();
+while _input.remaining() > 0 {
+let matching_ix = {
+_input.open_peek_context();
+{
+let ret = match _input.read_byte()? {
+byte if ((ByteSet::from_bits([71776119061217280u64, 0u64, 0u64, 0u64])).contains(byte)) => {
+0
+},
+
+byte if ((ByteSet::from_bits([4294967297u64, 0u64, 0u64, 0u64])).contains(byte)) => {
+1
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(14339975513692068616u64));
+}
+};
+_input.close_peek_context()?;
+ret
+}
+};
+if matching_ix == 0 {
+let next_elem = {
+let b = _input.read_byte()?;
+if (ByteSet::from_bits([71776119061217280u64, 0u64, 0u64, 0u64])).contains(b) {
+b
+} else {
+return Err(ParseError::ExcludedBranch(16299205781335471965u64));
+}
+};
+accum.push(next_elem)
+} else {
+break
+}
+};
+accum
+};
+(Decoder148(_input))?;
+{
+let mut accum = Vec::new();
+while _input.remaining() > 0 {
+let matching_ix = {
+_input.open_peek_context();
+let b = _input.read_byte()?;
+{
+let ret = if b == 0 {
+0
+} else {
+1
+};
+_input.close_peek_context()?;
+ret
+}
+};
+if matching_ix == 0 {
+let next_elem = {
+let b = _input.read_byte()?;
+if b == 0 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(1479153625485860551u64));
 }
 };
 accum.push(next_elem)
@@ -19670,7 +19769,7 @@ byte if ((ByteSet::from_bits([4294967297u64, 0u64, 0u64, 0u64])).contains(byte))
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(824589811577025210u64));
+return Err(ParseError::ExcludedBranch(12668500753644823654u64));
 }
 };
 _input.close_peek_context()?;
@@ -19683,7 +19782,7 @@ let b = _input.read_byte()?;
 if (ByteSet::from_bits([71776119061217280u64, 0u64, 0u64, 0u64])).contains(b) {
 b
 } else {
-return Err(ParseError::ExcludedBranch(4649034608147552416u64));
+return Err(ParseError::ExcludedBranch(8094248233631264621u64));
 }
 };
 accum.push(next_elem)
@@ -19716,7 +19815,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(16096650375442290768u64));
+return Err(ParseError::ExcludedBranch(1844274570107701975u64));
 }
 };
 accum.push(next_elem)
@@ -19745,7 +19844,7 @@ let b = _input.read_byte()?;
 if b == 117 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(14339975513692068616u64));
+return Err(ParseError::ExcludedBranch(4839194687019048322u64));
 }
 };
 let arg1 = {
@@ -19753,7 +19852,7 @@ let b = _input.read_byte()?;
 if b == 115 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(16299205781335471965u64));
+return Err(ParseError::ExcludedBranch(7230273548678969972u64));
 }
 };
 let arg2 = {
@@ -19761,7 +19860,7 @@ let b = _input.read_byte()?;
 if b == 116 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(1479153625485860551u64));
+return Err(ParseError::ExcludedBranch(14903563845775542749u64));
 }
 };
 let arg3 = {
@@ -19769,7 +19868,7 @@ let b = _input.read_byte()?;
 if b == 97 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(12668500753644823654u64));
+return Err(ParseError::ExcludedBranch(1969670610881234889u64));
 }
 };
 let arg4 = {
@@ -19777,7 +19876,7 @@ let b = _input.read_byte()?;
 if b == 114 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(8094248233631264621u64));
+return Err(ParseError::ExcludedBranch(9038350950373664822u64));
 }
 };
 let arg5 = {
@@ -19785,7 +19884,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(1844274570107701975u64));
+return Err(ParseError::ExcludedBranch(7281717462557989541u64));
 }
 };
 (arg0, arg1, arg2, arg3, arg4, arg5)
@@ -19796,7 +19895,7 @@ let b = _input.read_byte()?;
 if b == 48 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(4839194687019048322u64));
+return Err(ParseError::ExcludedBranch(15510952803379905659u64));
 }
 };
 let arg1 = {
@@ -19804,7 +19903,7 @@ let b = _input.read_byte()?;
 if b == 48 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(7230273548678969972u64));
+return Err(ParseError::ExcludedBranch(14681668243282477517u64));
 }
 };
 (arg0, arg1)
@@ -19843,7 +19942,7 @@ byte if ((ByteSet::from_bits([4294967297u64, 0u64, 0u64, 0u64])).contains(byte))
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14903563845775542749u64));
+return Err(ParseError::ExcludedBranch(6209434968043366837u64));
 }
 };
 _input.close_peek_context()?;
@@ -19856,7 +19955,7 @@ let b = _input.read_byte()?;
 if (ByteSet::from_bits([71776119061217280u64, 0u64, 0u64, 0u64])).contains(b) {
 b
 } else {
-return Err(ParseError::ExcludedBranch(1969670610881234889u64));
+return Err(ParseError::ExcludedBranch(16474038368490899078u64));
 }
 };
 accum.push(next_elem)
@@ -19889,7 +19988,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9038350950373664822u64));
+return Err(ParseError::ExcludedBranch(12217686503432178884u64));
 }
 };
 accum.push(next_elem)
@@ -19924,7 +20023,7 @@ byte if ((ByteSet::from_bits([4294967297u64, 0u64, 0u64, 0u64])).contains(byte))
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(7281717462557989541u64));
+return Err(ParseError::ExcludedBranch(8399572043096922156u64));
 }
 };
 _input.close_peek_context()?;
@@ -19937,7 +20036,7 @@ let b = _input.read_byte()?;
 if (ByteSet::from_bits([71776119061217280u64, 0u64, 0u64, 0u64])).contains(b) {
 b
 } else {
-return Err(ParseError::ExcludedBranch(15510952803379905659u64));
+return Err(ParseError::ExcludedBranch(7832192330748800109u64));
 }
 };
 accum.push(next_elem)
@@ -19970,7 +20069,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(14681668243282477517u64));
+return Err(ParseError::ExcludedBranch(9815657591077818003u64));
 }
 };
 accum.push(next_elem)
@@ -20000,7 +20099,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(6209434968043366837u64));
+return Err(ParseError::ExcludedBranch(2197379665604321609u64));
 }
 };
 accum.push(next_elem)
@@ -20031,7 +20130,7 @@ byte if (byte != 0) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(16474038368490899078u64));
+return Err(ParseError::ExcludedBranch(16624020278885696461u64));
 }
 };
 _input.close_peek_context()?;
@@ -20050,7 +20149,7 @@ let b = _input.read_byte()?;
 if b != 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(12217686503432178884u64));
+return Err(ParseError::ExcludedBranch(14485842416732585139u64));
 }
 };
 accum.push(next_elem)
@@ -20080,7 +20179,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(8399572043096922156u64));
+return Err(ParseError::ExcludedBranch(8179432974518885725u64));
 }
 };
 accum.push(next_elem)
@@ -20099,7 +20198,7 @@ let b = _input.read_byte()?;
 PResult::Ok(if (ByteSet::from_bits([4294967297u64, 0u64, 0u64, 0u64])).contains(b) {
 b
 } else {
-return Err(ParseError::ExcludedBranch(7832192330748800109u64));
+return Err(ParseError::ExcludedBranch(5152282179373241998u64));
 })
 }
 
@@ -20121,7 +20220,7 @@ byte if (byte != 0) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(9815657591077818003u64));
+return Err(ParseError::ExcludedBranch(13780055874544357936u64));
 }
 };
 _input.close_peek_context()?;
@@ -20134,7 +20233,7 @@ let b = _input.read_byte()?;
 if b != 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(2197379665604321609u64));
+return Err(ParseError::ExcludedBranch(16909208071962620789u64));
 }
 };
 accum.push(next_elem)
@@ -20166,7 +20265,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(16624020278885696461u64));
+return Err(ParseError::ExcludedBranch(7933266403838225878u64));
 }
 };
 accum.push(next_elem)
@@ -20197,7 +20296,7 @@ byte if (byte != 0) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14485842416732585139u64));
+return Err(ParseError::ExcludedBranch(12100308281236296642u64));
 }
 };
 _input.close_peek_context()?;
@@ -20210,7 +20309,7 @@ let b = _input.read_byte()?;
 if b != 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(8179432974518885725u64));
+return Err(ParseError::ExcludedBranch(9041056097467752267u64));
 }
 };
 accum.push(next_elem)
@@ -20248,7 +20347,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(5152282179373241998u64));
+return Err(ParseError::ExcludedBranch(5025197102194587315u64));
 }
 };
 accum.push(next_elem)
@@ -20330,7 +20429,7 @@ let b = _input.read_byte()?;
 Some(if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(13780055874544357936u64));
+return Err(ParseError::ExcludedBranch(3810055094392728880u64));
 })
 } else {
 None
@@ -20352,10 +20451,10 @@ length <= 2147483647u32
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(16909208071962620789u64));
+return Err(ParseError::FalsifiedWhere(15252450768049745444u64));
 }
 };
-let tag = (Decoder199(_input))?;
+let tag = (Decoder200(_input))?;
 let data = {
 let sz = length as usize;
 _input.start_slice(sz)?;
@@ -20384,65 +20483,16 @@ length <= 2147483647u32
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(7933266403838225878u64));
+return Err(ParseError::FalsifiedWhere(5599331855309773603u64));
 }
 };
-let tag = {
-{
-_input.open_peek_not_context();
-let res = (|| {
-let tree_index = {
-_input.open_peek_context();
-{
-let ret = 0;
-_input.close_peek_context()?;
-ret
-}
-};
-match tree_index {
-0 => {
-{
-let b = _input.read_byte()?;
-if b == 73 {
-b
-} else {
-return Err(ParseError::ExcludedBranch(12100308281236296642u64));
-}
-};
-PResult::Ok(())
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9041056097467752267u64));
-}
-}
-})();
-if res.is_err() {
-_input.close_peek_not_context()?
-} else {
-return Err(ParseError::NegatedSuccess);
-}
-};
-let mut accum = Vec::new();
-for _ in 0..4u32 {
-let next_elem = {
-let b = _input.read_byte()?;
-if (ByteSet::from_bits([0u64, 576460743847706622u64, 0u64, 0u64])).contains(b) {
-b
-} else {
-return Err(ParseError::ExcludedBranch(5025197102194587315u64));
-}
-};
-accum.push(next_elem)
-};
-accum
-};
+let tag = (Decoder170(_input))?;
 let data = {
 let sz = length as usize;
 _input.start_slice(sz)?;
 let ret = match tag.as_slice() {
 [80u8, 76u8, 84u8, 69u8] => {
-let inner = (Decoder170(_input))?;
+let inner = (Decoder171(_input))?;
 png_chunk_data::PLTE(inner)
 },
 
@@ -20565,7 +20615,7 @@ length <= 2147483647u32
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(3810055094392728880u64));
+return Err(ParseError::FalsifiedWhere(16437491640759399344u64));
 }
 };
 let tag = (Decoder168(_input))?;
@@ -20597,7 +20647,7 @@ method_info.compression_method == 8u8
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(15252450768049745444u64));
+return Err(ParseError::FalsifiedWhere(2988545765690796708u64));
 }
 };
 let flags = {
@@ -20637,7 +20687,7 @@ length == 0u32
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(5599331855309773603u64));
+return Err(ParseError::FalsifiedWhere(6215067399528787845u64));
 }
 };
 let tag = (Decoder159(_input))?;
@@ -20655,7 +20705,7 @@ let b = _input.read_byte()?;
 if b == 73 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(16437491640759399344u64));
+return Err(ParseError::ExcludedBranch(17176374570344757031u64));
 }
 };
 let arg1 = {
@@ -20663,7 +20713,7 @@ let b = _input.read_byte()?;
 if b == 69 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(2988545765690796708u64));
+return Err(ParseError::ExcludedBranch(3566920116549027235u64));
 }
 };
 let arg2 = {
@@ -20671,7 +20721,7 @@ let b = _input.read_byte()?;
 if b == 78 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(6215067399528787845u64));
+return Err(ParseError::ExcludedBranch(7979287392867129207u64));
 }
 };
 let arg3 = {
@@ -20679,7 +20729,7 @@ let b = _input.read_byte()?;
 if b == 68 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(17176374570344757031u64));
+return Err(ParseError::ExcludedBranch(3653195934333285574u64));
 }
 };
 PResult::Ok((arg0, arg1, arg2, arg3))
@@ -21898,7 +21948,7 @@ x
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(7979287392867129207u64));
+return Err(ParseError::ExcludedBranch(10721249873135158334u64));
 }
 }))
 },
@@ -22050,7 +22100,7 @@ PResult::Ok(match distance_code as u8 {
 },
 
 30u8..=31u8 => {
-return Err(ParseError::FailToken(3653195934333285574u64));
+return Err(ParseError::FailToken(8898504689444561451u64));
 },
 
 _other => {
@@ -22146,7 +22196,7 @@ let b = _input.read_byte()?;
 if b == 73 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(16671136947067655757u64));
+return Err(ParseError::ExcludedBranch(441240706992005484u64));
 }
 };
 let arg1 = {
@@ -22154,7 +22204,7 @@ let b = _input.read_byte()?;
 if b == 68 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(10721249873135158334u64));
+return Err(ParseError::ExcludedBranch(3950014938140253048u64));
 }
 };
 let arg2 = {
@@ -22162,7 +22212,7 @@ let b = _input.read_byte()?;
 if b == 65 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(8898504689444561451u64));
+return Err(ParseError::ExcludedBranch(10046433636842398056u64));
 }
 };
 let arg3 = {
@@ -22170,7 +22220,7 @@ let b = _input.read_byte()?;
 if b == 84 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(441240706992005484u64));
+return Err(ParseError::ExcludedBranch(11079395374415646537u64));
 }
 };
 PResult::Ok((arg0, arg1, arg2, arg3))
@@ -22200,7 +22250,129 @@ PResult::Ok(accum)
 }
 
 /// d#170
-fn Decoder170(_input: &mut Parser<'_>) -> Result<Vec<png_plte>, ParseError> {
+fn Decoder170(_input: &mut Parser<'_>) -> Result<Vec<u8>, ParseError> {
+{
+_input.open_peek_not_context();
+let res = (|| (|| {
+_input.start_alt();
+let res = (|| {
+{
+let arg0 = {
+let b = _input.read_byte()?;
+if b == 73 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(757122060916971772u64));
+}
+};
+let arg1 = {
+let b = _input.read_byte()?;
+if b == 68 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(5986772336072340665u64));
+}
+};
+let arg2 = {
+let b = _input.read_byte()?;
+if b == 65 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(8812292064350598352u64));
+}
+};
+let arg3 = {
+let b = _input.read_byte()?;
+if b == 84 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(10645729856418057640u64));
+}
+};
+(arg0, arg1, arg2, arg3)
+};
+PResult::Ok(())
+})();
+match res {
+Ok(inner) => {
+return PResult::Ok(inner);
+},
+
+Err(_e) => {
+_input.next_alt(true)?;
+}
+};
+let res = (|| {
+{
+let arg0 = {
+let b = _input.read_byte()?;
+if b == 73 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(2908689796368760670u64));
+}
+};
+let arg1 = {
+let b = _input.read_byte()?;
+if b == 69 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(4316175446384649956u64));
+}
+};
+let arg2 = {
+let b = _input.read_byte()?;
+if b == 78 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(13311790038092155306u64));
+}
+};
+let arg3 = {
+let b = _input.read_byte()?;
+if b == 68 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(4598583460226006268u64));
+}
+};
+(arg0, arg1, arg2, arg3)
+};
+PResult::Ok(())
+})();
+match res {
+Ok(inner) => {
+PResult::Ok(inner)
+},
+
+Err(_e) => {
+Err(_e)
+}
+}
+})())();
+if res.is_err() {
+_input.close_peek_not_context()?
+} else {
+return Err(ParseError::NegatedSuccess);
+}
+};
+let mut accum = Vec::new();
+for _ in 0..4u32 {
+let next_elem = {
+let b = _input.read_byte()?;
+if (ByteSet::from_bits([0u64, 576460743847706622u64, 0u64, 0u64])).contains(b) {
+b
+} else {
+return Err(ParseError::ExcludedBranch(275550262640764009u64));
+}
+};
+accum.push(next_elem)
+};
+PResult::Ok(accum)
+}
+
+/// d#171
+fn Decoder171(_input: &mut Parser<'_>) -> Result<Vec<png_plte>, ParseError> {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
 let matching_ix = {
@@ -22231,7 +22403,7 @@ accum.push(next_elem)
 PResult::Ok(accum)
 }
 
-/// d#171
+/// d#172
 fn Decoder_png_trns(_input: &mut Parser<'_>, ihdr: png_ihdr) -> Result<png_trns, ParseError> {
 PResult::Ok(match ihdr.data.color_type {
 0u8 => {
@@ -22298,7 +22470,7 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 })
 }
 
-/// d#172
+/// d#173
 fn Decoder_png_chrm(_input: &mut Parser<'_>) -> Result<png_chrm, ParseError> {
 let whitepoint_x = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -22335,7 +22507,7 @@ u32be(x)
 PResult::Ok(png_chrm { whitepoint_x, whitepoint_y, red_x, red_y, green_x, green_y, blue_x, blue_y })
 }
 
-/// d#173
+/// d#174
 fn Decoder_png_gama(_input: &mut Parser<'_>) -> Result<png_gama, ParseError> {
 let gamma = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -22344,16 +22516,16 @@ u32be(x)
 PResult::Ok(png_gama { gamma })
 }
 
-/// d#174
+/// d#175
 fn Decoder_png_iccp(_input: &mut Parser<'_>) -> Result<png_iccp, ParseError> {
 let profile_name = {
-let val = (Decoder197(_input))?;
+let val = (Decoder198(_input))?;
 {
 let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(3950014938140253048u64));
+return Err(ParseError::ExcludedBranch(11490274700962832028u64));
 }
 };
 val.clone()
@@ -22363,14 +22535,14 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(10046433636842398056u64));
+return Err(ParseError::ExcludedBranch(15680765559661576738u64));
 }
 };
-let compressed_profile = (Decoder198(_input))?;
+let compressed_profile = (Decoder199(_input))?;
 PResult::Ok(png_iccp { profile_name, compression_method, compressed_profile })
 }
 
-/// d#175
+/// d#176
 fn Decoder_png_sbit(_input: &mut Parser<'_>, ihdr: png_ihdr) -> Result<png_sbit, ParseError> {
 PResult::Ok(match ihdr.data.color_type {
 0u8 => {
@@ -22427,7 +22599,7 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 })
 }
 
-/// d#176
+/// d#177
 fn Decoder_png_srgb(_input: &mut Parser<'_>) -> Result<png_srgb, ParseError> {
 let rendering_intent = {
 let inner = _input.read_byte()?;
@@ -22438,22 +22610,22 @@ x <= 3u8
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(11079395374415646537u64));
+return Err(ParseError::FalsifiedWhere(1587806253186841834u64));
 }
 };
 PResult::Ok(png_srgb { rendering_intent })
 }
 
-/// d#177
+/// d#178
 fn Decoder_png_itxt(_input: &mut Parser<'_>) -> Result<png_itxt, ParseError> {
 let keyword = {
-let val = (Decoder191(_input))?;
+let val = (Decoder192(_input))?;
 {
 let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(757122060916971772u64));
+return Err(ParseError::ExcludedBranch(11297314001547702431u64));
 }
 };
 val.clone()
@@ -22463,7 +22635,7 @@ let b = _input.read_byte()?;
 if (ByteSet::from_bits([3u64, 0u64, 0u64, 0u64])).contains(b) {
 b
 } else {
-return Err(ParseError::ExcludedBranch(5986772336072340665u64));
+return Err(ParseError::ExcludedBranch(18399269270080151498u64));
 }
 };
 let compression_method = {
@@ -22471,7 +22643,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(8812292064350598352u64));
+return Err(ParseError::ExcludedBranch(30874382969105279u64));
 }
 };
 let language_tag = {
@@ -22491,7 +22663,7 @@ byte if (byte != 0) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10645729856418057640u64));
+return Err(ParseError::ExcludedBranch(9791114990321288281u64));
 }
 };
 _input.close_peek_context()?;
@@ -22504,7 +22676,7 @@ let b = _input.read_byte()?;
 if b != 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(2908689796368760670u64));
+return Err(ParseError::ExcludedBranch(1595897747104696027u64));
 }
 };
 accum.push(next_elem)
@@ -22519,19 +22691,19 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(4316175446384649956u64));
+return Err(ParseError::ExcludedBranch(2481175643332430741u64));
 }
 };
 chars.clone()
 };
 let translated_keyword = {
-let val = (Decoder192(_input))?;
+let val = (Decoder193(_input))?;
 {
 let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(13311790038092155306u64));
+return Err(ParseError::ExcludedBranch(15702070659753069395u64));
 }
 };
 val.clone()
@@ -22543,10 +22715,10 @@ _input.start_alt();
 let res = (|| {
 let inner = {
 let inner = {
-let zlib = (Decoder193(_input))?;
+let zlib = (Decoder194(_input))?;
 let mut buf_parser = Parser::new(zlib.data.inflate.as_slice());
 let buf_input = &mut buf_parser;
-(Decoder194(buf_input))?
+(Decoder195(buf_input))?
 };
 png_itxt_text_compressed::valid(inner)
 };
@@ -22601,23 +22773,23 @@ Err(_e)
 },
 
 false => {
-let inner = (Decoder195(_input))?;
+let inner = (Decoder196(_input))?;
 png_itxt_text::uncompressed(inner)
 }
 };
 PResult::Ok(png_itxt { keyword, compression_flag, compression_method, language_tag, translated_keyword, text })
 }
 
-/// d#178
+/// d#179
 fn Decoder_png_text(_input: &mut Parser<'_>) -> Result<png_text, ParseError> {
 let keyword = {
-let val = (Decoder190(_input))?;
+let val = (Decoder191(_input))?;
 {
 let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(4598583460226006268u64));
+return Err(ParseError::ExcludedBranch(4338497647520366709u64));
 }
 };
 val.clone()
@@ -22646,16 +22818,16 @@ accum
 PResult::Ok(png_text { keyword, text })
 }
 
-/// d#179
+/// d#180
 fn Decoder_png_ztxt(_input: &mut Parser<'_>) -> Result<png_ztxt, ParseError> {
 let keyword = {
-let val = (Decoder186(_input))?;
+let val = (Decoder187(_input))?;
 {
 let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(275550262640764009u64));
+return Err(ParseError::ExcludedBranch(14600508952542130472u64));
 }
 };
 val.clone()
@@ -22665,19 +22837,19 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(11490274700962832028u64));
+return Err(ParseError::ExcludedBranch(460669108121189046u64));
 }
 };
 let compressed_text = {
-let zlib = (Decoder187(_input))?;
+let zlib = (Decoder188(_input))?;
 let mut buf_parser = Parser::new(zlib.data.inflate.as_slice());
 let buf_input = &mut buf_parser;
-(Decoder188(buf_input))?
+(Decoder189(buf_input))?
 };
 PResult::Ok(png_ztxt { keyword, compression_method, compressed_text })
 }
 
-/// d#180
+/// d#181
 fn Decoder_png_bkgd(_input: &mut Parser<'_>, ihdr: png_ihdr) -> Result<png_bkgd, ParseError> {
 PResult::Ok(match ihdr.data.color_type {
 0u8 => {
@@ -22754,7 +22926,7 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 })
 }
 
-/// d#181
+/// d#182
 fn Decoder_png_hist(_input: &mut Parser<'_>) -> Result<png_hist, ParseError> {
 let histogram = {
 let mut accum = Vec::new();
@@ -22783,7 +22955,7 @@ accum
 PResult::Ok(png_hist { histogram })
 }
 
-/// d#182
+/// d#183
 fn Decoder_png_phys(_input: &mut Parser<'_>) -> Result<png_phys, ParseError> {
 let pixels_per_unit_x = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -22797,16 +22969,16 @@ let unit_specifier = _input.read_byte()?;
 PResult::Ok(png_phys { pixels_per_unit_x, pixels_per_unit_y, unit_specifier })
 }
 
-/// d#183
+/// d#184
 fn Decoder_png_splt(_input: &mut Parser<'_>) -> Result<png_splt, ParseError> {
 let palette_name = {
-let val = (Decoder185(_input))?;
+let val = (Decoder186(_input))?;
 {
 let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(15680765559661576738u64));
+return Err(ParseError::ExcludedBranch(8971553008180040990u64));
 }
 };
 val.clone()
@@ -22816,7 +22988,7 @@ let b = _input.read_byte()?;
 if (ByteSet::from_bits([65792u64, 0u64, 0u64, 0u64])).contains(b) {
 b
 } else {
-return Err(ParseError::ExcludedBranch(1587806253186841834u64));
+return Err(ParseError::ExcludedBranch(1310624491311340594u64));
 }
 };
 let palette = match sample_depth {
@@ -22909,7 +23081,7 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 PResult::Ok(png_splt { palette_name, sample_depth, palette })
 }
 
-/// d#184
+/// d#185
 fn Decoder_png_time(_input: &mut Parser<'_>) -> Result<png_time, ParseError> {
 let year = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -22921,983 +23093,6 @@ let hour = _input.read_byte()?;
 let minute = _input.read_byte()?;
 let second = _input.read_byte()?;
 PResult::Ok(png_time { year, month, day, hour, minute, second })
-}
-
-/// d#185
-fn Decoder185(_input: &mut Parser<'_>) -> Result<Vec<u8>, ParseError> {
-let mut accum = Vec::new();
-while _input.remaining() > 0 {
-let reps_left = {
-_input.open_peek_context();
-{
-let ret = match _input.read_byte()? {
-0u8 => {
-0
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-1
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-2
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-3
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-4
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-5
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-6
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-7
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-8
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-9
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-10
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-11
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-12
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-13
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-14
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-15
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-16
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-17
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-18
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-19
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-20
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-21
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-22
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-23
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-24
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-25
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-26
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-27
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-28
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-29
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-30
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-31
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-32
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-33
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-34
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-35
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-36
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-37
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-38
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-39
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-40
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-41
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-42
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-43
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-44
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-45
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-46
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-47
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-48
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-49
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-50
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-51
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-52
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-53
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-54
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-55
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-56
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-57
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-58
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-59
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-60
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-61
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-62
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-63
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-64
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-65
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-66
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-67
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-68
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-69
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-70
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-71
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-72
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-73
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-74
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-75
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-76
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-77
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-match _input.read_byte()? {
-0u8 => {
-78
-},
-
-byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
-79
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(11297314001547702431u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(18399269270080151498u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(30874382969105279u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9791114990321288281u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(1595897747104696027u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(2481175643332430741u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(15702070659753069395u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(4338497647520366709u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(14600508952542130472u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(460669108121189046u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(8971553008180040990u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(1310624491311340594u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(11225936372640404826u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(1029952099207838423u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(17327099206515189757u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(14652068248613900169u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(3089242474000390105u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(8785324329127396734u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(14646838598150249928u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(14949659785259585833u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(562280208679883345u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(1426091679331900812u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5775567136742802567u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(12616585043782016404u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(13260893460097040029u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5931637197703965434u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(144820728017547457u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(17376845638706524656u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9452754313802575046u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(15362228896620571409u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(17715157964684782708u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9465826900165497155u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(14571733789425208869u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(6611121695530188940u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9660375186237087060u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(11684704871632490773u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(17081364943144677526u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9710347097769530785u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(2466404913032252300u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(4149374297771033461u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5869833854865239916u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(13372240079418200167u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(10504805981668764726u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5250529337043320049u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(4159150678276994707u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5633181162991720115u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(13699185545200670755u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(1705816027536538342u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5442671660922928935u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(15425278341212694869u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(17519877619184542224u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(2881491179107816928u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(3382972670024593436u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(3782015444980282771u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(1977196682923428575u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(14908034280634314212u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(3857251694269754536u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5041932778480497827u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(4514882359072253410u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(13286112843953025473u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(15541745679144160988u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(16366772103869684910u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(16354405091856567045u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(15047091743774256727u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(89425857491903975u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(4693381172248071257u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(10755314521203959634u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(6506136565977297327u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(17617969929120925997u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9726369214549228587u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(7323683635844484191u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(2785003688991605442u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(17143373953369837893u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(4319635423750959827u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(3022274272397071746u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(14869310993580240597u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(7391010474856587818u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(7025852844623144626u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(13513276483415770047u64));
-}
-};
-_input.close_peek_context()?;
-ret
-}
-};
-if (repeat_between_finished(reps_left == 0, accum.len(), 1u32 as usize, 79u32 as usize))? {
-break
-} else {
-let next_elem = {
-let b = _input.read_byte()?;
-if (ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(b) {
-b
-} else {
-return Err(ParseError::ExcludedBranch(1292030895245088137u64));
-}
-};
-accum.push(next_elem)
-}
-};
-PResult::Ok(accum)
 }
 
 /// d#186
@@ -24385,6 +23580,414 @@ byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 1
 },
 
 _ => {
+return Err(ParseError::ExcludedBranch(11225936372640404826u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(1029952099207838423u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(17327099206515189757u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(14652068248613900169u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(3089242474000390105u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(8785324329127396734u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(14646838598150249928u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(14949659785259585833u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(562280208679883345u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(1426091679331900812u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(5775567136742802567u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(12616585043782016404u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(13260893460097040029u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(5931637197703965434u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(144820728017547457u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(17376845638706524656u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(9452754313802575046u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(15362228896620571409u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(17715157964684782708u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(9465826900165497155u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(14571733789425208869u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(6611121695530188940u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(9660375186237087060u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(11684704871632490773u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(17081364943144677526u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(9710347097769530785u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(2466404913032252300u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(4149374297771033461u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(5869833854865239916u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(13372240079418200167u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(10504805981668764726u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(5250529337043320049u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(4159150678276994707u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(5633181162991720115u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(13699185545200670755u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(1705816027536538342u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(5442671660922928935u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(15425278341212694869u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(17519877619184542224u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(2881491179107816928u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(3382972670024593436u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(3782015444980282771u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(1977196682923428575u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(14908034280634314212u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(3857251694269754536u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(5041932778480497827u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(4514882359072253410u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(13286112843953025473u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(15541745679144160988u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(16366772103869684910u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(16354405091856567045u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(15047091743774256727u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(89425857491903975u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(4693381172248071257u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(10755314521203959634u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(6506136565977297327u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(17617969929120925997u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(9726369214549228587u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(7323683635844484191u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(2785003688991605442u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(17143373953369837893u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(4319635423750959827u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(3022274272397071746u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(14869310993580240597u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(7391010474856587818u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(7025852844623144626u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(13513276483415770047u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(1292030895245088137u64));
+}
+}
+},
+
+_ => {
 return Err(ParseError::ExcludedBranch(8527564631842216417u64));
 }
 }
@@ -24447,414 +24050,6 @@ return Err(ParseError::ExcludedBranch(10179224889113195865u64));
 _ => {
 return Err(ParseError::ExcludedBranch(2526895115167988738u64));
 }
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(7617559532652678498u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(4051432836859471288u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(14741532803131558705u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(10276185770177327434u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(16586067667342674799u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(2497564037439806374u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(8400230153663738380u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(3348696109325747597u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(3775958429611079664u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(15402873290357121767u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(7699494290217942468u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(15920470819585350103u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(2212229856396822503u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(13487040053473546512u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(7142800526810245879u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(15228292911834498078u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(14228769055716402588u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(2096340590066926443u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(6262990113977164585u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(16057321717383774211u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5291563035461819971u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(14334546370445091615u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(18123524617814052121u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(3966750415843992376u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(3512844604428973098u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(14732383712267459599u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(13357689525249598011u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(16153196263894316997u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(11930340298772268405u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(8442068294613883251u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(6850311165997710199u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(2310756498479603065u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5816243344835903905u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(16915030153566842158u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5877293982949196624u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(2440323998191641952u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(3265375406401843811u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(11458871772722170518u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(12156808917241975156u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(15301408058960503169u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(4255813677013328811u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(7761201277159812979u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(15409834313606096443u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(7572218778908935167u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(12520942526725743695u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5905249956584638130u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(8609603324479018835u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(8973115486793444912u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(2872401692234135189u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(3556125603266802472u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(16173438081116718978u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(3532284049956758497u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(1214015012285792661u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(18287039256282529512u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(6040541316788286267u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(6926344996361682930u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(1335666833550050804u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(12949211704949756849u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(4317621489266312319u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(868434092978367357u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(496554245154466536u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(8244423856248085319u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(14587337454519331439u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(17469688165057057832u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(17175946860967673146u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(4411296728399804345u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(13980028702310773940u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(4312000683241916062u64));
-}
 };
 _input.close_peek_context()?;
 ret
@@ -24868,7 +24063,7 @@ let b = _input.read_byte()?;
 if (ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(b) {
 b
 } else {
-return Err(ParseError::ExcludedBranch(3334424754000117797u64));
+return Err(ParseError::ExcludedBranch(7617559532652678498u64));
 }
 };
 accum.push(next_elem)
@@ -24878,118 +24073,7 @@ PResult::Ok(accum)
 }
 
 /// d#187
-fn Decoder187(_input: &mut Parser<'_>) -> Result<zlib_main, ParseError> {
-let compression_method_flags = {
-let inner = {
-let packed_bits = _input.read_byte()?;
-zlib_main_compression_method_flags { compression_info: packed_bits >> 4u8 & 15u8, compression_method: packed_bits & 15u8 }
-};
-let is_valid = {
-let method_info = inner;
-method_info.compression_method == 8u8
-};
-if is_valid {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere(527013363415661133u64));
-}
-};
-let flags = {
-let packed_bits = _input.read_byte()?;
-zlib_main_flags { flevel: packed_bits >> 6u8 & 3u8, fdict: packed_bits >> 5u8 & 1u8 > 0u8, fcheck: packed_bits & 31u8 }
-};
-let dict_id = if flags.fdict {
-let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
-Some(u32be(x))
-} else {
-None
-};
-let data = {
-_input.enter_bits_mode()?;
-let ret = (Decoder_deflate_main(_input))?;
-let _bits_read = _input.escape_bits_mode()?;
-ret
-};
-let adler32 = {
-let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
-u32be(x)
-};
-PResult::Ok(zlib_main { compression_method_flags, flags, dict_id, data, adler32 })
-}
-
-/// d#188
-fn Decoder188(_input: &mut Parser<'_>) -> Result<Vec<char>, ParseError> {
-Decoder189(_input)
-}
-
-/// d#189
-fn Decoder189(_input: &mut Parser<'_>) -> Result<Vec<char>, ParseError> {
-let mut accum = Vec::new();
-while _input.remaining() > 0 {
-let matching_ix = {
-_input.open_peek_context();
-{
-let ret = match _input.read_byte()? {
-0u8 => {
-0
-},
-
-byte if ((ByteSet::from_bits([18446744073709551614u64, 18446744073709551615u64, 0u64, 0u64])).contains(byte)) => {
-0
-},
-
-byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 4294967292u64])).contains(byte)) => {
-0
-},
-
-224u8 => {
-0
-},
-
-byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 35175782154240u64])).contains(byte)) => {
-0
-},
-
-237u8 => {
-0
-},
-
-byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 211106232532992u64])).contains(byte)) => {
-0
-},
-
-240u8 => {
-0
-},
-
-byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 3940649673949184u64])).contains(byte)) => {
-0
-},
-
-244u8 => {
-0
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(4717292700030555590u64));
-}
-};
-_input.close_peek_context()?;
-ret
-}
-};
-if matching_ix == 0 {
-let next_elem = (Decoder18(_input))?;
-accum.push(next_elem)
-} else {
-break
-}
-};
-PResult::Ok(accum)
-}
-
-/// d#190
-fn Decoder190(_input: &mut Parser<'_>) -> Result<Vec<u8>, ParseError> {
+fn Decoder187(_input: &mut Parser<'_>) -> Result<Vec<u8>, ParseError> {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
 let reps_left = {
@@ -25473,6 +24557,426 @@ byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 1
 },
 
 _ => {
+return Err(ParseError::ExcludedBranch(4051432836859471288u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(14741532803131558705u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(10276185770177327434u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(16586067667342674799u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(2497564037439806374u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(8400230153663738380u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(3348696109325747597u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(3775958429611079664u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(15402873290357121767u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(7699494290217942468u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(15920470819585350103u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(2212229856396822503u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(13487040053473546512u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(7142800526810245879u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(15228292911834498078u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(14228769055716402588u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(2096340590066926443u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(6262990113977164585u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(16057321717383774211u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(5291563035461819971u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(14334546370445091615u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(18123524617814052121u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(3966750415843992376u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(3512844604428973098u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(14732383712267459599u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(13357689525249598011u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(16153196263894316997u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(11930340298772268405u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(8442068294613883251u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(6850311165997710199u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(2310756498479603065u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(5816243344835903905u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(16915030153566842158u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(5877293982949196624u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(2440323998191641952u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(3265375406401843811u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(11458871772722170518u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(12156808917241975156u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(15301408058960503169u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(4255813677013328811u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(7761201277159812979u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(15409834313606096443u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(7572218778908935167u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(12520942526725743695u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(5905249956584638130u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(8609603324479018835u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(8973115486793444912u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(2872401692234135189u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(3556125603266802472u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(16173438081116718978u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(3532284049956758497u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(1214015012285792661u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(18287039256282529512u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(6040541316788286267u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(6926344996361682930u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(1335666833550050804u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(12949211704949756849u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(4317621489266312319u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(868434092978367357u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(496554245154466536u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(8244423856248085319u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(14587337454519331439u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(17469688165057057832u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(17175946860967673146u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(4411296728399804345u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(13980028702310773940u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(4312000683241916062u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(3334424754000117797u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(527013363415661133u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(4717292700030555590u64));
+}
+}
+},
+
+_ => {
 return Err(ParseError::ExcludedBranch(653172816195928449u64));
 }
 }
@@ -25523,426 +25027,6 @@ return Err(ParseError::ExcludedBranch(6914153644311469309u64));
 _ => {
 return Err(ParseError::ExcludedBranch(11188141958235814565u64));
 }
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(15180040648844909945u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(18312372211249290289u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(6298802191889347847u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(11017185023542530489u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(15395924218065814216u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(14060832500024730160u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(3344470983013526080u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(10251322642913008199u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(10455173543833790502u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(1789963736344690987u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(15079752956117840734u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(7980438082889912554u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(6840264564700035644u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(2232617280930402416u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(10367781439645737926u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(6016311883578211466u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(14984769167642974435u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(11733915986279978987u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(12796096677294114859u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(4290849149416714172u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(2598935692633451852u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(8938360652744148620u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(3379987508464424555u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(11173052675913205247u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(1780493074893517013u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5013701440573848944u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(15508559755986719975u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(14782609537615230269u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(17984802637964449391u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(4337320827937013231u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9730514595131843432u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(11851311358763079517u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(4195586632355556000u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(3595083506735372973u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(7160308966995483862u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(10995965655495216468u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(329678914966083835u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(6740511944232229269u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(16842149192073737461u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(2734069901426030304u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(8313738771561634204u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5782291498890001703u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(10699246393255895644u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(16725113430369695556u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(10581544802310072854u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(2930236810929305906u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9788088961065186348u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(13475201244121026739u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(10514680212862927148u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(1404288588910574651u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9722140062746187322u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(14672290401516300248u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(1570732024996461745u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(3970524133912495743u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(10022572355386706896u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(7175325427369635964u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(10941190781838111798u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(8533828000951561331u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(7620563226324297760u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(3141147280724933447u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5155365750119375266u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(6019636780841875619u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9286045119570450224u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(12351156548319118754u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(16002368984748306955u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(2518353173875372183u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(1057280760989719477u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(4360542291358407189u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(11728165168471348185u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(10495009576779598530u64));
-}
 };
 _input.close_peek_context()?;
 ret
@@ -25956,10 +25040,121 @@ let b = _input.read_byte()?;
 if (ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(b) {
 b
 } else {
-return Err(ParseError::ExcludedBranch(7128967683436470476u64));
+return Err(ParseError::ExcludedBranch(15180040648844909945u64));
 }
 };
 accum.push(next_elem)
+}
+};
+PResult::Ok(accum)
+}
+
+/// d#188
+fn Decoder188(_input: &mut Parser<'_>) -> Result<zlib_main, ParseError> {
+let compression_method_flags = {
+let inner = {
+let packed_bits = _input.read_byte()?;
+zlib_main_compression_method_flags { compression_info: packed_bits >> 4u8 & 15u8, compression_method: packed_bits & 15u8 }
+};
+let is_valid = {
+let method_info = inner;
+method_info.compression_method == 8u8
+};
+if is_valid {
+inner
+} else {
+return Err(ParseError::FalsifiedWhere(18312372211249290289u64));
+}
+};
+let flags = {
+let packed_bits = _input.read_byte()?;
+zlib_main_flags { flevel: packed_bits >> 6u8 & 3u8, fdict: packed_bits >> 5u8 & 1u8 > 0u8, fcheck: packed_bits & 31u8 }
+};
+let dict_id = if flags.fdict {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+Some(u32be(x))
+} else {
+None
+};
+let data = {
+_input.enter_bits_mode()?;
+let ret = (Decoder_deflate_main(_input))?;
+let _bits_read = _input.escape_bits_mode()?;
+ret
+};
+let adler32 = {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u32be(x)
+};
+PResult::Ok(zlib_main { compression_method_flags, flags, dict_id, data, adler32 })
+}
+
+/// d#189
+fn Decoder189(_input: &mut Parser<'_>) -> Result<Vec<char>, ParseError> {
+Decoder190(_input)
+}
+
+/// d#190
+fn Decoder190(_input: &mut Parser<'_>) -> Result<Vec<char>, ParseError> {
+let mut accum = Vec::new();
+while _input.remaining() > 0 {
+let matching_ix = {
+_input.open_peek_context();
+{
+let ret = match _input.read_byte()? {
+0u8 => {
+0
+},
+
+byte if ((ByteSet::from_bits([18446744073709551614u64, 18446744073709551615u64, 0u64, 0u64])).contains(byte)) => {
+0
+},
+
+byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 4294967292u64])).contains(byte)) => {
+0
+},
+
+224u8 => {
+0
+},
+
+byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 35175782154240u64])).contains(byte)) => {
+0
+},
+
+237u8 => {
+0
+},
+
+byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 211106232532992u64])).contains(byte)) => {
+0
+},
+
+240u8 => {
+0
+},
+
+byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 3940649673949184u64])).contains(byte)) => {
+0
+},
+
+244u8 => {
+0
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(6298802191889347847u64));
+}
+};
+_input.close_peek_context()?;
+ret
+}
+};
+if matching_ix == 0 {
+let next_elem = (Decoder18(_input))?;
+accum.push(next_elem)
+} else {
+break
 }
 };
 PResult::Ok(accum)
@@ -26450,6 +25645,414 @@ byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 1
 },
 
 _ => {
+return Err(ParseError::ExcludedBranch(11017185023542530489u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(15395924218065814216u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(14060832500024730160u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(3344470983013526080u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(10251322642913008199u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(10455173543833790502u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(1789963736344690987u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(15079752956117840734u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(7980438082889912554u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(6840264564700035644u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(2232617280930402416u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(10367781439645737926u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(6016311883578211466u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(14984769167642974435u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(11733915986279978987u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(12796096677294114859u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(4290849149416714172u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(2598935692633451852u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(8938360652744148620u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(3379987508464424555u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(11173052675913205247u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(1780493074893517013u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(5013701440573848944u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(15508559755986719975u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(14782609537615230269u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(17984802637964449391u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(4337320827937013231u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(9730514595131843432u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(11851311358763079517u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(4195586632355556000u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(3595083506735372973u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(7160308966995483862u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(10995965655495216468u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(329678914966083835u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(6740511944232229269u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(16842149192073737461u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(2734069901426030304u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(8313738771561634204u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(5782291498890001703u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(10699246393255895644u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(16725113430369695556u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(10581544802310072854u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(2930236810929305906u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(9788088961065186348u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(13475201244121026739u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(10514680212862927148u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(1404288588910574651u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(9722140062746187322u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(14672290401516300248u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(1570732024996461745u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(3970524133912495743u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(10022572355386706896u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(7175325427369635964u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(10941190781838111798u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(8533828000951561331u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(7620563226324297760u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(3141147280724933447u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(5155365750119375266u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(6019636780841875619u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(9286045119570450224u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(12351156548319118754u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(16002368984748306955u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(2518353173875372183u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(1057280760989719477u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(4360542291358407189u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(11728165168471348185u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(10495009576779598530u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(7128967683436470476u64));
+}
+}
+},
+
+_ => {
 return Err(ParseError::ExcludedBranch(3036714361878569528u64));
 }
 }
@@ -26512,414 +26115,6 @@ return Err(ParseError::ExcludedBranch(17114848294724579474u64));
 _ => {
 return Err(ParseError::ExcludedBranch(6471433373632717886u64));
 }
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(11488186652992817125u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(16428598146864409139u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(11934620222090497034u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(7597388605883543966u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(1942606498606899849u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9288520242296510642u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(12753818979092594971u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9662462399070735352u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(8414850703985147087u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(14428558544277089677u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(17505260505493155057u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(4244096627290639074u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(16278372111013231116u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(4797145928961714098u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(11396441833338683368u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(18000244536401340529u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(17499296848696657524u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(17871409524597489995u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(18319329181163975393u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9728697411637566730u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9691647707184281179u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(7972156773864461481u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(11074874806330017418u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(12662813720965160010u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(3243138897542356980u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(15920917552321559809u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(835240278964504247u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(7150174851274887183u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(11306355108769900243u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9864490923722431849u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(1995664400520545068u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(14904826071154862403u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9819888267966403254u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9848248130448711783u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(13072404838946064765u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(608962121954693839u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(4003079682566975393u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(4315160623525052581u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(1862457564087794359u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(4725257428709613290u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(11823569341425521789u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(14474361861190022573u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(8440332211549640930u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(13045651918551022996u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(12507789284617859731u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(4636203914394120912u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(12770885481695079655u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5713736954960046494u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5286459060741837465u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(10857757036842967573u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(8347358143797316202u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9289217078927880343u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(7619374930571283120u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5502272810018950495u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9422091606538556682u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(1986031727359985319u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(2609726213773413101u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(4688564412461098550u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(4942686269660057715u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9251320185524837870u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(16934907723271638747u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(12709578918531114377u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(4227980562164448700u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(6852038687184722387u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(18441633166538026093u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(401788761305210720u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5252251088830583126u64));
-}
-}
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5396814765406749711u64));
-}
 };
 _input.close_peek_context()?;
 ret
@@ -26933,7 +26128,7 @@ let b = _input.read_byte()?;
 if (ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(b) {
 b
 } else {
-return Err(ParseError::ExcludedBranch(12786091976415550822u64));
+return Err(ParseError::ExcludedBranch(11488186652992817125u64));
 }
 };
 accum.push(next_elem)
@@ -26943,246 +26138,7 @@ PResult::Ok(accum)
 }
 
 /// d#192
-fn Decoder192(_input: &mut Parser<'_>) -> Result<Vec<char>, ParseError> {
-let mut accum = Vec::new();
-while _input.remaining() > 0 {
-let matching_ix = {
-_input.open_peek_context();
-{
-let ret = match _input.read_byte()? {
-byte if ((ByteSet::from_bits([18446744073709551614u64, 18446744073709551615u64, 0u64, 0u64])).contains(byte)) => {
-0
-},
-
-byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 4294967292u64])).contains(byte)) => {
-0
-},
-
-224u8 => {
-0
-},
-
-byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 35175782154240u64])).contains(byte)) => {
-0
-},
-
-237u8 => {
-0
-},
-
-byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 211106232532992u64])).contains(byte)) => {
-0
-},
-
-240u8 => {
-0
-},
-
-byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 3940649673949184u64])).contains(byte)) => {
-0
-},
-
-244u8 => {
-0
-},
-
-0u8 => {
-1
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(15224635086995724042u64));
-}
-};
-_input.close_peek_context()?;
-ret
-}
-};
-if matching_ix == 0 {
-let next_elem = (Decoder19(_input))?;
-accum.push(next_elem)
-} else {
-break
-}
-};
-PResult::Ok(accum)
-}
-
-/// d#193
-fn Decoder193(_input: &mut Parser<'_>) -> Result<zlib_main, ParseError> {
-let compression_method_flags = {
-let inner = {
-let packed_bits = _input.read_byte()?;
-zlib_main_compression_method_flags { compression_info: packed_bits >> 4u8 & 15u8, compression_method: packed_bits & 15u8 }
-};
-let is_valid = {
-let method_info = inner;
-method_info.compression_method == 8u8
-};
-if is_valid {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere(12911570055982528377u64));
-}
-};
-let flags = {
-let packed_bits = _input.read_byte()?;
-zlib_main_flags { flevel: packed_bits >> 6u8 & 3u8, fdict: packed_bits >> 5u8 & 1u8 > 0u8, fcheck: packed_bits & 31u8 }
-};
-let dict_id = if flags.fdict {
-let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
-Some(u32be(x))
-} else {
-None
-};
-let data = {
-_input.enter_bits_mode()?;
-let ret = (Decoder_deflate_main(_input))?;
-let _bits_read = _input.escape_bits_mode()?;
-ret
-};
-let adler32 = {
-let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
-u32be(x)
-};
-PResult::Ok(zlib_main { compression_method_flags, flags, dict_id, data, adler32 })
-}
-
-/// d#194
-fn Decoder194(_input: &mut Parser<'_>) -> Result<Vec<char>, ParseError> {
-let mut accum = Vec::new();
-while _input.remaining() > 0 {
-let matching_ix = {
-_input.open_peek_context();
-{
-let ret = match _input.read_byte()? {
-byte if ((ByteSet::from_bits([18446744073709551614u64, 18446744073709551615u64, 0u64, 0u64])).contains(byte)) => {
-0
-},
-
-byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 4294967292u64])).contains(byte)) => {
-0
-},
-
-224u8 => {
-0
-},
-
-byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 35175782154240u64])).contains(byte)) => {
-0
-},
-
-237u8 => {
-0
-},
-
-byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 211106232532992u64])).contains(byte)) => {
-0
-},
-
-240u8 => {
-0
-},
-
-byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 3940649673949184u64])).contains(byte)) => {
-0
-},
-
-244u8 => {
-0
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(17578303967306014514u64));
-}
-};
-_input.close_peek_context()?;
-ret
-}
-};
-if matching_ix == 0 {
-let next_elem = (Decoder19(_input))?;
-accum.push(next_elem)
-} else {
-break
-}
-};
-PResult::Ok(accum)
-}
-
-/// d#195
-fn Decoder195(_input: &mut Parser<'_>) -> Result<Vec<char>, ParseError> {
-Decoder196(_input)
-}
-
-/// d#196
-fn Decoder196(_input: &mut Parser<'_>) -> Result<Vec<char>, ParseError> {
-let mut accum = Vec::new();
-while _input.remaining() > 0 {
-let matching_ix = {
-_input.open_peek_context();
-{
-let ret = match _input.read_byte()? {
-0u8 => {
-0
-},
-
-byte if ((ByteSet::from_bits([18446744073709551614u64, 18446744073709551615u64, 0u64, 0u64])).contains(byte)) => {
-0
-},
-
-byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 4294967292u64])).contains(byte)) => {
-0
-},
-
-224u8 => {
-0
-},
-
-byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 35175782154240u64])).contains(byte)) => {
-0
-},
-
-237u8 => {
-0
-},
-
-byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 211106232532992u64])).contains(byte)) => {
-0
-},
-
-240u8 => {
-0
-},
-
-byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 3940649673949184u64])).contains(byte)) => {
-0
-},
-
-244u8 => {
-0
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(7236895128762201498u64));
-}
-};
-_input.close_peek_context()?;
-ret
-}
-};
-if matching_ix == 0 {
-let next_elem = (Decoder18(_input))?;
-accum.push(next_elem)
-} else {
-break
-}
-};
-PResult::Ok(accum)
-}
-
-/// d#197
-fn Decoder197(_input: &mut Parser<'_>) -> Result<Vec<u8>, ParseError> {
+fn Decoder192(_input: &mut Parser<'_>) -> Result<Vec<u8>, ParseError> {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
 let reps_left = {
@@ -27666,6 +26622,438 @@ byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 1
 },
 
 _ => {
+return Err(ParseError::ExcludedBranch(16428598146864409139u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(11934620222090497034u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(7597388605883543966u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(1942606498606899849u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(9288520242296510642u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(12753818979092594971u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(9662462399070735352u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(8414850703985147087u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(14428558544277089677u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(17505260505493155057u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(4244096627290639074u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(16278372111013231116u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(4797145928961714098u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(11396441833338683368u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(18000244536401340529u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(17499296848696657524u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(17871409524597489995u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(18319329181163975393u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(9728697411637566730u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(9691647707184281179u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(7972156773864461481u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(11074874806330017418u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(12662813720965160010u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(3243138897542356980u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(15920917552321559809u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(835240278964504247u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(7150174851274887183u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(11306355108769900243u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(9864490923722431849u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(1995664400520545068u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(14904826071154862403u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(9819888267966403254u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(9848248130448711783u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(13072404838946064765u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(608962121954693839u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(4003079682566975393u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(4315160623525052581u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(1862457564087794359u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(4725257428709613290u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(11823569341425521789u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(14474361861190022573u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(8440332211549640930u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(13045651918551022996u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(12507789284617859731u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(4636203914394120912u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(12770885481695079655u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(5713736954960046494u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(5286459060741837465u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(10857757036842967573u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(8347358143797316202u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(9289217078927880343u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(7619374930571283120u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(5502272810018950495u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(9422091606538556682u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(1986031727359985319u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(2609726213773413101u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(4688564412461098550u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(4942686269660057715u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(9251320185524837870u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(16934907723271638747u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(12709578918531114377u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(4227980562164448700u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(6852038687184722387u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(18441633166538026093u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(401788761305210720u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(5252251088830583126u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(5396814765406749711u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(12786091976415550822u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(15224635086995724042u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(12911570055982528377u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(17578303967306014514u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(7236895128762201498u64));
+}
+}
+},
+
+_ => {
 return Err(ParseError::ExcludedBranch(10396295304006156759u64));
 }
 }
@@ -27704,37 +27092,749 @@ return Err(ParseError::ExcludedBranch(6757475294452472580u64));
 _ => {
 return Err(ParseError::ExcludedBranch(5316076842439816359u64));
 }
+};
+_input.close_peek_context()?;
+ret
 }
-},
-
-_ => {
+};
+if (repeat_between_finished(reps_left == 0, accum.len(), 1u32 as usize, 79u32 as usize))? {
+break
+} else {
+let next_elem = {
+let b = _input.read_byte()?;
+if (ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(b) {
+b
+} else {
 return Err(ParseError::ExcludedBranch(13241229060561103069u64));
 }
+};
+accum.push(next_elem)
 }
+};
+PResult::Ok(accum)
+}
+
+/// d#193
+fn Decoder193(_input: &mut Parser<'_>) -> Result<Vec<char>, ParseError> {
+let mut accum = Vec::new();
+while _input.remaining() > 0 {
+let matching_ix = {
+_input.open_peek_context();
+{
+let ret = match _input.read_byte()? {
+byte if ((ByteSet::from_bits([18446744073709551614u64, 18446744073709551615u64, 0u64, 0u64])).contains(byte)) => {
+0
+},
+
+byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 4294967292u64])).contains(byte)) => {
+0
+},
+
+224u8 => {
+0
+},
+
+byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 35175782154240u64])).contains(byte)) => {
+0
+},
+
+237u8 => {
+0
+},
+
+byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 211106232532992u64])).contains(byte)) => {
+0
+},
+
+240u8 => {
+0
+},
+
+byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 3940649673949184u64])).contains(byte)) => {
+0
+},
+
+244u8 => {
+0
+},
+
+0u8 => {
+1
 },
 
 _ => {
 return Err(ParseError::ExcludedBranch(8896324603808149952u64));
 }
+};
+_input.close_peek_context()?;
+ret
 }
+};
+if matching_ix == 0 {
+let next_elem = (Decoder19(_input))?;
+accum.push(next_elem)
+} else {
+break
+}
+};
+PResult::Ok(accum)
+}
+
+/// d#194
+fn Decoder194(_input: &mut Parser<'_>) -> Result<zlib_main, ParseError> {
+let compression_method_flags = {
+let inner = {
+let packed_bits = _input.read_byte()?;
+zlib_main_compression_method_flags { compression_info: packed_bits >> 4u8 & 15u8, compression_method: packed_bits & 15u8 }
+};
+let is_valid = {
+let method_info = inner;
+method_info.compression_method == 8u8
+};
+if is_valid {
+inner
+} else {
+return Err(ParseError::FalsifiedWhere(8480214967847684808u64));
+}
+};
+let flags = {
+let packed_bits = _input.read_byte()?;
+zlib_main_flags { flevel: packed_bits >> 6u8 & 3u8, fdict: packed_bits >> 5u8 & 1u8 > 0u8, fcheck: packed_bits & 31u8 }
+};
+let dict_id = if flags.fdict {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+Some(u32be(x))
+} else {
+None
+};
+let data = {
+_input.enter_bits_mode()?;
+let ret = (Decoder_deflate_main(_input))?;
+let _bits_read = _input.escape_bits_mode()?;
+ret
+};
+let adler32 = {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u32be(x)
+};
+PResult::Ok(zlib_main { compression_method_flags, flags, dict_id, data, adler32 })
+}
+
+/// d#195
+fn Decoder195(_input: &mut Parser<'_>) -> Result<Vec<char>, ParseError> {
+let mut accum = Vec::new();
+while _input.remaining() > 0 {
+let matching_ix = {
+_input.open_peek_context();
+{
+let ret = match _input.read_byte()? {
+byte if ((ByteSet::from_bits([18446744073709551614u64, 18446744073709551615u64, 0u64, 0u64])).contains(byte)) => {
+0
 },
 
-_ => {
-return Err(ParseError::ExcludedBranch(8480214967847684808u64));
-}
-}
+byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 4294967292u64])).contains(byte)) => {
+0
+},
+
+224u8 => {
+0
+},
+
+byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 35175782154240u64])).contains(byte)) => {
+0
+},
+
+237u8 => {
+0
+},
+
+byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 211106232532992u64])).contains(byte)) => {
+0
+},
+
+240u8 => {
+0
+},
+
+byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 3940649673949184u64])).contains(byte)) => {
+0
+},
+
+244u8 => {
+0
 },
 
 _ => {
 return Err(ParseError::ExcludedBranch(4089331332020821320u64));
 }
+};
+_input.close_peek_context()?;
+ret
 }
+};
+if matching_ix == 0 {
+let next_elem = (Decoder19(_input))?;
+accum.push(next_elem)
+} else {
+break
+}
+};
+PResult::Ok(accum)
+}
+
+/// d#196
+fn Decoder196(_input: &mut Parser<'_>) -> Result<Vec<char>, ParseError> {
+Decoder197(_input)
+}
+
+/// d#197
+fn Decoder197(_input: &mut Parser<'_>) -> Result<Vec<char>, ParseError> {
+let mut accum = Vec::new();
+while _input.remaining() > 0 {
+let matching_ix = {
+_input.open_peek_context();
+{
+let ret = match _input.read_byte()? {
+0u8 => {
+0
+},
+
+byte if ((ByteSet::from_bits([18446744073709551614u64, 18446744073709551615u64, 0u64, 0u64])).contains(byte)) => {
+0
+},
+
+byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 4294967292u64])).contains(byte)) => {
+0
+},
+
+224u8 => {
+0
+},
+
+byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 35175782154240u64])).contains(byte)) => {
+0
+},
+
+237u8 => {
+0
+},
+
+byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 211106232532992u64])).contains(byte)) => {
+0
+},
+
+240u8 => {
+0
+},
+
+byte if ((ByteSet::from_bits([0u64, 0u64, 0u64, 3940649673949184u64])).contains(byte)) => {
+0
+},
+
+244u8 => {
+0
 },
 
 _ => {
 return Err(ParseError::ExcludedBranch(7660172056721883940u64));
 }
+};
+_input.close_peek_context()?;
+ret
 }
+};
+if matching_ix == 0 {
+let next_elem = (Decoder18(_input))?;
+accum.push(next_elem)
+} else {
+break
+}
+};
+PResult::Ok(accum)
+}
+
+/// d#198
+fn Decoder198(_input: &mut Parser<'_>) -> Result<Vec<u8>, ParseError> {
+let mut accum = Vec::new();
+while _input.remaining() > 0 {
+let reps_left = {
+_input.open_peek_context();
+{
+let ret = match _input.read_byte()? {
+0u8 => {
+0
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+1
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+2
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+3
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+4
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+5
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+6
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+7
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+8
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+9
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+10
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+11
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+12
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+13
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+14
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+15
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+16
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+17
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+18
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+19
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+20
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+21
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+22
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+23
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+24
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+25
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+26
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+27
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+28
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+29
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+30
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+31
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+32
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+33
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+34
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+35
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+36
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+37
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+38
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+39
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+40
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+41
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+42
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+43
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+44
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+45
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+46
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+47
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+48
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+49
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+50
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+51
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+52
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+53
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+54
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+55
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+56
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+57
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+58
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+59
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+60
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+61
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+62
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+63
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+64
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+65
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+66
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+67
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+68
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+69
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+70
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+71
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+72
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+73
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+74
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+75
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+76
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+77
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+match _input.read_byte()? {
+0u8 => {
+78
+},
+
+byte if ((ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(byte)) => {
+79
 },
 
 _ => {
@@ -28136,6 +28236,78 @@ return Err(ParseError::ExcludedBranch(552953513858366451u64));
 _ => {
 return Err(ParseError::ExcludedBranch(17332407069754301555u64));
 }
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(14279133095670415871u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(7347749870002275487u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(10748847049349746078u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(14220958138979104104u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(17741760072369420240u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(12223407337737822059u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(6072942808717419822u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(15560056883377919848u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(7977419944699061624u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(8323252642575612937u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(11678443062630698028u64));
+}
+}
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(14832405617500840744u64));
+}
 };
 _input.close_peek_context()?;
 ret
@@ -28149,7 +28321,7 @@ let b = _input.read_byte()?;
 if (ByteSet::from_bits([18446744069414584320u64, 9223372036854775807u64, 18446744065119617024u64, 18446744073709551615u64])).contains(b) {
 b
 } else {
-return Err(ParseError::ExcludedBranch(14279133095670415871u64));
+return Err(ParseError::ExcludedBranch(1398536204687975789u64));
 }
 };
 accum.push(next_elem)
@@ -28158,8 +28330,8 @@ accum.push(next_elem)
 PResult::Ok(accum)
 }
 
-/// d#198
-fn Decoder198(_input: &mut Parser<'_>) -> Result<zlib_main, ParseError> {
+/// d#199
+fn Decoder199(_input: &mut Parser<'_>) -> Result<zlib_main, ParseError> {
 let compression_method_flags = {
 let inner = {
 let packed_bits = _input.read_byte()?;
@@ -28172,7 +28344,7 @@ method_info.compression_method == 8u8
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(7347749870002275487u64));
+return Err(ParseError::FalsifiedWhere(7336714497745271452u64));
 }
 };
 let flags = {
@@ -28198,14 +28370,14 @@ u32be(x)
 PResult::Ok(zlib_main { compression_method_flags, flags, dict_id, data, adler32 })
 }
 
-/// d#199
-fn Decoder199(_input: &mut Parser<'_>) -> Result<(u8, u8, u8, u8), ParseError> {
+/// d#200
+fn Decoder200(_input: &mut Parser<'_>) -> Result<(u8, u8, u8, u8), ParseError> {
 let arg0 = {
 let b = _input.read_byte()?;
 if b == 73 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(10748847049349746078u64));
+return Err(ParseError::ExcludedBranch(4152914559762097168u64));
 }
 };
 let arg1 = {
@@ -28213,7 +28385,7 @@ let b = _input.read_byte()?;
 if b == 72 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(14220958138979104104u64));
+return Err(ParseError::ExcludedBranch(1152534299541961510u64));
 }
 };
 let arg2 = {
@@ -28221,7 +28393,7 @@ let b = _input.read_byte()?;
 if b == 68 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(17741760072369420240u64));
+return Err(ParseError::ExcludedBranch(5095757730543354711u64));
 }
 };
 let arg3 = {
@@ -28229,13 +28401,13 @@ let b = _input.read_byte()?;
 if b == 82 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(12223407337737822059u64));
+return Err(ParseError::ExcludedBranch(4668055697655854201u64));
 }
 };
 PResult::Ok((arg0, arg1, arg2, arg3))
 }
 
-/// d#200
+/// d#201
 fn Decoder_png_ihdr_data(_input: &mut Parser<'_>) -> Result<png_ihdr_data, ParseError> {
 let width = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -28253,13 +28425,13 @@ let interlace_method = _input.read_byte()?;
 PResult::Ok(png_ihdr_data { width, height, bit_depth, color_type, compression_method, filter_method, interlace_method })
 }
 
-/// d#201
+/// d#202
 fn Decoder_mpeg4_atom(_input: &mut Parser<'_>) -> Result<mpeg4_atom, ParseError> {
 let size_field = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let r#type = (Decoder202(_input))?;
+let r#type = (Decoder203(_input))?;
 let size = match size_field {
 0u32 => {
 0u64
@@ -28270,7 +28442,7 @@ let x = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u64be(x)
 };
-try_sub!(x, 16u64, 15560056883377919848u64)
+try_sub!(x, 16u64, 2017059186547121525u64)
 },
 
 _ => {
@@ -28283,7 +28455,7 @@ _input.start_slice(sz)?;
 let ret = match r#type {
 (102u8, 116u8, 121u8, 112u8) => {
 let inner = {
-let major_brand = (Decoder202(_input))?;
+let major_brand = (Decoder203(_input))?;
 let minor_version = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
@@ -28301,7 +28473,7 @@ ret
 }
 };
 if matching_ix == 0 {
-let next_elem = (Decoder202(_input))?;
+let next_elem = (Decoder203(_input))?;
 accum.push(next_elem)
 } else {
 break
@@ -28407,18 +28579,18 @@ ret
 PResult::Ok(mpeg4_atom { size_field, r#type, size, data })
 }
 
-/// d#202
-fn Decoder202(_input: &mut Parser<'_>) -> Result<(u8, u8, u8, u8), ParseError> {
+/// d#203
+fn Decoder203(_input: &mut Parser<'_>) -> Result<(u8, u8, u8, u8), ParseError> {
 PResult::Ok((_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?))
 }
 
-/// d#203
+/// d#204
 fn Decoder_mpeg4_meta_atom(_input: &mut Parser<'_>) -> Result<mpeg4_meta_atom, ParseError> {
 let size_field = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let r#type = (Decoder202(_input))?;
+let r#type = (Decoder203(_input))?;
 let size = match size_field {
 0u32 => {
 0u64
@@ -28429,7 +28601,7 @@ let x = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u64be(x)
 };
-try_sub!(x, 16u64, 8323252642575612937u64)
+try_sub!(x, 16u64, 16022216421479351095u64)
 },
 
 _ => {
@@ -28473,7 +28645,7 @@ let predefined = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let handler_type = (Decoder202(_input))?;
+let handler_type = (Decoder203(_input))?;
 let reserved = {
 let arg0 = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -28506,7 +28678,7 @@ byte if (byte != 0) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11678443062630698028u64));
+return Err(ParseError::ExcludedBranch(15337804701822118436u64));
 }
 };
 _input.close_peek_context()?;
@@ -28519,7 +28691,7 @@ let b = _input.read_byte()?;
 if b != 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(14832405617500840744u64));
+return Err(ParseError::ExcludedBranch(2750471357152633230u64));
 }
 };
 accum.push(next_elem)
@@ -28534,7 +28706,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(1398536204687975789u64));
+return Err(ParseError::ExcludedBranch(8306706226429158303u64));
 }
 };
 chars.clone()
@@ -28625,7 +28797,7 @@ let size_field = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let r#type = (Decoder202(_input))?;
+let r#type = (Decoder203(_input))?;
 let size = match size_field {
 0u32 => {
 0u64
@@ -28636,7 +28808,7 @@ let x = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u64be(x)
 };
-try_sub!(x, 16u64, 4152914559762097168u64)
+try_sub!(x, 16u64, 7258731811542513498u64)
 },
 
 _ => {
@@ -28702,7 +28874,7 @@ let size_field = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let r#type = (Decoder202(_input))?;
+let r#type = (Decoder203(_input))?;
 let size = match size_field {
 0u32 => {
 0u64
@@ -28713,7 +28885,7 @@ let x = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u64be(x)
 };
-try_sub!(x, 16u64, 5095757730543354711u64)
+try_sub!(x, 16u64, 1920187793319100008u64)
 },
 
 _ => {
@@ -29023,13 +29195,13 @@ ret
 PResult::Ok(mpeg4_meta_atom { size_field, r#type, size, data })
 }
 
-/// d#204
+/// d#205
 fn Decoder_mpeg4_moov_atom(_input: &mut Parser<'_>) -> Result<mpeg4_moov_atom, ParseError> {
 let size_field = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let r#type = (Decoder202(_input))?;
+let r#type = (Decoder203(_input))?;
 let size = match size_field {
 0u32 => {
 0u64
@@ -29040,7 +29212,7 @@ let x = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u64be(x)
 };
-try_sub!(x, 16u64, 6515957116553005671u64)
+try_sub!(x, 16u64, 4475730102931494177u64)
 },
 
 _ => {
@@ -29241,13 +29413,13 @@ ret
 PResult::Ok(mpeg4_moov_atom { size_field, r#type, size, data })
 }
 
-/// d#205
+/// d#206
 fn Decoder_mpeg4_trak_atom(_input: &mut Parser<'_>) -> Result<mpeg4_trak_atom, ParseError> {
 let size_field = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let r#type = (Decoder202(_input))?;
+let r#type = (Decoder203(_input))?;
 let size = match size_field {
 0u32 => {
 0u64
@@ -29258,7 +29430,7 @@ let x = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u64be(x)
 };
-try_sub!(x, 16u64, 11789784461021426583u64)
+try_sub!(x, 16u64, 6739127967943113267u64)
 },
 
 _ => {
@@ -29464,13 +29636,13 @@ ret
 PResult::Ok(mpeg4_trak_atom { size_field, r#type, size, data })
 }
 
-/// d#206
+/// d#207
 fn Decoder_mpeg4_udta_atom(_input: &mut Parser<'_>) -> Result<mpeg4_udta_atom, ParseError> {
 let size_field = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let r#type = (Decoder202(_input))?;
+let r#type = (Decoder203(_input))?;
 let size = match size_field {
 0u32 => {
 0u64
@@ -29481,7 +29653,7 @@ let x = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u64be(x)
 };
-try_sub!(x, 16u64, 15337804701822118436u64)
+try_sub!(x, 16u64, 14306133355400503306u64)
 },
 
 _ => {
@@ -29552,13 +29724,13 @@ ret
 PResult::Ok(mpeg4_udta_atom { size_field, r#type, size, data })
 }
 
-/// d#207
+/// d#208
 fn Decoder_mpeg4_edts_atom(_input: &mut Parser<'_>) -> Result<mpeg4_edts_atom, ParseError> {
 let size_field = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let r#type = (Decoder202(_input))?;
+let r#type = (Decoder203(_input))?;
 let size = match size_field {
 0u32 => {
 0u64
@@ -29569,7 +29741,7 @@ let x = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u64be(x)
 };
-try_sub!(x, 16u64, 8306706226429158303u64)
+try_sub!(x, 16u64, 10248009767256971850u64)
 },
 
 _ => {
@@ -29646,13 +29818,13 @@ ret
 PResult::Ok(mpeg4_edts_atom { size_field, r#type, size, data })
 }
 
-/// d#208
+/// d#209
 fn Decoder_mpeg4_mdia_atom(_input: &mut Parser<'_>) -> Result<mpeg4_mdia_atom, ParseError> {
 let size_field = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let r#type = (Decoder202(_input))?;
+let r#type = (Decoder203(_input))?;
 let size = match size_field {
 0u32 => {
 0u64
@@ -29663,7 +29835,7 @@ let x = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u64be(x)
 };
-try_sub!(x, 16u64, 7258731811542513498u64)
+try_sub!(x, 16u64, 7840596951976883698u64)
 },
 
 _ => {
@@ -29682,7 +29854,7 @@ let component_type = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let component_subtype = (Decoder202(_input))?;
+let component_subtype = (Decoder203(_input))?;
 let component_manufacturer = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
@@ -29712,7 +29884,7 @@ byte if (byte != 0) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(1283209893442238385u64));
+return Err(ParseError::ExcludedBranch(8004105446758774533u64));
 }
 };
 _input.close_peek_context()?;
@@ -29725,7 +29897,7 @@ let b = _input.read_byte()?;
 if b != 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(1920187793319100008u64));
+return Err(ParseError::ExcludedBranch(12569316739694558801u64));
 }
 };
 accum.push(next_elem)
@@ -29740,7 +29912,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(7474037925185307628u64));
+return Err(ParseError::ExcludedBranch(2967911718584065013u64));
 }
 };
 chars.clone()
@@ -29874,13 +30046,13 @@ ret
 PResult::Ok(mpeg4_mdia_atom { size_field, r#type, size, data })
 }
 
-/// d#209
+/// d#210
 fn Decoder_mpeg4_minf_atom(_input: &mut Parser<'_>) -> Result<mpeg4_minf_atom, ParseError> {
 let size_field = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let r#type = (Decoder202(_input))?;
+let r#type = (Decoder203(_input))?;
 let size = match size_field {
 0u32 => {
 0u64
@@ -29891,7 +30063,7 @@ let x = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u64be(x)
 };
-try_sub!(x, 16u64, 17780439059155340308u64)
+try_sub!(x, 16u64, 2859130192484418172u64)
 },
 
 _ => {
@@ -30024,13 +30196,13 @@ ret
 PResult::Ok(mpeg4_minf_atom { size_field, r#type, size, data })
 }
 
-/// d#210
+/// d#211
 fn Decoder_mpeg4_dinf_atom(_input: &mut Parser<'_>) -> Result<mpeg4_dinf_atom, ParseError> {
 let size_field = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let r#type = (Decoder202(_input))?;
+let r#type = (Decoder203(_input))?;
 let size = match size_field {
 0u32 => {
 0u64
@@ -30041,7 +30213,7 @@ let x = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u64be(x)
 };
-try_sub!(x, 16u64, 10170756778737993654u64)
+try_sub!(x, 16u64, 16954835414833850385u64)
 },
 
 _ => {
@@ -30078,7 +30250,7 @@ let size_field = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let r#type = (Decoder202(_input))?;
+let r#type = (Decoder203(_input))?;
 let size = match size_field {
 0u32 => {
 0u64
@@ -30089,7 +30261,7 @@ let x = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u64be(x)
 };
-try_sub!(x, 16u64, 8902666087419502325u64)
+try_sub!(x, 16u64, 13705211812356460160u64)
 },
 
 _ => {
@@ -30168,13 +30340,13 @@ ret
 PResult::Ok(mpeg4_dinf_atom { size_field, r#type, size, data })
 }
 
-/// d#211
+/// d#212
 fn Decoder_mpeg4_stbl_atom(_input: &mut Parser<'_>) -> Result<mpeg4_stbl_atom, ParseError> {
 let size_field = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let r#type = (Decoder202(_input))?;
+let r#type = (Decoder203(_input))?;
 let size = match size_field {
 0u32 => {
 0u64
@@ -30185,7 +30357,7 @@ let x = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u64be(x)
 };
-try_sub!(x, 16u64, 7807103255128873628u64)
+try_sub!(x, 16u64, 1328880024623199753u64)
 },
 
 _ => {
@@ -30212,7 +30384,7 @@ let size_field = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let r#type = (Decoder202(_input))?;
+let r#type = (Decoder203(_input))?;
 let size = match size_field {
 0u32 => {
 0u64
@@ -30223,7 +30395,7 @@ let x = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u64be(x)
 };
-try_sub!(x, 16u64, 8004105446758774533u64)
+try_sub!(x, 16u64, 3998072683184925592u64)
 },
 
 _ => {
@@ -30588,13 +30760,13 @@ ret
 PResult::Ok(mpeg4_stbl_atom { size_field, r#type, size, data })
 }
 
-/// d#212
+/// d#213
 fn Decoder_mpeg4_iinf_atom(_input: &mut Parser<'_>) -> Result<mpeg4_iinf_atom, ParseError> {
 let size_field = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let r#type = (Decoder202(_input))?;
+let r#type = (Decoder203(_input))?;
 let size = match size_field {
 0u32 => {
 0u64
@@ -30605,7 +30777,7 @@ let x = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u64be(x)
 };
-try_sub!(x, 16u64, 2967911718584065013u64)
+try_sub!(x, 16u64, 7279615132236188739u64)
 },
 
 _ => {
@@ -30632,235 +30804,6 @@ let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
 let item_name = {
-let chars = {
-let mut accum = Vec::new();
-while _input.remaining() > 0 {
-let matching_ix = {
-_input.open_peek_context();
-{
-let ret = match _input.read_byte()? {
-byte if (byte != 0) => {
-0
-},
-
-0u8 => {
-1
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(7227788188777836434u64));
-}
-};
-_input.close_peek_context()?;
-ret
-}
-};
-if matching_ix == 0 {
-let next_elem = {
-let b = _input.read_byte()?;
-if b != 0 {
-b
-} else {
-return Err(ParseError::ExcludedBranch(2859130192484418172u64));
-}
-};
-accum.push(next_elem)
-} else {
-break
-}
-};
-accum
-};
-{
-let b = _input.read_byte()?;
-if b == 0 {
-b
-} else {
-return Err(ParseError::ExcludedBranch(12550558264664848853u64));
-}
-};
-chars.clone()
-};
-let content_type = {
-let chars = {
-let mut accum = Vec::new();
-while _input.remaining() > 0 {
-let matching_ix = {
-_input.open_peek_context();
-{
-let ret = match _input.read_byte()? {
-byte if (byte != 0) => {
-0
-},
-
-0u8 => {
-1
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(16954835414833850385u64));
-}
-};
-_input.close_peek_context()?;
-ret
-}
-};
-if matching_ix == 0 {
-let next_elem = {
-let b = _input.read_byte()?;
-if b != 0 {
-b
-} else {
-return Err(ParseError::ExcludedBranch(1891774877762105457u64));
-}
-};
-accum.push(next_elem)
-} else {
-break
-}
-};
-accum
-};
-{
-let b = _input.read_byte()?;
-if b == 0 {
-b
-} else {
-return Err(ParseError::ExcludedBranch(13705211812356460160u64));
-}
-};
-chars.clone()
-};
-let content_encoding = {
-let chars = {
-let mut accum = Vec::new();
-while _input.remaining() > 0 {
-let matching_ix = {
-_input.open_peek_context();
-{
-let ret = match _input.read_byte()? {
-byte if (byte != 0) => {
-0
-},
-
-0u8 => {
-1
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5515497093089591991u64));
-}
-};
-_input.close_peek_context()?;
-ret
-}
-};
-if matching_ix == 0 {
-let next_elem = {
-let b = _input.read_byte()?;
-if b != 0 {
-b
-} else {
-return Err(ParseError::ExcludedBranch(1328880024623199753u64));
-}
-};
-accum.push(next_elem)
-} else {
-break
-}
-};
-accum
-};
-{
-let b = _input.read_byte()?;
-if b == 0 {
-b
-} else {
-return Err(ParseError::ExcludedBranch(6882184431082022206u64));
-}
-};
-chars.clone()
-};
-mpeg4_iinf_atom_data_infe_fields_yes { item_ID, item_protection_index, item_name, content_type, content_encoding }
-};
-mpeg4_iinf_atom_data_infe_fields::yes(inner)
-},
-
-false => {
-let inner = {
-let item_ID = match version == 2u8 {
-true => {
-let x = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-x as u32
-},
-
-false => {
-let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
-u32be(x)
-}
-};
-let item_protection_index = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-let item_type = (Decoder202(_input))?;
-let item_name = {
-let chars = {
-let mut accum = Vec::new();
-while _input.remaining() > 0 {
-let matching_ix = {
-_input.open_peek_context();
-{
-let ret = match _input.read_byte()? {
-byte if (byte != 0) => {
-0
-},
-
-0u8 => {
-1
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(3998072683184925592u64));
-}
-};
-_input.close_peek_context()?;
-ret
-}
-};
-if matching_ix == 0 {
-let next_elem = {
-let b = _input.read_byte()?;
-if b != 0 {
-b
-} else {
-return Err(ParseError::ExcludedBranch(29850628954056690u64));
-}
-};
-accum.push(next_elem)
-} else {
-break
-}
-};
-accum
-};
-{
-let b = _input.read_byte()?;
-if b == 0 {
-b
-} else {
-return Err(ParseError::ExcludedBranch(7279615132236188739u64));
-}
-};
-chars.clone()
-};
-let extra_fields = match item_type {
-(109u8, 105u8, 109u8, 101u8) => {
-let inner = {
-let content_type = {
 let chars = {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -30910,14 +30853,7 @@ return Err(ParseError::ExcludedBranch(16714498072262546943u64));
 };
 chars.clone()
 };
-mpeg4_iinf_atom_data_infe_fields_no_extra_fields_mime { content_type }
-};
-mpeg4_iinf_atom_data_infe_fields_no_extra_fields::mime(inner)
-},
-
-(117u8, 114u8, 105u8, 32u8) => {
-let inner = {
-let item_uri_type = {
+let content_type = {
 let chars = {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -30963,6 +30899,242 @@ if b == 0 {
 b
 } else {
 return Err(ParseError::ExcludedBranch(14950271805613481359u64));
+}
+};
+chars.clone()
+};
+let content_encoding = {
+let chars = {
+let mut accum = Vec::new();
+while _input.remaining() > 0 {
+let matching_ix = {
+_input.open_peek_context();
+{
+let ret = match _input.read_byte()? {
+byte if (byte != 0) => {
+0
+},
+
+0u8 => {
+1
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(5499566165243611472u64));
+}
+};
+_input.close_peek_context()?;
+ret
+}
+};
+if matching_ix == 0 {
+let next_elem = {
+let b = _input.read_byte()?;
+if b != 0 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(11265176092564100083u64));
+}
+};
+accum.push(next_elem)
+} else {
+break
+}
+};
+accum
+};
+{
+let b = _input.read_byte()?;
+if b == 0 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(14916894554939814670u64));
+}
+};
+chars.clone()
+};
+mpeg4_iinf_atom_data_infe_fields_yes { item_ID, item_protection_index, item_name, content_type, content_encoding }
+};
+mpeg4_iinf_atom_data_infe_fields::yes(inner)
+},
+
+false => {
+let inner = {
+let item_ID = match version == 2u8 {
+true => {
+let x = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+x as u32
+},
+
+false => {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u32be(x)
+}
+};
+let item_protection_index = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+let item_type = (Decoder203(_input))?;
+let item_name = {
+let chars = {
+let mut accum = Vec::new();
+while _input.remaining() > 0 {
+let matching_ix = {
+_input.open_peek_context();
+{
+let ret = match _input.read_byte()? {
+byte if (byte != 0) => {
+0
+},
+
+0u8 => {
+1
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(10473830801714814973u64));
+}
+};
+_input.close_peek_context()?;
+ret
+}
+};
+if matching_ix == 0 {
+let next_elem = {
+let b = _input.read_byte()?;
+if b != 0 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(5334325531610156978u64));
+}
+};
+accum.push(next_elem)
+} else {
+break
+}
+};
+accum
+};
+{
+let b = _input.read_byte()?;
+if b == 0 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(16975008930446149745u64));
+}
+};
+chars.clone()
+};
+let extra_fields = match item_type {
+(109u8, 105u8, 109u8, 101u8) => {
+let inner = {
+let content_type = {
+let chars = {
+let mut accum = Vec::new();
+while _input.remaining() > 0 {
+let matching_ix = {
+_input.open_peek_context();
+{
+let ret = match _input.read_byte()? {
+byte if (byte != 0) => {
+0
+},
+
+0u8 => {
+1
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(760820951392925727u64));
+}
+};
+_input.close_peek_context()?;
+ret
+}
+};
+if matching_ix == 0 {
+let next_elem = {
+let b = _input.read_byte()?;
+if b != 0 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(14363790737598139216u64));
+}
+};
+accum.push(next_elem)
+} else {
+break
+}
+};
+accum
+};
+{
+let b = _input.read_byte()?;
+if b == 0 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(4600414761378562541u64));
+}
+};
+chars.clone()
+};
+mpeg4_iinf_atom_data_infe_fields_no_extra_fields_mime { content_type }
+};
+mpeg4_iinf_atom_data_infe_fields_no_extra_fields::mime(inner)
+},
+
+(117u8, 114u8, 105u8, 32u8) => {
+let inner = {
+let item_uri_type = {
+let chars = {
+let mut accum = Vec::new();
+while _input.remaining() > 0 {
+let matching_ix = {
+_input.open_peek_context();
+{
+let ret = match _input.read_byte()? {
+byte if (byte != 0) => {
+0
+},
+
+0u8 => {
+1
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(18313399323903636110u64));
+}
+};
+_input.close_peek_context()?;
+ret
+}
+};
+if matching_ix == 0 {
+let next_elem = {
+let b = _input.read_byte()?;
+if b != 0 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(15786118691017431738u64));
+}
+};
+accum.push(next_elem)
+} else {
+break
+}
+};
+accum
+};
+{
+let b = _input.read_byte()?;
+if b == 0 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(16165934354425559621u64));
 }
 };
 chars.clone()
@@ -31017,13 +31189,13 @@ ret
 PResult::Ok(mpeg4_iinf_atom { size_field, r#type, size, data })
 }
 
-/// d#213
+/// d#214
 fn Decoder_mpeg4_ilst_atom(_input: &mut Parser<'_>) -> Result<mpeg4_ilst_atom, ParseError> {
 let size_field = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let r#type = (Decoder202(_input))?;
+let r#type = (Decoder203(_input))?;
 let size = match size_field {
 0u32 => {
 0u64
@@ -31034,7 +31206,7 @@ let x = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u64be(x)
 };
-try_sub!(x, 16u64, 11265176092564100083u64)
+try_sub!(x, 16u64, 7931358881575056193u64)
 },
 
 _ => {
@@ -31101,13 +31273,13 @@ ret
 PResult::Ok(mpeg4_ilst_atom { size_field, r#type, size, data })
 }
 
-/// d#214
+/// d#215
 fn Decoder_mpeg4_tool_atom(_input: &mut Parser<'_>) -> Result<mpeg4_tool_atom, ParseError> {
 let size_field = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let r#type = (Decoder202(_input))?;
+let r#type = (Decoder203(_input))?;
 let size = match size_field {
 0u32 => {
 0u64
@@ -31118,7 +31290,7 @@ let x = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u64be(x)
 };
-try_sub!(x, 16u64, 10473830801714814973u64)
+try_sub!(x, 16u64, 11515797873012483658u64)
 },
 
 _ => {
@@ -31196,14 +31368,14 @@ ret
 PResult::Ok(mpeg4_tool_atom { size_field, r#type, size, data })
 }
 
-/// d#215
+/// d#216
 fn Decoder_jpeg_eoi(_input: &mut Parser<'_>) -> Result<jpeg_eoi, ParseError> {
 let ff = {
 let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(5334325531610156978u64));
+return Err(ParseError::ExcludedBranch(8584109755265226714u64));
 }
 };
 let marker = {
@@ -31211,13 +31383,13 @@ let b = _input.read_byte()?;
 if b == 216 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(16975008930446149745u64));
+return Err(ParseError::ExcludedBranch(8076978189295213982u64));
 }
 };
 PResult::Ok(jpeg_eoi { ff, marker })
 }
 
-/// d#216
+/// d#217
 fn Decoder_jpeg_frame(_input: &mut Parser<'_>) -> Result<jpeg_frame, ParseError> {
 let initial_segment = {
 let tree_index = {
@@ -31235,11 +31407,11 @@ match _input.read_byte()? {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(760820951392925727u64));
+return Err(ParseError::ExcludedBranch(11570281271401624317u64));
 }
 }
 } else {
-return Err(ParseError::ExcludedBranch(14363790737598139216u64));
+return Err(ParseError::ExcludedBranch(14687724984806605719u64));
 };
 _input.close_peek_context()?;
 ret
@@ -31257,7 +31429,7 @@ jpeg_frame_initial_segment::app1(inner)
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(4600414761378562541u64));
+return Err(ParseError::ExcludedBranch(1378805635639824117u64));
 }
 }
 };
@@ -31407,11 +31579,11 @@ match _input.read_byte()? {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(18313399323903636110u64));
+return Err(ParseError::ExcludedBranch(8385173961957899741u64));
 }
 }
 } else {
-return Err(ParseError::ExcludedBranch(15786118691017431738u64));
+return Err(ParseError::ExcludedBranch(8407356061009412694u64));
 };
 _input.close_peek_context()?;
 ret
@@ -31532,11 +31704,11 @@ match _input.read_byte()? {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(16165934354425559621u64));
+return Err(ParseError::ExcludedBranch(6881565717664829242u64));
 }
 }
 } else {
-return Err(ParseError::ExcludedBranch(16399036514137665776u64));
+return Err(ParseError::ExcludedBranch(13752480002470540422u64));
 };
 _input.close_peek_context()?;
 ret
@@ -31552,7 +31724,7 @@ None
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(7931358881575056193u64));
+return Err(ParseError::ExcludedBranch(17107648091243309207u64));
 }
 }
 };
@@ -31658,18 +31830,18 @@ match _input.read_byte()? {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(17863486658382945784u64));
+return Err(ParseError::ExcludedBranch(5534609128357633386u64));
 }
 }
 } else {
-return Err(ParseError::ExcludedBranch(11515797873012483658u64));
+return Err(ParseError::ExcludedBranch(14539762430836305896u64));
 };
 _input.close_peek_context()?;
 ret
 }
 };
 if matching_ix == 0 {
-let next_elem = (Decoder224(_input))?;
+let next_elem = (Decoder225(_input))?;
 accum.push(next_elem)
 } else {
 break
@@ -31680,14 +31852,14 @@ accum
 PResult::Ok(jpeg_frame { initial_segment, segments, header, scan, dnl, scans })
 }
 
-/// d#217
-fn Decoder217(_input: &mut Parser<'_>) -> Result<jpeg_eoi, ParseError> {
+/// d#218
+fn Decoder218(_input: &mut Parser<'_>) -> Result<jpeg_eoi, ParseError> {
 let ff = {
 let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(8584109755265226714u64));
+return Err(ParseError::ExcludedBranch(16625761205375889740u64));
 }
 };
 let marker = {
@@ -31695,13 +31867,13 @@ let b = _input.read_byte()?;
 if b == 217 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(8076978189295213982u64));
+return Err(ParseError::ExcludedBranch(2662265345698212949u64));
 }
 };
 PResult::Ok(jpeg_eoi { ff, marker })
 }
 
-/// d#218
+/// d#219
 fn Decoder_jpeg_app0(_input: &mut Parser<'_>) -> Result<jpeg_app0, ParseError> {
 let marker = {
 let ff = {
@@ -31709,7 +31881,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(11570281271401624317u64));
+return Err(ParseError::ExcludedBranch(3344648651879382526u64));
 }
 };
 let marker = {
@@ -31717,7 +31889,7 @@ let b = _input.read_byte()?;
 if b == 224 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(14687724984806605719u64));
+return Err(ParseError::ExcludedBranch(8599210436172030522u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -31736,7 +31908,7 @@ ret
 PResult::Ok(jpeg_app0 { marker, length, data })
 }
 
-/// d#219
+/// d#220
 fn Decoder_jpeg_app1(_input: &mut Parser<'_>) -> Result<jpeg_app1, ParseError> {
 let marker = {
 let ff = {
@@ -31744,7 +31916,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(1378805635639824117u64));
+return Err(ParseError::ExcludedBranch(3484767027554133518u64));
 }
 };
 let marker = {
@@ -31752,7 +31924,7 @@ let b = _input.read_byte()?;
 if b == 225 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(8385173961957899741u64));
+return Err(ParseError::ExcludedBranch(15403934492100194569u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -31771,7 +31943,7 @@ ret
 PResult::Ok(jpeg_app1 { marker, length, data })
 }
 
-/// d#220
+/// d#221
 fn Decoder_jpeg_table_or_misc(_input: &mut Parser<'_>) -> Result<jpeg_table_or_misc, ParseError> {
 let tree_index = {
 _input.open_peek_context();
@@ -31864,11 +32036,11 @@ match _input.read_byte()? {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(8407356061009412694u64));
+return Err(ParseError::ExcludedBranch(12041148194529633639u64));
 }
 }
 } else {
-return Err(ParseError::ExcludedBranch(6881565717664829242u64));
+return Err(ParseError::ExcludedBranch(2288772415159374970u64));
 };
 _input.close_peek_context()?;
 ret
@@ -31911,82 +32083,82 @@ jpeg_table_or_misc::app2(inner)
 },
 
 7 => {
-let inner = (Decoder260(_input))?;
+let inner = (Decoder261(_input))?;
 jpeg_table_or_misc::app3(inner)
 },
 
 8 => {
-let inner = (Decoder261(_input))?;
+let inner = (Decoder262(_input))?;
 jpeg_table_or_misc::app4(inner)
 },
 
 9 => {
-let inner = (Decoder262(_input))?;
+let inner = (Decoder263(_input))?;
 jpeg_table_or_misc::app5(inner)
 },
 
 10 => {
-let inner = (Decoder263(_input))?;
+let inner = (Decoder264(_input))?;
 jpeg_table_or_misc::app6(inner)
 },
 
 11 => {
-let inner = (Decoder264(_input))?;
+let inner = (Decoder265(_input))?;
 jpeg_table_or_misc::app7(inner)
 },
 
 12 => {
-let inner = (Decoder265(_input))?;
+let inner = (Decoder266(_input))?;
 jpeg_table_or_misc::app8(inner)
 },
 
 13 => {
-let inner = (Decoder266(_input))?;
+let inner = (Decoder267(_input))?;
 jpeg_table_or_misc::app9(inner)
 },
 
 14 => {
-let inner = (Decoder267(_input))?;
+let inner = (Decoder268(_input))?;
 jpeg_table_or_misc::app10(inner)
 },
 
 15 => {
-let inner = (Decoder268(_input))?;
+let inner = (Decoder269(_input))?;
 jpeg_table_or_misc::app11(inner)
 },
 
 16 => {
-let inner = (Decoder269(_input))?;
+let inner = (Decoder270(_input))?;
 jpeg_table_or_misc::app12(inner)
 },
 
 17 => {
-let inner = (Decoder270(_input))?;
+let inner = (Decoder271(_input))?;
 jpeg_table_or_misc::app13(inner)
 },
 
 18 => {
-let inner = (Decoder271(_input))?;
+let inner = (Decoder272(_input))?;
 jpeg_table_or_misc::app14(inner)
 },
 
 19 => {
-let inner = (Decoder272(_input))?;
+let inner = (Decoder273(_input))?;
 jpeg_table_or_misc::app15(inner)
 },
 
 20 => {
-let inner = (Decoder273(_input))?;
+let inner = (Decoder274(_input))?;
 jpeg_table_or_misc::com(inner)
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(13752480002470540422u64));
+return Err(ParseError::ExcludedBranch(17888323854924040413u64));
 }
 })
 }
 
-/// d#221
+/// d#222
 fn Decoder_jpeg_frame_header(_input: &mut Parser<'_>) -> Result<jpeg_frame_header, ParseError> {
 let tree_index = {
 _input.open_peek_context();
@@ -32047,11 +32219,11 @@ match _input.read_byte()? {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(17107648091243309207u64));
+return Err(ParseError::ExcludedBranch(6279087434444973374u64));
 }
 }
 } else {
-return Err(ParseError::ExcludedBranch(5534609128357633386u64));
+return Err(ParseError::ExcludedBranch(11074951631636946051u64));
 };
 _input.close_peek_context()?;
 ret
@@ -32064,72 +32236,72 @@ jpeg_frame_header::sof0(inner)
 },
 
 1 => {
-let inner = (Decoder241(_input))?;
+let inner = (Decoder242(_input))?;
 jpeg_frame_header::sof1(inner)
 },
 
 2 => {
-let inner = (Decoder242(_input))?;
+let inner = (Decoder243(_input))?;
 jpeg_frame_header::sof2(inner)
 },
 
 3 => {
-let inner = (Decoder243(_input))?;
+let inner = (Decoder244(_input))?;
 jpeg_frame_header::sof3(inner)
 },
 
 4 => {
-let inner = (Decoder244(_input))?;
+let inner = (Decoder245(_input))?;
 jpeg_frame_header::sof5(inner)
 },
 
 5 => {
-let inner = (Decoder245(_input))?;
+let inner = (Decoder246(_input))?;
 jpeg_frame_header::sof6(inner)
 },
 
 6 => {
-let inner = (Decoder246(_input))?;
+let inner = (Decoder247(_input))?;
 jpeg_frame_header::sof7(inner)
 },
 
 7 => {
-let inner = (Decoder247(_input))?;
+let inner = (Decoder248(_input))?;
 jpeg_frame_header::sof9(inner)
 },
 
 8 => {
-let inner = (Decoder248(_input))?;
+let inner = (Decoder249(_input))?;
 jpeg_frame_header::sof10(inner)
 },
 
 9 => {
-let inner = (Decoder249(_input))?;
+let inner = (Decoder250(_input))?;
 jpeg_frame_header::sof11(inner)
 },
 
 10 => {
-let inner = (Decoder250(_input))?;
+let inner = (Decoder251(_input))?;
 jpeg_frame_header::sof13(inner)
 },
 
 11 => {
-let inner = (Decoder251(_input))?;
+let inner = (Decoder252(_input))?;
 jpeg_frame_header::sof14(inner)
 },
 
 12 => {
-let inner = (Decoder252(_input))?;
+let inner = (Decoder253(_input))?;
 jpeg_frame_header::sof15(inner)
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14539762430836305896u64));
+return Err(ParseError::ExcludedBranch(15601622509425384091u64));
 }
 })
 }
 
-/// d#222
+/// d#223
 fn Decoder_jpeg_scan(_input: &mut Parser<'_>) -> Result<jpeg_scan, ParseError> {
 let segments = {
 let mut accum = Vec::new();
@@ -32229,11 +32401,11 @@ match _input.read_byte()? {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(16625761205375889740u64));
+return Err(ParseError::ExcludedBranch(13675295148592556047u64));
 }
 }
 } else {
-return Err(ParseError::ExcludedBranch(2662265345698212949u64));
+return Err(ParseError::ExcludedBranch(4569970360394099475u64));
 };
 _input.close_peek_context()?;
 ret
@@ -32249,11 +32421,11 @@ break
 accum
 };
 let sos = (Decoder_jpeg_sos(_input))?;
-let data = (Decoder239(_input))?;
+let data = (Decoder240(_input))?;
 PResult::Ok(jpeg_scan { segments, sos, data })
 }
 
-/// d#223
+/// d#224
 fn Decoder_jpeg_dnl(_input: &mut Parser<'_>) -> Result<jpeg_dnl, ParseError> {
 let marker = {
 let ff = {
@@ -32261,7 +32433,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(3344648651879382526u64));
+return Err(ParseError::ExcludedBranch(9110520999974091875u64));
 }
 };
 let marker = {
@@ -32269,7 +32441,7 @@ let b = _input.read_byte()?;
 if b == 220 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(8599210436172030522u64));
+return Err(ParseError::ExcludedBranch(15293691521783146694u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -32288,8 +32460,8 @@ ret
 PResult::Ok(jpeg_dnl { marker, length, data })
 }
 
-/// d#224
-fn Decoder224(_input: &mut Parser<'_>) -> Result<jpeg_scan, ParseError> {
+/// d#225
+fn Decoder225(_input: &mut Parser<'_>) -> Result<jpeg_scan, ParseError> {
 let segments = {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -32388,11 +32560,11 @@ match _input.read_byte()? {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(3484767027554133518u64));
+return Err(ParseError::ExcludedBranch(15433822888775103886u64));
 }
 }
 } else {
-return Err(ParseError::ExcludedBranch(15403934492100194569u64));
+return Err(ParseError::ExcludedBranch(8403192837054512577u64));
 };
 _input.close_peek_context()?;
 ret
@@ -32412,7 +32584,7 @@ let data = (Decoder_jpeg_scan_data(_input))?;
 PResult::Ok(jpeg_scan { segments, sos, data })
 }
 
-/// d#225
+/// d#226
 fn Decoder_jpeg_sos(_input: &mut Parser<'_>) -> Result<jpeg_sos, ParseError> {
 let marker = {
 let ff = {
@@ -32420,7 +32592,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(12041148194529633639u64));
+return Err(ParseError::ExcludedBranch(17073037115051226650u64));
 }
 };
 let marker = {
@@ -32428,7 +32600,7 @@ let b = _input.read_byte()?;
 if b == 218 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(2288772415159374970u64));
+return Err(ParseError::ExcludedBranch(3975307768385535064u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -32447,7 +32619,7 @@ ret
 PResult::Ok(jpeg_sos { marker, length, data })
 }
 
-/// d#226
+/// d#227
 fn Decoder_jpeg_scan_data(_input: &mut Parser<'_>) -> Result<jpeg_scan_data, ParseError> {
 let scan_data = {
 let mut accum = Vec::new();
@@ -32591,13 +32763,13 @@ match _input.read_byte()? {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(17888323854924040413u64));
+return Err(ParseError::ExcludedBranch(10599514554463239458u64));
 }
 }
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6279087434444973374u64));
+return Err(ParseError::ExcludedBranch(16112061863928357291u64));
 }
 };
 _input.close_peek_context()?;
@@ -32653,13 +32825,13 @@ match _input.read_byte()? {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11074951631636946051u64));
+return Err(ParseError::ExcludedBranch(12017601628070515145u64));
 }
 }
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(15601622509425384091u64));
+return Err(ParseError::ExcludedBranch(1872233699568519226u64));
 }
 };
 _input.close_peek_context()?;
@@ -32668,52 +32840,52 @@ ret
 };
 match tree_index {
 0 => {
-let inner = (Decoder227(_input))?;
+let inner = (Decoder228(_input))?;
 jpeg_scan_data_scan_data::mcu(inner)
 },
 
 1 => {
-let inner = (Decoder228(_input))?;
+let inner = (Decoder229(_input))?;
 jpeg_scan_data_scan_data::rst0(inner)
 },
 
 2 => {
-let inner = (Decoder229(_input))?;
+let inner = (Decoder230(_input))?;
 jpeg_scan_data_scan_data::rst1(inner)
 },
 
 3 => {
-let inner = (Decoder230(_input))?;
+let inner = (Decoder231(_input))?;
 jpeg_scan_data_scan_data::rst2(inner)
 },
 
 4 => {
-let inner = (Decoder231(_input))?;
+let inner = (Decoder232(_input))?;
 jpeg_scan_data_scan_data::rst3(inner)
 },
 
 5 => {
-let inner = (Decoder232(_input))?;
+let inner = (Decoder233(_input))?;
 jpeg_scan_data_scan_data::rst4(inner)
 },
 
 6 => {
-let inner = (Decoder233(_input))?;
+let inner = (Decoder234(_input))?;
 jpeg_scan_data_scan_data::rst5(inner)
 },
 
 7 => {
-let inner = (Decoder234(_input))?;
+let inner = (Decoder235(_input))?;
 jpeg_scan_data_scan_data::rst6(inner)
 },
 
 8 => {
-let inner = (Decoder235(_input))?;
+let inner = (Decoder236(_input))?;
 jpeg_scan_data_scan_data::rst7(inner)
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(13675295148592556047u64));
+return Err(ParseError::ExcludedBranch(10708294527730390829u64));
 }
 }
 };
@@ -32764,8 +32936,8 @@ jpeg_scan_data_scan_data::rst7(..) => {
 PResult::Ok(jpeg_scan_data { scan_data, scan_data_stream })
 }
 
-/// d#227
-fn Decoder227(_input: &mut Parser<'_>) -> Result<u8, ParseError> {
+/// d#228
+fn Decoder228(_input: &mut Parser<'_>) -> Result<u8, ParseError> {
 let tree_index = {
 _input.open_peek_context();
 {
@@ -32779,7 +32951,7 @@ byte if (byte != 255) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(15433822888775103886u64));
+return Err(ParseError::ExcludedBranch(7795160901559545235u64));
 }
 };
 _input.close_peek_context()?;
@@ -32792,7 +32964,7 @@ let b = _input.read_byte()?;
 if b != 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(4569970360394099475u64));
+return Err(ParseError::ExcludedBranch(7432469293302627017u64));
 }
 },
 
@@ -32803,7 +32975,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9110520999974091875u64));
+return Err(ParseError::ExcludedBranch(13181260675040079306u64));
 }
 };
 let arg1 = {
@@ -32811,7 +32983,7 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(15293691521783146694u64));
+return Err(ParseError::ExcludedBranch(9159119361499271180u64));
 }
 };
 (arg0, arg1)
@@ -32820,30 +32992,9 @@ return Err(ParseError::ExcludedBranch(15293691521783146694u64));
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(8403192837054512577u64));
+return Err(ParseError::ExcludedBranch(3490919313637905107u64));
 }
 })
-}
-
-/// d#228
-fn Decoder228(_input: &mut Parser<'_>) -> Result<jpeg_eoi, ParseError> {
-let ff = {
-let b = _input.read_byte()?;
-if b == 255 {
-b
-} else {
-return Err(ParseError::ExcludedBranch(17073037115051226650u64));
-}
-};
-let marker = {
-let b = _input.read_byte()?;
-if b == 208 {
-b
-} else {
-return Err(ParseError::ExcludedBranch(3975307768385535064u64));
-}
-};
-PResult::Ok(jpeg_eoi { ff, marker })
 }
 
 /// d#229
@@ -32853,15 +33004,15 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(10599514554463239458u64));
+return Err(ParseError::ExcludedBranch(9331389203258424019u64));
 }
 };
 let marker = {
 let b = _input.read_byte()?;
-if b == 209 {
+if b == 208 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(16112061863928357291u64));
+return Err(ParseError::ExcludedBranch(16679512278832019969u64));
 }
 };
 PResult::Ok(jpeg_eoi { ff, marker })
@@ -32874,15 +33025,15 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(12017601628070515145u64));
+return Err(ParseError::ExcludedBranch(15311158871930328757u64));
 }
 };
 let marker = {
 let b = _input.read_byte()?;
-if b == 210 {
+if b == 209 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(1872233699568519226u64));
+return Err(ParseError::ExcludedBranch(9892894478446917378u64));
 }
 };
 PResult::Ok(jpeg_eoi { ff, marker })
@@ -32895,15 +33046,15 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(10708294527730390829u64));
+return Err(ParseError::ExcludedBranch(3585635225240718191u64));
 }
 };
 let marker = {
 let b = _input.read_byte()?;
-if b == 211 {
+if b == 210 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(7432469293302627017u64));
+return Err(ParseError::ExcludedBranch(5208404121666294786u64));
 }
 };
 PResult::Ok(jpeg_eoi { ff, marker })
@@ -32916,15 +33067,15 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(13181260675040079306u64));
+return Err(ParseError::ExcludedBranch(237665900562449517u64));
 }
 };
 let marker = {
 let b = _input.read_byte()?;
-if b == 212 {
+if b == 211 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9159119361499271180u64));
+return Err(ParseError::ExcludedBranch(13751590285972774894u64));
 }
 };
 PResult::Ok(jpeg_eoi { ff, marker })
@@ -32937,15 +33088,15 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(7795160901559545235u64));
+return Err(ParseError::ExcludedBranch(12552648416444111338u64));
 }
 };
 let marker = {
 let b = _input.read_byte()?;
-if b == 213 {
+if b == 212 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(3490919313637905107u64));
+return Err(ParseError::ExcludedBranch(9201081899504003615u64));
 }
 };
 PResult::Ok(jpeg_eoi { ff, marker })
@@ -32958,15 +33109,15 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9331389203258424019u64));
+return Err(ParseError::ExcludedBranch(10776065777346510440u64));
 }
 };
 let marker = {
 let b = _input.read_byte()?;
-if b == 214 {
+if b == 213 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(16679512278832019969u64));
+return Err(ParseError::ExcludedBranch(1821331332215525359u64));
 }
 };
 PResult::Ok(jpeg_eoi { ff, marker })
@@ -32979,7 +33130,28 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(15311158871930328757u64));
+return Err(ParseError::ExcludedBranch(1550574349011231204u64));
+}
+};
+let marker = {
+let b = _input.read_byte()?;
+if b == 214 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(6867774794241173436u64));
+}
+};
+PResult::Ok(jpeg_eoi { ff, marker })
+}
+
+/// d#236
+fn Decoder236(_input: &mut Parser<'_>) -> Result<jpeg_eoi, ParseError> {
+let ff = {
+let b = _input.read_byte()?;
+if b == 255 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(3475686103639625566u64));
 }
 };
 let marker = {
@@ -32987,13 +33159,13 @@ let b = _input.read_byte()?;
 if b == 215 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9892894478446917378u64));
+return Err(ParseError::ExcludedBranch(4130856500275801127u64));
 }
 };
 PResult::Ok(jpeg_eoi { ff, marker })
 }
 
-/// d#236
+/// d#237
 fn Decoder_jpeg_sos_data(_input: &mut Parser<'_>) -> Result<jpeg_sos_data, ParseError> {
 let num_image_components = {
 let inner = _input.read_byte()?;
@@ -33004,7 +33176,7 @@ matches!(x, 1u8..=4u8)
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(3585635225240718191u64));
+return Err(ParseError::FalsifiedWhere(11582380281701370059u64));
 }
 };
 let image_components = {
@@ -33024,7 +33196,7 @@ x <= 63u8
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(5208404121666294786u64));
+return Err(ParseError::FalsifiedWhere(7228157205966134869u64));
 }
 };
 let end_spectral_selection = {
@@ -33036,7 +33208,7 @@ x <= 63u8
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(237665900562449517u64));
+return Err(ParseError::FalsifiedWhere(2184161105566707760u64));
 }
 };
 let approximation_bit_position = {
@@ -33046,7 +33218,7 @@ jpeg_sos_data_approximation_bit_position { high: packed_bits >> 4u8 & 15u8, low:
 PResult::Ok(jpeg_sos_data { num_image_components, image_components, start_spectral_selection, end_spectral_selection, approximation_bit_position })
 }
 
-/// d#237
+/// d#238
 fn Decoder_jpeg_sos_image_component(_input: &mut Parser<'_>) -> Result<jpeg_sos_image_component, ParseError> {
 let component_selector = _input.read_byte()?;
 let entropy_coding_table_ids = {
@@ -33061,13 +33233,13 @@ let entropy_coding_table_ids = inner;
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(13751590285972774894u64));
+return Err(ParseError::FalsifiedWhere(9924059786910440358u64));
 }
 };
 PResult::Ok(jpeg_sos_image_component { component_selector, entropy_coding_table_ids })
 }
 
-/// d#238
+/// d#239
 fn Decoder_jpeg_dnl_data(_input: &mut Parser<'_>) -> Result<jpeg_dnl_data, ParseError> {
 let num_lines = {
 let inner = {
@@ -33081,14 +33253,14 @@ x != 0u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(12552648416444111338u64));
+return Err(ParseError::FalsifiedWhere(7274029685341305701u64));
 }
 };
 PResult::Ok(jpeg_dnl_data { num_lines })
 }
 
-/// d#239
-fn Decoder239(_input: &mut Parser<'_>) -> Result<jpeg_scan_data, ParseError> {
+/// d#240
+fn Decoder240(_input: &mut Parser<'_>) -> Result<jpeg_scan_data, ParseError> {
 let scan_data = {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -33235,13 +33407,13 @@ match _input.read_byte()? {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(9201081899504003615u64));
+return Err(ParseError::ExcludedBranch(16051783775494465147u64));
 }
 }
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10776065777346510440u64));
+return Err(ParseError::ExcludedBranch(13744164271564421708u64));
 }
 };
 _input.close_peek_context()?;
@@ -33297,13 +33469,13 @@ match _input.read_byte()? {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(1821331332215525359u64));
+return Err(ParseError::ExcludedBranch(5892114170581446733u64));
 }
 }
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(1550574349011231204u64));
+return Err(ParseError::ExcludedBranch(11821813774070801620u64));
 }
 };
 _input.close_peek_context()?;
@@ -33312,52 +33484,52 @@ ret
 };
 match tree_index {
 0 => {
-let inner = (Decoder227(_input))?;
+let inner = (Decoder228(_input))?;
 jpeg_scan_data_scan_data::mcu(inner)
 },
 
 1 => {
-let inner = (Decoder228(_input))?;
+let inner = (Decoder229(_input))?;
 jpeg_scan_data_scan_data::rst0(inner)
 },
 
 2 => {
-let inner = (Decoder229(_input))?;
+let inner = (Decoder230(_input))?;
 jpeg_scan_data_scan_data::rst1(inner)
 },
 
 3 => {
-let inner = (Decoder230(_input))?;
+let inner = (Decoder231(_input))?;
 jpeg_scan_data_scan_data::rst2(inner)
 },
 
 4 => {
-let inner = (Decoder231(_input))?;
+let inner = (Decoder232(_input))?;
 jpeg_scan_data_scan_data::rst3(inner)
 },
 
 5 => {
-let inner = (Decoder232(_input))?;
+let inner = (Decoder233(_input))?;
 jpeg_scan_data_scan_data::rst4(inner)
 },
 
 6 => {
-let inner = (Decoder233(_input))?;
+let inner = (Decoder234(_input))?;
 jpeg_scan_data_scan_data::rst5(inner)
 },
 
 7 => {
-let inner = (Decoder234(_input))?;
+let inner = (Decoder235(_input))?;
 jpeg_scan_data_scan_data::rst6(inner)
 },
 
 8 => {
-let inner = (Decoder235(_input))?;
+let inner = (Decoder236(_input))?;
 jpeg_scan_data_scan_data::rst7(inner)
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6867774794241173436u64));
+return Err(ParseError::ExcludedBranch(14520503729026832983u64));
 }
 }
 };
@@ -33408,7 +33580,7 @@ jpeg_scan_data_scan_data::rst7(..) => {
 PResult::Ok(jpeg_scan_data { scan_data, scan_data_stream })
 }
 
-/// d#240
+/// d#241
 fn Decoder_jpeg_dhp(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
 let marker = {
 let ff = {
@@ -33416,7 +33588,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(3475686103639625566u64));
+return Err(ParseError::ExcludedBranch(5309491469191307378u64));
 }
 };
 let marker = {
@@ -33424,7 +33596,7 @@ let b = _input.read_byte()?;
 if b == 192 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(4130856500275801127u64));
+return Err(ParseError::ExcludedBranch(17983075411320920965u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -33443,15 +33615,15 @@ ret
 PResult::Ok(jpeg_dhp { marker, length, data })
 }
 
-/// d#241
-fn Decoder241(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
+/// d#242
+fn Decoder242(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
 let marker = {
 let ff = {
 let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(11582380281701370059u64));
+return Err(ParseError::ExcludedBranch(7023661717588102849u64));
 }
 };
 let marker = {
@@ -33459,7 +33631,7 @@ let b = _input.read_byte()?;
 if b == 193 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(7228157205966134869u64));
+return Err(ParseError::ExcludedBranch(3448575031819686448u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -33478,15 +33650,15 @@ ret
 PResult::Ok(jpeg_dhp { marker, length, data })
 }
 
-/// d#242
-fn Decoder242(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
+/// d#243
+fn Decoder243(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
 let marker = {
 let ff = {
 let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(2184161105566707760u64));
+return Err(ParseError::ExcludedBranch(9960855096836829935u64));
 }
 };
 let marker = {
@@ -33494,7 +33666,7 @@ let b = _input.read_byte()?;
 if b == 194 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9924059786910440358u64));
+return Err(ParseError::ExcludedBranch(218475477370319322u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -33513,15 +33685,15 @@ ret
 PResult::Ok(jpeg_dhp { marker, length, data })
 }
 
-/// d#243
-fn Decoder243(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
+/// d#244
+fn Decoder244(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
 let marker = {
 let ff = {
 let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(7274029685341305701u64));
+return Err(ParseError::ExcludedBranch(18357658168615546095u64));
 }
 };
 let marker = {
@@ -33529,7 +33701,7 @@ let b = _input.read_byte()?;
 if b == 195 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(16051783775494465147u64));
+return Err(ParseError::ExcludedBranch(10650412753233146525u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -33548,15 +33720,15 @@ ret
 PResult::Ok(jpeg_dhp { marker, length, data })
 }
 
-/// d#244
-fn Decoder244(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
+/// d#245
+fn Decoder245(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
 let marker = {
 let ff = {
 let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(13744164271564421708u64));
+return Err(ParseError::ExcludedBranch(15859964085544252343u64));
 }
 };
 let marker = {
@@ -33564,7 +33736,7 @@ let b = _input.read_byte()?;
 if b == 197 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(5892114170581446733u64));
+return Err(ParseError::ExcludedBranch(653325817133119558u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -33583,15 +33755,15 @@ ret
 PResult::Ok(jpeg_dhp { marker, length, data })
 }
 
-/// d#245
-fn Decoder245(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
+/// d#246
+fn Decoder246(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
 let marker = {
 let ff = {
 let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(11821813774070801620u64));
+return Err(ParseError::ExcludedBranch(3349032559334020401u64));
 }
 };
 let marker = {
@@ -33599,7 +33771,7 @@ let b = _input.read_byte()?;
 if b == 198 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(14520503729026832983u64));
+return Err(ParseError::ExcludedBranch(14115009527471272688u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -33618,15 +33790,15 @@ ret
 PResult::Ok(jpeg_dhp { marker, length, data })
 }
 
-/// d#246
-fn Decoder246(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
+/// d#247
+fn Decoder247(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
 let marker = {
 let ff = {
 let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(5309491469191307378u64));
+return Err(ParseError::ExcludedBranch(8350850950759220429u64));
 }
 };
 let marker = {
@@ -33634,7 +33806,7 @@ let b = _input.read_byte()?;
 if b == 199 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(17983075411320920965u64));
+return Err(ParseError::ExcludedBranch(15412400192383838763u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -33653,15 +33825,15 @@ ret
 PResult::Ok(jpeg_dhp { marker, length, data })
 }
 
-/// d#247
-fn Decoder247(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
+/// d#248
+fn Decoder248(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
 let marker = {
 let ff = {
 let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(7023661717588102849u64));
+return Err(ParseError::ExcludedBranch(16334217566159141080u64));
 }
 };
 let marker = {
@@ -33669,7 +33841,7 @@ let b = _input.read_byte()?;
 if b == 201 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(3448575031819686448u64));
+return Err(ParseError::ExcludedBranch(15032955882314050195u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -33688,15 +33860,15 @@ ret
 PResult::Ok(jpeg_dhp { marker, length, data })
 }
 
-/// d#248
-fn Decoder248(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
+/// d#249
+fn Decoder249(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
 let marker = {
 let ff = {
 let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9960855096836829935u64));
+return Err(ParseError::ExcludedBranch(12522857579864693834u64));
 }
 };
 let marker = {
@@ -33704,7 +33876,7 @@ let b = _input.read_byte()?;
 if b == 202 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(218475477370319322u64));
+return Err(ParseError::ExcludedBranch(15286713778088114821u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -33723,15 +33895,15 @@ ret
 PResult::Ok(jpeg_dhp { marker, length, data })
 }
 
-/// d#249
-fn Decoder249(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
+/// d#250
+fn Decoder250(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
 let marker = {
 let ff = {
 let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(18357658168615546095u64));
+return Err(ParseError::ExcludedBranch(17055268834995250246u64));
 }
 };
 let marker = {
@@ -33739,7 +33911,7 @@ let b = _input.read_byte()?;
 if b == 203 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(10650412753233146525u64));
+return Err(ParseError::ExcludedBranch(15014773733126201031u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -33758,15 +33930,15 @@ ret
 PResult::Ok(jpeg_dhp { marker, length, data })
 }
 
-/// d#250
-fn Decoder250(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
+/// d#251
+fn Decoder251(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
 let marker = {
 let ff = {
 let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(15859964085544252343u64));
+return Err(ParseError::ExcludedBranch(9895655502210650925u64));
 }
 };
 let marker = {
@@ -33774,7 +33946,7 @@ let b = _input.read_byte()?;
 if b == 205 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(653325817133119558u64));
+return Err(ParseError::ExcludedBranch(3344835778759068560u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -33793,15 +33965,15 @@ ret
 PResult::Ok(jpeg_dhp { marker, length, data })
 }
 
-/// d#251
-fn Decoder251(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
+/// d#252
+fn Decoder252(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
 let marker = {
 let ff = {
 let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(3349032559334020401u64));
+return Err(ParseError::ExcludedBranch(2014773054382805425u64));
 }
 };
 let marker = {
@@ -33809,7 +33981,7 @@ let b = _input.read_byte()?;
 if b == 206 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(14115009527471272688u64));
+return Err(ParseError::ExcludedBranch(3011460078285478248u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -33828,15 +34000,15 @@ ret
 PResult::Ok(jpeg_dhp { marker, length, data })
 }
 
-/// d#252
-fn Decoder252(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
+/// d#253
+fn Decoder253(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
 let marker = {
 let ff = {
 let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(8350850950759220429u64));
+return Err(ParseError::ExcludedBranch(5117297982688264891u64));
 }
 };
 let marker = {
@@ -33844,7 +34016,7 @@ let b = _input.read_byte()?;
 if b == 207 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(15412400192383838763u64));
+return Err(ParseError::ExcludedBranch(4614223265245060097u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -33863,7 +34035,7 @@ ret
 PResult::Ok(jpeg_dhp { marker, length, data })
 }
 
-/// d#253
+/// d#254
 fn Decoder_jpeg_dhp_data(_input: &mut Parser<'_>) -> Result<jpeg_dhp_data, ParseError> {
 let sample_precision = {
 let inner = _input.read_byte()?;
@@ -33874,7 +34046,7 @@ matches!(x, 2u8..=16u8)
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(16334217566159141080u64));
+return Err(ParseError::FalsifiedWhere(2858990937242709991u64));
 }
 };
 let num_lines = {
@@ -33893,7 +34065,7 @@ x != 0u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(15032955882314050195u64));
+return Err(ParseError::FalsifiedWhere(13162270726566423196u64));
 }
 };
 let num_image_components = {
@@ -33905,7 +34077,7 @@ x != 0u8
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(12522857579864693834u64));
+return Err(ParseError::FalsifiedWhere(6766897041260485978u64));
 }
 };
 let image_components = {
@@ -33919,7 +34091,7 @@ accum
 PResult::Ok(jpeg_dhp_data { sample_precision, num_lines, num_samples_per_line, num_image_components, image_components })
 }
 
-/// d#254
+/// d#255
 fn Decoder_jpeg_dhp_image_component(_input: &mut Parser<'_>) -> Result<jpeg_dhp_image_component, ParseError> {
 let id = _input.read_byte()?;
 let sampling_factor = {
@@ -33935,13 +34107,13 @@ x <= 3u8
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(15286713778088114821u64));
+return Err(ParseError::FalsifiedWhere(7359082011512182682u64));
 }
 };
 PResult::Ok(jpeg_dhp_image_component { id, sampling_factor, quantization_table_id })
 }
 
-/// d#255
+/// d#256
 fn Decoder_jpeg_dqt(_input: &mut Parser<'_>) -> Result<jpeg_dqt, ParseError> {
 let marker = {
 let ff = {
@@ -33949,7 +34121,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(17055268834995250246u64));
+return Err(ParseError::ExcludedBranch(4005260763079064488u64));
 }
 };
 let marker = {
@@ -33957,7 +34129,7 @@ let b = _input.read_byte()?;
 if b == 219 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(15014773733126201031u64));
+return Err(ParseError::ExcludedBranch(9895427541506148364u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -34000,7 +34172,7 @@ ret
 PResult::Ok(jpeg_dqt { marker, length, data })
 }
 
-/// d#256
+/// d#257
 fn Decoder_jpeg_dht(_input: &mut Parser<'_>) -> Result<jpeg_dht, ParseError> {
 let marker = {
 let ff = {
@@ -34008,7 +34180,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9895655502210650925u64));
+return Err(ParseError::ExcludedBranch(15241527188218394569u64));
 }
 };
 let marker = {
@@ -34016,7 +34188,7 @@ let b = _input.read_byte()?;
 if b == 196 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(3344835778759068560u64));
+return Err(ParseError::ExcludedBranch(5019692195244899787u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -34035,7 +34207,7 @@ ret
 PResult::Ok(jpeg_dht { marker, length, data })
 }
 
-/// d#257
+/// d#258
 fn Decoder_jpeg_dac(_input: &mut Parser<'_>) -> Result<jpeg_dac, ParseError> {
 let marker = {
 let ff = {
@@ -34043,7 +34215,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(2014773054382805425u64));
+return Err(ParseError::ExcludedBranch(663652071640520941u64));
 }
 };
 let marker = {
@@ -34051,7 +34223,7 @@ let b = _input.read_byte()?;
 if b == 204 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(3011460078285478248u64));
+return Err(ParseError::ExcludedBranch(16835260701216065402u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -34070,7 +34242,7 @@ ret
 PResult::Ok(jpeg_dac { marker, length, data })
 }
 
-/// d#258
+/// d#259
 fn Decoder_jpeg_dri(_input: &mut Parser<'_>) -> Result<jpeg_dri, ParseError> {
 let marker = {
 let ff = {
@@ -34078,7 +34250,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(5117297982688264891u64));
+return Err(ParseError::ExcludedBranch(4248622096514297129u64));
 }
 };
 let marker = {
@@ -34086,7 +34258,7 @@ let b = _input.read_byte()?;
 if b == 221 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(4614223265245060097u64));
+return Err(ParseError::ExcludedBranch(18304605036866855350u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -34105,7 +34277,7 @@ ret
 PResult::Ok(jpeg_dri { marker, length, data })
 }
 
-/// d#259
+/// d#260
 fn Decoder_jpeg_jpeg(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
 let marker = {
 let ff = {
@@ -34113,7 +34285,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(2858990937242709991u64));
+return Err(ParseError::ExcludedBranch(49400955721755355u64));
 }
 };
 let marker = {
@@ -34121,7 +34293,7 @@ let b = _input.read_byte()?;
 if b == 226 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(13162270726566423196u64));
+return Err(ParseError::ExcludedBranch(8882217996184815919u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -34160,15 +34332,15 @@ ret
 PResult::Ok(jpeg_jpeg { marker, length, data })
 }
 
-/// d#260
-fn Decoder260(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
+/// d#261
+fn Decoder261(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
 let marker = {
 let ff = {
 let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(6766897041260485978u64));
+return Err(ParseError::ExcludedBranch(11885930557202460461u64));
 }
 };
 let marker = {
@@ -34176,7 +34348,7 @@ let b = _input.read_byte()?;
 if b == 227 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(7359082011512182682u64));
+return Err(ParseError::ExcludedBranch(9841369023026740320u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -34215,15 +34387,15 @@ ret
 PResult::Ok(jpeg_jpeg { marker, length, data })
 }
 
-/// d#261
-fn Decoder261(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
+/// d#262
+fn Decoder262(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
 let marker = {
 let ff = {
 let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(4005260763079064488u64));
+return Err(ParseError::ExcludedBranch(15065685669539080124u64));
 }
 };
 let marker = {
@@ -34231,7 +34403,7 @@ let b = _input.read_byte()?;
 if b == 228 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9895427541506148364u64));
+return Err(ParseError::ExcludedBranch(4896351207164742422u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -34270,15 +34442,15 @@ ret
 PResult::Ok(jpeg_jpeg { marker, length, data })
 }
 
-/// d#262
-fn Decoder262(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
+/// d#263
+fn Decoder263(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
 let marker = {
 let ff = {
 let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(15241527188218394569u64));
+return Err(ParseError::ExcludedBranch(12845528861092334564u64));
 }
 };
 let marker = {
@@ -34286,7 +34458,7 @@ let b = _input.read_byte()?;
 if b == 229 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(5019692195244899787u64));
+return Err(ParseError::ExcludedBranch(8497774971318424699u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -34325,15 +34497,15 @@ ret
 PResult::Ok(jpeg_jpeg { marker, length, data })
 }
 
-/// d#263
-fn Decoder263(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
+/// d#264
+fn Decoder264(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
 let marker = {
 let ff = {
 let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(663652071640520941u64));
+return Err(ParseError::ExcludedBranch(13677998342346693652u64));
 }
 };
 let marker = {
@@ -34341,7 +34513,7 @@ let b = _input.read_byte()?;
 if b == 230 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(16835260701216065402u64));
+return Err(ParseError::ExcludedBranch(18442161777584514946u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -34380,15 +34552,15 @@ ret
 PResult::Ok(jpeg_jpeg { marker, length, data })
 }
 
-/// d#264
-fn Decoder264(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
+/// d#265
+fn Decoder265(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
 let marker = {
 let ff = {
 let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(4248622096514297129u64));
+return Err(ParseError::ExcludedBranch(2668737607901180946u64));
 }
 };
 let marker = {
@@ -34396,7 +34568,7 @@ let b = _input.read_byte()?;
 if b == 231 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(18304605036866855350u64));
+return Err(ParseError::ExcludedBranch(12828788577937869717u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -34435,15 +34607,15 @@ ret
 PResult::Ok(jpeg_jpeg { marker, length, data })
 }
 
-/// d#265
-fn Decoder265(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
+/// d#266
+fn Decoder266(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
 let marker = {
 let ff = {
 let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(49400955721755355u64));
+return Err(ParseError::ExcludedBranch(4528919599938425798u64));
 }
 };
 let marker = {
@@ -34451,7 +34623,7 @@ let b = _input.read_byte()?;
 if b == 232 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(8882217996184815919u64));
+return Err(ParseError::ExcludedBranch(12955185663715491460u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -34490,15 +34662,15 @@ ret
 PResult::Ok(jpeg_jpeg { marker, length, data })
 }
 
-/// d#266
-fn Decoder266(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
+/// d#267
+fn Decoder267(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
 let marker = {
 let ff = {
 let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(11885930557202460461u64));
+return Err(ParseError::ExcludedBranch(6221053009072016381u64));
 }
 };
 let marker = {
@@ -34506,7 +34678,7 @@ let b = _input.read_byte()?;
 if b == 233 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9841369023026740320u64));
+return Err(ParseError::ExcludedBranch(4825757476091239776u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -34545,15 +34717,15 @@ ret
 PResult::Ok(jpeg_jpeg { marker, length, data })
 }
 
-/// d#267
-fn Decoder267(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
+/// d#268
+fn Decoder268(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
 let marker = {
 let ff = {
 let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(15065685669539080124u64));
+return Err(ParseError::ExcludedBranch(13877876706306354357u64));
 }
 };
 let marker = {
@@ -34561,7 +34733,7 @@ let b = _input.read_byte()?;
 if b == 234 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(4896351207164742422u64));
+return Err(ParseError::ExcludedBranch(12525311251009778949u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -34600,15 +34772,15 @@ ret
 PResult::Ok(jpeg_jpeg { marker, length, data })
 }
 
-/// d#268
-fn Decoder268(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
+/// d#269
+fn Decoder269(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
 let marker = {
 let ff = {
 let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(12845528861092334564u64));
+return Err(ParseError::ExcludedBranch(14962551735998681614u64));
 }
 };
 let marker = {
@@ -34616,7 +34788,7 @@ let b = _input.read_byte()?;
 if b == 235 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(8497774971318424699u64));
+return Err(ParseError::ExcludedBranch(2007599397777734421u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -34655,15 +34827,15 @@ ret
 PResult::Ok(jpeg_jpeg { marker, length, data })
 }
 
-/// d#269
-fn Decoder269(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
+/// d#270
+fn Decoder270(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
 let marker = {
 let ff = {
 let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(13677998342346693652u64));
+return Err(ParseError::ExcludedBranch(18069850277258932991u64));
 }
 };
 let marker = {
@@ -34671,7 +34843,7 @@ let b = _input.read_byte()?;
 if b == 236 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(18442161777584514946u64));
+return Err(ParseError::ExcludedBranch(180881308211696508u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -34710,15 +34882,15 @@ ret
 PResult::Ok(jpeg_jpeg { marker, length, data })
 }
 
-/// d#270
-fn Decoder270(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
+/// d#271
+fn Decoder271(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
 let marker = {
 let ff = {
 let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(2668737607901180946u64));
+return Err(ParseError::ExcludedBranch(17753230141940491005u64));
 }
 };
 let marker = {
@@ -34726,7 +34898,7 @@ let b = _input.read_byte()?;
 if b == 237 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(12828788577937869717u64));
+return Err(ParseError::ExcludedBranch(6110942357212830202u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -34765,15 +34937,15 @@ ret
 PResult::Ok(jpeg_jpeg { marker, length, data })
 }
 
-/// d#271
-fn Decoder271(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
+/// d#272
+fn Decoder272(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
 let marker = {
 let ff = {
 let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(4528919599938425798u64));
+return Err(ParseError::ExcludedBranch(6596410053543851077u64));
 }
 };
 let marker = {
@@ -34781,7 +34953,7 @@ let b = _input.read_byte()?;
 if b == 238 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(12955185663715491460u64));
+return Err(ParseError::ExcludedBranch(16339654162669176472u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -34820,15 +34992,15 @@ ret
 PResult::Ok(jpeg_jpeg { marker, length, data })
 }
 
-/// d#272
-fn Decoder272(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
+/// d#273
+fn Decoder273(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
 let marker = {
 let ff = {
 let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(6221053009072016381u64));
+return Err(ParseError::ExcludedBranch(1886358831178290550u64));
 }
 };
 let marker = {
@@ -34836,7 +35008,7 @@ let b = _input.read_byte()?;
 if b == 239 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(4825757476091239776u64));
+return Err(ParseError::ExcludedBranch(17004441093219507547u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -34875,15 +35047,15 @@ ret
 PResult::Ok(jpeg_jpeg { marker, length, data })
 }
 
-/// d#273
-fn Decoder273(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
+/// d#274
+fn Decoder274(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
 let marker = {
 let ff = {
 let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(13877876706306354357u64));
+return Err(ParseError::ExcludedBranch(3168197157646945762u64));
 }
 };
 let marker = {
@@ -34891,7 +35063,7 @@ let b = _input.read_byte()?;
 if b == 254 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(12525311251009778949u64));
+return Err(ParseError::ExcludedBranch(360138127928998237u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -34930,7 +35102,7 @@ ret
 PResult::Ok(jpeg_jpeg { marker, length, data })
 }
 
-/// d#274
+/// d#275
 fn Decoder_jpeg_dri_data(_input: &mut Parser<'_>) -> Result<jpeg_dri_data, ParseError> {
 let restart_interval = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -34939,7 +35111,7 @@ u16be(x)
 PResult::Ok(jpeg_dri_data { restart_interval })
 }
 
-/// d#275
+/// d#276
 fn Decoder_jpeg_dac_data(_input: &mut Parser<'_>) -> Result<jpeg_dac_data, ParseError> {
 let class_table_id = {
 let inner = {
@@ -34953,14 +35125,14 @@ let class_table_id = inner;
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(14962551735998681614u64));
+return Err(ParseError::FalsifiedWhere(9092411637461100444u64));
 }
 };
 let value = _input.read_byte()?;
 PResult::Ok(jpeg_dac_data { class_table_id, value })
 }
 
-/// d#276
+/// d#277
 fn Decoder_jpeg_dht_data(_input: &mut Parser<'_>) -> Result<jpeg_dht_data, ParseError> {
 let class_table_id = {
 let inner = {
@@ -34974,7 +35146,7 @@ let class_table_id = inner;
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(2007599397777734421u64));
+return Err(ParseError::FalsifiedWhere(15117497265985508077u64));
 }
 };
 let num_codes = {
@@ -35003,7 +35175,7 @@ accum
 PResult::Ok(jpeg_dht_data { class_table_id, num_codes, values })
 }
 
-/// d#277
+/// d#278
 fn Decoder_jpeg_dqt_data(_input: &mut Parser<'_>) -> Result<jpeg_dqt_data, ParseError> {
 let precision_table_id = {
 let inner = {
@@ -35017,7 +35189,7 @@ let precision_table_id = inner;
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(18069850277258932991u64));
+return Err(ParseError::FalsifiedWhere(11247369915737850258u64));
 }
 };
 let elements = match precision_table_id.precision {
@@ -35055,367 +35227,9 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 PResult::Ok(jpeg_dqt_data { precision_table_id, elements })
 }
 
-/// d#278
+/// d#279
 fn Decoder_jpeg_app1_data(_input: &mut Parser<'_>) -> Result<jpeg_app1_data, ParseError> {
 let identifier = {
-let chars = {
-let mut accum = Vec::new();
-while _input.remaining() > 0 {
-let matching_ix = {
-_input.open_peek_context();
-{
-let ret = match _input.read_byte()? {
-byte if (byte != 0) => {
-0
-},
-
-0u8 => {
-1
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(180881308211696508u64));
-}
-};
-_input.close_peek_context()?;
-ret
-}
-};
-if matching_ix == 0 {
-let next_elem = {
-let b = _input.read_byte()?;
-if b != 0 {
-b
-} else {
-return Err(ParseError::ExcludedBranch(17753230141940491005u64));
-}
-};
-accum.push(next_elem)
-} else {
-break
-}
-};
-accum
-};
-{
-let b = _input.read_byte()?;
-if b == 0 {
-b
-} else {
-return Err(ParseError::ExcludedBranch(6110942357212830202u64));
-}
-};
-chars.clone()
-};
-let data = match identifier.as_slice() {
-[69u8, 120u8, 105u8, 102u8] => {
-let inner = (Decoder_jpeg_app1_exif(_input))?;
-jpeg_app1_data_data::exif(inner)
-},
-
-[104u8, 116u8, 116u8, 112u8, 58u8, 47u8, 47u8, 110u8, 115u8, 46u8, 97u8, 100u8, 111u8, 98u8, 101u8, 46u8, 99u8, 111u8, 109u8, 47u8, 120u8, 97u8, 112u8, 47u8, 49u8, 46u8, 48u8, 47u8] => {
-let inner = (Decoder_jpeg_app1_xmp(_input))?;
-jpeg_app1_data_data::xmp(inner)
-},
-
-_ => {
-let inner = {
-let mut accum = Vec::new();
-while _input.remaining() > 0 {
-let matching_ix = {
-_input.open_peek_context();
-_input.read_byte()?;
-{
-let ret = 0;
-_input.close_peek_context()?;
-ret
-}
-};
-if matching_ix == 0 {
-let next_elem = _input.read_byte()?;
-accum.push(next_elem)
-} else {
-break
-}
-};
-accum
-};
-jpeg_app1_data_data::other(inner)
-}
-};
-PResult::Ok(jpeg_app1_data { identifier, data })
-}
-
-/// d#279
-fn Decoder_jpeg_app1_exif(_input: &mut Parser<'_>) -> Result<jpeg_app1_exif, ParseError> {
-let padding = {
-let b = _input.read_byte()?;
-if b == 0 {
-b
-} else {
-return Err(ParseError::ExcludedBranch(6596410053543851077u64));
-}
-};
-let exif = (Decoder_tiff_main(_input))?;
-PResult::Ok(jpeg_app1_exif { padding, exif })
-}
-
-/// d#280
-fn Decoder_jpeg_app1_xmp(_input: &mut Parser<'_>) -> Result<jpeg_app1_xmp, ParseError> {
-let xmp = {
-let mut accum = Vec::new();
-while _input.remaining() > 0 {
-let matching_ix = {
-_input.open_peek_context();
-_input.read_byte()?;
-{
-let ret = 0;
-_input.close_peek_context()?;
-ret
-}
-};
-if matching_ix == 0 {
-let next_elem = _input.read_byte()?;
-accum.push(next_elem)
-} else {
-break
-}
-};
-accum
-};
-PResult::Ok(jpeg_app1_xmp { xmp })
-}
-
-/// d#281
-fn Decoder_jpeg_app0_data(_input: &mut Parser<'_>) -> Result<jpeg_app0_data, ParseError> {
-let identifier = {
-let chars = {
-let mut accum = Vec::new();
-while _input.remaining() > 0 {
-let matching_ix = {
-_input.open_peek_context();
-{
-let ret = match _input.read_byte()? {
-byte if (byte != 0) => {
-0
-},
-
-0u8 => {
-1
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(16339654162669176472u64));
-}
-};
-_input.close_peek_context()?;
-ret
-}
-};
-if matching_ix == 0 {
-let next_elem = {
-let b = _input.read_byte()?;
-if b != 0 {
-b
-} else {
-return Err(ParseError::ExcludedBranch(1886358831178290550u64));
-}
-};
-accum.push(next_elem)
-} else {
-break
-}
-};
-accum
-};
-{
-let b = _input.read_byte()?;
-if b == 0 {
-b
-} else {
-return Err(ParseError::ExcludedBranch(17004441093219507547u64));
-}
-};
-chars.clone()
-};
-let data = match identifier.as_slice() {
-[74u8, 70u8, 73u8, 70u8] => {
-let inner = (Decoder_jpeg_app0_jfif(_input))?;
-jpeg_app0_data_data::jfif(inner)
-},
-
-_ => {
-let inner = {
-let mut accum = Vec::new();
-while _input.remaining() > 0 {
-let matching_ix = {
-_input.open_peek_context();
-_input.read_byte()?;
-{
-let ret = 0;
-_input.close_peek_context()?;
-ret
-}
-};
-if matching_ix == 0 {
-let next_elem = _input.read_byte()?;
-accum.push(next_elem)
-} else {
-break
-}
-};
-accum
-};
-jpeg_app0_data_data::other(inner)
-}
-};
-PResult::Ok(jpeg_app0_data { identifier, data })
-}
-
-/// d#282
-fn Decoder_jpeg_app0_jfif(_input: &mut Parser<'_>) -> Result<jpeg_app0_jfif, ParseError> {
-let version_major = _input.read_byte()?;
-let version_minor = _input.read_byte()?;
-let density_units = {
-let inner = _input.read_byte()?;
-let is_valid = {
-let x = inner;
-x <= 2u8
-};
-if is_valid {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere(3168197157646945762u64));
-}
-};
-let density_x = {
-let inner = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-let is_valid = {
-let x = inner;
-x != 0u16
-};
-if is_valid {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere(360138127928998237u64));
-}
-};
-let density_y = {
-let inner = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-let is_valid = {
-let x = inner;
-x != 0u16
-};
-if is_valid {
-inner
-} else {
-return Err(ParseError::FalsifiedWhere(9092411637461100444u64));
-}
-};
-let thumbnail_width = _input.read_byte()?;
-let thumbnail_height = _input.read_byte()?;
-let thumbnail_pixels = {
-let mut accum = Vec::new();
-for _ in 0..thumbnail_height {
-let next_elem = {
-let mut accum = Vec::new();
-for _ in 0..thumbnail_width {
-let next_elem = (Decoder_png_plte(_input))?;
-accum.push(next_elem)
-};
-accum
-};
-accum.push(next_elem)
-};
-accum
-};
-PResult::Ok(jpeg_app0_jfif { version_major, version_minor, density_units, density_x, density_y, thumbnail_width, thumbnail_height, thumbnail_pixels })
-}
-
-/// d#283
-fn Decoder_png_plte(_input: &mut Parser<'_>) -> Result<png_plte, ParseError> {
-let r = _input.read_byte()?;
-let g = _input.read_byte()?;
-let b = _input.read_byte()?;
-PResult::Ok(png_plte { r, g, b })
-}
-
-/// d#284
-fn Decoder_gzip_header(_input: &mut Parser<'_>) -> Result<gzip_header, ParseError> {
-let magic = {
-let arg0 = {
-let b = _input.read_byte()?;
-if b == 31 {
-b
-} else {
-return Err(ParseError::ExcludedBranch(15117497265985508077u64));
-}
-};
-let arg1 = {
-let b = _input.read_byte()?;
-if b == 139 {
-b
-} else {
-return Err(ParseError::ExcludedBranch(11247369915737850258u64));
-}
-};
-(arg0, arg1)
-};
-let method = _input.read_byte()?;
-let file_flags = (Decoder_gzip_header_file_flags(_input))?;
-let timestamp = {
-let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
-u32le(x)
-};
-let compression_flags = _input.read_byte()?;
-let os_id = _input.read_byte()?;
-PResult::Ok(gzip_header { magic, method, file_flags, timestamp, compression_flags, os_id })
-}
-
-/// d#285
-fn Decoder_gzip_fextra(_input: &mut Parser<'_>) -> Result<gzip_fextra, ParseError> {
-let xlen = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16le(x)
-};
-let subfields = {
-let sz = xlen as usize;
-_input.start_slice(sz)?;
-let ret = ((|| {
-let mut accum = Vec::new();
-while _input.remaining() > 0 {
-let matching_ix = {
-_input.open_peek_context();
-_input.read_byte()?;
-{
-let ret = 0;
-_input.close_peek_context()?;
-ret
-}
-};
-if matching_ix == 0 {
-let next_elem = (Decoder_gzip_fextra_subfield(_input))?;
-accum.push(next_elem)
-} else {
-break
-}
-};
-PResult::Ok(accum)
-})())?;
-_input.end_slice()?;
-ret
-};
-PResult::Ok(gzip_fextra { xlen, subfields })
-}
-
-/// d#286
-fn Decoder286(_input: &mut Parser<'_>) -> Result<Vec<u8>, ParseError> {
 let chars = {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -35463,12 +35277,90 @@ b
 return Err(ParseError::ExcludedBranch(15347994581840044382u64));
 }
 };
-PResult::Ok(chars.clone())
+chars.clone()
+};
+let data = match identifier.as_slice() {
+[69u8, 120u8, 105u8, 102u8] => {
+let inner = (Decoder_jpeg_app1_exif(_input))?;
+jpeg_app1_data_data::exif(inner)
+},
+
+[104u8, 116u8, 116u8, 112u8, 58u8, 47u8, 47u8, 110u8, 115u8, 46u8, 97u8, 100u8, 111u8, 98u8, 101u8, 46u8, 99u8, 111u8, 109u8, 47u8, 120u8, 97u8, 112u8, 47u8, 49u8, 46u8, 48u8, 47u8] => {
+let inner = (Decoder_jpeg_app1_xmp(_input))?;
+jpeg_app1_data_data::xmp(inner)
+},
+
+_ => {
+let inner = {
+let mut accum = Vec::new();
+while _input.remaining() > 0 {
+let matching_ix = {
+_input.open_peek_context();
+_input.read_byte()?;
+{
+let ret = 0;
+_input.close_peek_context()?;
+ret
+}
+};
+if matching_ix == 0 {
+let next_elem = _input.read_byte()?;
+accum.push(next_elem)
+} else {
+break
+}
+};
+accum
+};
+jpeg_app1_data_data::other(inner)
+}
+};
+PResult::Ok(jpeg_app1_data { identifier, data })
 }
 
-/// d#287
-fn Decoder_gzip_fcomment(_input: &mut Parser<'_>) -> Result<gzip_fcomment, ParseError> {
-let comment = {
+/// d#280
+fn Decoder_jpeg_app1_exif(_input: &mut Parser<'_>) -> Result<jpeg_app1_exif, ParseError> {
+let padding = {
+let b = _input.read_byte()?;
+if b == 0 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(18237415135895269790u64));
+}
+};
+let exif = (Decoder_tiff_main(_input))?;
+PResult::Ok(jpeg_app1_exif { padding, exif })
+}
+
+/// d#281
+fn Decoder_jpeg_app1_xmp(_input: &mut Parser<'_>) -> Result<jpeg_app1_xmp, ParseError> {
+let xmp = {
+let mut accum = Vec::new();
+while _input.remaining() > 0 {
+let matching_ix = {
+_input.open_peek_context();
+_input.read_byte()?;
+{
+let ret = 0;
+_input.close_peek_context()?;
+ret
+}
+};
+if matching_ix == 0 {
+let next_elem = _input.read_byte()?;
+accum.push(next_elem)
+} else {
+break
+}
+};
+accum
+};
+PResult::Ok(jpeg_app1_xmp { xmp })
+}
+
+/// d#282
+fn Decoder_jpeg_app0_data(_input: &mut Parser<'_>) -> Result<jpeg_app0_data, ParseError> {
+let identifier = {
 let chars = {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -35485,7 +35377,7 @@ byte if (byte != 0) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(18237415135895269790u64));
+return Err(ParseError::ExcludedBranch(4706601668945989307u64));
 }
 };
 _input.close_peek_context()?;
@@ -35496,282 +35388,206 @@ if matching_ix == 0 {
 let next_elem = {
 let b = _input.read_byte()?;
 if b != 0 {
-b
-} else {
-return Err(ParseError::ExcludedBranch(4706601668945989307u64));
-}
-};
-accum.push(next_elem)
-} else {
-break
-}
-};
-accum
-};
-{
-let b = _input.read_byte()?;
-if b == 0 {
 b
 } else {
 return Err(ParseError::ExcludedBranch(1678201523848816632u64));
 }
 };
-chars.clone()
-};
-PResult::Ok(gzip_fcomment { comment })
-}
-
-/// d#288
-fn Decoder_gzip_fhcrc(_input: &mut Parser<'_>) -> Result<gzip_fhcrc, ParseError> {
-let crc = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16le(x)
-};
-PResult::Ok(gzip_fhcrc { crc })
-}
-
-/// d#289
-fn Decoder_gzip_footer(_input: &mut Parser<'_>) -> Result<gzip_footer, ParseError> {
-let crc = {
-let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
-u32le(x)
-};
-let length = {
-let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
-u32le(x)
-};
-PResult::Ok(gzip_footer { crc, length })
-}
-
-/// d#290
-fn Decoder_gzip_fextra_subfield(_input: &mut Parser<'_>) -> Result<gzip_fextra_subfield, ParseError> {
-let si1 = _input.read_byte()?;
-let si2 = _input.read_byte()?;
-let len = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16le(x)
-};
-let data = {
-let mut accum = Vec::new();
-for _ in 0..len {
-let next_elem = _input.read_byte()?;
 accum.push(next_elem)
-};
-accum
-};
-PResult::Ok(gzip_fextra_subfield { si1, si2, len, data })
-}
-
-/// d#291
-fn Decoder_gzip_header_file_flags(_input: &mut Parser<'_>) -> Result<gzip_header_file_flags, ParseError> {
-let packed_bits = _input.read_byte()?;
-PResult::Ok(gzip_header_file_flags { fcomment: packed_bits >> 4u8 & 1u8 > 0u8, fname: packed_bits >> 3u8 & 1u8 > 0u8, fextra: packed_bits >> 2u8 & 1u8 > 0u8, fhcrc: packed_bits >> 1u8 & 1u8 > 0u8, ftext: packed_bits & 1u8 > 0u8 })
-}
-
-/// d#292
-fn Decoder292(_input: &mut Parser<'_>) -> Result<Vec<gzip_main>, ParseError> {
-let mut accum = Vec::new();
-while _input.remaining() > 0 {
-let matching_ix = {
-_input.open_peek_context();
-let b = _input.read_byte()?;
-{
-let ret = if b == 31 {
-1
-} else {
-0
-};
-_input.close_peek_context()?;
-ret
-}
-};
-if matching_ix == 0 {
-if accum.is_empty() {
-return Err(ParseError::InsufficientRepeats);
 } else {
 break
 }
-} else {
-let next_elem = {
-let header = (Decoder_gzip_header(_input))?;
-let fextra = if header.file_flags.fextra {
-Some((Decoder_gzip_fextra(_input))?)
-} else {
-None
 };
-let fname = if header.file_flags.fname {
-Some((Decoder294(_input))?)
-} else {
-None
+accum
 };
-let fcomment = if header.file_flags.fcomment {
-Some((Decoder295(_input))?)
-} else {
-None
-};
-let fhcrc = if header.file_flags.fhcrc {
-Some((Decoder_gzip_fhcrc(_input))?)
-} else {
-None
-};
-let data = {
-_input.enter_bits_mode()?;
-let ret = (Decoder_deflate_main(_input))?;
-let _bits_read = _input.escape_bits_mode()?;
-ret
-};
-let footer = (Decoder_gzip_footer(_input))?;
-gzip_main { header, fextra, fname, fcomment, fhcrc, data, footer }
-};
-accum.push(next_elem)
-}
-};
-PResult::Ok(accum)
-}
-
-/// d#293
-fn Decoder293(_input: &mut Parser<'_>) -> Result<tar_main, ParseError> {
-let contents = {
-let mut accum = Vec::new();
-while _input.remaining() > 0 {
-let matching_ix = {
-_input.open_peek_context();
 {
-let ret = match _input.read_byte()? {
-0u8 => {
-0
-},
-
-byte if (byte != 0) => {
-1
-},
-
-_ => {
+let b = _input.read_byte()?;
+if b == 0 {
+b
+} else {
 return Err(ParseError::ExcludedBranch(13246474195614162055u64));
 }
 };
-_input.close_peek_context()?;
-ret
-}
+chars.clone()
 };
-if matching_ix == 0 {
-if accum.is_empty() {
-return Err(ParseError::InsufficientRepeats);
-} else {
-break
-}
-} else {
-let next_elem = (Decoder_tar_header_with_data(_input))?;
-accum.push(next_elem)
-}
-};
-accum
-};
-{
-let mut accum = Vec::new();
-for _ in 0..1024u32 {
-let next_elem = {
-let b = _input.read_byte()?;
-if b == 0 {
-b
-} else {
-return Err(ParseError::ExcludedBranch(8414108255387456730u64));
-}
-};
-accum.push(next_elem)
-};
-accum
-};
-{
-let mut accum = Vec::new();
-while _input.remaining() > 0 {
-let matching_ix = {
-_input.open_peek_context();
-let b = _input.read_byte()?;
-{
-let ret = if b == 0 {
-0
-} else {
-1
-};
-_input.close_peek_context()?;
-ret
-}
-};
-if matching_ix == 0 {
-let next_elem = {
-let b = _input.read_byte()?;
-if b == 0 {
-b
-} else {
-return Err(ParseError::ExcludedBranch(1432698095084823598u64));
-}
-};
-accum.push(next_elem)
-} else {
-break
-}
-};
-accum
-};
-PResult::Ok(tar_main { contents })
-}
-
-/// d#294
-fn Decoder294(_input: &mut Parser<'_>) -> Result<Vec<u8>, ParseError> {
-let chars = {
-let mut accum = Vec::new();
-while _input.remaining() > 0 {
-let matching_ix = {
-_input.open_peek_context();
-{
-let ret = match _input.read_byte()? {
-byte if (byte != 0) => {
-0
-},
-
-0u8 => {
-1
+let data = match identifier.as_slice() {
+[74u8, 70u8, 73u8, 70u8] => {
+let inner = (Decoder_jpeg_app0_jfif(_input))?;
+jpeg_app0_data_data::jfif(inner)
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(9372987348964131232u64));
-}
-};
+let inner = {
+let mut accum = Vec::new();
+while _input.remaining() > 0 {
+let matching_ix = {
+_input.open_peek_context();
+_input.read_byte()?;
+{
+let ret = 0;
 _input.close_peek_context()?;
 ret
 }
 };
 if matching_ix == 0 {
+let next_elem = _input.read_byte()?;
+accum.push(next_elem)
+} else {
+break
+}
+};
+accum
+};
+jpeg_app0_data_data::other(inner)
+}
+};
+PResult::Ok(jpeg_app0_data { identifier, data })
+}
+
+/// d#283
+fn Decoder_jpeg_app0_jfif(_input: &mut Parser<'_>) -> Result<jpeg_app0_jfif, ParseError> {
+let version_major = _input.read_byte()?;
+let version_minor = _input.read_byte()?;
+let density_units = {
+let inner = _input.read_byte()?;
+let is_valid = {
+let x = inner;
+x <= 2u8
+};
+if is_valid {
+inner
+} else {
+return Err(ParseError::FalsifiedWhere(8414108255387456730u64));
+}
+};
+let density_x = {
+let inner = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+let is_valid = {
+let x = inner;
+x != 0u16
+};
+if is_valid {
+inner
+} else {
+return Err(ParseError::FalsifiedWhere(1432698095084823598u64));
+}
+};
+let density_y = {
+let inner = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+let is_valid = {
+let x = inner;
+x != 0u16
+};
+if is_valid {
+inner
+} else {
+return Err(ParseError::FalsifiedWhere(9372987348964131232u64));
+}
+};
+let thumbnail_width = _input.read_byte()?;
+let thumbnail_height = _input.read_byte()?;
+let thumbnail_pixels = {
+let mut accum = Vec::new();
+for _ in 0..thumbnail_height {
 let next_elem = {
+let mut accum = Vec::new();
+for _ in 0..thumbnail_width {
+let next_elem = (Decoder_png_plte(_input))?;
+accum.push(next_elem)
+};
+accum
+};
+accum.push(next_elem)
+};
+accum
+};
+PResult::Ok(jpeg_app0_jfif { version_major, version_minor, density_units, density_x, density_y, thumbnail_width, thumbnail_height, thumbnail_pixels })
+}
+
+/// d#284
+fn Decoder_png_plte(_input: &mut Parser<'_>) -> Result<png_plte, ParseError> {
+let r = _input.read_byte()?;
+let g = _input.read_byte()?;
 let b = _input.read_byte()?;
-if b != 0 {
+PResult::Ok(png_plte { r, g, b })
+}
+
+/// d#285
+fn Decoder_gzip_header(_input: &mut Parser<'_>) -> Result<gzip_header, ParseError> {
+let magic = {
+let arg0 = {
+let b = _input.read_byte()?;
+if b == 31 {
 b
 } else {
 return Err(ParseError::ExcludedBranch(8473414866110322269u64));
 }
 };
-accum.push(next_elem)
-} else {
-break
-}
-};
-accum
-};
-{
+let arg1 = {
 let b = _input.read_byte()?;
-if b == 0 {
+if b == 139 {
 b
 } else {
 return Err(ParseError::ExcludedBranch(671785503440284610u64));
 }
 };
-PResult::Ok(chars.clone())
+(arg0, arg1)
+};
+let method = _input.read_byte()?;
+let file_flags = (Decoder_gzip_header_file_flags(_input))?;
+let timestamp = {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u32le(x)
+};
+let compression_flags = _input.read_byte()?;
+let os_id = _input.read_byte()?;
+PResult::Ok(gzip_header { magic, method, file_flags, timestamp, compression_flags, os_id })
 }
 
-/// d#295
-fn Decoder295(_input: &mut Parser<'_>) -> Result<gzip_fcomment, ParseError> {
-let comment = {
+/// d#286
+fn Decoder_gzip_fextra(_input: &mut Parser<'_>) -> Result<gzip_fextra, ParseError> {
+let xlen = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16le(x)
+};
+let subfields = {
+let sz = xlen as usize;
+_input.start_slice(sz)?;
+let ret = ((|| {
+let mut accum = Vec::new();
+while _input.remaining() > 0 {
+let matching_ix = {
+_input.open_peek_context();
+_input.read_byte()?;
+{
+let ret = 0;
+_input.close_peek_context()?;
+ret
+}
+};
+if matching_ix == 0 {
+let next_elem = (Decoder_gzip_fextra_subfield(_input))?;
+accum.push(next_elem)
+} else {
+break
+}
+};
+PResult::Ok(accum)
+})())?;
+_input.end_slice()?;
+ret
+};
+PResult::Ok(gzip_fextra { xlen, subfields })
+}
+
+/// d#287
+fn Decoder287(_input: &mut Parser<'_>) -> Result<Vec<u8>, ParseError> {
 let chars = {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -35819,12 +35635,368 @@ b
 return Err(ParseError::ExcludedBranch(16948595091237008543u64));
 }
 };
+PResult::Ok(chars.clone())
+}
+
+/// d#288
+fn Decoder_gzip_fcomment(_input: &mut Parser<'_>) -> Result<gzip_fcomment, ParseError> {
+let comment = {
+let chars = {
+let mut accum = Vec::new();
+while _input.remaining() > 0 {
+let matching_ix = {
+_input.open_peek_context();
+{
+let ret = match _input.read_byte()? {
+byte if (byte != 0) => {
+0
+},
+
+0u8 => {
+1
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(108256050843388088u64));
+}
+};
+_input.close_peek_context()?;
+ret
+}
+};
+if matching_ix == 0 {
+let next_elem = {
+let b = _input.read_byte()?;
+if b != 0 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(7834223795690054720u64));
+}
+};
+accum.push(next_elem)
+} else {
+break
+}
+};
+accum
+};
+{
+let b = _input.read_byte()?;
+if b == 0 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(787921071240225899u64));
+}
+};
 chars.clone()
 };
 PResult::Ok(gzip_fcomment { comment })
 }
 
+/// d#289
+fn Decoder_gzip_fhcrc(_input: &mut Parser<'_>) -> Result<gzip_fhcrc, ParseError> {
+let crc = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16le(x)
+};
+PResult::Ok(gzip_fhcrc { crc })
+}
+
+/// d#290
+fn Decoder_gzip_footer(_input: &mut Parser<'_>) -> Result<gzip_footer, ParseError> {
+let crc = {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u32le(x)
+};
+let length = {
+let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
+u32le(x)
+};
+PResult::Ok(gzip_footer { crc, length })
+}
+
+/// d#291
+fn Decoder_gzip_fextra_subfield(_input: &mut Parser<'_>) -> Result<gzip_fextra_subfield, ParseError> {
+let si1 = _input.read_byte()?;
+let si2 = _input.read_byte()?;
+let len = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16le(x)
+};
+let data = {
+let mut accum = Vec::new();
+for _ in 0..len {
+let next_elem = _input.read_byte()?;
+accum.push(next_elem)
+};
+accum
+};
+PResult::Ok(gzip_fextra_subfield { si1, si2, len, data })
+}
+
+/// d#292
+fn Decoder_gzip_header_file_flags(_input: &mut Parser<'_>) -> Result<gzip_header_file_flags, ParseError> {
+let packed_bits = _input.read_byte()?;
+PResult::Ok(gzip_header_file_flags { fcomment: packed_bits >> 4u8 & 1u8 > 0u8, fname: packed_bits >> 3u8 & 1u8 > 0u8, fextra: packed_bits >> 2u8 & 1u8 > 0u8, fhcrc: packed_bits >> 1u8 & 1u8 > 0u8, ftext: packed_bits & 1u8 > 0u8 })
+}
+
+/// d#293
+fn Decoder293(_input: &mut Parser<'_>) -> Result<Vec<gzip_main>, ParseError> {
+let mut accum = Vec::new();
+while _input.remaining() > 0 {
+let matching_ix = {
+_input.open_peek_context();
+let b = _input.read_byte()?;
+{
+let ret = if b == 31 {
+1
+} else {
+0
+};
+_input.close_peek_context()?;
+ret
+}
+};
+if matching_ix == 0 {
+if accum.is_empty() {
+return Err(ParseError::InsufficientRepeats);
+} else {
+break
+}
+} else {
+let next_elem = {
+let header = (Decoder_gzip_header(_input))?;
+let fextra = if header.file_flags.fextra {
+Some((Decoder_gzip_fextra(_input))?)
+} else {
+None
+};
+let fname = if header.file_flags.fname {
+Some((Decoder295(_input))?)
+} else {
+None
+};
+let fcomment = if header.file_flags.fcomment {
+Some((Decoder296(_input))?)
+} else {
+None
+};
+let fhcrc = if header.file_flags.fhcrc {
+Some((Decoder_gzip_fhcrc(_input))?)
+} else {
+None
+};
+let data = {
+_input.enter_bits_mode()?;
+let ret = (Decoder_deflate_main(_input))?;
+let _bits_read = _input.escape_bits_mode()?;
+ret
+};
+let footer = (Decoder_gzip_footer(_input))?;
+gzip_main { header, fextra, fname, fcomment, fhcrc, data, footer }
+};
+accum.push(next_elem)
+}
+};
+PResult::Ok(accum)
+}
+
+/// d#294
+fn Decoder294(_input: &mut Parser<'_>) -> Result<tar_main, ParseError> {
+let contents = {
+let mut accum = Vec::new();
+while _input.remaining() > 0 {
+let matching_ix = {
+_input.open_peek_context();
+{
+let ret = match _input.read_byte()? {
+0u8 => {
+0
+},
+
+byte if (byte != 0) => {
+1
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(11557974043504662535u64));
+}
+};
+_input.close_peek_context()?;
+ret
+}
+};
+if matching_ix == 0 {
+if accum.is_empty() {
+return Err(ParseError::InsufficientRepeats);
+} else {
+break
+}
+} else {
+let next_elem = (Decoder_tar_header_with_data(_input))?;
+accum.push(next_elem)
+}
+};
+accum
+};
+{
+let mut accum = Vec::new();
+for _ in 0..1024u32 {
+let next_elem = {
+let b = _input.read_byte()?;
+if b == 0 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(14238499412440345954u64));
+}
+};
+accum.push(next_elem)
+};
+accum
+};
+{
+let mut accum = Vec::new();
+while _input.remaining() > 0 {
+let matching_ix = {
+_input.open_peek_context();
+let b = _input.read_byte()?;
+{
+let ret = if b == 0 {
+0
+} else {
+1
+};
+_input.close_peek_context()?;
+ret
+}
+};
+if matching_ix == 0 {
+let next_elem = {
+let b = _input.read_byte()?;
+if b == 0 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(14703397633096852322u64));
+}
+};
+accum.push(next_elem)
+} else {
+break
+}
+};
+accum
+};
+PResult::Ok(tar_main { contents })
+}
+
+/// d#295
+fn Decoder295(_input: &mut Parser<'_>) -> Result<Vec<u8>, ParseError> {
+let chars = {
+let mut accum = Vec::new();
+while _input.remaining() > 0 {
+let matching_ix = {
+_input.open_peek_context();
+{
+let ret = match _input.read_byte()? {
+byte if (byte != 0) => {
+0
+},
+
+0u8 => {
+1
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(268478239438800266u64));
+}
+};
+_input.close_peek_context()?;
+ret
+}
+};
+if matching_ix == 0 {
+let next_elem = {
+let b = _input.read_byte()?;
+if b != 0 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(6301432137385173939u64));
+}
+};
+accum.push(next_elem)
+} else {
+break
+}
+};
+accum
+};
+{
+let b = _input.read_byte()?;
+if b == 0 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(17762152702085771435u64));
+}
+};
+PResult::Ok(chars.clone())
+}
+
 /// d#296
+fn Decoder296(_input: &mut Parser<'_>) -> Result<gzip_fcomment, ParseError> {
+let comment = {
+let chars = {
+let mut accum = Vec::new();
+while _input.remaining() > 0 {
+let matching_ix = {
+_input.open_peek_context();
+{
+let ret = match _input.read_byte()? {
+byte if (byte != 0) => {
+0
+},
+
+0u8 => {
+1
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(6803443871185192093u64));
+}
+};
+_input.close_peek_context()?;
+ret
+}
+};
+if matching_ix == 0 {
+let next_elem = {
+let b = _input.read_byte()?;
+if b != 0 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(204361505388532862u64));
+}
+};
+accum.push(next_elem)
+} else {
+break
+}
+};
+accum
+};
+{
+let b = _input.read_byte()?;
+if b == 0 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(11161970641928094938u64));
+}
+};
+chars.clone()
+};
+PResult::Ok(gzip_fcomment { comment })
+}
+
+/// d#297
 fn Decoder_gif_header(_input: &mut Parser<'_>) -> Result<gif_header, ParseError> {
 let signature = {
 let arg0 = {
@@ -35832,7 +36004,7 @@ let b = _input.read_byte()?;
 if b == 71 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(108256050843388088u64));
+return Err(ParseError::ExcludedBranch(8787536656121914522u64));
 }
 };
 let arg1 = {
@@ -35840,7 +36012,7 @@ let b = _input.read_byte()?;
 if b == 73 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(7834223795690054720u64));
+return Err(ParseError::ExcludedBranch(18210277358428599455u64));
 }
 };
 let arg2 = {
@@ -35848,7 +36020,7 @@ let b = _input.read_byte()?;
 if b == 70 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(787921071240225899u64));
+return Err(ParseError::ExcludedBranch(9453259036882642818u64));
 }
 };
 (arg0, arg1, arg2)
@@ -35857,13 +36029,13 @@ let version = vec![_input.read_byte()?, _input.read_byte()?, _input.read_byte()?
 PResult::Ok(gif_header { signature, version })
 }
 
-/// d#297
+/// d#298
 fn Decoder_gif_logical_screen(_input: &mut Parser<'_>) -> Result<gif_logical_screen, ParseError> {
 let descriptor = (Decoder_gif_logical_screen_descriptor(_input))?;
 let global_color_table = if descriptor.flags.table_flag {
 let mut accum = Vec::new();
 for _ in 0..2u16 << (descriptor.flags.table_size as u16) {
-let next_elem = (Decoder311(_input))?;
+let next_elem = (Decoder312(_input))?;
 accum.push(next_elem)
 };
 Some(accum)
@@ -35873,7 +36045,7 @@ None
 PResult::Ok(gif_logical_screen { descriptor, global_color_table })
 }
 
-/// d#298
+/// d#299
 fn Decoder_gif_block(_input: &mut Parser<'_>) -> Result<gif_block, ParseError> {
 let tree_index = {
 _input.open_peek_context();
@@ -35898,7 +36070,7 @@ match _input.read_byte()? {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11557974043504662535u64));
+return Err(ParseError::ExcludedBranch(16811847696882257499u64));
 }
 }
 },
@@ -35908,7 +36080,7 @@ return Err(ParseError::ExcludedBranch(11557974043504662535u64));
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14238499412440345954u64));
+return Err(ParseError::ExcludedBranch(11078254580983048780u64));
 }
 };
 _input.close_peek_context()?;
@@ -35927,25 +36099,25 @@ gif_block::special_purpose_block(inner)
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14703397633096852322u64));
+return Err(ParseError::ExcludedBranch(1845850007550452160u64));
 }
 })
 }
 
-/// d#299
+/// d#300
 fn Decoder_gif_trailer(_input: &mut Parser<'_>) -> Result<gif_trailer, ParseError> {
 let separator = {
 let b = _input.read_byte()?;
 if b == 59 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(268478239438800266u64));
+return Err(ParseError::ExcludedBranch(7779176190297216638u64));
 }
 };
 PResult::Ok(gif_trailer { separator })
 }
 
-/// d#300
+/// d#301
 fn Decoder_gif_graphic_block(_input: &mut Parser<'_>) -> Result<gif_graphic_block, ParseError> {
 let graphic_control_extension = {
 let tree_index = {
@@ -35963,7 +36135,7 @@ match _input.read_byte()? {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6301432137385173939u64));
+return Err(ParseError::ExcludedBranch(1016564408906296566u64));
 }
 }
 },
@@ -35973,7 +36145,7 @@ return Err(ParseError::ExcludedBranch(6301432137385173939u64));
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(17762152702085771435u64));
+return Err(ParseError::ExcludedBranch(1591903561633999639u64));
 }
 };
 _input.close_peek_context()?;
@@ -35990,7 +36162,7 @@ None
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6803443871185192093u64));
+return Err(ParseError::ExcludedBranch(9590821821210520154u64));
 }
 }
 };
@@ -35998,7 +36170,7 @@ let graphic_rendering_block = (Decoder_gif_graphic_rendering_block(_input))?;
 PResult::Ok(gif_graphic_block { graphic_control_extension, graphic_rendering_block })
 }
 
-/// d#301
+/// d#302
 fn Decoder_gif_special_purpose_block(_input: &mut Parser<'_>) -> Result<gif_special_purpose_block, ParseError> {
 let tree_index = {
 _input.open_peek_context();
@@ -36015,11 +36187,11 @@ match _input.read_byte()? {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(204361505388532862u64));
+return Err(ParseError::ExcludedBranch(6175893723851407495u64));
 }
 }
 } else {
-return Err(ParseError::ExcludedBranch(11161970641928094938u64));
+return Err(ParseError::ExcludedBranch(4491050975676636472u64));
 };
 _input.close_peek_context()?;
 ret
@@ -36037,19 +36209,19 @@ gif_special_purpose_block::comment_extension(inner)
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(8787536656121914522u64));
+return Err(ParseError::ExcludedBranch(9933460716242958610u64));
 }
 })
 }
 
-/// d#302
+/// d#303
 fn Decoder_gif_application_extension(_input: &mut Parser<'_>) -> Result<gif_application_extension, ParseError> {
 let separator = {
 let b = _input.read_byte()?;
 if b == 33 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(18210277358428599455u64));
+return Err(ParseError::ExcludedBranch(10865781264025109219u64));
 }
 };
 let label = {
@@ -36057,7 +36229,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9453259036882642818u64));
+return Err(ParseError::ExcludedBranch(1125515999835788388u64));
 }
 };
 let block_size = {
@@ -36065,7 +36237,7 @@ let b = _input.read_byte()?;
 if b == 11 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(16811847696882257499u64));
+return Err(ParseError::ExcludedBranch(6928743980636918648u64));
 }
 };
 let identifier = {
@@ -36093,7 +36265,7 @@ byte if (byte != 0) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11078254580983048780u64));
+return Err(ParseError::ExcludedBranch(10349067556055585673u64));
 }
 };
 _input.close_peek_context()?;
@@ -36109,18 +36281,18 @@ break
 };
 accum
 };
-let terminator = (Decoder305(_input))?;
+let terminator = (Decoder306(_input))?;
 PResult::Ok(gif_application_extension { separator, label, block_size, identifier, authentication_code, application_data, terminator })
 }
 
-/// d#303
+/// d#304
 fn Decoder_gif_comment_extension(_input: &mut Parser<'_>) -> Result<gif_comment_extension, ParseError> {
 let separator = {
 let b = _input.read_byte()?;
 if b == 33 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(1845850007550452160u64));
+return Err(ParseError::ExcludedBranch(9276145871181842621u64));
 }
 };
 let label = {
@@ -36128,7 +36300,7 @@ let b = _input.read_byte()?;
 if b == 254 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(7779176190297216638u64));
+return Err(ParseError::ExcludedBranch(16224083238566163922u64));
 }
 };
 let comment_data = {
@@ -36147,7 +36319,7 @@ byte if (byte != 0) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(1016564408906296566u64));
+return Err(ParseError::ExcludedBranch(9651999844283402729u64));
 }
 };
 _input.close_peek_context()?;
@@ -36163,18 +36335,18 @@ break
 };
 accum
 };
-let terminator = (Decoder305(_input))?;
+let terminator = (Decoder306(_input))?;
 PResult::Ok(gif_comment_extension { separator, label, comment_data, terminator })
 }
 
-/// d#304
+/// d#305
 fn Decoder_gif_subblock(_input: &mut Parser<'_>) -> Result<gif_subblock, ParseError> {
 let len_bytes = {
 let b = _input.read_byte()?;
 if b != 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(1591903561633999639u64));
+return Err(ParseError::ExcludedBranch(4150962867603307131u64));
 }
 };
 let data = {
@@ -36188,24 +36360,24 @@ accum
 PResult::Ok(gif_subblock { len_bytes, data })
 }
 
-/// d#305
-fn Decoder305(_input: &mut Parser<'_>) -> Result<u8, ParseError> {
+/// d#306
+fn Decoder306(_input: &mut Parser<'_>) -> Result<u8, ParseError> {
 let b = _input.read_byte()?;
 PResult::Ok(if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9590821821210520154u64));
+return Err(ParseError::ExcludedBranch(1180075112413234847u64));
 })
 }
 
-/// d#306
+/// d#307
 fn Decoder_gif_graphic_control_extension(_input: &mut Parser<'_>) -> Result<gif_graphic_control_extension, ParseError> {
 let separator = {
 let b = _input.read_byte()?;
 if b == 33 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(6175893723851407495u64));
+return Err(ParseError::ExcludedBranch(4914981965961925407u64));
 }
 };
 let label = {
@@ -36213,7 +36385,7 @@ let b = _input.read_byte()?;
 if b == 249 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(4491050975676636472u64));
+return Err(ParseError::ExcludedBranch(4792114144900142999u64));
 }
 };
 let block_size = {
@@ -36221,7 +36393,7 @@ let b = _input.read_byte()?;
 if b == 4 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9933460716242958610u64));
+return Err(ParseError::ExcludedBranch(6091354260726402337u64));
 }
 };
 let flags = (Decoder_gif_graphic_control_extension_flags(_input))?;
@@ -36230,11 +36402,11 @@ let x = (_input.read_byte()?, _input.read_byte()?);
 u16le(x)
 };
 let transparent_color_index = _input.read_byte()?;
-let terminator = (Decoder305(_input))?;
+let terminator = (Decoder306(_input))?;
 PResult::Ok(gif_graphic_control_extension { separator, label, block_size, flags, delay_time, transparent_color_index, terminator })
 }
 
-/// d#307
+/// d#308
 fn Decoder_gif_graphic_rendering_block(_input: &mut Parser<'_>) -> Result<gif_graphic_rendering_block, ParseError> {
 let tree_index = {
 _input.open_peek_context();
@@ -36249,7 +36421,7 @@ let ret = match _input.read_byte()? {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10865781264025109219u64));
+return Err(ParseError::ExcludedBranch(16173518488310098141u64));
 }
 };
 _input.close_peek_context()?;
@@ -36268,18 +36440,18 @@ gif_graphic_rendering_block::plain_text_extension(inner)
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(1125515999835788388u64));
+return Err(ParseError::ExcludedBranch(6485872802951288360u64));
 }
 })
 }
 
-/// d#308
+/// d#309
 fn Decoder_gif_table_based_image(_input: &mut Parser<'_>) -> Result<gif_table_based_image, ParseError> {
 let descriptor = (Decoder_gif_image_descriptor(_input))?;
 let local_color_table = if descriptor.flags.table_flag {
 let mut accum = Vec::new();
 for _ in 0..2u16 << (descriptor.flags.table_size as u16) {
-let next_elem = (Decoder311(_input))?;
+let next_elem = (Decoder312(_input))?;
 accum.push(next_elem)
 };
 Some(accum)
@@ -36290,14 +36462,14 @@ let data = (Decoder_gif_table_based_image_data(_input))?;
 PResult::Ok(gif_table_based_image { descriptor, local_color_table, data })
 }
 
-/// d#309
+/// d#310
 fn Decoder_gif_plain_text_extension(_input: &mut Parser<'_>) -> Result<gif_plain_text_extension, ParseError> {
 let separator = {
 let b = _input.read_byte()?;
 if b == 33 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(6928743980636918648u64));
+return Err(ParseError::ExcludedBranch(14222995392916087968u64));
 }
 };
 let label = {
@@ -36305,7 +36477,7 @@ let b = _input.read_byte()?;
 if b == 1 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(10349067556055585673u64));
+return Err(ParseError::ExcludedBranch(9204716142356529030u64));
 }
 };
 let block_size = {
@@ -36313,7 +36485,7 @@ let b = _input.read_byte()?;
 if b == 12 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9276145871181842621u64));
+return Err(ParseError::ExcludedBranch(14055113049862078139u64));
 }
 };
 let text_grid_left_position = {
@@ -36352,7 +36524,7 @@ byte if (byte != 0) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(16224083238566163922u64));
+return Err(ParseError::ExcludedBranch(8236384974725516720u64));
 }
 };
 _input.close_peek_context()?;
@@ -36368,18 +36540,18 @@ break
 };
 accum
 };
-let terminator = (Decoder305(_input))?;
+let terminator = (Decoder306(_input))?;
 PResult::Ok(gif_plain_text_extension { separator, label, block_size, text_grid_left_position, text_grid_top_position, text_grid_width, text_grid_height, character_cell_width, character_cell_height, text_foreground_color_index, text_background_color_index, plain_text_data, terminator })
 }
 
-/// d#310
+/// d#311
 fn Decoder_gif_image_descriptor(_input: &mut Parser<'_>) -> Result<gif_image_descriptor, ParseError> {
 let separator = {
 let b = _input.read_byte()?;
 if b == 44 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9651999844283402729u64));
+return Err(ParseError::ExcludedBranch(4851501206534868925u64));
 }
 };
 let image_left_position = {
@@ -36402,15 +36574,15 @@ let flags = (Decoder_gif_image_descriptor_flags(_input))?;
 PResult::Ok(gif_image_descriptor { separator, image_left_position, image_top_position, image_width, image_height, flags })
 }
 
-/// d#311
-fn Decoder311(_input: &mut Parser<'_>) -> Result<png_plte, ParseError> {
+/// d#312
+fn Decoder312(_input: &mut Parser<'_>) -> Result<png_plte, ParseError> {
 let r = _input.read_byte()?;
 let g = _input.read_byte()?;
 let b = _input.read_byte()?;
 PResult::Ok(png_plte { r, g, b })
 }
 
-/// d#312
+/// d#313
 fn Decoder_gif_table_based_image_data(_input: &mut Parser<'_>) -> Result<gif_table_based_image_data, ParseError> {
 let lzw_min_code_size = _input.read_byte()?;
 let image_data = {
@@ -36429,7 +36601,7 @@ byte if (byte != 0) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(4150962867603307131u64));
+return Err(ParseError::ExcludedBranch(4255480819017852249u64));
 }
 };
 _input.close_peek_context()?;
@@ -36445,23 +36617,23 @@ break
 };
 accum
 };
-let terminator = (Decoder305(_input))?;
+let terminator = (Decoder306(_input))?;
 PResult::Ok(gif_table_based_image_data { lzw_min_code_size, image_data, terminator })
 }
 
-/// d#313
+/// d#314
 fn Decoder_gif_image_descriptor_flags(_input: &mut Parser<'_>) -> Result<gif_image_descriptor_flags, ParseError> {
 let packed_bits = _input.read_byte()?;
 PResult::Ok(gif_image_descriptor_flags { table_flag: packed_bits >> 7u8 & 1u8 > 0u8, interlace_flag: packed_bits >> 6u8 & 1u8 > 0u8, sort_flag: packed_bits >> 5u8 & 1u8 > 0u8, table_size: packed_bits & 7u8 })
 }
 
-/// d#314
+/// d#315
 fn Decoder_gif_graphic_control_extension_flags(_input: &mut Parser<'_>) -> Result<gif_graphic_control_extension_flags, ParseError> {
 let packed_bits = _input.read_byte()?;
 PResult::Ok(gif_graphic_control_extension_flags { disposal_method: packed_bits >> 2u8 & 7u8, user_input_flag: packed_bits >> 1u8 & 1u8 > 0u8, transparent_color_flag: packed_bits & 1u8 > 0u8 })
 }
 
-/// d#315
+/// d#316
 fn Decoder_gif_logical_screen_descriptor(_input: &mut Parser<'_>) -> Result<gif_logical_screen_descriptor, ParseError> {
 let screen_width = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -36477,14 +36649,14 @@ let pixel_aspect_ratio = _input.read_byte()?;
 PResult::Ok(gif_logical_screen_descriptor { screen_width, screen_height, flags, bg_color_index, pixel_aspect_ratio })
 }
 
-/// d#316
+/// d#317
 fn Decoder_gif_logical_screen_descriptor_flags(_input: &mut Parser<'_>) -> Result<gif_logical_screen_descriptor_flags, ParseError> {
 let packed_bits = _input.read_byte()?;
 PResult::Ok(gif_logical_screen_descriptor_flags { table_flag: packed_bits >> 7u8 & 1u8 > 0u8, color_resolution: packed_bits >> 4u8 & 7u8, sort_flag: packed_bits >> 3u8 & 1u8 > 0u8, table_size: packed_bits & 7u8 })
 }
 
-/// d#317
-fn Decoder317(_input: &mut Parser<'_>) -> Result<u32, ParseError> {
+/// d#318
+fn Decoder318(_input: &mut Parser<'_>) -> Result<u32, ParseError> {
 let tuple_var = {
 let arg0 = {
 let mut accum = Vec::new();
@@ -36550,55 +36722,55 @@ match _input.read_byte()? {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(1180075112413234847u64));
+return Err(ParseError::ExcludedBranch(17733863216727871551u64));
 }
 }
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(4914981965961925407u64));
+return Err(ParseError::ExcludedBranch(389354767835086292u64));
 }
 }
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(4792114144900142999u64));
+return Err(ParseError::ExcludedBranch(3216028881355025849u64));
 }
 }
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6091354260726402337u64));
+return Err(ParseError::ExcludedBranch(479680595494617916u64));
 }
 }
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(16173518488310098141u64));
+return Err(ParseError::ExcludedBranch(10531068763070667405u64));
 }
 }
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6485872802951288360u64));
+return Err(ParseError::ExcludedBranch(12431089125438936538u64));
 }
 }
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14222995392916087968u64));
+return Err(ParseError::ExcludedBranch(9066809807580136020u64));
 }
 }
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(9204716142356529030u64));
+return Err(ParseError::ExcludedBranch(12347909352078849049u64));
 }
 }
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14055113049862078139u64));
+return Err(ParseError::ExcludedBranch(10900015085754267678u64));
 }
 };
 _input.close_peek_context()?;
@@ -36613,7 +36785,7 @@ let b = _input.read_byte()?;
 if b == 83 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(8236384974725516720u64));
+return Err(ParseError::ExcludedBranch(5999000939515818447u64));
 }
 };
 accum.push(next_elem)
@@ -36626,7 +36798,7 @@ let b = _input.read_byte()?;
 if b == 90 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(4851501206534868925u64));
+return Err(ParseError::ExcludedBranch(10508718825232435214u64));
 }
 };
 (arg0, arg1)
@@ -36637,8 +36809,8 @@ let (s, _z) = tuple_var;
 })
 }
 
-/// d#318
-fn Decoder318(_input: &mut Parser<'_>) -> Result<jpeg_dhp_image_component, ParseError> {
+/// d#319
+fn Decoder319(_input: &mut Parser<'_>) -> Result<jpeg_dhp_image_component, ParseError> {
 let id = _input.read_byte()?;
 let sampling_factor = {
 let packed_bits = _input.read_byte()?;
@@ -36649,14 +36821,14 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(4255480819017852249u64));
+return Err(ParseError::ExcludedBranch(13460389694602013078u64));
 }
 };
 PResult::Ok(jpeg_dhp_image_component { id, sampling_factor, quantization_table_id })
 }
 
-/// d#319
-fn Decoder319(_input: &mut Parser<'_>) -> Result<jpeg_dhp_data, ParseError> {
+/// d#320
+fn Decoder320(_input: &mut Parser<'_>) -> Result<jpeg_dhp_data, ParseError> {
 let sample_precision = _input.read_byte()?;
 let num_lines = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -36674,7 +36846,7 @@ x != 0u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(17733863216727871551u64));
+return Err(ParseError::FalsifiedWhere(16535687493193441589u64));
 }
 };
 let num_image_components = {
@@ -36686,13 +36858,13 @@ x != 0u8
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(389354767835086292u64));
+return Err(ParseError::FalsifiedWhere(16678380679225161433u64));
 }
 };
 let image_components = {
 let mut accum = Vec::new();
 for _ in 0..num_image_components {
-let next_elem = (Decoder320(_input))?;
+let next_elem = (Decoder321(_input))?;
 accum.push(next_elem)
 };
 accum
@@ -36700,8 +36872,8 @@ accum
 PResult::Ok(jpeg_dhp_data { sample_precision, num_lines, num_samples_per_line, num_image_components, image_components })
 }
 
-/// d#320
-fn Decoder320(_input: &mut Parser<'_>) -> Result<jpeg_dhp_image_component, ParseError> {
+/// d#321
+fn Decoder321(_input: &mut Parser<'_>) -> Result<jpeg_dhp_image_component, ParseError> {
 let id = _input.read_byte()?;
 let sampling_factor = {
 let packed_bits = _input.read_byte()?;
@@ -36712,13 +36884,13 @@ let b = _input.read_byte()?;
 if b == 0 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(3216028881355025849u64));
+return Err(ParseError::ExcludedBranch(11416999240256111317u64));
 }
 };
 PResult::Ok(jpeg_dhp_image_component { id, sampling_factor, quantization_table_id })
 }
 
-/// d#321
+/// d#322
 fn Decoder_jpeg_exp_data__dupX1(_input: &mut Parser<'_>) -> Result<jpeg_exp_data__dupX1, ParseError> {
 let expand_horizontal_vertical = {
 let inner = {
@@ -36732,21 +36904,21 @@ let x = inner;
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(479680595494617916u64));
+return Err(ParseError::FalsifiedWhere(13319962755558045565u64));
 }
 };
 PResult::Ok(jpeg_exp_data__dupX1 { expand_horizontal_vertical })
 }
 
-/// d#322
-fn Decoder322(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
+/// d#323
+fn Decoder323(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
 let marker = {
 let ff = {
 let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(10531068763070667405u64));
+return Err(ParseError::ExcludedBranch(17426992236827678217u64));
 }
 };
 let marker = {
@@ -36754,7 +36926,7 @@ let b = _input.read_byte()?;
 if b == 200 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(12431089125438936538u64));
+return Err(ParseError::ExcludedBranch(1236150641026759388u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -36793,15 +36965,15 @@ ret
 PResult::Ok(jpeg_jpeg { marker, length, data })
 }
 
-/// d#323
-fn Decoder323(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
+/// d#324
+fn Decoder324(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
 let marker = {
 let ff = {
 let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(9066809807580136020u64));
+return Err(ParseError::ExcludedBranch(12386662728078486919u64));
 }
 };
 let marker = {
@@ -36809,7 +36981,7 @@ let b = _input.read_byte()?;
 if b == 222 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(12347909352078849049u64));
+return Err(ParseError::ExcludedBranch(14581882220438260695u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -36821,15 +36993,15 @@ u16be(x)
 let data = {
 let sz = (try_sub!(length, 2u16, 5625702265340316943u64)) as usize;
 _input.start_slice(sz)?;
-let ret = (Decoder324(_input))?;
+let ret = (Decoder325(_input))?;
 _input.end_slice()?;
 ret
 };
 PResult::Ok(jpeg_dhp { marker, length, data })
 }
 
-/// d#324
-fn Decoder324(_input: &mut Parser<'_>) -> Result<jpeg_dhp_data, ParseError> {
+/// d#325
+fn Decoder325(_input: &mut Parser<'_>) -> Result<jpeg_dhp_data, ParseError> {
 let sample_precision = _input.read_byte()?;
 let num_lines = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -36847,7 +37019,7 @@ x != 0u16
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(10900015085754267678u64));
+return Err(ParseError::FalsifiedWhere(107739895477412745u64));
 }
 };
 let num_image_components = {
@@ -36859,13 +37031,13 @@ x != 0u8
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(5999000939515818447u64));
+return Err(ParseError::FalsifiedWhere(11249661549694067250u64));
 }
 };
 let image_components = {
 let mut accum = Vec::new();
 for _ in 0..num_image_components {
-let next_elem = (Decoder320(_input))?;
+let next_elem = (Decoder321(_input))?;
 accum.push(next_elem)
 };
 accum
@@ -36873,7 +37045,7 @@ accum
 PResult::Ok(jpeg_dhp_data { sample_precision, num_lines, num_samples_per_line, num_image_components, image_components })
 }
 
-/// d#325
+/// d#326
 fn Decoder_jpeg_exp(_input: &mut Parser<'_>) -> Result<jpeg_exp, ParseError> {
 let marker = {
 let ff = {
@@ -36881,7 +37053,7 @@ let b = _input.read_byte()?;
 if b == 255 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(10508718825232435214u64));
+return Err(ParseError::ExcludedBranch(15129618400245272391u64));
 }
 };
 let marker = {
@@ -36889,7 +37061,7 @@ let b = _input.read_byte()?;
 if b == 223 {
 b
 } else {
-return Err(ParseError::ExcludedBranch(13460389694602013078u64));
+return Err(ParseError::ExcludedBranch(4714328060581312491u64));
 }
 };
 jpeg_eoi { ff, marker }
@@ -36901,15 +37073,15 @@ u16be(x)
 let data = {
 let sz = (try_sub!(length, 2u16, 4260205764162136487u64)) as usize;
 _input.start_slice(sz)?;
-let ret = (Decoder326(_input))?;
+let ret = (Decoder327(_input))?;
 _input.end_slice()?;
 ret
 };
 PResult::Ok(jpeg_exp { marker, length, data })
 }
 
-/// d#326
-fn Decoder326(_input: &mut Parser<'_>) -> Result<jpeg_exp_data__dupX1, ParseError> {
+/// d#327
+fn Decoder327(_input: &mut Parser<'_>) -> Result<jpeg_exp_data__dupX1, ParseError> {
 let expand_horizontal_vertical = {
 let inner = {
 let packed_bits = _input.read_byte()?;
@@ -36922,7 +37094,7 @@ let x = inner;
 if is_valid {
 inner
 } else {
-return Err(ParseError::FalsifiedWhere(16535687493193441589u64));
+return Err(ParseError::FalsifiedWhere(1886731551318106143u64));
 }
 };
 PResult::Ok(jpeg_exp_data__dupX1 { expand_horizontal_vertical })

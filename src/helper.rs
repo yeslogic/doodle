@@ -1279,10 +1279,7 @@ pub fn any_of(formats: impl IntoIterator<Item = Format>) -> Format {
 /// without designing a format that explicitly excludes such exceptions in its
 /// definition.
 pub fn excluding(negative: Format, inner: Format) -> Format {
-    monad_seq(
-        Format::PeekNot(Box::new(negative)),
-        inner,
-    )
+    monad_seq(Format::PeekNot(Box::new(negative)), inner)
 }
 
 /// Constructs a balanced (i.e. minimized max depth) tree of `bitor`-joined
