@@ -6,7 +6,7 @@
             │   ├── type <- mpeg4.tag := "ftyp"
             │   ├── size <- match size-field { ... } := 24
             │   └── data <- slice size (match type { ... }) :=
-            │       └── ftyp <- { ... } :=
+            │       └── ftyp <- mpeg4.ftyp-data :=
             │           ├── major_brand <- mpeg4.tag := "heic"
             │           ├── minor_version <- ReadU32Be := 0
             │           └── compatible_brands <- repeat mpeg4.tag :=
@@ -27,7 +27,7 @@
             │               │   ├── type <- mpeg4.tag := "hdlr"
             │               │   ├── size <- match size-field { ... } := 25
             │               │   └── data <- slice size (match type { ... }) :=
-            │               │       └── hdlr <- { ... } :=
+            │               │       └── hdlr <- mpeg4.meta-hdlr-data :=
             │               │           ├── version <- ReadU8 := 0
             │               │           ├── flags <- (...) :=
             │               │           │   ├── 0 <- ReadU8 := 0
@@ -51,7 +51,7 @@
             │               │               ├── type <- mpeg4.tag := "dref"
             │               │               ├── size <- match size-field { ... } := 20
             │               │               └── data <- slice size (match type { ... }) :=
-            │               │                   └── dref <- { ... } :=
+            │               │                   └── dref <- mpeg4.dref-data :=
             │               │                       ├── version <- ReadU8 := 0
             │               │                       ├── flags <- (...) :=
             │               │                       │   ├── 0 <- ReadU8 := 0
@@ -79,13 +79,13 @@
             │               │           │   ├── 0 <- ReadU8 := 0
             │               │           │   ├── 1 <- ReadU8 := 0
             │               │           │   └── 2 <- ReadU8 := 0
-            │               │           └── item_ID <- match (version == 0) { ... } := { yes := 7 }
+            │               │           └── item_ID <- match (version == 0) { ... } := { Id16 := 7 }
             │               ├── 3 <- mpeg4.meta-atom :=
             │               │   ├── size-field <- ReadU32Be := 223
             │               │   ├── type <- mpeg4.tag := "iinf"
             │               │   ├── size <- match size-field { ... } := 215
             │               │   └── data <- slice size (match type { ... }) :=
-            │               │       └── iinf <- { ... } :=
+            │               │       └── iinf <- mpeg4.iinf :=
             │               │           ├── version <- ReadU8 := 0
             │               │           ├── flags <- (...) :=
             │               │           │   ├── 0 <- ReadU8 := 0
@@ -98,164 +98,164 @@
             │               │               │   ├── type <- mpeg4.tag := "infe"
             │               │               │   ├── size <- match size-field { ... } := 13
             │               │               │   └── data <- slice size (match type { ... }) :=
-            │               │               │       └── infe <- { ... } :=
+            │               │               │       └── infe <- mpeg4.innf-atom.data-infe :=
             │               │               │           ├── version <- ReadU8 := 2
             │               │               │           ├── flags <- (...) :=
             │               │               │           │   ├── 0 <- ReadU8 := 0
             │               │               │           │   ├── 1 <- ReadU8 := 0
             │               │               │           │   └── 2 <- ReadU8 := 1
-            │               │               │           └── fields <- match (version < 2) { ... } :=
-            │               │               │               └── no <- { ... } :=
+            │               │               │           └── fields <- mpeg4.infe-data.fields(...) :=
+            │               │               │               └── Version2 <- mpeg4.infe-data.fields.version-gte2(...) :=
             │               │               │                   ├── item_ID <- match (version == 2) { ... } := 1
             │               │               │                   ├── item_protection_index <- ReadU16Be := 0
             │               │               │                   ├── item_type <- mpeg4.tag := "hvc1"
             │               │               │                   ├── item_name <- ascii-str (let-format chars (repeat [!= 0]) (monad-seq [= 0] (compute chars))) := ""
-            │               │               │                   └── extra_fields <- match item_type { ... } := unknown
+            │               │               │                   └── extra_fields <- mpeg4.infe-atom.data.extra-fields(...) := unknown
             │               │               ├── 1 <- mpeg4.iinf-atom :=
             │               │               │   ├── size-field <- ReadU32Be := 21
             │               │               │   ├── type <- mpeg4.tag := "infe"
             │               │               │   ├── size <- match size-field { ... } := 13
             │               │               │   └── data <- slice size (match type { ... }) :=
-            │               │               │       └── infe <- { ... } :=
+            │               │               │       └── infe <- mpeg4.innf-atom.data-infe :=
             │               │               │           ├── version <- ReadU8 := 2
             │               │               │           ├── flags <- (...) :=
             │               │               │           │   ├── 0 <- ReadU8 := 0
             │               │               │           │   ├── 1 <- ReadU8 := 0
             │               │               │           │   └── 2 <- ReadU8 := 1
-            │               │               │           └── fields <- match (version < 2) { ... } :=
-            │               │               │               └── no <- { ... } :=
+            │               │               │           └── fields <- mpeg4.infe-data.fields(...) :=
+            │               │               │               └── Version2 <- mpeg4.infe-data.fields.version-gte2(...) :=
             │               │               │                   ├── item_ID <- match (version == 2) { ... } := 2
             │               │               │                   ├── item_protection_index <- ReadU16Be := 0
             │               │               │                   ├── item_type <- mpeg4.tag := "hvc1"
             │               │               │                   ├── item_name <- ascii-str (let-format chars (repeat [!= 0]) (monad-seq [= 0] (compute chars))) := ""
-            │               │               │                   └── extra_fields <- match item_type { ... } := unknown
+            │               │               │                   └── extra_fields <- mpeg4.infe-atom.data.extra-fields(...) := unknown
             │               │               ├── 2 <- mpeg4.iinf-atom :=
             │               │               │   ├── size-field <- ReadU32Be := 21
             │               │               │   ├── type <- mpeg4.tag := "infe"
             │               │               │   ├── size <- match size-field { ... } := 13
             │               │               │   └── data <- slice size (match type { ... }) :=
-            │               │               │       └── infe <- { ... } :=
+            │               │               │       └── infe <- mpeg4.innf-atom.data-infe :=
             │               │               │           ├── version <- ReadU8 := 2
             │               │               │           ├── flags <- (...) :=
             │               │               │           │   ├── 0 <- ReadU8 := 0
             │               │               │           │   ├── 1 <- ReadU8 := 0
             │               │               │           │   └── 2 <- ReadU8 := 1
-            │               │               │           └── fields <- match (version < 2) { ... } :=
-            │               │               │               └── no <- { ... } :=
+            │               │               │           └── fields <- mpeg4.infe-data.fields(...) :=
+            │               │               │               └── Version2 <- mpeg4.infe-data.fields.version-gte2(...) :=
             │               │               │                   ├── item_ID <- match (version == 2) { ... } := 3
             │               │               │                   ├── item_protection_index <- ReadU16Be := 0
             │               │               │                   ├── item_type <- mpeg4.tag := "hvc1"
             │               │               │                   ├── item_name <- ascii-str (let-format chars (repeat [!= 0]) (monad-seq [= 0] (compute chars))) := ""
-            │               │               │                   └── extra_fields <- match item_type { ... } := unknown
+            │               │               │                   └── extra_fields <- mpeg4.infe-atom.data.extra-fields(...) := unknown
             │               │               ├── 3 <- mpeg4.iinf-atom :=
             │               │               │   ├── size-field <- ReadU32Be := 21
             │               │               │   ├── type <- mpeg4.tag := "infe"
             │               │               │   ├── size <- match size-field { ... } := 13
             │               │               │   └── data <- slice size (match type { ... }) :=
-            │               │               │       └── infe <- { ... } :=
+            │               │               │       └── infe <- mpeg4.innf-atom.data-infe :=
             │               │               │           ├── version <- ReadU8 := 2
             │               │               │           ├── flags <- (...) :=
             │               │               │           │   ├── 0 <- ReadU8 := 0
             │               │               │           │   ├── 1 <- ReadU8 := 0
             │               │               │           │   └── 2 <- ReadU8 := 1
-            │               │               │           └── fields <- match (version < 2) { ... } :=
-            │               │               │               └── no <- { ... } :=
+            │               │               │           └── fields <- mpeg4.infe-data.fields(...) :=
+            │               │               │               └── Version2 <- mpeg4.infe-data.fields.version-gte2(...) :=
             │               │               │                   ├── item_ID <- match (version == 2) { ... } := 4
             │               │               │                   ├── item_protection_index <- ReadU16Be := 0
             │               │               │                   ├── item_type <- mpeg4.tag := "hvc1"
             │               │               │                   ├── item_name <- ascii-str (let-format chars (repeat [!= 0]) (monad-seq [= 0] (compute chars))) := ""
-            │               │               │                   └── extra_fields <- match item_type { ... } := unknown
+            │               │               │                   └── extra_fields <- mpeg4.infe-atom.data.extra-fields(...) := unknown
             │               │               ├── 4 <- mpeg4.iinf-atom :=
             │               │               │   ├── size-field <- ReadU32Be := 21
             │               │               │   ├── type <- mpeg4.tag := "infe"
             │               │               │   ├── size <- match size-field { ... } := 13
             │               │               │   └── data <- slice size (match type { ... }) :=
-            │               │               │       └── infe <- { ... } :=
+            │               │               │       └── infe <- mpeg4.innf-atom.data-infe :=
             │               │               │           ├── version <- ReadU8 := 2
             │               │               │           ├── flags <- (...) :=
             │               │               │           │   ├── 0 <- ReadU8 := 0
             │               │               │           │   ├── 1 <- ReadU8 := 0
             │               │               │           │   └── 2 <- ReadU8 := 1
-            │               │               │           └── fields <- match (version < 2) { ... } :=
-            │               │               │               └── no <- { ... } :=
+            │               │               │           └── fields <- mpeg4.infe-data.fields(...) :=
+            │               │               │               └── Version2 <- mpeg4.infe-data.fields.version-gte2(...) :=
             │               │               │                   ├── item_ID <- match (version == 2) { ... } := 5
             │               │               │                   ├── item_protection_index <- ReadU16Be := 0
             │               │               │                   ├── item_type <- mpeg4.tag := "hvc1"
             │               │               │                   ├── item_name <- ascii-str (let-format chars (repeat [!= 0]) (monad-seq [= 0] (compute chars))) := ""
-            │               │               │                   └── extra_fields <- match item_type { ... } := unknown
+            │               │               │                   └── extra_fields <- mpeg4.infe-atom.data.extra-fields(...) := unknown
             │               │               ├── 5 <- mpeg4.iinf-atom :=
             │               │               │   ├── size-field <- ReadU32Be := 21
             │               │               │   ├── type <- mpeg4.tag := "infe"
             │               │               │   ├── size <- match size-field { ... } := 13
             │               │               │   └── data <- slice size (match type { ... }) :=
-            │               │               │       └── infe <- { ... } :=
+            │               │               │       └── infe <- mpeg4.innf-atom.data-infe :=
             │               │               │           ├── version <- ReadU8 := 2
             │               │               │           ├── flags <- (...) :=
             │               │               │           │   ├── 0 <- ReadU8 := 0
             │               │               │           │   ├── 1 <- ReadU8 := 0
             │               │               │           │   └── 2 <- ReadU8 := 1
-            │               │               │           └── fields <- match (version < 2) { ... } :=
-            │               │               │               └── no <- { ... } :=
+            │               │               │           └── fields <- mpeg4.infe-data.fields(...) :=
+            │               │               │               └── Version2 <- mpeg4.infe-data.fields.version-gte2(...) :=
             │               │               │                   ├── item_ID <- match (version == 2) { ... } := 6
             │               │               │                   ├── item_protection_index <- ReadU16Be := 0
             │               │               │                   ├── item_type <- mpeg4.tag := "hvc1"
             │               │               │                   ├── item_name <- ascii-str (let-format chars (repeat [!= 0]) (monad-seq [= 0] (compute chars))) := ""
-            │               │               │                   └── extra_fields <- match item_type { ... } := unknown
+            │               │               │                   └── extra_fields <- mpeg4.infe-atom.data.extra-fields(...) := unknown
             │               │               ├── 6 <- mpeg4.iinf-atom :=
             │               │               │   ├── size-field <- ReadU32Be := 21
             │               │               │   ├── type <- mpeg4.tag := "infe"
             │               │               │   ├── size <- match size-field { ... } := 13
             │               │               │   └── data <- slice size (match type { ... }) :=
-            │               │               │       └── infe <- { ... } :=
+            │               │               │       └── infe <- mpeg4.innf-atom.data-infe :=
             │               │               │           ├── version <- ReadU8 := 2
             │               │               │           ├── flags <- (...) :=
             │               │               │           │   ├── 0 <- ReadU8 := 0
             │               │               │           │   ├── 1 <- ReadU8 := 0
             │               │               │           │   └── 2 <- ReadU8 := 0
-            │               │               │           └── fields <- match (version < 2) { ... } :=
-            │               │               │               └── no <- { ... } :=
+            │               │               │           └── fields <- mpeg4.infe-data.fields(...) :=
+            │               │               │               └── Version2 <- mpeg4.infe-data.fields.version-gte2(...) :=
             │               │               │                   ├── item_ID <- match (version == 2) { ... } := 7
             │               │               │                   ├── item_protection_index <- ReadU16Be := 0
             │               │               │                   ├── item_type <- mpeg4.tag := "grid"
             │               │               │                   ├── item_name <- ascii-str (let-format chars (repeat [!= 0]) (monad-seq [= 0] (compute chars))) := ""
-            │               │               │                   └── extra_fields <- match item_type { ... } := unknown
+            │               │               │                   └── extra_fields <- mpeg4.infe-atom.data.extra-fields(...) := unknown
             │               │               ├── 7 <- mpeg4.iinf-atom :=
             │               │               │   ├── size-field <- ReadU32Be := 21
             │               │               │   ├── type <- mpeg4.tag := "infe"
             │               │               │   ├── size <- match size-field { ... } := 13
             │               │               │   └── data <- slice size (match type { ... }) :=
-            │               │               │       └── infe <- { ... } :=
+            │               │               │       └── infe <- mpeg4.innf-atom.data-infe :=
             │               │               │           ├── version <- ReadU8 := 2
             │               │               │           ├── flags <- (...) :=
             │               │               │           │   ├── 0 <- ReadU8 := 0
             │               │               │           │   ├── 1 <- ReadU8 := 0
             │               │               │           │   └── 2 <- ReadU8 := 1
-            │               │               │           └── fields <- match (version < 2) { ... } :=
-            │               │               │               └── no <- { ... } :=
+            │               │               │           └── fields <- mpeg4.infe-data.fields(...) :=
+            │               │               │               └── Version2 <- mpeg4.infe-data.fields.version-gte2(...) :=
             │               │               │                   ├── item_ID <- match (version == 2) { ... } := 8
             │               │               │                   ├── item_protection_index <- ReadU16Be := 0
             │               │               │                   ├── item_type <- mpeg4.tag := "Exif"
             │               │               │                   ├── item_name <- ascii-str (let-format chars (repeat [!= 0]) (monad-seq [= 0] (compute chars))) := ""
-            │               │               │                   └── extra_fields <- match item_type { ... } := unknown
+            │               │               │                   └── extra_fields <- mpeg4.infe-atom.data.extra-fields(...) := unknown
             │               │               └── 8 <- mpeg4.iinf-atom :=
             │               │                   ├── size-field <- ReadU32Be := 41
             │               │                   ├── type <- mpeg4.tag := "infe"
             │               │                   ├── size <- match size-field { ... } := 33
             │               │                   └── data <- slice size (match type { ... }) :=
-            │               │                       └── infe <- { ... } :=
+            │               │                       └── infe <- mpeg4.innf-atom.data-infe :=
             │               │                           ├── version <- ReadU8 := 2
             │               │                           ├── flags <- (...) :=
             │               │                           │   ├── 0 <- ReadU8 := 0
             │               │                           │   ├── 1 <- ReadU8 := 0
             │               │                           │   └── 2 <- ReadU8 := 1
-            │               │                           └── fields <- match (version < 2) { ... } :=
-            │               │                               └── no <- { ... } :=
+            │               │                           └── fields <- mpeg4.infe-data.fields(...) :=
+            │               │                               └── Version2 <- mpeg4.infe-data.fields.version-gte2(...) :=
             │               │                                   ├── item_ID <- match (version == 2) { ... } := 9
             │               │                                   ├── item_protection_index <- ReadU16Be := 0
             │               │                                   ├── item_type <- mpeg4.tag := "mime"
             │               │                                   ├── item_name <- ascii-str (let-format chars (repeat [!= 0]) (monad-seq [= 0] (compute chars))) := ""
-            │               │                                   └── extra_fields <- match item_type { ... } :=
-            │               │                                       └── mime <- { ... } :=
+            │               │                                   └── extra_fields <- mpeg4.infe-atom.data.extra-fields(...) :=
+            │               │                                       └── mime <- mpeg4.infe-atom.data.extra-fields.mime :=
             │               │                                           └── content_type <- ascii-str (let-format chars (repeat [!= 0]) (monad-seq [= 0] (compute chars))) := "application/rdf+xml"
             │               ├── 4 <- mpeg4.meta-atom :=
             │               │   ├── size-field <- ReadU32Be := 64
@@ -345,11 +345,9 @@
             │                           │   ├── 0 <- ReadU8 := 0
             │                           │   ├── 1 <- ReadU8 := 0
             │                           │   └── 2 <- ReadU8 := 0
-            │                           ├── offset_size_length_size <- ReadU8 := 68
-            │                           ├── base_offset_size_index_size <- ReadU8 := 0
-            │                           ├── offset_size <- compute offset_size_length_size >> 4 := 4
-            │                           ├── length_size <- compute offset_size_length_size & 7 := 4
-            │                           ├── base_offset_size <- compute base_offset_size_index_size >> 4 := 0
+            │                           ├── offset_size <- compute _packed_bits >> 4 & 15 := 4
+            │                           ├── length_size <- compute _packed_bits & 15 := 4
+            │                           ├── base_offset_size <- compute _packed_bits >> 4 & 15 := 0
             │                           ├── index_size <- match (version > 0) { ... } := 0
             │                           ├── item_count <- match (version < 2) { ... } := 9
             │                           └── items <- repeat-count item_count { ... } :=
@@ -359,8 +357,8 @@
             │                               │   ├── data_reference_index <- ReadU16Be := 0
             │                               │   ├── base_offset <- match base_offset_size { ... } := 0
             │                               │   ├── extent_count <- ReadU16Be := 1
-            │                               │   └── extents <- repeat-count extent_count { ... } :=
-            │                               │       └── 0 :=
+            │                               │   └── extents <- repeat-count extent_count mpeg4.iloc-extent(...) :=
+            │                               │       └── 0 <- mpeg4.iloc-extent(...) :=
             │                               │           ├── extent_index <- match index_size { ... } := 0
             │                               │           ├── extent_offset <- match offset_size { ... } := 6567
             │                               │           └── extent_length <- match length_size { ... } := 97715
@@ -370,8 +368,8 @@
             │                               │   ├── data_reference_index <- ReadU16Be := 0
             │                               │   ├── base_offset <- match base_offset_size { ... } := 0
             │                               │   ├── extent_count <- ReadU16Be := 1
-            │                               │   └── extents <- repeat-count extent_count { ... } :=
-            │                               │       └── 0 :=
+            │                               │   └── extents <- repeat-count extent_count mpeg4.iloc-extent(...) :=
+            │                               │       └── 0 <- mpeg4.iloc-extent(...) :=
             │                               │           ├── extent_index <- match index_size { ... } := 0
             │                               │           ├── extent_offset <- match offset_size { ... } := 104282
             │                               │           └── extent_length <- match length_size { ... } := 27699
@@ -381,8 +379,8 @@
             │                               │   ├── data_reference_index <- ReadU16Be := 0
             │                               │   ├── base_offset <- match base_offset_size { ... } := 0
             │                               │   ├── extent_count <- ReadU16Be := 1
-            │                               │   └── extents <- repeat-count extent_count { ... } :=
-            │                               │       └── 0 :=
+            │                               │   └── extents <- repeat-count extent_count mpeg4.iloc-extent(...) :=
+            │                               │       └── 0 <- mpeg4.iloc-extent(...) :=
             │                               │           ├── extent_index <- match index_size { ... } := 0
             │                               │           ├── extent_offset <- match offset_size { ... } := 131981
             │                               │           └── extent_length <- match length_size { ... } := 84325
@@ -392,8 +390,8 @@
             │                               │   ├── data_reference_index <- ReadU16Be := 0
             │                               │   ├── base_offset <- match base_offset_size { ... } := 0
             │                               │   ├── extent_count <- ReadU16Be := 1
-            │                               │   └── extents <- repeat-count extent_count { ... } :=
-            │                               │       └── 0 :=
+            │                               │   └── extents <- repeat-count extent_count mpeg4.iloc-extent(...) :=
+            │                               │       └── 0 <- mpeg4.iloc-extent(...) :=
             │                               │           ├── extent_index <- match index_size { ... } := 0
             │                               │           ├── extent_offset <- match offset_size { ... } := 216306
             │                               │           └── extent_length <- match length_size { ... } := 27493
@@ -403,8 +401,8 @@
             │                               │   ├── data_reference_index <- ReadU16Be := 0
             │                               │   ├── base_offset <- match base_offset_size { ... } := 0
             │                               │   ├── extent_count <- ReadU16Be := 1
-            │                               │   └── extents <- repeat-count extent_count { ... } :=
-            │                               │       └── 0 :=
+            │                               │   └── extents <- repeat-count extent_count mpeg4.iloc-extent(...) :=
+            │                               │       └── 0 <- mpeg4.iloc-extent(...) :=
             │                               │           ├── extent_index <- match index_size { ... } := 0
             │                               │           ├── extent_offset <- match offset_size { ... } := 243799
             │                               │           └── extent_length <- match length_size { ... } := 34733
@@ -414,8 +412,8 @@
             │                               │   ├── data_reference_index <- ReadU16Be := 0
             │                               │   ├── base_offset <- match base_offset_size { ... } := 0
             │                               │   ├── extent_count <- ReadU16Be := 1
-            │                               │   └── extents <- repeat-count extent_count { ... } :=
-            │                               │       └── 0 :=
+            │                               │   └── extents <- repeat-count extent_count mpeg4.iloc-extent(...) :=
+            │                               │       └── 0 <- mpeg4.iloc-extent(...) :=
             │                               │           ├── extent_index <- match index_size { ... } := 0
             │                               │           ├── extent_offset <- match offset_size { ... } := 278532
             │                               │           └── extent_length <- match length_size { ... } := 10655
@@ -425,8 +423,8 @@
             │                               │   ├── data_reference_index <- ReadU16Be := 0
             │                               │   ├── base_offset <- match base_offset_size { ... } := 0
             │                               │   ├── extent_count <- ReadU16Be := 1
-            │                               │   └── extents <- repeat-count extent_count { ... } :=
-            │                               │       └── 0 :=
+            │                               │   └── extents <- repeat-count extent_count mpeg4.iloc-extent(...) :=
+            │                               │       └── 0 <- mpeg4.iloc-extent(...) :=
             │                               │           ├── extent_index <- match index_size { ... } := 0
             │                               │           ├── extent_offset <- match offset_size { ... } := 0
             │                               │           └── extent_length <- match length_size { ... } := 8
@@ -436,8 +434,8 @@
             │                               │   ├── data_reference_index <- ReadU16Be := 0
             │                               │   ├── base_offset <- match base_offset_size { ... } := 0
             │                               │   ├── extent_count <- ReadU16Be := 1
-            │                               │   └── extents <- repeat-count extent_count { ... } :=
-            │                               │       └── 0 :=
+            │                               │   └── extents <- repeat-count extent_count mpeg4.iloc-extent(...) :=
+            │                               │       └── 0 <- mpeg4.iloc-extent(...) :=
             │                               │           ├── extent_index <- match index_size { ... } := 0
             │                               │           ├── extent_offset <- match offset_size { ... } := 1406
             │                               │           └── extent_length <- match length_size { ... } := 2618
@@ -447,8 +445,8 @@
             │                                   ├── data_reference_index <- ReadU16Be := 0
             │                                   ├── base_offset <- match base_offset_size { ... } := 0
             │                                   ├── extent_count <- ReadU16Be := 1
-            │                                   └── extents <- repeat-count extent_count { ... } :=
-            │                                       └── 0 :=
+            │                                   └── extents <- repeat-count extent_count mpeg4.iloc-extent(...) :=
+            │                                       └── 0 <- mpeg4.iloc-extent(...) :=
             │                                           ├── extent_index <- match index_size { ... } := 0
             │                                           ├── extent_offset <- match offset_size { ... } := 4024
             │                                           └── extent_length <- match length_size { ... } := 2543

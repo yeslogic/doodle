@@ -4,7 +4,7 @@
             ├── header <- gzip.header :=
             │   ├── magic <- (...)
             │   ├── method <- ReadU8 := 8
-            │   ├── file-flags <- map (packed_bits -> { ... }) U8 := bool-flags[fname]
+            │   ├── file-flags <- gzip.header.file-flags := bool-flags[fname]
             │   ├── timestamp <- ReadU32Le := 1684478387
             │   ├── compression-flags <- ReadU8 := 0
             │   └── os-id <- ReadU8 := 3
@@ -35,7 +35,7 @@
             │   │   │           │   ├── 9 := 4
             │   │   │           │   ~
             │   │   │           │   └── 14 := 6
-            │   │   │           ├── literal-length-distance-alphabet-code-lengths <- dynamic code-length-alphabet-format huffman (repeat-until-seq (y -> seq-length (flat-map-accum (tuple_var -> pat-bind [(last-symbol, cl-code-extra) = tuple_var] match as-u8 (cl-code-extra.code) { ... }, none) y) >= as-u32 (hlit + hdist) + 258) { ... }) :=
+            │   │   │           ├── literal-length-distance-alphabet-code-lengths <- deflate.dynamic-huffman.literal-length-distance-alphabet-code-lengths(...) :=
             │   │   │           │   ├── 0 :=
             │   │   │           │   │   ├── code <- apply := 5
             │   │   │           │   │   └── extra <- match (as-u8 code) { ... } := 0
@@ -178,7 +178,7 @@
             │   │   │           │   ├── 9 := 6
             │   │   │           │   ~
             │   │   │           │   └── 18 := 6
-            │   │   │           ├── literal-length-distance-alphabet-code-lengths <- dynamic code-length-alphabet-format huffman (repeat-until-seq (y -> seq-length (flat-map-accum (tuple_var -> pat-bind [(last-symbol, cl-code-extra) = tuple_var] match as-u8 (cl-code-extra.code) { ... }, none) y) >= as-u32 (hlit + hdist) + 258) { ... }) :=
+            │   │   │           ├── literal-length-distance-alphabet-code-lengths <- deflate.dynamic-huffman.literal-length-distance-alphabet-code-lengths(...) :=
             │   │   │           │   ├── 0 :=
             │   │   │           │   │   ├── code <- apply := 6
             │   │   │           │   │   └── extra <- match (as-u8 code) { ... } := 0
@@ -321,7 +321,7 @@
             │   │               │   ├── 9 := 5
             │   │               │   ~
             │   │               │   └── 16 := 5
-            │   │               ├── literal-length-distance-alphabet-code-lengths <- dynamic code-length-alphabet-format huffman (repeat-until-seq (y -> seq-length (flat-map-accum (tuple_var -> pat-bind [(last-symbol, cl-code-extra) = tuple_var] match as-u8 (cl-code-extra.code) { ... }, none) y) >= as-u32 (hlit + hdist) + 258) { ... }) :=
+            │   │               ├── literal-length-distance-alphabet-code-lengths <- deflate.dynamic-huffman.literal-length-distance-alphabet-code-lengths(...) :=
             │   │               │   ├── 0 :=
             │   │               │   │   ├── code <- apply := 7
             │   │               │   │   └── extra <- match (as-u8 code) { ... } := 0

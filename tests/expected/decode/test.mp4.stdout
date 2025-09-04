@@ -6,7 +6,7 @@
             │   ├── type <- mpeg4.tag := "ftyp"
             │   ├── size <- match size-field { ... } := 24
             │   └── data <- slice size (match type { ... }) :=
-            │       └── ftyp <- { ... } :=
+            │       └── ftyp <- mpeg4.ftyp-data :=
             │           ├── major_brand <- mpeg4.tag := "isom"
             │           ├── minor_version <- ReadU32Be := 512
             │           └── compatible_brands <- repeat mpeg4.tag :=
@@ -157,7 +157,7 @@
             │           │                       │   ├── type <- mpeg4.tag := "hdlr"
             │           │                       │   ├── size <- match size-field { ... } := 45
             │           │                       │   └── data <- slice size (match type { ... }) :=
-            │           │                       │       └── hdlr <- { ... } :=
+            │           │                       │       └── hdlr <- mpeg4.mdia-hdlr-data :=
             │           │                       │           ├── version <- ReadU8 := 0
             │           │                       │           ├── flags <- (...) :=
             │           │                       │           │   ├── 0 <- ReadU8 := 0
@@ -202,7 +202,7 @@
             │           │                                   │               ├── type <- mpeg4.tag := "dref"
             │           │                                   │               ├── size <- match size-field { ... } := 20
             │           │                                   │               └── data <- slice size (match type { ... }) :=
-            │           │                                   │                   └── dref <- { ... } :=
+            │           │                                   │                   └── dref <- mpeg4.dref-data :=
             │           │                                   │                       ├── version <- ReadU8 := 0
             │           │                                   │                       ├── flags <- (...) :=
             │           │                                   │                       │   ├── 0 <- ReadU8 := 0
@@ -237,8 +237,8 @@
             │           │                                               │           │   ├── 1 <- ReadU8 := 0
             │           │                                               │           │   └── 2 <- ReadU8 := 0
             │           │                                               │           ├── entry_count <- ReadU32Be := 1
-            │           │                                               │           └── sample_entries <- repeat-count entry_count { ... } :=
-            │           │                                               │               └── 0 :=
+            │           │                                               │           └── sample_entries <- repeat-count entry_count mpeg4.stsd.sample-entry :=
+            │           │                                               │               └── 0 <- mpeg4.stsd.sample-entry :=
             │           │                                               │                   ├── size-field <- ReadU32Be := 169
             │           │                                               │                   ├── type <- mpeg4.tag := "avc1"
             │           │                                               │                   ├── size <- match size-field { ... } := 161
@@ -453,7 +453,7 @@
             │           │                       │   ├── type <- mpeg4.tag := "hdlr"
             │           │                       │   ├── size <- match size-field { ... } := 45
             │           │                       │   └── data <- slice size (match type { ... }) :=
-            │           │                       │       └── hdlr <- { ... } :=
+            │           │                       │       └── hdlr <- mpeg4.mdia-hdlr-data :=
             │           │                       │           ├── version <- ReadU8 := 0
             │           │                       │           ├── flags <- (...) :=
             │           │                       │           │   ├── 0 <- ReadU8 := 0
@@ -495,7 +495,7 @@
             │           │                                   │               ├── type <- mpeg4.tag := "dref"
             │           │                                   │               ├── size <- match size-field { ... } := 20
             │           │                                   │               └── data <- slice size (match type { ... }) :=
-            │           │                                   │                   └── dref <- { ... } :=
+            │           │                                   │                   └── dref <- mpeg4.dref-data :=
             │           │                                   │                       ├── version <- ReadU8 := 0
             │           │                                   │                       ├── flags <- (...) :=
             │           │                                   │                       │   ├── 0 <- ReadU8 := 0
@@ -530,8 +530,8 @@
             │           │                                               │           │   ├── 1 <- ReadU8 := 0
             │           │                                               │           │   └── 2 <- ReadU8 := 0
             │           │                                               │           ├── entry_count <- ReadU32Be := 1
-            │           │                                               │           └── sample_entries <- repeat-count entry_count { ... } :=
-            │           │                                               │               └── 0 :=
+            │           │                                               │           └── sample_entries <- repeat-count entry_count mpeg4.stsd.sample-entry :=
+            │           │                                               │               └── 0 <- mpeg4.stsd.sample-entry :=
             │           │                                               │                   ├── size-field <- ReadU32Be := 110
             │           │                                               │                   ├── type <- mpeg4.tag := "mp4a"
             │           │                                               │                   ├── size <- match size-field { ... } := 102
@@ -731,7 +731,7 @@
             │                                       │   ├── type <- mpeg4.tag := "hdlr"
             │                                       │   ├── size <- match size-field { ... } := 25
             │                                       │   └── data <- slice size (match type { ... }) :=
-            │                                       │       └── hdlr <- { ... } :=
+            │                                       │       └── hdlr <- mpeg4.meta-hdlr-data :=
             │                                       │           ├── version <- ReadU8 := 0
             │                                       │           ├── flags <- (...) :=
             │                                       │           │   ├── 0 <- ReadU8 := 0

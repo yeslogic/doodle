@@ -8,10 +8,10 @@
         │   │   ├── screen-width <- ReadU16Le := 50
         │   │   ├── screen-height <- ReadU16Le := 50
         │   │   ├── flags <- gif.logical-screen-descriptor.flags :=
-        │   │   │   ├── table-flag := true
-        │   │   │   ├── color-resolution := 7
-        │   │   │   ├── sort-flag := false
-        │   │   │   └── table-size := 4
+        │   │   │   ├── table-flag <- compute _packed_bits >> 7 & 1 > 0 := true
+        │   │   │   ├── color-resolution <- compute _packed_bits >> 4 & 7 := 7
+        │   │   │   ├── sort-flag <- compute _packed_bits >> 3 & 1 > 0 := false
+        │   │   │   └── table-size <- compute _packed_bits & 7 := 4
         │   │   ├── bg-color-index <- ReadU8 := 0
         │   │   └── pixel-aspect-ratio <- ReadU8 := 0
         │   └── global-color-table <- maybe (descriptor.flags.table-flag) (repeat-count (2 << as-u16 (descriptor.flags.table-size)) gif.color-table-entry) :=
@@ -58,9 +58,9 @@
         │           │       ├── label <- [= 249]
         │           │       ├── block-size <- [= 4]
         │           │       ├── flags <- gif.graphic-control-extension.flags :=
-        │           │       │   ├── disposal-method := 0
-        │           │       │   ├── user-input-flag := false
-        │           │       │   └── transparent-color-flag := true
+        │           │       │   ├── disposal-method <- compute _packed_bits >> 2 & 7 := 0
+        │           │       │   ├── user-input-flag <- compute _packed_bits >> 1 & 1 > 0 := false
+        │           │       │   └── transparent-color-flag <- compute _packed_bits & 1 > 0 := true
         │           │       ├── delay-time <- ReadU16Le := 0
         │           │       ├── transparent-color-index <- ReadU8 := 0
         │           │       └── terminator <- gif.block-terminator
@@ -73,10 +73,10 @@
         │                   │   ├── image-width <- ReadU16Le := 50
         │                   │   ├── image-height <- ReadU16Le := 50
         │                   │   └── flags <- gif.image-descriptor.flags :=
-        │                   │       ├── table-flag := false
-        │                   │       ├── interlace-flag := false
-        │                   │       ├── sort-flag := false
-        │                   │       └── table-size := 0
+        │                   │       ├── table-flag <- compute _packed_bits >> 7 & 1 > 0 := false
+        │                   │       ├── interlace-flag <- compute _packed_bits >> 6 & 1 > 0 := false
+        │                   │       ├── sort-flag <- compute _packed_bits >> 5 & 1 > 0 := false
+        │                   │       └── table-size <- compute _packed_bits & 7 := 0
         │                   ├── local-color-table <- maybe (descriptor.flags.table-flag) (repeat-count (2 << as-u16 (descriptor.flags.table-size)) gif.color-table-entry) := none
         │                   └── data <- gif.table-based-image-data :=
         │                       ├── lzw-min-code-size <- ReadU8 := 5

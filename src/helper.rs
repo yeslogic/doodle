@@ -5,8 +5,8 @@ use num_traits::{ToPrimitive, Zero};
 use crate::byte_set::ByteSet;
 pub use crate::marker::BaseKind;
 use crate::{
-    Arith, BaseType, Expr, Format, IntRel, IntoLabel, Label, Pattern, StyleHint, TypeHint, UnaryOp,
-    ValueType, ViewExpr, ViewFormat,
+    Arith, BaseType, Expr, Format, IntRel, IntoLabel, Label, OwnedRecordFormat, Pattern,
+    RecordBuilder, StyleHint, TypeHint, UnaryOp, ValueType, ViewExpr, ViewFormat,
 };
 use crate::{Endian, bounds::Bounds};
 
@@ -110,7 +110,7 @@ fn mask_bits_u16(x: Expr, high_bits_used: u8, nbits: u8) -> Expr {
 ///
 /// Requires that the total length of all fields is 8 bits, and panics otherwise.
 pub fn bit_fields_u8<const N: usize>(bit_fields: [BitFieldKind; N]) -> Format {
-    const BINDING_NAME: &str = "packed_bits";
+    const BINDING_NAME: &str = "_packed_bits";
     #[cfg(debug_assertions)]
     {
         let _len: u8 = bit_fields.iter().map(BitFieldKind::bit_width).sum();
@@ -135,7 +135,7 @@ pub fn bit_fields_u8<const N: usize>(bit_fields: [BitFieldKind; N]) -> Format {
             } else {
                 raw // u8
             };
-            fields.push((Label::Borrowed(name), field_value));
+            fields.push((Label::Borrowed(name), compute(field_value)));
         } else if bit_field.check_zero() {
             unset_bits_mask &= ((1u8 << nbits) - 1) << (8 - (high_bits_used + nbits));
         }
@@ -157,14 +157,17 @@ pub fn bit_fields_u8<const N: usize>(bit_fields: [BitFieldKind; N]) -> Format {
         ANY_BYTE
     };
 
-    map(packed, lambda(BINDING_NAME, Expr::Record(fields)))
+    record_auto(Iterator::chain(
+        std::iter::once((Label::Borrowed(BINDING_NAME), packed)),
+        fields.into_iter(),
+    ))
 }
 
 /// Ergonomic helper for parsing a 16-bit packed value into a multi-field record with more
 /// context-awareness for determining the interpretation (and semantics) of the various
 /// segments of contiguous bits.
 pub fn bit_fields_u16<const N: usize>(bit_fields: [BitFieldKind; N]) -> Format {
-    const BINDING_NAME: &str = "packed_bits";
+    const BINDING_NAME: &str = "_packed_bits";
     #[cfg(debug_assertions)]
     {
         let len: u8 = bit_fields.iter().map(BitFieldKind::bit_width).sum();
@@ -188,7 +191,7 @@ pub fn bit_fields_u16<const N: usize>(bit_fields: [BitFieldKind; N]) -> Format {
             } else {
                 raw
             };
-            fields.push((Label::Borrowed(name), field_value));
+            fields.push((Label::Borrowed(name), compute(field_value)));
         } else if bit_field.check_zero() {
             unset_bits_mask &= ((1u16 << nbits) - 1) << (16 - (high_bits_used + nbits));
         }
@@ -210,7 +213,10 @@ pub fn bit_fields_u16<const N: usize>(bit_fields: [BitFieldKind; N]) -> Format {
         base::u16be()
     };
 
-    map(packed, lambda(BINDING_NAME, Expr::Record(fields)))
+    record_auto(Iterator::chain(
+        std::iter::once((Label::Borrowed(BINDING_NAME), packed)),
+        fields.into_iter(),
+    ))
 }
 
 /// Returns an [`Expr`] that refers to a (hopefully) in-scope variable by name.
@@ -336,6 +342,46 @@ pub fn union_nondet<Name: IntoLabel>(branches: impl IntoIterator<Item = (Name, F
             .map(|(label, format)| Format::Variant(label.into(), Box::new(format)))
             .collect(),
     )
+}
+
+/// Helper that takes an iterable container of Record-kinded formats and 'fuses' them, combining their field-parses
+/// in natural order into a flat record.
+///
+/// # Notes
+///
+/// When providing inputs to this helper, it is the caller's responsibility to ensure that fields are not unintentionally
+/// shadowed by later Records.
+pub fn merge_records(records: impl IntoIterator<Item = Format>) -> Format {
+    let mut combined = OwnedRecordFormat::default();
+    for record in records {
+        let mut builder = RecordBuilder::init();
+        builder.accum(&record).unwrap();
+        let mut record_f: OwnedRecordFormat = builder.finish().into();
+        combined.append(&mut record_f);
+    }
+    combined.into_format()
+}
+
+/// Takes a record-format, a field-name within it, and a function that transforms a field-format, and produces
+/// a new record-format with the same structure but with the associated field remapped. If there are no fields
+/// with the specified name, the original record-format is returned.
+pub fn remap_field(name: &str, remap: impl FnOnce(Format) -> Format, format: Format) -> Format {
+    match format {
+        Format::LetFormat(f, ident, inner) => {
+            if ident == name {
+                Format::LetFormat(Box::new(remap(*f)), ident, inner)
+            } else {
+                Format::LetFormat(f, ident, Box::new(remap_field(name, remap, *inner)))
+            }
+        }
+        Format::MonadSeq(f0, f1) => Format::MonadSeq(f0, Box::new(remap_field(name, remap, *f1))),
+        Format::Hint(StyleHint::Record { old_style }, f) => Format::Hint(
+            StyleHint::Record { old_style },
+            Box::new(remap_field(name, remap, *f)),
+        ),
+        // REVIEW - do we miss any cases with this catch-all?
+        f => f,
+    }
 }
 
 /// Helper-function for [`Format::record`] taking any iterable container of
@@ -499,16 +545,21 @@ pub fn if_then_else(cond: Expr, format_true: Format, format_false: Format) -> Fo
 
 /// Helper function for branching between two formats based on a boolean predicate, even when the two formats have different value-types.
 ///
-/// If `cond` evaluates to `true`, will decode into the variant-format `yes(format_yes)`, and otherwise `no(format_no)`.
+/// Takes two pairs consisting of a variant name and its inner format, the first applying to the case where the condition is `true` and the
+/// second applying to the case where the condition is `false`.
 ///
 /// # Notes
 ///
 /// If `format_no` happens to be `Format::EMPTY`, consider using [`cond_maybe`] instead.
-pub fn if_then_else_variant(cond: Expr, format_yes: Format, format_no: Format) -> Format {
+pub fn if_then_else_variant<Name: IntoLabel>(
+    cond: Expr,
+    (variant_yes, format_yes): (Name, Format),
+    (variant_no, format_no): (Name, Format),
+) -> Format {
     if_then_else(
         cond,
-        Format::Variant("yes".into(), Box::new(format_yes)),
-        Format::Variant("no".into(), Box::new(format_no)),
+        Format::Variant(variant_yes.into(), Box::new(format_yes)),
+        Format::Variant(variant_no.into(), Box::new(format_no)),
     )
 }
 
@@ -1733,7 +1784,7 @@ mod tests {
         let module = FormatModule::new();
 
         assert!(ascii_char().is_ascii_char_format(&module));
-        assert!(ascii_char_strict().is_ascii_char_format(&module));
+        assert!(ascii_alpha().is_ascii_char_format(&module));
         assert!(!u8().is_ascii_char_format(&module));
     }
 }

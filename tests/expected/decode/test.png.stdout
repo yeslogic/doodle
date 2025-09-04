@@ -16,7 +16,7 @@
         ├── chunks <- repeat png.chunk(...) :=
         │   ├── 0 <- png.chunk(...) :=
         │   │   ├── length <- assert (length -> length <= 2147483647) ReadU32Be := 87
-        │   │   ├── tag <- monad-seq (peek-not [= 73]) (repeat-count 4 (ascii-char ASCII.Strict)) := "PLTE"
+        │   │   ├── tag <- png.tag := "PLTE"
         │   │   ├── data <- slice length (match tag { ... }) :=
         │   │   │   └── PLTE <- png.plte :=
         │   │   │       └──    r   g   b
@@ -52,7 +52,7 @@
         │   │   └── crc <- ReadU32Be := 1943707985
         │   ├── 1 <- png.chunk(...) :=
         │   │   ├── length <- assert (length -> length <= 2147483647) ReadU32Be := 1
-        │   │   ├── tag <- monad-seq (peek-not [= 73]) (repeat-count 4 (ascii-char ASCII.Strict)) := "tRNS"
+        │   │   ├── tag <- png.tag := "tRNS"
         │   │   ├── data <- slice length (match tag { ... }) :=
         │   │   │   └── tRNS <- png.trns(...) :=
         │   │   │       └── color-type-3 <- repeat { ... } :=
@@ -61,7 +61,7 @@
         │   │   └── crc <- ReadU32Be := 1088870502
         │   ├── 2 <- png.chunk(...) :=
         │   │   ├── length <- assert (length -> length <= 2147483647) ReadU32Be := 1
-        │   │   ├── tag <- monad-seq (peek-not [= 73]) (repeat-count 4 (ascii-char ASCII.Strict)) := "bKGD"
+        │   │   ├── tag <- png.tag := "bKGD"
         │   │   ├── data <- slice length (match tag { ... }) :=
         │   │   │   └── bKGD <- png.bkgd(...) :=
         │   │   │       └── color-type-3 <- { ... } :=
@@ -69,7 +69,7 @@
         │   │   └── crc <- ReadU32Be := 2282036552
         │   ├── 3 <- png.chunk(...) :=
         │   │   ├── length <- assert (length -> length <= 2147483647) ReadU32Be := 9
-        │   │   ├── tag <- monad-seq (peek-not [= 73]) (repeat-count 4 (ascii-char ASCII.Strict)) := "pHYs"
+        │   │   ├── tag <- png.tag := "pHYs"
         │   │   ├── data <- slice length (match tag { ... }) :=
         │   │   │   └── pHYs <- png.phys :=
         │   │   │       ├── pixels-per-unit-x <- ReadU32Be := 2835
@@ -78,7 +78,7 @@
         │   │   └── crc <- ReadU32Be := 10132504
         │   └── 4 <- png.chunk(...) :=
         │       ├── length <- assert (length -> length <= 2147483647) ReadU32Be := 7
-        │       ├── tag <- monad-seq (peek-not [= 73]) (repeat-count 4 (ascii-char ASCII.Strict)) := "tIME"
+        │       ├── tag <- png.tag := "tIME"
         │       ├── data <- slice length (match tag { ... }) :=
         │       │   └── tIME <- png.time :=
         │       │       ├── year <- ReadU16Be := 2005
@@ -89,13 +89,13 @@
         │       │       └── second <- ReadU8 := 34
         │       └── crc <- ReadU32Be := 491070829
         ├── idat <- let-format idat (map (xs -> flat-map (x -> x.data) xs) (repeat1 png.idat)) (decode-bytes idat zlib.main) :=
-        │   ├── compression-method-flags <- assert (method-info -> method-info.compression-method == 8) (map (packed_bits -> { ... }) U8) :=
-        │   │   ├── compression-info := 4
-        │   │   └── compression-method := 8
-        │   ├── flags <- map (packed_bits -> { ... }) U8 :=
-        │   │   ├── flevel := 3
-        │   │   ├── fdict := false
-        │   │   └── fcheck := 7
+        │   ├── compression-method-flags <- assert (method-info -> method-info.compression-method == 8) { ... } :=
+        │   │   ├── compression-info <- compute _packed_bits >> 4 & 15 := 4
+        │   │   └── compression-method <- compute _packed_bits & 15 := 8
+        │   ├── flags <- { ... } :=
+        │   │   ├── flevel <- compute _packed_bits >> 6 & 3 := 3
+        │   │   ├── fdict <- compute _packed_bits >> 5 & 1 > 0 := false
+        │   │   └── fcheck <- compute _packed_bits & 31 := 7
         │   ├── dict-id <- maybe (flags.fdict) ReadU32Be := none
         │   ├── data <- bits deflate.main :=
         │   │   ├── blocks <- repeat-until-last (x -> x.final == 1) deflate.block :=
@@ -120,7 +120,7 @@
         │   │   │               │   ├── 9 := 3
         │   │   │               │   ~
         │   │   │               │   └── 13 := 4
-        │   │   │               ├── literal-length-distance-alphabet-code-lengths <- dynamic code-length-alphabet-format huffman (repeat-until-seq (y -> seq-length (flat-map-accum (tuple_var -> pat-bind [(last-symbol, cl-code-extra) = tuple_var] match as-u8 (cl-code-extra.code) { ... }, none) y) >= as-u32 (hlit + hdist) + 258) { ... }) :=
+        │   │   │               ├── literal-length-distance-alphabet-code-lengths <- deflate.dynamic-huffman.literal-length-distance-alphabet-code-lengths(...) :=
         │   │   │               │   ├── 0 :=
         │   │   │               │   │   ├── code <- apply := 5
         │   │   │               │   │   └── extra <- match (as-u8 code) { ... } := 0

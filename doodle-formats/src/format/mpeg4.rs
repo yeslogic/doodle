@@ -1,5 +1,19 @@
 use doodle::helper::{u8, *};
-use doodle::{Expr, Format, FormatModule, FormatRef, Pattern};
+use doodle::{BaseType, Expr, Format, FormatModule, FormatRef, Pattern, ValueType};
+
+fn u4_pair(hi: &'static str, lo: &'static str) -> Format {
+    use BitFieldKind::*;
+    bit_fields_u8([
+        BitsField {
+            field_name: hi,
+            bit_width: 4,
+        },
+        BitsField {
+            field_name: lo,
+            bit_width: 4,
+        },
+    ])
+}
 
 fn tag_pattern(tag: [char; 4]) -> Pattern {
     Pattern::Tuple(vec![
@@ -19,157 +33,84 @@ fn tag_pattern3(tag: [char; 3]) -> Pattern {
     ])
 }
 
+fn make_atom(tag: FormatRef, data: Format) -> Format {
+    record([
+        ("size-field", u32be()),
+        ("type", tag.call()),
+        (
+            "size",
+            Format::Match(
+                Box::new(var("size-field")),
+                vec![
+                    (Pattern::U32(0), compute(Expr::U64(0))), // FIXME
+                    (
+                        Pattern::U32(1),
+                        map(u64be(), lambda("x", sub(var("x"), Expr::U64(16)))),
+                    ),
+                    (
+                        Pattern::Wildcard,
+                        compute(as_u64(sub(var("size-field"), Expr::U32(8)))),
+                    ),
+                ],
+            ),
+        ),
+        ("data", slice(var("size"), data)),
+    ])
+}
+
 pub fn main(module: &mut FormatModule) -> FormatRef {
+    // REVIEW - is it better for this to be a tuple than a sequential type that can be shown as a string more easily?
     let tag = module.define_format("mpeg4.tag", tuple_repeat(4, ascii_char()));
 
-    fn make_atom(tag: FormatRef, data: Format) -> Format {
+    let ftyp_data = module.define_format(
+        "mpeg4.ftyp-data",
         record([
-            ("size-field", u32be()),
-            ("type", tag.call()),
-            (
-                "size",
-                Format::Match(
-                    Box::new(var("size-field")),
-                    vec![
-                        (Pattern::U32(0), compute(Expr::U64(0))), // FIXME
-                        (
-                            Pattern::U32(1),
-                            map(u64be(), lambda("x", sub(var("x"), Expr::U64(16)))),
-                        ),
-                        (
-                            Pattern::Wildcard,
-                            compute(as_u64(sub(var("size-field"), Expr::U32(8)))),
-                        ),
-                    ],
-                ),
-            ),
-            ("data", slice(var("size"), data)),
-        ])
-    }
+            ("major_brand", tag.call()),
+            ("minor_version", u32be()),
+            ("compatible_brands", repeat(tag.call())),
+        ]),
+    );
 
-    let ftyp_data = record([
-        ("major_brand", tag.call()),
-        ("minor_version", u32be()),
-        ("compatible_brands", repeat(tag.call())),
-    ]);
+    let mdia_hdlr_data = module.define_format(
+        "mpeg4.mdia-hdlr-data",
+        record([
+            ("version", u8()),
+            ("flags", tuple_repeat(3, u8())),
+            ("component_type", u32be()),
+            ("component_subtype", tag.call()),
+            ("component_manufacturer", u32be()),
+            ("component_flags", u32be()),
+            ("component_flags_mask", u32be()),
+            ("component_name", asciiz_string()),
+        ]),
+    );
 
-    let mdia_hdlr_data = record([
-        ("version", u8()),
-        ("flags", tuple_repeat(3, u8())),
-        ("component_type", u32be()),
-        ("component_subtype", tag.call()),
-        ("component_manufacturer", u32be()),
-        ("component_flags", u32be()),
-        ("component_flags_mask", u32be()),
-        ("component_name", asciiz_string()),
-    ]);
-
-    let meta_hdlr_data = record([
-        ("version", u8()),
-        ("flags", tuple_repeat(3, u8())),
-        ("predefined", u32be()),
-        ("handler_type", tag.call()),
-        ("reserved", tuple_repeat(3, u32be())),
-        ("name", asciiz_string()),
-    ]);
+    let meta_hdlr_data = module.define_format(
+        "mpeg4.meta-hdlr-data",
+        record([
+            ("version", u8()),
+            ("flags", tuple_repeat(3, u8())),
+            ("predefined", u32be()),
+            ("handler_type", tag.call()),
+            ("reserved", tuple_repeat(3, u32be())),
+            ("name", asciiz_string()),
+        ]),
+    );
 
     let pitm_data = record([
         ("version", u8()),
         ("flags", tuple_repeat(3, u8())),
         (
             "item_ID",
-            if_then_else_variant(expr_eq(var("version"), Expr::U8(0)), u16be(), u32be()),
-        ),
-    ]);
-
-    let infe_data = record([
-        ("version", u8()),
-        ("flags", tuple_repeat(3, u8())),
-        (
-            "fields",
             if_then_else_variant(
-                expr_lt(var("version"), Expr::U8(2)),
-                record([
-                    ("item_ID", u16be()),
-                    ("item_protection_index", u16be()),
-                    ("item_name", asciiz_string()),
-                    ("content_type", asciiz_string()),
-                    ("content_encoding", asciiz_string()),
-                    // FIXME unfinished
-                ]),
-                record([
-                    (
-                        "item_ID",
-                        if_then_else(
-                            expr_eq(var("version"), Expr::U8(2)),
-                            map(u16be(), lambda("x", as_u32(var("x")))),
-                            u32be(),
-                        ),
-                    ),
-                    ("item_protection_index", u16be()),
-                    ("item_type", tag.call()),
-                    ("item_name", asciiz_string()),
-                    (
-                        "extra_fields",
-                        match_variant(
-                            var("item_type"),
-                            vec![
-                                (
-                                    tag_pattern(['m', 'i', 'm', 'e']),
-                                    "mime",
-                                    record([
-                                        ("content_type", asciiz_string()),
-                                        //FIXME optional ("content_encoding", asciiz_string()),
-                                    ]),
-                                ),
-                                (
-                                    tag_pattern(['u', 'r', 'i', ' ']),
-                                    "uri",
-                                    record([("item_uri_type", asciiz_string())]),
-                                ),
-                                (
-                                    Pattern::Wildcard,
-                                    "unknown",
-                                    Format::EMPTY, // FIXME
-                                ),
-                            ],
-                        ),
-                    ),
-                ]),
-            ),
-        ),
-    ]);
-
-    let iinf_atom = module.define_format(
-        "mpeg4.iinf-atom",
-        make_atom(
-            tag,
-            match_variant(
-                var("type"),
-                vec![
-                    (tag_pattern(['i', 'n', 'f', 'e']), "infe", infe_data),
-                    (Pattern::Wildcard, "unknown", opaque_bytes()),
-                ],
-            ),
-        ),
-    );
-
-    let iinf_data = record([
-        ("version", u8()),
-        ("flags", tuple_repeat(3, u8())),
-        (
-            "entry_count",
-            if_then_else(
                 expr_eq(var("version"), Expr::U8(0)),
-                map(u16be(), lambda("x", as_u32(var("x")))),
-                u32be(),
+                ("Id16", u16be()),
+                ("Id32", u32be()),
             ),
         ),
-        (
-            "item_info_entry",
-            repeat_count(var("entry_count"), iinf_atom.call()),
-        ),
     ]);
+
+    let iinf_data = iinf_data(module, tag);
 
     let single_item_reference_data = record([
         ("from_item_ID", u16be()),
@@ -206,130 +147,131 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
         ),
     ]);
 
-    let iloc_data = record([
-        ("version", u8()),
-        ("flags", tuple_repeat(3, u8())),
-        ("offset_size_length_size", u8()), // two four-bit fields
-        ("base_offset_size_index_size", u8()), // two four-bit fields
-        (
-            "offset_size",
-            compute(shr(var("offset_size_length_size"), Expr::U8(4))),
-        ),
-        (
-            "length_size",
-            compute(bit_and(var("offset_size_length_size"), Expr::U8(7))),
-        ),
-        (
-            "base_offset_size",
-            compute(shr(var("base_offset_size_index_size"), Expr::U8(4))),
-        ),
-        (
+    let mpeg4_extent = module.define_format_args(
+        "mpeg4.iloc-extent",
+        vec![
+            ("offset_size".into(), ValueType::Base(BaseType::U8)),
+            ("length_size".into(), ValueType::Base(BaseType::U8)),
+            ("index_size".into(), ValueType::Base(BaseType::U8)),
+        ],
+        record([
+            (
+                "extent_index",
+                Format::Match(
+                    Box::new(var("index_size")),
+                    vec![
+                        (Pattern::U8(0), compute(Expr::U64(0))),
+                        (Pattern::U8(4), map(u32be(), lambda("x", as_u64(var("x"))))),
+                        (Pattern::U8(8), u64be()),
+                    ],
+                ),
+            ),
+            (
+                "extent_offset",
+                Format::Match(
+                    Box::new(var("offset_size")),
+                    vec![
+                        (Pattern::U8(0), compute(Expr::U64(0))),
+                        (Pattern::U8(4), map(u32be(), lambda("x", as_u64(var("x"))))),
+                        (Pattern::U8(8), u64be()),
+                    ],
+                ),
+            ),
+            (
+                "extent_length",
+                Format::Match(
+                    Box::new(var("length_size")),
+                    vec![
+                        (Pattern::U8(0), compute(Expr::U64(0))),
+                        (Pattern::U8(4), map(u32be(), lambda("x", as_u64(var("x"))))),
+                        (Pattern::U8(8), u64be()),
+                    ],
+                ),
+            ),
+        ]),
+    );
+
+    let iloc_data = merge_records([
+        record([("version", u8()), ("flags", tuple_repeat(3, u8()))]),
+        // two four-bit fields, for offset_size and length_size
+        u4_pair("offset_size", "length_size"),
+        // two four-bit fields; index_size is reserved and should be treated as `0` for version 0
+        remap_field(
             "index_size",
-            if_then_else(
-                expr_gt(var("version"), Expr::U8(0)),
-                compute(bit_and(var("base_offset_size_index_size"), Expr::U8(7))),
-                compute(Expr::U8(0)),
-            ),
+            |f| {
+                if_then_else(
+                    expr_gt(var("version"), Expr::U8(0)),
+                    f,
+                    compute(Expr::U8(0)),
+                )
+            },
+            u4_pair("base_offset_size", "index_size"),
         ),
-        (
-            "item_count",
-            if_then_else(
-                expr_lt(var("version"), Expr::U8(2)),
-                map(u16be(), lambda("x", as_u32(var("x")))),
-                u32be(),
+        record([
+            (
+                "item_count",
+                if_then_else(
+                    expr_lt(var("version"), Expr::U8(2)),
+                    map(u16be(), lambda("x", as_u32(var("x")))),
+                    u32be(),
+                ),
             ),
-        ),
-        (
-            "items",
-            repeat_count(
-                var("item_count"),
-                record([
-                    (
-                        "item_ID",
-                        if_then_else(
-                            expr_lt(var("version"), Expr::U8(2)),
-                            map(u16be(), lambda("x", as_u32(var("x")))),
-                            u32be(),
+            (
+                "items",
+                repeat_count(
+                    var("item_count"),
+                    record([
+                        (
+                            "item_ID",
+                            if_then_else(
+                                expr_lt(var("version"), Expr::U8(2)),
+                                map(u16be(), lambda("x", as_u32(var("x")))),
+                                u32be(),
+                            ),
                         ),
-                    ),
-                    (
-                        "construction_method",
-                        cond_maybe(expr_gt(var("version"), Expr::U8(0)), u16be()),
-                    ),
-                    ("data_reference_index", u16be()),
-                    (
-                        "base_offset",
-                        Format::Match(
-                            Box::new(var("base_offset_size")),
-                            vec![
-                                (Pattern::U8(0), compute(Expr::U64(0))),
-                                (Pattern::U8(4), map(u32be(), lambda("x", as_u64(var("x"))))),
-                                (Pattern::U8(8), u64be()),
-                            ],
+                        (
+                            "construction_method",
+                            cond_maybe(expr_gt(var("version"), Expr::U8(0)), u16be()),
                         ),
-                    ),
-                    ("extent_count", u16be()),
-                    (
-                        "extents",
-                        repeat_count(
-                            var("extent_count"),
-                            record([
-                                (
-                                    "extent_index",
-                                    Format::Match(
-                                        Box::new(var("index_size")),
-                                        vec![
-                                            (Pattern::U8(0), compute(Expr::U64(0))),
-                                            (
-                                                Pattern::U8(4),
-                                                map(u32be(), lambda("x", as_u64(var("x")))),
-                                            ),
-                                            (Pattern::U8(8), u64be()),
-                                        ],
-                                    ),
-                                ),
-                                (
-                                    "extent_offset",
-                                    Format::Match(
-                                        Box::new(var("offset_size")),
-                                        vec![
-                                            (Pattern::U8(0), compute(Expr::U64(0))),
-                                            (
-                                                Pattern::U8(4),
-                                                map(u32be(), lambda("x", as_u64(var("x")))),
-                                            ),
-                                            (Pattern::U8(8), u64be()),
-                                        ],
-                                    ),
-                                ),
-                                (
-                                    "extent_length",
-                                    Format::Match(
-                                        Box::new(var("length_size")),
-                                        vec![
-                                            (Pattern::U8(0), compute(Expr::U64(0))),
-                                            (
-                                                Pattern::U8(4),
-                                                map(u32be(), lambda("x", as_u64(var("x")))),
-                                            ),
-                                            (Pattern::U8(8), u64be()),
-                                        ],
-                                    ),
-                                ),
-                            ]),
+                        ("data_reference_index", u16be()),
+                        (
+                            "base_offset",
+                            Format::Match(
+                                Box::new(var("base_offset_size")),
+                                vec![
+                                    (Pattern::U8(0), compute(Expr::U64(0))),
+                                    (Pattern::U8(4), map(u32be(), lambda("x", as_u64(var("x"))))),
+                                    (Pattern::U8(8), u64be()),
+                                ],
+                            ),
                         ),
-                    ),
-                ]),
+                        ("extent_count", u16be()),
+                        (
+                            "extents",
+                            repeat_count(
+                                var("extent_count"),
+                                mpeg4_extent.call_args(vec![
+                                    var("offset_size"),
+                                    var("length_size"),
+                                    var("index_size"),
+                                ]),
+                            ),
+                        ),
+                    ]),
+                ),
             ),
-        ),
+        ]),
     ]);
 
-    let dref_data = record([
-        ("version", u8()),
-        ("flags", tuple_repeat(3, u8())),
-        ("number_of_entries", u32be()),
-        ("data", repeat(make_atom(tag, opaque_bytes()))),
-    ]);
+    let dref_data = module.define_format(
+        "mpeg4.dref-data",
+        record([
+            ("version", u8()),
+            ("flags", tuple_repeat(3, u8())),
+            ("number_of_entries", u32be()),
+            ("data", repeat(make_atom(tag, opaque_bytes()))),
+        ]),
+    );
 
     let elst_data = record([
         ("version", u8()),
@@ -348,13 +290,15 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
         ),
     ]);
 
+    let sample_entry =
+        module.define_format("mpeg4.stsd.sample-entry", make_atom(tag, opaque_bytes()));
     let stsd_data = record([
         ("version", u8()),
         ("flags", tuple_repeat(3, u8())),
         ("entry_count", u32be()),
         (
             "sample_entries",
-            repeat_count(var("entry_count"), make_atom(tag, opaque_bytes())),
+            repeat_count(var("entry_count"), sample_entry.call()),
         ),
     ]);
 
@@ -649,7 +593,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
             match_variant(
                 var("type"),
                 vec![
-                    (tag_pattern(['d', 'r', 'e', 'f']), "dref", dref_data),
+                    (tag_pattern(['d', 'r', 'e', 'f']), "dref", dref_data.call()),
                     (Pattern::Wildcard, "unknown", opaque_bytes()),
                 ],
             ),
@@ -711,7 +655,11 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
             match_variant(
                 var("type"),
                 vec![
-                    (tag_pattern(['h', 'd', 'l', 'r']), "hdlr", mdia_hdlr_data),
+                    (
+                        tag_pattern(['h', 'd', 'l', 'r']),
+                        "hdlr",
+                        mdia_hdlr_data.call(),
+                    ),
                     (tag_pattern(['m', 'd', 'h', 'd']), "mdhd", mdhd_data),
                     (
                         tag_pattern(['m', 'i', 'n', 'f']),
@@ -792,9 +740,13 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                         "dinf",
                         repeat(dinf_atom.call()),
                     ),
-                    (tag_pattern(['h', 'd', 'l', 'r']), "hdlr", meta_hdlr_data),
+                    (
+                        tag_pattern(['h', 'd', 'l', 'r']),
+                        "hdlr",
+                        meta_hdlr_data.call(),
+                    ),
                     (tag_pattern(['p', 'i', 't', 'm']), "pitm", pitm_data),
-                    (tag_pattern(['i', 'i', 'n', 'f']), "iinf", iinf_data),
+                    (tag_pattern(['i', 'i', 'n', 'f']), "iinf", iinf_data.call()),
                     (tag_pattern(['i', 'r', 'e', 'f']), "iref", iref_data),
                     (tag_pattern(['i', 'l', 'o', 'c']), "iloc", iloc_data),
                     (
@@ -862,7 +814,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
             match_variant(
                 var("type"),
                 vec![
-                    (tag_pattern(['f', 't', 'y', 'p']), "ftyp", ftyp_data),
+                    (tag_pattern(['f', 't', 'y', 'p']), "ftyp", ftyp_data.call()),
                     (tag_pattern(['f', 'r', 'e', 'e']), "free", Format::EMPTY),
                     (
                         tag_pattern(['m', 'd', 'a', 't']),
@@ -894,6 +846,135 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
             ("atoms", repeat(atom.call())),
             //("atoms", repeat_count(Expr::U8(4), atom.call())),
             //("trailer", opaque_bytes())
+        ]),
+    )
+}
+
+fn iinf_data(module: &mut FormatModule, tag: FormatRef) -> FormatRef {
+    let infe_data_extra_mime = module.define_format(
+        "mpeg4.infe-atom.data.extra-fields.mime",
+        record([
+            ("content_type", asciiz_string()),
+            //FIXME optional ("content_encoding", asciiz_string()),
+        ]),
+    );
+    let infe_data_extra_uri = module.define_format(
+        "mpeg4.infe-atom.data.extra-fields.uri",
+        record([("item_uri_type", asciiz_string())]),
+    );
+
+    let infe_extra_fields = module.define_format_args(
+        "mpeg4.infe-atom.data.extra-fields",
+        vec![(
+            "item_type".into(),
+            module.get_format_type(tag.get_level()).clone(),
+        )],
+        match_variant(
+            var("item_type"),
+            vec![
+                (
+                    tag_pattern(['m', 'i', 'm', 'e']),
+                    "mime",
+                    infe_data_extra_mime.call(),
+                ),
+                (
+                    tag_pattern(['u', 'r', 'i', ' ']),
+                    "uri",
+                    infe_data_extra_uri.call(),
+                ),
+                (
+                    Pattern::Wildcard,
+                    "unknown",
+                    Format::EMPTY, // FIXME
+                ),
+            ],
+        ),
+    );
+
+    let infe_data_ver1 = module.define_format(
+        "mpeg4.infe-data.fields.version-lt2",
+        record([
+            ("item_ID", u16be()),
+            ("item_protection_index", u16be()),
+            ("item_name", asciiz_string()),
+            ("content_type", asciiz_string()),
+            ("content_encoding", asciiz_string()),
+            // FIXME unfinished
+        ]),
+    );
+
+    let infe_data_ver2 = module.define_format_args(
+        "mpeg4.infe-data.fields.version-gte2",
+        vec![("version".into(), ValueType::Base(BaseType::U8))],
+        record([
+            (
+                "item_ID",
+                if_then_else(
+                    expr_eq(var("version"), Expr::U8(2)),
+                    map(u16be(), lambda("x", as_u32(var("x")))),
+                    u32be(),
+                ),
+            ),
+            ("item_protection_index", u16be()),
+            ("item_type", tag.call()),
+            ("item_name", asciiz_string()),
+            (
+                "extra_fields",
+                infe_extra_fields.call_args(vec![var("item_type")]),
+            ),
+        ]),
+    );
+
+    let infe_data_fields = module.define_format_args(
+        "mpeg4.infe-data.fields",
+        vec![("version".into(), ValueType::Base(BaseType::U8))],
+        if_then_else_variant(
+            expr_lt(var("version"), Expr::U8(2)),
+            ("Version1", infe_data_ver1.call()),
+            ("Version2", infe_data_ver2.call_args(vec![var("version")])),
+        ),
+    );
+
+    let infe_data = module.define_format(
+        "mpeg4.innf-atom.data-infe",
+        record([
+            ("version", u8()),
+            ("flags", tuple_repeat(3, u8())),
+            ("fields", infe_data_fields.call_args(vec![var("version")])),
+        ]),
+    );
+
+    let iinf_atom = module.define_format(
+        "mpeg4.iinf-atom",
+        make_atom(
+            tag,
+            match_variant(
+                var("type"),
+                vec![
+                    (tag_pattern(['i', 'n', 'f', 'e']), "infe", infe_data.call()),
+                    (Pattern::Wildcard, "unknown", opaque_bytes()),
+                ],
+            ),
+        ),
+    );
+
+    module.define_format(
+        "mpeg4.iinf",
+        record([
+            ("version", u8()),
+            ("flags", tuple_repeat(3, u8())),
+            (
+                "entry_count",
+                if_then_else(
+                    expr_eq(var("version"), Expr::U8(0)),
+                    map(u16be(), lambda("x", as_u32(var("x")))),
+                    u32be(),
+                ),
+            ),
+            (
+                "item_info_entry",
+                repeat_count(var("entry_count"), iinf_atom.call()),
+            ),
         ]),
     )
 }
