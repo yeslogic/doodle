@@ -788,8 +788,70 @@ pub(crate) enum FieldLabel<Name> {
     Permanent { in_capture: Name, in_value: Name },
 }
 
+impl<'a, Name: Clone> FieldLabel<&'a Name> {
+    pub fn cloned(self) -> FieldLabel<Name> {
+        match self {
+            FieldLabel::Anonymous => FieldLabel::Anonymous,
+            FieldLabel::Ephemeral(name) => FieldLabel::Ephemeral(name.clone()),
+            FieldLabel::Permanent {
+                in_capture,
+                in_value,
+            } => FieldLabel::Permanent {
+                in_capture: in_capture.clone(),
+                in_value: in_value.clone(),
+            },
+        }
+    }
+}
+
+impl<Name> FieldLabel<Name> {
+    #[expect(dead_code)]
+    pub fn into_label(self) -> FieldLabel<Label>
+    where
+        Name: IntoLabel,
+    {
+        match self {
+            FieldLabel::Anonymous => FieldLabel::Anonymous,
+            FieldLabel::Ephemeral(name) => FieldLabel::Ephemeral(name.into()),
+            FieldLabel::Permanent {
+                in_capture,
+                in_value,
+            } => FieldLabel::Permanent {
+                in_capture: in_capture.into(),
+                in_value: in_value.into(),
+            },
+        }
+    }
+
+    pub fn to_option(self) -> Option<(Name, bool)> {
+        match self {
+            FieldLabel::Anonymous => None,
+            FieldLabel::Ephemeral(name) => Some((name, false)),
+            FieldLabel::Permanent { in_value, .. } => Some((in_value, true)),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
 pub(crate) struct RecordFormat<'a> {
     flat: Vec<(FieldLabel<&'a Label>, &'a Format)>,
+}
+
+impl<'a> From<RecordFormat<'a>> for OwnedRecordFormat {
+    fn from(value: RecordFormat<'a>) -> Self {
+        OwnedRecordFormat {
+            flat: value
+                .flat
+                .into_iter()
+                .map(|(field_label, format)| (field_label.cloned(), format.clone()))
+                .collect(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub(crate) struct OwnedRecordFormat {
+    flat: Vec<(FieldLabel<Label>, Format)>,
 }
 
 impl<'a> std::ops::Deref for RecordFormat<'a> {
@@ -797,6 +859,26 @@ impl<'a> std::ops::Deref for RecordFormat<'a> {
 
     fn deref(&self) -> &Self::Target {
         &self.flat
+    }
+}
+
+impl<'a> std::ops::DerefMut for RecordFormat<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.flat
+    }
+}
+
+impl std::ops::Deref for OwnedRecordFormat {
+    type Target = Vec<(FieldLabel<Label>, Format)>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.flat
+    }
+}
+
+impl std::ops::DerefMut for OwnedRecordFormat {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.flat
     }
 }
 
@@ -824,6 +906,26 @@ impl<'a> RecordFormat<'a> {
             }
         }
         None
+    }
+}
+
+impl OwnedRecordFormat {
+    pub(crate) fn into_format(self) -> Format {
+        let mut rev_fields = self
+            .flat
+            .into_iter()
+            .rev()
+            .map(|(fld_label, format)| (fld_label.to_option(), format))
+            .collect::<Vec<(Option<(Label, bool)>, Format)>>();
+        let accum = Vec::with_capacity(rev_fields.len());
+        let old_style = rev_fields.iter().all(|(opt, _)| {
+            opt.as_ref()
+                .is_some_and(|(_, is_persistent)| *is_persistent)
+        });
+        Format::Hint(
+            StyleHint::Record { old_style },
+            Box::new(Format::__chain_record(accum, &mut rev_fields)),
+        )
     }
 }
 

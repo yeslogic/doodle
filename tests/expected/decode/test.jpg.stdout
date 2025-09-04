@@ -2,13 +2,13 @@
     └── jpeg <- jpeg.main :=
         ├── soi <- jpeg.soi
         ├── frame <- jpeg.frame :=
-        │   ├── initial-segment <- _ |...| _ :=
+        │   ├── initial-segment <- jpeg.frame.initial-segment :=
         │   │   └── app0 <- jpeg.app0 :=
         │   │       ├── marker <- { ... }
         │   │       ├── length <- ReadU16Be := 16
         │   │       └── data <- slice (length - 2) jpeg.app0-data :=
         │   │           ├── identifier <- ascii-str (let-format chars (repeat [!= 0]) (monad-seq [= 0] (compute chars))) := "JFIF"
-        │   │           └── data <- match identifier { ... } :=
+        │   │           └── data <- jpeg.app0-data.data(...) :=
         │   │               └── jfif <- jpeg.app0-jfif :=
         │   │                   ├── version-major <- ReadU8 := 1
         │   │                   ├── version-minor <- ReadU8 := 1
@@ -25,10 +25,10 @@
         │   │   │       ├── length <- ReadU16Be := 67
         │   │   │       └── data <- slice (length - 2) (repeat1 jpeg.dqt-data) :=
         │   │   │           └── 0 <- jpeg.dqt-data :=
-        │   │   │               ├── precision-table-id <- assert (precision-table-id -> (precision-table-id.precision <= 1) && (precision-table-id.table-id <= 3)) (map (packed_bits -> { ... }) U8) :=
-        │   │   │               │   ├── precision := 0
-        │   │   │               │   └── table-id := 0
-        │   │   │               └── elements <- match precision-table-id.precision { ... } :=
+        │   │   │               ├── precision-table-id <- jpeg.precision-table-id :=
+        │   │   │               │   ├── precision <- compute _packed_bits >> 4 & 15 := 0
+        │   │   │               │   └── table-id <- compute _packed_bits & 15 := 0
+        │   │   │               └── elements <- jpeg.dqt-data.elements(...) :=
         │   │   │                   └── Bytes <- repeat-count 64 ReadU8 :=
         │   │   │                       ├── 0 := 8
         │   │   │                       ├── 1 := 6
@@ -48,10 +48,10 @@
         │   │           ├── length <- ReadU16Be := 67
         │   │           └── data <- slice (length - 2) (repeat1 jpeg.dqt-data) :=
         │   │               └── 0 <- jpeg.dqt-data :=
-        │   │                   ├── precision-table-id <- assert (precision-table-id -> (precision-table-id.precision <= 1) && (precision-table-id.table-id <= 3)) (map (packed_bits -> { ... }) U8) :=
-        │   │                   │   ├── precision := 0
-        │   │                   │   └── table-id := 1
-        │   │                   └── elements <- match precision-table-id.precision { ... } :=
+        │   │                   ├── precision-table-id <- jpeg.precision-table-id :=
+        │   │                   │   ├── precision <- compute _packed_bits >> 4 & 15 := 0
+        │   │                   │   └── table-id <- compute _packed_bits & 15 := 1
+        │   │                   └── elements <- jpeg.dqt-data.elements(...) :=
         │   │                       └── Bytes <- repeat-count 64 ReadU8 :=
         │   │                           ├── 0 := 9
         │   │                           ├── 1 := 9
@@ -77,21 +77,21 @@
         │   │           └── image-components <- repeat-count num-image-components jpeg.sof-image-component :=
         │   │               ├── 0 <- jpeg.sof-image-component :=
         │   │               │   ├── id <- ReadU8 := 1
-        │   │               │   ├── sampling-factor <- map (packed_bits -> { ... }) U8 :=
-        │   │               │   │   ├── horizontal := 2
-        │   │               │   │   └── vertical := 2
+        │   │               │   ├── sampling-factor <- { ... } :=
+        │   │               │   │   ├── horizontal <- compute _packed_bits >> 4 & 15 := 2
+        │   │               │   │   └── vertical <- compute _packed_bits & 15 := 2
         │   │               │   └── quantization-table-id <- assert (x -> x <= 3) ReadU8 := 0
         │   │               ├── 1 <- jpeg.sof-image-component :=
         │   │               │   ├── id <- ReadU8 := 2
-        │   │               │   ├── sampling-factor <- map (packed_bits -> { ... }) U8 :=
-        │   │               │   │   ├── horizontal := 1
-        │   │               │   │   └── vertical := 1
+        │   │               │   ├── sampling-factor <- { ... } :=
+        │   │               │   │   ├── horizontal <- compute _packed_bits >> 4 & 15 := 1
+        │   │               │   │   └── vertical <- compute _packed_bits & 15 := 1
         │   │               │   └── quantization-table-id <- assert (x -> x <= 3) ReadU8 := 1
         │   │               └── 2 <- jpeg.sof-image-component :=
         │   │                   ├── id <- ReadU8 := 3
-        │   │                   ├── sampling-factor <- map (packed_bits -> { ... }) U8 :=
-        │   │                   │   ├── horizontal := 1
-        │   │                   │   └── vertical := 1
+        │   │                   ├── sampling-factor <- { ... } :=
+        │   │                   │   ├── horizontal <- compute _packed_bits >> 4 & 15 := 1
+        │   │                   │   └── vertical <- compute _packed_bits & 15 := 1
         │   │                   └── quantization-table-id <- assert (x -> x <= 3) ReadU8 := 1
         │   ├── scan <- jpeg.scan :=
         │   │   ├── segments <- repeat jpeg.table-or-misc :=
@@ -100,9 +100,9 @@
         │   │   │   │       ├── marker <- { ... }
         │   │   │   │       ├── length <- ReadU16Be := 27
         │   │   │   │       └── data <- slice (length - 2) jpeg.dht-data :=
-        │   │   │   │           ├── class-table-id <- assert (class-table-id -> (class-table-id.class < 2) && (class-table-id.table-id < 4)) (map (packed_bits -> { ... }) U8) :=
-        │   │   │   │           │   ├── class := 0
-        │   │   │   │           │   └── table-id := 0
+        │   │   │   │           ├── class-table-id <- jpeg.class-table-id :=
+        │   │   │   │           │   ├── class <- compute _packed_bits >> 4 & 15 := 0
+        │   │   │   │           │   └── table-id <- compute _packed_bits & 15 := 0
         │   │   │   │           ├── num-codes <- repeat-count 16 ReadU8 :=
         │   │   │   │           │   ├── 0 := 0
         │   │   │   │           │   ├── 1 := 2
@@ -142,9 +142,9 @@
         │   │   │   │       ├── marker <- { ... }
         │   │   │   │       ├── length <- ReadU16Be := 58
         │   │   │   │       └── data <- slice (length - 2) jpeg.dht-data :=
-        │   │   │   │           ├── class-table-id <- assert (class-table-id -> (class-table-id.class < 2) && (class-table-id.table-id < 4)) (map (packed_bits -> { ... }) U8) :=
-        │   │   │   │           │   ├── class := 1
-        │   │   │   │           │   └── table-id := 0
+        │   │   │   │           ├── class-table-id <- jpeg.class-table-id :=
+        │   │   │   │           │   ├── class <- compute _packed_bits >> 4 & 15 := 1
+        │   │   │   │           │   └── table-id <- compute _packed_bits & 15 := 0
         │   │   │   │           ├── num-codes <- repeat-count 16 ReadU8 :=
         │   │   │   │           │   ├── 0 := 0
         │   │   │   │           │   ├── 1 := 2
@@ -201,9 +201,9 @@
         │   │   │   │       ├── marker <- { ... }
         │   │   │   │       ├── length <- ReadU16Be := 26
         │   │   │   │       └── data <- slice (length - 2) jpeg.dht-data :=
-        │   │   │   │           ├── class-table-id <- assert (class-table-id -> (class-table-id.class < 2) && (class-table-id.table-id < 4)) (map (packed_bits -> { ... }) U8) :=
-        │   │   │   │           │   ├── class := 0
-        │   │   │   │           │   └── table-id := 1
+        │   │   │   │           ├── class-table-id <- jpeg.class-table-id :=
+        │   │   │   │           │   ├── class <- compute _packed_bits >> 4 & 15 := 0
+        │   │   │   │           │   └── table-id <- compute _packed_bits & 15 := 1
         │   │   │   │           ├── num-codes <- repeat-count 16 ReadU8 :=
         │   │   │   │           │   ├── 0 := 0
         │   │   │   │           │   ├── 1 := 2
@@ -242,9 +242,9 @@
         │   │   │           ├── marker <- { ... }
         │   │   │           ├── length <- ReadU16Be := 38
         │   │   │           └── data <- slice (length - 2) jpeg.dht-data :=
-        │   │   │               ├── class-table-id <- assert (class-table-id -> (class-table-id.class < 2) && (class-table-id.table-id < 4)) (map (packed_bits -> { ... }) U8) :=
-        │   │   │               │   ├── class := 1
-        │   │   │               │   └── table-id := 1
+        │   │   │               ├── class-table-id <- jpeg.class-table-id :=
+        │   │   │               │   ├── class <- compute _packed_bits >> 4 & 15 := 1
+        │   │   │               │   └── table-id <- compute _packed_bits & 15 := 1
         │   │   │               ├── num-codes <- repeat-count 16 ReadU8 :=
         │   │   │               │   ├── 0 := 0
         │   │   │               │   ├── 1 := 3
@@ -298,26 +298,26 @@
         │   │   │       ├── image-components <- repeat-count num-image-components jpeg.sos-image-component :=
         │   │   │       │   ├── 0 <- jpeg.sos-image-component :=
         │   │   │       │   │   ├── component-selector <- ReadU8 := 1
-        │   │   │       │   │   └── entropy-coding-table-ids <- assert (entropy-coding-table-ids -> (entropy-coding-table-ids.dc-entropy-coding-table-id <= 3) && (entropy-coding-table-ids.ac-entropy-coding-table-id <= 3)) (map (packed_bits -> { ... }) U8) :=
-        │   │   │       │   │       ├── dc-entropy-coding-table-id := 0
-        │   │   │       │   │       └── ac-entropy-coding-table-id := 0
+        │   │   │       │   │   └── entropy-coding-table-ids <- jpeg.sos-image-component.entropy-coding-table-ids :=
+        │   │   │       │   │       ├── dc-entropy-coding-table-id <- compute _packed_bits >> 4 & 15 := 0
+        │   │   │       │   │       └── ac-entropy-coding-table-id <- compute _packed_bits & 15 := 0
         │   │   │       │   ├── 1 <- jpeg.sos-image-component :=
         │   │   │       │   │   ├── component-selector <- ReadU8 := 2
-        │   │   │       │   │   └── entropy-coding-table-ids <- assert (entropy-coding-table-ids -> (entropy-coding-table-ids.dc-entropy-coding-table-id <= 3) && (entropy-coding-table-ids.ac-entropy-coding-table-id <= 3)) (map (packed_bits -> { ... }) U8) :=
-        │   │   │       │   │       ├── dc-entropy-coding-table-id := 1
-        │   │   │       │   │       └── ac-entropy-coding-table-id := 1
+        │   │   │       │   │   └── entropy-coding-table-ids <- jpeg.sos-image-component.entropy-coding-table-ids :=
+        │   │   │       │   │       ├── dc-entropy-coding-table-id <- compute _packed_bits >> 4 & 15 := 1
+        │   │   │       │   │       └── ac-entropy-coding-table-id <- compute _packed_bits & 15 := 1
         │   │   │       │   └── 2 <- jpeg.sos-image-component :=
         │   │   │       │       ├── component-selector <- ReadU8 := 3
-        │   │   │       │       └── entropy-coding-table-ids <- assert (entropy-coding-table-ids -> (entropy-coding-table-ids.dc-entropy-coding-table-id <= 3) && (entropy-coding-table-ids.ac-entropy-coding-table-id <= 3)) (map (packed_bits -> { ... }) U8) :=
-        │   │   │       │           ├── dc-entropy-coding-table-id := 1
-        │   │   │       │           └── ac-entropy-coding-table-id := 1
+        │   │   │       │       └── entropy-coding-table-ids <- jpeg.sos-image-component.entropy-coding-table-ids :=
+        │   │   │       │           ├── dc-entropy-coding-table-id <- compute _packed_bits >> 4 & 15 := 1
+        │   │   │       │           └── ac-entropy-coding-table-id <- compute _packed_bits & 15 := 1
         │   │   │       ├── start-spectral-selection <- assert (x -> x <= 63) ReadU8 := 0
         │   │   │       ├── end-spectral-selection <- assert (x -> x <= 63) ReadU8 := 63
-        │   │   │       └── approximation-bit-position <- map (packed_bits -> { ... }) U8 :=
-        │   │   │           ├── high := 0
-        │   │   │           └── low := 0
+        │   │   │       └── approximation-bit-position <- jpeg.sos-data.approximation-bit-position :=
+        │   │   │           ├── high <- compute _packed_bits >> 4 & 15 := 0
+        │   │   │           └── low <- compute _packed_bits & 15 := 0
         │   │   └── data <- jpeg.scan-data :=
-        │   │       ├── scan-data <- repeat (_ |...| _) :=
+        │   │       ├── scan-data <- repeat jpeg.scan-data.entropy-coded-segment :=
         │   │       │   ├── 0 := { mcu := 191 }
         │   │       │   ├── 1 := { mcu := 244 }
         │   │       │   ├── 2 := { mcu := 104 }

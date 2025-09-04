@@ -98,8 +98,6 @@ mod test {
     #[test]
     fn with_relative_offset_format() -> Result<(), DecodeError> {
         let mut module = FormatModule::new();
-        let base = base::main(&mut module);
-
         let mask_bytes = {
             let mut tmp = ByteSet::new();
             tmp.insert(0x7f);

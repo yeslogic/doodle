@@ -26,6 +26,7 @@ pub enum Pattern {
 impl Pattern {
     pub const UNIT: Pattern = Pattern::Tuple(Vec::new());
 
+    /// Constructs a pattern that matches against literal sequence of bytes.
     pub fn from_bytes(bs: &[u8]) -> Pattern {
         Pattern::Seq(bs.iter().copied().map(Pattern::U8).collect())
     }
