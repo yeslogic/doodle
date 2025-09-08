@@ -54,6 +54,22 @@ where
     x + one()
 }
 
+/// Helper for normalizing both `&Vec<T>` and `&[T]` to `&[T]`.
+///
+/// # Examples
+///
+/// ```
+/// # use doodle::prelude::slice_all;
+/// let v = vec![true, false];
+/// assert_eq!(slice_all(&v), slice_all(&v[..]));
+/// ```
+pub fn slice_all<'a, T, Arr>(buf: &'a Arr) -> &'a [T]
+where
+    Arr: ?Sized + AsRef<[T]>,
+{
+    buf.as_ref()
+}
+
 /// Performs a flat-map operation taking an iterator over `T` and returning a vector over `U`.
 ///
 /// Will short-circuit if `f` returns an `Err` at any point, preserving the error returned.

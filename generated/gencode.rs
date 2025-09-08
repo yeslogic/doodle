@@ -5349,7 +5349,7 @@ let gzip_raw = (Decoder320(_input))?;
 let mut accum = Vec::new();
 for item in gzip_raw.clone() {
 let next_elem = {
-let mut buf_parser = Parser::new(item.data.inflate.as_slice());
+let mut buf_parser = Parser::new(slice_all(&item.data.inflate));
 let buf_input = &mut buf_parser;
 (Decoder321(buf_input))?
 };
@@ -5683,7 +5683,7 @@ accum
 };
 (try_flat_map_vec(xs.iter().cloned(), |x: png_idat| PResult::Ok(x.data.clone())))?
 };
-let mut buf_parser = Parser::new(idat.as_slice());
+let mut buf_parser = Parser::new(slice_all(&idat));
 let buf_input = &mut buf_parser;
 (Decoder_zlib_main(buf_input))?
 };
@@ -20592,7 +20592,7 @@ let tag = (Decoder174(_input))?;
 let data = {
 let sz = length as usize;
 _input.start_slice(sz)?;
-let ret = match tag.as_slice() {
+let ret = match slice_all(&tag) {
 [80u8, 76u8, 84u8, 69u8] => {
 let inner = (Decoder175(_input))?;
 png_chunk_data::PLTE(inner)
@@ -22823,7 +22823,7 @@ let res = (|| {
 let inner = {
 let inner = {
 let zlib = (Decoder198(_input))?;
-let mut buf_parser = Parser::new(zlib.data.inflate.as_slice());
+let mut buf_parser = Parser::new(slice_all(&zlib.data.inflate));
 let buf_input = &mut buf_parser;
 (Decoder199(buf_input))?
 };
@@ -22949,7 +22949,7 @@ return Err(ParseError::ExcludedBranch(460669108121189046u64));
 };
 let compressed_text = {
 let zlib = (Decoder192(_input))?;
-let mut buf_parser = Parser::new(zlib.data.inflate.as_slice());
+let mut buf_parser = Parser::new(slice_all(&zlib.data.inflate));
 let buf_input = &mut buf_parser;
 (Decoder193(buf_input))?
 };
@@ -35235,7 +35235,7 @@ PResult::Ok(jpeg_app1_data { identifier, data })
 
 /// d#298
 fn Decoder_jpeg_app1_data_data(_input: &mut Parser<'_>, identifier: &[u8]) -> Result<jpeg_app1_data_data, ParseError> {
-PResult::Ok(match identifier.as_slice() {
+PResult::Ok(match slice_all(&identifier) {
 [69u8, 120u8, 105u8, 102u8] => {
 let inner = (Decoder_jpeg_app1_exif(_input))?;
 jpeg_app1_data_data::exif(inner)
@@ -35371,7 +35371,7 @@ PResult::Ok(jpeg_app0_data { identifier, data })
 
 /// d#302
 fn Decoder_jpeg_app0_data_data(_input: &mut Parser<'_>, identifier: &[u8]) -> Result<jpeg_app0_data_data, ParseError> {
-PResult::Ok(match identifier.as_slice() {
+PResult::Ok(match slice_all(&identifier) {
 [74u8, 70u8, 73u8, 70u8] => {
 let inner = (Decoder_jpeg_app0_jfif(_input))?;
 jpeg_app0_data_data::jfif(inner)

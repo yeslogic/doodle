@@ -18,7 +18,7 @@ pub type XmpData = jpeg_app1_xmp;
 pub type GifData = gif_main;
 pub type GifLogicalScreenDesc = gif_logical_screen_descriptor;
 pub type RiffData = riff_main;
-pub type ExifByteOrder = tiff_main_byte_order;
+pub type ExifByteOrder = tiff_byte_order;
 pub type GzipChunk = gzip_main;
 
 pub fn try_decode_gzip(test_file: &str) -> TestResult<Vec<GzipChunk>> {

@@ -349,8 +349,8 @@ pub fn union_nondet<Name: IntoLabel>(branches: impl IntoIterator<Item = (Name, F
 ///
 /// # Notes
 ///
-/// When providing inputs to this helper, it is the caller's responsibility to ensure that fields are not unintentionally
-/// shadowed by later Records.
+/// When providing inputs to this helper, it is the caller's responsibility to ensure that fields in early record-formats are not unintentionally
+/// shadowed by later record-formats, and that cross-record references are valid.
 pub fn merge_records(records: impl IntoIterator<Item = Format>) -> Format {
     let mut combined = OwnedRecordFormat::default();
     for record in records {
@@ -366,6 +366,7 @@ pub fn merge_records(records: impl IntoIterator<Item = Format>) -> Format {
 /// a new record-format with the same structure but with the associated field remapped. If there are no fields
 /// with the specified name, the original record-format is returned.
 pub fn remap_field(name: &str, remap: impl FnOnce(Format) -> Format, format: Format) -> Format {
+    // REVIEW - is there a way to perform this operation with mutable references instead of ownership (and would that be a good idea anyway?)
     match format {
         Format::LetFormat(f, ident, inner) => {
             if ident == name {
