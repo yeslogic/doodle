@@ -1925,15 +1925,20 @@ impl RustExpr {
         ))
     }
 
-    /// Helper method that calls the `as_slice` method on the expression passed in,
-    /// unpacking any top-level `RustExpr::CloneOf` variants to avoid inefficient (and unnecessary)
+    /// Helper method that transforms a `Vec<T>` (owned or borrowed) to `&[T]` with an inherited lifetime
+    /// unpacking any top-level `RustExpr::Owned` variants to avoid inefficient (and unnecessary)
     /// clone-then-borrow constructs in the generated code.
+    ///
+    /// # Note
+    ///
+    /// This method must also produce valid code even when the receiver expression is already a slice.
     pub fn vec_as_slice(self) -> Self {
         let this = match self {
             Self::Owned(OwnedRustExpr { expr, .. }) => *expr,
-            other => other,
+            other => other.borrow_of(),
         };
-        this.call_method("as_slice")
+        // NOTE - use prelude helper `slice_all` to avoid errant `.as_slice()` method on slice-receiver
+        RustExpr::local("slice_all").call_with([this])
     }
 
     /// Helper method that calls the `len` method on the expression passed in,
