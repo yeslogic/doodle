@@ -580,11 +580,13 @@ let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
 let flags = {
-let packed_bits = {
+let _packed_bits = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-opentype_stat_axis_value_table_data_Format1_flags { elidable_axis_value_name: packed_bits >> 1u16 & 1u16 > 0u16, older_sibling_font_attribute: packed_bits & 1u16 > 0u16 }
+let elidable_axis_value_name = _packed_bits >> 1u16 & 1u16 > 0u16;
+let older_sibling_font_attribute = _packed_bits & 1u16 > 0u16;
+opentype_stat_axis_value_table_data_Format1_flags { elidable_axis_value_name, older_sibling_font_attribute }
 };
 let value_name_id = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -609,11 +611,13 @@ let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
 let flags = {
-let packed_bits = {
+let _packed_bits = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-opentype_stat_axis_value_table_data_Format1_flags { elidable_axis_value_name: packed_bits >> 1u16 & 1u16 > 0u16, older_sibling_font_attribute: packed_bits & 1u16 > 0u16 }
+let elidable_axis_value_name = _packed_bits >> 1u16 & 1u16 > 0u16;
+let older_sibling_font_attribute = _packed_bits & 1u16 > 0u16;
+opentype_stat_axis_value_table_data_Format1_flags { elidable_axis_value_name, older_sibling_font_attribute }
 };
 let value_name_id = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -652,11 +656,13 @@ let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
 let flags = {
-let packed_bits = {
+let _packed_bits = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-opentype_stat_axis_value_table_data_Format1_flags { elidable_axis_value_name: packed_bits >> 1u16 & 1u16 > 0u16, older_sibling_font_attribute: packed_bits & 1u16 > 0u16 }
+let elidable_axis_value_name = _packed_bits >> 1u16 & 1u16 > 0u16;
+let older_sibling_font_attribute = _packed_bits & 1u16 > 0u16;
+opentype_stat_axis_value_table_data_Format1_flags { elidable_axis_value_name, older_sibling_font_attribute }
 };
 let value_name_id = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -688,11 +694,13 @@ let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
 let flags = {
-let packed_bits = {
+let _packed_bits = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-opentype_stat_axis_value_table_data_Format1_flags { elidable_axis_value_name: packed_bits >> 1u16 & 1u16 > 0u16, older_sibling_font_attribute: packed_bits & 1u16 > 0u16 }
+let elidable_axis_value_name = _packed_bits >> 1u16 & 1u16 > 0u16;
+let older_sibling_font_attribute = _packed_bits & 1u16 > 0u16;
+opentype_stat_axis_value_table_data_Format1_flags { elidable_axis_value_name, older_sibling_font_attribute }
 };
 let value_name_id = {
 let x = (_input.read_byte()?, _input.read_byte()?);
