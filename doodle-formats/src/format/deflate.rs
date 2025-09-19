@@ -113,6 +113,7 @@ fn bits16(n: usize) -> Format {
     )
 }
 
+// FIXME: document this
 fn length_record(start: usize, extra_bits: usize, distance_record: FormatRef) -> Format {
     record([
         ("length-extra-bits", bits8(extra_bits)),
@@ -134,6 +135,7 @@ fn length_record(start: usize, extra_bits: usize, distance_record: FormatRef) ->
     ])
 }
 
+// FIXME: document this
 fn length_record_fixed(start: usize, extra_bits: usize, distance_record: FormatRef) -> Format {
     record([
         ("length-extra-bits", bits8(extra_bits)),
@@ -152,9 +154,10 @@ fn length_record_fixed(start: usize, extra_bits: usize, distance_record: FormatR
     ])
 }
 
-fn reference_record() -> Expr {
+// FIXME - document this
+fn reference_record(scrutinee: Expr) -> Expr {
     expr_match(
-        record_proj(var("x"), "extra"),
+        record_proj(scrutinee, "extra"),
         vec![(
             pat_some(Pattern::binding("rec")),
             Expr::Seq(vec![variant(
@@ -537,7 +540,10 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                             record_proj(var("x"), "code"),
                             vec![
                                 (Pattern::U16(256), Expr::Seq(vec![])),
-                                (Pattern::Int(Bounds::new(257, 285)), reference_record()),
+                                (
+                                    Pattern::Int(Bounds::new(257, 285)),
+                                    reference_record(var("x")),
+                                ),
                                 // NOTE - whether or not we might see 286 or 287, we should elide them for code-value interpretation purposes
                                 (Pattern::Int(Bounds::new(286, 287)), Expr::Seq(vec![])),
                                 (
@@ -650,6 +656,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                             add(as_u32(add(var("hlit"), var("hdist"))), Expr::U32(258)),
                         ),
                     ),
+                    // REVIEW[epic=trait-orphan] - the type this corresponds to has no top-level decoder (and it can't, unless we permit Dynamic formats to be passed as format params)
                     record([
                         (
                             "code",
@@ -771,6 +778,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
             ),
             (
                 "codes",
+                // REVIEW[epic=trait-orphan] - the type this corresponds to has no top-level decoder
                 Format::Dynamic(
                     "distance-alphabet-format".into(),
                     DynFormat::Huffman(Box::new(var("distance-alphabet-code-lengths-value")), None),
@@ -924,6 +932,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
             ),
             (
                 "codes-values",
+                // REVIEW[epic=trait-orphan] - the type this describes has no decoder (and it probably shouldn't because it is an Expr-level construction and not a stateful Format to parse)
                 compute(flat_map(
                     lambda(
                         "x",
@@ -931,7 +940,10 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                             record_proj(var("x"), "code"),
                             vec![
                                 (Pattern::U16(256), Expr::Seq(vec![])),
-                                (Pattern::Int(Bounds::new(257, 285)), reference_record()),
+                                (
+                                    Pattern::Int(Bounds::new(257, 285)),
+                                    reference_record(var("x")),
+                                ),
                                 // NOTE - whether or not we might see 286 or 287, we should elide them for code-value interpretation purposes
                                 (Pattern::Int(Bounds::new(286, 287)), Expr::Seq(vec![])),
                                 (

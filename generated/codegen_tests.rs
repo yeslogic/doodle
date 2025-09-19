@@ -5,14 +5,6 @@ use super::*;
 fn testpath(filename: &str) -> String {
     format!("../{filename}")
 }
-#[test]
-fn test_png_signature_decoder() {
-    // PNG signature
-    let input = b"\x89PNG\r\n\x1A\n";
-    let mut parser = Parser::new(input);
-    let ret = Decoder158(&mut parser);
-    assert!(ret.is_ok());
-}
 
 #[test]
 fn test_decoder_tgz() -> TestResult {

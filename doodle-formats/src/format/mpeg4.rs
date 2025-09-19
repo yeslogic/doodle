@@ -1,5 +1,7 @@
 use doodle::helper::{u8, *};
-use doodle::{BaseType, Expr, Format, FormatModule, FormatRef, Pattern, ValueType};
+use doodle::{
+    BaseType, Expr, Format, FormatModule, FormatRef, IntoLabel, Label, Pattern, ValueType,
+};
 
 fn u4_pair(hi: &'static str, lo: &'static str) -> Format {
     use BitFieldKind::*;
@@ -33,6 +35,11 @@ fn tag_pattern3(tag: [char; 3]) -> Pattern {
     ])
 }
 
+/// Given the correct `FormatRef` for mpeg4 tag-sequences, as well as the inner `datta` format
+/// for an mpeg4 atom-kind, constructs an mpeg4 atom.
+///
+// TODO - add a relevant reference hint for where this appears in the spec
+// TODO - refactor so that either `data` is a FormatRef, or creates a definition corresponding to it
 fn make_atom(tag: FormatRef, data: Format) -> Format {
     record([
         ("size-field", u32be()),
@@ -54,8 +61,30 @@ fn make_atom(tag: FormatRef, data: Format) -> Format {
                 ],
             ),
         ),
+        // TODO: refactor so `data: FormatRef`
         ("data", slice(var("size"), data)),
     ])
+}
+
+fn define_atom(
+    module: &mut FormatModule,
+    name: impl IntoLabel,
+    tag: FormatRef,
+    data: Format,
+) -> FormatRef {
+    module.define_format(name, make_atom(tag, data))
+}
+
+// TODO - use this function proactively, or or remove io
+#[expect(dead_code)]
+fn define_atom_args(
+    module: &mut FormatModule,
+    name: impl IntoLabel,
+    tag: FormatRef,
+    args: Vec<(Label, ValueType)>,
+    data: Format,
+) -> FormatRef {
+    module.define_format_args(name, args, make_atom(tag, data))
 }
 
 pub fn main(module: &mut FormatModule) -> FormatRef {
@@ -124,28 +153,35 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
         ("to_item_ID", repeat_count(var("reference_count"), u32be())),
     ]);
 
-    let iref_data = record([
-        ("version", u8()),
-        ("flags", tuple_repeat(3, u8())),
-        (
-            "single_item_reference",
-            match_variant(
-                var("version"),
-                vec![
-                    (
-                        Pattern::U8(0),
-                        "small",
-                        repeat(make_atom(tag, single_item_reference_data)),
-                    ),
-                    (
-                        Pattern::U8(1),
-                        "large",
-                        Format::Repeat(Box::new(make_atom(tag, single_item_reference_large_data))),
-                    ),
-                ],
+    let iref_data = {
+        let small_ref = define_atom(
+            module,
+            "mpeg4.iref-data.single-item-reference.small",
+            tag,
+            single_item_reference_data,
+        );
+        let large_ref = define_atom(
+            module,
+            "mpeg4.iref-data.single-item-reference.large",
+            tag,
+            single_item_reference_large_data,
+        );
+        record([
+            ("version", u8()),
+            ("flags", tuple_repeat(3, u8())),
+            (
+                "single_item_reference",
+                match_variant(
+                    var("version"),
+                    vec![
+                        (Pattern::U8(0), "small", repeat(small_ref.call())),
+                        (Pattern::U8(1), "large", repeat(large_ref.call())),
+                        // FIXME - do we want to do anything in particular for versions higher than 1?
+                    ],
+                ),
             ),
-        ),
-    ]);
+        ])
+    };
 
     let mpeg4_extent = module.define_format_args(
         "mpeg4.iloc-extent",
@@ -263,32 +299,39 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
         ]),
     ]);
 
+    let dref_data_data = define_atom(module, "mpeg4.dref-data.data", tag, opaque_bytes());
     let dref_data = module.define_format(
         "mpeg4.dref-data",
         record([
             ("version", u8()),
             ("flags", tuple_repeat(3, u8())),
             ("number_of_entries", u32be()),
-            ("data", repeat(make_atom(tag, opaque_bytes()))),
+            ("data", repeat(dref_data_data.call())),
         ]),
     );
 
-    let elst_data = record([
-        ("version", u8()),
-        ("flags", tuple_repeat(3, u8())),
-        ("number_of_entries", u32be()),
-        (
-            "edit_list_table",
-            repeat_count(
-                var("number_of_entries"),
-                record([
-                    ("track_duration", u32be()),
-                    ("media_time", u32be()),
-                    ("media_rate", u32be()),
-                ]),
-            ),
-        ),
-    ]);
+    let elst_data = {
+        let elst_entry = module.define_format(
+            "mpeg4.elst-data.entry",
+            record([
+                ("track_duration", u32be()),
+                ("media_time", u32be()),
+                ("media_rate", u32be()),
+            ]),
+        );
+        module.define_format(
+            "mpeg4.elst-data",
+            record([
+                ("version", u8()),
+                ("flags", tuple_repeat(3, u8())),
+                ("number_of_entries", u32be()),
+                (
+                    "edit_list_table",
+                    repeat_count(var("number_of_entries"), elst_entry.call()),
+                ),
+            ]),
+        )
+    };
 
     let sample_entry =
         module.define_format("mpeg4.stsd.sample-entry", make_atom(tag, opaque_bytes()));
@@ -572,79 +615,102 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
         ("value", repeat(ascii_char())),
     ]);
 
-    let edts_atom = module.define_format(
+    let edts_atom = define_atom(
+        module,
         "mpeg4.edts-atom",
-        make_atom(
-            tag,
-            match_variant(
-                var("type"),
-                vec![
-                    (tag_pattern(['e', 'l', 's', 't']), "elst", elst_data),
-                    (Pattern::Wildcard, "unknown", opaque_bytes()),
-                ],
-            ),
+        tag,
+        match_variant(
+            var("type"),
+            vec![
+                (tag_pattern(['e', 'l', 's', 't']), "elst", elst_data.call()),
+                (Pattern::Wildcard, "unknown", opaque_bytes()),
+            ],
         ),
     );
 
-    let dinf_atom = module.define_format(
+    let dinf_atom = define_atom(
+        module,
         "mpeg4.dinf-atom",
-        make_atom(
-            tag,
-            match_variant(
-                var("type"),
-                vec![
-                    (tag_pattern(['d', 'r', 'e', 'f']), "dref", dref_data.call()),
-                    (Pattern::Wildcard, "unknown", opaque_bytes()),
-                ],
-            ),
+        tag,
+        match_variant(
+            var("type"),
+            vec![
+                (tag_pattern(['d', 'r', 'e', 'f']), "dref", dref_data.call()),
+                (Pattern::Wildcard, "unknown", opaque_bytes()),
+            ],
         ),
     );
 
-    let stbl_atom = module.define_format(
+    let stbl_atom = define_atom(
+        module,
         "mpeg4.stbl-atom",
-        make_atom(
-            tag,
-            match_variant(
-                var("type"),
-                vec![
-                    (tag_pattern(['s', 't', 's', 'd']), "stsd", stsd_data),
-                    (tag_pattern(['s', 't', 't', 's']), "stts", stts_data),
-                    (tag_pattern(['c', 't', 't', 's']), "ctts", ctts_data),
-                    (tag_pattern(['s', 't', 's', 's']), "stss", stss_data),
-                    (tag_pattern(['s', 't', 's', 'c']), "stsc", stsc_data),
-                    (tag_pattern(['s', 't', 's', 'z']), "stsz", stsz_data),
-                    (tag_pattern(['s', 't', 'c', 'o']), "stco", stco_data),
-                    (tag_pattern(['c', 'o', '6', '4']), "co64", co64_data),
-                    (tag_pattern(['s', 'g', 'p', 'd']), "sgpd", sgpd_data),
-                    (tag_pattern(['s', 'b', 'g', 'p']), "sbgp", sbgp_data),
-                    (Pattern::Wildcard, "unknown", opaque_bytes()),
-                ],
-            ),
+        tag,
+        match_variant(
+            var("type"),
+            vec![
+                (tag_pattern(['s', 't', 's', 'd']), "stsd", stsd_data),
+                (tag_pattern(['s', 't', 't', 's']), "stts", stts_data),
+                (tag_pattern(['c', 't', 't', 's']), "ctts", ctts_data),
+                (tag_pattern(['s', 't', 's', 's']), "stss", stss_data),
+                (tag_pattern(['s', 't', 's', 'c']), "stsc", stsc_data),
+                (tag_pattern(['s', 't', 's', 'z']), "stsz", stsz_data),
+                (tag_pattern(['s', 't', 'c', 'o']), "stco", stco_data),
+                (tag_pattern(['c', 'o', '6', '4']), "co64", co64_data),
+                (tag_pattern(['s', 'g', 'p', 'd']), "sgpd", sgpd_data),
+                (tag_pattern(['s', 'b', 'g', 'p']), "sbgp", sbgp_data),
+                // REVIEW - do we want to make unknown-variants a 'standard pattern'?
+                (Pattern::Wildcard, "unknown", opaque_bytes()),
+            ],
         ),
     );
 
-    let minf_atom = module.define_format(
+    let minf_atom = define_atom(
+        module,
         "mpeg4.minf-atom",
-        make_atom(
-            tag,
-            match_variant(
-                var("type"),
-                vec![
-                    (tag_pattern(['v', 'm', 'h', 'd']), "vmhd", vmhd_data),
-                    (tag_pattern(['s', 'm', 'h', 'd']), "smhd", smhd_data),
-                    (
-                        tag_pattern(['d', 'i', 'n', 'f']),
-                        "dinf",
-                        repeat(dinf_atom.call()),
-                    ),
-                    (
-                        tag_pattern(['s', 't', 'b', 'l']),
-                        "stbl",
-                        repeat(stbl_atom.call()),
-                    ),
-                    (Pattern::Wildcard, "unknown", opaque_bytes()),
-                ],
-            ),
+        tag,
+        match_variant(
+            var("type"),
+            vec![
+                (tag_pattern(['v', 'm', 'h', 'd']), "vmhd", vmhd_data),
+                (tag_pattern(['s', 'm', 'h', 'd']), "smhd", smhd_data),
+                (
+                    tag_pattern(['d', 'i', 'n', 'f']),
+                    "dinf",
+                    repeat(dinf_atom.call()),
+                ),
+                (
+                    tag_pattern(['s', 't', 'b', 'l']),
+                    "stbl",
+                    repeat(stbl_atom.call()),
+                ),
+                (Pattern::Wildcard, "unknown", opaque_bytes()),
+            ],
+        ),
+    );
+
+    // TODO: apply this pattern more broadly to all make_atom parameter-formats
+    let mdia_atom_data = module.define_format_args(
+        "mpeg4.mdia-atom.data",
+        vec![(
+            "type".into(),
+            module.get_format_type(tag.get_level()).clone(),
+        )],
+        match_variant(
+            var("type"),
+            vec![
+                (
+                    tag_pattern(['h', 'd', 'l', 'r']),
+                    "hdlr",
+                    mdia_hdlr_data.call(),
+                ),
+                (tag_pattern(['m', 'd', 'h', 'd']), "mdhd", mdhd_data),
+                (
+                    tag_pattern(['m', 'i', 'n', 'f']),
+                    "minf",
+                    repeat(minf_atom.call()),
+                ),
+                (Pattern::Wildcard, "unknown", opaque_bytes()),
+            ],
         ),
     );
 
@@ -652,191 +718,179 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
         "mpeg4.mdia-atom",
         make_atom(
             tag,
-            match_variant(
-                var("type"),
-                vec![
-                    (
-                        tag_pattern(['h', 'd', 'l', 'r']),
-                        "hdlr",
-                        mdia_hdlr_data.call(),
-                    ),
-                    (tag_pattern(['m', 'd', 'h', 'd']), "mdhd", mdhd_data),
-                    (
-                        tag_pattern(['m', 'i', 'n', 'f']),
-                        "minf",
-                        repeat(minf_atom.call()),
-                    ),
-                    (Pattern::Wildcard, "unknown", opaque_bytes()),
-                ],
-            ),
+            // NOTE - make_atom binds `type` so even though this looks unscoped it is fine.
+            mdia_atom_data.call_args(vec![var("type")]),
         ),
     );
 
-    let trak_atom = module.define_format(
+    let trak_atom = define_atom(
+        module,
         "mpeg4.trak-atom",
-        make_atom(
-            tag,
-            match_variant(
-                var("type"),
-                vec![
-                    (tag_pattern(['t', 'k', 'h', 'd']), "tkhd", tkhd_data),
-                    (
-                        tag_pattern(['e', 'd', 't', 's']),
-                        "edts",
-                        repeat(edts_atom.call()),
-                    ),
-                    (
-                        tag_pattern(['m', 'd', 'i', 'a']),
-                        "mdia",
-                        repeat(mdia_atom.call()),
-                    ),
-                    (Pattern::Wildcard, "unknown", opaque_bytes()),
-                ],
-            ),
+        tag,
+        match_variant(
+            var("type"),
+            vec![
+                (tag_pattern(['t', 'k', 'h', 'd']), "tkhd", tkhd_data),
+                (
+                    tag_pattern(['e', 'd', 't', 's']),
+                    "edts",
+                    repeat(edts_atom.call()),
+                ),
+                (
+                    tag_pattern(['m', 'd', 'i', 'a']),
+                    "mdia",
+                    repeat(mdia_atom.call()),
+                ),
+                (Pattern::Wildcard, "unknown", opaque_bytes()),
+            ],
         ),
     );
 
-    let tool_atom = module.define_format(
+    let tool_atom = define_atom(
+        module,
         "mpeg4.tool-atom",
-        make_atom(
-            tag,
-            match_variant(
-                var("type"),
-                vec![
-                    (tag_pattern(['d', 'a', 't', 'a']), "data", data_data),
-                    (Pattern::Wildcard, "unknown", opaque_bytes()),
-                ],
-            ),
+        tag,
+        match_variant(
+            var("type"),
+            vec![
+                (tag_pattern(['d', 'a', 't', 'a']), "data", data_data),
+                (Pattern::Wildcard, "unknown", opaque_bytes()),
+            ],
         ),
     );
 
-    let ilst_atom = module.define_format(
+    let ilst_atom = define_atom(
+        module,
         "mpeg4.ilst-atom",
-        make_atom(
-            tag,
-            match_variant(
-                var("type"),
-                vec![
-                    (
-                        tag_pattern3(['t', 'o', 'o']),
-                        "tool",
-                        repeat(tool_atom.call()),
-                    ),
-                    (Pattern::Wildcard, "unknown", opaque_bytes()),
-                ],
-            ),
+        tag,
+        match_variant(
+            var("type"),
+            vec![
+                (
+                    tag_pattern3(['t', 'o', 'o']),
+                    "tool",
+                    repeat(tool_atom.call()),
+                ),
+                (Pattern::Wildcard, "unknown", opaque_bytes()),
+            ],
         ),
     );
 
-    let meta_atom = module.define_format(
+    let meta_atom_data = module.define_format_args(
+        "mpeg4.meta-atom.data",
+        vec![(
+            "type".into(),
+            module.get_format_type(tag.get_level()).clone(),
+        )],
+        match_variant(
+            var("type"),
+            vec![
+                (
+                    tag_pattern(['d', 'i', 'n', 'f']),
+                    "dinf",
+                    repeat(dinf_atom.call()),
+                ),
+                (
+                    tag_pattern(['h', 'd', 'l', 'r']),
+                    "hdlr",
+                    meta_hdlr_data.call(),
+                ),
+                (tag_pattern(['p', 'i', 't', 'm']), "pitm", pitm_data),
+                (tag_pattern(['i', 'i', 'n', 'f']), "iinf", iinf_data.call()),
+                (tag_pattern(['i', 'r', 'e', 'f']), "iref", iref_data),
+                (tag_pattern(['i', 'l', 'o', 'c']), "iloc", iloc_data),
+                (
+                    tag_pattern(['i', 'l', 's', 't']),
+                    "ilst",
+                    repeat(ilst_atom.call()),
+                ),
+                (tag_pattern(['i', 'd', 'a', 't']), "idat", opaque_bytes()),
+                (Pattern::Wildcard, "unknown", opaque_bytes()),
+            ],
+        ),
+    );
+
+    let meta_atom = define_atom(
+        module,
         "mpeg4.meta-atom",
-        make_atom(
-            tag,
-            match_variant(
-                var("type"),
-                vec![
-                    (
-                        tag_pattern(['d', 'i', 'n', 'f']),
-                        "dinf",
-                        repeat(dinf_atom.call()),
-                    ),
-                    (
-                        tag_pattern(['h', 'd', 'l', 'r']),
-                        "hdlr",
-                        meta_hdlr_data.call(),
-                    ),
-                    (tag_pattern(['p', 'i', 't', 'm']), "pitm", pitm_data),
-                    (tag_pattern(['i', 'i', 'n', 'f']), "iinf", iinf_data.call()),
-                    (tag_pattern(['i', 'r', 'e', 'f']), "iref", iref_data),
-                    (tag_pattern(['i', 'l', 'o', 'c']), "iloc", iloc_data),
-                    (
-                        tag_pattern(['i', 'l', 's', 't']),
-                        "ilst",
-                        repeat(ilst_atom.call()),
-                    ),
-                    (tag_pattern(['i', 'd', 'a', 't']), "idat", opaque_bytes()),
-                    (Pattern::Wildcard, "unknown", opaque_bytes()),
-                ],
-            ),
-        ),
+        tag,
+        // NOTE - make_atom binds `type` so even though this looks unscoped it is fine.
+        meta_atom_data.call_args(vec![var("type")]),
     );
 
-    let udta_atom = module.define_format(
+    let udta_atom = define_atom(
+        module,
         "mpeg4.udta-atom",
-        make_atom(
-            tag,
-            match_variant(
-                var("type"),
-                vec![
-                    (
-                        tag_pattern(['m', 'e', 't', 'a']),
-                        "meta",
-                        tuple(vec![
-                            u32be(), // 8-bit version, 24-bit flags
-                            repeat(meta_atom.call()),
-                        ]),
-                    ),
-                    (Pattern::Wildcard, "unknown", opaque_bytes()),
-                ],
-            ),
+        tag,
+        match_variant(
+            var("type"),
+            vec![
+                (
+                    tag_pattern(['m', 'e', 't', 'a']),
+                    "meta",
+                    tuple(vec![
+                        u32be(), // 8-bit version, 24-bit flags
+                        repeat(meta_atom.call()),
+                    ]),
+                ),
+                (Pattern::Wildcard, "unknown", opaque_bytes()),
+            ],
         ),
     );
 
-    let moov_atom = module.define_format(
+    let moov_atom = define_atom(
+        module,
         "mpeg4.moov-atom",
-        make_atom(
-            tag,
-            match_variant(
-                var("type"),
-                vec![
-                    (tag_pattern(['m', 'v', 'h', 'd']), "mvhd", mvhd_data),
-                    (
-                        tag_pattern(['t', 'r', 'a', 'k']),
-                        "trak",
-                        repeat(trak_atom.call()),
-                    ),
-                    (
-                        tag_pattern(['u', 'd', 't', 'a']),
-                        "udta",
-                        repeat(udta_atom.call()),
-                        // FIXME can be followed by optional 32-bit zero value
-                    ),
-                    (Pattern::Wildcard, "unknown", opaque_bytes()),
-                ],
-            ),
+        tag,
+        match_variant(
+            var("type"),
+            vec![
+                (tag_pattern(['m', 'v', 'h', 'd']), "mvhd", mvhd_data),
+                (
+                    tag_pattern(['t', 'r', 'a', 'k']),
+                    "trak",
+                    repeat(trak_atom.call()),
+                ),
+                (
+                    tag_pattern(['u', 'd', 't', 'a']),
+                    "udta",
+                    repeat(udta_atom.call()),
+                    // FIXME can be followed by optional 32-bit zero value
+                ),
+                (Pattern::Wildcard, "unknown", opaque_bytes()),
+            ],
         ),
     );
 
-    let atom = module.define_format(
+    let atom = define_atom(
+        module,
         "mpeg4.atom",
-        make_atom(
-            tag,
-            match_variant(
-                var("type"),
-                vec![
-                    (tag_pattern(['f', 't', 'y', 'p']), "ftyp", ftyp_data.call()),
-                    (tag_pattern(['f', 'r', 'e', 'e']), "free", Format::EMPTY),
-                    (
-                        tag_pattern(['m', 'd', 'a', 't']),
-                        "mdat",
-                        Format::EMPTY, // FIXME
-                    ),
-                    (
-                        tag_pattern(['m', 'e', 't', 'a']),
-                        "meta",
-                        tuple(vec![
-                            u32be(), // 8-bit version, 24-bit flags
-                            repeat(meta_atom.call()),
-                        ]),
-                    ),
-                    (
-                        tag_pattern(['m', 'o', 'o', 'v']),
-                        "moov",
-                        repeat(moov_atom.call()),
-                    ),
-                    (Pattern::Wildcard, "unknown", opaque_bytes()),
-                ],
-            ),
+        tag,
+        match_variant(
+            var("type"),
+            vec![
+                (tag_pattern(['f', 't', 'y', 'p']), "ftyp", ftyp_data.call()),
+                (tag_pattern(['f', 'r', 'e', 'e']), "free", Format::EMPTY),
+                (
+                    tag_pattern(['m', 'd', 'a', 't']),
+                    "mdat",
+                    Format::EMPTY, // FIXME
+                ),
+                (
+                    tag_pattern(['m', 'e', 't', 'a']),
+                    "meta",
+                    tuple(vec![
+                        u32be(), // 8-bit version, 24-bit flags
+                        repeat(meta_atom.call()),
+                    ]),
+                ),
+                (
+                    tag_pattern(['m', 'o', 'o', 'v']),
+                    "moov",
+                    repeat(moov_atom.call()),
+                ),
+                (Pattern::Wildcard, "unknown", opaque_bytes()),
+            ],
         ),
     );
 
