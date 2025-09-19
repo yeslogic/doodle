@@ -75,7 +75,7 @@ fn define_atom(
     module.define_format(name, make_atom(tag, data))
 }
 
-// TODO - use this function proactively, or or remove io
+// TODO - use this function proactively, or remove it
 #[expect(dead_code)]
 fn define_atom_args(
     module: &mut FormatModule,
