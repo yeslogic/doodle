@@ -554,6 +554,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
         Format::Match(
             Box::new(var("type")),
             vec![
+                // REVIEW - does `slice(var("size"), abstract_bytes())` seem better?
                 (Pattern::Wildcard, repeat_count(var("size"), u8())), // abstract (unrefined) section
             ],
         ),

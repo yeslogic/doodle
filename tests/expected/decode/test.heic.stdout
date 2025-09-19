@@ -26,7 +26,7 @@
             │               │   ├── size-field <- ReadU32Be := 33
             │               │   ├── type <- mpeg4.tag := "hdlr"
             │               │   ├── size <- match size-field { ... } := 25
-            │               │   └── data <- slice size (match type { ... }) :=
+            │               │   └── data <- slice size mpeg4.meta-atom.data(...) :=
             │               │       └── hdlr <- mpeg4.meta-hdlr-data :=
             │               │           ├── version <- ReadU8 := 0
             │               │           ├── flags <- (...) :=
@@ -44,7 +44,7 @@
             │               │   ├── size-field <- ReadU32Be := 36
             │               │   ├── type <- mpeg4.tag := "dinf"
             │               │   ├── size <- match size-field { ... } := 28
-            │               │   └── data <- slice size (match type { ... }) :=
+            │               │   └── data <- slice size mpeg4.meta-atom.data(...) :=
             │               │       └── dinf <- repeat mpeg4.dinf-atom :=
             │               │           └── 0 <- mpeg4.dinf-atom :=
             │               │               ├── size-field <- ReadU32Be := 28
@@ -58,8 +58,8 @@
             │               │                       │   ├── 1 <- ReadU8 := 0
             │               │                       │   └── 2 <- ReadU8 := 0
             │               │                       ├── number_of_entries <- ReadU32Be := 1
-            │               │                       └── data <- repeat { ... } :=
-            │               │                           └── 0 :=
+            │               │                       └── data <- repeat mpeg4.dref-data.data :=
+            │               │                           └── 0 <- mpeg4.dref-data.data :=
             │               │                               ├── size-field <- ReadU32Be := 12
             │               │                               ├── type <- mpeg4.tag := "url "
             │               │                               ├── size <- match size-field { ... } := 4
@@ -72,7 +72,7 @@
             │               │   ├── size-field <- ReadU32Be := 14
             │               │   ├── type <- mpeg4.tag := "pitm"
             │               │   ├── size <- match size-field { ... } := 6
-            │               │   └── data <- slice size (match type { ... }) :=
+            │               │   └── data <- slice size mpeg4.meta-atom.data(...) :=
             │               │       └── pitm <- { ... } :=
             │               │           ├── version <- ReadU8 := 0
             │               │           ├── flags <- (...) :=
@@ -84,7 +84,7 @@
             │               │   ├── size-field <- ReadU32Be := 223
             │               │   ├── type <- mpeg4.tag := "iinf"
             │               │   ├── size <- match size-field { ... } := 215
-            │               │   └── data <- slice size (match type { ... }) :=
+            │               │   └── data <- slice size mpeg4.meta-atom.data(...) :=
             │               │       └── iinf <- mpeg4.iinf :=
             │               │           ├── version <- ReadU8 := 0
             │               │           ├── flags <- (...) :=
@@ -261,7 +261,7 @@
             │               │   ├── size-field <- ReadU32Be := 64
             │               │   ├── type <- mpeg4.tag := "iref"
             │               │   ├── size <- match size-field { ... } := 56
-            │               │   └── data <- slice size (match type { ... }) :=
+            │               │   └── data <- slice size mpeg4.meta-atom.data(...) :=
             │               │       └── iref <- { ... } :=
             │               │           ├── version <- ReadU8 := 0
             │               │           ├── flags <- (...) :=
@@ -269,8 +269,8 @@
             │               │           │   ├── 1 <- ReadU8 := 0
             │               │           │   └── 2 <- ReadU8 := 0
             │               │           └── single_item_reference <- match version { ... } :=
-            │               │               └── small <- repeat { ... } :=
-            │               │                   ├── 0 :=
+            │               │               └── small <- repeat mpeg4.iref-data.single-item-reference.small :=
+            │               │                   ├── 0 <- mpeg4.iref-data.single-item-reference.small :=
             │               │                   │   ├── size-field <- ReadU32Be := 24
             │               │                   │   ├── type <- mpeg4.tag := "dimg"
             │               │                   │   ├── size <- match size-field { ... } := 16
@@ -284,7 +284,7 @@
             │               │                   │           ├── 3 := 4
             │               │                   │           ├── 4 := 5
             │               │                   │           └── 5 := 6
-            │               │                   ├── 1 :=
+            │               │                   ├── 1 <- mpeg4.iref-data.single-item-reference.small :=
             │               │                   │   ├── size-field <- ReadU32Be := 14
             │               │                   │   ├── type <- mpeg4.tag := "cdsc"
             │               │                   │   ├── size <- match size-field { ... } := 6
@@ -293,7 +293,7 @@
             │               │                   │       ├── reference_count <- ReadU16Be := 1
             │               │                   │       └── to_item_ID <- repeat-count reference_count ReadU16Be :=
             │               │                   │           └── 0 := 7
-            │               │                   └── 2 :=
+            │               │                   └── 2 <- mpeg4.iref-data.single-item-reference.small :=
             │               │                       ├── size-field <- ReadU32Be := 14
             │               │                       ├── type <- mpeg4.tag := "cdsc"
             │               │                       ├── size <- match size-field { ... } := 6
@@ -306,7 +306,7 @@
             │               │   ├── size-field <- ReadU32Be := 800
             │               │   ├── type <- mpeg4.tag := "iprp"
             │               │   ├── size <- match size-field { ... } := 792
-            │               │   └── data <- slice size (match type { ... }) :=
+            │               │   └── data <- slice size mpeg4.meta-atom.data(...) :=
             │               │       └── unknown <- repeat ReadU8 :=
             │               │           ├── 0 := 0
             │               │           ├── 1 := 0
@@ -324,7 +324,7 @@
             │               │   ├── size-field <- ReadU32Be := 16
             │               │   ├── type <- mpeg4.tag := "idat"
             │               │   ├── size <- match size-field { ... } := 8
-            │               │   └── data <- slice size (match type { ... }) :=
+            │               │   └── data <- slice size mpeg4.meta-atom.data(...) :=
             │               │       └── idat <- repeat ReadU8 :=
             │               │           ├── 0 := 0
             │               │           ├── 1 := 0
@@ -338,7 +338,7 @@
             │                   ├── size-field <- ReadU32Be := 160
             │                   ├── type <- mpeg4.tag := "iloc"
             │                   ├── size <- match size-field { ... } := 152
-            │                   └── data <- slice size (match type { ... }) :=
+            │                   └── data <- slice size mpeg4.meta-atom.data(...) :=
             │                       └── iloc <- { ... } :=
             │                           ├── version <- ReadU8 := 1
             │                           ├── flags <- (...) :=
