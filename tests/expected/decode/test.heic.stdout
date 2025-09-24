@@ -73,7 +73,7 @@
             │               │   ├── type <- mpeg4.tag := "pitm"
             │               │   ├── size <- match size-field { ... } := 6
             │               │   └── data <- slice size mpeg4.meta-atom.data(...) :=
-            │               │       └── pitm <- { ... } :=
+            │               │       └── pitm <- mpeg4.pitm-atom.data :=
             │               │           ├── version <- ReadU8 := 0
             │               │           ├── flags <- (...) :=
             │               │           │   ├── 0 <- ReadU8 := 0
@@ -98,7 +98,7 @@
             │               │               │   ├── type <- mpeg4.tag := "infe"
             │               │               │   ├── size <- match size-field { ... } := 13
             │               │               │   └── data <- slice size (match type { ... }) :=
-            │               │               │       └── infe <- mpeg4.innf-atom.data-infe :=
+            │               │               │       └── infe <- mpeg4.iinf-atom.data-infe :=
             │               │               │           ├── version <- ReadU8 := 2
             │               │               │           ├── flags <- (...) :=
             │               │               │           │   ├── 0 <- ReadU8 := 0
@@ -116,7 +116,7 @@
             │               │               │   ├── type <- mpeg4.tag := "infe"
             │               │               │   ├── size <- match size-field { ... } := 13
             │               │               │   └── data <- slice size (match type { ... }) :=
-            │               │               │       └── infe <- mpeg4.innf-atom.data-infe :=
+            │               │               │       └── infe <- mpeg4.iinf-atom.data-infe :=
             │               │               │           ├── version <- ReadU8 := 2
             │               │               │           ├── flags <- (...) :=
             │               │               │           │   ├── 0 <- ReadU8 := 0
@@ -134,7 +134,7 @@
             │               │               │   ├── type <- mpeg4.tag := "infe"
             │               │               │   ├── size <- match size-field { ... } := 13
             │               │               │   └── data <- slice size (match type { ... }) :=
-            │               │               │       └── infe <- mpeg4.innf-atom.data-infe :=
+            │               │               │       └── infe <- mpeg4.iinf-atom.data-infe :=
             │               │               │           ├── version <- ReadU8 := 2
             │               │               │           ├── flags <- (...) :=
             │               │               │           │   ├── 0 <- ReadU8 := 0
@@ -152,7 +152,7 @@
             │               │               │   ├── type <- mpeg4.tag := "infe"
             │               │               │   ├── size <- match size-field { ... } := 13
             │               │               │   └── data <- slice size (match type { ... }) :=
-            │               │               │       └── infe <- mpeg4.innf-atom.data-infe :=
+            │               │               │       └── infe <- mpeg4.iinf-atom.data-infe :=
             │               │               │           ├── version <- ReadU8 := 2
             │               │               │           ├── flags <- (...) :=
             │               │               │           │   ├── 0 <- ReadU8 := 0
@@ -170,7 +170,7 @@
             │               │               │   ├── type <- mpeg4.tag := "infe"
             │               │               │   ├── size <- match size-field { ... } := 13
             │               │               │   └── data <- slice size (match type { ... }) :=
-            │               │               │       └── infe <- mpeg4.innf-atom.data-infe :=
+            │               │               │       └── infe <- mpeg4.iinf-atom.data-infe :=
             │               │               │           ├── version <- ReadU8 := 2
             │               │               │           ├── flags <- (...) :=
             │               │               │           │   ├── 0 <- ReadU8 := 0
@@ -188,7 +188,7 @@
             │               │               │   ├── type <- mpeg4.tag := "infe"
             │               │               │   ├── size <- match size-field { ... } := 13
             │               │               │   └── data <- slice size (match type { ... }) :=
-            │               │               │       └── infe <- mpeg4.innf-atom.data-infe :=
+            │               │               │       └── infe <- mpeg4.iinf-atom.data-infe :=
             │               │               │           ├── version <- ReadU8 := 2
             │               │               │           ├── flags <- (...) :=
             │               │               │           │   ├── 0 <- ReadU8 := 0
@@ -206,7 +206,7 @@
             │               │               │   ├── type <- mpeg4.tag := "infe"
             │               │               │   ├── size <- match size-field { ... } := 13
             │               │               │   └── data <- slice size (match type { ... }) :=
-            │               │               │       └── infe <- mpeg4.innf-atom.data-infe :=
+            │               │               │       └── infe <- mpeg4.iinf-atom.data-infe :=
             │               │               │           ├── version <- ReadU8 := 2
             │               │               │           ├── flags <- (...) :=
             │               │               │           │   ├── 0 <- ReadU8 := 0
@@ -224,7 +224,7 @@
             │               │               │   ├── type <- mpeg4.tag := "infe"
             │               │               │   ├── size <- match size-field { ... } := 13
             │               │               │   └── data <- slice size (match type { ... }) :=
-            │               │               │       └── infe <- mpeg4.innf-atom.data-infe :=
+            │               │               │       └── infe <- mpeg4.iinf-atom.data-infe :=
             │               │               │           ├── version <- ReadU8 := 2
             │               │               │           ├── flags <- (...) :=
             │               │               │           │   ├── 0 <- ReadU8 := 0
@@ -242,7 +242,7 @@
             │               │                   ├── type <- mpeg4.tag := "infe"
             │               │                   ├── size <- match size-field { ... } := 33
             │               │                   └── data <- slice size (match type { ... }) :=
-            │               │                       └── infe <- mpeg4.innf-atom.data-infe :=
+            │               │                       └── infe <- mpeg4.iinf-atom.data-infe :=
             │               │                           ├── version <- ReadU8 := 2
             │               │                           ├── flags <- (...) :=
             │               │                           │   ├── 0 <- ReadU8 := 0
@@ -262,7 +262,7 @@
             │               │   ├── type <- mpeg4.tag := "iref"
             │               │   ├── size <- match size-field { ... } := 56
             │               │   └── data <- slice size mpeg4.meta-atom.data(...) :=
-            │               │       └── iref <- { ... } :=
+            │               │       └── iref <- mpeg4.iref-data :=
             │               │           ├── version <- ReadU8 := 0
             │               │           ├── flags <- (...) :=
             │               │           │   ├── 0 <- ReadU8 := 0
@@ -339,7 +339,7 @@
             │                   ├── type <- mpeg4.tag := "iloc"
             │                   ├── size <- match size-field { ... } := 152
             │                   └── data <- slice size mpeg4.meta-atom.data(...) :=
-            │                       └── iloc <- { ... } :=
+            │                       └── iloc <- mpeg4.iloc-atom.data :=
             │                           ├── version <- ReadU8 := 1
             │                           ├── flags <- (...) :=
             │                           │   ├── 0 <- ReadU8 := 0
