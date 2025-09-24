@@ -25,7 +25,7 @@
             │           │   ├── type <- mpeg4.tag := "mvhd"
             │           │   ├── size <- match size-field { ... } := 100
             │           │   └── data <- slice size (match type { ... }) :=
-            │           │       └── mvhd <- { ... } :=
+            │           │       └── mvhd <- mpeg4.mvhd-data :=
             │           │           ├── version <- ReadU8 := 0
             │           │           ├── flags <- (...) :=
             │           │           │   ├── 0 <- ReadU8 := 0
@@ -72,7 +72,7 @@
             │           │           │   ├── type <- mpeg4.tag := "tkhd"
             │           │           │   ├── size <- match size-field { ... } := 84
             │           │           │   └── data <- slice size (match type { ... }) :=
-            │           │           │       └── tkhd <- { ... } :=
+            │           │           │       └── tkhd <- mpeg4.tkhd-data :=
             │           │           │           ├── version <- ReadU8 := 0
             │           │           │           ├── flags <- (...) :=
             │           │           │           │   ├── 0 <- ReadU8 := 0
@@ -138,7 +138,7 @@
             │           │                       │   ├── type <- mpeg4.tag := "mdhd"
             │           │                       │   ├── size <- match size-field { ... } := 24
             │           │                       │   └── data <- slice size mpeg4.mdia-atom.data(...) :=
-            │           │                       │       └── mdhd <- { ... } :=
+            │           │                       │       └── mdhd <- mpeg4.mdhd-data :=
             │           │                       │           ├── version <- ReadU8 := 0
             │           │                       │           ├── flags <- (...) :=
             │           │                       │           │   ├── 0 <- ReadU8 := 0
@@ -180,7 +180,7 @@
             │           │                                   │   ├── type <- mpeg4.tag := "vmhd"
             │           │                                   │   ├── size <- match size-field { ... } := 12
             │           │                                   │   └── data <- slice size (match type { ... }) :=
-            │           │                                   │       └── vmhd <- { ... } :=
+            │           │                                   │       └── vmhd <- mpeg4.vmhd-data :=
             │           │                                   │           ├── version <- ReadU8 := 0
             │           │                                   │           ├── flags <- (...) :=
             │           │                                   │           │   ├── 0 <- ReadU8 := 0
@@ -230,7 +230,7 @@
             │           │                                               │   ├── type <- mpeg4.tag := "stsd"
             │           │                                               │   ├── size <- match size-field { ... } := 177
             │           │                                               │   └── data <- slice size (match type { ... }) :=
-            │           │                                               │       └── stsd <- { ... } :=
+            │           │                                               │       └── stsd <- mpeg4.stsd.data :=
             │           │                                               │           ├── version <- ReadU8 := 0
             │           │                                               │           ├── flags <- (...) :=
             │           │                                               │           │   ├── 0 <- ReadU8 := 0
@@ -260,15 +260,15 @@
             │           │                                               │   ├── type <- mpeg4.tag := "stts"
             │           │                                               │   ├── size <- match size-field { ... } := 16
             │           │                                               │   └── data <- slice size (match type { ... }) :=
-            │           │                                               │       └── stts <- { ... } :=
+            │           │                                               │       └── stts <- mpeg4.stts-data :=
             │           │                                               │           ├── version <- ReadU8 := 0
             │           │                                               │           ├── flags <- (...) :=
             │           │                                               │           │   ├── 0 <- ReadU8 := 0
             │           │                                               │           │   ├── 1 <- ReadU8 := 0
             │           │                                               │           │   └── 2 <- ReadU8 := 0
             │           │                                               │           ├── entry_count <- ReadU32Be := 1
-            │           │                                               │           └── sample_entries <- repeat-count entry_count { ... } :=
-            │           │                                               │               └── 0 :=
+            │           │                                               │           └── sample_entries <- repeat-count entry_count mpeg4.stts.sample-entry :=
+            │           │                                               │               └── 0 <- mpeg4.stts.sample-entry :=
             │           │                                               │                   ├── sample_count <- ReadU32Be := 182
             │           │                                               │                   └── sample_delta <- ReadU32Be := 400
             │           │                                               ├── 2 <- mpeg4.stbl-atom :=
@@ -276,7 +276,7 @@
             │           │                                               │   ├── type <- mpeg4.tag := "stss"
             │           │                                               │   ├── size <- match size-field { ... } := 24
             │           │                                               │   └── data <- slice size (match type { ... }) :=
-            │           │                                               │       └── stss <- { ... } :=
+            │           │                                               │       └── stss <- mpeg4.stss-data :=
             │           │                                               │           ├── version <- ReadU8 := 0
             │           │                                               │           ├── flags <- (...) :=
             │           │                                               │           │   ├── 0 <- ReadU8 := 0
@@ -293,7 +293,7 @@
             │           │                                               │   ├── type <- mpeg4.tag := "stsc"
             │           │                                               │   ├── size <- match size-field { ... } := 20
             │           │                                               │   └── data <- slice size (match type { ... }) :=
-            │           │                                               │       └── stsc <- { ... } :=
+            │           │                                               │       └── stsc <- mpeg4.stsc-data :=
             │           │                                               │           ├── version <- ReadU8 := 0
             │           │                                               │           ├── flags <- (...) :=
             │           │                                               │           │   ├── 0 <- ReadU8 := 0
@@ -310,7 +310,7 @@
             │           │                                               │   ├── type <- mpeg4.tag := "stsz"
             │           │                                               │   ├── size <- match size-field { ... } := 740
             │           │                                               │   └── data <- slice size (match type { ... }) :=
-            │           │                                               │       └── stsz <- { ... } :=
+            │           │                                               │       └── stsz <- mpeg4.stsz-data :=
             │           │                                               │           ├── version <- ReadU8 := 0
             │           │                                               │           ├── flags <- (...) :=
             │           │                                               │           │   ├── 0 <- ReadU8 := 0
@@ -337,7 +337,7 @@
             │           │                                                   ├── type <- mpeg4.tag := "stco"
             │           │                                                   ├── size <- match size-field { ... } := 736
             │           │                                                   └── data <- slice size (match type { ... }) :=
-            │           │                                                       └── stco <- { ... } :=
+            │           │                                                       └── stco <- mpeg4.stco-data :=
             │           │                                                           ├── version <- ReadU8 := 0
             │           │                                                           ├── flags <- (...) :=
             │           │                                                           │   ├── 0 <- ReadU8 := 0
@@ -368,7 +368,7 @@
             │           │           │   ├── type <- mpeg4.tag := "tkhd"
             │           │           │   ├── size <- match size-field { ... } := 84
             │           │           │   └── data <- slice size (match type { ... }) :=
-            │           │           │       └── tkhd <- { ... } :=
+            │           │           │       └── tkhd <- mpeg4.tkhd-data :=
             │           │           │           ├── version <- ReadU8 := 0
             │           │           │           ├── flags <- (...) :=
             │           │           │           │   ├── 0 <- ReadU8 := 0
@@ -434,7 +434,7 @@
             │           │                       │   ├── type <- mpeg4.tag := "mdhd"
             │           │                       │   ├── size <- match size-field { ... } := 24
             │           │                       │   └── data <- slice size mpeg4.mdia-atom.data(...) :=
-            │           │                       │       └── mdhd <- { ... } :=
+            │           │                       │       └── mdhd <- mpeg4.mdhd-data :=
             │           │                       │           ├── version <- ReadU8 := 0
             │           │                       │           ├── flags <- (...) :=
             │           │                       │           │   ├── 0 <- ReadU8 := 0
@@ -476,7 +476,7 @@
             │           │                                   │   ├── type <- mpeg4.tag := "smhd"
             │           │                                   │   ├── size <- match size-field { ... } := 8
             │           │                                   │   └── data <- slice size (match type { ... }) :=
-            │           │                                   │       └── smhd <- { ... } :=
+            │           │                                   │       └── smhd <- mpeg4.smhd-data :=
             │           │                                   │           ├── version <- ReadU8 := 0
             │           │                                   │           ├── flags <- (...) :=
             │           │                                   │           │   ├── 0 <- ReadU8 := 0
@@ -523,7 +523,7 @@
             │           │                                               │   ├── type <- mpeg4.tag := "stsd"
             │           │                                               │   ├── size <- match size-field { ... } := 118
             │           │                                               │   └── data <- slice size (match type { ... }) :=
-            │           │                                               │       └── stsd <- { ... } :=
+            │           │                                               │       └── stsd <- mpeg4.stsd.data :=
             │           │                                               │           ├── version <- ReadU8 := 0
             │           │                                               │           ├── flags <- (...) :=
             │           │                                               │           │   ├── 0 <- ReadU8 := 0
@@ -553,15 +553,15 @@
             │           │                                               │   ├── type <- mpeg4.tag := "stts"
             │           │                                               │   ├── size <- match size-field { ... } := 16
             │           │                                               │   └── data <- slice size (match type { ... }) :=
-            │           │                                               │       └── stts <- { ... } :=
+            │           │                                               │       └── stts <- mpeg4.stts-data :=
             │           │                                               │           ├── version <- ReadU8 := 0
             │           │                                               │           ├── flags <- (...) :=
             │           │                                               │           │   ├── 0 <- ReadU8 := 0
             │           │                                               │           │   ├── 1 <- ReadU8 := 0
             │           │                                               │           │   └── 2 <- ReadU8 := 0
             │           │                                               │           ├── entry_count <- ReadU32Be := 1
-            │           │                                               │           └── sample_entries <- repeat-count entry_count { ... } :=
-            │           │                                               │               └── 0 :=
+            │           │                                               │           └── sample_entries <- repeat-count entry_count mpeg4.stts.sample-entry :=
+            │           │                                               │               └── 0 <- mpeg4.stts.sample-entry :=
             │           │                                               │                   ├── sample_count <- ReadU32Be := 284
             │           │                                               │                   └── sample_delta <- ReadU32Be := 1024
             │           │                                               ├── 2 <- mpeg4.stbl-atom :=
@@ -569,7 +569,7 @@
             │           │                                               │   ├── type <- mpeg4.tag := "stsc"
             │           │                                               │   ├── size <- match size-field { ... } := 1904
             │           │                                               │   └── data <- slice size (match type { ... }) :=
-            │           │                                               │       └── stsc <- { ... } :=
+            │           │                                               │       └── stsc <- mpeg4.stsc-data :=
             │           │                                               │           ├── version <- ReadU8 := 0
             │           │                                               │           ├── flags <- (...) :=
             │           │                                               │           │   ├── 0 <- ReadU8 := 0
@@ -627,7 +627,7 @@
             │           │                                               │   ├── type <- mpeg4.tag := "stsz"
             │           │                                               │   ├── size <- match size-field { ... } := 1148
             │           │                                               │   └── data <- slice size (match type { ... }) :=
-            │           │                                               │       └── stsz <- { ... } :=
+            │           │                                               │       └── stsz <- mpeg4.stsz-data :=
             │           │                                               │           ├── version <- ReadU8 := 0
             │           │                                               │           ├── flags <- (...) :=
             │           │                                               │           │   ├── 0 <- ReadU8 := 0
@@ -654,7 +654,7 @@
             │           │                                               │   ├── type <- mpeg4.tag := "stco"
             │           │                                               │   ├── size <- match size-field { ... } := 736
             │           │                                               │   └── data <- slice size (match type { ... }) :=
-            │           │                                               │       └── stco <- { ... } :=
+            │           │                                               │       └── stco <- mpeg4.stco-data :=
             │           │                                               │           ├── version <- ReadU8 := 0
             │           │                                               │           ├── flags <- (...) :=
             │           │                                               │           │   ├── 0 <- ReadU8 := 0
@@ -679,7 +679,7 @@
             │           │                                               │   ├── type <- mpeg4.tag := "sgpd"
             │           │                                               │   ├── size <- match size-field { ... } := 18
             │           │                                               │   └── data <- slice size (match type { ... }) :=
-            │           │                                               │       └── sgpd <- { ... } :=
+            │           │                                               │       └── sgpd <- mpeg4.sgpd-data :=
             │           │                                               │           ├── version <- ReadU8 := 1
             │           │                                               │           ├── flags <- (...) :=
             │           │                                               │           │   ├── 0 <- ReadU8 := 0
@@ -699,7 +699,7 @@
             │           │                                                   ├── type <- mpeg4.tag := "sbgp"
             │           │                                                   ├── size <- match size-field { ... } := 20
             │           │                                                   └── data <- slice size (match type { ... }) :=
-            │           │                                                       └── sbgp <- { ... } :=
+            │           │                                                       └── sbgp <- mpeg4.sbgp-data :=
             │           │                                                           ├── version <- ReadU8 := 0
             │           │                                                           ├── flags <- (...) :=
             │           │                                                           │   ├── 0 <- ReadU8 := 0
@@ -761,7 +761,7 @@
             │                                                                   ├── type <- mpeg4.tag := "data"
             │                                                                   ├── size <- match size-field { ... } := 21
             │                                                                   └── data <- slice size (match type { ... }) :=
-            │                                                                       └── data <- { ... } :=
+            │                                                                       └── data <- mpeg4.tool_atom.data.data :=
             │                                                                           ├── type_indicator <- ReadU32Be := 1
             │                                                                           ├── locale_indicator <- ReadU32Be := 0
             │                                                                           └── value <- repeat (ascii-char U8) := "Lavf59.27.100"
