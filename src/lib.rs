@@ -1179,7 +1179,12 @@ impl Format {
         remaining: &mut Vec<(Option<(Name, bool)>, Format)>,
     ) -> Format {
         if remaining.is_empty() {
-            Format::Compute(Box::new(Expr::Record(captured)))
+            if captured.is_empty() {
+                // NOTE - avoid constructing 'empty records' by returning a unit
+                Format::Compute(Box::new(Expr::UNIT))
+            } else {
+                Format::Compute(Box::new(Expr::Record(captured)))
+            }
         } else {
             let this = remaining.pop().unwrap();
             let (label, format) = this;

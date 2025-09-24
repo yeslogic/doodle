@@ -163,6 +163,23 @@ pub fn bit_fields_u8<const N: usize>(bit_fields: [BitFieldKind; N]) -> Format {
     ))
 }
 
+/// Special case of [`bit_fields_u8`] for parsing a pair of 4-bit fields.
+///
+/// `hi` is the field storing the high 4 bits, and `lo` the low 4 bits.
+pub fn u4_pair(hi: &'static str, lo: &'static str) -> Format {
+    use BitFieldKind::*;
+    bit_fields_u8([
+        BitsField {
+            field_name: hi,
+            bit_width: 4,
+        },
+        BitsField {
+            field_name: lo,
+            bit_width: 4,
+        },
+    ])
+}
+
 /// Ergonomic helper for parsing a 16-bit packed value into a multi-field record with more
 /// context-awareness for determining the interpretation (and semantics) of the various
 /// segments of contiguous bits.

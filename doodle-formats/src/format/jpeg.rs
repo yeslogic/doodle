@@ -2,18 +2,9 @@ use doodle::{
     BaseType, Expr, Format, FormatModule, FormatRef, Label, Pattern, ValueType, helper::*,
 };
 
-fn u4_pair(hi: &'static str, lo: &'static str) -> Format {
-    use BitFieldKind::*;
-    bit_fields_u8([
-        BitsField {
-            field_name: hi,
-            bit_width: 4,
-        },
-        BitsField {
-            field_name: lo,
-            bit_width: 4,
-        },
-    ])
+/// Helper for JPEG-specific markers (0xFF + id)
+fn marker(id: u8) -> Format {
+    record_auto([("__ff", is_byte(0xFF)), ("marker", is_byte(id))])
 }
 
 /// JPEG File Interchange Format
@@ -21,11 +12,6 @@ fn u4_pair(hi: &'static str, lo: &'static str) -> Format {
 /// - [JPEG File Interchange Format Version 1.02](https://www.w3.org/Graphics/JPEG/jfif3.pdf)
 /// - [ITU T.81 | ISO IEC 10918-1](https://www.w3.org/Graphics/JPEG/itu-t81.pdf)
 pub fn main(module: &mut FormatModule, tiff: FormatRef) -> FormatRef {
-    fn marker(id: u8) -> Format {
-        // REVIEW - do  we want to persist the 0xFF, or even either field?
-        record([("ff", is_byte(0xFF)), ("marker", is_byte(id))])
-    }
-
     let marker_segment = |id: u8, data: Format| {
         record([
             ("marker", marker(id)),
