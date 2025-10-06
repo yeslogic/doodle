@@ -1221,6 +1221,7 @@ pub fn expr_max(a: Expr, b: Expr) -> Expr {
 /// Convenience tool for cloning a subset of a record-typed Expr's field-set in an arbitrary order
 ///
 /// # Notes
+///
 /// The list of fields must all appear in the original, and should contain no duplicates
 pub fn subset_fields<const N: usize>(original: Expr, field_set: [&'static str; N]) -> Expr {
     let mut accum_fields = Vec::with_capacity(N);

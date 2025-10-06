@@ -1485,6 +1485,7 @@ impl FormatRef {
         Format::ItemVar(self.0, vec![])
     }
 
+    // REVIEW - do we need it to be `Vec` or is `impl IntoIterator<Item = Expr>` better?
     pub fn call_args(&self, args: Vec<Expr>) -> Format {
         Format::ItemVar(self.0, args)
     }
