@@ -67,6 +67,9 @@ impl ValueType {
 
     pub const UNIT: ValueType = ValueType::Tuple(Vec::new());
 
+    // TODO - add other numeric types
+    pub const U32: ValueType = ValueType::Base(BaseType::U32);
+
     pub(crate) fn record_proj(&self, label: &str) -> ValueType {
         match self {
             ValueType::Record(fields) => match fields.iter().find(|(l, _)| label == l) {
