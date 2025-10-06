@@ -1823,7 +1823,6 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
     )
 }
 
-
 mod gpos {
     use super::*;
 
@@ -3467,167 +3466,167 @@ mod layout {
         )
     }
 
-/// LookupList table
-///
-/// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#lookuplist-table
-fn lookup_list(
-    tag: u32,
-    subst_extension: FormatRef,
-    ground_subst: FormatRef,
-    pos_extension: FormatRef,
-    ground_pos: FormatRef,
-) -> Format {
-    let lookup_table = |tag: u32| {
-        // NOTE - tag is a model-external value, lookup-type is model-internal.
-        let lookup_subtable = |tag: u32, lookup_type: Expr| -> Format {
-            const GSUB: u32 = magic(b"GSUB");
-            const GPOS: u32 = magic(b"GPOS");
-            match tag {
-                // natural pattern-match on tag
-                GSUB => {
-                    // in-model pattern-match on lookup-type
-                    match_variant(
-                        lookup_type,
-                        [
-                            (Pattern::U16(7), "SubstExtension", subst_extension.call()),
-                            (
-                                Pattern::Wildcard,
-                                "GroundSubst",
-                                ground_subst.call_args(vec![var("lookup_type")]),
-                            ),
-                        ],
-                    )
+    /// LookupList table
+    ///
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#lookuplist-table
+    fn lookup_list(
+        tag: u32,
+        subst_extension: FormatRef,
+        ground_subst: FormatRef,
+        pos_extension: FormatRef,
+        ground_pos: FormatRef,
+    ) -> Format {
+        let lookup_table = |tag: u32| {
+            // NOTE - tag is a model-external value, lookup-type is model-internal.
+            let lookup_subtable = |tag: u32, lookup_type: Expr| -> Format {
+                const GSUB: u32 = magic(b"GSUB");
+                const GPOS: u32 = magic(b"GPOS");
+                match tag {
+                    // natural pattern-match on tag
+                    GSUB => {
+                        // in-model pattern-match on lookup-type
+                        match_variant(
+                            lookup_type,
+                            [
+                                (Pattern::U16(7), "SubstExtension", subst_extension.call()),
+                                (
+                                    Pattern::Wildcard,
+                                    "GroundSubst",
+                                    ground_subst.call_args(vec![var("lookup_type")]),
+                                ),
+                            ],
+                        )
+                    }
+                    GPOS => {
+                        // in-model pattern-match on lookup-type
+                        match_variant(
+                            lookup_type,
+                            [
+                                (Pattern::U16(9), "PosExtension", pos_extension.call()),
+                                (
+                                    Pattern::Wildcard,
+                                    "GroundPos",
+                                    ground_pos.call_args(vec![var("lookup_type")]),
+                                ),
+                            ],
+                        )
+                    }
+                    _ => Format::Fail,
                 }
-                GPOS => {
-                    // in-model pattern-match on lookup-type
-                    match_variant(
-                        lookup_type,
-                        [
-                            (Pattern::U16(9), "PosExtension", pos_extension.call()),
-                            (
-                                Pattern::Wildcard,
-                                "GroundPos",
-                                ground_pos.call_args(vec![var("lookup_type")]),
-                            ),
-                        ],
-                    )
-                }
-                _ => Format::Fail,
-            }
-        };
-        let lookup_flag = {
-            use BitFieldKind::*;
-            // REVIEW[epic=check-zero] - consider whether this should be set to true
-            const SHOULD_CHECK_ZERO: bool = false;
-            bit_fields_u16([
-                BitsField {
-                    bit_width: 8,
-                    field_name: "mark_attachment_class_filter",
-                },
-                Reserved {
-                    bit_width: 3,
-                    check_zero: SHOULD_CHECK_ZERO,
-                },
-                FlagBit("use_mark_filtering_set"), // Bit 4 (0x10) - indicator flag for presence of markFilteringSet field in Lookup table structure
-                FlagBit("ignore_marks"), // Bit 3 (0x8) - if set, skips  over combining marks
-                FlagBit("ignore_ligatures"), // Bit 2 (0x4) - if set, skips over ligatures
-                FlagBit("ignore_base_glyphs"), // Bit 1 (0x2) - if set, skips over base glyphs
-                FlagBit("right_to_left"), // Bit 0 (0x1) - [GPOS type 3 only] when set, last glyph matched input will be positioned on baseline
+            };
+            let lookup_flag = {
+                use BitFieldKind::*;
+                // REVIEW[epic=check-zero] - consider whether this should be set to true
+                const SHOULD_CHECK_ZERO: bool = false;
+                bit_fields_u16([
+                    BitsField {
+                        bit_width: 8,
+                        field_name: "mark_attachment_class_filter",
+                    },
+                    Reserved {
+                        bit_width: 3,
+                        check_zero: SHOULD_CHECK_ZERO,
+                    },
+                    FlagBit("use_mark_filtering_set"), // Bit 4 (0x10) - indicator flag for presence of markFilteringSet field in Lookup table structure
+                    FlagBit("ignore_marks"), // Bit 3 (0x8) - if set, skips  over combining marks
+                    FlagBit("ignore_ligatures"), // Bit 2 (0x4) - if set, skips over ligatures
+                    FlagBit("ignore_base_glyphs"), // Bit 1 (0x2) - if set, skips over base glyphs
+                    FlagBit("right_to_left"), // Bit 0 (0x1) - [GPOS type 3 only] when set, last glyph matched input will be positioned on baseline
+                ])
+            };
+            // STUB - initial pass to merely provide a structure without gaps (but not full-featured coverage of each sub-component)
+            // FIXME - refine and enrich this
+            record([
+                ("table_start", pos32()),
+                ("lookup_type", u16be()),
+                ("lookup_flag", lookup_flag),
+                ("sub_table_count", u16be()),
+                (
+                    "subtables",
+                    repeat_count(
+                        var("sub_table_count"),
+                        offset16_mandatory(
+                            var("table_start"),
+                            lookup_subtable(tag, var("lookup_type")),
+                        ),
+                    ),
+                ),
+                (
+                    "mark_filtering_set",
+                    if_then_else(
+                        record_proj(var("lookup_flag"), "use_mark_filtering_set"),
+                        fmt_some(u16be()),
+                        fmt_none(),
+                    ),
+                ),
             ])
         };
-        // STUB - initial pass to merely provide a structure without gaps (but not full-featured coverage of each sub-component)
-        // FIXME - refine and enrich this
         record([
             ("table_start", pos32()),
-            ("lookup_type", u16be()),
-            ("lookup_flag", lookup_flag),
-            ("sub_table_count", u16be()),
+            ("lookup_count", u16be()),
             (
-                "subtables",
+                "lookups",
                 repeat_count(
-                    var("sub_table_count"),
-                    offset16_mandatory(
-                        var("table_start"),
-                        lookup_subtable(tag, var("lookup_type")),
+                    var("lookup_count"),
+                    offset16_mandatory(var("table_start"), lookup_table(tag)),
+                ),
+            ),
+        ])
+    }
+
+    /// Factory funtion used for defining GPOS and GSUB table-formatjs
+    ///
+    // REVIEW - does the function need both GSUB and GPOS or should those be passed in?
+    pub(crate) fn table(
+        tag: u32,
+        script_list: FormatRef,
+        feature_list: FormatRef,
+        ground_subst: FormatRef,
+        ground_pos: FormatRef,
+        subst_extension: FormatRef,
+        pos_extension: FormatRef,
+        feature_variations: FormatRef,
+    ) -> Format {
+        // FIXME - this belongs above but because it is a Format and not yet FormatRef, it is not Copy and so has to be defined in the closure body
+        record([
+            ("table_start", pos32()),
+            ("major_version", expect_u16be(1)),
+            ("minor_version", u16be()),
+            (
+                "script_list",
+                offset16_mandatory(var("table_start"), script_list.call()),
+            ),
+            (
+                "feature_list",
+                offset16_mandatory(var("table_start"), feature_list.call()),
+            ),
+            (
+                "lookup_list",
+                offset16_mandatory(
+                    var("table_start"),
+                    lookup_list(
+                        tag,
+                        subst_extension,
+                        ground_subst,
+                        pos_extension,
+                        ground_pos,
                     ),
                 ),
             ),
             (
-                "mark_filtering_set",
-                if_then_else(
-                    record_proj(var("lookup_flag"), "use_mark_filtering_set"),
-                    fmt_some(u16be()),
-                    fmt_none(),
+                "feature_variations",
+                offset16_mandatory(var("table_start"), feature_variations.call()),
+            ),
+            // FIXME - add Version 1.1-specific fields as cond_maybe on minor-version
+            (
+                "feature_variations_offset",
+                cond_maybe(
+                    expr_gt(var("minor_version"), Expr::U16(0)), // Since Major == 1 by assertion, minor > 0 implies v1.1 or (as yet unimplemented) greater
+                    offset32(var("table_start"), feature_variations.call()),
                 ),
             ),
         ])
-    };
-    record([
-        ("table_start", pos32()),
-        ("lookup_count", u16be()),
-        (
-            "lookups",
-            repeat_count(
-                var("lookup_count"),
-                offset16_mandatory(var("table_start"), lookup_table(tag)),
-            ),
-        ),
-    ])
-}
-
-/// Factory funtion used for defining GPOS and GSUB table-formatjs
-///
-// REVIEW - does the function need both GSUB and GPOS or should those be passed in?
-pub(crate) fn table(
-    tag: u32,
-    script_list: FormatRef,
-    feature_list: FormatRef,
-    ground_subst: FormatRef,
-    ground_pos: FormatRef,
-    subst_extension: FormatRef,
-    pos_extension: FormatRef,
-    feature_variations: FormatRef,
-) -> Format {
-    // FIXME - this belongs above but because it is a Format and not yet FormatRef, it is not Copy and so has to be defined in the closure body
-    record([
-        ("table_start", pos32()),
-        ("major_version", expect_u16be(1)),
-        ("minor_version", u16be()),
-        (
-            "script_list",
-            offset16_mandatory(var("table_start"), script_list.call()),
-        ),
-        (
-            "feature_list",
-            offset16_mandatory(var("table_start"), feature_list.call()),
-        ),
-        (
-            "lookup_list",
-            offset16_mandatory(
-                var("table_start"),
-                lookup_list(
-                    tag,
-                    subst_extension,
-                    ground_subst,
-                    pos_extension,
-                    ground_pos,
-                ),
-            ),
-        ),
-        (
-            "feature_variations",
-            offset16_mandatory(var("table_start"), feature_variations.call()),
-        ),
-        // FIXME - add Version 1.1-specific fields as cond_maybe on minor-version
-        (
-            "feature_variations_offset",
-            cond_maybe(
-                expr_gt(var("minor_version"), Expr::U16(0)), // Since Major == 1 by assertion, minor > 0 implies v1.1 or (as yet unimplemented) greater
-                offset32(var("table_start"), feature_variations.call()),
-            ),
-        ),
-    ])
-}
+    }
 }
 
 mod gdef {
