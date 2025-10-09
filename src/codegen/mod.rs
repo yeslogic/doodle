@@ -17,8 +17,8 @@ use crate::{
     byte_set::ByteSet,
     decoder::extract_pair,
     parser::error::TraceHash,
-    typecheck::{TypeChecker, UVar, UType},
-    valuetype::{ValueType, SeqBorrowHint, augmented::AugValueType},
+    typecheck::{TypeChecker, UType, UVar},
+    valuetype::{SeqBorrowHint, ValueType, augmented::AugValueType},
 };
 
 use std::{
@@ -4922,12 +4922,17 @@ impl<'a> Elaborator<'a> {
                     self.increment_index();
                     self.force_unify_against_valuetype(inner);
                 }
-                other => unreachable!("force_unify_against_valuetype hit non-nested ValueType: {other:?}"),
-            }
+                other => unreachable!(
+                    "force_unify_against_valuetype hit non-nested ValueType: {other:?}"
+                ),
+            },
         }
     }
 
-    fn force_unify_against_valuetype_union<'b>(&mut self, branches: impl IntoIterator<Item = (&'b Label, &'b ValueType)> + 'b) {
+    fn force_unify_against_valuetype_union<'b>(
+        &mut self,
+        branches: impl IntoIterator<Item = (&'b Label, &'b ValueType)> + 'b,
+    ) {
         for (_, branch_vt) in branches.into_iter() {
             if let None = UType::from_valuetype(branch_vt) {
                 self.increment_index();
