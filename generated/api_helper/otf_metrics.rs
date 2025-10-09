@@ -107,7 +107,7 @@ impl Promote<OpentypeTag> for Tag {
 }
 
 // REVIEW - no module-level definition so the names are the semi-arbitrary 'first' one the code-generator sees
-pub type OpentypeFixed = opentype_var_user_tuple_coordinates;
+pub type OpentypeFixed = opentype_fvar_user_tuple_coordinates;
 pub type Fixed = I16F16;
 
 impl Promote<OpentypeFixed> for Fixed {
@@ -118,7 +118,7 @@ impl Promote<OpentypeFixed> for Fixed {
     }
 }
 
-pub type OpentypeF2Dot14 = opentype_var_tuple_record_coordinates;
+pub type OpentypeF2Dot14 = opentype_gvar_tuple_record_coordinates;
 pub type F2Dot14 = I2F14;
 
 impl Promote<OpentypeF2Dot14> for F2Dot14 {
@@ -159,7 +159,7 @@ pub type SimpleGlyph = opentype_glyf_simple;
 
 pub type OpentypeCmap = opentype_cmap_table;
 pub type OpentypeHead = opentype_head_table;
-pub type OpentypeHhea = opentype_hhea_table;
+pub type OpentypeHhea = opentype_vhea_table;
 
 pub type OpentypeHmtx = opentype_hmtx_table;
 pub type OpentypeHmtxLongMetric = opentype_hmtx_table_long_metrics;
@@ -186,7 +186,7 @@ pub type OpentypeKern = opentype_kern_table;
 pub type OpentypeStat = opentype_stat_table;
 
 // STUB[epic=horizontal-for-vertical] - change to distinguished type names once we have them
-pub type OpentypeVhea = opentype_hhea_table;
+pub type OpentypeVhea = opentype_vhea_table;
 pub type OpentypeVmtx = opentype_hmtx_table;
 pub type OpentypeVmtxLongMetric = opentype_hmtx_table_long_metrics;
 // !SECTION
@@ -621,7 +621,7 @@ struct FvarMetrics {
     instances: Vec<InstanceRecord>,
 }
 
-pub type OpentypeUserTuple = opentype_var_user_tuple;
+pub type OpentypeUserTuple = opentype_fvar_user_tuple;
 
 impl Promote<OpentypeUserTuple> for UserTuple {
     fn promote(orig: &OpentypeUserTuple) -> Self {
@@ -631,7 +631,7 @@ impl Promote<OpentypeUserTuple> for UserTuple {
 
 type UserTuple = Vec<Fixed>;
 
-pub type OpentypeInstanceRecord = opentype_fvar_table_instances;
+pub type OpentypeInstanceRecord = opentype_fvar_instance_record;
 
 // REVIEW - currently not implemented in the Opentype spec
 type InstanceFlags = ();
@@ -655,9 +655,9 @@ struct InstanceRecord {
     postscript_nameid: Option<NameId>,
 }
 
-pub type OpentypeVariationAxisRecord = opentype_var_variation_axis_record;
+pub type OpentypeVariationAxisRecord = opentype_fvar_variation_axis_record;
 
-pub type OpentypeVariationAxisRecordFlags = opentype_var_variation_axis_record_flags;
+pub type OpentypeVariationAxisRecordFlags = opentype_fvar_variation_axis_record_flags;
 
 impl Promote<OpentypeVariationAxisRecord> for VariationAxisRecord {
     fn promote(orig: &OpentypeVariationAxisRecord) -> Self {
@@ -1433,7 +1433,7 @@ struct MarkGlyphSet {
     coverage: Vec<Option<CoverageTable>>,
 }
 
-type OpentypeMarkGlyphSet = opentype_mark_glyph_set;
+type OpentypeMarkGlyphSet = opentype_gdef_mark_glyph_set;
 
 impl TryPromote<OpentypeMarkGlyphSet> for MarkGlyphSet {
     type Error = Local<UnknownValueError<u16>>;
@@ -2095,7 +2095,7 @@ struct LangSys {
     feature_indices: Vec<u16>,
 }
 
-pub type OpentypeLangSysRecord = opentype_common_script_table_lang_sys_records;
+pub type OpentypeLangSysRecord = opentype_layout_lang_sys_record;
 
 impl Promote<OpentypeLangSysRecord> for LangSysRecord {
     fn promote(orig: &OpentypeLangSysRecord) -> Self {
@@ -2112,7 +2112,7 @@ struct LangSysRecord {
     lang_sys: Link<LangSys>,
 }
 
-pub type OpentypeScriptTable = opentype_common_script_table;
+pub type OpentypeScriptTable = opentype_layout_script_table;
 
 impl Promote<OpentypeScriptTable> for ScriptTable {
     fn promote(orig: &OpentypeScriptTable) -> Self {
@@ -2858,16 +2858,12 @@ struct SingleSubstFormat2 {
 
 pub type OpentypeChainedSequenceContext = opentype_common_chained_sequence_context;
 pub type OpentypeChainedSequenceContextInner = opentype_common_chained_sequence_context_subst;
-pub type OpentypeChainedSequenceContextFormat1 =
-    opentype_common_chained_sequence_context_subst_Format1;
-pub type OpentypeChainedSequenceContextFormat2 =
-    opentype_common_chained_sequence_context_subst_Format2;
-pub type OpentypeChainedSequenceContextFormat3 =
-    opentype_common_chained_sequence_context_subst_Format3;
+pub type OpentypeChainedSequenceContextFormat1 = opentype_layout_chained_sequence_context_format1;
+pub type OpentypeChainedSequenceContextFormat2 = opentype_layout_chained_sequence_context_format2;
+pub type OpentypeChainedSequenceContextFormat3 = opentype_layout_chained_sequence_context_format3;
 
-pub type OpentypeChainedRuleSet =
-    opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link;
-pub type OpentypeChainedRule = opentype_common_chained_sequence_context_subst_Format1_chained_seq_rule_sets_link_chained_seq_rules_link;
+pub type OpentypeChainedRuleSet = opentype_layout_chained_sequence_rule_set;
+pub type OpentypeChainedRule = opentype_layout_chained_sequence_rule;
 
 impl<Sem> Promote<OpentypeChainedRuleSet> for ChainedRuleSet<Sem>
 where
@@ -3800,7 +3796,7 @@ struct BaseMetrics {
     // STUB - add more fields as desired
 }
 
-pub type OpentypeKernCoverage = opentype_kern_table_subtables_coverage;
+pub type OpentypeKernCoverage = opentype_kern_kern_subtable_coverage;
 
 impl Promote<OpentypeKernCoverage> for KernFlags {
     fn promote(orig: &OpentypeKernCoverage) -> Self {
@@ -3821,7 +3817,7 @@ struct KernFlags {
     horizontal: bool,
 }
 
-pub type OpentypeKernSubtable = opentype_kern_table_subtables;
+pub type OpentypeKernSubtable = opentype_kern_kern_subtable;
 
 impl Promote<OpentypeKernSubtable> for KernSubtable {
     fn promote(orig: &OpentypeKernSubtable) -> Self {
@@ -3837,7 +3833,7 @@ struct KernSubtable {
     data: KernSubtableData,
 }
 
-pub type OpentypeKernPair = opentype_kern_table_subtables_data_Format0_kern_pairs;
+pub type OpentypeKernPair = opentype_kern_subtable_format0_kern_pairs;
 
 impl Promote<OpentypeKernPair> for KernPair {
     fn promote(orig: &OpentypeKernPair) -> Self {
@@ -3878,7 +3874,7 @@ impl Ord for KernPair {
     }
 }
 
-pub type OpentypeKernSubtableFormat0 = opentype_kern_table_subtables_data_Format0;
+pub type OpentypeKernSubtableFormat0 = opentype_kern_subtable_format0;
 
 impl Promote<OpentypeKernSubtableFormat0> for KernSubtableFormat0 {
     fn promote(orig: &OpentypeKernSubtableFormat0) -> Self {
@@ -3894,7 +3890,7 @@ struct KernSubtableFormat0 {
     kern_pairs: Vec<KernPair>,
 }
 
-pub type OpentypeKernSubtableFormat2 = opentype_kern_table_subtables_data_Format2;
+pub type OpentypeKernSubtableFormat2 = opentype_kern_subtable_format2;
 
 impl Promote<OpentypeKernSubtableFormat2> for KernSubtableFormat2 {
     fn promote(orig: &OpentypeKernSubtableFormat2) -> Self {
@@ -3934,7 +3930,7 @@ struct KernSubtableFormat2 {
     kerning_array: Link<KerningArray>,
 }
 
-pub type OpentypeKernClassTable = opentype_kern_table_subtables_data_Format2_left_class_offset_link;
+pub type OpentypeKernClassTable = opentype_kern_class_table;
 
 impl Promote<OpentypeKernClassTable> for KernClassTable {
     fn promote(orig: &OpentypeKernClassTable) -> Self {
@@ -3953,7 +3949,7 @@ struct KernClassTable {
     class_values: Vec<u16>,
 }
 
-pub type OpentypeKernSubtableData = opentype_kern_table_subtables_data;
+pub type OpentypeKernSubtableData = opentype_kern_kern_subtable_data;
 
 impl Promote<OpentypeKernSubtableData> for KernSubtableData {
     fn promote(orig: &OpentypeKernSubtableData) -> Self {

@@ -1,592 +1,618 @@
 use doodle::{
-    BaseType, Expr, Format, FormatModule, FormatRef, IntoLabel, Label, Pattern, ValueType,
-    ViewExpr, bounds::Bounds, helper::*,
+    BaseType, Expr, Format, FormatModule, FormatRef, Label, Pattern, ValueType, ViewExpr,
+    bounds::Bounds, helper::*,
 };
 
-fn id<T>(x: T) -> T {
-    x
-}
+mod util {
+    use super::*;
+    use doodle::IntoLabel;
 
-fn shadow_check(x: &Expr, name: &'static str) {
-    if x.is_shadowed_by(name) {
-        panic!("Shadow! Variable-name {name} already occurs in Expr {x:?}!");
+    pub(crate) fn id<T>(x: T) -> T {
+        x
     }
-}
 
-/// Marker-type for controlling how records-with-alternation are composed
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
-enum NestingKind {
-    #[default]
-    /// `MinimalVariation`: Fields that may alternate are extracted into their own enum
-    MinimalVariation,
-    /// `UnifiedRecord`: Common fields and non-common fields are distributively unified into a single record, for each possible variant
-    UnifiedRecord,
-}
-
-/// Helper function for generically constructing a Format that consists of a
-///   set of invariant fields, a discriminant field, and an alternation over
-///   exactly one inhabited sub-format based on the value of the discriminant.
-///
-/// - `outer_fields` is a list of the `(name, format)` pairs that are invariant and precede
-///   the dependent field-set.
-/// - `discriminant` consists of the name of the discriminant field and its sole value.
-///   The field-name in question must be present in `outer_fields`, and this function
-///   will panic if it is missing.
-/// - `inner_fields` is the list of fields that belong to the sub-format dependent on `discriminant`.
-/// - `intermediate` is the name of the field that will be used to hold the `inner_fields` ADT when
-///   not flattened (see `nesting kind`)
-/// - `variant_name` is the constructor-name for the sole variant of the enum that holds the `inner_fields` record
-/// - `nesting_kind` is a template-selector that determines how to construct the return-value from the given arguments.
-///
-/// We have two choices: `SingletonADT`, which constructs an embedded ADT using `intermediate` and `variant_name`; and `FlattenInner`,
-///   which ignores those fields and instead constructs a single flattened record, concatenating `outer_fields` and `inner_fields`
-///   in the expected order, and wrapping the discriminant-field in a `Format::Where` context that ensures that the
-///   field in question has the appropriate value.
-///
-/// # Panics
-///
-/// Will panic if `discriminant` specifies a field-name that is not present in `outer_fields`.
-fn embedded_singleton_alternation<const OUTER: usize, const INNER: usize>(
-    outer_fields: [(&'static str, Format); OUTER],
-    discriminant: (&'static str, u16),
-    inner_fields: [(&'static str, Format); INNER],
-    intermediate: &'static str,
-    variant_name: &'static str,
-    nesting_kind: NestingKind,
-) -> Format {
-    let (disc_field, disc_value) = discriminant;
-    let accum = match nesting_kind {
-        NestingKind::MinimalVariation => {
-            // REVIEW - it is not necessarily obvious that all FlatternInner defs can be changed to SingletonADT versions if they refer to variables in the outer record, but it seems plausible at least
-            let mut has_discriminant = false;
-            let record_inner = record(inner_fields);
-            let mut accum = Vec::with_capacity(OUTER + 1);
-            for (name, format) in outer_fields {
-                has_discriminant = has_discriminant || name == disc_field;
-                accum.push((Label::Borrowed(name), format));
-            }
-            accum.push((
-                Label::Borrowed(intermediate),
-                match_variant(
-                    var(disc_field),
-                    [
-                        (Pattern::U16(disc_value), variant_name, record_inner),
-                        // REVIEW - we could technically add an explicit catch-all but it might be simpler to leave it as an implicit unhandled case
-                    ],
-                ),
-            ));
-            assert!(
-                has_discriminant,
-                "missing discriminant field `{disc_field}` in outer-field set"
-            );
-            accum
+    pub(crate) fn shadow_check(x: &Expr, name: &'static str) {
+        if x.is_shadowed_by(name) {
+            panic!("Shadow! Variable-name {name} already occurs in Expr {x:?}!");
         }
-        NestingKind::UnifiedRecord => {
-            let mut accum = Vec::with_capacity(OUTER + INNER);
-            for (name, format) in outer_fields {
-                if name == disc_field {
-                    accum.push((
-                        Label::Borrowed(name),
-                        where_lambda(format, name, expr_eq(var(name), Expr::U16(disc_value))),
-                    ));
-                } else {
+    }
+
+    /// Marker-type for controlling how records-with-alternation are composed
+    #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+    pub(crate) enum NestingKind {
+        #[default]
+        /// `MinimalVariation`: Fields that may alternate are extracted into their own enum
+        MinimalVariation,
+        /// `UnifiedRecord`: Common fields and non-common fields are distributively unified into a single record, for each possible variant
+        UnifiedRecord,
+    }
+
+    /// Helper function for generically constructing a Format that consists of a
+    ///   set of invariant fields, a discriminant field, and an alternation over
+    ///   exactly one inhabited sub-format based on the value of the discriminant.
+    ///
+    /// - `outer_fields` is a list of the `(name, format)` pairs that are invariant and precede
+    ///   the dependent field-set.
+    /// - `discriminant` consists of the name of the discriminant field and its sole value.
+    ///   The field-name in question must be present in `outer_fields`, and this function
+    ///   will panic if it is missing.
+    /// - `inner_fields` is the list of fields that belong to the sub-format dependent on `discriminant`.
+    /// - `intermediate` is the name of the field that will be used to hold the `inner_fields` ADT when
+    ///   not flattened (see `nesting kind`)
+    /// - `variant_name` is the constructor-name for the sole variant of the enum that holds the `inner_fields` record
+    /// - `nesting_kind` is a template-selector that determines how to construct the return-value from the given arguments.
+    ///
+    /// We have two choices: `SingletonADT`, which constructs an embedded ADT using `intermediate` and `variant_name`; and `FlattenInner`,
+    ///   which ignores those fields and instead constructs a single flattened record, concatenating `outer_fields` and `inner_fields`
+    ///   in the expected order, and wrapping the discriminant-field in a `Format::Where` context that ensures that the
+    ///   field in question has the appropriate value.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if `discriminant` specifies a field-name that is not present in `outer_fields`.
+    pub(crate) fn embedded_singleton_alternation<const OUTER: usize, const INNER: usize>(
+        outer_fields: [(&'static str, Format); OUTER],
+        discriminant: (&'static str, u16),
+        inner_fields: [(&'static str, Format); INNER],
+        intermediate: &'static str,
+        variant_name: &'static str,
+        nesting_kind: NestingKind,
+    ) -> Format {
+        let (disc_field, disc_value) = discriminant;
+        let accum = match nesting_kind {
+            NestingKind::MinimalVariation => {
+                // REVIEW - it is not necessarily obvious that all FlatternInner defs can be changed to SingletonADT versions if they refer to variables in the outer record, but it seems plausible at least
+                let mut has_discriminant = false;
+                let record_inner = record(inner_fields);
+                let mut accum = Vec::with_capacity(OUTER + 1);
+                for (name, format) in outer_fields {
+                    has_discriminant = has_discriminant || name == disc_field;
                     accum.push((Label::Borrowed(name), format));
                 }
-            }
-            for (name, format) in inner_fields {
-                accum.push((Label::Borrowed(name), format));
-            }
-            accum
-        }
-    };
-    Format::record(accum)
-}
-
-fn for_each_pair(
-    seq: Expr,
-    premap: (impl FnOnce(Expr) -> Expr, impl FnOnce(Expr) -> Expr),
-    labels: [&'static str; 2],
-    dep_format: Format,
-) -> Format {
-    Format::Let(
-        Label::Borrowed("len"),
-        Box::new(pred(seq_length(seq.clone()))),
-        Box::new(for_each(
-            enum_from_to(Expr::U32(0), var("len")),
-            "ix",
-            with_tuple(
-                Expr::Tuple(vec![
-                    premap.0(index_unchecked(seq.clone(), var("ix"))),
-                    premap.1(index_unchecked(seq.clone(), succ(var("ix")))),
-                ]),
-                labels,
-                dep_format,
-            ),
-        )),
-    )
-}
-
-fn embedded_variadic_alternation<C, const OUTER: usize, const BRANCHES: usize>(
-    shared_fields: [(&'static str, Format); OUTER],
-    discriminant: &'static str,
-    branches: [(u16, &'static str, C); BRANCHES],
-    intermediate: &'static str,
-    nesting_kind: NestingKind,
-) -> Format
-where
-    C: IntoIterator<Item = (&'static str, Format), IntoIter: DoubleEndedIterator>,
-{
-    match nesting_kind {
-        NestingKind::MinimalVariation => {
-            let mut pat_branches = Vec::with_capacity(BRANCHES);
-            for (value, vname, c) in branches.into_iter() {
-                let record_inner = record(c);
-                pat_branches.push((Pattern::U16(value), vname, record_inner));
-            }
-            let final_field = (intermediate, match_variant(var(discriminant), pat_branches));
-            let mut has_discriminant = false;
-            let mut accum = Vec::with_capacity(OUTER + 1);
-            for (name, format) in shared_fields {
-                has_discriminant = has_discriminant || name == discriminant;
-                accum.push((name, format));
-            }
-            accum.push(final_field);
-            assert!(
-                has_discriminant,
-                "missing discriminant field `{discriminant}` in outer-field set"
-            );
-            record(accum)
-        }
-        NestingKind::UnifiedRecord => {
-            let mut field_prefix = Vec::with_capacity(OUTER);
-            let mut has_discriminant = false;
-            for (name, format) in shared_fields.iter() {
-                field_prefix.push((Label::Borrowed(name), format.clone()));
-                if *name == discriminant {
-                    has_discriminant = true;
-                    break;
-                }
-            }
-            assert!(
-                has_discriminant,
-                "missing discriminant field `{discriminant}` in outer-field set"
-            );
-            let mut pat_branches = Vec::with_capacity(BRANCHES);
-            for (value, vname, c) in branches {
-                let unified = Iterator::chain(shared_fields.iter().cloned(), c.into_iter())
-                    .collect::<Vec<(&'static str, Format)>>();
-                let record_inner = record(unified);
-                pat_branches.push((Pattern::U16(value), vname, record_inner));
-            }
-            peek_field_then(
-                field_prefix.as_slice(),
-                match_variant(var(discriminant), pat_branches),
-            )
-        }
-    }
-}
-
-fn hi_flag_u15be(flag_name: &'static str, field_name: &'static str) -> Format {
-    bit_fields_u16([
-        BitFieldKind::FlagBit(flag_name),
-        BitFieldKind::BitsField {
-            field_name,
-            bit_width: 15,
-        },
-    ])
-}
-
-/// Extracts the final element of a sequence-Expr if it is not empty
-///
-/// If the sequence is empty, the behavior is unspecified
-fn last_elem(seq: Expr) -> Expr {
-    let last_ix = pred(seq_length(seq.clone()));
-    index_unchecked(seq, last_ix)
-}
-
-/// Helper function to handle the fact that though vmtx only appears alongside vhea, both are optional tables
-/// so direct record projection is not possible (as vhea will be an option-wrapped record)
-fn vhea_long_metrics(vhea: Expr) -> Expr {
-    record_proj(expr_unwrap(vhea), "number_of_long_metrics")
-}
-
-/// Attemptis to index on the `offsets` key of `loca` through an option-unpacking indirection.
-///
-/// Helper function to handle the fact that though loca only appears alongside glyf, both are optional tables
-fn loca_offsets(loca: Expr) -> Expr {
-    let f = |loca_table: Expr| record_proj(loca_table, "offsets");
-    let loca_empty = variant("Offsets32", seq_empty());
-    expr_option_map_or(loca_empty, f, loca)
-}
-
-/// Doubles a `U16`-kinded Expr into a `U32`-kinded output.
-fn scale2(half: Expr) -> Expr {
-    mul(as_u32(half), Expr::U32(2))
-}
-
-/// Converts a `u8` value to an `i16` value within the `Expr` model
-/// according to a bit-flag for signedness `pos_bit` (`1` for positive, `0` for negative).
-// FIXME - this currently yields the u16 value with the same machine-rep as the nominal i16 value we want
-fn u8_to_i16(x: Expr, is_positive: Expr) -> Expr {
-    expr_if_else(
-        is_positive,
-        as_u16(x.clone()),
-        expr_match(
-            x,
-            [
-                (Pattern::U8(0), Expr::U16(0)),
-                (bind("n"), sub(Expr::U16(u16::MAX), pred(as_u16(var("n"))))),
-            ],
-        ),
-    )
-}
-
-/// Given a U32-typed position `pos32` and a U16-typed offset `offset16`, computes a target-position as the U32-typed sum of the two values.
-fn pos_add_u16(pos32: Expr, offset16: Expr) -> Expr {
-    add(pos32, Expr::AsU32(Box::new(offset16)))
-}
-
-/// Parses a u32 serving as the de-facto representation of a signed, 16.16 bit fixed-point number
-fn fixed32be() -> Format {
-    fmt_variant("Fixed32", u32be())
-}
-
-// Custom type for fixed-point values that are interpreted as (2bits . 14bits) within a u16be raw-parse
-fn f2dot14() -> Format {
-    fmt_variant("F2Dot14", u16be())
-}
-
-/// FIXME[epic=signedness-hack] - scaffolding to signal intent to use i8 format before it is implemented
-fn s8() -> Format {
-    u8()
-}
-
-/// FIXME[epic=signedness-hack] - scaffolding to signal intent to use i16 format before it is implemented
-fn s16be() -> Format {
-    u16be()
-}
-
-/// FIXME[epic=signedness-hack] - scaffolding to signal intent to use i32 format before it is implemented
-fn s32be() -> Format {
-    u32be()
-}
-
-/// FIXME[epic=signedness-hack] - scaffolding to signal intent to use i64 format before it is implemented
-fn s64be() -> Format {
-    u64be()
-}
-
-/// Helper function for parsing a big-endian u24 (3-byte) value
-fn u24be() -> Format {
-    // REVIEW - should U24Be be a CommonOp?
-    map(
-        Format::Tuple(vec![compute(Expr::U8(0)), u8(), u8(), u8()]),
-        lambda("x", Expr::U32Be(Box::new(var("x")))),
-    )
-}
-
-// Placeholder for a `(u16, u16)` value-pair packed as a big-endian u32
-fn version16_16() -> Format {
-    u32be()
-}
-
-/// Helper function for compile-time conversion of b"..." literals into u32 (big-endian) values.
-const fn magic(tag: &'static [u8; 4]) -> u32 {
-    u32::from_be_bytes(*tag)
-}
-
-/// Parses a `U16Be` value that is expected to be equal to `val`
-fn expect_u16be(val: u16) -> Format {
-    // REVIEW - if we cared to do it, we could use `chain(is_bytes(val.to_be_bytes()), "_", compute(Expr::U16(val)))` (at the cost of worsening error reporting)
-    where_lambda(u16be(), "x", expr_eq(var("x"), Expr::U16(val)))
-}
-
-/// Parses a `U16Be` value that is expected to be equal to one of `N` values in `vals`
-fn expects_u16be<const N: usize>(vals: [u16; N]) -> Format {
-    where_lambda(
-        u16be(),
-        "x",
-        expr_match(
-            var("x"),
-            vals.into_iter()
-                .map(|v| (Pattern::U16(v), Expr::Bool(true)))
-                .chain(std::iter::once((Pattern::Wildcard, Expr::Bool(false)))),
-        ),
-    )
-}
-
-/// Constructs a format that peeks the value of a specific field in a given
-/// record (or the common prefix of a union of related records), discarding the
-/// values of all fields that come before it; the result of this speculative
-/// parse is then associated to the original field-name (in `field_prefix`) before
-/// finally parsing the format `dep_format` that depends on its value.
-fn peek_field_then<Name>(field_prefix: &[(Name, Format)], dep_format: Format) -> Format
-where
-    Name: IntoLabel + Clone + AsRef<str>,
-{
-    let Some(((field_name, field_format), init)) = field_prefix.split_last() else {
-        panic!("field_prefix must be non-empty")
-    };
-
-    chain(
-        Format::Peek(Box::new(monad_seq(
-            // Process all the fields before the one we care about and discard their cumulative value
-            record(init.iter().cloned()),
-            // Process the field we *do* care about, while still in the peek context, and yield its value as the result of the entire parse
-            field_format.clone(),
-        ))),
-        // Scope-capture the final field of `field_prefix` under the identifier it is paired
-        field_name.clone(),
-        dep_format,
-    )
-}
-
-/// Specialized format-construction designed for supporting `cmap` and `kern` sub-tables.
-///
-/// Speculatively peeks the shortest prefix of fields required to witness a field with the
-/// indicated label (`length_field`), which is interpreted as a positive integer byte-length
-/// constraining the entire record (and not just subsequent fields); this value is extracted
-/// and forms the length of a slice around parsing the complete record.
-///
-/// Handles the construction of the record format from the given fields, which are provided
-/// in a raw form to allow for ease of introspection.
-fn slice_record<Name, const N: usize>(
-    length_field: &'static str,
-    fields: [(Name, Format); N],
-) -> Format
-where
-    Name: IntoLabel + Clone + AsRef<str>,
-{
-    let mut prefix = Vec::new();
-    let mut full = Vec::with_capacity(fields.len());
-
-    let mut prefix_done = false;
-
-    for (name, format) in fields.into_iter() {
-        if !prefix_done {
-            prefix.push((name.clone(), format.clone()));
-            if name.as_ref() == length_field {
-                prefix_done = true;
-            }
-        }
-        full.push((name, format));
-    }
-
-    peek_field_then(&prefix[..], slice(var(length_field), record_auto(full)))
-}
-
-/// Computes the maximum value of `x / 8` for `x: U16` in seq (return value wrapped in Option to handle empty list)
-fn subheader_index(seq: Expr) -> Expr {
-    // REVIEW - because of how narrow the use-case is, we might be able to use 0 as the init-accum value and avoid Option entirely
-    expr_unwrap(left_fold(
-        lambda_tuple(
-            ["acc", "y"],
-            expr_match(
-                var("acc"),
-                [
-                    (
-                        pat_some(bind("x")),
-                        expr_some(expr_max(var("x"), div(var("y"), Expr::U16(8)))),
+                accum.push((
+                    Label::Borrowed(intermediate),
+                    match_variant(
+                        var(disc_field),
+                        [
+                            (Pattern::U16(disc_value), variant_name, record_inner),
+                            // REVIEW - we could technically add an explicit catch-all but it might be simpler to leave it as an implicit unhandled case
+                        ],
                     ),
-                    (pat_none(), expr_some(div(var("y"), Expr::U16(8)))),
+                ));
+                assert!(
+                    has_discriminant,
+                    "missing discriminant field `{disc_field}` in outer-field set"
+                );
+                accum
+            }
+            NestingKind::UnifiedRecord => {
+                let mut accum = Vec::with_capacity(OUTER + INNER);
+                for (name, format) in outer_fields {
+                    if name == disc_field {
+                        accum.push((
+                            Label::Borrowed(name),
+                            where_lambda(format, name, expr_eq(var(name), Expr::U16(disc_value))),
+                        ));
+                    } else {
+                        accum.push((Label::Borrowed(name), format));
+                    }
+                }
+                for (name, format) in inner_fields {
+                    accum.push((Label::Borrowed(name), format));
+                }
+                accum
+            }
+        };
+        Format::record(accum)
+    }
+
+    pub(crate) fn for_each_pair(
+        seq: Expr,
+        premap: (impl FnOnce(Expr) -> Expr, impl FnOnce(Expr) -> Expr),
+        labels: [&'static str; 2],
+        dep_format: Format,
+    ) -> Format {
+        Format::Let(
+            Label::Borrowed("len"),
+            Box::new(pred(seq_length(seq.clone()))),
+            Box::new(for_each(
+                enum_from_to(Expr::U32(0), var("len")),
+                "ix",
+                with_tuple(
+                    Expr::Tuple(vec![
+                        premap.0(index_unchecked(seq.clone(), var("ix"))),
+                        premap.1(index_unchecked(seq.clone(), succ(var("ix")))),
+                    ]),
+                    labels,
+                    dep_format,
+                ),
+            )),
+        )
+    }
+
+    pub(crate) fn embedded_variadic_alternation<C, const OUTER: usize, const BRANCHES: usize>(
+        shared_fields: [(&'static str, Format); OUTER],
+        discriminant: &'static str,
+        branches: [(u16, &'static str, C); BRANCHES],
+        intermediate: &'static str,
+        nesting_kind: NestingKind,
+    ) -> Format
+    where
+        C: IntoIterator<Item = (&'static str, Format), IntoIter: DoubleEndedIterator>,
+    {
+        match nesting_kind {
+            NestingKind::MinimalVariation => {
+                let mut pat_branches = Vec::with_capacity(BRANCHES);
+                for (value, vname, c) in branches.into_iter() {
+                    let record_inner = record(c);
+                    pat_branches.push((Pattern::U16(value), vname, record_inner));
+                }
+                let final_field = (intermediate, match_variant(var(discriminant), pat_branches));
+                let mut has_discriminant = false;
+                let mut accum = Vec::with_capacity(OUTER + 1);
+                for (name, format) in shared_fields {
+                    has_discriminant = has_discriminant || name == discriminant;
+                    accum.push((name, format));
+                }
+                accum.push(final_field);
+                assert!(
+                    has_discriminant,
+                    "missing discriminant field `{discriminant}` in outer-field set"
+                );
+                record(accum)
+            }
+            NestingKind::UnifiedRecord => {
+                let mut field_prefix = Vec::with_capacity(OUTER);
+                let mut has_discriminant = false;
+                for (name, format) in shared_fields.iter() {
+                    field_prefix.push((Label::Borrowed(name), format.clone()));
+                    if *name == discriminant {
+                        has_discriminant = true;
+                        break;
+                    }
+                }
+                assert!(
+                    has_discriminant,
+                    "missing discriminant field `{discriminant}` in outer-field set"
+                );
+                let mut pat_branches = Vec::with_capacity(BRANCHES);
+                for (value, vname, c) in branches {
+                    let unified = Iterator::chain(shared_fields.iter().cloned(), c.into_iter())
+                        .collect::<Vec<(&'static str, Format)>>();
+                    let record_inner = record(unified);
+                    pat_branches.push((Pattern::U16(value), vname, record_inner));
+                }
+                peek_field_then(
+                    field_prefix.as_slice(),
+                    match_variant(var(discriminant), pat_branches),
+                )
+            }
+        }
+    }
+
+    pub(crate) fn hi_flag_u15be(flag_name: &'static str, field_name: &'static str) -> Format {
+        bit_fields_u16([
+            BitFieldKind::FlagBit(flag_name),
+            BitFieldKind::BitsField {
+                field_name,
+                bit_width: 15,
+            },
+        ])
+    }
+
+    /// Extracts the final element of a sequence-Expr if it is not empty
+    ///
+    /// If the sequence is empty, the behavior is unspecified
+    pub(crate) fn last_elem(seq: Expr) -> Expr {
+        let last_ix = pred(seq_length(seq.clone()));
+        index_unchecked(seq, last_ix)
+    }
+
+    /// Helper function to handle the fact that though vmtx only appears alongside vhea, both are optional tables
+    /// so direct record projection is not possible (as vhea will be an option-wrapped record)
+    pub(crate) fn vhea_long_metrics(vhea: Expr) -> Expr {
+        record_proj(expr_unwrap(vhea), "number_of_long_metrics")
+    }
+
+    /// Attemptis to index on the `offsets` key of `loca` through an option-unpacking indirection.
+    ///
+    /// Helper function to handle the fact that though loca only appears alongside glyf, both are optional tables
+    pub(crate) fn loca_offsets(loca: Expr) -> Expr {
+        let f = |loca_table: Expr| record_proj(loca_table, "offsets");
+        let loca_empty = variant("Offsets32", seq_empty());
+        expr_option_map_or(loca_empty, f, loca)
+    }
+
+    /// Doubles a `U16`-kinded Expr into a `U32`-kinded output.
+    pub(crate) fn scale2(half: Expr) -> Expr {
+        mul(as_u32(half), Expr::U32(2))
+    }
+
+    /// Converts a `u8` value to an `i16` value within the `Expr` model
+    /// according to a bit-flag for signedness `pos_bit` (`1` for positive, `0` for negative).
+    // FIXME - this currently yields the u16 value with the same machine-rep as the nominal i16 value we want
+    pub(crate) fn u8_to_i16(x: Expr, is_positive: Expr) -> Expr {
+        expr_if_else(
+            is_positive,
+            as_u16(x.clone()),
+            expr_match(
+                x,
+                [
+                    (Pattern::U8(0), Expr::U16(0)),
+                    (bind("n"), sub(Expr::U16(u16::MAX), pred(as_u16(var("n"))))),
                 ],
             ),
-        ),
-        expr_none(),
-        ValueType::Option(Box::new(ValueType::Base(BaseType::U16))),
-        seq,
-    ))
-}
+        )
+    }
 
-const START_VAR: Expr = Expr::Var(Label::Borrowed("start"));
-const START_ARG: (Label, ValueType) = (Label::Borrowed("start"), ValueType::Base(BaseType::U32));
+    /// Given a U32-typed position `pos32` and a U16-typed offset `offset16`, computes a target-position as the U32-typed sum of the two values.
+    pub(crate) fn pos_add_u16(pos32: Expr, offset16: Expr) -> Expr {
+        add(pos32, Expr::AsU32(Box::new(offset16)))
+    }
 
-/// Given `Expr`s `table_records` and a `query_table_id` of the appropriate Rust-type (`u32`),
-/// applies `dep_format` to the `Option<T>`-kinded `Expr` yielded by a binary search over
-/// `table_records ~ Seq<T>`.
-///
-/// # Notes
-///
-/// When constructing the `dep_format` closure, callers should be aware that the `Expr`
-/// parameter it accepts will implicitly have the ValueType `Option<opentype_table_record>`,
-/// where `table_records` has ValueType `Seq<opentype_table_record>`.
-///
-/// As the search is hardcoded to be binary, this method should only be called when the
-/// only cases where `table_records` might be unsorted are deemed definitionally invalid
-/// OpenType streams.
-///
-/// Care should also be taken that only OpenType streams are parsed to the point where
-/// this function's output would be parsed, and that any non-OpenType streams are filtered
-/// out by that point (either as a result of delaying OpenType alternatives until very few
-/// formats remain, or precluding invalid streams via parse-level invariants such as magic
-/// bytes).
-fn with_table(
-    table_records: Expr,
-    query_table_id: u32,
-    dep_format: impl FnOnce(Expr) -> Format,
-) -> Format {
-    // Not all fonts are actually sorted: https://github.com/harfbuzz/harfbuzz/issues/3065
-    // NOTE - while technically, we could refactor to make the sortedness a runtime-dependant parameter and check (once) whether the directory is sorted, this may yield only marginal benefits
-    const TABLE_RECORDS_ARE_SORTED: bool = false;
-    let f_get_table_id = |table_record: Expr| record_proj(table_record, "table_id");
-    let opt_match = find_by_key(
-        TABLE_RECORDS_ARE_SORTED,
-        f_get_table_id,
-        Expr::U32(query_table_id),
-        table_records,
-    );
-    dep_format(opt_match)
-}
+    /// Parses a u32 serving as the de-facto representation of a signed, 16.16 bit fixed-point number
+    pub(crate) fn fixed32be() -> Format {
+        fmt_variant("Fixed32", u32be())
+    }
 
-/// Given a raw Format `format` and an absolute buffer-offset `abs_offset`,
-/// attempts to parse `format` at `abs_offset`, wrapping it in `format_some`
-/// if this is a sound operation.
-///
-/// If the offset specified has already been exceeded, will return `format_none()`
-/// instead.
-fn link_forward_checked(abs_offset: Expr, format: Format) -> Format {
-    chain(
-        pos32(),
-        "__here",
-        cond_maybe(
-            expr_gte(abs_offset.clone(), var("__here")),
-            with_relative_offset(Some(Expr::U32(0)), abs_offset, format),
-        ),
-    )
-}
+    // Custom type for fixed-point values that are interpreted as (2bits . 14bits) within a u16be raw-parse
+    pub(crate) fn f2dot14() -> Format {
+        fmt_variant("F2Dot14", u16be())
+    }
 
-/// Given a raw Format `format` and an absolute buffer-offset `abs_offset`,
-/// attempts to parse `format` at `abs_offset`.
-///
-/// If the offset specified has already been exceeded, will fail the local parse instead.
-fn link_forward_unchecked(abs_offset: Expr, format: Format) -> Format {
-    // FIXME - forgetful chaining candidate
-    monad_seq(
-        // NOTE - rather than construct a fallible value in an infallible parse, fail the parse if the desired invariant does not hold
-        // REVIEW - is it worth it to forgo this validation if we are confident it won't be called with bad values?
+    /// FIXME[epic=signedness-hack] - scaffolding to signal intent to use i8 format before it is implemented
+    pub(crate) fn s8() -> Format {
+        u8()
+    }
+
+    /// FIXME[epic=signedness-hack] - scaffolding to signal intent to use i16 format before it is implemented
+    pub(crate) fn s16be() -> Format {
+        u16be()
+    }
+
+    /// FIXME[epic=signedness-hack] - scaffolding to signal intent to use i32 format before it is implemented
+    pub(crate) fn s32be() -> Format {
+        u32be()
+    }
+
+    /// FIXME[epic=signedness-hack] - scaffolding to signal intent to use i64 format before it is implemented
+    pub(crate) fn s64be() -> Format {
+        u64be()
+    }
+
+    /// Helper function for parsing a big-endian u24 (3-byte) value
+    pub(crate) fn u24be() -> Format {
+        // REVIEW - should U24Be be a CommonOp?
+        map(
+            Format::Tuple(vec![compute(Expr::U8(0)), u8(), u8(), u8()]),
+            lambda("x", Expr::U32Be(Box::new(var("x")))),
+        )
+    }
+
+    // Placeholder for a `(u16, u16)` value-pair packed as a big-endian u32
+    pub(crate) fn version16_16() -> Format {
+        u32be()
+    }
+
+    /// Helper function for compile-time conversion of b"..." literals into u32 (big-endian) values.
+    pub(crate) const fn magic(tag: &'static [u8; 4]) -> u32 {
+        u32::from_be_bytes(*tag)
+    }
+
+    /// Parses a `U16Be` value that is expected to be equal to `val`
+    pub(crate) fn expect_u16be(val: u16) -> Format {
+        // REVIEW - if we cared to do it, we could use `chain(is_bytes(val.to_be_bytes()), "_", compute(Expr::U16(val)))` (at the cost of worsening error reporting)
+        where_lambda(u16be(), "x", expr_eq(var("x"), Expr::U16(val)))
+    }
+
+    /// Parses a `U16Be` value that is expected to be equal to one of `N` values in `vals`
+    pub(crate) fn expects_u16be<const N: usize>(vals: [u16; N]) -> Format {
         where_lambda(
+            u16be(),
+            "x",
+            expr_match(
+                var("x"),
+                vals.into_iter()
+                    .map(|v| (Pattern::U16(v), Expr::Bool(true)))
+                    .chain(std::iter::once((Pattern::Wildcard, Expr::Bool(false)))),
+            ),
+        )
+    }
+
+    /// Constructs a format that peeks the value of a specific field in a given
+    /// record (or the common prefix of a union of related records), discarding the
+    /// values of all fields that come before it; the result of this speculative
+    /// parse is then associated to the original field-name (in `field_prefix`) before
+    /// finally parsing the format `dep_format` that depends on its value.
+    pub(crate) fn peek_field_then<Name>(
+        field_prefix: &[(Name, Format)],
+        dep_format: Format,
+    ) -> Format
+    where
+        Name: IntoLabel + Clone + AsRef<str>,
+    {
+        let Some(((field_name, field_format), init)) = field_prefix.split_last() else {
+            panic!("field_prefix must be non-empty")
+        };
+
+        chain(
+            Format::Peek(Box::new(monad_seq(
+                // Process all the fields before the one we care about and discard their cumulative value
+                record(init.iter().cloned()),
+                // Process the field we *do* care about, while still in the peek context, and yield its value as the result of the entire parse
+                field_format.clone(),
+            ))),
+            // Scope-capture the final field of `field_prefix` under the identifier it is paired
+            field_name.clone(),
+            dep_format,
+        )
+    }
+
+    /// Specialized format-construction designed for supporting `cmap` and `kern` sub-tables.
+    ///
+    /// Speculatively peeks the shortest prefix of fields required to witness a field with the
+    /// indicated label (`length_field`), which is interpreted as a positive integer byte-length
+    /// constraining the entire record (and not just subsequent fields); this value is extracted
+    /// and forms the length of a slice around parsing the complete record.
+    ///
+    /// Handles the construction of the record format from the given fields, which are provided
+    /// in a raw form to allow for ease of introspection.
+    pub(crate) fn slice_record<Name, const N: usize>(
+        length_field: &'static str,
+        fields: [(Name, Format); N],
+    ) -> Format
+    where
+        Name: IntoLabel + Clone + AsRef<str>,
+    {
+        let mut prefix = Vec::new();
+        let mut full = Vec::with_capacity(fields.len());
+
+        let mut prefix_done = false;
+
+        for (name, format) in fields.into_iter() {
+            if !prefix_done {
+                prefix.push((name.clone(), format.clone()));
+                if name.as_ref() == length_field {
+                    prefix_done = true;
+                }
+            }
+            full.push((name, format));
+        }
+
+        peek_field_then(&prefix[..], slice(var(length_field), record_auto(full)))
+    }
+
+    /// Computes the maximum value of `x / 8` for `x: U16` in seq (return value wrapped in Option to handle empty list)
+    pub(crate) fn subheader_index(seq: Expr) -> Expr {
+        // REVIEW - because of how narrow the use-case is, we might be able to use 0 as the init-accum value and avoid Option entirely
+        expr_unwrap(left_fold(
+            lambda_tuple(
+                ["acc", "y"],
+                expr_match(
+                    var("acc"),
+                    [
+                        (
+                            pat_some(bind("x")),
+                            expr_some(expr_max(var("x"), div(var("y"), Expr::U16(8)))),
+                        ),
+                        (pat_none(), expr_some(div(var("y"), Expr::U16(8)))),
+                    ],
+                ),
+            ),
+            expr_none(),
+            ValueType::Option(Box::new(ValueType::Base(BaseType::U16))),
+            seq,
+        ))
+    }
+
+    pub(crate) const START_VAR: Expr = Expr::Var(Label::Borrowed("start"));
+
+    pub(crate) const START_ARG: (Label, ValueType) =
+        (Label::Borrowed("start"), ValueType::Base(BaseType::U32));
+
+    /// Given `Expr`s `table_records` and a `query_table_id` of the appropriate Rust-type (`u32`),
+    /// applies `dep_format` to the `Option<T>`-kinded `Expr` yielded by a binary search over
+    /// `table_records ~ Seq<T>`.
+    ///
+    /// # Notes
+    ///
+    /// When constructing the `dep_format` closure, callers should be aware that the `Expr`
+    /// parameter it accepts will implicitly have the ValueType `Option<opentype_table_record>`,
+    /// where `table_records` has ValueType `Seq<opentype_table_record>`.
+    ///
+    /// As the search is hardcoded to be binary, this method should only be called when the
+    /// only cases where `table_records` might be unsorted are deemed definitionally invalid
+    /// OpenType streams.
+    ///
+    /// Care should also be taken that only OpenType streams are parsed to the point where
+    /// this function's output would be parsed, and that any non-OpenType streams are filtered
+    /// out by that point (either as a result of delaying OpenType alternatives until very few
+    /// formats remain, or precluding invalid streams via parse-level invariants such as magic
+    /// bytes).
+    pub(crate) fn with_table(
+        table_records: Expr,
+        query_table_id: u32,
+        dep_format: impl FnOnce(Expr) -> Format,
+    ) -> Format {
+        // Not all fonts are actually sorted: https://github.com/harfbuzz/harfbuzz/issues/3065
+        // NOTE - while technically, we could refactor to make the sortedness a runtime-dependant parameter and check (once) whether the directory is sorted, this may yield only marginal benefits
+        const TABLE_RECORDS_ARE_SORTED: bool = false;
+        let f_get_table_id = |table_record: Expr| record_proj(table_record, "table_id");
+        let opt_match = find_by_key(
+            TABLE_RECORDS_ARE_SORTED,
+            f_get_table_id,
+            Expr::U32(query_table_id),
+            table_records,
+        );
+        dep_format(opt_match)
+    }
+
+    /// Given a raw Format `format` and an absolute buffer-offset `abs_offset`,
+    /// attempts to parse `format` at `abs_offset`, wrapping it in `format_some`
+    /// if this is a sound operation.
+    ///
+    /// If the offset specified has already been exceeded, will return `format_none()`
+    /// instead.
+    pub(crate) fn link_forward_checked(abs_offset: Expr, format: Format) -> Format {
+        chain(
             pos32(),
             "__here",
-            expr_gte(abs_offset.clone(), var("__here")),
-        ),
-        with_relative_offset(Some(Expr::U32(0)), abs_offset, format),
-    )
-}
-
-/// Given a value of `base_offset` (the absolute stream-position relative to which offsets are to be interpreted),
-/// parses a u16be as a positive delta from `base_offset` and returns the linked content parsed according
-/// to `format` at that location.
-///
-/// Returns a record `{ offset: u16, link := (offset > 0) ?Some(format) : None }`
-///
-/// # Note
-///
-/// Despite a valid offset being 'mandatory', there is no practical way to avoid constructing
-/// some form of `Option`-like container to reluctantly avoid erroring out; the OpenType specification
-/// itself says that parsers of OpenType data should "anticipate non-conformant font data that has a
-/// NULL subtable offset where only a non-NULL value is expected."
-///
-/// Thus, we have to be prepared to parse a zero-length offset and return an empty format of some kind.
-///
-/// In future iterations, a distinct option-like type may be constructed to distinguish nullable offset-links
-/// from non-nullable offset-links, but for now, behavior is identical to [`offset16_nullable`].
-///
-/// See [https://learn.microsoft.com/en-us/typography/opentype/spec/otff#data-types] for more info.
-///
-/// Furthermore, to handle irregular inputs that would otherwise require moving *backwards* to reach the
-/// desired offset, `None` is returned in any case where the relative-delta to reach the target offset is
-/// non-positive.
-fn offset16_mandatory(base_offset: Expr, format: Format) -> Format {
-    shadow_check(&base_offset, "offset");
-    // REVIEW - there is an argument to be made that we should use `chain` instead of `record` to elide the offset and flatten the link
-    record([
-        ("offset", u16be()),
-        (
-            "link",
-            if_then_else(
-                is_nonzero_u16(var("offset")),
-                // because link-checked can also return format_none, it has to be the one to wrap format_some around the parse
-                link_forward_checked(pos_add_u16(base_offset, var("offset")), format),
-                fmt_none(),
+            cond_maybe(
+                expr_gte(abs_offset.clone(), var("__here")),
+                with_relative_offset(Some(Expr::U32(0)), abs_offset, format),
             ),
-        ),
-    ])
-}
+        )
+    }
 
-/// Given a U32-kinded expression `base_offset` that represents the absolute stream-position relative to
-/// which offsets are to be interpreted, parses a u16be as a positive delta from `base_offset` and returns
-/// the parse-result of `format` at the target stream-position (in a lookahead--style context).
-///
-/// Returns a record `{ offset: u16, link := (offset > 0) ? Some(format) : None }`
-///
-/// (Implicitly includes a semantic shortcut whereby an offset-value (parsed) of `0` signals
-/// that there is no associated data, in which case `None` is yielded for the `link`.)
-///
-/// # Notes
-///
-/// To handle irregular inputs that would otherwise require moving *backwards* to reach the desired offset,
-/// `None` is returned in any case where the relative-delta to reach the target offset is non-positive.
-fn offset16_nullable(base_offset: Expr, format: Format) -> Format {
-    shadow_check(&base_offset, "offset");
-    // REVIEW - there is an argument to be made that we should use `chain` instead of `record` to elide the offset and flatten the link
-    record([
-        ("offset", u16be()),
-        (
-            "link",
-            if_then_else(
-                is_nonzero_u16(var("offset")),
-                // because link-checked can also return format_none, it has to be the one to wrap format_some around the parse
-                link_forward_checked(pos_add_u16(base_offset, var("offset")), format),
-                fmt_none(),
+    /// Given a raw Format `format` and an absolute buffer-offset `abs_offset`,
+    /// attempts to parse `format` at `abs_offset`.
+    ///
+    /// If the offset specified has already been exceeded, will fail the local parse instead.
+    pub(crate) fn link_forward_unchecked(abs_offset: Expr, format: Format) -> Format {
+        // FIXME - forgetful chaining candidate
+        monad_seq(
+            // NOTE - rather than construct a fallible value in an infallible parse, fail the parse if the desired invariant does not hold
+            // REVIEW - is it worth it to forgo this validation if we are confident it won't be called with bad values?
+            where_lambda(
+                pos32(),
+                "__here",
+                expr_gte(abs_offset.clone(), var("__here")),
             ),
-        ),
-    ])
-}
+            with_relative_offset(Some(Expr::U32(0)), abs_offset, format),
+        )
+    }
 
-/// Given a value of `base_offset` (the absolute stream-position relative to which offsets are to be interpreted),
-/// parses a u32be as a positive delta from `base_offset` and returns the linked content parsed according
-/// to `format` at that location.
-///
-/// Returns a record `{ offset: u32, link := (offset > 0) ? Some(format) : None }`
-///
-/// (Implicitly includes a semantic shortcut whereby an offset-value (parsed) of `0` signals
-/// that there is no associated data, in which case `None` is yielded for the `link`.)
-///
-/// # Notes
-///
-/// To handle irregular inputs that would otherwise require moving *backwards* to reach the desired offset,
-/// `None` is returned in any case where the relative-delta to reach the target offset is non-positive.
-fn offset32(base_offset: Expr, format: Format) -> Format {
-    shadow_check(&base_offset, "offset");
-    // FIXME - should we use `chain` instead of `record` to elide the offset and flatten the link?
-    record([
-        ("offset", u32be()),
-        (
-            "link",
-            if_then_else(
-                is_nonzero_u32(var("offset")),
-                linked_offset32(base_offset, var("offset"), fmt_some(format)),
-                fmt_none(),
+    pub(crate) const CONTENT_AT_OFFSET_IDENT: &str = "link";
+
+    /// Given a value of `base_offset` (the absolute stream-position relative to which offsets are to be interpreted),
+    /// parses a u16be as a positive delta from `base_offset` and returns the linked content parsed according
+    /// to `format` at that location.
+    ///
+    /// Returns a record `{ offset: u16, link := (offset > 0) ? Some(format) : None }`
+    ///
+    /// # Note
+    ///
+    /// Despite a valid offset being 'mandatory', there is no practical way to avoid constructing
+    /// some form of `Option`-like container to reluctantly avoid erroring out; the OpenType specification
+    /// itself says that parsers of OpenType data should "anticipate non-conformant font data that has a
+    /// NULL subtable offset where only a non-NULL value is expected."
+    ///
+    /// Thus, we have to be prepared to parse a zero-length offset and return an empty format of some kind.
+    ///
+    /// In future iterations, a distinct option-like type may be constructed to distinguish nullable offset-links
+    /// from non-nullable offset-links, but for now, behavior is identical to [`offset16_nullable`].
+    ///
+    /// See [https://learn.microsoft.com/en-us/typography/opentype/spec/otff#data-types] for more info.
+    ///
+    /// Furthermore, to handle irregular inputs that would otherwise require moving *backwards* to reach the
+    /// desired offset, `None` is returned in any case where the relative-delta to reach the target offset is
+    /// non-positive.
+    pub(crate) fn offset16_mandatory(base_offset: Expr, format: Format) -> Format {
+        shadow_check(&base_offset, "offset");
+        // REVIEW - there is an argument to be made that we should use `chain` instead of `record` to elide the offset and flatten the link
+        record([
+            ("offset", u16be()),
+            (
+                CONTENT_AT_OFFSET_IDENT,
+                if_then_else(
+                    is_nonzero_u16(var("offset")),
+                    link_forward_checked(pos_add_u16(base_offset, var("offset")), format),
+                    // NOTE - link_forward_checked  yields None if the offset has been exceeded and Some(format) otherwise
+                    fmt_none(),
+                ),
             ),
-        ),
-    ])
-}
+        ])
+    }
 
-/// Given the appropriate Start-of-Frame absolute-stream-offset (`base_offset`) and
-/// an SOF-relative `rel_offset`, produce a relative-seek format that
-/// seeks to the appropriate stream-location and parses `format`.
-///
-/// # Notes
-///
-/// Though not directly stated, the assumed type of `sof_offset` and `target_offset` is
-/// `U32`, and if this is not satisfied, the invocation of this function will produce a
-/// type-error when expanded.
-///
-/// Will fail at time-of-parse in any case where the stream-offset we are expanding this
-/// format from is greater than the absolute target offset we would be attempting to seek to.
-fn linked_offset32(base_offset: Expr, rel_offset: Expr, format: Format) -> Format {
-    with_relative_offset(Some(base_offset), rel_offset, format)
+    /// Given a U32-kinded expression `base_offset` that represents the absolute stream-position relative to
+    /// which offsets are to be interpreted, parses a u16be as a positive delta from `base_offset` and returns
+    /// the parse-result of `format` at the target stream-position (in a lookahead--style context).
+    ///
+    /// Returns a record `{ offset: u16, link := (offset > 0) ? Some(format) : None }`
+    ///
+    /// (Implicitly includes a semantic shortcut whereby an offset-value (parsed) of `0` signals
+    /// that there is no associated data, in which case `None` is yielded for the `link`.)
+    ///
+    /// # Notes
+    ///
+    /// To handle irregular inputs that would otherwise require moving *backwards* to reach the desired offset,
+    /// `None` is returned in any case where the relative-delta to reach the target offset is non-positive.
+    pub(crate) fn offset16_nullable(base_offset: Expr, format: Format) -> Format {
+        shadow_check(&base_offset, "offset");
+        // REVIEW - there is an argument to be made that we should use `chain` instead of `record` to elide the offset and flatten the link
+        record([
+            ("offset", u16be()),
+            (
+                CONTENT_AT_OFFSET_IDENT,
+                if_then_else(
+                    is_nonzero_u16(var("offset")),
+                    // NOTE - link_forward_checked  yields None if the offset has been exceeded and Some(format) otherwise
+                    link_forward_checked(pos_add_u16(base_offset, var("offset")), format),
+                    fmt_none(),
+                ),
+            ),
+        ])
+    }
+
+    /// Given a value of `base_offset` (the absolute stream-position relative to which offsets are to be interpreted),
+    /// parses a u32be as a positive delta from `base_offset` and returns the linked content parsed according
+    /// to `format` at that location.
+    ///
+    /// Returns a record `{ offset: u32, link := (offset > 0) ? Some(format) : None }`
+    ///
+    /// (Implicitly includes a semantic shortcut whereby an offset-value (parsed) of `0` signals
+    /// that there is no associated data, in which case `None` is yielded for the `link`.)
+    ///
+    /// # Notes
+    ///
+    /// To handle irregular inputs that would otherwise require moving *backwards* to reach the desired offset,
+    /// `None` is returned in any case where the relative-delta to reach the target offset is non-positive.
+    pub(crate) fn offset32(base_offset: Expr, format: Format) -> Format {
+        shadow_check(&base_offset, "offset");
+        // FIXME - should we use `chain` instead of `record` to elide the offset and flatten the link?
+        record([
+            ("offset", u32be()),
+            (
+                CONTENT_AT_OFFSET_IDENT,
+                if_then_else(
+                    is_nonzero_u32(var("offset")),
+                    linked_offset32(base_offset, var("offset"), fmt_some(format)),
+                    fmt_none(),
+                ),
+            ),
+        ])
+    }
+
+    /// Given the appropriate Start-of-Frame absolute-stream-offset (`base_offset`) and
+    /// an SOF-relative `rel_offset`, produce a relative-seek format that
+    /// seeks to the appropriate stream-location and parses `format`.
+    ///
+    /// # Notes
+    ///
+    /// Though not directly stated, the assumed type of `sof_offset` and `target_offset` is
+    /// `U32`, and if this is not satisfied, the invocation of this function will produce a
+    /// type-error when expanded.
+    ///
+    /// Will fail at time-of-parse if seeking to the target requires going backwards from the immediate
+    /// offset we are reading from.
+    // REVIEW - double-check whether the claim that retrograde seeks will fail is still true
+    pub(crate) fn linked_offset32(base_offset: Expr, rel_offset: Expr, format: Format) -> Format {
+        with_relative_offset(Some(base_offset), rel_offset, format)
+    }
+
+    /// Given a record `{ offset: (u16 | u32), link: ... }`, returns the value of `link`
+    ///
+    /// # Notes
+    ///
+    /// Used to avoid hard-coded/open-coded references to "link" in format definitions that
+    /// are unbound from the identifier used in `offset16_*` and `offset32`.
+    ///
+    /// When called on the result  of `offset16_nullable`
+    pub(crate) fn get_content_at_offset(offset_record: Expr) -> Expr {
+        record_proj(offset_record, CONTENT_AT_OFFSET_IDENT)
+    }
 }
+use util::*;
 
 /// Flag-value used in `head` table to mark `loca` offsets as being 16-bit
 const SHORT_OFFSET16: u16 = 0;
@@ -615,38 +641,23 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
     let table_links = {
         // character mapping table
         let cmap_table = cmap::table(module);
-
         let head_table = head::table(module);
-
         let hhea_table = hhea::table(module);
-
         let vhea_table = vhea::table(module);
-
         let maxp_table = maxp::table(module);
-
         let hmtx_table = hmtx::table(module);
-
         let vmtx_table = vmtx::table(module);
-
         let name_table = name::table(module);
-
-        let os2_table = { os2::table(module, tag) };
-
-        let post_table = { post::post_table(module) };
-
-        let cvt_table = repeat(s16be());
-        let fpgm_table = opaque_bytes();
-
+        let os2_table = os2::table(module, tag);
+        let post_table = post::table(module);
+        let cvt_table = cvt::table(module);
+        let fpgm_table = fpgm::table(module);
         let loca_table = loca::table(module);
         let glyf_table = glyf::table(module);
-
-        let prep_table = opaque_bytes();
-        // REVIEW - the generated names for gasp subtypes can be run-on, consider pruning name tokens or module.define_format(_args) for brevity
+        let prep_table = prep::table(module);
         let gasp_table = gasp::table(module);
 
-        // Class Definition Table - https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#class-definition-table
         let class_def = common::class_def(module);
-
         let coverage_table = common::coverage_table(module);
         let device_or_variation_index_table = common::device_or_variation_index_table(module);
         let item_variation_store = common::item_variation_store(module);
@@ -657,6 +668,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
             device_or_variation_index_table,
             item_variation_store,
         );
+
         // SECTION - bulk common definitions for GSUB and GPOS
         let value_format_flags = layout::value_format_flags(module);
         let vf_flags_type = module
@@ -688,6 +700,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
         );
         // !SECTION
 
+        // SECTION - high-level definitions to support GSUB and GPOS
         let ground_subst = gsub::ground_subst(
             module,
             coverage_table,
@@ -709,7 +722,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
         let pos_extension = gpos::pos_extension(module, ground_pos);
         let feature_variations = layout::feature_variations(module, feature_table);
 
-        let layout_table = |tag: u32| {
+        let mk_layout = |tag: u32| {
             layout::table(
                 tag,
                 script_list,
@@ -722,795 +735,26 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
             )
         };
         // !SECTION
-        let gpos_table = module.define_format("opentype.gpos_table", layout_table(magic(b"GPOS")));
-        let gsub_table = module.define_format("opentype.gsub_table", layout_table(magic(b"GSUB")));
 
-        let base_table = {
-            let base_coord = module.define_format(
-                "opentype.layout.base_coord",
-                record([
-                    ("table_start", pos32()),
-                    ("format", u16be()),
-                    ("coordinate", s16be()),
-                    // REVIEW - is "hint" an appropriate name for this extra-fields field?
-                    (
-                        "hint",
-                        match_variant(
-                            var("format"),
-                            [
-                                (Pattern::U16(1), "NoHint", Format::EMPTY),
-                                (
-                                    Pattern::U16(2),
-                                    "GlyphHint",
-                                    record([
-                                        ("reference_glyph", u16be()),
-                                        ("base_coord_point", u16be()),
-                                    ]),
-                                ),
-                                (
-                                    Pattern::U16(3),
-                                    "DeviceHint",
-                                    record([(
-                                        "device_offset",
-                                        offset16_nullable(
-                                            var("table_start"),
-                                            device_or_variation_index_table.call(),
-                                        ),
-                                    )]),
-                                ),
-                                (Pattern::Wildcard, "UnknownFormat", Format::Fail),
-                            ],
-                        ),
-                    ),
-                ]),
-            );
-            let feat_min_max = |table_start: Expr| {
-                record([
-                    ("feature_tag", tag.call()),
-                    (
-                        "min_coord_offset",
-                        offset16_nullable(table_start.clone(), base_coord.call()),
-                    ),
-                    (
-                        "max_coord_offset",
-                        offset16_nullable(table_start.clone(), base_coord.call()),
-                    ),
-                ])
-            };
-            let min_max = module.define_format(
-                "opentype.layout.min_max",
-                record([
-                    ("table_start", pos32()),
-                    (
-                        "min_coord_offset",
-                        offset16_nullable(var("table_start"), base_coord.call()),
-                    ),
-                    (
-                        "max_coord_offset",
-                        offset16_nullable(var("table_start"), base_coord.call()),
-                    ),
-                    ("feat_min_max_count", u16be()),
-                    (
-                        "feat_min_max_records",
-                        repeat_count(var("feat_min_max_count"), feat_min_max(var("table_start"))),
-                    ),
-                ]),
-            );
-            let base_values = module.define_format(
-                "opentype.layout.base_values",
-                record([
-                    ("table_start", pos32()),
-                    ("default_baseline_index", u16be()),
-                    ("base_coord_count", u16be()), // NOTE - should be equal to baseTagCount in BaseTagList
-                    (
-                        "base_coord_offsets",
-                        repeat_count(
-                            var("base_coord_count"),
-                            offset16_mandatory(var("table_start"), base_coord.call()),
-                        ),
-                    ),
-                ]),
-            );
-            let base_lang_sys = |table_start: Expr| {
-                record([
-                    ("base_lang_sys_tag", tag.call()),
-                    (
-                        "min_max_offset",
-                        offset16_mandatory(table_start, min_max.call()),
-                    ),
-                ])
-            };
-            let base_script = module.define_format(
-                "opentype.layout.base_script",
-                record([
-                    ("table_start", pos32()),
-                    (
-                        "base_values_offset",
-                        offset16_nullable(var("table_start"), base_values.call()),
-                    ),
-                    (
-                        "default_min_max_offset",
-                        offset16_nullable(var("table_start"), min_max.call()),
-                    ),
-                    ("base_lang_sys_count", u16be()),
-                    (
-                        "base_lang_sys_records",
-                        repeat_count(
-                            var("base_lang_sys_count"),
-                            base_lang_sys(var("table_start")),
-                        ),
-                    ),
-                ]),
-            );
-            let base_script_record = |table_start: Expr| {
-                record([
-                    ("base_script_tag", tag.call()),
-                    (
-                        "base_script_offset",
-                        offset16_mandatory(table_start, base_script.call()),
-                    ),
-                ])
-            };
-            let base_script_list = record([
-                ("table_start", pos32()),
-                ("base_script_count", u16be()),
-                (
-                    "base_script_records",
-                    repeat_count(
-                        var("base_script_count"),
-                        base_script_record(var("table_start")),
-                    ),
-                ),
-            ]);
-            let base_tag_list = record([
-                ("base_tag_count", u16be()),
-                (
-                    "baseline_tags",
-                    repeat_count(var("base_tag_count"), tag.call()),
-                ), // must appear in alphabetical order (not enforced locally)
-            ]);
-            let axis_table = module.define_format(
-                "opentype.layout.axis_table",
-                record([
-                    ("table_start", pos32()),
-                    (
-                        "base_tag_list_offset",
-                        offset16_nullable(var("table_start"), base_tag_list),
-                    ),
-                    (
-                        "base_script_list_offset",
-                        offset16_mandatory(var("table_start"), base_script_list),
-                    ),
-                ]),
-            );
-            module.define_format(
-                "opentype.base_table",
-                // STUB - implement base table
-                record([
-                    ("table_start", pos32()),
-                    ("major_version", expect_u16be(1)),
-                    ("minor_version", where_between_u16(u16be(), 0, 1)), // v1.0 and v1.1
-                    (
-                        "horiz_axis_offset",
-                        offset16_nullable(var("table_start"), axis_table.call()),
-                    ),
-                    (
-                        "vert_axis_offset",
-                        offset16_nullable(var("table_start"), axis_table.call()),
-                    ),
-                    (
-                        "item_var_store_offset",
-                        cond_maybe(
-                            expr_gt(var("minor_version"), Expr::U16(0)),
-                            offset32(var("table_start"), item_variation_store.call()),
-                        ),
-                    ),
-                ]),
-            )
-        };
+        // REVIEW - we might consider rewriting `layout::table` to spin off `gpos::table` and `gsub::table` more easily (self-contained)
+        let gpos_table =
+            module.define_format("opentype.gpos_table", mk_layout(util::magic(b"GPOS")));
+        let gsub_table =
+            module.define_format("opentype.gsub_table", mk_layout(util::magic(b"GSUB")));
+
+        let base_table = base::table(
+            module,
+            tag,
+            device_or_variation_index_table,
+            item_variation_store,
+        );
 
         // `kern` table [https://learn.microsoft.com/en-us/typography/opentype/spec/kern]
-        let kern_table = {
-            let kern_subtable = {
-                use BitFieldKind::*;
-                // REVIEW[epic=check-zero] - should we consider changing this constant to `true`
-                const SHOULD_CHECK_ZERO: bool = false;
-                let kern_cov_flags = bit_fields_u16([
-                    BitsField {
-                        bit_width: 8,
-                        field_name: "format",
-                    },
-                    Reserved {
-                        bit_width: 4,
-                        check_zero: SHOULD_CHECK_ZERO,
-                    },
-                    FlagBit("override"), // Bit 3 - when true, value in this table replaces the current accumulator value
-                    FlagBit("cross_stream"), // Bit 2 - when true, kerning is perpendicular to text-flow (reset by 0x8000 in kerning data)
-                    FlagBit("minimum"), // Bit 1 - when true, table contains minimum values, otherwise the table has kerning values
-                    FlagBit("horizontal"), // Bit 0 - when true, table has horizontal data, otherwise vertical
-                ]);
-                let kern_pair = record([
-                    ("left", u16be()),  // glyph index for left-hand glyph in kerning pair
-                    ("right", u16be()), // glyph index for right-hand glyph in kerning pair
-                    ("value", s16be()), // kerning value for given pair, in design-units. Positive values move characters apart, negative values move characters closer together.
-                ]);
-                // SECTION - `kern` subtable record-formats
-                let kern_subtable_format0 = record([
-                    ("n_pairs", u16be()),
-                    ("search_range", u16be()), // sizeof(table_entry) * (2^(ilog2(n_pairs)))
-                    ("entry_selector", u16be()), // ilog2(n_pairs) [number of iterations of binary search algo to find a query]
-                    ("range_shift", u16be()), // (nPairs - 2^(ilog2(nPairs))) * sizeof(table_entry)
-                    // NOTE - kern-pairs array is sorted by the value of the packed Word32 consisting of the bytes of `left` and `right` in that order (big-endian).
-                    ("kern_pairs", repeat_count(var("n_pairs"), kern_pair)),
-                ]);
-                let kern_subtable_format2 = {
-                    fn glyph_count(class_table_offset: Expr) -> Expr {
-                        record_proj(
-                            expr_unwrap(record_proj(class_table_offset, "link")),
-                            "n_glyphs",
-                        )
-                    }
-                    let class_table = record([
-                        ("first_glyph", u16be()), // first glyph in class range
-                        ("n_glyphs", u16be()),    // number of glyphs in class range
-                        ("class_values", repeat_count(var("n_glyphs"), u16be())), // class values for each glyph in class range
-                    ]);
-
-                    // Simultaneously 2D/1D array: indices in ClassTables are scaled (J = 2 x j ; I = 2 x M x i) to facilitate offset-arithmetic for random access (TargetOffset(i,j) = BaseOffset + I + J)
-                    let kerning_array = |left_class_offset: Expr, right_class_offset: Expr| {
-                        repeat_count(
-                            glyph_count(left_class_offset), // N rows where there are N left-hand classes
-                            repeat_count(
-                                glyph_count(right_class_offset), // M columns
-                                s16be(),                         // FWORD value at index (i, j)
-                            ),
-                        )
-                    };
-                    record([
-                        ("table_start", pos32()),
-                        ("row_width", u16be()), // width (in bytes) of a table row
-                        (
-                            "left_class_offset",
-                            offset16_mandatory(var("table_start"), class_table.clone()),
-                        ),
-                        (
-                            "right_class_offset",
-                            offset16_mandatory(var("table_start"), class_table),
-                        ),
-                        (
-                            "kerning_array_offset",
-                            offset16_mandatory(
-                                var("table_start"),
-                                kerning_array(var("left_class_offset"), var("right_class_offset")),
-                            ),
-                        ),
-                    ])
-                };
-                // !SECTION
-                /* Previously defined as a slice_record but sufficiently large `n_pairs` values for Format0
-                 * could cause length to wrap around mod 65536 and lead to slice boundary violation
-                 * while reading `kern_pairs`
-                 */
-                record([
-                    ("version", expect_u16be(0)),
-                    ("length", u16be()), // NOTE - Cannot be trusted as overflow exists in the wild
-                    ("coverage", kern_cov_flags),
-                    (
-                        "data",
-                        match_variant(
-                            record_proj(var("coverage"), "format"),
-                            [
-                                (Pattern::U16(0), "Format0", kern_subtable_format0),
-                                (Pattern::U16(2), "Format2", kern_subtable_format2),
-                                // REVIEW - do we even want to bother with an explicit catch-all failure branch?
-                                (Pattern::Wildcard, "UnknownFormat", Format::Fail),
-                            ],
-                        ),
-                    ),
-                ])
-            };
-            module.define_format(
-                "opentype.kern_table",
-                record([
-                    ("version", expect_u16be(0)), // Table version number (KernHeader)
-                    ("n_tables", u16be()),
-                    ("subtables", repeat_count(var("n_tables"), kern_subtable)),
-                ]),
-            )
-        };
+        let kern_table = kern::table(module);
 
         let stat_table = stat::table(module, tag);
-        let fvar_table = {
-            use BitFieldKind::*;
-            let axis_qual_flags = bit_fields_u16([
-                Reserved {
-                    bit_width: 15,
-                    check_zero: false,
-                },
-                FlagBit("hidden_axis"),
-            ]);
-            let variation_axis_record = module.define_format(
-                "opentype.var.variation_axis_record", // REVIEW - is there a better name to ascribe this?
-                record([
-                    ("axis_tag", tag.call()),
-                    ("min_value", fixed32be()),
-                    ("default_value", fixed32be()),
-                    ("max_value", fixed32be()),
-                    ("flags", axis_qual_flags),
-                    ("axis_name_id", u16be()),
-                ]),
-            );
-            let user_tuple = module.define_format_args(
-                "opentype.var.user_tuple",
-                vec![(
-                    Label::Borrowed("axis_count"),
-                    ValueType::Base(BaseType::U16),
-                )],
-                record([("coordinates", repeat_count(var("axis_count"), fixed32be()))]),
-            );
-            module.define_format(
-                "opentype.fvar_table",
-                record([
-                    ("table_start", pos32()),
-                    ("major_version", expect_u16be(1)),
-                    ("minor_version", expect_u16be(0)),
-                    // REVIEW[epic=retrograde-dependency] - consider alternate approaches to avoid constructing dummy offset-field
-                    (
-                        "__offset_axes",
-                        where_lambda(u16be(), "raw", is_nonzero_u16(var("raw"))),
-                    ),
-                    ("__reserved", expect_u16be(2)),
-                    ("axis_count", u16be()),
-                    ("axis_size", expect_u16be(20)), // For fvar version 1.0, axis record are fixed-size == 20 (0x0014) bytes
-                    ("instance_count", u16be()),
-                    ("instance_size", u16be()), // not yet enforced, but should be axisCount * sizeOf(Fixed32Be) + (4 or 6)
-                    // NOTE - We use our current record scope to avoid the need to pass in the relevant variables from above, and to avoid nested record structures
-                    (
-                        "__axes_length",
-                        compute(mul(var("axis_count"), var("axis_size"))),
-                    ),
-                    (
-                        "axes",
-                        // NOTE - because we delay interpretation of the offset above to collect additional fields, we inline and specialize offset16 based on the captured value
-                        link_forward_unchecked(
-                            pos_add_u16(var("table_start"), var("__offset_axes")),
-                            slice(
-                                var("__axes_length"),
-                                repeat_count(
-                                    var("axis_count"),
-                                    slice(var("axis_size"), variation_axis_record.call()),
-                                ),
-                            ),
-                        ),
-                    ),
-                    (
-                        "instances",
-                        // NOTE - because we delay interpretation of the offset above to collect additional fields, we inline and specialize offset16 based on the captured value
-                        link_forward_unchecked(
-                            pos_add_u16(
-                                var("table_start"),
-                                // use the length of the axes array as a second-order correction to the original offset
-                                add(var("__offset_axes"), var("__axes_length")),
-                            ),
-                            repeat_count(
-                                var("instance_count"),
-                                slice(
-                                    var("instance_size"),
-                                    record([
-                                        ("subfamily_nameid", u16be()),
-                                        ("flags", expect_u16be(0)), // reserved for future use, should be set to 0,
-                                        (
-                                            "coordinates",
-                                            user_tuple.call_args(vec![var("axis_count")]),
-                                        ),
-                                        (
-                                            "postscript_nameid",
-                                            cond_maybe(
-                                                // Only included if the extra 2 bytes are implied by `instance_size`, which is otherwise divisible by 4
-                                                expr_eq(
-                                                    rem(var("instance_size"), Expr::U16(4)),
-                                                    Expr::U16(2),
-                                                ),
-                                                u16be(),
-                                            ),
-                                        ),
-                                    ]),
-                                ),
-                            ),
-                        ),
-                    ),
-                ]),
-            )
-        };
-        let gvar_table = {
-            use BitFieldKind::*;
-
-            // NOTE - controls whether or not a ParseError is raised if reserved bits of a packed-word are not all cleared
-            // REVIEW - do we consider it sensible to set this to `true`?
-            const SHOULD_CHECK_ZERO: bool = false;
-
-            let gvar_flags = bit_fields_u16([
-                Reserved {
-                    bit_width: 15,
-                    check_zero: SHOULD_CHECK_ZERO,
-                },
-                FlagBit("is_long_offset"),
-            ]);
-            let tuple_record = module.define_format_args(
-                "opentype.var.tuple_record",
-                vec![(
-                    Label::Borrowed("axis_count"),
-                    ValueType::Base(BaseType::U16),
-                )],
-                record([("coordinates", repeat_count(var("axis_count"), f2dot14()))]),
-            );
-
-            let tuple_variation_header = |axis_count: Expr| {
-                let tuple_index = bit_fields_u16([
-                    FlagBit("embedded_peak_tuple"), // if set, includes an embedded peak tuple record, immediately after tupleIndex, and that the low 12 bits (field `tuple_index`) are to be ignored
-                    FlagBit("intermediate_region"), // if set, header includes a start- and end-tuple-record (2 tuple records total) immediately after peak-tuple-record logical position (whether present or not)
-                    FlagBit("private_point_numbers"), // if set, serialized data includes packed "point" number data; when not set, the shared number data at the start of serialized data is used by default
-                    Reserved {
-                        bit_width: 1,
-                        check_zero: SHOULD_CHECK_ZERO,
-                    },
-                    BitsField {
-                        bit_width: 12,
-                        field_name: "tuple_index",
-                    },
-                ]);
-                record([
-                    ("variation_data_size", u16be()), // size, in bytes, of serialized data for this tuple variation table
-                    ("tuple_index", tuple_index),
-                    (
-                        "peak_tuple",
-                        cond_maybe(
-                            record_proj(var("tuple_index"), "embedded_peak_tuple"),
-                            tuple_record.call_args(vec![axis_count.clone()]),
-                        ),
-                    ),
-                    (
-                        "intermediate_tuples",
-                        cond_maybe(
-                            record_proj(var("tuple_index"), "intermediate_region"),
-                            record_repeat(
-                                ["start_tuple", "end_tuple"],
-                                tuple_record.call_args(vec![axis_count]),
-                            ),
-                        ),
-                    ),
-                ])
-            };
-            let u15be = |hi: Expr, lo: Expr| -> Expr {
-                bit_or(
-                    shl(bit_and(as_u16(hi), Expr::U16(0x7f)), Expr::U16(8)),
-                    as_u16(lo),
-                )
-            };
-            let packed_point_numbers = {
-                let runs = |point_count: Expr| {
-                    let control_byte = bit_fields_u8([
-                        FlagBit("points_are_words"), // If set, each point is a u16-based delta; u8 otherwise
-                        BitsField {
-                            bit_width: 7,
-                            field_name: "point_run_count",
-                        }, // 7-bit run-length
-                    ]);
-                    let run = record([
-                        ("control", control_byte),
-                        (
-                            "points",
-                            Format::Let(
-                                // REVIEW - should this be a synthetic field of the record, to make AccumUntil loop easier to specify?
-                                Label::Borrowed("run_length"),
-                                // Value stored in low 7 bits of control-byte is one less than the actual run-length
-                                Box::new(succ(record_proj(var("control"), "point_run_count"))),
-                                Box::new(if_then_else(
-                                    record_proj(var("control"), "points_are_words"),
-                                    fmt_variant(
-                                        "Points16",
-                                        repeat_count(var("run_length"), u16be()),
-                                    ),
-                                    fmt_variant("Points8", repeat_count(var("run_length"), u8())),
-                                )),
-                            ),
-                        ),
-                    ]);
-                    let is_finished =
-                        lambda_tuple(["totlen", "_seq"], expr_gte(var("totlen"), point_count));
-                    let update_totlen = lambda_tuple(
-                        ["acc", "run"],
-                        add(
-                            var("acc"),
-                            succ(as_u16(record_lens(
-                                var("run"),
-                                &["control", "point_run_count"],
-                            ))),
-                        ),
-                    );
-                    accum_until(
-                        is_finished,
-                        update_totlen,
-                        Expr::U16(0),
-                        ValueType::Base(BaseType::U16),
-                        run,
-                    )
-                };
-                // Variable-precision count-field that is one-byte if it fits in 7 bits, or 15-bit if it doesn't (U16Be ignoring MSB in first byte read)
-                union([
-                    map(
-                        is_byte(0),
-                        lambda("_", Expr::Tuple(vec![Expr::U16(0), seq_empty()])),
-                    ),
-                    chain(
-                        byte_in(1..=127),
-                        "point_count",
-                        runs(as_u16(var("point_count"))),
-                    ),
-                    chain(
-                        byte_in(128..=255),
-                        "hi",
-                        chain(u8(), "lo", runs(u15be(var("hi"), var("lo")))),
-                    ),
-                ])
-            };
-            let packed_deltas = |total_deltas: Expr| {
-                let control_byte = bit_fields_u8([
-                    FlagBit("deltas_are_zero"), // If set, no values are stored but the logical count is incremented as if explicit all-zeroes were listed
-                    FlagBit("deltas_are_words"), // If set, each delta is i16-based; i8 otherwise
-                    BitsField {
-                        bit_width: 6,
-                        field_name: "delta_run_count",
-                    }, // 6-bit run-length
-                ]);
-                let run = record([
-                    ("control", control_byte),
-                    (
-                        "deltas",
-                        Format::Let(
-                            Label::Borrowed("run_length"),
-                            Box::new(succ(record_proj(var("control"), "delta_run_count"))),
-                            Box::new(if_then_else(
-                                record_proj(var("control"), "deltas_are_zero"),
-                                fmt_variant("Delta0", compute(var("run_length"))),
-                                if_then_else(
-                                    record_proj(var("control"), "deltas_are_words"),
-                                    fmt_variant(
-                                        "Delta16",
-                                        repeat_count(var("run_length"), s16be()),
-                                    ),
-                                    fmt_variant("Delta8", repeat_count(var("run_length"), s8())),
-                                ),
-                            )),
-                        ),
-                    ),
-                ]);
-                let is_finished =
-                    lambda_tuple(["totlen", "_seq"], expr_gte(var("totlen"), total_deltas));
-                let update_totlen = lambda_tuple(
-                    ["acc", "run"],
-                    add(
-                        var("acc"),
-                        succ(as_u16(record_lens(
-                            var("run"),
-                            &["control", "delta_run_count"],
-                        ))),
-                    ),
-                );
-                accum_until(
-                    is_finished,
-                    update_totlen,
-                    Expr::U16(0),
-                    ValueType::Base(BaseType::U16),
-                    run,
-                )
-            };
-            let serialized_data = |shared_point_numbers: Expr, tuple_var_headers: Expr| {
-                record([
-                    (
-                        "shared_point_numbers",
-                        cond_maybe(shared_point_numbers, packed_point_numbers.clone()),
-                    ),
-                    (
-                        "per_tuple_variation_data",
-                        for_each(
-                            tuple_var_headers,
-                            "header",
-                            slice(
-                                record_proj(var("header"), "variation_data_size"),
-                                record([
-                                    (
-                                        "private_point_numbers",
-                                        cond_maybe(
-                                            record_lens(
-                                                var("header"),
-                                                &["tuple_index", "private_point_numbers"],
-                                            ),
-                                            packed_point_numbers.clone(),
-                                        ),
-                                    ),
-                                    (
-                                        "x_and_y_coordinate_deltas",
-                                        Format::Let(
-                                            Label::Borrowed("point_count"),
-                                            Box::new(tuple_proj(
-                                                expr_option_unwrap_first(
-                                                    var("private_point_numbers"),
-                                                    var("shared_point_numbers"),
-                                                ),
-                                                0,
-                                            )),
-                                            Box::new(packed_deltas(mul(
-                                                var("point_count"),
-                                                Expr::U16(2),
-                                            ))),
-                                        ),
-                                    ),
-                                ]),
-                            ),
-                        ),
-                    ),
-                ])
-            };
-            let tuple_variation_count = bit_fields_u16([
-                FlagBit("shared_point_numbers"),
-                Reserved {
-                    bit_width: 3,
-                    check_zero: SHOULD_CHECK_ZERO,
-                },
-                BitsField {
-                    bit_width: 12,
-                    field_name: "tuple_count",
-                },
-            ]);
-            let glyph_variation_data_table = module.define_format_args(
-                "opentype.var.glyph_variation_data_table",
-                vec![(
-                    Label::Borrowed("axis_count"),
-                    ValueType::Base(BaseType::U16),
-                )],
-                record([
-                    ("table_start", pos32()),
-                    ("tuple_variation_count", tuple_variation_count),
-                    // REVIEW[epic=retrograde-dependency] - consider alternate approaches to avoid constructing dummy offset-field
-                    ("__data_offset", where_nonzero::<U16>(u16be())),
-                    (
-                        "tuple_variation_headers",
-                        repeat_count(
-                            record_proj(var("tuple_variation_count"), "tuple_count"),
-                            tuple_variation_header(var("axis_count")),
-                        ),
-                    ),
-                    (
-                        "data",
-                        link_forward_unchecked(
-                            pos_add_u16(var("table_start"), var("__data_offset")),
-                            serialized_data(
-                                record_proj(var("tuple_variation_count"), "shared_point_numbers"),
-                                var("tuple_variation_headers"),
-                            ),
-                        ),
-                    ),
-                ]),
-            );
-            let offset_linked_gvar_data_table =
-                |axis_count: Expr, array_start: Expr, this_offset32: Expr, next_offset32: Expr| {
-                    cond_maybe(
-                        // NOTE - checks that the GlyphVariationData table is non-zero length
-                        expr_gt(next_offset32.clone(), this_offset32.clone()),
-                        linked_offset32(
-                            array_start,
-                            this_offset32.clone(),
-                            slice(
-                                sub(next_offset32, this_offset32),
-                                glyph_variation_data_table.call_args(vec![axis_count]),
-                            ),
-                        ),
-                    )
-                };
-            let glyph_variation_data_table_array = |axis_count: Expr, offsets: Expr| {
-                chain(
-                    pos32(),
-                    "array_start",
-                    Format::Match(
-                        Box::new(offsets),
-                        vec![
-                            (
-                                Pattern::Variant(
-                                    Label::Borrowed("Offsets16"),
-                                    Box::new(bind("half16s")),
-                                ),
-                                for_each_pair(
-                                    var("half16s"),
-                                    (scale2, scale2),
-                                    ["this_offs", "next_offs"],
-                                    offset_linked_gvar_data_table(
-                                        axis_count.clone(),
-                                        var("array_start"),
-                                        var("this_offs"),
-                                        var("next_offs"),
-                                    ),
-                                ),
-                            ),
-                            (
-                                Pattern::Variant(
-                                    Label::Borrowed("Offsets32"),
-                                    Box::new(bind("off32s")),
-                                ),
-                                for_each_pair(
-                                    var("off32s"),
-                                    (id, id),
-                                    ["this_offs", "next_offs"],
-                                    offset_linked_gvar_data_table(
-                                        axis_count,
-                                        var("array_start"),
-                                        var("this_offs"),
-                                        var("next_offs"),
-                                    ),
-                                ),
-                            ),
-                        ],
-                    ),
-                )
-            };
-            let shared_tuples = |shared_tuple_count: Expr, axis_count: Expr| {
-                repeat_count(shared_tuple_count, tuple_record.call_args(vec![axis_count]))
-            };
-            let offsets_array = |is_long_offsets: Expr, glyph_count: Expr| {
-                if_then_else(
-                    is_long_offsets,
-                    fmt_variant(
-                        "Offsets32",
-                        repeat_count(succ(glyph_count.clone()), u32be()),
-                    ),
-                    fmt_variant("Offsets16", repeat_count(succ(glyph_count), u16be())),
-                )
-            };
-            // NOTE - can only appear in font files with fvar and glyf tables also present
-            module.define_format(
-                "opentype.gvar_table",
-                record([
-                    ("gvar_table_start", pos32()),
-                    ("major_version", expect_u16be(1)),
-                    ("minor_version", expect_u16be(0)),
-                    ("axis_count", u16be()),
-                    ("shared_tuple_count", u16be()),
-                    (
-                        "shared_tuples_offset",
-                        offset32(
-                            var("gvar_table_start"),
-                            shared_tuples(var("shared_tuple_count"), var("axis_count")),
-                        ),
-                    ),
-                    ("glyph_count", u16be()),
-                    ("flags", gvar_flags),
-                    ("glyph_variation_data_array_offset", u32be()),
-                    (
-                        "glyph_variation_data_offsets",
-                        offsets_array(
-                            record_proj(var("flags"), "is_long_offset"),
-                            var("glyph_count"),
-                        ),
-                    ),
-                    (
-                        "glyph_variation_data_array",
-                        // FIXME - this is a hack to force a clone to avoid use-after-move
-                        // fmt_let(
-                        //     var("glyph_variation_data_offsets"),
-                        //     "offsets",
-                        linked_offset32(
-                            var("gvar_table_start"),
-                            var("glyph_variation_data_array_offset"),
-                            glyph_variation_data_table_array(
-                                var("axis_count"),
-                                var("glyph_variation_data_offsets"),
-                            ),
-                        ),
-                        // ),
-                    ),
-                ]),
-            )
-        };
+        let fvar_table = fvar::table(module, tag);
+        let gvar_table = gvar::table(module);
 
         module.define_format_args(
             "opentype.table_directory.table_links",
@@ -1524,26 +768,46 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
             record_auto([
                 (
                     "cmap",
-                    required_table(START_VAR, var("tables"), magic(b"cmap"), cmap_table.call()),
+                    required_table(
+                        util::START_VAR,
+                        var("tables"),
+                        util::magic(b"cmap"),
+                        cmap_table.call(),
+                    ),
                 ),
                 (
                     "head",
-                    required_table(START_VAR, var("tables"), magic(b"head"), head_table.call()),
+                    required_table(
+                        util::START_VAR,
+                        var("tables"),
+                        util::magic(b"head"),
+                        head_table.call(),
+                    ),
                 ),
                 (
                     "hhea",
-                    required_table(START_VAR, var("tables"), magic(b"hhea"), hhea_table.call()),
+                    required_table(
+                        util::START_VAR,
+                        var("tables"),
+                        util::magic(b"hhea"),
+                        hhea_table.call(),
+                    ),
                 ),
                 (
                     "maxp",
-                    required_table(START_VAR, var("tables"), magic(b"maxp"), maxp_table.call()),
+                    required_table(
+                        util::START_VAR,
+                        var("tables"),
+                        util::magic(b"maxp"),
+                        maxp_table.call(),
+                    ),
                 ),
                 (
                     "hmtx",
                     required_table(
-                        START_VAR,
+                        util::START_VAR,
                         var("tables"),
-                        magic(b"hmtx"),
+                        util::magic(b"hmtx"),
                         hmtx_table.call_args(vec![
                             record_proj(var("hhea"), "number_of_long_metrics"),
                             record_proj(var("maxp"), "num_glyphs"),
@@ -1552,31 +816,56 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                 ),
                 (
                     "name",
-                    required_table(START_VAR, var("tables"), magic(b"name"), name_table.call()),
+                    required_table(
+                        util::START_VAR,
+                        var("tables"),
+                        util::magic(b"name"),
+                        name_table.call(),
+                    ),
                 ),
                 (
                     "os2",
-                    required_table_with_len(START_VAR, var("tables"), magic(b"OS/2"), os2_table),
+                    required_table_with_len(
+                        util::START_VAR,
+                        var("tables"),
+                        util::magic(b"OS/2"),
+                        os2_table,
+                    ),
                 ),
                 (
                     "post",
-                    required_table(START_VAR, var("tables"), magic(b"post"), post_table.call()),
+                    required_table(
+                        util::START_VAR,
+                        var("tables"),
+                        util::magic(b"post"),
+                        post_table.call(),
+                    ),
                 ),
                 // SECTION - TrueType Outline
                 (
                     "cvt",
-                    optional_table(START_VAR, var("tables"), magic(b"cvt "), cvt_table),
+                    optional_table(
+                        util::START_VAR,
+                        var("tables"),
+                        util::magic(b"cvt "),
+                        cvt_table,
+                    ),
                 ),
                 (
                     "fpgm",
-                    optional_table(START_VAR, var("tables"), magic(b"fpgm"), fpgm_table),
+                    optional_table(
+                        util::START_VAR,
+                        var("tables"),
+                        util::magic(b"fpgm"),
+                        fpgm_table,
+                    ),
                 ),
                 (
                     "loca",
                     optional_table(
-                        START_VAR,
+                        util::START_VAR,
                         var("tables"),
-                        magic(b"loca"),
+                        util::magic(b"loca"),
                         loca_table.call_args(vec![
                             record_proj(var("maxp"), "num_glyphs"),
                             record_proj(var("head"), "index_to_loc_format"),
@@ -1586,19 +875,29 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                 (
                     "glyf",
                     optional_table(
-                        START_VAR,
+                        util::START_VAR,
                         var("tables"),
-                        magic(b"glyf"),
+                        util::magic(b"glyf"),
                         glyf_table.call_args(vec![loca_offsets(var("loca"))]),
                     ),
                 ),
                 (
                     "prep",
-                    optional_table(START_VAR, var("tables"), magic(b"prep"), prep_table),
+                    optional_table(
+                        util::START_VAR,
+                        var("tables"),
+                        util::magic(b"prep"),
+                        prep_table,
+                    ),
                 ),
                 (
                     "gasp",
-                    optional_table(START_VAR, var("tables"), magic(b"gasp"), gasp_table.call()),
+                    optional_table(
+                        util::START_VAR,
+                        var("tables"),
+                        util::magic(b"gasp"),
+                        gasp_table.call(),
+                    ),
                 ),
                 // !SECTION
                 // SECTION - CFF Outline
@@ -1620,19 +919,39 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                 // SECTION - Advanced Typography
                 (
                     "base",
-                    optional_table(START_VAR, var("tables"), magic(b"BASE"), base_table.call()),
+                    optional_table(
+                        util::START_VAR,
+                        var("tables"),
+                        util::magic(b"BASE"),
+                        base_table.call(),
+                    ),
                 ),
                 (
                     "gdef",
-                    optional_table(START_VAR, var("tables"), magic(b"GDEF"), gdef_table.call()),
+                    optional_table(
+                        util::START_VAR,
+                        var("tables"),
+                        util::magic(b"GDEF"),
+                        gdef_table.call(),
+                    ),
                 ),
                 (
                     "gpos",
-                    optional_table(START_VAR, var("tables"), magic(b"GPOS"), gpos_table.call()),
+                    optional_table(
+                        util::START_VAR,
+                        var("tables"),
+                        util::magic(b"GPOS"),
+                        gpos_table.call(),
+                    ),
                 ),
                 (
                     "gsub",
-                    optional_table(START_VAR, var("tables"), magic(b"GSUB"), gsub_table.call()),
+                    optional_table(
+                        util::START_VAR,
+                        var("tables"),
+                        util::magic(b"GSUB"),
+                        gsub_table.call(),
+                    ),
                 ),
                 // !SECTION
                 // STUB - add more table sections
@@ -1640,11 +959,21 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                 // STUB - add more tables
                 (
                     "fvar",
-                    optional_table(START_VAR, var("tables"), magic(b"fvar"), fvar_table.call()),
+                    optional_table(
+                        util::START_VAR,
+                        var("tables"),
+                        util::magic(b"fvar"),
+                        fvar_table.call(),
+                    ),
                 ),
                 (
                     "gvar",
-                    optional_table(START_VAR, var("tables"), magic(b"gvar"), gvar_table.call()),
+                    optional_table(
+                        util::START_VAR,
+                        var("tables"),
+                        util::magic(b"gvar"),
+                        gvar_table.call(),
+                    ),
                 ),
                 // !SECTION
                 // STUB - add more table sections
@@ -1652,22 +981,37 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                 // STUB - add more tables
                 (
                     "kern",
-                    optional_table(START_VAR, var("tables"), magic(b"kern"), kern_table.call()),
+                    optional_table(
+                        util::START_VAR,
+                        var("tables"),
+                        util::magic(b"kern"),
+                        kern_table.call(),
+                    ),
                 ),
                 (
                     "stat",
-                    optional_table(START_VAR, var("tables"), magic(b"STAT"), stat_table.call()),
+                    optional_table(
+                        util::START_VAR,
+                        var("tables"),
+                        util::magic(b"STAT"),
+                        stat_table.call(),
+                    ),
                 ),
                 (
                     "vhea",
-                    optional_table(START_VAR, var("tables"), magic(b"vhea"), vhea_table.call()),
+                    optional_table(
+                        util::START_VAR,
+                        var("tables"),
+                        util::magic(b"vhea"),
+                        vhea_table.call(),
+                    ),
                 ),
                 (
                     "vmtx",
                     optional_table(
-                        START_VAR,
+                        util::START_VAR,
                         var("tables"),
-                        magic(b"vmtx"),
+                        util::magic(b"vmtx"),
                         vmtx_table.call_args(vec![
                             vhea_long_metrics(var("vhea")),
                             record_proj(var("maxp"), "num_glyphs"),
@@ -1696,8 +1040,8 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                         var("version"),
                         [
                             (Pattern::U32(0x0001_0000), Expr::Bool(true)),
-                            (Pattern::U32(magic(b"OTTO")), Expr::Bool(true)),
-                            (Pattern::U32(magic(b"true")), Expr::Bool(true)),
+                            (Pattern::U32(util::magic(b"OTTO")), Expr::Bool(true)),
+                            (Pattern::U32(util::magic(b"true")), Expr::Bool(true)),
                             (Pattern::Wildcard, Expr::Bool(false)),
                         ],
                     ),
@@ -1727,7 +1071,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                     "table_directories",
                     repeat_count(
                         var("num_fonts"),
-                        offset32(start.clone(), table_directory.call_args(vec![start])),
+                        util::offset32(start.clone(), table_directory.call_args(vec![start])),
                     ),
                 ),
             ])
@@ -1741,7 +1085,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                     "table_directories",
                     repeat_count(
                         var("num_fonts"),
-                        offset32(start.clone(), table_directory.call_args(vec![start])),
+                        util::offset32(start.clone(), table_directory.call_args(vec![start])),
                     ),
                 ),
                 ("dsig_tag", u32be()),    // either b"DSIG" or 0 if none
@@ -1759,7 +1103,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                     where_lambda(
                         u32be(),
                         "tag",
-                        expr_eq(var("tag"), Expr::U32(magic(b"ttcf"))),
+                        expr_eq(var("tag"), Expr::U32(util::magic(b"ttcf"))),
                     ),
                 ),
                 ("major_version", u16be()),
@@ -1769,8 +1113,8 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                     match_variant(
                         var("major_version"),
                         [
-                            (Pattern::U16(1), "Version1", ttc_header1(START_VAR)),
-                            (Pattern::U16(2), "Version2", ttc_header2(START_VAR)),
+                            (Pattern::U16(1), "Version1", ttc_header1(util::START_VAR)),
+                            (Pattern::U16(2), "Version2", ttc_header2(util::START_VAR)),
                             // REVIEW - is this the preferred pattern (i.e. apply broadly) or do we want to fail here as well?
                             (bind("unknown"), "UnknownVersion", compute(var("unknown"))),
                         ],
@@ -1800,18 +1144,18 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                             table_directory.call_args(vec![var("file_start")]),
                         ),
                         (
-                            Pattern::U32(magic(b"OTTO")),
+                            Pattern::U32(util::magic(b"OTTO")),
                             "TableDirectory",
                             table_directory.call_args(vec![var("file_start")]),
                         ),
                         (
-                            Pattern::U32(magic(b"ttcf")),
+                            Pattern::U32(util::magic(b"ttcf")),
                             "TTCHeader",
                             ttc_header.call_args(vec![var("file_start")]),
                         ),
                         // TODO - not yet sure if TrueType fonts will parse correctly under our current table_directory implementation...
                         (
-                            Pattern::U32(magic(b"true")),
+                            Pattern::U32(util::magic(b"true")),
                             "TableDirectory",
                             table_directory.call_args(vec![var("file_start")]),
                         ),
@@ -1821,6 +1165,1039 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
             ),
         ]),
     )
+}
+
+mod gvar {
+    use super::*;
+
+    // REVIEW - do we consider it sensible to set this to `true`?
+    const SHOULD_CHECK_ZERO: bool = false;
+
+    /// Packed deltas format definition
+    ///
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/otvarcommonformats#packed-deltas
+    fn packed_deltas(total_deltas: Expr) -> Format {
+        use BitFieldKind::*;
+        let control_byte = bit_fields_u8([
+            FlagBit("deltas_are_zero"), // If set, no values are stored but the logical count is incremented as if explicit all-zeroes were listed
+            FlagBit("deltas_are_words"), // If set, each delta is i16-based; i8 otherwise
+            BitsField {
+                bit_width: 6,
+                field_name: "delta_run_count",
+            }, // 6-bit run-length
+        ]);
+        let run = record([
+            ("control", control_byte),
+            (
+                "deltas",
+                Format::Let(
+                    Label::Borrowed("run_length"),
+                    Box::new(succ(record_proj(var("control"), "delta_run_count"))),
+                    Box::new(if_then_else(
+                        record_proj(var("control"), "deltas_are_zero"),
+                        fmt_variant("Delta0", compute(var("run_length"))),
+                        if_then_else(
+                            record_proj(var("control"), "deltas_are_words"),
+                            fmt_variant("Delta16", repeat_count(var("run_length"), util::s16be())),
+                            fmt_variant("Delta8", repeat_count(var("run_length"), util::s8())),
+                        ),
+                    )),
+                ),
+            ),
+        ]);
+        let is_finished = lambda_tuple(["totlen", "_seq"], expr_gte(var("totlen"), total_deltas));
+        let update_totlen = lambda_tuple(
+            ["acc", "run"],
+            add(
+                var("acc"),
+                succ(as_u16(record_lens(
+                    var("run"),
+                    &["control", "delta_run_count"],
+                ))),
+            ),
+        );
+        accum_until(
+            is_finished,
+            update_totlen,
+            Expr::U16(0),
+            ValueType::Base(BaseType::U16),
+            run,
+        )
+    }
+
+    /// Format for the bit-field `flags` in the gvar header record
+    ///
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/gvar#gvar-header
+    fn header_flags() -> Format {
+        use BitFieldKind::*;
+        // NOTE - controls whether or not a ParseError is raised if reserved bits of a packed-word are not all cleared
+        const SHOULD_CHECK_ZERO: bool = false;
+
+        bit_fields_u16([
+            Reserved {
+                bit_width: 15,
+                check_zero: SHOULD_CHECK_ZERO,
+            },
+            FlagBit("is_long_offset"),
+        ])
+    }
+
+    /// Helper for processing a `GlyphVariationData` table at a specific offset within
+    /// the `glyphVariationDataOffsets` array at the end of the gvar header.
+    ///
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/gvar#gvar-header
+    ///
+    /// - `axis_count :~ U16`: axis-count passed in from the gvar header
+    /// - `array_start :~ U32`: absolute position corresponding to the logical start-of-array (which offsets are implicitly relative to)
+    /// - `this_offset32 :~ U32`: relative offset where the GlyphVariationData table begins
+    /// - `next_offset32 :~ U32`: relative offset where the immediately following GlyphVariationData table begins
+    /// - `data_table`: Format definition for GlyphVariationData table
+    fn data_table_array_entry(
+        axis_count: Expr,
+        array_start: Expr,
+        this_offset32: Expr,
+        next_offset32: Expr,
+        data_table: FormatRef,
+    ) -> Format {
+        cond_maybe(
+            // NOTE - checks that the GlyphVariationData table is non-zero length
+            expr_gt(next_offset32.clone(), this_offset32.clone()),
+            util::linked_offset32(
+                array_start,
+                this_offset32.clone(),
+                slice(
+                    sub(next_offset32, this_offset32),
+                    data_table.call_args(vec![axis_count]),
+                ),
+            ),
+        )
+    }
+
+    /// Helper for processing the full array of GlypohVariationData tables at linked offsets, given
+    /// in an array at the end of the `gvar` header
+    ///
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/gvar#gvar-header
+    ///
+    /// - `axis_count :~ U16`: axis-count passed in from the gvar header
+    /// - `offsets :~ Offsets16([U16]) | Offsets32([U32])`: array of offsets stored in the gvar header
+    /// - `data_table`: Format definition for GlyphVariationData table
+    fn data_table_array(axis_count: Expr, offsets: Expr, data_table: FormatRef) -> Format {
+        chain(
+            pos32(),
+            "array_start",
+            Format::Match(
+                Box::new(offsets),
+                vec![
+                    (
+                        Pattern::Variant(Label::Borrowed("Offsets16"), Box::new(bind("half16s"))),
+                        for_each_pair(
+                            var("half16s"),
+                            (scale2, scale2),
+                            ["this_offs", "next_offs"],
+                            data_table_array_entry(
+                                axis_count.clone(),
+                                var("array_start"),
+                                var("this_offs"),
+                                var("next_offs"),
+                                data_table,
+                            ),
+                        ),
+                    ),
+                    (
+                        Pattern::Variant(Label::Borrowed("Offsets32"), Box::new(bind("off32s"))),
+                        for_each_pair(
+                            var("off32s"),
+                            (id, id),
+                            ["this_offs", "next_offs"],
+                            data_table_array_entry(
+                                axis_count,
+                                var("array_start"),
+                                var("this_offs"),
+                                var("next_offs"),
+                                data_table,
+                            ),
+                        ),
+                    ),
+                ],
+            ),
+        )
+    }
+
+    /// Format for processing the array-of-offsets in a gvar header, which can be either
+    /// U16Be or U32Be depending on the flag `is_long_offsets`. When the values are U16,
+    /// the actual offset requires scaling the raw u16be value by a factor of 2.
+    ///
+    /// The number of entries in the array is `glyph_count + 1` (as the offsets are processed
+    /// pairwise to determine entry-length), similar to `loca` tables.
+    ///
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/gvar#glyph-variations-table-format
+    fn offsets_array(is_long_offsets: Expr, glyph_count: Expr) -> Format {
+        if_then_else(
+            is_long_offsets,
+            fmt_variant(
+                "Offsets32",
+                repeat_count(succ(glyph_count.clone()), u32be()),
+            ),
+            fmt_variant("Offsets16", repeat_count(succ(glyph_count), u16be())),
+        )
+    }
+
+    pub(crate) fn table(module: &mut FormatModule) -> FormatRef {
+        let gvar_flags = header_flags();
+        let tuple_record = tuple_record(module);
+        let glyph_variation_data_table = glyph_variation_data(module, tuple_record);
+
+        // NOTE - can only appear in font files with fvar and glyf tables also present
+        // TODO[epic=view-over-pos32] - refactor to use ViewFormat over position arithmetic
+        module.define_format(
+            "opentype.gvar_table",
+            record([
+                ("gvar_table_start", pos32()),
+                ("major_version", util::expect_u16be(1)),
+                ("minor_version", util::expect_u16be(0)),
+                ("axis_count", u16be()),
+                ("shared_tuple_count", u16be()),
+                (
+                    "shared_tuples_offset",
+                    util::offset32(
+                        var("gvar_table_start"),
+                        repeat_count(
+                            var("shared_tuple_count"),
+                            tuple_record.call_args(vec![var("axis_count")]),
+                        ),
+                    ),
+                ),
+                ("glyph_count", u16be()),
+                ("flags", gvar_flags),
+                ("glyph_variation_data_array_offset", u32be()),
+                (
+                    "glyph_variation_data_offsets",
+                    offsets_array(
+                        record_proj(var("flags"), "is_long_offset"),
+                        var("glyph_count"),
+                    ),
+                ),
+                (
+                    // TODO[epic=view-over-pos32] - refactor using ViewFormat constructions
+                    "glyph_variation_data_array",
+                    util::linked_offset32(
+                        var("gvar_table_start"),
+                        var("glyph_variation_data_array_offset"),
+                        data_table_array(
+                            var("axis_count"),
+                            var("glyph_variation_data_offsets"),
+                            glyph_variation_data_table,
+                        ),
+                    ),
+                ),
+            ]),
+        )
+    }
+
+    /// GlyphVariationData table format definition
+    ///
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/gvar#the-glyphvariationdata-table-array
+    fn glyph_variation_data(module: &mut FormatModule, tuple_record: FormatRef) -> FormatRef {
+        use BitFieldKind::*;
+        let tuple_variation_header = tuple_variation_header(module, tuple_record);
+        let packed_point_numbers = packed_point_numbers(module);
+        let serialized_data = serialized_data(module, packed_point_numbers, tuple_variation_header);
+
+        let tuple_variation_count = bit_fields_u16([
+            FlagBit("shared_point_numbers"),
+            Reserved {
+                bit_width: 3,
+                check_zero: SHOULD_CHECK_ZERO,
+            },
+            BitsField {
+                bit_width: 12,
+                field_name: "tuple_count",
+            },
+        ]);
+
+        module.define_format_args(
+            "opentype.gvar.glyph_variation_data",
+            vec![(
+                Label::Borrowed("axis_count"),
+                ValueType::Base(BaseType::U16),
+            )],
+            record_auto([
+                ("table_start", pos32()),
+                ("tuple_variation_count", tuple_variation_count),
+                // REVIEW[epic=retrograde-dependency] - consider alternate approaches to avoid constructing dummy offset-field
+                // TODO[epic=view-over-pos32] - this hack solves itself (mostly) in a ViewFormat-based refactor
+                ("_data_offset", where_nonzero::<U16>(u16be())),
+                (
+                    "tuple_variation_headers",
+                    repeat_count(
+                        record_proj(var("tuple_variation_count"), "tuple_count"),
+                        tuple_variation_header.call_args(vec![var("axis_count")]),
+                    ),
+                ),
+                (
+                    "data",
+                    util::link_forward_unchecked(
+                        util::pos_add_u16(var("table_start"), var("_data_offset")),
+                        serialized_data.call_args(vec![
+                            record_proj(var("tuple_variation_count"), "shared_point_numbers"),
+                            var("tuple_variation_headers"),
+                        ]),
+                    ),
+                ),
+            ]),
+        )
+    }
+
+    /// GVAR-specific Serialiezd Data section
+    ///
+    /// Defined as a dep-format that takes two argumnts
+    ///  - `shared_point_numbers :~ Bool`
+    ///  - `tuple_var_headers :~ Seq(TypeOf(TupleVarHeader))``
+    ///
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/otvarcommonformats#serialized-data
+    fn serialized_data(
+        module: &mut FormatModule,
+        packed_point_numbers: FormatRef,
+        tuple_variation_header: FormatRef,
+    ) -> FormatRef {
+        let header_type = module
+            .get_format_type(tuple_variation_header.get_level())
+            .clone();
+        module.define_format_args(
+            "opentype.gvar.serialized-data",
+            vec![
+                (Label::Borrowed("shared_point_numbers"), ValueType::BOOL),
+                (
+                    Label::Borrowed("tuple_var_headers"),
+                    ValueType::Seq(Box::new(header_type)),
+                ),
+            ],
+            record([
+                (
+                    "shared_point_numbers",
+                    cond_maybe(var("shared_point_numbers"), packed_point_numbers.call()),
+                ),
+                (
+                    "per_tuple_variation_data",
+                    for_each(
+                        var("tuple_var_headers"),
+                        "header",
+                        slice(
+                            record_proj(var("header"), "variation_data_size"),
+                            record([
+                                (
+                                    "private_point_numbers",
+                                    cond_maybe(
+                                        record_lens(
+                                            var("header"),
+                                            &["tuple_index", "private_point_numbers"],
+                                        ),
+                                        packed_point_numbers.call(),
+                                    ),
+                                ),
+                                (
+                                    "x_and_y_coordinate_deltas",
+                                    Format::Let(
+                                        Label::Borrowed("point_count"),
+                                        Box::new(tuple_proj(
+                                            expr_option_unwrap_first(
+                                                var("private_point_numbers"),
+                                                var("shared_point_numbers"),
+                                            ),
+                                            0,
+                                        )),
+                                        Box::new(packed_deltas(mul(
+                                            var("point_count"),
+                                            Expr::U16(2),
+                                        ))),
+                                    ),
+                                ),
+                            ]),
+                        ),
+                    ),
+                ),
+            ]),
+        )
+    }
+
+    /// Given two U8-kinded `Expr`s, `hi` and `lo`, computes a 16-bit value whose high byte
+    /// is `hi` with its MSB zeroed out, and whose low byte is `lo`.
+    fn u15be(hi: Expr, lo: Expr) -> Expr {
+        bit_or(
+            shl(bit_and(as_u16(hi), Expr::U16(0x7f)), Expr::U16(8)),
+            as_u16(lo),
+        )
+    }
+
+    /// Individual run of point-number data, consisting of a control-byte that dictates the width of a point-number
+    /// (u8 or u16) and how many such values are stored, followed by an array of the indicated length and element-width.
+    ///
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/otvarcommonformats#packed-point-numbers
+    fn point_number_run(module: &mut FormatModule) -> FormatRef {
+        use BitFieldKind::*;
+        let control_byte = bit_fields_u8([
+            FlagBit("points_are_words"), // If set, each point is a u16-based delta; u8 otherwise
+            BitsField {
+                bit_width: 7,
+                field_name: "point_run_count",
+            }, // 7-bit run-length
+        ]);
+        module.define_format(
+            "opentype.var.packed-point-numbers.run",
+            record([
+                ("control", control_byte),
+                (
+                    "points",
+                    Format::Let(
+                        // REVIEW - should this be a synthetic field of the record, to make AccumUntil loop easier to specify?
+                        Label::Borrowed("run_length"),
+                        // Value stored in low 7 bits of control-byte is one less than the actual run-length
+                        Box::new(succ(record_proj(var("control"), "point_run_count"))),
+                        Box::new(if_then_else(
+                            record_proj(var("control"), "points_are_words"),
+                            fmt_variant("Points16", repeat_count(var("run_length"), u16be())),
+                            fmt_variant("Points8", repeat_count(var("run_length"), u8())),
+                        )),
+                    ),
+                ),
+            ]),
+        )
+    }
+
+    /// Dependent format (taking U16-kinded argument `point_count`) that accumulates [`point_number_run`] parses
+    /// until a total of `point_count` point-numbers have been parsed.
+    ///
+    /// # Notes
+    ///
+    /// If the `point_count` is only satisfied after reading a run that contains more than enough point-numbers
+    /// proceeds no differently than if the exact count of point-number values were read.
+    fn point_number_runs(module: &mut FormatModule) -> FormatRef {
+        let run = point_number_run(module);
+        let update_totlen = lambda_tuple(
+            ["acc", "run"],
+            add(
+                var("acc"),
+                // NOTE - the value stored in the control-byte is 1 less than the actual number of points in the run
+                succ(as_u16(record_lens(
+                    var("run"),
+                    &["control", "point_run_count"],
+                ))),
+            ),
+        );
+        module.define_format_args(
+            "opentype.var.packed-point-numbers.runs",
+            vec![(Label::Borrowed("point_count"), ValueType::U16)],
+            accum_until(
+                lambda_tuple(
+                    ["totlen", "_seq"],
+                    expr_gte(var("totlen"), var("point_count")),
+                ),
+                update_totlen,
+                Expr::U16(0),
+                ValueType::Base(BaseType::U16),
+                run.call(),
+            ),
+        )
+    }
+
+    /// Packed "point" numbers format definition
+    ///
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/otvarcommonformats#packed-point-numbers
+    fn packed_point_numbers(module: &mut FormatModule) -> FormatRef {
+        let runs = point_number_runs(module);
+        // Variable-precision count-field that is one-byte if it fits in 7 bits, or 15-bit if it doesn't (U16Be ignoring MSB in first byte read)
+        module.define_format(
+            "opentype.var.packed-point-numbers",
+            union([
+                map(
+                    is_byte(0),
+                    lambda("_", Expr::Tuple(vec![Expr::U16(0), seq_empty()])),
+                ),
+                chain(
+                    byte_in(1..=127),
+                    "point_count",
+                    runs.call_args(vec![as_u16(var("point_count"))]),
+                ),
+                chain(
+                    byte_in(128..=255),
+                    "hi",
+                    chain(
+                        u8(),
+                        "lo",
+                        runs.call_args(vec![u15be(var("hi"), var("lo"))]),
+                    ),
+                ),
+            ]),
+        )
+    }
+
+    fn tuple_variation_header(module: &mut FormatModule, tuple_record: FormatRef) -> FormatRef {
+        use BitFieldKind::*;
+        const SHOULD_CHECK_ZERO: bool = false;
+        let tuple_index = bit_fields_u16([
+            FlagBit("embedded_peak_tuple"), // if set, includes an embedded peak tuple record, immediately after tupleIndex, and that the low 12 bits (field `tuple_index`) are to be ignored
+            FlagBit("intermediate_region"), // if set, header includes a start- and end-tuple-record (2 tuple records total) immediately after peak-tuple-record logical position (whether present or not)
+            FlagBit("private_point_numbers"), // if set, serialized data includes packed "point" number data; when not set, the shared number data at the start of serialized data is used by default
+            Reserved {
+                bit_width: 1,
+                check_zero: SHOULD_CHECK_ZERO,
+            },
+            BitsField {
+                bit_width: 12,
+                field_name: "tuple_index",
+            },
+        ]);
+        module.define_format_args(
+            "opentype.gvar.tuple_variation_header",
+            vec![(Label::Borrowed("axis_count"), ValueType::U16)],
+            record([
+                ("variation_data_size", u16be()), // size, in bytes, of serialized data for this tuple variation table
+                ("tuple_index", tuple_index),
+                (
+                    "peak_tuple",
+                    cond_maybe(
+                        record_proj(var("tuple_index"), "embedded_peak_tuple"),
+                        tuple_record.call_args(vec![var("axis_count")]),
+                    ),
+                ),
+                (
+                    "intermediate_tuples",
+                    cond_maybe(
+                        record_proj(var("tuple_index"), "intermediate_region"),
+                        record_repeat(
+                            ["start_tuple", "end_tuple"],
+                            tuple_record.call_args(vec![var("axis_count")]),
+                        ),
+                    ),
+                ),
+            ]),
+        )
+    }
+
+    /// Definition for Tuple Records used in variation tables
+    ///
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/otvarcommonformats#tuple-records
+    /// TODO - change namespace from `gvar` to `var`, move to common submodule for multi-table sub-formats
+    fn tuple_record(module: &mut FormatModule) -> FormatRef {
+        module.define_format_args(
+            "opentype.gvar.tuple_record",
+            vec![(Label::Borrowed("axis_count"), ValueType::U16)],
+            record([(
+                "coordinates",
+                repeat_count(var("axis_count"), util::f2dot14()),
+            )]),
+        )
+    }
+}
+
+pub(crate) mod fvar {
+    use super::*;
+
+    pub(crate) fn table(module: &mut FormatModule, tag: FormatRef) -> FormatRef {
+        let variation_axis_record = variation_axis_record(module, tag);
+        let instance_record = instance_record(module);
+
+        // First half of `fvar` table: fixed-size header
+        let fvar_header = record_auto([
+            ("table_start", pos32()),
+            ("major_version", util::expect_u16be(1)),
+            ("minor_version", util::expect_u16be(0)),
+            // REVIEW[epic=retrograde-dependency] - consider alternate approaches to avoid constructing dummy offset-field
+            (
+                "_offset_axes",
+                where_lambda(u16be(), "raw", is_nonzero_u16(var("raw"))),
+            ),
+            ("__reserved", util::expect_u16be(2)),
+            ("axis_count", u16be()),
+            ("axis_size", util::expect_u16be(20)), // For fvar version 1.0, axis record are fixed-size == 20 (0x0014) bytes
+            ("instance_count", u16be()),
+            ("instance_size", u16be()), // not yet enforced, but should be axisCount * sizeOf(Fixed32Be) + (4 or 6)
+        ]);
+        // Second half of `fvar` table: offset-linked axes and instances
+        let fvar_arrays = record_auto([
+            (
+                "_axes_length",
+                compute(mul(var("axis_count"), var("axis_size"))),
+            ),
+            (
+                "axes",
+                // TODO - this becomes a lot easier if we use ViewFormats instead of offset-parse patterns
+                // NOTE - because we delay interpretation of the offset above to collect additional fields, we inline and specialize offset16 based on the captured value
+                util::link_forward_unchecked(
+                    util::pos_add_u16(var("table_start"), var("_offset_axes")),
+                    slice(
+                        var("_axes_length"),
+                        repeat_count(
+                            var("axis_count"),
+                            // because axis_size is fixed at 20 and variation_axis_record is a fixed-width (20 byte) parse, we don't need a slice here
+                            variation_axis_record.call(),
+                        ),
+                    ),
+                ),
+            ),
+            (
+                "instances",
+                // TODO - this becomes a lot easier if we use ViewFormats instead of offset-parse patterns
+                // NOTE - because we delay interpretation of the offset above to collect additional fields, we inline and specialize offset16 based on the captured value
+                util::link_forward_unchecked(
+                    util::pos_add_u16(
+                        var("table_start"),
+                        // use the length of the axes array as a second-order correction to the original offset
+                        add(var("_offset_axes"), var("_axes_length")),
+                    ),
+                    repeat_count(
+                        var("instance_count"),
+                        slice(
+                            var("instance_size"),
+                            instance_record
+                                .call_args(vec![var("axis_count"), var("instance_size")]),
+                        ),
+                    ),
+                ),
+            ),
+        ]);
+        module.define_format(
+            "opentype.fvar.table",
+            merge_records([fvar_header, fvar_arrays]),
+        )
+    }
+
+    /// InstanceRecord format implementation
+    ///
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/fvar#instancerecord
+    fn instance_record(module: &mut FormatModule) -> FormatRef {
+        let user_tuple = user_tuple(module);
+        module.define_format_args(
+            "opentype.fvar.instance_record",
+            vec![
+                (Label::Borrowed("axis_count"), ValueType::U16),
+                (Label::Borrowed("instance_size"), ValueType::U16),
+            ],
+            record([
+                ("subfamily_nameid", u16be()),
+                ("flags", util::expect_u16be(0)), // reserved for future use, should be set to 0,
+                ("coordinates", user_tuple.call_args(vec![var("axis_count")])),
+                (
+                    "postscript_nameid",
+                    cond_maybe(
+                        // Only included if the extra 2 bytes are implied by `instance_size`, which is otherwise divisible by 4
+                        expr_eq(rem(var("instance_size"), Expr::U16(4)), Expr::U16(2)),
+                        u16be(),
+                    ),
+                ),
+            ]),
+        )
+    }
+
+    /// UserTuple record (part of `InstanceRecord`)
+    ///
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/fvar#instancerecord
+    fn user_tuple(module: &mut FormatModule) -> FormatRef {
+        module.define_format_args(
+            "opentype.fvar.user_tuple",
+            vec![(Label::Borrowed("axis_count"), ValueType::U16)],
+            record([(
+                "coordinates",
+                repeat_count(var("axis_count"), util::fixed32be()),
+            )]),
+        )
+    }
+
+    fn variation_axis_record(module: &mut FormatModule, tag: FormatRef) -> FormatRef {
+        use BitFieldKind::*;
+        let axis_qual_flags = bit_fields_u16([
+            Reserved {
+                bit_width: 15,
+                check_zero: false,
+            },
+            FlagBit("hidden_axis"),
+        ]);
+        module.define_format(
+            "opentype.fvar.variation_axis_record",
+            record([
+                ("axis_tag", tag.call()),             // 4 bytes
+                ("min_value", util::fixed32be()),     // + 4 = 8 bytes
+                ("default_value", util::fixed32be()), // + 4 = 12 bytes
+                ("max_value", util::fixed32be()),     // +4 = 16 bytes
+                ("flags", axis_qual_flags),           // + 2 = 18 bytes
+                ("axis_name_id", u16be()),            // + 2 = 20 bytes
+            ]),
+        )
+    }
+}
+
+pub(crate) mod kern {
+    use super::*;
+
+    pub(crate) fn table(module: &mut FormatModule) -> FormatRef {
+        let kern_subtable = subtable(module);
+        module.define_format(
+            "opentype.kern.table",
+            record([
+                ("version", util::expect_u16be(0)), // Table version number (KernHeader)
+                ("n_tables", u16be()),
+                (
+                    "subtables",
+                    repeat_count(var("n_tables"), kern_subtable.call()),
+                ),
+            ]),
+        )
+    }
+
+    fn subtable(module: &mut FormatModule) -> FormatRef {
+        let kern_cov_flags = kern_cov_flags();
+        // SECTION - `kern` subtable record-formats
+
+        let format0 = subtable_format0(module);
+        let format2 = subtable_format2(module);
+        // !SECTION
+        /* Previously defined as a slice_record but sufficiently large `n_pairs` values for Format0
+         * could cause length to wrap around mod 65536 and lead to slice boundary violation
+         * while reading `kern_pairs`
+         */
+        module.define_format(
+            "opentype.kern.kern_subtable",
+            record([
+                ("version", util::expect_u16be(0)),
+                ("length", u16be()), // NOTE - Cannot be trusted as overflow exists in the wild
+                ("coverage", kern_cov_flags),
+                (
+                    "data",
+                    match_variant(
+                        record_proj(var("coverage"), "format"),
+                        [
+                            (Pattern::U16(0), "Format0", format0.call()),
+                            (Pattern::U16(2), "Format2", format2.call()),
+                            // REVIEW - do we even want to bother with an explicit catch-all failure branch?
+                            (Pattern::Wildcard, "UnknownFormat", Format::Fail),
+                        ],
+                    ),
+                ),
+            ]),
+        )
+    }
+
+    // REVIEW - consider refactoring into FormatRef registration
+    /// Kern subtable format 0
+    ///
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/kern#format-0
+    fn subtable_format0(module: &mut FormatModule) -> FormatRef {
+        let kern_pair = record([
+            ("left", u16be()),        // glyph index for left-hand glyph in kerning pair
+            ("right", u16be()),       // glyph index for right-hand glyph in kerning pair
+            ("value", util::s16be()), // kerning value for given pair, in design-units. Positive values move characters apart, negative values move characters closer together.
+        ]);
+        module.define_format(
+            "opentype.kern.subtable.format0",
+            record([
+                ("n_pairs", u16be()),
+                ("search_range", u16be()), // sizeof(table_entry) * (2^(ilog2(n_pairs)))
+                ("entry_selector", u16be()), // ilog2(n_pairs) [number of iterations of binary search algo to find a query]
+                ("range_shift", u16be()),    // (nPairs - 2^(ilog2(nPairs))) * sizeof(table_entry)
+                // NOTE - kern-pairs array is sorted by the value of the packed Word32 consisting of the bytes of `left` and `right` in that order (big-endian).
+                ("kern_pairs", repeat_count(var("n_pairs"), kern_pair)),
+            ]),
+        )
+    }
+
+    /// Helper function used to compute the number of glyphs in a left-or-right class table (for Format 2 kern subtables)
+    fn glyph_count(class_table_offset: Expr) -> Expr {
+        record_proj(
+            expr_unwrap(util::get_content_at_offset(class_table_offset)),
+            // NOTE - this corresponds to the identifier used in class_table in subtable_format2
+            "n_glyphs",
+        )
+    }
+
+    /// Simultaneously 2D/1D array for kerning values
+    ///
+    /// 'Left-by-right': each row represents a left-hand glyph class, each column represents a right-hand glyph class
+    ///
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/kern#format-2
+    ///
+    /// # Notes
+    ///
+    /// The indices in ClassTables are scaled (J = 2 x j ; I = 2 x M x i) to facilitate offset-arithmetic for random access (TargetOffset(i,j) = BaseOffset + I + J)
+    fn kerning_array(left_class_offset: Expr, right_class_offset: Expr) -> Format {
+        repeat_count(
+            glyph_count(left_class_offset), // N rows where there are N left-hand classes
+            repeat_count(
+                glyph_count(right_class_offset), // M columns
+                util::s16be(),                   // FWORD value at index (i, j)
+            ),
+        )
+    }
+    /// Kern subtable format 2
+    ///
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/kern#format-2
+    fn subtable_format2(module: &mut FormatModule) -> FormatRef {
+        let class_table = module.define_format(
+            "opentype.kern.class_table",
+            record([
+                ("first_glyph", u16be()), // first glyph in class range
+                ("n_glyphs", u16be()),    // number of glyphs in class range
+                ("class_values", repeat_count(var("n_glyphs"), u16be())), // class values for each glyph in class range
+            ]),
+        );
+        module.define_format(
+            "opentype.kern.subtable.format2",
+            record([
+                ("table_start", pos32()),
+                ("row_width", u16be()), // width (in bytes) of a table row
+                (
+                    "left_class_offset",
+                    util::offset16_mandatory(var("table_start"), class_table.call()),
+                ),
+                (
+                    "right_class_offset",
+                    util::offset16_mandatory(var("table_start"), class_table.call()),
+                ),
+                (
+                    "kerning_array_offset",
+                    util::offset16_mandatory(
+                        var("table_start"),
+                        kerning_array(var("left_class_offset"), var("right_class_offset")),
+                    ),
+                ),
+            ]),
+        )
+    }
+
+    // REVIEW - consider refactoring into FormatRef registration
+    fn kern_cov_flags() -> Format {
+        use BitFieldKind::*;
+        // REVIEW[epic=check-zero] - should we consider changing this constant to `true`
+        const SHOULD_CHECK_ZERO: bool = false;
+        bit_fields_u16([
+            BitsField {
+                bit_width: 8,
+                field_name: "format",
+            },
+            Reserved {
+                bit_width: 4,
+                check_zero: SHOULD_CHECK_ZERO,
+            },
+            FlagBit("override"), // Bit 3 - when true, value in this table replaces the current accumulator value
+            FlagBit("cross_stream"), // Bit 2 - when true, kerning is perpendicular to text-flow (reset by 0x8000 in kerning data)
+            FlagBit("minimum"), // Bit 1 - when true, table contains minimum values, otherwise the table has kerning values
+            FlagBit("horizontal"), // Bit 0 - when true, table has horizontal data, otherwise vertical
+        ])
+    }
+}
+
+mod base {
+    use super::*;
+
+    /// BASE table format definition
+    ///
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/base
+    pub(crate) fn table(
+        module: &mut FormatModule,
+        tag: FormatRef,
+        device_or_variation_index_table: FormatRef,
+        item_variation_store: FormatRef,
+    ) -> FormatRef {
+        let base_coord = base_coord(module, device_or_variation_index_table);
+        let min_max = min_max(module, tag, base_coord);
+        let base_values = base_values(module, base_coord);
+        let base_lang_sys = |table_start: Expr| {
+            record([
+                ("base_lang_sys_tag", tag.call()),
+                (
+                    "min_max_offset",
+                    util::offset16_mandatory(table_start, min_max.call()),
+                ),
+            ])
+        };
+        let base_script = module.define_format(
+            "opentype.layout.base_script",
+            record([
+                ("table_start", pos32()),
+                (
+                    "base_values_offset",
+                    util::offset16_nullable(var("table_start"), base_values.call()),
+                ),
+                (
+                    "default_min_max_offset",
+                    util::offset16_nullable(var("table_start"), min_max.call()),
+                ),
+                ("base_lang_sys_count", u16be()),
+                (
+                    "base_lang_sys_records",
+                    repeat_count(
+                        var("base_lang_sys_count"),
+                        base_lang_sys(var("table_start")),
+                    ),
+                ),
+            ]),
+        );
+        let base_script_record = |table_start: Expr| {
+            record([
+                ("base_script_tag", tag.call()),
+                (
+                    "base_script_offset",
+                    util::offset16_mandatory(table_start, base_script.call()),
+                ),
+            ])
+        };
+        let base_script_list = record([
+            ("table_start", pos32()),
+            ("base_script_count", u16be()),
+            (
+                "base_script_records",
+                repeat_count(
+                    var("base_script_count"),
+                    base_script_record(var("table_start")),
+                ),
+            ),
+        ]);
+        let base_tag_list = record([
+            ("base_tag_count", u16be()),
+            (
+                "baseline_tags",
+                repeat_count(var("base_tag_count"), tag.call()),
+            ), // must appear in alphabetical order (not enforced locally)
+        ]);
+        let axis_table = module.define_format(
+            "opentype.layout.axis_table",
+            record([
+                ("table_start", pos32()),
+                (
+                    "base_tag_list_offset",
+                    util::offset16_nullable(var("table_start"), base_tag_list),
+                ),
+                (
+                    "base_script_list_offset",
+                    util::offset16_mandatory(var("table_start"), base_script_list),
+                ),
+            ]),
+        );
+        module.define_format(
+            "opentype.base.table",
+            // STUB - implement base table
+            record([
+                ("table_start", pos32()),
+                ("major_version", util::expect_u16be(1)),
+                ("minor_version", where_between_u16(u16be(), 0, 1)), // v1.0 and v1.1
+                (
+                    "horiz_axis_offset",
+                    util::offset16_nullable(var("table_start"), axis_table.call()),
+                ),
+                (
+                    "vert_axis_offset",
+                    util::offset16_nullable(var("table_start"), axis_table.call()),
+                ),
+                (
+                    "item_var_store_offset",
+                    cond_maybe(
+                        expr_gt(var("minor_version"), Expr::U16(0)),
+                        util::offset32(var("table_start"), item_variation_store.call()),
+                    ),
+                ),
+            ]),
+        )
+    }
+
+    /// BaseValues table
+    ///
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/base#basevalues-table
+    fn base_values(module: &mut FormatModule, base_coord: FormatRef) -> FormatRef {
+        let base_values = module.define_format(
+            "opentype.layout.base_values",
+            record([
+                ("table_start", pos32()),
+                ("default_baseline_index", u16be()),
+                ("base_coord_count", u16be()), // NOTE - should be equal to baseTagCount in BaseTagList
+                (
+                    "base_coord_offsets",
+                    repeat_count(
+                        var("base_coord_count"),
+                        util::offset16_mandatory(var("table_start"), base_coord.call()),
+                    ),
+                ),
+            ]),
+        );
+        base_values
+    }
+
+    /// MinMax table format definition
+    ///
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/base#the-minmax-table-and-featminmax-record
+    fn min_max(module: &mut FormatModule, tag: FormatRef, base_coord: FormatRef) -> FormatRef {
+        // TODO - refactor into dep-format or standalone function
+        let feat_min_max = |table_start: Expr| {
+            record([
+                ("feature_tag", tag.call()),
+                (
+                    "min_coord_offset",
+                    util::offset16_nullable(table_start.clone(), base_coord.call()),
+                ),
+                (
+                    "max_coord_offset",
+                    util::offset16_nullable(table_start.clone(), base_coord.call()),
+                ),
+            ])
+        };
+        module.define_format(
+            "opentype.layout.min_max",
+            record([
+                ("table_start", pos32()),
+                (
+                    "min_coord_offset",
+                    util::offset16_nullable(var("table_start"), base_coord.call()),
+                ),
+                (
+                    "max_coord_offset",
+                    util::offset16_nullable(var("table_start"), base_coord.call()),
+                ),
+                ("feat_min_max_count", u16be()),
+                (
+                    "feat_min_max_records",
+                    repeat_count(var("feat_min_max_count"), feat_min_max(var("table_start"))),
+                ),
+            ]),
+        )
+    }
+
+    /// BaseCoord table format definition
+    ///
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/base#basecoord-tables
+    fn base_coord(
+        module: &mut FormatModule,
+        device_or_variation_index_table: FormatRef,
+    ) -> FormatRef {
+        // REVIEW - is "hint" an appropriate name for what this field-format is used for?
+        // NOTE - 'hint' field is a nested record of any fields beyond `{ format, coordinate }` used in a given format
+        let hint1 = Format::EMPTY;
+        let hint2 = record([("reference_glyph", u16be()), ("base_coord_point", u16be())]);
+        let hint3 = |table_start: Expr| {
+            record([(
+                "device_offset",
+                util::offset16_nullable(table_start, device_or_variation_index_table.call()),
+            )])
+        };
+        module.define_format(
+            "opentype.layout.base_coord",
+            record([
+                ("table_start", pos32()),
+                ("format", u16be()),
+                ("coordinate", util::s16be()),
+                // REVIEW - is "hint" an appropriate name for this extra-fields field?
+                (
+                    "hint",
+                    match_variant(
+                        var("format"),
+                        [
+                            (Pattern::U16(1), "NoHint", hint1),
+                            (Pattern::U16(2), "GlyphHint", hint2),
+                            (Pattern::U16(3), "DeviceHint", hint3(var("table_start"))),
+                            (Pattern::Wildcard, "UnknownFormat", Format::Fail),
+                        ],
+                    ),
+                ),
+            ]),
+        )
+    }
 }
 
 mod gpos {
@@ -1839,7 +2216,7 @@ mod gpos {
             record([
                 (
                     "coverage_offset",
-                    offset16_mandatory(table_start.clone(), coverage_table.call()),
+                    util::offset16_mandatory(table_start.clone(), coverage_table.call()),
                 ),
                 ("value_format", value_format_flags.call()),
                 (
@@ -1852,7 +2229,7 @@ mod gpos {
             record([
                 (
                     "coverage_offset",
-                    offset16_mandatory(table_start.clone(), coverage_table.call()),
+                    util::offset16_mandatory(table_start.clone(), coverage_table.call()),
                 ),
                 ("value_format", value_format_flags.call()),
                 ("value_count", u16be()),
@@ -1938,7 +2315,7 @@ mod gpos {
             record([
                 (
                     "coverage",
-                    offset16_mandatory(table_start, coverage_table.call()),
+                    util::offset16_mandatory(table_start, coverage_table.call()),
                 ),
                 ("value_format1", value_format_flags.call()),
                 ("value_format2", value_format_flags.call()),
@@ -1947,7 +2324,7 @@ mod gpos {
                     "pair_sets",
                     repeat_count(
                         var("pair_set_count"),
-                        offset16_mandatory(
+                        util::offset16_mandatory(
                             var("table_start"),
                             pair_set(var("value_format1"), var("value_format2")),
                         ),
@@ -1984,17 +2361,17 @@ mod gpos {
             record([
                 (
                     "coverage",
-                    offset16_mandatory(pair_pos_start.clone(), coverage_table.call()),
+                    util::offset16_mandatory(pair_pos_start.clone(), coverage_table.call()),
                 ),
                 ("value_format1", value_format_flags.call()),
                 ("value_format2", value_format_flags.call()),
                 (
                     "class_def1",
-                    offset16_mandatory(pair_pos_start.clone(), class_def.call()),
+                    util::offset16_mandatory(pair_pos_start.clone(), class_def.call()),
                 ),
                 (
                     "class_def2",
-                    offset16_mandatory(pair_pos_start.clone(), class_def.call()),
+                    util::offset16_mandatory(pair_pos_start.clone(), class_def.call()),
                 ),
                 ("class1_count", u16be()),
                 ("class2_count", u16be()),
@@ -2054,23 +2431,23 @@ mod gpos {
             record([
                 (
                     "entry_anchor",
-                    offset16_nullable(table_start.clone(), anchor_table.call()),
+                    util::offset16_nullable(table_start.clone(), anchor_table.call()),
                 ),
                 (
                     "exit_anchor",
-                    offset16_nullable(table_start, anchor_table.call()),
+                    util::offset16_nullable(table_start, anchor_table.call()),
                 ),
             ])
         };
         module.define_format(
             "opentype.layout.cursive_pos",
-            embedded_singleton_alternation(
+            util::embedded_singleton_alternation(
                 [("table_start", pos32()), ("pos_format", u16be())],
                 ("pos_format", 1),
                 [
                     (
                         "coverage",
-                        offset16_mandatory(var("table_start"), coverage_table.call()),
+                        util::offset16_mandatory(var("table_start"), coverage_table.call()),
                     ),
                     ("entry_exit_count", u16be()),
                     (
@@ -2083,7 +2460,7 @@ mod gpos {
                 ],
                 "subtable",
                 "Format1",
-                NestingKind::UnifiedRecord,
+                util::NestingKind::UnifiedRecord,
             ),
         )
     }
@@ -2098,7 +2475,7 @@ mod gpos {
                 ("mark_class", u16be()),
                 (
                     "mark_anchor_offset",
-                    offset16_mandatory(table_start, anchor_table.call()),
+                    util::offset16_mandatory(table_start, anchor_table.call()),
                 ),
             ])
         };
@@ -2129,7 +2506,7 @@ mod gpos {
                 "base_anchor_offsets",
                 repeat_count(
                     mark_class_count,
-                    offset16_nullable(table_start, anchor_table.call()),
+                    util::offset16_nullable(table_start, anchor_table.call()),
                 ),
             )])
         };
@@ -2148,31 +2525,34 @@ mod gpos {
         };
         module.define_format(
             "opentype.layout.mark_base_pos",
-            embedded_singleton_alternation(
+            util::embedded_singleton_alternation(
                 [("table_start", pos32()), ("format", u16be())],
                 ("format", 1),
                 [
                     (
                         "mark_coverage_offset",
-                        offset16_mandatory(var("table_start"), coverage_table.call()),
+                        util::offset16_mandatory(var("table_start"), coverage_table.call()),
                     ),
                     (
                         "base_coverage_offset",
-                        offset16_mandatory(var("table_start"), coverage_table.call()),
+                        util::offset16_mandatory(var("table_start"), coverage_table.call()),
                     ),
                     ("mark_class_count", u16be()),
                     (
                         "mark_array_offset",
-                        offset16_mandatory(var("table_start"), mark_array.call()),
+                        util::offset16_mandatory(var("table_start"), mark_array.call()),
                     ),
                     (
                         "base_array_offset",
-                        offset16_mandatory(var("table_start"), base_array(var("mark_class_count"))),
+                        util::offset16_mandatory(
+                            var("table_start"),
+                            base_array(var("mark_class_count")),
+                        ),
                     ),
                 ],
                 "pos",
                 "Format1",
-                NestingKind::UnifiedRecord,
+                util::NestingKind::UnifiedRecord,
             ),
         )
     }
@@ -2192,7 +2572,7 @@ mod gpos {
                 "ligature_anchor_offsets",
                 repeat_count(
                     mark_class_count,
-                    offset16_nullable(table_start, anchor_table.call()),
+                    util::offset16_nullable(table_start, anchor_table.call()),
                 ),
             )])
         };
@@ -2219,33 +2599,36 @@ mod gpos {
                     "ligature_attach_offsets",
                     repeat_count(
                         var("ligature_count"),
-                        offset16_mandatory(var("table_start"), ligature_attach(mark_class_count)),
+                        util::offset16_mandatory(
+                            var("table_start"),
+                            ligature_attach(mark_class_count),
+                        ),
                     ),
                 ),
             ])
         };
         module.define_format(
             "opentype.layout.mark_lig_pos",
-            embedded_singleton_alternation(
+            util::embedded_singleton_alternation(
                 [("table_start", pos32()), ("format", u16be())],
                 ("format", 1),
                 [
                     (
                         "mark_coverage_offset",
-                        offset16_mandatory(var("table_start"), coverage_table.call()),
+                        util::offset16_mandatory(var("table_start"), coverage_table.call()),
                     ),
                     (
                         "ligature_coverage_offset",
-                        offset16_mandatory(var("table_start"), coverage_table.call()),
+                        util::offset16_mandatory(var("table_start"), coverage_table.call()),
                     ),
                     ("mark_class_count", u16be()),
                     (
                         "mark_array_offset",
-                        offset16_mandatory(var("table_start"), mark_array.call()),
+                        util::offset16_mandatory(var("table_start"), mark_array.call()),
                     ),
                     (
                         "ligature_array_offset",
-                        offset16_mandatory(
+                        util::offset16_mandatory(
                             var("table_start"),
                             ligature_array(var("mark_class_count")),
                         ),
@@ -2253,7 +2636,7 @@ mod gpos {
                 ],
                 "pos",
                 "Format1",
-                NestingKind::UnifiedRecord,
+                util::NestingKind::UnifiedRecord,
             ),
         )
     }
@@ -2273,7 +2656,7 @@ mod gpos {
                 "mark2_anchor_offsets",
                 repeat_count(
                     mark_class_count,
-                    offset16_nullable(table_start, anchor_table.call()),
+                    util::offset16_nullable(table_start, anchor_table.call()),
                 ),
             )])
         };
@@ -2293,26 +2676,26 @@ mod gpos {
         };
         module.define_format(
             "opentype.layout.mark_mark_pos",
-            embedded_singleton_alternation(
+            util::embedded_singleton_alternation(
                 [("table_start", pos32()), ("format", u16be())],
                 ("format", 1),
                 [
                     (
                         "mark1_coverage_offset",
-                        offset16_mandatory(var("table_start"), coverage_table.call()),
+                        util::offset16_mandatory(var("table_start"), coverage_table.call()),
                     ),
                     (
                         "mark2_coverage_offset",
-                        offset16_mandatory(var("table_start"), coverage_table.call()),
+                        util::offset16_mandatory(var("table_start"), coverage_table.call()),
                     ),
                     ("mark_class_count", u16be()),
                     (
                         "mark1_array_offset",
-                        offset16_mandatory(var("table_start"), mark_array.call()),
+                        util::offset16_mandatory(var("table_start"), mark_array.call()),
                     ),
                     (
                         "mark2_array_offset",
-                        offset16_mandatory(
+                        util::offset16_mandatory(
                             var("table_start"),
                             mark2_array(var("mark_class_count")),
                         ),
@@ -2320,7 +2703,7 @@ mod gpos {
                 ],
                 "pos",
                 "Format1",
-                NestingKind::UnifiedRecord,
+                util::NestingKind::UnifiedRecord,
             ),
         )
     }
@@ -2380,7 +2763,7 @@ mod gpos {
     pub(crate) fn pos_extension(module: &mut FormatModule, ground_pos: FormatRef) -> FormatRef {
         module.define_format(
             "opentype.layout.pos_extension",
-            embedded_singleton_alternation(
+            util::embedded_singleton_alternation(
                 [("table_start", pos32()), ("format", u16be())],
                 ("format", 1),
                 [
@@ -2390,7 +2773,7 @@ mod gpos {
                     ),
                     (
                         "extension_offset",
-                        offset32(
+                        util::offset32(
                             var("table_start"),
                             ground_pos.call_args(vec![var("extension_lookup_type")]),
                         ),
@@ -2398,7 +2781,7 @@ mod gpos {
                 ],
                 "pos",
                 "Format1",
-                NestingKind::UnifiedRecord,
+                util::NestingKind::UnifiedRecord,
             ),
         )
     }
@@ -2428,12 +2811,12 @@ mod gsub {
                                 record([
                                     (
                                         "coverage",
-                                        offset16_mandatory(
+                                        util::offset16_mandatory(
                                             var("table_start"),
                                             coverage_table.call(),
                                         ),
                                     ),
-                                    ("delta_glyph_id", s16be()),
+                                    ("delta_glyph_id", util::s16be()),
                                 ]),
                             ),
                             (
@@ -2443,7 +2826,7 @@ mod gsub {
                                 record([
                                     (
                                         "coverage",
-                                        offset16_mandatory(
+                                        util::offset16_mandatory(
                                             var("table_start"),
                                             coverage_table.call(),
                                         ),
@@ -2481,13 +2864,13 @@ mod gsub {
         ]);
         module.define_format(
             "opentype.layout.multiple_subst",
-            embedded_singleton_alternation(
+            util::embedded_singleton_alternation(
                 [
                     ("table_start", pos32()),
                     ("subst_format", u16be()),
                     (
                         "coverage",
-                        offset16_mandatory(var("table_start"), coverage_table.call()),
+                        util::offset16_mandatory(var("table_start"), coverage_table.call()),
                     ),
                 ],
                 ("subst_format", 1),
@@ -2497,14 +2880,14 @@ mod gsub {
                         "sequences",
                         repeat_count(
                             var("sequence_count"),
-                            offset16_mandatory(var("table_start"), sequence_table),
+                            util::offset16_mandatory(var("table_start"), sequence_table),
                         ),
                     ),
                 ],
                 "subst",
                 "Format1",
                 // REVIEW - Consider what style we want to adopt more generally for MultipleSubst, AlternateSubst, LigatureSubst
-                NestingKind::MinimalVariation,
+                util::NestingKind::MinimalVariation,
             ),
         )
     }
@@ -2525,13 +2908,13 @@ mod gsub {
         ]);
         module.define_format(
             "opentype.layout.alternate_subst",
-            embedded_singleton_alternation(
+            util::embedded_singleton_alternation(
                 [
                     ("table_start", pos32()),
                     ("subst_format", u16be()),
                     (
                         "coverage",
-                        offset16_mandatory(var("table_start"), coverage_table.call()),
+                        util::offset16_mandatory(var("table_start"), coverage_table.call()),
                     ),
                 ],
                 ("subst_format", 1),
@@ -2541,14 +2924,14 @@ mod gsub {
                         "alternate_sets",
                         repeat_count(
                             var("alternate_set_count"),
-                            offset16_mandatory(var("table_start"), alternate_set),
+                            util::offset16_mandatory(var("table_start"), alternate_set),
                         ),
                     ),
                 ],
                 "subst",
                 "Format1",
                 // REVIEW - Consider what style we want to adopt more generally for MultipleSubst, AlternateSubst, LigatureSubst
-                NestingKind::UnifiedRecord,
+                util::NestingKind::UnifiedRecord,
             ),
         )
     }
@@ -2575,19 +2958,19 @@ mod gsub {
                 "ligatures",
                 repeat_count(
                     var("ligature_count"),
-                    offset16_mandatory(var("table_start"), ligature_table),
+                    util::offset16_mandatory(var("table_start"), ligature_table),
                 ),
             ),
         ]);
         module.define_format(
             "opentype.layout.ligature_subst",
-            embedded_singleton_alternation(
+            util::embedded_singleton_alternation(
                 [
                     ("table_start", pos32()),
                     ("subst_format", u16be()),
                     (
                         "coverage",
-                        offset16_mandatory(var("table_start"), coverage_table.call()),
+                        util::offset16_mandatory(var("table_start"), coverage_table.call()),
                     ),
                 ],
                 ("subst_format", 1),
@@ -2597,14 +2980,14 @@ mod gsub {
                         "ligature_sets",
                         repeat_count(
                             var("ligature_set_count"),
-                            offset16_mandatory(var("table_start"), ligature_set),
+                            util::offset16_mandatory(var("table_start"), ligature_set),
                         ),
                     ),
                 ],
                 "subst",
                 "Format1",
                 // REVIEW - Consider what style we want to adopt more generally for MultipleSubst, AlternateSubst, LigatureSubst
-                NestingKind::UnifiedRecord,
+                util::NestingKind::UnifiedRecord,
             ),
         )
     }
@@ -2618,20 +3001,20 @@ mod gsub {
     ) -> FormatRef {
         module.define_format(
             "opentype.layout.reverse_chain_single_subst",
-            embedded_singleton_alternation(
+            util::embedded_singleton_alternation(
                 [("table_start", pos32()), ("subst_format", u16be())],
                 ("subst_format", 1),
                 [
                     (
                         "coverage",
-                        offset16_mandatory(var("table_start"), coverage_table.call()),
+                        util::offset16_mandatory(var("table_start"), coverage_table.call()),
                     ),
                     ("backtrack_glyph_count", u16be()),
                     (
                         "backtrack_coverage_tables",
                         repeat_count(
                             var("backtrack_glyph_count"),
-                            offset16_mandatory(var("table_start"), coverage_table.call()),
+                            util::offset16_mandatory(var("table_start"), coverage_table.call()),
                         ),
                     ),
                     ("lookahead_glyph_count", u16be()),
@@ -2639,7 +3022,7 @@ mod gsub {
                         "lookahead_coverage_tables",
                         repeat_count(
                             var("lookahead_glyph_count"),
-                            offset16_mandatory(var("table_start"), coverage_table.call()),
+                            util::offset16_mandatory(var("table_start"), coverage_table.call()),
                         ),
                     ),
                     ("glyph_count", u16be()),
@@ -2650,7 +3033,7 @@ mod gsub {
                 ],
                 "subst",
                 "Format1",
-                NestingKind::UnifiedRecord,
+                util::NestingKind::UnifiedRecord,
             ),
         )
     }
@@ -2701,7 +3084,7 @@ mod gsub {
     pub(crate) fn subst_extension(module: &mut FormatModule, ground_subst: FormatRef) -> FormatRef {
         module.define_format(
             "opentype.layout.subst_extension",
-            embedded_singleton_alternation(
+            util::embedded_singleton_alternation(
                 [("table_start", pos32()), ("format", u16be())],
                 ("format", 1),
                 [
@@ -2711,7 +3094,7 @@ mod gsub {
                     ),
                     (
                         "extension_offset",
-                        offset32(
+                        util::offset32(
                             var("table_start"),
                             ground_subst.call_args(vec![var("extension_lookup_type")]),
                         ),
@@ -2719,7 +3102,7 @@ mod gsub {
                 ],
                 "subst",
                 "Format1",
-                NestingKind::UnifiedRecord,
+                util::NestingKind::UnifiedRecord,
             ),
         )
     }
@@ -2794,7 +3177,7 @@ mod layout {
                     "chained_seq_rules",
                     repeat_count(
                         var("chained_seq_rule_count"),
-                        offset16_mandatory(var("table_start"), chained_sequence_rule.call()),
+                        util::offset16_mandatory(var("table_start"), chained_sequence_rule.call()),
                     ),
                 ),
             ]),
@@ -2849,14 +3232,14 @@ mod layout {
             record([
                 (
                     "coverage",
-                    offset16_mandatory(var("table_start"), coverage_table.call()),
+                    util::offset16_mandatory(var("table_start"), coverage_table.call()),
                 ),
                 ("chained_seq_rule_set_count", u16be()),
                 (
                     "chained_seq_rule_sets",
                     repeat_count(
                         var("chained_seq_rule_set_count"),
-                        offset16_nullable(var("table_start"), rule_set.call()),
+                        util::offset16_nullable(var("table_start"), rule_set.call()),
                     ),
                 ),
             ]),
@@ -2878,26 +3261,26 @@ mod layout {
             record([
                 (
                     "coverage",
-                    offset16_mandatory(var("table_start"), coverage_table.call()),
+                    util::offset16_mandatory(var("table_start"), coverage_table.call()),
                 ),
                 (
                     "backtrack_class_def",
-                    offset16_mandatory(var("table_start"), class_def.call()),
+                    util::offset16_mandatory(var("table_start"), class_def.call()),
                 ),
                 (
                     "input_class_def",
-                    offset16_mandatory(var("table_start"), class_def.call()),
+                    util::offset16_mandatory(var("table_start"), class_def.call()),
                 ),
                 (
                     "lookahead_class_def",
-                    offset16_mandatory(var("table_start"), class_def.call()),
+                    util::offset16_mandatory(var("table_start"), class_def.call()),
                 ),
                 ("chained_class_seq_rule_set_count", u16be()),
                 (
                     "chained_class_seq_rule_sets",
                     repeat_count(
                         var("chained_class_seq_rule_set_count"),
-                        offset16_nullable(var("table_start"), rule_set.call()),
+                        util::offset16_nullable(var("table_start"), rule_set.call()),
                     ),
                 ),
             ]),
@@ -2921,7 +3304,7 @@ mod layout {
                     "backtrack_coverages",
                     repeat_count(
                         var("backtrack_glyph_count"),
-                        offset16_mandatory(var("table_start"), coverage_table.call()),
+                        util::offset16_mandatory(var("table_start"), coverage_table.call()),
                     ),
                 ),
                 ("input_glyph_count", u16be()),
@@ -2929,7 +3312,7 @@ mod layout {
                     "input_coverages",
                     repeat_count(
                         var("input_glyph_count"),
-                        offset16_mandatory(var("table_start"), coverage_table.call()),
+                        util::offset16_mandatory(var("table_start"), coverage_table.call()),
                     ),
                 ),
                 ("lookahead_glyph_count", u16be()),
@@ -2937,7 +3320,7 @@ mod layout {
                     "lookahead_coverages",
                     repeat_count(
                         var("lookahead_glyph_count"),
-                        offset16_mandatory(var("table_start"), coverage_table.call()),
+                        util::offset16_mandatory(var("table_start"), coverage_table.call()),
                     ),
                 ),
                 ("seq_lookup_count", u16be()),
@@ -2974,7 +3357,7 @@ mod layout {
                     "rules",
                     repeat_count(
                         var("rule_count"),
-                        offset16_mandatory(var("table_start"), rule),
+                        util::offset16_mandatory(var("table_start"), rule),
                     ),
                 ),
             ])
@@ -2983,14 +3366,14 @@ mod layout {
             record([
                 (
                     "coverage",
-                    offset16_mandatory(table_start.clone(), coverage_table.call()),
+                    util::offset16_mandatory(table_start.clone(), coverage_table.call()),
                 ),
                 ("seq_rule_set_count", u16be()),
                 (
                     "seq_rule_sets",
                     repeat_count(
                         var("seq_rule_set_count"),
-                        offset16_nullable(table_start, rule_set.clone()),
+                        util::offset16_nullable(table_start, rule_set.clone()),
                     ),
                 ),
             ])
@@ -2999,18 +3382,18 @@ mod layout {
             record([
                 (
                     "coverage",
-                    offset16_mandatory(table_start.clone(), coverage_table.call()),
+                    util::offset16_mandatory(table_start.clone(), coverage_table.call()),
                 ),
                 (
                     "class_def",
-                    offset16_mandatory(table_start.clone(), class_def.call()),
+                    util::offset16_mandatory(table_start.clone(), class_def.call()),
                 ),
                 ("class_seq_rule_set_count", u16be()),
                 (
                     "class_seq_rule_sets",
                     repeat_count(
                         var("class_seq_rule_set_count"),
-                        offset16_nullable(table_start, rule_set.clone()),
+                        util::offset16_nullable(table_start, rule_set.clone()),
                     ),
                 ),
             ])
@@ -3023,7 +3406,7 @@ mod layout {
                     "coverage_tables",
                     repeat_count(
                         var("glyph_count"),
-                        offset16_mandatory(table_start, coverage_table.call()),
+                        util::offset16_mandatory(table_start, coverage_table.call()),
                     ),
                 ),
                 (
@@ -3110,7 +3493,7 @@ mod layout {
             ("feature_tag", tag.call()),
             (
                 "feature",
-                offset16_mandatory(feature_list_start, feature_table.call()),
+                util::offset16_mandatory(feature_list_start, feature_table.call()),
             ),
         ])
     }
@@ -3143,7 +3526,7 @@ mod layout {
             ("script_tag", tag.call()),
             (
                 "script",
-                offset16_mandatory(script_list_start, script_table.call()),
+                util::offset16_mandatory(script_list_start, script_table.call()),
             ),
         ])
     }
@@ -3179,20 +3562,21 @@ mod layout {
         tag: FormatRef,
         lang_sys: FormatRef,
     ) -> FormatRef {
+        let lang_sys_record = lang_sys_record(module, tag, lang_sys);
         module.define_format(
             "opentype.layout.script_table",
             record([
                 ("table_start", pos32()),
                 (
                     "default_lang_sys",
-                    offset16_nullable(var("table_start"), lang_sys.call()),
+                    util::offset16_nullable(var("table_start"), lang_sys.call()),
                 ),
                 ("lang_sys_count", u16be()),
                 (
                     "lang_sys_records",
                     repeat_count(
                         var("lang_sys_count"),
-                        lang_sys_record(var("table_start"), tag, lang_sys),
+                        lang_sys_record.call_args(vec![var("table_start")]),
                     ),
                 ),
             ]),
@@ -3275,53 +3659,73 @@ mod layout {
                 (Label::Borrowed("flags"), vf_flags_type.clone()),
             ],
             record([
-                opt_field("x_placement", s16be()),
-                opt_field("y_placement", s16be()),
-                opt_field("x_advance", s16be()),
-                opt_field("y_advance", s16be()),
+                opt_field("x_placement", util::s16be()),
+                opt_field("y_placement", util::s16be()),
+                opt_field("x_advance", util::s16be()),
+                opt_field("y_advance", util::s16be()),
                 opt_field(
                     "x_placement_device",
-                    offset16_mandatory(var("table_start"), device_or_variation_index_table.call()),
+                    util::offset16_mandatory(
+                        var("table_start"),
+                        device_or_variation_index_table.call(),
+                    ),
                 ),
                 opt_field(
                     "y_placement_device",
-                    offset16_mandatory(var("table_start"), device_or_variation_index_table.call()),
+                    util::offset16_mandatory(
+                        var("table_start"),
+                        device_or_variation_index_table.call(),
+                    ),
                 ),
                 opt_field(
                     "x_advance_device",
-                    offset16_mandatory(var("table_start"), device_or_variation_index_table.call()),
+                    util::offset16_mandatory(
+                        var("table_start"),
+                        device_or_variation_index_table.call(),
+                    ),
                 ),
                 opt_field(
                     "y_advance_device",
-                    offset16_mandatory(var("table_start"), device_or_variation_index_table.call()),
+                    util::offset16_mandatory(
+                        var("table_start"),
+                        device_or_variation_index_table.call(),
+                    ),
                 ),
             ]),
         )
     }
 
-    /// Helpor-function for defining the `LangSysRecord` format
+    /// Format registtration for LangSysRecord
+    ///
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#script-table
     pub(crate) fn lang_sys_record(
-        script_start: Expr,
+        module: &mut FormatModule,
         tag: FormatRef,
         lang_sys: FormatRef,
-    ) -> Format {
-        // REVIEW - shjould this be a FormatRef instead?
-        record([
-            ("lang_sys_tag", tag.call()),
-            (
-                "lang_sys",
-                offset16_mandatory(script_start, lang_sys.call()),
-            ),
-        ])
+    ) -> FormatRef {
+        module.define_format_args(
+            "opentype.layout.lang_sys_record",
+            vec![(Label::Borrowed("script_start"), ValueType::U32)],
+            record([
+                ("lang_sys_tag", tag.call()),
+                (
+                    "lang_sys",
+                    util::offset16_mandatory(var("script_start"), lang_sys.call()),
+                ),
+            ]),
+        )
     }
 
+    /// LangSys (language system) table definition
+    ///
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#language-system-table
     pub(crate) fn lang_sys(module: &mut FormatModule) -> FormatRef {
         // Language System Table
         module.define_format(
             "opentype.common.langsys",
             record([
-                ("lookup_order_offset", expect_u16be(0x0000)), // RESERVED - set to NULL [Offset16 type but it doesn't point to anything]
-                ("required_feature_index", u16be()),           // 0xFFFF if no features required
+                ("lookup_order_offset", util::expect_u16be(0x0000)), // RESERVED - set to NULL [Offset16 type but it doesn't point to anything]
+                ("required_feature_index", u16be()), // 0xFFFF if no features required
                 ("feature_index_count", u16be()),
                 (
                     "feature_indices",
@@ -3335,25 +3739,31 @@ mod layout {
         module: &mut FormatModule,
         device_or_variation_index_table: FormatRef,
     ) -> FormatRef {
-        let anchor_format1 = record([("x_coordinate", s16be()), ("y_coordinate", s16be())]);
+        let anchor_format1 = record([
+            ("x_coordinate", util::s16be()),
+            ("y_coordinate", util::s16be()),
+        ]);
         let anchor_format2 = record([
-            ("x_coordinate", s16be()),
-            ("y_coordinate", s16be()),
+            ("x_coordinate", util::s16be()),
+            ("y_coordinate", util::s16be()),
             ("anchor_point", u16be()),
         ]);
         // REVIEW[epic=closure-dep-formats] - should this be a Dep-Format registration (module.define_format_args) instead?
         let anchor_format3 = |table_start: Expr| {
             record([
-                ("x_coordinate", s16be()),
-                ("y_coordinate", s16be()),
+                ("x_coordinate", util::s16be()),
+                ("y_coordinate", util::s16be()),
                 // REVIEW - each offset below is individually nullable if the other is set, but it may be invalid for them to both be null simultaneously...?
                 (
                     "x_device_offset",
-                    offset16_nullable(table_start.clone(), device_or_variation_index_table.call()),
+                    util::offset16_nullable(
+                        table_start.clone(),
+                        device_or_variation_index_table.call(),
+                    ),
                 ),
                 (
                     "y_device_offset",
-                    offset16_nullable(table_start, device_or_variation_index_table.call()),
+                    util::offset16_nullable(table_start, device_or_variation_index_table.call()),
                 ),
             ])
         };
@@ -3390,17 +3800,17 @@ mod layout {
         module: &mut FormatModule,
         feature_table: FormatRef,
     ) -> FormatRef {
-        let condition_table = embedded_singleton_alternation(
+        let condition_table = util::embedded_singleton_alternation(
             [("format", u16be())],
             ("format", 1),
             [
                 ("axis_index", u16be()),
-                ("filter_range_min_value", f2dot14()),
-                ("filter_range_max_value", f2dot14()),
+                ("filter_range_min_value", util::f2dot14()),
+                ("filter_range_max_value", util::f2dot14()),
             ],
             "cond",
             "Format1",
-            NestingKind::UnifiedRecord,
+            util::NestingKind::UnifiedRecord,
         );
         let condition_set = record([
             ("table_start", pos32()),
@@ -3409,7 +3819,7 @@ mod layout {
                 "condition_offsets",
                 repeat_count(
                     var("condition_count"),
-                    offset32(var("table_start"), condition_table),
+                    util::offset32(var("table_start"), condition_table),
                 ),
             ),
         ]);
@@ -3418,14 +3828,14 @@ mod layout {
                 ("feature_index", u16be()),
                 (
                     "alternate_feature_offset",
-                    offset32(table_start, feature_table.call()),
+                    util::offset32(table_start, feature_table.call()),
                 ),
             ])
         };
         let feature_table_substitution = record([
             ("table_start", pos32()),
-            ("major_version", expect_u16be(1)),
-            ("minor_version", expect_u16be(0)),
+            ("major_version", util::expect_u16be(1)),
+            ("minor_version", util::expect_u16be(0)),
             ("substitution_count", u16be()),
             (
                 "substitutions",
@@ -3440,11 +3850,11 @@ mod layout {
             record([
                 (
                     "condition_set_offset",
-                    offset32(table_start.clone(), condition_set),
+                    util::offset32(table_start.clone(), condition_set),
                 ),
                 (
                     "feature_table_substitution_offset",
-                    offset32(table_start, feature_table_substitution),
+                    util::offset32(table_start, feature_table_substitution),
                 ),
             ])
         };
@@ -3452,8 +3862,8 @@ mod layout {
             "opentype.layout.feature_variations",
             record([
                 ("table_start", pos32()),
-                ("major_version", expect_u16be(1)),
-                ("minor_version", expect_u16be(0)),
+                ("major_version", util::expect_u16be(1)),
+                ("minor_version", util::expect_u16be(0)),
                 ("feature_variation_record_count", u32be()),
                 (
                     "feature_variation_records",
@@ -3479,8 +3889,8 @@ mod layout {
         let lookup_table = |tag: u32| {
             // NOTE - tag is a model-external value, lookup-type is model-internal.
             let lookup_subtable = |tag: u32, lookup_type: Expr| -> Format {
-                const GSUB: u32 = magic(b"GSUB");
-                const GPOS: u32 = magic(b"GPOS");
+                const GSUB: u32 = util::magic(b"GSUB");
+                const GPOS: u32 = util::magic(b"GPOS");
                 match tag {
                     // natural pattern-match on tag
                     GSUB => {
@@ -3545,7 +3955,7 @@ mod layout {
                     "subtables",
                     repeat_count(
                         var("sub_table_count"),
-                        offset16_mandatory(
+                        util::offset16_mandatory(
                             var("table_start"),
                             lookup_subtable(tag, var("lookup_type")),
                         ),
@@ -3568,7 +3978,7 @@ mod layout {
                 "lookups",
                 repeat_count(
                     var("lookup_count"),
-                    offset16_mandatory(var("table_start"), lookup_table(tag)),
+                    util::offset16_mandatory(var("table_start"), lookup_table(tag)),
                 ),
             ),
         ])
@@ -3590,19 +4000,19 @@ mod layout {
         // FIXME - this belongs above but because it is a Format and not yet FormatRef, it is not Copy and so has to be defined in the closure body
         record([
             ("table_start", pos32()),
-            ("major_version", expect_u16be(1)),
+            ("major_version", util::expect_u16be(1)),
             ("minor_version", u16be()),
             (
                 "script_list",
-                offset16_mandatory(var("table_start"), script_list.call()),
+                util::offset16_mandatory(var("table_start"), script_list.call()),
             ),
             (
                 "feature_list",
-                offset16_mandatory(var("table_start"), feature_list.call()),
+                util::offset16_mandatory(var("table_start"), feature_list.call()),
             ),
             (
                 "lookup_list",
-                offset16_mandatory(
+                util::offset16_mandatory(
                     var("table_start"),
                     lookup_list(
                         tag,
@@ -3615,14 +4025,14 @@ mod layout {
             ),
             (
                 "feature_variations",
-                offset16_mandatory(var("table_start"), feature_variations.call()),
+                util::offset16_mandatory(var("table_start"), feature_variations.call()),
             ),
             // FIXME - add Version 1.1-specific fields as cond_maybe on minor-version
             (
                 "feature_variations_offset",
                 cond_maybe(
                     expr_gt(var("minor_version"), Expr::U16(0)), // Since Major == 1 by assertion, minor > 0 implies v1.1 or (as yet unimplemented) greater
-                    offset32(var("table_start"), feature_variations.call()),
+                    util::offset32(var("table_start"), feature_variations.call()),
                 ),
             ),
         ])
@@ -3644,7 +4054,7 @@ mod gdef {
         let gdef_header_version_1_2 = |gdef_start_pos: Expr| {
             record([(
                 "mark_glyph_sets_def",
-                offset16_nullable(gdef_start_pos, mark_glyph_set.call()),
+                util::offset16_nullable(gdef_start_pos, mark_glyph_set.call()),
             )])
         };
         let gdef_header_version_1_3 = |gdef_start_pos: Expr| {
@@ -3652,44 +4062,44 @@ mod gdef {
             record([
                 (
                     "mark_glyph_sets_def",
-                    offset16_nullable(gdef_start_pos.clone(), mark_glyph_set.call()),
+                    util::offset16_nullable(gdef_start_pos.clone(), mark_glyph_set.call()),
                 ),
                 (
                     "item_var_store",
-                    offset32(gdef_start_pos, item_variation_store.call()),
+                    util::offset32(gdef_start_pos, item_variation_store.call()),
                 ),
             ])
         };
         let attach_list = { attach_list(coverage_table) };
         let lig_caret_list = lig_caret_list(coverage_table, device_or_variation_index_table);
         module.define_format(
-            "opentype.gdef_table",
+            "opentype.gdef.table",
             record([
                 // Starting offset of `GDEF` table
                 ("table_start", pos32()),
                 // Major Version of `GDEF` table - only 1[.x] defined
-                ("major_version", expect_u16be(1)), // NOTE - only major version 1 is defined: https://learn.microsoft.com/en-us/typography/opentype/spec/gdef#gdef-table-structures
+                ("major_version", util::expect_u16be(1)), // NOTE - only major version 1 is defined: https://learn.microsoft.com/en-us/typography/opentype/spec/gdef#gdef-table-structures
                 // Minor Version (can be [1.]0, [1.]2, or [1.]3)
                 ("minor_version", u16be()),
                 // Class definition table for glyph type (may be NULL)
                 (
                     "glyph_class_def",
-                    offset16_nullable(var("table_start"), class_def.call()),
+                    util::offset16_nullable(var("table_start"), class_def.call()),
                 ),
                 // Attachment point list table (may be NULL)
                 (
                     "attach_list",
-                    offset16_nullable(var("table_start"), attach_list),
+                    util::offset16_nullable(var("table_start"), attach_list),
                 ),
                 // Ligature caret list table (may be NULL)
                 (
                     "lig_caret_list",
-                    offset16_nullable(var("table_start"), lig_caret_list),
+                    util::offset16_nullable(var("table_start"), lig_caret_list),
                 ),
                 // Class definition table for mark attachment type (may be NULL)
                 (
                     "mark_attach_class_def",
-                    offset16_nullable(var("table_start"), class_def.call()),
+                    util::offset16_nullable(var("table_start"), class_def.call()),
                 ),
                 // Version-specific data, if > 1.0
                 // REVIEW - do we want to flatten this variant abstraction into two Option<...> fields instead?
@@ -3729,16 +4139,19 @@ mod gdef {
         device_or_variation_index_table: FormatRef,
     ) -> Format {
         let caret_value = {
-            let caret_value_format_1 = record([("coordinate", s16be())]);
+            let caret_value_format_1 = record([("coordinate", util::s16be())]);
 
             let caret_value_format_2 = record([("caret_value_point_index", u16be())]);
 
             let caret_value_format_3 = |table_start: Expr| {
                 record([
-                    ("coordinate", s16be()),
+                    ("coordinate", util::s16be()),
                     (
                         "table",
-                        offset16_mandatory(table_start, device_or_variation_index_table.call()),
+                        util::offset16_mandatory(
+                            table_start,
+                            device_or_variation_index_table.call(),
+                        ),
                     ),
                 ])
             };
@@ -3772,7 +4185,7 @@ mod gdef {
                 "caret_values",
                 repeat_count(
                     var("caret_count"),
-                    offset16_mandatory(var("table_start"), caret_value),
+                    util::offset16_mandatory(var("table_start"), caret_value),
                 ),
             ),
         ]);
@@ -3780,14 +4193,14 @@ mod gdef {
             ("table_start", pos32()),
             (
                 "coverage",
-                offset16_mandatory(var("table_start"), coverage_table.call()),
+                util::offset16_mandatory(var("table_start"), coverage_table.call()),
             ),
             ("lig_glyph_count", u16be()),
             (
                 "lig_glyph_offsets",
                 repeat_count(
                     var("lig_glyph_count"),
-                    offset16_mandatory(var("table_start"), lig_glyph),
+                    util::offset16_mandatory(var("table_start"), lig_glyph),
                 ),
             ),
         ])
@@ -3803,14 +4216,14 @@ mod gdef {
             ("table_start", pos32()),
             (
                 "coverage",
-                offset16_mandatory(var("table_start"), coverage_table.call()),
+                util::offset16_mandatory(var("table_start"), coverage_table.call()),
             ),
             ("glyph_count", u16be()),
             (
                 "attach_point_offsets",
                 repeat_count(
                     var("glyph_count"),
-                    offset16_mandatory(var("table_start"), attach_point_table),
+                    util::offset16_mandatory(var("table_start"), attach_point_table),
                 ),
             ),
         ])
@@ -3818,16 +4231,16 @@ mod gdef {
 
     fn mark_glyph_set(module: &mut FormatModule, coverage_table: FormatRef) -> FormatRef {
         module.define_format(
-            "opentype.mark_glyph_set",
+            "opentype.gdef.mark_glyph_set",
             record([
                 ("table_start", pos32()),
-                ("format", expect_u16be(1)), // FIXME - u16be() instead if this is validation fails
+                ("format", util::expect_u16be(1)), // FIXME - u16be() instead if this is validation fails
                 ("mark_glyph_set_count", u16be()),
                 (
                     "coverage",
                     repeat_count(
                         var("mark_glyph_set_count"),
-                        offset32(var("table_start"), coverage_table.call()),
+                        util::offset32(var("table_start"), coverage_table.call()),
                     ),
                 ),
             ]),
@@ -3842,7 +4255,7 @@ mod common {
         let variation_region_list = {
             // NOTE - all coordinates should be in range [-1.0, +1.0], and start <= peak <= end; must either all be non-positive or non-negative, or else peak must be 0 for negative start and non-negative end.
             let region_axis_coordinates =
-                record_repeat(["start_coord", "peak_coord", "end_coord"], f2dot14());
+                record_repeat(["start_coord", "peak_coord", "end_coord"], util::f2dot14());
             let variation_region = |axis_count: Expr| {
                 record([(
                     "region_axes",
@@ -3866,17 +4279,17 @@ mod common {
             "opentype.common.item_variation_store",
             record([
                 ("table_start", pos32()),
-                ("format", expect_u16be(1)),
+                ("format", util::expect_u16be(1)),
                 (
                     "variation_region_list_offset",
-                    offset32(var("table_start"), variation_region_list),
+                    util::offset32(var("table_start"), variation_region_list),
                 ),
                 ("item_variation_data_count", u16be()),
                 (
                     "item_variation_data_offsets",
                     repeat_count(
                         var("item_variation_data_count"),
-                        offset32(var("table_start"), item_variation_data),
+                        util::offset32(var("table_start"), item_variation_data),
                     ),
                 ),
             ]),
@@ -3912,8 +4325,8 @@ mod common {
                     repeat_count(
                         item_count.clone(),
                         deltas(
-                            s32be(),
-                            s16be(),
+                            util::s32be(),
+                            util::s16be(),
                             record_proj(word_delta_count.clone(), "word_count"),
                             region_index_count.clone(),
                         ),
@@ -3924,8 +4337,8 @@ mod common {
                     repeat_count(
                         item_count,
                         deltas(
-                            s16be(),
-                            s8(),
+                            util::s16be(),
+                            util::s8(),
                             record_proj(word_delta_count.clone(), "word_count"),
                             region_index_count,
                         ),
@@ -3937,7 +4350,7 @@ mod common {
             ("item_count", u16be()),
             (
                 "word_delta_count",
-                hi_flag_u15be("long_words", "word_count"),
+                util::hi_flag_u15be("long_words", "word_count"),
             ),
             ("region_index_count", u16be()),
             (
@@ -3972,7 +4385,7 @@ mod common {
         };
         module.define_format(
             "opentype.common.device_or_variation_index_table",
-            peek_field_then(
+            util::peek_field_then(
                 &[
                     ("__skipped0", u16be()), // `startSize` or `deltaSetOuterIndex`
                     ("__skipped1", u16be()), // `endSize` or `deltaSetInnerIndex`
@@ -4089,6 +4502,16 @@ mod common {
         )
     }
 
+    /// Class Definition Table
+    ///
+    /// | Class | Description                                               |
+    /// |-------|-----------------------------------------------------------|
+    /// | 1     | Base glyph (single character, spacing glyph)              |
+    /// | 2     | Ligature glyph (multiple character, spacing glyph)        |
+    /// | 3     | Mark glyph (non-spacing combining glyph)                  |
+    /// | 4     | Component glyph (part of single character, spacing glyph) |
+    ///
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#class-definition-table
     pub(crate) fn class_def(module: &mut FormatModule) -> FormatRef {
         // - [Microsoft's OpenType Spec: Class Definition Table Format 1](https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#class-definition-table-format-1)
         let class_format_1 = record([
@@ -4115,14 +4538,7 @@ mod common {
                 ),
             ])
         };
-        // # Class Definition Table
-        //
-        // | Class | Description                                               |
-        // |-------|-----------------------------------------------------------|
-        // | 1     | Base glyph (single character, spacing glyph)              |
-        // | 2     | Ligature glyph (multiple character, spacing glyph)        |
-        // | 3     | Mark glyph (non-spacing combining glyph)                  |
-        // | 4     | Component glyph (part of single character, spacing glyph) |
+
         module.define_format(
             "opentype.class_def",
             record([
@@ -4144,6 +4560,16 @@ mod common {
     }
 }
 
+mod prep {
+    use super::*;
+
+    // REVIEW - this function breaks the convention of `-> FormatRef` but it's an edge-case already
+    pub(crate) fn table(_module: &mut FormatModule) -> Format {
+        // REVIEW[epic=view-opaque-bytes] - we may wish to use ViewFormat in place of opaque_bytes to avoid vector allocation
+        opaque_bytes()
+    }
+}
+// REVIEW - the generated names for gasp subtypes can be run-on, consider pruning name tokens or module.define_format(_args) for brevity
 mod gasp {
     use super::*;
 
@@ -4191,7 +4617,7 @@ mod gasp {
 
     pub(crate) fn table(module: &mut FormatModule) -> FormatRef {
         module.define_format(
-            "opentype.gasp_table",
+            "opentype.gasp.table",
             record([
                 ("version", u16be()),
                 ("num_ranges", u16be()),
@@ -4314,7 +4740,7 @@ mod glyf {
                     u8(),
                     lambda(
                         "abs",
-                        u8_to_i16(
+                        util::u8_to_i16(
                             var("abs"),
                             record_proj(field_set.clone(), "x_is_same_or_positive_x_short_vector"),
                         ),
@@ -4324,7 +4750,7 @@ mod glyf {
                     record_proj(field_set.clone(), "x_is_same_or_positive_x_short_vector"),
                     // this wants to be i16
                     compute(Expr::U16(0)),
-                    s16be(),
+                    util::s16be(),
                 ),
             )
         }
@@ -4339,7 +4765,7 @@ mod glyf {
                     u8(),
                     lambda(
                         "abs",
-                        u8_to_i16(
+                        util::u8_to_i16(
                             var("abs"),
                             record_proj(field_set.clone(), "y_is_same_or_positive_y_short_vector"),
                         ),
@@ -4349,7 +4775,7 @@ mod glyf {
                     record_proj(field_set.clone(), "y_is_same_or_positive_y_short_vector"),
                     // this wants to be i16
                     compute(Expr::U16(0)),
-                    s16be(),
+                    util::s16be(),
                 ),
             )
         }
@@ -4374,7 +4800,7 @@ mod glyf {
                     ),
                     (
                         "number_of_coordinates",
-                        compute(succ(last_elem(var("end_points_of_contour")))),
+                        compute(succ(util::last_elem(var("end_points_of_contour")))),
                     ),
                     (
                         "flags",
@@ -4403,12 +4829,12 @@ mod glyf {
                     are_words,
                     if_then_else(
                         are_xy_values.clone(),
-                        fmt_variant("Int16", s16be()),
+                        fmt_variant("Int16", util::s16be()),
                         fmt_variant("Uint16", u16be()),
                     ),
                     if_then_else(
                         are_xy_values,
-                        fmt_variant("Int8", s8()),
+                        fmt_variant("Int8", util::s8()),
                         fmt_variant("Uint8", u8()),
                     ),
                 )
@@ -4417,18 +4843,18 @@ mod glyf {
             let glyf_scale = |flags: Expr| -> Format {
                 if_then_else(
                     record_proj(flags.clone(), "we_have_a_scale"),
-                    fmt_some(fmt_variant("Scale", f2dot14())),
+                    fmt_some(fmt_variant("Scale", util::f2dot14())),
                     if_then_else(
                         record_proj(flags.clone(), "we_have_an_x_and_y_scale"),
                         fmt_some(fmt_variant(
                             "XY",
-                            record_repeat(["x_scale", "y_scale"], f2dot14()),
+                            record_repeat(["x_scale", "y_scale"], util::f2dot14()),
                         )),
                         if_then_else(
                             record_proj(flags, "we_have_a_two_by_two"),
                             fmt_some(fmt_variant(
                                 "Matrix",
-                                tuple_repeat(2, tuple_repeat(2, f2dot14())),
+                                tuple_repeat(2, tuple_repeat(2, util::f2dot14())),
                             )),
                             fmt_none(),
                         ),
@@ -4534,17 +4960,17 @@ mod glyf {
         if_then_else(
             // NOTE - checks that the glyph is non-vacuous
             expr_gt(next_offset32, this_offset32.clone()),
-            linked_offset32(
+            util::linked_offset32(
                 start_offset,
                 this_offset32,
                 fmt_variant(
                     "Glyph",
                     record([
-                        ("number_of_contours", s16be()),
-                        ("x_min", s16be()),
-                        ("y_min", s16be()),
-                        ("x_max", s16be()),
-                        ("y_max", s16be()),
+                        ("number_of_contours", util::s16be()),
+                        ("x_min", util::s16be()),
+                        ("y_min", util::s16be()),
+                        ("x_max", util::s16be()),
+                        ("y_max", util::s16be()),
                         (
                             "description",
                             glyf_description.call_args(vec![var("number_of_contours")]),
@@ -4577,7 +5003,7 @@ mod glyf {
         };
 
         module.define_format_args(
-            "opentype.glyf_table",
+            "opentype.glyf.table",
             vec![(Label::Borrowed("offsets"), offsets_type)],
             chain(
                 pos32(),
@@ -4657,7 +5083,7 @@ pub(crate) mod loca {
 
     pub(crate) fn table(module: &mut FormatModule) -> FormatRef {
         module.define_format_args(
-            "opentype.loca_table",
+            "opentype.loca.table",
             vec![
                 (
                     Label::Borrowed("num_glyphs"),
@@ -4690,10 +5116,27 @@ pub(crate) mod loca {
     }
 }
 
+pub(crate) mod fpgm {
+    use super::*;
+
+    // REVIEW - this function breaks the convention of `-> FormatRef` but it's an edge-case already
+    pub(crate) fn table(_module: &mut FormatModule) -> Format {
+        // REVIEW[epic=view-opaque-bytes] - we may wish to use ViewFormat in place of opaque_bytes to avoid vector allocation
+        opaque_bytes()
+    }
+}
+
+pub(crate) mod cvt {
+    use super::*;
+
+    pub(crate) fn table(_module: &mut FormatModule) -> Format {
+        repeat(util::s16be())
+    }
+}
 pub(crate) mod post {
     use super::*;
 
-    pub(crate) fn post_table(module: &mut FormatModule) -> FormatRef {
+    pub(crate) fn table(module: &mut FormatModule) -> FormatRef {
         let postv2 = record([
             ("num_glyphs", u16be()),
             ("glyph_name_index", repeat_count(var("num_glyphs"), u16be())),
@@ -4702,16 +5145,16 @@ pub(crate) mod post {
 
         let postv2dot5 = record([
             ("num_glyphs", u16be()),
-            ("offset", repeat_count(var("num_glyphs"), s8())),
+            ("offset", repeat_count(var("num_glyphs"), util::s8())),
         ]);
 
         module.define_format(
-            "opentype.post_table",
+            "opentype.post.table",
             record([
-                ("version", version16_16()),
-                ("italic_angle", fixed32be()),
-                ("underline_position", s16be()),
-                ("underline_thickness", s16be()),
+                ("version", util::version16_16()),
+                ("italic_angle", util::fixed32be()),
+                ("underline_position", util::s16be()),
+                ("underline_thickness", util::s16be()),
                 ("is_fixed_pitch", u32be()), // nonzero <=> fixed pitch
                 ("min_mem_type42", u32be()),
                 ("max_mem_type42", u32be()),
@@ -4739,83 +5182,100 @@ pub(crate) mod post {
 mod os2 {
     use super::*;
 
-    pub(crate) fn table(module: &mut FormatModule, tag: FormatRef) -> FormatRef {
-        let version_record = |version_ident: &'static str, table_length: Expr| -> Format {
-            const V0_MIN_LENGTH: u32 = 78;
-            cond_maybe(
-                or(
-                    is_nonzero_u16(var(version_ident)),
-                    expr_gte(table_length, Expr::U32(V0_MIN_LENGTH)),
-                ),
-                record([
-                    ("s_typo_ascender", s16be()),
-                    ("s_typo_descender", s16be()),
-                    ("s_typo_line_gap", s16be()),
-                    ("us_win_ascent", u16be()),
-                    ("us_win_descent", u16be()),
-                    (
-                        "extra_fields_v1",
-                        cond_maybe(
-                            is_within(var(version_ident), Bounds::at_least(1)),
-                            record([
-                                ("ul_code_page_range_1", u32be()),
-                                ("ul_code_page_range_2", u32be()),
-                                (
-                                    "extra_fields_v2",
-                                    cond_maybe(
-                                        is_within(var(version_ident), Bounds::at_least(2)),
-                                        record([
-                                            ("sx_height", s16be()),
-                                            ("s_cap_height", s16be()),
-                                            ("us_default_char", u16be()),
-                                            ("us_break_char", u16be()),
-                                            ("us_max_context", u16be()),
-                                            (
-                                                "extra_fields_v5",
-                                                cond_maybe(
-                                                    is_within(
-                                                        var(version_ident),
-                                                        Bounds::at_least(5),
-                                                    ),
-                                                    record([
-                                                        ("us_lower_optical_point_size", u16be()),
-                                                        ("us_upper_optical_point_size", u16be()),
-                                                    ]),
-                                                ),
+    /// Conditional r1ecord-format consisting of OS/2 table fields for each version of the OS/2 table
+    ///
+    /// Takes a variable-identifier `version_ident` corresponding to the scoped variable storing the version-number
+    /// as a u16, and a table-length expression `table_length`, both inherited from this function's caller, [`table`].
+    /// # Notes
+    ///
+    /// Based on the notes in the Microsoft documentation for legacy OS/2 table version 0,
+    /// (https://learn.microsoft.com/en-us/typography/opentype/spec/os2#version-0),
+    /// a version 0 table with no more than 78 bytes is a valid OS/2 table whose final field
+    /// is `usLastCharIndex`, skipping the formally specified final 5 fields.
+    ///
+    /// If the version is greater than 0, or the table is longer than 78 bytes, then the final 5 fields will be parsed,
+    /// and otherwise the Format returned by this function will yield `None`.
+    ///
+    /// Each version of the OS/2 table has a different number of fields, but as they are strictly additive and do not
+    /// change between versions in which they are present, each version that adds more fields has its fields stored
+    /// as an optional nested-record in the previous version's record-of-extra-fields.
+    ///
+    /// As versions 2, 3, and 4 have the same basic fields, only versions 1, 2, and 5 act as thresholds
+    /// for including extra fields (w.r.t. `version >= N` predicates)
+    fn version_record(version_ident: &'static str, table_length: Expr) -> Format {
+        const V0_MIN_LENGTH: u32 = 78;
+        cond_maybe(
+            or(
+                is_nonzero_u16(var(version_ident)),
+                expr_gte(table_length, Expr::U32(V0_MIN_LENGTH)),
+            ),
+            record([
+                ("s_typo_ascender", util::s16be()),
+                ("s_typo_descender", util::s16be()),
+                ("s_typo_line_gap", util::s16be()),
+                ("us_win_ascent", u16be()),
+                ("us_win_descent", u16be()),
+                (
+                    "extra_fields_v1",
+                    cond_maybe(
+                        is_within(var(version_ident), Bounds::at_least(1)),
+                        record([
+                            ("ul_code_page_range_1", u32be()),
+                            ("ul_code_page_range_2", u32be()),
+                            (
+                                "extra_fields_v2",
+                                cond_maybe(
+                                    is_within(var(version_ident), Bounds::at_least(2)),
+                                    record([
+                                        ("sx_height", util::s16be()),
+                                        ("s_cap_height", util::s16be()),
+                                        ("us_default_char", u16be()),
+                                        ("us_break_char", u16be()),
+                                        ("us_max_context", u16be()),
+                                        (
+                                            "extra_fields_v5",
+                                            cond_maybe(
+                                                is_within(var(version_ident), Bounds::at_least(5)),
+                                                record([
+                                                    ("us_lower_optical_point_size", u16be()),
+                                                    ("us_upper_optical_point_size", u16be()),
+                                                ]),
                                             ),
-                                        ]),
-                                    ),
+                                        ),
+                                    ]),
                                 ),
-                            ]),
-                        ),
+                            ),
+                        ]),
                     ),
-                ]),
-            )
-        };
+                ),
+            ]),
+        )
+    }
 
+    pub(crate) fn table(module: &mut FormatModule, tag: FormatRef) -> FormatRef {
         module.define_format_args(
-            "opentype.os2_table",
+            "opentype.os2.table",
             vec![(
                 Label::Borrowed("table_length"),
                 ValueType::Base(BaseType::U32),
             )],
             record([
                 ("version", u16be()),
-                ("x_avg_char_width", s16be()),
+                ("x_avg_char_width", util::s16be()),
                 ("us_weight_class", u16be()),
                 ("us_width_class", u16be()),
                 ("fs_type", u16be()),
-                ("y_subscript_x_size", s16be()),
-                ("y_subscript_y_size", s16be()),
-                ("y_subscript_x_offset", s16be()),
-                ("y_subscript_y_offset", s16be()),
-                ("y_superscript_x_size", s16be()),
-                ("y_superscript_y_size", s16be()),
-                ("y_superscript_x_offset", s16be()),
-                ("y_superscript_y_offset", s16be()),
-                ("y_strikeout_size", s16be()),
-                ("y_strikeout_position", s16be()),
-                ("s_family_class", s16be()),
+                ("y_subscript_x_size", util::s16be()),
+                ("y_subscript_y_size", util::s16be()),
+                ("y_subscript_x_offset", util::s16be()),
+                ("y_subscript_y_offset", util::s16be()),
+                ("y_superscript_x_size", util::s16be()),
+                ("y_superscript_y_size", util::s16be()),
+                ("y_superscript_x_offset", util::s16be()),
+                ("y_superscript_y_offset", util::s16be()),
+                ("y_strikeout_size", util::s16be()),
+                ("y_strikeout_position", util::s16be()),
+                ("s_family_class", util::s16be()),
                 ("panose", repeat_count(Expr::U8(10), u8())),
                 ("ul_unicode_range1", u32be()),
                 ("ul_unicode_range2", u32be()),
@@ -4847,7 +5307,7 @@ mod name {
                 ("length", u16be()),
                 (
                     "offset",
-                    offset16_mandatory(storage_start, repeat_count(var("length"), u8())),
+                    util::offset16_mandatory(storage_start, repeat_count(var("length"), u8())),
                 ),
             ])
         };
@@ -4855,7 +5315,7 @@ mod name {
         let name_version_1 = name_version_1(module);
 
         module.define_format(
-            "opentype.name_table",
+            "opentype.name.table",
             record([
                 ("table_start", pos32()),
                 ("version", u16be()),
@@ -4865,7 +5325,7 @@ mod name {
                     "name_records",
                     repeat_count(
                         var("name_count"),
-                        name_record(pos_add_u16(var("table_start"), var("storage_offset"))),
+                        name_record(util::pos_add_u16(var("table_start"), var("storage_offset"))),
                     ),
                 ),
                 (
@@ -4935,13 +5395,13 @@ mod name {
                 ("length", u16be()),
                 (
                     "offset",
-                    offset16_mandatory(storage_start, repeat_count(var("length"), u8())),
+                    util::offset16_mandatory(storage_start, repeat_count(var("length"), u8())),
                 ),
             ])
         };
 
         module.define_format_args(
-            "opentype.name_table.name_version_1",
+            "opentype.name.name_version_1",
             vec![(
                 Label::Borrowed("storage_start"),
                 ValueType::Base(BaseType::U32),
@@ -4965,11 +5425,13 @@ pub(crate) mod hmtx {
     use super::*;
 
     pub(crate) fn table(module: &mut FormatModule) -> FormatRef {
-        let long_horizontal_metric =
-            record([("advance_width", u16be()), ("left_side_bearing", s16be())]);
+        let long_horizontal_metric = record([
+            ("advance_width", u16be()),
+            ("left_side_bearing", util::s16be()),
+        ]);
 
         module.define_format_args(
-            "opentype.hmtx_table",
+            "opentype.hmtx.table",
             vec![
                 (
                     Label::Borrowed("num_long_metrics"),
@@ -4987,7 +5449,10 @@ pub(crate) mod hmtx {
                 ),
                 (
                     "left_side_bearings", // REVIEW - 'top_side_bearings' in vmtx
-                    repeat_count(sub(var("num_glyphs"), var("num_long_metrics")), s16be()),
+                    repeat_count(
+                        sub(var("num_glyphs"), var("num_long_metrics")),
+                        util::s16be(),
+                    ),
                 ),
             ]),
         )
@@ -5002,7 +5467,7 @@ pub(crate) mod maxp {
         const YES_Z0: u16 = 2;
 
         let maxp_version_1 = module.define_format(
-            "opentype.maxp_table.version1",
+            "opentype.maxp.version1",
             record([
                 ("max_points", u16be()),
                 ("max_contours", u16be()),
@@ -5021,9 +5486,9 @@ pub(crate) mod maxp {
         );
 
         module.define_format(
-            "opentype.maxp_table",
+            "opentype.maxp.table",
             record([
-                ("version", version16_16()),
+                ("version", util::version16_16()),
                 ("num_glyphs", u16be()),
                 (
                     "data",
@@ -5044,37 +5509,41 @@ pub(crate) mod maxp {
 pub(crate) mod hhea {
     use super::*;
 
+    pub(crate) fn table_def() -> Format {
+        record_auto([
+            ("major_version", util::expect_u16be(1)),
+            (
+                "minor_version",
+                util::expects_u16be([0x0000, 0x1000]), // NOTE - due to how versions are encoded for hhea/vhea tables v1.1 is `00 01 . 10 00`
+            ), // FIXME - hhea only has 1.0, but vhea has 1.1 as well, so we compromise by allowing it in both to re-use it properly
+            ("ascent", util::s16be()), // distance from baseline to highest ascender, in font design units
+            ("descent", util::s16be()), // distance from baseline to lowest descender, in font design units
+            ("line_gap", util::s16be()), // intended gap between baselines, in font design units
+            ("advance_width_max", u16be()), // must be consistent with horizontal metrics
+            ("min_left_side_bearing", util::s16be()), // must be consistent with horizontal metrics
+            ("min_right_side_bearing", util::s16be()), // must be consistent with horizontal metrics
+            ("x_max_extent", util::s16be()), // `max(left_side_bearing + (x_max - x_min))`
+            // slope of the caret (rise/run), (1/0) for vertical caret
+            ("caret_slope", record_repeat(["rise", "run"], util::s16be())),
+            ("caret_offset", util::s16be()), // 0 for non-slanted fonts
+            ("__reservedX4", tuple_repeat(4, util::expect_u16be(0))), // NOTE: 4 separate isolated fields in fathom
+            ("metric_data_format", util::expect_u16be(0)),
+            // number of `long_horizontal_metric` records in the `htmx_table`, `long_vertical_metrics` in `vmtx_table`
+            ("number_of_long_metrics", u16be()),
+        ])
+    }
+
     pub(crate) fn table(module: &mut FormatModule) -> FormatRef {
-        module.define_format(
-            "opentype.hhea_table",
-            record_auto([
-                ("major_version", expect_u16be(1)),
-                (
-                    "minor_version",
-                    expects_u16be([0x0000, 0x1000]), // NOTE - due to how versions are encoded for hhea/vhea tables v1.1 is `00 01 . 10 00`
-                ), // FIXME - hhea only has 1.0, but vhea has 1.1 as well, so we compromise by allowing it in both to re-use it properly
-                ("ascent", s16be()), // distance from baseline to highest ascender, in font design units
-                ("descent", s16be()), // distance from baseline to lowest descender, in font design units
-                ("line_gap", s16be()), // intended gap between baselines, in font design units
-                ("advance_width_max", u16be()), // must be consistent with horizontal metrics
-                ("min_left_side_bearing", s16be()), // must be consistent with horizontal metrics
-                ("min_right_side_bearing", s16be()), // must be consistent with horizontal metrics
-                ("x_max_extent", s16be()), // `max(left_side_bearing + (x_max - x_min))`
-                // slope of the caret (rise/run), (1/0) for vertical caret
-                ("caret_slope", record_repeat(["rise", "run"], s16be())),
-                ("caret_offset", s16be()), // 0 for non-slanted fonts
-                ("__reservedX4", tuple_repeat(4, expect_u16be(0))), // NOTE: 4 separate isolated fields in fathom
-                ("metric_data_format", expect_u16be(0)),
-                // number of `long_horizontal_metric` records in the `htmx_table`, `long_vertical_metrics` in `vmtx_table`
-                ("number_of_long_metrics", u16be()),
-            ]),
-        )
+        module.define_format("opentype.hhea.table", table_def())
     }
 }
-
 pub(crate) mod vhea {
-    // STUB[epic=horizontal-for-vertical] - this technically works as-is, but certain fields might want to be named differently
-    pub(crate) use super::hhea::table;
+    use super::*;
+
+    // STUB[epic=horizontal-for-vertical] - this currently works, but the field-names are misleading because they are implicitly biased for hhea
+    pub(crate) fn table(module: &mut FormatModule) -> FormatRef {
+        module.define_format("opentype.vhea.table", super::hhea::table_def())
+    }
 }
 
 // ANCHOR - `cmap` table
@@ -5126,7 +5595,7 @@ pub(crate) mod cmap {
         let cmap_subtable_format14 = subtable_format14(module);
 
         let cmap_subtable = module.define_format_args(
-            "opentype.cmap_subtable",
+            "opentype.cmap.subtable",
             vec![(Label::Borrowed("_platform"), ValueType::Base(BaseType::U16))],
             record([
                 ("table_start", pos32()),
@@ -5197,7 +5666,10 @@ pub(crate) mod cmap {
                 ("encoding", encoding_id(var("platform"))), // encoding identifier
                 (
                     "subtable_offset",
-                    offset32(START_VAR, cmap_subtable.call_args(vec![var("platform")])),
+                    util::offset32(
+                        util::START_VAR,
+                        cmap_subtable.call_args(vec![var("platform")]),
+                    ),
                 ),
             ]),
         );
@@ -5224,7 +5696,7 @@ pub(crate) mod cmap {
         module.define_format_args(
             "opentype.cmap_subtable.format0",
             vec![(Label::Borrowed("_platform"), ValueType::Base(BaseType::U16))],
-            slice_record(
+            util::slice_record(
                 "length",
                 [
                     ("format", u16be()), // == 0
@@ -5244,7 +5716,7 @@ pub(crate) mod cmap {
             ("first_code", u16be()),
             ("entry_count", u16be()),
             // FIXME - this is actually a signed 16-bit value but we don't support that; it can be unsigned as long as we do the right wrapping addition
-            ("id_delta", s16be()),
+            ("id_delta", util::s16be()),
             ("id_range_offset", u16be()),
         ]);
 
@@ -5252,10 +5724,10 @@ pub(crate) mod cmap {
         module.define_format_args(
             "opentype.cmap_subtable.format2",
             vec![(Label::Borrowed("_platform"), ValueType::Base(BaseType::U16))],
-            slice_record(
+            util::slice_record(
                 "length",
                 [
-                    ("format", expect_u16be(2)),
+                    ("format", util::expect_u16be(2)),
                     (
                         "length",
                         where_lambda(
@@ -5273,7 +5745,10 @@ pub(crate) mod cmap {
                     ("sub_header_keys", repeat_count(Expr::U16(256), u16be())),
                     (
                         "sub_headers",
-                        repeat_count(succ(subheader_index(var("sub_header_keys"))), subheader),
+                        repeat_count(
+                            succ(util::subheader_index(var("sub_header_keys"))),
+                            subheader,
+                        ),
                     ),
                     ("glyph_array", repeat(u16be())),
                 ],
@@ -5286,10 +5761,10 @@ pub(crate) mod cmap {
         module.define_format_args(
             "opentype.cmap_subtable.format4",
             vec![(Label::Borrowed("_platform"), ValueType::Base(BaseType::U16))],
-            slice_record(
+            util::slice_record(
                 "length",
                 [
-                    ("format", expect_u16be(4)),
+                    ("format", util::expect_u16be(4)),
                     ("length", u16be()),
                     ("language", cmap_language_id(var("_platform"))),
                     (
@@ -5303,7 +5778,7 @@ pub(crate) mod cmap {
                     ("entry_selector", u16be()), // := ilog2(seg_count)
                     ("range_shift", u16be()),  // := seg_count * 2 - search_range
                     ("end_code", repeat_count(var("seg_count"), u16be())), // end character-code for each seg, last is 0xFFFF
-                    ("__reserved_pad", expect_u16be(0)),
+                    ("__reserved_pad", util::expect_u16be(0)),
                     ("start_code", repeat_count(var("seg_count"), u16be())),
                     ("id_delta", repeat_count(var("seg_count"), u16be())), // ought to be signed but will work if we perform as unsigned addition mod-0xFFFF
                     ("id_range_offset", repeat_count(var("seg_count"), u16be())), // offsets into glyphIdArray or 0
@@ -5322,7 +5797,7 @@ pub(crate) mod cmap {
              * while reading `glyph_id_array`
              */
             record([
-                ("format", expect_u16be(6)),
+                ("format", util::expect_u16be(6)),
                 ("length", u16be()),
                 ("language", cmap_language_id(var("_platform"))),
                 ("first_code", u16be()),
@@ -5336,11 +5811,11 @@ pub(crate) mod cmap {
         module.define_format_args(
             "opentype.cmap_subtable.format8",
             vec![(Label::Borrowed("_platform"), ValueType::Base(BaseType::U16))],
-            slice_record(
+            util::slice_record(
                 "length",
                 [
-                    ("format", expect_u16be(8)),
-                    ("__reserved", expect_u16be(0)),
+                    ("format", util::expect_u16be(8)),
+                    ("__reserved", util::expect_u16be(0)),
                     ("length", u32be()),
                     ("language", cmap_language_id32(var("_platform"))),
                     // REVIEW - should this be 8x as long and consist of bits?
@@ -5359,11 +5834,11 @@ pub(crate) mod cmap {
         module.define_format_args(
             "opentype.cmap_subtable.format10",
             vec![(Label::Borrowed("_platform"), ValueType::Base(BaseType::U16))],
-            slice_record(
+            util::slice_record(
                 "length",
                 [
-                    ("format", expect_u16be(10)),
-                    ("__reserved", expect_u16be(0)),
+                    ("format", util::expect_u16be(10)),
+                    ("__reserved", util::expect_u16be(0)),
                     ("length", u32be()),
                     ("language", cmap_language_id32(var("_platform"))),
                     ("start_char_code", u32be()),
@@ -5378,11 +5853,11 @@ pub(crate) mod cmap {
         module.define_format_args(
             "opentype.cmap_subtable.format12",
             vec![(Label::Borrowed("_platform"), ValueType::Base(BaseType::U16))],
-            slice_record(
+            util::slice_record(
                 "length",
                 [
-                    ("format", expect_u16be(12)),
-                    ("__reserved", expect_u16be(0)),
+                    ("format", util::expect_u16be(12)),
+                    ("__reserved", util::expect_u16be(0)),
                     ("length", u32be()),
                     ("language", cmap_language_id32(var("_platform"))),
                     ("num_groups", u32be()),
@@ -5401,11 +5876,11 @@ pub(crate) mod cmap {
         module.define_format_args(
             "opentype.cmap_subtable.format13",
             vec![(Label::Borrowed("_platform"), ValueType::Base(BaseType::U16))],
-            slice_record(
+            util::slice_record(
                 "length",
                 [
-                    ("format", expect_u16be(13)),
-                    ("__reserved", expect_u16be(0)),
+                    ("format", util::expect_u16be(13)),
+                    ("__reserved", util::expect_u16be(0)),
                     ("length", u32be()),
                     ("language", cmap_language_id32(var("_platform"))),
                     ("num_groups", u32be()),
@@ -5419,9 +5894,12 @@ pub(crate) mod cmap {
     }
 
     fn subtable_format14(module: &mut FormatModule) -> FormatRef {
-        let unicode_range = record([("start_unicode_value", u24be()), ("additional_count", u8())]);
+        let unicode_range = record([
+            ("start_unicode_value", util::u24be()),
+            ("additional_count", u8()),
+        ]);
 
-        let uvs_mapping = record([("unicode_value", u24be()), ("glyph_id", u16be())]);
+        let uvs_mapping = record([("unicode_value", util::u24be()), ("glyph_id", u16be())]);
 
         let default_uvs_table = record([
             ("num_unicode_value_ranges", u32be()),
@@ -5446,14 +5924,14 @@ pub(crate) mod cmap {
                 ValueType::Base(BaseType::U32),
             )],
             record([
-                ("var_selector", u24be()),
+                ("var_selector", util::u24be()),
                 (
                     "default_uvs_offset",
-                    offset32(var("table_start"), default_uvs_table),
+                    util::offset32(var("table_start"), default_uvs_table),
                 ),
                 (
                     "non_default_uvs_offset",
-                    offset32(var("table_start"), non_default_uvs_table),
+                    util::offset32(var("table_start"), non_default_uvs_table),
                 ),
             ]),
         );
@@ -5464,10 +5942,10 @@ pub(crate) mod cmap {
                 Label::Borrowed("table_start"),
                 ValueType::Base(BaseType::U32),
             )],
-            slice_record(
+            util::slice_record(
                 "length",
                 [
-                    ("format", expect_u16be(14)),
+                    ("format", util::expect_u16be(14)),
                     ("length", u32be()),
                     ("num_var_selector_records", u32be()),
                     (
@@ -5490,9 +5968,9 @@ pub(crate) mod head {
         // FIXME - replace with bit_fields_u16 if appropriate
         let head_table_flags = u16be();
 
-        let long_date_time = module.define_format("opentype.types.long_date_time", s64be());
+        let long_date_time = module.define_format("opentype.types.long_date_time", util::s64be());
 
-        let xy_min_max = record_repeat(["x_min", "y_min", "x_max", "y_max"], s16be());
+        let xy_min_max = record_repeat(["x_min", "y_min", "x_max", "y_max"], util::s16be());
 
         // REVIEW[epic=check-zero] - determine whether we should check for zeroing of reserved bit-fields positions
         const SHOULD_CHECK_ZERO: bool = false;
@@ -5520,14 +5998,14 @@ pub(crate) mod head {
          *     WeakRL   = -2,
          * }
          */
-        let glyph_dir_hint = s16be();
+        let glyph_dir_hint = util::s16be();
 
         module.define_format(
             "opentype.head_table",
             record([
-                ("major_version", expect_u16be(1)),
-                ("minor_version", expect_u16be(0)),
-                ("font_revision", fixed32be()),
+                ("major_version", util::expect_u16be(1)),
+                ("minor_version", util::expect_u16be(0)),
+                ("font_revision", util::fixed32be()),
                 ("checksum_adjustment", u32be()),
                 ("magic_number", is_bytes(&[0x5F, 0x0F, 0x3C, 0xF5])),
                 ("flags", head_table_flags),
@@ -5542,7 +6020,7 @@ pub(crate) mod head {
                     "index_to_loc_format",
                     where_between_u16(u16be(), SHORT_OFFSET16, LONG_OFFSET32),
                 ),
-                ("glyph_data_format", expect_u16be(0)),
+                ("glyph_data_format", util::expect_u16be(0)),
             ]),
         )
     }
@@ -5590,7 +6068,7 @@ pub(crate) mod table {
                 [
                     (
                         pat_some(bind("matching_table")),
-                        linked_offset32(
+                        util::linked_offset32(
                             sof_offset,
                             record_proj(var("matching_table"), "offset"),
                             slice(record_proj(var("matching_table"), "length"), table_format),
@@ -5601,7 +6079,7 @@ pub(crate) mod table {
                 ],
             )
         };
-        with_table(table_records, id, dep_format)
+        util::with_table(table_records, id, dep_format)
     }
 
     /// Variation of [`required_table`]where the table-format is dependent on the length of the table (as accessed through the `.length` projection on the corresponding table-record)
@@ -5619,7 +6097,7 @@ pub(crate) mod table {
                 [
                     (
                         pat_some(bind("matching_table")),
-                        linked_offset32(
+                        util::linked_offset32(
                             sof_offset,
                             record_proj(var("matching_table"), "offset"),
                             fmt_let(
@@ -5637,7 +6115,7 @@ pub(crate) mod table {
                 ],
             )
         };
-        with_table(table_records, id, dep_format)
+        util::with_table(table_records, id, dep_format)
     }
 
     pub(crate) fn optional_table(
@@ -5647,7 +6125,7 @@ pub(crate) mod table {
         table_format: Format,
     ) -> Format {
         let cond_fmt = |table_match: Expr| -> Format {
-            linked_offset32(
+            util::linked_offset32(
                 sof_offset,
                 record_proj(table_match.clone(), "offset"),
                 slice(record_proj(table_match, "length"), table_format),
@@ -5656,7 +6134,7 @@ pub(crate) mod table {
         let dep_format = move |opt_table_match: Expr| -> Format {
             map_option(opt_table_match, "table", cond_fmt)
         };
-        with_table(table_records, id, dep_format)
+        util::with_table(table_records, id, dep_format)
     }
 }
 use table::{optional_table, required_table, required_table_with_len};
@@ -5688,7 +6166,7 @@ pub(crate) mod stat {
                 FlagBit("elidable_axis_value_name"), // Bit 1 - When set, indicates the 'normal' value for this axis and implies it may be omitted when composing name-strings
                 FlagBit("older_sibling_font_attribute"), // Bit 0 - When set, indicates that the axis information applies to previously released fonts in the same font-family
             ]);
-            let axis_value = record([("axis_index", u16be()), ("value", fixed32be())]);
+            let axis_value = record([("axis_index", u16be()), ("value", util::fixed32be())]);
             let f1_fields = vec![
                 ("axis_index", u16be()),
                 ("flags", axis_flags.clone()),
@@ -5716,7 +6194,7 @@ pub(crate) mod stat {
                 ("value_name_id", u16be()), // NameId for entries in 'name' table that provide display-string for this combination of axis values
                 ("axis_values", repeat_count(var("axis_count"), axis_value)),
             ];
-            embedded_variadic_alternation(
+            util::embedded_variadic_alternation(
                 [("format", where_between_u16(u16be(), 1, 4))],
                 "format",
                 [
@@ -5726,7 +6204,7 @@ pub(crate) mod stat {
                     (4, "Format4", f4_fields),
                 ],
                 "data",
-                NestingKind::MinimalVariation,
+                util::NestingKind::MinimalVariation,
             )
         };
         let design_axes_array = |design_axis_count: Expr| {
@@ -5739,7 +6217,7 @@ pub(crate) mod stat {
                     "axis_value_offsets",
                     repeat_count(
                         axis_value_count,
-                        offset16_mandatory(var("table_start"), axis_value_table),
+                        util::offset16_mandatory(var("table_start"), axis_value_table),
                     ),
                 ),
             ])
@@ -5748,13 +6226,13 @@ pub(crate) mod stat {
             "opentype.stat_table",
             record([
                 ("table_start", pos32()),
-                ("major_version", expect_u16be(1)),
-                ("minor_version", expects_u16be([1, 2])), // Version 1.0 is deprecated
-                ("design_axis_size", u16be()),            // size (in bytes) of each axis record
-                ("design_axis_count", u16be()),           // number of axis records
+                ("major_version", util::expect_u16be(1)),
+                ("minor_version", util::expects_u16be([1, 2])), // Version 1.0 is deprecated
+                ("design_axis_size", u16be()), // size (in bytes) of each axis record
+                ("design_axis_count", u16be()), // number of axis records
                 (
                     "design_axes_offset",
-                    offset32(
+                    util::offset32(
                         var("table_start"),
                         design_axes_array(var("design_axis_count")),
                     ),
@@ -5762,7 +6240,7 @@ pub(crate) mod stat {
                 ("axis_value_count", u16be()),
                 (
                     "offset_to_axis_value_offsets",
-                    offset32(
+                    util::offset32(
                         var("table_start"),
                         axis_value_offsets_array(var("axis_value_count")),
                     ),
@@ -5811,7 +6289,12 @@ pub(crate) mod alt {
                 record_auto([
                     (
                         "stat",
-                        optional_table(START_VAR, var("tables"), magic(b"STAT"), stat_table.call()),
+                        optional_table(
+                            util::START_VAR,
+                            var("tables"),
+                            util::magic(b"STAT"),
+                            stat_table.call(),
+                        ),
                     ),
                     ("__skip", Format::SkipRemainder),
                 ]),
@@ -5834,8 +6317,8 @@ pub(crate) mod alt {
                             var("version"),
                             [
                                 (Pattern::U32(0x0001_0000), Expr::Bool(true)),
-                                (Pattern::U32(magic(b"OTTO")), Expr::Bool(true)),
-                                (Pattern::U32(magic(b"true")), Expr::Bool(true)),
+                                (Pattern::U32(util::magic(b"OTTO")), Expr::Bool(true)),
+                                (Pattern::U32(util::magic(b"true")), Expr::Bool(true)),
                                 (Pattern::Wildcard, Expr::Bool(false)),
                             ],
                         ),
@@ -5865,7 +6348,7 @@ pub(crate) mod alt {
                         "table_directories",
                         repeat_count(
                             var("num_fonts"),
-                            offset32(start.clone(), table_directory.call_args(vec![start])),
+                            util::offset32(start.clone(), table_directory.call_args(vec![start])),
                         ),
                     ),
                 ])
@@ -5879,7 +6362,7 @@ pub(crate) mod alt {
                         "table_directories",
                         repeat_count(
                             var("num_fonts"),
-                            offset32(start.clone(), table_directory.call_args(vec![start])),
+                            util::offset32(start.clone(), table_directory.call_args(vec![start])),
                         ),
                     ),
                     ("dsig_tag", u32be()),    // either b"DSIG" or 0 if none
@@ -5897,7 +6380,7 @@ pub(crate) mod alt {
                         where_lambda(
                             u32be(),
                             "tag",
-                            expr_eq(var("tag"), Expr::U32(magic(b"ttcf"))),
+                            expr_eq(var("tag"), Expr::U32(util::magic(b"ttcf"))),
                         ),
                     ),
                     ("major_version", u16be()),
@@ -5907,8 +6390,8 @@ pub(crate) mod alt {
                         match_variant(
                             var("major_version"),
                             [
-                                (Pattern::U16(1), "Version1", ttc_header1(START_VAR)),
-                                (Pattern::U16(2), "Version2", ttc_header2(START_VAR)),
+                                (Pattern::U16(1), "Version1", ttc_header1(util::START_VAR)),
+                                (Pattern::U16(2), "Version2", ttc_header2(util::START_VAR)),
                                 // REVIEW - is this the preferred pattern (i.e. apply broadly) or do we want to fail here as well?
                                 (bind("unknown"), "UnknownVersion", compute(var("unknown"))),
                             ],
@@ -5938,18 +6421,18 @@ pub(crate) mod alt {
                                 table_directory.call_args(vec![var("file_start")]),
                             ),
                             (
-                                Pattern::U32(magic(b"OTTO")),
+                                Pattern::U32(util::magic(b"OTTO")),
                                 "TableDirectory",
                                 table_directory.call_args(vec![var("file_start")]),
                             ),
                             (
-                                Pattern::U32(magic(b"ttcf")),
+                                Pattern::U32(util::magic(b"ttcf")),
                                 "TTCHeader",
                                 ttc_header.call_args(vec![var("file_start")]),
                             ),
                             // TODO - not yet sure if TrueType fonts will parse correctly under our current table_directory implementation...
                             (
-                                Pattern::U32(magic(b"true")),
+                                Pattern::U32(util::magic(b"true")),
                                 "TableDirectory",
                                 table_directory.call_args(vec![var("file_start")]),
                             ),
@@ -5983,7 +6466,7 @@ pub(crate) mod alt {
                 FlagBit("elidable_axis_value_name"), // Bit 1 - When set, indicates the 'normal' value for this axis and implies it may be omitted when composing name-strings
                 FlagBit("older_sibling_font_attribute"), // Bit 0 - When set, indicates that the axis information applies to previously released fonts in the same font-family
             ]);
-            let axis_value = record([("axis_index", u16be()), ("value", fixed32be())]);
+            let axis_value = record([("axis_index", u16be()), ("value", util::fixed32be())]);
             let f1_fields = vec![
                 ("axis_index", u16be()),
                 ("flags", axis_flags.clone()),
@@ -6013,7 +6496,7 @@ pub(crate) mod alt {
             ];
             module.define_format(
                 "opentype.stat.axis_value_table",
-                embedded_variadic_alternation(
+                util::embedded_variadic_alternation(
                     [("format", where_between_u16(u16be(), 1, 4))],
                     "format",
                     [
@@ -6023,7 +6506,7 @@ pub(crate) mod alt {
                         (4, "Format4", f4_fields),
                     ],
                     "data",
-                    NestingKind::MinimalVariation,
+                    util::NestingKind::MinimalVariation,
                 ),
             )
         };
@@ -6065,10 +6548,10 @@ pub(crate) mod alt {
             let_view(
                 "table_scope",
                 record_auto([
-                    ("major_version", expect_u16be(1)),
-                    ("minor_version", expects_u16be([1, 2])), // Version 1.0 is deprecated
-                    ("design_axis_size", u16be()),            // size (in bytes) of each axis record
-                    ("design_axis_count", u16be()),           // number of axis records
+                    ("major_version", util::expect_u16be(1)),
+                    ("minor_version", util::expects_u16be([1, 2])), // Version 1.0 is deprecated
+                    ("design_axis_size", u16be()), // size (in bytes) of each axis record
+                    ("design_axis_count", u16be()), // number of axis records
                     ("_design_axes_offset", u32be()),
                     (
                         "design_axes_array",

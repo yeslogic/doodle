@@ -17,8 +17,8 @@ use crate::{
     byte_set::ByteSet,
     decoder::extract_pair,
     parser::error::TraceHash,
-    typecheck::{TypeChecker, UVar},
-    valuetype::{SeqBorrowHint, augmented::AugValueType},
+    typecheck::{TypeChecker, UVar, UType},
+    valuetype::{ValueType, SeqBorrowHint, augmented::AugValueType},
 };
 
 use std::{
@@ -4027,9 +4027,10 @@ impl<'a> Elaborator<'a> {
 
                 self.codegen.name_gen.ctxt.push_atom(NameAtom::DeadEnd);
                 let mut t_args = Vec::with_capacity(args.len());
-                for ((lbl, _), arg) in Iterator::zip(fm_args.iter(), args.iter()) {
+                for ((lbl, ty), arg) in Iterator::zip(fm_args.iter(), args.iter()) {
                     let t_arg = self.elaborate_expr(arg);
                     t_args.push((lbl.clone(), t_arg));
+                    self.force_unify_against_valuetype(ty);
                 }
                 self.codegen.name_gen.ctxt.escape();
 
@@ -4898,6 +4899,41 @@ impl<'a> Elaborator<'a> {
             seen_levels = all_seen_levels;
         }
         (top, extra)
+    }
+
+    fn force_unify_against_valuetype(&mut self, vt: &ValueType) {
+        match UType::from_valuetype(vt) {
+            Some(_) => (),
+            _ => match vt {
+                ValueType::Union(branches) => self.force_unify_against_valuetype_union(branches),
+                ValueType::Record(fs) => {
+                    for (_, fvt) in fs.iter() {
+                        self.increment_index();
+                        self.force_unify_against_valuetype(fvt);
+                    }
+                }
+                ValueType::Tuple(ts) => {
+                    for t in ts.iter() {
+                        self.increment_index();
+                        self.force_unify_against_valuetype(t);
+                    }
+                }
+                ValueType::Seq(inner) | ValueType::Option(inner) => {
+                    self.increment_index();
+                    self.force_unify_against_valuetype(inner);
+                }
+                other => unreachable!("force_unify_against_valuetype hit non-nested ValueType: {other:?}"),
+            }
+        }
+    }
+
+    fn force_unify_against_valuetype_union<'b>(&mut self, branches: impl IntoIterator<Item = (&'b Label, &'b ValueType)> + 'b) {
+        for (_, branch_vt) in branches.into_iter() {
+            if let None = UType::from_valuetype(branch_vt) {
+                self.increment_index();
+                self.force_unify_against_valuetype(branch_vt);
+            }
+        }
     }
 }
 

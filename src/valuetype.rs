@@ -68,6 +68,7 @@ impl ValueType {
     pub const UNIT: ValueType = ValueType::Tuple(Vec::new());
 
     // TODO - add other numeric types
+    pub const U16: ValueType = ValueType::Base(BaseType::U16);
     pub const U32: ValueType = ValueType::Base(BaseType::U32);
 
     pub(crate) fn record_proj(&self, label: &str) -> ValueType {
