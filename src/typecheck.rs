@@ -68,6 +68,10 @@ impl UType {
         Self::Seq(self, SeqBorrowHint::Constructed)
     }
 
+    pub fn opt(self: Rc<Self>) -> Self {
+        Self::Option(self)
+    }
+
     pub fn seq_view(self: Rc<Self>) -> Self {
         Self::Seq(self, SeqBorrowHint::BufferView)
     }
@@ -539,6 +543,7 @@ pub enum ProjShape {
     TupleWith(BTreeMap<usize, UVar>), // required associations of meta-variables at given indices of an uncertain tuple
     RecordWith(BTreeMap<Label, UVar>), // required associations of meta-variables at given fields of an uncertain record
     SeqOf(UVar),                       // simple sequence element-type projection
+    OptOf(UVar),                       // simple Option param-type projection
 }
 
 impl ProjShape {
@@ -552,6 +557,10 @@ impl ProjShape {
 
     pub fn seq_of(elem: UVar) -> Self {
         Self::SeqOf(elem)
+    }
+
+    pub fn opt_of(inner: UVar) -> Self {
+        Self::OptOf(inner)
     }
 
     fn as_tuple_mut(&mut self) -> &mut BTreeMap<usize, UVar> {
@@ -1301,6 +1310,7 @@ impl TypeChecker {
                         Ok(())
                     }
                     ProjShape::SeqOf(elem_v) => self.occurs_in(v, Rc::<UType>::from(*elem_v)),
+                    ProjShape::OptOf(param_v) => self.occurs_in(v, Rc::<UType>::from(*param_v)),
                 },
             },
         }
@@ -1559,6 +1569,39 @@ impl TypeChecker {
         }
     }
 
+    /// Establishes `?i ~ Opt(?j)` through projective unification, where `opt_v` is the lhs
+    /// and `param_v` is the rhs metavariable.
+    fn unify_var_proj_param(&mut self, opt_v: UVar, param_v: UVar) -> TCResult<()> {
+        let can_v = self.get_canonical_uvar(opt_v);
+        match &mut self.constraints[can_v.0] {
+            Constraints::Indefinite => {
+                let proj = ProjShape::opt_of(param_v);
+                self.unify_var_constraint(opt_v, Constraint::Proj(proj))?;
+                Ok(())
+            }
+            Constraints::Variant(_) => unreachable!("cannot solve param projection on union"),
+            Constraints::Invariant(c) => match c {
+                Constraint::Elem(_) => unreachable!("cannot solve param projection on base-set"),
+                Constraint::Equiv(ut) => match ut.as_ref() {
+                    UType::Option(inner) => {
+                        let param_t = inner.clone();
+                        self.unify_var_utype(param_v, param_t)?;
+                        Ok(())
+                    }
+                    other => unreachable!("expected UType::Option, found {other:?}"),
+                },
+                Constraint::Proj(ps) => match ps {
+                    ProjShape::OptOf(other_var) => {
+                        let tmp = *other_var;
+                        self.unify_var_pair(param_v, tmp)?;
+                        Ok(())
+                    }
+                    _ => unreachable!("cannot unify on parameter type of non-opt projection"),
+                },
+            },
+        }
+    }
+
     /// Establishes `?i ~ Seq(?j)` through projective unification, where `seq_v` is the lhs
     /// and `elem_v` is the rhs metavariable.
     fn unify_var_proj_elem(&mut self, seq_v: UVar, elem_v: UVar) -> TCResult<()> {
@@ -1569,9 +1612,9 @@ impl TypeChecker {
                 self.unify_var_constraint(seq_v, Constraint::Proj(proj))?;
                 Ok(())
             }
-            Constraints::Variant(_) => unreachable!("cannot solve record projection on union"),
+            Constraints::Variant(_) => unreachable!("cannot solve elem projection on union"),
             Constraints::Invariant(c) => match c {
-                Constraint::Elem(_) => unreachable!("cannot solve record projection on base-set"),
+                Constraint::Elem(_) => unreachable!("cannot solve elem projection on base-set"),
                 Constraint::Equiv(ut) => match ut.as_ref() {
                     UType::Seq(inner, _) => {
                         let elem_t = inner.clone();
@@ -1612,6 +1655,7 @@ impl TypeChecker {
                 VType::ImplicitRecord(flat)
             }
             ProjShape::SeqOf(v) => VType::Abstract(Rc::new(UType::seq((*v).into()))),
+            ProjShape::OptOf(v) => VType::Abstract(Rc::new(UType::opt((*v).into()))),
         }
     }
 
@@ -1790,6 +1834,11 @@ impl TypeChecker {
                     self.unify_var_proj_elem(uv, elem_v)?;
                     self.unify_var_valuetype(elem_v, inner)?;
                 }
+                ValueType::Option(inner) => {
+                    let param_v = self.get_new_uvar();
+                    self.unify_var_proj_param(uv, param_v)?;
+                    self.unify_var_valuetype(param_v, inner)?;
+                }
                 other => unreachable!("unify_var_utype failed on non-nested ValueType {other:?}"),
             },
         }
@@ -1887,6 +1936,13 @@ impl TypeChecker {
                 self.unify_var_pair(elt_var1, elt_var2)?;
                 Ok(Constraint::Proj(ProjShape::SeqOf(elt_var1)))
             }
+            (
+                Constraint::Proj(ProjShape::OptOf(param_var1)),
+                Constraint::Proj(ProjShape::OptOf(param_var2))
+            ) => {
+                self.unify_var_pair(param_var1, param_var2)?;
+                Ok(Constraint::Proj(ProjShape::OptOf(param_var1)))
+            }
             (ref c1 @ Constraint::Proj(ref p), ref c2 @ Constraint::Equiv(ref ut))
             | (ref c1 @ Constraint::Equiv(ref ut), ref c2 @ Constraint::Proj(ref p)) => {
                 match (p, ut.as_ref()) {
@@ -1928,6 +1984,10 @@ impl TypeChecker {
                         self.unify_var_utype(*elem_v, elem_t.clone())?;
                         Ok(Constraint::Equiv(ut.clone()))
                     }
+                    (ProjShape::OptOf(param_v), UType::Option(param_t)) => {
+                        self.unify_var_utype(*param_v, param_t.clone())?;
+                        Ok(Constraint::Equiv(ut.clone()))
+                    }
                     (proj, UType::Var(var)) => {
                         self.unify_var_constraint(*var, Constraint::Proj(proj.clone()))
                     }
@@ -1940,19 +2000,26 @@ impl TypeChecker {
                     (ProjShape::SeqOf(_), other) => {
                         unreachable!("could not match Seq-Shape against {other:?}")
                     }
+                    (ProjShape::OptOf(_), other) => {
+                        unreachable!("could not match Opt-Shape against {other:?}")
+                    }
                 }
             }
             (
                 ref c1 @ Constraint::Proj(ProjShape::RecordWith(..)),
-                ref c2 @ Constraint::Proj(ProjShape::SeqOf(..) | ProjShape::TupleWith(..)),
+                ref c2 @ Constraint::Proj(ProjShape::SeqOf(..) | ProjShape::TupleWith(..) | ProjShape::OptOf(..)),
             )
             | (
                 ref c1 @ Constraint::Proj(ProjShape::TupleWith(..)),
-                ref c2 @ Constraint::Proj(ProjShape::SeqOf(..) | ProjShape::RecordWith(..)),
+                ref c2 @ Constraint::Proj(ProjShape::SeqOf(..) | ProjShape::RecordWith(..) | ProjShape::OptOf(..)),
             )
             | (
                 ref c1 @ Constraint::Proj(ProjShape::SeqOf(..)),
-                ref c2 @ Constraint::Proj(ProjShape::TupleWith(..) | ProjShape::RecordWith(..)),
+                ref c2 @ Constraint::Proj(ProjShape::TupleWith(..) | ProjShape::RecordWith(..) | ProjShape::OptOf(..)),
+            )
+            | (
+                ref c1 @ Constraint::Proj(ProjShape::OptOf(..)),
+                ref c2 @ Constraint::Proj(ProjShape::TupleWith(..) | ProjShape::RecordWith(..) | ProjShape::SeqOf(..))
             )
             | (ref c1 @ Constraint::Elem(_), ref c2 @ Constraint::Proj(_))
             | (ref c1 @ Constraint::Proj(_), ref c2 @ Constraint::Elem(_)) => {
@@ -3497,6 +3564,7 @@ mod __impl {
                     ),
                     ProjShape::RecordWith(fs) => write!(f, "~ Record(..) (>={} fields)", fs.len()),
                     ProjShape::SeqOf(elv) => write!(f, "~ Seq({elv})"),
+                    ProjShape::OptOf(parv) => write!(f, "~ Opt({parv})"),
                 },
             }
         }
