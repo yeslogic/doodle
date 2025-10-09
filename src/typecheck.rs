@@ -1938,7 +1938,7 @@ impl TypeChecker {
             }
             (
                 Constraint::Proj(ProjShape::OptOf(param_var1)),
-                Constraint::Proj(ProjShape::OptOf(param_var2))
+                Constraint::Proj(ProjShape::OptOf(param_var2)),
             ) => {
                 self.unify_var_pair(param_var1, param_var2)?;
                 Ok(Constraint::Proj(ProjShape::OptOf(param_var1)))
@@ -2007,19 +2007,27 @@ impl TypeChecker {
             }
             (
                 ref c1 @ Constraint::Proj(ProjShape::RecordWith(..)),
-                ref c2 @ Constraint::Proj(ProjShape::SeqOf(..) | ProjShape::TupleWith(..) | ProjShape::OptOf(..)),
+                ref c2 @ Constraint::Proj(
+                    ProjShape::SeqOf(..) | ProjShape::TupleWith(..) | ProjShape::OptOf(..),
+                ),
             )
             | (
                 ref c1 @ Constraint::Proj(ProjShape::TupleWith(..)),
-                ref c2 @ Constraint::Proj(ProjShape::SeqOf(..) | ProjShape::RecordWith(..) | ProjShape::OptOf(..)),
+                ref c2 @ Constraint::Proj(
+                    ProjShape::SeqOf(..) | ProjShape::RecordWith(..) | ProjShape::OptOf(..),
+                ),
             )
             | (
                 ref c1 @ Constraint::Proj(ProjShape::SeqOf(..)),
-                ref c2 @ Constraint::Proj(ProjShape::TupleWith(..) | ProjShape::RecordWith(..) | ProjShape::OptOf(..)),
+                ref c2 @ Constraint::Proj(
+                    ProjShape::TupleWith(..) | ProjShape::RecordWith(..) | ProjShape::OptOf(..),
+                ),
             )
             | (
                 ref c1 @ Constraint::Proj(ProjShape::OptOf(..)),
-                ref c2 @ Constraint::Proj(ProjShape::TupleWith(..) | ProjShape::RecordWith(..) | ProjShape::SeqOf(..))
+                ref c2 @ Constraint::Proj(
+                    ProjShape::TupleWith(..) | ProjShape::RecordWith(..) | ProjShape::SeqOf(..),
+                ),
             )
             | (ref c1 @ Constraint::Elem(_), ref c2 @ Constraint::Proj(_))
             | (ref c1 @ Constraint::Proj(_), ref c2 @ Constraint::Elem(_)) => {
