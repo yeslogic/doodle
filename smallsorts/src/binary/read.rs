@@ -365,8 +365,8 @@ impl<'a> ReadCtxt<'a> {
     /// Check a condition, returning `ParseError::BadIndex` if `false`.
     ///
     /// ```
-    /// use allsorts::binary::read::ReadScope;
-    /// use allsorts::error::ParseError;
+    /// use smallsorts::binary::read::ReadScope;
+    /// use smallsorts::error::ParseError;
     ///
     /// # fn main() -> Result<(), ParseError> {
     /// let ctxt = ReadScope::new(b"some data").ctxt();
@@ -390,8 +390,8 @@ impl<'a> ReadCtxt<'a> {
     /// Intended for use in checking versions read from data. Example:
     ///
     /// ```
-    /// use allsorts::binary::read::ReadScope;
-    /// use allsorts::error::ParseError;
+    /// use smallsorts::binary::read::ReadScope;
+    /// use smallsorts::error::ParseError;
     ///
     /// let scope = ReadScope::new(&[0, 2]);
     /// let mut ctxt = scope.ctxt();

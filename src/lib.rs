@@ -3,6 +3,7 @@
 
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashSet};
+use std::iter::repeat_n;
 use std::ops::Add;
 use std::rc::Rc;
 
@@ -33,6 +34,8 @@ pub mod read;
 
 mod typecheck;
 pub use typecheck::{TCError, TCResult, typecheck};
+mod util;
+pub(crate) use util::IxHeap;
 
 pub type Label = std::borrow::Cow<'static, str>;
 
@@ -1052,7 +1055,8 @@ impl<'a> RecordBuilder<'a> {
 #[serde(tag = "tag", content = "data")]
 pub enum Format {
     /// Reference to a top-level item
-    ItemVar(usize, Vec<Expr>), // FIXME - do the exprs here need type(+) info?
+    // REVIEW - is the `Option` around `Vec<ViewExpr>` useful?
+    ItemVar(usize, Vec<Expr>, Option<Vec<ViewExpr>>), // FIXME - do the exprs here need type(+) info?
     /// A format that never matches
     Fail,
     /// Matches if the end of the input has been reached
@@ -1213,7 +1217,7 @@ impl Format {
     /// Conservative bounds for number of byte-positions advanced after a format is matched (i.e. parsed)
     fn match_bounds(&self, module: &FormatModule) -> Bounds {
         match self {
-            Format::ItemVar(level, _args) => module.get_format(*level).match_bounds(module),
+            Format::ItemVar(level, _args, _views) => module.get_format(*level).match_bounds(module),
             Format::Fail => Bounds::exact(0),
             Format::EndOfInput => Bounds::exact(0),
             Format::SkipRemainder => Bounds::any(),
@@ -1290,7 +1294,9 @@ impl Format {
     /// are consumed as opposed to being left untouched in the buffer.
     pub(crate) fn lookahead_bounds(&self, module: &FormatModule) -> Bounds {
         match self {
-            Format::ItemVar(level, _args) => module.get_format(*level).lookahead_bounds(module),
+            Format::ItemVar(level, _args, _views) => {
+                module.get_format(*level).lookahead_bounds(module)
+            }
             Format::Fail => Bounds::exact(0),
             Format::EndOfInput => Bounds::exact(0),
             // NOTE - for PeekNot purposes it is not fully clear how to treat SkipRemainder, but we want to mirror the behavior of `Repeat(Byte)`
@@ -1375,7 +1381,9 @@ impl Format {
     /// True if the compilation of this format depends on the format that follows it
     fn depends_on_next(&self, module: &FormatModule) -> bool {
         match self {
-            Format::ItemVar(level, _args) => module.get_format(*level).depends_on_next(module),
+            Format::ItemVar(level, _args, _views) => {
+                module.get_format(*level).depends_on_next(module)
+            }
             Format::Fail => false,
             Format::EndOfInput => false,
             // NOTE - compiling SkipRemainder doesn't depend on the next format because the next format can only ever match the empty byte string at that point
@@ -1435,7 +1443,7 @@ impl Format {
     pub fn is_ascii_char_format(&self, module: &FormatModule) -> bool {
         match self {
             Format::Hint(StyleHint::AsciiChar, _) => true,
-            Format::ItemVar(level, _) => module.get_format(*level).is_ascii_char_format(module),
+            Format::ItemVar(level, ..) => module.get_format(*level).is_ascii_char_format(module),
             Format::Let(.., f) | Format::LetFormat(.., f) | Format::MonadSeq(_, f) => {
                 f.is_ascii_char_format(module)
             }
@@ -1448,7 +1456,7 @@ impl Format {
     pub fn is_ascii_string_format(&self, module: &FormatModule) -> bool {
         match self {
             Format::Hint(StyleHint::AsciiStr, _) => true,
-            Format::ItemVar(level, _) => module.get_format(*level).is_ascii_string_format(module),
+            Format::ItemVar(level, ..) => module.get_format(*level).is_ascii_string_format(module),
             Format::Tuple(formats) | Format::Sequence(formats) => {
                 !formats.is_empty() && formats.iter().all(|f| f.is_ascii_char_format(module))
             }
@@ -1482,12 +1490,16 @@ impl FormatRef {
     }
 
     pub fn call(&self) -> Format {
-        Format::ItemVar(self.0, vec![])
+        Format::ItemVar(self.0, vec![], None)
     }
 
     // REVIEW - do we need it to be `Vec` or is `impl IntoIterator<Item = Expr>` better?
     pub fn call_args(&self, args: Vec<Expr>) -> Format {
-        Format::ItemVar(self.0, args)
+        Format::ItemVar(self.0, args, None)
+    }
+
+    pub fn call_args_view(&self, args: Vec<Expr>, views: Vec<ViewExpr>) -> Format {
+        Format::ItemVar(self.0, args, Some(views))
     }
 }
 
@@ -1495,6 +1507,7 @@ impl FormatRef {
 pub struct FormatModule {
     names: Vec<Label>,
     args: Vec<Vec<(Label, ValueType)>>,
+    views: IxHeap<Vec<Label>>,
     formats: Vec<Format>,
     format_types: Vec<ValueType>,
 }
@@ -1504,6 +1517,7 @@ impl FormatModule {
         FormatModule {
             names: Vec::new(),
             args: Vec::new(),
+            views: IxHeap::new(),
             formats: Vec::new(),
             format_types: Vec::new(),
         }
@@ -1519,9 +1533,22 @@ impl FormatModule {
         args: Vec<(Label, ValueType)>,
         format: Format,
     ) -> FormatRef {
+        self.define_format_args_views(name, args, vec![], format)
+    }
+
+    pub fn define_format_args_views(
+        &mut self,
+        name: impl IntoLabel,
+        args: Vec<(Label, ValueType)>,
+        views: Vec<Label>,
+        format: Format,
+    ) -> FormatRef {
         let mut scope = TypeScope::new();
         for (arg_name, arg_type) in &args {
             scope.push(arg_name.clone(), arg_type.clone());
+        }
+        for view_name in &views {
+            scope.push_view(view_name.clone());
         }
         let format_type = match self.infer_format_type(&scope, &format) {
             Ok(t) => t,
@@ -1530,6 +1557,7 @@ impl FormatModule {
         let level = self.names.len();
         self.names.push(name.into());
         self.args.push(args);
+        self.views.push(views);
         self.formats.push(format);
         self.format_types.push(format_type);
         FormatRef(level)
@@ -1539,18 +1567,40 @@ impl FormatModule {
         &self.names[level]
     }
 
+    /// Iterates through every format defined in this module, constructing an invocation for each
+    /// with an appropriate array of arguments with the expected `ValueType`s.
+    ///
+    /// # Notes
+    ///
+    /// Does not yet have a way of passing in parameters to view-dependent formats.
     pub fn iter_formats(&self) -> impl Iterator<Item = (usize, Format)> + '_ {
         (0..self.formats.len()).filter_map(|ix| {
             let mut x_args = Vec::with_capacity(self.args[ix].len());
             for (_, vt) in self.args[ix].iter() {
                 x_args.push(mk_value_expr(vt)?);
             }
-            Some((ix, Format::ItemVar(ix, x_args)))
+            match self.views[ix].len() {
+                0 => Some((ix, Format::ItemVar(ix, x_args, None))),
+                n => {
+                    let x_views = repeat_n(ViewExpr::var("dummy"), n).collect();
+                    Some((
+                        ix,
+                        Format::LetView(
+                            Label::Borrowed("dummy"),
+                            Box::new(Format::ItemVar(ix, x_args, Some(x_views))),
+                        ),
+                    ))
+                }
+            }
         })
     }
 
     fn get_args(&self, level: usize) -> &[(Label, ValueType)] {
         &self.args[level]
+    }
+
+    fn get_view_args(&self, level: usize) -> &[Label] {
+        &self.views[level]
     }
 
     pub fn get_format(&self, level: usize) -> &Format {
@@ -1563,7 +1613,7 @@ impl FormatModule {
 
     fn infer_format_type(&self, scope: &TypeScope<'_>, f: &Format) -> AResult<ValueType> {
         match f {
-            Format::ItemVar(level, arg_exprs) => {
+            Format::ItemVar(level, arg_exprs, _arg_views) => {
                 let arg_names = self.get_args(*level);
                 if arg_names.len() != arg_exprs.len() {
                     return Err(anyhow!(
@@ -1571,6 +1621,16 @@ impl FormatModule {
                         arg_names.len(),
                         arg_exprs.len()
                     ));
+                }
+                if let Some(arg_views) = _arg_views {
+                    let view_names = self.get_view_args(*level);
+                    if view_names.len() != arg_views.len() {
+                        return Err(anyhow!(
+                            "Expected {} views, found {}",
+                            view_names.len(),
+                            arg_views.len(),
+                        ));
+                    }
                 }
                 for ((_name, arg_type), expr) in Iterator::zip(arg_names.iter(), arg_exprs.iter()) {
                     let t = expr.infer_type(scope)?;
@@ -2494,7 +2554,7 @@ impl<'a> MatchTreeStep<'a> {
         next: Rc<Next<'a>>,
     ) -> MatchTreeStep<'a> {
         match f {
-            Format::ItemVar(level, _args) => {
+            Format::ItemVar(level, _args, _views) => {
                 Self::from_format(module, module.get_format(*level), next)
             }
             Format::Fail => Self::reject(),

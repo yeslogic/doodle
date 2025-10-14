@@ -10,7 +10,7 @@ use std::{fmt, iter, str};
 /// Example:
 ///
 /// ```
-/// use allsorts::tag;
+/// use smallsorts::tag;
 /// assert_eq!(tag!(b"glyf"), 0x676C7966);
 /// ```
 #[macro_export]
@@ -25,7 +25,7 @@ macro_rules! tag {
 /// Example:
 ///
 /// ```
-/// use allsorts::tag::{self, DisplayTag};
+/// use smallsorts::tag::{self, DisplayTag};
 ///
 /// // ASCII tag comes out as a string
 /// assert_eq!(&DisplayTag(tag::NAME).to_string(), "name");

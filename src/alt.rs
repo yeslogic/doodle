@@ -8,7 +8,7 @@ use std::{
 
 use crate::{
     BaseKind, BaseType, ByteSet, DynFormat, Endian, Expr, Format, FormatModule, FormatRef,
-    IntoLabel, Label, Pattern, StyleHint, TypeScope, ValueKind, ValueType, ViewExpr,
+    IntoLabel, IxHeap, Label, Pattern, StyleHint, TypeScope, ValueKind, ValueType, ViewExpr,
     typecheck::UnificationError, valuetype::Container,
 };
 use anyhow::{Result as AResult, anyhow};
@@ -25,7 +25,7 @@ pub enum ModelKind {
 #[serde(tag = "tag", content = "data")]
 pub enum GroundFormat {
     /// Reference to a top-level item
-    ItemVar(usize, Vec<Expr>), // FIXME - do the exprs here need type(+) info?
+    ItemVar(usize, Vec<Expr>, Option<Vec<ViewExpr>>), // FIXME - do the exprs here need type(+) info?
     /// A format that never matches
     Fail,
     /// Matches if the end of the input has been reached
@@ -755,6 +755,7 @@ impl ValueTypeExt {
 pub struct FormatModuleExt {
     names: Vec<Label>,
     args: Vec<Vec<(Label, ValueTypeExt)>>,
+    views: IxHeap<Vec<Label>>,
     formats: Vec<FormatExt>,
     format_types: Vec<ValueTypeExt>,
 }
@@ -764,6 +765,7 @@ impl FormatModuleExt {
         FormatModuleExt {
             names: Vec::new(),
             args: Vec::new(),
+            views: IxHeap::new(),
             formats: Vec::new(),
             format_types: Vec::new(),
         }
@@ -781,6 +783,7 @@ impl FormatModuleExt {
                         .collect()
                 })
                 .collect(),
+            views: self.views,
             formats: self.formats.iter().map(|f| compiler.compile(f)).collect(),
             format_types: self
                 .format_types
@@ -802,13 +805,14 @@ impl FormatModuleExt {
         name: Name,
         format_ext: FormatExt,
     ) -> FormatRef {
-        self.define_format_args(name, vec![], format_ext)
+        self.define_format_args(name, vec![], vec![], format_ext)
     }
 
     pub fn define_format_args<Name: IntoLabel>(
         &mut self,
         name: Name,
         args: Vec<(Label, ValueTypeExt)>,
+        views: Vec<Label>,
         format_ext: FormatExt,
     ) -> FormatRef {
         let mut scope = TypeScope::<'_, ValueTypeExt>::new();
@@ -822,6 +826,7 @@ impl FormatModuleExt {
         let level = self.names.len();
         self.names.push(name.into());
         self.args.push(args);
+        self.views.push(views);
         self.formats.push(format_ext);
         self.format_types.push(format_type);
         FormatRef(level)
@@ -844,7 +849,7 @@ impl FormatModuleExt {
     ) -> AResult<ValueTypeExt> {
         match f {
             FormatExt::Ground(ground_format) => match ground_format {
-                GroundFormat::ItemVar(level, args) => {
+                GroundFormat::ItemVar(level, args, _views) => {
                     let arg_names = self.get_args(*level);
                     if arg_names.len() != args.len() {
                         return Err(anyhow!(
@@ -1680,8 +1685,8 @@ mod __impls {
     impl From<Format> for FormatExt {
         fn from(value: Format) -> Self {
             match value {
-                Format::ItemVar(level, exprs) => {
-                    FormatExt::Ground(GroundFormat::ItemVar(level, exprs))
+                Format::ItemVar(level, exprs, views) => {
+                    FormatExt::Ground(GroundFormat::ItemVar(level, exprs, views))
                 }
                 Format::Fail => FormatExt::Ground(GroundFormat::Fail),
                 Format::EndOfInput => FormatExt::Ground(GroundFormat::EndOfInput),
@@ -1863,7 +1868,7 @@ mod __impls {
                 GroundFormat::Align(n) => Format::Align(n),
                 GroundFormat::Byte(bs) => Format::Byte(bs),
                 GroundFormat::Apply(lbl) => Format::Apply(lbl),
-                GroundFormat::ItemVar(level, exprs) => Format::ItemVar(level, exprs),
+                GroundFormat::ItemVar(level, exprs, views) => Format::ItemVar(level, exprs, views),
                 GroundFormat::Compute(expr) => Format::Compute(expr),
                 GroundFormat::WithView(v_expr, vfx) => Format::WithView(v_expr, vfx.into()),
             }

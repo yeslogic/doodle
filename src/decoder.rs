@@ -924,7 +924,7 @@ pub(crate) mod search;
 /// Decoders with a fixed amount of lookahead
 #[derive(Clone, Debug)]
 pub enum Decoder {
-    Call(usize, Vec<(Label, Expr)>),
+    Call(usize, Vec<(Label, Expr)>, Option<Vec<(Label, ViewExpr)>>),
     Pos,
     Fail,
     EndOfInput,
@@ -1034,7 +1034,7 @@ impl<'a> Compiler<'a> {
 
     fn compile_format(&mut self, format: &'a Format, next: Rc<Next<'a>>) -> AResult<Decoder> {
         match format {
-            Format::ItemVar(level, arg_exprs) => {
+            Format::ItemVar(level, arg_exprs, arg_views) => {
                 let f = self.module.get_format(*level);
                 let next = if f.depends_on_next(self.module) {
                     next
@@ -1050,11 +1050,21 @@ impl<'a> Compiler<'a> {
                     n
                 };
                 let arg_names = self.module.get_args(*level);
-                let mut args = Vec::new();
+                let mut args = Vec::with_capacity(arg_names.len());
                 for ((name, _type), expr) in Iterator::zip(arg_names.iter(), arg_exprs.iter()) {
                     args.push((name.clone(), expr.clone()));
                 }
-                Ok(Decoder::Call(n, args))
+                let views = if let Some(arg_views) = arg_views {
+                    let view_names = self.module.get_view_args(*level);
+                    let mut views = Vec::with_capacity(view_names.len());
+                    for (name, view) in Iterator::zip(view_names.iter(), arg_views.iter()) {
+                        views.push((name.clone(), view.clone()));
+                    }
+                    Some(views)
+                } else {
+                    None
+                };
+                Ok(Decoder::Call(n, args, views))
             }
             Format::Fail => Ok(Decoder::Fail),
             Format::DecodeBytes(expr, inner) => {
@@ -1338,9 +1348,15 @@ pub enum Scope<'a> {
     View(ViewScope<'a>),
 }
 
+#[derive(Clone)]
+enum ViewOrValue<'a> {
+    View(View<'a>),
+    Value(Cow<'a, Value>),
+}
+
 pub struct MultiScope<'a> {
     parent: &'a Scope<'a>,
-    entries: Vec<(Label, Cow<'a, Value>)>,
+    entries: Vec<(Label, ViewOrValue<'a>)>,
 }
 
 pub struct SingleScope<'a> {
@@ -1419,26 +1435,43 @@ impl<'a> MultiScope<'a> {
 
     /// Pushes a new binding to the scope using a borrow that lives at least as long as the scope itself
     pub fn push(&mut self, name: impl Into<Label>, v: &'a Value) {
-        self.entries.push((name.into(), Cow::Borrowed(v)));
+        self.entries
+            .push((name.into(), ViewOrValue::Value(Cow::Borrowed(v))))
     }
 
     /// Pushes a new binding to the scope using an owned [Value]
     pub fn push_owned(&mut self, name: impl Into<Label>, v: Value) {
-        self.entries.push((name.into(), Cow::Owned(v)));
+        self.entries
+            .push((name.into(), ViewOrValue::Value(Cow::Owned(v))))
+    }
+
+    pub fn push_view(&mut self, name: impl Into<Label>, view: View<'a>) {
+        self.entries.push((name.into(), ViewOrValue::View(view)));
     }
 
     fn get_value_by_name(&self, name: &str) -> &Value {
         for (n, v) in self.entries.iter().rev() {
             if n == name {
-                return v;
+                if let ViewOrValue::Value(v) = v {
+                    return v;
+                } else {
+                    // TODO - should view-shadows-value cases be errors?
+                }
             }
         }
         self.parent.get_value_by_name(name)
     }
 
     fn get_bindings(&self, bindings: &mut Vec<(Label, ScopeEntry<Value>)>) {
-        for (name, value) in self.entries.iter().rev() {
-            bindings.push((name.clone(), ScopeEntry::Value(value.clone().into_owned())));
+        for (name, vv) in self.entries.iter().rev() {
+            match vv {
+                ViewOrValue::View(view) => {
+                    bindings.push((name.clone(), ScopeEntry::View(view.offset)))
+                }
+                ViewOrValue::Value(value) => {
+                    bindings.push((name.clone(), ScopeEntry::Value(value.clone().into_owned())));
+                }
+            }
         }
         self.parent.get_bindings(bindings);
     }
@@ -1526,11 +1559,15 @@ impl Decoder {
         input: ReadCtxt<'input>,
     ) -> DecodeResult<(Value, ReadCtxt<'input>)> {
         match self {
-            Decoder::Call(n, es) => {
+            Decoder::Call(n, es, vs) => {
                 let mut new_scope = MultiScope::with_capacity(&Scope::Empty, es.len());
                 for (name, e) in es {
                     let v = e.eval_value(scope);
                     new_scope.push_owned(name.clone(), v);
+                }
+                for (name, v) in vs.iter().flatten() {
+                    let vv = Self::eval_view_expr(scope, v)?;
+                    new_scope.push_view(name.clone(), vv);
                 }
                 program.decoders[*n]
                     .0

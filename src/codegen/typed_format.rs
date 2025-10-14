@@ -7,7 +7,7 @@ use super::{AtomType, LocalType};
 use crate::bounds::Bounds;
 use crate::byte_set::ByteSet;
 use crate::codegen::rust_ast::{RustLt, RustParams, UseParams};
-use crate::{Arith, BaseKind, Endian, IntRel, Label, StyleHint, TypeHint, UnaryOp};
+use crate::{Arith, BaseKind, Endian, IntRel, Label, StyleHint, TypeHint, UnaryOp, ViewExpr};
 
 pub(crate) mod variables;
 
@@ -83,9 +83,10 @@ impl<TypeRep> std::hash::Hash for TypedFormat<TypeRep> {
         let disc = core::mem::discriminant(self);
         disc.hash(state);
         match self {
-            TypedFormat::FormatCall(_, level, args, _) => {
+            TypedFormat::FormatCall(_, level, args, views, _) => {
                 level.hash(state);
                 args.hash(state);
+                views.hash(state);
             }
             TypedFormat::SkipRemainder
             | TypedFormat::Pos
@@ -206,6 +207,7 @@ pub enum TypedFormat<TypeRep> {
         TypeRep,
         usize,
         Vec<(Label, TypedExpr<TypeRep>)>,
+        Option<Vec<ViewExpr>>,
         Rc<TypedFormat<TypeRep>>,
     ),
     ForEach(
@@ -300,7 +302,7 @@ impl TypedFormat<GenType> {
 
     pub(crate) fn lookahead_bounds(&self) -> Bounds {
         match self {
-            TypedFormat::FormatCall(_gt, _lvl, _args, def) => def.lookahead_bounds(),
+            TypedFormat::FormatCall(_gt, _lvl, _args, _views, def) => def.lookahead_bounds(),
 
             TypedFormat::DecodeBytes(_, _, _)
             | TypedFormat::SkipRemainder
@@ -380,7 +382,7 @@ impl TypedFormat<GenType> {
 
     pub(crate) fn match_bounds(&self) -> Bounds {
         match self {
-            TypedFormat::FormatCall(_gt, _lvl, _args, def) => def.match_bounds(),
+            TypedFormat::FormatCall(_gt, _lvl, _args, _views, def) => def.match_bounds(),
 
             TypedFormat::DecodeBytes(_, _, _)
             | TypedFormat::ParseFromView(_, _, _)
@@ -1094,12 +1096,12 @@ mod __impls {
     impl<TypeRep> From<TypedFormat<TypeRep>> for Format {
         fn from(value: TypedFormat<TypeRep>) -> Self {
             match value {
-                TypedFormat::FormatCall(_gt, level, t_args, _) => {
+                TypedFormat::FormatCall(_gt, level, t_args, views, _) => {
                     let args = t_args
                         .into_iter()
                         .map(|(_lbl, arg)| Expr::from(arg))
                         .collect();
-                    Format::ItemVar(level, args)
+                    Format::ItemVar(level, args, views)
                 }
                 TypedFormat::DecodeBytes(_, expr, inner) => {
                     Format::DecodeBytes(rebox(expr), rebox(inner))

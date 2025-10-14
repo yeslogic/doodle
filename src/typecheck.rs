@@ -225,11 +225,12 @@ impl<'a> USingleScope<'a> {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 pub(crate) enum ViewScope<'a> {
     #[default]
     Empty,
     Single(ViewSingleScope<'a>),
+    Multi(&'a ViewMultiScope<'a>),
 }
 
 impl<'a> ViewScope<'a> {
@@ -241,11 +242,46 @@ impl<'a> ViewScope<'a> {
         match self {
             ViewScope::Empty => false,
             ViewScope::Single(s) => s.includes_name(name),
+            ViewScope::Multi(m) => m.includes_name(name),
         }
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone)]
+pub(crate) struct ViewMultiScope<'a> {
+    parent: &'a ViewScope<'a>,
+    entries: BTreeSet<Label>,
+}
+
+impl<'a> ViewMultiScope<'a> {
+    pub fn new(parent: &'a ViewScope<'a>) -> Self {
+        Self {
+            parent,
+            entries: BTreeSet::new(),
+        }
+    }
+
+    /// Records the presence of a view-kinded dep-format parameter in this scope.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if the same identifier is added twice to the same local scope (but not if it is
+    /// re-used across layers of scope).
+    pub fn push_view(&mut self, name: Label) {
+        // FIXME - the clone cost ought to be avoidable but
+        let _name = name.clone();
+        if !self.entries.insert(name) {
+            unreachable!("duplicate parameter identifier in format view-params: {_name}");
+        }
+    }
+
+    fn includes_name(&self, name: &str) -> bool
+where {
+        self.entries.contains(name) || self.parent.includes_name(name)
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
 pub(crate) struct ViewSingleScope<'a> {
     parent: &'a ViewScope<'a>,
     name: &'a str,
@@ -305,7 +341,7 @@ impl<'a> DynSingleScope<'a> {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub(crate) struct Ctxt<'a> {
     pub(crate) module: &'a FormatModule,
     pub(crate) scope: &'a UScope<'a>,
@@ -333,12 +369,21 @@ impl<'a> Ctxt<'a> {
         }
     }
 
+    pub(crate) fn with_view_bindings(&'a self, views: &'a ViewMultiScope<'a>) -> Ctxt<'a> {
+        Self {
+            module: self.module,
+            dyn_s: self.dyn_s,
+            views: ViewScope::Multi(views),
+            scope: self.scope,
+        }
+    }
+
     pub(crate) fn with_dyn_binding(&'a self, name: &'a str, dynf_var: UVar) -> Ctxt<'a> {
         Self {
             module: self.module,
             dyn_s: DynScope::Single(DynSingleScope::new(&self.dyn_s, name, dynf_var)),
             scope: self.scope,
-            views: self.views,
+            views: self.views.clone(),
         }
     }
 
@@ -2882,18 +2927,25 @@ impl TypeChecker {
     /// Assigns new meta-variables and simple constraints for a format, and returns the novel toplevel UVar
     pub(crate) fn infer_var_format(&mut self, f: &Format, ctxt: Ctxt<'_>) -> TCResult<UVar> {
         match f {
-            Format::ItemVar(level, args) => {
+            Format::ItemVar(level, args, _views) => {
                 let newvar = self.get_new_uvar();
                 let level_var = if !args.is_empty() {
                     let mut arg_scope = UMultiScope::new(ctxt.scope);
+                    let mut view_scope = ViewMultiScope::new(&ctxt.views);
                     let expected = ctxt.module.get_args(*level);
                     for ((lbl, vt), arg) in Iterator::zip(expected.iter(), args.iter()) {
                         let v_arg = self.infer_var_expr(arg, ctxt.scope)?;
                         arg_scope.push(lbl.clone(), v_arg);
                         self.unify_var_valuetype(v_arg, vt)?;
                     }
+                    let expected = ctxt.module.get_view_args(*level);
+                    for (lbl, view_x) in Iterator::zip(expected.iter(), _views.iter().flatten()) {
+                        self.traverse_view_expr(view_x, ctxt)?;
+                        view_scope.push_view(lbl.clone());
+                    }
                     let new_scope = UScope::Multi(&arg_scope);
-                    let new_ctxt = ctxt.with_scope(&new_scope);
+                    let tmp = ctxt.with_scope(&new_scope);
+                    let new_ctxt = tmp.with_view_bindings(&view_scope);
                     self.infer_var_format_level(*level, new_ctxt)?
                 } else {
                     self.infer_var_format_level(*level, ctxt)?

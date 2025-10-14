@@ -1203,9 +1203,24 @@ pub enum LocScope<'a> {
     View(LocViewScope<'a>),
 }
 
+#[derive(Clone, Debug)]
+enum ViewOrParsedValue<'a> {
+    View(View<'a>),
+    ParsedValue(ParsedValue),
+}
+
+impl<'a> ViewOrParsedValue<'a> {
+    fn try_as_value(&self) -> Option<&ParsedValue> {
+        match self {
+            ViewOrParsedValue::ParsedValue(v) => Some(v),
+            _ => None,
+        }
+    }
+}
+
 pub struct LocMultiScope<'a> {
     parent: &'a LocScope<'a>,
-    entries: Vec<(Label, ParsedValue)>,
+    entries: Vec<(Label, ViewOrParsedValue<'a>)>,
 }
 
 pub struct LocSingleScope<'a> {
@@ -1280,21 +1295,38 @@ impl<'a> LocMultiScope<'a> {
     }
 
     pub fn push(&mut self, name: impl Into<Label>, v: ParsedValue) {
-        self.entries.push((name.into(), v));
+        self.entries
+            .push((name.into(), ViewOrParsedValue::ParsedValue(v)))
+    }
+
+    pub fn push_view(&mut self, name: impl Into<Label>, view: View<'a>) {
+        self.entries
+            .push((name.into(), ViewOrParsedValue::View(view)))
     }
 
     fn get_value_by_name(&self, name: &str) -> &ParsedValue {
-        for (n, v) in self.entries.iter().rev() {
+        for (n, vv) in self.entries.iter().rev() {
             if n == name {
-                return v;
+                if let Some(v) = vv.try_as_value() {
+                    return v;
+                } else {
+                    // REVIEW - consider whether view-shadows-value cases should be errors
+                }
             }
         }
         self.parent.get_value_by_name(name)
     }
 
     fn get_bindings(&self, bindings: &mut Vec<(Label, LocScopeEntry)>) {
-        for (name, value) in self.entries.iter().rev() {
-            bindings.push((name.clone(), LocScopeEntry::Value(value.clone())));
+        for (name, vv) in self.entries.iter().rev() {
+            match vv {
+                ViewOrParsedValue::View(view) => {
+                    bindings.push((name.clone(), LocScopeEntry::View(view.offset)))
+                }
+                ViewOrParsedValue::ParsedValue(value) => {
+                    bindings.push((name.clone(), LocScopeEntry::Value(value.clone())))
+                }
+            }
         }
         self.parent.get_bindings(bindings);
     }
@@ -1387,11 +1419,15 @@ impl Decoder {
     ) -> LocDecodeError<(ParsedValue, ReadCtxt<'input>)> {
         let start_offset = input.offset;
         match self {
-            Decoder::Call(n, es) => {
+            Decoder::Call(n, es, vs) => {
                 let mut new_scope = LocMultiScope::with_capacity(&LocScope::Empty, es.len());
                 for (name, e) in es {
                     let v = e.eval_with_loc(scope).as_ref().clone();
                     new_scope.push(name.clone(), v);
+                }
+                for (name, vv) in vs.iter().flatten() {
+                    let v = Self::eval_view_expr_with_loc(scope, vv)?;
+                    new_scope.push_view(name.clone(), v);
                 }
                 program.decoders[*n]
                     .0
