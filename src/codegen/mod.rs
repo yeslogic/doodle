@@ -4015,7 +4015,7 @@ impl<'a> Elaborator<'a> {
 
     fn elaborate_format(&mut self, format: &Format, dyn_scope: &TypedDynScope<'_>) -> GTFormat {
         match format {
-            Format::ItemVar(level, args) => {
+            Format::ItemVar(level, args, _views) => {
                 self.codegen
                     .name_gen
                     .ctxt
@@ -4034,6 +4034,9 @@ impl<'a> Elaborator<'a> {
                 }
                 self.codegen.name_gen.ctxt.escape();
 
+                // TODO[epic=view-dependent-formats] - figure out what needs to be done here, beyond a simple clone
+                let views = _views.clone();
+
                 let t_inner = if let Some(val) = self.t_formats.get(level) {
                     val.clone()
                 } else {
@@ -4045,7 +4048,7 @@ impl<'a> Elaborator<'a> {
                 };
                 let gt = self.get_gt_from_index(index);
                 self.codegen.name_gen.ctxt.escape();
-                TypedFormat::FormatCall(gt, *level, t_args, t_inner)
+                TypedFormat::FormatCall(gt, *level, t_args, views, t_inner)
             }
             Format::ForEach(expr, lbl, inner) => {
                 let index = self.get_and_increment_index();

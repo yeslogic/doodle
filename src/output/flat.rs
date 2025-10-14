@@ -114,7 +114,7 @@ fn check_covered(
     format: &Format,
 ) -> Result<(), String> {
     match format {
-        Format::ItemVar(level, _args) => {
+        Format::ItemVar(level, _args, _views) => {
             let name = module.get_name(*level).to_string();
             if is_show_format(&name).is_none() {
                 path.push(name.into());
@@ -212,7 +212,7 @@ impl<'module, W: io::Write> Context<'module, W> {
 
     pub fn write_flat(&mut self, value: &Value, format: &Format) -> io::Result<()> {
         match format {
-            Format::ItemVar(level, _args) => {
+            Format::ItemVar(level, _args, _views) => {
                 let label = self.module.get_name(*level);
                 if let Some(title) = is_show_format(label) {
                     writeln!(&mut self.writer, "{label} - {title}")

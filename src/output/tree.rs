@@ -95,7 +95,7 @@ impl<'module> TreePrinter<'module> {
 
     fn is_implied_value_format(&self, format: &Format) -> bool {
         match format {
-            Format::ItemVar(level, _args) => {
+            Format::ItemVar(level, _args, _views) => {
                 self.is_implied_value_format(self.module.get_format(*level))
             }
             Format::EndOfInput => true,
@@ -159,7 +159,9 @@ impl<'module> TreePrinter<'module> {
 
     fn is_atomic_format(&self, format: &Format) -> bool {
         match format {
-            Format::ItemVar(level, _args) => self.is_atomic_format(self.module.get_format(*level)),
+            Format::ItemVar(level, _args, _views) => {
+                self.is_atomic_format(self.module.get_format(*level))
+            }
             Format::Byte(_) => true,
             Format::Hint(StyleHint::Common(..), inner) => self.is_atomic_format(inner),
             Format::Hint(StyleHint::AsciiChar, inner) => self.is_atomic_format(inner),
@@ -173,7 +175,7 @@ impl<'module> TreePrinter<'module> {
     ) -> Option<Vec<(&'a Label, &'a Format)>> {
         let mut fields = Vec::new();
         match format {
-            Format::ItemVar(level, _args) => {
+            Format::ItemVar(level, _args, _views) => {
                 self.try_as_record_with_atomic_fields(self.module.get_format(*level))
             }
             Format::Hint(StyleHint::Record { .. }, ..) => {
@@ -358,7 +360,7 @@ impl<'module> TreePrinter<'module> {
     pub fn compile_parsed_decoded_value(&mut self, value: &ParsedValue, fmt: &Format) -> Fragment {
         let mut frag = Fragment::Empty;
         match fmt {
-            Format::ItemVar(level, _args) => {
+            Format::ItemVar(level, _args, _views) => {
                 let fmt_name = self.module.get_name(*level);
 
                 // FIXME - this is a bit hackish, we should have a sentinel or marker to avoid magic strings
@@ -541,7 +543,7 @@ impl<'module> TreePrinter<'module> {
     pub fn compile_decoded_value(&mut self, value: &Value, fmt: &Format) -> Fragment {
         let mut frag = Fragment::Empty;
         match fmt {
-            Format::ItemVar(level, _args) => {
+            Format::ItemVar(level, _args, _views) => {
                 let fmt_name = self.module.get_name(*level);
 
                 // FIXME - this is a bit hackish, we should have a sentinel or marker to avoid magic strings
@@ -2331,13 +2333,17 @@ impl<'module> TreePrinter<'module> {
             }
             Format::Apply(_) => Fragment::String("apply".into()),
 
-            Format::ItemVar(var, args) => {
+            Format::ItemVar(var, args, views) => {
                 let mut frag = Fragment::new();
                 frag.append(Fragment::String(
                     self.module.get_name(*var).to_string().into(),
                 ));
                 if !args.is_empty() {
                     frag.append(Fragment::String("(...)".into()));
+                }
+                if !views.as_ref().is_none_or(Vec::is_empty) {
+                    // REVIEW - consider the stylistic decision of how to signify view-arguments
+                    frag.append(Fragment::String("{...}".into()));
                 }
                 frag
             }
