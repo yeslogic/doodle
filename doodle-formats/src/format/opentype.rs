@@ -4048,10 +4048,6 @@ mod layout {
                     ),
                 ),
             ),
-            (
-                "feature_variations",
-                util::offset16_mandatory(var("table_start"), feature_variations.call()),
-            ),
             // FIXME - add Version 1.1-specific fields as cond_maybe on minor-version
             (
                 "feature_variations_offset",
