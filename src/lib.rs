@@ -701,6 +701,7 @@ pub enum ViewFormat {
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub enum ViewExpr {
     Var(Label),
+    /// Offset(BaseView, OffsetExpr): advances the start of BaseView by a number of byte-positions equal to the numeric value of OffsetExpr (which can be any numeric type)
     Offset(Box<ViewExpr>, Box<Expr>),
 }
 

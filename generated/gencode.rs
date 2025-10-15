@@ -4008,12 +4008,12 @@ pub struct opentype_gvar_tuple_record {
 coordinates: Vec<opentype_gvar_tuple_record_coordinates>
 }
 
-/// expected size: 32
+/// expected size: 48
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_gvar_table_shared_tuples_offset {
-offset: u32,
-link: Option<Vec<opentype_gvar_tuple_record>>
+pub struct opentype_gvar_table_shared_tuples<'input> {
+shared_tuples_ctxt: View<'input>,
+dummy_shared_tuples: Vec<opentype_gvar_tuple_record>
 }
 
 /// expected size: 1
@@ -4128,16 +4128,16 @@ tuple_variation_headers: Vec<opentype_gvar_tuple_variation_header>,
 data: opentype_gvar_serialized_data
 }
 
-/// expected size: 112
+/// expected size: 128
 /// trait-ready: unique decoder function (d#45)
 #[derive(Debug, Clone)]
-pub struct opentype_gvar_table {
-gvar_table_start: u32,
+pub struct opentype_gvar_table<'input> {
 major_version: u16,
 minor_version: u16,
 axis_count: u16,
 shared_tuple_count: u16,
-shared_tuples_offset: opentype_gvar_table_shared_tuples_offset,
+_shared_tuples_offset: u32,
+shared_tuples: Option<opentype_gvar_table_shared_tuples<'input>>,
 glyph_count: u16,
 flags: opentype_gvar_table_flags,
 glyph_variation_data_array_offset: u32,
@@ -4371,10 +4371,10 @@ offset_to_axis_value_offsets: opentype_stat_table_offset_to_axis_value_offsets,
 elided_fallback_name_id: u16
 }
 
-/// expected size: 2192
+/// expected size: 2208
 /// trait-ready: unique decoder function (d#28)
 #[derive(Debug, Clone)]
-pub struct opentype_table_directory_table_links {
+pub struct opentype_table_directory_table_links<'input> {
 cmap: opentype_cmap_table,
 head: opentype_head_table,
 hhea: opentype_vhea_table,
@@ -4394,48 +4394,48 @@ gdef: Option<opentype_gdef_table>,
 gpos: Option<opentype_gpos_table>,
 gsub: Option<opentype_gsub_table>,
 fvar: Option<opentype_fvar_table>,
-gvar: Option<opentype_gvar_table>,
+gvar: Option<opentype_gvar_table<'input>>,
 kern: Option<opentype_kern_table>,
 stat: Option<opentype_stat_table>,
 vhea: Option<opentype_vhea_table>,
 vmtx: Option<opentype_hmtx_table>
 }
 
-/// expected size: 2232
+/// expected size: 2248
 /// trait-ready: unique decoder function (d#25)
 #[derive(Debug, Clone)]
-pub struct opentype_table_directory {
+pub struct opentype_table_directory<'input> {
 sfnt_version: u32,
 num_tables: u16,
 search_range: u16,
 entry_selector: u16,
 range_shift: u16,
 table_records: Vec<opentype_table_record>,
-table_links: opentype_table_directory_table_links
+table_links: opentype_table_directory_table_links<'input>
 }
 
-/// expected size: 2240
+/// expected size: 2256
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_ttc_header_header_Version1_table_directories {
+pub struct opentype_ttc_header_header_Version1_table_directories<'input> {
 offset: u32,
-link: Option<opentype_table_directory>
+link: Option<opentype_table_directory<'input>>
 }
 
 /// expected size: 32
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_ttc_header_header_Version1 {
+pub struct opentype_ttc_header_header_Version1<'input> {
 num_fonts: u32,
-table_directories: Vec<opentype_ttc_header_header_Version1_table_directories>
+table_directories: Vec<opentype_ttc_header_header_Version1_table_directories<'input>>
 }
 
 /// expected size: 40
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_ttc_header_header_Version2 {
+pub struct opentype_ttc_header_header_Version2<'input> {
 num_fonts: u32,
-table_directories: Vec<opentype_ttc_header_header_Version1_table_directories>,
+table_directories: Vec<opentype_ttc_header_header_Version1_table_directories<'input>>,
 dsig_tag: u32,
 dsig_length: u32,
 dsig_offset: u32
@@ -4444,32 +4444,32 @@ dsig_offset: u32
 /// expected size: 48
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub enum opentype_ttc_header_header { UnknownVersion(u16), Version1(opentype_ttc_header_header_Version1), Version2(opentype_ttc_header_header_Version2) }
+pub enum opentype_ttc_header_header<'input> { UnknownVersion(u16), Version1(opentype_ttc_header_header_Version1<'input>), Version2(opentype_ttc_header_header_Version2<'input>) }
 
 /// expected size: 56
 /// trait-ready: unique decoder function (d#26)
 #[derive(Debug, Clone)]
-pub struct opentype_ttc_header {
+pub struct opentype_ttc_header<'input> {
 ttc_tag: u32,
 major_version: u16,
 minor_version: u16,
-header: opentype_ttc_header_header
+header: opentype_ttc_header_header<'input>
 }
 
-/// expected size: 2240
+/// expected size: 2256
 /// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InEnum { variants: [Noop, DirectHeap] }, Layout { size: 56, align: 8 (1 << 3) })
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub enum opentype_main_directory { TTCHeader(opentype_ttc_header), TableDirectory(opentype_table_directory) }
+pub enum opentype_main_directory<'input> { TTCHeader(opentype_ttc_header<'input>), TableDirectory(opentype_table_directory<'input>) }
 
-/// expected size: 2248
+/// expected size: 2264
 /// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap] })] }, Layout { size: 64, align: 8 (1 << 3) })
 /// trait-ready: unique decoder function (d#14)
 #[derive(Debug, Clone)]
-pub struct opentype_main {
+pub struct opentype_main<'input> {
 file_start: u32,
 magic: u32,
-directory: opentype_main_directory
+directory: opentype_main_directory<'input>
 }
 
 /// expected size: 16
@@ -4882,11 +4882,11 @@ noise: Vec<u8>,
 waldo: &'input [u8]
 }
 
-/// expected size: 2256
+/// expected size: 2272
 /// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InEnum { variants: [DirectHeap, Noop, Noop, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap] })] })] }, Noop, DirectHeap, Noop, Noop, Noop, Noop, Noop, Noop, Noop] }, Layout { size: 104, align: 8 (1 << 3) })
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub enum main_data<'input> { elf(elf_main), gif(gif_main), gzip(Vec<gzip_main>), jpeg(jpeg_main), mpeg4(mpeg4_main), opentype(opentype_main), peano(Vec<u32>), png(png_main), riff(riff_main), rle(rle_main), tar(tar_main), text(Vec<char>), tgz(Vec<tar_main>), tiff(tiff_main), waldo(waldo_main<'input>) }
+pub enum main_data<'input> { elf(elf_main), gif(gif_main), gzip(Vec<gzip_main>), jpeg(jpeg_main), mpeg4(mpeg4_main), opentype(opentype_main<'input>), peano(Vec<u32>), png(png_main), riff(riff_main), rle(rle_main), tar(tar_main), text(Vec<char>), tgz(Vec<tar_main>), tiff(tiff_main), waldo(waldo_main<'input>) }
 
 /// expected size: 4
 /// trait-orphaned: no decoder functions provided
@@ -4958,7 +4958,7 @@ _char: u8,
 buf: Vec<u8>
 }
 
-/// expected size: 2256
+/// expected size: 2272
 /// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [InDef(InEnum { variants: [DirectHeap, Noop, Noop, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap] })] })] }, Noop, DirectHeap, Noop, Noop, Noop, Noop, Noop, Noop, Noop] })] }, Layout { size: 104, align: 8 (1 << 3) })
 /// trait-unready: multiple (2) decoders exist (d#{0, 1})
 #[derive(Debug, Clone)]
@@ -6037,7 +6037,7 @@ PResult::Ok(elf_main { header, program_headers, section_headers, sections })
 }
 
 /// d#14
-fn Decoder_opentype_main(_input: &mut Parser<'_>) -> Result<opentype_main, ParseError> {
+fn Decoder_opentype_main<'input>(_input: &mut Parser<'input>) -> Result<opentype_main<'input>, ParseError> {
 let file_start = {
 let x = _input.get_offset_u64();
 x as u32
@@ -6716,7 +6716,7 @@ PResult::Ok(rle_old_style_run { len, char, buf })
 }
 
 /// d#25
-fn Decoder_opentype_table_directory(_input: &mut Parser<'_>, font_start: u32) -> Result<opentype_table_directory, ParseError> {
+fn Decoder_opentype_table_directory<'input>(_input: &mut Parser<'input>, font_start: u32) -> Result<opentype_table_directory<'input>, ParseError> {
 let sfnt_version = {
 let inner = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -6761,7 +6761,7 @@ PResult::Ok(opentype_table_directory { sfnt_version, num_tables, search_range, e
 }
 
 /// d#26
-fn Decoder_opentype_ttc_header(_input: &mut Parser<'_>, start: u32) -> Result<opentype_ttc_header, ParseError> {
+fn Decoder_opentype_ttc_header<'input>(_input: &mut Parser<'input>, start: u32) -> Result<opentype_ttc_header<'input>, ParseError> {
 let ttc_tag = {
 let inner = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -6902,7 +6902,7 @@ PResult::Ok(opentype_table_record { table_id, checksum, offset, length })
 }
 
 /// d#28
-fn Decoder_opentype_table_directory_table_links(_input: &mut Parser<'_>, start: u32, tables: &[opentype_table_record]) -> Result<opentype_table_directory_table_links, ParseError> {
+fn Decoder_opentype_table_directory_table_links<'input>(_input: &mut Parser<'input>, start: u32, tables: &[opentype_table_record]) -> Result<opentype_table_directory_table_links<'input>, ParseError> {
 let cmap = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1668112752u32, tables)).copied() {
 Some(ref matching_table) => {
 let tgt_offset = start + matching_table.offset;
@@ -9901,11 +9901,8 @@ PResult::Ok(opentype_fvar_table { table_start, major_version, minor_version, axi
 }
 
 /// d#45
-fn Decoder_opentype_gvar_table(_input: &mut Parser<'_>) -> Result<opentype_gvar_table, ParseError> {
-let gvar_table_start = {
-let x = _input.get_offset_u64();
-x as u32
-};
+fn Decoder_opentype_gvar_table<'input>(_input: &mut Parser<'input>) -> Result<opentype_gvar_table<'input>, ParseError> {
+let gvar_table = _input.view();
 let major_version = {
 let inner = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -9944,32 +9941,29 @@ let shared_tuple_count = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-let shared_tuples_offset = {
-let offset = {
+let _shared_tuples_offset = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let link = match offset > 0u32 {
+let shared_tuples = match _shared_tuples_offset > 0u32 {
 true => {
-let tgt_offset = gvar_table_start + offset;
-let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
+let shared_tuples_ctxt = gvar_table.offset(_shared_tuples_offset as usize)?;
+let dummy_shared_tuples = {
+let mut view_parser = Parser::from(gvar_table.offset(_shared_tuples_offset as usize)?);
+let view_input = &mut view_parser;
 let mut accum = Vec::new();
 for _ in 0..shared_tuple_count {
-let next_elem = (Decoder_opentype_gvar_tuple_record(_input, axis_count))?;
+let next_elem = (Decoder_opentype_gvar_tuple_record(view_input, axis_count))?;
 accum.push(next_elem)
 };
-PResult::Ok(Some(accum))
-})())?;
-_input.close_peek_context()?;
-ret
+accum
+};
+Some(opentype_gvar_table_shared_tuples { shared_tuples_ctxt, dummy_shared_tuples })
 },
 
 false => {
 None
 }
-};
-opentype_gvar_table_shared_tuples_offset { offset, link }
 };
 let glyph_count = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -10019,13 +10013,9 @@ opentype_gvar_table_glyph_variation_data_offsets::Offsets16(inner)
 }
 };
 let glyph_variation_data_array = {
-let tgt_offset = gvar_table_start + glyph_variation_data_array_offset;
-let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = {
-let array_start = {
-let x = _input.get_offset_u64();
-x as u32
-};
+let mut view_parser = Parser::from(gvar_table.offset(glyph_variation_data_array_offset as usize)?);
+let view_input = &mut view_parser;
+let array_view = view_input.view();
 match glyph_variation_data_offsets {
 opentype_gvar_table_glyph_variation_data_offsets::Offsets16(ref half16s) => {
 let len = pred((half16s.len()) as u32);
@@ -10034,16 +10024,13 @@ for ix in 0u32..len {
 let next_elem = {
 let (this_offs, next_offs) = ((half16s[ix as usize] as u32) * 2u32, (half16s[(succ(ix)) as usize] as u32) * 2u32);
 if next_offs > this_offs {
-let tgt_offset = array_start + this_offs;
-let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
-let sz = (try_sub!(next_offs, this_offs, 11876854719037224982u64)) as usize;
-_input.start_slice(sz)?;
-let ret = (Decoder_opentype_gvar_glyph_variation_data(_input, axis_count))?;
-_input.end_slice()?;
-PResult::Ok(ret)
-})())?;
-_input.close_peek_context()?;
+let len = try_sub!(next_offs, this_offs, 11876854719037224982u64);
+let mut view_parser = Parser::from(array_view.offset(this_offs as usize)?);
+let view_input = &mut view_parser;
+let sz = len as usize;
+view_input.start_slice(sz)?;
+let ret = (Decoder_opentype_gvar_glyph_variation_data(view_input, axis_count))?;
+view_input.end_slice()?;
 Some(ret)
 } else {
 None
@@ -10061,16 +10048,13 @@ for ix in 0u32..len {
 let next_elem = {
 let (this_offs, next_offs) = (off32s[ix as usize], off32s[(succ(ix)) as usize]);
 if next_offs > this_offs {
-let tgt_offset = array_start + this_offs;
-let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
-let sz = (try_sub!(next_offs, this_offs, 18270091135093349626u64)) as usize;
-_input.start_slice(sz)?;
-let ret = (Decoder_opentype_gvar_glyph_variation_data(_input, axis_count))?;
-_input.end_slice()?;
-PResult::Ok(ret)
-})())?;
-_input.close_peek_context()?;
+let len = try_sub!(next_offs, this_offs, 18270091135093349626u64);
+let mut view_parser = Parser::from(array_view.offset(this_offs as usize)?);
+let view_input = &mut view_parser;
+let sz = len as usize;
+view_input.start_slice(sz)?;
+let ret = (Decoder_opentype_gvar_glyph_variation_data(view_input, axis_count))?;
+view_input.end_slice()?;
 Some(ret)
 } else {
 None
@@ -10082,10 +10066,7 @@ accum
 }
 }
 };
-_input.close_peek_context()?;
-ret
-};
-PResult::Ok(opentype_gvar_table { gvar_table_start, major_version, minor_version, axis_count, shared_tuple_count, shared_tuples_offset, glyph_count, flags, glyph_variation_data_array_offset, glyph_variation_data_offsets, glyph_variation_data_array })
+PResult::Ok(opentype_gvar_table { major_version, minor_version, axis_count, shared_tuple_count, _shared_tuples_offset, shared_tuples, glyph_count, flags, glyph_variation_data_array_offset, glyph_variation_data_offsets, glyph_variation_data_array })
 }
 
 /// d#46

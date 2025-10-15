@@ -4,7 +4,7 @@ pub type TestResult<T = ()> = Result<T, Box<dyn Send + Sync + std::error::Error>
 
 // Stabilization aliases to avoid hard-coding shifting numbers as formats are enriched with more possibilities
 pub type Top<'a> = main_data<'a>;
-pub type OpentypeData = opentype_main;
+pub type OpentypeData<'a> = opentype_main<'a>;
 pub type TarBlock = tar_header_with_data;
 pub type PngData = png_main;
 pub type JpegData = jpeg_main;

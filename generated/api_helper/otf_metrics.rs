@@ -152,7 +152,7 @@ impl std::fmt::Display for Tag {
 }
 
 // SECTION - Type aliases for stable referencing of commonly-used generated types
-pub type OpentypeFontDirectory = opentype_table_directory;
+pub type OpentypeFontDirectory<'input> = opentype_table_directory<'input>;
 pub type OpentypeGlyf = opentype_glyf_table;
 pub type GlyphDescription = opentype_glyf_description;
 pub type SimpleGlyph = opentype_glyf_simple;
@@ -184,6 +184,8 @@ pub type OpentypeGsub = opentype_gsub_table;
 
 pub type OpentypeKern = opentype_kern_table;
 pub type OpentypeStat = opentype_stat_table;
+pub type OpentypeFvar = opentype_fvar_table;
+pub type OpentypeGvar<'input> = opentype_gvar_table<'input>;
 
 // STUB[epic=horizontal-for-vertical] - change to distinguished type names once we have them
 pub type OpentypeVhea = opentype_vhea_table;
@@ -600,7 +602,270 @@ where
     result
 }
 
-pub type OpentypeFvar = opentype_fvar_table;
+impl<'input> Promote<OpentypeGvar<'input>> for GvarMetrics {
+    fn promote(orig: &OpentypeGvar<'input>) -> Self {
+        Self {
+            major_version: orig.major_version,
+            minor_version: orig.minor_version,
+            shared_tuples: promote_from_null(&orig.shared_tuples),
+            glyph_count: orig.glyph_count,
+            flags: Promote::promote(&orig.flags),
+            glyph_variation_data_array: orig
+                .glyph_variation_data_array
+                .iter()
+                .map(|data| data.as_ref().map(GlyphVariationData::promote))
+                .collect(),
+        }
+    }
+}
+
+pub type OpentypeGvarSharedTupleRecords<'input> = opentype_gvar_table_shared_tuples<'input>;
+
+impl<'input> Promote<OpentypeGvarSharedTupleRecords<'input>> for Vec<GvarTupleRecord> {
+    fn promote(orig: &OpentypeGvarSharedTupleRecords<'input>) -> Self {
+        // FIXME - remove dependency on eager-computed dummy-field
+        promote_vec(&orig.dummy_shared_tuples)
+    }
+}
+
+pub type OpentypeGvarTupleRecord = opentype_gvar_tuple_record;
+
+impl Promote<OpentypeGvarTupleRecord> for GvarTupleRecord {
+    fn promote(orig: &OpentypeGvarTupleRecord) -> Self {
+        GvarTupleRecord {
+            coordinates: promote_vec(&orig.coordinates),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct GvarTupleRecord {
+    coordinates: Vec<F2Dot14>,
+}
+
+pub type OpentypeGvarFlags = opentype_gvar_table_flags;
+
+impl Promote<OpentypeGvarFlags> for GvarFlags {
+    fn promote(orig: &OpentypeGvarFlags) -> Self {
+        GvarFlags {
+            is_long_offset: orig.is_long_offset,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct GvarFlags {
+    is_long_offset: bool,
+}
+
+pub type OpentypeGvarTupleVariationHeader = opentype_gvar_tuple_variation_header;
+
+impl Promote<OpentypeGvarTupleVariationHeader> for GvarTupleVariationHeader {
+    fn promote(orig: &OpentypeGvarTupleVariationHeader) -> Self {
+        GvarTupleVariationHeader {
+            variation_data_size: orig.variation_data_size,
+            tuple_index: GvarTupleVariationHeaderTupleIndex::promote(&orig.tuple_index),
+            peak_tuple: promote_opt(&orig.peak_tuple),
+            intermediate_tuples: promote_opt(&orig.intermediate_tuples),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct GvarTupleVariationHeader {
+    variation_data_size: u16,
+    tuple_index: GvarTupleVariationHeaderTupleIndex,
+    peak_tuple: Option<GvarTupleRecord>,
+    intermediate_tuples: Option<GvarIntermediateTuples>,
+}
+
+pub type OpentypeGvarTupleVariationHeaderTupleIndex =
+    opentype_gvar_tuple_variation_header_tuple_index;
+
+impl Promote<OpentypeGvarTupleVariationHeaderTupleIndex> for GvarTupleVariationHeaderTupleIndex {
+    fn promote(orig: &OpentypeGvarTupleVariationHeaderTupleIndex) -> Self {
+        GvarTupleVariationHeaderTupleIndex {
+            embedded_peak_tuple: orig.embedded_peak_tuple,
+            intermediate_region: orig.intermediate_region,
+            private_point_numbers: orig.private_point_numbers,
+            tuple_index: orig.tuple_index,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct GvarTupleVariationHeaderTupleIndex {
+    embedded_peak_tuple: bool,
+    intermediate_region: bool,
+    private_point_numbers: bool,
+    tuple_index: u16,
+}
+
+pub type OpentypeGvarIntermediateTuples = opentype_gvar_tuple_variation_header_intermediate_tuples;
+
+impl Promote<OpentypeGvarIntermediateTuples> for GvarIntermediateTuples {
+    fn promote(orig: &OpentypeGvarIntermediateTuples) -> Self {
+        GvarIntermediateTuples {
+            start_tuple: GvarTupleRecord::promote(&orig.start_tuple),
+            end_tuple: GvarTupleRecord::promote(&orig.end_tuple),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct GvarIntermediateTuples {
+    start_tuple: GvarTupleRecord,
+    end_tuple: GvarTupleRecord,
+}
+
+pub type OpentypeGlyphVariationData = opentype_gvar_glyph_variation_data;
+
+impl Promote<OpentypeGlyphVariationData> for GlyphVariationData {
+    fn promote(orig: &OpentypeGlyphVariationData) -> Self {
+        GlyphVariationData {
+            shared_point_numbers: orig.tuple_variation_count.shared_point_numbers,
+            tuple_count: orig.tuple_variation_count.tuple_count,
+            tuple_variation_headers: promote_vec(&orig.tuple_variation_headers),
+            data: Promote::promote(&orig.data),
+        }
+    }
+}
+
+pub type OpentypePackedPoints = opentype_var_packed_point_numbers_run_points;
+pub type OpentypePackedPointRun = opentype_var_packed_point_numbers_run;
+pub type OpentypePackedPointRuns = (u16, Vec<OpentypePackedPointRun>);
+
+impl Promote<OpentypePackedPointRuns> for PackedPointNumbers {
+    fn promote(orig: &OpentypePackedPointRuns) -> Self {
+        PackedPointNumbers {
+            point_numbers: promote_vec(&orig.1),
+        }
+    }
+}
+
+impl Promote<OpentypePackedPointRun> for PackedPointRun {
+    fn promote(orig: &OpentypePackedPointRun) -> Self {
+        PackedPointRun::promote(&orig.points)
+    }
+}
+
+impl Promote<OpentypePackedPoints> for PackedPointRun {
+    fn promote(orig: &OpentypePackedPoints) -> Self {
+        match orig {
+            OpentypePackedPoints::Points8(points) => PackedPointRun::Short(points.clone()),
+            OpentypePackedPoints::Points16(points) => PackedPointRun::Long(points.clone()),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum PackedPointRun {
+    Short(Vec<u8>),
+    Long(Vec<u16>),
+}
+
+#[derive(Debug, Clone)]
+pub struct PackedPointNumbers {
+    point_numbers: Vec<PackedPointRun>,
+}
+
+pub type OpentypeXYCoordinateDeltas = (u16, Vec<OpentypeCoordinateDeltaRun>);
+pub type OpentypeCoordinateDeltaRun =
+    opentype_gvar_serialized_data_per_tuple_variation_data_x_and_y_coordinate_deltas;
+pub type OpentypeXYCoordinateDeltaDeltas =
+    opentype_gvar_serialized_data_per_tuple_variation_data_x_and_y_coordinate_deltas_deltas;
+
+impl Promote<OpentypeCoordinateDeltaRun> for CoordinateDeltas {
+    fn promote(orig: &OpentypeCoordinateDeltaRun) -> Self {
+        CoordinateDeltas::promote(&orig.deltas)
+    }
+}
+
+impl Promote<OpentypeXYCoordinateDeltaDeltas> for CoordinateDeltas {
+    fn promote(orig: &OpentypeXYCoordinateDeltaDeltas) -> Self {
+        match orig {
+            &OpentypeXYCoordinateDeltaDeltas::Delta0(run_length) => {
+                CoordinateDeltas::Zero { run_length }
+            }
+            OpentypeXYCoordinateDeltaDeltas::Delta8(raw) => CoordinateDeltas::Short {
+                deltas: raw.iter().map(|x| *x as i8).collect(),
+            },
+            OpentypeXYCoordinateDeltaDeltas::Delta16(raw) => CoordinateDeltas::Long {
+                deltas: raw.iter().map(|x| *x as i16).collect(),
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum CoordinateDeltas {
+    Zero { run_length: u8 },
+    Short { deltas: Vec<i8> },
+    Long { deltas: Vec<i16> },
+}
+
+impl Promote<OpentypeXYCoordinateDeltas> for XYCoordinateDeltas {
+    fn promote(orig: &OpentypeXYCoordinateDeltas) -> Self {
+        XYCoordinateDeltas {
+            xy_deltas: promote_vec(&orig.1),
+        }
+    }
+}
+#[derive(Debug, Clone)]
+pub struct XYCoordinateDeltas {
+    xy_deltas: Vec<CoordinateDeltas>,
+}
+
+pub type OpentypeGvarPerTupleVariationData = opentype_gvar_serialized_data_per_tuple_variation_data;
+
+impl Promote<OpentypeGvarPerTupleVariationData> for GvarPerTupleVariationData {
+    fn promote(orig: &OpentypeGvarPerTupleVariationData) -> Self {
+        GvarPerTupleVariationData {
+            private_point_numbers: promote_opt(&orig.private_point_numbers),
+            x_and_y_coordinate_deltas: XYCoordinateDeltas::promote(&orig.x_and_y_coordinate_deltas),
+        }
+    }
+}
+#[derive(Debug, Clone)]
+pub struct GvarPerTupleVariationData {
+    private_point_numbers: Option<PackedPointNumbers>,
+    x_and_y_coordinate_deltas: XYCoordinateDeltas,
+}
+
+pub type OpentypeGvarSerializedData = opentype_gvar_serialized_data;
+
+impl Promote<OpentypeGvarSerializedData> for GvarSerializedData {
+    fn promote(orig: &OpentypeGvarSerializedData) -> Self {
+        GvarSerializedData {
+            shared_point_numbers: promote_opt(&orig.shared_point_numbers),
+            per_tuple_variation_data: promote_vec(&orig.per_tuple_variation_data),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct GvarSerializedData {
+    shared_point_numbers: Option<PackedPointNumbers>,
+    per_tuple_variation_data: Vec<GvarPerTupleVariationData>,
+}
+
+#[derive(Debug, Clone)]
+pub struct GlyphVariationData {
+    shared_point_numbers: bool,
+    tuple_count: u16,
+    tuple_variation_headers: Vec<GvarTupleVariationHeader>,
+    data: GvarSerializedData,
+}
+
+#[derive(Debug, Clone)]
+struct GvarMetrics {
+    major_version: u16,
+    minor_version: u16,
+    shared_tuples: Vec<GvarTupleRecord>,
+    glyph_count: u16,
+    flags: GvarFlags,
+    glyph_variation_data_array: Vec<Option<GlyphVariationData>>,
+}
 
 impl Promote<OpentypeFvar> for FvarMetrics {
     fn promote(orig: &OpentypeFvar) -> Self {
@@ -3992,7 +4257,7 @@ pub struct OptionalTableMetrics {
     gsub: Option<Heap<LayoutMetrics>>,
     // STUB - add more tables as we expand opentype definition
     fvar: Option<Heap<FvarMetrics>>,
-    // gvar: Option<Heap<GvarMetrics>>,
+    gvar: Option<Heap<GvarMetrics>>,
     // STUB - add more tables as we expand opentype definition
     kern: Option<KernMetrics>,
     stat: Option<Heap<StatMetrics>>,
@@ -4380,6 +4645,7 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
                 .transpose()?
         };
         let fvar = promote_opt(&dir.table_links.fvar).map(Heap::new);
+        let gvar = promote_opt(&dir.table_links.gvar).map(Heap::new);
         let kern = {
             let kern = &dir.table_links.kern;
             kern.as_ref().map(|kern| KernMetrics {
@@ -4433,7 +4699,7 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
             gsub,
             // TODO - add more variation tables as they are added to the spec
             fvar,
-            // gvar,
+            gvar,
             // TODO - add more optional tables as they are added to the spec
             kern,
             stat,
@@ -4576,11 +4842,59 @@ fn show_optional_metrics(optional: &OptionalTableMetrics, conf: &Config) {
     );
 
     show_fvar_metrics(optional.fvar.as_deref(), conf);
+    show_gvar_metrics(optional.gvar.as_deref(), conf);
 
     show_kern_metrics(&optional.kern, conf);
     show_stat_metrics(optional.stat.as_deref(), conf);
     show_vhea_metrics(&optional.vhea, conf);
     show_vmtx_metrics(&optional.vmtx, conf);
+}
+
+fn show_gvar_metrics(gvar: Option<&GvarMetrics>, conf: &Config) {
+    let Some(gvar) = gvar else { return };
+    if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
+        fn show_shared_tuples(shared_tuples: &[GvarTupleRecord]) {
+            fn format_shared_tuple_record(tuple: &GvarTupleRecord) -> String {
+                const COORD_BOOKEND: usize = 4;
+                format_items_inline(
+                    &tuple.coordinates,
+                    |coord| format!("{}", coord),
+                    COORD_BOOKEND,
+                    |n_skipped| format!("..({n_skipped} skipped).."),
+                )
+            }
+            const RECORDS_BOOKEND: usize = 4;
+            show_items_elided(
+                shared_tuples,
+                |shared_tuple_ix, record| {
+                    println!(
+                        "\t\t[{shared_tuple_ix}]: {}",
+                        format_shared_tuple_record(record)
+                    )
+                },
+                RECORDS_BOOKEND,
+                |start, stop| format!("\t    (skipping shared tuples {start}..{stop})"),
+            )
+        }
+
+        println!(
+            "gvar: version {}",
+            format_version_major_minor(gvar.major_version, gvar.minor_version)
+        );
+        println!("\tShared Tuples:");
+        show_shared_tuples(&gvar.shared_tuples);
+        // WIP
+    } else {
+        print!(
+            "gvar: version {}",
+            format_version_major_minor(gvar.major_version, gvar.minor_version)
+        );
+        println!(
+            "; {} shared tuples, {} glyph variation data tables",
+            gvar.shared_tuples.len(),
+            gvar.glyph_variation_data_array.len(),
+        );
+    }
 }
 
 fn show_fvar_metrics(fvar: Option<&FvarMetrics>, conf: &Config) {

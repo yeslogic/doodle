@@ -1254,7 +1254,7 @@ mod gvar {
     /// - `data_table`: Format definition for GlyphVariationData table
     fn data_table_array_entry(
         axis_count: Expr,
-        array_start: Expr,
+        array_view: ViewExpr,
         this_offset32: Expr,
         next_offset32: Expr,
         data_table: FormatRef,
@@ -1262,12 +1262,13 @@ mod gvar {
         cond_maybe(
             // NOTE - checks that the GlyphVariationData table is non-zero length
             expr_gt(next_offset32.clone(), this_offset32.clone()),
-            util::linked_offset32(
-                array_start,
-                this_offset32.clone(),
-                slice(
-                    sub(next_offset32, this_offset32),
-                    data_table.call_args(vec![axis_count]),
+            fmt_let(
+                "len",
+                sub(next_offset32, this_offset32.clone()),
+                // FIXME[epic=eager-view-parse] - this parse is more eager than we actually want
+                parse_from_view(
+                    array_view.offset(this_offset32),
+                    slice(var("len"), data_table.call_args(vec![axis_count])),
                 ),
             ),
         )
@@ -1282,9 +1283,8 @@ mod gvar {
     /// - `offsets :~ Offsets16([U16]) | Offsets32([U32])`: array of offsets stored in the gvar header
     /// - `data_table`: Format definition for GlyphVariationData table
     fn data_table_array(axis_count: Expr, offsets: Expr, data_table: FormatRef) -> Format {
-        chain(
-            pos32(),
-            "array_start",
+        let_view(
+            "array_view",
             Format::Match(
                 Box::new(offsets),
                 vec![
@@ -1296,7 +1296,7 @@ mod gvar {
                             ["this_offs", "next_offs"],
                             data_table_array_entry(
                                 axis_count.clone(),
-                                var("array_start"),
+                                ViewExpr::var("array_view"),
                                 var("this_offs"),
                                 var("next_offs"),
                                 data_table,
@@ -1311,7 +1311,7 @@ mod gvar {
                             ["this_offs", "next_offs"],
                             data_table_array_entry(
                                 axis_count,
-                                var("array_start"),
+                                ViewExpr::var("array_view"),
                                 var("this_offs"),
                                 var("next_offs"),
                                 data_table,
@@ -1351,46 +1351,69 @@ mod gvar {
         // TODO[epic=view-over-pos32] - refactor to use ViewFormat over position arithmetic
         module.define_format(
             "opentype.gvar_table",
-            record([
-                ("gvar_table_start", pos32()),
-                ("major_version", util::expect_u16be(1)),
-                ("minor_version", util::expect_u16be(0)),
-                ("axis_count", u16be()),
-                ("shared_tuple_count", u16be()),
-                (
-                    "shared_tuples_offset",
-                    util::offset32(
-                        var("gvar_table_start"),
-                        repeat_count(
-                            var("shared_tuple_count"),
-                            tuple_record.call_args(vec![var("axis_count")]),
+            let_view(
+                "gvar_table",
+                record_auto([
+                    ("major_version", util::expect_u16be(1)),
+                    ("minor_version", util::expect_u16be(0)),
+                    ("axis_count", u16be()),
+                    ("shared_tuple_count", u16be()),
+                    ("_shared_tuples_offset", u32be()),
+                    (
+                        "shared_tuples",
+                        if_then_else(
+                            is_nonzero_u32(var("_shared_tuples_offset")),
+                            fmt_some(record([
+                                (
+                                    "shared_tuples_ctxt",
+                                    with_view(
+                                        ViewExpr::var("gvar_table")
+                                            .offset(var("_shared_tuples_offset")),
+                                        doodle::ViewFormat::ReifyView,
+                                    ),
+                                ),
+                                (
+                                    // FIXME - this field is only here to ensure things work, it would go away in the finished version
+                                    "dummy_shared_tuples",
+                                    parse_from_view(
+                                        // NOTE - we can't use "shared_tuples_ctxt" because it is reified
+                                        ViewExpr::var("gvar_table")
+                                            .offset(var("_shared_tuples_offset")),
+                                        repeat_count(
+                                            var("shared_tuple_count"),
+                                            tuple_record.call_args(vec![var("axis_count")]),
+                                        ),
+                                    ),
+                                ),
+                            ])),
+                            fmt_none(),
                         ),
                     ),
-                ),
-                ("glyph_count", u16be()),
-                ("flags", gvar_flags),
-                ("glyph_variation_data_array_offset", u32be()),
-                (
-                    "glyph_variation_data_offsets",
-                    offsets_array(
-                        record_proj(var("flags"), "is_long_offset"),
-                        var("glyph_count"),
-                    ),
-                ),
-                (
-                    // TODO[epic=view-over-pos32] - refactor using ViewFormat constructions
-                    "glyph_variation_data_array",
-                    util::linked_offset32(
-                        var("gvar_table_start"),
-                        var("glyph_variation_data_array_offset"),
-                        data_table_array(
-                            var("axis_count"),
-                            var("glyph_variation_data_offsets"),
-                            glyph_variation_data_table,
+                    ("glyph_count", u16be()),
+                    ("flags", gvar_flags),
+                    ("glyph_variation_data_array_offset", u32be()),
+                    (
+                        "glyph_variation_data_offsets",
+                        offsets_array(
+                            record_proj(var("flags"), "is_long_offset"),
+                            var("glyph_count"),
                         ),
                     ),
-                ),
-            ]),
+                    (
+                        "glyph_variation_data_array",
+                        // FIXME[epic=eager-view-parse] - this is more eager than we actually want
+                        parse_from_view(
+                            ViewExpr::var("gvar_table")
+                                .offset(var("glyph_variation_data_array_offset")),
+                            data_table_array(
+                                var("axis_count"),
+                                var("glyph_variation_data_offsets"),
+                                glyph_variation_data_table,
+                            ),
+                        ),
+                    ),
+                ]),
+            ),
         )
     }
 
@@ -1421,30 +1444,32 @@ mod gvar {
                 Label::Borrowed("axis_count"),
                 ValueType::Base(BaseType::U16),
             )],
-            record_auto([
-                ("table_start", pos32()),
-                ("tuple_variation_count", tuple_variation_count),
-                // REVIEW[epic=retrograde-dependency] - consider alternate approaches to avoid constructing dummy offset-field
-                // TODO[epic=view-over-pos32] - this hack solves itself (mostly) in a ViewFormat-based refactor
-                ("_data_offset", where_nonzero::<U16>(u16be())),
-                (
-                    "tuple_variation_headers",
-                    repeat_count(
-                        record_proj(var("tuple_variation_count"), "tuple_count"),
-                        tuple_variation_header.call_args(vec![var("axis_count")]),
+            let_view(
+                "data_view",
+                record_auto([
+                    ("tuple_variation_count", tuple_variation_count),
+                    // REVIEW[epic=retrograde-dependency] - consider alternate approaches to avoid constructing dummy offset-field
+                    // TODO[epic=view-over-pos32] - this hack solves itself (mostly) in a ViewFormat-based refactor
+                    ("_data_offset", where_nonzero::<U16>(u16be())),
+                    (
+                        "tuple_variation_headers",
+                        repeat_count(
+                            record_proj(var("tuple_variation_count"), "tuple_count"),
+                            tuple_variation_header.call_args(vec![var("axis_count")]),
+                        ),
                     ),
-                ),
-                (
-                    "data",
-                    util::link_forward_unchecked(
-                        util::pos_add_u16(var("table_start"), var("_data_offset")),
-                        serialized_data.call_args(vec![
-                            record_proj(var("tuple_variation_count"), "shared_point_numbers"),
-                            var("tuple_variation_headers"),
-                        ]),
+                    (
+                        "data",
+                        parse_from_view(
+                            ViewExpr::var("data_view").offset(var("_data_offset")),
+                            serialized_data.call_args(vec![
+                                record_proj(var("tuple_variation_count"), "shared_point_numbers"),
+                                var("tuple_variation_headers"),
+                            ]),
+                        ),
                     ),
-                ),
-            ]),
+                ]),
+            ),
         )
     }
 
