@@ -4890,6 +4890,10 @@ impl<'a> Elaborator<'a> {
                 .push_atom(NameAtom::Explicit(Label::from(
                     self.module.get_name(next_level).to_string(),
                 )));
+            for _ in self.module.get_args(next_level) {
+                // handle metavariable increment for each dep-arg
+                self.increment_index();
+            }
             let local_root = self.elaborate_format(module.get_format(next_level), &dyn_s);
             // clean-up
             self.codegen.name_gen.ctxt.escape();

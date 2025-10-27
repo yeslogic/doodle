@@ -182,7 +182,7 @@ pub type OpentypeCoverageTable = opentype_coverage_table;
 pub type OpentypeCoverageTableData = opentype_coverage_table_data;
 pub type OpentypeCoverageRangeRecord = opentype_coverage_table_data_Format2_range_records;
 
-pub type OpentypeGpos = opentype_gpos_table;
+pub type OpentypeGpos<'input> = opentype_gpos_table<'input>;
 pub type OpentypeGsub = opentype_gsub_table;
 
 pub type OpentypeKern = opentype_kern_table;
@@ -2449,15 +2449,15 @@ struct FeatureRecord {
     feature: Link<FeatureTable>,
 }
 
-pub type OpentypeGposLookupSubtableExt =
-    opentype_gpos_table_lookup_list_link_lookups_link_subtables_link;
+pub type OpentypeGposLookupSubtableExt<'input> =
+    opentype_gpos_table_lookup_list_link_lookups_link_subtables_link<'input>;
 pub type OpentypeGsubLookupSubtableExt =
     opentype_gsub_table_lookup_list_link_lookups_link_subtables_link;
 
 pub type OpentypeSubstExtension = opentype_layout_subst_extension;
-pub type OpentypePosExtension = opentype_layout_pos_extension;
+pub type OpentypePosExtension<'input> = opentype_layout_pos_extension<'input>;
 
-pub type OpentypeGposLookupSubtable = opentype_layout_ground_pos;
+pub type OpentypeGposLookupSubtable<'input> = opentype_layout_ground_pos<'input>;
 pub type OpentypeGsubLookupSubtable = opentype_layout_ground_subst;
 
 #[derive(Debug)]
@@ -2543,11 +2543,11 @@ impl TryPromote<OpentypeGsubLookupSubtable> for LookupSubtable {
     }
 }
 
-impl TryPromote<OpentypeGposLookupSubtableExt> for LookupSubtable {
+impl<'input> TryPromote<OpentypeGposLookupSubtableExt<'input>> for LookupSubtable {
     type Error = ReflType<
         ReflType<
-            TPErr<OpentypeGposLookupSubtable, LookupSubtable>,
-            TPErr<OpentypePosExtension, LookupSubtable>,
+            TPErr<OpentypeGposLookupSubtable<'input>, LookupSubtable>,
+            TPErr<OpentypePosExtension<'input>, LookupSubtable>,
         >,
         UnknownValueError<u16>,
     >;
@@ -2560,9 +2560,9 @@ impl TryPromote<OpentypeGposLookupSubtableExt> for LookupSubtable {
     }
 }
 
-impl TryPromote<OpentypePosExtension> for LookupSubtable {
+impl<'input> TryPromote<OpentypePosExtension<'input>> for LookupSubtable {
     type Error =
-        ReflType<TPErr<OpentypeGposLookupSubtable, LookupSubtable>, UnknownValueError<u16>>;
+        ReflType<TPErr<OpentypeGposLookupSubtable<'input>, LookupSubtable>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypePosExtension) -> Result<Self, Self::Error> {
         match &orig.extension_offset.link {
@@ -2572,7 +2572,7 @@ impl TryPromote<OpentypePosExtension> for LookupSubtable {
     }
 }
 
-impl TryPromote<OpentypeGposLookupSubtable> for LookupSubtable {
+impl<'input> TryPromote<OpentypeGposLookupSubtable<'input>> for LookupSubtable {
     type Error = ReflType<
         ReflType<TPErr<OpentypeSinglePos, SinglePos>, TPErr<OpentypePairPos, PairPos>>,
         ReflType<TPErr<OpentypeCursivePos, CursivePos>, UnknownValueError<u16>>,
@@ -2691,20 +2691,73 @@ struct Mark2Record {
     mark2_anchors: Vec<Option<AnchorTable>>,
 }
 
-pub type OpentypeMarkLigPos = opentype_layout_mark_lig_pos;
+pub type OpentypeMarkLigPos<'input> = opentype_layout_mark_lig_pos<'input>;
 
-impl TryPromote<OpentypeMarkLigPos> for MarkLigPos {
+impl<'input> TryPromote<OpentypeMarkLigPos<'input>> for MarkLigPos {
     type Error = ReflType<
-        ReflType<TPErr<OpentypeLigatureArray, LigatureArray>, TPErr<OpentypeMarkArray, MarkArray>>,
+        ReflType<
+            TPErr<OpentypeLigatureArray<'input>, LigatureArray>,
+            TPErr<OpentypeMarkArray, MarkArray>,
+        >,
         UnknownValueError<u16>,
     >;
 
     fn try_promote(orig: &OpentypeMarkLigPos) -> Result<Self, Self::Error> {
+        let mark_coverage = {
+            let mut view_parser = Parser::from(
+                orig.table_scope
+                    .offset(orig.mark_coverage_offset as usize)
+                    .unwrap(),
+            );
+            let ret = Decoder_opentype_coverage_table(&mut view_parser)
+                .expect("bad coverage-table parse");
+            CoverageTable::promote(&ret)
+        };
+        let ligature_coverage = {
+            let mut view_parser = Parser::from(
+                orig.table_scope
+                    .offset(orig.ligature_coverage_offset as usize)
+                    .unwrap(),
+            );
+            let ret = Decoder_opentype_coverage_table(&mut view_parser)
+                .expect("bad coverage-table parse");
+            CoverageTable::promote(&ret)
+        };
+        let mark_array = {
+            if orig.mark_array_offset == 0 {
+                MarkArray::from_null()
+            } else {
+                let mut view_parser = Parser::from(
+                    orig.table_scope
+                        .offset(orig.mark_array_offset as usize)
+                        .unwrap(),
+                );
+                let ret = Decoder_opentype_layout_mark_array(&mut view_parser)
+                    .expect("bad mark-array parse");
+                MarkArray::try_promote(&ret)?
+            }
+        };
+        let ligature_array = {
+            if orig.ligature_array_offset == 0 {
+                LigatureArray::from_null()
+            } else {
+                let mut view_parser = Parser::from(
+                    orig.table_scope
+                        .offset(orig.ligature_array_offset as usize)
+                        .unwrap(),
+                );
+                let ret = Decoder_opentype_layout_ligature_array(&mut view_parser)
+                    .expect("bad ligature-array parse");
+
+                LigatureArray::try_promote(&ret)?
+            }
+        };
+
         Ok(MarkLigPos {
-            mark_coverage: CoverageTable::promote(&orig.mark_coverage_offset.link),
-            ligature_coverage: CoverageTable::promote(&orig.ligature_coverage_offset.link),
-            mark_array: try_promote_from_null(&orig.mark_array_offset.link)?,
-            ligature_array: try_promote_from_null(&orig.ligature_array_offset.link)?,
+            mark_coverage,
+            ligature_coverage,
+            mark_array,
+            ligature_array,
         })
     }
 }
@@ -2717,15 +2770,25 @@ struct MarkLigPos {
     ligature_array: LigatureArray,
 }
 
-pub type OpentypeLigatureArray = opentype_layout_mark_lig_pos_ligature_array_offset_link;
+pub type OpentypeLigatureArray<'input> = opentype_layout_ligature_array<'input>;
 
-impl TryPromote<OpentypeLigatureArray> for LigatureArray {
-    type Error = ReflType<TPErr<OpentypeLigatureAttach, LigatureAttach>, UnknownValueError<u16>>;
+impl<'input> TryPromote<OpentypeLigatureArray<'input>> for LigatureArray {
+    type Error =
+        ReflType<TPErr<OpentypeLigatureAttach<'input>, LigatureAttach>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeLigatureArray) -> Result<Self, Self::Error> {
         let mut ligature_attach = Vec::with_capacity(orig.ligature_attach_offsets.len());
         for offset in orig.ligature_attach_offsets.iter() {
-            ligature_attach.push(try_promote_from_null(&offset.link)?);
+            let lig = if *offset == 0 {
+                LigatureAttach::from_null()
+            } else {
+                let view = orig.array_scope.offset(*offset as usize).unwrap();
+                let mut p = Parser::from(view);
+                let ret =
+                    Decoder_opentype_layout_ligature_attach(&mut p).expect("bad ligature attach");
+                LigatureAttach::try_promote(&ret)?
+            };
+            ligature_attach.push(lig);
         }
         Ok(LigatureArray { ligature_attach })
     }
@@ -2737,16 +2800,15 @@ struct LigatureArray {
     ligature_attach: Vec<LigatureAttach>,
 }
 
-pub type OpentypeLigatureAttach =
-    opentype_layout_mark_lig_pos_ligature_array_offset_link_ligature_attach_offsets_link;
+pub type OpentypeLigatureAttach<'input> = opentype_layout_ligature_attach<'input>;
 
-impl TryPromote<OpentypeLigatureAttach> for LigatureAttach {
-    type Error = ReflType<TPErr<OpentypeComponentRecord, ComponentRecord>, UnknownValueError<u16>>;
+impl<'input> TryPromote<OpentypeLigatureAttach<'input>> for LigatureAttach {
+    type Error =
+        ReflType<TPErr<OpentypeComponentRecord<'input>, ComponentRecord>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeLigatureAttach) -> Result<Self, Self::Error> {
-        Ok(LigatureAttach {
-            component_records: try_promote_vec(&orig.component_records)?,
-        })
+        let component_records = try_promote_vec(&orig.component_records)?;
+        Ok(LigatureAttach { component_records })
     }
 }
 
@@ -2756,15 +2818,24 @@ struct LigatureAttach {
     component_records: Vec<ComponentRecord>,
 }
 
-pub type OpentypeComponentRecord = opentype_layout_mark_lig_pos_ligature_array_offset_link_ligature_attach_offsets_link_component_records;
+pub type OpentypeComponentRecord<'input> =
+    opentype_layout_ligature_attach_component_record__dupX1<'input>;
 
-impl TryPromote<OpentypeComponentRecord> for ComponentRecord {
+impl<'input> TryPromote<OpentypeComponentRecord<'input>> for ComponentRecord {
     type Error = ReflType<TPErr<OpentypeAnchorTable, AnchorTable>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeComponentRecord) -> Result<Self, Self::Error> {
         let mut ligature_anchors = Vec::with_capacity(orig.ligature_anchor_offsets.len());
         for offset in orig.ligature_anchor_offsets.iter() {
-            ligature_anchors.push(try_promote_opt(&offset.link)?);
+            if *offset == 0 {
+                ligature_anchors.push(None);
+            } else {
+                let view = orig.record_scope.offset(*offset as usize).unwrap();
+                let mut p = Parser::from(view);
+                let ret =
+                    Decoder_opentype_common_anchor_table(&mut p).expect("bad anchor-table parse");
+                ligature_anchors.push(Some(AnchorTable::try_promote(&ret)?));
+            }
         }
 
         Ok(ComponentRecord { ligature_anchors })
@@ -3859,12 +3930,13 @@ struct ValueRecord {
 
 type LookupFlag = opentype_gsub_table_lookup_list_link_lookups_link_lookup_flag;
 
-pub type OpentypeGposLookupTable = opentype_gpos_table_lookup_list_link_lookups_link;
+pub type OpentypeGposLookupTable<'input> =
+    opentype_gpos_table_lookup_list_link_lookups_link<'input>;
 pub type OpentypeGsubLookupTable = opentype_gsub_table_lookup_list_link_lookups_link;
 
-impl TryPromote<OpentypeGposLookupTable> for LookupTable {
+impl<'input> TryPromote<OpentypeGposLookupTable<'input>> for LookupTable {
     type Error =
-        ReflType<TPErr<OpentypeGposLookupSubtable, LookupSubtable>, UnknownValueError<u16>>;
+        ReflType<TPErr<OpentypeGposLookupSubtable<'input>, LookupSubtable>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeGposLookupTable) -> Result<Self, Self::Error> {
         let mut subtables = Vec::with_capacity(orig.subtables.len());
@@ -4009,11 +4081,12 @@ impl Promote<OpentypeFeatureList> for FeatureList {
     }
 }
 
-pub type OpentypeGposLookupList = opentype_gpos_table_lookup_list_link;
+pub type OpentypeGposLookupList<'input> = opentype_gpos_table_lookup_list_link<'input>;
 pub type OpentypeGsubLookupList = opentype_gsub_table_lookup_list_link;
 
-impl TryPromote<OpentypeGposLookupList> for LookupList {
-    type Error = ReflType<TPErr<OpentypeGposLookupTable, LookupTable>, UnknownValueError<u16>>;
+impl<'input> TryPromote<OpentypeGposLookupList<'input>> for LookupList {
+    type Error =
+        ReflType<TPErr<OpentypeGposLookupTable<'input>, LookupTable>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeGposLookupList) -> Result<Self, Self::Error> {
         let mut accum = Vec::with_capacity(orig.lookups.len());
