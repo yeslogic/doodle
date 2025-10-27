@@ -8,6 +8,9 @@ use encoding::{
 };
 use fixed::types::{I2F14, I16F16};
 
+/// Half-Tab for partial indentation
+const HT: &str = "    ";
+
 // SECTION - Command-line configurable options for what to show
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Default)]
@@ -1194,9 +1197,10 @@ struct HmtxMetrics(Vec<UnifiedBearing>);
 #[derive(Clone, Debug)]
 struct VmtxMetrics(Vec<UnifiedBearing>);
 
+/// Unified Left-or-TOP side bearing
 #[derive(Copy, Clone, Debug)]
 struct UnifiedBearing {
-    advance_width: Option<u16>, // FIXME - name is misleading as this also reperesnts 'advance_height' for vmtx
+    advance_width: Option<u16>, // FIXME - name is misleading as this also represents 'advance_height' for vmtx
     left_side_bearing: i16, // FIXME - name is misleading as this also represents 'top_side_bearing' for vmtx
 }
 
@@ -4853,36 +4857,111 @@ fn show_optional_metrics(optional: &OptionalTableMetrics, conf: &Config) {
 fn show_gvar_metrics(gvar: Option<&GvarMetrics>, conf: &Config) {
     let Some(gvar) = gvar else { return };
     if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
-        fn show_shared_tuples(shared_tuples: &[GvarTupleRecord]) {
-            fn format_shared_tuple_record(tuple: &GvarTupleRecord) -> String {
+        fn display_shared_tuples(
+            shared_tuples: &[GvarTupleRecord],
+        ) -> display::TokenStream<'static> {
+            fn display_shared_tuple_record(
+                tuple: &GvarTupleRecord,
+            ) -> display::TokenStream<'static> {
+                use display::{tok, toks};
                 const COORD_BOOKEND: usize = 4;
-                format_items_inline(
+                arrayfmt::display_items_inline(
                     &tuple.coordinates,
-                    |coord| format!("{}", coord),
+                    |coord| toks(format!("{}", coord)),
                     COORD_BOOKEND,
-                    |n_skipped| format!("..({n_skipped} skipped).."),
+                    |n_skipped| toks(format!("...({n_skipped} skipped)...")),
                 )
             }
+
+            use display::toks;
             const RECORDS_BOOKEND: usize = 4;
-            show_items_elided(
+            arrayfmt::display_items_elided(
                 shared_tuples,
                 |shared_tuple_ix, record| {
-                    println!(
-                        "\t\t[{shared_tuple_ix}]: {}",
-                        format_shared_tuple_record(record)
-                    )
+                    toks(format!("[{shared_tuple_ix}]: "))
+                        .pre_indent(4)
+                        .chain(display_shared_tuple_record(record))
                 },
                 RECORDS_BOOKEND,
-                |start, stop| format!("\t    (skipping shared tuples {start}..{stop})"),
+                |start, stop| toks(format!("\t{HT}(skipping shared tuples {start}..{stop})")),
+            )
+        }
+        fn display_glyph_variation_data_array(
+            array: &[Option<GlyphVariationData>],
+        ) -> display::TokenStream<'_> {
+            fn display_glyph_variation_data(
+                table: &GlyphVariationData,
+            ) -> display::TokenStream<'static> {
+                fn display_tuple_variation_header(
+                    header: &GvarTupleVariationHeader,
+                ) -> display::TokenStream<'static> {
+                    display::Token::from(format!(
+                        "Header (size: {} bytes)",
+                        header.variation_data_size
+                    ))
+                    .into()
+                    // WIP
+                }
+
+                match &table.tuple_variation_headers[..] {
+                    [] => unreachable!("empty tuple variation headers"), // FIXME - final version should not panic, but we want to figure out whether this case happens
+                    [header] => {
+                        display_tuple_variation_header(header)
+                        // WIP - we may want to show more than just the header in future
+                    }
+                    headers => {
+                        let headers_str = arrayfmt::display_items_elided(
+                            headers,
+                            |ix, header| {
+                                toks(format!("[{ix}]: "))
+                                    .pre_indent(6)
+                                    .chain(display_tuple_variation_header(header))
+                            },
+                            4,
+                            |start, stop| {
+                                toks(format!(
+                                    "(skipping tuple variation headers {start}..{stop})"
+                                ))
+                                .pre_indent(5)
+                            },
+                        );
+                        // WIP - we may want to show more than just the headers in future
+                        LineBreak.then(headers_str)
+                    }
+                }
+            }
+
+            use display::{Token::LineBreak, toks};
+            const TABLE_BOOKEND: usize = 4;
+            arrayfmt::display_nullable(
+                array,
+                |ix, table| {
+                    toks(format!("[{ix}]: "))
+                        .pre_indent(4)
+                        .chain(display_glyph_variation_data(table))
+                },
+                TABLE_BOOKEND,
+                |n, (start, stop)| {
+                    toks(format!(
+                        "(skipping {n} glyph variation data tables between indices {start}..{stop})"
+                    ))
+                    .pre_indent(3)
+                },
             )
         }
 
+        // WIP
         println!(
             "gvar: version {}",
             format_version_major_minor(gvar.major_version, gvar.minor_version)
         );
-        println!("\tShared Tuples:");
-        show_shared_tuples(&gvar.shared_tuples);
+        println!("\tShared Tuples ({} total):", gvar.shared_tuples.len());
+        display_shared_tuples(&gvar.shared_tuples).println();
+        println!(
+            "\tGlyph Variation Data ({} glyphs):",
+            gvar.glyph_variation_data_array.len()
+        );
+        display_glyph_variation_data_array(&gvar.glyph_variation_data_array).println();
         // WIP
     } else {
         print!(
@@ -4905,8 +4984,10 @@ fn show_fvar_metrics(fvar: Option<&FvarMetrics>, conf: &Config) {
             format_version_major_minor(fvar.major_version, fvar.minor_version)
         );
         println!("\tAxes:");
-        fn format_variation_axis_record(axis: &VariationAxisRecord) -> String {
-            format!(
+        fn display_variation_axis_record(
+            axis: &VariationAxisRecord,
+        ) -> display::TokenStream<'static> {
+            display::Token::from(format!(
                 "'{}' axis: [{}, {}] (default: {}){}{:?}",
                 axis.axis_tag,
                 axis.min_value,
@@ -4918,38 +4999,60 @@ fn show_fvar_metrics(fvar: Option<&FvarMetrics>, conf: &Config) {
                     " "
                 },
                 axis.axis_name_id,
-            )
+            ))
+            .into()
         }
-        fn format_instance_record(instance: &InstanceRecord, conf: &Config) -> String {
-            format!(
-                "Subfamily={:?};{} {}",
+        fn display_instance_record(
+            instance: &InstanceRecord,
+            conf: &Config,
+        ) -> display::TokenStream<'static> {
+            display::Token::from(format!(
+                "Subfamily={:?};{} ",
                 instance.subfamily_nameid,
                 match instance.postscript_nameid {
                     None => String::new(),
                     Some(name_id) => format!(" Postscript={name_id:?};"),
                 },
-                format_items_inline(
-                    &instance.coordinates,
-                    |coord| format!("{coord:+}"),
-                    conf.inline_bookend,
-                    |n_skipped| format!("..(skipping {n_skipped} coordinates).."),
-                )
-            )
+            ))
+            .then(arrayfmt::display_items_inline(
+                &instance.coordinates,
+                |coord| display::Token::from(format!("{coord:+}")).into(),
+                conf.inline_bookend,
+                |n_skipped| {
+                    display::Token::from(format!("...(skipping {n_skipped} coordinates)...")).into()
+                },
+            ))
         }
-        show_items_elided(
+
+        // FIXME: rewerite into pure TokenStream
+        arrayfmt::display_items_elided(
             &fvar.axes,
-            |ix, axis| println!("\t\t[{ix}]: {}", format_variation_axis_record(axis)),
+            |ix, axis| {
+                display::Token::from(format!("\t\t[{ix}]: "))
+                    .then(display_variation_axis_record(axis))
+            },
             conf.bookend_size,
-            |start, stop| format!("\t(skipping axis records {start}..{stop})"),
-        );
+            |start, stop| {
+                display::Token::from(format!("\t(skipping axis records {start}..{stop})")).into()
+            },
+        )
+        .println();
         println!("\tInstances:");
-        show_items_elided(
+        arrayfmt::display_items_elided(
             &fvar.instances,
-            |ix, instance| println!("\t\t[{ix}]: {}", format_instance_record(instance, conf)),
+            |ix, instance| {
+                display::Token::from(format!("\t\t[{ix}]: "))
+                    .then(display_instance_record(instance, conf))
+            },
             conf.bookend_size,
-            |start, stop| format!("\t(skipping instance records {start}..{stop})"),
-        );
+            |start, stop| {
+                display::Token::from(format!("\t(skipping instance records {start}..{stop})"))
+                    .into()
+            },
+        )
+        .println();
     } else {
+        // FIXME - rewrite into pure TokenStream
         print!(
             "fvar: version {}",
             format_version_major_minor(fvar.major_version, fvar.minor_version)
@@ -4999,6 +5102,7 @@ fn show_gdef_metrics(gdef: Option<&GdefMetrics>, conf: &Config) {
         data,
     }) = gdef
     {
+        // WIP
         println!(
             "GDEF: version {}",
             format_version_major_minor(*major_version, *minor_version)
@@ -5008,21 +5112,23 @@ fn show_gdef_metrics(gdef: Option<&GdefMetrics>, conf: &Config) {
                 show_glyph_class_def(glyph_class_def, conf);
             }
             if let Some(attach_list) = attach_list {
-                show_attach_list(attach_list, conf);
+                display_attach_list(attach_list, conf).println(); // WIP
             }
             if let Some(lig_caret_list) = lig_caret_list {
-                show_lig_caret_list(lig_caret_list, conf);
+                // WIP
+                display_lig_caret_list(lig_caret_list, conf).println();
             }
             if let Some(mark_attach_class_def) = mark_attach_class_def {
                 show_mark_attach_class_def(mark_attach_class_def, conf);
             }
             match &data.mark_glyph_sets_def {
+                // WIP
                 None => println!("\tMarkGlyphSet: <none>"),
-                Some(mgs) => show_mark_glyph_set(mgs, conf),
+                Some(mgs) => display_mark_glyph_set(mgs, conf).println(),
             }
             match &data.item_var_store {
                 None => println!("\tItemVariationStore: <none>"),
-                Some(ivs) => show_item_variation_store(ivs, conf),
+                Some(ivs) => display_item_variation_store(ivs, conf).println(),
             }
         }
     }
@@ -5067,7 +5173,7 @@ fn show_layout_metrics(layout: Option<&LayoutMetrics>, ctxt: Ctxt, conf: &Config
         if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
             show_script_list(script_list, conf);
             show_feature_list(feature_list, conf);
-            show_lookup_list(lookup_list, ctxt, conf);
+            display_lookup_list(lookup_list, ctxt, conf).println();
         }
     }
 }
@@ -5077,7 +5183,7 @@ fn show_script_list(script_list: &ScriptList, conf: &Config) {
         println!("\tScriptList [empty]");
     } else {
         println!("\tScriptList");
-        show_items_elided(
+        arrayfmt::display_items_elided(
             script_list,
             |ix, item| {
                 let Some(ScriptTable {
@@ -5087,40 +5193,61 @@ fn show_script_list(script_list: &ScriptList, conf: &Config) {
                 else {
                     unreachable!("missing ScriptTable at index {ix} in ScriptList");
                 };
-                println!("\t\t[{ix}]: {}", item.script_tag);
+
+                let mut tmp = display::TokenStream::from_stream(
+                    [
+                        format!("\t\t[{ix}]: {}", item.script_tag).into(),
+                        display::Token::LineBreak,
+                    ]
+                    .into_iter(),
+                );
                 match default_lang_sys {
                     None => (),
                     langsys @ Some(..) => {
-                        print!("\t\t    [Default LangSys]: ");
-                        show_langsys(langsys, conf);
+                        tmp = tmp.chain(
+                            display::tok(format!("\t\t    [Default LangSys]: "))
+                                .then(display_langsys(langsys, conf)),
+                        )
                     }
                 }
-                show_lang_sys_records(lang_sys_records, conf)
+                tmp.chain(display_lang_sys_records(lang_sys_records, conf))
             },
             conf.bookend_size,
-            |start, stop| format!("skipping ScriptRecords {start}..{stop}"),
-        );
+            |start, stop| {
+                display::Token::from(format!("skipping ScriptRecords {start}..{stop}")).into()
+            },
+        )
+        .println()
     }
 }
 
-fn show_lang_sys_records(lang_sys_records: &[LangSysRecord], conf: &Config) {
+fn display_lang_sys_records(
+    lang_sys_records: &[LangSysRecord],
+    conf: &Config,
+) -> display::TokenStream<'static> {
     if lang_sys_records.is_empty() {
-        println!("\t\t    LangSysRecords: <empty list>");
+        display::Token::InlineText("\t\t    LangSysRecords: <empty list>".into()).into()
     } else {
-        println!("\t\t    LangSysRecords:");
-        show_items_elided(
-            lang_sys_records,
-            |ix, item| {
-                print!("\t\t\t[{ix}]: {}; ", item.lang_sys_tag);
-                show_langsys(&item.lang_sys, conf);
-            },
-            conf.bookend_size,
-            |start, stop| format!("\t\t    (skipping LangSysRecords {start}..{stop})"),
+        display::Token::from(format!("\t\t    LangSysRecords:")).then(
+            arrayfmt::display_items_elided(
+                lang_sys_records,
+                |ix, item| {
+                    display::Token::from(format!("\t\t\t[{ix}]: {}; ", item.lang_sys_tag))
+                        .then(display_langsys(&item.lang_sys, conf))
+                },
+                conf.bookend_size,
+                |start, stop| {
+                    display::Token::from(format!(
+                        "\t\t    (skipping LangSysRecords {start}..{stop})"
+                    ))
+                    .into()
+                },
+            ),
         )
     }
 }
 
-fn show_langsys(lang_sys: &Link<LangSys>, conf: &Config) {
+fn display_langsys(lang_sys: &Link<LangSys>, conf: &Config) -> display::TokenStream<'static> {
     let Some(LangSys {
         lookup_order_offset,
         required_feature_index,
@@ -5131,110 +5258,135 @@ fn show_langsys(lang_sys: &Link<LangSys>, conf: &Config) {
     };
     debug_assert_eq!(*lookup_order_offset, 0);
     match required_feature_index {
-        0xFFFF => print!("feature-indices: "),
-        other => print!("feature-indices (required: {other}): "),
+        0xFFFF => display::Token::from(format!("feature-indices: ")),
+        other => display::Token::from(format!("feature-indices (required: {other}): ")),
     }
-    show_items_inline(
+    .then(arrayfmt::display_items_inline(
         feature_indices,
-        |ix: &u16| format!("{ix}"),
+        |ix: &u16| display::Token::from(format!("{ix}")).into(),
         conf.inline_bookend,
-        |num_skipped: usize| format!("...({num_skipped} skipped)..."),
-    );
+        |num_skipped: usize| display::Token::from(format!("...({num_skipped} skipped)...")).into(),
+    ))
 }
 
 fn show_feature_list(feature_list: &FeatureList, conf: &Config) {
     if feature_list.is_empty() {
+        // FIXME - turn into pure tokenstream
         println!("\tFeatureList [empty]");
     } else {
         println!("\tFeatureList");
-        show_items_elided(
+        arrayfmt::display_items_elided(
             feature_list,
             |ix, item| {
                 let FeatureRecord {
                     feature_tag,
                     feature,
                 } = item;
-                print!("\t\t[{ix}]: {feature_tag}");
                 let feature = feature.as_ref().unwrap_or_else(|| {
                     unreachable!("bad feature link (tag: {feature_tag})");
                 });
-                show_feature_table(feature, conf);
+                display::Token::from(format!("\t\t[{ix}]: {feature_tag}"))
+                    .then(show_feature_table(feature, conf))
             },
             conf.bookend_size,
-            |start, stop| format!("\t    (skipping FeatureIndices {start}..{stop})"),
-        );
+            |start, stop| {
+                display::Token::from(format!("\t    (skipping FeatureIndices {start}..{stop})"))
+                    .into()
+            },
+        )
+        .println()
     }
 }
 
-fn show_feature_table(table: &FeatureTable, conf: &Config) {
+fn show_feature_table(table: &FeatureTable, conf: &Config) -> display::TokenStream<'static> {
     let FeatureTable {
         feature_params,
         lookup_list_indices,
     } = table;
-    match feature_params {
-        0 => (),
-        offset => print!("[parameters located at SoF+{offset}B]"),
-    }
-    show_items_inline(
+
+    let stream = arrayfmt::display_items_inline(
         lookup_list_indices,
-        |index| format!("{index}"),
+        |index| display::Token::from(format!("{index}")).into(),
         conf.inline_bookend,
-        |num_skipped| format!("...({num_skipped} skipped)..."),
+        |num_skipped| display::Token::from(format!("...({num_skipped} skipped)...")).into(),
     );
+    match feature_params {
+        0 => stream,
+        offset => {
+            display::Token::from(format!("[parameters located at SoF+{offset}B]")).then(stream)
+        }
+    }
 }
 
-fn show_lookup_list(lookup_list: &LookupList, ctxt: Ctxt, conf: &Config) {
-    println!("\tLookupList:");
-    show_items_elided(
-        lookup_list,
-        move |ix, table| {
-            print!("\t\t[{ix}]: ");
-            match table {
-                Some(table) => show_lookup_table(table, ctxt, conf),
-                None => unreachable!("None lookup-table at index {ix}"),
-            }
-        },
-        conf.bookend_size,
-        |start, stop| format!("\t    (skipping LookupTables {start}..{stop})"),
-    );
+fn display_lookup_list(
+    lookup_list: &LookupList,
+    ctxt: Ctxt,
+    conf: &Config,
+) -> display::TokenStream<'static> {
+    display::tok("\tLookupList:").then(display::Token::LineBreak.then(
+        arrayfmt::display_items_elided(
+            lookup_list,
+            move |ix, table| {
+                display::tok(format!("\t\t[{ix}]: ")).then(match table {
+                    Some(table) => display_lookup_table(table, ctxt, conf),
+                    None => unreachable!("None lookup-table at index {ix}"),
+                })
+            },
+            conf.bookend_size,
+            |start, stop| display::toks(format!("\t    (skipping LookupTables {start}..{stop})")),
+        ),
+    ))
 }
 
-fn show_lookup_table(table: &LookupTable, ctxt: Ctxt, conf: &Config) {
+fn display_lookup_table(
+    table: &LookupTable,
+    ctxt: Ctxt,
+    conf: &Config,
+) -> display::TokenStream<'static> {
     // NOTE - because we print the kind of the lookup here, we don't need to list it for every element
     // LINK[format-lookup-subtable] -  (see format_lookup_subtable below)
-    print!(
+    let mut stream = display::Token::from(format!(
         "LookupTable: kind={}",
         format_lookup_type(ctxt, table.lookup_type),
-    );
-    show_lookup_flag(&table.lookup_flag);
+    ))
+    .then(display_lookup_flags(&table.lookup_flag));
     if let Some(filtering_set) = table.mark_filtering_set {
-        print!(", markFilteringSet=GDEF->MarkGlyphSet[{filtering_set}]")
+        stream = stream.chain(
+            display::Token::from(format!(
+                ", markFilteringSet=GDEF->MarkGlyphSet[{filtering_set}]"
+            ))
+            .into(),
+        );
     }
-    print!(": ");
-    show_items_inline(
-        &table.subtables,
-        |subtable| format_lookup_subtable(subtable, false, conf),
-        conf.inline_bookend,
-        |n_skipped| format!("...({n_skipped} skipped)..."),
-    );
+    stream.chain(
+        display::Token::InlineText(": ".into()).then(arrayfmt::display_items_inline(
+            &table.subtables,
+            |subtable| display_lookup_subtable(subtable, false, conf),
+            conf.inline_bookend,
+            |n_skipped| display::Token::from(format!("...({n_skipped} skipped)...")).into(),
+        )),
+    )
 }
 
 // ANCHOR[format-lookup-subtable]
-fn format_lookup_subtable(
+fn display_lookup_subtable(
     subtable: &LookupSubtable,
     show_lookup_type: bool,
     conf: &Config,
-) -> String {
+) -> display::TokenStream<'static> {
+    use display::{tok, toks};
     // STUB - because the subtables are both partial (more variants exist) and abridged (existing variants are missing details), reimplement as necessary
+    // FIXME - refactor so contents is a pure tokenstream
+    // WIP
     let (label, contents) = match subtable {
         LookupSubtable::SinglePos(single_pos) => {
             let contents = {
                 match single_pos {
                     SinglePos::Format1(SinglePosFormat1 { value_record, .. }) => {
-                        format!("single({})", format_value_record(value_record))
+                        tok("single").then(display_value_record(value_record).paren())
                     }
                     SinglePos::Format2(SinglePosFormat2 { coverage, .. }) => {
-                        format!("array({})", format_coverage_table(coverage))
+                        tok("array").then(display_coverage_table(coverage).paren())
                     }
                 }
             };
@@ -5244,7 +5396,7 @@ fn format_lookup_subtable(
             let contents = {
                 match pair_pos {
                     PairPos::Format1(PairPosFormat1 { coverage, .. }) => {
-                        format!("byGlyph({})", format_coverage_table(coverage))
+                        tok("byGlyph").then(display_coverage_table(coverage).paren())
                     }
                     PairPos::Format2(PairPosFormat2 {
                         coverage,
@@ -5271,17 +5423,14 @@ fn format_lookup_subtable(
                         // TODO - should this be a more general parameter in the Config type?
                         const MAX_POPULATION: usize = 3;
                         if _populated_class_pairs.len() <= MAX_POPULATION {
-                            format!(
-                                "byClass{:?}({})",
-                                _populated_class_pairs,
-                                format_coverage_table(coverage)
-                            )
+                            tok(format!("byClass{:?}", _populated_class_pairs,))
+                                .then(display_coverage_table(coverage).surround(tok("("), tok(")")))
                         } else {
-                            format!(
-                                "byClass[{} ∈ {rows} x {cols}]({})",
+                            tok(format!(
+                                "byClass[{} ∈ {rows} x {cols}]",
                                 _populated_class_pairs.len(),
-                                format_coverage_table(coverage)
-                            )
+                            ))
+                            .then(display_coverage_table(coverage).paren())
                         }
                     }
                 }
@@ -5289,7 +5438,7 @@ fn format_lookup_subtable(
             ("PairPos", contents)
         }
         LookupSubtable::CursivePos(CursivePos { coverage, .. }) => {
-            let contents = format!("entryExit({})", format_coverage_table(coverage));
+            let contents = tok("entryExit").then(display_coverage_table(coverage).paren());
             ("CursivePos", contents)
         }
         LookupSubtable::MarkBasePos(MarkBasePos {
@@ -5301,13 +5450,15 @@ fn format_lookup_subtable(
             let contents = {
                 let mut mark_iter = mark_coverage.iter();
                 let mut base_iter = base_coverage.iter();
-                format!(
-                    "Mark({})+Base({})=>MarkArray[{}]+BaseArray[{}]",
-                    format_coverage_table(mark_coverage),
-                    format_coverage_table(base_coverage),
-                    format_mark_array(mark_array, &mut mark_iter),
-                    format_base_array(base_array, &mut base_iter),
-                )
+                let mark_lhs = tok("Mark").then(display_coverage_table(mark_coverage).paren());
+                let base_lhs = tok("Base").then(display_coverage_table(base_coverage).paren());
+                let mark_rhs =
+                    tok("MarkArray").then(display_mark_array(mark_array, &mut mark_iter).bracket());
+                let base_rhs =
+                    tok("BaseArray").then(display_base_array(base_array, &mut base_iter).bracket());
+                let lhs = mark_lhs.glue(tok("+"), base_lhs);
+                let rhs = mark_rhs.glue(tok("+"), base_rhs);
+                lhs.glue(tok("=>"), rhs)
             };
             ("MarkBasePos", contents)
         }
@@ -5320,13 +5471,16 @@ fn format_lookup_subtable(
             let contents = {
                 let mut mark_iter = mark_coverage.iter();
                 let mut ligature_iter = ligature_coverage.iter();
-                format!(
-                    "Mark({})+Ligature({})=>MarkArray[{}]+LigatureArray[{}]",
-                    format_coverage_table(mark_coverage),
-                    format_coverage_table(ligature_coverage),
-                    format_mark_array(mark_array, &mut mark_iter),
-                    format_ligature_array(ligature_array, &mut ligature_iter),
-                )
+                let mark_lhs = tok("Mark").then(display_coverage_table(mark_coverage).paren());
+                let lig_lhs =
+                    tok("Ligature").then(display_coverage_table(ligature_coverage).paren());
+                let mark_rhs =
+                    tok("MarkArray").then(display_mark_array(mark_array, &mut mark_iter).bracket());
+                let lig_rhs = tok("LigatureArray")
+                    .then(display_ligature_array(ligature_array, &mut ligature_iter).bracket());
+                let lhs = mark_lhs.glue(tok("+"), lig_lhs);
+                let rhs = mark_rhs.glue(tok("+"), lig_rhs);
+                lhs.glue(tok("=>"), rhs)
             };
             ("MarkLigPos", contents)
         }
@@ -5339,13 +5493,15 @@ fn format_lookup_subtable(
             let contents = {
                 let mut mark1_iter = mark1_coverage.iter();
                 let mut mark2_iter = mark2_coverage.iter();
-                format!(
-                    "Mark({})+Mark({})=>MarkArray[{}]+Mark2Array[{}]",
-                    format_coverage_table(mark1_coverage),
-                    format_coverage_table(mark2_coverage),
-                    format_mark_array(mark1_array, &mut mark1_iter),
-                    format_mark2_array(mark2_array, &mut mark2_iter),
-                )
+                let mark_lhs = tok("Mark").then(display_coverage_table(mark1_coverage).paren());
+                let mark2_lhs = tok("Mark").then(display_coverage_table(mark2_coverage).paren());
+                let mark_rhs = tok("MarkArray")
+                    .then(display_mark_array(mark1_array, &mut mark1_iter).bracket());
+                let mark2_rhs = tok("Mark2Array")
+                    .then(display_mark2_array(mark2_array, &mut mark2_iter).bracket());
+                let lhs = mark_lhs.glue(tok("+"), mark2_lhs);
+                let rhs = mark_rhs.glue(tok("+"), mark2_rhs);
+                lhs.glue(tok("=>"), rhs)
             };
             ("MarkMarkPos", contents)
         }
@@ -5355,29 +5511,28 @@ fn format_lookup_subtable(
                     coverage,
                     delta_glyph_id,
                 }) => {
-                    format!("{}=>({delta_glyph_id:+})", format_coverage_table(coverage))
+                    display_coverage_table(coverage).chain(toks(format!("=>({delta_glyph_id:+})")))
                 }
                 SingleSubst::Format2(SingleSubstFormat2 {
                     coverage,
                     substitute_glyph_ids,
                 }) => {
                     let iter = coverage.iter();
-                    format!(
-                        "{}=>{}",
-                        format_coverage_table(coverage),
-                        format_coverage_linked_array(
+                    display_coverage_table(coverage).glue(
+                        tok("=>"),
+                        display_coverage_linked_array(
                             substitute_glyph_ids,
                             iter,
                             |orig_glyph, subst_glyph| {
-                                format!(
+                                toks(format!(
                                     "{}->{}",
                                     format_glyphid_hex(orig_glyph, true),
                                     format_glyphid_hex(*subst_glyph, true),
-                                )
+                                ))
                             },
                             conf.inline_bookend,
-                            |n_skipped| format!("..(skipping {n_skipped} substs).."),
-                        )
+                            |n_skipped| toks(format!("...(skipping {n_skipped} substs)...")),
+                        ),
                     )
                 }
             };
@@ -5390,11 +5545,8 @@ fn format_lookup_subtable(
                     subst: MultipleSubstFormat1 { sequences },
                 } = &multi_subst;
                 // REVIEW - is this the right balance of specificity and brevity?
-                format!(
-                    "{}=>SequenceTable[{}]",
-                    format_coverage_table(coverage),
-                    sequences.len()
-                )
+                display_coverage_table(coverage)
+                    .chain(toks(format!("=>SequenceTable[{}]", sequences.len())))
             };
             ("MultipleSubst", contents)
         }
@@ -5403,11 +5555,8 @@ fn format_lookup_subtable(
             alternate_sets,
         }) => {
             let contents = {
-                format!(
-                    "{}=>{}",
-                    format_coverage_table(coverage),
-                    format_alternate_sets(alternate_sets),
-                )
+                display_coverage_table(coverage)
+                    .glue(tok("=>"), display_alternate_sets(alternate_sets))
             };
             ("AlternateSubst", contents)
         }
@@ -5415,7 +5564,8 @@ fn format_lookup_subtable(
             coverage,
             ligature_sets,
         }) => {
-            let contents = format_ligature_sets(ligature_sets, coverage.iter());
+            // WIP
+            let contents = display_ligature_sets(ligature_sets, coverage.iter());
             ("LigatureSubst", contents)
         }
         LookupSubtable::ReverseChainSingleSubst(ReverseChainSingleSubst {
@@ -5428,42 +5578,46 @@ fn format_lookup_subtable(
             let contents = {
                 // REVIEW - since we are already within an inline elision context, try to avoid taking up too much space per item, but this might not want to be a hardcoded value
                 const INLINE_INLINE_BOOKEND: usize = 1;
-                // FIXME - show_lookup_table calls this function through show_items_inline already, so we might want to reduce how many values we are willing to show proportionally
+                // FIXME - show_lookup_table calls this function through display_items_inline already, so we might want to reduce how many values we are willing to show proportionally
                 let backtrack_pattern = if backtrack_coverages.is_empty() {
-                    String::new()
+                    display::TokenStream::empty()
                 } else {
-                    let tmp = format_items_inline(
+                    arrayfmt::display_items_inline(
                         backtrack_coverages,
-                        format_coverage_table,
+                        display_coverage_table,
                         INLINE_INLINE_BOOKEND,
-                        |n| format!("(..{n}..)"),
-                    );
-                    format!("(?<={tmp})")
+                        |n| display::toks(format!("(..{n}..)")),
+                    )
+                    .surround(tok("(?<="), tok(")"))
                 };
-                let input_pattern = format_coverage_table(coverage);
+                let input_pattern = display_coverage_table(coverage);
                 let lookahead_pattern = if lookahead_coverages.is_empty() {
-                    String::new()
+                    display::TokenStream::empty()
                 } else {
-                    let tmp = format_items_inline(
+                    arrayfmt::display_items_inline(
                         lookahead_coverages,
-                        format_coverage_table,
+                        display_coverage_table,
                         INLINE_INLINE_BOOKEND,
-                        |n| format!("(..{n}..)"),
-                    );
-                    format!("(?={tmp})")
+                        |n| display::toks(format!("(..{n}..)")),
+                    )
+                    .surround(tok("(?="), tok(")"))
                 };
                 let substitute_ids = format_glyphid_array_hex(substitute_glyph_ids, true);
-                format!("{backtrack_pattern}{input_pattern}{lookahead_pattern}=>{substitute_ids}")
+
+                backtrack_pattern
+                    .chain(input_pattern)
+                    .chain(lookahead_pattern)
+                    .chain(toks(format!("=>{substitute_ids}")))
             };
             ("RevChainSingleSubst", contents)
         }
         LookupSubtable::SequenceContext(seq_ctx) => {
             let contents = match seq_ctx {
                 SequenceContext::Format1(SequenceContextFormat1 { coverage, .. }) => {
-                    format!("Glyphs({})", format_coverage_table(coverage))
+                    tok("Glyphs").then(display_coverage_table(coverage).paren())
                 }
                 SequenceContext::Format2(SequenceContextFormat2 { coverage, .. }) => {
-                    format!("Classes({})", format_coverage_table(coverage))
+                    tok("Classes").then(display_coverage_table(coverage).paren())
                 }
                 SequenceContext::Format3(SequenceContextFormat3 {
                     coverage_tables,
@@ -5472,20 +5626,20 @@ fn format_lookup_subtable(
                 }) => {
                     // REVIEW - since we are already within an inline elision context, try to avoid taking up too much space per item, but this might not want to be a hardcoded value
                     const INLINE_INLINE_BOOKEND: usize = 1;
-                    // FIXME - show_lookup_table calls this function through show_items_inline already, so we might want to reduce how many values we are willing to show proportionally
-                    let input_pattern = format_items_inline(
+                    // FIXME - show_lookup_table calls this function through display_items_inline already, so we might want to reduce how many values we are willing to show proportionally
+                    let input_pattern = arrayfmt::display_items_inline(
                         coverage_tables,
-                        format_coverage_table,
+                        display_coverage_table,
                         INLINE_INLINE_BOOKEND,
-                        |n| format!("(..{n}..)"),
+                        |n| toks(format!("(..{n}..)")),
                     );
-                    let seq_lookups = format_items_inline(
+                    let seq_lookups = arrayfmt::display_items_inline(
                         seq_lookup_records,
-                        format_sequence_lookup,
+                        display_sequence_lookup,
                         INLINE_INLINE_BOOKEND,
-                        |n| format!("(..{n}..)"),
+                        |n| toks(format!("(..{n}..)")),
                     );
-                    format!("{input_pattern}=>{seq_lookups}")
+                    input_pattern.glue(tok("=>"), seq_lookups)
                 }
             };
             ("SeqCtx", contents)
@@ -5496,14 +5650,14 @@ fn format_lookup_subtable(
                     coverage, ..
                 }) => {
                     // TODO - even if it means overly verbose output, this might be too little info to be useful compared to discriminant-only display
-                    format!("ChainedGlyphs({})", format_coverage_table(coverage))
+                    tok("ChainedGlyphs").then(display_coverage_table(coverage).paren())
                 }
                 ChainedSequenceContext::Format2(ChainedSequenceContextFormat2 {
                     coverage, ..
                 }) => {
                     // TODO - even if it means overly verbose output, this might be too little info to be useful compared to discriminant-only display
                     // REVIEW - consider what other details (e.g. class-def summary metrics) to show in implicitly- or explicitly-verbose display format
-                    format!("ChainedClasses({})", format_coverage_table(coverage))
+                    tok("ChainedClasses").then(display_coverage_table(coverage).paren())
                 }
                 ChainedSequenceContext::Format3(ChainedSequenceContextFormat3 {
                     backtrack_coverages,
@@ -5514,62 +5668,67 @@ fn format_lookup_subtable(
                 }) => {
                     // REVIEW - since we are already within an inline elision context, try to avoid taking up too much space per item, but this might not want to be a hardcoded value
                     const INLINE_INLINE_BOOKEND: usize = 1;
-                    // FIXME - show_lookup_table calls this function through show_items_inline already, so we might want to reduce how many values we are willing to show proportionally
+                    // FIXME - show_lookup_table calls this function through display_items_inline already, so we might want to reduce how many values we are willing to show proportionally
                     let backtrack_pattern = if backtrack_coverages.is_empty() {
-                        String::new()
+                        display::TokenStream::empty()
                     } else {
-                        let tmp = format_items_inline(
+                        arrayfmt::display_items_inline(
                             backtrack_coverages,
-                            format_coverage_table,
+                            display_coverage_table,
                             INLINE_INLINE_BOOKEND,
-                            |n| format!("(..{n}..)"),
-                        );
-                        format!("(?<={tmp})")
+                            |n| toks(format!("(..{n}..)")),
+                        )
+                        .surround(tok("(?<="), tok(")"))
                     };
-                    let input_pattern = format_items_inline(
+                    let input_pattern = arrayfmt::display_items_inline(
                         input_coverages,
-                        format_coverage_table,
+                        display_coverage_table,
                         INLINE_INLINE_BOOKEND,
-                        |n| format!("(..{n}..)"),
+                        |n| toks(format!("(..{n}..)")),
                     );
                     let lookahead_pattern = if lookahead_coverages.is_empty() {
-                        String::new()
+                        display::TokenStream::empty()
                     } else {
-                        let tmp = format_items_inline(
+                        arrayfmt::display_items_inline(
                             lookahead_coverages,
-                            format_coverage_table,
+                            display_coverage_table,
                             INLINE_INLINE_BOOKEND,
-                            |n| format!("(..{n}..)"),
-                        );
-                        format!("(?={tmp})")
+                            |n| toks(format!("(..{n}..)")),
+                        )
+                        .surround(tok("(?="), tok(")"))
                     };
-                    let seq_lookups = format_items_inline(
+                    let seq_lookups = arrayfmt::display_items_inline(
                         seq_lookup_records,
-                        format_sequence_lookup,
+                        display_sequence_lookup,
                         INLINE_INLINE_BOOKEND,
-                        |n| format!("(..{n}..)"),
+                        |n| toks(format!("(..{n}..)")),
                     );
-                    format!("{backtrack_pattern}{input_pattern}{lookahead_pattern}=>{seq_lookups}")
+                    backtrack_pattern
+                        .chain(input_pattern)
+                        .chain(lookahead_pattern)
+                        .glue(tok("=>"), seq_lookups)
                 }
             };
             ("ChainSeqCtx", contents)
         }
     };
+    let label = tok(label);
+    // WIP
     if show_lookup_type {
-        format!("{label}{contents}")
+        label.then(contents)
     } else {
         contents
     }
 }
 
 fn show_stat_metrics(stat: Option<&StatMetrics>, conf: &Config) {
-    fn format_design_axis(axis: &DesignAxis, _conf: &Config) -> String {
-        format!(
+    fn display_design_axis(axis: &DesignAxis, _conf: &Config) -> display::TokenStream<'static> {
+        display::toks(format!(
             "Tag={} ; Axis NameID={} ; Ordering={}",
             axis.axis_tag, axis.axis_name_id.0, axis.axis_ordering
-        )
+        ))
     }
-    fn format_axis_value(value: &AxisValue, conf: &Config) -> String {
+    fn display_axis_value(value: &AxisValue, conf: &Config) -> display::TokenStream<'static> {
         fn format_axis_value_flags(flags: &AxisValueFlags) -> String {
             let mut set_flags = Vec::new();
             if flags.elidable_axis_value_name {
@@ -5586,21 +5745,21 @@ fn show_stat_metrics(stat: Option<&StatMetrics>, conf: &Config) {
                 format!(" (Flags: {})", set_flags.join(" | "))
             }
         }
+
+        use display::{tok, toks};
         match value {
             AxisValue::Format1(AxisValueFormat1 {
                 axis_index,
                 flags,
                 value_name_id,
                 value,
-            }) => {
-                format!(
-                    "Axis[{}]{}: {:?} = {}",
-                    axis_index,
-                    format_axis_value_flags(flags),
-                    value_name_id,
-                    value
-                )
-            }
+            }) => toks(format!(
+                "Axis[{}]{}: {:?} = {}",
+                axis_index,
+                format_axis_value_flags(flags),
+                value_name_id,
+                value
+            )),
             AxisValue::Format2(AxisValueFormat2 {
                 axis_index,
                 flags,
@@ -5608,53 +5767,51 @@ fn show_stat_metrics(stat: Option<&StatMetrics>, conf: &Config) {
                 nominal_value,
                 range_min_value,
                 range_max_value,
-            }) => {
-                format!(
-                    "Axis[{}]{}: {:?} = {} ∈ [{}, {}]",
-                    axis_index,
-                    format_axis_value_flags(flags),
-                    value_name_id,
-                    nominal_value,
-                    range_min_value,
-                    range_max_value
-                )
-            }
+            }) => toks(format!(
+                "Axis[{}]{}: {:?} = {} ∈ [{}, {}]",
+                axis_index,
+                format_axis_value_flags(flags),
+                value_name_id,
+                nominal_value,
+                range_min_value,
+                range_max_value
+            )),
             AxisValue::Format3(AxisValueFormat3 {
                 axis_index,
                 flags,
                 value_name_id,
                 value,
                 linked_value,
-            }) => {
-                format!(
-                    "Axis[{}]{}: {:?} = {} (-> {})",
-                    axis_index,
-                    format_axis_value_flags(flags),
-                    value_name_id,
-                    value,
-                    linked_value
-                )
-            }
+            }) => toks(format!(
+                "Axis[{}]{}: {:?} = {} (-> {})",
+                axis_index,
+                format_axis_value_flags(flags),
+                value_name_id,
+                value,
+                linked_value
+            )),
             AxisValue::Format4(AxisValueFormat4 {
                 flags,
                 value_name_id,
                 axis_values,
-            }) => {
-                format!(
-                    "{:?}{}: {}",
-                    value_name_id,
-                    format_axis_value_flags(flags),
-                    format_items_inline(
-                        axis_values,
-                        |axis_value| format!(
-                            "Axis[{}] = {}",
-                            axis_value.axis_index, axis_value.value
-                        ),
-                        conf.inline_bookend,
-                        |n_skipped| format!("..(skipping {n_skipped} AxisValue records).."),
-                    )
-                )
-            }
+            }) => tok(format!(
+                "{:?}{}: ",
+                value_name_id,
+                format_axis_value_flags(flags),
+            ))
+            .then(arrayfmt::display_items_inline(
+                axis_values,
+                |axis_value| {
+                    display::toks(format!(
+                        "Axis[{}] = {}",
+                        axis_value.axis_index, axis_value.value
+                    ))
+                },
+                conf.inline_bookend,
+                |n_skipped| {
+                    display::toks(format!("...(skipping {n_skipped} AxisValue records)..."))
+                },
+            )),
         }
     }
     if let Some(stat) = stat {
@@ -5667,29 +5824,42 @@ fn show_stat_metrics(stat: Option<&StatMetrics>, conf: &Config) {
             match stat.design_axes.len() {
                 0 => (),
                 n => {
+                    // FIXME - promote to first-class tokenstream
                     println!("\tDesignAxes: {n} total");
-                    show_items_elided(
+                    arrayfmt::display_items_elided(
                         &stat.design_axes,
-                        |ix, d_axis| println!("\t\t[{ix}]: {}", format_design_axis(d_axis, conf)),
+                        |ix, d_axis| {
+                            display::tok(format!("\t\t[{ix}]: "))
+                                .then(display_design_axis(d_axis, conf))
+                        },
                         conf.bookend_size,
                         |start, stop| {
-                            format!("\t(skipping design-axes from index {start}..{stop})")
+                            display::toks(format!(
+                                "\t(skipping design-axes from index {start}..{stop})"
+                            ))
                         },
                     )
+                    .println()
                 }
             }
             match stat.axis_values.len() {
                 0 => (),
                 n => {
                     println!("\tAxisValues: {n} total");
-                    show_items_elided(
+                    arrayfmt::display_items_elided(
                         &stat.axis_values,
-                        |ix, a_value| println!("\t\t[{ix}]: {}", format_axis_value(a_value, conf)),
+                        |ix, a_value| {
+                            display::tok(format!("\t\t[{ix}]: "))
+                                .then(display_axis_value(a_value, conf))
+                        },
                         conf.bookend_size,
                         |start, stop| {
-                            format!("\t(skipping design-axes from index {start}..{stop})")
+                            display::toks(format!(
+                                "\t(skipping design-axes from index {start}..{stop})"
+                            ))
                         },
                     )
+                    .println()
                 }
             }
         }
@@ -5697,7 +5867,12 @@ fn show_stat_metrics(stat: Option<&StatMetrics>, conf: &Config) {
 }
 
 fn show_kern_metrics(kern: &Option<KernMetrics>, conf: &Config) {
-    fn show_kern_subtable(subtable: &KernSubtable, conf: &Config) {
+    use display::{tok, toks};
+    fn display_kern_subtable(
+        subtable: &KernSubtable,
+        conf: &Config,
+    ) -> display::TokenStream<'static> {
+        use display::{tok, toks};
         fn format_kern_flags(flags: KernFlags) -> String {
             let mut params = Vec::new();
             if flags.r#override {
@@ -5719,251 +5894,256 @@ fn show_kern_metrics(kern: &Option<KernMetrics>, conf: &Config) {
 
             params.join(" | ")
         }
-        print!("KernSubtable ({}):", format_kern_flags(subtable.flags));
-        match &subtable.data {
-            KernSubtableData::Format0(KernSubtableFormat0 { kern_pairs }) => show_items_inline(
-                kern_pairs,
-                |kern_pair| {
-                    format!(
-                        "({},{}) {:+}",
-                        format_glyphid_hex(kern_pair.left, true),
-                        format_glyphid_hex(kern_pair.right, true),
-                        kern_pair.value
-                    )
-                },
-                conf.inline_bookend,
-                |n| format!("(..{n}..)"),
-            ),
+        tok(format!(
+            "KernSubtable ({}):",
+            format_kern_flags(subtable.flags)
+        ))
+        .then(match &subtable.data {
+            KernSubtableData::Format0(KernSubtableFormat0 { kern_pairs }) => {
+                use display::toks;
+                arrayfmt::display_items_inline(
+                    kern_pairs,
+                    |kern_pair| {
+                        toks(format!(
+                            "({},{}) {:+}",
+                            format_glyphid_hex(kern_pair.left, true),
+                            format_glyphid_hex(kern_pair.right, true),
+                            kern_pair.value
+                        ))
+                    },
+                    conf.inline_bookend,
+                    |n| toks(format!("(..{n}..)")),
+                )
+            }
             KernSubtableData::Format2(KernSubtableFormat2 {
                 left_class,
                 right_class,
                 kerning_array,
             }) => {
-                fn format_kern_class_table(table: &KernClassTable, conf: &Config) -> String {
-                    format!(
-                        "Classes[first={}, nGlyphs={}]: {}",
+                fn display_kern_class_table(
+                    table: &KernClassTable,
+                    conf: &Config,
+                ) -> display::TokenStream<'static> {
+                    use display::{tok, toks};
+                    tok(format!(
+                        "Classes[first={}, nGlyphs={}]: ",
                         format_glyphid_hex(table.first_glyph, true),
                         table.n_glyphs,
-                        format_items_inline(
-                            &table.class_values,
-                            u16::to_string,
-                            conf.inline_bookend,
-                            |n| format!("(..{n}..)"),
-                        )
-                    )
+                    ))
+                    .then(arrayfmt::display_items_inline(
+                        &table.class_values,
+                        |id| toks(u16::to_string(id)),
+                        conf.inline_bookend,
+                        |n| toks(format!("(..{n}..)")),
+                    ))
                 }
-                fn show_kerning_array(array: &KerningArray, conf: &Config) {
-                    show_wec_rows_elided(
+                fn display_kerning_array(
+                    array: &KerningArray,
+                    conf: &Config,
+                ) -> display::TokenStream<'static> {
+                    display_wec_rows_elided(
                         &array.0,
                         |ix, row| {
-                            print!("\t\t[{ix}]: ");
-                            show_items_inline(
-                                row,
-                                |kern_val| format!("{kern_val:+}"),
-                                conf.inline_bookend,
-                                |n| format!("(..{n}..)"),
+                            display::tok(format!("\t\t[{ix}]: ")).then(
+                                arrayfmt::display_items_inline(
+                                    row,
+                                    |kern_val| display::toks(format!("{kern_val:+}")),
+                                    conf.inline_bookend,
+                                    |n| display::toks(format!("(..{n}..)")),
+                                ),
                             )
                         },
                         conf.bookend_size / 2, // FIXME - magic constant adjustment
-                        |start, stop| format!("\t\t(skipping kerning array rows {start}..{stop})"),
+                        |start, stop| {
+                            display::toks(format!(
+                                "\t\t(skipping kerning array rows {start}..{stop})"
+                            ))
+                        },
                     )
                 }
-                print!(
-                    "LeftClass={}\tRightClass={}\tKerningArray:",
-                    format_kern_class_table(
-                        left_class.as_ref().expect("missing left class table"),
-                        conf
-                    ),
-                    format_kern_class_table(
-                        right_class.as_ref().expect("missing left class table"),
-                        conf
-                    ),
-                );
-                show_kerning_array(kerning_array.as_ref().expect("missing kerning array"), conf)
+                let left = tok("LeftClass=").then(display_kern_class_table(
+                    left_class.as_ref().expect("missing left class table"),
+                    conf,
+                ));
+
+                let right = tok("RightClass=").then(display_kern_class_table(
+                    right_class.as_ref().expect("missing left class table"),
+                    conf,
+                ));
+                let kern = tok("KerningArray:").then(display_kerning_array(
+                    kerning_array.as_ref().expect("missing kerning array"),
+                    conf,
+                ));
+                left.glue(tok("\t"), right).glue(tok("\t"), kern)
             }
-        };
+        })
     }
 
     if let Some(kern) = kern {
         if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
             println!("kern");
-            show_items_elided(
+            arrayfmt::display_items_elided(
                 &kern.subtables,
                 |ix, subtable| {
-                    print!("\t[{ix}]: ");
-                    show_kern_subtable(subtable, conf);
+                    display::tok(format!("\t[{ix}]: ")).then(display_kern_subtable(subtable, conf))
                 },
                 conf.bookend_size,
-                |start, stop| format!("\t(skipping kern subtables {start}..{stop})"),
+                |start, stop| toks(format!("\t(skipping kern subtables {start}..{stop})")),
             )
+            .println();
         } else {
             println!("kern: {} kerning subtables", kern.subtables.len());
         }
     }
 }
 
-fn format_mark2_array(arr: &Mark2Array, coverage: &mut impl Iterator<Item = u16>) -> String {
-    fn format_mark2_record(mark2_record: &Mark2Record, cov: u16) -> String {
+fn display_mark2_array(
+    arr: &Mark2Array,
+    coverage: &mut impl Iterator<Item = u16>,
+) -> display::TokenStream<'static> {
+    use display::toks;
+
+    fn display_mark2_record(mark2_record: &Mark2Record, cov: u16) -> display::TokenStream<'static> {
         const CLASS_ANCHORS: usize = 2;
-        format!(
-            "{}: {}",
-            format_glyphid_hex(cov, true),
-            format_indexed_nullable(
+        use display::{tok, toks};
+        tok(format!("{}: ", format_glyphid_hex(cov, true),)).then(
+            arrayfmt::display_inline_nullable(
                 &mark2_record.mark2_anchors,
-                |ix, anchor| format!("[{ix}]=>{}", format_anchor_table(anchor)),
+                |ix, anchor| tok(format!("[{ix}]=>")).then(display_anchor_table(anchor)),
                 CLASS_ANCHORS,
-                |n, (start, end)| format!("...(skipping {n} indices spanning {start}..={end})...",),
+                |n, (start, end)| {
+                    toks(format!(
+                        "...(skipping {n} indices spanning {start}..={end})..."
+                    ))
+                },
             ),
         )
     }
 
     const MARK2_ARRAY_BOOKEND: usize = 2;
-    format_items_inline(
+    arrayfmt::display_items_inline(
         &arr.mark2_records,
         |mark2_record| {
-            format_mark2_record(mark2_record, coverage.next().expect("missing coverage"))
+            display_mark2_record(mark2_record, coverage.next().expect("missing coverage"))
         },
         MARK2_ARRAY_BOOKEND,
-        |n| format!("...(skipping {n} Mark2Records)..."),
+        |n| toks(format!("...(skipping {n} Mark2Records)...")),
     )
 }
 
-fn format_indexed_nullable<T>(
-    opt_items: &[Option<T>],
-    mut show_fn: impl FnMut(usize, &T) -> String,
-    bookend: usize,
-    ellipsis: impl Fn(usize, (usize, usize)) -> String,
-) -> String {
-    let items: Vec<(usize, &T)> = opt_items
-        .iter()
-        .enumerate()
-        .filter_map(|(ix, opt)| opt.as_ref().map(|v| (ix, v)))
-        .collect();
-    let mut buffer = Vec::<String>::with_capacity(Ord::min(items.len(), bookend * 2 + 1));
-
-    let count = items.len();
-
-    if count > bookend * 2 {
-        let (left_bookend, middle, right_bookend) =
-            unsafe { trisect_unchecked(&items, bookend, bookend) };
-
-        for (ix, it) in left_bookend {
-            buffer.push(show_fn(*ix, it));
-        }
-
-        let n_skipped = count - bookend * 2;
-        assert_eq!(middle.len(), n_skipped);
-        buffer.push(ellipsis(n_skipped, (middle[0].0, middle[n_skipped - 1].0)));
-
-        for (ix, it) in right_bookend {
-            buffer.push(show_fn(*ix, it));
-        }
-    } else {
-        for (ix, it) in items.into_iter() {
-            buffer.push(show_fn(ix, it));
-        }
-    }
-    format!("[{}]", buffer.join(", "))
-}
-
-fn format_ligature_array(
+fn display_ligature_array(
     ligature_array: &LigatureArray,
     coverage: &mut impl Iterator<Item = u16>,
-) -> String {
-    fn format_ligature_attach(ligature_attach: &LigatureAttach, cov: u16) -> String {
-        fn format_component_record(component_record: &ComponentRecord) -> String {
+) -> display::TokenStream<'static> {
+    fn display_ligature_attach(
+        ligature_attach: &LigatureAttach,
+        cov: u16,
+    ) -> display::TokenStream<'static> {
+        fn display_component_record(
+            component_record: &ComponentRecord,
+        ) -> display::TokenStream<'static> {
+            use display::{tok, toks};
             const CLASS_ANCHOR_BOOKEND: usize = 2;
-            format_indexed_nullable(
+            arrayfmt::display_inline_nullable(
                 &component_record.ligature_anchors,
-                |ix, anchor| format!("[{ix}]=>{}", format_anchor_table(anchor)),
+                |ix, anchor| tok(format!("[{ix}]=>")).then(display_anchor_table(anchor)),
                 CLASS_ANCHOR_BOOKEND,
                 |n_skipped, (first, last)| {
-                    format!("...(skipping {n_skipped} indices from {first} to {last})...")
+                    toks(format!(
+                        "...(skipping {n_skipped} indices from {first} to {last})..."
+                    ))
                 },
             )
         }
 
+        use display::{tok, toks};
         const COMPONENTS_BOOKEND: usize = 1;
-        format!(
-            "{cov:04x}={}",
-            format_items_inline(
-                &ligature_attach.component_records,
-                format_component_record,
-                COMPONENTS_BOOKEND,
-                |_| "..".to_string(),
-            )
-        )
+        tok(format!("{cov:04x}=")).then(arrayfmt::display_items_inline(
+            &ligature_attach.component_records,
+            display_component_record,
+            COMPONENTS_BOOKEND,
+            |_| toks(".."),
+        ))
     }
 
+    use display::toks;
     const ATTACHES_INLINE: usize = 2;
-    format_items_inline(
+    arrayfmt::display_items_inline(
         &ligature_array.ligature_attach,
-        |attach| format_ligature_attach(attach, coverage.next().expect("missing coverage")),
+        |attach| display_ligature_attach(attach, coverage.next().expect("missing coverage")),
         ATTACHES_INLINE,
-        |n_skipped| format!("...(skipping {n_skipped})..."),
+        |n_skipped| toks(format!("...(skipping {n_skipped})...")),
     )
 }
 
-fn format_base_array(base_array: &BaseArray, coverage: &mut impl Iterator<Item = u16>) -> String {
-    fn format_base_record(base_record: &BaseRecord, cov: u16) -> String {
+fn display_base_array(
+    base_array: &BaseArray,
+    coverage: &mut impl Iterator<Item = u16>,
+) -> display::TokenStream<'static> {
+    fn display_base_record(base_record: &BaseRecord, cov: u16) -> display::TokenStream<'static> {
+        use display::{tok, toks};
         const CLASS_ANCHOR_BOOKEND: usize = 2;
-        format!(
-            "{cov:04x}: {}",
-            format_indexed_nullable(
-                &base_record.base_anchors,
-                |ix, anchor| format!("[{ix}]=>{}", format_anchor_table(anchor)),
-                CLASS_ANCHOR_BOOKEND,
-                |n_skipped, (first, last)| format!(
+        tok(format!("{cov:04x}: ")).then(arrayfmt::display_inline_nullable(
+            &base_record.base_anchors,
+            |ix, anchor| tok(format!("[{ix}]=>")).then(display_anchor_table(anchor)),
+            CLASS_ANCHOR_BOOKEND,
+            |n_skipped, (first, last)| {
+                toks(format!(
                     "...(skipping {n_skipped} indices from {first} to {last})..."
-                )
-            )
-        )
+                ))
+            },
+        ))
     }
 
+    use display::toks;
     const BASE_ARRAY_BOOKEND: usize = 2;
-    format_items_inline(
+    arrayfmt::display_items_inline(
         &base_array.base_records,
-        |base_record| format_base_record(base_record, coverage.next().expect("missing coverage")),
+        |base_record| display_base_record(base_record, coverage.next().expect("missing coverage")),
         BASE_ARRAY_BOOKEND,
-        |n_skipped| format!("...({n_skipped} skipped)..."),
+        |n_skipped| toks(format!("...({n_skipped} skipped)...")),
     )
 }
 
-fn format_mark_array(mark_array: &MarkArray, coverage: &mut impl Iterator<Item = u16>) -> String {
-    fn format_mark_record(mark_record: &MarkRecord, cov: u16) -> String {
-        format!(
-            "{cov:04x}=({}, {})",
-            mark_record.mark_class,
-            format_anchor_table(mark_record.mark_anchor.as_ref().expect("broken link"))
+fn display_mark_array(
+    mark_array: &MarkArray,
+    coverage: &mut impl Iterator<Item = u16>,
+) -> display::TokenStream<'static> {
+    fn display_mark_record(mark_record: &MarkRecord, cov: u16) -> display::TokenStream<'static> {
+        use display::{tok, toks};
+        tok(format!("{cov:04x}=({}, ", mark_record.mark_class,)).then(
+            display_anchor_table(mark_record.mark_anchor.as_ref().expect("broken link"))
+                .chain(toks(")")),
         )
     }
 
     // FIXME[magic] - arbitrary local bookending const
     const MARK_ARRAY_BOOKEND: usize = 2;
-    format_items_inline(
+    arrayfmt::display_items_inline(
         &mark_array.mark_records,
-        |mark_record| format_mark_record(mark_record, coverage.next().expect("missing coverage")),
+        |mark_record| display_mark_record(mark_record, coverage.next().expect("missing coverage")),
         MARK_ARRAY_BOOKEND,
-        |n_skipped| format!("...({n_skipped} skipped)..."),
+        |n_skipped| display::toks(format!("...({n_skipped} skipped)...")),
     )
 }
 
-fn format_anchor_table(anchor: &AnchorTable) -> String {
+fn display_anchor_table(anchor: &AnchorTable) -> display::TokenStream<'static> {
+    use display::{tok, toks};
     match anchor {
         AnchorTable::Format1(AnchorTableFormat1 {
             x_coordinate,
             y_coordinate,
-        }) => {
-            format!("({}, {})", as_s16(*x_coordinate), as_s16(*y_coordinate))
-        }
-        AnchorTable::Format2(f2) => {
-            format!(
-                "({}, {})@[{}]",
-                as_s16(f2.x_coordinate),
-                as_s16(f2.y_coordinate),
-                f2.anchor_point
-            )
-        }
+        }) => toks(format!(
+            "({}, {})",
+            as_s16(*x_coordinate),
+            as_s16(*y_coordinate)
+        )),
+        AnchorTable::Format2(f2) => toks(format!(
+            "({}, {})@[{}]",
+            as_s16(f2.x_coordinate),
+            as_s16(f2.y_coordinate),
+            f2.anchor_point
+        )),
         AnchorTable::Format3(AnchorTableFormat3 {
             x_coordinate,
             y_coordinate,
@@ -5975,95 +6155,105 @@ fn format_anchor_table(anchor: &AnchorTable) -> String {
                     "unexpected both-Null DeviceOrVariationIndexTable-offsets in AnchorTable::Format3"
                 ),
                 (Some(x), Some(y)) => {
-                    format!(
+                    // FIXME - refactor format_device_or_variation_index_table to be TokenStream
+                    toks(format!(
                         "×({}, {})",
                         format_device_or_variation_index_table(x),
                         format_device_or_variation_index_table(y)
-                    )
+                    ))
                 }
                 (Some(x), None) => {
-                    format!("×({}, ⅈ)", format_device_or_variation_index_table(x))
+                    // FIXME - refactor format_device_or_variation_index_table to be TokenStream
+                    toks(format!(
+                        "×({}, ⅈ)",
+                        format_device_or_variation_index_table(x)
+                    ))
                 }
                 (None, Some(y)) => {
-                    format!("×(ⅈ, {})", format_device_or_variation_index_table(y))
+                    // FIXME - refactor format_device_or_variation_index_table to be TokenStream
+                    toks(format!(
+                        "×(ⅈ, {})",
+                        format_device_or_variation_index_table(y)
+                    ))
                 }
             };
-            format!(
-                "({}, {}){}",
+            tok(format!(
+                "({}, {})",
                 as_s16(*x_coordinate),
                 as_s16(*y_coordinate),
-                extra
-            )
+            ))
+            .then(extra)
         }
     }
 }
 
-fn format_ligature_sets(
+fn display_ligature_sets(
     lig_sets: &[LigatureSet],
     mut coverage: impl Iterator<Item = u16>,
-) -> String {
-    fn format_ligature_set(lig_set: &LigatureSet, cov: u16) -> String {
-        fn format_ligature(lig: &Ligature, cov: u16) -> String {
-            // NOTE - bec
-            format!(
+) -> display::TokenStream<'static> {
+    fn display_ligature_set(lig_set: &LigatureSet, cov: u16) -> display::TokenStream<'static> {
+        fn display_ligature(lig: &Ligature, cov: u16) -> display::TokenStream<'static> {
+            // FIXME - refactor format_glyphid_array_hex to be TokenStream
+            display::toks(format!(
                 "(#{cov:04x}.{} => {})",
                 format_glyphid_array_hex(&lig.component_glyph_ids, false),
                 lig.ligature_glyph,
-            )
+            ))
         }
         // FIXME[magic] - arbitrary local bookending const
         const LIG_BOOKEND: usize = 2;
-        format_items_inline(
+        arrayfmt::display_items_inline(
             &lig_set.ligatures,
             |lig| match lig {
-                Some(lig) => format_ligature(lig, cov),
+                Some(lig) => display_ligature(lig, cov),
                 None => unreachable!("missing (None) ligature"),
             },
             LIG_BOOKEND,
-            |n_skipped| format!("...({n_skipped} skipped)..."),
+            |n_skipped| display::toks(format!("...({n_skipped} skipped)...")),
         )
     }
     match lig_sets {
-        [set] => format_ligature_set(set, coverage.next().expect("missing coverage")),
+        [set] => display_ligature_set(set, coverage.next().expect("missing coverage")),
         more => {
             const LIG_SET_BOOKEND: usize = 1;
-            format_coverage_linked_array(
+            display_coverage_linked_array(
                 more,
                 coverage,
-                |cov, lig_set| format_ligature_set(lig_set, cov),
+                |cov, lig_set| display_ligature_set(lig_set, cov),
                 LIG_SET_BOOKEND,
-                |_| String::from(".."),
+                |_| display::toks(".."),
             )
         }
     }
 }
 
-fn format_alternate_sets(alt_sets: &[AlternateSet]) -> String {
-    fn format_alternate_set(alt_set: &AlternateSet) -> String {
+fn display_alternate_sets(alt_sets: &[AlternateSet]) -> display::TokenStream<'static> {
+    fn display_alternate_set(alt_set: &AlternateSet) -> display::TokenStream<'static> {
+        use display::toks;
         const ALT_GLYPH_BOOKEND: usize = 2;
-        format_items_inline(
+        arrayfmt::display_items_inline(
             &alt_set.alternate_glyph_ids,
-            |glyph_id| format_glyphid_hex(*glyph_id, true),
+            |glyph_id| toks(format_glyphid_hex(*glyph_id, true)),
             ALT_GLYPH_BOOKEND,
-            |_| "..".to_string(),
+            |_| toks("..".to_string()),
         )
     }
     match alt_sets {
-        [set] => format_alternate_set(set),
+        [set] => display_alternate_set(set),
         more => {
             const ALT_SET_BOOKEND: usize = 1;
-            format_items_inline(more, format_alternate_set, ALT_SET_BOOKEND, |count| {
-                format!("...({count} skipped)...")
+            arrayfmt::display_items_inline(more, display_alternate_set, ALT_SET_BOOKEND, |count| {
+                display::toks(format!("...({count} skipped)..."))
             })
         }
     }
 }
 
-fn format_sequence_lookup(sl: &SequenceLookup) -> String {
+fn display_sequence_lookup(sl: &SequenceLookup) -> display::TokenStream<'static> {
     let s_ix = sl.sequence_index;
     let ll_ix = sl.lookup_list_index;
-    // NOTE - the number in `\[_\]` is meant to mimic the index display of the show_items_elided formatting of LookupList, so it is the lookup index. The number after `@` is the positional index to apply the lookup to
-    format!("[{ll_ix}]@{s_ix}")
+    // NOTE - the number in `\[_\]` is meant to mimic the index display of the display_items_elided formatting of LookupList, so it is the lookup index. The number after `@` is the positional index to apply the lookup to
+    display::toks(format!("[{ll_ix}]@{s_ix}"))
 }
 
 /// Checks that the given ClassDef (assumed to be Some) contains the expected number of classes.
@@ -6122,7 +6312,7 @@ fn validate_class_count(class_def: &ClassDef, expected_classes: usize) {
     }
 }
 
-fn format_value_record(record: &ValueRecord) -> String {
+fn display_value_record(record: &ValueRecord) -> display::TokenStream<'static> {
     let ValueRecord {
         x_placement,
         y_placement,
@@ -6133,20 +6323,21 @@ fn format_value_record(record: &ValueRecord) -> String {
         x_advance_device,
         y_advance_device,
     } = record;
+    use display::{tok, toks};
     const NUM_FRAGMENTS: usize = 4;
-    let mut buf = Vec::<String>::with_capacity(NUM_FRAGMENTS);
+    let mut buf = Vec::with_capacity(NUM_FRAGMENTS);
 
     // helper to indicate whether a field exists
     let elide = |opt_val: &Option<_>| -> Option<&'static str> { opt_val.as_ref().map(|_| "(..)") };
 
-    buf.extend(format_opt_xy("placement", *x_placement, *y_placement));
-    buf.extend(format_opt_xy("advance", *x_advance, *y_advance));
-    buf.extend(format_opt_xy(
+    buf.extend(display_opt_xy("placement", *x_placement, *y_placement));
+    buf.extend(display_opt_xy("advance", *x_advance, *y_advance));
+    buf.extend(display_opt_xy(
         "placement(device)",
         elide(x_placement_device),
         elide(y_placement_device),
     ));
-    buf.extend(format_opt_xy(
+    buf.extend(display_opt_xy(
         "advance(device)",
         elide(x_advance_device),
         elide(y_advance_device),
@@ -6154,28 +6345,67 @@ fn format_value_record(record: &ValueRecord) -> String {
 
     if buf.is_empty() {
         // REVIEW - this is highly unlikely, right..?
-        String::from("<Empty ValueRecord>")
+        toks("<Empty ValueRecord>")
     } else {
-        buf.join("; ")
+        display::TokenStream::join_with(buf, tok("; "))
     }
 }
 
-fn format_opt_xy<T>(what: &str, x: Option<T>, y: Option<T>) -> Option<String>
+fn display_opt_xy<T>(
+    what: &str,
+    x: Option<T>,
+    y: Option<T>,
+) -> Option<display::TokenStream<'static>>
 where
     T: std::fmt::Display,
 {
+    use display::toks;
     match (x, y) {
         (None, None) => None,
-        (Some(x), Some(y)) => Some(format!("{what}: ({x},{y})")),
-        (Some(x), None) => Some(format!("{what}[x]: {x}")),
-        (None, Some(y)) => Some(format!("{what}[y]: {y}")),
+        (Some(x), Some(y)) => Some(toks(format!("{what}: ({x},{y})"))),
+        (Some(x), None) => Some(toks(format!("{what}[x]: {x}"))),
+        (None, Some(y)) => Some(toks(format!("{what}[y]: {y}"))),
     }
 }
 
 /// Prints a summary of a given `LookupFlag` value, including logic to avoid printing anything for the default flag value.
 ///
 /// Because of this elision, will also print a prefix that separates the displayed content from the previous field
-fn show_lookup_flag(flags: &LookupFlag) {
+fn display_lookup_flags(flags: &LookupFlag) -> display::TokenStream<'static> {
+    fn display_lookup_flag(flags: &LookupFlag) -> display::TokenStream<'static> {
+        let mut set_flags = Vec::new();
+        if flags.right_to_left {
+            set_flags.push("RIGHT_TO_LEFT");
+        }
+        if flags.ignore_base_glyphs {
+            set_flags.push("IGNORE_BASE_GLYPHS");
+        }
+        if flags.ignore_ligatures {
+            set_flags.push("IGNORE_LIGATURES");
+        }
+        if flags.ignore_marks {
+            set_flags.push("IGNORE_MARKS");
+        }
+        if flags.use_mark_filtering_set {
+            set_flags.push("USE_MARK_FILTERING_SET");
+        }
+
+        let str_flags = if set_flags.is_empty() {
+            String::from("∅")
+        } else {
+            set_flags.join(" | ")
+        };
+
+        let str_macf = match flags.mark_attachment_class_filter {
+            // NOTE - If we are not filtering by mark attachment class, we don't need to print anything for that field
+            0 => String::new(),
+            // REVIEW - if horizontal space is at a premium, we may want to shorten or partially elide the label-string
+            n => format!("; mark_attachment_class_filter = {n}"),
+        };
+
+        display::Token::from(format!("LookupFlag ({str_flags}{str_macf})")).into()
+    }
+
     if flags.mark_attachment_class_filter != 0
         || flags.right_to_left
         || flags.ignore_ligatures
@@ -6183,42 +6413,11 @@ fn show_lookup_flag(flags: &LookupFlag) {
         || flags.ignore_marks
         || flags.use_mark_filtering_set
     {
-        print!(", flags={}", format_lookup_flag(flags))
-    }
-}
-
-fn format_lookup_flag(flags: &LookupFlag) -> String {
-    let mut set_flags = Vec::new();
-    if flags.right_to_left {
-        set_flags.push("RIGHT_TO_LEFT");
-    }
-    if flags.ignore_base_glyphs {
-        set_flags.push("IGNORE_BASE_GLYPHS");
-    }
-    if flags.ignore_ligatures {
-        set_flags.push("IGNORE_LIGATURES");
-    }
-    if flags.ignore_marks {
-        set_flags.push("IGNORE_MARKS");
-    }
-    if flags.use_mark_filtering_set {
-        set_flags.push("USE_MARK_FILTERING_SET");
-    }
-
-    let str_flags = if set_flags.is_empty() {
-        String::from("∅")
+        display::tok(", flags=").then(display_lookup_flag(flags))
     } else {
-        set_flags.join(" | ")
-    };
-
-    let str_macf = match flags.mark_attachment_class_filter {
-        // NOTE - If we are not filtering by mark attachment class, we don't need to print anything for that field
-        0 => String::new(),
-        // REVIEW - if horizontal space is at a premium, we may want to shorten or partially elide the label-string
-        n => format!("; mark_attachment_class_filter = {n}"),
-    };
-
-    format!("LookupFlag ({str_flags}{str_macf})")
+        // FIXME - add special case for empty-string TokenStream
+        display::toks("")
+    }
 }
 
 fn format_lookup_type(ctxt: Ctxt, ltype: u16) -> &'static str {
@@ -6250,165 +6449,215 @@ fn format_lookup_type(ctxt: Ctxt, ltype: u16) -> &'static str {
     }
 }
 
-fn show_mark_glyph_set(mgs: &MarkGlyphSet, conf: &Config) {
-    println!("\tMarkGlyphSet:");
-    show_items_elided(
+fn display_mark_glyph_set(mgs: &MarkGlyphSet, conf: &Config) -> display::TokenStream<'static> {
+    use display::{Token::LineBreak, tok, toks};
+    tok("\tMarkGlyphSet:").then(LineBreak.then(arrayfmt::display_items_elided(
         &mgs.coverage,
         |ix, item| match item {
-            None => println!("\t\t[{ix}]: <none>"),
+            None => toks(format!("\t\t[{ix}]: <none>")).into(),
             Some(covt) => {
-                print!("\t\t[{ix}]: ");
-                show_coverage_table(covt, conf);
+                tok(format!("\t\t[{ix}]: ")).then(display_coverage_table_summary(covt, conf))
             }
         },
         conf.bookend_size,
-        |start, stop| format!("\t    (skipping coverage tables {start}..{stop})"),
-    )
+        |start, stop| toks(format!("\t    (skipping coverage tables {start}..{stop})")),
+    )))
 }
 
-fn show_table_column_horiz<A>(
+// TODO - move to arrayfmt module
+fn display_table_column_horiz<A>(
     heading: &str,
     items: &[A],
-    mut show_fn: impl FnMut(&A) -> String,
+    mut show_fn: impl FnMut(&A) -> display::TokenStream<'static>,
     bookend: usize,
-    ellipsis: impl FnOnce(usize) -> String,
-) {
-    print!("{heading}");
-    let count = items.len();
-    if count > 2 * bookend {
-        let (left_bookend, _middle, right_bookend) =
-            unsafe { trisect_unchecked(items, bookend, bookend) };
+    ellipsis: impl FnOnce(usize) -> display::TokenStream<'static>,
+) -> display::TokenStream<'static> {
+    use display::{tok, toks};
+    tok(format!("{heading}")).then({
+        let count = items.len();
+        let mut buf = Vec::with_capacity(Ord::min(count, 2 * bookend + 1));
+        if count > 2 * bookend {
+            let (left_bookend, _middle, right_bookend) =
+                unsafe { trisect_unchecked(items, bookend, bookend) };
 
-        for it in left_bookend {
-            print!("{} ", show_fn(it));
-        }
+            for it in left_bookend {
+                buf.push(show_fn(it));
+            }
 
-        let n_skipped = count - bookend * 2;
-        print!("{}", ellipsis(n_skipped));
+            let n_skipped = count - bookend * 2;
+            buf.push(ellipsis(n_skipped));
 
-        for it in right_bookend {
-            print!(" {}", show_fn(it));
+            for it in right_bookend {
+                buf.push(show_fn(it));
+            }
+        } else {
+            buf.extend(items.iter().map(show_fn));
         }
-    } else {
-        print!("{}", show_fn(&items[0]));
-        for it in &items[1..] {
-            print!(" {}", show_fn(it));
-        }
-    }
-    println!();
+        display::TokenStream::join_with(buf, tok(" "))
+    })
 }
 
-fn show_item_variation_store(ivs: &ItemVariationStore, conf: &Config) {
-    fn show_variation_regions(vrl: &VariationRegionList, conf: &Config) {
-        fn show_variation_axes(per_region: &[RegionAxisCoordinates], conf: &Config) {
-            show_table_column_horiz(
-                "\t\t start |",
-                per_region,
-                |coords| format!("{:.03}", coords.start_coord),
-                conf.inline_bookend,
-                |n_skipped| format!("..{n_skipped:02}.."),
-            );
-            show_table_column_horiz(
-                "\t\t  peak |",
-                per_region,
-                |coords| format!("{:.03}", coords.peak_coord),
-                conf.inline_bookend,
-                |n_skipped| format!("..{n_skipped:02}.."),
-            );
-            show_table_column_horiz(
-                "\t\t   end |",
-                per_region,
-                |coords| format!("{:.03}", coords.end_coord),
-                conf.inline_bookend,
-                |n_skipped| format!("..{n_skipped:02}.."),
-            );
+fn display_item_variation_store(
+    ivs: &ItemVariationStore,
+    conf: &Config,
+) -> display::TokenStream<'static> {
+    fn display_variation_regions(
+        vrl: &VariationRegionList,
+        conf: &Config,
+    ) -> display::TokenStream<'static> {
+        fn display_variation_axes(
+            per_region: &[RegionAxisCoordinates],
+            conf: &Config,
+        ) -> display::TokenStream<'static> {
+            use display::toks;
+            display::TokenStream::join_with(
+                vec![
+                    display_table_column_horiz(
+                        "\t\t start |",
+                        per_region,
+                        |coords| toks(format!("{:.03}", coords.start_coord)),
+                        conf.inline_bookend,
+                        |n_skipped| toks(format!("..{n_skipped:02}..")),
+                    ),
+                    display_table_column_horiz(
+                        "\t\t  peak |",
+                        per_region,
+                        |coords| toks(format!("{:.03}", coords.peak_coord)),
+                        conf.inline_bookend,
+                        |n_skipped| toks(format!("..{n_skipped:02}..")),
+                    ),
+                    display_table_column_horiz(
+                        "\t\t   end |",
+                        per_region,
+                        |coords| toks(format!("{:.03}", coords.end_coord)),
+                        conf.inline_bookend,
+                        |n_skipped| toks(format!("..{n_skipped:02}..")),
+                    ),
+                ],
+                display::Token::LineBreak,
+            )
         }
-        println!(
+        use display::{Token::LineBreak, tok, toks};
+
+        tok(format!(
             "\t    VariationRegions: {} regions ({} axes)",
             vrl.0.len(),
             vrl.0[0].len()
-        );
-        show_items_elided(
+        ))
+        .then(LineBreak.then(arrayfmt::display_items_elided(
             &vrl.0,
             |ix, per_region| {
-                println!("\t\t[{ix}]:");
-                show_variation_axes(per_region, conf);
+                tok(format!("\t\t[{ix}]:"))
+                    .then(LineBreak.then(display_variation_axes(per_region, conf)))
             },
             conf.bookend_size,
-            |start_ix, end_ix| format!("\t    (skipping regions {start_ix}..{end_ix})"),
-        )
+            |start_ix, end_ix| toks(format!("\t    (skipping regions {start_ix}..{end_ix})")),
+        )))
     }
-    fn show_variation_data_array(ivda: &[Option<ItemVariationData>], conf: &Config) {
-        fn show_variation_data(ivd: &ItemVariationData, conf: &Config) {
-            fn show_delta_sets(_sets: &DeltaSets, _conf: &Config) {
-                println!("\t\t\t<show_delta_sets: incomplete>")
+    fn display_variation_data_array(
+        ivda: &[Option<ItemVariationData>],
+        conf: &Config,
+    ) -> display::TokenStream<'static> {
+        fn display_variation_data(
+            ivd: &ItemVariationData,
+            conf: &Config,
+        ) -> display::TokenStream<'static> {
+            fn display_delta_sets(
+                _sets: &DeltaSets,
+                _conf: &Config,
+            ) -> display::TokenStream<'static> {
+                // WIP
+                toks(format!("\t\t\t<show_delta_sets: incomplete>"))
             }
-            println!("ItemVariationData:");
 
-            print!("\t\t\t{} region indices: ", ivd.region_index_count);
-            show_items_inline(
-                &ivd.region_indices,
-                |ix| format!("{ix}"),
-                conf.inline_bookend,
-                |n_skipped| format!("..({n_skipped}).."),
-            );
+            use display::{Token::LineBreak, tok, toks};
 
             let full_bits = if ivd.long_words { 32 } else { 16 };
-            println!(
-                "\t\t\t{} delta-sets ({} full [{}-bit], {} half [{}-bit]): ",
-                ivd.item_count,
-                ivd.word_count,
-                full_bits,
-                ivd.region_index_count - ivd.word_count,
-                full_bits >> 1
-            );
-            show_delta_sets(&ivd.delta_sets, conf);
+
+            tok("ItemVariationData:")
+                .then(LineBreak.then(
+                    tok(format!("\t\t\t{} region indices: ", ivd.region_index_count)).then(
+                        arrayfmt::display_items_inline(
+                            &ivd.region_indices,
+                            |ix| toks(format!("{ix}")),
+                            conf.inline_bookend,
+                            |n_skipped| toks(format!("...({n_skipped})...")),
+                        ),
+                    ),
+                ))
+                .chain(
+                    tok(format!(
+                        "\t\t\t{} delta-sets ({} full [{}-bit], {} half [{}-bit]): ",
+                        ivd.item_count,
+                        ivd.word_count,
+                        full_bits,
+                        ivd.region_index_count - ivd.word_count,
+                        full_bits >> 1
+                    ))
+                    .then(LineBreak.then(display_delta_sets(&ivd.delta_sets, conf))),
+                )
         }
-        println!("\t    ItemVariationData[{}]", ivda.len());
-        show_items_elided(
-            ivda,
-            |ix, o_ivd| match o_ivd {
-                Some(ivd) => {
-                    print!("\t\t[{ix}]: ");
-                    show_variation_data(ivd, conf);
-                }
-                None => {
-                    println!("\t\t[{ix}]: <NONE>");
-                }
+        use display::{Token::LineBreak, tok, toks};
+        // WIP
+        tok(format!("\t    ItemVariationData[{}]", ivda.len())).then(LineBreak.then(
+            arrayfmt::display_items_elided(
+                ivda,
+                |ix, o_ivd| match o_ivd {
+                    Some(ivd) => {
+                        tok(format!("\t\t[{ix}]: ")).then(display_variation_data(ivd, conf))
+                    }
+                    None => toks(format!("\t\t[{ix}]: <NONE>")),
+                },
+                conf.bookend_size,
+                |start_ix, stop_ix| {
+                    toks(format!(
+                        "\t    ...(skipping entries {start_ix}..{stop_ix})..."
+                    ))
+                },
+            ),
+        ))
+    }
+    use display::{Token::LineBreak, tok, toks};
+
+    tok("\tItemVariationStore:")
+        .then(LineBreak.then(display_variation_regions(&ivs.variation_region_list, conf)))
+        .chain(LineBreak.then(display_variation_data_array(
+            &ivs.item_variation_data_list,
+            conf,
+        )))
+}
+
+fn display_lig_caret_list(
+    lig_caret_list: &LigCaretList,
+    conf: &Config,
+) -> display::TokenStream<'static> {
+    use display::{Token::LineBreak, tok, toks};
+    tok("\tLigCaretList:")
+        .then(
+            LineBreak.then(tok("\t\t").then(display_coverage_table_summary(
+                &lig_caret_list.coverage,
+                conf,
+            ))),
+        )
+        .chain(LineBreak.then(arrayfmt::display_items_elided(
+            &lig_caret_list.lig_glyphs,
+            |ix, lig_glyph| {
+                tok(format!("\t\t[{ix}]: ")).then(arrayfmt::display_items_inline(
+                    &lig_glyph.caret_values,
+                    display_caret_value,
+                    conf.inline_bookend,
+                    |num_skipped| toks(format!("...({num_skipped})...")),
+                ))
             },
             conf.bookend_size,
-            |start_ix, stop_ix| format!("\t    ...(skipping entries {start_ix}..{stop_ix})..."),
-        )
-    }
-
-    println!("\tItemVariationStore:");
-    show_variation_regions(&ivs.variation_region_list, conf);
-    show_variation_data_array(&ivs.item_variation_data_list, conf);
-}
-
-fn show_lig_caret_list(lig_caret_list: &LigCaretList, conf: &Config) {
-    println!("\tLigCaretList:");
+            |start, stop| toks(format!("\t    (skipping LigGlyphs {start}..{stop})")),
+        )))
     // NOTE - since coverage tables are used in MarkGlyphSet, we don't want to force-indent within the `show_coverage_table` function, so we do it before instead.
-    print!("\t\t");
-    show_coverage_table(&lig_caret_list.coverage, conf);
-    show_items_elided(
-        &lig_caret_list.lig_glyphs,
-        |ix, lig_glyph| {
-            print!("\t\t[{ix}]: ");
-            show_items_inline(
-                &lig_glyph.caret_values,
-                format_caret_value,
-                conf.inline_bookend,
-                |num_skipped| format!("...({num_skipped})..."),
-            )
-        },
-        conf.bookend_size,
-        |start, stop| format!("\t    (skipping LigGlyphs {start}..{stop})"),
-    )
 }
 
-fn format_caret_value(cv: &Link<CaretValue>) -> String {
-    match cv {
+fn display_caret_value(cv: &Link<CaretValue>) -> display::TokenStream<'static> {
+    // WIP
+    display::toks(match cv {
         None => unreachable!("caret value null link"),
         Some(cv) => match cv {
             // REVIEW - this isn't really a canonical abbreviation, so we might adjust what we show for Design Units (Format 1)
@@ -6420,14 +6669,15 @@ fn format_caret_value(cv: &Link<CaretValue>) -> String {
                     format!(
                         "{}du+{}",
                         coordinate,
-                        format_device_or_variation_index_table(table)
+                        format_device_or_variation_index_table(table) // WIP
                     )
                 }
             },
         },
-    }
+    })
 }
 
+// TODO - refactor to tokenstream
 fn format_device_or_variation_index_table(table: &DeviceOrVariationIndexTable) -> String {
     match table {
         DeviceOrVariationIndexTable::Device(dev_table) => format_device_table(dev_table),
@@ -6452,25 +6702,34 @@ fn format_variation_index_table(var_ix_table: &VariationIndexTable) -> String {
     )
 }
 
-fn show_attach_list(attach_list: &AttachList, conf: &Config) {
-    println!("\tAttachList:");
-    // NOTE - since coverage tables are used in MarkGlyphSet, we don't want to force-indent within the `show_coverage_table` function, so we do it before instead.
-    print!("\t\t");
-    show_coverage_table(&attach_list.coverage, conf);
-    show_items_elided(
-        &attach_list.attach_points,
-        |ix, AttachPoint { point_indices }| {
-            print!("\t\t[{ix}]:");
-            show_items_inline(
-                point_indices,
-                |point_ix| format!("{point_ix}"),
-                conf.inline_bookend,
-                |num_skipped| format!("...({num_skipped})..."),
-            );
-        },
-        conf.bookend_size,
-        |start, stop| format!("\t    (skipping attach points for glyphs {start}..{stop})"),
-    )
+fn display_attach_list(attach_list: &AttachList, conf: &Config) -> display::TokenStream<'static> {
+    use display::{tok, toks};
+    // WIP
+    toks("AttachList:")
+        .pre_indent(2)
+        .break_line()
+        .chain(
+            display_coverage_table_summary(&attach_list.coverage, conf)
+                .pre_indent(4)
+                .break_line(),
+        )
+        .chain(arrayfmt::display_items_elided(
+            &attach_list.attach_points,
+            |ix, AttachPoint { point_indices }| {
+                tok(format!("\t\t[{ix}]:")).then(arrayfmt::display_items_inline(
+                    point_indices,
+                    |point_ix| toks(format!("{point_ix}")),
+                    conf.inline_bookend,
+                    |num_skipped| toks(format!("...({num_skipped})...")),
+                ))
+            },
+            conf.bookend_size,
+            |start, stop| {
+                toks(format!(
+                    "\t    (skipping attach points for glyphs {start}..{stop})"
+                ))
+            },
+        ))
 }
 
 fn format_glyphid_hex(glyph: u16, is_standalone: bool) -> String {
@@ -6532,19 +6791,20 @@ fn format_glyphid_array_hex(glyphs: &impl AsRef<[u16]>, is_standalone: bool) -> 
 }
 
 // FIXME - we might want a more flexible model where the `show_XYZZY`/`format_XYZZY` dichotomy is erased, such as a generic Writer or Fragment-producer...
-fn format_coverage_table(cov: &CoverageTable) -> String {
+fn display_coverage_table(cov: &CoverageTable) -> display::TokenStream<'static> {
+    use display::{tok, toks};
     match cov {
         CoverageTable::Format1 { glyph_array } => {
             let num_glyphs = glyph_array.len();
             match glyph_array.as_slice() {
-                [] => "∅".to_string(),
-                [id] => format!("[{id}]"),
-                [first, .., last] => format!("[{num_glyphs} ∈ [{first},{last}]]"),
+                [] => toks("∅"),
+                [id] => toks(format!("[{id}]")),
+                [first, .., last] => toks(format!("[{num_glyphs} ∈ [{first},{last}]]")),
             }
         }
         CoverageTable::Format2 { range_records } => match range_records.as_slice() {
-            [] => "∅".to_string(),
-            [rr] => format!("[∀: {}..={}]", rr.start_glyph_id, rr.end_glyph_id),
+            [] => toks("∅"),
+            [rr] => toks(format!("[∀: {}..={}]", rr.start_glyph_id, rr.end_glyph_id)),
             [first, .., last] => {
                 let num_glyphs: u16 = range_records
                     .iter()
@@ -6553,31 +6813,35 @@ fn format_coverage_table(cov: &CoverageTable) -> String {
                 let num_ranges = range_records.len();
                 let min_glyph = first.start_glyph_id;
                 let max_glyph = last.end_glyph_id;
-                format!("[{num_ranges} ranges; {num_glyphs} ∈ [{min_glyph},{max_glyph}]]")
+                toks(format!(
+                    "[{num_ranges} ranges; {num_glyphs} ∈ [{min_glyph},{max_glyph}]]"
+                ))
             }
         },
     }
 }
 
-fn show_coverage_table(cov: &CoverageTable, conf: &Config) {
+fn display_coverage_table_summary(
+    cov: &CoverageTable,
+    conf: &Config,
+) -> display::TokenStream<'static> {
+    use display::{tok, toks};
     match cov {
         CoverageTable::Format1 { glyph_array } => {
-            print!("Glyphs Covered: ");
-            show_items_inline(
+            tok("Glyphs Covered: ").then(arrayfmt::display_items_inline(
                 glyph_array,
-                |item| format!("{item}"),
+                |item| toks(format!("{item}")),
                 conf.inline_bookend,
-                |num_skipped| format!("...({num_skipped})..."),
-            );
+                |num_skipped| toks(format!("...({num_skipped})...")),
+            ))
         }
         CoverageTable::Format2 { range_records } => {
-            print!("Glyph Ranges Covered: ");
-            show_items_inline(
+            tok("Glyph Ranges Covered: ").then(arrayfmt::display_items_inline(
                 range_records,
-                format_coverage_range_record,
+                display_coverage_range_record,
                 conf.inline_bookend,
-                |num_skipped| format!("...({num_skipped})..."),
-            );
+                |num_skipped| toks(format!("...({num_skipped})...")),
+            ))
         }
     }
 }
@@ -6597,11 +6861,13 @@ fn show_glyph_class_def(class_def: &ClassDef, conf: &Config) {
     show_class_def(class_def, show_glyph_class, conf)
 }
 
-fn show_class_def<S: std::fmt::Display>(
+fn show_class_def<L: Into<Label>>(
     class_def: &ClassDef,
-    show_fn: impl Fn(&u16) -> S,
+    show_fn: impl Fn(&u16) -> L,
     conf: &Config,
 ) {
+    use display::{tok, toks};
+    // WIP
     match *class_def {
         ClassDef::Format1 {
             start_glyph_id,
@@ -6613,54 +6879,59 @@ fn show_class_def<S: std::fmt::Display>(
                 1 => println!("\t    (skipping uncovered glyph 0)"),
                 n => println!("\t    (skipping uncovered glyphs 0..{n})"),
             }
-            show_items_elided(
+            arrayfmt::display_items_elided(
                 class_value_array,
                 |ix, item| {
                     let gix = start_glyph_id as usize + ix;
-                    println!("\t\tGlyph [{gix}]: {}", show_fn(item));
+                    tok(format!("\t\tGlyph [{gix}]: ")).then(toks(show_fn(item)))
                 },
                 conf.bookend_size,
                 |start, stop| {
-                    format!(
+                    toks(format!(
                         "\t    (skipping glyphs {}..{})",
                         format_glyphid_hex(start_glyph_id + start as u16, false),
                         format_glyphid_hex(start_glyph_id + stop as u16, false),
-                    )
+                    ))
                 },
             )
+            .println() // WIP
         }
         ClassDef::Format2 {
             ref class_range_records,
-        } => show_items_elided(
+        } => arrayfmt::display_items_elided(
             class_range_records,
             |_ix, class_range| {
-                println!(
-                    "\t\t({} -> {}): {}",
-                    class_range.start_glyph_id,
-                    class_range.end_glyph_id,
-                    show_fn(&class_range.value)
-                );
+                tok(format!(
+                    "\t\t({} -> {}): ",
+                    class_range.start_glyph_id, class_range.end_glyph_id,
+                ))
+                .then(toks(show_fn(&class_range.value)))
             },
             conf.bookend_size,
             |start, stop| {
                 let low_end = class_range_records[start].start_glyph_id;
                 let high_end = class_range_records[stop - 1].end_glyph_id;
-                format!("\t    (skipping ranges covering glyphs {low_end}..={high_end})",)
+                toks(format!(
+                    "\t    (skipping ranges covering glyphs {low_end}..={high_end})",
+                ))
             },
-        ),
+        )
+        .println(), // WIP
     }
 }
 
-fn format_coverage_range_record(coverage_range: &CoverageRangeRecord) -> String {
+fn display_coverage_range_record(
+    coverage_range: &CoverageRangeRecord,
+) -> display::TokenStream<'static> {
     let span = coverage_range.end_glyph_id - coverage_range.start_glyph_id;
     let end_coverage_index = coverage_range.value + span;
-    format!(
+    display::toks(format!(
         "({} -> {}): {}(->{})",
         coverage_range.start_glyph_id,
         coverage_range.end_glyph_id,
         coverage_range.value,
         end_coverage_index
-    )
+    ))
 }
 
 fn show_gasp_metrics(gasp: &Option<GaspMetrics>, conf: &Config) {
@@ -6670,7 +6941,9 @@ fn show_gasp_metrics(gasp: &Option<GaspMetrics>, conf: &Config) {
         ranges,
     }) = gasp
     {
-        let show_gasp_range = |_ix: usize, range: &GaspRange| {
+        fn display_gasp_range(_ix: usize, range: &GaspRange) -> display::TokenStream<'static> {
+            use display::{tok, toks};
+
             let GaspBehaviorFlags {
                 symmetric_smoothing: syms,
                 symmetric_gridfit: symgrift,
@@ -6698,50 +6971,47 @@ fn show_gasp_metrics(gasp: &Option<GaspMetrics>, conf: &Config) {
                     }
                 }
                 if buffer.is_empty() {
-                    Label::Borrowed("(no flags)")
+                    toks("(no flags)")
                 } else {
-                    Label::Owned(format!("({buffer})"))
+                    toks(format!("({buffer})"))
                 }
             };
             if _ix == 0 && range.range_max_ppem == 0xFFFF {
-                println!("\t[∀ PPEM] {disp}");
+                tok("\t[∀ PPEM] ").then(disp)
             } else {
-                println!("\t[PPEM <= {}]  {disp}", range.range_max_ppem)
+                tok(format!("\t[PPEM <= {}]  ", range.range_max_ppem)).then(disp)
             }
-        };
+        }
         println!("gasp: version {version}, {num_ranges} ranges");
         if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
-            show_items_elided(ranges, show_gasp_range, conf.bookend_size, |start, stop| {
-                format!(
-                    "    skipping gasp ranges for max_ppem values {}..={}",
-                    ranges[start].range_max_ppem,
-                    ranges[stop - 1].range_max_ppem
-                )
-            });
+            arrayfmt::display_items_elided(
+                ranges,
+                display_gasp_range,
+                conf.bookend_size,
+                |start, stop| {
+                    display::toks(format!(
+                        "    skipping gasp ranges for max_ppem values {}..={}",
+                        ranges[start].range_max_ppem,
+                        ranges[stop - 1].range_max_ppem
+                    ))
+                },
+            )
+            .println(); // WIP
         }
     }
 }
 
-// REVIEW - this construction suggests we may really want a Write-generic or Fragment-like output model to avoid duplication between I/O show and String formatting functions
-fn show_items_inline<T>(
-    items: &[T],
-    show_fn: impl FnMut(&T) -> String,
-    bookend: usize,
-    ellipsis: impl Fn(usize) -> String,
-) {
-    let oput = format_items_inline(items, show_fn, bookend, ellipsis);
-    println!("{oput}");
-}
-
-fn format_coverage_linked_array<T>(
+// TODO - move into arrayfmt module
+fn display_coverage_linked_array<T>(
     items: &[T],
     coverage: impl Iterator<Item = u16>,
-    mut fmt_fn: impl FnMut(u16, &T) -> String,
+    mut fmt_fn: impl FnMut(u16, &T) -> display::TokenStream<'static>,
     bookend: usize,
-    ellipsis: impl FnOnce(usize) -> String,
-) -> String {
+    ellipsis: impl FnOnce(usize) -> display::TokenStream<'static>,
+) -> display::TokenStream<'static> {
+    use display::{tok, toks};
     let count = items.len();
-    let mut buffer = Vec::<String>::with_capacity(Ord::min(count, bookend * 2 + 1));
+    let mut buffer = Vec::with_capacity(Ord::min(count, bookend * 2 + 1));
 
     let mut ix_iter = EnumLen::new(coverage, count);
 
@@ -6767,85 +7037,43 @@ fn format_coverage_linked_array<T>(
         Ok(_) => {}
         Err(e) => panic!("format_coverage_linked_array found error: {e}"),
     }
-    format!("[{}]", buffer.join(", "))
-}
-
-fn format_items_inline<T>(
-    items: &[T],
-    mut fmt_fn: impl FnMut(&T) -> String,
-    bookend: usize,
-    ellipsis: impl Fn(usize) -> String,
-) -> String {
-    // Allocate a buffer big enough to hold one string per item in the array, or enough items to show both bookends and one ellipsis-string
-    let mut buffer = Vec::<String>::with_capacity(Ord::min(items.len(), bookend * 2 + 1));
-
-    let count = items.len();
-    if count > bookend * 2 {
-        for item in &items[..bookend] {
-            buffer.push(fmt_fn(item));
-        }
-
-        buffer.push(ellipsis(count - bookend * 2));
-
-        for item in &items[count - bookend..] {
-            buffer.push(fmt_fn(item));
-        }
-    } else {
-        buffer.extend(items.iter().map(fmt_fn));
-    }
-    format!("[{}]", buffer.join(", "))
+    tok("[")
+        .then(display::TokenStream::join_with(buffer, tok(", ")))
+        .chain(toks("]"))
 }
 
 // Enumerates the contents of a Wec<T>, showing only the first and last `bookend` rows if the Wec is tall enough.
 ///
 /// Each row is shown with `show_fn`, and the `elision_message` is printed (along with the range of indices skipped)
 /// if the slice length exceeds than 2 * `bookend`, in between the initial and terminal span of `bookend` items.
-fn show_wec_rows_elided<T>(
+// TODO - move into arrayfmt module
+fn display_wec_rows_elided<T>(
     matrix: &Wec<T>,
-    show_fn: impl Fn(usize, &[T]),
+    show_fn: impl Fn(usize, &[T]) -> display::TokenStream<'static>,
     bookend: usize,
-    fn_message: impl Fn(usize, usize) -> String,
-) {
+    fn_message: impl Fn(usize, usize) -> display::TokenStream<'static>,
+) -> display::TokenStream<'static> {
     let count = matrix.rows();
+    let mut lines = Vec::with_capacity(Ord::min(count, bookend * 2 + 1));
+
     if count > bookend * 2 {
         for ix in 0..bookend {
-            show_fn(ix, &matrix[ix]);
+            lines.push(show_fn(ix, &matrix[ix]));
         }
-        println!("{}", fn_message(bookend, count - bookend));
+        lines.push(fn_message(bookend, count - bookend));
         for ix in (count - bookend)..count {
-            show_fn(ix, &matrix[ix]);
+            lines.push(show_fn(ix, &matrix[ix]));
         }
     } else {
-        for (ix, row) in matrix.iter_rows().enumerate() {
-            show_fn(ix, row);
-        }
+        let mut lines = Vec::with_capacity(count);
+        lines.extend(
+            matrix
+                .iter_rows()
+                .enumerate()
+                .map(|(ix, row)| show_fn(ix, row)),
+        );
     }
-}
-
-/// Enumerates the contents of a slice, showing only the first and last `bookend` items if the slice is long enough.
-///
-/// Each item is shown with `show_fn`, and the `elision_message` is printed (along with the range of indices skipped)
-/// if the slice length exceeds than 2 * `bookend`, in between the initial and terminal span of `bookend` items.
-fn show_items_elided<T>(
-    items: &[T],
-    show_fn: impl Fn(usize, &T),
-    bookend: usize,
-    fn_message: impl Fn(usize, usize) -> String,
-) {
-    let count = items.len();
-    if count > bookend * 2 {
-        for (ix, item) in items.iter().enumerate().take(bookend) {
-            show_fn(ix, item);
-        }
-        println!("{}", fn_message(bookend, count - bookend));
-        for (ix, item) in items.iter().enumerate().skip(count - bookend) {
-            show_fn(ix, item);
-        }
-    } else {
-        for (ix, item) in items.iter().enumerate() {
-            show_fn(ix, item);
-        }
-    }
+    display::TokenStream::join_with(lines, display::Token::LineBreak)
 }
 
 fn format_version16dot16(v: u32) -> String {
@@ -6859,27 +7087,31 @@ fn format_version_major_minor(major: u16, minor: u16) -> String {
 }
 
 fn show_cmap_metrics(cmap: &Cmap, conf: &Config) {
-    print!("cmap: version {}", cmap.version);
-    if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
-        println!();
-        let show_record = |ix: usize, record: &EncodingRecord| {
-            // TODO[enrichment]: if we implement subtables and more verbosity levels, show subtable details
-            let EncodingRecord {
-                platform,
-                encoding,
-                subtable: _subtable,
-            } = record;
-            println!("\t[{ix}]: platform={platform}, encoding={encoding}");
-        };
-        show_items_elided(
-            &cmap.encoding_records,
-            show_record,
-            conf.bookend_size,
-            |start, stop| format!("\t(skipping encoding records {start}..{stop})"),
-        )
-    } else {
-        println!(", {} encoding tables", cmap.encoding_records.len());
-    }
+    use display::{Token::LineBreak, tok, toks};
+
+    tok(format!("cmap: version {}", cmap.version))
+        .then(if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
+            let show_record = |ix: usize, record: &EncodingRecord| {
+                // TODO[enrichment]: if we implement subtables and more verbosity levels, show subtable details
+                let EncodingRecord {
+                    platform,
+                    encoding,
+                    subtable: _subtable,
+                } = record;
+                toks(format!(
+                    "\t[{ix}]: platform={platform}, encoding={encoding}"
+                ))
+            };
+            LineBreak.then(arrayfmt::display_items_elided(
+                &cmap.encoding_records,
+                show_record,
+                conf.bookend_size,
+                |start, stop| toks(format!("\t(skipping encoding records {start}..{stop})")),
+            ))
+        } else {
+            toks(format!(", {} encoding tables", cmap.encoding_records.len()))
+        })
+        .println() // WIP
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -6949,41 +7181,65 @@ fn show_vhea_metrics(vhea: &Option<VheaMetrics>, _conf: &Config) {
 }
 
 fn show_hmtx_metrics(hmtx: &HmtxMetrics, conf: &Config) {
-    let show_unified = |ix: usize, hmet: &UnifiedBearing| match &hmet.advance_width {
-        Some(width) => println!(
-            "\tGlyph ID [{ix}]: advanceWidth={width}, lsb={}",
-            hmet.left_side_bearing
-        ),
-        None => println!("\tGlyph ID [{ix}]: lsb={}", hmet.left_side_bearing),
-    };
+    fn display_unified(ix: usize, hmet: &UnifiedBearing) -> display::TokenStream<'static> {
+        use display::toks;
+        match &hmet.advance_width {
+            Some(width) => toks(format!(
+                "\tGlyph ID [{ix}]: advanceWidth={width}, lsb={}",
+                hmet.left_side_bearing
+            )),
+            None => toks(format!("\tGlyph ID [{ix}]: lsb={}", hmet.left_side_bearing)),
+        }
+    }
+    use display::{Token::LineBreak, tok, toks};
     if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
-        println!("hmtx");
-        show_items_elided(&hmtx.0, show_unified, conf.bookend_size, |start, stop| {
-            format!("    (skipping hmetrics {start}..{stop})")
-        });
+        tok("hmtx")
+            .then(LineBreak.then(arrayfmt::display_items_elided(
+                &hmtx.0,
+                display_unified,
+                conf.bookend_size,
+                |start, stop| toks(format!("{HT}(skipping hmetrics {start}..{stop})")),
+            )))
+            .println()
     } else {
         println!("hmtx: {} hmetrics", hmtx.0.len())
     }
 }
 
 fn show_vmtx_metrics(vmtx: &Option<VmtxMetrics>, conf: &Config) {
-    let show_unified = |ix: usize, vmet: &UnifiedBearing| match &vmet.advance_width {
-        // FIXME - `_width` is a misnomer, should be `_height`
-        Some(height) => println!(
-            "\tGlyph ID [{ix}]: advanceHeight={height}, tsb={}",
-            vmet.left_side_bearing // FIXME - `left` is a misnomer, should be `top`
-        ),
-        None => println!("\tGlyph ID [{ix}]: tsb={}", vmet.left_side_bearing), // FIXME - `left` is a misnomer, should be `top`
-    };
-    if let Some(vmtx) = vmtx {
-        if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
-            println!("vmtx");
-            show_items_elided(&vmtx.0, show_unified, conf.bookend_size, |start, stop| {
-                format!("    (skipping vmetrics {start}..{stop})")
-            });
-        } else {
-            println!("vmtx: {} vmetrics", vmtx.0.len())
+    fn display_unified(ix: usize, vmet: &UnifiedBearing) -> display::TokenStream<'static> {
+        use display::{tok, toks};
+        const INDENT_LEVEL: u8 = 2;
+
+        match &vmet.advance_width {
+            // FIXME - `_width` is a misnomer, should be `_height`
+            Some(height) => toks(format!(
+                "Glyph ID [{ix}]: advanceHeight={height}, tsb={}",
+                vmet.left_side_bearing // FIXME - `left` is a misnomer, should be `top`
+            ))
+            .pre_indent(INDENT_LEVEL),
+            None => toks(format!("Glyph ID [{ix}]: tsb={}", vmet.left_side_bearing))
+                .pre_indent(INDENT_LEVEL), // FIXME - `left` is a misnomer, should be `top`
         }
+    }
+    use display::{Token::LineBreak, tok, toks};
+
+    // FIXME - add mechanism for auto-computation of current indent level
+    const INDENT_LEVEL: u8 = 1;
+    if let Some(vmtx) = vmtx {
+        let disp = if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
+            tok("vmtx").then(LineBreak.then(arrayfmt::display_items_elided(
+                &vmtx.0,
+                display_unified,
+                conf.bookend_size,
+                |start, stop| {
+                    toks(format!("(skipping vmetrics {start}..{stop})")).pre_indent(INDENT_LEVEL)
+                },
+            )))
+        } else {
+            toks(format!("vmtx: {} vmetrics", vmtx.0.len()))
+        };
+        disp.println()
     }
 }
 
@@ -7067,38 +7323,45 @@ const fn as_s16(v: u16) -> i16 {
 }
 
 fn show_glyf_metrics(glyf: &Option<GlyfMetrics>, conf: &Config) {
-    if let Some(glyf) = glyf.as_ref() {
-        println!("glyf: {} glyphs", glyf.num_glyphs);
+    fn display_glyph_metric(ix: usize, glyf: &GlyphMetric) -> display::TokenStream<'static> {
+        use display::{tok, toks};
+        const INDENT_LEVEL: u8 = 2;
+
+        tok(format!("[{ix}]: "))
+            .then(match glyf {
+                GlyphMetric::Empty => toks("<empty>"),
+                GlyphMetric::Simple(simple) => toks(format!(
+                    "Simple Glyph [{} contours, {} coordinates, {} instructions, xy: {}]",
+                    simple.contours, simple.coordinates, simple.instructions, simple.bounding_box
+                )),
+                GlyphMetric::Composite(composite) => toks(format!(
+                    "Composite Glyph [{} components, {} instructions, xy: {}]",
+                    composite.components, composite.instructions, composite.bounding_box,
+                )),
+            })
+            .pre_indent(INDENT_LEVEL)
+    }
+
+    use display::{Token::LineBreak, tok, toks};
+    const INDENT_LEVEL: u8 = 1;
+    let disp = if let Some(glyf) = glyf.as_ref() {
+        let hdr = tok(format!("glyf: {} glyphs", glyf.num_glyphs));
         if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
-            show_items_elided(
+            hdr.then(LineBreak.then(arrayfmt::display_items_elided(
                 glyf.glyphs.as_slice(),
-                show_glyph_metric,
+                display_glyph_metric,
                 conf.bookend_size,
-                |start, stop| format!("    (skipping glyphs {start}..{stop})"),
-            )
+                |start, stop| {
+                    toks(format!("(skipping glyphs {start}..{stop})")).pre_indent(INDENT_LEVEL)
+                },
+            )))
+        } else {
+            hdr.into()
         }
     } else {
-        println!("glyf: <not present>")
-    }
-}
-
-fn show_glyph_metric(ix: usize, glyf: &GlyphMetric) {
-    print!("\t[{ix}]: ");
-    match glyf {
-        GlyphMetric::Empty => println!("<empty>"),
-        GlyphMetric::Simple(simple) => {
-            println!(
-                "Simple Glyph [{} contours, {} coordinates, {} instructions, xy: {}]",
-                simple.contours, simple.coordinates, simple.instructions, simple.bounding_box
-            );
-        }
-        GlyphMetric::Composite(composite) => {
-            println!(
-                "Composite Glyph [{} components, {} instructions, xy: {}]",
-                composite.components, composite.instructions, composite.bounding_box,
-            );
-        }
-    }
+        toks("glyf: <not present>")
+    };
+    disp.println()
 }
 
 pub mod lookup_subtable {
@@ -7322,5 +7585,385 @@ pub mod lookup_subtable {
                 }
             }
         }
+    }
+}
+
+mod display {
+
+    pub fn tok(str: impl Into<doodle::Label>) -> Token {
+        Token::InlineText(str.into())
+    }
+
+    pub fn toks(str: impl Into<doodle::Label>) -> TokenStream<'static> {
+        TokenStream::from(Token::InlineText(str.into()))
+    }
+
+    #[derive(Clone)]
+    pub enum Token {
+        InlineText(doodle::Label),
+        LineBreak,
+    }
+
+    impl std::fmt::Display for Token {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                Token::InlineText(s) => write!(f, "{s}"),
+                Token::LineBreak => write!(f, "\n"),
+            }
+        }
+    }
+
+    impl Token {
+        pub fn then(self, stream: TokenStream<'_>) -> TokenStream<'_> {
+            <Token as Into<TokenStream<'static>>>::into(self).chain(stream)
+        }
+    }
+
+    impl From<String> for Token {
+        fn from(s: String) -> Self {
+            Token::InlineText(s.into())
+        }
+    }
+
+    impl From<Token> for TokenStream<'static> {
+        fn from(value: Token) -> Self {
+            TokenStream {
+                inner: Box::new(std::iter::once(value)),
+            }
+        }
+    }
+
+    #[must_use]
+    pub struct TokenStream<'a> {
+        inner: Box<dyn Iterator<Item = Token> + 'a>,
+    }
+
+    impl<'a> TokenStream<'a> {
+        // FIXME - join_with will double-separate if empty is encountered
+        pub fn empty() -> TokenStream<'static> {
+            TokenStream {
+                inner: Box::new(std::iter::empty()),
+            }
+        }
+
+        pub fn from_stream(stream: impl Iterator<Item = Token> + 'a) -> Self {
+            TokenStream {
+                inner: Box::new(stream),
+            }
+        }
+
+        pub fn write_to<W: std::io::Write>(self, mut w: W) -> std::io::Result<()> {
+            for token in self.inner {
+                write!(w, "{token}")?
+            }
+            Ok(())
+        }
+
+        pub fn print(self) {
+            let oput = std::io::stdout().lock();
+            let mut buf = std::io::BufWriter::new(oput);
+            self.write_to(&mut buf).unwrap();
+        }
+
+        pub fn println(self) {
+            self.chain(TokenStream::from(Token::LineBreak)).print()
+        }
+
+        pub fn into_string(self) -> String {
+            let mut buf = String::new();
+            for token in self.inner {
+                buf.push_str(&token.to_string());
+            }
+            buf
+        }
+
+        pub fn group_lines(self) -> TokenStream<'static> {
+            let mut lines = Vec::new();
+            let mut line = String::new();
+            for token in self.inner {
+                match token {
+                    Token::InlineText(s) => line.push_str(&s),
+                    Token::LineBreak => {
+                        lines.push(Token::InlineText(std::borrow::Cow::Owned(line.clone())));
+                        line.clear();
+                    }
+                }
+            }
+            TokenStream {
+                inner: Box::new(lines.into_iter()),
+            }
+        }
+
+        pub fn chain(self, other: Self) -> Self {
+            TokenStream {
+                inner: Box::new(self.inner.chain(other.inner)),
+            }
+        }
+
+        pub fn glue(self, glue: Token, other: Self) -> Self {
+            Self {
+                inner: Box::new(self.inner.chain(std::iter::once(glue).chain(other.inner))),
+            }
+        }
+
+        pub fn surround(self, before: Token, after: Token) -> Self {
+            Self {
+                inner: Box::new(
+                    std::iter::once(before)
+                        .chain(self.inner)
+                        .chain(std::iter::once(after)),
+                ),
+            }
+        }
+
+        pub fn paren(self) -> Self {
+            self.surround(tok("("), tok(")"))
+        }
+
+        pub fn bracket(self) -> Self {
+            self.surround(tok("["), tok("]"))
+        }
+
+        pub fn break_line(self) -> TokenStream<'a> {
+            TokenStream {
+                inner: Box::new(self.inner.chain(std::iter::once(Token::LineBreak))),
+            }
+        }
+
+        /// Prepends a number of indents equal to `stops` as measured in 4-space half-tabs.
+        pub fn pre_indent(self, stops: u8) -> Self {
+            let tabs = stops / 2;
+            let hts = stops % 2;
+
+            let mut indent = String::new();
+            for _ in 0..tabs {
+                indent.push('\t');
+            }
+            for _ in 0..hts {
+                indent.push_str(super::HT);
+            }
+            tok(indent).then(self)
+        }
+
+        pub fn join_with(streams: Vec<TokenStream<'static>>, sep: Token) -> TokenStream<'a> {
+            TokenStream {
+                inner: Box::new(IntersperseIter::new(
+                    Box::new(streams.into_iter().map(|s| s.inner)),
+                    sep,
+                )),
+            }
+        }
+    }
+
+    pub struct IntersperseIter<'a, T: Clone> {
+        items: Box<dyn Iterator<Item = Box<dyn Iterator<Item = T> + 'a>>>,
+        rest: Box<dyn Iterator<Item = T> + 'a>,
+        sep: T,
+        non_empty: bool,
+    }
+
+    impl<'a, T: 'static + Clone> IntersperseIter<'a, T> {
+        pub fn new(
+            items: Box<dyn Iterator<Item = Box<dyn Iterator<Item = T> + 'a>>>,
+            sep: T,
+        ) -> Self {
+            Self {
+                items,
+                rest: Box::new(std::iter::empty()),
+                sep,
+                non_empty: false,
+            }
+        }
+    }
+
+    impl<'a, T: Clone> std::iter::Iterator for IntersperseIter<'a, T> {
+        type Item = T;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            match self.rest.next() {
+                None => match self.items.next() {
+                    None => None,
+                    Some(iter) => {
+                        self.rest = iter;
+                        if self.non_empty {
+                            self.non_empty = false;
+                            Some(self.sep.clone())
+                        } else {
+                            self.next()
+                        }
+                    }
+                },
+                Some(item) => {
+                    self.non_empty = true;
+                    Some(item)
+                }
+            }
+        }
+    }
+}
+
+// TODO - rewrite the functions to either be Write-generic or used Fragment-like output model to avoid duplication between I/O show and String formatting functions
+mod arrayfmt {
+    use super::display::{Token, TokenStream};
+    use crate::api_helper::util::trisect_unchecked;
+
+    /// Generic helper for displaying an array of possibly-None elements, skipping over
+    /// all None-values and only showing up to the first, and last `N` elements, where
+    /// `N` is determined by `bookend` (shows all elements if the lenght is less than or equal to `2 * bookend`).
+    ///
+    /// The `show_fn` function is used to display individual elements, and takes both the index and the value of the element in question.
+    ///
+    /// The `ellipsis` function is used to signal information about the skipped middle-elements (if any), and takes two arguments:
+    /// the number of elements that were skipped over (after filtering out None-values), and a tuple `(start, stop)` where `start` is the first
+    /// element-index skipped and `stop` is the element-index where display resumes.
+    pub(crate) fn display_nullable<T>(
+        opt_items: &[Option<T>],
+        mut show_fn: impl FnMut(usize, &T) -> TokenStream<'static>,
+        bookend: usize,
+        ellipsis: impl Fn(usize, (usize, usize)) -> TokenStream<'static>,
+    ) -> TokenStream<'static> {
+        let items: Vec<(usize, &T)> = opt_items
+            .iter()
+            .enumerate()
+            .filter_map(|(ix, opt)| opt.as_ref().map(|v| (ix, v)))
+            .collect();
+        let mut buffer =
+            Vec::<TokenStream<'static>>::with_capacity(Ord::min(items.len(), bookend * 2 + 1));
+
+        let count = items.len();
+
+        if count > bookend * 2 {
+            let (left_bookend, middle, right_bookend) =
+                unsafe { trisect_unchecked(&items, bookend, bookend) };
+
+            for (ix, it) in left_bookend {
+                buffer.push(show_fn(*ix, it));
+            }
+
+            let n_skipped = count - bookend * 2;
+            assert_eq!(middle.len(), n_skipped);
+            buffer.push(ellipsis(n_skipped, (middle[0].0, middle[n_skipped - 1].0)));
+
+            for (ix, it) in right_bookend {
+                buffer.push(show_fn(*ix, it));
+            }
+        } else {
+            for (ix, it) in items.into_iter() {
+                buffer.push(show_fn(ix, it));
+            }
+        }
+        TokenStream::join_with(buffer, Token::LineBreak)
+    }
+
+    /// Generic helper for displaying an array of possibly-None elements, skipping over
+    /// all None-values and only showing up to the first, and last `N` elements, where
+    /// `N` is determined by `bookend` (shows all elements if the lenght is less than or equal to `2 * bookend`).
+    ///
+    /// The `show_fn` function is used to display individual elements, and takes both the index and the value of the element in question.
+    ///
+    /// The `ellipsis` function is used to signal information about the skipped middle-elements (if any), and takes two arguments:
+    /// the number of elements that were skipped over (after filtering out None-values), and a tuple `(start, stop)` where `start` is the first
+    /// element-index skipped and `stop` is the element-index where display resumes.
+    pub(crate) fn display_inline_nullable<T>(
+        opt_items: &[Option<T>],
+        mut show_fn: impl FnMut(usize, &T) -> TokenStream<'static>,
+        bookend: usize,
+        ellipsis: impl Fn(usize, (usize, usize)) -> TokenStream<'static>,
+    ) -> TokenStream<'static> {
+        let items: Vec<(usize, &T)> = opt_items
+            .iter()
+            .enumerate()
+            .filter_map(|(ix, opt)| opt.as_ref().map(|v| (ix, v)))
+            .collect();
+        let mut buffer =
+            Vec::<TokenStream<'static>>::with_capacity(Ord::min(items.len(), bookend * 2 + 1));
+
+        let count = items.len();
+
+        if count > bookend * 2 {
+            let (left_bookend, middle, right_bookend) =
+                unsafe { trisect_unchecked(&items, bookend, bookend) };
+
+            for (ix, it) in left_bookend {
+                buffer.push(show_fn(*ix, it));
+            }
+
+            let n_skipped = count - bookend * 2;
+            assert_eq!(middle.len(), n_skipped);
+            buffer.push(ellipsis(n_skipped, (middle[0].0, middle[n_skipped - 1].0)));
+
+            for (ix, it) in right_bookend {
+                buffer.push(show_fn(*ix, it));
+            }
+        } else {
+            for (ix, it) in items.into_iter() {
+                buffer.push(show_fn(ix, it));
+            }
+        }
+        TokenStream::join_with(buffer, Token::InlineText(", ".into())).bracket()
+    }
+
+    /// Generic helper for displaying an array of elements, showing at most `bookend` elements at the start and end of the array and a single ellipsis if the array is longer than `2 * bookend`.
+    ///
+    /// Each element that is to be displayed is formatted using the provided closure `fmt_fn`.
+    ///
+    /// All elements will be written on the same line, and so the `fmt_fn` closure should not include any line-breaks.
+    ///
+    /// The `ellipsis` function is used to signal information about the skipped middle-elements (if any), and takes the number of elements that were skipped over.
+    pub(crate) fn display_items_inline<T>(
+        items: &[T],
+        mut fmt_fn: impl FnMut(&T) -> TokenStream<'static>,
+        bookend: usize,
+        ellipsis: impl Fn(usize) -> TokenStream<'static>,
+    ) -> TokenStream<'static> {
+        // Allocate a buffer big enough to hold one string per item in the array, or enough items to show both bookends and one ellipsis-string
+        let mut buffer =
+            Vec::<TokenStream<'static>>::with_capacity(Ord::min(items.len(), bookend * 2 + 1));
+
+        let count = items.len();
+        if count > bookend * 2 {
+            for item in &items[..bookend] {
+                buffer.push(fmt_fn(item));
+            }
+
+            buffer.push(ellipsis(count - bookend * 2));
+
+            for item in &items[count - bookend..] {
+                buffer.push(fmt_fn(item));
+            }
+        } else {
+            buffer.extend(items.iter().map(fmt_fn));
+        }
+        TokenStream::join_with(buffer, Token::InlineText(", ".into())).bracket()
+    }
+
+    /// Enumerates the contents of a slice, showing only the first and last `bookend` items if the slice is long enough.
+    ///
+    /// Each item is shown with `show_fn`, and `fn_message` is used to signal the range of indices skipped.
+    /// If the slice length is less than or equal to `2 * bookend`, all elements are displayed and `ellipsis` is not called.
+    pub(crate) fn display_items_elided<T>(
+        items: &[T],
+        show_fn: impl Fn(usize, &T) -> TokenStream<'static>,
+        bookend: usize,
+        ellipsis: impl Fn(usize, usize) -> TokenStream<'static>,
+    ) -> TokenStream<'static> {
+        let mut buffer =
+            Vec::<TokenStream<'static>>::with_capacity(Ord::min(items.len(), bookend * 2 + 1));
+
+        let count = items.len();
+        if count > bookend * 2 {
+            for (ix, item) in items.iter().enumerate().take(bookend) {
+                buffer.push(show_fn(ix, item));
+            }
+
+            buffer.push(ellipsis(bookend, count - bookend));
+
+            for (ix, item) in items.iter().enumerate().skip(count - bookend) {
+                buffer.push(show_fn(ix, item));
+            }
+        } else {
+            buffer.extend(items.iter().enumerate().map(|(ix, item)| show_fn(ix, item)));
+        }
+        TokenStream::join_with(buffer, Token::LineBreak)
     }
 }
