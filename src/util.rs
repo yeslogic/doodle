@@ -46,6 +46,7 @@ impl<T: IsNull> IxHeap<T> {
     }
 
     /// Returns the logical length of an `IxHeap`, which includes empty entries.
+    #[expect(dead_code)]
     pub const fn len(&self) -> usize {
         self._len
     }
@@ -72,19 +73,14 @@ impl<T: IsNull> IxHeap<T> {
 }
 
 impl<T> IxHeap<Vec<T>> {
-    /// Retrieves the element at index `ix`, or an empty slice if it does not exist.
+    /// Retrieves the element at index `ix`, or a null-value (i.e. empty slice) if the logical element at that index is null.
     ///
-    /// # Notes
+    /// # Panics
     ///
-    /// Does not necessarily check whether `ix` is in-bounds, and therefore should not be relied upon
-    /// as an indicator of validity.
+    /// Will panic if the specified index is out of bounds.
     pub fn get(&self, ix: usize) -> &[T] {
-        debug_assert!(ix < self._len);
-        if self._store.contains_key(&ix) {
-            &self._store[&ix]
-        } else {
-            &[]
-        }
+        assert!(ix < self._len, "index out of bounds");
+        self._store.get(&ix).map(Vec::as_slice).unwrap_or(&[])
     }
 }
 
