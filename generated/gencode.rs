@@ -3192,58 +3192,17 @@ mark_array_offset: opentype_layout_mark_mark_pos_mark1_array_offset,
 base_array_offset: opentype_layout_mark_base_pos_base_array_offset
 }
 
-/// expected size: 24
-/// trait-orphaned: no decoder functions provided
-#[derive(Debug, Clone)]
-pub struct opentype_layout_mark_lig_pos_ligature_array_offset_link_ligature_attach_offsets_link_component_records {
-ligature_anchor_offsets: Vec<opentype_layout_mark_array_mark_records_mark_anchor_offset>
-}
-
-/// expected size: 32
-/// trait-orphaned: no decoder functions provided
-#[derive(Debug, Clone)]
-pub struct opentype_layout_mark_lig_pos_ligature_array_offset_link_ligature_attach_offsets_link {
-table_start: u32,
-component_count: u16,
-component_records: Vec<opentype_layout_mark_lig_pos_ligature_array_offset_link_ligature_attach_offsets_link_component_records>
-}
-
 /// expected size: 40
-/// trait-orphaned: no decoder functions provided
-#[derive(Debug, Clone)]
-pub struct opentype_layout_mark_lig_pos_ligature_array_offset_link_ligature_attach_offsets {
-offset: u16,
-link: Option<opentype_layout_mark_lig_pos_ligature_array_offset_link_ligature_attach_offsets_link>
-}
-
-/// expected size: 32
-/// trait-orphaned: no decoder functions provided
-#[derive(Debug, Clone)]
-pub struct opentype_layout_mark_lig_pos_ligature_array_offset_link {
-table_start: u32,
-ligature_count: u16,
-ligature_attach_offsets: Vec<opentype_layout_mark_lig_pos_ligature_array_offset_link_ligature_attach_offsets>
-}
-
-/// expected size: 40
-/// trait-orphaned: no decoder functions provided
-#[derive(Debug, Clone)]
-pub struct opentype_layout_mark_lig_pos_ligature_array_offset {
-offset: u16,
-link: Option<opentype_layout_mark_lig_pos_ligature_array_offset_link>
-}
-
-/// expected size: 200
 /// trait-ready: unique decoder function (d#95)
-#[derive(Debug, Clone)]
-pub struct opentype_layout_mark_lig_pos {
-table_start: u32,
+#[derive(Debug, Copy, Clone)]
+pub struct opentype_layout_mark_lig_pos<'input> {
+table_scope: View<'input>,
 format: u16,
-mark_coverage_offset: opentype_layout_reverse_chain_single_subst_coverage,
-ligature_coverage_offset: opentype_layout_reverse_chain_single_subst_coverage,
+mark_coverage_offset: u16,
+ligature_coverage_offset: u16,
 mark_class_count: u16,
-mark_array_offset: opentype_layout_mark_mark_pos_mark1_array_offset,
-ligature_array_offset: opentype_layout_mark_lig_pos_ligature_array_offset
+mark_array_offset: u16,
+ligature_array_offset: u16
 }
 
 /// expected size: 24
@@ -3505,81 +3464,81 @@ subtable: opentype_layout_single_pos_subtable
 }
 
 /// expected size: 296
-/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InEnum { variants: [InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap, Noop] })] })] }, Noop, Noop, Noop, Noop, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [DirectHeap, Noop] })] })] }] }, Layout { size: 200, align: 8 (1 << 3) })
+/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InEnum { variants: [InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap, Noop] })] })] }, Noop, DirectHeap, Noop, DirectHeap, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [DirectHeap, Noop] })] })] }] }, Layout { size: 160, align: 8 (1 << 3) })
 /// trait-ready: unique decoder function (d#90)
 #[derive(Debug, Clone)]
-pub enum opentype_layout_ground_pos { ChainedSequenceContext(opentype_common_chained_sequence_context), CursivePos(opentype_layout_cursive_pos), MarkBasePos(opentype_layout_mark_base_pos), MarkLigPos(opentype_layout_mark_lig_pos), MarkMarkPos(opentype_layout_mark_mark_pos), PairPos(opentype_layout_pair_pos), SequenceContext(opentype_common_sequence_context), SinglePos(opentype_layout_single_pos) }
+pub enum opentype_layout_ground_pos<'input> { ChainedSequenceContext(opentype_common_chained_sequence_context), CursivePos(opentype_layout_cursive_pos), MarkBasePos(opentype_layout_mark_base_pos), MarkLigPos(opentype_layout_mark_lig_pos<'input>), MarkMarkPos(opentype_layout_mark_mark_pos), PairPos(opentype_layout_pair_pos), SequenceContext(opentype_common_sequence_context), SinglePos(opentype_layout_single_pos) }
 
 /// expected size: 304
-/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [Noop, InOption(InDef(InEnum { variants: [InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap, Noop] })] })] }, Noop, Noop, Noop, Noop, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [DirectHeap, Noop] })] })] }] }))] }, Layout { size: 24, align: 8 (1 << 3) })
+/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [Noop, InOption(InDef(InEnum { variants: [InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap, Noop] })] })] }, Noop, DirectHeap, Noop, DirectHeap, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [DirectHeap, Noop] })] })] }] }))] }, Layout { size: 24, align: 8 (1 << 3) })
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_layout_pos_extension_extension_offset {
+pub struct opentype_layout_pos_extension_extension_offset<'input> {
 offset: u32,
-link: Option<opentype_layout_ground_pos>
+link: Option<opentype_layout_ground_pos<'input>>
 }
 
 /// expected size: 312
-/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [Noop, Noop, Noop, InDef(InRecord { fields: [Noop, InOption(InDef(InEnum { variants: [InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap, Noop] })] })] }, Noop, Noop, Noop, Noop, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [DirectHeap, Noop] })] })] }] }))] })] }, Layout { size: 32, align: 8 (1 << 3) })
+/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [Noop, Noop, Noop, InDef(InRecord { fields: [Noop, InOption(InDef(InEnum { variants: [InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap, Noop] })] })] }, Noop, DirectHeap, Noop, DirectHeap, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [DirectHeap, Noop] })] })] }] }))] })] }, Layout { size: 32, align: 8 (1 << 3) })
 /// trait-ready: unique decoder function (d#89)
 #[derive(Debug, Clone)]
-pub struct opentype_layout_pos_extension {
+pub struct opentype_layout_pos_extension<'input> {
 table_start: u32,
 format: u16,
 extension_lookup_type: u16,
-extension_offset: opentype_layout_pos_extension_extension_offset
+extension_offset: opentype_layout_pos_extension_extension_offset<'input>
 }
 
 /// expected size: 320
-/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InEnum { variants: [DirectHeap, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, Noop, InDef(InRecord { fields: [Noop, InOption(InDef(InEnum { variants: [InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap, Noop] })] })] }, Noop, Noop, Noop, Noop, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [DirectHeap, Noop] })] })] }] }))] })] })] }] }, Layout { size: 32, align: 8 (1 << 3) })
+/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InEnum { variants: [DirectHeap, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, Noop, InDef(InRecord { fields: [Noop, InOption(InDef(InEnum { variants: [InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap, Noop] })] })] }, Noop, DirectHeap, Noop, DirectHeap, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [DirectHeap, Noop] })] })] }] }))] })] })] }] }, Layout { size: 32, align: 8 (1 << 3) })
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub enum opentype_gpos_table_lookup_list_link_lookups_link_subtables_link { GroundPos(opentype_layout_ground_pos), PosExtension(opentype_layout_pos_extension) }
+pub enum opentype_gpos_table_lookup_list_link_lookups_link_subtables_link<'input> { GroundPos(opentype_layout_ground_pos<'input>), PosExtension(opentype_layout_pos_extension<'input>) }
 
 /// expected size: 328
-/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [Noop, InOption(InDef(InEnum { variants: [DirectHeap, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, Noop, InDef(InRecord { fields: [Noop, InOption(InDef(InEnum { variants: [InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap, Noop] })] })] }, Noop, Noop, Noop, Noop, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [DirectHeap, Noop] })] })] }] }))] })] })] }] }))] }, Layout { size: 24, align: 8 (1 << 3) })
+/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [Noop, InOption(InDef(InEnum { variants: [DirectHeap, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, Noop, InDef(InRecord { fields: [Noop, InOption(InDef(InEnum { variants: [InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap, Noop] })] })] }, Noop, DirectHeap, Noop, DirectHeap, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [DirectHeap, Noop] })] })] }] }))] })] })] }] }))] }, Layout { size: 24, align: 8 (1 << 3) })
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_gpos_table_lookup_list_link_lookups_link_subtables {
+pub struct opentype_gpos_table_lookup_list_link_lookups_link_subtables<'input> {
 offset: u16,
-link: Option<opentype_gpos_table_lookup_list_link_lookups_link_subtables_link>
+link: Option<opentype_gpos_table_lookup_list_link_lookups_link_subtables_link<'input>>
 }
 
 /// expected size: 48
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_gpos_table_lookup_list_link_lookups_link {
+pub struct opentype_gpos_table_lookup_list_link_lookups_link<'input> {
 table_start: u32,
 lookup_type: u16,
 lookup_flag: opentype_gsub_table_lookup_list_link_lookups_link_lookup_flag,
 sub_table_count: u16,
-subtables: Vec<opentype_gpos_table_lookup_list_link_lookups_link_subtables>,
+subtables: Vec<opentype_gpos_table_lookup_list_link_lookups_link_subtables<'input>>,
 mark_filtering_set: Option<u16>
 }
 
 /// expected size: 56
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_gpos_table_lookup_list_link_lookups {
+pub struct opentype_gpos_table_lookup_list_link_lookups<'input> {
 offset: u16,
-link: Option<opentype_gpos_table_lookup_list_link_lookups_link>
+link: Option<opentype_gpos_table_lookup_list_link_lookups_link<'input>>
 }
 
 /// expected size: 32
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_gpos_table_lookup_list_link {
+pub struct opentype_gpos_table_lookup_list_link<'input> {
 table_start: u32,
 lookup_count: u16,
-lookups: Vec<opentype_gpos_table_lookup_list_link_lookups>
+lookups: Vec<opentype_gpos_table_lookup_list_link_lookups<'input>>
 }
 
 /// expected size: 40
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_gpos_table_lookup_list {
+pub struct opentype_gpos_table_lookup_list<'input> {
 offset: u16,
-link: Option<opentype_gpos_table_lookup_list_link>
+link: Option<opentype_gpos_table_lookup_list_link<'input>>
 }
 
 /// expected size: 12
@@ -3682,13 +3641,13 @@ link: Option<opentype_layout_feature_variations>
 /// expected size: 176
 /// trait-ready: unique decoder function (d#42)
 #[derive(Debug, Clone)]
-pub struct opentype_gpos_table {
+pub struct opentype_gpos_table<'input> {
 table_start: u32,
 major_version: u16,
 minor_version: u16,
 script_list: opentype_gsub_table_script_list,
 feature_list: opentype_gsub_table_feature_list,
-lookup_list: opentype_gpos_table_lookup_list,
+lookup_list: opentype_gpos_table_lookup_list<'input>,
 feature_variations_offset: Option<opentype_gsub_table_feature_variations_offset>
 }
 
@@ -4379,7 +4338,7 @@ prep: Option<Vec<u8>>,
 gasp: Option<opentype_gasp_table>,
 base: Option<opentype_base_table>,
 gdef: Option<opentype_gdef_table>,
-gpos: Option<opentype_gpos_table>,
+gpos: Option<opentype_gpos_table<'input>>,
 gsub: Option<opentype_gsub_table>,
 fvar: Option<opentype_fvar_table>,
 gvar: Option<opentype_gvar_table<'input>>,
@@ -4976,6 +4935,31 @@ pub struct jpeg_exp {
 marker: jpeg_eoi,
 length: u16,
 data: jpeg_exp_data__dupX1
+}
+
+/// expected size: 48
+/// trait-unready: multiple (2) decoders exist (d#{403, 405})
+#[derive(Debug, Clone)]
+pub struct opentype_layout_ligature_attach_component_record__dupX1<'input> {
+record_scope: View<'input>,
+ligature_anchor_offsets: Vec<u16>
+}
+
+/// expected size: 32
+/// trait-ready: unique decoder function (d#404)
+#[derive(Debug, Clone)]
+pub struct opentype_layout_ligature_attach<'input> {
+component_count: u16,
+component_records: Vec<opentype_layout_ligature_attach_component_record__dupX1<'input>>
+}
+
+/// expected size: 56
+/// trait-ready: unique decoder function (d#406)
+#[derive(Debug, Clone)]
+pub struct opentype_layout_ligature_array<'input> {
+array_scope: View<'input>,
+ligature_count: u16,
+ligature_attach_offsets: Vec<u16>
 }
 
 /// d#0
@@ -9144,7 +9128,7 @@ PResult::Ok(opentype_gdef_table { table_start, major_version, minor_version, gly
 }
 
 /// d#42
-fn Decoder_opentype_gpos_table(_input: &mut Parser<'_>) -> Result<opentype_gpos_table, ParseError> {
+fn Decoder_opentype_gpos_table<'input>(_input: &mut Parser<'input>) -> Result<opentype_gpos_table<'input>, ParseError> {
 let table_start = {
 let x = _input.get_offset_u64();
 x as u32
@@ -13570,7 +13554,7 @@ PResult::Ok(opentype_layout_lang_sys_record { lang_sys_tag, lang_sys })
 }
 
 /// d#89
-fn Decoder_opentype_layout_pos_extension(_input: &mut Parser<'_>) -> Result<opentype_layout_pos_extension, ParseError> {
+fn Decoder_opentype_layout_pos_extension<'input>(_input: &mut Parser<'input>) -> Result<opentype_layout_pos_extension<'input>, ParseError> {
 let table_start = {
 let x = _input.get_offset_u64();
 x as u32
@@ -13629,7 +13613,7 @@ PResult::Ok(opentype_layout_pos_extension { table_start, format, extension_looku
 }
 
 /// d#90
-fn Decoder_opentype_layout_ground_pos(_input: &mut Parser<'_>, lookup_type: u16) -> Result<opentype_layout_ground_pos, ParseError> {
+fn Decoder_opentype_layout_ground_pos<'input>(_input: &mut Parser<'input>, lookup_type: u16) -> Result<opentype_layout_ground_pos<'input>, ParseError> {
 PResult::Ok(match lookup_type {
 1u16 => {
 let inner = (Decoder_opentype_layout_single_pos(_input))?;
@@ -14361,11 +14345,9 @@ PResult::Ok(opentype_layout_mark_base_pos { table_start, format, mark_coverage_o
 }
 
 /// d#95
-fn Decoder_opentype_layout_mark_lig_pos(_input: &mut Parser<'_>) -> Result<opentype_layout_mark_lig_pos, ParseError> {
-let table_start = {
-let x = _input.get_offset_u64();
-x as u32
-};
+fn Decoder_opentype_layout_mark_lig_pos<'input>(_input: &mut Parser<'input>) -> Result<opentype_layout_mark_lig_pos<'input>, ParseError> {
+let table_view = _input.view();
+let table_scope = table_view;
 let format = {
 let inner = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -14382,222 +14364,26 @@ return Err(ParseError::FalsifiedWhere(6949960292533894002u64));
 }
 };
 let mark_coverage_offset = {
-let offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
-};
-let link = match offset > 0u16 {
-true => {
-let __here = {
-let x = _input.get_offset_u64();
-x as u32
-};
-if table_start + (offset as u32) >= __here {
-let tgt_offset = table_start + (offset as u32);
-let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = (Decoder_opentype_coverage_table(_input))?;
-_input.close_peek_context()?;
-Some(ret)
-} else {
-None
-}
-},
-
-false => {
-None
-}
-};
-opentype_layout_reverse_chain_single_subst_coverage { offset, link }
 };
 let ligature_coverage_offset = {
-let offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
-};
-let link = match offset > 0u16 {
-true => {
-let __here = {
-let x = _input.get_offset_u64();
-x as u32
-};
-if table_start + (offset as u32) >= __here {
-let tgt_offset = table_start + (offset as u32);
-let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = (Decoder_opentype_coverage_table(_input))?;
-_input.close_peek_context()?;
-Some(ret)
-} else {
-None
-}
-},
-
-false => {
-None
-}
-};
-opentype_layout_reverse_chain_single_subst_coverage { offset, link }
 };
 let mark_class_count = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
 let mark_array_offset = {
-let offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
-};
-let link = match offset > 0u16 {
-true => {
-let __here = {
-let x = _input.get_offset_u64();
-x as u32
-};
-if table_start + (offset as u32) >= __here {
-let tgt_offset = table_start + (offset as u32);
-let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = (Decoder_opentype_layout_mark_array(_input))?;
-_input.close_peek_context()?;
-Some(ret)
-} else {
-None
-}
-},
-
-false => {
-None
-}
-};
-opentype_layout_mark_mark_pos_mark1_array_offset { offset, link }
 };
 let ligature_array_offset = {
-let offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-let link = match offset > 0u16 {
-true => {
-let __here = {
-let x = _input.get_offset_u64();
-x as u32
-};
-if table_start + (offset as u32) >= __here {
-let tgt_offset = table_start + (offset as u32);
-let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
-let table_start = {
-let x = _input.get_offset_u64();
-x as u32
-};
-let ligature_count = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-let ligature_attach_offsets = {
-let mut accum = Vec::new();
-for _ in 0..ligature_count {
-let next_elem = {
-let offset = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-let link = match offset > 0u16 {
-true => {
-let __here = {
-let x = _input.get_offset_u64();
-x as u32
-};
-if table_start + (offset as u32) >= __here {
-let tgt_offset = table_start + (offset as u32);
-let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
-let table_start = {
-let x = _input.get_offset_u64();
-x as u32
-};
-let component_count = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-let component_records = {
-let mut accum = Vec::new();
-for _ in 0..component_count {
-let next_elem = {
-let ligature_anchor_offsets = {
-let mut accum = Vec::new();
-for _ in 0..mark_class_count {
-let next_elem = {
-let offset = {
-let x = (_input.read_byte()?, _input.read_byte()?);
-u16be(x)
-};
-let link = match offset > 0u16 {
-true => {
-let __here = {
-let x = _input.get_offset_u64();
-x as u32
-};
-if table_start + (offset as u32) >= __here {
-let tgt_offset = table_start + (offset as u32);
-let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = (Decoder_opentype_common_anchor_table(_input))?;
-_input.close_peek_context()?;
-Some(ret)
-} else {
-None
-}
-},
-
-false => {
-None
-}
-};
-opentype_layout_mark_array_mark_records_mark_anchor_offset { offset, link }
-};
-accum.push(next_elem)
-};
-accum
-};
-opentype_layout_mark_lig_pos_ligature_array_offset_link_ligature_attach_offsets_link_component_records { ligature_anchor_offsets }
-};
-accum.push(next_elem)
-};
-accum
-};
-PResult::Ok(opentype_layout_mark_lig_pos_ligature_array_offset_link_ligature_attach_offsets_link { table_start, component_count, component_records })
-})())?;
-_input.close_peek_context()?;
-Some(ret)
-} else {
-None
-}
-},
-
-false => {
-None
-}
-};
-opentype_layout_mark_lig_pos_ligature_array_offset_link_ligature_attach_offsets { offset, link }
-};
-accum.push(next_elem)
-};
-accum
-};
-PResult::Ok(opentype_layout_mark_lig_pos_ligature_array_offset_link { table_start, ligature_count, ligature_attach_offsets })
-})())?;
-_input.close_peek_context()?;
-Some(ret)
-} else {
-None
-}
-},
-
-false => {
-None
-}
-};
-opentype_layout_mark_lig_pos_ligature_array_offset { offset, link }
-};
-PResult::Ok(opentype_layout_mark_lig_pos { table_start, format, mark_coverage_offset, ligature_coverage_offset, mark_class_count, mark_array_offset, ligature_array_offset })
+PResult::Ok(opentype_layout_mark_lig_pos { table_scope, format, mark_coverage_offset, ligature_coverage_offset, mark_class_count, mark_array_offset, ligature_array_offset })
 }
 
 /// d#96
@@ -37121,5 +36907,79 @@ return Err(ParseError::FalsifiedWhere(15129618400245272391u64));
 }
 };
 PResult::Ok(jpeg_exp_data__dupX1 { expand_horizontal_vertical })
+}
+
+/// d#403
+fn Decoder_opentype_layout_ligature_attach_component_record__dupX1<'input>(_input: &mut Parser<'input>) -> Result<opentype_layout_ligature_attach_component_record__dupX1<'input>, ParseError> {
+let record_scope = table_view;
+let ligature_anchor_offsets = {
+let mut accum = Vec::new();
+for _ in 0..mark_class_count {
+let next_elem = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+accum.push(next_elem)
+};
+accum
+};
+PResult::Ok(opentype_layout_ligature_attach_component_record__dupX1 { record_scope, ligature_anchor_offsets })
+}
+
+/// d#404
+fn Decoder_opentype_layout_ligature_attach<'input>(_input: &mut Parser<'input>) -> Result<opentype_layout_ligature_attach<'input>, ParseError> {
+let table_view = _input.view();
+let component_count = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+let component_records = {
+let mut accum = Vec::new();
+for _ in 0..component_count {
+let next_elem = (Decoder405(_input, mark_class_count))?;
+accum.push(next_elem)
+};
+accum
+};
+PResult::Ok(opentype_layout_ligature_attach { component_count, component_records })
+}
+
+/// d#405
+fn Decoder405<'input>(_input: &mut Parser<'input>, mark_class_count: u16) -> Result<opentype_layout_ligature_attach_component_record__dupX1<'input>, ParseError> {
+let record_scope = table_view;
+let ligature_anchor_offsets = {
+let mut accum = Vec::new();
+for _ in 0..mark_class_count {
+let next_elem = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+accum.push(next_elem)
+};
+accum
+};
+PResult::Ok(opentype_layout_ligature_attach_component_record__dupX1 { record_scope, ligature_anchor_offsets })
+}
+
+/// d#406
+fn Decoder_opentype_layout_ligature_array<'input>(_input: &mut Parser<'input>) -> Result<opentype_layout_ligature_array<'input>, ParseError> {
+let array_view = _input.view();
+let array_scope = array_view;
+let ligature_count = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+let ligature_attach_offsets = {
+let mut accum = Vec::new();
+for _ in 0..ligature_count {
+let next_elem = {
+let x = (_input.read_byte()?, _input.read_byte()?);
+u16be(x)
+};
+accum.push(next_elem)
+};
+accum
+};
+PResult::Ok(opentype_layout_ligature_array { array_scope, ligature_count, ligature_attach_offsets })
 }
 

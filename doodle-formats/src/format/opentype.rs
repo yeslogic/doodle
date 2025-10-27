@@ -484,6 +484,20 @@ mod util {
 
     pub(crate) const CONTENT_AT_OFFSET_IDENT: &str = "link";
 
+    /// Scaffolding aid for migration from Pos-arithmetic model to ViewFormat model
+    ///
+    /// Given a ViewExpr `base_view` that stands in for the base-position for offset arithmetic,
+    /// a possibly-zero u16-kinded `offset`, and a Format `format`, constructs a Format that
+    /// parses `format` at the location `base_view + offset` iff `offset` is non-zero, and returns
+    /// None otherwise (meaning that non-zero offset parses are wrapped in Some).
+    // TODO[epic=eager-view-parse] - This should be phased out in favor of less-eager ViewFormat processing.
+    pub(crate) fn view_offset16(base_view: ViewExpr, offset: Expr, format: Format) -> Format {
+        cond_maybe(
+            is_nonzero_u16(offset.clone()),
+            parse_from_view(base_view.offset(offset), format),
+        )
+    }
+
     /// Given a value of `base_offset` (the absolute stream-position relative to which offsets are to be interpreted),
     /// parses a u16be as a positive delta from `base_offset` and returns the linked content parsed according
     /// to `format` at that location.
@@ -1348,7 +1362,6 @@ mod gvar {
         let glyph_variation_data_table = glyph_variation_data(module, tuple_record);
 
         // NOTE - can only appear in font files with fvar and glyf tables also present
-        // TODO[epic=view-over-pos32] - refactor to use ViewFormat over position arithmetic
         module.define_format(
             "opentype.gvar_table",
             let_view(
@@ -1448,8 +1461,6 @@ mod gvar {
                 "data_view",
                 record_auto([
                     ("tuple_variation_count", tuple_variation_count),
-                    // REVIEW[epic=retrograde-dependency] - consider alternate approaches to avoid constructing dummy offset-field
-                    // TODO[epic=view-over-pos32] - this hack solves itself (mostly) in a ViewFormat-based refactor
                     ("_data_offset", where_nonzero::<U16>(u16be())),
                     (
                         "tuple_variation_headers",
@@ -1460,6 +1471,7 @@ mod gvar {
                     ),
                     (
                         "data",
+                        // FIXME[epic=eager-view-parse] - parse_from_view used only to ensure things work, should be phased out in favor of reify-view with downstream processing
                         parse_from_view(
                             ViewExpr::var("data_view").offset(var("_data_offset")),
                             serialized_data.call_args(vec![
@@ -2226,6 +2238,8 @@ mod base {
 }
 
 mod gpos {
+    use doodle::ViewFormat;
+
     use super::*;
 
     /// Lookup type 1 subtable: single adjustment positioning
@@ -2582,86 +2596,103 @@ mod gpos {
         )
     }
 
+    /// Subformat definition helper for MarkLigPos LigatureArray
+    fn ligature_array(module: &mut FormatModule) -> FormatRef {
+        fn ligature_attach(module: &mut FormatModule) -> FormatRef {
+            fn component_record(module: &mut FormatModule) -> FormatRef {
+                module.define_format_args_views(
+                    "opentype.layout.ligature_attach.component_record",
+                    vec![(Label::Borrowed("mark_class_count"), ValueType::U16)],
+                    vec![Label::Borrowed("table_view")],
+                    record([
+                        (
+                            "record_scope",
+                            with_view(ViewExpr::var("table_view"), ViewFormat::ReifyView),
+                        ),
+                        (
+                            "ligature_anchor_offsets",
+                            // REVIEW[epic=read-fixed-array] - does ReadArray work better here?
+                            repeat_count(var("mark_class_count"), u16be()),
+                        ),
+                    ]),
+                )
+            }
+
+            let component_record = component_record(module);
+
+            module.define_format_args(
+                "opentype.layout.ligature_attach",
+                vec![(Label::Borrowed("mark_class_count"), ValueType::U16)],
+                let_view(
+                    "table_view",
+                    record([
+                        ("component_count", u16be()),
+                        (
+                            "component_records",
+                            repeat_count(
+                                var("component_count"),
+                                component_record.call_args_view(
+                                    vec![var("mark_class_count")],
+                                    vec![ViewExpr::var("table_view")],
+                                ),
+                            ),
+                        ),
+                    ]),
+                ),
+            )
+        }
+        ligature_attach(module);
+
+        module.define_format_args(
+            "opentype.layout.ligature_array",
+            vec![(Label::Borrowed("mark_class_count"), ValueType::U16)],
+            let_view(
+                "array_view",
+                record([
+                    (
+                        "array_scope",
+                        with_view(ViewExpr::var("array_view"), ViewFormat::ReifyView),
+                    ),
+                    ("ligature_count", u16be()),
+                    (
+                        "ligature_attach_offsets",
+                        repeat_count(var("ligature_count"), u16be()),
+                    ),
+                ]),
+            ),
+        )
+    }
+
     /// Looukup type 5 subtable: mark-to-ligature attachment positioning
     ///
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/gpos#lookup-type-5-subtable-mark-to-ligature-attachment-positioning
-    pub(crate) fn mark_lig_pos(
-        module: &mut FormatModule,
-        coverage_table: FormatRef,
-        anchor_table: FormatRef,
-        mark_array: FormatRef,
-    ) -> FormatRef {
-        // TODO - refactor into dep-format or standalone function
-        let component_record = |mark_class_count: Expr, table_start: Expr| {
-            record([(
-                "ligature_anchor_offsets",
-                repeat_count(
-                    mark_class_count,
-                    util::offset16_nullable(table_start, anchor_table.call()),
-                ),
-            )])
-        };
-        // TODO - refactor into dep-format or standalone function
-        let ligature_attach = |mark_class_count: Expr| {
-            record([
-                ("table_start", pos32()),
-                ("component_count", u16be()),
-                (
-                    "component_records",
-                    repeat_count(
-                        var("component_count"),
-                        component_record(mark_class_count, var("table_start")),
-                    ),
-                ),
-            ])
-        };
-        // TODO - refactor into dep-format or standalone function
-        let ligature_array = |mark_class_count: Expr| {
-            record([
-                ("table_start", pos32()),
-                ("ligature_count", u16be()),
-                (
-                    "ligature_attach_offsets",
-                    repeat_count(
-                        var("ligature_count"),
-                        util::offset16_mandatory(
-                            var("table_start"),
-                            ligature_attach(mark_class_count),
-                        ),
-                    ),
-                ),
-            ])
-        };
+    pub(crate) fn mark_lig_pos(module: &mut FormatModule) -> FormatRef {
+        ligature_array(module);
+
         module.define_format(
             "opentype.layout.mark_lig_pos",
-            util::embedded_singleton_alternation(
-                [("table_start", pos32()), ("format", u16be())],
-                ("format", 1),
-                [
-                    (
-                        "mark_coverage_offset",
-                        util::offset16_mandatory(var("table_start"), coverage_table.call()),
-                    ),
-                    (
-                        "ligature_coverage_offset",
-                        util::offset16_mandatory(var("table_start"), coverage_table.call()),
-                    ),
-                    ("mark_class_count", u16be()),
-                    (
-                        "mark_array_offset",
-                        util::offset16_mandatory(var("table_start"), mark_array.call()),
-                    ),
-                    (
-                        "ligature_array_offset",
-                        util::offset16_mandatory(
-                            var("table_start"),
-                            ligature_array(var("mark_class_count")),
+            let_view(
+                "table_view",
+                util::embedded_singleton_alternation(
+                    [
+                        (
+                            "table_scope",
+                            with_view(ViewExpr::var("table_view"), ViewFormat::ReifyView),
                         ),
-                    ),
-                ],
-                "pos",
-                "Format1",
-                util::NestingKind::UnifiedRecord,
+                        ("format", u16be()),
+                    ],
+                    ("format", 1),
+                    [
+                        ("mark_coverage_offset", u16be()),
+                        ("ligature_coverage_offset", u16be()),
+                        ("mark_class_count", u16be()),
+                        ("mark_array_offset", u16be()),
+                        ("ligature_array_offset", u16be()),
+                    ],
+                    "pos",
+                    "Format1",
+                    util::NestingKind::UnifiedRecord,
+                ),
             ),
         )
     }
@@ -2675,18 +2706,21 @@ mod gpos {
         anchor_table: FormatRef,
         mark_array: FormatRef,
     ) -> FormatRef {
-        // TODO - refactor into dep-format or standalone function
-        let mark2_record = |mark_class_count: Expr, table_start: Expr| {
-            record([(
-                "mark2_anchor_offsets",
-                repeat_count(
-                    mark_class_count,
-                    util::offset16_nullable(table_start, anchor_table.call()),
-                ),
-            )])
-        };
-        // TODO - refactor into dep-format or standalone function
-        let mark2_array = |mark_class_count: Expr| {
+        fn mark2_array(mark_class_count: Expr, anchor_table: FormatRef) -> Format {
+            fn mark2_record(
+                mark_class_count: Expr,
+                table_start: Expr,
+                anchor_table: FormatRef,
+            ) -> Format {
+                record([(
+                    "mark2_anchor_offsets",
+                    repeat_count(
+                        mark_class_count,
+                        util::offset16_nullable(table_start, anchor_table.call()),
+                    ),
+                )])
+            }
+            // TODO[epic=view-over-pos32] - replace pos-arithmetic with ViewFormat
             record([
                 ("table_start", pos32()),
                 ("mark2_count", u16be()),
@@ -2694,11 +2728,11 @@ mod gpos {
                     "mark2_records",
                     repeat_count(
                         var("mark2_count"),
-                        mark2_record(mark_class_count, var("table_start")),
+                        mark2_record(mark_class_count, var("table_start"), anchor_table),
                     ),
                 ),
             ])
-        };
+        }
         module.define_format(
             "opentype.layout.mark_mark_pos",
             util::embedded_singleton_alternation(
@@ -2722,7 +2756,7 @@ mod gpos {
                         "mark2_array_offset",
                         util::offset16_mandatory(
                             var("table_start"),
-                            mark2_array(var("mark_class_count")),
+                            mark2_array(var("mark_class_count"), anchor_table),
                         ),
                     ),
                 ],
@@ -2755,7 +2789,7 @@ mod gpos {
         let cursive_pos = cursive_pos(module, coverage_table, anchor_table);
         let mark_array = mark_array(module, anchor_table);
         let mark_base_pos = mark_base_pos(module, coverage_table, anchor_table, mark_array);
-        let mark_lig_pos = mark_lig_pos(module, coverage_table, anchor_table, mark_array);
+        let mark_lig_pos = mark_lig_pos(module);
         let mark_mark_pos = mark_mark_pos(module, coverage_table, anchor_table, mark_array);
         module.define_format_args(
             "opentype.layout.ground_pos",
