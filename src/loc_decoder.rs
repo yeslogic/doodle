@@ -1444,6 +1444,7 @@ impl Decoder {
                 None => Ok((ParsedValue::unit_at(start_offset), input)),
                 Some((b, _)) => Err(DecodeError::<ParsedValue>::trailing(b, input.offset)),
             },
+            Decoder::Phantom => Ok((ParsedValue::from_evaluated(Value::UNIT), input)),
             Decoder::Align(n) => {
                 let skip = (n - (input.offset % n)) % n;
                 let (_, input) = input

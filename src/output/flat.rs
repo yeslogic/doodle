@@ -122,6 +122,9 @@ fn check_covered(
                 path.pop();
             }
         }
+        Format::Phantom(inner) => {
+            check_covered(module, path, inner)?;
+        }
         Format::Fail => {}
         Format::EndOfInput => {}
         Format::SkipRemainder => {}
@@ -220,6 +223,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                     self.write_flat(value, self.module.get_format(*level))
                 }
             }
+            Format::Phantom(..) => Ok(()),
             Format::Fail => Ok(()),
             Format::EndOfInput => Ok(()),
             Format::SkipRemainder => Ok(()),

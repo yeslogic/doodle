@@ -14,7 +14,7 @@ use super::{
     GTFormat,
     typed_format::{TypedDynFormat, TypedExpr, TypedFormat},
 };
-use super::{PrimType, RustType};
+use super::{PrimType, RustLt, RustType};
 
 #[derive(Clone, Debug)]
 pub(crate) struct TypedDecoderExt<TypeRep> {
@@ -55,7 +55,10 @@ impl TypedDecoder<GenType> {
     pub(crate) fn get_type(&self) -> Option<Cow<'_, GenType>> {
         match self {
             TypedDecoder::Fail => None,
-            TypedDecoder::Align(_) | TypedDecoder::SkipRemainder | TypedDecoder::EndOfInput => {
+            TypedDecoder::Align(_)
+            | TypedDecoder::SkipRemainder
+            | TypedDecoder::EndOfInput
+            | TypedDecoder::Phantom => {
                 Some(Cow::Owned(GenType::Inline(RustType::from(PrimType::Unit))))
             }
             TypedDecoder::Byte(set) => {
@@ -106,7 +109,14 @@ impl TypedDecoder<GenType> {
 /// Decoders with a fixed amount of lookahead
 #[derive(Clone, Debug)]
 pub(crate) enum TypedDecoder<TypeRep> {
-    Call(TypeRep, usize, Vec<(Label, TypedExpr<TypeRep>)>),
+    Call(
+        TypeRep,
+        usize,
+        (
+            Vec<(Label, TypedExpr<TypeRep>)>,
+            Option<Vec<(Label, TypedViewExpr<TypeRep>)>>,
+        ),
+    ),
     Fail,
     EndOfInput,
     Align(usize),
@@ -236,6 +246,7 @@ pub(crate) enum TypedDecoder<TypeRep> {
         BaseKind<Endian>,
     ),
     ReifyView(TypeRep, TypedViewExpr<TypeRep>),
+    Phantom,
 }
 
 #[derive(Clone, Debug)]
@@ -336,26 +347,34 @@ impl<'a> GTCompiler<'a> {
     ) -> AResult<GTDecoderExt> {
         let dec = match format {
             // TODO - figure out what needs to be done with `_arg_views`
-            TypedFormat::FormatCall(gt, level, arg_exprs, _arg_views, deref) => {
-                let this_args = arg_exprs.to_vec();
-                let sig_args = if arg_exprs.is_empty() {
-                    None
-                } else {
-                    Some(
-                        arg_exprs
-                            .iter()
-                            .map(|(lab, gtx)| {
-                                (
-                                    lab.clone(),
-                                    gtx.get_type()
-                                        .expect("found lambda in format args")
-                                        .into_owned(),
-                                )
-                            })
-                            .collect(),
-                    )
-                };
-
+            TypedFormat::FormatCall(gt, level, arg_exprs, arg_views, deref) => {
+                let this_args = (arg_exprs.to_vec(), arg_views.as_ref().map(|v| v.to_vec()));
+                let sig_args =
+                    if arg_exprs.is_empty() && arg_views.as_ref().is_none_or(Vec::is_empty) {
+                        None
+                    } else {
+                        Some(
+                            arg_exprs
+                                .iter()
+                                .map(|(lab, gtx)| {
+                                    (
+                                        lab.clone(),
+                                        gtx.get_type()
+                                            .expect("found lambda in format args")
+                                            .into_owned(),
+                                    )
+                                })
+                                .chain(arg_views.into_iter().flatten().map(|(lab, _)| {
+                                    (
+                                        lab.clone(),
+                                        GenType::Inline(RustType::ViewObject(RustLt::Parametric(
+                                            Label::Borrowed(super::model::DEFAULT_LT),
+                                        ))),
+                                    )
+                                }))
+                                .collect(),
+                        )
+                    };
                 let _f = self.module.get_format(*level);
                 let next = if _f.depends_on_next(self.module) {
                     next
@@ -371,6 +390,10 @@ impl<'a> GTCompiler<'a> {
                 };
 
                 Ok(TypedDecoder::Call(gt.clone(), n, this_args))
+            }
+            TypedFormat::Phantom(_, inner) => {
+                self.compile_gt_format(inner, None, Rc::new(Next::Empty))?;
+                Ok(TypedDecoder::Phantom)
             }
             TypedFormat::DecodeBytes(gt, expr, f) => {
                 let da = Box::new(self.compile_gt_format(f, None, Rc::new(Next::Empty))?);

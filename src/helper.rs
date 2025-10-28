@@ -1793,6 +1793,10 @@ pub fn opaque_bytes() -> Format {
     repeat(u8())
 }
 
+pub fn phantom(format: Format) -> Format {
+    Format::Phantom(Box::new(format))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

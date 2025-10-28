@@ -427,6 +427,7 @@ pub(crate) enum VType {
 /// Mutably updated state-engine for performing complete type-inference on a top-level `Format`.
 #[derive(Debug)]
 pub struct TypeChecker {
+    // TODO - implement segmented store to keep dep-format solving from interfering with proper sequencing
     constraints: Vec<Constraints>,
     aliases: Vec<Alias>, // set of non-identity meta-variables that are aliased to ?ix
     varmaps: VarMapMap, // logically separate table of meta-context variant-maps for indirect aliasing
@@ -2928,6 +2929,11 @@ impl TypeChecker {
     /// Assigns new meta-variables and simple constraints for a format, and returns the novel toplevel UVar
     pub(crate) fn infer_var_format(&mut self, f: &Format, ctxt: Ctxt<'_>) -> TCResult<UVar> {
         match f {
+            Format::Phantom(inner) => {
+                let newvar = self.init_var_simple(UType::UNIT)?.0;
+                self.infer_var_format(inner, ctxt)?;
+                Ok(newvar)
+            }
             Format::ItemVar(level, args, _views) => {
                 let newvar = self.get_new_uvar();
                 let level_var = if !args.is_empty() {
@@ -3300,21 +3306,7 @@ impl TypeChecker {
             let Some(next_level) = unexplored.pop_first() else {
                 break;
             };
-            let mut arg_scope = UMultiScope::new(ctxt.scope);
-            let mut view_scope = ViewMultiScope::new(&ctxt.views);
-            for (lbl, vt) in ctxt.module.get_args(next_level) {
-                let v_arg = this.get_new_uvar();
-                this.unify_var_valuetype(v_arg, vt)?;
-                arg_scope.push(lbl.clone(), v_arg);
-            }
-            let expected = ctxt.module.get_view_args(next_level);
-            for lbl in expected.iter() {
-                view_scope.push_view(lbl.clone());
-            }
-            let new_scope = UScope::Multi(&arg_scope);
-            let tmp = ctxt.with_scope(&new_scope);
-            let level_ctxt = tmp.with_view_bindings(&view_scope);
-            let _ = this.infer_var_format(module.get_format(next_level), level_ctxt)?;
+            let _ = this.infer_var_format(module.get_format(next_level), ctxt)?;
             let all_seen_levels = this.level_vars.keys().copied().collect::<BTreeSet<usize>>();
             for just_seen in all_seen_levels.difference(&seen_levels) {
                 unexplored.remove(just_seen);

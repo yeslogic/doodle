@@ -99,6 +99,7 @@ impl<'module> TreePrinter<'module> {
                 self.is_implied_value_format(self.module.get_format(*level))
             }
             Format::EndOfInput => true,
+            Format::Phantom(_) => true,
             Format::Byte(bs) => bs.len() == 1,
             Format::Tuple(fields) => fields.iter().all(|f| self.is_implied_value_format(f)),
             Format::Hint(StyleHint::Common(_), inner) => self.is_implied_value_format(inner),
@@ -360,6 +361,7 @@ impl<'module> TreePrinter<'module> {
     pub fn compile_parsed_decoded_value(&mut self, value: &ParsedValue, fmt: &Format) -> Fragment {
         let mut frag = Fragment::Empty;
         match fmt {
+            Format::Phantom(_) => unreachable!("phantom parses should not appear"),
             Format::ItemVar(level, _args, _views) => {
                 let fmt_name = self.module.get_name(*level);
 
@@ -543,6 +545,7 @@ impl<'module> TreePrinter<'module> {
     pub fn compile_decoded_value(&mut self, value: &Value, fmt: &Format) -> Fragment {
         let mut frag = Fragment::Empty;
         match fmt {
+            Format::Phantom(_) => panic!("phantom parses should not appear"),
             Format::ItemVar(level, _args, _views) => {
                 let fmt_name = self.module.get_name(*level);
 
@@ -2071,6 +2074,8 @@ impl<'module> TreePrinter<'module> {
     // FIXME - without a first-class record, Formats will be printed in less sensible ways
     fn compile_format(&mut self, format: &Format, prec: Precedence) -> Fragment {
         match format {
+            // REVIEW - will this break anything?
+            Format::Phantom(_) => Fragment::Empty,
             Format::Variant(label, f) => cond_paren(
                 self.compile_nested_format(
                     "variant",

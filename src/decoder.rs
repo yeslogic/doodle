@@ -967,6 +967,7 @@ pub enum Decoder {
     CaptureBytes(ViewExpr, Box<Expr>),
     ReadArray(ViewExpr, Box<Expr>, BaseKind<Endian>),
     ReifyView(ViewExpr),
+    Phantom,
 }
 
 #[derive(Clone, Debug)]
@@ -1066,6 +1067,7 @@ impl<'a> Compiler<'a> {
                 };
                 Ok(Decoder::Call(n, args, views))
             }
+            Format::Phantom(_) => Ok(Decoder::Phantom),
             Format::Fail => Ok(Decoder::Fail),
             Format::DecodeBytes(expr, inner) => {
                 let d = self.compile_format(inner, Rc::new(Next::Empty))?;
@@ -1573,6 +1575,7 @@ impl Decoder {
                     .0
                     .parse(program, &Scope::Multi(&new_scope), input)
             }
+            Decoder::Phantom => Ok((Value::UNIT, input)),
             Decoder::Fail => Err(DecodeError::<Value>::fail(scope, input)),
             Decoder::Pos => {
                 let pos = input.offset as u64;
