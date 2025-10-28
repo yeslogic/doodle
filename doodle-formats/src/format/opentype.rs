@@ -103,7 +103,7 @@ mod util {
                 accum
             }
         };
-        Format::record(accum)
+        record_auto(accum)
     }
 
     pub(crate) fn for_each_pair(
@@ -2509,25 +2509,43 @@ mod gpos {
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/gpos#mark-array-table
     pub(crate) fn mark_array(module: &mut FormatModule, anchor_table: FormatRef) -> FormatRef {
         // TODO - refactor into dep-format or standalone function
-        let mark_record = |table_start: Expr| {
-            record([
+        let mark_record = module.define_format_args_views(
+            "opentype.layout.mark_record",
+            vec![],
+            vec![Label::Borrowed("array_view")],
+            record_auto([
                 ("mark_class", u16be()),
+                ("mark_anchor_offset", u16be()),
                 (
-                    "mark_anchor_offset",
-                    util::offset16_mandatory(table_start, anchor_table.call()),
-                ),
-            ])
-        };
-        module.define_format(
-            "opentype.layout.mark_array",
-            record([
-                ("table_start", pos32()),
-                ("mark_count", u16be()),
-                (
-                    "mark_records",
-                    repeat_count(var("mark_count"), mark_record(var("table_start"))),
+                    "__mark_anchor",
+                    phantom(util::view_offset16(
+                        ViewExpr::var("array_view"),
+                        var("mark_anchor_offset"),
+                        anchor_table.call(),
+                    )),
                 ),
             ]),
+        );
+        module.define_format(
+            "opentype.layout.mark_array",
+            let_view(
+                "array_view",
+                record([
+                    (
+                        "array_scope",
+                        with_view(ViewExpr::var("array_view"), ViewFormat::ReifyView),
+                    ),
+                    ("mark_count", u16be()),
+                    (
+                        "mark_records",
+                        repeat_count(
+                            var("mark_count"),
+                            mark_record
+                                .call_args_views(Vec::new(), vec![ViewExpr::var("array_view")]),
+                        ),
+                    ),
+                ]),
+            ),
         )
     }
 
@@ -2597,14 +2615,14 @@ mod gpos {
     }
 
     /// Subformat definition helper for MarkLigPos LigatureArray
-    fn ligature_array(module: &mut FormatModule) -> FormatRef {
-        fn ligature_attach(module: &mut FormatModule) -> FormatRef {
-            fn component_record(module: &mut FormatModule) -> FormatRef {
+    fn ligature_array(module: &mut FormatModule, anchor_table: FormatRef) -> FormatRef {
+        fn ligature_attach(module: &mut FormatModule, anchor_table: FormatRef) -> FormatRef {
+            fn component_record(module: &mut FormatModule, anchor_table: FormatRef) -> FormatRef {
                 module.define_format_args_views(
                     "opentype.layout.ligature_attach.component_record",
                     vec![(Label::Borrowed("mark_class_count"), ValueType::U16)],
                     vec![Label::Borrowed("table_view")],
-                    record([
+                    record_auto([
                         (
                             "record_scope",
                             with_view(ViewExpr::var("table_view"), ViewFormat::ReifyView),
@@ -2614,11 +2632,23 @@ mod gpos {
                             // REVIEW[epic=read-fixed-array] - does ReadArray work better here?
                             repeat_count(var("mark_class_count"), u16be()),
                         ),
+                        (
+                            "__dummy",
+                            phantom(for_each(
+                                var("ligature_anchor_offsets"),
+                                "offset",
+                                util::view_offset16(
+                                    ViewExpr::var("table_view"),
+                                    var("offset"),
+                                    anchor_table.call(),
+                                ),
+                            )),
+                        ),
                     ]),
                 )
             }
 
-            let component_record = component_record(module);
+            let component_record = component_record(module, anchor_table);
 
             module.define_format_args(
                 "opentype.layout.ligature_attach",
@@ -2631,7 +2661,7 @@ mod gpos {
                             "component_records",
                             repeat_count(
                                 var("component_count"),
-                                component_record.call_args_view(
+                                component_record.call_args_views(
                                     vec![var("mark_class_count")],
                                     vec![ViewExpr::var("table_view")],
                                 ),
@@ -2641,14 +2671,14 @@ mod gpos {
                 ),
             )
         }
-        ligature_attach(module);
+        let ligature_attach = ligature_attach(module, anchor_table);
 
         module.define_format_args(
             "opentype.layout.ligature_array",
             vec![(Label::Borrowed("mark_class_count"), ValueType::U16)],
             let_view(
                 "array_view",
-                record([
+                record_auto([
                     (
                         "array_scope",
                         with_view(ViewExpr::var("array_view"), ViewFormat::ReifyView),
@@ -2658,6 +2688,18 @@ mod gpos {
                         "ligature_attach_offsets",
                         repeat_count(var("ligature_count"), u16be()),
                     ),
+                    (
+                        "__dummy",
+                        phantom(for_each(
+                            var("ligature_attach_offsets"),
+                            "offset",
+                            util::view_offset16(
+                                ViewExpr::var("array_view"),
+                                var("offset"),
+                                ligature_attach.call_args(vec![var("mark_class_count")]),
+                            ),
+                        )),
+                    ),
                 ]),
             ),
         )
@@ -2666,8 +2708,13 @@ mod gpos {
     /// Looukup type 5 subtable: mark-to-ligature attachment positioning
     ///
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/gpos#lookup-type-5-subtable-mark-to-ligature-attachment-positioning
-    pub(crate) fn mark_lig_pos(module: &mut FormatModule) -> FormatRef {
-        ligature_array(module);
+    pub(crate) fn mark_lig_pos(
+        module: &mut FormatModule,
+        coverage_table: FormatRef,
+        anchor_table: FormatRef,
+        mark_array: FormatRef,
+    ) -> FormatRef {
+        let ligature_array = ligature_array(module, anchor_table);
 
         module.define_format(
             "opentype.layout.mark_lig_pos",
@@ -2685,9 +2732,15 @@ mod gpos {
                     [
                         ("mark_coverage_offset", u16be()),
                         ("ligature_coverage_offset", u16be()),
+                        ("__coverage", phantom(coverage_table.call())),
                         ("mark_class_count", u16be()),
                         ("mark_array_offset", u16be()),
+                        ("__mark_array", phantom(mark_array.call())),
                         ("ligature_array_offset", u16be()),
+                        (
+                            "__ligature_array",
+                            phantom(ligature_array.call_args(vec![var("mark_class_count")])),
+                        ),
                     ],
                     "pos",
                     "Format1",
@@ -2789,7 +2842,7 @@ mod gpos {
         let cursive_pos = cursive_pos(module, coverage_table, anchor_table);
         let mark_array = mark_array(module, anchor_table);
         let mark_base_pos = mark_base_pos(module, coverage_table, anchor_table, mark_array);
-        let mark_lig_pos = mark_lig_pos(module);
+        let mark_lig_pos = mark_lig_pos(module, coverage_table, anchor_table, mark_array);
         let mark_mark_pos = mark_mark_pos(module, coverage_table, anchor_table, mark_array);
         module.define_format_args(
             "opentype.layout.ground_pos",
@@ -3169,6 +3222,8 @@ mod gsub {
 
 /// Module for sub-formats used in both GSUB and GPOS
 mod layout {
+    use doodle::ViewFormat;
+
     use super::*;
 
     /// Format definition for ChainedSequenceContext tables
@@ -3798,6 +3853,7 @@ mod layout {
         module: &mut FormatModule,
         device_or_variation_index_table: FormatRef,
     ) -> FormatRef {
+        // REVIEW - should formats 1 and 2 be defined as well?
         let anchor_format1 = record([
             ("x_coordinate", util::s16be()),
             ("y_coordinate", util::s16be()),
@@ -3808,47 +3864,64 @@ mod layout {
             ("anchor_point", u16be()),
         ]);
         // REVIEW[epic=closure-dep-formats] - should this be a Dep-Format registration (module.define_format_args) instead?
-        let anchor_format3 = |table_start: Expr| {
-            record([
+        let anchor_format3 = module.define_format_args_views(
+            "opentype.common.anchor_table.format3",
+            vec![],
+            vec![Label::Borrowed("table_view")],
+            record_auto([
+                (
+                    "table_scope",
+                    with_view(ViewExpr::var("table_view"), ViewFormat::ReifyView),
+                ),
                 ("x_coordinate", util::s16be()),
                 ("y_coordinate", util::s16be()),
                 // REVIEW - each offset below is individually nullable if the other is set, but it may be invalid for them to both be null simultaneously...?
+                ("x_device_offset", u16be()),
                 (
-                    "x_device_offset",
-                    util::offset16_nullable(
-                        table_start.clone(),
+                    "__x_device",
+                    phantom(view_offset16(
+                        ViewExpr::var("table_view"),
+                        var("x_device_offset"),
                         device_or_variation_index_table.call(),
-                    ),
+                    )),
                 ),
+                ("y_device_offset", u16be()),
                 (
-                    "y_device_offset",
-                    util::offset16_nullable(table_start, device_or_variation_index_table.call()),
-                ),
-            ])
-        };
-        module.define_format(
-            "opentype.common.anchor_table",
-            record([
-                ("table_start", pos32()),
-                ("anchor_format", u16be()),
-                (
-                    "table",
-                    match_variant(
-                        var("anchor_format"),
-                        [
-                            (Pattern::U16(1), "Format1", anchor_format1),
-                            (Pattern::U16(2), "Format2", anchor_format2),
-                            (
-                                Pattern::U16(3),
-                                "Format3",
-                                anchor_format3(var("table_start")),
-                            ),
-                            // REVIEW[epic=catchall-policy] - do we need this catchall?
-                            (Pattern::Wildcard, "BadFormat", Format::Fail),
-                        ],
-                    ),
+                    "__y_device",
+                    phantom(view_offset16(
+                        ViewExpr::var("table_view"),
+                        var("y_device_offset"),
+                        device_or_variation_index_table.call(),
+                    )),
                 ),
             ]),
+        );
+        module.define_format(
+            "opentype.common.anchor_table",
+            let_view(
+                "table_view",
+                record([
+                    ("anchor_format", u16be()),
+                    (
+                        "table",
+                        match_variant(
+                            var("anchor_format"),
+                            [
+                                (Pattern::U16(1), "Format1", anchor_format1),
+                                (Pattern::U16(2), "Format2", anchor_format2),
+                                (
+                                    Pattern::U16(3),
+                                    "Format3",
+                                    anchor_format3
+                                        .call_args_views(vec![], vec![ViewExpr::var("table_view")]),
+                                ),
+                                // REVIEW[epic=catchall-policy] - do we need this catchall?
+                                (Pattern::Wildcard, "BadFormat", Format::Fail),
+                            ],
+                        ),
+                    ),
+                ]),
+            ),
         )
     }
 

@@ -1141,6 +1141,8 @@ pub enum Format {
     /// Parses a given format within the context of a View
     ParseFromView(ViewExpr, Box<Format>),
     // !SECTION
+    // Include a format in the tree as a placeholder, without ever processing it
+    Phantom(Box<Format>),
 }
 
 impl Format {
@@ -1288,6 +1290,7 @@ impl Format {
                 ViewFormat::ReifyView => Bounds::exact(0),
             },
             Format::ParseFromView(_v_expr, _inner) => Bounds::exact(0),
+            Format::Phantom(_) => Bounds::exact(0),
         }
     }
 
@@ -1371,6 +1374,7 @@ impl Format {
                 ViewFormat::ReifyView => Bounds::exact(0),
             },
             Format::ParseFromView(_v_expr, _f) => Bounds::exact(0),
+            Format::Phantom(_) => Bounds::exact(0),
         }
     }
 
@@ -1424,6 +1428,7 @@ impl Format {
             }
             Format::Hint(_, f) => f.depends_on_next(module),
             Format::LiftedOption(opt) => opt.as_ref().is_some_and(|f| f.depends_on_next(module)),
+            Format::Phantom(_) => false,
         }
     }
 
@@ -1499,7 +1504,7 @@ impl FormatRef {
         Format::ItemVar(self.0, args, None)
     }
 
-    pub fn call_args_view(&self, args: Vec<Expr>, views: Vec<ViewExpr>) -> Format {
+    pub fn call_args_views(&self, args: Vec<Expr>, views: Vec<ViewExpr>) -> Format {
         Format::ItemVar(self.0, args, Some(views))
     }
 }
@@ -1943,6 +1948,10 @@ impl FormatModule {
                     Ok(ValueType::ViewObj)
                 }
             },
+            Format::Phantom(inner) => {
+                self.infer_format_type(scope, &**inner)?;
+                Ok(ValueType::UNIT)
+            }
         }
     }
 }
@@ -2335,6 +2344,7 @@ impl<'a> MatchTreeStep<'a> {
             TypedFormat::Align(_) => {
                 Self::accept() // FIXME
             }
+            TypedFormat::Phantom(..) => Self::accept(),
             TypedFormat::SkipRemainder => Self::accept(),
             TypedFormat::Byte(bs) => Self::branch(*bs, next),
             TypedFormat::Variant(_, _label, f) => Self::from_gt_format(module, f, next.clone()),
@@ -2558,6 +2568,7 @@ impl<'a> MatchTreeStep<'a> {
             Format::ItemVar(level, _args, _views) => {
                 Self::from_format(module, module.get_format(*level), next)
             }
+            Format::Phantom(..) => Self::accept(),
             Format::Fail => Self::reject(),
             Format::EndOfInput => Self::accept(),
             Format::SkipRemainder => Self::accept(),

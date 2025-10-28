@@ -375,6 +375,9 @@ mod census {
             Format::Variant(_, format) => {
                 crawl(format, module, pop);
             }
+            Format::Phantom(inner) => {
+                crawl(inner, module, pop);
+            }
             Format::Union(formats) => {
                 for f in formats {
                     crawl(f, module, pop);

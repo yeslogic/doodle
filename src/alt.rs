@@ -72,6 +72,7 @@ pub enum MonoKind {
     DecodeBytes(Box<Expr>),
     ParseFromView(ViewExpr),
     Hint(StyleHint),
+    Phantom,
 }
 
 /// Descent-patterns for Formats that hold `Vec<Format>`
@@ -1167,6 +1168,10 @@ impl FormatModuleExt {
                             self.infer_format_ext_type(scope, f)
                         }
                         MonoKind::Hint(_) => self.infer_format_ext_type(scope, f),
+                        MonoKind::Phantom => {
+                            let _ = self.infer_format_ext_type(scope, f);
+                            Ok(ValueTypeExt::UNIT)
+                        }
                     }
                 }
                 EpiFormat::Duo(duo_kind, f0, f1) => match duo_kind {
@@ -1834,6 +1839,10 @@ mod __impls {
                     let view_format_ext = ViewFormatExt::from(view_format);
                     FormatExt::Ground(GroundFormat::WithView(name, view_format_ext))
                 }
+                Format::Phantom(inner) => {
+                    let inner = Box::new(FormatExt::from(*inner));
+                    FormatExt::Epi(EpiFormat::Mono(MonoKind::Phantom, inner))
+                }
             }
         }
     }
@@ -1910,6 +1919,7 @@ mod __impls {
                 MonoKind::ParseFromView(v_expr) => Format::ParseFromView(v_expr, inner),
                 MonoKind::Hint(style_hint) => Format::Hint(style_hint, inner),
                 MonoKind::LetView(ident) => Format::LetView(ident, inner),
+                MonoKind::Phantom => Format::Phantom(inner),
             }
         }
     }

@@ -2575,7 +2575,7 @@ impl<'input> TryPromote<OpentypePosExtension<'input>> for LookupSubtable {
 impl<'input> TryPromote<OpentypeGposLookupSubtable<'input>> for LookupSubtable {
     type Error = ReflType<
         ReflType<TPErr<OpentypeSinglePos, SinglePos>, TPErr<OpentypePairPos, PairPos>>,
-        ReflType<TPErr<OpentypeCursivePos, CursivePos>, UnknownValueError<u16>>,
+        ReflType<TPErr<OpentypeCursivePos<'input>, CursivePos>, UnknownValueError<u16>>,
     >;
 
     fn try_promote(orig: &OpentypeGposLookupSubtable) -> Result<Self, Self::Error> {
@@ -2627,11 +2627,14 @@ enum LookupSubtable {
     ReverseChainSingleSubst(ReverseChainSingleSubst),
 }
 
-pub type OpentypeMarkMarkPos = opentype_layout_mark_mark_pos;
+pub type OpentypeMarkMarkPos<'input> = opentype_layout_mark_mark_pos<'input>;
 
-impl TryPromote<OpentypeMarkMarkPos> for MarkMarkPos {
+impl<'input> TryPromote<OpentypeMarkMarkPos<'input>> for MarkMarkPos {
     type Error = ReflType<
-        ReflType<TPErr<OpentypeMarkArray, MarkArray>, TPErr<OpentypeMark2Array, Mark2Array>>,
+        ReflType<
+            TPErr<OpentypeMarkArray<'input>, MarkArray>,
+            TPErr<OpentypeMark2Array<'input>, Mark2Array>,
+        >,
         UnknownValueError<u16>,
     >;
 
@@ -2653,10 +2656,10 @@ struct MarkMarkPos {
     mark2_array: Mark2Array,
 }
 
-pub type OpentypeMark2Array = opentype_layout_mark_mark_pos_mark2_array_offset_link;
+pub type OpentypeMark2Array<'input> = opentype_layout_mark_mark_pos_mark2_array_offset_link<'input>;
 
-impl TryPromote<OpentypeMark2Array> for Mark2Array {
-    type Error = ReflType<TPErr<OpentypeMark2Record, Mark2Record>, UnknownValueError<u16>>;
+impl<'input> TryPromote<OpentypeMark2Array<'input>> for Mark2Array {
+    type Error = ReflType<TPErr<OpentypeMark2Record<'input>, Mark2Record>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeMark2Array) -> Result<Self, Self::Error> {
         Ok(Mark2Array {
@@ -2671,10 +2674,11 @@ struct Mark2Array {
     mark2_records: Vec<Mark2Record>,
 }
 
-pub type OpentypeMark2Record = opentype_layout_mark_mark_pos_mark2_array_offset_link_mark2_records;
+pub type OpentypeMark2Record<'input> =
+    opentype_layout_mark_mark_pos_mark2_array_offset_link_mark2_records<'input>;
 
-impl TryPromote<OpentypeMark2Record> for Mark2Record {
-    type Error = ReflType<TPErr<OpentypeAnchorTable, AnchorTable>, UnknownValueError<u16>>;
+impl<'input> TryPromote<OpentypeMark2Record<'input>> for Mark2Record {
+    type Error = ReflType<TPErr<OpentypeAnchorTable<'input>, AnchorTable>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeMark2Record) -> Result<Self, Self::Error> {
         let mut mark2_anchors = Vec::with_capacity(orig.mark2_anchor_offsets.len());
@@ -2694,13 +2698,7 @@ struct Mark2Record {
 pub type OpentypeMarkLigPos<'input> = opentype_layout_mark_lig_pos<'input>;
 
 impl<'input> TryPromote<OpentypeMarkLigPos<'input>> for MarkLigPos {
-    type Error = ReflType<
-        ReflType<
-            TPErr<OpentypeLigatureArray<'input>, LigatureArray>,
-            TPErr<OpentypeMarkArray, MarkArray>,
-        >,
-        UnknownValueError<u16>,
-    >;
+    type Error = ReflType<TPErr<OpentypeMarkArray<'input>, MarkArray>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeMarkLigPos) -> Result<Self, Self::Error> {
         let mark_coverage = {
@@ -2737,21 +2735,7 @@ impl<'input> TryPromote<OpentypeMarkLigPos<'input>> for MarkLigPos {
                 MarkArray::try_promote(&ret)?
             }
         };
-        let ligature_array = {
-            if orig.ligature_array_offset == 0 {
-                LigatureArray::from_null()
-            } else {
-                let mut view_parser = Parser::from(
-                    orig.table_scope
-                        .offset(orig.ligature_array_offset as usize)
-                        .unwrap(),
-                );
-                let ret = Decoder_opentype_layout_ligature_array(&mut view_parser)
-                    .expect("bad ligature-array parse");
-
-                LigatureArray::try_promote(&ret)?
-            }
-        };
+        let ligature_array = orig.ligature_array();
 
         Ok(MarkLigPos {
             mark_coverage,
@@ -2772,20 +2756,27 @@ struct MarkLigPos {
 
 pub type OpentypeLigatureArray<'input> = opentype_layout_ligature_array<'input>;
 
-impl<'input> TryPromote<OpentypeLigatureArray<'input>> for LigatureArray {
-    type Error =
-        ReflType<TPErr<OpentypeLigatureAttach<'input>, LigatureAttach>, UnknownValueError<u16>>;
-
-    fn try_promote(orig: &OpentypeLigatureArray) -> Result<Self, Self::Error> {
-        let mut ligature_attach = Vec::with_capacity(orig.ligature_attach_offsets.len());
-        for offset in orig.ligature_attach_offsets.iter() {
+impl<'input> OpentypeLigatureArray<'input> {
+    fn expand(
+        self,
+        mark_class_count: u16,
+    ) -> Result<
+        LigatureArray,
+        ReflType<TPErr<OpentypeLigatureAttach<'input>, LigatureAttach>, UnknownValueError<u16>>,
+    > {
+        let mut ligature_attach = Vec::with_capacity(self.ligature_attach_offsets.len());
+        for offset in self.ligature_attach_offsets.iter() {
             let lig = if *offset == 0 {
                 LigatureAttach::from_null()
             } else {
-                let view = orig.array_scope.offset(*offset as usize).unwrap();
-                let mut p = Parser::from(view);
+                let mut view_parser = Parser::from(
+                    self.array_scope
+                        .offset(*offset as usize)
+                        .expect("invalid offset operation on ligature-array scope (view)"),
+                );
                 let ret =
-                    Decoder_opentype_layout_ligature_attach(&mut p).expect("bad ligature attach");
+                    Decoder_opentype_layout_ligature_attach(&mut view_parser, mark_class_count)
+                        .expect("bad ligature-attach parse");
                 LigatureAttach::try_promote(&ret)?
             };
             ligature_attach.push(lig);
@@ -2793,6 +2784,51 @@ impl<'input> TryPromote<OpentypeLigatureArray<'input>> for LigatureArray {
         Ok(LigatureArray { ligature_attach })
     }
 }
+
+impl<'input> OpentypeMarkLigPos<'input> {
+    #[must_use]
+    /// Performs the deferred parse of the OpentypeLigatureArray field and promotes it to a `LigatureArray`..
+    fn ligature_array(&self) -> LigatureArray {
+        if self.ligature_array_offset == 0 {
+            LigatureArray::from_null()
+        } else {
+            let mut view_parser = Parser::from(
+                self.table_scope
+                    .offset(self.ligature_array_offset as usize)
+                    .unwrap(),
+            );
+            let ret =
+                Decoder_opentype_layout_ligature_array(&mut view_parser, self.mark_class_count)
+                    .expect("bad ligature-array parse");
+
+            ret.expand(self.mark_class_count)
+                .expect("unable to expand ligature array")
+        }
+    }
+}
+
+// REVIEW : TryPromote for LigatureArray cannot be performed without knowing mark_class_count
+// impl<'input> TryPromote<OpentypeLigatureArray<'input>> for LigatureArray {
+//     type Error =
+//         ReflType<TPErr<OpentypeLigatureAttach<'input>, LigatureAttach>, UnknownValueError<u16>>;
+
+//     fn try_promote(orig: &OpentypeLigatureArray) -> Result<Self, Self::Error> {
+//         let mut ligature_attach = Vec::with_capacity(orig.ligature_attach_offsets.len());
+//         for offset in orig.ligature_attach_offsets.iter() {
+//             let lig = if *offset == 0 {
+//                 LigatureAttach::from_null()
+//             } else {
+//                 let view = orig.array_scope.offset(*offset as usize).unwrap();
+//                 let mut p = Parser::from(view);
+//                 let ret =
+//                     Decoder_opentype_layout_ligature_attach(&mut p, orig.mark_class_count).expect("bad ligature attach");
+//                 LigatureAttach::try_promote(&ret)?
+//             };
+//             ligature_attach.push(lig);
+//         }
+//         Ok(LigatureArray { ligature_attach })
+//     }
+// }
 
 #[derive(Debug, Clone, Default)]
 #[repr(transparent)]
@@ -2818,11 +2854,10 @@ struct LigatureAttach {
     component_records: Vec<ComponentRecord>,
 }
 
-pub type OpentypeComponentRecord<'input> =
-    opentype_layout_ligature_attach_component_record__dupX1<'input>;
+pub type OpentypeComponentRecord<'input> = opentype_layout_ligature_attach_component_record<'input>;
 
 impl<'input> TryPromote<OpentypeComponentRecord<'input>> for ComponentRecord {
-    type Error = ReflType<TPErr<OpentypeAnchorTable, AnchorTable>, UnknownValueError<u16>>;
+    type Error = ReflType<TPErr<OpentypeAnchorTable<'input>, AnchorTable>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeComponentRecord) -> Result<Self, Self::Error> {
         let mut ligature_anchors = Vec::with_capacity(orig.ligature_anchor_offsets.len());
@@ -2848,11 +2883,14 @@ struct ComponentRecord {
     ligature_anchors: Vec<Option<AnchorTable>>,
 }
 
-pub type OpentypeMarkBasePos = opentype_layout_mark_base_pos;
+pub type OpentypeMarkBasePos<'input> = opentype_layout_mark_base_pos<'input>;
 
-impl TryPromote<OpentypeMarkBasePos> for MarkBasePos {
+impl<'input> TryPromote<OpentypeMarkBasePos<'input>> for MarkBasePos {
     type Error = ReflType<
-        ReflType<TPErr<OpentypeBaseArray, BaseArray>, TPErr<OpentypeMarkArray, MarkArray>>,
+        ReflType<
+            TPErr<OpentypeBaseArray<'input>, BaseArray>,
+            TPErr<OpentypeMarkArray<'input>, MarkArray>,
+        >,
         UnknownValueError<u16>,
     >;
 
@@ -2866,15 +2904,33 @@ impl TryPromote<OpentypeMarkBasePos> for MarkBasePos {
     }
 }
 
-pub type OpentypeMarkArray = opentype_layout_mark_array;
+pub type OpentypeMarkArray<'input> = opentype_layout_mark_array<'input>;
 
-impl TryPromote<OpentypeMarkArray> for MarkArray {
-    type Error = ReflType<TPErr<OpentypeMarkRecord, MarkRecord>, UnknownValueError<u16>>;
+impl<'input> TryPromote<OpentypeMarkArray<'input>> for MarkArray {
+    type Error = ReflType<TPErr<OpentypeAnchorTable<'input>, AnchorTable>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeMarkArray) -> Result<Self, Self::Error> {
-        Ok(MarkArray {
-            mark_records: try_promote_vec(&orig.mark_records)?,
-        })
+        let mut mark_records = Vec::with_capacity(orig.mark_records.len());
+        for record in &orig.mark_records {
+            let offset = record.mark_anchor_offset;
+            let mark_anchor = if offset == 0 {
+                None
+            } else {
+                let view = orig
+                    .array_scope
+                    .offset(offset as usize)
+                    .expect("bad offset operation on mark record");
+                let mut p = Parser::from(view);
+                let ret =
+                    Decoder_opentype_common_anchor_table(&mut p).expect("bad anchor table parse");
+                Some(AnchorTable::try_promote(&ret)?)
+            };
+            mark_records.push(MarkRecord {
+                mark_class: record.mark_class,
+                mark_anchor,
+            });
+        }
+        Ok(MarkArray { mark_records })
     }
 }
 
@@ -2884,18 +2940,18 @@ struct MarkArray {
     mark_records: Vec<MarkRecord>,
 }
 
-pub type OpentypeMarkRecord = opentype_layout_mark_array_mark_records;
+pub type OpentypeMarkRecord = opentype_layout_mark_record;
 
-impl TryPromote<OpentypeMarkRecord> for MarkRecord {
-    type Error = ReflType<TPErr<OpentypeAnchorTable, AnchorTable>, UnknownValueError<u16>>;
+// impl TryPromote<OpentypeMarkRecord> for MarkRecord {
+//     type Error = ReflType<TPErr<OpentypeAnchorTable, AnchorTable>, UnknownValueError<u16>>;
 
-    fn try_promote(orig: &OpentypeMarkRecord) -> Result<Self, Self::Error> {
-        Ok(MarkRecord {
-            mark_class: orig.mark_class,
-            mark_anchor: try_promote_link(&orig.mark_anchor_offset.link)?,
-        })
-    }
-}
+//     fn try_promote(orig: &OpentypeMarkRecord) -> Result<Self, Self::Error> {
+//         Ok(MarkRecord {
+//             mark_class: orig.mark_class,
+//             mark_anchor: try_promote_link(&orig.mark_anchor_offset.link)?,
+//         })
+//     }
+// }
 
 #[derive(Debug, Clone)]
 struct MarkRecord {
@@ -2903,10 +2959,10 @@ struct MarkRecord {
     mark_anchor: Link<AnchorTable>,
 }
 
-pub type OpentypeBaseArray = opentype_layout_mark_base_pos_base_array_offset_link;
+pub type OpentypeBaseArray<'input> = opentype_layout_mark_base_pos_base_array_offset_link<'input>;
 
-impl TryPromote<OpentypeBaseArray> for BaseArray {
-    type Error = ReflType<TPErr<OpentypeBaseRecord, BaseRecord>, UnknownValueError<u16>>;
+impl<'input> TryPromote<OpentypeBaseArray<'input>> for BaseArray {
+    type Error = ReflType<TPErr<OpentypeBaseRecord<'input>, BaseRecord>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeBaseArray) -> Result<Self, Self::Error> {
         Ok(BaseArray {
@@ -2921,10 +2977,11 @@ struct BaseArray {
     base_records: Vec<BaseRecord>,
 }
 
-pub type OpentypeBaseRecord = opentype_layout_mark_base_pos_base_array_offset_link_base_records;
+pub type OpentypeBaseRecord<'input> =
+    opentype_layout_mark_base_pos_base_array_offset_link_base_records<'input>;
 
-impl TryPromote<OpentypeBaseRecord> for BaseRecord {
-    type Error = ReflType<TPErr<OpentypeAnchorTable, AnchorTable>, UnknownValueError<u16>>;
+impl<'input> TryPromote<OpentypeBaseRecord<'input>> for BaseRecord {
+    type Error = ReflType<TPErr<OpentypeAnchorTable<'input>, AnchorTable>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeBaseRecord) -> Result<Self, Self::Error> {
         let mut base_anchors = Vec::with_capacity(orig.base_anchor_offsets.len());
@@ -3519,10 +3576,11 @@ struct Rule {
     seq_lookup_records: Vec<SequenceLookup>,
 }
 
-pub type OpentypeCursivePos = opentype_layout_cursive_pos;
+pub type OpentypeCursivePos<'input> = opentype_layout_cursive_pos<'input>;
 
-impl TryPromote<OpentypeCursivePos> for CursivePos {
-    type Error = ReflType<TPErr<OpentypeEntryExitRecord, EntryExitRecord>, UnknownValueError<u16>>;
+impl<'input> TryPromote<OpentypeCursivePos<'input>> for CursivePos {
+    type Error =
+        ReflType<TPErr<OpentypeEntryExitRecord<'input>, EntryExitRecord>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeCursivePos) -> Result<Self, Self::Error> {
         Ok(CursivePos {
@@ -3538,10 +3596,10 @@ struct CursivePos {
     entry_exit_records: Vec<EntryExitRecord>,
 }
 
-pub type OpentypeEntryExitRecord = opentype_layout_cursive_pos_entry_exit_records;
+pub type OpentypeEntryExitRecord<'input> = opentype_layout_cursive_pos_entry_exit_records<'input>;
 
-impl TryPromote<OpentypeEntryExitRecord> for EntryExitRecord {
-    type Error = ReflType<TPErr<OpentypeAnchorTable, AnchorTable>, UnknownValueError<u16>>;
+impl<'input> TryPromote<OpentypeEntryExitRecord<'input>> for EntryExitRecord {
+    type Error = ReflType<TPErr<OpentypeAnchorTable<'input>, AnchorTable>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeEntryExitRecord) -> Result<Self, Self::Error> {
         Ok(EntryExitRecord {
@@ -3557,24 +3615,27 @@ struct EntryExitRecord {
     exit_anchor: Option<AnchorTable>,
 }
 
-pub type OpentypeAnchorTable = opentype_common_anchor_table;
-pub type OpentypeAnchorTableTable = opentype_common_anchor_table_table;
+pub type OpentypeAnchorTable<'input> = opentype_common_anchor_table<'input>;
+pub type OpentypeAnchorTableTable<'input> = opentype_common_anchor_table_table<'input>;
 
 pub type OpentypeAnchorTableFormat1 = opentype_common_anchor_table_table_Format1;
 pub type OpentypeAnchorTableFormat2 = opentype_common_anchor_table_table_Format2;
-pub type OpentypeAnchorTableFormat3 = opentype_common_anchor_table_table_Format3;
+pub type OpentypeAnchorTableFormat3<'input> = opentype_common_anchor_table_format3<'input>;
 
-impl TryPromote<OpentypeAnchorTable> for AnchorTable {
-    type Error = ReflType<TPErr<OpentypeAnchorTableTable, AnchorTable>, UnknownValueError<u16>>;
+impl<'input> TryPromote<OpentypeAnchorTable<'input>> for AnchorTable {
+    type Error =
+        ReflType<TPErr<OpentypeAnchorTableTable<'input>, AnchorTable>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeAnchorTable) -> Result<Self, Self::Error> {
         AnchorTable::try_promote(&orig.table)
     }
 }
 
-impl TryPromote<OpentypeAnchorTableTable> for AnchorTable {
-    type Error =
-        ReflType<TPErr<OpentypeAnchorTableFormat3, AnchorTableFormat3>, UnknownValueError<u16>>;
+impl<'input> TryPromote<OpentypeAnchorTableTable<'input>> for AnchorTable {
+    type Error = ReflType<
+        TPErr<OpentypeAnchorTableFormat3<'input>, AnchorTableFormat3>,
+        UnknownValueError<u16>,
+    >;
 
     fn try_promote(orig: &OpentypeAnchorTableTable) -> Result<Self, Self::Error> {
         Ok(match orig {
@@ -3622,18 +3683,36 @@ impl Promote<OpentypeAnchorTableFormat2> for AnchorTableFormat2 {
     }
 }
 
-impl TryPromote<OpentypeAnchorTableFormat3> for AnchorTableFormat3 {
+impl<'input> TryPromote<OpentypeAnchorTableFormat3<'input>> for AnchorTableFormat3 {
     type Error = ReflType<
         TPErr<OpentypeDeviceOrVariationIndexTable, DeviceOrVariationIndexTable>,
         UnknownValueError<u16>,
     >;
 
     fn try_promote(orig: &OpentypeAnchorTableFormat3) -> Result<Self, Self::Error> {
+        fn expand(
+            scope: View<'_>,
+            offset: u16,
+        ) -> Result<Option<DeviceOrVariationIndexTable>, UnknownValueError<u16>> {
+            if offset == 0 {
+                Ok(None)
+            } else {
+                let view = scope
+                    .offset(offset as usize)
+                    .expect("bad offset in anchor table");
+                let mut p = Parser::from(view);
+                let ret = Decoder_opentype_common_device_or_variation_index_table(&mut p)
+                    .expect("bad device table parse");
+                Ok(Some(DeviceOrVariationIndexTable::try_promote(&ret)?))
+            }
+        }
+        let x_device = expand(orig.table_scope, orig.x_device_offset)?;
+        let y_device = expand(orig.table_scope, orig.y_device_offset)?;
         Ok(AnchorTableFormat3 {
             x_coordinate: orig.x_coordinate,
             y_coordinate: orig.y_coordinate,
-            x_device: try_promote_opt(&orig.x_device_offset.link)?,
-            y_device: try_promote_opt(&orig.y_device_offset.link)?,
+            x_device,
+            y_device,
         })
     }
 }
@@ -5252,6 +5331,7 @@ fn show_layout_metrics(layout: Option<&LayoutMetrics>, ctxt: Ctxt, conf: &Config
 }
 
 fn show_script_list(script_list: &ScriptList, conf: &Config) {
+    use display::{Token::LineBreak, toks};
     if script_list.is_empty() {
         println!("\tScriptList [empty]");
     } else {
@@ -5267,28 +5347,20 @@ fn show_script_list(script_list: &ScriptList, conf: &Config) {
                     unreachable!("missing ScriptTable at index {ix} in ScriptList");
                 };
 
-                let mut tmp = display::TokenStream::from_stream(
-                    [
-                        format!("\t\t[{ix}]: {}", item.script_tag).into(),
-                        display::Token::LineBreak,
-                    ]
-                    .into_iter(),
-                );
-                match default_lang_sys {
-                    None => (),
-                    langsys @ Some(..) => {
-                        tmp = tmp.chain(
-                            display::tok(format!("\t\t    [Default LangSys]: "))
-                                .then(display_langsys(langsys, conf)),
-                        )
-                    }
-                }
-                tmp.chain(display_lang_sys_records(lang_sys_records, conf))
+                toks(format!("[{ix}]: {}", item.script_tag))
+                    .pre_indent(4)
+                    .glue(LineBreak, {
+                        match default_lang_sys {
+                            None => display_lang_sys_records(lang_sys_records, conf),
+                            langsys @ Some(..) => toks("[Default LangSys]: ")
+                                .pre_indent(5)
+                                .chain(display_langsys(langsys, conf))
+                                .glue(LineBreak, display_lang_sys_records(lang_sys_records, conf)),
+                        }
+                    })
             },
             conf.bookend_size,
-            |start, stop| {
-                display::Token::from(format!("skipping ScriptRecords {start}..{stop}")).into()
-            },
+            |start, stop| toks(format!("skipping ScriptRecords {start}..{stop}")),
         )
         .println()
     }
@@ -5298,22 +5370,22 @@ fn display_lang_sys_records(
     lang_sys_records: &[LangSysRecord],
     conf: &Config,
 ) -> display::TokenStream<'static> {
+    use display::{Token::LineBreak, toks};
     if lang_sys_records.is_empty() {
-        display::Token::InlineText("\t\t    LangSysRecords: <empty list>".into()).into()
+        toks("LangSysRecords: <empty list>").pre_indent(5)
     } else {
-        display::Token::from(format!("\t\t    LangSysRecords:")).then(
+        toks("LangSysRecords:").pre_indent(5).glue(
+            LineBreak,
             arrayfmt::display_items_elided(
                 lang_sys_records,
                 |ix, item| {
-                    display::Token::from(format!("\t\t\t[{ix}]: {}; ", item.lang_sys_tag))
-                        .then(display_langsys(&item.lang_sys, conf))
+                    toks(format!("[{ix}]: {}; ", item.lang_sys_tag))
+                        .pre_indent(6)
+                        .chain(display_langsys(&item.lang_sys, conf))
                 },
                 conf.bookend_size,
                 |start, stop| {
-                    display::Token::from(format!(
-                        "\t\t    (skipping LangSysRecords {start}..{stop})"
-                    ))
-                    .into()
+                    toks(format!("(skipping LangSysRecords {start}..{stop})")).pre_indent(5)
                 },
             ),
         )

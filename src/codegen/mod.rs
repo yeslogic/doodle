@@ -212,14 +212,15 @@ impl CodeGen {
 
     fn translate(&self, decoder: &GTDecoder) -> CaseLogic<GTExpr> {
         match decoder {
-            TypedDecoder::Call(_gt, ix, args) => {
-                CaseLogic::Simple(SimpleLogic::Invoke(*ix, args.clone()))
+            TypedDecoder::Call(_gt, ix, (args, views)) => {
+                CaseLogic::Simple(SimpleLogic::Invoke(*ix, args.clone(), views.clone()))
             }
             TypedDecoder::Fail => CaseLogic::Simple(SimpleLogic::Fail),
             TypedDecoder::EndOfInput => CaseLogic::Simple(SimpleLogic::ExpectEnd),
             TypedDecoder::Align(n) => CaseLogic::Simple(SimpleLogic::SkipToNextMultiple(*n)),
             TypedDecoder::Pos => CaseLogic::Simple(SimpleLogic::YieldCurrentOffset),
             TypedDecoder::SkipRemainder => CaseLogic::Simple(SimpleLogic::SkipRemainder),
+            TypedDecoder::Phantom => CaseLogic::Simple(SimpleLogic::Noop),
             TypedDecoder::Byte(bs) => CaseLogic::Simple(SimpleLogic::ByteIn(*bs)),
             TypedDecoder::Variant(gt, name, inner) => {
                 let (type_name, def) = {
@@ -2313,12 +2314,15 @@ struct GenBlock {
 
 impl GenBlock {
     /// Constructs a new, empty `GenBlock``.
-    #[expect(unused)]
     pub const fn new() -> Self {
         GenBlock {
             stmts: Vec::new(),
             ret: None,
         }
+    }
+
+    pub const fn is_empty(&self) -> bool {
+        self.stmts.is_empty() && self.ret.is_none()
     }
 
     pub const fn from_parts(stmts: Vec<GenStmt>, ret: Option<GenExpr>) -> Self {
@@ -2612,10 +2616,10 @@ impl_toast_caselogic!(GTExpr);
 
 /// Cases that require no recursion into other case-logic
 #[derive(Clone, Debug)]
-enum SimpleLogic<ExprT> {
+enum SimpleLogic<ExprT, ViewExprT = TypedViewExpr<GenType>> {
     Fail,
     ExpectEnd,
-    Invoke(usize, Vec<(Label, ExprT)>),
+    Invoke(usize, Vec<(Label, ExprT)>, Option<Vec<(Label, ViewExprT)>>),
     SkipToNextMultiple(usize),
     ByteIn(ByteSet),
     Eval(RustExpr),
@@ -2623,6 +2627,7 @@ enum SimpleLogic<ExprT> {
     YieldCurrentOffset,
     SkipRemainder,
     ConstNone,
+    Noop,
 }
 
 impl ToAst for SimpleLogic<GTExpr> {
@@ -2630,26 +2635,30 @@ impl ToAst for SimpleLogic<GTExpr> {
 
     fn to_ast(&self, ctxt: ProdCtxt<'_>) -> GenBlock {
         match self {
+            SimpleLogic::Noop => GenBlock::new(),
             SimpleLogic::Fail => GenBlock::explicit_return(model::err_fail(get_trace(&()))),
             SimpleLogic::ExpectEnd => GenBlock::simple_expr(model::try_enforce_eos(ctxt.parser())),
             SimpleLogic::SkipRemainder => {
                 GenBlock::simple_expr(model::skip_remainder(ctxt.parser()))
             }
-            SimpleLogic::Invoke(ix_dec, args) => {
+            SimpleLogic::Invoke(ix_dec, args, o_views) => {
                 let fname = format!("Decoder{ix_dec}");
                 let call_args = {
                     let base_args = [ctxt.parser()];
-                    let dep_args = args.iter().map(|(_lab, x)| {
-                        let Some(t) = x.get_type() else {
-                            panic!("unexpected lambda in arg-list of SimpleLogic::Invoke")
-                        };
-                        if t.to_rust_type().should_borrow_for_arg() {
-                            RustExpr::borrow_of(embed_expr_nat(x))
-                        } else {
-                            embed_expr_owned(x)
-                        }
-                    });
-                    if args.is_empty() {
+                    let dep_args = args
+                        .iter()
+                        .map(|(_lab, x)| {
+                            let Some(t) = x.get_type() else {
+                                panic!("unexpected lambda in arg-list of SimpleLogic::Invoke")
+                            };
+                            if t.to_rust_type().should_borrow_for_arg() {
+                                RustExpr::borrow_of(embed_expr_nat(x))
+                            } else {
+                                embed_expr_owned(x)
+                            }
+                        })
+                        .chain(o_views.iter().flatten().map(|(_lab, x)| embed_view_expr(x)));
+                    if args.is_empty() && o_views.as_ref().is_none_or(Vec::is_empty) {
                         base_args.to_vec()
                     } else {
                         base_args.into_iter().chain(dep_args).collect()
@@ -3285,10 +3294,12 @@ where
                 let prior_block = prior.to_ast(ctxt);
                 let mut inner_block = inner.to_ast(ctxt);
 
-                // REVIEW - is there a better construction we can use instead of this?
-                let prior_stmt = GenStmt::Expr(GenExpr::BlockScope(Box::new(prior_block)));
-
-                inner_block.prepend_stmt(prior_stmt);
+                // REVIEW - handle empty-blocks from SimpleLogic::Noop (phantom)
+                if !prior_block.is_empty() {
+                    // REVIEW - is there a better construction we can use instead of this?
+                    let prior_stmt = GenStmt::Expr(GenExpr::BlockScope(Box::new(prior_block)));
+                    inner_block.prepend_stmt(prior_stmt);
+                }
                 inner_block
             }
             OtherLogic::Hint(_hint, inner) => {
@@ -3714,9 +3725,22 @@ where
     fn to_ast(&self, _ctxt: ProdCtxt<'_>) -> RustFn {
         let name = decoder_fname(self.ixlabel);
 
-        let params = self
-            .ret_type
-            .lt_param()
+        // properly capture associated lifetimes of extra arguments
+        let mut arg_lt = None;
+        for (_, t) in self.extra_args.iter().flatten() {
+            // specialize over views only, to avoid deep recursion
+            match t {
+                GenType::Inline(RustType::ViewObject(lt)) => {
+                    let _ = arg_lt.insert(lt);
+                    break;
+                }
+                _ => continue,
+            }
+        }
+
+        let this_lt = self.ret_type.lt_param().or(arg_lt);
+        let params = this_lt
+            .as_ref()
             .map(|lt| DefParams::from_lt(lt.as_ref().clone()));
         let sig = {
             let args = {
@@ -3724,7 +3748,7 @@ where
                     let name = "_input".into();
                     let ty = {
                         let mut params = RustParams::<RustLt, RustType>::new();
-                        if let Some(lt) = self.ret_type.lt_param() {
+                        if let Some(lt) = this_lt {
                             params.push_lifetime(lt.clone());
                         } else {
                             params.push_lifetime(RustLt::Parametric("'_".into()));
@@ -4015,7 +4039,7 @@ impl<'a> Elaborator<'a> {
 
     fn elaborate_format(&mut self, format: &Format, dyn_scope: &TypedDynScope<'_>) -> GTFormat {
         match format {
-            Format::ItemVar(level, args, _views) => {
+            Format::ItemVar(level, args, views) => {
                 self.codegen
                     .name_gen
                     .ctxt
@@ -4035,7 +4059,17 @@ impl<'a> Elaborator<'a> {
                 self.codegen.name_gen.ctxt.escape();
 
                 // TODO[epic=view-dependent-formats] - figure out what needs to be done here, beyond a simple clone
-                let views = _views.clone();
+                let t_views = if let Some(views) = views {
+                    let fm_views = &self.module.views[*level];
+                    let mut t_views = Vec::with_capacity(views.len());
+                    for (lbl, view) in Iterator::zip(fm_views.iter(), views.iter()) {
+                        let t_view = self.elaborate_view_expr(view);
+                        t_views.push((lbl.clone(), t_view));
+                    }
+                    Some(t_views)
+                } else {
+                    None
+                };
 
                 let t_inner = if let Some(val) = self.t_formats.get(level) {
                     val.clone()
@@ -4048,7 +4082,7 @@ impl<'a> Elaborator<'a> {
                 };
                 let gt = self.get_gt_from_index(index);
                 self.codegen.name_gen.ctxt.escape();
-                TypedFormat::FormatCall(gt, *level, t_args, views, t_inner)
+                TypedFormat::FormatCall(gt, *level, t_args, t_views, t_inner)
             }
             Format::ForEach(expr, lbl, inner) => {
                 let index = self.get_and_increment_index();
@@ -4452,6 +4486,12 @@ impl<'a> Elaborator<'a> {
                 let t_view_format = self.elaborate_view_format(view_format);
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::WithView(gt, t_view, t_view_format)
+            }
+            Format::Phantom(inner) => {
+                let index = self.get_and_increment_index();
+                let t_inner = self.elaborate_format(inner, dyn_scope);
+                let gt = self.get_gt_from_index(index);
+                TypedFormat::Phantom(gt, Box::new(t_inner))
             }
         }
     }
@@ -4890,10 +4930,6 @@ impl<'a> Elaborator<'a> {
                 .push_atom(NameAtom::Explicit(Label::from(
                     self.module.get_name(next_level).to_string(),
                 )));
-            for _ in self.module.get_args(next_level) {
-                // handle metavariable increment for each dep-arg
-                self.increment_index();
-            }
             let local_root = self.elaborate_format(module.get_format(next_level), &dyn_s);
             // clean-up
             self.codegen.name_gen.ctxt.escape();

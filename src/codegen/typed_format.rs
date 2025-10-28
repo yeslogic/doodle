@@ -7,7 +7,7 @@ use super::{AtomType, LocalType};
 use crate::bounds::Bounds;
 use crate::byte_set::ByteSet;
 use crate::codegen::rust_ast::{RustLt, RustParams, UseParams};
-use crate::{Arith, BaseKind, Endian, IntRel, Label, StyleHint, TypeHint, UnaryOp, ViewExpr};
+use crate::{Arith, BaseKind, Endian, IntRel, Label, StyleHint, TypeHint, UnaryOp};
 
 pub(crate) mod variables;
 
@@ -96,6 +96,7 @@ impl<TypeRep> std::hash::Hash for TypedFormat<TypeRep> {
                 expr.hash(state);
                 inner.hash(state);
             }
+            TypedFormat::Phantom(_, inner) => inner.hash(state),
             TypedFormat::ParseFromView(_, view, inner) => {
                 view.hash(state);
                 inner.hash(state);
@@ -207,7 +208,7 @@ pub enum TypedFormat<TypeRep> {
         TypeRep,
         usize,
         Vec<(Label, TypedExpr<TypeRep>)>,
-        Option<Vec<ViewExpr>>,
+        Option<Vec<(Label, TypedViewExpr<TypeRep>)>>,
         Rc<TypedFormat<TypeRep>>,
     ),
     ForEach(
@@ -295,6 +296,7 @@ pub enum TypedFormat<TypeRep> {
     LiftedOption(TypeRep, Option<Box<TypedFormat<TypeRep>>>),
     LetView(TypeRep, Label, Box<TypedFormat<TypeRep>>),
     WithView(TypeRep, TypedViewExpr<TypeRep>, TypedViewFormat<TypeRep>),
+    Phantom(TypeRep, Box<TypedFormat<TypeRep>>),
 }
 
 impl TypedFormat<GenType> {
@@ -377,6 +379,7 @@ impl TypedFormat<GenType> {
                 .map_or(Bounds::exact(0), |f| f.lookahead_bounds()),
             // REVIEW[epic=view-format] - is this correct?
             TypedFormat::WithView(_, _ident, _vf) => Bounds::exact(0),
+            TypedFormat::Phantom(..) => Bounds::exact(0),
         }
     }
 
@@ -452,6 +455,7 @@ impl TypedFormat<GenType> {
             }
             // REVIEW[epic=view-format] - is this correct?
             TypedFormat::WithView(_, _ident, _vf) => Bounds::exact(0),
+            TypedFormat::Phantom(..) => Bounds::exact(0),
         }
     }
 
@@ -474,9 +478,10 @@ impl TypedFormat<GenType> {
     pub(crate) fn get_type(&self) -> Option<Cow<'_, GenType>> {
         match self {
             TypedFormat::Fail => None,
-            TypedFormat::SkipRemainder | TypedFormat::EndOfInput | TypedFormat::Align(_) => {
-                Some(Cow::Owned(GenType::from(RustType::UNIT)))
-            }
+            TypedFormat::SkipRemainder
+            | TypedFormat::EndOfInput
+            | TypedFormat::Align(_)
+            | TypedFormat::Phantom(..) => Some(Cow::Owned(GenType::from(RustType::UNIT))),
             TypedFormat::Byte(_) => Some(Cow::Owned(GenType::from(PrimType::U8))),
             // REVIEW - forcing Pos to be a U64-valued format
             TypedFormat::Pos => Some(Cow::Owned(GenType::from(PrimType::U64))),
@@ -1096,11 +1101,17 @@ mod __impls {
     impl<TypeRep> From<TypedFormat<TypeRep>> for Format {
         fn from(value: TypedFormat<TypeRep>) -> Self {
             match value {
-                TypedFormat::FormatCall(_gt, level, t_args, views, _) => {
+                TypedFormat::FormatCall(_gt, level, t_args, t_views, _) => {
                     let args = t_args
                         .into_iter()
                         .map(|(_lbl, arg)| Expr::from(arg))
                         .collect();
+                    let views = t_views.map(|views| {
+                        views
+                            .into_iter()
+                            .map(|(_lbl, view)| ViewExpr::from(view))
+                            .collect()
+                    });
                     Format::ItemVar(level, args, views)
                 }
                 TypedFormat::DecodeBytes(_, expr, inner) => {
@@ -1181,6 +1192,7 @@ mod __impls {
                 }
                 TypedFormat::Apply(_, name, _) => Format::Apply(name),
                 TypedFormat::LiftedOption(_, inner) => Format::LiftedOption(inner.map(rebox)),
+                TypedFormat::Phantom(_, inner) => Format::Phantom(rebox(inner)),
             }
         }
     }
