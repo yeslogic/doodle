@@ -1,6 +1,6 @@
 use super::util::{FxHash, StableMap};
 use super::{
-    name::{NameCtxt, PathLabel, pick_best_path},
+    name::{NameCtxt, PathLabel},
     rust_ast::RustTypeDecl,
 };
 use crate::Label;
@@ -8,7 +8,7 @@ use crate::Label;
 pub struct NameGen {
     pub(super) ctxt: NameCtxt,
     ctr: usize,
-    // Reverse mapping from a RustTypeDef to its index in the ad-hoc type inventory and the PathLabel it is to be assigned
+    // Reverse mapping from a RustTypeDef to its index in the ad-hoc type inventory and the PathLabel it was first assigned (which cannot be safely mutated)
     pub(super) rev_map: StableMap<RustTypeDecl, (usize, PathLabel), FxHash>,
     // Reassociation table for converting first-pass name selections into their ideal seed-PathLabel
     pub(super) name_remap: StableMap<Label, PathLabel, FxHash>,
@@ -33,33 +33,47 @@ impl NameGen {
         ret
     }
 
-    /// Finds an existing name, or generates a new name, for a [`RustTypeDef`]
+    /// Yields a first-pass name for a [`RustTypeDecl`]
     ///
-    /// Returns `(old, (ix, false))` if the RustTypeDef was already given a name `old`, where `ix` is the index of the definition in the overall order of ad-hoc types that were defined thus-far.
+    /// If the `RustTypeDecl` has not yet been recorded, its entry is populated and it is assigned a first-pass name
+    /// based on the current `self.ctxt` path.
     ///
-    /// Returns `(new, (ix, true))` otherwise, where `ix` is the uniquely-identifying index of the newly defined type at time-of-invocation, and `new` is a fresh path-based name for the type.
-    pub fn get_name(&mut self, def: &RustTypeDecl) -> (Label, (usize, bool)) {
-        match self.rev_map.get(def) {
-            Some((ix, path)) => match self.ctxt.find_name_for(path).ok() {
+    /// If the `RustTypeDecl` has previously been recorded, the first-pass name it was given originally is preserved, but the name-remap table is updated
+    /// to reflect whichever of its currently-held path and the `self.ctxt` path would yield a better second-pass name.
+    ///
+    /// Returns a nested tuple `(name, (ix, is_new))` where `name` is the first-pass name, `ix` is the index of the type in the adhoc type inventory,
+    /// and `is_new` is true iff the `RustTypeDecl` was not previously recorded.
+    pub fn get_name(&mut self, decl: &RustTypeDecl) -> (Label, (usize, bool)) {
+        match self.rev_map.get(decl) {
+            Some((ix, orig_path)) => match self.ctxt.find_name_for(orig_path).ok() {
                 Some(name) => {
-                    let path = self.ctxt.produce_name();
-                    self.name_remap
-                        .entry(name.clone())
-                        .and_modify(|prior| pick_best_path(prior, path.clone()))
-                        .or_insert(path);
+                    /*
+                    * `orig_path`: the PathLabel that `decl` was first assigned in `self.rev_map`
+                    * `name`: the first-pass name we are committed to using
+                    * `path_here`: the current stack-path stored in `self.ctxt`
+                    */
+                    let path_here = self.ctxt.register_path();
+
+                    self.name_remap          // with our renaming table (early commit -> final name),
+                        .entry(name.clone()) // get the Entry for the `name`, the first-pass name that decl is getting
+                        .and_modify(|prior: &mut PathLabel| {
+                            // if it is currently associated with a different PathLabel `prior`,
+                            self.ctxt.refine_path(prior, path_here.clone()); // rebind to whichever of `path_here` or `prior` is better
+                        })
+                        .or_insert(path_here); // or otherwise insert path_here
                     (name, (*ix, false))
                 }
                 None => unreachable!("no identifier associated with path, but path is in use"),
-            },
+            }
             None => {
                 let ix = self.ctr;
                 self.ctr += 1;
                 let (path, ret) = {
-                    let loc = self.ctxt.produce_name();
+                    let loc = self.ctxt.register_path();
                     let name = self.ctxt.find_name_for(&loc).unwrap();
                     (loc, name)
                 };
-                self.rev_map.insert(def.clone(), (ix, path.clone()));
+                self.rev_map.insert(decl.clone(), (ix, path.clone()));
                 // ensure deduplication happens by forcing a no-op rename by default
                 self.name_remap.insert(ret.clone(), path);
                 (ret, (ix, true))

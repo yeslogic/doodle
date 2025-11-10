@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
+use std::borrow::Cow;
 
 use anyhow::anyhow;
 
@@ -8,8 +9,8 @@ use crate::output::Fragment;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum Derivation {
-    /// Incidental type that is mapped or transformed (e.g. via Format::LetFormat, Format::Map, Format::DecodeBytes)
-    Preimage,
+    /// Incidental type that is processed but not persisted (e.g. via Format::Map or Format::MonadSeq)
+    Lhs,
     /// Inner-Type that appears inside of a Maybe-Context
     // REVIEW - do we need to distinguish items in such positions?
     Yes,
@@ -18,7 +19,7 @@ pub(crate) enum Derivation {
 impl Derivation {
     pub(crate) fn token(&self) -> &'static str {
         match self {
-            Derivation::Preimage => "raw",
+            Derivation::Lhs => "lhs",
             Derivation::Yes => "yes",
         }
     }
@@ -99,16 +100,8 @@ pub(crate) fn is_refinement(x: &PathLabel, y: &PathLabel) -> bool {
             },
         }
     }
-    // NOTE - we would normally just return false, but to allow conditional bypass of backup heuristics for DeadEnd, we pply them outside the loop
-    y.len() < x.len() || NameCtxt::generate_name(y).len() < NameCtxt::generate_name(x).len()
-}
-
-/// If `y` is a refinement over `x`, then `x` is replaced with `y`
-pub(crate) fn pick_best_path(x: &mut PathLabel, y: PathLabel) {
-    if is_refinement(x, &y) {
-        // eprintln!("{} -> {}", NameCtxt::generate_name(&*x), NameCtxt::generate_name(&y));
-        *x = y;
-    }
+    // NOTE - we would normally just return false, but to allow conditional bypass of backup heuristics for DeadEnd, we apply them outside the loop
+    y.len() < x.len() || NameCtxt::synthesize_name(x).len() > NameCtxt::synthesize_name(y).len()
 }
 
 #[derive(Debug)]
@@ -132,6 +125,22 @@ impl<T: Ord> PHeap<T> {
             fixed: Vec::new(),
             floating: BTreeSet::new(),
         }
+    }
+
+    /// Returns the priority of element `elem` in the Priority-heap.
+    ///
+    /// If the element is in the fixed segment, returns its exact priority.
+    /// If the element is in the floating segment, returns the worst priority that would be assigned based on the PHeap size.
+    pub fn get_priority(&self, elem: &T) -> Option<usize> {
+        for (i, elt0) in self.fixed.iter().enumerate() {
+            if elt0 == elem {
+                return Some(i);
+            }
+        }
+        if !self.floating.contains(elem) {
+            return None;
+        }
+        Some(self.fixed.len() + self.floating.len() - 1)
     }
 
     /// Given a value already in the `PHeap`, promotes it to the next available priority-slot and returns the corresponding
@@ -175,7 +184,7 @@ impl NameCtxt {
     }
 
     /// Pushes a given [`NameAtom`] to the top (i.e. deepest element) of the [`NameCtxt`] and returns the
-    /// reborrowed receiver, for chaining with other operations
+    /// re-borrowed receiver, for chaining with other operations
     pub fn push_atom(&mut self, atom: NameAtom) -> &mut Self {
         // eprintln!("{:?} + {:?}", self.stack, &atom);
         self.stack.push(atom);
@@ -248,15 +257,18 @@ impl NameCtxt {
         identifier: Label,
         location: &PathLabel,
     ) {
+        let loc = Self::trim(location).into_owned();
         table
             .entry(identifier)
             .or_insert_with(|| RefCell::new(PHeap::new()))
             .borrow_mut()
-            .insert(location.clone());
+            .insert(loc);
     }
 
-    /// Statically translates a `PathLabel` into a locally-unique identifier-string
-    pub(crate) fn generate_name(location: &PathLabel) -> Label {
+    /// Static, mechanical transformation from a `PathLabel` to a locally-unique identifier-string
+    ///
+    /// Will not distinguish between two paths with a common suffix whose head is an explicitly-named atom.
+    pub(crate) fn synthesize_name(location: &PathLabel) -> Label {
         let mut buffer = Fragment::Empty;
         for atom in location.iter().rev() {
             match atom {
@@ -271,29 +283,85 @@ impl NameCtxt {
         Label::Owned(ret)
     }
 
+    fn trim(path: &PathLabel) -> Cow<'_, PathLabel> {
+        for ix in (0..path.len()).rev() {
+            match &path[ix] {
+                NameAtom::Explicit(_) =>  return Cow::Owned(path[ix..].to_vec()),
+                _ => continue,
+            }
+        }
+        return Cow::Borrowed(path)
+    }
+
     /// Returns a globally-unique fixed-priority name for a given `PathLabel`
     ///
     /// The order in which competing candidates for a given name are passed into this method affects deduplication strategies
     /// and resulting identifiers, but otherwise the generation process for names is invariant.
     pub(crate) fn find_name_for(&self, loc: &PathLabel) -> Result<Label, anyhow::Error> {
-        let rawname = Self::generate_name(loc);
+        let rawname = Self::synthesize_name(loc);
         match self.table.get(&rawname) {
             None => Err(anyhow!("no raw-name found for {:?}", loc)),
-            Some(heap) => match heap.borrow_mut().fix(loc.to_vec()) {
-                Ok(ix) => Ok(dedup(rawname, ix)),
-                Err(e) => Err(anyhow!("error: {e}")),
-            },
+            Some(heap) => {
+                let loc = Self::trim(loc);
+                let res = heap.borrow_mut().fix(loc.to_vec());
+                match res {
+                    Ok(ix) => {
+                        // trace mechanism to diagnose where dedup-names arise
+                        #[cfg(false)]
+                        {
+                            if ix > 0 {
+                                let _loc = &heap.borrow().fixed[0];
+                                eprintln!("[UNDUP]: {rawname} <- {_loc:#?}");
+                                eprintln!("[DEDUP]: {rawname} [dup {ix}] <- {loc:#?}");
+                            }
+                        }
+                        Ok(dedup(rawname, ix))
+                    }
+                    Err(e) => Err(anyhow!("error: {e}")),
+                }
+            }
+        }
+    }
+
+    fn get_priority(&self, loc: &PathLabel) -> Option<usize> {
+        let rawname = Self::synthesize_name(loc);
+        match self.table.get(rawname.as_ref()) {
+            None => unreachable!("missing entry for name {rawname}"),
+            Some(heap) => {
+                let loc = Self::trim(loc);
+                heap.borrow().get_priority(&loc)
+            }
         }
     }
 
     /// Registers the current `PathLabel` on-stack into the appropriate [`PHeap`] in the association-table,
     /// returning a duplicate copy of it, which can then be promoted using [`NameCtxt::find_name_for`]
-    pub fn produce_name(&mut self) -> PathLabel {
-        let identifier = Self::generate_name(&self.stack);
+    pub fn register_path(&mut self) -> PathLabel {
+        let identifier = Self::synthesize_name(&self.stack);
         Self::resolve(&mut self.table, identifier.clone(), &self.stack);
-        self.stack.clone()
+        Self::trim(&self.stack).into_owned()
     }
-}
+
+    /// If `y` is a refinement over `x`, then `x` is replaced with `y`.
+    ///
+    /// Returns `true` if `x` was replaced with `y`, and `false`` otherwise.
+    pub(crate) fn refine_path(&self, x: &mut PathLabel, y: PathLabel) -> bool {
+        let name_x = Self::synthesize_name(x);
+        let name_y = Self::synthesize_name(&y);
+        let is_improvement = if name_x == name_y {
+            match (self.get_priority(x), self.get_priority(&y)) {
+                (Some(xp), Some(yp)) => yp < xp,
+
+                (None, Some(_)) => true,
+                _ => false,
+            }
+        } else {
+            is_refinement(x, &y)
+        };
+        if is_improvement { *x = y; }
+        is_improvement
+    }
+ }
 
 /// Simple dodging scheme for generating a unique name from a possibly-shared base-name
 fn dedup(rawname: Label, ix: usize) -> Label {
@@ -327,9 +395,9 @@ mod tests {
         ];
         let mut namectxt = NameCtxt::new();
         let _ = std::mem::replace(&mut namectxt.stack, overlap0.clone());
-        let oput0 = namectxt.produce_name();
+        let oput0 = namectxt.register_path();
         let _ = std::mem::replace(&mut namectxt.stack, overlap1.clone());
-        let oput1 = namectxt.produce_name();
+        let oput1 = namectxt.register_path();
         let name0 = namectxt.find_name_for(&oput0).unwrap();
         let name1 = namectxt.find_name_for(&oput1).unwrap();
         assert_ne!(name0, name1);
@@ -340,40 +408,40 @@ mod tests {
         let ctxt = &mut NameCtxt::new();
         let root = ctxt
             .push_atom(NameAtom::Explicit(Label::Borrowed("root")))
-            .produce_name();
+            .register_path();
         let root_data = ctxt
             .push_atom(NameAtom::RecordField(Label::Borrowed("data")))
-            .produce_name();
+            .register_path();
         let root_data_header = ctxt
             .push_atom(NameAtom::RecordField(Label::Borrowed("header")))
-            .produce_name();
+            .register_path();
         let data_header = ctxt
             .push_atom(NameAtom::Explicit(Label::Borrowed("hdat")))
-            .produce_name();
+            .register_path();
         let root_data_body = ctxt
             .escape()
             .escape()
             .push_atom(NameAtom::RecordField(Label::Borrowed("body")))
-            .produce_name();
-        let root_data_body0 = ctxt.increment_index().produce_name();
-        let root_data_body1 = ctxt.increment_index().produce_name();
+            .register_path();
+        let root_data_body0 = ctxt.increment_index().register_path();
+        let root_data_body1 = ctxt.increment_index().register_path();
         let root_data_footer = ctxt
             .escape()
             .escape()
             .push_atom(NameAtom::RecordField(Label::Borrowed("footer")))
-            .produce_name();
+            .register_path();
         let root_extra = ctxt
             .escape()
             .escape()
             .push_atom(NameAtom::RecordField("extra".into()))
-            .produce_name();
+            .register_path();
         let root_extra_varyes = ctxt
             .push_atom(NameAtom::Variant("Yes".into()))
-            .produce_name();
+            .register_path();
         let root_extra_varno = ctxt
             .escape()
             .push_atom(NameAtom::Variant("No".into()))
-            .produce_name();
+            .register_path();
         assert_eq!(ctxt.find_name_for(&root).unwrap(), "root");
         assert_eq!(ctxt.find_name_for(&root_data).unwrap(), "root_data");
         assert_eq!(

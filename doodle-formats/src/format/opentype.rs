@@ -6,6 +6,7 @@ use doodle::{
 mod util {
     use super::*;
     use doodle::IntoLabel;
+    #[cfg(feature = "alt")] use doodle::alt::FormatExt;
 
     pub(crate) fn id<T>(x: T) -> T {
         x
@@ -496,6 +497,34 @@ mod util {
             is_nonzero_u16(offset.clone()),
             parse_from_view(base_view.offset(offset), format),
         )
+    }
+
+    /// Compact format for parsing a u16be and phantom-parsing `format` at that offset (relative to a view).
+    pub(crate) fn read_phantom_view_offset16(view: ViewExpr, format: Format) -> Format {
+        record_auto([
+            ("offset", u16be()),
+            (
+                "__data",
+                phantom(view_offset16(view, var("offset"), format)),
+            ),
+        ])
+    }
+
+    /// Reads a U16Be offset value and conditionally applies `format` to the location found at that offset
+    /// relative to `view`, depending on the processing model.
+    #[cfg(feature = "alt")]
+    pub(crate) fn alt_read_u16be_view_offset(view: ViewExpr, format: Format) -> FormatExt {
+        use doodle::alt::MetaFormat;
+        let base_model = Box::new(FormatExt::from(chain(
+            u16be(),
+            "offset",
+            view_offset16(view.clone(), var("offset"), format.clone()),
+        )));
+        let alt_model = Box::new(FormatExt::from(read_phantom_view_offset16(view, format)));
+        FormatExt::Meta(MetaFormat::EngineSpecific {
+            base_model,
+            alt_model,
+        })
     }
 
     /// Given a value of `base_offset` (the absolute stream-position relative to which offsets are to be interpreted),
@@ -2251,24 +2280,33 @@ mod gpos {
         value_format_flags: FormatRef,
         value_record: FormatRef,
     ) -> FormatRef {
-        let single_pos_format1 = |table_start: Expr| {
+        let single_pos_format1 = module.define_format_args_views(
+            "opentype.layout.single_pos.format1",
+            vec![],
+            vec![Label::Borrowed("table_view")],
             record([
                 (
-                    "coverage_offset",
-                    util::offset16_mandatory(table_start.clone(), coverage_table.call()),
+                    "coverage",
+                    read_phantom_view_offset16(ViewExpr::var("table_view"), coverage_table.call()),
                 ),
                 ("value_format", value_format_flags.call()),
                 (
                     "value_record",
-                    value_record.call_args(vec![table_start, var("value_format")]),
+                    value_record.call_args_views(
+                        vec![var("value_format")],
+                        vec![ViewExpr::var("table_view")],
+                    ),
                 ),
-            ])
-        };
-        let single_pos_format2 = |table_start: Expr| {
+            ]),
+        );
+        let single_pos_format2 = module.define_format_args_views(
+            "opentype.layout.single_pos.format2",
+            vec![],
+            vec![Label::Borrowed("table_view")],
             record([
                 (
-                    "coverage_offset",
-                    util::offset16_mandatory(table_start.clone(), coverage_table.call()),
+                    "coverage",
+                    read_phantom_view_offset16(ViewExpr::var("table_view"), coverage_table.call()),
                 ),
                 ("value_format", value_format_flags.call()),
                 ("value_count", u16be()),
@@ -2276,37 +2314,48 @@ mod gpos {
                     "value_records",
                     repeat_count(
                         var("value_count"),
-                        value_record.call_args(vec![table_start, var("value_format")]),
-                    ),
-                ),
-            ])
-        };
-        module.define_format(
-            "opentype.layout.single_pos",
-            record([
-                ("table_start", pos32()),
-                ("pos_format", u16be()),
-                (
-                    "subtable",
-                    match_variant(
-                        var("pos_format"),
-                        [
-                            (
-                                Pattern::U16(1),
-                                "Format1",
-                                single_pos_format1(var("table_start")),
-                            ),
-                            (
-                                Pattern::U16(2),
-                                "Format2",
-                                single_pos_format2(var("table_start")),
-                            ),
-                            // REVIEW - should this be a permanent hard-failure?
-                            (Pattern::Wildcard, "BadFormat", Format::Fail),
-                        ],
+                        value_record.call_args_views(
+                            vec![var("value_format")],
+                            vec![ViewExpr::var("table_view")],
+                        ),
                     ),
                 ),
             ]),
+        );
+        module.define_format(
+            "opentype.layout.single_pos",
+            let_view(
+                "table_view",
+                record([
+                    ("pos_format", u16be()),
+                    (
+                        "subtable",
+                        match_variant(
+                            var("pos_format"),
+                            [
+                                (
+                                    Pattern::U16(1),
+                                    "Format1",
+                                    single_pos_format1.call_args_views(
+                                        Vec::new(),
+                                        vec![ViewExpr::var("table_view")],
+                                    ),
+                                ),
+                                (
+                                    Pattern::U16(2),
+                                    "Format2",
+                                    single_pos_format2.call_args_views(
+                                        Vec::new(),
+                                        vec![ViewExpr::var("table_view")],
+                                    ),
+                                ),
+                                // REVIEW - should this be a permanent hard-failure?
+                                (Pattern::Wildcard, "BadFormat", Format::Fail),
+                            ],
+                        ),
+                    ),
+                ]),
+            ),
         )
     }
 
@@ -2320,42 +2369,72 @@ mod gpos {
         value_format_flags: FormatRef,
         value_record: FormatRef,
     ) -> FormatRef {
-        // TODO - refactor into dep-format or standalone function
-        let pair_value_record = |table_start: Expr, value_format1: Expr, value_format2: Expr| {
+        let vf_flags_type = module.get_format_type(value_format_flags.get_level()).clone();
+
+        let pair_value_record = module.define_format_args_views(
+            "opentype.layout.pair_pos.pair_value_record",
+            vec![
+                (Label::Borrowed("value_format1"), vf_flags_type.clone()),
+                (Label::Borrowed("value_format2"), vf_flags_type.clone()),
+            ],
+            vec![Label::Borrowed("set_view")],
             record([
                 // NOTE - first glyph id is listed in the Coverage table
                 ("second_glyph", u16be()),
                 (
                     "value_record1",
-                    layout::optional_value_record(value_record, table_start.clone(), value_format1),
+                    layout::optional_value_record(
+                        value_record,
+                        ViewExpr::var("set_view"),
+                        var("value_format1"),
+                    ),
                 ),
                 (
                     "value_record2",
-                    layout::optional_value_record(value_record, table_start, value_format2),
-                ),
-            ])
-        };
-        // TODO - refactor into dep-format or standalone function
-        let pair_set = |value_format1: Expr, value_format2: Expr| {
-            record([
-                ("table_start", pos32()),
-                ("pair_value_count", u16be()),
-                (
-                    "pair_value_records",
-                    repeat_count(
-                        var("pair_value_count"),
-                        pair_value_record(var("table_start"), value_format1, value_format2),
+                    layout::optional_value_record(
+                        value_record,
+                        ViewExpr::var("set_view"),
+                        var("value_format2"),
                     ),
                 ),
-            ])
-        };
+            ]),
+        );
+        let pair_set = module.define_format_args(
+            "opentype.layout.pair_pos.pair_set",
+            vec![
+                (Label::Borrowed("value_format1"), vf_flags_type.clone()),
+                (Label::Borrowed("value_format2"), vf_flags_type.clone()),
+            ],
+            let_view(
+                "set_view",
+                record([
+                    (
+                        "set_scope",
+                        with_view(ViewExpr::var("set_view"), ViewFormat::ReifyView),
+                    ),
+                    ("pair_value_count", u16be()),
+                    (
+                        "pair_value_records",
+                        repeat_count(
+                            var("pair_value_count"),
+                            pair_value_record.call_args_views(
+                                vec![var("value_format1"), var("value_format2")],
+                                vec![ViewExpr::var("set_view")],
+                            ),
+                        ),
+                    ),
+                ]),
+            ),
+        );
         // TODO - refactor into dep-format or standalone function
-        let pair_pos_format1 = |table_start: Expr| {
-            record([
-                (
-                    "coverage",
-                    util::offset16_mandatory(table_start, coverage_table.call()),
-                ),
+        let pair_pos_format1 = module.define_format_args_views(
+            "opentype.layout.pair_pos.format1",
+            vec![],
+            vec![Label::Borrowed("table_view")],
+            record_auto([
+                ("table_scope", with_view(ViewExpr::var("table_view"), ViewFormat::ReifyView)),
+                ("coverage_offset", u16be()),
+                ("__coverage", phantom(util::view_offset16(ViewExpr::var("table_view"), var("coverage_offset"), coverage_table.call()))),
                 ("value_format1", value_format_flags.call()),
                 ("value_format2", value_format_flags.call()),
                 ("pair_set_count", u16be()),
@@ -2363,54 +2442,63 @@ mod gpos {
                     "pair_sets",
                     repeat_count(
                         var("pair_set_count"),
-                        util::offset16_mandatory(
-                            var("table_start"),
-                            pair_set(var("value_format1"), var("value_format2")),
+                        util::read_phantom_view_offset16(
+                            ViewExpr::var("table_view"),
+                            pair_set.call_args(vec![var("value_format1"), var("value_format2")]),
                         ),
                     ),
                 ),
-            ])
-        };
-        // TODO - refactor into dep-format or standalone function
-        let class2_record = |table_start: Expr, value_format1: Expr, value_format2: Expr| {
+            ]),
+        );
+        let class2_record = module.define_format_args_views(
+            "opentype.layout.pair_pos.class2_record",
+            vec![
+                (Label::Borrowed("value_format1"), vf_flags_type.clone()),
+                (Label::Borrowed("value_format2"), vf_flags_type.clone()),
+            ],
+            vec![Label::Borrowed("table_view")],
             record([
                 (
                     "value_record1",
-                    layout::optional_value_record(value_record, table_start.clone(), value_format1),
+                    layout::optional_value_record(value_record, ViewExpr::var("table_view"), var("value_format1")),
                 ),
                 (
                     "value_record2",
-                    layout::optional_value_record(value_record, table_start, value_format2),
+                    layout::optional_value_record(value_record, ViewExpr::var("table_view"), var("value_format2")),
                 ),
-            ])
-        };
+            ]),
+        );
+
         // TODO - refactor into dep-format or standalone function
-        let class1_record =
-            |table_start: Expr, class2_count: Expr, value_format1: Expr, value_format2: Expr| {
-                record([(
-                    "class2_records",
-                    repeat_count(
-                        class2_count,
-                        class2_record(table_start, value_format1, value_format2),
-                    ),
-                )])
-            };
+        fn class1_record(table_view: ViewExpr, class2_count: Expr, value_format1: Expr, value_format2: Expr, class2_record: FormatRef) -> Format {
+            record([(
+                "class2_records",
+                repeat_count(
+                    class2_count,
+                    class2_record.call_args_views(vec![value_format1, value_format2], vec![table_view]),
+                ),
+            )])
+        }
         // TODO - refactor into dep-format or standalone function
-        let pair_pos_format2 = |pair_pos_start: Expr| {
+        let pair_pos_format2 = module.define_format_args_views(
+            "opentype.layout.pair_pos.format2",
+            vec![],
+            vec![Label::Borrowed("table_view")],
             record([
+                ("table_scope", with_view(ViewExpr::var("table_view"), ViewFormat::ReifyView)),
                 (
                     "coverage",
-                    util::offset16_mandatory(pair_pos_start.clone(), coverage_table.call()),
+                    util::read_phantom_view_offset16(ViewExpr::var("table_view"), coverage_table.call()),
                 ),
                 ("value_format1", value_format_flags.call()),
                 ("value_format2", value_format_flags.call()),
                 (
                     "class_def1",
-                    util::offset16_mandatory(pair_pos_start.clone(), class_def.call()),
+                    util::read_phantom_view_offset16(ViewExpr::var("table_view"), class_def.call()),
                 ),
                 (
                     "class_def2",
-                    util::offset16_mandatory(pair_pos_start.clone(), class_def.call()),
+                    util::read_phantom_view_offset16(ViewExpr::var("table_view"), class_def.call()),
                 ),
                 ("class1_count", u16be()),
                 ("class2_count", u16be()),
@@ -2419,19 +2507,21 @@ mod gpos {
                     repeat_count(
                         var("class1_count"),
                         class1_record(
-                            pair_pos_start,
+                            ViewExpr::var("table_view"),
                             var("class2_count"),
                             var("value_format1"),
                             var("value_format2"),
+                            class2_record,
                         ),
                     ),
                 ),
             ])
-        };
+        );
         module.define_format(
             "opentype.layout.pair_pos",
+            let_view(
+                "table_view",
             record([
-                ("table_start", pos32()),
                 ("pos_format", u16be()),
                 (
                     "subtable",
@@ -2441,12 +2531,12 @@ mod gpos {
                             (
                                 Pattern::U16(1),
                                 "Format1",
-                                pair_pos_format1(var("table_start")),
+                                pair_pos_format1.call_args_views(vec![], vec![ViewExpr::var("table_view")]),
                             ),
                             (
                                 Pattern::U16(2),
                                 "Format2",
-                                pair_pos_format2(var("table_start")),
+                                pair_pos_format2.call_args_views(vec![], vec![ViewExpr::var("table_view")]),
                             ),
                             // REVIEW - should this be a permanent hard-failure?
                             (Pattern::Wildcard, "BadFormat", Format::Fail),
@@ -2455,6 +2545,7 @@ mod gpos {
                 ),
             ]),
         )
+    )
     }
 
     /// Lookup type 3 subtable: cursive attachment positioning
@@ -2466,45 +2557,71 @@ mod gpos {
         anchor_table: FormatRef,
     ) -> FormatRef {
         // TODO - refactor into dep-format or standalone function
-        let entry_exit_record = |table_start: Expr| {
-            record([
+        let entry_exit_record = module.define_format_args_views(
+            "opentype.layout.entry_exit_record",
+            vec![],
+            vec![Label::Borrowed("table_view")],
+            record_auto([
+                ("entry_anchor_offset", u16be()),
                 (
-                    "entry_anchor",
-                    util::offset16_nullable(table_start.clone(), anchor_table.call()),
+                    "__entry_anchor",
+                    phantom(util::view_offset16(
+                        ViewExpr::var("table_view"),
+                        var("entry_anchor_offset"),
+                        anchor_table.call(),
+                    )),
                 ),
+                ("exit_anchor_offset", u16be()),
                 (
-                    "exit_anchor",
-                    util::offset16_nullable(table_start, anchor_table.call()),
+                    "__exit_anchor",
+                    phantom(util::view_offset16(
+                        ViewExpr::var("table_view"),
+                        var("exit_anchor_offset"),
+                        anchor_table.call(),
+                    )),
                 ),
-            ])
-        };
+            ]),
+        );
         module.define_format(
             "opentype.layout.cursive_pos",
-            util::embedded_singleton_alternation(
-                [("table_start", pos32()), ("pos_format", u16be())],
-                ("pos_format", 1),
-                [
-                    (
-                        "coverage",
-                        util::offset16_mandatory(var("table_start"), coverage_table.call()),
-                    ),
-                    ("entry_exit_count", u16be()),
-                    (
-                        "entry_exit_records",
-                        repeat_count(
-                            var("entry_exit_count"),
-                            entry_exit_record(var("table_start")),
+            let_view(
+                "table_view",
+                util::embedded_singleton_alternation(
+                    [("pos_format", u16be())],
+                    ("pos_format", 1),
+                    [
+                        (
+                            "table_scope",
+                            with_view(ViewExpr::var("table_view"), ViewFormat::ReifyView),
                         ),
-                    ),
-                ],
-                "subtable",
-                "Format1",
-                util::NestingKind::UnifiedRecord,
+                        ("coverage_offset", u16be()),
+                        (
+                            "__coverage",
+                            phantom(util::view_offset16(
+                                ViewExpr::var("table_view"),
+                                var("coverage_offset"),
+                                coverage_table.call(),
+                            )),
+                        ),
+                        ("entry_exit_count", u16be()),
+                        (
+                            "entry_exit_records",
+                            repeat_count(
+                                var("entry_exit_count"),
+                                entry_exit_record
+                                    .call_args_views(vec![], vec![ViewExpr::var("table_view")]),
+                            ),
+                        ),
+                    ],
+                    "subtable",
+                    "Format1",
+                    util::NestingKind::UnifiedRecord,
+                ),
             ),
         )
     }
 
-    /// Mark array tble
+    /// Mark array table
     ///
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/gpos#mark-array-table
     pub(crate) fn mark_array(module: &mut FormatModule, anchor_table: FormatRef) -> FormatRef {
@@ -2549,6 +2666,59 @@ mod gpos {
         )
     }
 
+    #[cfg(feature = "alt")]
+    pub(crate) mod alt {
+        use super::*;
+        use doodle::alt::{self, FormatModuleExt};
+
+        /// Mark array table (alternate definition)
+        ///
+        /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/gpos#mark-array-table
+        #[expect(unused)]
+        pub(crate) fn mark_array(
+            module: &mut FormatModuleExt,
+            anchor_table: FormatRef,
+        ) -> FormatRef {
+            // TODO - refactor into dep-format or standalone function
+            let mark_record = module.define_format_args(
+                "opentype.layout.mark_record",
+                vec![],
+                vec![Label::Borrowed("array_view")],
+                alt::helper::record_auto([
+                    ("mark_class", u16be().into()),
+                    (
+                        "mark_anchor",
+                        util::alt_read_u16be_view_offset(
+                            ViewExpr::var("array_view"),
+                            anchor_table.call(),
+                        ),
+                    ),
+                ]),
+            );
+            module.define_format(
+                "opentype.layout.mark_array",
+                let_view(
+                    "array_view",
+                    record([
+                        (
+                            "array_scope",
+                            with_view(ViewExpr::var("array_view"), ViewFormat::ReifyView),
+                        ),
+                        ("mark_count", u16be()),
+                        (
+                            "mark_records",
+                            repeat_count(
+                                var("mark_count"),
+                                mark_record
+                                    .call_args_views(Vec::new(), vec![ViewExpr::var("array_view")]),
+                            ),
+                        ),
+                    ]),
+                ),
+            )
+        }
+    }
+
     /// Lookup type 4 subtable: mark-to-base attachment positioning
     ///
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/gpos#lookup-type-4-subtable-mark-to-base-attachment-positioning
@@ -2558,58 +2728,108 @@ mod gpos {
         anchor_table: FormatRef,
         mark_array: FormatRef,
     ) -> FormatRef {
-        let base_record = |mark_class_count: Expr, table_start: Expr| {
-            record([(
-                "base_anchor_offsets",
-                repeat_count(
-                    mark_class_count,
-                    util::offset16_nullable(table_start, anchor_table.call()),
-                ),
-            )])
-        };
-        let base_array = |mark_class_count: Expr| {
-            record([
-                ("table_start", pos32()),
-                ("base_count", u16be()),
+        let base_record = module.define_format_args_views(
+            "opentype.layout.base_array.base_record",
+            vec![(Label::Borrowed("mark_class_count"), ValueType::U16)],
+            vec![Label::Borrowed("_array_view")],
+            record_auto([
                 (
-                    "base_records",
-                    repeat_count(
-                        var("base_count"),
-                        base_record(mark_class_count, var("table_start")),
-                    ),
+                    "base_anchor_offsets",
+                    repeat_count(var("mark_class_count"), u16be()),
                 ),
-            ])
-        };
-        module.define_format(
-            "opentype.layout.mark_base_pos",
-            util::embedded_singleton_alternation(
-                [("table_start", pos32()), ("format", u16be())],
-                ("format", 1),
-                [
+                (
+                    "__base_anchors",
+                    // REVIEW - instead of for-each, do we want to express the phantom parse in the offset repeat_count itself?
+                    phantom(for_each(
+                        var("base_anchor_offsets"),
+                        "offset",
+                        util::view_offset16(
+                            ViewExpr::var("_array_view"),
+                            var("offset"),
+                            anchor_table.call(),
+                        ),
+                    )),
+                ),
+            ]),
+        );
+        let base_array = module.define_format_args(
+            "opentype.layout.base_array",
+            vec![(Label::Borrowed("mark_class_count"), ValueType::U16)],
+            let_view(
+                "array_view",
+                record_auto([
                     (
-                        "mark_coverage_offset",
-                        util::offset16_mandatory(var("table_start"), coverage_table.call()),
+                        "array_scope",
+                        with_view(ViewExpr::var("array_view"), ViewFormat::ReifyView),
                     ),
+                    ("base_count", u16be()),
                     (
-                        "base_coverage_offset",
-                        util::offset16_mandatory(var("table_start"), coverage_table.call()),
-                    ),
-                    ("mark_class_count", u16be()),
-                    (
-                        "mark_array_offset",
-                        util::offset16_mandatory(var("table_start"), mark_array.call()),
-                    ),
-                    (
-                        "base_array_offset",
-                        util::offset16_mandatory(
-                            var("table_start"),
-                            base_array(var("mark_class_count")),
+                        "base_records",
+                        repeat_count(
+                            var("base_count"),
+                            base_record.call_args_views(
+                                vec![var("mark_class_count")],
+                                vec![ViewExpr::var("array_view")],
+                            ),
                         ),
                     ),
-                ],
-                "pos",
-                "Format1",
-                util::NestingKind::UnifiedRecord,
+                ]),
+            ),
+        );
+        module.define_format(
+            "opentype.layout.mark_base_pos",
+            let_view(
+                "table_view",
+                util::embedded_singleton_alternation(
+                    [("format", u16be())],
+                    ("format", 1),
+                    [
+                        (
+                            "table_scope",
+                            with_view(ViewExpr::var("table_view"), ViewFormat::ReifyView),
+                        ),
+                        ("mark_coverage_offset", u16be()),
+                        (
+                            "__mark_coverage",
+                            phantom(util::view_offset16(
+                                ViewExpr::var("table_view"),
+                                var("mark_coverage_offset"),
+                                coverage_table.call(),
+                            )),
+                        ),
+                        ("base_coverage_offset", u16be()),
+                        (
+                            "__base_coverage",
+                            phantom(util::view_offset16(
+                                ViewExpr::var("table_view"),
+                                var("base_coverage_offset"),
+                                coverage_table.call(),
+                            )),
+                        ),
+                        ("mark_class_count", u16be()),
+                        ("mark_array_offset", u16be()),
+                        (
+                            "__mark_array",
+                            phantom(util::view_offset16(
+                                ViewExpr::var("table_view"),
+                                var("mark_array_offset"),
+                                mark_array.call(),
+                            )),
+                        ),
+                        ("base_array_offset", u16be()),
+                        (
+                            "__base_array",
+                            phantom(util::view_offset16(
+                                ViewExpr::var("table_view"),
+                                var("base_array_offset"),
+                                base_array.call_args(vec![var("mark_class_count")]),
+                            )),
+                        ),
+                    ],
+                    "pos",
+                    "Format1",
+                    util::NestingKind::UnifiedRecord,
+                ),
             ),
         )
     }
@@ -2633,7 +2853,7 @@ mod gpos {
                             repeat_count(var("mark_class_count"), u16be()),
                         ),
                         (
-                            "__dummy",
+                            "__ligature_anchors",
                             phantom(for_each(
                                 var("ligature_anchor_offsets"),
                                 "offset",
@@ -2731,15 +2951,41 @@ mod gpos {
                     ("format", 1),
                     [
                         ("mark_coverage_offset", u16be()),
+                        (
+                            "__mark_coverage",
+                            phantom(util::view_offset16(
+                                ViewExpr::var("table_view"),
+                                var("mark_coverage_offset"),
+                                coverage_table.call(),
+                            )),
+                        ),
                         ("ligature_coverage_offset", u16be()),
-                        ("__coverage", phantom(coverage_table.call())),
+                        (
+                            "__ligature_coverage",
+                            phantom(util::view_offset16(
+                                ViewExpr::var("table_view"),
+                                var("ligature_coverage_offset"),
+                                coverage_table.call(),
+                            )),
+                        ),
                         ("mark_class_count", u16be()),
                         ("mark_array_offset", u16be()),
-                        ("__mark_array", phantom(mark_array.call())),
+                        (
+                            "__mark_array",
+                            phantom(util::view_offset16(
+                                ViewExpr::var("table_view"),
+                                var("mark_array_offset"),
+                                mark_array.call(),
+                            )),
+                        ),
                         ("ligature_array_offset", u16be()),
                         (
                             "__ligature_array",
-                            phantom(ligature_array.call_args(vec![var("mark_class_count")])),
+                            phantom(util::view_offset16(
+                                ViewExpr::var("table_view"),
+                                var("ligature_array_offset"),
+                                ligature_array.call_args(vec![var("mark_class_count")]),
+                            )),
                         ),
                     ],
                     "pos",
@@ -2759,63 +3005,108 @@ mod gpos {
         anchor_table: FormatRef,
         mark_array: FormatRef,
     ) -> FormatRef {
-        fn mark2_array(mark_class_count: Expr, anchor_table: FormatRef) -> Format {
-            fn mark2_record(
-                mark_class_count: Expr,
-                table_start: Expr,
-                anchor_table: FormatRef,
-            ) -> Format {
-                record([(
-                    "mark2_anchor_offsets",
-                    repeat_count(
-                        mark_class_count,
-                        util::offset16_nullable(table_start, anchor_table.call()),
-                    ),
-                )])
-            }
-            // TODO[epic=view-over-pos32] - replace pos-arithmetic with ViewFormat
-            record([
-                ("table_start", pos32()),
-                ("mark2_count", u16be()),
+        let mark2_record = module.define_format_args_views(
+            "opentype.layout.mark2_array.mark2_record",
+            vec![(Label::Borrowed("mark_class_count"), ValueType::U16)],
+            vec![Label::Borrowed("_array_view")],
+            record_auto([
                 (
-                    "mark2_records",
-                    repeat_count(
-                        var("mark2_count"),
-                        mark2_record(mark_class_count, var("table_start"), anchor_table),
-                    ),
+                    "mark2_anchor_offsets",
+                    repeat_count(var("mark_class_count"), u16be()),
                 ),
-            ])
-        }
-        module.define_format(
-            "opentype.layout.mark_mark_pos",
-            util::embedded_singleton_alternation(
-                [("table_start", pos32()), ("format", u16be())],
-                ("format", 1),
-                [
+                // REVIEW - eliminate foreach and fold phantom offsetting into repeat_count ?
+                (
+                    "__mark2_anchors",
+                    phantom(for_each(
+                        var("mark2_anchor_offsets"),
+                        "offset",
+                        util::view_offset16(
+                            ViewExpr::var("_array_view"),
+                            var("offset"),
+                            anchor_table.call(),
+                        ),
+                    )),
+                ),
+            ]),
+        );
+        let mark2_array = module.define_format_args(
+            "opentype.layout.mark2_array",
+            vec![(Label::Borrowed("mark_class_count"), ValueType::U16)],
+            let_view(
+                "array_view",
+                record([
                     (
-                        "mark1_coverage_offset",
-                        util::offset16_mandatory(var("table_start"), coverage_table.call()),
+                        "array_scope",
+                        with_view(ViewExpr::var("array_view"), ViewFormat::ReifyView),
                     ),
+                    ("mark2_count", u16be()),
                     (
-                        "mark2_coverage_offset",
-                        util::offset16_mandatory(var("table_start"), coverage_table.call()),
-                    ),
-                    ("mark_class_count", u16be()),
-                    (
-                        "mark1_array_offset",
-                        util::offset16_mandatory(var("table_start"), mark_array.call()),
-                    ),
-                    (
-                        "mark2_array_offset",
-                        util::offset16_mandatory(
-                            var("table_start"),
-                            mark2_array(var("mark_class_count"), anchor_table),
+                        "mark2_records",
+                        repeat_count(
+                            var("mark2_count"),
+                            mark2_record.call_args_views(
+                                vec![var("mark_class_count")],
+                                vec![ViewExpr::var("array_view")],
+                            ),
                         ),
                     ),
-                ],
-                "pos",
-                "Format1",
-                util::NestingKind::UnifiedRecord,
+                ]),
+            ),
+        );
+        module.define_format(
+            "opentype.layout.mark_mark_pos",
+            let_view(
+                "table_view",
+                util::embedded_singleton_alternation(
+                    [("format", u16be())],
+                    ("format", 1),
+                    [
+                        (
+                            "table_scope",
+                            with_view(ViewExpr::var("table_view"), ViewFormat::ReifyView),
+                        ),
+                        ("mark1_coverage_offset", u16be()),
+                        (
+                            "__mark1_coverage",
+                            phantom(util::view_offset16(
+                                ViewExpr::var("table_view"),
+                                var("mark1_coverage_offset"),
+                                coverage_table.call(),
+                            )),
+                        ),
+                        ("mark2_coverage_offset", u16be()),
+                        (
+                            "__mark2_coverage",
+                            phantom(util::view_offset16(
+                                ViewExpr::var("table_view"),
+                                var("mark2_coverage_offset"),
+                                coverage_table.call(),
+                            )),
+                        ),
+                        ("mark_class_count", u16be()),
+                        ("mark1_array_offset", u16be()),
+                        (
+                            "__mark1_array",
+                            util::view_offset16(
+                                ViewExpr::var("table_view"),
+                                var("mark1_array_offset"),
+                                mark_array.call(),
+                            ),
+                        ),
+                        ("mark2_array_offset", u16be()),
+                        (
+                            "__mark2_array",
+                            phantom(util::view_offset16(
+                                ViewExpr::var("table_view"),
+                                var("mark2_array_offset"),
+                                mark2_array.call_args(vec![var("mark_class_count")]),
+                            )),
+                        ),
+                    ],
+                    "pos",
+                    "Format1",
+                    util::NestingKind::UnifiedRecord,
+                ),
             ),
         )
     }
@@ -3722,12 +4013,12 @@ mod layout {
 
     pub(crate) fn optional_value_record(
         value_record: FormatRef,
-        table_start: Expr,
+        table_view: ViewExpr,
         flags: Expr,
     ) -> Format {
         cond_maybe(
             any_set(flags.clone()),
-            value_record.call_args(vec![table_start, flags]),
+            value_record.call_args_views(vec![flags], vec![table_view]),
         )
     }
 
@@ -3763,15 +4054,10 @@ mod layout {
                 cond_maybe(record_proj(var("flags"), field_name), format),
             )
         };
-        module.define_format_args(
+        module.define_format_args_views(
             "opentype.common.value_record",
-            vec![
-                (
-                    Label::Borrowed("table_start"),
-                    ValueType::Base(BaseType::U32),
-                ),
-                (Label::Borrowed("flags"), vf_flags_type.clone()),
-            ],
+            vec![(Label::Borrowed("flags"), vf_flags_type.clone())],
+            vec![Label::Borrowed("table_view")],
             record([
                 opt_field("x_placement", util::s16be()),
                 opt_field("y_placement", util::s16be()),
@@ -3779,31 +4065,59 @@ mod layout {
                 opt_field("y_advance", util::s16be()),
                 opt_field(
                     "x_placement_device",
-                    util::offset16_mandatory(
-                        var("table_start"),
-                        device_or_variation_index_table.call(),
-                    ),
+                    record_auto([
+                        ("offset", u16be()),
+                        (
+                            "__data",
+                            util::view_offset16(
+                                ViewExpr::var("table_view"),
+                                var("offset"),
+                                device_or_variation_index_table.call(),
+                            ),
+                        ),
+                    ]),
                 ),
                 opt_field(
                     "y_placement_device",
-                    util::offset16_mandatory(
-                        var("table_start"),
-                        device_or_variation_index_table.call(),
-                    ),
+                    record_auto([
+                        ("offset", u16be()),
+                        (
+                            "__data",
+                            util::view_offset16(
+                                ViewExpr::var("table_view"),
+                                var("offset"),
+                                device_or_variation_index_table.call(),
+                            ),
+                        ),
+                    ]),
                 ),
                 opt_field(
                     "x_advance_device",
-                    util::offset16_mandatory(
-                        var("table_start"),
-                        device_or_variation_index_table.call(),
-                    ),
+                    record_auto([
+                        ("offset", u16be()),
+                        (
+                            "__data",
+                            util::view_offset16(
+                                ViewExpr::var("table_view"),
+                                var("offset"),
+                                device_or_variation_index_table.call(),
+                            ),
+                        ),
+                    ]),
                 ),
                 opt_field(
                     "y_advance_device",
-                    util::offset16_mandatory(
-                        var("table_start"),
-                        device_or_variation_index_table.call(),
-                    ),
+                    record_auto([
+                        ("offset", u16be()),
+                        (
+                            "__data",
+                            util::view_offset16(
+                                ViewExpr::var("table_view"),
+                                var("offset"),
+                                device_or_variation_index_table.call(),
+                            ),
+                        ),
+                    ]),
                 ),
             ]),
         )

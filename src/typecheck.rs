@@ -955,15 +955,15 @@ impl BaseSet {
         }
     }
 
-    fn get_unique_solution(&self, v: UVar) -> TCResult<Rc<UType>> {
+    fn get_unique_solution(&self, v: UVar) -> TCResult<BaseType> {
         match self {
-            BaseSet::Single(b) => Ok(Rc::new(UType::Base(*b))),
+            BaseSet::Single(b) => Ok(*b),
             BaseSet::U(u) => {
                 if u.is_empty() {
                     return Err(TCErrorKind::NoSolution(v).into());
                 }
                 match u.get_unique_solution() {
-                    Some(b) => Ok(Rc::new(UType::Base(b))),
+                    Some(b) => Ok(b),
                     None => Err(TCErrorKind::MultipleSolutions(v, *self).into()),
                 }
             }
@@ -1286,8 +1286,7 @@ impl TypeChecker {
                 if ctxt.views.includes_name(ident) {
                     Ok(())
                 } else {
-                    unreachable!("!!");
-                    // Err(TCError::from(TCErrorKind::MissingView(ident.clone())))
+                    Err(TCError::from(TCErrorKind::MissingView(ident.clone())))
                 }
             }
             ViewExpr::Offset(base, offs) => {
@@ -1785,23 +1784,25 @@ impl TypeChecker {
                 let constraint = Constraint::Equiv(right.clone());
                 let after = self.unify_var_constraint(v, constraint)?;
                 self.occurs(v)?;
-                match after {
-                    Constraint::Equiv(t) => Ok(t.clone()),
-                    Constraint::Elem(_) | Constraint::Proj(_) => {
-                        unreachable!("equiv should erase proj and elem")
-                    }
-                }
+                Ok(Rc::new(UType::Var(v)))
+                // match after {
+                //     Constraint::Equiv(t) => Ok(t.clone()),
+                //     Constraint::Elem(_) | Constraint::Proj(_) => {
+                //         unreachable!("equiv should erase proj and elem")
+                //     }
+                // }
             }
             (_, &UType::Var(v)) => {
                 let constraint = Constraint::Equiv(left.clone());
                 let after = self.unify_var_constraint(v, constraint)?;
                 self.occurs(v)?;
-                match after {
-                    Constraint::Equiv(t) => Ok(t.clone()),
-                    Constraint::Elem(_) | Constraint::Proj(_) => {
-                        unreachable!("equiv should erase proj and elem")
-                    }
-                }
+                Ok(Rc::new(UType::Var(v)))
+                 // match after {
+                //     Constraint::Equiv(t) => Ok(t.clone()),
+                //     Constraint::Elem(_) | Constraint::Proj(_) => {
+                //         unreachable!("equiv should erase proj and elem")
+                //     }
+                // }
             }
             // all the remaining cases are mismatched UType constructors
             _ => Err(UnificationError::Unsatisfiable(left, right).into()),
@@ -3332,7 +3333,7 @@ impl TypeChecker {
     /// # Panics
     ///
     /// Will panic if [`UType::Hole`] is encountered, or if any `UVar` has an unresolved record- or tuple- `ProjShape` constraint.
-    pub fn reify(&self, t: Rc<UType>) -> Option<AugValueType> {
+    pub(crate) fn reify(&self, t: Rc<UType>) -> Option<AugValueType> {
         match t.as_ref() {
             UType::Hole => {
                 // REVIEW - should this simply return None instead? or maybe ValueType::Any?
@@ -3343,11 +3344,8 @@ impl TypeChecker {
                 let v = self.get_canonical_uvar(uv);
                 match self.substitute_uvar_vtype(v) {
                     Ok(Some(t0)) => match t0 {
-                        VType::Base(bs) => match bs.get_unique_solution(uv).as_deref() {
-                            Ok(UType::Base(b)) => Some(AugValueType::Base(*b)),
-                            Ok(other) => unreachable!(
-                                "base-set {bs:?} yielded unexpected solution {other:?}"
-                            ),
+                        VType::Base(bs) => match bs.get_unique_solution(uv) {
+                            Ok(b) => Some(AugValueType::Base(b)),
                             Err(_e) => None,
                         },
                         VType::Abstract(ut) => self.reify(ut),
@@ -3400,8 +3398,136 @@ impl TypeChecker {
         Some(AugValueType::Union(branches))
     }
 }
-
 // !SECTION
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum WHNFSolution {
+    Var(UVar),
+    Base(BaseType),
+}
+
+impl WHNFSolution {
+    pub fn coerce(ty: &UType) -> Self {
+        match ty {
+            UType::Var(v) => Self::Var(*v),
+            UType::Base(b) => Self::Base(*b),
+            _ => panic!("non-whnf utype encountered during coercion: {ty:?}"),
+        }
+    }
+}
+
+/// Output type for step-by-step expansion.
+///
+/// Hybrid between UType and VType specialized for stepwise reification (expansion).
+#[derive(Debug, Clone)]
+pub(crate) enum Expansion {
+    Empty,
+    Base(BaseType),
+    Record(Vec<(Label, WHNFSolution)>),
+    Union(BTreeMap<Label, WHNFSolution>),
+    Seq(WHNFSolution, SeqBorrowHint),
+    Option(WHNFSolution),
+    Tuple(Vec<WHNFSolution>),
+    ViewObj,
+}
+
+// SECTION - specialized methods for codegen purposes
+impl TypeChecker {
+    pub(crate) fn expand_var(&self, var: UVar) -> Expansion {
+        let v = self.get_canonical_uvar(var);
+        match &self.constraints[v.0] {
+            Constraints::Indefinite => panic!("expand_var: indefinite constraint on {v}"),
+            Constraints::Variant(vmid) => self.expand_union(*vmid),
+            Constraints::Invariant(constraint) => match constraint {
+                Constraint::Equiv(utype) => self.expand_type(utype.clone()),
+                Constraint::Elem(bs) => match bs.get_unique_solution(v) {
+                    Ok(b) => Expansion::Base(b),
+                    Err(e) => panic!("{e}"),
+                },
+                Constraint::Proj(proj_shape) => match proj_shape {
+                    ProjShape::TupleWith(ix_vars) => {
+                        let mut flat = Vec::new();
+                        for (ix, var) in ix_vars.iter() {
+                            if *ix > flat.len() {
+                                panic!("missing index {ix} in {v}")
+                            }
+                            flat.push(WHNFSolution::Var(*var));
+                        }
+                        Expansion::Tuple(flat)
+                    }
+                    ProjShape::RecordWith(fld_vars) => {
+                        let mut flat = Vec::new();
+                        for (lbl, var) in fld_vars.iter() {
+                            flat.push((lbl.clone(), WHNFSolution::Var(*var)));
+                        }
+                        Expansion::Record(flat)
+                    }
+                    ProjShape::SeqOf(v) => Expansion::Seq(WHNFSolution::Var(*v), SeqBorrowHint::Constructed),
+                    ProjShape::OptOf(v) => Expansion::Option(WHNFSolution::Var(*v)),
+                },
+            },
+        }
+    }
+
+    // NOTE - the implementation here is not the most robust as it relies on every UVar expanding to a WHNF all of whose UTypes are Var.
+    fn expand_type(&self, ty: Rc<UType>) -> Expansion {
+        match ty.as_ref() {
+            UType::Hole => {
+                // REVIEW - should this simply return None instead? or maybe ValueType::Any?
+                unreachable!(
+                    "expand_type: UType::Hole should be erased by any non-Hole unification!"
+                );
+            }
+            UType::ViewObj => Expansion::ViewObj,
+            UType::Var(uv) => self.expand_var(*uv),
+            UType::Base(g) => Expansion::Base(*g),
+            UType::Empty => Expansion::Empty,
+            UType::Tuple(ts) => {
+                let mut vts = Vec::with_capacity(ts.len());
+                for elt in ts.iter() {
+                    let sol = WHNFSolution::coerce(&elt);
+                    vts.push(sol);
+                }
+                Expansion::Tuple(vts)
+            }
+            UType::Record(fs) => {
+                let mut vfs = Vec::with_capacity(fs.len());
+                for (lab, ft) in fs.iter() {
+                    let sol = WHNFSolution::coerce(&ft);
+                    vfs.push((lab.clone(), sol));
+                }
+                Expansion::Record(vfs)
+            }
+            UType::Seq(t0, h) => {
+                let v0 = WHNFSolution::coerce(&t0);
+                Expansion::Seq(v0, *h)
+            }
+            UType::Option(t0) => {
+                let v0 = WHNFSolution::coerce(&t0);
+                Expansion::Option(v0)
+            }
+        }
+    }
+
+    fn is_empty_var(&self, var: WHNFSolution) -> bool {
+        let WHNFSolution::Var(var) = var else { return false };
+        let var = self.get_canonical_uvar(var);
+        matches!(&self.constraints[var.0], Constraints::Invariant(con) if matches!(con, Constraint::Equiv(ut) if matches!(**ut, UType::Empty)))
+    }
+
+    fn expand_union(&self, vmid: VMId) -> Expansion {
+        let vm = self.varmaps.get_varmap(vmid);
+        let mut branches = BTreeMap::new();
+        for (label, branch_t) in vm.iter() {
+            let var = WHNFSolution::coerce(&branch_t);
+            // NOTE - only add a variant to the union-type if its inner type is inhabitable
+            if !self.is_empty_var(var) {
+                branches.insert(label.clone(), var);
+            }
+        }
+        Expansion::Union(branches)
+    }
+}
 
 pub(crate) type TypeError = UnificationError<Rc<UType>>;
 pub(crate) type ConstraintError = UnificationError<Constraint>;

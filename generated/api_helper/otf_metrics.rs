@@ -255,6 +255,112 @@ trait TryPromote<Original>: Sized {
     fn try_promote(orig: &Original) -> Result<Self, Self::Error>;
 }
 
+pub mod manifest {
+    use super::{View, PResult, Parser};
+
+    pub trait ViewFrame<'input> {
+        fn scope(&self) -> View<'input>;
+    }
+
+    pub trait CommonObject {
+        type Args;
+        type Output<'a>: Sized;
+
+        fn parse_view_offset<'input>(view: View<'input>, offset: usize, args: Self::Args) -> PResult<Self::Output<'input>>;
+    }
+
+    pub trait Container<Obj, const N: usize>
+    where Obj: CommonObject
+    {
+        fn get_offsets(&self) -> [usize; N];
+
+        fn get_args(&self) -> [Obj::Args; N];
+    }
+
+    pub type CovTable = std::marker::PhantomData<super::OpentypeCoverageTable>;
+
+    impl CommonObject for CovTable {
+        type Args = ();
+        type Output<'a> = super::OpentypeCoverageTable;
+
+        fn parse_view_offset<'input>(view: View<'input>, offset: usize, _args: ()) -> PResult<super::OpentypeCoverageTable> {
+            let mut p = Parser::from(view.offset(offset)?);
+            super::Decoder_opentype_coverage_table(&mut p)
+        }
+    }
+
+    pub fn reify<'input, Frame, Obj, const N: usize>(frame: &'input Frame, proxy: Obj, ix: usize) -> Obj::Output<'input>
+    where
+        Frame: ViewFrame<'input> + Container<Obj, N>,
+        Obj: CommonObject,
+    {
+        Obj::parse_view_offset(frame.scope(), frame.get_offsets()[ix], frame.get_args()[ix]).expect("failed to parse")
+    }
+}
+
+
+#[derive(Debug)]
+pub enum ValueParseError<E: std::error::Error> {
+    Value(E),
+    Parse(doodle::parser::error::ParseError)
+}
+
+impl<E: std::error::Error> ValueParseError<E> {
+    pub fn coerce_value(self) -> E {
+        match self {
+            ValueParseError::Value(e) => e,
+            ValueParseError::Parse(e) => panic!("parse error: {e}"),
+        }
+    }
+}
+
+impl<E: std::error::Error> std::fmt::Display for ValueParseError<E> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ValueParseError::Value(e) => write!(f, "value error: {e}"),
+            ValueParseError::Parse(e) => write!(f, "parse error: {e}"),
+        }
+    }
+}
+
+impl<E: std::error::Error + 'static> std::error::Error for ValueParseError<E> {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            ValueParseError::Value(e) => Some(e),
+            ValueParseError::Parse(e) => Some(e),
+        }
+    }
+}
+
+// NOTE - without specialization, we cannot have both this and From<ParseError>, so we choose the latter
+/*
+impl<E: std::error::Error> From<E> for ValueParseError<E> {
+    fn from(e: E) -> Self {
+        ValueParseError::Value(e)
+    }
+}
+*/
+
+impl<E: std::error::Error> From<doodle::parser::error::ParseError> for ValueParseError<E> {
+    fn from(e: doodle::parser::error::ParseError) -> Self {
+        ValueParseError::Parse(e)
+    }
+}
+
+/// Variant of `Promote` for objects holding offsets but not the View they associate with.
+trait PromoteView<Original>: Sized {
+    fn promote_view(orig: &Original, view: View<'_>) -> PResult<Self>;
+}
+
+/// Variant of `TryPromote` for objects holding offsets but not the View they associate with.
+trait TryPromoteView<Original>: Sized {
+    /// The error-type returned when a given conversion cannot succeed.
+    type Error<'a>: std::error::Error where Original: 'a;
+
+    /// Fallibly post-process from a source-object to `Self` using the appropriate View.
+    fn try_promote_view<'a>(orig: &'a Original, view: View<'a>) -> Result<Self, ValueParseError<Self::Error<'a>>>;
+}
+
 /// Custom trait that facilitates conversion from partially-borrowed non-atomic types
 /// without needing explicit lifetimes in the trait signature itself.
 trait TryFromRef<Original: _Ref>: Sized {
@@ -467,6 +573,7 @@ use refl::ReflType;
 
 /// Shorthand for qualifying a TryPromote::Error item
 type TPErr<Src, Tgt> = <Tgt as TryPromote<Src>>::Error;
+type TPVErr<'a, Src, Tgt> = <Tgt as TryPromoteView<Src>>::Error<'a>;
 
 /// Shorthand for qualifying a TryFromRef::Error item in the same style as `TPErr`
 type TFRErr<Src, Tgt> = <Tgt as TryFromRef<Src>>::Error;
@@ -2574,7 +2681,7 @@ impl<'input> TryPromote<OpentypePosExtension<'input>> for LookupSubtable {
 
 impl<'input> TryPromote<OpentypeGposLookupSubtable<'input>> for LookupSubtable {
     type Error = ReflType<
-        ReflType<TPErr<OpentypeSinglePos, SinglePos>, TPErr<OpentypePairPos, PairPos>>,
+        ReflType<TPErr<OpentypeSinglePos, SinglePos>, TPErr<OpentypePairPos<'input>, PairPos>>,
         ReflType<TPErr<OpentypeCursivePos<'input>, CursivePos>, UnknownValueError<u16>>,
     >;
 
@@ -2629,6 +2736,52 @@ enum LookupSubtable {
 
 pub type OpentypeMarkMarkPos<'input> = opentype_layout_mark_mark_pos<'input>;
 
+impl<'input> OpentypeMarkMarkPos<'input> {
+    fn __coverage_raw(&self, offset: u16) -> PResult<OpentypeCoverageTable> {
+        let view = self.table_scope.offset(offset as usize)?;
+        let mut p = Parser::from(view);
+        Decoder_opentype_coverage_table(&mut p)
+    }
+
+    fn __mark1_array_raw(&self) -> PResult<Option<OpentypeMarkArray<'input>>> {
+        if self.mark1_array_offset == 0 {
+            return Ok(None);
+        }
+        let view = self.table_scope.offset(self.mark1_array_offset as usize)?;
+        let mut p = Parser::from(view);
+        Ok(Some(Decoder_opentype_layout_mark_array(&mut p)?))
+    }
+
+    fn __mark2_array_raw(&self) -> PResult<Option<OpentypeMark2Array<'input>>> {
+        if self.mark2_array_offset == 0 {
+            return Ok(None);
+        }
+         let view = self.table_scope.offset(self.mark2_array_offset as usize)?;
+        let mut p = Parser::from(view);
+        Ok(Some(Decoder_opentype_layout_mark2_array(&mut p, self.mark_class_count)?))
+    }
+
+    pub fn mark1_coverage(&self) -> CoverageTable {
+        let raw = self.__coverage_raw(self.mark1_coverage_offset).expect("unable to parse Mark1 coverage");
+        CoverageTable::promote(&raw)
+    }
+
+    pub fn mark2_coverage(&self) -> CoverageTable {
+        let raw = self.__coverage_raw(self.mark2_coverage_offset).expect("unable to parse Mark2 coverage");
+        CoverageTable::promote(&raw)
+    }
+
+    pub fn mark1_array(&self) -> Result<MarkArray, UnknownValueError<u16>> {
+        let raw = self.__mark1_array_raw().expect("unable to parse Mark1 array");
+        try_promote_from_null(&raw)
+    }
+
+    pub fn mark2_array(&self) -> Result<Mark2Array, UnknownValueError<u16>> {
+        let raw = self.__mark2_array_raw().expect("unable to parse Mark2 array");
+        try_promote_from_null(&raw)
+    }
+}
+
 impl<'input> TryPromote<OpentypeMarkMarkPos<'input>> for MarkMarkPos {
     type Error = ReflType<
         ReflType<
@@ -2640,10 +2793,10 @@ impl<'input> TryPromote<OpentypeMarkMarkPos<'input>> for MarkMarkPos {
 
     fn try_promote(orig: &OpentypeMarkMarkPos) -> Result<Self, Self::Error> {
         Ok(MarkMarkPos {
-            mark1_coverage: CoverageTable::promote(&orig.mark1_coverage_offset.link),
-            mark2_coverage: CoverageTable::promote(&orig.mark2_coverage_offset.link),
-            mark1_array: try_promote_from_null(&orig.mark1_array_offset.link)?,
-            mark2_array: try_promote_from_null(&orig.mark2_array_offset.link)?,
+            mark1_coverage: orig.mark1_coverage(),
+            mark2_coverage: orig.mark2_coverage(),
+            mark1_array: orig.mark1_array()?,
+            mark2_array: orig.mark2_array()?,
         })
     }
 }
@@ -2656,14 +2809,25 @@ struct MarkMarkPos {
     mark2_array: Mark2Array,
 }
 
-pub type OpentypeMark2Array<'input> = opentype_layout_mark_mark_pos_mark2_array_offset_link<'input>;
+pub type OpentypeMark2Array<'input> = opentype_layout_mark2_array<'input>;
+
+impl<'input> OpentypeMark2Array<'input> {
+    pub fn mark2_records(&self) -> Result<Vec<Mark2Record>, UnknownValueError<u16>>  {
+        let mut records = Vec::with_capacity(self.mark2_records.len());
+        for mark2_record in self.mark2_records.iter() {
+            let record = Mark2Record::try_promote_view(mark2_record, self.array_scope).map_err(ValueParseError::coerce_value)?;
+            records.push(record);
+        }
+        Ok(records)
+    }
+}
 
 impl<'input> TryPromote<OpentypeMark2Array<'input>> for Mark2Array {
-    type Error = ReflType<TPErr<OpentypeMark2Record<'input>, Mark2Record>, UnknownValueError<u16>>;
+    type Error = ReflType<TPVErr<'input, OpentypeMark2Record, Mark2Record>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeMark2Array) -> Result<Self, Self::Error> {
         Ok(Mark2Array {
-            mark2_records: try_promote_vec(&orig.mark2_records)?,
+            mark2_records: orig.mark2_records()?,
         })
     }
 }
@@ -2674,16 +2838,23 @@ struct Mark2Array {
     mark2_records: Vec<Mark2Record>,
 }
 
-pub type OpentypeMark2Record<'input> =
-    opentype_layout_mark_mark_pos_mark2_array_offset_link_mark2_records<'input>;
+pub type OpentypeMark2Record =
+    opentype_layout_mark2_array_mark2_record;
 
-impl<'input> TryPromote<OpentypeMark2Record<'input>> for Mark2Record {
-    type Error = ReflType<TPErr<OpentypeAnchorTable<'input>, AnchorTable>, UnknownValueError<u16>>;
+impl TryPromoteView<OpentypeMark2Record> for Mark2Record {
+    type Error<'input> = ReflType<TPErr<OpentypeAnchorTable<'input>, AnchorTable>, UnknownValueError<u16>>;
 
-    fn try_promote(orig: &OpentypeMark2Record) -> Result<Self, Self::Error> {
+    fn try_promote_view<'input>(orig: &OpentypeMark2Record, view: View<'input>) -> Result<Self, Self::Error<'input>> {
         let mut mark2_anchors = Vec::with_capacity(orig.mark2_anchor_offsets.len());
-        for offset in orig.mark2_anchor_offsets.iter() {
-            mark2_anchors.push(try_promote_opt(&offset.link)?);
+        for offset in orig.mark2_anchor_offsets {
+            if offset == 0 {
+                mark2_anchors.push(None);
+            } else {
+                let view = view.offset(offset as usize).expect("bad offset to anchor-table");
+                let mut p = Parser::from(view);
+                let ret = Decoder_opentype_common_anchor_table(&mut p).expect("bad AnchorTable parse");
+                mark2_anchors.push(Some(AnchorTable::try_promote(&ret)?))
+            }
         }
         Ok(Mark2Record { mark2_anchors })
     }
@@ -2959,7 +3130,7 @@ struct MarkRecord {
     mark_anchor: Link<AnchorTable>,
 }
 
-pub type OpentypeBaseArray<'input> = opentype_layout_mark_base_pos_base_array_offset_link<'input>;
+pub type OpentypeBaseArray<'input> = opentype_layout_base_array<'input>;
 
 impl<'input> TryPromote<OpentypeBaseArray<'input>> for BaseArray {
     type Error = ReflType<TPErr<OpentypeBaseRecord<'input>, BaseRecord>, UnknownValueError<u16>>;
@@ -2978,7 +3149,7 @@ struct BaseArray {
 }
 
 pub type OpentypeBaseRecord<'input> =
-    opentype_layout_mark_base_pos_base_array_offset_link_base_records<'input>;
+    opentype_layout_base_array_base_record<'input>;
 
 impl<'input> TryPromote<OpentypeBaseRecord<'input>> for BaseRecord {
     type Error = ReflType<TPErr<OpentypeAnchorTable<'input>, AnchorTable>, UnknownValueError<u16>>;
@@ -3738,25 +3909,25 @@ struct AnchorTableFormat3 {
     y_device: Option<DeviceOrVariationIndexTable>,
 }
 
-pub type OpentypePairPos = opentype_layout_pair_pos;
+pub type OpentypePairPos<'input> = opentype_layout_pair_pos<'input>;
 
-pub type OpentypePairPosSubtable = opentype_layout_pair_pos_subtable;
-pub type OpentypePairPosFormat1 = opentype_layout_pair_pos_subtable_Format1;
-pub type OpentypePairPosFormat2 = opentype_layout_pair_pos_subtable_Format2;
+pub type OpentypePairPosSubtable<'input> = opentype_layout_pair_pos_subtable<'input>;
+pub type OpentypePairPosFormat1<'input> = opentype_layout_pair_pos_format1<'input>;
+pub type OpentypePairPosFormat2<'input> = opentype_layout_pair_pos_format2<'input>;
 
-impl TryPromote<OpentypePairPos> for PairPos {
-    type Error = ReflType<TPErr<OpentypePairPosSubtable, PairPos>, UnknownValueError<u16>>;
+impl<'input> TryPromote<OpentypePairPos<'input>> for PairPos {
+    type Error = ReflType<TPErr<OpentypePairPosSubtable<'input>, PairPos>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypePairPos) -> Result<Self, Self::Error> {
         Self::try_promote(&orig.subtable)
     }
 }
 
-impl TryPromote<OpentypePairPosSubtable> for PairPos {
+impl<'input> TryPromote<OpentypePairPosSubtable<'input>> for PairPos {
     type Error = ReflType<
         ReflType<
-            TPErr<OpentypePairPosFormat1, PairPosFormat1>,
-            TPErr<OpentypePairPosFormat2, PairPosFormat2>,
+            TPErr<OpentypePairPosFormat1<'input>, PairPosFormat1>,
+            TPErr<OpentypePairPosFormat2<'input>, PairPosFormat2>,
         >,
         UnknownValueError<u16>,
     >;
@@ -3779,24 +3950,46 @@ enum PairPos {
     Format2(PairPosFormat2),
 }
 
-impl TryPromote<OpentypePairPosFormat1> for PairPosFormat1 {
+impl<'input> TryPromote<OpentypePairPosFormat1<'input>> for PairPosFormat1 {
     type Error = ReflType<TPErr<OpentypePairSet, PairSet>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypePairPosFormat1) -> Result<Self, Self::Error> {
+        let coverage = {
+            if orig.coverage_offset == 0 {
+                // REVIEW - this should probably be an error value rather than a panic
+                panic!("missing coverage table");
+            } else {
+                let view = orig.table_scope.offset(orig.coverage_offset as usize).expect("bad offset to coverage table");
+                let mut p = Parser::from(view);
+                let ret = Decoder_opentype_coverage_table(&mut p).expect("bad coverage-table parse");
+                CoverageTable::promote(&ret)
+            }
+        };
         let mut pair_sets = Vec::with_capacity(orig.pair_sets.len());
-        for offset in orig.pair_sets.iter() {
-            let pair_set = try_promote_from_null(&offset.link)?;
-            pair_sets.push(pair_set)
+        for pair_set in orig.pair_sets.iter() {
+            if pair_set.offset == 0 {
+                pair_sets.push(PairSet::from_null());
+            } else {
+                let view = orig.table_scope.offset(pair_set.offset as usize).expect("bad offset to PairSet");
+                let mut p = Parser::from(view);
+                let ret = Decoder_opentype_layout_pair_pos_pair_set(
+                    &mut p,
+                    orig.value_format1,
+                    orig.value_format2,
+                )
+                .expect("bad PairSet parse");
+                pair_sets.push(Some(PairSet::try_promote(ret)?))
+            }
         }
 
         Ok(PairPosFormat1 {
-            coverage: CoverageTable::promote(&orig.coverage.link),
+            coverage,
             pair_sets,
         })
     }
 }
 
-impl TryPromote<OpentypePairPosFormat2> for PairPosFormat2 {
+impl<'input> TryPromote<OpentypePairPosFormat2<'input>> for PairPosFormat2 {
     type Error = ReflType<TPErr<OpentypeClass2Record, Class2Record>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypePairPosFormat2) -> Result<Self, Self::Error> {
@@ -5665,7 +5858,7 @@ fn display_lookup_subtable(
                     let iter = coverage.iter();
                     display_coverage_table(coverage).glue(
                         tok("=>"),
-                        display_coverage_linked_array(
+                        arrayfmt::display_coverage_linked_array(
                             substitute_glyph_ids,
                             iter,
                             |orig_glyph, subst_glyph| {
@@ -6039,89 +6232,97 @@ fn show_kern_metrics(kern: &Option<KernMetrics>, conf: &Config) {
 
             params.join(" | ")
         }
-        tok(format!(
-            "KernSubtable ({}):",
-            format_kern_flags(subtable.flags)
-        ))
-        .then(match &subtable.data {
-            KernSubtableData::Format0(KernSubtableFormat0 { kern_pairs }) => {
-                use display::toks;
-                arrayfmt::display_items_inline(
-                    kern_pairs,
-                    |kern_pair| {
-                        toks(format!(
-                            "({},{}) {:+}",
-                            format_glyphid_hex(kern_pair.left, true),
-                            format_glyphid_hex(kern_pair.right, true),
-                            kern_pair.value
-                        ))
-                    },
-                    conf.inline_bookend,
-                    |n| toks(format!("(..{n}..)")),
-                )
-            }
-            KernSubtableData::Format2(KernSubtableFormat2 {
-                left_class,
-                right_class,
-                kerning_array,
-            }) => {
-                fn display_kern_class_table(
-                    table: &KernClassTable,
-                    conf: &Config,
-                ) -> display::TokenStream<'static> {
-                    use display::{tok, toks};
-                    tok(format!(
-                        "Classes[first={}, nGlyphs={}]: ",
-                        format_glyphid_hex(table.first_glyph, true),
-                        table.n_glyphs,
-                    ))
-                    .then(arrayfmt::display_items_inline(
-                        &table.class_values,
-                        |id| toks(u16::to_string(id)),
-                        conf.inline_bookend,
-                        |n| toks(format!("(..{n}..)")),
-                    ))
-                }
-                fn display_kerning_array(
-                    array: &KerningArray,
-                    conf: &Config,
-                ) -> display::TokenStream<'static> {
-                    display_wec_rows_elided(
-                        &array.0,
-                        |ix, row| {
-                            display::tok(format!("\t\t[{ix}]: ")).then(
-                                arrayfmt::display_items_inline(
-                                    row,
-                                    |kern_val| display::toks(format!("{kern_val:+}")),
-                                    conf.inline_bookend,
-                                    |n| display::toks(format!("(..{n}..)")),
-                                ),
-                            )
-                        },
-                        conf.bookend_size / 2, // FIXME - magic constant adjustment
-                        |start, stop| {
-                            display::toks(format!(
-                                "\t\t(skipping kerning array rows {start}..{stop})"
+
+        fn display_kern_subtable_data(
+            subtable_data: &KernSubtableData,
+            conf: &Config,
+        ) -> display::TokenStream<'static> {
+            use display::{tok, toks};
+            match subtable_data {
+                KernSubtableData::Format0(KernSubtableFormat0 { kern_pairs }) => {
+                    arrayfmt::display_items_inline(
+                        kern_pairs,
+                        |kern_pair| {
+                            toks(format!(
+                                "({},{}) {:+}",
+                                format_glyphid_hex(kern_pair.left, true),
+                                format_glyphid_hex(kern_pair.right, true),
+                                kern_pair.value
                             ))
                         },
+                        conf.inline_bookend,
+                        |n| toks(format!("(..{n}..)")),
                     )
                 }
-                let left = tok("LeftClass=").then(display_kern_class_table(
-                    left_class.as_ref().expect("missing left class table"),
-                    conf,
-                ));
+                KernSubtableData::Format2(KernSubtableFormat2 {
+                    left_class,
+                    right_class,
+                    kerning_array,
+                }) => {
+                    fn display_kern_class_table(
+                        table: &KernClassTable,
+                        conf: &Config,
+                    ) -> display::TokenStream<'static> {
+                        use display::{tok, toks};
+                        tok(format!(
+                            "Classes[first={}, nGlyphs={}]: ",
+                            format_glyphid_hex(table.first_glyph, true),
+                            table.n_glyphs,
+                        ))
+                        .then(arrayfmt::display_items_inline(
+                            &table.class_values,
+                            |id| toks(u16::to_string(id)),
+                            conf.inline_bookend,
+                            |n| toks(format!("(..{n}..)")),
+                        ))
+                    }
+                    fn display_kerning_array(
+                        array: &KerningArray,
+                        conf: &Config,
+                    ) -> display::TokenStream<'static> {
+                        arrayfmt::display_wec_rows_elided(
+                            &array.0,
+                            |ix, row| {
+                                display::tok(format!("\t\t[{ix}]: ")).then(
+                                    arrayfmt::display_items_inline(
+                                        row,
+                                        |kern_val| display::toks(format!("{kern_val:+}")),
+                                        conf.inline_bookend,
+                                        |n| display::toks(format!("(..{n}..)")),
+                                    ),
+                                )
+                            },
+                            conf.bookend_size / 2, // FIXME - magic constant adjustment
+                            |start, stop| {
+                                display::toks(format!(
+                                    "\t\t(skipping kerning array rows {start}..{stop})"
+                                ))
+                            },
+                        )
+                    }
+                    let left = tok("LeftClass=").then(display_kern_class_table(
+                        left_class.as_ref().expect("missing left class table"),
+                        conf,
+                    ));
 
-                let right = tok("RightClass=").then(display_kern_class_table(
-                    right_class.as_ref().expect("missing left class table"),
-                    conf,
-                ));
-                let kern = tok("KerningArray:").then(display_kerning_array(
-                    kerning_array.as_ref().expect("missing kerning array"),
-                    conf,
-                ));
-                left.glue(tok("\t"), right).glue(tok("\t"), kern)
+                    let right = tok("RightClass=").then(display_kern_class_table(
+                        right_class.as_ref().expect("missing left class table"),
+                        conf,
+                    ));
+                    let kern = tok("KerningArray:").then(display_kerning_array(
+                        kerning_array.as_ref().expect("missing kerning array"),
+                        conf,
+                    ));
+                    left.glue(tok("\t"), right).glue(tok("\t"), kern)
+                }
             }
-        })
+        }
+
+        tok(format!(
+            "KernSubtable ({}): ",
+            format_kern_flags(subtable.flags)
+        ))
+        .then(display_kern_subtable_data(&subtable.data, conf))
     }
 
     if let Some(kern) = kern {
@@ -6130,10 +6331,14 @@ fn show_kern_metrics(kern: &Option<KernMetrics>, conf: &Config) {
             arrayfmt::display_items_elided(
                 &kern.subtables,
                 |ix, subtable| {
-                    display::tok(format!("\t[{ix}]: ")).then(display_kern_subtable(subtable, conf))
+                    toks(format!("[{ix}]: "))
+                        .pre_indent(2)
+                        .chain(display_kern_subtable(subtable, conf))
                 },
                 conf.bookend_size,
-                |start, stop| toks(format!("\t(skipping kern subtables {start}..{stop})")),
+                |start, stop| {
+                    toks(format!("(skipping kern subtables {start}..{stop})")).pre_indent(1)
+                },
             )
             .println();
         } else {
@@ -6361,7 +6566,7 @@ fn display_ligature_sets(
         [set] => display_ligature_set(set, coverage.next().expect("missing coverage")),
         more => {
             const LIG_SET_BOOKEND: usize = 1;
-            display_coverage_linked_array(
+            arrayfmt::display_coverage_linked_array(
                 more,
                 coverage,
                 |cov, lig_set| display_ligature_set(lig_set, cov),
@@ -6609,39 +6814,6 @@ fn display_mark_glyph_set(mgs: &MarkGlyphSet, conf: &Config) -> display::TokenSt
     )))
 }
 
-// TODO - move to arrayfmt module
-fn display_table_column_horiz<A>(
-    heading: &str,
-    items: &[A],
-    mut show_fn: impl FnMut(&A) -> display::TokenStream<'static>,
-    bookend: usize,
-    ellipsis: impl FnOnce(usize) -> display::TokenStream<'static>,
-) -> display::TokenStream<'static> {
-    use display::{tok, toks};
-    tok(format!("{heading}")).then({
-        let count = items.len();
-        let mut buf = Vec::with_capacity(Ord::min(count, 2 * bookend + 1));
-        if count > 2 * bookend {
-            let (left_bookend, _middle, right_bookend) =
-                unsafe { trisect_unchecked(items, bookend, bookend) };
-
-            for it in left_bookend {
-                buf.push(show_fn(it));
-            }
-
-            let n_skipped = count - bookend * 2;
-            buf.push(ellipsis(n_skipped));
-
-            for it in right_bookend {
-                buf.push(show_fn(it));
-            }
-        } else {
-            buf.extend(items.iter().map(show_fn));
-        }
-        display::TokenStream::join_with(buf, tok(" "))
-    })
-}
-
 fn display_item_variation_store(
     ivs: &ItemVariationStore,
     conf: &Config,
@@ -6657,21 +6829,21 @@ fn display_item_variation_store(
             use display::toks;
             display::TokenStream::join_with(
                 vec![
-                    display_table_column_horiz(
+                    arrayfmt::display_table_column_horiz(
                         "\t\t start |",
                         per_region,
                         |coords| toks(format!("{:.03}", coords.start_coord)),
                         conf.inline_bookend,
                         |n_skipped| toks(format!("..{n_skipped:02}..")),
                     ),
-                    display_table_column_horiz(
+                    arrayfmt::display_table_column_horiz(
                         "\t\t  peak |",
                         per_region,
                         |coords| toks(format!("{:.03}", coords.peak_coord)),
                         conf.inline_bookend,
                         |n_skipped| toks(format!("..{n_skipped:02}..")),
                     ),
-                    display_table_column_horiz(
+                    arrayfmt::display_table_column_horiz(
                         "\t\t   end |",
                         per_region,
                         |coords| toks(format!("{:.03}", coords.end_coord)),
@@ -6711,7 +6883,7 @@ fn display_item_variation_store(
                 _sets: &DeltaSets,
                 _conf: &Config,
             ) -> display::TokenStream<'static> {
-                // WIP
+                // STUB - figure out what we actually want to show
                 toks(format!("\t\t\t<show_delta_sets: incomplete>"))
             }
 
@@ -6743,7 +6915,7 @@ fn display_item_variation_store(
                 )
         }
         use display::{Token::LineBreak, tok, toks};
-        // WIP
+        // WIP - refactor using pre-indent+glue
         tok(format!("\t    ItemVariationData[{}]", ivda.len())).then(LineBreak.then(
             arrayfmt::display_items_elided(
                 ivda,
@@ -6777,31 +6949,35 @@ fn display_lig_caret_list(
     conf: &Config,
 ) -> display::TokenStream<'static> {
     use display::{Token::LineBreak, tok, toks};
-    tok("\tLigCaretList:")
-        .then(
-            LineBreak.then(tok("\t\t").then(display_coverage_table_summary(
-                &lig_caret_list.coverage,
-                conf,
-            ))),
+    toks("LigCaretList:")
+        .glue(
+            LineBreak,
+            display_coverage_table_summary(&lig_caret_list.coverage, conf).pre_indent(4),
         )
-        .chain(LineBreak.then(arrayfmt::display_items_elided(
-            &lig_caret_list.lig_glyphs,
-            |ix, lig_glyph| {
-                tok(format!("\t\t[{ix}]: ")).then(arrayfmt::display_items_inline(
-                    &lig_glyph.caret_values,
-                    display_caret_value,
-                    conf.inline_bookend,
-                    |num_skipped| toks(format!("...({num_skipped})...")),
-                ))
-            },
-            conf.bookend_size,
-            |start, stop| toks(format!("\t    (skipping LigGlyphs {start}..{stop})")),
-        )))
+        .glue(
+            LineBreak,
+            arrayfmt::display_items_elided(
+                &lig_caret_list.lig_glyphs,
+                |ix, lig_glyph| {
+                    toks(format!("[{ix}]: "))
+                        .pre_indent(4)
+                        .chain(arrayfmt::display_items_inline(
+                            &lig_glyph.caret_values,
+                            display_caret_value,
+                            conf.inline_bookend,
+                            |num_skipped| toks(format!("...({num_skipped})...")),
+                        ))
+                },
+                conf.bookend_size,
+                |start, stop| toks(format!("(skipping LigGlyphs {start}..{stop})")).pre_indent(3),
+            ),
+        )
+
     // NOTE - since coverage tables are used in MarkGlyphSet, we don't want to force-indent within the `show_coverage_table` function, so we do it before instead.
 }
 
 fn display_caret_value(cv: &Link<CaretValue>) -> display::TokenStream<'static> {
-    // WIP
+    // FIXME - refactor each branch to produce tokenstream
     display::toks(match cv {
         None => unreachable!("caret value null link"),
         Some(cv) => match cv {
@@ -6822,7 +6998,7 @@ fn display_caret_value(cv: &Link<CaretValue>) -> display::TokenStream<'static> {
     })
 }
 
-// TODO - refactor to tokenstream
+// TODO - refactor into display model
 fn format_device_or_variation_index_table(table: &DeviceOrVariationIndexTable) -> String {
     match table {
         DeviceOrVariationIndexTable::Device(dev_table) => format_device_table(dev_table),
@@ -6835,11 +7011,13 @@ fn format_device_or_variation_index_table(table: &DeviceOrVariationIndexTable) -
     }
 }
 
+// TODO - refactor into display model
 fn format_device_table(dev_table: &DeviceTable) -> String {
     // REVIEW - we are so far down the stack there is very little we can display inline for the delta-values, but we have them on hand if we wish to show them in some abbreviated form...
     format!("{}..{}", dev_table.start_size, dev_table.end_size)
 }
 
+// TODO - refactor into display model
 fn format_variation_index_table(var_ix_table: &VariationIndexTable) -> String {
     format!(
         "{}->{}",
@@ -6848,33 +7026,41 @@ fn format_variation_index_table(var_ix_table: &VariationIndexTable) -> String {
 }
 
 fn display_attach_list(attach_list: &AttachList, conf: &Config) -> display::TokenStream<'static> {
-    use display::{tok, toks};
+    use display::{Token::LineBreak, tok, toks};
+    fn display_attach_point(point_indices: &[u16], conf: &Config) -> display::TokenStream<'static> {
+        arrayfmt::display_items_inline(
+            point_indices,
+            |point_ix| toks(u16::to_string(point_ix)),
+            conf.inline_bookend,
+            |num_skipped| toks(format!("...({num_skipped})...")),
+        )
+    }
+
     // WIP
     toks("AttachList:")
         .pre_indent(2)
-        .break_line()
-        .chain(
-            display_coverage_table_summary(&attach_list.coverage, conf)
-                .pre_indent(4)
-                .break_line(),
+        .glue(
+            LineBreak,
+            display_coverage_table_summary(&attach_list.coverage, conf).pre_indent(4),
         )
-        .chain(arrayfmt::display_items_elided(
-            &attach_list.attach_points,
-            |ix, AttachPoint { point_indices }| {
-                tok(format!("\t\t[{ix}]:")).then(arrayfmt::display_items_inline(
-                    point_indices,
-                    |point_ix| toks(format!("{point_ix}")),
-                    conf.inline_bookend,
-                    |num_skipped| toks(format!("...({num_skipped})...")),
-                ))
-            },
-            conf.bookend_size,
-            |start, stop| {
-                toks(format!(
-                    "\t    (skipping attach points for glyphs {start}..{stop})"
-                ))
-            },
-        ))
+        .glue(
+            LineBreak,
+            arrayfmt::display_items_elided(
+                &attach_list.attach_points,
+                |ix, AttachPoint { point_indices }| {
+                    toks(format!("[{ix}]: "))
+                        .pre_indent(4)
+                        .chain(display_attach_point(point_indices, conf))
+                },
+                conf.bookend_size,
+                |start, stop| {
+                    toks(format!(
+                        "(skipping attach points for glyphs {start}..{stop})"
+                    ))
+                    .pre_indent(3)
+                },
+            ),
+        )
 }
 
 fn format_glyphid_hex(glyph: u16, is_standalone: bool) -> String {
@@ -6935,7 +7121,6 @@ fn format_glyphid_array_hex(glyphs: &impl AsRef<[u16]>, is_standalone: bool) -> 
     buffer
 }
 
-// FIXME - we might want a more flexible model where the `show_XYZZY`/`format_XYZZY` dichotomy is erased, such as a generic Writer or Fragment-producer...
 fn display_coverage_table(cov: &CoverageTable) -> display::TokenStream<'static> {
     use display::{tok, toks};
     match cov {
@@ -7144,81 +7329,6 @@ fn show_gasp_metrics(gasp: &Option<GaspMetrics>, conf: &Config) {
             .println(); // WIP
         }
     }
-}
-
-// TODO - move into arrayfmt module
-fn display_coverage_linked_array<T>(
-    items: &[T],
-    coverage: impl Iterator<Item = u16>,
-    mut fmt_fn: impl FnMut(u16, &T) -> display::TokenStream<'static>,
-    bookend: usize,
-    ellipsis: impl FnOnce(usize) -> display::TokenStream<'static>,
-) -> display::TokenStream<'static> {
-    use display::{tok, toks};
-    let count = items.len();
-    let mut buffer = Vec::with_capacity(Ord::min(count, bookend * 2 + 1));
-
-    let mut ix_iter = EnumLen::new(coverage, count);
-
-    if count > bookend * 2 {
-        for (ix, glyph_id) in ix_iter.iter_with().take(bookend) {
-            buffer.push(fmt_fn(glyph_id, &items[ix]));
-        }
-
-        let n_skipped = count - bookend * 2;
-
-        buffer.push(ellipsis(n_skipped));
-
-        for (ix, glyph_id) in ix_iter.iter_with().skip(n_skipped).take(bookend) {
-            buffer.push(fmt_fn(glyph_id, &items[ix]));
-        }
-    } else {
-        for (ix, glyph_id) in ix_iter.iter_with() {
-            buffer.push(fmt_fn(glyph_id, &items[ix]));
-        }
-    }
-    // NOTE - the boolean arg is set to false to avoid flagging leftover coverage as an error
-    match ix_iter.finish(false) {
-        Ok(_) => {}
-        Err(e) => panic!("format_coverage_linked_array found error: {e}"),
-    }
-    tok("[")
-        .then(display::TokenStream::join_with(buffer, tok(", ")))
-        .chain(toks("]"))
-}
-
-// Enumerates the contents of a Wec<T>, showing only the first and last `bookend` rows if the Wec is tall enough.
-///
-/// Each row is shown with `show_fn`, and the `elision_message` is printed (along with the range of indices skipped)
-/// if the slice length exceeds than 2 * `bookend`, in between the initial and terminal span of `bookend` items.
-// TODO - move into arrayfmt module
-fn display_wec_rows_elided<T>(
-    matrix: &Wec<T>,
-    show_fn: impl Fn(usize, &[T]) -> display::TokenStream<'static>,
-    bookend: usize,
-    fn_message: impl Fn(usize, usize) -> display::TokenStream<'static>,
-) -> display::TokenStream<'static> {
-    let count = matrix.rows();
-    let mut lines = Vec::with_capacity(Ord::min(count, bookend * 2 + 1));
-
-    if count > bookend * 2 {
-        for ix in 0..bookend {
-            lines.push(show_fn(ix, &matrix[ix]));
-        }
-        lines.push(fn_message(bookend, count - bookend));
-        for ix in (count - bookend)..count {
-            lines.push(show_fn(ix, &matrix[ix]));
-        }
-    } else {
-        let mut lines = Vec::with_capacity(count);
-        lines.extend(
-            matrix
-                .iter_rows()
-                .enumerate()
-                .map(|(ix, row)| show_fn(ix, row)),
-        );
-    }
-    display::TokenStream::join_with(lines, display::Token::LineBreak)
 }
 
 fn format_version16dot16(v: u32) -> String {
@@ -7861,10 +7971,12 @@ mod display {
             }
         }
 
+        /// Surrounds the TokenStream with `'('..')'`
         pub fn paren(self) -> Self {
             self.surround(tok("("), tok(")"))
         }
 
+        /// Surrounds the TokenStream with `'['..']'`
         pub fn bracket(self) -> Self {
             self.surround(tok("["), tok("]"))
         }
@@ -7875,7 +7987,9 @@ mod display {
             }
         }
 
-        /// Prepends a number of indents equal to `stops` as measured in 4-space half-tabs.
+        /// Prepends indentation to the first line of the stream, measured 4-space half-tabs.
+        ///
+        /// Will prefer using `'\t'` for indentation, and will include a final half-tab iff `stops` is odd.
         pub fn pre_indent(self, stops: u8) -> Self {
             let tabs = stops / 2;
             let hts = stops % 2;
@@ -7949,8 +8063,11 @@ mod display {
 
 // TODO - rewrite the functions to either be Write-generic or used Fragment-like output model to avoid duplication between I/O show and String formatting functions
 mod arrayfmt {
-    use super::display::{Token, TokenStream};
-    use crate::api_helper::util::trisect_unchecked;
+    use super::display::{
+        Token::{self, LineBreak},
+        TokenStream, tok, toks,
+    };
+    use crate::api_helper::util::{EnumLen, Wec, trisect_unchecked};
 
     /// Generic helper for displaying an array of possibly-None elements, skipping over
     /// all None-values and only showing up to the first, and last `N` elements, where
@@ -7997,7 +8114,7 @@ mod arrayfmt {
                 buffer.push(show_fn(ix, it));
             }
         }
-        TokenStream::join_with(buffer, Token::LineBreak)
+        TokenStream::join_with(buffer, LineBreak)
     }
 
     /// Generic helper for displaying an array of possibly-None elements, skipping over
@@ -8045,7 +8162,7 @@ mod arrayfmt {
                 buffer.push(show_fn(ix, it));
             }
         }
-        TokenStream::join_with(buffer, Token::InlineText(", ".into())).bracket()
+        TokenStream::join_with(buffer, tok(", ")).bracket()
     }
 
     /// Generic helper for displaying an array of elements, showing at most `bookend` elements at the start and end of the array and a single ellipsis if the array is longer than `2 * bookend`.
@@ -8079,7 +8196,7 @@ mod arrayfmt {
         } else {
             buffer.extend(items.iter().map(fmt_fn));
         }
-        TokenStream::join_with(buffer, Token::InlineText(", ".into())).bracket()
+        TokenStream::join_with(buffer, tok(", ")).bracket()
     }
 
     /// Enumerates the contents of a slice, showing only the first and last `bookend` items if the slice is long enough.
@@ -8109,6 +8226,110 @@ mod arrayfmt {
         } else {
             buffer.extend(items.iter().enumerate().map(|(ix, item)| show_fn(ix, item)));
         }
-        TokenStream::join_with(buffer, Token::LineBreak)
+        TokenStream::join_with(buffer, LineBreak)
+    }
+
+    // Enumerates the contents of a Wec<T>, showing only the first and last `bookend` rows if the Wec is tall enough.
+    ///
+    /// Each row is shown with `show_fn`, and the `elision_message` is printed (along with the range of indices skipped)
+    /// if the slice length exceeds than 2 * `bookend`, in between the initial and terminal span of `bookend` items.
+    // TODO - move into arrayfmt module
+    pub(crate) fn display_wec_rows_elided<T>(
+        matrix: &Wec<T>,
+        show_fn: impl Fn(usize, &[T]) -> TokenStream<'static>,
+        bookend: usize,
+        fn_message: impl Fn(usize, usize) -> TokenStream<'static>,
+    ) -> TokenStream<'static> {
+        let count = matrix.rows();
+        let mut lines = Vec::with_capacity(Ord::min(count, bookend * 2 + 1));
+
+        if count > bookend * 2 {
+            for ix in 0..bookend {
+                lines.push(show_fn(ix, &matrix[ix]));
+            }
+            lines.push(fn_message(bookend, count - bookend));
+            for ix in (count - bookend)..count {
+                lines.push(show_fn(ix, &matrix[ix]));
+            }
+        } else {
+            let mut lines = Vec::with_capacity(count);
+            lines.extend(
+                matrix
+                    .iter_rows()
+                    .enumerate()
+                    .map(|(ix, row)| show_fn(ix, row)),
+            );
+        }
+        TokenStream::join_with(lines, LineBreak)
+    }
+
+    pub(crate) fn display_coverage_linked_array<T>(
+        items: &[T],
+        coverage: impl Iterator<Item = u16>,
+        mut fmt_fn: impl FnMut(u16, &T) -> TokenStream<'static>,
+        bookend: usize,
+        ellipsis: impl FnOnce(usize) -> TokenStream<'static>,
+    ) -> TokenStream<'static> {
+        let count = items.len();
+        let mut buffer = Vec::with_capacity(Ord::min(count, bookend * 2 + 1));
+
+        let mut ix_iter = EnumLen::new(coverage, count);
+
+        if count > bookend * 2 {
+            for (ix, glyph_id) in ix_iter.iter_with().take(bookend) {
+                buffer.push(fmt_fn(glyph_id, &items[ix]));
+            }
+
+            let n_skipped = count - bookend * 2;
+
+            buffer.push(ellipsis(n_skipped));
+
+            for (ix, glyph_id) in ix_iter.iter_with().skip(n_skipped).take(bookend) {
+                buffer.push(fmt_fn(glyph_id, &items[ix]));
+            }
+        } else {
+            for (ix, glyph_id) in ix_iter.iter_with() {
+                buffer.push(fmt_fn(glyph_id, &items[ix]));
+            }
+        }
+
+        // NOTE - boolean control-flag for strictness; when false, will not return an error if there are leftover items in the coverage iterator
+        const FORBID_LEFTOVER_COVERAGE: bool = false;
+
+        match ix_iter.finish(FORBID_LEFTOVER_COVERAGE) {
+            Ok(_) => {}
+            Err(e) => panic!("format_coverage_linked_array found error: {e}"),
+        }
+        TokenStream::join_with(buffer, tok(", ")).bracket()
+    }
+
+    pub(crate) fn display_table_column_horiz<A>(
+        heading: &'static str,
+        items: &[A],
+        mut show_fn: impl FnMut(&A) -> TokenStream<'static>,
+        bookend: usize,
+        ellipsis: impl FnOnce(usize) -> TokenStream<'static>,
+    ) -> TokenStream<'static> {
+        let count = items.len();
+        let mut buf = Vec::with_capacity(Ord::min(count, 2 * bookend + 1));
+        if count > 2 * bookend {
+            let (left_bookend, _middle, right_bookend) =
+                unsafe { trisect_unchecked(items, bookend, bookend) };
+
+            for it in left_bookend {
+                buf.push(show_fn(it));
+            }
+
+            let n_skipped = count - bookend * 2;
+            buf.push(ellipsis(n_skipped));
+
+            for it in right_bookend {
+                buf.push(show_fn(it));
+            }
+        } else {
+            buf.extend(items.iter().map(show_fn));
+        }
+
+        tok(heading).then(TokenStream::join_with(buf, tok(" ")))
     }
 }
