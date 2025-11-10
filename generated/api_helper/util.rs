@@ -262,12 +262,19 @@ where
     }
 }
 
+/// Iterator object for cross-indexing an iterator with an enumeration of a specified length.
+///
+/// Initialized with a length-promise and a source iterator, and yields each element paired with its index.
+///
+/// If the iterator runs out before the promise is met, or if the promise is met but
+/// the iterator is not fully consumed, will return an error upon calling the `finish` method.
 pub struct EnumLen<T, I: Iterator<Item = T>> {
     iter: I,
     range: std::ops::Range<usize>,
     len: usize,
 }
 
+/// Error category for `EnumLen`, returned upon `finish` if the length-promise is not met exactly.
 #[derive(Debug)]
 pub enum EnumLenError<T> {
     TooShort { len: usize, yielded: usize },
@@ -292,6 +299,8 @@ impl<T: std::fmt::Display> std::fmt::Display for EnumLenError<T> {
 impl<T: std::fmt::Debug + std::fmt::Display> std::error::Error for EnumLenError<T> {}
 
 impl<T, I: Iterator<Item = T>> EnumLen<T, I> {
+    /// Constructs a new [`EnumLen`] iteration object given a source iterator `iter` we are claiming to
+    /// contain exactly `len` elements.
     pub fn new(iter: I, len: usize) -> Self {
         EnumLen {
             iter,
@@ -300,6 +309,10 @@ impl<T, I: Iterator<Item = T>> EnumLen<T, I> {
         }
     }
 
+    /// Mutably borrows [`self`] for iteration purposes, returning an iterator that yields `(index, item)`
+    /// until either the iterator runs out or `len` elements have been yielded.
+    ///
+    /// If the returned iterator is partly consumed, can be called again to resume iteration where it left off.
     pub fn iter_with(&mut self) -> impl '_ + Iterator<Item = (usize, T)> {
         PerIndex {
             index_iter: &mut self.range,
@@ -307,6 +320,12 @@ impl<T, I: Iterator<Item = T>> EnumLen<T, I> {
         }
     }
 
+    /// Handles deallocation of `self` and returns an error if the length-promise was not met exactly.
+    ///
+    /// If `strict` is true, then the iterator must be fully consumed before calling `finish`.
+    ///
+    /// If `strict` is false, will only return an error if the iterator ran out of elements early,
+    /// and not if it contained more elements than implied by `len`.
     pub fn finish(mut self, strict: bool) -> Result<(), EnumLenError<T>> {
         match self.range.next() {
             Some(ix) => Err(EnumLenError::TooShort {

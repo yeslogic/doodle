@@ -17,8 +17,8 @@ use crate::{
     byte_set::ByteSet,
     decoder::extract_pair,
     parser::error::TraceHash,
-    typecheck::{TypeChecker, UType, UVar},
-    valuetype::{SeqBorrowHint, ValueType, augmented::AugValueType},
+    typecheck::{TypeChecker, UType, UVar, WHNFSolution},
+    valuetype::{SeqBorrowHint, ValueType},
 };
 
 use std::{
@@ -71,49 +71,151 @@ fn get_trace(_salt: &impl std::hash::Hash) -> TraceHash {
 pub struct CodeGen {
     name_gen: NameGen,
     defined_types: Vec<RustTypeDecl>,
+    metavariables: StableMap<UVar, RustTypeDecl, util::BTree>,
 }
 
 impl CodeGen {
     pub fn new() -> Self {
         let name_gen = NameGen::new();
         let defined_types = Vec::new();
+        let metavariables = StableMap::<_, _, util::BTree>::new();
         CodeGen {
             name_gen,
             defined_types,
+            metavariables,
         }
     }
 
-    /// Converts a `ValueType` to a `GenType`, potentially creating new ad-hoc names
+    fn lift_base<T>(bt: BaseType) -> T
+    where
+        T: From<PrimType>,
+    {
+        match bt {
+            BaseType::Bool => PrimType::Bool.into(),
+            BaseType::U8 => PrimType::U8.into(),
+            BaseType::U16 => PrimType::U16.into(),
+            BaseType::U32 => PrimType::U32.into(),
+            BaseType::U64 => PrimType::U64.into(),
+            BaseType::Char => PrimType::Char.into(),
+        }
+    }
+
+    fn lift_whnf_solution(&mut self, tc: &TypeChecker, sol: WHNFSolution, lt: &RustLt) -> RustType {
+        match sol {
+            WHNFSolution::Base(bt) => Self::lift_base(bt),
+            WHNFSolution::Var(var) => self.lift_uvar(tc, var, lt).to_rust_type(),
+        }
+    }
+
+    /// Resolves a metavariable type in a solved TypeChecker into a `GenType`, potentially creating new ad-hoc names
     /// for any records or unions encountered, and registering any new ad-hoc type definitions
     /// in `self`.
-    fn lift_type(&mut self, vt: &AugValueType, lt: &RustLt) -> GenType {
-        match vt {
-            AugValueType::Empty => RustType::UNIT.into(),
-            AugValueType::Base(BaseType::Bool) => PrimType::Bool.into(),
-            AugValueType::Base(BaseType::U8) => PrimType::U8.into(),
-            AugValueType::Base(BaseType::U16) => PrimType::U16.into(),
-            AugValueType::Base(BaseType::U32) => PrimType::U32.into(),
-            AugValueType::Base(BaseType::U64) => PrimType::U64.into(),
-            AugValueType::Base(BaseType::Char) => PrimType::Char.into(),
-            AugValueType::Option(param_t) => GenType::Inline(
-                CompType::Option(Box::new(self.lift_type(param_t, lt).to_rust_type())).into(),
-            ),
-            AugValueType::Tuple(vs) => match &vs[..] {
-                [] => RustType::AnonTuple(Vec::new()).into(),
-                [v] => RustType::AnonTuple(vec![self.lift_type(v, lt).to_rust_type()]).into(),
-                _ => {
-                    let mut buf = Vec::with_capacity(vs.len());
-                    self.name_gen.ctxt.push_atom(NameAtom::Positional(0));
-                    for v in vs.iter() {
-                        buf.push(self.lift_type(v, lt).to_rust_type());
-                        self.name_gen.ctxt.increment_index();
-                    }
-                    self.name_gen.ctxt.escape();
-                    RustType::AnonTuple(buf).into()
+    fn lift_uvar(&mut self, tc: &TypeChecker, var: UVar, lt: &RustLt) -> GenType {
+        use super::typecheck::Expansion;
+        let var = tc.get_canonical_uvar(var);
+        match tc.expand_var(var) {
+            Expansion::Empty => RustType::UNIT.into(),
+            Expansion::Base(bt) => Self::lift_base(bt),
+            Expansion::Record(fields) => {
+                if let Some(decl) = self.metavariables.get(&var) {
+                    let (type_name, (ix, is_new)) = self.name_gen.get_name(decl);
+                    assert!(!is_new);
+                    return GenType::Def((ix, type_name), decl.clone());
                 }
-            },
-            AugValueType::Seq(t, hint) => {
-                let inner = self.lift_type(t.as_ref(), lt).to_rust_type();
+
+                let mut lt_bound = None;
+                let mut rt_fields = Vec::new();
+                for (lab, f_sol) in fields.iter() {
+                    self.name_gen
+                        .ctxt
+                        .push_atom(NameAtom::RecordField(lab.clone()));
+                    let rt_field = self.lift_whnf_solution(tc, *f_sol, lt);
+                    if let Some(lt) = rt_field.lt_param() {
+                        // REVIEW - is it likely to have clashing lifetimes?
+                        let _ = lt_bound.get_or_insert(lt.clone());
+                    }
+                    rt_fields.push((lab.clone(), rt_field));
+                    self.name_gen.ctxt.escape();
+                }
+                let rt_def = RustTypeDef::Struct(RustStruct::Record(rt_fields));
+                let rt_decl = RustTypeDecl {
+                    def: rt_def,
+                    lt: lt_bound,
+                };
+                let (type_name, (ix, is_new)) = self.name_gen.get_name(&rt_decl);
+                if is_new {
+                    self.defined_types.push(rt_decl.clone());
+                }
+                self.metavariables.insert(var, rt_decl.clone());
+                GenType::Def((ix, type_name), rt_decl)
+            }
+            Expansion::Union(vars) => {
+                if let Some(decl) = self.metavariables.get(&var) {
+                    let (type_name, (ix, is_new)) = self.name_gen.get_name(decl);
+                    assert!(!is_new);
+                    return GenType::Def((ix, type_name), decl.clone());
+                }
+
+                let mut rt_vars = Vec::new();
+                let mut lt_bound = None;
+                for (name, branch_sol) in vars.iter() {
+                    self.name_gen
+                        .ctxt
+                        .push_atom(NameAtom::Variant(name.clone()));
+                    let name = name.clone();
+                    let variant = match branch_sol {
+                        WHNFSolution::Base(bt) => {
+                            RustVariant::Tuple(name, vec![Self::lift_base(*bt)])
+                        }
+                        WHNFSolution::Var(branch_v) => {
+                            let def = tc.expand_var(*branch_v);
+                            match def {
+                                Expansion::Empty => RustVariant::Unit(name),
+                                Expansion::Tuple(args) => match &args[..] {
+                                    [] => RustVariant::Unit(name),
+                                    [sol_arg] => RustVariant::Tuple(
+                                        name,
+                                        vec![self.lift_whnf_solution(tc, *sol_arg, lt)],
+                                    ),
+                                    _ => {
+                                        let mut v_args = Vec::new();
+                                        self.name_gen.ctxt.push_atom(NameAtom::Positional(0));
+                                        for sol_arg in args {
+                                            v_args
+                                                .push(self.lift_whnf_solution(tc, sol_arg, lt));
+                                            self.name_gen.ctxt.increment_index();
+                                        }
+                                        self.name_gen.ctxt.escape();
+                                        RustVariant::Tuple(name, v_args)
+                                    }
+                                },
+                                _ => {
+                                    let inner = self.lift_uvar(tc, *branch_v, lt).to_rust_type();
+                                    RustVariant::Tuple(name, vec![inner])
+                                }
+                            }
+                        }
+                    };
+                    if let Some(lt) = variant.lt_param() {
+                        let _ = lt_bound.get_or_insert(lt.clone());
+                    }
+                    rt_vars.push(variant);
+                    self.name_gen.ctxt.escape();
+                }
+                let rt_def = RustTypeDef::Enum(rt_vars);
+                let rt_decl = RustTypeDecl {
+                    def: rt_def,
+                    lt: lt_bound,
+                };
+                let (tname, (ix, is_new)) = self.name_gen.get_name(&rt_decl);
+                if is_new {
+                    self.defined_types.push(rt_decl.clone());
+                }
+                self.metavariables.insert(var, rt_decl.clone());
+                GenType::Def((ix, tname), rt_decl)
+            }
+            Expansion::Seq(sol, hint) => {
+                let inner = self.lift_whnf_solution(tc, sol, lt);
                 match hint {
                     SeqBorrowHint::ReadArray => {
                         let Some(p) = inner.try_as_prim() else {
@@ -130,83 +232,25 @@ impl CodeGen {
                     .into(),
                 }
             }
-            AugValueType::ViewObj => GenType::Inline(model::view_obj_type(lt.clone())),
-            AugValueType::Any => panic!("AugValueType::Any"),
-            AugValueType::Record(fields) => {
-                let mut lt_bound = None;
-                let mut rt_fields = Vec::new();
-                for (lab, ty) in fields.iter() {
-                    self.name_gen
-                        .ctxt
-                        .push_atom(NameAtom::RecordField(lab.clone()));
-                    let rt_field = self.lift_type(ty, lt);
-                    if let Some(lt) = rt_field.lt_param() {
-                        // REVIEW - is it likely to have clashing lifetimes?
-                        let _ = lt_bound.get_or_insert(lt.clone());
+            Expansion::Option(sol) => GenType::Inline(
+                CompType::Option(Box::new(self.lift_whnf_solution(tc, sol, lt))).into(),
+            ),
+            Expansion::Tuple(vs) => match &vs[..] {
+                [] => RustType::AnonTuple(Vec::new()).into(),
+                // REVIEW - should one-tuples be preserved?
+                [v] => RustType::AnonTuple(vec![self.lift_whnf_solution(tc, *v, lt)]).into(),
+                _ => {
+                    let mut buf = Vec::with_capacity(vs.len());
+                    self.name_gen.ctxt.push_atom(NameAtom::Positional(0));
+                    for v in vs.iter() {
+                        buf.push(self.lift_whnf_solution(tc, *v, lt));
+                        self.name_gen.ctxt.increment_index();
                     }
-                    rt_fields.push((lab.clone(), rt_field.to_rust_type()));
                     self.name_gen.ctxt.escape();
+                    RustType::AnonTuple(buf).into()
                 }
-                let rt_def = RustTypeDef::Struct(RustStruct::Record(rt_fields));
-                let rt_decl = RustTypeDecl {
-                    def: rt_def,
-                    lt: lt_bound,
-                };
-                let (type_name, (ix, is_new)) = self.name_gen.get_name(&rt_decl);
-                if is_new {
-                    self.defined_types.push(rt_decl.clone());
-                }
-                GenType::Def((ix, type_name), rt_decl)
-            }
-            AugValueType::Union(vars) => {
-                let mut rt_vars = Vec::new();
-                let mut lt_bound = None;
-                for (name, def) in vars.iter() {
-                    self.name_gen
-                        .ctxt
-                        .push_atom(NameAtom::Variant(name.clone()));
-                    let name = name.clone();
-                    let var = match def {
-                        AugValueType::Empty => RustVariant::Unit(name),
-                        AugValueType::Tuple(args) => match &args[..] {
-                            [] => RustVariant::Unit(name),
-                            [arg] => RustVariant::Tuple(
-                                name,
-                                vec![self.lift_type(arg, lt).to_rust_type()],
-                            ),
-                            _ => {
-                                let mut v_args = Vec::new();
-                                self.name_gen.ctxt.push_atom(NameAtom::Positional(0));
-                                for arg in args {
-                                    v_args.push(self.lift_type(arg, lt).to_rust_type());
-                                    self.name_gen.ctxt.increment_index();
-                                }
-                                self.name_gen.ctxt.escape();
-                                RustVariant::Tuple(name, v_args)
-                            }
-                        },
-                        other => {
-                            let inner = self.lift_type(other, lt).to_rust_type();
-                            RustVariant::Tuple(name, vec![inner])
-                        }
-                    };
-                    if let Some(lt) = var.lt_param() {
-                        let _ = lt_bound.get_or_insert(lt.clone());
-                    }
-                    rt_vars.push(var);
-                    self.name_gen.ctxt.escape();
-                }
-                let rt_def = RustTypeDef::Enum(rt_vars);
-                let rt_decl = RustTypeDecl {
-                    def: rt_def,
-                    lt: lt_bound,
-                };
-                let (tname, (ix, is_new)) = self.name_gen.get_name(&rt_decl);
-                if is_new {
-                    self.defined_types.push(rt_decl.clone());
-                }
-                GenType::Def((ix, tname), rt_decl)
-            }
+            },
+            Expansion::ViewObj => GenType::Inline(model::view_obj_type(lt.clone())),
         }
     }
 
@@ -4322,7 +4366,7 @@ impl<'a> Elaborator<'a> {
                 self.codegen
                     .name_gen
                     .ctxt
-                    .push_atom(NameAtom::Derived(Derivation::Preimage));
+                    .push_atom(NameAtom::Derived(Derivation::Lhs));
                 let t_inner = self.elaborate_format(inner, dyn_scope);
                 self.codegen.name_gen.ctxt.escape();
                 let t_lambda = self.elaborate_expr_lambda(lambda);
@@ -4414,7 +4458,7 @@ impl<'a> Elaborator<'a> {
                 self.codegen
                     .name_gen
                     .ctxt
-                    .push_atom(NameAtom::Derived(Derivation::Preimage));
+                    .push_atom(NameAtom::Derived(Derivation::Lhs));
                 let t_f0 = self.elaborate_format(f0, dyn_scope);
                 self.codegen.name_gen.ctxt.escape();
                 let t_f = self.elaborate_format(f, dyn_scope);
@@ -4489,7 +4533,12 @@ impl<'a> Elaborator<'a> {
             }
             Format::Phantom(inner) => {
                 let index = self.get_and_increment_index();
+
+                // Avoid reaching garden-path type-names by pruning anonymous descendants
+                self.codegen.name_gen.ctxt.push_atom(NameAtom::DeadEnd);
                 let t_inner = self.elaborate_format(inner, dyn_scope);
+                self.codegen.name_gen.ctxt.escape();
+
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::Phantom(gt, Box::new(t_inner))
             }
@@ -4498,11 +4547,11 @@ impl<'a> Elaborator<'a> {
 
     fn get_gt_from_index(&mut self, index: usize) -> GenType {
         let var = UVar::new(index);
-        let Some(vt) = self.tc.reify(var.into()) else {
-            unreachable!("unable to reify {var}")
-        };
-        self.codegen
-            .lift_type(&vt, &RustLt::Parametric(Label::Borrowed(model::DEFAULT_LT)))
+        self.codegen.lift_uvar(
+            &self.tc,
+            var,
+            &RustLt::Parametric(Label::Borrowed(model::DEFAULT_LT)),
+        )
     }
 
     fn elaborate_expr(&mut self, expr: &Expr) -> GTExpr {
@@ -5268,6 +5317,95 @@ mod tests {
         let inner = module.define_format("test.inner", ANY_BYTE);
         let outer = module.define_format("test.outer", record([("inner", inner.call())]));
         let output = produce_string_gencode(&module, &outer.call());
+        println!("{}", output);
+    }
+
+    #[test]
+    fn test_namegen_deflate_analogue() {
+        use crate::helper::*;
+        let mut module = FormatModule::new();
+
+        let block = module.define_format(
+            "deflate.block",
+            record([
+                ("final", u8()),
+                ("type", u8()),
+                ("data", {
+                    Format::Match(
+                        Box::new(var("type")),
+                        vec![
+                            (Pattern::U8(0), fmt_variant("uncompressed", opaque_bytes())),
+                            (Pattern::U8(1), fmt_variant("fixed_huffman", opaque_bytes())),
+                            (
+                                Pattern::U8(2),
+                                fmt_variant("dynamic_huffman", opaque_bytes()),
+                            ),
+                        ],
+                    )
+                }),
+            ]),
+        );
+
+        let f = record([
+            (
+                "foobar",
+                repeat_until_last(
+                    lambda("x", expr_eq(record_proj(var("x"), "final"), Expr::U8(1))),
+                    block.call(),
+                ),
+            ),
+            (
+                "xyzzy",
+                compute(flat_map(
+                    lambda(
+                        "x",
+                        expr_match(
+                            record_proj(var("x"), "data"),
+                            vec![
+                                (
+                                    Pattern::variant("uncompressed", Pattern::binding("y")),
+                                    var("y"),
+                                ),
+                                (
+                                    Pattern::variant("fixed_huffman", Pattern::binding("y")),
+                                    var("y"),
+                                ),
+                                (
+                                    Pattern::variant("dynamic_huffman", Pattern::binding("y")),
+                                    var("y"),
+                                ),
+                            ],
+                        ),
+                    ),
+                    var("foobar"),
+                )),
+            ),
+            (
+                "deadbeef",
+                compute(flat_map_list(
+                    lambda_tuple(
+                        ["buffer", "symbol"],
+                        expr_match(
+                            var("symbol"),
+                            vec![
+                                (
+                                    Pattern::variant("literal", Pattern::binding("b")),
+                                    Expr::U8(0),
+                                ),
+                                (
+                                    Pattern::variant("reference", Pattern::binding("r")),
+                                    Expr::U8(0),
+                                ),
+                            ],
+                        ),
+                    ),
+                    ValueType::Base(BaseType::U8),
+                    var("xyzzy"),
+                )),
+            ),
+        ]);
+        let main = module.define_format("main", f);
+        let output = produce_string_gencode(&module, &main.call());
         println!("{}", output);
     }
 }

@@ -1,4 +1,5 @@
 pub mod prelude;
+pub mod helper;
 
 use std::{
     borrow::Cow,
@@ -116,8 +117,6 @@ pub enum EpiFormat<B = Box<FormatExt>, V = Vec<FormatExt>, P = Vec<(Pattern, For
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 #[serde(tag = "tag", content = "data")]
 pub enum MetaFormat {
-    // LetView(Label, Box<FormatExt>),
-    // WithView(Label, ViewFormatExt),
     EngineSpecific {
         base_model: Box<FormatExt>,
         alt_model: Box<FormatExt>,
@@ -173,6 +172,40 @@ impl FormatExt {
             FormatExt::Ground(_) => false,
             FormatExt::Epi(f) => f.contains_meta(),
             FormatExt::Meta(_) => true,
+        }
+    }
+
+    pub(crate) fn __chain_record<Name: IntoLabel>(
+        mut captured: Vec<(Label, Expr)>,
+        remaining: &mut Vec<(Option<(Name, bool)>, FormatExt)>,
+    ) -> FormatExt {
+
+    if remaining.is_empty() {
+            if captured.is_empty() {
+                // NOTE - avoid constructing 'empty records' by returning a unit
+                FormatExt::Ground(GroundFormat::Compute(Box::new(Expr::UNIT)))
+            } else {
+                FormatExt::Ground(GroundFormat::Compute(Box::new(Expr::Record(captured))))
+            }
+        } else {
+            let this = remaining.pop().unwrap();
+            let (label, format_ext) = this;
+            match label {
+                None => FormatExt::Epi(EpiFormat::Duo(DuoKind::MonadSeq,
+                    Box::new(format_ext),
+                    Box::new(FormatExt::__chain_record(captured, remaining)),
+                )),
+                Some((name, is_persist)) => {
+                    let name: Label = name.into();
+                    if is_persist {
+                        captured.push((name.clone(), Expr::Var(name.clone())));
+                    }
+                    FormatExt::Epi(EpiFormat::Duo(DuoKind::LetFormat(name),
+                        Box::new(format_ext),
+                        Box::new(FormatExt::__chain_record(captured, remaining)),
+                    ))
+                }
+            }
         }
     }
 }
@@ -833,8 +866,12 @@ impl FormatModuleExt {
         FormatRef(level)
     }
 
-    fn get_args(&self, level: usize) -> &[(Label, ValueTypeExt)] {
+    pub fn get_args(&self, level: usize) -> &[(Label, ValueTypeExt)] {
         &self.args[level]
+    }
+
+    pub fn get_views(&self, level: usize) -> &[Label] {
+        &self.views[level]
     }
 
     pub fn get_format_type(&self, level: usize) -> &ValueTypeExt {

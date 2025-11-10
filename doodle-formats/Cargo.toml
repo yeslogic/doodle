@@ -7,6 +7,10 @@ edition = "2024"
 path = "src/lib.rs"
 bench = false
 
+[features]
+default = []
+alt = []
+
 [[bench]]
 name = "decoder_inflate_bench"
 path = "benches/inflate_bench.rs"

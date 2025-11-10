@@ -77,7 +77,7 @@ impl ValueType {
                 Some((_, t)) => t.clone(),
                 None => panic!("{label} not found in record type"),
             },
-            _ => panic!("expected record type"),
+            _ => panic!("expected record type, found {self:?}"),
         }
     }
 
