@@ -1,6 +1,6 @@
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
-use std::borrow::Cow;
 
 use anyhow::anyhow;
 
@@ -11,16 +11,12 @@ use crate::output::Fragment;
 pub(crate) enum Derivation {
     /// Incidental type that is processed but not persisted (e.g. via Format::Map or Format::MonadSeq)
     Lhs,
-    /// Inner-Type that appears inside of a Maybe-Context
-    // REVIEW - do we need to distinguish items in such positions?
-    Yes,
 }
 
 impl Derivation {
     pub(crate) fn token(&self) -> &'static str {
         match self {
             Derivation::Lhs => "lhs",
-            Derivation::Yes => "yes",
         }
     }
 }
@@ -90,8 +86,7 @@ pub(crate) fn is_refinement(x: &PathLabel, y: &PathLabel) -> bool {
                     if labx == laby {
                         continue;
                     } else {
-                        // REVIEW - this might be better off as a guard, or constant-false
-                        return true;
+                        break;
                     }
                 }
                 (NameAtom::Explicit(_), _) => return false,
@@ -101,7 +96,7 @@ pub(crate) fn is_refinement(x: &PathLabel, y: &PathLabel) -> bool {
         }
     }
     // NOTE - we would normally just return false, but to allow conditional bypass of backup heuristics for DeadEnd, we apply them outside the loop
-    y.len() < x.len() || NameCtxt::synthesize_name(x).len() > NameCtxt::synthesize_name(y).len()
+    y.len() < x.len()
 }
 
 #[derive(Debug)]
@@ -286,11 +281,11 @@ impl NameCtxt {
     fn trim(path: &PathLabel) -> Cow<'_, PathLabel> {
         for ix in (0..path.len()).rev() {
             match &path[ix] {
-                NameAtom::Explicit(_) =>  return Cow::Owned(path[ix..].to_vec()),
+                NameAtom::Explicit(_) => return Cow::Owned(path[ix..].to_vec()),
                 _ => continue,
             }
         }
-        return Cow::Borrowed(path)
+        return Cow::Borrowed(path);
     }
 
     /// Returns a globally-unique fixed-priority name for a given `PathLabel`
@@ -344,7 +339,7 @@ impl NameCtxt {
 
     /// If `y` is a refinement over `x`, then `x` is replaced with `y`.
     ///
-    /// Returns `true` if `x` was replaced with `y`, and `false`` otherwise.
+    /// Returns `true` if `x` was replaced with `y`, and `false` otherwise.
     pub(crate) fn refine_path(&self, x: &mut PathLabel, y: PathLabel) -> bool {
         let name_x = Self::synthesize_name(x);
         let name_y = Self::synthesize_name(&y);
@@ -358,10 +353,12 @@ impl NameCtxt {
         } else {
             is_refinement(x, &y)
         };
-        if is_improvement { *x = y; }
+        if is_improvement {
+            *x = y;
+        }
         is_improvement
     }
- }
+}
 
 /// Simple dodging scheme for generating a unique name from a possibly-shared base-name
 fn dedup(rawname: Label, ix: usize) -> Label {
@@ -489,5 +486,19 @@ mod tests {
         assert!(is_refinement(&x, &z));
         assert!(!is_refinement(&y, &x));
         assert!(!is_refinement(&z, &x));
+    }
+
+    #[test]
+    fn test_refinement2() {
+        let x = vec![
+            NameAtom::Explicit(Label::Borrowed("deflate.block")),
+            NameAtom::Bind(Label::Borrowed("data")),
+        ];
+        let y = vec![
+            NameAtom::Explicit(Label::Borrowed("deflate.main")),
+            NameAtom::Bind(Label::Borrowed("codes")),
+        ];
+
+        assert!(!is_refinement(&x, &y));
     }
 }

@@ -1,5 +1,5 @@
-pub mod prelude;
 pub mod helper;
+pub mod prelude;
 
 use std::{
     borrow::Cow,
@@ -179,8 +179,7 @@ impl FormatExt {
         mut captured: Vec<(Label, Expr)>,
         remaining: &mut Vec<(Option<(Name, bool)>, FormatExt)>,
     ) -> FormatExt {
-
-    if remaining.is_empty() {
+        if remaining.is_empty() {
             if captured.is_empty() {
                 // NOTE - avoid constructing 'empty records' by returning a unit
                 FormatExt::Ground(GroundFormat::Compute(Box::new(Expr::UNIT)))
@@ -191,7 +190,8 @@ impl FormatExt {
             let this = remaining.pop().unwrap();
             let (label, format_ext) = this;
             match label {
-                None => FormatExt::Epi(EpiFormat::Duo(DuoKind::MonadSeq,
+                None => FormatExt::Epi(EpiFormat::Duo(
+                    DuoKind::MonadSeq,
                     Box::new(format_ext),
                     Box::new(FormatExt::__chain_record(captured, remaining)),
                 )),
@@ -200,7 +200,8 @@ impl FormatExt {
                     if is_persist {
                         captured.push((name.clone(), Expr::Var(name.clone())));
                     }
-                    FormatExt::Epi(EpiFormat::Duo(DuoKind::LetFormat(name),
+                    FormatExt::Epi(EpiFormat::Duo(
+                        DuoKind::LetFormat(name),
                         Box::new(format_ext),
                         Box::new(FormatExt::__chain_record(captured, remaining)),
                     ))

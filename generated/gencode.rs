@@ -59,7 +59,7 @@ pub enum elf_types_elf_full { Full32(u32), Full64(u64) }
 /// expected size: 120
 /// trait-ready: unique decoder function (d#167)
 #[derive(Debug, Copy, Clone)]
-pub struct elf_phdr_table {
+pub struct elf_phdr {
 r#type: u32,
 flags64: Option<u32>,
 offset: elf_types_elf_off,
@@ -74,7 +74,7 @@ align: elf_types_elf_full
 /// expected size: 112
 /// trait-ready: unique decoder function (d#155)
 #[derive(Debug, Copy, Clone)]
-pub struct elf_shdr_table {
+pub struct elf_shdr {
 name: u32,
 r#type: u32,
 flags: elf_types_elf_full,
@@ -92,8 +92,8 @@ entsize: elf_types_elf_full
 #[derive(Debug, Clone)]
 pub struct elf_main {
 header: elf_header,
-program_headers: Option<Vec<elf_phdr_table>>,
-section_headers: Option<Vec<elf_shdr_table>>,
+program_headers: Option<Vec<elf_phdr>>,
+section_headers: Option<Vec<elf_shdr>>,
 sections: Option<Vec<Option<Vec<u8>>>>
 }
 
@@ -129,7 +129,7 @@ pixel_aspect_ratio: u8
 /// expected size: 3
 /// trait-unready: multiple (2) decoders exist (d#{367, 402})
 #[derive(Debug, Copy, Clone)]
-pub struct png_plte {
+pub struct gif_color_table_entry {
 r: u8,
 g: u8,
 b: u8
@@ -140,7 +140,7 @@ b: u8
 #[derive(Debug, Clone)]
 pub struct gif_logical_screen {
 descriptor: gif_logical_screen_descriptor,
-global_color_table: Option<Vec<png_plte>>
+global_color_table: Option<Vec<gif_color_table_entry>>
 }
 
 /// expected size: 3
@@ -228,7 +228,7 @@ terminator: u8
 #[derive(Debug, Clone)]
 pub struct gif_table_based_image {
 descriptor: gif_image_descriptor,
-local_color_table: Option<Vec<png_plte>>,
+local_color_table: Option<Vec<gif_color_table_entry>>,
 data: gif_table_based_image_data
 }
 
@@ -361,7 +361,7 @@ extra: u8
 /// expected size: 4
 /// trait-unready: multiple (2) decoders exist (d#{205, 206})
 #[derive(Debug, Copy, Clone)]
-pub struct deflate_distance_record {
+pub struct deflate_distance_record0 {
 distance_extra_bits: u16,
 distance: u16
 }
@@ -373,7 +373,7 @@ pub struct deflate_dynamic_huffman_codes_values {
 length_extra_bits: u8,
 length: u16,
 distance_code: u16,
-distance_record: deflate_distance_record
+distance_record: deflate_distance_record0
 }
 
 /// expected size: 14
@@ -387,7 +387,7 @@ extra: Option<deflate_dynamic_huffman_codes_values>
 /// expected size: 4
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
-pub struct deflate_dynamic_huffman_codes_values_reference {
+pub struct deflate_fixed_huffman_codes_values_reference {
 length: u16,
 distance: u16
 }
@@ -395,7 +395,7 @@ distance: u16
 /// expected size: 6
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
-pub enum deflate_main_codes { literal(u8), reference(deflate_dynamic_huffman_codes_values_reference) }
+pub enum deflate_uncompressed_codes_values { literal(u8), reference(deflate_fixed_huffman_codes_values_reference) }
 
 /// expected size: 176
 /// trait-ready: unique decoder function (d#203)
@@ -410,7 +410,7 @@ literal_length_distance_alphabet_code_lengths_value: Vec<u8>,
 literal_length_alphabet_code_lengths_value: Vec<u8>,
 distance_alphabet_code_lengths_value: Vec<u8>,
 codes: Vec<deflate_dynamic_huffman_codes>,
-codes_values: Vec<deflate_main_codes>
+codes_values: Vec<deflate_uncompressed_codes_values>
 }
 
 /// expected size: 8
@@ -420,7 +420,7 @@ pub struct deflate_fixed_huffman_codes_values {
 length_extra_bits: u8,
 length: u16,
 distance_code: u8,
-distance_record: deflate_distance_record
+distance_record: deflate_distance_record0
 }
 
 /// expected size: 12
@@ -436,7 +436,7 @@ extra: Option<deflate_fixed_huffman_codes_values>
 #[derive(Debug, Clone)]
 pub struct deflate_fixed_huffman {
 codes: Vec<deflate_fixed_huffman_codes>,
-codes_values: Vec<deflate_main_codes>
+codes_values: Vec<deflate_uncompressed_codes_values>
 }
 
 /// expected size: 56
@@ -446,14 +446,14 @@ pub struct deflate_uncompressed {
 len: u16,
 nlen: u16,
 bytes: Vec<u8>,
-codes_values: Vec<deflate_main_codes>
+codes_values: Vec<deflate_uncompressed_codes_values>
 }
 
 /// expected size: 184
 /// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InEnum { variants: [DirectHeap, Noop, Noop] }, Layout { size: 56, align: 8 (1 << 3) })
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub enum deflate_main_codes { dynamic_huffman(deflate_dynamic_huffman), fixed_huffman(deflate_fixed_huffman), uncompressed(deflate_uncompressed) }
+pub enum deflate_block_data { dynamic_huffman(deflate_dynamic_huffman), fixed_huffman(deflate_fixed_huffman), uncompressed(deflate_uncompressed) }
 
 /// expected size: 192
 /// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [DirectHeap, Noop, Noop] })] }, Layout { size: 64, align: 8 (1 << 3) })
@@ -462,7 +462,7 @@ pub enum deflate_main_codes { dynamic_huffman(deflate_dynamic_huffman), fixed_hu
 pub struct deflate_block {
 r#final: u8,
 r#type: u8,
-data: deflate_main_codes
+data: deflate_block_data
 }
 
 /// expected size: 72
@@ -470,7 +470,7 @@ data: deflate_main_codes
 #[derive(Debug, Clone)]
 pub struct deflate_main {
 blocks: Vec<deflate_block>,
-codes: Vec<deflate_main_codes>,
+codes: Vec<deflate_uncompressed_codes_values>,
 inflate: Vec<u8>
 }
 
@@ -498,7 +498,7 @@ footer: gzip_footer
 /// expected size: 1
 /// trait-unready: multiple (10) decoders exist (d#{297, 299, 310, 311, 312, 313, 314, 315, 316, 317})
 #[derive(Debug, Copy, Clone)]
-pub struct jpeg_eoi {
+pub struct jpeg_soi {
 marker: u8
 }
 
@@ -513,7 +513,7 @@ density_x: u16,
 density_y: u16,
 thumbnail_width: u8,
 thumbnail_height: u8,
-thumbnail_pixels: Vec<Vec<png_plte>>
+thumbnail_pixels: Vec<Vec<gif_color_table_entry>>
 }
 
 /// expected size: 48
@@ -533,7 +533,7 @@ data: jpeg_app0_data_data
 /// trait-ready: unique decoder function (d#343)
 #[derive(Debug, Clone)]
 pub struct jpeg_app0 {
-marker: jpeg_eoi,
+marker: jpeg_soi,
 length: u16,
 data: jpeg_app0_data
 }
@@ -546,7 +546,7 @@ pub enum tiff_byte_order { be(u8, u8), le(u8, u8) }
 /// expected size: 12
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
-pub struct tiff_ifd_be_fields {
+pub struct tiff_ifd_le_fields {
 tag: u16,
 r#type: u16,
 length: u32,
@@ -556,9 +556,9 @@ offset_or_data: u32
 /// expected size: 56
 /// trait-unready: multiple (3) decoders exist (d#{187, 188, 189})
 #[derive(Debug, Clone)]
-pub struct tiff_ifd {
+pub struct tiff_ifd_le {
 num_fields: u16,
-fields: Vec<tiff_ifd_be_fields>,
+fields: Vec<tiff_ifd_le_fields>,
 next_ifd_offset: u32,
 next_ifd: Vec<u8>
 }
@@ -571,7 +571,7 @@ start_of_header: u32,
 byte_order: tiff_byte_order,
 magic: u16,
 offset: u32,
-ifd: tiff_ifd
+ifd: tiff_ifd_le
 }
 
 /// expected size: 80
@@ -606,7 +606,7 @@ data: jpeg_app1_data_data
 /// trait-ready: unique decoder function (d#344)
 #[derive(Debug, Clone)]
 pub struct jpeg_app1 {
-marker: jpeg_eoi,
+marker: jpeg_soi,
 length: u16,
 data: jpeg_app1_data
 }
@@ -619,8 +619,8 @@ pub enum jpeg_frame_initial_segment { app0(jpeg_app0), app1(jpeg_app1) }
 /// expected size: 32
 /// trait-unready: multiple (16) decoders exist (d#{345, 346, 347, 348, 349, 350, 351, 352, 353, 354, 355, 356, 357, 358, 359, 415})
 #[derive(Debug, Clone)]
-pub struct jpeg_jpeg {
-marker: jpeg_eoi,
+pub struct jpeg_app2 {
+marker: jpeg_soi,
 length: u16,
 data: Vec<u8>
 }
@@ -645,7 +645,7 @@ value: u8
 /// trait-ready: unique decoder function (d#341)
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_dac {
-marker: jpeg_eoi,
+marker: jpeg_soi,
 length: u16,
 data: jpeg_dac_data
 }
@@ -663,7 +663,7 @@ values: Vec<Vec<u8>>
 /// trait-ready: unique decoder function (d#340)
 #[derive(Debug, Clone)]
 pub struct jpeg_dht {
-marker: jpeg_eoi,
+marker: jpeg_soi,
 length: u16,
 data: jpeg_dht_data
 }
@@ -693,7 +693,7 @@ elements: jpeg_dqt_data_elements
 /// trait-ready: unique decoder function (d#339)
 #[derive(Debug, Clone)]
 pub struct jpeg_dqt {
-marker: jpeg_eoi,
+marker: jpeg_soi,
 length: u16,
 data: Vec<jpeg_dqt_data>
 }
@@ -709,7 +709,7 @@ restart_interval: u16
 /// trait-ready: unique decoder function (d#342)
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_dri {
-marker: jpeg_eoi,
+marker: jpeg_soi,
 length: u16,
 data: jpeg_dri_data
 }
@@ -717,7 +717,7 @@ data: jpeg_dri_data
 /// expected size: 128
 /// trait-ready: unique decoder function (d#301)
 #[derive(Debug, Clone)]
-pub enum jpeg_table_or_misc { app0(jpeg_app0), app1(jpeg_app1), app10(jpeg_jpeg), app11(jpeg_jpeg), app12(jpeg_jpeg), app13(jpeg_jpeg), app14(jpeg_jpeg), app15(jpeg_jpeg), app2(jpeg_jpeg), app3(jpeg_jpeg), app4(jpeg_jpeg), app5(jpeg_jpeg), app6(jpeg_jpeg), app7(jpeg_jpeg), app8(jpeg_jpeg), app9(jpeg_jpeg), com(jpeg_jpeg), dac(jpeg_dac), dht(jpeg_dht), dqt(jpeg_dqt), dri(jpeg_dri) }
+pub enum jpeg_table_or_misc { app0(jpeg_app0), app1(jpeg_app1), app10(jpeg_app2), app11(jpeg_app2), app12(jpeg_app2), app13(jpeg_app2), app14(jpeg_app2), app15(jpeg_app2), app2(jpeg_app2), app3(jpeg_app2), app4(jpeg_app2), app5(jpeg_app2), app6(jpeg_app2), app7(jpeg_app2), app8(jpeg_app2), app9(jpeg_app2), com(jpeg_app2), dac(jpeg_dac), dht(jpeg_dht), dqt(jpeg_dqt), dri(jpeg_dri) }
 
 /// expected size: 2
 /// trait-unready: multiple (2) decoders exist (d#{409, 411})
@@ -730,7 +730,7 @@ vertical: u8
 /// expected size: 4
 /// trait-unready: multiple (3) decoders exist (d#{338, 410, 413})
 #[derive(Debug, Copy, Clone)]
-pub struct jpeg_dhp_image_component {
+pub struct jpeg_sof_image_component {
 id: u8,
 sampling_factor: jpeg_dhp_image_component_sampling_factor,
 quantization_table_id: u8
@@ -739,27 +739,27 @@ quantization_table_id: u8
 /// expected size: 32
 /// trait-unready: multiple (3) decoders exist (d#{337, 412, 417})
 #[derive(Debug, Clone)]
-pub struct jpeg_dhp_data {
+pub struct jpeg_sof_data {
 sample_precision: u8,
 num_lines: u16,
 num_samples_per_line: u16,
 num_image_components: u8,
-image_components: Vec<jpeg_dhp_image_component>
+image_components: Vec<jpeg_sof_image_component>
 }
 
 /// expected size: 40
 /// trait-unready: multiple (14) decoders exist (d#{324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 334, 335, 336, 416})
 #[derive(Debug, Clone)]
-pub struct jpeg_dhp {
-marker: jpeg_eoi,
+pub struct jpeg_sof0 {
+marker: jpeg_soi,
 length: u16,
-data: jpeg_dhp_data
+data: jpeg_sof_data
 }
 
 /// expected size: 48
 /// trait-ready: unique decoder function (d#302)
 #[derive(Debug, Clone)]
-pub enum jpeg_frame_header { sof0(jpeg_dhp), sof1(jpeg_dhp), sof10(jpeg_dhp), sof11(jpeg_dhp), sof13(jpeg_dhp), sof14(jpeg_dhp), sof15(jpeg_dhp), sof2(jpeg_dhp), sof3(jpeg_dhp), sof5(jpeg_dhp), sof6(jpeg_dhp), sof7(jpeg_dhp), sof9(jpeg_dhp) }
+pub enum jpeg_frame_header { sof0(jpeg_sof0), sof1(jpeg_sof0), sof10(jpeg_sof0), sof11(jpeg_sof0), sof13(jpeg_sof0), sof14(jpeg_sof0), sof15(jpeg_sof0), sof2(jpeg_sof0), sof3(jpeg_sof0), sof5(jpeg_sof0), sof6(jpeg_sof0), sof7(jpeg_sof0), sof9(jpeg_sof0) }
 
 /// expected size: 2
 /// trait-ready: unique decoder function (d#321)
@@ -800,7 +800,7 @@ approximation_bit_position: jpeg_sos_data_approximation_bit_position
 /// trait-ready: unique decoder function (d#306)
 #[derive(Debug, Clone)]
 pub struct jpeg_sos {
-marker: jpeg_eoi,
+marker: jpeg_soi,
 length: u16,
 data: jpeg_sos_data
 }
@@ -808,7 +808,7 @@ data: jpeg_sos_data
 /// expected size: 2
 /// trait-ready: unique decoder function (d#308)
 #[derive(Debug, Copy, Clone)]
-pub enum jpeg_scan_data_entropy_coded_segment { mcu(u8), rst0(jpeg_eoi), rst1(jpeg_eoi), rst2(jpeg_eoi), rst3(jpeg_eoi), rst4(jpeg_eoi), rst5(jpeg_eoi), rst6(jpeg_eoi), rst7(jpeg_eoi) }
+pub enum jpeg_scan_data_entropy_coded_segment { mcu(u8), rst0(jpeg_soi), rst1(jpeg_soi), rst2(jpeg_soi), rst3(jpeg_soi), rst4(jpeg_soi), rst5(jpeg_soi), rst6(jpeg_soi), rst7(jpeg_soi) }
 
 /// expected size: 48
 /// trait-unready: multiple (2) decoders exist (d#{307, 323})
@@ -838,7 +838,7 @@ num_lines: u16
 /// trait-ready: unique decoder function (d#304)
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_dnl {
-marker: jpeg_eoi,
+marker: jpeg_soi,
 length: u16,
 data: jpeg_dnl_data
 }
@@ -859,9 +859,9 @@ scans: Vec<jpeg_scan>
 /// trait-ready: unique decoder function (d#7)
 #[derive(Debug, Clone)]
 pub struct jpeg_main {
-soi: jpeg_eoi,
+soi: jpeg_soi,
 frame: jpeg_frame,
-eoi: jpeg_eoi
+eoi: jpeg_soi
 }
 
 /// expected size: 32
@@ -876,7 +876,7 @@ compatible_brands: Vec<(u8, u8, u8, u8)>
 /// expected size: 40
 /// trait-unready: multiple (2) decoders exist (d#{272, 274})
 #[derive(Debug, Clone)]
-pub struct mpeg4_stsd_sample_entry {
+pub struct mpeg4_dref_data_data {
 size_field: u32,
 r#type: (u8, u8, u8, u8),
 size: u64,
@@ -890,7 +890,7 @@ pub struct mpeg4_dref_data {
 version: u8,
 flags: (u8, u8, u8),
 number_of_entries: u32,
-data: Vec<mpeg4_stsd_sample_entry>
+data: Vec<mpeg4_dref_data_data>
 }
 
 /// expected size: 40
@@ -1158,7 +1158,7 @@ data: mpeg4_meta_atom_data
 /// expected size: 16
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
-pub struct mpeg4_mdhd_data_fields_version0 {
+pub struct mpeg4_mvhd_data_fields_version0 {
 creation_time: u32,
 modification_time: u32,
 timescale: u32,
@@ -1168,7 +1168,7 @@ duration: u32
 /// expected size: 32
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
-pub struct mpeg4_mdhd_data_fields_version1 {
+pub struct mpeg4_mvhd_data_fields_version1 {
 creation_time: u64,
 modification_time: u64,
 timescale: u32,
@@ -1178,7 +1178,7 @@ duration: u64
 /// expected size: 40
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
-pub enum mpeg4_mdhd_data_fields { version0(mpeg4_mdhd_data_fields_version0), version1(mpeg4_mdhd_data_fields_version1) }
+pub enum mpeg4_mvhd_data_fields { version0(mpeg4_mvhd_data_fields_version0), version1(mpeg4_mvhd_data_fields_version1) }
 
 /// expected size: 112
 /// trait-ready: unique decoder function (d#246)
@@ -1186,7 +1186,7 @@ pub enum mpeg4_mdhd_data_fields { version0(mpeg4_mdhd_data_fields_version0), ver
 pub struct mpeg4_mvhd_data {
 version: u8,
 flags: (u8, u8, u8),
-fields: mpeg4_mdhd_data_fields,
+fields: mpeg4_mvhd_data_fields,
 rate: u32,
 volume: u16,
 reserved1: u16,
@@ -1250,7 +1250,7 @@ component_name: Vec<u8>
 pub struct mpeg4_mdhd_data {
 version: u8,
 flags: (u8, u8, u8),
-fields: mpeg4_mdhd_data_fields,
+fields: mpeg4_mvhd_data_fields,
 language: u16,
 pre_defined: u16
 }
@@ -1369,7 +1369,7 @@ pub struct mpeg4_stsd_data {
 version: u8,
 flags: (u8, u8, u8),
 entry_count: u32,
-sample_entries: Vec<mpeg4_stsd_sample_entry>
+sample_entries: Vec<mpeg4_dref_data_data>
 }
 
 /// expected size: 32
@@ -1621,7 +1621,7 @@ start_glyph_id: u32
 /// expected size: 40
 /// trait-unready: multiple (2) decoders exist (d#{146, 147})
 #[derive(Debug, Clone)]
-pub struct opentype_cmap_subtable_format13 {
+pub struct opentype_cmap_subtable_format12 {
 format: u16,
 length: u32,
 language: u32,
@@ -1763,7 +1763,7 @@ groups: Vec<opentype_types_sequential_map_record>
 /// expected size: 144
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub enum opentype_cmap_subtable_data { Format0(opentype_cmap_subtable_format0), Format10(opentype_cmap_subtable_format10), Format12(opentype_cmap_subtable_format13), Format13(opentype_cmap_subtable_format13), Format14(opentype_cmap_subtable_format14), Format2(opentype_cmap_subtable_format2), Format4(opentype_cmap_subtable_format4), Format6(opentype_cmap_subtable_format6), Format8(opentype_cmap_subtable_format8) }
+pub enum opentype_cmap_subtable_data { Format0(opentype_cmap_subtable_format0), Format10(opentype_cmap_subtable_format10), Format12(opentype_cmap_subtable_format12), Format13(opentype_cmap_subtable_format12), Format14(opentype_cmap_subtable_format14), Format2(opentype_cmap_subtable_format2), Format4(opentype_cmap_subtable_format4), Format6(opentype_cmap_subtable_format6), Format8(opentype_cmap_subtable_format8) }
 
 /// expected size: 152
 /// trait-ready: unique decoder function (d#139)
@@ -1804,7 +1804,7 @@ encoding_records: Vec<opentype_encoding_record>
 /// expected size: 8
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
-pub enum opentype_fvar_user_tuple_coordinates { Fixed32(u32) }
+pub enum opentype_head_table_font_revision { Fixed32(u32) }
 
 /// expected size: 8
 /// trait-orphaned: no decoder functions provided
@@ -1835,7 +1835,7 @@ bold: bool
 pub struct opentype_head_table {
 major_version: u16,
 minor_version: u16,
-font_revision: opentype_fvar_user_tuple_coordinates,
+font_revision: opentype_head_table_font_revision,
 checksum_adjustment: u32,
 magic_number: (u8, u8, u8, u8),
 flags: u16,
@@ -1853,7 +1853,7 @@ glyph_data_format: u16
 /// expected size: 4
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
-pub struct opentype_vhea_table_caret_slope {
+pub struct opentype_hhea_table_caret_slope {
 rise: u16,
 run: u16
 }
@@ -1861,7 +1861,7 @@ run: u16
 /// expected size: 28
 /// trait-unready: multiple (2) decoders exist (d#{31, 48})
 #[derive(Debug, Copy, Clone)]
-pub struct opentype_vhea_table {
+pub struct opentype_hhea_table {
 major_version: u16,
 minor_version: u16,
 ascent: u16,
@@ -1871,7 +1871,7 @@ advance_width_max: u16,
 min_left_side_bearing: u16,
 min_right_side_bearing: u16,
 x_max_extent: u16,
-caret_slope: opentype_vhea_table_caret_slope,
+caret_slope: opentype_hhea_table_caret_slope,
 caret_offset: u16,
 metric_data_format: u16,
 number_of_long_metrics: u16
@@ -1929,7 +1929,7 @@ left_side_bearings: Vec<u16>
 /// expected size: 32
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_name_name_version_1_lang_tag_records_offset {
+pub struct opentype_name_table_name_records_offset {
 offset: u16,
 link: Option<Vec<u8>>
 }
@@ -1943,7 +1943,7 @@ encoding: u16,
 language: u16,
 name_id: u16,
 length: u16,
-offset: opentype_name_name_version_1_lang_tag_records_offset
+offset: opentype_name_table_name_records_offset
 }
 
 /// expected size: 40
@@ -1951,7 +1951,7 @@ offset: opentype_name_name_version_1_lang_tag_records_offset
 #[derive(Debug, Clone)]
 pub struct opentype_name_name_version_1_lang_tag_records {
 length: u16,
-offset: opentype_name_name_version_1_lang_tag_records_offset
+offset: opentype_name_table_name_records_offset
 }
 
 /// expected size: 32
@@ -1982,7 +1982,7 @@ data: opentype_name_table_data
 /// expected size: 4
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
-pub struct opentype_os2_table_data_yes_extra_fields_v1_yes_extra_fields_v2_yes_extra_fields_v5 {
+pub struct opentype_os2_table_data_extra_fields_v1_extra_fields_v2_extra_fields_v5 {
 us_lower_optical_point_size: u16,
 us_upper_optical_point_size: u16
 }
@@ -1990,22 +1990,22 @@ us_upper_optical_point_size: u16
 /// expected size: 16
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
-pub struct opentype_os2_table_data_yes_extra_fields_v1_yes_extra_fields_v2 {
+pub struct opentype_os2_table_data_extra_fields_v1_extra_fields_v2 {
 sx_height: u16,
 s_cap_height: u16,
 us_default_char: u16,
 us_break_char: u16,
 us_max_context: u16,
-extra_fields_v5: Option<opentype_os2_table_data_yes_extra_fields_v1_yes_extra_fields_v2_yes_extra_fields_v5>
+extra_fields_v5: Option<opentype_os2_table_data_extra_fields_v1_extra_fields_v2_extra_fields_v5>
 }
 
 /// expected size: 24
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
-pub struct opentype_os2_table_data_yes_extra_fields_v1 {
+pub struct opentype_os2_table_data_extra_fields_v1 {
 ul_code_page_range_1: u32,
 ul_code_page_range_2: u32,
-extra_fields_v2: Option<opentype_os2_table_data_yes_extra_fields_v1_yes_extra_fields_v2>
+extra_fields_v2: Option<opentype_os2_table_data_extra_fields_v1_extra_fields_v2>
 }
 
 /// expected size: 36
@@ -2017,7 +2017,7 @@ s_typo_descender: u16,
 s_typo_line_gap: u16,
 us_win_ascent: u16,
 us_win_descent: u16,
-extra_fields_v1: Option<opentype_os2_table_data_yes_extra_fields_v1>
+extra_fields_v1: Option<opentype_os2_table_data_extra_fields_v1>
 }
 
 /// expected size: 120
@@ -2079,7 +2079,7 @@ pub enum opentype_post_table_names { Version1, Version2(opentype_post_table_name
 #[derive(Debug, Clone)]
 pub struct opentype_post_table {
 version: u32,
-italic_angle: opentype_fvar_user_tuple_coordinates,
+italic_angle: opentype_head_table_font_revision,
 underline_position: u16,
 underline_thickness: u16,
 is_fixed_pitch: u32,
@@ -2093,13 +2093,13 @@ names: opentype_post_table_names
 /// expected size: 32
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub enum opentype_gvar_table_glyph_variation_data_offsets { Offsets16(Vec<u16>), Offsets32(Vec<u32>) }
+pub enum opentype_loca_table_offsets { Offsets16(Vec<u16>), Offsets32(Vec<u32>) }
 
 /// expected size: 32
 /// trait-ready: unique decoder function (d#37)
 #[derive(Debug, Clone)]
 pub struct opentype_loca_table {
-offsets: opentype_gvar_table_glyph_variation_data_offsets
+offsets: opentype_loca_table_offsets
 }
 
 /// expected size: 12
@@ -2146,7 +2146,7 @@ pub enum opentype_glyf_composite_acc_glyphs_scale { Matrix((opentype_gvar_tuple_
 /// expected size: 42
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
-pub struct opentype_glyf_composite_glyphs {
+pub struct opentype_glyf_composite_acc_glyphs {
 flags: opentype_glyf_composite_acc_glyphs_flags,
 glyph_index: u16,
 argument1: opentype_glyf_composite_acc_glyphs_argument1,
@@ -2158,7 +2158,7 @@ scale: Option<opentype_glyf_composite_acc_glyphs_scale>
 /// trait-ready: unique decoder function (d#133)
 #[derive(Debug, Clone)]
 pub struct opentype_glyf_composite {
-glyphs: Vec<opentype_glyf_composite_glyphs>,
+glyphs: Vec<opentype_glyf_composite_acc_glyphs>,
 instructions: Vec<u8>
 }
 
@@ -2342,7 +2342,7 @@ hint: opentype_layout_base_coord_hint
 /// expected size: 72
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_layout_min_max_min_coord_offset {
+pub struct opentype_layout_base_values_base_coord_offsets {
 offset: u16,
 link: Option<opentype_layout_base_coord>
 }
@@ -2354,7 +2354,7 @@ pub struct opentype_layout_base_values {
 table_start: u32,
 default_baseline_index: u16,
 base_coord_count: u16,
-base_coord_offsets: Vec<opentype_layout_min_max_min_coord_offset>
+base_coord_offsets: Vec<opentype_layout_base_values_base_coord_offsets>
 }
 
 /// expected size: 40
@@ -2370,8 +2370,8 @@ link: Option<opentype_layout_base_values>
 #[derive(Debug, Clone)]
 pub struct opentype_layout_min_max_feat_min_max_records {
 feature_tag: u32,
-min_coord_offset: opentype_layout_min_max_min_coord_offset,
-max_coord_offset: opentype_layout_min_max_min_coord_offset
+min_coord_offset: opentype_layout_base_values_base_coord_offsets,
+max_coord_offset: opentype_layout_base_values_base_coord_offsets
 }
 
 /// expected size: 176
@@ -2379,8 +2379,8 @@ max_coord_offset: opentype_layout_min_max_min_coord_offset
 #[derive(Debug, Clone)]
 pub struct opentype_layout_min_max {
 table_start: u32,
-min_coord_offset: opentype_layout_min_max_min_coord_offset,
-max_coord_offset: opentype_layout_min_max_min_coord_offset,
+min_coord_offset: opentype_layout_base_values_base_coord_offsets,
+max_coord_offset: opentype_layout_base_values_base_coord_offsets,
 feat_min_max_count: u16,
 feat_min_max_records: Vec<opentype_layout_min_max_feat_min_max_records>
 }
@@ -2415,7 +2415,7 @@ base_lang_sys_records: Vec<opentype_layout_base_script_base_lang_sys_records>
 /// expected size: 264
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_layout_axis_table_base_script_list_offset_link_yes_base_script_records_base_script_offset {
+pub struct opentype_layout_axis_table_base_script_list_offset_link_base_script_records_base_script_offset {
 offset: u16,
 link: Option<opentype_layout_base_script>
 }
@@ -2423,9 +2423,9 @@ link: Option<opentype_layout_base_script>
 /// expected size: 272
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_layout_axis_table_base_script_list_offset_link_yes_base_script_records {
+pub struct opentype_layout_axis_table_base_script_list_offset_link_base_script_records {
 base_script_tag: u32,
-base_script_offset: opentype_layout_axis_table_base_script_list_offset_link_yes_base_script_records_base_script_offset
+base_script_offset: opentype_layout_axis_table_base_script_list_offset_link_base_script_records_base_script_offset
 }
 
 /// expected size: 32
@@ -2434,7 +2434,7 @@ base_script_offset: opentype_layout_axis_table_base_script_list_offset_link_yes_
 pub struct opentype_layout_axis_table_base_script_list_offset_link {
 table_start: u32,
 base_script_count: u16,
-base_script_records: Vec<opentype_layout_axis_table_base_script_list_offset_link_yes_base_script_records>
+base_script_records: Vec<opentype_layout_axis_table_base_script_list_offset_link_base_script_records>
 }
 
 /// expected size: 40
@@ -2457,7 +2457,7 @@ base_script_list_offset: opentype_layout_axis_table_base_script_list_offset
 /// expected size: 96
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_base_table_vert_axis_offset {
+pub struct opentype_base_table_horiz_axis_offset {
 offset: u16,
 link: Option<opentype_layout_axis_table>
 }
@@ -2569,8 +2569,8 @@ pub struct opentype_base_table {
 table_start: u32,
 major_version: u16,
 minor_version: u16,
-horiz_axis_offset: opentype_base_table_vert_axis_offset,
-vert_axis_offset: opentype_base_table_vert_axis_offset,
+horiz_axis_offset: opentype_base_table_horiz_axis_offset,
+vert_axis_offset: opentype_base_table_horiz_axis_offset,
 item_var_store_offset: Option<opentype_base_table_item_var_store_offset>
 }
 
@@ -2616,7 +2616,7 @@ data: opentype_class_def_data
 /// expected size: 56
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_layout_chained_sequence_context_format2_input_class_def {
+pub struct opentype_gdef_table_glyph_class_def {
 offset: u16,
 link: Option<opentype_class_def>
 }
@@ -2662,7 +2662,7 @@ data: opentype_coverage_table_data
 /// expected size: 56
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_layout_reverse_chain_single_subst_coverage {
+pub struct opentype_layout_chained_sequence_context_format1_coverage {
 offset: u16,
 link: Option<opentype_coverage_table>
 }
@@ -2670,7 +2670,7 @@ link: Option<opentype_coverage_table>
 /// expected size: 32
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_gdef_table_attach_list_link_yes_attach_point_offsets_link {
+pub struct opentype_gdef_table_attach_list_link_attach_point_offsets_link {
 point_count: u16,
 point_indices: Vec<u16>
 }
@@ -2678,9 +2678,9 @@ point_indices: Vec<u16>
 /// expected size: 40
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_gdef_table_attach_list_link_yes_attach_point_offsets {
+pub struct opentype_gdef_table_attach_list_link_attach_point_offsets {
 offset: u16,
-link: Option<opentype_gdef_table_attach_list_link_yes_attach_point_offsets_link>
+link: Option<opentype_gdef_table_attach_list_link_attach_point_offsets_link>
 }
 
 /// expected size: 88
@@ -2688,9 +2688,9 @@ link: Option<opentype_gdef_table_attach_list_link_yes_attach_point_offsets_link>
 #[derive(Debug, Clone)]
 pub struct opentype_gdef_table_attach_list_link {
 table_start: u32,
-coverage: opentype_layout_reverse_chain_single_subst_coverage,
+coverage: opentype_layout_chained_sequence_context_format1_coverage,
 glyph_count: u16,
-attach_point_offsets: Vec<opentype_gdef_table_attach_list_link_yes_attach_point_offsets>
+attach_point_offsets: Vec<opentype_gdef_table_attach_list_link_attach_point_offsets>
 }
 
 /// expected size: 96
@@ -2704,21 +2704,21 @@ link: Option<opentype_gdef_table_attach_list_link>
 /// expected size: 2
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
-pub struct opentype_gdef_table_lig_caret_list_link_yes_lig_glyph_offsets_link_yes_caret_values_link_yes_data_Format1 {
+pub struct opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link_data_Format1 {
 coordinate: u16
 }
 
 /// expected size: 2
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
-pub struct opentype_gdef_table_lig_caret_list_link_yes_lig_glyph_offsets_link_yes_caret_values_link_yes_data_Format2 {
+pub struct opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link_data_Format2 {
 caret_value_point_index: u16
 }
 
 /// expected size: 56
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_gdef_table_lig_caret_list_link_yes_lig_glyph_offsets_link_yes_caret_values_link_yes_data_Format3 {
+pub struct opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link_data_Format3 {
 coordinate: u16,
 table: opentype_layout_base_coord_hint_DeviceHint_device_offset
 }
@@ -2726,40 +2726,40 @@ table: opentype_layout_base_coord_hint_DeviceHint_device_offset
 /// expected size: 64
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub enum opentype_gdef_table_lig_caret_list_link_yes_lig_glyph_offsets_link_yes_caret_values_link_yes_data { Format1(opentype_gdef_table_lig_caret_list_link_yes_lig_glyph_offsets_link_yes_caret_values_link_yes_data_Format1), Format2(opentype_gdef_table_lig_caret_list_link_yes_lig_glyph_offsets_link_yes_caret_values_link_yes_data_Format2), Format3(opentype_gdef_table_lig_caret_list_link_yes_lig_glyph_offsets_link_yes_caret_values_link_yes_data_Format3) }
+pub enum opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link_data { Format1(opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link_data_Format1), Format2(opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link_data_Format2), Format3(opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link_data_Format3) }
 
 /// expected size: 72
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_gdef_table_lig_caret_list_link_yes_lig_glyph_offsets_link_yes_caret_values_link {
+pub struct opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link {
 table_start: u32,
 caret_value_format: u16,
-data: opentype_gdef_table_lig_caret_list_link_yes_lig_glyph_offsets_link_yes_caret_values_link_yes_data
+data: opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link_data
 }
 
 /// expected size: 80
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_gdef_table_lig_caret_list_link_yes_lig_glyph_offsets_link_yes_caret_values {
+pub struct opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values {
 offset: u16,
-link: Option<opentype_gdef_table_lig_caret_list_link_yes_lig_glyph_offsets_link_yes_caret_values_link>
+link: Option<opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link>
 }
 
 /// expected size: 32
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_gdef_table_lig_caret_list_link_yes_lig_glyph_offsets_link {
+pub struct opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link {
 table_start: u32,
 caret_count: u16,
-caret_values: Vec<opentype_gdef_table_lig_caret_list_link_yes_lig_glyph_offsets_link_yes_caret_values>
+caret_values: Vec<opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values>
 }
 
 /// expected size: 40
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_gdef_table_lig_caret_list_link_yes_lig_glyph_offsets {
+pub struct opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets {
 offset: u16,
-link: Option<opentype_gdef_table_lig_caret_list_link_yes_lig_glyph_offsets_link>
+link: Option<opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link>
 }
 
 /// expected size: 88
@@ -2767,9 +2767,9 @@ link: Option<opentype_gdef_table_lig_caret_list_link_yes_lig_glyph_offsets_link>
 #[derive(Debug, Clone)]
 pub struct opentype_gdef_table_lig_caret_list_link {
 table_start: u32,
-coverage: opentype_layout_reverse_chain_single_subst_coverage,
+coverage: opentype_layout_chained_sequence_context_format1_coverage,
 lig_glyph_count: u16,
-lig_glyph_offsets: Vec<opentype_gdef_table_lig_caret_list_link_yes_lig_glyph_offsets>
+lig_glyph_offsets: Vec<opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets>
 }
 
 /// expected size: 96
@@ -2833,10 +2833,10 @@ pub struct opentype_gdef_table {
 table_start: u32,
 major_version: u16,
 minor_version: u16,
-glyph_class_def: opentype_layout_chained_sequence_context_format2_input_class_def,
+glyph_class_def: opentype_gdef_table_glyph_class_def,
 attach_list: opentype_gdef_table_attach_list,
 lig_caret_list: opentype_gdef_table_lig_caret_list,
-mark_attach_class_def: opentype_layout_chained_sequence_context_format2_input_class_def,
+mark_attach_class_def: opentype_gdef_table_glyph_class_def,
 data: opentype_gdef_table_data
 }
 
@@ -2853,7 +2853,7 @@ feature_indices: Vec<u16>
 /// expected size: 40
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_layout_lang_sys_record_lang_sys {
+pub struct opentype_layout_script_table_default_lang_sys {
 offset: u16,
 link: Option<opentype_common_langsys>
 }
@@ -2863,7 +2863,7 @@ link: Option<opentype_common_langsys>
 #[derive(Debug, Clone)]
 pub struct opentype_layout_lang_sys_record {
 lang_sys_tag: u32,
-lang_sys: opentype_layout_lang_sys_record_lang_sys
+lang_sys: opentype_layout_script_table_default_lang_sys
 }
 
 /// expected size: 72
@@ -2871,7 +2871,7 @@ lang_sys: opentype_layout_lang_sys_record_lang_sys
 #[derive(Debug, Clone)]
 pub struct opentype_layout_script_table {
 table_start: u32,
-default_lang_sys: opentype_layout_lang_sys_record_lang_sys,
+default_lang_sys: opentype_layout_script_table_default_lang_sys,
 lang_sys_count: u16,
 lang_sys_records: Vec<opentype_layout_lang_sys_record>
 }
@@ -2904,7 +2904,7 @@ script_records: Vec<opentype_common_script_list_script_records>
 /// expected size: 40
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_gsub_table_script_list {
+pub struct opentype_gpos_table_script_list {
 offset: u16,
 link: Option<opentype_common_script_list>
 }
@@ -2947,7 +2947,7 @@ feature_records: Vec<opentype_common_feature_list_feature_records>
 /// expected size: 40
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_gsub_table_feature_list {
+pub struct opentype_gpos_table_feature_list {
 offset: u16,
 link: Option<opentype_common_feature_list>
 }
@@ -2955,7 +2955,7 @@ link: Option<opentype_common_feature_list>
 /// expected size: 8
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
-pub struct opentype_gsub_table_lookup_list_link_yes_lookups_link_yes_lookup_flag {
+pub struct opentype_gpos_table_lookup_list_link_lookups_link_lookup_flag {
 mark_attachment_class_filter: u16,
 use_mark_filtering_set: bool,
 ignore_marks: bool,
@@ -3006,7 +3006,7 @@ chained_seq_rules: Vec<opentype_layout_chained_sequence_rule_set_chained_seq_rul
 /// expected size: 40
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_layout_chained_sequence_context_format2_chained_class_seq_rule_sets {
+pub struct opentype_layout_chained_sequence_context_format1_chained_seq_rule_sets {
 offset: u16,
 link: Option<opentype_layout_chained_sequence_rule_set>
 }
@@ -3015,21 +3015,21 @@ link: Option<opentype_layout_chained_sequence_rule_set>
 /// trait-ready: unique decoder function (d#79)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_chained_sequence_context_format1 {
-coverage: opentype_layout_reverse_chain_single_subst_coverage,
+coverage: opentype_layout_chained_sequence_context_format1_coverage,
 chained_seq_rule_set_count: u16,
-chained_seq_rule_sets: Vec<opentype_layout_chained_sequence_context_format2_chained_class_seq_rule_sets>
+chained_seq_rule_sets: Vec<opentype_layout_chained_sequence_context_format1_chained_seq_rule_sets>
 }
 
 /// expected size: 256
 /// trait-ready: unique decoder function (d#80)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_chained_sequence_context_format2 {
-coverage: opentype_layout_reverse_chain_single_subst_coverage,
-backtrack_class_def: opentype_layout_chained_sequence_context_format2_input_class_def,
-input_class_def: opentype_layout_chained_sequence_context_format2_input_class_def,
-lookahead_class_def: opentype_layout_chained_sequence_context_format2_input_class_def,
+coverage: opentype_layout_chained_sequence_context_format1_coverage,
+backtrack_class_def: opentype_gdef_table_glyph_class_def,
+input_class_def: opentype_gdef_table_glyph_class_def,
+lookahead_class_def: opentype_gdef_table_glyph_class_def,
 chained_class_seq_rule_set_count: u16,
-chained_class_seq_rule_sets: Vec<opentype_layout_chained_sequence_context_format2_chained_class_seq_rule_sets>
+chained_class_seq_rule_sets: Vec<opentype_layout_chained_sequence_context_format1_chained_seq_rule_sets>
 }
 
 /// expected size: 104
@@ -3037,11 +3037,11 @@ chained_class_seq_rule_sets: Vec<opentype_layout_chained_sequence_context_format
 #[derive(Debug, Clone)]
 pub struct opentype_layout_chained_sequence_context_format3 {
 backtrack_glyph_count: u16,
-backtrack_coverages: Vec<opentype_layout_reverse_chain_single_subst_coverage>,
+backtrack_coverages: Vec<opentype_layout_chained_sequence_context_format1_coverage>,
 input_glyph_count: u16,
-input_coverages: Vec<opentype_layout_reverse_chain_single_subst_coverage>,
+input_coverages: Vec<opentype_layout_chained_sequence_context_format1_coverage>,
 lookahead_glyph_count: u16,
-lookahead_coverages: Vec<opentype_layout_reverse_chain_single_subst_coverage>,
+lookahead_coverages: Vec<opentype_layout_chained_sequence_context_format1_coverage>,
 seq_lookup_count: u16,
 seq_lookup_records: Vec<opentype_common_sequence_lookup>
 }
@@ -3137,7 +3137,7 @@ x_placement: bool
 /// expected size: 2
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
-pub struct opentype_layout_pair_pos_format2_coverage {
+pub struct opentype_layout_single_pos_format1_coverage {
 offset: u16
 }
 
@@ -3150,7 +3150,7 @@ coverage_offset: u16,
 value_format1: opentype_common_value_format_flags,
 value_format2: opentype_common_value_format_flags,
 pair_set_count: u16,
-pair_sets: Vec<opentype_layout_pair_pos_format2_coverage>
+pair_sets: Vec<opentype_layout_single_pos_format1_coverage>
 }
 
 /// expected size: 32
@@ -3161,10 +3161,10 @@ x_placement: Option<u16>,
 y_placement: Option<u16>,
 x_advance: Option<u16>,
 y_advance: Option<u16>,
-x_placement_device: Option<opentype_layout_pair_pos_format2_coverage>,
-y_placement_device: Option<opentype_layout_pair_pos_format2_coverage>,
-x_advance_device: Option<opentype_layout_pair_pos_format2_coverage>,
-y_advance_device: Option<opentype_layout_pair_pos_format2_coverage>
+x_placement_device: Option<opentype_layout_single_pos_format1_coverage>,
+y_placement_device: Option<opentype_layout_single_pos_format1_coverage>,
+x_advance_device: Option<opentype_layout_single_pos_format1_coverage>,
+y_advance_device: Option<opentype_layout_single_pos_format1_coverage>
 }
 
 /// expected size: 64
@@ -3187,11 +3187,11 @@ class2_records: Vec<opentype_layout_pair_pos_class2_record>
 #[derive(Debug, Clone)]
 pub struct opentype_layout_pair_pos_format2<'input> {
 table_scope: View<'input>,
-coverage: opentype_layout_pair_pos_format2_coverage,
+coverage: opentype_layout_single_pos_format1_coverage,
 value_format1: opentype_common_value_format_flags,
 value_format2: opentype_common_value_format_flags,
-class_def1: opentype_layout_pair_pos_format2_coverage,
-class_def2: opentype_layout_pair_pos_format2_coverage,
+class_def1: opentype_layout_single_pos_format1_coverage,
+class_def2: opentype_layout_single_pos_format1_coverage,
 class1_count: u16,
 class2_count: u16,
 class1_records: Vec<opentype_layout_pair_pos_format2_class1_records>
@@ -3213,7 +3213,7 @@ subtable: opentype_layout_pair_pos_subtable<'input>
 /// expected size: 56
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_common_sequence_context_subst_Format1_seq_rule_sets_link_yes_rules_link {
+pub struct opentype_common_sequence_context_subst_Format1_seq_rule_sets_link_rules_link {
 glyph_count: u16,
 seq_lookup_count: u16,
 input_sequence: Vec<u16>,
@@ -3223,9 +3223,9 @@ seq_lookup_records: Vec<opentype_common_sequence_lookup>
 /// expected size: 64
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_common_sequence_context_subst_Format1_seq_rule_sets_link_yes_rules {
+pub struct opentype_common_sequence_context_subst_Format1_seq_rule_sets_link_rules {
 offset: u16,
-link: Option<opentype_common_sequence_context_subst_Format1_seq_rule_sets_link_yes_rules_link>
+link: Option<opentype_common_sequence_context_subst_Format1_seq_rule_sets_link_rules_link>
 }
 
 /// expected size: 32
@@ -3234,7 +3234,7 @@ link: Option<opentype_common_sequence_context_subst_Format1_seq_rule_sets_link_y
 pub struct opentype_common_sequence_context_subst_Format1_seq_rule_sets_link {
 table_start: u32,
 rule_count: u16,
-rules: Vec<opentype_common_sequence_context_subst_Format1_seq_rule_sets_link_yes_rules>
+rules: Vec<opentype_common_sequence_context_subst_Format1_seq_rule_sets_link_rules>
 }
 
 /// expected size: 40
@@ -3249,7 +3249,7 @@ link: Option<opentype_common_sequence_context_subst_Format1_seq_rule_sets_link>
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
 pub struct opentype_common_sequence_context_subst_Format1 {
-coverage: opentype_layout_reverse_chain_single_subst_coverage,
+coverage: opentype_layout_chained_sequence_context_format1_coverage,
 seq_rule_set_count: u16,
 seq_rule_sets: Vec<opentype_common_sequence_context_subst_Format1_seq_rule_sets>
 }
@@ -3258,8 +3258,8 @@ seq_rule_sets: Vec<opentype_common_sequence_context_subst_Format1_seq_rule_sets>
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
 pub struct opentype_common_sequence_context_subst_Format2 {
-coverage: opentype_layout_reverse_chain_single_subst_coverage,
-class_def: opentype_layout_chained_sequence_context_format2_input_class_def,
+coverage: opentype_layout_chained_sequence_context_format1_coverage,
+class_def: opentype_gdef_table_glyph_class_def,
 class_seq_rule_set_count: u16,
 class_seq_rule_sets: Vec<opentype_common_sequence_context_subst_Format1_seq_rule_sets>
 }
@@ -3270,7 +3270,7 @@ class_seq_rule_sets: Vec<opentype_common_sequence_context_subst_Format1_seq_rule
 pub struct opentype_common_sequence_context_subst_Format3 {
 glyph_count: u16,
 seq_lookup_count: u16,
-coverage_tables: Vec<opentype_layout_reverse_chain_single_subst_coverage>,
+coverage_tables: Vec<opentype_layout_chained_sequence_context_format1_coverage>,
 seq_lookup_records: Vec<opentype_common_sequence_lookup>
 }
 
@@ -3292,7 +3292,7 @@ subst: opentype_common_sequence_context_subst
 /// trait-ready: unique decoder function (d#120)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_layout_single_pos_format1 {
-coverage: opentype_layout_pair_pos_format2_coverage,
+coverage: opentype_layout_single_pos_format1_coverage,
 value_format: opentype_common_value_format_flags,
 value_record: opentype_common_value_record
 }
@@ -3301,7 +3301,7 @@ value_record: opentype_common_value_record
 /// trait-ready: unique decoder function (d#121)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_single_pos_format2 {
-coverage: opentype_layout_pair_pos_format2_coverage,
+coverage: opentype_layout_single_pos_format1_coverage,
 value_format: opentype_common_value_format_flags,
 value_count: u16,
 value_records: Vec<opentype_common_value_record>
@@ -3350,35 +3350,35 @@ extension_offset: opentype_layout_pos_extension_extension_offset<'input>
 /// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InEnum { variants: [DirectHeap, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, Noop, InDef(InRecord { fields: [Noop, InOption(NonLocal)] })] })] }] }, Layout { size: 32, align: 8 (1 << 3) })
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub enum opentype_gpos_table_lookup_list_link_yes_lookups_link_yes_subtables_link<'input> { GroundPos(opentype_layout_ground_pos<'input>), PosExtension(opentype_layout_pos_extension<'input>) }
+pub enum opentype_gpos_table_lookup_list_link_lookups_link_subtables_link<'input> { GroundPos(opentype_layout_ground_pos<'input>), PosExtension(opentype_layout_pos_extension<'input>) }
 
 /// expected size: 312
 /// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [Noop, InOption(InDef(InEnum { variants: [DirectHeap, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, Noop, InDef(InRecord { fields: [Noop, InOption(NonLocal)] })] })] }] }))] }, Layout { size: 24, align: 8 (1 << 3) })
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_gpos_table_lookup_list_link_yes_lookups_link_yes_subtables<'input> {
+pub struct opentype_gpos_table_lookup_list_link_lookups_link_subtables<'input> {
 offset: u16,
-link: Option<opentype_gpos_table_lookup_list_link_yes_lookups_link_yes_subtables_link<'input>>
+link: Option<opentype_gpos_table_lookup_list_link_lookups_link_subtables_link<'input>>
 }
 
 /// expected size: 48
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_gpos_table_lookup_list_link_yes_lookups_link<'input> {
+pub struct opentype_gpos_table_lookup_list_link_lookups_link<'input> {
 table_start: u32,
 lookup_type: u16,
-lookup_flag: opentype_gsub_table_lookup_list_link_yes_lookups_link_yes_lookup_flag,
+lookup_flag: opentype_gpos_table_lookup_list_link_lookups_link_lookup_flag,
 sub_table_count: u16,
-subtables: Vec<opentype_gpos_table_lookup_list_link_yes_lookups_link_yes_subtables<'input>>,
+subtables: Vec<opentype_gpos_table_lookup_list_link_lookups_link_subtables<'input>>,
 mark_filtering_set: Option<u16>
 }
 
 /// expected size: 56
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_gpos_table_lookup_list_link_yes_lookups<'input> {
+pub struct opentype_gpos_table_lookup_list_link_lookups<'input> {
 offset: u16,
-link: Option<opentype_gpos_table_lookup_list_link_yes_lookups_link<'input>>
+link: Option<opentype_gpos_table_lookup_list_link_lookups_link<'input>>
 }
 
 /// expected size: 32
@@ -3387,7 +3387,7 @@ link: Option<opentype_gpos_table_lookup_list_link_yes_lookups_link<'input>>
 pub struct opentype_gpos_table_lookup_list_link<'input> {
 table_start: u32,
 lookup_count: u16,
-lookups: Vec<opentype_gpos_table_lookup_list_link_yes_lookups<'input>>
+lookups: Vec<opentype_gpos_table_lookup_list_link_lookups<'input>>
 }
 
 /// expected size: 40
@@ -3490,7 +3490,7 @@ feature_variation_records: Vec<opentype_layout_feature_variations_feature_variat
 /// expected size: 48
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_gsub_table_feature_variations_offset {
+pub struct opentype_gpos_table_feature_variations_offset {
 offset: u32,
 link: Option<opentype_layout_feature_variations>
 }
@@ -3502,10 +3502,10 @@ pub struct opentype_gpos_table<'input> {
 table_start: u32,
 major_version: u16,
 minor_version: u16,
-script_list: opentype_gsub_table_script_list,
-feature_list: opentype_gsub_table_feature_list,
+script_list: opentype_gpos_table_script_list,
+feature_list: opentype_gpos_table_feature_list,
 lookup_list: opentype_gpos_table_lookup_list<'input>,
-feature_variations_offset: Option<opentype_gsub_table_feature_variations_offset>
+feature_variations_offset: Option<opentype_gpos_table_feature_variations_offset>
 }
 
 /// expected size: 32
@@ -3530,7 +3530,7 @@ link: Option<opentype_layout_alternate_subst_alternate_sets_link>
 pub struct opentype_layout_alternate_subst {
 table_start: u32,
 subst_format: u16,
-coverage: opentype_layout_reverse_chain_single_subst_coverage,
+coverage: opentype_layout_chained_sequence_context_format1_coverage,
 alternate_set_count: u16,
 alternate_sets: Vec<opentype_layout_alternate_subst_alternate_sets>
 }
@@ -3538,7 +3538,7 @@ alternate_sets: Vec<opentype_layout_alternate_subst_alternate_sets>
 /// expected size: 32
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_layout_ligature_subst_ligature_sets_link_yes_ligatures_link {
+pub struct opentype_layout_ligature_subst_ligature_sets_link_ligatures_link {
 ligature_glyph: u16,
 component_count: u16,
 component_glyph_ids: Vec<u16>
@@ -3547,9 +3547,9 @@ component_glyph_ids: Vec<u16>
 /// expected size: 40
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_layout_ligature_subst_ligature_sets_link_yes_ligatures {
+pub struct opentype_layout_ligature_subst_ligature_sets_link_ligatures {
 offset: u16,
-link: Option<opentype_layout_ligature_subst_ligature_sets_link_yes_ligatures_link>
+link: Option<opentype_layout_ligature_subst_ligature_sets_link_ligatures_link>
 }
 
 /// expected size: 32
@@ -3558,7 +3558,7 @@ link: Option<opentype_layout_ligature_subst_ligature_sets_link_yes_ligatures_lin
 pub struct opentype_layout_ligature_subst_ligature_sets_link {
 table_start: u32,
 ligature_count: u16,
-ligatures: Vec<opentype_layout_ligature_subst_ligature_sets_link_yes_ligatures>
+ligatures: Vec<opentype_layout_ligature_subst_ligature_sets_link_ligatures>
 }
 
 /// expected size: 40
@@ -3575,7 +3575,7 @@ link: Option<opentype_layout_ligature_subst_ligature_sets_link>
 pub struct opentype_layout_ligature_subst {
 table_start: u32,
 subst_format: u16,
-coverage: opentype_layout_reverse_chain_single_subst_coverage,
+coverage: opentype_layout_chained_sequence_context_format1_coverage,
 ligature_set_count: u16,
 ligature_sets: Vec<opentype_layout_ligature_subst_ligature_sets>
 }
@@ -3615,7 +3615,7 @@ pub enum opentype_layout_multiple_subst_subst { Format1(opentype_layout_multiple
 pub struct opentype_layout_multiple_subst {
 table_start: u32,
 subst_format: u16,
-coverage: opentype_layout_reverse_chain_single_subst_coverage,
+coverage: opentype_layout_chained_sequence_context_format1_coverage,
 subst: opentype_layout_multiple_subst_subst
 }
 
@@ -3625,11 +3625,11 @@ subst: opentype_layout_multiple_subst_subst
 pub struct opentype_layout_reverse_chain_single_subst {
 table_start: u32,
 subst_format: u16,
-coverage: opentype_layout_reverse_chain_single_subst_coverage,
+coverage: opentype_layout_chained_sequence_context_format1_coverage,
 backtrack_glyph_count: u16,
-backtrack_coverage_tables: Vec<opentype_layout_reverse_chain_single_subst_coverage>,
+backtrack_coverage_tables: Vec<opentype_layout_chained_sequence_context_format1_coverage>,
 lookahead_glyph_count: u16,
-lookahead_coverage_tables: Vec<opentype_layout_reverse_chain_single_subst_coverage>,
+lookahead_coverage_tables: Vec<opentype_layout_chained_sequence_context_format1_coverage>,
 glyph_count: u16,
 substitute_glyph_ids: Vec<u16>
 }
@@ -3638,7 +3638,7 @@ substitute_glyph_ids: Vec<u16>
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
 pub struct opentype_layout_single_subst_subst_Format1 {
-coverage: opentype_layout_reverse_chain_single_subst_coverage,
+coverage: opentype_layout_chained_sequence_context_format1_coverage,
 delta_glyph_id: u16
 }
 
@@ -3646,7 +3646,7 @@ delta_glyph_id: u16
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
 pub struct opentype_layout_single_subst_subst_Format2 {
-coverage: opentype_layout_reverse_chain_single_subst_coverage,
+coverage: opentype_layout_chained_sequence_context_format1_coverage,
 glyph_count: u16,
 substitute_glyph_ids: Vec<u16>
 }
@@ -3695,35 +3695,35 @@ extension_offset: opentype_layout_subst_extension_extension_offset
 /// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InEnum { variants: [DirectHeap, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, Noop, InDef(InRecord { fields: [Noop, InOption(NonLocal)] })] })] }] }, Layout { size: 32, align: 8 (1 << 3) })
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub enum opentype_gsub_table_lookup_list_link_yes_lookups_link_yes_subtables_link { GroundSubst(opentype_layout_ground_subst), SubstExtension(opentype_layout_subst_extension) }
+pub enum opentype_gsub_table_lookup_list_link_lookups_link_subtables_link { GroundSubst(opentype_layout_ground_subst), SubstExtension(opentype_layout_subst_extension) }
 
 /// expected size: 312
 /// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [Noop, InOption(InDef(InEnum { variants: [DirectHeap, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, Noop, InDef(InRecord { fields: [Noop, InOption(NonLocal)] })] })] }] }))] }, Layout { size: 24, align: 8 (1 << 3) })
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_gsub_table_lookup_list_link_yes_lookups_link_yes_subtables {
+pub struct opentype_gsub_table_lookup_list_link_lookups_link_subtables {
 offset: u16,
-link: Option<opentype_gsub_table_lookup_list_link_yes_lookups_link_yes_subtables_link>
+link: Option<opentype_gsub_table_lookup_list_link_lookups_link_subtables_link>
 }
 
 /// expected size: 48
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_gsub_table_lookup_list_link_yes_lookups_link {
+pub struct opentype_gsub_table_lookup_list_link_lookups_link {
 table_start: u32,
 lookup_type: u16,
-lookup_flag: opentype_gsub_table_lookup_list_link_yes_lookups_link_yes_lookup_flag,
+lookup_flag: opentype_gpos_table_lookup_list_link_lookups_link_lookup_flag,
 sub_table_count: u16,
-subtables: Vec<opentype_gsub_table_lookup_list_link_yes_lookups_link_yes_subtables>,
+subtables: Vec<opentype_gsub_table_lookup_list_link_lookups_link_subtables>,
 mark_filtering_set: Option<u16>
 }
 
 /// expected size: 56
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_gsub_table_lookup_list_link_yes_lookups {
+pub struct opentype_gsub_table_lookup_list_link_lookups {
 offset: u16,
-link: Option<opentype_gsub_table_lookup_list_link_yes_lookups_link>
+link: Option<opentype_gsub_table_lookup_list_link_lookups_link>
 }
 
 /// expected size: 32
@@ -3732,7 +3732,7 @@ link: Option<opentype_gsub_table_lookup_list_link_yes_lookups_link>
 pub struct opentype_gsub_table_lookup_list_link {
 table_start: u32,
 lookup_count: u16,
-lookups: Vec<opentype_gsub_table_lookup_list_link_yes_lookups>
+lookups: Vec<opentype_gsub_table_lookup_list_link_lookups>
 }
 
 /// expected size: 40
@@ -3750,10 +3750,10 @@ pub struct opentype_gsub_table {
 table_start: u32,
 major_version: u16,
 minor_version: u16,
-script_list: opentype_gsub_table_script_list,
-feature_list: opentype_gsub_table_feature_list,
+script_list: opentype_gpos_table_script_list,
+feature_list: opentype_gpos_table_feature_list,
 lookup_list: opentype_gsub_table_lookup_list,
-feature_variations_offset: Option<opentype_gsub_table_feature_variations_offset>
+feature_variations_offset: Option<opentype_gpos_table_feature_variations_offset>
 }
 
 /// expected size: 1
@@ -3768,9 +3768,9 @@ hidden_axis: bool
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_fvar_variation_axis_record {
 axis_tag: u32,
-min_value: opentype_fvar_user_tuple_coordinates,
-default_value: opentype_fvar_user_tuple_coordinates,
-max_value: opentype_fvar_user_tuple_coordinates,
+min_value: opentype_head_table_font_revision,
+default_value: opentype_head_table_font_revision,
+max_value: opentype_head_table_font_revision,
 flags: opentype_fvar_variation_axis_record_flags,
 axis_name_id: u16
 }
@@ -3779,7 +3779,7 @@ axis_name_id: u16
 /// trait-ready: unique decoder function (d#64)
 #[derive(Debug, Clone)]
 pub struct opentype_fvar_user_tuple {
-coordinates: Vec<opentype_fvar_user_tuple_coordinates>
+coordinates: Vec<opentype_head_table_font_revision>
 }
 
 /// expected size: 32
@@ -3881,7 +3881,7 @@ pub enum opentype_var_packed_point_numbers_run_points { Points16(Vec<u16>), Poin
 /// expected size: 40
 /// trait-ready: unique decoder function (d#61)
 #[derive(Debug, Clone)]
-pub struct opentype_var_packed_point_numbers_run {
+pub struct opentype_var_packed_point_numbers_runs {
 control: opentype_var_packed_point_numbers_run_control,
 points: opentype_var_packed_point_numbers_run_points
 }
@@ -3912,7 +3912,7 @@ deltas: opentype_gvar_serialized_data_per_tuple_variation_data_x_and_y_coordinat
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
 pub struct opentype_gvar_serialized_data_per_tuple_variation_data {
-private_point_numbers: Option<(u16, Vec<opentype_var_packed_point_numbers_run>)>,
+private_point_numbers: Option<(u16, Vec<opentype_var_packed_point_numbers_runs>)>,
 x_and_y_coordinate_deltas: (u16, Vec<opentype_gvar_serialized_data_per_tuple_variation_data_x_and_y_coordinate_deltas>)
 }
 
@@ -3920,7 +3920,7 @@ x_and_y_coordinate_deltas: (u16, Vec<opentype_gvar_serialized_data_per_tuple_var
 /// trait-ready: unique decoder function (d#58)
 #[derive(Debug, Clone)]
 pub struct opentype_gvar_serialized_data {
-shared_point_numbers: Option<(u16, Vec<opentype_var_packed_point_numbers_run>)>,
+shared_point_numbers: Option<(u16, Vec<opentype_var_packed_point_numbers_runs>)>,
 per_tuple_variation_data: Vec<opentype_gvar_serialized_data_per_tuple_variation_data>
 }
 
@@ -3945,7 +3945,7 @@ shared_tuples: Option<opentype_gvar_table_shared_tuples<'input>>,
 glyph_count: u16,
 flags: opentype_gvar_table_flags,
 glyph_variation_data_array_offset: u32,
-glyph_variation_data_offsets: opentype_gvar_table_glyph_variation_data_offsets,
+glyph_variation_data_offsets: opentype_loca_table_offsets,
 glyph_variation_data_array: Vec<Option<opentype_gvar_glyph_variation_data>>
 }
 
@@ -4067,7 +4067,7 @@ link: Option<opentype_stat_table_design_axes_offset_link>
 /// expected size: 2
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
-pub struct opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_yes_data_Format1_flags {
+pub struct opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1_flags {
 elidable_axis_value_name: bool,
 older_sibling_font_attribute: bool
 }
@@ -4075,65 +4075,65 @@ older_sibling_font_attribute: bool
 /// expected size: 16
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
-pub struct opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_yes_data_Format1 {
+pub struct opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1 {
 axis_index: u16,
-flags: opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_yes_data_Format1_flags,
+flags: opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1_flags,
 value_name_id: u16,
-value: opentype_fvar_user_tuple_coordinates
+value: opentype_head_table_font_revision
 }
 
 /// expected size: 32
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
-pub struct opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_yes_data_Format2 {
+pub struct opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format2 {
 axis_index: u16,
-flags: opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_yes_data_Format1_flags,
+flags: opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1_flags,
 value_name_id: u16,
-nominal_value: opentype_fvar_user_tuple_coordinates,
-range_min_value: opentype_fvar_user_tuple_coordinates,
-range_max_value: opentype_fvar_user_tuple_coordinates
+nominal_value: opentype_head_table_font_revision,
+range_min_value: opentype_head_table_font_revision,
+range_max_value: opentype_head_table_font_revision
 }
 
 /// expected size: 24
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
-pub struct opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_yes_data_Format3 {
+pub struct opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format3 {
 axis_index: u16,
-flags: opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_yes_data_Format1_flags,
+flags: opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1_flags,
 value_name_id: u16,
-value: opentype_fvar_user_tuple_coordinates,
-linked_value: opentype_fvar_user_tuple_coordinates
+value: opentype_head_table_font_revision,
+linked_value: opentype_head_table_font_revision
 }
 
 /// expected size: 12
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
-pub struct opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_yes_data_Format4_axis_values {
+pub struct opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format4_axis_values {
 axis_index: u16,
-value: opentype_fvar_user_tuple_coordinates
+value: opentype_head_table_font_revision
 }
 
 /// expected size: 32
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub struct opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_yes_data_Format4 {
+pub struct opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format4 {
 axis_count: u16,
-flags: opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_yes_data_Format1_flags,
+flags: opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1_flags,
 value_name_id: u16,
-axis_values: Vec<opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_yes_data_Format4_axis_values>
+axis_values: Vec<opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format4_axis_values>
 }
 
 /// expected size: 40
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub enum opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_yes_data { Format1(opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_yes_data_Format1), Format2(opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_yes_data_Format2), Format3(opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_yes_data_Format3), Format4(opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_yes_data_Format4) }
+pub enum opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data { Format1(opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1), Format2(opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format2), Format3(opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format3), Format4(opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format4) }
 
 /// expected size: 48
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
 pub struct opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link {
 format: u16,
-data: opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_yes_data
+data: opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data
 }
 
 /// expected size: 56
@@ -4181,7 +4181,7 @@ elided_fallback_name_id: u16
 pub struct opentype_table_directory_table_links<'input> {
 cmap: opentype_cmap_table,
 head: opentype_head_table,
-hhea: opentype_vhea_table,
+hhea: opentype_hhea_table,
 maxp: opentype_maxp_table,
 hmtx: opentype_hmtx_table,
 name: opentype_name_table,
@@ -4201,7 +4201,7 @@ fvar: Option<opentype_fvar_table>,
 gvar: Option<opentype_gvar_table<'input>>,
 kern: Option<opentype_kern_table>,
 stat: Option<opentype_stat_table>,
-vhea: Option<opentype_vhea_table>,
+vhea: Option<opentype_hhea_table>,
 vmtx: Option<opentype_hmtx_table>
 }
 
@@ -4302,14 +4302,14 @@ crc: u32
 /// expected size: 2
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
-pub struct png_bkgd_color_type_0 {
+pub struct png_trns_color_type_0 {
 greyscale: u16
 }
 
 /// expected size: 6
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
-pub struct png_bkgd_color_type_2 {
+pub struct png_trns_color_type_2 {
 red: u16,
 green: u16,
 blue: u16
@@ -4318,14 +4318,14 @@ blue: u16
 /// expected size: 1
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
-pub struct png_bkgd_color_type_3 {
+pub struct png_trns_color_type_3 {
 palette_index: u8
 }
 
 /// expected size: 8
 /// trait-ready: unique decoder function (d#220)
 #[derive(Debug, Copy, Clone)]
-pub enum png_bkgd { color_type_0(png_bkgd_color_type_0), color_type_2(png_bkgd_color_type_2), color_type_3(png_bkgd_color_type_3), color_type_4(png_bkgd_color_type_0), color_type_6(png_bkgd_color_type_2) }
+pub enum png_bkgd { color_type_0(png_trns_color_type_0), color_type_2(png_trns_color_type_2), color_type_3(png_trns_color_type_3), color_type_4(png_trns_color_type_0), color_type_6(png_trns_color_type_2) }
 
 /// expected size: 32
 /// trait-ready: unique decoder function (d#212)
@@ -4528,7 +4528,7 @@ second: u8
 /// expected size: 32
 /// trait-ready: unique decoder function (d#211)
 #[derive(Debug, Clone)]
-pub enum png_trns { color_type_0(png_bkgd_color_type_0), color_type_2(png_bkgd_color_type_2), color_type_3(Vec<png_bkgd_color_type_3>) }
+pub enum png_trns { color_type_0(png_trns_color_type_0), color_type_2(png_trns_color_type_2), color_type_3(Vec<png_trns_color_type_3>) }
 
 /// expected size: 56
 /// trait-ready: unique decoder function (d#219)
@@ -4542,7 +4542,7 @@ compressed_text: Vec<char>
 /// expected size: 136
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub enum png_chunk_data { PLTE(Vec<png_plte>), bKGD(png_bkgd), cHRM(png_chrm), gAMA(png_gama), hIST(png_hist), iCCP(png_iccp), iTXt(png_itxt), pHYs(png_phys), sBIT(png_sbit), sPLT(png_splt), sRGB(png_srgb), tEXt(png_text), tIME(png_time), tRNS(png_trns), unknown(Vec<u8>), zTXt(png_ztxt) }
+pub enum png_chunk_data { PLTE(Vec<gif_color_table_entry>), bKGD(png_bkgd), cHRM(png_chrm), gAMA(png_gama), hIST(png_hist), iCCP(png_iccp), iTXt(png_itxt), pHYs(png_phys), sBIT(png_sbit), sPLT(png_splt), sRGB(png_srgb), tEXt(png_text), tIME(png_time), tRNS(png_trns), unknown(Vec<u8>), zTXt(png_ztxt) }
 
 /// expected size: 168
 /// trait-ready: unique decoder function (d#194)
@@ -4635,7 +4635,7 @@ pub enum rle_main { new_style(rle_new_style), old_style(rle_old_style) }
 /// expected size: 24
 /// trait-unready: multiple (3) decoders exist (d#{182, 184, 185})
 #[derive(Debug, Clone)]
-pub struct tar_ascii_string_opt0 {
+pub struct tar_ascii_string_opt0_nonempty {
 string: Vec<u8>
 }
 
@@ -4643,22 +4643,22 @@ string: Vec<u8>
 /// trait-ready: unique decoder function (d#181)
 #[derive(Debug, Clone)]
 pub struct tar_header {
-name: tar_ascii_string_opt0,
-mode: tar_ascii_string_opt0,
-uid: tar_ascii_string_opt0,
-gid: tar_ascii_string_opt0,
+name: tar_ascii_string_opt0_nonempty,
+mode: tar_ascii_string_opt0_nonempty,
+uid: tar_ascii_string_opt0_nonempty,
+gid: tar_ascii_string_opt0_nonempty,
 size: u32,
-mtime: tar_ascii_string_opt0,
-chksum: tar_ascii_string_opt0,
+mtime: tar_ascii_string_opt0_nonempty,
+chksum: tar_ascii_string_opt0_nonempty,
 typeflag: u8,
-linkname: tar_ascii_string_opt0,
+linkname: tar_ascii_string_opt0_nonempty,
 magic: (u8, u8, u8, u8, u8, u8),
 version: (u8, u8),
-uname: tar_ascii_string_opt0,
-gname: tar_ascii_string_opt0,
-devmajor: tar_ascii_string_opt0,
-devminor: tar_ascii_string_opt0,
-prefix: tar_ascii_string_opt0,
+uname: tar_ascii_string_opt0_nonempty,
+gname: tar_ascii_string_opt0_nonempty,
+devmajor: tar_ascii_string_opt0_nonempty,
+devminor: tar_ascii_string_opt0_nonempty,
+prefix: tar_ascii_string_opt0_nonempty,
 pad: Vec<u8>
 }
 
@@ -4712,14 +4712,14 @@ crc: u32
 /// expected size: 2
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
-pub struct opentype_cmap_subtable_format14_length_lhs {
+pub struct opentype_cmap_subtable_format0_length_lhs {
 format: u16
 }
 
 /// expected size: 4
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
-pub struct opentype_cmap_subtable_format13_length_lhs {
+pub struct opentype_cmap_subtable_format8_length_lhs {
 format: u16,
 __reserved: u16
 }
@@ -4922,7 +4922,7 @@ expand_horizontal_vertical: jpeg_exp_data_expand_horizontal_vertical
 /// trait-ready: unique decoder function (d#418)
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_exp {
-marker: jpeg_eoi,
+marker: jpeg_soi,
 length: u16,
 data: jpeg_exp_data
 }
@@ -5358,7 +5358,7 @@ PResult::Ok(accum)
 
 /// d#7
 fn Decoder_jpeg_main(_input: &mut Parser<'_>) -> Result<jpeg_main, ParseError> {
-let soi = (Decoder_jpeg_eoi(_input))?;
+let soi = (Decoder_jpeg_soi(_input))?;
 let frame = (Decoder_jpeg_frame(_input))?;
 let eoi = (Decoder299(_input))?;
 PResult::Ok(jpeg_main { soi, frame, eoi })
@@ -5798,7 +5798,7 @@ u32be(x)
 let ifd = {
 let tgt_offset = start_of_header + offset;
 let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = (Decoder_tiff_ifd(_input, byte_order))?;
+let ret = (Decoder_tiff_ifd_le(_input, byte_order))?;
 _input.close_peek_context()?;
 ret
 };
@@ -6885,7 +6885,7 @@ let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = ((|| {
 let sz = matching_table.length as usize;
 _input.start_slice(sz)?;
-let ret = (Decoder_opentype_vhea_table(_input))?;
+let ret = (Decoder_opentype_hhea_table(_input))?;
 _input.end_slice()?;
 PResult::Ok(ret)
 })())?;
@@ -7106,7 +7106,7 @@ x.offsets.clone()
 },
 
 None => {
-opentype_gvar_table_glyph_variation_data_offsets::Offsets32([].to_vec())
+opentype_loca_table_offsets::Offsets32([].to_vec())
 }
 }))?;
 _input.end_slice()?;
@@ -7442,7 +7442,7 @@ let inner = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-opentype_fvar_user_tuple_coordinates::Fixed32(inner)
+opentype_head_table_font_revision::Fixed32(inner)
 };
 let checksum_adjustment = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -7579,7 +7579,7 @@ PResult::Ok(opentype_head_table { major_version, minor_version, font_revision, c
 }
 
 /// d#31
-fn Decoder_opentype_vhea_table(_input: &mut Parser<'_>) -> Result<opentype_vhea_table, ParseError> {
+fn Decoder_opentype_hhea_table(_input: &mut Parser<'_>) -> Result<opentype_hhea_table, ParseError> {
 let major_version = {
 let inner = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -7647,7 +7647,7 @@ let run = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-opentype_vhea_table_caret_slope { rise, run }
+opentype_hhea_table_caret_slope { rise, run }
 };
 let caret_offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -7735,7 +7735,7 @@ let number_of_long_metrics = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-PResult::Ok(opentype_vhea_table { major_version, minor_version, ascent, descent, line_gap, advance_width_max, min_left_side_bearing, min_right_side_bearing, x_max_extent, caret_slope, caret_offset, metric_data_format, number_of_long_metrics })
+PResult::Ok(opentype_hhea_table { major_version, minor_version, ascent, descent, line_gap, advance_width_max, min_left_side_bearing, min_right_side_bearing, x_max_extent, caret_slope, caret_offset, metric_data_format, number_of_long_metrics })
 }
 
 /// d#32
@@ -7875,7 +7875,7 @@ false => {
 None
 }
 };
-opentype_name_name_version_1_lang_tag_records_offset { offset, link }
+opentype_name_table_name_records_offset { offset, link }
 };
 opentype_name_table_name_records { platform, encoding, language, name_id, length, offset }
 };
@@ -8064,15 +8064,15 @@ let us_upper_optical_point_size = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-Some(opentype_os2_table_data_yes_extra_fields_v1_yes_extra_fields_v2_yes_extra_fields_v5 { us_lower_optical_point_size, us_upper_optical_point_size })
+Some(opentype_os2_table_data_extra_fields_v1_extra_fields_v2_extra_fields_v5 { us_lower_optical_point_size, us_upper_optical_point_size })
 } else {
 None
 };
-Some(opentype_os2_table_data_yes_extra_fields_v1_yes_extra_fields_v2 { sx_height, s_cap_height, us_default_char, us_break_char, us_max_context, extra_fields_v5 })
+Some(opentype_os2_table_data_extra_fields_v1_extra_fields_v2 { sx_height, s_cap_height, us_default_char, us_break_char, us_max_context, extra_fields_v5 })
 } else {
 None
 };
-Some(opentype_os2_table_data_yes_extra_fields_v1 { ul_code_page_range_1, ul_code_page_range_2, extra_fields_v2 })
+Some(opentype_os2_table_data_extra_fields_v1 { ul_code_page_range_1, ul_code_page_range_2, extra_fields_v2 })
 } else {
 None
 };
@@ -8094,7 +8094,7 @@ let inner = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-opentype_fvar_user_tuple_coordinates::Fixed32(inner)
+opentype_head_table_font_revision::Fixed32(inner)
 };
 let underline_position = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -8201,7 +8201,7 @@ accum.push(next_elem)
 };
 accum
 };
-opentype_gvar_table_glyph_variation_data_offsets::Offsets16(inner)
+opentype_loca_table_offsets::Offsets16(inner)
 },
 
 1u16 => {
@@ -8216,7 +8216,7 @@ accum.push(next_elem)
 };
 accum
 };
-opentype_gvar_table_glyph_variation_data_offsets::Offsets32(inner)
+opentype_loca_table_offsets::Offsets32(inner)
 },
 
 _other => {
@@ -8227,13 +8227,13 @@ PResult::Ok(opentype_loca_table { offsets })
 }
 
 /// d#38
-fn Decoder38(_input: &mut Parser<'_>, offsets: opentype_gvar_table_glyph_variation_data_offsets) -> Result<Vec<opentype_glyf_table>, ParseError> {
+fn Decoder38(_input: &mut Parser<'_>, offsets: opentype_loca_table_offsets) -> Result<Vec<opentype_glyf_table>, ParseError> {
 let start_offset = {
 let x = _input.get_offset_u64();
 x as u32
 };
 PResult::Ok(match offsets {
-opentype_gvar_table_glyph_variation_data_offsets::Offsets16(ref half16s) => {
+opentype_loca_table_offsets::Offsets16(ref half16s) => {
 let len = pred((half16s.len()) as u32);
 let mut accum = Vec::new();
 for ix in 0u32..len {
@@ -8284,7 +8284,7 @@ accum.push(next_elem)
 accum
 },
 
-opentype_gvar_table_glyph_variation_data_offsets::Offsets32(ref off32s) => {
+opentype_loca_table_offsets::Offsets32(ref off32s) => {
 let len = pred((off32s.len()) as u32);
 let mut accum = Vec::new();
 for ix in 0u32..len {
@@ -8459,7 +8459,7 @@ false => {
 None
 }
 };
-opentype_base_table_vert_axis_offset { offset, link }
+opentype_base_table_horiz_axis_offset { offset, link }
 };
 let vert_axis_offset = {
 let offset = {
@@ -8487,7 +8487,7 @@ false => {
 None
 }
 };
-opentype_base_table_vert_axis_offset { offset, link }
+opentype_base_table_horiz_axis_offset { offset, link }
 };
 let item_var_store_offset = if minor_version > 0u16 {
 let offset = {
@@ -8565,7 +8565,7 @@ false => {
 None
 }
 };
-opentype_layout_chained_sequence_context_format2_input_class_def { offset, link }
+opentype_gdef_table_glyph_class_def { offset, link }
 };
 let attach_list = {
 let offset = {
@@ -8612,7 +8612,7 @@ false => {
 None
 }
 };
-opentype_layout_reverse_chain_single_subst_coverage { offset, link }
+opentype_layout_chained_sequence_context_format1_coverage { offset, link }
 };
 let glyph_count = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -8651,7 +8651,7 @@ accum.push(next_elem)
 };
 accum
 };
-PResult::Ok(opentype_gdef_table_attach_list_link_yes_attach_point_offsets_link { point_count, point_indices })
+PResult::Ok(opentype_gdef_table_attach_list_link_attach_point_offsets_link { point_count, point_indices })
 })())?;
 _input.close_peek_context()?;
 Some(ret)
@@ -8664,7 +8664,7 @@ false => {
 None
 }
 };
-opentype_gdef_table_attach_list_link_yes_attach_point_offsets { offset, link }
+opentype_gdef_table_attach_list_link_attach_point_offsets { offset, link }
 };
 accum.push(next_elem)
 };
@@ -8730,7 +8730,7 @@ false => {
 None
 }
 };
-opentype_layout_reverse_chain_single_subst_coverage { offset, link }
+opentype_layout_chained_sequence_context_format1_coverage { offset, link }
 };
 let lig_glyph_count = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -8795,9 +8795,9 @@ let coordinate = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-opentype_gdef_table_lig_caret_list_link_yes_lig_glyph_offsets_link_yes_caret_values_link_yes_data_Format1 { coordinate }
+opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link_data_Format1 { coordinate }
 };
-opentype_gdef_table_lig_caret_list_link_yes_lig_glyph_offsets_link_yes_caret_values_link_yes_data::Format1(inner)
+opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link_data::Format1(inner)
 },
 
 2u16 => {
@@ -8806,9 +8806,9 @@ let caret_value_point_index = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-opentype_gdef_table_lig_caret_list_link_yes_lig_glyph_offsets_link_yes_caret_values_link_yes_data_Format2 { caret_value_point_index }
+opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link_data_Format2 { caret_value_point_index }
 };
-opentype_gdef_table_lig_caret_list_link_yes_lig_glyph_offsets_link_yes_caret_values_link_yes_data::Format2(inner)
+opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link_data::Format2(inner)
 },
 
 3u16 => {
@@ -8845,16 +8845,16 @@ None
 };
 opentype_layout_base_coord_hint_DeviceHint_device_offset { offset, link }
 };
-opentype_gdef_table_lig_caret_list_link_yes_lig_glyph_offsets_link_yes_caret_values_link_yes_data_Format3 { coordinate, table }
+opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link_data_Format3 { coordinate, table }
 };
-opentype_gdef_table_lig_caret_list_link_yes_lig_glyph_offsets_link_yes_caret_values_link_yes_data::Format3(inner)
+opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link_data::Format3(inner)
 },
 
 _ => {
 return Err(ParseError::FailToken(908377722732597655u64));
 }
 };
-PResult::Ok(opentype_gdef_table_lig_caret_list_link_yes_lig_glyph_offsets_link_yes_caret_values_link { table_start, caret_value_format, data })
+PResult::Ok(opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link { table_start, caret_value_format, data })
 })())?;
 _input.close_peek_context()?;
 Some(ret)
@@ -8867,13 +8867,13 @@ false => {
 None
 }
 };
-opentype_gdef_table_lig_caret_list_link_yes_lig_glyph_offsets_link_yes_caret_values { offset, link }
+opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values { offset, link }
 };
 accum.push(next_elem)
 };
 accum
 };
-PResult::Ok(opentype_gdef_table_lig_caret_list_link_yes_lig_glyph_offsets_link { table_start, caret_count, caret_values })
+PResult::Ok(opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link { table_start, caret_count, caret_values })
 })())?;
 _input.close_peek_context()?;
 Some(ret)
@@ -8886,7 +8886,7 @@ false => {
 None
 }
 };
-opentype_gdef_table_lig_caret_list_link_yes_lig_glyph_offsets { offset, link }
+opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets { offset, link }
 };
 accum.push(next_elem)
 };
@@ -8933,7 +8933,7 @@ false => {
 None
 }
 };
-opentype_layout_chained_sequence_context_format2_input_class_def { offset, link }
+opentype_gdef_table_glyph_class_def { offset, link }
 };
 let data = match minor_version {
 0u16 => {
@@ -9143,7 +9143,7 @@ false => {
 None
 }
 };
-opentype_gsub_table_script_list { offset, link }
+opentype_gpos_table_script_list { offset, link }
 };
 let feature_list = {
 let offset = {
@@ -9171,7 +9171,7 @@ false => {
 None
 }
 };
-opentype_gsub_table_feature_list { offset, link }
+opentype_gpos_table_feature_list { offset, link }
 };
 let lookup_list = {
 let offset = {
@@ -9233,7 +9233,7 @@ let ignore_marks = _packed_bits >> 3u16 & 1u16 > 0u16;
 let ignore_ligatures = _packed_bits >> 2u16 & 1u16 > 0u16;
 let ignore_base_glyphs = _packed_bits >> 1u16 & 1u16 > 0u16;
 let right_to_left = _packed_bits & 1u16 > 0u16;
-opentype_gsub_table_lookup_list_link_yes_lookups_link_yes_lookup_flag { mark_attachment_class_filter, use_mark_filtering_set, ignore_marks, ignore_ligatures, ignore_base_glyphs, right_to_left }
+opentype_gpos_table_lookup_list_link_lookups_link_lookup_flag { mark_attachment_class_filter, use_mark_filtering_set, ignore_marks, ignore_ligatures, ignore_base_glyphs, right_to_left }
 };
 let sub_table_count = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -9259,12 +9259,12 @@ let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = match lookup_type {
 9u16 => {
 let inner = (Decoder_opentype_layout_pos_extension(_input))?;
-opentype_gpos_table_lookup_list_link_yes_lookups_link_yes_subtables_link::PosExtension(inner)
+opentype_gpos_table_lookup_list_link_lookups_link_subtables_link::PosExtension(inner)
 },
 
 _ => {
 let inner = (Decoder_opentype_layout_ground_pos(_input, lookup_type))?;
-opentype_gpos_table_lookup_list_link_yes_lookups_link_yes_subtables_link::GroundPos(inner)
+opentype_gpos_table_lookup_list_link_lookups_link_subtables_link::GroundPos(inner)
 }
 };
 _input.close_peek_context()?;
@@ -9278,7 +9278,7 @@ false => {
 None
 }
 };
-opentype_gpos_table_lookup_list_link_yes_lookups_link_yes_subtables { offset, link }
+opentype_gpos_table_lookup_list_link_lookups_link_subtables { offset, link }
 };
 accum.push(next_elem)
 };
@@ -9294,7 +9294,7 @@ false => {
 None
 }
 };
-PResult::Ok(opentype_gpos_table_lookup_list_link_yes_lookups_link { table_start, lookup_type, lookup_flag, sub_table_count, subtables, mark_filtering_set })
+PResult::Ok(opentype_gpos_table_lookup_list_link_lookups_link { table_start, lookup_type, lookup_flag, sub_table_count, subtables, mark_filtering_set })
 })())?;
 _input.close_peek_context()?;
 Some(ret)
@@ -9307,7 +9307,7 @@ false => {
 None
 }
 };
-opentype_gpos_table_lookup_list_link_yes_lookups { offset, link }
+opentype_gpos_table_lookup_list_link_lookups { offset, link }
 };
 accum.push(next_elem)
 };
@@ -9346,7 +9346,7 @@ false => {
 None
 }
 };
-Some(opentype_gsub_table_feature_variations_offset { offset, link })
+Some(opentype_gpos_table_feature_variations_offset { offset, link })
 } else {
 None
 };
@@ -9404,7 +9404,7 @@ false => {
 None
 }
 };
-opentype_gsub_table_script_list { offset, link }
+opentype_gpos_table_script_list { offset, link }
 };
 let feature_list = {
 let offset = {
@@ -9432,7 +9432,7 @@ false => {
 None
 }
 };
-opentype_gsub_table_feature_list { offset, link }
+opentype_gpos_table_feature_list { offset, link }
 };
 let lookup_list = {
 let offset = {
@@ -9494,7 +9494,7 @@ let ignore_marks = _packed_bits >> 3u16 & 1u16 > 0u16;
 let ignore_ligatures = _packed_bits >> 2u16 & 1u16 > 0u16;
 let ignore_base_glyphs = _packed_bits >> 1u16 & 1u16 > 0u16;
 let right_to_left = _packed_bits & 1u16 > 0u16;
-opentype_gsub_table_lookup_list_link_yes_lookups_link_yes_lookup_flag { mark_attachment_class_filter, use_mark_filtering_set, ignore_marks, ignore_ligatures, ignore_base_glyphs, right_to_left }
+opentype_gpos_table_lookup_list_link_lookups_link_lookup_flag { mark_attachment_class_filter, use_mark_filtering_set, ignore_marks, ignore_ligatures, ignore_base_glyphs, right_to_left }
 };
 let sub_table_count = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -9520,12 +9520,12 @@ let _is_advance = _input.advance_or_seek(tgt_offset)?;
 let ret = match lookup_type {
 7u16 => {
 let inner = (Decoder_opentype_layout_subst_extension(_input))?;
-opentype_gsub_table_lookup_list_link_yes_lookups_link_yes_subtables_link::SubstExtension(inner)
+opentype_gsub_table_lookup_list_link_lookups_link_subtables_link::SubstExtension(inner)
 },
 
 _ => {
 let inner = (Decoder_opentype_layout_ground_subst(_input, lookup_type))?;
-opentype_gsub_table_lookup_list_link_yes_lookups_link_yes_subtables_link::GroundSubst(inner)
+opentype_gsub_table_lookup_list_link_lookups_link_subtables_link::GroundSubst(inner)
 }
 };
 _input.close_peek_context()?;
@@ -9539,7 +9539,7 @@ false => {
 None
 }
 };
-opentype_gsub_table_lookup_list_link_yes_lookups_link_yes_subtables { offset, link }
+opentype_gsub_table_lookup_list_link_lookups_link_subtables { offset, link }
 };
 accum.push(next_elem)
 };
@@ -9555,7 +9555,7 @@ false => {
 None
 }
 };
-PResult::Ok(opentype_gsub_table_lookup_list_link_yes_lookups_link { table_start, lookup_type, lookup_flag, sub_table_count, subtables, mark_filtering_set })
+PResult::Ok(opentype_gsub_table_lookup_list_link_lookups_link { table_start, lookup_type, lookup_flag, sub_table_count, subtables, mark_filtering_set })
 })())?;
 _input.close_peek_context()?;
 Some(ret)
@@ -9568,7 +9568,7 @@ false => {
 None
 }
 };
-opentype_gsub_table_lookup_list_link_yes_lookups { offset, link }
+opentype_gsub_table_lookup_list_link_lookups { offset, link }
 };
 accum.push(next_elem)
 };
@@ -9607,7 +9607,7 @@ false => {
 None
 }
 };
-Some(opentype_gsub_table_feature_variations_offset { offset, link })
+Some(opentype_gpos_table_feature_variations_offset { offset, link })
 } else {
 None
 };
@@ -9875,7 +9875,7 @@ accum.push(next_elem)
 };
 accum
 };
-opentype_gvar_table_glyph_variation_data_offsets::Offsets32(inner)
+opentype_loca_table_offsets::Offsets32(inner)
 },
 
 false => {
@@ -9890,7 +9890,7 @@ accum.push(next_elem)
 };
 accum
 };
-opentype_gvar_table_glyph_variation_data_offsets::Offsets16(inner)
+opentype_loca_table_offsets::Offsets16(inner)
 }
 };
 let glyph_variation_data_array = {
@@ -9898,7 +9898,7 @@ let mut view_parser = Parser::from(gvar_table.offset(glyph_variation_data_array_
 let view_input = &mut view_parser;
 let array_view = view_input.view();
 match glyph_variation_data_offsets {
-opentype_gvar_table_glyph_variation_data_offsets::Offsets16(ref half16s) => {
+opentype_loca_table_offsets::Offsets16(ref half16s) => {
 let len = pred((half16s.len()) as u32);
 let mut accum = Vec::new();
 for ix in 0u32..len {
@@ -9922,7 +9922,7 @@ accum.push(next_elem)
 accum
 },
 
-opentype_gvar_table_glyph_variation_data_offsets::Offsets32(ref off32s) => {
+opentype_loca_table_offsets::Offsets32(ref off32s) => {
 let len = pred((off32s.len()) as u32);
 let mut accum = Vec::new();
 for ix in 0u32..len {
@@ -10132,7 +10132,7 @@ u16be(x)
 };
 let elidable_axis_value_name = _packed_bits >> 1u16 & 1u16 > 0u16;
 let older_sibling_font_attribute = _packed_bits & 1u16 > 0u16;
-opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_yes_data_Format1_flags { elidable_axis_value_name, older_sibling_font_attribute }
+opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1_flags { elidable_axis_value_name, older_sibling_font_attribute }
 };
 let value_name_id = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -10143,11 +10143,11 @@ let inner = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-opentype_fvar_user_tuple_coordinates::Fixed32(inner)
+opentype_head_table_font_revision::Fixed32(inner)
 };
-opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_yes_data_Format1 { axis_index, flags, value_name_id, value }
+opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1 { axis_index, flags, value_name_id, value }
 };
-opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_yes_data::Format1(inner)
+opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data::Format1(inner)
 },
 
 2u16 => {
@@ -10163,7 +10163,7 @@ u16be(x)
 };
 let elidable_axis_value_name = _packed_bits >> 1u16 & 1u16 > 0u16;
 let older_sibling_font_attribute = _packed_bits & 1u16 > 0u16;
-opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_yes_data_Format1_flags { elidable_axis_value_name, older_sibling_font_attribute }
+opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1_flags { elidable_axis_value_name, older_sibling_font_attribute }
 };
 let value_name_id = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -10174,25 +10174,25 @@ let inner = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-opentype_fvar_user_tuple_coordinates::Fixed32(inner)
+opentype_head_table_font_revision::Fixed32(inner)
 };
 let range_min_value = {
 let inner = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-opentype_fvar_user_tuple_coordinates::Fixed32(inner)
+opentype_head_table_font_revision::Fixed32(inner)
 };
 let range_max_value = {
 let inner = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-opentype_fvar_user_tuple_coordinates::Fixed32(inner)
+opentype_head_table_font_revision::Fixed32(inner)
 };
-opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_yes_data_Format2 { axis_index, flags, value_name_id, nominal_value, range_min_value, range_max_value }
+opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format2 { axis_index, flags, value_name_id, nominal_value, range_min_value, range_max_value }
 };
-opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_yes_data::Format2(inner)
+opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data::Format2(inner)
 },
 
 3u16 => {
@@ -10208,7 +10208,7 @@ u16be(x)
 };
 let elidable_axis_value_name = _packed_bits >> 1u16 & 1u16 > 0u16;
 let older_sibling_font_attribute = _packed_bits & 1u16 > 0u16;
-opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_yes_data_Format1_flags { elidable_axis_value_name, older_sibling_font_attribute }
+opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1_flags { elidable_axis_value_name, older_sibling_font_attribute }
 };
 let value_name_id = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -10219,18 +10219,18 @@ let inner = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-opentype_fvar_user_tuple_coordinates::Fixed32(inner)
+opentype_head_table_font_revision::Fixed32(inner)
 };
 let linked_value = {
 let inner = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-opentype_fvar_user_tuple_coordinates::Fixed32(inner)
+opentype_head_table_font_revision::Fixed32(inner)
 };
-opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_yes_data_Format3 { axis_index, flags, value_name_id, value, linked_value }
+opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format3 { axis_index, flags, value_name_id, value, linked_value }
 };
-opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_yes_data::Format3(inner)
+opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data::Format3(inner)
 },
 
 4u16 => {
@@ -10246,7 +10246,7 @@ u16be(x)
 };
 let elidable_axis_value_name = _packed_bits >> 1u16 & 1u16 > 0u16;
 let older_sibling_font_attribute = _packed_bits & 1u16 > 0u16;
-opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_yes_data_Format1_flags { elidable_axis_value_name, older_sibling_font_attribute }
+opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format1_flags { elidable_axis_value_name, older_sibling_font_attribute }
 };
 let value_name_id = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -10265,17 +10265,17 @@ let inner = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-opentype_fvar_user_tuple_coordinates::Fixed32(inner)
+opentype_head_table_font_revision::Fixed32(inner)
 };
-opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_yes_data_Format4_axis_values { axis_index, value }
+opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format4_axis_values { axis_index, value }
 };
 accum.push(next_elem)
 };
 accum
 };
-opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_yes_data_Format4 { axis_count, flags, value_name_id, axis_values }
+opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data_Format4 { axis_count, flags, value_name_id, axis_values }
 };
-opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_yes_data::Format4(inner)
+opentype_stat_table_offset_to_axis_value_offsets_link_axis_value_offsets_link_data::Format4(inner)
 },
 
 _other => {
@@ -10321,7 +10321,7 @@ PResult::Ok(opentype_stat_table { table_start, major_version, minor_version, des
 }
 
 /// d#48
-fn Decoder48(_input: &mut Parser<'_>) -> Result<opentype_vhea_table, ParseError> {
+fn Decoder48(_input: &mut Parser<'_>) -> Result<opentype_hhea_table, ParseError> {
 let major_version = {
 let inner = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -10389,7 +10389,7 @@ let run = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-opentype_vhea_table_caret_slope { rise, run }
+opentype_hhea_table_caret_slope { rise, run }
 };
 let caret_offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -10477,7 +10477,7 @@ let number_of_long_metrics = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-PResult::Ok(opentype_vhea_table { major_version, minor_version, ascent, descent, line_gap, advance_width_max, min_left_side_bearing, min_right_side_bearing, x_max_extent, caret_slope, caret_offset, metric_data_format, number_of_long_metrics })
+PResult::Ok(opentype_hhea_table { major_version, minor_version, ascent, descent, line_gap, advance_width_max, min_left_side_bearing, min_right_side_bearing, x_max_extent, caret_slope, caret_offset, metric_data_format, number_of_long_metrics })
 }
 
 /// d#49
@@ -10984,7 +10984,7 @@ PResult::Ok(opentype_gvar_serialized_data { shared_point_numbers, per_tuple_vari
 }
 
 /// d#59
-fn Decoder59(_input: &mut Parser<'_>) -> Result<(u16, Vec<opentype_var_packed_point_numbers_run>), ParseError> {
+fn Decoder59(_input: &mut Parser<'_>) -> Result<(u16, Vec<opentype_var_packed_point_numbers_runs>), ParseError> {
 let tree_index = {
 _input.open_peek_context();
 {
@@ -11054,8 +11054,8 @@ return Err(ParseError::ExcludedBranch(2818918064991511645u64));
 }
 
 /// d#60
-fn Decoder60(_input: &mut Parser<'_>, point_count: u16) -> Result<(u16, Vec<opentype_var_packed_point_numbers_run>), ParseError> {
-let mut seq: Vec<opentype_var_packed_point_numbers_run> = Vec::new();
+fn Decoder60(_input: &mut Parser<'_>, point_count: u16) -> Result<(u16, Vec<opentype_var_packed_point_numbers_runs>), ParseError> {
+let mut seq: Vec<opentype_var_packed_point_numbers_runs> = Vec::new();
 let mut acc = 0u16;
 loop {
 {
@@ -11068,7 +11068,7 @@ break
 };
 
 };
-let elem = (Decoder_opentype_var_packed_point_numbers_run(_input))?;
+let elem = (Decoder_opentype_var_packed_point_numbers_runs(_input))?;
 acc = {
 let acc = acc;
 let run = elem.clone();
@@ -11080,7 +11080,7 @@ PResult::Ok((acc, seq))
 }
 
 /// d#61
-fn Decoder_opentype_var_packed_point_numbers_run(_input: &mut Parser<'_>) -> Result<opentype_var_packed_point_numbers_run, ParseError> {
+fn Decoder_opentype_var_packed_point_numbers_runs(_input: &mut Parser<'_>) -> Result<opentype_var_packed_point_numbers_runs, ParseError> {
 let control = {
 let _packed_bits = _input.read_byte()?;
 let points_are_words = _packed_bits >> 7u8 & 1u8 > 0u8;
@@ -11118,7 +11118,7 @@ opentype_var_packed_point_numbers_run_points::Points8(inner)
 }
 }
 };
-PResult::Ok(opentype_var_packed_point_numbers_run { control, points })
+PResult::Ok(opentype_var_packed_point_numbers_runs { control, points })
 }
 
 /// d#62
@@ -11129,21 +11129,21 @@ let inner = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-opentype_fvar_user_tuple_coordinates::Fixed32(inner)
+opentype_head_table_font_revision::Fixed32(inner)
 };
 let default_value = {
 let inner = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-opentype_fvar_user_tuple_coordinates::Fixed32(inner)
+opentype_head_table_font_revision::Fixed32(inner)
 };
 let max_value = {
 let inner = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-opentype_fvar_user_tuple_coordinates::Fixed32(inner)
+opentype_head_table_font_revision::Fixed32(inner)
 };
 let flags = {
 let _packed_bits = {
@@ -11201,7 +11201,7 @@ let inner = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-opentype_fvar_user_tuple_coordinates::Fixed32(inner)
+opentype_head_table_font_revision::Fixed32(inner)
 };
 accum.push(next_elem)
 };
@@ -11727,7 +11727,7 @@ false => {
 None
 }
 };
-opentype_layout_reverse_chain_single_subst_coverage { offset, link }
+opentype_layout_chained_sequence_context_format1_coverage { offset, link }
 };
 let delta_glyph_id = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -11766,7 +11766,7 @@ false => {
 None
 }
 };
-opentype_layout_reverse_chain_single_subst_coverage { offset, link }
+opentype_layout_chained_sequence_context_format1_coverage { offset, link }
 };
 let glyph_count = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -11831,7 +11831,7 @@ false => {
 None
 }
 };
-opentype_layout_reverse_chain_single_subst_coverage { offset, link }
+opentype_layout_chained_sequence_context_format1_coverage { offset, link }
 };
 let subst = match subst_format {
 1u16 => {
@@ -11951,7 +11951,7 @@ false => {
 None
 }
 };
-opentype_layout_reverse_chain_single_subst_coverage { offset, link }
+opentype_layout_chained_sequence_context_format1_coverage { offset, link }
 };
 let alternate_set_count = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -12059,7 +12059,7 @@ false => {
 None
 }
 };
-opentype_layout_reverse_chain_single_subst_coverage { offset, link }
+opentype_layout_chained_sequence_context_format1_coverage { offset, link }
 };
 let ligature_set_count = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -12128,7 +12128,7 @@ accum.push(next_elem)
 };
 accum
 };
-PResult::Ok(opentype_layout_ligature_subst_ligature_sets_link_yes_ligatures_link { ligature_glyph, component_count, component_glyph_ids })
+PResult::Ok(opentype_layout_ligature_subst_ligature_sets_link_ligatures_link { ligature_glyph, component_count, component_glyph_ids })
 })())?;
 _input.close_peek_context()?;
 Some(ret)
@@ -12141,7 +12141,7 @@ false => {
 None
 }
 };
-opentype_layout_ligature_subst_ligature_sets_link_yes_ligatures { offset, link }
+opentype_layout_ligature_subst_ligature_sets_link_ligatures { offset, link }
 };
 accum.push(next_elem)
 };
@@ -12208,7 +12208,7 @@ false => {
 None
 }
 };
-opentype_layout_reverse_chain_single_subst_coverage { offset, link }
+opentype_layout_chained_sequence_context_format1_coverage { offset, link }
 };
 let seq_rule_set_count = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -12296,7 +12296,7 @@ accum.push(next_elem)
 };
 accum
 };
-PResult::Ok(opentype_common_sequence_context_subst_Format1_seq_rule_sets_link_yes_rules_link { glyph_count, seq_lookup_count, input_sequence, seq_lookup_records })
+PResult::Ok(opentype_common_sequence_context_subst_Format1_seq_rule_sets_link_rules_link { glyph_count, seq_lookup_count, input_sequence, seq_lookup_records })
 })())?;
 _input.close_peek_context()?;
 Some(ret)
@@ -12309,7 +12309,7 @@ false => {
 None
 }
 };
-opentype_common_sequence_context_subst_Format1_seq_rule_sets_link_yes_rules { offset, link }
+opentype_common_sequence_context_subst_Format1_seq_rule_sets_link_rules { offset, link }
 };
 accum.push(next_elem)
 };
@@ -12367,7 +12367,7 @@ false => {
 None
 }
 };
-opentype_layout_reverse_chain_single_subst_coverage { offset, link }
+opentype_layout_chained_sequence_context_format1_coverage { offset, link }
 };
 let class_def = {
 let offset = {
@@ -12395,7 +12395,7 @@ false => {
 None
 }
 };
-opentype_layout_chained_sequence_context_format2_input_class_def { offset, link }
+opentype_gdef_table_glyph_class_def { offset, link }
 };
 let class_seq_rule_set_count = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -12483,7 +12483,7 @@ accum.push(next_elem)
 };
 accum
 };
-PResult::Ok(opentype_common_sequence_context_subst_Format1_seq_rule_sets_link_yes_rules_link { glyph_count, seq_lookup_count, input_sequence, seq_lookup_records })
+PResult::Ok(opentype_common_sequence_context_subst_Format1_seq_rule_sets_link_rules_link { glyph_count, seq_lookup_count, input_sequence, seq_lookup_records })
 })())?;
 _input.close_peek_context()?;
 Some(ret)
@@ -12496,7 +12496,7 @@ false => {
 None
 }
 };
-opentype_common_sequence_context_subst_Format1_seq_rule_sets_link_yes_rules { offset, link }
+opentype_common_sequence_context_subst_Format1_seq_rule_sets_link_rules { offset, link }
 };
 accum.push(next_elem)
 };
@@ -12565,7 +12565,7 @@ false => {
 None
 }
 };
-opentype_layout_reverse_chain_single_subst_coverage { offset, link }
+opentype_layout_chained_sequence_context_format1_coverage { offset, link }
 };
 accum.push(next_elem)
 };
@@ -12671,7 +12671,7 @@ false => {
 None
 }
 };
-opentype_layout_reverse_chain_single_subst_coverage { offset, link }
+opentype_layout_chained_sequence_context_format1_coverage { offset, link }
 };
 let backtrack_glyph_count = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -12706,7 +12706,7 @@ false => {
 None
 }
 };
-opentype_layout_reverse_chain_single_subst_coverage { offset, link }
+opentype_layout_chained_sequence_context_format1_coverage { offset, link }
 };
 accum.push(next_elem)
 };
@@ -12745,7 +12745,7 @@ false => {
 None
 }
 };
-opentype_layout_reverse_chain_single_subst_coverage { offset, link }
+opentype_layout_chained_sequence_context_format1_coverage { offset, link }
 };
 accum.push(next_elem)
 };
@@ -12866,7 +12866,7 @@ false => {
 None
 }
 };
-opentype_layout_reverse_chain_single_subst_coverage { offset, link }
+opentype_layout_chained_sequence_context_format1_coverage { offset, link }
 };
 let chained_seq_rule_set_count = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -12901,7 +12901,7 @@ false => {
 None
 }
 };
-opentype_layout_chained_sequence_context_format2_chained_class_seq_rule_sets { offset, link }
+opentype_layout_chained_sequence_context_format1_chained_seq_rule_sets { offset, link }
 };
 accum.push(next_elem)
 };
@@ -12938,7 +12938,7 @@ false => {
 None
 }
 };
-opentype_layout_reverse_chain_single_subst_coverage { offset, link }
+opentype_layout_chained_sequence_context_format1_coverage { offset, link }
 };
 let backtrack_class_def = {
 let offset = {
@@ -12966,7 +12966,7 @@ false => {
 None
 }
 };
-opentype_layout_chained_sequence_context_format2_input_class_def { offset, link }
+opentype_gdef_table_glyph_class_def { offset, link }
 };
 let input_class_def = {
 let offset = {
@@ -12994,7 +12994,7 @@ false => {
 None
 }
 };
-opentype_layout_chained_sequence_context_format2_input_class_def { offset, link }
+opentype_gdef_table_glyph_class_def { offset, link }
 };
 let lookahead_class_def = {
 let offset = {
@@ -13022,7 +13022,7 @@ false => {
 None
 }
 };
-opentype_layout_chained_sequence_context_format2_input_class_def { offset, link }
+opentype_gdef_table_glyph_class_def { offset, link }
 };
 let chained_class_seq_rule_set_count = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -13057,7 +13057,7 @@ false => {
 None
 }
 };
-opentype_layout_chained_sequence_context_format2_chained_class_seq_rule_sets { offset, link }
+opentype_layout_chained_sequence_context_format1_chained_seq_rule_sets { offset, link }
 };
 accum.push(next_elem)
 };
@@ -13101,7 +13101,7 @@ false => {
 None
 }
 };
-opentype_layout_reverse_chain_single_subst_coverage { offset, link }
+opentype_layout_chained_sequence_context_format1_coverage { offset, link }
 };
 accum.push(next_elem)
 };
@@ -13140,7 +13140,7 @@ false => {
 None
 }
 };
-opentype_layout_reverse_chain_single_subst_coverage { offset, link }
+opentype_layout_chained_sequence_context_format1_coverage { offset, link }
 };
 accum.push(next_elem)
 };
@@ -13179,7 +13179,7 @@ false => {
 None
 }
 };
-opentype_layout_reverse_chain_single_subst_coverage { offset, link }
+opentype_layout_chained_sequence_context_format1_coverage { offset, link }
 };
 accum.push(next_elem)
 };
@@ -13428,7 +13428,7 @@ false => {
 None
 }
 };
-opentype_layout_lang_sys_record_lang_sys { offset, link }
+opentype_layout_script_table_default_lang_sys { offset, link }
 };
 let lang_sys_count = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -13513,7 +13513,7 @@ false => {
 None
 }
 };
-opentype_layout_lang_sys_record_lang_sys { offset, link }
+opentype_layout_script_table_default_lang_sys { offset, link }
 };
 PResult::Ok(opentype_layout_lang_sys_record { lang_sys_tag, lang_sys })
 }
@@ -14265,7 +14265,7 @@ let offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-opentype_layout_pair_pos_format2_coverage { offset }
+opentype_layout_single_pos_format1_coverage { offset }
 };
 accum.push(next_elem)
 };
@@ -14282,7 +14282,7 @@ let offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-opentype_layout_pair_pos_format2_coverage { offset }
+opentype_layout_single_pos_format1_coverage { offset }
 };
 let value_format1 = (Decoder_opentype_common_value_format_flags(_input))?;
 let value_format2 = (Decoder_opentype_common_value_format_flags(_input))?;
@@ -14291,14 +14291,14 @@ let offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-opentype_layout_pair_pos_format2_coverage { offset }
+opentype_layout_single_pos_format1_coverage { offset }
 };
 let class_def2 = {
 let offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-opentype_layout_pair_pos_format2_coverage { offset }
+opentype_layout_single_pos_format1_coverage { offset }
 };
 let class1_count = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -14399,7 +14399,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_pair_pos_format2_coverage { offset })
+Some(opentype_layout_single_pos_format1_coverage { offset })
 } else {
 None
 };
@@ -14415,7 +14415,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_pair_pos_format2_coverage { offset })
+Some(opentype_layout_single_pos_format1_coverage { offset })
 } else {
 None
 };
@@ -14431,7 +14431,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_pair_pos_format2_coverage { offset })
+Some(opentype_layout_single_pos_format1_coverage { offset })
 } else {
 None
 };
@@ -14447,7 +14447,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_pair_pos_format2_coverage { offset })
+Some(opentype_layout_single_pos_format1_coverage { offset })
 } else {
 None
 };
@@ -14492,7 +14492,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_pair_pos_format2_coverage { offset })
+Some(opentype_layout_single_pos_format1_coverage { offset })
 } else {
 None
 };
@@ -14508,7 +14508,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_pair_pos_format2_coverage { offset })
+Some(opentype_layout_single_pos_format1_coverage { offset })
 } else {
 None
 };
@@ -14524,7 +14524,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_pair_pos_format2_coverage { offset })
+Some(opentype_layout_single_pos_format1_coverage { offset })
 } else {
 None
 };
@@ -14540,7 +14540,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_pair_pos_format2_coverage { offset })
+Some(opentype_layout_single_pos_format1_coverage { offset })
 } else {
 None
 };
@@ -14623,7 +14623,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_pair_pos_format2_coverage { offset })
+Some(opentype_layout_single_pos_format1_coverage { offset })
 } else {
 None
 };
@@ -14639,7 +14639,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_pair_pos_format2_coverage { offset })
+Some(opentype_layout_single_pos_format1_coverage { offset })
 } else {
 None
 };
@@ -14655,7 +14655,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_pair_pos_format2_coverage { offset })
+Some(opentype_layout_single_pos_format1_coverage { offset })
 } else {
 None
 };
@@ -14671,7 +14671,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_pair_pos_format2_coverage { offset })
+Some(opentype_layout_single_pos_format1_coverage { offset })
 } else {
 None
 };
@@ -14716,7 +14716,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_pair_pos_format2_coverage { offset })
+Some(opentype_layout_single_pos_format1_coverage { offset })
 } else {
 None
 };
@@ -14732,7 +14732,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_pair_pos_format2_coverage { offset })
+Some(opentype_layout_single_pos_format1_coverage { offset })
 } else {
 None
 };
@@ -14748,7 +14748,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_pair_pos_format2_coverage { offset })
+Some(opentype_layout_single_pos_format1_coverage { offset })
 } else {
 None
 };
@@ -14764,7 +14764,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_pair_pos_format2_coverage { offset })
+Some(opentype_layout_single_pos_format1_coverage { offset })
 } else {
 None
 };
@@ -14778,7 +14778,7 @@ let offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-opentype_layout_pair_pos_format2_coverage { offset }
+opentype_layout_single_pos_format1_coverage { offset }
 };
 let value_format = (Decoder_opentype_common_value_format_flags(_input))?;
 let value_record = (Decoder123(_input, value_format, table_view))?;
@@ -14792,7 +14792,7 @@ let offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-opentype_layout_pair_pos_format2_coverage { offset }
+opentype_layout_single_pos_format1_coverage { offset }
 };
 let value_format = (Decoder_opentype_common_value_format_flags(_input))?;
 let value_count = {
@@ -14848,7 +14848,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_pair_pos_format2_coverage { offset })
+Some(opentype_layout_single_pos_format1_coverage { offset })
 } else {
 None
 };
@@ -14864,7 +14864,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_pair_pos_format2_coverage { offset })
+Some(opentype_layout_single_pos_format1_coverage { offset })
 } else {
 None
 };
@@ -14880,7 +14880,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_pair_pos_format2_coverage { offset })
+Some(opentype_layout_single_pos_format1_coverage { offset })
 } else {
 None
 };
@@ -14896,7 +14896,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_pair_pos_format2_coverage { offset })
+Some(opentype_layout_single_pos_format1_coverage { offset })
 } else {
 None
 };
@@ -14941,7 +14941,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_pair_pos_format2_coverage { offset })
+Some(opentype_layout_single_pos_format1_coverage { offset })
 } else {
 None
 };
@@ -14957,7 +14957,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_pair_pos_format2_coverage { offset })
+Some(opentype_layout_single_pos_format1_coverage { offset })
 } else {
 None
 };
@@ -14973,7 +14973,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_pair_pos_format2_coverage { offset })
+Some(opentype_layout_single_pos_format1_coverage { offset })
 } else {
 None
 };
@@ -14989,7 +14989,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_pair_pos_format2_coverage { offset })
+Some(opentype_layout_single_pos_format1_coverage { offset })
 } else {
 None
 };
@@ -15390,9 +15390,9 @@ false => {
 None
 }
 };
-opentype_layout_axis_table_base_script_list_offset_link_yes_base_script_records_base_script_offset { offset, link }
+opentype_layout_axis_table_base_script_list_offset_link_base_script_records_base_script_offset { offset, link }
 };
-opentype_layout_axis_table_base_script_list_offset_link_yes_base_script_records { base_script_tag, base_script_offset }
+opentype_layout_axis_table_base_script_list_offset_link_base_script_records { base_script_tag, base_script_offset }
 };
 accum.push(next_elem)
 };
@@ -15567,7 +15567,7 @@ false => {
 None
 }
 };
-opentype_layout_min_max_min_coord_offset { offset, link }
+opentype_layout_base_values_base_coord_offsets { offset, link }
 };
 accum.push(next_elem)
 };
@@ -15608,7 +15608,7 @@ false => {
 None
 }
 };
-opentype_layout_min_max_min_coord_offset { offset, link }
+opentype_layout_base_values_base_coord_offsets { offset, link }
 };
 let max_coord_offset = {
 let offset = {
@@ -15636,7 +15636,7 @@ false => {
 None
 }
 };
-opentype_layout_min_max_min_coord_offset { offset, link }
+opentype_layout_base_values_base_coord_offsets { offset, link }
 };
 let feat_min_max_count = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -15673,7 +15673,7 @@ false => {
 None
 }
 };
-opentype_layout_min_max_min_coord_offset { offset, link }
+opentype_layout_base_values_base_coord_offsets { offset, link }
 };
 let max_coord_offset = {
 let offset = {
@@ -15701,7 +15701,7 @@ false => {
 None
 }
 };
-opentype_layout_min_max_min_coord_offset { offset, link }
+opentype_layout_base_values_base_coord_offsets { offset, link }
 };
 opentype_layout_min_max_feat_min_max_records { feature_tag, min_coord_offset, max_coord_offset }
 };
@@ -15969,7 +15969,7 @@ PResult::Ok(opentype_glyf_simple { end_points_of_contour, instruction_length, in
 /// d#133
 fn Decoder_opentype_glyf_composite(_input: &mut Parser<'_>) -> Result<opentype_glyf_composite, ParseError> {
 let acc_glyphs = {
-let mut seq: Vec<opentype_glyf_composite_glyphs> = Vec::new();
+let mut seq: Vec<opentype_glyf_composite_acc_glyphs> = Vec::new();
 let mut acc = false;
 loop {
 {
@@ -16175,7 +16175,7 @@ None
 }
 }
 };
-opentype_glyf_composite_glyphs { flags, glyph_index, argument1, argument2, scale }
+opentype_glyf_composite_acc_glyphs { flags, glyph_index, argument1, argument2, scale }
 };
 acc = {
 let acc = acc;
@@ -16268,7 +16268,7 @@ false => {
 None
 }
 };
-opentype_name_name_version_1_lang_tag_records_offset { offset, link }
+opentype_name_table_name_records_offset { offset, link }
 };
 opentype_name_name_version_1_lang_tag_records { length, offset }
 };
@@ -16444,7 +16444,7 @@ opentype_cmap_subtable_data::Format10(inner)
 },
 
 12u16 => {
-let inner = (Decoder_opentype_cmap_subtable_format13(_input, _platform))?;
+let inner = (Decoder_opentype_cmap_subtable_format12(_input, _platform))?;
 opentype_cmap_subtable_data::Format12(inner)
 },
 
@@ -16475,7 +16475,7 @@ let format = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-opentype_cmap_subtable_format14_length_lhs { format }
+opentype_cmap_subtable_format0_length_lhs { format }
 };
 let x = (_input.read_byte()?, _input.read_byte()?);
 PResult::Ok(u16be(x))
@@ -16533,7 +16533,7 @@ inner
 return Err(ParseError::FalsifiedWhere(11250208753083412758u64));
 }
 };
-opentype_cmap_subtable_format14_length_lhs { format }
+opentype_cmap_subtable_format0_length_lhs { format }
 };
 let inner = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -16704,7 +16704,7 @@ inner
 return Err(ParseError::FalsifiedWhere(3249387167439447765u64));
 }
 };
-opentype_cmap_subtable_format14_length_lhs { format }
+opentype_cmap_subtable_format0_length_lhs { format }
 };
 let x = (_input.read_byte()?, _input.read_byte()?);
 PResult::Ok(u16be(x))
@@ -16929,7 +16929,7 @@ inner
 return Err(ParseError::FalsifiedWhere(9798710097031164942u64));
 }
 };
-opentype_cmap_subtable_format13_length_lhs { format, __reserved }
+opentype_cmap_subtable_format8_length_lhs { format, __reserved }
 };
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 PResult::Ok(u32be(x))
@@ -17040,7 +17040,7 @@ inner
 return Err(ParseError::FalsifiedWhere(11046436797737227751u64));
 }
 };
-opentype_cmap_subtable_format13_length_lhs { format, __reserved }
+opentype_cmap_subtable_format8_length_lhs { format, __reserved }
 };
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 PResult::Ok(u32be(x))
@@ -17115,7 +17115,7 @@ PResult::Ok(ret)
 }
 
 /// d#146
-fn Decoder_opentype_cmap_subtable_format13(_input: &mut Parser<'_>, _platform: u16) -> Result<opentype_cmap_subtable_format13, ParseError> {
+fn Decoder_opentype_cmap_subtable_format12(_input: &mut Parser<'_>, _platform: u16) -> Result<opentype_cmap_subtable_format12, ParseError> {
 let length = {
 _input.open_peek_context();
 let ret = ((|| {
@@ -17150,7 +17150,7 @@ inner
 return Err(ParseError::FalsifiedWhere(2688427941405105545u64));
 }
 };
-opentype_cmap_subtable_format13_length_lhs { format, __reserved }
+opentype_cmap_subtable_format8_length_lhs { format, __reserved }
 };
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 PResult::Ok(u32be(x))
@@ -17211,14 +17211,14 @@ accum.push(next_elem)
 };
 accum
 };
-PResult::Ok(opentype_cmap_subtable_format13 { format, length, language, num_groups, groups })
+PResult::Ok(opentype_cmap_subtable_format12 { format, length, language, num_groups, groups })
 })())?;
 _input.end_slice()?;
 PResult::Ok(ret)
 }
 
 /// d#147
-fn Decoder147(_input: &mut Parser<'_>, _platform: u16) -> Result<opentype_cmap_subtable_format13, ParseError> {
+fn Decoder147(_input: &mut Parser<'_>, _platform: u16) -> Result<opentype_cmap_subtable_format12, ParseError> {
 let length = {
 _input.open_peek_context();
 let ret = ((|| {
@@ -17253,7 +17253,7 @@ inner
 return Err(ParseError::FalsifiedWhere(1179945139148562335u64));
 }
 };
-opentype_cmap_subtable_format13_length_lhs { format, __reserved }
+opentype_cmap_subtable_format8_length_lhs { format, __reserved }
 };
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 PResult::Ok(u32be(x))
@@ -17314,7 +17314,7 @@ accum.push(next_elem)
 };
 accum
 };
-PResult::Ok(opentype_cmap_subtable_format13 { format, length, language, num_groups, groups })
+PResult::Ok(opentype_cmap_subtable_format12 { format, length, language, num_groups, groups })
 })())?;
 _input.end_slice()?;
 PResult::Ok(ret)
@@ -17341,7 +17341,7 @@ inner
 return Err(ParseError::FalsifiedWhere(15898809900392744567u64));
 }
 };
-opentype_cmap_subtable_format14_length_lhs { format }
+opentype_cmap_subtable_format0_length_lhs { format }
 };
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 PResult::Ok(u32be(x))
@@ -17526,20 +17526,20 @@ PResult::Ok(elf_header { ident, r#type, machine, version, entry, phoff, shoff, f
 }
 
 /// d#152
-fn Decoder152(_input: &mut Parser<'_>, is_be: bool, class: u8, phnum: u16) -> Result<Vec<elf_phdr_table>, ParseError> {
+fn Decoder152(_input: &mut Parser<'_>, is_be: bool, class: u8, phnum: u16) -> Result<Vec<elf_phdr>, ParseError> {
 let mut accum = Vec::new();
 for _ in 0..phnum {
-let next_elem = (Decoder_elf_phdr_table(_input, is_be, class))?;
+let next_elem = (Decoder_elf_phdr(_input, is_be, class))?;
 accum.push(next_elem)
 };
 PResult::Ok(accum)
 }
 
 /// d#153
-fn Decoder153(_input: &mut Parser<'_>, is_be: bool, class: u8, shnum: u16) -> Result<Vec<elf_shdr_table>, ParseError> {
+fn Decoder153(_input: &mut Parser<'_>, is_be: bool, class: u8, shnum: u16) -> Result<Vec<elf_shdr>, ParseError> {
 let mut accum = Vec::new();
 for _ in 0..shnum {
-let next_elem = (Decoder_elf_shdr_table(_input, is_be, class))?;
+let next_elem = (Decoder_elf_shdr(_input, is_be, class))?;
 accum.push(next_elem)
 };
 PResult::Ok(accum)
@@ -17559,7 +17559,7 @@ accum
 }
 
 /// d#155
-fn Decoder_elf_shdr_table(_input: &mut Parser<'_>, is_be: bool, class: u8) -> Result<elf_shdr_table, ParseError> {
+fn Decoder_elf_shdr(_input: &mut Parser<'_>, is_be: bool, class: u8) -> Result<elf_shdr, ParseError> {
 let name = (Decoder156(_input, is_be))?;
 let r#type = (Decoder157(_input, is_be))?;
 let flags = (Decoder_elf_types_elf_full(_input, is_be, class))?;
@@ -17570,7 +17570,7 @@ let link = (Decoder156(_input, is_be))?;
 let info = (Decoder161(_input, is_be))?;
 let addralign = (Decoder_elf_types_elf_full(_input, is_be, class))?;
 let entsize = (Decoder_elf_types_elf_full(_input, is_be, class))?;
-PResult::Ok(elf_shdr_table { name, r#type, flags, addr, offset, size, link, info, addralign, entsize })
+PResult::Ok(elf_shdr { name, r#type, flags, addr, offset, size, link, info, addralign, entsize })
 }
 
 /// d#156
@@ -17746,7 +17746,7 @@ u64le(x)
 }
 
 /// d#167
-fn Decoder_elf_phdr_table(_input: &mut Parser<'_>, is_be: bool, class: u8) -> Result<elf_phdr_table, ParseError> {
+fn Decoder_elf_phdr(_input: &mut Parser<'_>, is_be: bool, class: u8) -> Result<elf_phdr, ParseError> {
 let r#type = (Decoder156(_input, is_be))?;
 let flags64 = (Decoder168(_input, is_be, class))?;
 let offset = (Decoder_elf_types_elf_off(_input, is_be, class))?;
@@ -17756,7 +17756,7 @@ let filesz = (Decoder_elf_types_elf_full(_input, is_be, class))?;
 let memsz = (Decoder_elf_types_elf_full(_input, is_be, class))?;
 let flags32 = (Decoder169(_input, is_be, class))?;
 let align = (Decoder_elf_types_elf_full(_input, is_be, class))?;
-PResult::Ok(elf_phdr_table { r#type, flags64, offset, vaddr, paddr, filesz, memsz, flags32, align })
+PResult::Ok(elf_phdr { r#type, flags64, offset, vaddr, paddr, filesz, memsz, flags32, align })
 }
 
 /// d#168
@@ -17978,7 +17978,7 @@ let ret = ((|| {
 let name = {
 let sz = 100u16 as usize;
 _input.start_slice(sz)?;
-let ret = (Decoder_tar_ascii_string_opt0(_input))?;
+let ret = (Decoder_tar_ascii_string_opt0_nonempty(_input))?;
 _input.end_slice()?;
 ret
 };
@@ -18058,7 +18058,7 @@ break
 };
 accum
 };
-PResult::Ok(tar_ascii_string_opt0 { string })
+PResult::Ok(tar_ascii_string_opt0_nonempty { string })
 })())?;
 _input.end_slice()?;
 ret
@@ -18139,7 +18139,7 @@ break
 };
 accum
 };
-PResult::Ok(tar_ascii_string_opt0 { string })
+PResult::Ok(tar_ascii_string_opt0_nonempty { string })
 })())?;
 _input.end_slice()?;
 ret
@@ -18220,7 +18220,7 @@ break
 };
 accum
 };
-PResult::Ok(tar_ascii_string_opt0 { string })
+PResult::Ok(tar_ascii_string_opt0_nonempty { string })
 })())?;
 _input.end_slice()?;
 ret
@@ -18430,7 +18430,7 @@ break
 };
 accum
 };
-PResult::Ok(tar_ascii_string_opt0 { string })
+PResult::Ok(tar_ascii_string_opt0_nonempty { string })
 })())?;
 _input.end_slice()?;
 ret
@@ -18511,7 +18511,7 @@ break
 };
 accum
 };
-PResult::Ok(tar_ascii_string_opt0 { string })
+PResult::Ok(tar_ascii_string_opt0_nonempty { string })
 })())?;
 _input.end_slice()?;
 ret
@@ -18684,7 +18684,7 @@ break
 };
 accum
 };
-PResult::Ok(tar_ascii_string_opt0 { string })
+PResult::Ok(tar_ascii_string_opt0_nonempty { string })
 })())?;
 _input.end_slice()?;
 ret
@@ -18765,7 +18765,7 @@ break
 };
 accum
 };
-PResult::Ok(tar_ascii_string_opt0 { string })
+PResult::Ok(tar_ascii_string_opt0_nonempty { string })
 })())?;
 _input.end_slice()?;
 ret
@@ -18799,7 +18799,7 @@ PResult::Ok(ret)
 }
 
 /// d#182
-fn Decoder_tar_ascii_string_opt0(_input: &mut Parser<'_>) -> Result<tar_ascii_string_opt0, ParseError> {
+fn Decoder_tar_ascii_string_opt0_nonempty(_input: &mut Parser<'_>) -> Result<tar_ascii_string_opt0_nonempty, ParseError> {
 let string = {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -18875,7 +18875,7 @@ break
 };
 accum
 };
-PResult::Ok(tar_ascii_string_opt0 { string })
+PResult::Ok(tar_ascii_string_opt0_nonempty { string })
 }
 
 /// d#183
@@ -18889,7 +18889,7 @@ return Err(ParseError::ExcludedBranch(2197379665604321609u64));
 }
 
 /// d#184
-fn Decoder184(_input: &mut Parser<'_>) -> Result<tar_ascii_string_opt0, ParseError> {
+fn Decoder184(_input: &mut Parser<'_>) -> Result<tar_ascii_string_opt0_nonempty, ParseError> {
 let string = {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -18961,11 +18961,11 @@ break
 };
 accum
 };
-PResult::Ok(tar_ascii_string_opt0 { string })
+PResult::Ok(tar_ascii_string_opt0_nonempty { string })
 }
 
 /// d#185
-fn Decoder185(_input: &mut Parser<'_>) -> Result<tar_ascii_string_opt0, ParseError> {
+fn Decoder185(_input: &mut Parser<'_>) -> Result<tar_ascii_string_opt0_nonempty, ParseError> {
 let string = {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -19041,7 +19041,7 @@ accum.push(next_elem)
 };
 accum
 };
-PResult::Ok(tar_ascii_string_opt0 { string })
+PResult::Ok(tar_ascii_string_opt0_nonempty { string })
 }
 
 /// d#186
@@ -19114,7 +19114,7 @@ return Err(ParseError::ExcludedBranch(15252450768049745444u64));
 }
 
 /// d#187
-fn Decoder_tiff_ifd(_input: &mut Parser<'_>, byte_order: tiff_byte_order) -> Result<tiff_ifd, ParseError> {
+fn Decoder_tiff_ifd_le(_input: &mut Parser<'_>, byte_order: tiff_byte_order) -> Result<tiff_ifd_le, ParseError> {
 PResult::Ok(match byte_order {
 tiff_byte_order::le(..) => {
 (Decoder188(_input))?
@@ -19127,7 +19127,7 @@ tiff_byte_order::be(..) => {
 }
 
 /// d#188
-fn Decoder188(_input: &mut Parser<'_>) -> Result<tiff_ifd, ParseError> {
+fn Decoder188(_input: &mut Parser<'_>) -> Result<tiff_ifd_le, ParseError> {
 let num_fields = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16le(x)
@@ -19152,7 +19152,7 @@ let offset_or_data = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32le(x)
 };
-tiff_ifd_be_fields { tag, r#type, length, offset_or_data }
+tiff_ifd_le_fields { tag, r#type, length, offset_or_data }
 };
 accum.push(next_elem)
 };
@@ -19183,11 +19183,11 @@ break
 };
 accum
 };
-PResult::Ok(tiff_ifd { num_fields, fields, next_ifd_offset, next_ifd })
+PResult::Ok(tiff_ifd_le { num_fields, fields, next_ifd_offset, next_ifd })
 }
 
 /// d#189
-fn Decoder189(_input: &mut Parser<'_>) -> Result<tiff_ifd, ParseError> {
+fn Decoder189(_input: &mut Parser<'_>) -> Result<tiff_ifd_le, ParseError> {
 let num_fields = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
@@ -19212,7 +19212,7 @@ let offset_or_data = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-tiff_ifd_be_fields { tag, r#type, length, offset_or_data }
+tiff_ifd_le_fields { tag, r#type, length, offset_or_data }
 };
 accum.push(next_elem)
 };
@@ -19243,7 +19243,7 @@ break
 };
 accum
 };
-PResult::Ok(tiff_ifd { num_fields, fields, next_ifd_offset, next_ifd })
+PResult::Ok(tiff_ifd_le { num_fields, fields, next_ifd_offset, next_ifd })
 }
 
 /// d#190
@@ -19651,26 +19651,26 @@ accum.push(next_elem)
 accum
 };
 let codes = (try_flat_map_vec(blocks.iter().cloned(), |x: deflate_block| PResult::Ok(match x.data {
-deflate_main_codes::uncompressed(ref y) => {
+deflate_block_data::uncompressed(ref y) => {
 y.codes_values.clone()
 },
 
-deflate_main_codes::fixed_huffman(ref y) => {
+deflate_block_data::fixed_huffman(ref y) => {
 y.codes_values.clone()
 },
 
-deflate_main_codes::dynamic_huffman(ref y) => {
+deflate_block_data::dynamic_huffman(ref y) => {
 y.codes_values.clone()
 }
 })))?;
-let inflate = (try_flat_map_append_vec(codes.iter().cloned(), |tuple_var: (&[u8], deflate_main_codes)| PResult::Ok({
+let inflate = (try_flat_map_append_vec(codes.iter().cloned(), |tuple_var: (&[u8], deflate_uncompressed_codes_values)| PResult::Ok({
 let (buffer, symbol) = tuple_var;
 match symbol {
-deflate_main_codes::literal(b) => {
+deflate_uncompressed_codes_values::literal(b) => {
 [b].to_vec()
 },
 
-deflate_main_codes::reference(r) => {
+deflate_uncompressed_codes_values::reference(r) => {
 {
 let ix = (try_sub!((buffer.len()) as u32, r.distance as u32, 98102193810481173u64)) as usize;
 (slice_ext(buffer, ix..ix + ((r.length as u32) as usize))).to_vec()
@@ -19691,17 +19691,17 @@ bits.0 | bits.1 << 1u8
 let data = match r#type {
 0u8 => {
 let inner = (Decoder_deflate_uncompressed(_input))?;
-deflate_main_codes::uncompressed(inner)
+deflate_block_data::uncompressed(inner)
 },
 
 1u8 => {
 let inner = (Decoder_deflate_fixed_huffman(_input))?;
-deflate_main_codes::fixed_huffman(inner)
+deflate_block_data::fixed_huffman(inner)
 },
 
 2u8 => {
 let inner = (Decoder_deflate_dynamic_huffman(_input))?;
-deflate_main_codes::dynamic_huffman(inner)
+deflate_block_data::dynamic_huffman(inner)
 },
 
 _other => {
@@ -19733,7 +19733,7 @@ accum.push(next_elem)
 };
 accum
 };
-let codes_values = (try_flat_map_vec(bytes.iter().cloned(), |x: u8| PResult::Ok([deflate_main_codes::literal(x)].to_vec())))?;
+let codes_values = (try_flat_map_vec(bytes.iter().cloned(), |x: u8| PResult::Ok([deflate_uncompressed_codes_values::literal(x)].to_vec())))?;
 PResult::Ok(deflate_uncompressed { len, nlen, bytes, codes_values })
 }
 
@@ -19760,7 +19760,7 @@ accum
 };
 bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -19778,7 +19778,7 @@ accum
 };
 bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -19796,7 +19796,7 @@ accum
 };
 bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -19814,7 +19814,7 @@ accum
 };
 bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -19832,7 +19832,7 @@ accum
 };
 bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -19850,7 +19850,7 @@ accum
 };
 bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -19868,7 +19868,7 @@ accum
 };
 bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -19886,7 +19886,7 @@ accum
 };
 bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -19907,7 +19907,7 @@ accum
 };
 bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -19928,7 +19928,7 @@ accum
 };
 bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -19949,7 +19949,7 @@ accum
 };
 bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -19970,7 +19970,7 @@ accum
 };
 bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -19991,7 +19991,7 @@ accum
 };
 bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20012,7 +20012,7 @@ accum
 };
 bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20033,7 +20033,7 @@ accum
 };
 bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20054,7 +20054,7 @@ accum
 };
 bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20075,7 +20075,7 @@ accum
 };
 bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20096,7 +20096,7 @@ accum
 };
 bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20117,7 +20117,7 @@ accum
 };
 bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20138,7 +20138,7 @@ accum
 };
 bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20159,7 +20159,7 @@ accum
 };
 bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20180,7 +20180,7 @@ accum
 };
 bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20201,7 +20201,7 @@ accum
 };
 bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20222,7 +20222,7 @@ accum
 };
 bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20243,7 +20243,7 @@ accum
 };
 bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20264,7 +20264,7 @@ accum
 };
 bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20285,7 +20285,7 @@ accum
 };
 bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20306,7 +20306,7 @@ accum
 };
 bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20324,7 +20324,7 @@ accum
 };
 bits[0u32 as usize] << 4u8 | bits[1u32 as usize] << 3u8 | bits[2u32 as usize] << 2u8 | bits[3u32 as usize] << 1u8 | bits[4u32 as usize]
 };
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code as u16))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code as u16))?;
 Some(deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20362,7 +20362,7 @@ let codes_values = (try_flat_map_vec(codes.iter().cloned(), |x: deflate_fixed_hu
 257u16..=285u16 => {
 match x.extra {
 Some(ref rec) => {
-[deflate_main_codes::reference(deflate_dynamic_huffman_codes_values_reference { length: rec.length, distance: rec.distance_record.distance })].to_vec()
+[deflate_uncompressed_codes_values::reference(deflate_fixed_huffman_codes_values_reference { length: rec.length, distance: rec.distance_record.distance })].to_vec()
 },
 
 _ => {
@@ -20376,7 +20376,7 @@ return Err(ParseError::ExcludedBranch(734991270787736827u64));
 },
 
 _ => {
-[deflate_main_codes::literal(x.code as u8)].to_vec()
+[deflate_uncompressed_codes_values::literal(x.code as u8)].to_vec()
 }
 })))?;
 PResult::Ok(deflate_fixed_huffman { codes, codes_values })
@@ -20456,7 +20456,7 @@ let extra = match code {
 let length_extra_bits = 0u8;
 let length = 3u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20464,7 +20464,7 @@ Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_
 let length_extra_bits = 0u8;
 let length = 4u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20472,7 +20472,7 @@ Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_
 let length_extra_bits = 0u8;
 let length = 5u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20480,7 +20480,7 @@ Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_
 let length_extra_bits = 0u8;
 let length = 6u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20488,7 +20488,7 @@ Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_
 let length_extra_bits = 0u8;
 let length = 7u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20496,7 +20496,7 @@ Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_
 let length_extra_bits = 0u8;
 let length = 8u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20504,7 +20504,7 @@ Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_
 let length_extra_bits = 0u8;
 let length = 9u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20512,7 +20512,7 @@ Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_
 let length_extra_bits = 0u8;
 let length = 10u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20523,7 +20523,7 @@ bits.0
 };
 let length = 11u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20534,7 +20534,7 @@ bits.0
 };
 let length = 13u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20545,7 +20545,7 @@ bits.0
 };
 let length = 15u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20556,7 +20556,7 @@ bits.0
 };
 let length = 17u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20567,7 +20567,7 @@ bits.0 | bits.1 << 1u8
 };
 let length = 19u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20578,7 +20578,7 @@ bits.0 | bits.1 << 1u8
 };
 let length = 23u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20589,7 +20589,7 @@ bits.0 | bits.1 << 1u8
 };
 let length = 27u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20600,7 +20600,7 @@ bits.0 | bits.1 << 1u8
 };
 let length = 31u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20611,7 +20611,7 @@ bits.0 | bits.1 << 1u8 | bits.2 << 2u8
 };
 let length = 35u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20622,7 +20622,7 @@ bits.0 | bits.1 << 1u8 | bits.2 << 2u8
 };
 let length = 43u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20633,7 +20633,7 @@ bits.0 | bits.1 << 1u8 | bits.2 << 2u8
 };
 let length = 51u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20644,7 +20644,7 @@ bits.0 | bits.1 << 1u8 | bits.2 << 2u8
 };
 let length = 59u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20655,7 +20655,7 @@ bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8
 };
 let length = 67u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20666,7 +20666,7 @@ bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8
 };
 let length = 83u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20677,7 +20677,7 @@ bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8
 };
 let length = 99u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20688,7 +20688,7 @@ bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8
 };
 let length = 115u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20699,7 +20699,7 @@ bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8
 };
 let length = 131u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20710,7 +20710,7 @@ bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8
 };
 let length = 163u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20721,7 +20721,7 @@ bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8
 };
 let length = 195u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20732,7 +20732,7 @@ bits.0 | bits.1 << 1u8 | bits.2 << 2u8 | bits.3 << 3u8 | bits.4 << 4u8
 };
 let length = 227u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20740,7 +20740,7 @@ Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_
 let length_extra_bits = 0u8;
 let length = 258u16 + (length_extra_bits as u16);
 let distance_code = (distance_alphabet_format(_input))?;
-let distance_record = (Decoder_deflate_distance_record(_input, distance_code))?;
+let distance_record = (Decoder_deflate_distance_record0(_input, distance_code))?;
 Some(deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code, distance_record })
 },
 
@@ -20778,7 +20778,7 @@ let codes_values = (try_flat_map_vec(codes.iter().cloned(), |x: deflate_dynamic_
 257u16..=285u16 => {
 match x.extra {
 Some(ref rec) => {
-[deflate_main_codes::reference(deflate_dynamic_huffman_codes_values_reference { length: rec.length, distance: rec.distance_record.distance })].to_vec()
+[deflate_uncompressed_codes_values::reference(deflate_fixed_huffman_codes_values_reference { length: rec.length, distance: rec.distance_record.distance })].to_vec()
 },
 
 _ => {
@@ -20792,7 +20792,7 @@ return Err(ParseError::ExcludedBranch(1644793874183523166u64));
 },
 
 _ => {
-[deflate_main_codes::literal(x.code as u8)].to_vec()
+[deflate_uncompressed_codes_values::literal(x.code as u8)].to_vec()
 }
 })))?;
 PResult::Ok(deflate_dynamic_huffman { hlit, hdist, hclen, code_length_alphabet_code_lengths, literal_length_distance_alphabet_code_lengths, literal_length_distance_alphabet_code_lengths_value, literal_length_alphabet_code_lengths_value, distance_alphabet_code_lengths_value, codes, codes_values })
@@ -20870,7 +20870,7 @@ PResult::Ok(accum)
 }
 
 /// d#205
-fn Decoder_deflate_distance_record(_input: &mut Parser<'_>, distance_code: u16) -> Result<deflate_distance_record, ParseError> {
+fn Decoder_deflate_distance_record0(_input: &mut Parser<'_>, distance_code: u16) -> Result<deflate_distance_record0, ParseError> {
 PResult::Ok(match distance_code as u8 {
 0u8 => {
 (Decoder206(_input, 0u8, 1u16))?
@@ -21003,7 +21003,7 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 }
 
 /// d#206
-fn Decoder206(_input: &mut Parser<'_>, extra_bits: u8, start: u16) -> Result<deflate_distance_record, ParseError> {
+fn Decoder206(_input: &mut Parser<'_>, extra_bits: u8, start: u16) -> Result<deflate_distance_record0, ParseError> {
 let distance_extra_bits = match extra_bits {
 0u8 => {
 0u16
@@ -21079,7 +21079,7 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 }
 };
 let distance = start + distance_extra_bits;
-PResult::Ok(deflate_distance_record { distance_extra_bits, distance })
+PResult::Ok(deflate_distance_record0 { distance_extra_bits, distance })
 }
 
 /// d#207
@@ -21265,7 +21265,7 @@ PResult::Ok(accum)
 }
 
 /// d#210
-fn Decoder210(_input: &mut Parser<'_>) -> Result<Vec<png_plte>, ParseError> {
+fn Decoder210(_input: &mut Parser<'_>) -> Result<Vec<gif_color_table_entry>, ParseError> {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
 let matching_ix = {
@@ -21288,7 +21288,7 @@ let next_elem = {
 let r = _input.read_byte()?;
 let g = _input.read_byte()?;
 let b = _input.read_byte()?;
-png_plte { r, g, b }
+gif_color_table_entry { r, g, b }
 };
 accum.push(next_elem)
 }
@@ -21305,7 +21305,7 @@ let greyscale = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-png_bkgd_color_type_0 { greyscale }
+png_trns_color_type_0 { greyscale }
 };
 png_trns::color_type_0(inner)
 },
@@ -21324,7 +21324,7 @@ let blue = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-png_bkgd_color_type_2 { red, green, blue }
+png_trns_color_type_2 { red, green, blue }
 };
 png_trns::color_type_2(inner)
 },
@@ -21345,7 +21345,7 @@ ret
 if matching_ix == 0 {
 let next_elem = {
 let palette_index = _input.read_byte()?;
-png_bkgd_color_type_3 { palette_index }
+png_trns_color_type_3 { palette_index }
 };
 accum.push(next_elem)
 } else {
@@ -21751,7 +21751,7 @@ let greyscale = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-png_bkgd_color_type_0 { greyscale }
+png_trns_color_type_0 { greyscale }
 };
 png_bkgd::color_type_0(inner)
 },
@@ -21762,7 +21762,7 @@ let greyscale = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-png_bkgd_color_type_0 { greyscale }
+png_trns_color_type_0 { greyscale }
 };
 png_bkgd::color_type_4(inner)
 },
@@ -21781,7 +21781,7 @@ let blue = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-png_bkgd_color_type_2 { red, green, blue }
+png_trns_color_type_2 { red, green, blue }
 };
 png_bkgd::color_type_2(inner)
 },
@@ -21800,7 +21800,7 @@ let blue = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-png_bkgd_color_type_2 { red, green, blue }
+png_trns_color_type_2 { red, green, blue }
 };
 png_bkgd::color_type_6(inner)
 },
@@ -21808,7 +21808,7 @@ png_bkgd::color_type_6(inner)
 3u8 => {
 let inner = {
 let palette_index = _input.read_byte()?;
-png_bkgd_color_type_3 { palette_index }
+png_trns_color_type_3 { palette_index }
 };
 png_bkgd::color_type_3(inner)
 },
@@ -27666,9 +27666,9 @@ let duration = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-mpeg4_mdhd_data_fields_version0 { creation_time, modification_time, timescale, duration }
+mpeg4_mvhd_data_fields_version0 { creation_time, modification_time, timescale, duration }
 };
-mpeg4_mdhd_data_fields::version0(inner)
+mpeg4_mvhd_data_fields::version0(inner)
 },
 
 1u8 => {
@@ -27689,9 +27689,9 @@ let duration = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u64be(x)
 };
-mpeg4_mdhd_data_fields_version1 { creation_time, modification_time, timescale, duration }
+mpeg4_mvhd_data_fields_version1 { creation_time, modification_time, timescale, duration }
 };
-mpeg4_mdhd_data_fields::version1(inner)
+mpeg4_mvhd_data_fields::version1(inner)
 },
 
 _other => {
@@ -28324,9 +28324,9 @@ let duration = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-mpeg4_mdhd_data_fields_version0 { creation_time, modification_time, timescale, duration }
+mpeg4_mvhd_data_fields_version0 { creation_time, modification_time, timescale, duration }
 };
-mpeg4_mdhd_data_fields::version0(inner)
+mpeg4_mvhd_data_fields::version0(inner)
 },
 
 1u8 => {
@@ -28347,9 +28347,9 @@ let duration = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u64be(x)
 };
-mpeg4_mdhd_data_fields_version1 { creation_time, modification_time, timescale, duration }
+mpeg4_mvhd_data_fields_version1 { creation_time, modification_time, timescale, duration }
 };
-mpeg4_mdhd_data_fields::version1(inner)
+mpeg4_mvhd_data_fields::version1(inner)
 },
 
 _other => {
@@ -28707,7 +28707,7 @@ u32be(x)
 let sample_entries = {
 let mut accum = Vec::new();
 for _ in 0..entry_count {
-let next_elem = (Decoder_mpeg4_stsd_sample_entry(_input))?;
+let next_elem = (Decoder_mpeg4_dref_data_data(_input))?;
 accum.push(next_elem)
 };
 accum
@@ -28993,7 +28993,7 @@ PResult::Ok(mpeg4_stts_sample_entry { sample_count, sample_delta })
 }
 
 /// d#272
-fn Decoder_mpeg4_stsd_sample_entry(_input: &mut Parser<'_>) -> Result<mpeg4_stsd_sample_entry, ParseError> {
+fn Decoder_mpeg4_dref_data_data(_input: &mut Parser<'_>) -> Result<mpeg4_dref_data_data, ParseError> {
 let size_field = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
@@ -29043,7 +29043,7 @@ PResult::Ok(accum)
 _input.end_slice()?;
 ret
 };
-PResult::Ok(mpeg4_stsd_sample_entry { size_field, r#type, size, data })
+PResult::Ok(mpeg4_dref_data_data { size_field, r#type, size, data })
 }
 
 /// d#273
@@ -29079,7 +29079,7 @@ PResult::Ok(mpeg4_dref_data { version, flags, number_of_entries, data })
 }
 
 /// d#274
-fn Decoder274(_input: &mut Parser<'_>) -> Result<mpeg4_stsd_sample_entry, ParseError> {
+fn Decoder274(_input: &mut Parser<'_>) -> Result<mpeg4_dref_data_data, ParseError> {
 let size_field = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
@@ -29129,7 +29129,7 @@ PResult::Ok(accum)
 _input.end_slice()?;
 ret
 };
-PResult::Ok(mpeg4_stsd_sample_entry { size_field, r#type, size, data })
+PResult::Ok(mpeg4_dref_data_data { size_field, r#type, size, data })
 }
 
 /// d#275
@@ -30411,7 +30411,7 @@ PResult::Ok(mpeg4_infe_atom_data_extra_fields_uri { item_uri_type })
 }
 
 /// d#297
-fn Decoder_jpeg_eoi(_input: &mut Parser<'_>) -> Result<jpeg_eoi, ParseError> {
+fn Decoder_jpeg_soi(_input: &mut Parser<'_>) -> Result<jpeg_soi, ParseError> {
 {
 let b = _input.read_byte()?;
 if b == 255 {
@@ -30428,7 +30428,7 @@ b
 return Err(ParseError::ExcludedBranch(14687724984806605719u64));
 }
 };
-PResult::Ok(jpeg_eoi { marker })
+PResult::Ok(jpeg_soi { marker })
 }
 
 /// d#298
@@ -30854,7 +30854,7 @@ PResult::Ok(jpeg_frame { initial_segment, segments, header, scan, dnl, scans })
 }
 
 /// d#299
-fn Decoder299(_input: &mut Parser<'_>) -> Result<jpeg_eoi, ParseError> {
+fn Decoder299(_input: &mut Parser<'_>) -> Result<jpeg_soi, ParseError> {
 {
 let b = _input.read_byte()?;
 if b == 255 {
@@ -30871,7 +30871,7 @@ b
 return Err(ParseError::ExcludedBranch(16625761205375889740u64));
 }
 };
-PResult::Ok(jpeg_eoi { marker })
+PResult::Ok(jpeg_soi { marker })
 }
 
 /// d#300
@@ -31053,7 +31053,7 @@ jpeg_table_or_misc::app1(inner)
 },
 
 6 => {
-let inner = (Decoder_jpeg_jpeg(_input))?;
+let inner = (Decoder_jpeg_app2(_input))?;
 jpeg_table_or_misc::app2(inner)
 },
 
@@ -31206,7 +31206,7 @@ ret
 };
 PResult::Ok(match tree_index {
 0 => {
-let inner = (Decoder_jpeg_dhp(_input))?;
+let inner = (Decoder_jpeg_sof0(_input))?;
 jpeg_frame_header::sof0(inner)
 },
 
@@ -31419,7 +31419,7 @@ b
 return Err(ParseError::ExcludedBranch(4569970360394099475u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -31578,7 +31578,7 @@ b
 return Err(ParseError::ExcludedBranch(8403192837054512577u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -31976,7 +31976,7 @@ return Err(ParseError::ExcludedBranch(9159119361499271180u64));
 }
 
 /// d#310
-fn Decoder310(_input: &mut Parser<'_>) -> Result<jpeg_eoi, ParseError> {
+fn Decoder310(_input: &mut Parser<'_>) -> Result<jpeg_soi, ParseError> {
 {
 let b = _input.read_byte()?;
 if b == 255 {
@@ -31993,11 +31993,11 @@ b
 return Err(ParseError::ExcludedBranch(3490919313637905107u64));
 }
 };
-PResult::Ok(jpeg_eoi { marker })
+PResult::Ok(jpeg_soi { marker })
 }
 
 /// d#311
-fn Decoder311(_input: &mut Parser<'_>) -> Result<jpeg_eoi, ParseError> {
+fn Decoder311(_input: &mut Parser<'_>) -> Result<jpeg_soi, ParseError> {
 {
 let b = _input.read_byte()?;
 if b == 255 {
@@ -32014,11 +32014,11 @@ b
 return Err(ParseError::ExcludedBranch(16679512278832019969u64));
 }
 };
-PResult::Ok(jpeg_eoi { marker })
+PResult::Ok(jpeg_soi { marker })
 }
 
 /// d#312
-fn Decoder312(_input: &mut Parser<'_>) -> Result<jpeg_eoi, ParseError> {
+fn Decoder312(_input: &mut Parser<'_>) -> Result<jpeg_soi, ParseError> {
 {
 let b = _input.read_byte()?;
 if b == 255 {
@@ -32035,11 +32035,11 @@ b
 return Err(ParseError::ExcludedBranch(9892894478446917378u64));
 }
 };
-PResult::Ok(jpeg_eoi { marker })
+PResult::Ok(jpeg_soi { marker })
 }
 
 /// d#313
-fn Decoder313(_input: &mut Parser<'_>) -> Result<jpeg_eoi, ParseError> {
+fn Decoder313(_input: &mut Parser<'_>) -> Result<jpeg_soi, ParseError> {
 {
 let b = _input.read_byte()?;
 if b == 255 {
@@ -32056,11 +32056,11 @@ b
 return Err(ParseError::ExcludedBranch(5208404121666294786u64));
 }
 };
-PResult::Ok(jpeg_eoi { marker })
+PResult::Ok(jpeg_soi { marker })
 }
 
 /// d#314
-fn Decoder314(_input: &mut Parser<'_>) -> Result<jpeg_eoi, ParseError> {
+fn Decoder314(_input: &mut Parser<'_>) -> Result<jpeg_soi, ParseError> {
 {
 let b = _input.read_byte()?;
 if b == 255 {
@@ -32077,11 +32077,11 @@ b
 return Err(ParseError::ExcludedBranch(13751590285972774894u64));
 }
 };
-PResult::Ok(jpeg_eoi { marker })
+PResult::Ok(jpeg_soi { marker })
 }
 
 /// d#315
-fn Decoder315(_input: &mut Parser<'_>) -> Result<jpeg_eoi, ParseError> {
+fn Decoder315(_input: &mut Parser<'_>) -> Result<jpeg_soi, ParseError> {
 {
 let b = _input.read_byte()?;
 if b == 255 {
@@ -32098,11 +32098,11 @@ b
 return Err(ParseError::ExcludedBranch(9201081899504003615u64));
 }
 };
-PResult::Ok(jpeg_eoi { marker })
+PResult::Ok(jpeg_soi { marker })
 }
 
 /// d#316
-fn Decoder316(_input: &mut Parser<'_>) -> Result<jpeg_eoi, ParseError> {
+fn Decoder316(_input: &mut Parser<'_>) -> Result<jpeg_soi, ParseError> {
 {
 let b = _input.read_byte()?;
 if b == 255 {
@@ -32119,11 +32119,11 @@ b
 return Err(ParseError::ExcludedBranch(1821331332215525359u64));
 }
 };
-PResult::Ok(jpeg_eoi { marker })
+PResult::Ok(jpeg_soi { marker })
 }
 
 /// d#317
-fn Decoder317(_input: &mut Parser<'_>) -> Result<jpeg_eoi, ParseError> {
+fn Decoder317(_input: &mut Parser<'_>) -> Result<jpeg_soi, ParseError> {
 {
 let b = _input.read_byte()?;
 if b == 255 {
@@ -32140,7 +32140,7 @@ b
 return Err(ParseError::ExcludedBranch(6867774794241173436u64));
 }
 };
-PResult::Ok(jpeg_eoi { marker })
+PResult::Ok(jpeg_soi { marker })
 }
 
 /// d#318
@@ -32458,7 +32458,7 @@ PResult::Ok(jpeg_scan_data { scan_data, scan_data_stream })
 }
 
 /// d#324
-fn Decoder_jpeg_dhp(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
+fn Decoder_jpeg_sof0(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -32476,7 +32476,7 @@ b
 return Err(ParseError::ExcludedBranch(13744164271564421708u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -32485,15 +32485,15 @@ u16be(x)
 let data = {
 let sz = (try_sub!(length, 2u16, 7538966935051243003u64)) as usize;
 _input.start_slice(sz)?;
-let ret = (Decoder_jpeg_dhp_data(_input))?;
+let ret = (Decoder_jpeg_sof_data(_input))?;
 _input.end_slice()?;
 ret
 };
-PResult::Ok(jpeg_dhp { marker, length, data })
+PResult::Ok(jpeg_sof0 { marker, length, data })
 }
 
 /// d#325
-fn Decoder325(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
+fn Decoder325(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -32511,7 +32511,7 @@ b
 return Err(ParseError::ExcludedBranch(11821813774070801620u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -32520,15 +32520,15 @@ u16be(x)
 let data = {
 let sz = (try_sub!(length, 2u16, 4867798537713738914u64)) as usize;
 _input.start_slice(sz)?;
-let ret = (Decoder_jpeg_dhp_data(_input))?;
+let ret = (Decoder_jpeg_sof_data(_input))?;
 _input.end_slice()?;
 ret
 };
-PResult::Ok(jpeg_dhp { marker, length, data })
+PResult::Ok(jpeg_sof0 { marker, length, data })
 }
 
 /// d#326
-fn Decoder326(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
+fn Decoder326(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -32546,7 +32546,7 @@ b
 return Err(ParseError::ExcludedBranch(5309491469191307378u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -32555,15 +32555,15 @@ u16be(x)
 let data = {
 let sz = (try_sub!(length, 2u16, 11266387855511437693u64)) as usize;
 _input.start_slice(sz)?;
-let ret = (Decoder_jpeg_dhp_data(_input))?;
+let ret = (Decoder_jpeg_sof_data(_input))?;
 _input.end_slice()?;
 ret
 };
-PResult::Ok(jpeg_dhp { marker, length, data })
+PResult::Ok(jpeg_sof0 { marker, length, data })
 }
 
 /// d#327
-fn Decoder327(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
+fn Decoder327(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -32581,7 +32581,7 @@ b
 return Err(ParseError::ExcludedBranch(7023661717588102849u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -32590,15 +32590,15 @@ u16be(x)
 let data = {
 let sz = (try_sub!(length, 2u16, 11452033436843896773u64)) as usize;
 _input.start_slice(sz)?;
-let ret = (Decoder_jpeg_dhp_data(_input))?;
+let ret = (Decoder_jpeg_sof_data(_input))?;
 _input.end_slice()?;
 ret
 };
-PResult::Ok(jpeg_dhp { marker, length, data })
+PResult::Ok(jpeg_sof0 { marker, length, data })
 }
 
 /// d#328
-fn Decoder328(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
+fn Decoder328(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -32616,7 +32616,7 @@ b
 return Err(ParseError::ExcludedBranch(9960855096836829935u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -32625,15 +32625,15 @@ u16be(x)
 let data = {
 let sz = (try_sub!(length, 2u16, 8138544351856664662u64)) as usize;
 _input.start_slice(sz)?;
-let ret = (Decoder_jpeg_dhp_data(_input))?;
+let ret = (Decoder_jpeg_sof_data(_input))?;
 _input.end_slice()?;
 ret
 };
-PResult::Ok(jpeg_dhp { marker, length, data })
+PResult::Ok(jpeg_sof0 { marker, length, data })
 }
 
 /// d#329
-fn Decoder329(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
+fn Decoder329(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -32651,7 +32651,7 @@ b
 return Err(ParseError::ExcludedBranch(18357658168615546095u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -32660,15 +32660,15 @@ u16be(x)
 let data = {
 let sz = (try_sub!(length, 2u16, 12696272221194189133u64)) as usize;
 _input.start_slice(sz)?;
-let ret = (Decoder_jpeg_dhp_data(_input))?;
+let ret = (Decoder_jpeg_sof_data(_input))?;
 _input.end_slice()?;
 ret
 };
-PResult::Ok(jpeg_dhp { marker, length, data })
+PResult::Ok(jpeg_sof0 { marker, length, data })
 }
 
 /// d#330
-fn Decoder330(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
+fn Decoder330(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -32686,7 +32686,7 @@ b
 return Err(ParseError::ExcludedBranch(15859964085544252343u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -32695,15 +32695,15 @@ u16be(x)
 let data = {
 let sz = (try_sub!(length, 2u16, 3995820927126919547u64)) as usize;
 _input.start_slice(sz)?;
-let ret = (Decoder_jpeg_dhp_data(_input))?;
+let ret = (Decoder_jpeg_sof_data(_input))?;
 _input.end_slice()?;
 ret
 };
-PResult::Ok(jpeg_dhp { marker, length, data })
+PResult::Ok(jpeg_sof0 { marker, length, data })
 }
 
 /// d#331
-fn Decoder331(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
+fn Decoder331(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -32721,7 +32721,7 @@ b
 return Err(ParseError::ExcludedBranch(3349032559334020401u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -32730,15 +32730,15 @@ u16be(x)
 let data = {
 let sz = (try_sub!(length, 2u16, 9149418055219508197u64)) as usize;
 _input.start_slice(sz)?;
-let ret = (Decoder_jpeg_dhp_data(_input))?;
+let ret = (Decoder_jpeg_sof_data(_input))?;
 _input.end_slice()?;
 ret
 };
-PResult::Ok(jpeg_dhp { marker, length, data })
+PResult::Ok(jpeg_sof0 { marker, length, data })
 }
 
 /// d#332
-fn Decoder332(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
+fn Decoder332(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -32756,7 +32756,7 @@ b
 return Err(ParseError::ExcludedBranch(8350850950759220429u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -32765,15 +32765,15 @@ u16be(x)
 let data = {
 let sz = (try_sub!(length, 2u16, 8000269442706245049u64)) as usize;
 _input.start_slice(sz)?;
-let ret = (Decoder_jpeg_dhp_data(_input))?;
+let ret = (Decoder_jpeg_sof_data(_input))?;
 _input.end_slice()?;
 ret
 };
-PResult::Ok(jpeg_dhp { marker, length, data })
+PResult::Ok(jpeg_sof0 { marker, length, data })
 }
 
 /// d#333
-fn Decoder333(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
+fn Decoder333(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -32791,7 +32791,7 @@ b
 return Err(ParseError::ExcludedBranch(16334217566159141080u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -32800,15 +32800,15 @@ u16be(x)
 let data = {
 let sz = (try_sub!(length, 2u16, 4100106362216887809u64)) as usize;
 _input.start_slice(sz)?;
-let ret = (Decoder_jpeg_dhp_data(_input))?;
+let ret = (Decoder_jpeg_sof_data(_input))?;
 _input.end_slice()?;
 ret
 };
-PResult::Ok(jpeg_dhp { marker, length, data })
+PResult::Ok(jpeg_sof0 { marker, length, data })
 }
 
 /// d#334
-fn Decoder334(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
+fn Decoder334(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -32826,7 +32826,7 @@ b
 return Err(ParseError::ExcludedBranch(12522857579864693834u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -32835,15 +32835,15 @@ u16be(x)
 let data = {
 let sz = (try_sub!(length, 2u16, 3198904588321530108u64)) as usize;
 _input.start_slice(sz)?;
-let ret = (Decoder_jpeg_dhp_data(_input))?;
+let ret = (Decoder_jpeg_sof_data(_input))?;
 _input.end_slice()?;
 ret
 };
-PResult::Ok(jpeg_dhp { marker, length, data })
+PResult::Ok(jpeg_sof0 { marker, length, data })
 }
 
 /// d#335
-fn Decoder335(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
+fn Decoder335(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -32861,7 +32861,7 @@ b
 return Err(ParseError::ExcludedBranch(17055268834995250246u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -32870,15 +32870,15 @@ u16be(x)
 let data = {
 let sz = (try_sub!(length, 2u16, 8674930063339641954u64)) as usize;
 _input.start_slice(sz)?;
-let ret = (Decoder_jpeg_dhp_data(_input))?;
+let ret = (Decoder_jpeg_sof_data(_input))?;
 _input.end_slice()?;
 ret
 };
-PResult::Ok(jpeg_dhp { marker, length, data })
+PResult::Ok(jpeg_sof0 { marker, length, data })
 }
 
 /// d#336
-fn Decoder336(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
+fn Decoder336(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -32896,7 +32896,7 @@ b
 return Err(ParseError::ExcludedBranch(9895655502210650925u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -32905,15 +32905,15 @@ u16be(x)
 let data = {
 let sz = (try_sub!(length, 2u16, 15244023661753025012u64)) as usize;
 _input.start_slice(sz)?;
-let ret = (Decoder_jpeg_dhp_data(_input))?;
+let ret = (Decoder_jpeg_sof_data(_input))?;
 _input.end_slice()?;
 ret
 };
-PResult::Ok(jpeg_dhp { marker, length, data })
+PResult::Ok(jpeg_sof0 { marker, length, data })
 }
 
 /// d#337
-fn Decoder_jpeg_dhp_data(_input: &mut Parser<'_>) -> Result<jpeg_dhp_data, ParseError> {
+fn Decoder_jpeg_sof_data(_input: &mut Parser<'_>) -> Result<jpeg_sof_data, ParseError> {
 let sample_precision = {
 let inner = _input.read_byte()?;
 let is_valid = {
@@ -32960,16 +32960,16 @@ return Err(ParseError::FalsifiedWhere(3011460078285478248u64));
 let image_components = {
 let mut accum = Vec::new();
 for _ in 0..num_image_components {
-let next_elem = (Decoder_jpeg_dhp_image_component(_input))?;
+let next_elem = (Decoder_jpeg_sof_image_component(_input))?;
 accum.push(next_elem)
 };
 accum
 };
-PResult::Ok(jpeg_dhp_data { sample_precision, num_lines, num_samples_per_line, num_image_components, image_components })
+PResult::Ok(jpeg_sof_data { sample_precision, num_lines, num_samples_per_line, num_image_components, image_components })
 }
 
 /// d#338
-fn Decoder_jpeg_dhp_image_component(_input: &mut Parser<'_>) -> Result<jpeg_dhp_image_component, ParseError> {
+fn Decoder_jpeg_sof_image_component(_input: &mut Parser<'_>) -> Result<jpeg_sof_image_component, ParseError> {
 let id = _input.read_byte()?;
 let sampling_factor = {
 let _packed_bits = _input.read_byte()?;
@@ -32989,7 +32989,7 @@ inner
 return Err(ParseError::FalsifiedWhere(5117297982688264891u64));
 }
 };
-PResult::Ok(jpeg_dhp_image_component { id, sampling_factor, quantization_table_id })
+PResult::Ok(jpeg_sof_image_component { id, sampling_factor, quantization_table_id })
 }
 
 /// d#339
@@ -33011,7 +33011,7 @@ b
 return Err(ParseError::ExcludedBranch(2858990937242709991u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -33070,7 +33070,7 @@ b
 return Err(ParseError::ExcludedBranch(6766897041260485978u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -33105,7 +33105,7 @@ b
 return Err(ParseError::ExcludedBranch(4005260763079064488u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -33140,7 +33140,7 @@ b
 return Err(ParseError::ExcludedBranch(15241527188218394569u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -33175,7 +33175,7 @@ b
 return Err(ParseError::ExcludedBranch(663652071640520941u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -33210,7 +33210,7 @@ b
 return Err(ParseError::ExcludedBranch(4248622096514297129u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -33227,7 +33227,7 @@ PResult::Ok(jpeg_app1 { marker, length, data })
 }
 
 /// d#345
-fn Decoder_jpeg_jpeg(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
+fn Decoder_jpeg_app2(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -33245,7 +33245,7 @@ b
 return Err(ParseError::ExcludedBranch(49400955721755355u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -33278,11 +33278,11 @@ PResult::Ok(accum)
 _input.end_slice()?;
 ret
 };
-PResult::Ok(jpeg_jpeg { marker, length, data })
+PResult::Ok(jpeg_app2 { marker, length, data })
 }
 
 /// d#346
-fn Decoder346(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
+fn Decoder346(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -33300,7 +33300,7 @@ b
 return Err(ParseError::ExcludedBranch(11885930557202460461u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -33333,11 +33333,11 @@ PResult::Ok(accum)
 _input.end_slice()?;
 ret
 };
-PResult::Ok(jpeg_jpeg { marker, length, data })
+PResult::Ok(jpeg_app2 { marker, length, data })
 }
 
 /// d#347
-fn Decoder347(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
+fn Decoder347(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -33355,7 +33355,7 @@ b
 return Err(ParseError::ExcludedBranch(15065685669539080124u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -33388,11 +33388,11 @@ PResult::Ok(accum)
 _input.end_slice()?;
 ret
 };
-PResult::Ok(jpeg_jpeg { marker, length, data })
+PResult::Ok(jpeg_app2 { marker, length, data })
 }
 
 /// d#348
-fn Decoder348(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
+fn Decoder348(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -33410,7 +33410,7 @@ b
 return Err(ParseError::ExcludedBranch(12845528861092334564u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -33443,11 +33443,11 @@ PResult::Ok(accum)
 _input.end_slice()?;
 ret
 };
-PResult::Ok(jpeg_jpeg { marker, length, data })
+PResult::Ok(jpeg_app2 { marker, length, data })
 }
 
 /// d#349
-fn Decoder349(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
+fn Decoder349(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -33465,7 +33465,7 @@ b
 return Err(ParseError::ExcludedBranch(13677998342346693652u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -33498,11 +33498,11 @@ PResult::Ok(accum)
 _input.end_slice()?;
 ret
 };
-PResult::Ok(jpeg_jpeg { marker, length, data })
+PResult::Ok(jpeg_app2 { marker, length, data })
 }
 
 /// d#350
-fn Decoder350(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
+fn Decoder350(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -33520,7 +33520,7 @@ b
 return Err(ParseError::ExcludedBranch(2668737607901180946u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -33553,11 +33553,11 @@ PResult::Ok(accum)
 _input.end_slice()?;
 ret
 };
-PResult::Ok(jpeg_jpeg { marker, length, data })
+PResult::Ok(jpeg_app2 { marker, length, data })
 }
 
 /// d#351
-fn Decoder351(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
+fn Decoder351(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -33575,7 +33575,7 @@ b
 return Err(ParseError::ExcludedBranch(4528919599938425798u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -33608,11 +33608,11 @@ PResult::Ok(accum)
 _input.end_slice()?;
 ret
 };
-PResult::Ok(jpeg_jpeg { marker, length, data })
+PResult::Ok(jpeg_app2 { marker, length, data })
 }
 
 /// d#352
-fn Decoder352(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
+fn Decoder352(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -33630,7 +33630,7 @@ b
 return Err(ParseError::ExcludedBranch(6221053009072016381u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -33663,11 +33663,11 @@ PResult::Ok(accum)
 _input.end_slice()?;
 ret
 };
-PResult::Ok(jpeg_jpeg { marker, length, data })
+PResult::Ok(jpeg_app2 { marker, length, data })
 }
 
 /// d#353
-fn Decoder353(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
+fn Decoder353(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -33685,7 +33685,7 @@ b
 return Err(ParseError::ExcludedBranch(13877876706306354357u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -33718,11 +33718,11 @@ PResult::Ok(accum)
 _input.end_slice()?;
 ret
 };
-PResult::Ok(jpeg_jpeg { marker, length, data })
+PResult::Ok(jpeg_app2 { marker, length, data })
 }
 
 /// d#354
-fn Decoder354(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
+fn Decoder354(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -33740,7 +33740,7 @@ b
 return Err(ParseError::ExcludedBranch(14962551735998681614u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -33773,11 +33773,11 @@ PResult::Ok(accum)
 _input.end_slice()?;
 ret
 };
-PResult::Ok(jpeg_jpeg { marker, length, data })
+PResult::Ok(jpeg_app2 { marker, length, data })
 }
 
 /// d#355
-fn Decoder355(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
+fn Decoder355(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -33795,7 +33795,7 @@ b
 return Err(ParseError::ExcludedBranch(18069850277258932991u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -33828,11 +33828,11 @@ PResult::Ok(accum)
 _input.end_slice()?;
 ret
 };
-PResult::Ok(jpeg_jpeg { marker, length, data })
+PResult::Ok(jpeg_app2 { marker, length, data })
 }
 
 /// d#356
-fn Decoder356(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
+fn Decoder356(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -33850,7 +33850,7 @@ b
 return Err(ParseError::ExcludedBranch(17753230141940491005u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -33883,11 +33883,11 @@ PResult::Ok(accum)
 _input.end_slice()?;
 ret
 };
-PResult::Ok(jpeg_jpeg { marker, length, data })
+PResult::Ok(jpeg_app2 { marker, length, data })
 }
 
 /// d#357
-fn Decoder357(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
+fn Decoder357(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -33905,7 +33905,7 @@ b
 return Err(ParseError::ExcludedBranch(6596410053543851077u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -33938,11 +33938,11 @@ PResult::Ok(accum)
 _input.end_slice()?;
 ret
 };
-PResult::Ok(jpeg_jpeg { marker, length, data })
+PResult::Ok(jpeg_app2 { marker, length, data })
 }
 
 /// d#358
-fn Decoder358(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
+fn Decoder358(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -33960,7 +33960,7 @@ b
 return Err(ParseError::ExcludedBranch(1886358831178290550u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -33993,11 +33993,11 @@ PResult::Ok(accum)
 _input.end_slice()?;
 ret
 };
-PResult::Ok(jpeg_jpeg { marker, length, data })
+PResult::Ok(jpeg_app2 { marker, length, data })
 }
 
 /// d#359
-fn Decoder359(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
+fn Decoder359(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -34015,7 +34015,7 @@ b
 return Err(ParseError::ExcludedBranch(3168197157646945762u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -34048,7 +34048,7 @@ PResult::Ok(accum)
 _input.end_slice()?;
 ret
 };
-PResult::Ok(jpeg_jpeg { marker, length, data })
+PResult::Ok(jpeg_app2 { marker, length, data })
 }
 
 /// d#360
@@ -34332,7 +34332,7 @@ for _ in 0..thumbnail_height {
 let next_elem = {
 let mut accum = Vec::new();
 for _ in 0..thumbnail_width {
-let next_elem = (Decoder_png_plte(_input))?;
+let next_elem = (Decoder_gif_color_table_entry(_input))?;
 accum.push(next_elem)
 };
 accum
@@ -34345,11 +34345,11 @@ PResult::Ok(jpeg_app0_jfif { version_major, version_minor, density_units, densit
 }
 
 /// d#367
-fn Decoder_png_plte(_input: &mut Parser<'_>) -> Result<png_plte, ParseError> {
+fn Decoder_gif_color_table_entry(_input: &mut Parser<'_>) -> Result<gif_color_table_entry, ParseError> {
 let r = _input.read_byte()?;
 let g = _input.read_byte()?;
 let b = _input.read_byte()?;
-PResult::Ok(png_plte { r, g, b })
+PResult::Ok(gif_color_table_entry { r, g, b })
 }
 
 /// d#368
@@ -35540,11 +35540,11 @@ PResult::Ok(gif_image_descriptor { separator, image_left_position, image_top_pos
 }
 
 /// d#402
-fn Decoder402(_input: &mut Parser<'_>) -> Result<png_plte, ParseError> {
+fn Decoder402(_input: &mut Parser<'_>) -> Result<gif_color_table_entry, ParseError> {
 let r = _input.read_byte()?;
 let g = _input.read_byte()?;
 let b = _input.read_byte()?;
-PResult::Ok(png_plte { r, g, b })
+PResult::Ok(gif_color_table_entry { r, g, b })
 }
 
 /// d#403
@@ -35794,7 +35794,7 @@ PResult::Ok(jpeg_dhp_image_component_sampling_factor { horizontal, vertical })
 }
 
 /// d#410
-fn Decoder410(_input: &mut Parser<'_>) -> Result<jpeg_dhp_image_component, ParseError> {
+fn Decoder410(_input: &mut Parser<'_>) -> Result<jpeg_sof_image_component, ParseError> {
 let id = _input.read_byte()?;
 let sampling_factor = (Decoder411(_input))?;
 let quantization_table_id = {
@@ -35805,7 +35805,7 @@ b
 return Err(ParseError::ExcludedBranch(5999000939515818447u64));
 }
 };
-PResult::Ok(jpeg_dhp_image_component { id, sampling_factor, quantization_table_id })
+PResult::Ok(jpeg_sof_image_component { id, sampling_factor, quantization_table_id })
 }
 
 /// d#411
@@ -35817,7 +35817,7 @@ PResult::Ok(jpeg_dhp_image_component_sampling_factor { horizontal, vertical })
 }
 
 /// d#412
-fn Decoder412(_input: &mut Parser<'_>) -> Result<jpeg_dhp_data, ParseError> {
+fn Decoder412(_input: &mut Parser<'_>) -> Result<jpeg_sof_data, ParseError> {
 let sample_precision = _input.read_byte()?;
 let num_lines = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -35858,11 +35858,11 @@ accum.push(next_elem)
 };
 accum
 };
-PResult::Ok(jpeg_dhp_data { sample_precision, num_lines, num_samples_per_line, num_image_components, image_components })
+PResult::Ok(jpeg_sof_data { sample_precision, num_lines, num_samples_per_line, num_image_components, image_components })
 }
 
 /// d#413
-fn Decoder413(_input: &mut Parser<'_>) -> Result<jpeg_dhp_image_component, ParseError> {
+fn Decoder413(_input: &mut Parser<'_>) -> Result<jpeg_sof_image_component, ParseError> {
 let id = _input.read_byte()?;
 let sampling_factor = (Decoder411(_input))?;
 let quantization_table_id = {
@@ -35873,7 +35873,7 @@ b
 return Err(ParseError::ExcludedBranch(16535687493193441589u64));
 }
 };
-PResult::Ok(jpeg_dhp_image_component { id, sampling_factor, quantization_table_id })
+PResult::Ok(jpeg_sof_image_component { id, sampling_factor, quantization_table_id })
 }
 
 /// d#414
@@ -35899,7 +35899,7 @@ PResult::Ok(jpeg_exp_data { expand_horizontal_vertical })
 }
 
 /// d#415
-fn Decoder415(_input: &mut Parser<'_>) -> Result<jpeg_jpeg, ParseError> {
+fn Decoder415(_input: &mut Parser<'_>) -> Result<jpeg_app2, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -35917,7 +35917,7 @@ b
 return Err(ParseError::ExcludedBranch(13319962755558045565u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -35950,11 +35950,11 @@ PResult::Ok(accum)
 _input.end_slice()?;
 ret
 };
-PResult::Ok(jpeg_jpeg { marker, length, data })
+PResult::Ok(jpeg_app2 { marker, length, data })
 }
 
 /// d#416
-fn Decoder416(_input: &mut Parser<'_>) -> Result<jpeg_dhp, ParseError> {
+fn Decoder416(_input: &mut Parser<'_>) -> Result<jpeg_sof0, ParseError> {
 let marker = {
 {
 let b = _input.read_byte()?;
@@ -35972,7 +35972,7 @@ b
 return Err(ParseError::ExcludedBranch(1236150641026759388u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -35985,11 +35985,11 @@ let ret = (Decoder417(_input))?;
 _input.end_slice()?;
 ret
 };
-PResult::Ok(jpeg_dhp { marker, length, data })
+PResult::Ok(jpeg_sof0 { marker, length, data })
 }
 
 /// d#417
-fn Decoder417(_input: &mut Parser<'_>) -> Result<jpeg_dhp_data, ParseError> {
+fn Decoder417(_input: &mut Parser<'_>) -> Result<jpeg_sof_data, ParseError> {
 let sample_precision = _input.read_byte()?;
 let num_lines = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -36030,7 +36030,7 @@ accum.push(next_elem)
 };
 accum
 };
-PResult::Ok(jpeg_dhp_data { sample_precision, num_lines, num_samples_per_line, num_image_components, image_components })
+PResult::Ok(jpeg_sof_data { sample_precision, num_lines, num_samples_per_line, num_image_components, image_components })
 }
 
 /// d#418
@@ -36052,7 +36052,7 @@ b
 return Err(ParseError::ExcludedBranch(11249661549694067250u64));
 }
 };
-jpeg_eoi { marker }
+jpeg_soi { marker }
 };
 let length = {
 let x = (_input.read_byte()?, _input.read_byte()?);
