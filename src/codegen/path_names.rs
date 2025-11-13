@@ -28,6 +28,12 @@ impl NameGen {
         let mut ret = StableMap::<Label, Label, FxHash>::default();
         for (k, v) in self.name_remap.iter() {
             let rename = self.ctxt.find_name_for(v).unwrap();
+
+            // NOTE - comment out the cfg attr to re-enable debugging
+            #[cfg(false)]
+            {
+                eprintln!("[RENAME]: {k} -> {v:?} ~ {rename}");
+            }
             ret.insert(k.clone(), rename);
         }
         ret
@@ -48,23 +54,34 @@ impl NameGen {
             Some((ix, orig_path)) => match self.ctxt.find_name_for(orig_path).ok() {
                 Some(name) => {
                     /*
-                    * `orig_path`: the PathLabel that `decl` was first assigned in `self.rev_map`
-                    * `name`: the first-pass name we are committed to using
-                    * `path_here`: the current stack-path stored in `self.ctxt`
-                    */
+                     * `orig_path`: the PathLabel that `decl` was first assigned in `self.rev_map`
+                     * `name`: the first-pass name we are committed to using
+                     * `path_here`: the current stack-path stored in `self.ctxt`
+                     */
                     let path_here = self.ctxt.register_path();
 
                     self.name_remap          // with our renaming table (early commit -> final name),
                         .entry(name.clone()) // get the Entry for the `name`, the first-pass name that decl is getting
                         .and_modify(|prior: &mut PathLabel| {
+                            let _tmp = prior.clone();
                             // if it is currently associated with a different PathLabel `prior`,
-                            self.ctxt.refine_path(prior, path_here.clone()); // rebind to whichever of `path_here` or `prior` is better
+                            let _changed = self.ctxt.refine_path(prior, path_here.clone()); // rebind to whichever of `path_here` or `prior` is better
+
+                            // NOTE - comment out the cfg attr to re-enable debugging
+                            #[cfg(false)]
+                            {
+                                if _changed {
+                                    eprintln!(
+                                        "[RENAME][OLD] {name} -> {_tmp:?}\n[RENAME][NEW] {name} -> {path_here:?}"
+                                    );
+                                }
+                            }
                         })
                         .or_insert(path_here); // or otherwise insert path_here
                     (name, (*ix, false))
                 }
                 None => unreachable!("no identifier associated with path, but path is in use"),
-            }
+            },
             None => {
                 let ix = self.ctr;
                 self.ctr += 1;
@@ -73,9 +90,17 @@ impl NameGen {
                     let name = self.ctxt.find_name_for(&loc).unwrap();
                     (loc, name)
                 };
+
+                // NOTE - comment out the cfg attr to re-enable debugging
+                #[cfg(false)]
+                {
+                    eprintln!("[RENAME][INIT] {ret} -> {path:?}");
+                }
+
                 self.rev_map.insert(decl.clone(), (ix, path.clone()));
                 // ensure deduplication happens by forcing a no-op rename by default
                 self.name_remap.insert(ret.clone(), path);
+
                 (ret, (ix, true))
             }
         }

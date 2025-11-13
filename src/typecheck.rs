@@ -1782,27 +1782,15 @@ impl TypeChecker {
             }
             (&UType::Var(v), _) => {
                 let constraint = Constraint::Equiv(right.clone());
-                let after = self.unify_var_constraint(v, constraint)?;
+                let _ = self.unify_var_constraint(v, constraint)?;
                 self.occurs(v)?;
                 Ok(Rc::new(UType::Var(v)))
-                // match after {
-                //     Constraint::Equiv(t) => Ok(t.clone()),
-                //     Constraint::Elem(_) | Constraint::Proj(_) => {
-                //         unreachable!("equiv should erase proj and elem")
-                //     }
-                // }
             }
             (_, &UType::Var(v)) => {
                 let constraint = Constraint::Equiv(left.clone());
-                let after = self.unify_var_constraint(v, constraint)?;
+                let _ = self.unify_var_constraint(v, constraint)?;
                 self.occurs(v)?;
                 Ok(Rc::new(UType::Var(v)))
-                 // match after {
-                //     Constraint::Equiv(t) => Ok(t.clone()),
-                //     Constraint::Elem(_) | Constraint::Proj(_) => {
-                //         unreachable!("equiv should erase proj and elem")
-                //     }
-                // }
             }
             // all the remaining cases are mismatched UType constructors
             _ => Err(UnificationError::Unsatisfiable(left, right).into()),
@@ -3462,7 +3450,9 @@ impl TypeChecker {
                         }
                         Expansion::Record(flat)
                     }
-                    ProjShape::SeqOf(v) => Expansion::Seq(WHNFSolution::Var(*v), SeqBorrowHint::Constructed),
+                    ProjShape::SeqOf(v) => {
+                        Expansion::Seq(WHNFSolution::Var(*v), SeqBorrowHint::Constructed)
+                    }
                     ProjShape::OptOf(v) => Expansion::Option(WHNFSolution::Var(*v)),
                 },
             },
@@ -3510,7 +3500,9 @@ impl TypeChecker {
     }
 
     fn is_empty_var(&self, var: WHNFSolution) -> bool {
-        let WHNFSolution::Var(var) = var else { return false };
+        let WHNFSolution::Var(var) = var else {
+            return false;
+        };
         let var = self.get_canonical_uvar(var);
         matches!(&self.constraints[var.0], Constraints::Invariant(con) if matches!(con, Constraint::Equiv(ut) if matches!(**ut, UType::Empty)))
     }

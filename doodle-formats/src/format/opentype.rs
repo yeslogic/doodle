@@ -6,7 +6,8 @@ use doodle::{
 mod util {
     use super::*;
     use doodle::IntoLabel;
-    #[cfg(feature = "alt")] use doodle::alt::FormatExt;
+    #[cfg(feature = "alt")]
+    use doodle::alt::FormatExt;
 
     pub(crate) fn id<T>(x: T) -> T {
         x
@@ -2369,7 +2370,9 @@ mod gpos {
         value_format_flags: FormatRef,
         value_record: FormatRef,
     ) -> FormatRef {
-        let vf_flags_type = module.get_format_type(value_format_flags.get_level()).clone();
+        let vf_flags_type = module
+            .get_format_type(value_format_flags.get_level())
+            .clone();
 
         let pair_value_record = module.define_format_args_views(
             "opentype.layout.pair_pos.pair_value_record",
@@ -2432,9 +2435,19 @@ mod gpos {
             vec![],
             vec![Label::Borrowed("table_view")],
             record_auto([
-                ("table_scope", with_view(ViewExpr::var("table_view"), ViewFormat::ReifyView)),
+                (
+                    "table_scope",
+                    with_view(ViewExpr::var("table_view"), ViewFormat::ReifyView),
+                ),
                 ("coverage_offset", u16be()),
-                ("__coverage", phantom(util::view_offset16(ViewExpr::var("table_view"), var("coverage_offset"), coverage_table.call()))),
+                (
+                    "__coverage",
+                    phantom(util::view_offset16(
+                        ViewExpr::var("table_view"),
+                        var("coverage_offset"),
+                        coverage_table.call(),
+                    )),
+                ),
                 ("value_format1", value_format_flags.call()),
                 ("value_format2", value_format_flags.call()),
                 ("pair_set_count", u16be()),
@@ -2460,22 +2473,37 @@ mod gpos {
             record([
                 (
                     "value_record1",
-                    layout::optional_value_record(value_record, ViewExpr::var("table_view"), var("value_format1")),
+                    layout::optional_value_record(
+                        value_record,
+                        ViewExpr::var("table_view"),
+                        var("value_format1"),
+                    ),
                 ),
                 (
                     "value_record2",
-                    layout::optional_value_record(value_record, ViewExpr::var("table_view"), var("value_format2")),
+                    layout::optional_value_record(
+                        value_record,
+                        ViewExpr::var("table_view"),
+                        var("value_format2"),
+                    ),
                 ),
             ]),
         );
 
         // TODO - refactor into dep-format or standalone function
-        fn class1_record(table_view: ViewExpr, class2_count: Expr, value_format1: Expr, value_format2: Expr, class2_record: FormatRef) -> Format {
+        fn class1_record(
+            table_view: ViewExpr,
+            class2_count: Expr,
+            value_format1: Expr,
+            value_format2: Expr,
+            class2_record: FormatRef,
+        ) -> Format {
             record([(
                 "class2_records",
                 repeat_count(
                     class2_count,
-                    class2_record.call_args_views(vec![value_format1, value_format2], vec![table_view]),
+                    class2_record
+                        .call_args_views(vec![value_format1, value_format2], vec![table_view]),
                 ),
             )])
         }
@@ -2485,10 +2513,16 @@ mod gpos {
             vec![],
             vec![Label::Borrowed("table_view")],
             record([
-                ("table_scope", with_view(ViewExpr::var("table_view"), ViewFormat::ReifyView)),
+                (
+                    "table_scope",
+                    with_view(ViewExpr::var("table_view"), ViewFormat::ReifyView),
+                ),
                 (
                     "coverage",
-                    util::read_phantom_view_offset16(ViewExpr::var("table_view"), coverage_table.call()),
+                    util::read_phantom_view_offset16(
+                        ViewExpr::var("table_view"),
+                        coverage_table.call(),
+                    ),
                 ),
                 ("value_format1", value_format_flags.call()),
                 ("value_format2", value_format_flags.call()),
@@ -2515,37 +2549,39 @@ mod gpos {
                         ),
                     ),
                 ),
-            ])
+            ]),
         );
         module.define_format(
             "opentype.layout.pair_pos",
             let_view(
                 "table_view",
-            record([
-                ("pos_format", u16be()),
-                (
-                    "subtable",
-                    match_variant(
-                        var("pos_format"),
-                        [
-                            (
-                                Pattern::U16(1),
-                                "Format1",
-                                pair_pos_format1.call_args_views(vec![], vec![ViewExpr::var("table_view")]),
-                            ),
-                            (
-                                Pattern::U16(2),
-                                "Format2",
-                                pair_pos_format2.call_args_views(vec![], vec![ViewExpr::var("table_view")]),
-                            ),
-                            // REVIEW - should this be a permanent hard-failure?
-                            (Pattern::Wildcard, "BadFormat", Format::Fail),
-                        ],
+                record([
+                    ("pos_format", u16be()),
+                    (
+                        "subtable",
+                        match_variant(
+                            var("pos_format"),
+                            [
+                                (
+                                    Pattern::U16(1),
+                                    "Format1",
+                                    pair_pos_format1
+                                        .call_args_views(vec![], vec![ViewExpr::var("table_view")]),
+                                ),
+                                (
+                                    Pattern::U16(2),
+                                    "Format2",
+                                    pair_pos_format2
+                                        .call_args_views(vec![], vec![ViewExpr::var("table_view")]),
+                                ),
+                                // REVIEW - should this be a permanent hard-failure?
+                                (Pattern::Wildcard, "BadFormat", Format::Fail),
+                            ],
+                        ),
                     ),
-                ),
-            ]),
+                ]),
+            ),
         )
-    )
     }
 
     /// Lookup type 3 subtable: cursive attachment positioning

@@ -181,8 +181,7 @@ impl CodeGen {
                                         let mut v_args = Vec::new();
                                         self.name_gen.ctxt.push_atom(NameAtom::Positional(0));
                                         for sol_arg in args {
-                                            v_args
-                                                .push(self.lift_whnf_solution(tc, sol_arg, lt));
+                                            v_args.push(self.lift_whnf_solution(tc, sol_arg, lt));
                                             self.name_gen.ctxt.increment_index();
                                         }
                                         self.name_gen.ctxt.escape();
@@ -4313,12 +4312,7 @@ impl<'a> Elaborator<'a> {
             Format::Maybe(cond, inner) => {
                 let index = self.get_and_increment_index();
                 let t_cond = self.elaborate_expr(cond);
-                self.codegen
-                    .name_gen
-                    .ctxt
-                    .push_atom(NameAtom::Derived(Derivation::Yes));
                 let t_inner = self.elaborate_format(inner, dyn_scope);
-                self.codegen.name_gen.ctxt.escape();
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::Maybe(gt, Box::new(t_cond), Box::new(t_inner))
             }
@@ -5223,7 +5217,9 @@ mod tests {
         let fxs = compute(Expr::FlatMapAccum(
             Box::new(ix_dup),
             Box::new(Expr::U32(1)),
-            TypeHint::from(crate::ValueType::from(AugValueType::Base(BaseType::U32))),
+            TypeHint::from(crate::ValueType::from(
+                crate::valuetype::augmented::AugValueType::Base(BaseType::U32),
+            )),
             Box::new(Expr::Var("xs".into())),
         ));
 

@@ -1,5 +1,5 @@
+use super::{EpiFormat, FormatExt, MonoKind};
 use crate::{IntoLabel, StyleHint};
-use super::{FormatExt, EpiFormat, MonoKind};
 
 pub fn record_auto<Name: IntoLabel + AsRef<str>>(
     fields: impl IntoIterator<Item = (Name, FormatExt), IntoIter: DoubleEndedIterator>,
@@ -34,8 +34,8 @@ pub fn record_ext<Name: IntoLabel>(
         .rev()
         .collect::<Vec<(Option<(Name, bool)>, FormatExt)>>();
     let accum = Vec::with_capacity(rev_fields.len());
-    FormatExt::Epi(
-        EpiFormat::Mono(MonoKind::Hint(StyleHint::Record { old_style: false }),
+    FormatExt::Epi(EpiFormat::Mono(
+        MonoKind::Hint(StyleHint::Record { old_style: false }),
         Box::new(FormatExt::__chain_record(accum, &mut rev_fields)),
     ))
 }
