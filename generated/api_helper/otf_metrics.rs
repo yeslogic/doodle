@@ -5608,7 +5608,7 @@ fn is_extra(table_id: &u32) -> bool {
         b"cmap" | b"head" | b"hhea" | b"hmtx" | b"maxp" | b"name" | b"OS/2" | b"post" => false,
         b"cvt " | b"fpgm" | b"loca" | b"glyf" | b"prep" | b"gasp" => false,
         b"GDEF" | b"GPOS" | b"GSUB" | b"BASE" => false,
-        b"fvar" => false,
+        b"fvar" | b"gvar" => false,
         b"kern" | b"STAT" | b"vhea" | b"vmtx" => false,
         // FIXME - update with more cases as we handle more table records
         _ => true,
