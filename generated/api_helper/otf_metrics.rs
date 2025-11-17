@@ -110,7 +110,7 @@ impl Promote<OpentypeTag> for Tag {
 }
 
 // REVIEW - no module-level definition so the names are the semi-arbitrary 'first' one the code-generator sees
-pub type OpentypeFixed = opentype_fvar_user_tuple_coordinates;
+pub type OpentypeFixed = opentype_head_table_font_revision;
 pub type Fixed = I16F16;
 
 impl Promote<OpentypeFixed> for Fixed {
@@ -162,7 +162,7 @@ pub type SimpleGlyph = opentype_glyf_simple;
 
 pub type OpentypeCmap = opentype_cmap_table;
 pub type OpentypeHead = opentype_head_table;
-pub type OpentypeHhea = opentype_vhea_table;
+pub type OpentypeHhea = opentype_hhea_table;
 
 pub type OpentypeHmtx = opentype_hmtx_table;
 pub type OpentypeHmtxLongMetric = opentype_hmtx_table_long_metrics;
@@ -191,7 +191,7 @@ pub type OpentypeFvar = opentype_fvar_table;
 pub type OpentypeGvar<'input> = opentype_gvar_table<'input>;
 
 // STUB[epic=horizontal-for-vertical] - change to distinguished type names once we have them
-pub type OpentypeVhea = opentype_vhea_table;
+pub type OpentypeVhea = opentype_hhea_table;
 pub type OpentypeVmtx = opentype_hmtx_table;
 pub type OpentypeVmtxLongMetric = opentype_hmtx_table_long_metrics;
 // !SECTION
@@ -255,57 +255,281 @@ trait TryPromote<Original>: Sized {
     fn try_promote(orig: &Original) -> Result<Self, Self::Error>;
 }
 
-pub mod manifest {
-    use super::{View, PResult, Parser};
+/// Submodule for boilerplate around objects holding views and offsets, and the nominal objects those offsets point to.
+pub mod container {
+    use super::{PResult, Parser, View};
 
+    /// Trait marking a type as holding a `View` that can be used for offset-parsing its direct fields (or their subtrees).
     pub trait ViewFrame<'input> {
+        /// Returns the `View`-object directly held by `Self`.
         fn scope(&self) -> View<'input>;
     }
 
+    /// Trait implemented over marker-type proxies that implement the most natural parse for their
     pub trait CommonObject {
         type Args;
         type Output<'a>: Sized;
 
-        fn parse_view_offset<'input>(view: View<'input>, offset: usize, args: Self::Args) -> PResult<Self::Output<'input>>;
+        fn parse_view_offset<'input>(
+            view: View<'input>,
+            offset: usize,
+            args: Self::Args,
+        ) -> PResult<Self::Output<'input>>;
     }
 
     pub trait Container<Obj, const N: usize>
-    where Obj: CommonObject
+    where
+        Obj: CommonObject,
     {
         fn get_offsets(&self) -> [usize; N];
 
         fn get_args(&self) -> [Obj::Args; N];
     }
 
-    pub type CovTable = std::marker::PhantomData<super::OpentypeCoverageTable>;
+    pub trait DynContainer<Obj>
+    where
+        Obj: CommonObject,
+    {
+        fn count(&self) -> usize;
 
-    impl CommonObject for CovTable {
+        fn iter_offsets(&self) -> impl Iterator<Item = usize>;
+
+        fn iter_args(&self) -> impl Iterator<Item = Obj::Args>;
+    }
+}
+
+pub fn reify<'input, Frame, Obj, const N: usize>(
+    frame: &'input Frame,
+    _proxy: Obj,
+    ix: usize,
+) -> Obj::Output<'input>
+where
+    Frame: container::ViewFrame<'input> + container::Container<Obj, N>,
+    Obj: container::CommonObject<Args: Clone>,
+{
+    let tmp = frame.get_args();
+    let offset = frame.get_offsets()[ix];
+    Obj::parse_view_offset(frame.scope(), offset, tmp[ix].clone()).expect("failed to parse")
+}
+
+pub fn reify_all<'input, Frame, Obj>(
+    frame: &'input Frame,
+    _proxy: Obj,
+) -> impl Iterator<Item = Obj::Output<'input>> + 'input
+where
+    Frame: container::ViewFrame<'input> + container::DynContainer<Obj>,
+    Obj: container::CommonObject<Args: Clone + 'input> + 'static,
+{
+    Iterator::zip(frame.iter_offsets(), frame.iter_args()).map(move |(offset, args)| {
+        Obj::parse_view_offset(frame.scope(), offset, args).expect("failed to parse")
+    })
+}
+
+pub fn reify_dep<'input, Con, Obj, const N: usize>(
+    view: View<'input>,
+    container: &Con,
+    _proxy: Obj,
+    ix: usize,
+) -> PResult<Obj::Output<'input>>
+where
+    Con: container::Container<Obj, N>,
+    Obj: container::CommonObject<Args: Clone>,
+{
+    let tmp = container.get_args();
+    let offset = container.get_offsets()[ix];
+    Obj::parse_view_offset(view, offset, tmp[ix].clone())
+}
+
+pub fn reify_all_dep<'input, Con, Obj>(
+    view: View<'input>,
+    container: &'input Con,
+    _proxy: Obj,
+) -> impl Iterator<Item = Obj::Output<'input>> + 'input
+where
+    Con: container::DynContainer<Obj>,
+    Obj: container::CommonObject<Args: Clone + 'input> + 'static,
+{
+    Iterator::zip(container.iter_offsets(), container.iter_args()).map(move |(offset, args)| {
+        Obj::parse_view_offset(view, offset, args).expect("failed to parse")
+    })
+}
+
+pub mod obj {
+    use super::container::CommonObject;
+    use super::{PResult, Parser, View};
+
+    macro_rules! proxy {
+        ($real:ident => $proxy:ident) => {
+            use super::$real;
+            pub struct $proxy;
+        };
+    }
+
+    proxy!(OpentypeAnchorTable => AncTable);
+
+    impl CommonObject for AncTable {
         type Args = ();
-        type Output<'a> = super::OpentypeCoverageTable;
+        type Output<'a> = Option<OpentypeAnchorTable<'a>>;
 
-        fn parse_view_offset<'input>(view: View<'input>, offset: usize, _args: ()) -> PResult<super::OpentypeCoverageTable> {
+        fn parse_view_offset<'input>(
+            view: View<'input>,
+            offset: usize,
+            _args: (),
+        ) -> PResult<Self::Output<'input>> {
+            if offset == 0 {
+                return Ok(None);
+            }
             let mut p = Parser::from(view.offset(offset)?);
-            super::Decoder_opentype_coverage_table(&mut p)
+            Ok(Some(crate::Decoder_opentype_common_anchor_table(&mut p)?))
         }
     }
 
-    pub fn reify<'input, Frame, Obj, const N: usize>(frame: &'input Frame, proxy: Obj, ix: usize) -> Obj::Output<'input>
-    where
-        Frame: ViewFrame<'input> + Container<Obj, N>,
-        Obj: CommonObject,
-    {
-        Obj::parse_view_offset(frame.scope(), frame.get_offsets()[ix], frame.get_args()[ix]).expect("failed to parse")
+    proxy!(OpentypeCoverageTable => CovTable);
+
+    impl CommonObject for CovTable {
+        type Args = ();
+        type Output<'a> = OpentypeCoverageTable;
+
+        fn parse_view_offset<'input>(
+            view: View<'input>,
+            offset: usize,
+            _args: (),
+        ) -> PResult<Self::Output<'input>> {
+            let mut p = Parser::from(view.offset(offset)?);
+            crate::Decoder_opentype_coverage_table(&mut p)
+        }
+    }
+
+    proxy!(OpentypeMarkArray => MarkArr);
+
+    impl CommonObject for MarkArr {
+        type Args = ();
+        type Output<'a> = Option<OpentypeMarkArray<'a>>;
+
+        fn parse_view_offset<'input>(
+            view: View<'input>,
+            offset: usize,
+            _args: (),
+        ) -> PResult<Self::Output<'input>> {
+            if offset == 0 {
+                return Ok(None);
+            }
+            let mut p = Parser::from(view.offset(offset)?);
+            Ok(Some(crate::Decoder_opentype_layout_mark_array(&mut p)?))
+        }
+    }
+
+    proxy!(OpentypeBaseArray => BaseArr);
+
+    impl CommonObject for BaseArr {
+        type Args = u16;
+        type Output<'a> = Option<OpentypeBaseArray<'a>>;
+
+        fn parse_view_offset<'input>(
+            view: View<'input>,
+            offset: usize,
+            mark_class_count: u16,
+        ) -> PResult<Self::Output<'input>> {
+            if offset == 0 {
+                return Ok(None);
+            }
+            let mut p = Parser::from(view.offset(offset)?);
+            Ok(Some(crate::Decoder_opentype_layout_base_array(
+                &mut p,
+                mark_class_count,
+            )?))
+        }
+    }
+
+    proxy!(OpentypeLigatureArray => LigArr);
+
+    impl CommonObject for LigArr {
+        type Args = u16;
+        type Output<'a> = Option<OpentypeLigatureArray<'a>>;
+
+        fn parse_view_offset<'input>(
+            view: View<'input>,
+            offset: usize,
+            mark_class_count: u16,
+        ) -> PResult<Self::Output<'input>> {
+            if offset == 0 {
+                return Ok(None);
+            }
+            let mut p = Parser::from(view.offset(offset)?);
+            Ok(Some(crate::Decoder_opentype_layout_ligature_array(
+                &mut p,
+                mark_class_count,
+            )?))
+        }
+    }
+
+    proxy!(OpentypeClassDef => ClsDef);
+
+    impl CommonObject for ClsDef {
+        type Args = ();
+        type Output<'a> = Option<OpentypeClassDef>;
+
+        fn parse_view_offset<'input>(
+            view: View<'input>,
+            offset: usize,
+            _args: (),
+        ) -> PResult<Self::Output<'input>> {
+            if offset == 0 {
+                Ok(None)
+            } else {
+                let mut p = Parser::from(view.offset(offset)?);
+                Ok(Some(crate::Decoder_opentype_class_def(&mut p)?))
+            }
+        }
+    }
+
+    proxy!(OpentypeDeviceOrVariationIndexTable => DevTable);
+
+    impl CommonObject for DevTable {
+        type Args = ();
+        type Output<'a> = Option<OpentypeDeviceOrVariationIndexTable>;
+
+        fn parse_view_offset<'input>(
+            view: View<'input>,
+            offset: usize,
+            _args: (),
+        ) -> PResult<Self::Output<'input>> {
+            if offset == 0 {
+                Ok(None)
+            } else {
+                let mut p = Parser::from(view.offset(offset)?);
+                Ok(Some(
+                    crate::Decoder_opentype_common_device_or_variation_index_table(&mut p)?,
+                ))
+            }
+        }
     }
 }
 
-
+/// Union over errors that arise during parsing, and generic-type errors arising in manual post-conversion
+///
+/// For soundness, `E` should not be [`doodle::parser::error::ParseError`]
 #[derive(Debug)]
 pub enum ValueParseError<E: std::error::Error> {
     Value(E),
-    Parse(doodle::parser::error::ParseError)
+    Parse(doodle::parser::error::ParseError),
 }
 
 impl<E: std::error::Error> ValueParseError<E> {
+    /// Infallibly lifts a conversion error to a [`ValueParseError`]
+    ///
+    /// # Notes
+    ///
+    /// Should not be used to construct [`ValueParseError<ParseError>`]
+    pub fn value(e: E) -> Self {
+        ValueParseError::Value(e)
+    }
+
+    /// Fallibly coerces `self` into an error of the generic error-type `E`.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if `self` represents a parser error.
     pub fn coerce_value(self) -> E {
         match self {
             ValueParseError::Value(e) => e,
@@ -347,18 +571,24 @@ impl<E: std::error::Error> From<doodle::parser::error::ParseError> for ValuePars
     }
 }
 
-/// Variant of `Promote` for objects holding offsets but not the View they associate with.
+/// Variant of `Promote` for objects holding offsets but which do not encapsulate the `View` they are relative to.
 trait PromoteView<Original>: Sized {
+    /// Convert a source-object to `Self` using the provided `View``.
     fn promote_view(orig: &Original, view: View<'_>) -> PResult<Self>;
 }
 
-/// Variant of `TryPromote` for objects holding offsets but not the View they associate with.
+/// Variant of `TryPromote` for objects holding offsets but which do not encapsulate the `View` they are relative to.
 trait TryPromoteView<Original>: Sized {
     /// The error-type returned when a given conversion cannot succeed.
-    type Error<'a>: std::error::Error where Original: 'a;
+    type Error<'a>: std::error::Error
+    where
+        Original: 'a;
 
-    /// Fallibly post-process from a source-object to `Self` using the appropriate View.
-    fn try_promote_view<'a>(orig: &'a Original, view: View<'a>) -> Result<Self, ValueParseError<Self::Error<'a>>>;
+    /// Fallibly post-process from a source-object to `Self` using the provided `View``.
+    fn try_promote_view<'a>(
+        orig: &'a Original,
+        view: View<'a>,
+    ) -> Result<Self, ValueParseError<Self::Error<'a>>>;
 }
 
 /// Custom trait that facilitates conversion from partially-borrowed non-atomic types
@@ -442,6 +672,18 @@ where
     T: TryPromote<O>,
 {
     orig.as_ref().map(T::try_promote).transpose()
+}
+
+fn try_promote_view_opt<'input, O, T>(
+    orig: &'input Option<O>,
+    view: View<'input>,
+) -> Result<Option<T>, ValueParseError<T::Error<'input>>>
+where
+    T: TryPromoteView<O>,
+{
+    orig.as_ref()
+        .map(|orig| T::try_promote_view(orig, view))
+        .transpose()
 }
 
 /// Type-agnostic macro for dereferencing machine-generated Offset16 abstractions
@@ -568,6 +810,17 @@ pub(crate) mod refl {
     ///
     /// E.g. `ReflType<A, B> = A` (which the compiler might not like, perhaps?)
     pub(crate) type ReflType<A, B> = <A as Refl<B>>::Solution;
+
+    pub(crate) type ReflType3<A, B, C> = ReflType<A, ReflType<B, C>>;
+
+    pub(crate) type ReflType4<A, B, C, D> = ReflType<ReflType<A, B>, ReflType<C, D>>;
+
+    pub(crate) type ReflType5<A, B, C, D, E> = ReflType<ReflType<A, B>, ReflType3<C, D, E>>;
+
+    pub(crate) type ReflType6<A, B, C, D, E, F> = ReflType<ReflType3<A, B, C>, ReflType3<D, E, F>>;
+
+    pub(crate) type ReflType7<A, B, C, D, E, F, G> =
+        ReflType<ReflType3<A, B, C>, ReflType4<D, E, F, G>>;
 }
 use refl::ReflType;
 
@@ -842,7 +1095,7 @@ impl Promote<OpentypeGlyphVariationData> for GlyphVariationData {
 }
 
 pub type OpentypePackedPoints = opentype_var_packed_point_numbers_run_points;
-pub type OpentypePackedPointRun = opentype_var_packed_point_numbers_run;
+pub type OpentypePackedPointRun = opentype_var_packed_point_numbers_runs;
 pub type OpentypePackedPointRuns = (u16, Vec<OpentypePackedPointRun>);
 
 impl Promote<OpentypePackedPointRuns> for PackedPointNumbers {
@@ -1733,7 +1986,7 @@ struct GaspRange {
 // NOTE - Version 1 contains all the fields that version 0 contains, so it can be used as the unifying type
 type GaspBehaviorFlags = opentype_gasp_table_gasp_ranges_range_gasp_behavior_Version1;
 
-type CoverageRangeRecord = RangeRecord<u16>;
+pub(crate) type CoverageRangeRecord = RangeRecord<u16>;
 
 impl Promote<OpentypeCoverageRangeRecord> for CoverageRangeRecord {
     fn promote(orig: &OpentypeCoverageRangeRecord) -> Self {
@@ -1746,7 +1999,7 @@ impl Promote<OpentypeCoverageRangeRecord> for CoverageRangeRecord {
 }
 
 #[derive(Clone, Debug)]
-enum CoverageTable {
+pub(crate) enum CoverageTable {
     Format1 {
         glyph_array: Vec<u16>,
     }, // Individual glyph indices
@@ -1756,7 +2009,7 @@ enum CoverageTable {
 }
 
 impl CoverageTable {
-    fn iter(&self) -> Box<dyn Iterator<Item = u16> + '_> {
+    pub(crate) fn iter(&self) -> Box<dyn Iterator<Item = u16> + '_> {
         match self {
             CoverageTable::Format1 { glyph_array } => Box::new(glyph_array.iter().copied()),
             CoverageTable::Format2 { range_records } => Box::new(
@@ -2076,7 +2329,7 @@ impl FromNull for ClassDef {
 }
 
 #[derive(Clone, Copy, Debug)]
-struct RangeRecord<T> {
+pub(crate) struct RangeRecord<T> {
     start_glyph_id: u16,
     end_glyph_id: u16,
     value: T,
@@ -2680,9 +2933,14 @@ impl<'input> TryPromote<OpentypePosExtension<'input>> for LookupSubtable {
 }
 
 impl<'input> TryPromote<OpentypeGposLookupSubtable<'input>> for LookupSubtable {
-    type Error = ReflType<
-        ReflType<TPErr<OpentypeSinglePos, SinglePos>, TPErr<OpentypePairPos<'input>, PairPos>>,
-        ReflType<TPErr<OpentypeCursivePos<'input>, CursivePos>, UnknownValueError<u16>>,
+    type Error = refl::ReflType7<
+        TPErr<OpentypeSinglePos<'input>, SinglePos>,
+        TPErr<OpentypePairPos<'input>, PairPos>,
+        TPErr<OpentypeCursivePos<'input>, CursivePos>,
+        TPErr<OpentypeMarkBasePos<'input>, MarkBasePos>,
+        TPErr<OpentypeMarkLigPos<'input>, MarkLigPos>,
+        TPErr<OpentypeMarkMarkPos<'input>, MarkMarkPos>,
+        UnknownValueError<u16>,
     >;
 
     fn try_promote(orig: &OpentypeGposLookupSubtable) -> Result<Self, Self::Error> {
@@ -2736,13 +2994,27 @@ enum LookupSubtable {
 
 pub type OpentypeMarkMarkPos<'input> = opentype_layout_mark_mark_pos<'input>;
 
-impl<'input> OpentypeMarkMarkPos<'input> {
-    fn __coverage_raw(&self, offset: u16) -> PResult<OpentypeCoverageTable> {
-        let view = self.table_scope.offset(offset as usize)?;
-        let mut p = Parser::from(view);
-        Decoder_opentype_coverage_table(&mut p)
+impl<'input> container::ViewFrame<'input> for OpentypeMarkMarkPos<'input> {
+    fn scope(&self) -> View<'input> {
+        self.table_scope
+    }
+}
+
+impl<'input> container::Container<obj::CovTable, 2> for OpentypeMarkMarkPos<'input> {
+    fn get_offsets(&self) -> [usize; 2] {
+        [
+            self.mark1_coverage_offset as usize,
+            self.mark2_coverage_offset as usize,
+        ]
     }
 
+    fn get_args(&self) -> [(); 2] {
+        [(); 2]
+    }
+}
+
+impl<'input> OpentypeMarkMarkPos<'input> {
+    // TODO - replace with container+obj implemention
     fn __mark1_array_raw(&self) -> PResult<Option<OpentypeMarkArray<'input>>> {
         if self.mark1_array_offset == 0 {
             return Ok(None);
@@ -2752,32 +3024,30 @@ impl<'input> OpentypeMarkMarkPos<'input> {
         Ok(Some(Decoder_opentype_layout_mark_array(&mut p)?))
     }
 
+    // TODO - replace with container+obj implemention
     fn __mark2_array_raw(&self) -> PResult<Option<OpentypeMark2Array<'input>>> {
         if self.mark2_array_offset == 0 {
             return Ok(None);
         }
-         let view = self.table_scope.offset(self.mark2_array_offset as usize)?;
+        let view = self.table_scope.offset(self.mark2_array_offset as usize)?;
         let mut p = Parser::from(view);
-        Ok(Some(Decoder_opentype_layout_mark2_array(&mut p, self.mark_class_count)?))
+        Ok(Some(Decoder_opentype_layout_mark2_array(
+            &mut p,
+            self.mark_class_count,
+        )?))
     }
 
-    pub fn mark1_coverage(&self) -> CoverageTable {
-        let raw = self.__coverage_raw(self.mark1_coverage_offset).expect("unable to parse Mark1 coverage");
-        CoverageTable::promote(&raw)
-    }
-
-    pub fn mark2_coverage(&self) -> CoverageTable {
-        let raw = self.__coverage_raw(self.mark2_coverage_offset).expect("unable to parse Mark2 coverage");
-        CoverageTable::promote(&raw)
-    }
-
-    pub fn mark1_array(&self) -> Result<MarkArray, UnknownValueError<u16>> {
-        let raw = self.__mark1_array_raw().expect("unable to parse Mark1 array");
+    pub(crate) fn mark1_array(&self) -> Result<MarkArray, UnknownValueError<u16>> {
+        let raw = self
+            .__mark1_array_raw()
+            .expect("unable to parse Mark1 array");
         try_promote_from_null(&raw)
     }
 
-    pub fn mark2_array(&self) -> Result<Mark2Array, UnknownValueError<u16>> {
-        let raw = self.__mark2_array_raw().expect("unable to parse Mark2 array");
+    pub(crate) fn mark2_array(&self) -> Result<Mark2Array, UnknownValueError<u16>> {
+        let raw = self
+            .__mark2_array_raw()
+            .expect("unable to parse Mark2 array");
         try_promote_from_null(&raw)
     }
 }
@@ -2793,8 +3063,8 @@ impl<'input> TryPromote<OpentypeMarkMarkPos<'input>> for MarkMarkPos {
 
     fn try_promote(orig: &OpentypeMarkMarkPos) -> Result<Self, Self::Error> {
         Ok(MarkMarkPos {
-            mark1_coverage: orig.mark1_coverage(),
-            mark2_coverage: orig.mark2_coverage(),
+            mark1_coverage: CoverageTable::promote(&reify(orig, obj::CovTable, 0)),
+            mark2_coverage: CoverageTable::promote(&reify(orig, obj::CovTable, 1)),
             mark1_array: orig.mark1_array()?,
             mark2_array: orig.mark2_array()?,
         })
@@ -2812,10 +3082,11 @@ struct MarkMarkPos {
 pub type OpentypeMark2Array<'input> = opentype_layout_mark2_array<'input>;
 
 impl<'input> OpentypeMark2Array<'input> {
-    pub fn mark2_records(&self) -> Result<Vec<Mark2Record>, UnknownValueError<u16>>  {
+    pub(crate) fn mark2_records(&self) -> Result<Vec<Mark2Record>, UnknownValueError<u16>> {
         let mut records = Vec::with_capacity(self.mark2_records.len());
         for mark2_record in self.mark2_records.iter() {
-            let record = Mark2Record::try_promote_view(mark2_record, self.array_scope).map_err(ValueParseError::coerce_value)?;
+            let record = Mark2Record::try_promote_view(mark2_record, self.array_scope)
+                .map_err(ValueParseError::coerce_value)?;
             records.push(record);
         }
         Ok(records)
@@ -2834,26 +3105,31 @@ impl<'input> TryPromote<OpentypeMark2Array<'input>> for Mark2Array {
 
 #[derive(Debug, Clone, Default)]
 #[repr(transparent)]
-struct Mark2Array {
+pub(crate) struct Mark2Array {
     mark2_records: Vec<Mark2Record>,
 }
 
-pub type OpentypeMark2Record =
-    opentype_layout_mark2_array_mark2_record;
+pub type OpentypeMark2Record = opentype_layout_mark2_array_mark2_record;
 
 impl TryPromoteView<OpentypeMark2Record> for Mark2Record {
-    type Error<'input> = ReflType<TPErr<OpentypeAnchorTable<'input>, AnchorTable>, UnknownValueError<u16>>;
+    type Error<'input> =
+        ReflType<TPErr<OpentypeAnchorTable<'input>, AnchorTable>, UnknownValueError<u16>>;
 
-    fn try_promote_view<'input>(orig: &OpentypeMark2Record, view: View<'input>) -> Result<Self, Self::Error<'input>> {
+    fn try_promote_view<'input>(
+        orig: &OpentypeMark2Record,
+        view: View<'input>,
+    ) -> Result<Self, ValueParseError<Self::Error<'input>>> {
         let mut mark2_anchors = Vec::with_capacity(orig.mark2_anchor_offsets.len());
-        for offset in orig.mark2_anchor_offsets {
+        for &offset in orig.mark2_anchor_offsets.iter() {
             if offset == 0 {
                 mark2_anchors.push(None);
             } else {
-                let view = view.offset(offset as usize).expect("bad offset to anchor-table");
+                let view = view.offset(offset as usize)?;
                 let mut p = Parser::from(view);
-                let ret = Decoder_opentype_common_anchor_table(&mut p).expect("bad AnchorTable parse");
-                mark2_anchors.push(Some(AnchorTable::try_promote(&ret)?))
+                let ret = Decoder_opentype_common_anchor_table(&mut p)?;
+                mark2_anchors.push(Some(
+                    AnchorTable::try_promote(&ret).map_err(ValueParseError::value)?,
+                ))
             }
         }
         Ok(Mark2Record { mark2_anchors })
@@ -2862,11 +3138,50 @@ impl TryPromoteView<OpentypeMark2Record> for Mark2Record {
 
 #[derive(Debug, Clone, Default)]
 #[repr(transparent)]
-struct Mark2Record {
+pub(crate) struct Mark2Record {
     mark2_anchors: Vec<Option<AnchorTable>>,
 }
 
 pub type OpentypeMarkLigPos<'input> = opentype_layout_mark_lig_pos<'input>;
+
+impl<'input> container::ViewFrame<'input> for OpentypeMarkLigPos<'input> {
+    fn scope(&self) -> View<'input> {
+        self.table_scope
+    }
+}
+
+impl<'input> container::Container<obj::CovTable, 2> for OpentypeMarkLigPos<'input> {
+    fn get_offsets(&self) -> [usize; 2] {
+        [
+            self.mark_coverage_offset as usize,
+            self.ligature_coverage_offset as usize,
+        ]
+    }
+
+    fn get_args(&self) -> [(); 2] {
+        [(), ()]
+    }
+}
+
+impl<'input> container::Container<obj::MarkArr, 1> for OpentypeMarkLigPos<'input> {
+    fn get_offsets(&self) -> [usize; 1] {
+        [self.mark_array_offset as usize]
+    }
+
+    fn get_args(&self) -> [(); 1] {
+        [()]
+    }
+}
+
+impl<'input> container::Container<obj::LigArr, 1> for OpentypeMarkLigPos<'input> {
+    fn get_offsets(&self) -> [usize; 1] {
+        [self.ligature_array_offset as usize]
+    }
+
+    fn get_args(&self) -> [u16; 1] {
+        [self.mark_class_count]
+    }
+}
 
 impl<'input> TryPromote<OpentypeMarkLigPos<'input>> for MarkLigPos {
     type Error = ReflType<TPErr<OpentypeMarkArray<'input>, MarkArray>, UnknownValueError<u16>>;
@@ -3056,6 +3371,45 @@ struct ComponentRecord {
 
 pub type OpentypeMarkBasePos<'input> = opentype_layout_mark_base_pos<'input>;
 
+impl<'input> container::ViewFrame<'input> for OpentypeMarkBasePos<'input> {
+    fn scope(&self) -> View<'input> {
+        self.table_scope
+    }
+}
+
+impl<'input> container::Container<obj::CovTable, 2> for OpentypeMarkBasePos<'input> {
+    fn get_offsets(&self) -> [usize; 2] {
+        [
+            self.mark_coverage_offset as usize,
+            self.base_coverage_offset as usize,
+        ]
+    }
+
+    fn get_args(&self) -> [(); 2] {
+        [(), ()]
+    }
+}
+
+impl<'input> container::Container<obj::MarkArr, 1> for OpentypeMarkBasePos<'input> {
+    fn get_offsets(&self) -> [usize; 1] {
+        [self.mark_array_offset as usize]
+    }
+
+    fn get_args(&self) -> [(); 1] {
+        [()]
+    }
+}
+
+impl<'input> container::Container<obj::BaseArr, 1> for OpentypeMarkBasePos<'input> {
+    fn get_offsets(&self) -> [usize; 1] {
+        [self.base_array_offset as usize]
+    }
+
+    fn get_args(&self) -> [u16; 1] {
+        [self.mark_class_count]
+    }
+}
+
 impl<'input> TryPromote<OpentypeMarkBasePos<'input>> for MarkBasePos {
     type Error = ReflType<
         ReflType<
@@ -3067,10 +3421,10 @@ impl<'input> TryPromote<OpentypeMarkBasePos<'input>> for MarkBasePos {
 
     fn try_promote(orig: &OpentypeMarkBasePos) -> Result<Self, Self::Error> {
         Ok(MarkBasePos {
-            mark_coverage: CoverageTable::promote(&orig.mark_coverage_offset.link),
-            base_coverage: CoverageTable::promote(&orig.base_coverage_offset.link),
-            mark_array: try_promote_from_null(&orig.mark_array_offset.link)?,
-            base_array: try_promote_from_null(&orig.base_array_offset.link)?,
+            mark_coverage: CoverageTable::promote(&reify(orig, obj::CovTable, 0)),
+            base_coverage: CoverageTable::promote(&reify(orig, obj::CovTable, 1)),
+            mark_array: try_promote_from_null(&reify(orig, obj::MarkArr, 0))?,
+            base_array: try_promote_from_null(&reify(orig, obj::BaseArr, 0))?,
         })
     }
 }
@@ -3107,7 +3461,7 @@ impl<'input> TryPromote<OpentypeMarkArray<'input>> for MarkArray {
 
 #[derive(Debug, Clone, Default)]
 #[repr(transparent)]
-struct MarkArray {
+pub(crate) struct MarkArray {
     mark_records: Vec<MarkRecord>,
 }
 
@@ -3133,12 +3487,18 @@ struct MarkRecord {
 pub type OpentypeBaseArray<'input> = opentype_layout_base_array<'input>;
 
 impl<'input> TryPromote<OpentypeBaseArray<'input>> for BaseArray {
-    type Error = ReflType<TPErr<OpentypeBaseRecord<'input>, BaseRecord>, UnknownValueError<u16>>;
+    type Error = ReflType<TPVErr<'input, OpentypeBaseRecord, BaseRecord>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeBaseArray) -> Result<Self, Self::Error> {
-        Ok(BaseArray {
-            base_records: try_promote_vec(&orig.base_records)?,
-        })
+        let mut base_records = Vec::with_capacity(orig.base_records.len());
+
+        for base_record in orig.base_records.iter() {
+            base_records.push(
+                BaseRecord::try_promote_view(base_record, orig.array_scope)
+                    .map_err(ValueParseError::coerce_value)?,
+            );
+        }
+        Ok(BaseArray { base_records })
     }
 }
 
@@ -3148,16 +3508,36 @@ struct BaseArray {
     base_records: Vec<BaseRecord>,
 }
 
-pub type OpentypeBaseRecord<'input> =
-    opentype_layout_base_array_base_record<'input>;
+pub type OpentypeBaseRecord = opentype_layout_base_array_base_record;
 
-impl<'input> TryPromote<OpentypeBaseRecord<'input>> for BaseRecord {
-    type Error = ReflType<TPErr<OpentypeAnchorTable<'input>, AnchorTable>, UnknownValueError<u16>>;
+impl container::DynContainer<obj::AncTable> for OpentypeBaseRecord {
+    fn count(&self) -> usize {
+        self.base_anchor_offsets.len()
+    }
 
-    fn try_promote(orig: &OpentypeBaseRecord) -> Result<Self, Self::Error> {
-        let mut base_anchors = Vec::with_capacity(orig.base_anchor_offsets.len());
-        for offset in orig.base_anchor_offsets.iter() {
-            base_anchors.push(try_promote_opt(&offset.link)?);
+    fn iter_offsets(&self) -> impl Iterator<Item = usize> {
+        self.base_anchor_offsets
+            .iter()
+            .map(|offs: &u16| *offs as usize)
+    }
+
+    fn iter_args(&self) -> impl Iterator<Item = ()> {
+        std::iter::repeat_n((), self.count())
+    }
+}
+
+impl TryPromoteView<OpentypeBaseRecord> for BaseRecord {
+    type Error<'input> =
+        ReflType<TPErr<OpentypeAnchorTable<'input>, AnchorTable>, UnknownValueError<u16>>;
+
+    fn try_promote_view<'input>(
+        orig: &OpentypeBaseRecord,
+        view: View<'input>,
+    ) -> Result<Self, ValueParseError<Self::Error<'input>>> {
+        use container::DynContainer;
+        let mut base_anchors = Vec::with_capacity(DynContainer::<obj::AncTable>::count(orig));
+        for raw in reify_all_dep(view, orig, obj::AncTable) {
+            base_anchors.push(try_promote_opt(&raw).map_err(ValueParseError::value)?);
         }
 
         Ok(BaseRecord { base_anchors })
@@ -3181,7 +3561,7 @@ pub type OpentypeReverseChainSingleSubst = opentype_layout_reverse_chain_single_
 impl Promote<OpentypeReverseChainSingleSubst> for ReverseChainSingleSubst {
     fn promote(orig: &OpentypeReverseChainSingleSubst) -> Self {
         fn promote_coverages(
-            offsets: &[opentype_layout_reverse_chain_single_subst_coverage],
+            offsets: &[opentype_layout_chained_sequence_context_format1_coverage],
         ) -> Vec<CoverageTable> {
             offsets
                 .iter()
@@ -3577,7 +3957,7 @@ struct ChainedSequenceContextFormat2 {
 
 impl Promote<OpentypeChainedSequenceContextFormat3> for ChainedSequenceContextFormat3 {
     fn promote(orig: &OpentypeChainedSequenceContextFormat3) -> Self {
-        type OpentypeCoverageTableLink = opentype_layout_reverse_chain_single_subst_coverage;
+        type OpentypeCoverageTableLink = opentype_layout_chained_sequence_context_format1_coverage;
         let follow = |covs: &Vec<OpentypeCoverageTableLink>| -> Vec<CoverageTable> {
             covs.iter()
                 .map(|offset| CoverageTable::promote(&offset.link))
@@ -3749,14 +4129,37 @@ struct Rule {
 
 pub type OpentypeCursivePos<'input> = opentype_layout_cursive_pos<'input>;
 
+impl<'input> container::ViewFrame<'input> for OpentypeCursivePos<'input> {
+    fn scope(&self) -> View<'input> {
+        self.table_scope
+    }
+}
+
+impl<'input> container::Container<obj::CovTable, 1> for OpentypeCursivePos<'input> {
+    fn get_args(&self) -> [(); 1] {
+        [()]
+    }
+
+    fn get_offsets(&self) -> [usize; 1] {
+        [self.coverage_offset as usize]
+    }
+}
+
 impl<'input> TryPromote<OpentypeCursivePos<'input>> for CursivePos {
     type Error =
-        ReflType<TPErr<OpentypeEntryExitRecord<'input>, EntryExitRecord>, UnknownValueError<u16>>;
+        ReflType<TPVErr<'input, OpentypeEntryExitRecord, EntryExitRecord>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeCursivePos) -> Result<Self, Self::Error> {
+        let mut entry_exit_records = Vec::with_capacity(orig.entry_exit_records.len());
+        for entry_exit in orig.entry_exit_records.iter() {
+            entry_exit_records.push(
+                EntryExitRecord::try_promote_view(entry_exit, orig.table_scope)
+                    .map_err(ValueParseError::coerce_value)?,
+            );
+        }
         Ok(CursivePos {
-            coverage: CoverageTable::promote(&orig.coverage.link),
-            entry_exit_records: try_promote_vec(&orig.entry_exit_records)?,
+            coverage: CoverageTable::promote(&reify(orig, obj::CovTable, 0)),
+            entry_exit_records,
         })
     }
 }
@@ -3767,15 +4170,34 @@ struct CursivePos {
     entry_exit_records: Vec<EntryExitRecord>,
 }
 
-pub type OpentypeEntryExitRecord<'input> = opentype_layout_cursive_pos_entry_exit_records<'input>;
+pub type OpentypeEntryExitRecord = opentype_layout_entry_exit_record;
 
-impl<'input> TryPromote<OpentypeEntryExitRecord<'input>> for EntryExitRecord {
-    type Error = ReflType<TPErr<OpentypeAnchorTable<'input>, AnchorTable>, UnknownValueError<u16>>;
+impl container::Container<obj::AncTable, 2> for OpentypeEntryExitRecord {
+    fn get_args(&self) -> [(); 2] {
+        [(); 2]
+    }
 
-    fn try_promote(orig: &OpentypeEntryExitRecord) -> Result<Self, Self::Error> {
+    fn get_offsets(&self) -> [usize; 2] {
+        [
+            self.entry_anchor_offset as usize,
+            self.exit_anchor_offset as usize,
+        ]
+    }
+}
+
+impl TryPromoteView<OpentypeEntryExitRecord> for EntryExitRecord {
+    type Error<'input> =
+        ReflType<TPErr<OpentypeAnchorTable<'input>, AnchorTable>, UnknownValueError<u16>>;
+
+    fn try_promote_view<'a>(
+        orig: &'a OpentypeEntryExitRecord,
+        view: View<'a>,
+    ) -> Result<Self, ValueParseError<Self::Error<'a>>> {
         Ok(EntryExitRecord {
-            entry_anchor: try_promote_opt(&orig.entry_anchor.link)?,
-            exit_anchor: try_promote_opt(&orig.exit_anchor.link)?,
+            entry_anchor: try_promote_opt(&reify_dep(view, orig, obj::AncTable, 0)?)
+                .map_err(ValueParseError::value)?,
+            exit_anchor: try_promote_opt(&reify_dep(view, orig, obj::AncTable, 1)?)
+                .map_err(ValueParseError::value)?,
         })
     }
 }
@@ -3951,7 +4373,7 @@ enum PairPos {
 }
 
 impl<'input> TryPromote<OpentypePairPosFormat1<'input>> for PairPosFormat1 {
-    type Error = ReflType<TPErr<OpentypePairSet, PairSet>, UnknownValueError<u16>>;
+    type Error = ReflType<TPErr<OpentypePairSet<'input>, PairSet>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypePairPosFormat1) -> Result<Self, Self::Error> {
         let coverage = {
@@ -3959,9 +4381,13 @@ impl<'input> TryPromote<OpentypePairPosFormat1<'input>> for PairPosFormat1 {
                 // REVIEW - this should probably be an error value rather than a panic
                 panic!("missing coverage table");
             } else {
-                let view = orig.table_scope.offset(orig.coverage_offset as usize).expect("bad offset to coverage table");
+                let view = orig
+                    .table_scope
+                    .offset(orig.coverage_offset as usize)
+                    .expect("bad offset to coverage table");
                 let mut p = Parser::from(view);
-                let ret = Decoder_opentype_coverage_table(&mut p).expect("bad coverage-table parse");
+                let ret =
+                    Decoder_opentype_coverage_table(&mut p).expect("bad coverage-table parse");
                 CoverageTable::promote(&ret)
             }
         };
@@ -3970,7 +4396,10 @@ impl<'input> TryPromote<OpentypePairPosFormat1<'input>> for PairPosFormat1 {
             if pair_set.offset == 0 {
                 pair_sets.push(PairSet::from_null());
             } else {
-                let view = orig.table_scope.offset(pair_set.offset as usize).expect("bad offset to PairSet");
+                let view = orig
+                    .table_scope
+                    .offset(pair_set.offset as usize)
+                    .expect("bad offset to PairSet");
                 let mut p = Parser::from(view);
                 let ret = Decoder_opentype_layout_pair_pos_pair_set(
                     &mut p,
@@ -3978,7 +4407,7 @@ impl<'input> TryPromote<OpentypePairPosFormat1<'input>> for PairPosFormat1 {
                     orig.value_format2,
                 )
                 .expect("bad PairSet parse");
-                pair_sets.push(Some(PairSet::try_promote(ret)?))
+                pair_sets.push(PairSet::try_promote(&ret)?)
             }
         }
 
@@ -3989,23 +4418,58 @@ impl<'input> TryPromote<OpentypePairPosFormat1<'input>> for PairPosFormat1 {
     }
 }
 
+impl<'input> container::ViewFrame<'input> for OpentypePairPosFormat2<'input> {
+    fn scope(&self) -> View<'input> {
+        self.table_scope
+    }
+}
+
+impl<'input> container::Container<obj::CovTable, 1> for OpentypePairPosFormat2<'input> {
+    fn get_offsets(&self) -> [usize; 1] {
+        // REVIEW[epic=hardcoded-assumption] - based on current implementation, `self.coverage` is an ad-hoc record type with a single u16 `offset` field
+        [self.coverage.offset as usize]
+    }
+
+    fn get_args(&self) -> [(); 1] {
+        [()]
+    }
+}
+
+impl<'input> container::Container<obj::ClsDef, 2> for OpentypePairPosFormat2<'input> {
+    fn get_offsets(&self) -> [usize; 2] {
+        // REVIEW[epic=hardcoded-assumption] - based on current implementation, `self.class_def{1,2}` is an ad-hoc record type with a single u16 `offset` field
+        [
+            self.class_def1.offset as usize,
+            self.class_def2.offset as usize,
+        ]
+    }
+
+    fn get_args(&self) -> [(); 2] {
+        [(); 2]
+    }
+}
+
 impl<'input> TryPromote<OpentypePairPosFormat2<'input>> for PairPosFormat2 {
-    type Error = ReflType<TPErr<OpentypeClass2Record, Class2Record>, UnknownValueError<u16>>;
+    type Error =
+        ReflType<TPVErr<'input, OpentypeClass2Record, Class2Record>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypePairPosFormat2) -> Result<Self, Self::Error> {
         let mut store = Vec::with_capacity(orig.class1_count as usize * orig.class2_count as usize);
 
         for class1_record in orig.class1_records.iter() {
             for class2_record in class1_record.class2_records.iter() {
-                store.push(Class2Record::try_promote(class2_record)?);
+                store.push(
+                    Class2Record::try_promote_view(class2_record, orig.table_scope)
+                        .map_err(ValueParseError::coerce_value)?,
+                );
             }
         }
         let class1_records = Wec::from_vec(store, orig.class2_count as usize);
 
         Ok(PairPosFormat2 {
-            coverage: CoverageTable::promote(&orig.coverage.link),
-            class_def1: ClassDef::promote(&orig.class_def1.link),
-            class_def2: ClassDef::promote(&orig.class_def2.link),
+            coverage: CoverageTable::promote(&reify(orig, obj::CovTable, 0)),
+            class_def1: ClassDef::promote(&reify(orig, obj::ClsDef, 0)),
+            class_def2: ClassDef::promote(&reify(orig, obj::ClsDef, 1)),
             class1_records,
         })
     }
@@ -4027,16 +4491,19 @@ struct PairPosFormat2 {
 
 type Class1RecordList = Wec<Class2Record>;
 
-pub type OpentypeClass2Record =
-    opentype_layout_pair_pos_subtable_Format2_class1_records_class2_records;
+pub type OpentypeClass2Record = opentype_layout_pair_pos_class2_record;
 
-impl TryPromote<OpentypeClass2Record> for Class2Record {
-    type Error = ReflType<TPErr<OpentypeValueRecord, ValueRecord>, UnknownValueError<u16>>;
+impl TryPromoteView<OpentypeClass2Record> for Class2Record {
+    type Error<'input> =
+        ReflType<TPVErr<'input, OpentypeValueRecord, ValueRecord>, UnknownValueError<u16>>;
 
-    fn try_promote(orig: &OpentypeClass2Record) -> Result<Self, Self::Error> {
+    fn try_promote_view<'input>(
+        orig: &OpentypeClass2Record,
+        view: View<'input>,
+    ) -> Result<Self, ValueParseError<Self::Error<'input>>> {
         Ok(Class2Record {
-            value_record1: try_promote_opt(&orig.value_record1)?,
-            value_record2: try_promote_opt(&orig.value_record2)?,
+            value_record1: try_promote_view_opt(&orig.value_record1, view)?,
+            value_record2: try_promote_view_opt(&orig.value_record2, view)?,
         })
     }
 }
@@ -4047,32 +4514,45 @@ struct Class2Record {
     value_record2: Option<ValueRecord>,
 }
 
-pub type OpentypePairSet = opentype_layout_pair_pos_subtable_Format1_pair_sets_link;
-pub type OpentypePairValueRecord =
-    opentype_layout_pair_pos_subtable_Format1_pair_sets_link_pair_value_records;
+pub type OpentypePairSet<'input> = opentype_layout_pair_pos_pair_set<'input>;
+pub type OpentypePairValueRecord = opentype_layout_pair_pos_pair_value_record;
 
 type PairSet = Vec<PairValueRecord>;
 
-impl TryPromote<OpentypePairSet> for PairSet {
-    type Error = ReflType<TPErr<OpentypePairValueRecord, PairValueRecord>, UnknownValueError<u16>>;
+impl<'input> container::ViewFrame<'input> for OpentypePairSet<'input> {
+    fn scope(&self) -> View<'input> {
+        self.set_scope
+    }
+}
+
+impl<'input> TryPromote<OpentypePairSet<'input>> for PairSet {
+    type Error =
+        ReflType<TPVErr<'input, OpentypePairValueRecord, PairValueRecord>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypePairSet) -> Result<Self, Self::Error> {
         let mut accum = Vec::with_capacity(orig.pair_value_records.len());
         for record in orig.pair_value_records.iter() {
-            accum.push(PairValueRecord::try_promote(record)?);
+            accum.push(
+                PairValueRecord::try_promote_view(record, orig.set_scope)
+                    .map_err(ValueParseError::coerce_value)?,
+            );
         }
         Ok(accum)
     }
 }
 
-impl TryPromote<OpentypePairValueRecord> for PairValueRecord {
-    type Error = ReflType<TPErr<OpentypeValueRecord, ValueRecord>, UnknownValueError<u16>>;
+impl TryPromoteView<OpentypePairValueRecord> for PairValueRecord {
+    type Error<'input> =
+        ReflType<TPVErr<'input, OpentypeValueRecord, ValueRecord>, UnknownValueError<u16>>;
 
-    fn try_promote(orig: &OpentypePairValueRecord) -> Result<Self, Self::Error> {
+    fn try_promote_view<'input>(
+        orig: &OpentypePairValueRecord,
+        view: View<'input>,
+    ) -> Result<Self, ValueParseError<Self::Error<'input>>> {
         Ok(PairValueRecord {
             second_glyph: orig.second_glyph,
-            value_record1: try_promote_opt(&orig.value_record1)?,
-            value_record2: try_promote_opt(&orig.value_record2)?,
+            value_record1: try_promote_view_opt(&orig.value_record1, view)?,
+            value_record2: try_promote_view_opt(&orig.value_record2, view)?,
         })
     }
 }
@@ -4084,24 +4564,25 @@ struct PairValueRecord {
     value_record2: Option<ValueRecord>,
 }
 
-pub type OpentypeSinglePos = opentype_layout_single_pos;
-pub type OpentypeSinglePosSubtable = opentype_layout_single_pos_subtable;
-pub type OpentypeSinglePosFormat1 = opentype_layout_single_pos_subtable_Format1;
-pub type OpentypeSinglePosFormat2 = opentype_layout_single_pos_subtable_Format2;
+pub type OpentypeSinglePos<'input> = opentype_layout_single_pos<'input>;
+pub type OpentypeSinglePosSubtable<'input> = opentype_layout_single_pos_subtable<'input>;
+pub type OpentypeSinglePosFormat1<'input> = opentype_layout_single_pos_format1<'input>;
+pub type OpentypeSinglePosFormat2<'input> = opentype_layout_single_pos_format2<'input>;
 
-impl TryPromote<OpentypeSinglePos> for SinglePos {
-    type Error = ReflType<TPErr<OpentypeSinglePosSubtable, SinglePos>, UnknownValueError<u16>>;
+impl<'input> TryPromote<OpentypeSinglePos<'input>> for SinglePos {
+    type Error =
+        ReflType<TPErr<OpentypeSinglePosSubtable<'input>, SinglePos>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeSinglePos) -> Result<Self, Self::Error> {
         Self::try_promote(&orig.subtable)
     }
 }
 
-impl TryPromote<OpentypeSinglePosSubtable> for SinglePos {
+impl<'input> TryPromote<OpentypeSinglePosSubtable<'input>> for SinglePos {
     type Error = ReflType<
         ReflType<
-            TPErr<OpentypeSinglePosFormat1, SinglePosFormat1>,
-            TPErr<OpentypeSinglePosFormat2, SinglePosFormat2>,
+            TPErr<OpentypeSinglePosFormat1<'input>, SinglePosFormat1>,
+            TPErr<OpentypeSinglePosFormat2<'input>, SinglePosFormat2>,
         >,
         UnknownValueError<u16>,
     >;
@@ -4124,27 +4605,65 @@ enum SinglePos {
     Format2(SinglePosFormat2),
 }
 
-impl TryPromote<OpentypeSinglePosFormat1> for SinglePosFormat1 {
-    type Error = ReflType<TPErr<OpentypeValueRecord, ValueRecord>, UnknownValueError<u16>>;
+impl<'input> container::ViewFrame<'input> for OpentypeSinglePosFormat1<'input> {
+    fn scope(&self) -> View<'input> {
+        self.table_scope
+    }
+}
+
+impl<'input> container::ViewFrame<'input> for OpentypeSinglePosFormat2<'input> {
+    fn scope(&self) -> View<'input> {
+        self.table_scope
+    }
+}
+
+impl<'input> container::Container<obj::CovTable, 1> for OpentypeSinglePosFormat1<'input> {
+    fn get_offsets(&self) -> [usize; 1] {
+        // REVIEW[epic=hardcoded-assumption] - `read_phantom_view_offset16` call in format def yields a `{ offset: u16 }` record
+        [self.coverage.offset as usize]
+    }
+
+    fn get_args(&self) -> [(); 1] {
+        [()]
+    }
+}
+
+impl<'input> TryPromote<OpentypeSinglePosFormat1<'input>> for SinglePosFormat1 {
+    type Error = ReflType<TPVErr<'input, OpentypeValueRecord, ValueRecord>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeSinglePosFormat1) -> Result<Self, Self::Error> {
         Ok(SinglePosFormat1 {
-            coverage: CoverageTable::promote(&orig.coverage_offset.link),
-            value_record: ValueRecord::try_promote(&orig.value_record)?,
+            coverage: CoverageTable::promote(&reify(orig, obj::CovTable, 0)),
+            value_record: ValueRecord::try_promote_view(&orig.value_record, orig.table_scope)
+                .map_err(ValueParseError::coerce_value)?,
         })
     }
 }
 
-impl TryPromote<OpentypeSinglePosFormat2> for SinglePosFormat2 {
-    type Error = ReflType<TPErr<OpentypeValueRecord, ValueRecord>, UnknownValueError<u16>>;
+impl<'input> container::Container<obj::CovTable, 1> for OpentypeSinglePosFormat2<'input> {
+    fn get_offsets(&self) -> [usize; 1] {
+        // REVIEW[epic=hardcoded-assumption] - `read_phantom_view_offset16` call in format def yields a `{ offset: u16 }` record
+        [self.coverage.offset as usize]
+    }
+
+    fn get_args(&self) -> [(); 1] {
+        [()]
+    }
+}
+
+impl<'input> TryPromote<OpentypeSinglePosFormat2<'input>> for SinglePosFormat2 {
+    type Error = ReflType<TPVErr<'input, OpentypeValueRecord, ValueRecord>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeSinglePosFormat2) -> Result<Self, Self::Error> {
         let mut value_records = Vec::with_capacity(orig.value_records.len());
         for value_record in orig.value_records.iter() {
-            value_records.push(ValueRecord::try_promote(value_record)?);
+            value_records.push(
+                ValueRecord::try_promote_view(value_record, orig.table_scope)
+                    .map_err(ValueParseError::coerce_value)?,
+            );
         }
         Ok(SinglePosFormat2 {
-            coverage: CoverageTable::promote(&orig.coverage_offset.link),
+            coverage: CoverageTable::promote(&reify(orig, obj::CovTable, 0)),
             value_records,
         })
     }
@@ -4164,15 +4683,26 @@ struct SinglePosFormat2 {
 
 pub type OpentypeValueRecord = opentype_common_value_record;
 
-impl TryPromote<OpentypeValueRecord> for ValueRecord {
-    type Error = ReflType<
+impl TryPromoteView<OpentypeValueRecord> for ValueRecord {
+    type Error<'input> = ReflType<
         TPErr<OpentypeDeviceOrVariationIndexTable, DeviceOrVariationIndexTable>,
         UnknownValueError<u16>,
     >;
 
-    fn try_promote(orig: &OpentypeValueRecord) -> Result<Self, Self::Error> {
-        let follow = |device: &Option<opentype_common_value_record_x_advance_device>| match device {
-            Some(dev) => try_promote_opt(&dev.link),
+    fn try_promote_view<'input>(
+        orig: &OpentypeValueRecord,
+        view: View<'input>,
+    ) -> Result<Self, ValueParseError<Self::Error<'input>>> {
+        // NOTE - we do not distinguish between omitted device-fields and included-but-zeroed device-fields
+        let follow = |device: &Option<opentype_layout_single_pos_format1_coverage>| match device {
+            Some(dev) => try_promote_opt(
+                &<obj::DevTable as container::CommonObject>::parse_view_offset(
+                    view,
+                    dev.offset as usize,
+                    (),
+                )?,
+            )
+            .map_err(ValueParseError::value),
             None => Ok(None),
         };
         Ok(ValueRecord {
@@ -4200,7 +4730,7 @@ struct ValueRecord {
     y_advance_device: Option<DeviceOrVariationIndexTable>,
 }
 
-type LookupFlag = opentype_gsub_table_lookup_list_link_lookups_link_lookup_flag;
+type LookupFlag = opentype_gpos_table_lookup_list_link_lookups_link_lookup_flag;
 
 pub type OpentypeGposLookupTable<'input> =
     opentype_gpos_table_lookup_list_link_lookups_link<'input>;

@@ -70,6 +70,7 @@ impl GenType {
         }
     }
 
+    #[expect(dead_code)]
     pub(crate) fn lt_param(&self) -> Option<&RustLt> {
         match self {
             GenType::Inline(rust_type) => rust_type.lt_param(),

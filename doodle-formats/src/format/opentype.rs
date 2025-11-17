@@ -2287,6 +2287,10 @@ mod gpos {
             vec![Label::Borrowed("table_view")],
             record([
                 (
+                    "table_scope",
+                    with_view(ViewExpr::var("table_view"), ViewFormat::ReifyView),
+                ),
+                (
                     "coverage",
                     read_phantom_view_offset16(ViewExpr::var("table_view"), coverage_table.call()),
                 ),
@@ -2305,6 +2309,10 @@ mod gpos {
             vec![],
             vec![Label::Borrowed("table_view")],
             record([
+                (
+                    "table_scope",
+                    with_view(ViewExpr::var("table_view"), ViewFormat::ReifyView),
+                ),
                 (
                     "coverage",
                     read_phantom_view_offset16(ViewExpr::var("table_view"), coverage_table.call()),

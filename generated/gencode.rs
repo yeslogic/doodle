@@ -3288,43 +3288,45 @@ format: u16,
 subst: opentype_common_sequence_context_subst
 }
 
-/// expected size: 42
+/// expected size: 72
 /// trait-ready: unique decoder function (d#120)
 #[derive(Debug, Copy, Clone)]
-pub struct opentype_layout_single_pos_format1 {
+pub struct opentype_layout_single_pos_format1<'input> {
+table_scope: View<'input>,
 coverage: opentype_layout_single_pos_format1_coverage,
 value_format: opentype_common_value_format_flags,
 value_record: opentype_common_value_record
 }
 
-/// expected size: 40
+/// expected size: 64
 /// trait-ready: unique decoder function (d#121)
 #[derive(Debug, Clone)]
-pub struct opentype_layout_single_pos_format2 {
+pub struct opentype_layout_single_pos_format2<'input> {
+table_scope: View<'input>,
 coverage: opentype_layout_single_pos_format1_coverage,
 value_format: opentype_common_value_format_flags,
 value_count: u16,
 value_records: Vec<opentype_common_value_record>
 }
 
-/// expected size: 48
+/// expected size: 80
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
-pub enum opentype_layout_single_pos_subtable { Format1(opentype_layout_single_pos_format1), Format2(opentype_layout_single_pos_format2) }
+pub enum opentype_layout_single_pos_subtable<'input> { Format1(opentype_layout_single_pos_format1<'input>), Format2(opentype_layout_single_pos_format2<'input>) }
 
-/// expected size: 56
+/// expected size: 88
 /// trait-ready: unique decoder function (d#91)
 #[derive(Debug, Clone)]
-pub struct opentype_layout_single_pos {
+pub struct opentype_layout_single_pos<'input> {
 pos_format: u16,
-subtable: opentype_layout_single_pos_subtable
+subtable: opentype_layout_single_pos_subtable<'input>
 }
 
 /// expected size: 280
 /// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (NonLocal, Layout { size: 168, align: 8 (1 << 3) })
 /// trait-ready: unique decoder function (d#90)
 #[derive(Debug, Clone)]
-pub enum opentype_layout_ground_pos<'input> { ChainedSequenceContext(opentype_common_chained_sequence_context), CursivePos(opentype_layout_cursive_pos<'input>), MarkBasePos(opentype_layout_mark_base_pos<'input>), MarkLigPos(opentype_layout_mark_lig_pos<'input>), MarkMarkPos(opentype_layout_mark_mark_pos<'input>), PairPos(opentype_layout_pair_pos<'input>), SequenceContext(opentype_common_sequence_context), SinglePos(opentype_layout_single_pos) }
+pub enum opentype_layout_ground_pos<'input> { ChainedSequenceContext(opentype_common_chained_sequence_context), CursivePos(opentype_layout_cursive_pos<'input>), MarkBasePos(opentype_layout_mark_base_pos<'input>), MarkLigPos(opentype_layout_mark_lig_pos<'input>), MarkMarkPos(opentype_layout_mark_mark_pos<'input>), PairPos(opentype_layout_pair_pos<'input>), SequenceContext(opentype_common_sequence_context), SinglePos(opentype_layout_single_pos<'input>) }
 
 /// expected size: 288
 /// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [Noop, InOption(NonLocal)] }, Layout { size: 24, align: 8 (1 << 3) })
@@ -13631,7 +13633,7 @@ return Err(ParseError::FailToken(14751251992141172493u64));
 }
 
 /// d#91
-fn Decoder_opentype_layout_single_pos(_input: &mut Parser<'_>) -> Result<opentype_layout_single_pos, ParseError> {
+fn Decoder_opentype_layout_single_pos<'input>(_input: &mut Parser<'input>) -> Result<opentype_layout_single_pos<'input>, ParseError> {
 let table_view = _input.view();
 let pos_format = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -14772,7 +14774,8 @@ PResult::Ok(opentype_common_value_record { x_placement, y_placement, x_advance, 
 }
 
 /// d#120
-fn Decoder_opentype_layout_single_pos_format1<'input>(_input: &mut Parser<'input>, table_view: View<'input>) -> Result<opentype_layout_single_pos_format1, ParseError> {
+fn Decoder_opentype_layout_single_pos_format1<'input>(_input: &mut Parser<'input>, table_view: View<'input>) -> Result<opentype_layout_single_pos_format1<'input>, ParseError> {
+let table_scope = table_view;
 let coverage = {
 let offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -14782,11 +14785,12 @@ opentype_layout_single_pos_format1_coverage { offset }
 };
 let value_format = (Decoder_opentype_common_value_format_flags(_input))?;
 let value_record = (Decoder123(_input, value_format, table_view))?;
-PResult::Ok(opentype_layout_single_pos_format1 { coverage, value_format, value_record })
+PResult::Ok(opentype_layout_single_pos_format1 { table_scope, coverage, value_format, value_record })
 }
 
 /// d#121
-fn Decoder_opentype_layout_single_pos_format2<'input>(_input: &mut Parser<'input>, table_view: View<'input>) -> Result<opentype_layout_single_pos_format2, ParseError> {
+fn Decoder_opentype_layout_single_pos_format2<'input>(_input: &mut Parser<'input>, table_view: View<'input>) -> Result<opentype_layout_single_pos_format2<'input>, ParseError> {
+let table_scope = table_view;
 let coverage = {
 let offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -14807,7 +14811,7 @@ accum.push(next_elem)
 };
 accum
 };
-PResult::Ok(opentype_layout_single_pos_format2 { coverage, value_format, value_count, value_records })
+PResult::Ok(opentype_layout_single_pos_format2 { table_scope, coverage, value_format, value_count, value_records })
 }
 
 /// d#122
