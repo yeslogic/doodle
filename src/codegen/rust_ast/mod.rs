@@ -649,7 +649,6 @@ pub(crate) struct RustTypeDecl {
 }
 
 impl RustTypeDecl {
-    #[expect(dead_code)]
     pub(crate) fn lt_param(&self) -> Option<&RustLt> {
         self.lt.as_ref()
     }
