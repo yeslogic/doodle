@@ -47,7 +47,7 @@ pub enum Value {
     Seq(SeqKind<Value>),
     Mapped(Box<Value>, Box<Value>),
     Branch(usize, Box<Value>),
-    PhantomData(TypeHint),
+    PhantomData,
 }
 
 impl From<usize> for Value {
@@ -120,7 +120,7 @@ impl std::fmt::Display for Value {
             }
             Value::Branch(n, value) => write!(f, "({n} :~ {value})"),
             // REVIEW - is this over-verbose?
-            Value::PhantomData(hint) => write!(f, "<PhantomData<{hint:?}>>"),
+            Value::PhantomData => write!(f, "<PhantomData>"),
         }
     }
 }
@@ -970,8 +970,7 @@ pub enum Decoder {
     CaptureBytes(ViewExpr, Box<Expr>),
     ReadArray(ViewExpr, Box<Expr>, BaseKind<Endian>),
     ReifyView(ViewExpr),
-    // REVIEW - should we store the value-type instead?
-    Phantom(TypeHint),
+    Phantom,
 }
 
 #[derive(Clone, Debug)]
@@ -1071,11 +1070,7 @@ impl<'a> Compiler<'a> {
                 };
                 Ok(Decoder::Call(n, args, views))
             }
-            Format::Phantom(inner) => {
-                // REVIEW - this specifies the definition, which may not be the most-compact representation of a Phantom-type (e.g. module-level name)
-                let vt = inner.output_value_type(self.module)?;
-                Ok(Decoder::Phantom(TypeHint::from(vt)))
-            }
+            Format::Phantom(_inner) => Ok(Decoder::Phantom),
             Format::Fail => Ok(Decoder::Fail),
             Format::DecodeBytes(expr, inner) => {
                 let d = self.compile_format(inner, Rc::new(Next::Empty))?;
@@ -1583,8 +1578,7 @@ impl Decoder {
                     .0
                     .parse(program, &Scope::Multi(&new_scope), input)
             }
-            // REVIEW - what details of `_a`, if any, should be represented in Value?
-            Decoder::Phantom(hint) => Ok((Value::PhantomData(hint.clone()), input)),
+            Decoder::Phantom => Ok((Value::PhantomData, input)),
             Decoder::Fail => Err(DecodeError::<Value>::fail(scope, input)),
             Decoder::Pos => {
                 let pos = input.offset as u64;

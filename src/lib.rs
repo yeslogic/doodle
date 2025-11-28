@@ -1445,16 +1445,6 @@ impl Format {
 }
 
 impl Format {
-    /// Returns the appropriate ValueType for `self` in the context of a given `FormatModule`.
-    ///
-    /// Will return an error if the ValueType cannot be determined.
-    pub(crate) fn output_value_type(&self, module: &FormatModule) -> AResult<ValueType> {
-        let scope = TypeScope::new();
-        module.infer_format_type(&scope, self)
-    }
-}
-
-impl Format {
     /// Returns `true` if values associated to this format should be handled as single ASCII characters
     pub fn is_ascii_char_format(&self, module: &FormatModule) -> bool {
         match self {
