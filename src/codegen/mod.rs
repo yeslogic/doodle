@@ -2364,6 +2364,7 @@ struct GenBlock {
 
 impl GenBlock {
     /// Constructs a new, empty `GenBlock``.
+    #[expect(dead_code)]
     pub const fn new() -> Self {
         GenBlock {
             stmts: Vec::new(),

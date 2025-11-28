@@ -260,7 +260,7 @@ impl<'module> TreePrinter<'module> {
             Value::Option(None) => true,
             // REVIEW - do we have a better alternative to passing in `None` on the following line?
             Value::Option(Some(value)) => self.is_atomic_value(value, None),
-            Value::PhantomData(_type_hint) => true,
+            Value::PhantomData => true,
         }
     }
 
@@ -775,13 +775,9 @@ impl<'module> TreePrinter<'module> {
             Value::Branch(_n, value) => self.compile_value(value),
             Value::Option(None) => Fragment::string("none"),
             Value::Option(Some(value)) => self.compile_variant("some", value, None),
-            Value::PhantomData(type_hint) => Fragment::string("Phantom")
-                .cat(
-                    // REVIEW - is this the right verbosity/specificity (viz. Debug on ValueType)?
-                    Fragment::DebugAtom(type_hint.into_inner().clone())
-                        .delimit(Fragment::Char('<'), Fragment::Char('>')),
-                )
-                .delimit(Fragment::Char('<'), Fragment::Char('>')),
+            Value::PhantomData => {
+                Fragment::string("PhantomData<_>").delimit(Fragment::Char('<'), Fragment::Char('>'))
+            }
         }
     }
 
