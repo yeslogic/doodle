@@ -3063,11 +3063,56 @@ subst: opentype_common_chained_sequence_context_subst
 }
 
 /// expected size: 4
+/// trait-orphaned: no decoder functions provided
+#[derive(Debug, Copy, Clone)]
+pub struct opentype_common_anchor_table_table_Format1 {
+x_coordinate: u16,
+y_coordinate: u16
+}
+
+/// expected size: 6
+/// trait-orphaned: no decoder functions provided
+#[derive(Debug, Copy, Clone)]
+pub struct opentype_common_anchor_table_table_Format2 {
+x_coordinate: u16,
+y_coordinate: u16,
+anchor_point: u16
+}
+
+/// expected size: 32
+/// trait-ready: unique decoder function (d#101)
+#[derive(Debug, Copy, Clone)]
+pub struct opentype_common_anchor_table_format3<'input> {
+table_scope: View<'input>,
+x_coordinate: u16,
+y_coordinate: u16,
+x_device_offset: u16,
+_x_device: std::marker::PhantomData<Option<opentype_common_device_or_variation_index_table>>,
+y_device_offset: u16,
+_y_device: std::marker::PhantomData<Option<opentype_common_device_or_variation_index_table>>
+}
+
+/// expected size: 40
+/// trait-orphaned: no decoder functions provided
+#[derive(Debug, Copy, Clone)]
+pub enum opentype_common_anchor_table_table<'input> { Format1(opentype_common_anchor_table_table_Format1), Format2(opentype_common_anchor_table_table_Format2), Format3(opentype_common_anchor_table_format3<'input>) }
+
+/// expected size: 48
+/// trait-ready: unique decoder function (d#100)
+#[derive(Debug, Copy, Clone)]
+pub struct opentype_common_anchor_table<'input> {
+anchor_format: u16,
+table: opentype_common_anchor_table_table<'input>
+}
+
+/// expected size: 4
 /// trait-ready: unique decoder function (d#109)
 #[derive(Debug, Copy, Clone)]
-pub struct opentype_layout_entry_exit_record {
+pub struct opentype_layout_entry_exit_record<'input> {
 entry_anchor_offset: u16,
-exit_anchor_offset: u16
+_entry_anchor: std::marker::PhantomData<Option<opentype_common_anchor_table<'input>>>,
+exit_anchor_offset: u16,
+_exit_anchor: std::marker::PhantomData<Option<opentype_common_anchor_table<'input>>>
 }
 
 /// expected size: 56
@@ -3077,8 +3122,44 @@ pub struct opentype_layout_cursive_pos<'input> {
 pos_format: u16,
 table_scope: View<'input>,
 coverage_offset: u16,
+_coverage: std::marker::PhantomData<Option<opentype_coverage_table>>,
 entry_exit_count: u16,
-entry_exit_records: Vec<opentype_layout_entry_exit_record>
+entry_exit_records: Vec<opentype_layout_entry_exit_record<'input>>
+}
+
+/// expected size: 4
+/// trait-ready: unique decoder function (d#103)
+#[derive(Debug, Copy, Clone)]
+pub struct opentype_layout_mark_record<'input> {
+mark_class: u16,
+mark_anchor_offset: u16,
+_mark_anchor: std::marker::PhantomData<Option<opentype_common_anchor_table<'input>>>
+}
+
+/// expected size: 56
+/// trait-ready: unique decoder function (d#97)
+#[derive(Debug, Clone)]
+pub struct opentype_layout_mark_array<'input> {
+array_scope: View<'input>,
+mark_count: u16,
+mark_records: Vec<opentype_layout_mark_record<'input>>
+}
+
+/// expected size: 24
+/// trait-ready: unique decoder function (d#108)
+#[derive(Debug, Clone)]
+pub struct opentype_layout_base_array_base_record<'input> {
+base_anchor_offsets: Vec<u16>,
+_base_anchors: std::marker::PhantomData<Vec<Option<opentype_common_anchor_table<'input>>>>
+}
+
+/// expected size: 56
+/// trait-ready: unique decoder function (d#107)
+#[derive(Debug, Clone)]
+pub struct opentype_layout_base_array<'input> {
+array_scope: View<'input>,
+base_count: u16,
+base_records: Vec<opentype_layout_base_array_base_record<'input>>
 }
 
 /// expected size: 40
@@ -3088,10 +3169,41 @@ pub struct opentype_layout_mark_base_pos<'input> {
 format: u16,
 table_scope: View<'input>,
 mark_coverage_offset: u16,
+_mark_coverage: std::marker::PhantomData<Option<opentype_coverage_table>>,
 base_coverage_offset: u16,
+_base_coverage: std::marker::PhantomData<Option<opentype_coverage_table>>,
 mark_class_count: u16,
 mark_array_offset: u16,
-base_array_offset: u16
+_mark_array: std::marker::PhantomData<Option<opentype_layout_mark_array<'input>>>,
+base_array_offset: u16,
+_base_array: std::marker::PhantomData<Option<opentype_layout_base_array<'input>>>
+}
+
+/// expected size: 48
+/// trait-ready: unique decoder function (d#106)
+#[derive(Debug, Clone)]
+pub struct opentype_layout_ligature_attach_component_record<'input> {
+record_scope: View<'input>,
+ligature_anchor_offsets: Vec<u16>,
+_ligature_anchors: std::marker::PhantomData<Vec<Option<opentype_common_anchor_table<'input>>>>
+}
+
+/// expected size: 32
+/// trait-ready: unique decoder function (d#105)
+#[derive(Debug, Clone)]
+pub struct opentype_layout_ligature_attach<'input> {
+component_count: u16,
+component_records: Vec<opentype_layout_ligature_attach_component_record<'input>>
+}
+
+/// expected size: 56
+/// trait-ready: unique decoder function (d#104)
+#[derive(Debug, Clone)]
+pub struct opentype_layout_ligature_array<'input> {
+array_scope: View<'input>,
+ligature_count: u16,
+ligature_attach_offsets: Vec<u16>,
+_ligature_attaches: std::marker::PhantomData<Vec<Option<opentype_layout_ligature_attach<'input>>>>
 }
 
 /// expected size: 40
@@ -3101,23 +3213,48 @@ pub struct opentype_layout_mark_lig_pos<'input> {
 table_scope: View<'input>,
 format: u16,
 mark_coverage_offset: u16,
+_mark_coverage: std::marker::PhantomData<Option<opentype_coverage_table>>,
 ligature_coverage_offset: u16,
+_ligature_coverage: std::marker::PhantomData<Option<opentype_coverage_table>>,
 mark_class_count: u16,
 mark_array_offset: u16,
-ligature_array_offset: u16
+_mark_array: std::marker::PhantomData<Option<opentype_layout_mark_array<'input>>>,
+ligature_array_offset: u16,
+_ligature_array: std::marker::PhantomData<Option<opentype_layout_ligature_array<'input>>>
 }
 
-/// expected size: 40
+/// expected size: 24
+/// trait-ready: unique decoder function (d#99)
+#[derive(Debug, Clone)]
+pub struct opentype_layout_mark2_array_mark2_record<'input> {
+mark2_anchor_offsets: Vec<u16>,
+_mark2_anchors: std::marker::PhantomData<Vec<Option<opentype_common_anchor_table<'input>>>>
+}
+
+/// expected size: 56
+/// trait-ready: unique decoder function (d#98)
+#[derive(Debug, Clone)]
+pub struct opentype_layout_mark2_array<'input> {
+array_scope: View<'input>,
+mark2_count: u16,
+mark2_records: Vec<opentype_layout_mark2_array_mark2_record<'input>>
+}
+
+/// expected size: 96
 /// trait-ready: unique decoder function (d#96)
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub struct opentype_layout_mark_mark_pos<'input> {
 format: u16,
 table_scope: View<'input>,
 mark1_coverage_offset: u16,
+_mark1_coverage: std::marker::PhantomData<Option<opentype_coverage_table>>,
 mark2_coverage_offset: u16,
+_mark2_coverage: std::marker::PhantomData<Option<opentype_coverage_table>>,
 mark_class_count: u16,
 mark1_array_offset: u16,
-mark2_array_offset: u16
+_mark1_array: Option<opentype_layout_mark_array<'input>>,
+mark2_array_offset: u16,
+_mark2_array: std::marker::PhantomData<Option<opentype_layout_mark2_array<'input>>>
 }
 
 /// expected size: 8
@@ -3137,20 +3274,8 @@ x_placement: bool
 /// expected size: 2
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
-pub struct opentype_layout_single_pos_format1_coverage {
+pub struct opentype_common_value_record_x_placement_device {
 offset: u16
-}
-
-/// expected size: 72
-/// trait-ready: unique decoder function (d#110)
-#[derive(Debug, Clone)]
-pub struct opentype_layout_pair_pos_format1<'input> {
-table_scope: View<'input>,
-coverage_offset: u16,
-value_format1: opentype_common_value_format_flags,
-value_format2: opentype_common_value_format_flags,
-pair_set_count: u16,
-pair_sets: Vec<opentype_layout_single_pos_format1_coverage>
 }
 
 /// expected size: 32
@@ -3161,10 +3286,65 @@ x_placement: Option<u16>,
 y_placement: Option<u16>,
 x_advance: Option<u16>,
 y_advance: Option<u16>,
-x_placement_device: Option<opentype_layout_single_pos_format1_coverage>,
-y_placement_device: Option<opentype_layout_single_pos_format1_coverage>,
-x_advance_device: Option<opentype_layout_single_pos_format1_coverage>,
-y_advance_device: Option<opentype_layout_single_pos_format1_coverage>
+x_placement_device: Option<opentype_common_value_record_x_placement_device>,
+y_placement_device: Option<opentype_common_value_record_x_placement_device>,
+x_advance_device: Option<opentype_common_value_record_x_placement_device>,
+y_advance_device: Option<opentype_common_value_record_x_placement_device>
+}
+
+/// expected size: 66
+/// trait-ready: unique decoder function (d#117)
+#[derive(Debug, Copy, Clone)]
+pub struct opentype_layout_pair_pos_pair_value_record {
+second_glyph: u16,
+value_record1: Option<opentype_common_value_record>,
+value_record2: Option<opentype_common_value_record>
+}
+
+/// expected size: 56
+/// trait-ready: unique decoder function (d#116)
+#[derive(Debug, Clone)]
+pub struct opentype_layout_pair_pos_pair_set<'input> {
+set_scope: View<'input>,
+pair_value_count: u16,
+pair_value_records: Vec<opentype_layout_pair_pos_pair_value_record>
+}
+
+/// expected size: 2
+/// trait-orphaned: no decoder functions provided
+#[derive(Debug, Copy, Clone)]
+pub struct opentype_layout_pair_pos_format1_pair_sets<'input> {
+offset: u16,
+__data: std::marker::PhantomData<Option<opentype_layout_pair_pos_pair_set<'input>>>
+}
+
+/// expected size: 72
+/// trait-ready: unique decoder function (d#110)
+#[derive(Debug, Clone)]
+pub struct opentype_layout_pair_pos_format1<'input> {
+table_scope: View<'input>,
+coverage_offset: u16,
+_coverage: std::marker::PhantomData<Option<opentype_coverage_table>>,
+value_format1: opentype_common_value_format_flags,
+value_format2: opentype_common_value_format_flags,
+pair_set_count: u16,
+pair_sets: Vec<opentype_layout_pair_pos_format1_pair_sets<'input>>
+}
+
+/// expected size: 2
+/// trait-orphaned: no decoder functions provided
+#[derive(Debug, Copy, Clone)]
+pub struct opentype_layout_single_pos_format1_coverage {
+offset: u16,
+__data: std::marker::PhantomData<Option<opentype_coverage_table>>
+}
+
+/// expected size: 2
+/// trait-orphaned: no decoder functions provided
+#[derive(Debug, Copy, Clone)]
+pub struct opentype_layout_pair_pos_format2_class_def1 {
+offset: u16,
+__data: std::marker::PhantomData<Option<opentype_class_def>>
 }
 
 /// expected size: 64
@@ -3190,8 +3370,8 @@ table_scope: View<'input>,
 coverage: opentype_layout_single_pos_format1_coverage,
 value_format1: opentype_common_value_format_flags,
 value_format2: opentype_common_value_format_flags,
-class_def1: opentype_layout_single_pos_format1_coverage,
-class_def2: opentype_layout_single_pos_format1_coverage,
+class_def1: opentype_layout_pair_pos_format2_class_def1,
+class_def2: opentype_layout_pair_pos_format2_class_def1,
 class1_count: u16,
 class2_count: u16,
 class1_records: Vec<opentype_layout_pair_pos_format2_class1_records>
@@ -4753,139 +4933,6 @@ on_curve_point: bool
 pub struct opentype_common_device_or_variation_index_table_delta_format_lhs {
 __skipped0: u16,
 __skipped1: u16
-}
-
-/// expected size: 66
-/// trait-ready: unique decoder function (d#117)
-#[derive(Debug, Copy, Clone)]
-pub struct opentype_layout_pair_pos_pair_value_record {
-second_glyph: u16,
-value_record1: Option<opentype_common_value_record>,
-value_record2: Option<opentype_common_value_record>
-}
-
-/// expected size: 56
-/// trait-ready: unique decoder function (d#116)
-#[derive(Debug, Clone)]
-pub struct opentype_layout_pair_pos_pair_set<'input> {
-set_scope: View<'input>,
-pair_value_count: u16,
-pair_value_records: Vec<opentype_layout_pair_pos_pair_value_record>
-}
-
-/// expected size: 4
-/// trait-orphaned: no decoder functions provided
-#[derive(Debug, Copy, Clone)]
-pub struct opentype_common_anchor_table_table_Format1 {
-x_coordinate: u16,
-y_coordinate: u16
-}
-
-/// expected size: 6
-/// trait-orphaned: no decoder functions provided
-#[derive(Debug, Copy, Clone)]
-pub struct opentype_common_anchor_table_table_Format2 {
-x_coordinate: u16,
-y_coordinate: u16,
-anchor_point: u16
-}
-
-/// expected size: 32
-/// trait-ready: unique decoder function (d#101)
-#[derive(Debug, Copy, Clone)]
-pub struct opentype_common_anchor_table_format3<'input> {
-table_scope: View<'input>,
-x_coordinate: u16,
-y_coordinate: u16,
-x_device_offset: u16,
-y_device_offset: u16
-}
-
-/// expected size: 40
-/// trait-orphaned: no decoder functions provided
-#[derive(Debug, Copy, Clone)]
-pub enum opentype_common_anchor_table_table<'input> { Format1(opentype_common_anchor_table_table_Format1), Format2(opentype_common_anchor_table_table_Format2), Format3(opentype_common_anchor_table_format3<'input>) }
-
-/// expected size: 48
-/// trait-ready: unique decoder function (d#100)
-#[derive(Debug, Copy, Clone)]
-pub struct opentype_common_anchor_table<'input> {
-anchor_format: u16,
-table: opentype_common_anchor_table_table<'input>
-}
-
-/// expected size: 4
-/// trait-ready: unique decoder function (d#103)
-#[derive(Debug, Copy, Clone)]
-pub struct opentype_layout_mark_record {
-mark_class: u16,
-mark_anchor_offset: u16
-}
-
-/// expected size: 56
-/// trait-ready: unique decoder function (d#97)
-#[derive(Debug, Clone)]
-pub struct opentype_layout_mark_array<'input> {
-array_scope: View<'input>,
-mark_count: u16,
-mark_records: Vec<opentype_layout_mark_record>
-}
-
-/// expected size: 24
-/// trait-ready: unique decoder function (d#108)
-#[derive(Debug, Clone)]
-pub struct opentype_layout_base_array_base_record {
-base_anchor_offsets: Vec<u16>
-}
-
-/// expected size: 56
-/// trait-ready: unique decoder function (d#107)
-#[derive(Debug, Clone)]
-pub struct opentype_layout_base_array<'input> {
-array_scope: View<'input>,
-base_count: u16,
-base_records: Vec<opentype_layout_base_array_base_record>
-}
-
-/// expected size: 48
-/// trait-ready: unique decoder function (d#106)
-#[derive(Debug, Clone)]
-pub struct opentype_layout_ligature_attach_component_record<'input> {
-record_scope: View<'input>,
-ligature_anchor_offsets: Vec<u16>
-}
-
-/// expected size: 32
-/// trait-ready: unique decoder function (d#105)
-#[derive(Debug, Clone)]
-pub struct opentype_layout_ligature_attach<'input> {
-component_count: u16,
-component_records: Vec<opentype_layout_ligature_attach_component_record<'input>>
-}
-
-/// expected size: 56
-/// trait-ready: unique decoder function (d#104)
-#[derive(Debug, Clone)]
-pub struct opentype_layout_ligature_array<'input> {
-array_scope: View<'input>,
-ligature_count: u16,
-ligature_attach_offsets: Vec<u16>
-}
-
-/// expected size: 24
-/// trait-ready: unique decoder function (d#99)
-#[derive(Debug, Clone)]
-pub struct opentype_layout_mark2_array_mark2_record {
-mark2_anchor_offsets: Vec<u16>
-}
-
-/// expected size: 56
-/// trait-ready: unique decoder function (d#98)
-#[derive(Debug, Clone)]
-pub struct opentype_layout_mark2_array<'input> {
-array_scope: View<'input>,
-mark2_count: u16,
-mark2_records: Vec<opentype_layout_mark2_array_mark2_record>
 }
 
 /// expected size: 32
@@ -13705,6 +13752,7 @@ let coverage_offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
+let _coverage = std::marker::PhantomData;
 let entry_exit_count = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
@@ -13717,7 +13765,7 @@ accum.push(next_elem)
 };
 accum
 };
-PResult::Ok(opentype_layout_cursive_pos { pos_format, table_scope, coverage_offset, entry_exit_count, entry_exit_records })
+PResult::Ok(opentype_layout_cursive_pos { pos_format, table_scope, coverage_offset, _coverage, entry_exit_count, entry_exit_records })
 }
 
 /// d#94
@@ -13743,10 +13791,12 @@ let mark_coverage_offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
+let _mark_coverage = std::marker::PhantomData;
 let base_coverage_offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
+let _base_coverage = std::marker::PhantomData;
 let mark_class_count = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
@@ -13755,11 +13805,13 @@ let mark_array_offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
+let _mark_array = std::marker::PhantomData;
 let base_array_offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-PResult::Ok(opentype_layout_mark_base_pos { format, table_scope, mark_coverage_offset, base_coverage_offset, mark_class_count, mark_array_offset, base_array_offset })
+let _base_array = std::marker::PhantomData;
+PResult::Ok(opentype_layout_mark_base_pos { format, table_scope, mark_coverage_offset, _mark_coverage, base_coverage_offset, _base_coverage, mark_class_count, mark_array_offset, _mark_array, base_array_offset, _base_array })
 }
 
 /// d#95
@@ -13785,10 +13837,12 @@ let mark_coverage_offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
+let _mark_coverage = std::marker::PhantomData;
 let ligature_coverage_offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
+let _ligature_coverage = std::marker::PhantomData;
 let mark_class_count = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
@@ -13797,11 +13851,13 @@ let mark_array_offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
+let _mark_array = std::marker::PhantomData;
 let ligature_array_offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-PResult::Ok(opentype_layout_mark_lig_pos { table_scope, format, mark_coverage_offset, ligature_coverage_offset, mark_class_count, mark_array_offset, ligature_array_offset })
+let _ligature_array = std::marker::PhantomData;
+PResult::Ok(opentype_layout_mark_lig_pos { table_scope, format, mark_coverage_offset, _mark_coverage, ligature_coverage_offset, _ligature_coverage, mark_class_count, mark_array_offset, _mark_array, ligature_array_offset, _ligature_array })
 }
 
 /// d#96
@@ -13827,10 +13883,12 @@ let mark1_coverage_offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
+let _mark1_coverage = std::marker::PhantomData;
 let mark2_coverage_offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
+let _mark2_coverage = std::marker::PhantomData;
 let mark_class_count = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
@@ -13839,7 +13897,7 @@ let mark1_array_offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-if mark1_array_offset > 0u16 {
+let _mark1_array = if mark1_array_offset > 0u16 {
 let mut view_parser = Parser::from(table_view.offset(mark1_array_offset as usize)?);
 let view_input = &mut view_parser;
 Some((Decoder_opentype_layout_mark_array(view_input))?)
@@ -13850,7 +13908,8 @@ let mark2_array_offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-PResult::Ok(opentype_layout_mark_mark_pos { format, table_scope, mark1_coverage_offset, mark2_coverage_offset, mark_class_count, mark1_array_offset, mark2_array_offset })
+let _mark2_array = std::marker::PhantomData;
+PResult::Ok(opentype_layout_mark_mark_pos { format, table_scope, mark1_coverage_offset, _mark1_coverage, mark2_coverage_offset, _mark2_coverage, mark_class_count, mark1_array_offset, _mark1_array, mark2_array_offset, _mark2_array })
 }
 
 /// d#97
@@ -13892,7 +13951,7 @@ PResult::Ok(opentype_layout_mark2_array { array_scope, mark2_count, mark2_record
 }
 
 /// d#99
-fn Decoder_opentype_layout_mark2_array_mark2_record<'input>(_input: &mut Parser<'input>, mark_class_count: u16, _array_view: View<'input>) -> Result<opentype_layout_mark2_array_mark2_record, ParseError> {
+fn Decoder_opentype_layout_mark2_array_mark2_record<'input>(_input: &mut Parser<'input>, mark_class_count: u16, _array_view: View<'input>) -> Result<opentype_layout_mark2_array_mark2_record<'input>, ParseError> {
 let mark2_anchor_offsets = {
 let mut accum = Vec::new();
 for _ in 0..mark_class_count {
@@ -13904,7 +13963,8 @@ accum.push(next_elem)
 };
 accum
 };
-PResult::Ok(opentype_layout_mark2_array_mark2_record { mark2_anchor_offsets })
+let _mark2_anchors = std::marker::PhantomData;
+PResult::Ok(opentype_layout_mark2_array_mark2_record { mark2_anchor_offsets, _mark2_anchors })
 }
 
 /// d#100
@@ -13976,11 +14036,13 @@ let x_device_offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
+let _x_device = std::marker::PhantomData;
 let y_device_offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-PResult::Ok(opentype_common_anchor_table_format3 { table_scope, x_coordinate, y_coordinate, x_device_offset, y_device_offset })
+let _y_device = std::marker::PhantomData;
+PResult::Ok(opentype_common_anchor_table_format3 { table_scope, x_coordinate, y_coordinate, x_device_offset, _x_device, y_device_offset, _y_device })
 }
 
 /// d#102
@@ -14129,7 +14191,7 @@ opentype_common_device_or_variation_index_table::OtherTable(inner)
 }
 
 /// d#103
-fn Decoder_opentype_layout_mark_record<'input>(_input: &mut Parser<'input>, array_view: View<'input>) -> Result<opentype_layout_mark_record, ParseError> {
+fn Decoder_opentype_layout_mark_record<'input>(_input: &mut Parser<'input>, array_view: View<'input>) -> Result<opentype_layout_mark_record<'input>, ParseError> {
 let mark_class = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
@@ -14138,7 +14200,8 @@ let mark_anchor_offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-PResult::Ok(opentype_layout_mark_record { mark_class, mark_anchor_offset })
+let _mark_anchor = std::marker::PhantomData;
+PResult::Ok(opentype_layout_mark_record { mark_class, mark_anchor_offset, _mark_anchor })
 }
 
 /// d#104
@@ -14160,7 +14223,8 @@ accum.push(next_elem)
 };
 accum
 };
-PResult::Ok(opentype_layout_ligature_array { array_scope, ligature_count, ligature_attach_offsets })
+let _ligature_attaches = std::marker::PhantomData;
+PResult::Ok(opentype_layout_ligature_array { array_scope, ligature_count, ligature_attach_offsets, _ligature_attaches })
 }
 
 /// d#105
@@ -14195,7 +14259,8 @@ accum.push(next_elem)
 };
 accum
 };
-PResult::Ok(opentype_layout_ligature_attach_component_record { record_scope, ligature_anchor_offsets })
+let _ligature_anchors = std::marker::PhantomData;
+PResult::Ok(opentype_layout_ligature_attach_component_record { record_scope, ligature_anchor_offsets, _ligature_anchors })
 }
 
 /// d#107
@@ -14218,7 +14283,7 @@ PResult::Ok(opentype_layout_base_array { array_scope, base_count, base_records }
 }
 
 /// d#108
-fn Decoder_opentype_layout_base_array_base_record<'input>(_input: &mut Parser<'input>, mark_class_count: u16, _array_view: View<'input>) -> Result<opentype_layout_base_array_base_record, ParseError> {
+fn Decoder_opentype_layout_base_array_base_record<'input>(_input: &mut Parser<'input>, mark_class_count: u16, _array_view: View<'input>) -> Result<opentype_layout_base_array_base_record<'input>, ParseError> {
 let base_anchor_offsets = {
 let mut accum = Vec::new();
 for _ in 0..mark_class_count {
@@ -14230,20 +14295,23 @@ accum.push(next_elem)
 };
 accum
 };
-PResult::Ok(opentype_layout_base_array_base_record { base_anchor_offsets })
+let _base_anchors = std::marker::PhantomData;
+PResult::Ok(opentype_layout_base_array_base_record { base_anchor_offsets, _base_anchors })
 }
 
 /// d#109
-fn Decoder_opentype_layout_entry_exit_record<'input>(_input: &mut Parser<'input>, table_view: View<'input>) -> Result<opentype_layout_entry_exit_record, ParseError> {
+fn Decoder_opentype_layout_entry_exit_record<'input>(_input: &mut Parser<'input>, table_view: View<'input>) -> Result<opentype_layout_entry_exit_record<'input>, ParseError> {
 let entry_anchor_offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
+let _entry_anchor = std::marker::PhantomData;
 let exit_anchor_offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-PResult::Ok(opentype_layout_entry_exit_record { entry_anchor_offset, exit_anchor_offset })
+let _exit_anchor = std::marker::PhantomData;
+PResult::Ok(opentype_layout_entry_exit_record { entry_anchor_offset, _entry_anchor, exit_anchor_offset, _exit_anchor })
 }
 
 /// d#110
@@ -14253,6 +14321,7 @@ let coverage_offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
+let _coverage = std::marker::PhantomData;
 let value_format1 = (Decoder_opentype_common_value_format_flags(_input))?;
 let value_format2 = (Decoder_opentype_common_value_format_flags(_input))?;
 let pair_set_count = {
@@ -14267,13 +14336,14 @@ let offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-opentype_layout_single_pos_format1_coverage { offset }
+let __data = std::marker::PhantomData;
+opentype_layout_pair_pos_format1_pair_sets { offset, __data }
 };
 accum.push(next_elem)
 };
 accum
 };
-PResult::Ok(opentype_layout_pair_pos_format1 { table_scope, coverage_offset, value_format1, value_format2, pair_set_count, pair_sets })
+PResult::Ok(opentype_layout_pair_pos_format1 { table_scope, coverage_offset, _coverage, value_format1, value_format2, pair_set_count, pair_sets })
 }
 
 /// d#111
@@ -14284,7 +14354,8 @@ let offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-opentype_layout_single_pos_format1_coverage { offset }
+let __data = std::marker::PhantomData;
+opentype_layout_single_pos_format1_coverage { offset, __data }
 };
 let value_format1 = (Decoder_opentype_common_value_format_flags(_input))?;
 let value_format2 = (Decoder_opentype_common_value_format_flags(_input))?;
@@ -14293,14 +14364,16 @@ let offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-opentype_layout_single_pos_format1_coverage { offset }
+let __data = std::marker::PhantomData;
+opentype_layout_pair_pos_format2_class_def1 { offset, __data }
 };
 let class_def2 = {
 let offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-opentype_layout_single_pos_format1_coverage { offset }
+let __data = std::marker::PhantomData;
+opentype_layout_pair_pos_format2_class_def1 { offset, __data }
 };
 let class1_count = {
 let x = (_input.read_byte()?, _input.read_byte()?);
@@ -14401,7 +14474,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_single_pos_format1_coverage { offset })
+Some(opentype_common_value_record_x_placement_device { offset })
 } else {
 None
 };
@@ -14417,7 +14490,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_single_pos_format1_coverage { offset })
+Some(opentype_common_value_record_x_placement_device { offset })
 } else {
 None
 };
@@ -14433,7 +14506,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_single_pos_format1_coverage { offset })
+Some(opentype_common_value_record_x_placement_device { offset })
 } else {
 None
 };
@@ -14449,7 +14522,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_single_pos_format1_coverage { offset })
+Some(opentype_common_value_record_x_placement_device { offset })
 } else {
 None
 };
@@ -14494,7 +14567,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_single_pos_format1_coverage { offset })
+Some(opentype_common_value_record_x_placement_device { offset })
 } else {
 None
 };
@@ -14510,7 +14583,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_single_pos_format1_coverage { offset })
+Some(opentype_common_value_record_x_placement_device { offset })
 } else {
 None
 };
@@ -14526,7 +14599,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_single_pos_format1_coverage { offset })
+Some(opentype_common_value_record_x_placement_device { offset })
 } else {
 None
 };
@@ -14542,7 +14615,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_single_pos_format1_coverage { offset })
+Some(opentype_common_value_record_x_placement_device { offset })
 } else {
 None
 };
@@ -14625,7 +14698,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_single_pos_format1_coverage { offset })
+Some(opentype_common_value_record_x_placement_device { offset })
 } else {
 None
 };
@@ -14641,7 +14714,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_single_pos_format1_coverage { offset })
+Some(opentype_common_value_record_x_placement_device { offset })
 } else {
 None
 };
@@ -14657,7 +14730,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_single_pos_format1_coverage { offset })
+Some(opentype_common_value_record_x_placement_device { offset })
 } else {
 None
 };
@@ -14673,7 +14746,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_single_pos_format1_coverage { offset })
+Some(opentype_common_value_record_x_placement_device { offset })
 } else {
 None
 };
@@ -14718,7 +14791,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_single_pos_format1_coverage { offset })
+Some(opentype_common_value_record_x_placement_device { offset })
 } else {
 None
 };
@@ -14734,7 +14807,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_single_pos_format1_coverage { offset })
+Some(opentype_common_value_record_x_placement_device { offset })
 } else {
 None
 };
@@ -14750,7 +14823,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_single_pos_format1_coverage { offset })
+Some(opentype_common_value_record_x_placement_device { offset })
 } else {
 None
 };
@@ -14766,7 +14839,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_single_pos_format1_coverage { offset })
+Some(opentype_common_value_record_x_placement_device { offset })
 } else {
 None
 };
@@ -14781,7 +14854,8 @@ let offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-opentype_layout_single_pos_format1_coverage { offset }
+let __data = std::marker::PhantomData;
+opentype_layout_single_pos_format1_coverage { offset, __data }
 };
 let value_format = (Decoder_opentype_common_value_format_flags(_input))?;
 let value_record = (Decoder123(_input, value_format, table_view))?;
@@ -14796,7 +14870,8 @@ let offset = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
-opentype_layout_single_pos_format1_coverage { offset }
+let __data = std::marker::PhantomData;
+opentype_layout_single_pos_format1_coverage { offset, __data }
 };
 let value_format = (Decoder_opentype_common_value_format_flags(_input))?;
 let value_count = {
@@ -14852,7 +14927,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_single_pos_format1_coverage { offset })
+Some(opentype_common_value_record_x_placement_device { offset })
 } else {
 None
 };
@@ -14868,7 +14943,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_single_pos_format1_coverage { offset })
+Some(opentype_common_value_record_x_placement_device { offset })
 } else {
 None
 };
@@ -14884,7 +14959,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_single_pos_format1_coverage { offset })
+Some(opentype_common_value_record_x_placement_device { offset })
 } else {
 None
 };
@@ -14900,7 +14975,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_single_pos_format1_coverage { offset })
+Some(opentype_common_value_record_x_placement_device { offset })
 } else {
 None
 };
@@ -14945,7 +15020,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_single_pos_format1_coverage { offset })
+Some(opentype_common_value_record_x_placement_device { offset })
 } else {
 None
 };
@@ -14961,7 +15036,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_single_pos_format1_coverage { offset })
+Some(opentype_common_value_record_x_placement_device { offset })
 } else {
 None
 };
@@ -14977,7 +15052,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_single_pos_format1_coverage { offset })
+Some(opentype_common_value_record_x_placement_device { offset })
 } else {
 None
 };
@@ -14993,7 +15068,7 @@ Some((Decoder_opentype_common_device_or_variation_index_table(view_input))?)
 } else {
 None
 };
-Some(opentype_layout_single_pos_format1_coverage { offset })
+Some(opentype_common_value_record_x_placement_device { offset })
 } else {
 None
 };

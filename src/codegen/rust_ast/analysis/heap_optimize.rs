@@ -242,6 +242,7 @@ impl HeapOptimize for CompType<Box<RustType>> {
             // REVIEW - is this an accurate claim, or do we need a bespoke variant for this case?
             CompType::Borrow(..) => (HeapAction::Noop, mk_layout(self, context)),
             CompType::RawSlice(..) => unreachable!("unexpected raw slice in structural type"),
+            CompType::PhantomData(..) => (HeapAction::Noop, mk_layout(self, context)),
         }
     }
 }

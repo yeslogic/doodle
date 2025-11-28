@@ -139,6 +139,7 @@ impl ReadWidth for PrimType {
 impl<T: ASTContext> ReadWidth for CompType<Box<T>> {
     fn read_width(&self, _: T::Context<'_>) -> ValueWidth {
         match self {
+            CompType::PhantomData(..) => ValueWidth::ZERO,
             CompType::Vec(..) => ValueWidth::DYN,
             CompType::RawSlice(_) => ValueWidth::VAR,
             CompType::Option(_) => ValueWidth::VAR,

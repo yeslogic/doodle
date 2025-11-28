@@ -48,6 +48,7 @@ pub enum ValueType {
     Any,
     Empty,
     ViewObj,
+    PhantomData(Box<ValueType>),
     Base(BaseType),
     Tuple(Vec<ValueType>),
     Record(Vec<(Label, ValueType)>),
@@ -176,6 +177,9 @@ impl ValueType {
             (ValueType::Option(t1), ValueType::Option(t2)) => {
                 Ok(ValueType::Option(Box::new(t1.unify(t2)?)))
             }
+            (ValueType::PhantomData(t1), ValueType::PhantomData(t2)) => {
+                Ok(ValueType::PhantomData(Box::new(t1.unify(t2)?)))
+            }
             (t1, t2) => Err(UnificationError::Unsatisfiable(t1.clone(), t2.clone())),
         }
     }
@@ -237,6 +241,7 @@ pub(crate) mod augmented {
         Union(BTreeMap<Label, AugValueType>),
         Seq(Box<AugValueType>, SeqBorrowHint),
         Option(Box<AugValueType>),
+        PhantomData(Box<AugValueType>),
     }
 
     impl AugValueType {
@@ -263,6 +268,7 @@ pub(crate) mod augmented {
                     AugValueType::Seq(Box::new(From::from(*t)), SeqBorrowHint::default())
                 }
                 ValueType::Option(t) => AugValueType::Option(Box::new(From::from(*t))),
+                ValueType::PhantomData(t) => AugValueType::PhantomData(Box::new(From::from(*t))),
             }
         }
     }
@@ -285,6 +291,7 @@ pub(crate) mod augmented {
                 }
                 AugValueType::Seq(t, _) => ValueType::Seq(Box::new(From::from(*t))),
                 AugValueType::Option(t) => ValueType::Option(Box::new(From::from(*t))),
+                AugValueType::PhantomData(t) => ValueType::PhantomData(Box::new(From::from(*t))),
             }
         }
     }

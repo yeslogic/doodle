@@ -593,4 +593,8 @@ pub fn eq0(val: RustExpr) -> RustExpr {
     RustExpr::infix(val, InfixOperator::Eq, RustExpr::num_lit(0usize))
 }
 
+pub fn phantom_data() -> RustExpr {
+    RustExpr::scoped(vec!["std", "marker"], "PhantomData")
+}
+
 // !SECTION

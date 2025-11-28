@@ -763,6 +763,9 @@ impl RustType {
                     CompType::RawSlice(..) => {
                         unreachable!("raw slice should always be behind a ref")
                     }
+                    CompType::PhantomData(..) => {
+                        unreachable!("phantom-data should not be used as argument")
+                    }
                 },
                 AtomType::TypeRef(local) => match local {
                     // REVIEW - shallow wrappers around vec should be treated as if vec, but that is difficult to achieve without more state-info from generation process
@@ -883,6 +886,7 @@ impl RustType {
                     CompType::RawSlice(_) => {
                         unreachable!("raw slice should not exist outside of ref context")
                     }
+                    CompType::PhantomData(..) => true,
                 },
             },
             RustType::AnonTuple(args) => args.iter().all(|t| t.can_be_copy()),
@@ -1308,6 +1312,7 @@ pub(crate) enum CompType<T = Box<RustType>, U = T> {
     Option(T),
     Result(T, U),
     Borrow(Option<RustLt>, Mut, T),
+    PhantomData(T),
 }
 
 impl CompType {
@@ -1318,6 +1323,7 @@ impl CompType {
             CompType::Option(t) => t.lt_param(),
             CompType::Result(t, _) => t.lt_param(),
             CompType::Borrow(rust_lt, _, t) => rust_lt.as_ref().or_else(|| t.lt_param()),
+            CompType::PhantomData(t) => t.lt_param(),
         }
     }
 }
@@ -1353,6 +1359,14 @@ where
                 let f_aux = Fragment::intervene(f_lt, Fragment::Char(' '), f_mut);
                 let f_body = Fragment::intervene(f_aux, Fragment::Char(' '), ty.to_fragment());
                 Fragment::cat(Fragment::Char('&'), f_body)
+            }
+            CompType::PhantomData(inner) => {
+                let tmp = inner.to_fragment();
+                // REVIEW - do we import instead of qualifying here?
+                tmp.delimit(
+                    Fragment::string("std::marker::PhantomData<"),
+                    Fragment::Char('>'),
+                )
             }
         }
     }
@@ -1420,6 +1434,12 @@ impl TryFrom<ValueType> for RustType {
                 Ok(RustType::Atom(AtomType::Comp(CompType::Option(Box::new(
                     inner,
                 )))))
+            }
+            ValueType::PhantomData(t) => {
+                let inner = Self::try_from(t.as_ref().clone())?;
+                Ok(RustType::Atom(AtomType::Comp(CompType::PhantomData(
+                    Box::new(inner),
+                ))))
             }
             ValueType::Any | ValueType::Record(..) | ValueType::Union(..) => Err(value),
         }

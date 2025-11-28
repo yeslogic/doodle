@@ -61,6 +61,7 @@ pub enum UType {
     Seq(Rc<UType>, SeqBorrowHint),
     /// For `std::option::Option<InnerType>`
     Option(Rc<UType>),
+    PhantomData(Rc<UType>),
 }
 
 impl UType {
@@ -123,6 +124,10 @@ impl UType {
             ValueType::Any => Some(Self::Hole),
             ValueType::Empty => Some(Self::Empty),
             ValueType::ViewObj => Some(Self::ViewObj),
+            ValueType::PhantomData(inner) => {
+                let inner_t = Self::from_valuetype(inner)?;
+                Some(UType::PhantomData(Rc::new(inner_t)))
+            }
             ValueType::Base(b) => Some(Self::Base(*b)),
             ValueType::Tuple(vts) => {
                 let mut uts = Vec::with_capacity(vts.len());
@@ -409,7 +414,9 @@ impl UType {
             }
             UType::Tuple(ts) => Box::new(ts.iter().cloned()),
             UType::Record(fs) => Box::new(fs.iter().map(|(_l, t)| t.clone())),
-            UType::Seq(t, _) | UType::Option(t) => Box::new(std::iter::once(t.clone())),
+            UType::Seq(t, _) | UType::Option(t) | UType::PhantomData(t) => {
+                Box::new(std::iter::once(t.clone()))
+            }
         }
     }
 }
@@ -1385,7 +1392,7 @@ impl TypeChecker {
                 }
                 Ok(())
             }
-            UType::Seq(inner, _) | UType::Option(inner) => {
+            UType::Seq(inner, _) | UType::Option(inner) | UType::PhantomData(inner) => {
                 self.occurs_in(v, inner.clone())?;
                 Ok(())
             }
@@ -2919,8 +2926,9 @@ impl TypeChecker {
     pub(crate) fn infer_var_format(&mut self, f: &Format, ctxt: Ctxt<'_>) -> TCResult<UVar> {
         match f {
             Format::Phantom(inner) => {
-                let newvar = self.init_var_simple(UType::UNIT)?.0;
-                self.infer_var_format(inner, ctxt)?;
+                let newvar = self.get_new_uvar();
+                let inner_var = self.infer_var_format(inner, ctxt)?;
+                self.unify_var_utype(newvar, Rc::new(UType::PhantomData(inner_var.into())))?;
                 Ok(newvar)
             }
             Format::ItemVar(level, args, _views) => {
@@ -3370,6 +3378,9 @@ impl TypeChecker {
             }
             UType::Seq(t0, h) => Some(AugValueType::Seq(Box::new(self.reify(t0.clone())?), *h)),
             UType::Option(t0) => Some(AugValueType::Option(Box::new(self.reify(t0.clone())?))),
+            UType::PhantomData(t0) => {
+                Some(AugValueType::PhantomData(Box::new(self.reify(t0.clone())?)))
+            }
         }
     }
 
@@ -3417,6 +3428,7 @@ pub(crate) enum Expansion {
     Option(WHNFSolution),
     Tuple(Vec<WHNFSolution>),
     ViewObj,
+    PhantomData(WHNFSolution),
 }
 
 // SECTION - specialized methods for codegen purposes
@@ -3495,6 +3507,10 @@ impl TypeChecker {
             UType::Option(t0) => {
                 let v0 = WHNFSolution::coerce(&t0);
                 Expansion::Option(v0)
+            }
+            UType::PhantomData(t0) => {
+                let v0 = WHNFSolution::coerce(&t0);
+                Expansion::PhantomData(v0)
             }
         }
     }

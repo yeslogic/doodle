@@ -422,6 +422,9 @@ pub fn record<Name: IntoLabel>(
 /// capture labels starting with `_` without forcing in-record persistence (e.g. count-fields for
 /// repeat arrays), and capture all other labels with in-record persistence.
 ///
+/// Any label that starts with `#` will be preserved as the verbatim identifier after discarding `#`; this
+/// is useful if we actually want to keep fields that start with `_` or `__` as-is.
+///
 /// # Examples
 ///
 /// ```
@@ -431,17 +434,21 @@ pub fn record<Name: IntoLabel>(
 ///     ("_foo", Format::ANY_BYTE), // will be captured, but not persisted
 ///     ("bar", repeat_count(var("_foo"), Format::ANY_BYTE)), // will be captured and persisted
 ///     ("__baz", Format::ANY_BYTE), // will be discarded without ever being captured
-/// ]); // yields `struct _ { bar: Vec<u8> }`
+///     ("#_qux", Format::ANY_BYTE), // will be preserved as `_qux`
+/// ]); // yields `struct _ { bar: Vec<u8>, _qux: u8 }`
 /// ```
 pub fn record_auto<Name: IntoLabel + AsRef<str>>(
     fields: impl IntoIterator<Item = (Name, Format), IntoIter: DoubleEndedIterator>,
 ) -> Format {
     let fields_persist = fields.into_iter().map(|(label, format)| {
-        if label.as_ref().starts_with("__") {
+        if label.as_ref().starts_with("#") {
+            let tmp = label.as_ref().trim_start_matches("#").to_string();
+            (Some((Label::Owned(tmp), true)), format)
+        } else if label.as_ref().starts_with("__") {
             (None, format)
         } else {
             let is_tmp = label.as_ref().starts_with("_");
-            (Some((label, !is_tmp)), format)
+            (Some((label.into(), !is_tmp)), format)
         }
     });
     record_ext(fields_persist)
