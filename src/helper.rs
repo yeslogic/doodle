@@ -1554,6 +1554,15 @@ pub fn with_view(view: ViewExpr, view_format: ViewFormat) -> Format {
     Format::WithView(view, view_format)
 }
 
+/// Helper for `WithView(X, ReifyView)`
+pub fn reify_view(view: ViewExpr) -> Format {
+    Format::WithView(view, ViewFormat::ReifyView)
+}
+
+pub fn vvar(ident: impl IntoLabel) -> ViewExpr {
+    ViewExpr::var(ident)
+}
+
 /// Helper for [`Format::ParseFromView`]
 pub fn parse_from_view(view: ViewExpr, format: Format) -> Format {
     Format::ParseFromView(view, Box::new(format))
@@ -1800,6 +1809,7 @@ pub fn opaque_bytes() -> Format {
     repeat(u8())
 }
 
+/// Helper function for [`Format::Phantom`].
 pub fn phantom(format: Format) -> Format {
     Format::Phantom(Box::new(format))
 }

@@ -3337,6 +3337,11 @@ where
             }
             OtherLogic::LetFormat(prior, name, inner) => {
                 let prior_block = prior.to_ast(ctxt);
+                if prior_block.is_empty() {
+                    unreachable!(
+                        "let binding `{name}` has empty rhs; there may be an exposed phantom in definition"
+                    );
+                }
                 let mut inner_block = inner.to_ast(ctxt);
                 inner_block.prepend_stmt(GenStmt::assign(name.clone(), prior_block));
                 inner_block
