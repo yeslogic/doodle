@@ -312,6 +312,7 @@ pub enum ValueTypeExt {
     Union(BTreeMap<Label, ValueTypeExt>),
     Seq(Box<ValueTypeExt>),
     Option(Box<ValueTypeExt>),
+    PhantomData(Box<ValueTypeExt>),
     EngineSpecific {
         base_model: Box<ValueTypeExt>,
         alt_model: Box<ValueTypeExt>,
@@ -340,6 +341,9 @@ impl From<ValueType> for ValueTypeExt {
             ),
             ValueType::Seq(v) => ValueTypeExt::Seq(Box::new(ValueTypeExt::from(*v))),
             ValueType::Option(v) => ValueTypeExt::Option(Box::new(ValueTypeExt::from(*v))),
+            ValueType::PhantomData(t) => {
+                ValueTypeExt::PhantomData(Box::new(ValueTypeExt::from(*t)))
+            }
         }
     }
 }
@@ -369,6 +373,7 @@ impl ValueTypeExt {
             // NOTE - potentially misleading case
             ValueTypeExt::ViewObj => false,
             ValueTypeExt::Base(_) => false,
+            ValueTypeExt::PhantomData(inner) => inner.depends_on_model(),
             ValueTypeExt::Tuple(ts) => ts.iter().any(|t| t.depends_on_model()),
             ValueTypeExt::Record(items) => items.iter().any(|(_, t)| t.depends_on_model()),
             ValueTypeExt::Union(items) => items.iter().any(|(_, t)| t.depends_on_model()),
@@ -550,6 +555,9 @@ impl ValueTypeExt {
             ValueTypeExt::Option(inner) => Cow::Owned(ValueTypeExt::Option(Box::new(
                 inner.normalize(model).into_owned(),
             ))),
+            ValueTypeExt::PhantomData(inner) => Cow::Owned(ValueTypeExt::PhantomData(Box::new(
+                inner.normalize(model).into_owned(),
+            ))),
         }
     }
 
@@ -729,6 +737,9 @@ impl ValueTypeExt {
             }
             ValueTypeExt::Seq(v) => Some(ValueType::Seq(Box::new(v.try_to_valuetype()?))),
             ValueTypeExt::Option(v) => Some(ValueType::Option(Box::new(v.try_to_valuetype()?))),
+            ValueTypeExt::PhantomData(v) => {
+                Some(ValueType::PhantomData(Box::new(v.try_to_valuetype()?)))
+            }
             ValueTypeExt::EngineSpecific { .. } => None,
         }
     }
@@ -772,6 +783,7 @@ impl ValueTypeExt {
             }
             ValueTypeExt::Seq(v) => ValueType::Seq(Box::new(v.reify(compiler))),
             ValueTypeExt::Option(v) => ValueType::Option(Box::new(v.reify(compiler))),
+            ValueTypeExt::PhantomData(v) => ValueType::PhantomData(Box::new(v.reify(compiler))),
         }
     }
 

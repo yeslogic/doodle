@@ -344,9 +344,9 @@ impl CopyEligible for PrimType {
     }
 }
 
-/// Local choice of what type to embed as the parameter to make `Vec` a concrete type-instance we can pass into
+/// Local choice of what type to embed as the parameter to make concrete type-instances we can pass into
 /// `size_of` and `align_of` methods.
-type VecFiller = u8;
+type Cement = u32;
 
 impl<T> ASTContext for CompType<Box<T>>
 where
@@ -362,7 +362,7 @@ where
 {
     fn size_hint(&self, context: Self::Context<'_>) -> usize {
         match self {
-            CompType::Vec(..) => size_of::<Vec<VecFiller>>(),
+            CompType::Vec(..) => size_of::<Vec<Cement>>(),
             CompType::Option(inner) => {
                 if inner.is_optimized(context) {
                     inner.size_hint(context)
@@ -370,6 +370,7 @@ where
                     inner.size_hint(context) + inner.align_hint(context)
                 }
             }
+            CompType::PhantomData(..) => size_of::<std::marker::PhantomData<Cement>>(),
             CompType::Result(..) => unimplemented!("unexpected result in structural type"),
             CompType::Borrow(..) => size_of::<usize>(),
             CompType::RawSlice(..) => unimplemented!("unexpected raw slice in structural type"),
@@ -378,7 +379,8 @@ where
 
     fn align_hint(&self, context: Self::Context<'_>) -> usize {
         match self {
-            CompType::Vec(..) => align_of::<Vec<VecFiller>>(),
+            CompType::PhantomData(..) => align_of::<std::marker::PhantomData<Cement>>(),
+            CompType::Vec(..) => align_of::<Vec<Cement>>(),
             CompType::Option(inner) => inner.align_hint(context),
             CompType::Result(..) => unimplemented!("unexpected result in structural type"),
             CompType::Borrow(..) => align_of::<usize>(),
@@ -396,6 +398,7 @@ where
         match self {
             // Vec<T> has enough niches that all values of `n: u8` are optimizable
             CompType::Vec(..) => usize::MAX,
+            // Option<&T> cannot be optimized, but &T itself and Option<Option<&T>> (and above) can be
             CompType::Option(inner) => match inner.niches(context) {
                 0 => match inner.align_hint(context) {
                     n @ 1..=7 => (1 << (8 * n)) - 1,
@@ -404,7 +407,7 @@ where
                 },
                 n => n - 1,
             },
-            // Option<&T> cannot be optimized, but &T itself and Option<Option<&T>> (and above) can be
+            CompType::PhantomData(..) => 0,
             CompType::Borrow(..) => 1,
             CompType::Result(..) => unreachable!("unexpected result in structural type"),
             CompType::RawSlice(..) => unimplemented!("unexpected raw slice in structural type"),
@@ -423,6 +426,7 @@ where
             CompType::Borrow(_lt, Mut::Mutable, _) => {
                 unreachable!("unexpected mutable borrow in generative type: {self:?}")
             }
+            CompType::PhantomData(..) => true,
             CompType::Vec(..) => false,
             CompType::RawSlice(..) => unreachable!("unexpected raw slice in structural type"),
             CompType::Option(inner) => inner.copy_hint(context),

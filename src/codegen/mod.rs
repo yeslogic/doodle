@@ -234,6 +234,9 @@ impl CodeGen {
             Expansion::Option(sol) => GenType::Inline(
                 CompType::Option(Box::new(self.lift_whnf_solution(tc, sol, lt))).into(),
             ),
+            Expansion::PhantomData(sol) => GenType::Inline(
+                CompType::PhantomData(Box::new(self.lift_whnf_solution(tc, sol, lt))).into(),
+            ),
             Expansion::Tuple(vs) => match &vs[..] {
                 [] => RustType::AnonTuple(Vec::new()).into(),
                 // REVIEW - should one-tuples be preserved?
@@ -263,7 +266,7 @@ impl CodeGen {
             TypedDecoder::Align(n) => CaseLogic::Simple(SimpleLogic::SkipToNextMultiple(*n)),
             TypedDecoder::Pos => CaseLogic::Simple(SimpleLogic::YieldCurrentOffset),
             TypedDecoder::SkipRemainder => CaseLogic::Simple(SimpleLogic::SkipRemainder),
-            TypedDecoder::Phantom => CaseLogic::Simple(SimpleLogic::Noop),
+            TypedDecoder::Phantom => CaseLogic::Simple(SimpleLogic::PhantomData),
             TypedDecoder::Byte(bs) => CaseLogic::Simple(SimpleLogic::ByteIn(*bs)),
             TypedDecoder::Variant(gt, name, inner) => {
                 let (type_name, def) = {
@@ -1495,6 +1498,10 @@ fn refutability_check<A: std::fmt::Debug + Clone>(
                 },
                 AtomType::Comp(ct) => match ct {
                     CompType::Vec(_) | CompType::RawSlice(_) => Refutability::Refutable, // Vec can have any length, so no match can be exhaustive without catchalls
+                    CompType::PhantomData(..) => {
+                        unreachable!("PhantomData is not a sensible scrutinee");
+                        // Refutability::Irrefutable
+                    }
                     CompType::Option(t) => {
                         let none_covered = cases
                             .iter()
@@ -2670,7 +2677,7 @@ enum SimpleLogic<ExprT, ViewExprT = TypedViewExpr<GenType>> {
     YieldCurrentOffset,
     SkipRemainder,
     ConstNone,
-    Noop,
+    PhantomData,
 }
 
 impl ToAst for SimpleLogic<GTExpr> {
@@ -2678,9 +2685,9 @@ impl ToAst for SimpleLogic<GTExpr> {
 
     fn to_ast(&self, ctxt: ProdCtxt<'_>) -> GenBlock {
         match self {
-            SimpleLogic::Noop => GenBlock::new(),
             SimpleLogic::Fail => GenBlock::explicit_return(model::err_fail(get_trace(&()))),
             SimpleLogic::ExpectEnd => GenBlock::simple_expr(model::try_enforce_eos(ctxt.parser())),
+            SimpleLogic::PhantomData => GenBlock::simple_expr(model::phantom_data()),
             SimpleLogic::SkipRemainder => {
                 GenBlock::simple_expr(model::skip_remainder(ctxt.parser()))
             }

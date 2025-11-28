@@ -60,7 +60,7 @@ pub use valuetype::{BaseType, TypeHint, ValueType};
 fn mk_value_expr(vt: &ValueType) -> Option<Expr> {
     match vt {
         ValueType::Any | ValueType::Empty => None,
-        ValueType::ViewObj => None,
+        ValueType::ViewObj | ValueType::PhantomData(..) => None,
         ValueType::Base(b) => Some(match b {
             BaseType::Bool => Expr::Bool(false),
             BaseType::U8 => Expr::U8(0),
@@ -1441,6 +1441,16 @@ impl Format {
             fs.push(f.clone());
         }
         MatchTree::build(module, &fs, Rc::new(Next::Empty)).is_none()
+    }
+}
+
+impl Format {
+    /// Returns the appropriate ValueType for `self` in the context of a given `FormatModule`.
+    ///
+    /// Will return an error if the ValueType cannot be determined.
+    pub(crate) fn output_value_type(&self, module: &FormatModule) -> AResult<ValueType> {
+        let scope = TypeScope::new();
+        module.infer_format_type(&scope, self)
     }
 }
 

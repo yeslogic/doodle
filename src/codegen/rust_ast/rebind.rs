@@ -417,6 +417,7 @@ impl Rebindable for CompType {
             | CompType::RawSlice(t)
             | CompType::Option(t)
             | CompType::Result(t, ..)
+            | CompType::PhantomData(t)
             | CompType::Borrow(.., t) => t.rebind(table),
         }
     }

@@ -4,12 +4,17 @@ use crate::codegen::{
     rust_ast::analysis::SourceContext,
 };
 
+/// Represents the aggregate 'answers' for certain queries on types
+///   - is_copy: whether the type is copyable
+///   - is_ref: whether the type is held as a reference
 pub(crate) struct Solution {
     is_copy: bool,
     is_ref: bool,
 }
 
+/// Trait for things that can be resolved (i.e. collapsed to ground-state based on contextual Solutions)
 pub trait Resolvable {
+    /// Modify self to be ground-state
     fn resolve(&mut self, ctx: &SourceContext<'_>);
 }
 
@@ -239,6 +244,7 @@ impl Resolvable for OwnedRustExpr {
     }
 }
 
+/// Produces a `Solution` for a RustType based on a SourceContext
 fn solve_type(ty: &RustType, ctx: &SourceContext<'_>) -> Solution {
     match ty {
         RustType::Atom(at) => match at {
@@ -280,6 +286,10 @@ fn solve_type(ty: &RustType, ctx: &SourceContext<'_>) -> Solution {
                         is_ref: true,
                     }
                 }
+                CompType::PhantomData(_t) => Solution {
+                    is_copy: true,
+                    is_ref: false,
+                },
             },
         },
         RustType::AnonTuple(rust_types) => {

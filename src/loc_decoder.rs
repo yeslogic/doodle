@@ -9,7 +9,8 @@ use crate::decoder::{
 use crate::error::{DecodeError, LocDecodeError};
 use crate::read::ReadCtxt;
 use crate::{
-    Arith, BaseKind, DynFormat, Endian, Expr, Format, IntRel, Label, Pattern, UnaryOp, ViewExpr,
+    Arith, BaseKind, DynFormat, Endian, Expr, Format, IntRel, Label, Pattern, TypeHint, UnaryOp,
+    ViewExpr,
 };
 use std::borrow::Cow;
 use std::cmp::Ordering;
@@ -214,6 +215,13 @@ impl ParsedValue {
         ParsedValue::Tuple(Parsed {
             loc: ParseLoc::InBuffer { offset, length },
             inner: v,
+        })
+    }
+
+    fn new_phantom(hint: TypeHint) -> ParsedValue {
+        ParsedValue::Flat(Parsed {
+            loc: ParseLoc::Synthesized,
+            inner: Value::PhantomData(hint),
         })
     }
 
@@ -439,6 +447,7 @@ impl ParsedValue {
             | Value::View { .. }
             | Value::Usize(_)
             | Value::EnumFromTo(_)
+            | Value::PhantomData(_)
             | Value::Char(_) => ParsedValue::Flat(Parsed {
                 loc: ParseLoc::Synthesized,
                 inner: expr_value,
@@ -1444,7 +1453,7 @@ impl Decoder {
                 None => Ok((ParsedValue::unit_at(start_offset), input)),
                 Some((b, _)) => Err(DecodeError::<ParsedValue>::trailing(b, input.offset)),
             },
-            Decoder::Phantom => Ok((ParsedValue::from_evaluated(Value::UNIT), input)),
+            Decoder::Phantom(h) => Ok((ParsedValue::new_phantom(h.clone()), input)),
             Decoder::Align(n) => {
                 let skip = (n - (input.offset % n)) % n;
                 let (_, input) = input

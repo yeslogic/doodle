@@ -505,7 +505,7 @@ mod util {
         record_auto([
             ("offset", u16be()),
             (
-                "__data",
+                "#__data",
                 phantom(view_offset16(view, var("offset"), format)),
             ),
         ])
@@ -2449,7 +2449,7 @@ mod gpos {
                 ),
                 ("coverage_offset", u16be()),
                 (
-                    "__coverage",
+                    "#_coverage",
                     phantom(util::view_offset16(
                         ViewExpr::var("table_view"),
                         var("coverage_offset"),
@@ -2608,7 +2608,7 @@ mod gpos {
             record_auto([
                 ("entry_anchor_offset", u16be()),
                 (
-                    "__entry_anchor",
+                    "#_entry_anchor",
                     phantom(util::view_offset16(
                         ViewExpr::var("table_view"),
                         var("entry_anchor_offset"),
@@ -2617,7 +2617,7 @@ mod gpos {
                 ),
                 ("exit_anchor_offset", u16be()),
                 (
-                    "__exit_anchor",
+                    "#_exit_anchor",
                     phantom(util::view_offset16(
                         ViewExpr::var("table_view"),
                         var("exit_anchor_offset"),
@@ -2640,7 +2640,7 @@ mod gpos {
                         ),
                         ("coverage_offset", u16be()),
                         (
-                            "__coverage",
+                            "#_coverage",
                             phantom(util::view_offset16(
                                 ViewExpr::var("table_view"),
                                 var("coverage_offset"),
@@ -2678,7 +2678,7 @@ mod gpos {
                 ("mark_class", u16be()),
                 ("mark_anchor_offset", u16be()),
                 (
-                    "__mark_anchor",
+                    "#_mark_anchor",
                     phantom(util::view_offset16(
                         ViewExpr::var("array_view"),
                         var("mark_anchor_offset"),
@@ -2782,7 +2782,7 @@ mod gpos {
                     repeat_count(var("mark_class_count"), u16be()),
                 ),
                 (
-                    "__base_anchors",
+                    "#_base_anchors",
                     // REVIEW - instead of for-each, do we want to express the phantom parse in the offset repeat_count itself?
                     phantom(for_each(
                         var("base_anchor_offsets"),
@@ -2834,7 +2834,7 @@ mod gpos {
                         ),
                         ("mark_coverage_offset", u16be()),
                         (
-                            "__mark_coverage",
+                            "#_mark_coverage",
                             phantom(util::view_offset16(
                                 ViewExpr::var("table_view"),
                                 var("mark_coverage_offset"),
@@ -2843,7 +2843,7 @@ mod gpos {
                         ),
                         ("base_coverage_offset", u16be()),
                         (
-                            "__base_coverage",
+                            "#_base_coverage",
                             phantom(util::view_offset16(
                                 ViewExpr::var("table_view"),
                                 var("base_coverage_offset"),
@@ -2853,7 +2853,7 @@ mod gpos {
                         ("mark_class_count", u16be()),
                         ("mark_array_offset", u16be()),
                         (
-                            "__mark_array",
+                            "#_mark_array",
                             phantom(util::view_offset16(
                                 ViewExpr::var("table_view"),
                                 var("mark_array_offset"),
@@ -2862,7 +2862,7 @@ mod gpos {
                         ),
                         ("base_array_offset", u16be()),
                         (
-                            "__base_array",
+                            "#_base_array",
                             phantom(util::view_offset16(
                                 ViewExpr::var("table_view"),
                                 var("base_array_offset"),
@@ -2897,7 +2897,7 @@ mod gpos {
                             repeat_count(var("mark_class_count"), u16be()),
                         ),
                         (
-                            "__ligature_anchors",
+                            "#_ligature_anchors",
                             phantom(for_each(
                                 var("ligature_anchor_offsets"),
                                 "offset",
@@ -2953,7 +2953,7 @@ mod gpos {
                         repeat_count(var("ligature_count"), u16be()),
                     ),
                     (
-                        "__dummy",
+                        "#_ligature_attaches",
                         phantom(for_each(
                             var("ligature_attach_offsets"),
                             "offset",
@@ -2996,7 +2996,7 @@ mod gpos {
                     [
                         ("mark_coverage_offset", u16be()),
                         (
-                            "__mark_coverage",
+                            "#_mark_coverage",
                             phantom(util::view_offset16(
                                 ViewExpr::var("table_view"),
                                 var("mark_coverage_offset"),
@@ -3005,7 +3005,7 @@ mod gpos {
                         ),
                         ("ligature_coverage_offset", u16be()),
                         (
-                            "__ligature_coverage",
+                            "#_ligature_coverage",
                             phantom(util::view_offset16(
                                 ViewExpr::var("table_view"),
                                 var("ligature_coverage_offset"),
@@ -3015,7 +3015,7 @@ mod gpos {
                         ("mark_class_count", u16be()),
                         ("mark_array_offset", u16be()),
                         (
-                            "__mark_array",
+                            "#_mark_array",
                             phantom(util::view_offset16(
                                 ViewExpr::var("table_view"),
                                 var("mark_array_offset"),
@@ -3024,7 +3024,7 @@ mod gpos {
                         ),
                         ("ligature_array_offset", u16be()),
                         (
-                            "__ligature_array",
+                            "#_ligature_array",
                             phantom(util::view_offset16(
                                 ViewExpr::var("table_view"),
                                 var("ligature_array_offset"),
@@ -3060,7 +3060,7 @@ mod gpos {
                 ),
                 // REVIEW - eliminate foreach and fold phantom offsetting into repeat_count ?
                 (
-                    "__mark2_anchors",
+                    "#_mark2_anchors",
                     phantom(for_each(
                         var("mark2_anchor_offsets"),
                         "offset",
@@ -3111,7 +3111,7 @@ mod gpos {
                         ),
                         ("mark1_coverage_offset", u16be()),
                         (
-                            "__mark1_coverage",
+                            "#_mark1_coverage",
                             phantom(util::view_offset16(
                                 ViewExpr::var("table_view"),
                                 var("mark1_coverage_offset"),
@@ -3120,7 +3120,7 @@ mod gpos {
                         ),
                         ("mark2_coverage_offset", u16be()),
                         (
-                            "__mark2_coverage",
+                            "#_mark2_coverage",
                             phantom(util::view_offset16(
                                 ViewExpr::var("table_view"),
                                 var("mark2_coverage_offset"),
@@ -3130,7 +3130,7 @@ mod gpos {
                         ("mark_class_count", u16be()),
                         ("mark1_array_offset", u16be()),
                         (
-                            "__mark1_array",
+                            "#_mark1_array",
                             util::view_offset16(
                                 ViewExpr::var("table_view"),
                                 var("mark1_array_offset"),
@@ -3139,7 +3139,7 @@ mod gpos {
                         ),
                         ("mark2_array_offset", u16be()),
                         (
-                            "__mark2_array",
+                            "#_mark2_array",
                             phantom(util::view_offset16(
                                 ViewExpr::var("table_view"),
                                 var("mark2_array_offset"),
@@ -4236,7 +4236,7 @@ mod layout {
                 // REVIEW - each offset below is individually nullable if the other is set, but it may be invalid for them to both be null simultaneously...?
                 ("x_device_offset", u16be()),
                 (
-                    "__x_device",
+                    "#_x_device",
                     phantom(view_offset16(
                         ViewExpr::var("table_view"),
                         var("x_device_offset"),
@@ -4245,7 +4245,7 @@ mod layout {
                 ),
                 ("y_device_offset", u16be()),
                 (
-                    "__y_device",
+                    "#_y_device",
                     phantom(view_offset16(
                         ViewExpr::var("table_view"),
                         var("y_device_offset"),

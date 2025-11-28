@@ -580,15 +580,17 @@ trait PromoteView<Original>: Sized {
 /// Variant of `TryPromote` for objects holding offsets but which do not encapsulate the `View` they are relative to.
 trait TryPromoteView<Original>: Sized {
     /// The error-type returned when a given conversion cannot succeed.
-    type Error<'a>: std::error::Error
+    type Error<'input>: std::error::Error
     where
-        Original: 'a;
+        Original: 'input;
 
     /// Fallibly post-process from a source-object to `Self` using the provided `View``.
-    fn try_promote_view<'a>(
-        orig: &'a Original,
-        view: View<'a>,
-    ) -> Result<Self, ValueParseError<Self::Error<'a>>>;
+    fn try_promote_view<'input>(
+        orig: &'input Original,
+        view: View<'input>,
+    ) -> Result<Self, ValueParseError<Self::Error<'input>>>
+    where
+        Original: 'input;
 }
 
 /// Custom trait that facilitates conversion from partially-borrowed non-atomic types
@@ -3094,7 +3096,8 @@ impl<'input> OpentypeMark2Array<'input> {
 }
 
 impl<'input> TryPromote<OpentypeMark2Array<'input>> for Mark2Array {
-    type Error = ReflType<TPVErr<'input, OpentypeMark2Record, Mark2Record>, UnknownValueError<u16>>;
+    type Error =
+        ReflType<TPVErr<'input, OpentypeMark2Record<'input>, Mark2Record>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeMark2Array) -> Result<Self, Self::Error> {
         Ok(Mark2Array {
@@ -3109,16 +3112,21 @@ pub(crate) struct Mark2Array {
     mark2_records: Vec<Mark2Record>,
 }
 
-pub type OpentypeMark2Record = opentype_layout_mark2_array_mark2_record;
+pub type OpentypeMark2Record<'input> = opentype_layout_mark2_array_mark2_record<'input>;
 
-impl TryPromoteView<OpentypeMark2Record> for Mark2Record {
-    type Error<'input> =
-        ReflType<TPErr<OpentypeAnchorTable<'input>, AnchorTable>, UnknownValueError<u16>>;
+impl<'a> TryPromoteView<OpentypeMark2Record<'a>> for Mark2Record {
+    type Error<'input>
+        = ReflType<TPErr<OpentypeAnchorTable<'input>, AnchorTable>, UnknownValueError<u16>>
+    where
+        OpentypeMark2Record<'a>: 'input;
 
     fn try_promote_view<'input>(
-        orig: &OpentypeMark2Record,
+        orig: &'input OpentypeMark2Record<'a>,
         view: View<'input>,
-    ) -> Result<Self, ValueParseError<Self::Error<'input>>> {
+    ) -> Result<Self, ValueParseError<Self::Error<'input>>>
+    where
+        'a: 'input,
+    {
         let mut mark2_anchors = Vec::with_capacity(orig.mark2_anchor_offsets.len());
         for &offset in orig.mark2_anchor_offsets.iter() {
             if offset == 0 {
@@ -3465,7 +3473,7 @@ pub(crate) struct MarkArray {
     mark_records: Vec<MarkRecord>,
 }
 
-pub type OpentypeMarkRecord = opentype_layout_mark_record;
+pub type OpentypeMarkRecord<'input> = opentype_layout_mark_record<'input>;
 
 // impl TryPromote<OpentypeMarkRecord> for MarkRecord {
 //     type Error = ReflType<TPErr<OpentypeAnchorTable, AnchorTable>, UnknownValueError<u16>>;
@@ -3487,7 +3495,8 @@ struct MarkRecord {
 pub type OpentypeBaseArray<'input> = opentype_layout_base_array<'input>;
 
 impl<'input> TryPromote<OpentypeBaseArray<'input>> for BaseArray {
-    type Error = ReflType<TPVErr<'input, OpentypeBaseRecord, BaseRecord>, UnknownValueError<u16>>;
+    type Error =
+        ReflType<TPVErr<'input, OpentypeBaseRecord<'input>, BaseRecord>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeBaseArray) -> Result<Self, Self::Error> {
         let mut base_records = Vec::with_capacity(orig.base_records.len());
@@ -3508,9 +3517,9 @@ struct BaseArray {
     base_records: Vec<BaseRecord>,
 }
 
-pub type OpentypeBaseRecord = opentype_layout_base_array_base_record;
+pub type OpentypeBaseRecord<'input> = opentype_layout_base_array_base_record<'input>;
 
-impl container::DynContainer<obj::AncTable> for OpentypeBaseRecord {
+impl<'input> container::DynContainer<obj::AncTable> for OpentypeBaseRecord<'input> {
     fn count(&self) -> usize {
         self.base_anchor_offsets.len()
     }
@@ -3526,14 +3535,19 @@ impl container::DynContainer<obj::AncTable> for OpentypeBaseRecord {
     }
 }
 
-impl TryPromoteView<OpentypeBaseRecord> for BaseRecord {
-    type Error<'input> =
-        ReflType<TPErr<OpentypeAnchorTable<'input>, AnchorTable>, UnknownValueError<u16>>;
+impl<'a> TryPromoteView<OpentypeBaseRecord<'a>> for BaseRecord {
+    type Error<'input>
+        = ReflType<TPErr<OpentypeAnchorTable<'a>, AnchorTable>, UnknownValueError<u16>>
+    where
+        'a: 'input;
 
     fn try_promote_view<'input>(
-        orig: &OpentypeBaseRecord,
+        orig: &'input OpentypeBaseRecord<'a>,
         view: View<'input>,
-    ) -> Result<Self, ValueParseError<Self::Error<'input>>> {
+    ) -> Result<Self, ValueParseError<Self::Error<'input>>>
+    where
+        'a: 'input,
+    {
         use container::DynContainer;
         let mut base_anchors = Vec::with_capacity(DynContainer::<obj::AncTable>::count(orig));
         for raw in reify_all_dep(view, orig, obj::AncTable) {
@@ -4146,8 +4160,10 @@ impl<'input> container::Container<obj::CovTable, 1> for OpentypeCursivePos<'inpu
 }
 
 impl<'input> TryPromote<OpentypeCursivePos<'input>> for CursivePos {
-    type Error =
-        ReflType<TPVErr<'input, OpentypeEntryExitRecord, EntryExitRecord>, UnknownValueError<u16>>;
+    type Error = ReflType<
+        TPVErr<'input, OpentypeEntryExitRecord<'input>, EntryExitRecord>,
+        UnknownValueError<u16>,
+    >;
 
     fn try_promote(orig: &OpentypeCursivePos) -> Result<Self, Self::Error> {
         let mut entry_exit_records = Vec::with_capacity(orig.entry_exit_records.len());
@@ -4170,9 +4186,9 @@ struct CursivePos {
     entry_exit_records: Vec<EntryExitRecord>,
 }
 
-pub type OpentypeEntryExitRecord = opentype_layout_entry_exit_record;
+pub type OpentypeEntryExitRecord<'input> = opentype_layout_entry_exit_record<'input>;
 
-impl container::Container<obj::AncTable, 2> for OpentypeEntryExitRecord {
+impl<'input> container::Container<obj::AncTable, 2> for OpentypeEntryExitRecord<'input> {
     fn get_args(&self) -> [(); 2] {
         [(); 2]
     }
@@ -4185,14 +4201,19 @@ impl container::Container<obj::AncTable, 2> for OpentypeEntryExitRecord {
     }
 }
 
-impl TryPromoteView<OpentypeEntryExitRecord> for EntryExitRecord {
-    type Error<'input> =
-        ReflType<TPErr<OpentypeAnchorTable<'input>, AnchorTable>, UnknownValueError<u16>>;
+impl<'a> TryPromoteView<OpentypeEntryExitRecord<'a>> for EntryExitRecord {
+    type Error<'input>
+        = ReflType<TPErr<OpentypeAnchorTable<'a>, AnchorTable>, UnknownValueError<u16>>
+    where
+        'a: 'input;
 
-    fn try_promote_view<'a>(
-        orig: &'a OpentypeEntryExitRecord,
-        view: View<'a>,
-    ) -> Result<Self, ValueParseError<Self::Error<'a>>> {
+    fn try_promote_view<'input>(
+        orig: &'input OpentypeEntryExitRecord<'a>,
+        view: View<'input>,
+    ) -> Result<Self, ValueParseError<Self::Error<'input>>>
+    where
+        'a: 'input,
+    {
         Ok(EntryExitRecord {
             entry_anchor: try_promote_opt(&reify_dep(view, orig, obj::AncTable, 0)?)
                 .map_err(ValueParseError::value)?,
@@ -4498,9 +4519,12 @@ impl TryPromoteView<OpentypeClass2Record> for Class2Record {
         ReflType<TPVErr<'input, OpentypeValueRecord, ValueRecord>, UnknownValueError<u16>>;
 
     fn try_promote_view<'input>(
-        orig: &OpentypeClass2Record,
+        orig: &'input OpentypeClass2Record,
         view: View<'input>,
-    ) -> Result<Self, ValueParseError<Self::Error<'input>>> {
+    ) -> Result<Self, ValueParseError<Self::Error<'input>>>
+    where
+        OpentypeClass2Record: 'input,
+    {
         Ok(Class2Record {
             value_record1: try_promote_view_opt(&orig.value_record1, view)?,
             value_record2: try_promote_view_opt(&orig.value_record2, view)?,
@@ -4546,9 +4570,12 @@ impl TryPromoteView<OpentypePairValueRecord> for PairValueRecord {
         ReflType<TPVErr<'input, OpentypeValueRecord, ValueRecord>, UnknownValueError<u16>>;
 
     fn try_promote_view<'input>(
-        orig: &OpentypePairValueRecord,
+        orig: &'input OpentypePairValueRecord,
         view: View<'input>,
-    ) -> Result<Self, ValueParseError<Self::Error<'input>>> {
+    ) -> Result<Self, ValueParseError<Self::Error<'input>>>
+    where
+        OpentypePairValueRecord: 'input,
+    {
         Ok(PairValueRecord {
             second_glyph: orig.second_glyph,
             value_record1: try_promote_view_opt(&orig.value_record1, view)?,
@@ -4690,11 +4717,15 @@ impl TryPromoteView<OpentypeValueRecord> for ValueRecord {
     >;
 
     fn try_promote_view<'input>(
-        orig: &OpentypeValueRecord,
+        orig: &'input OpentypeValueRecord,
         view: View<'input>,
-    ) -> Result<Self, ValueParseError<Self::Error<'input>>> {
+    ) -> Result<Self, ValueParseError<Self::Error<'input>>>
+    where
+        OpentypeValueRecord: 'input,
+    {
         // NOTE - we do not distinguish between omitted device-fields and included-but-zeroed device-fields
-        let follow = |device: &Option<opentype_layout_single_pos_format1_coverage>| match device {
+        let follow = |device: &Option<opentype_common_value_record_x_placement_device>| match device
+        {
             Some(dev) => try_promote_opt(
                 &<obj::DevTable as container::CommonObject>::parse_view_offset(
                     view,
