@@ -288,13 +288,13 @@ pub mod container {
 
     /// Trait implemented over marker-type proxies that implement the most natural parse for their
     pub trait CommonObject {
-        type Args;
+        type Args<'a>: Sized;
         type Output<'a>: Sized;
 
         fn parse_view_offset<'input>(
             view: View<'input>,
             offset: usize,
-            args: Self::Args,
+            args: Self::Args<'input>,
         ) -> PResult<Self::Output<'input>>;
     }
 
@@ -304,7 +304,7 @@ pub mod container {
     {
         fn get_offsets(&self) -> [usize; N];
 
-        fn get_args(&self) -> [Obj::Args; N];
+        fn get_args(&self) -> [Obj::Args<'_>; N];
     }
 
     pub trait DynContainer<Obj>
@@ -315,7 +315,7 @@ pub mod container {
 
         fn iter_offsets(&self) -> impl Iterator<Item = usize>;
 
-        fn iter_args(&self) -> impl Iterator<Item = Obj::Args>;
+        fn iter_args(&self) -> impl Iterator<Item = Obj::Args<'_>>;
     }
 }
 
@@ -326,7 +326,7 @@ pub fn reify<'input, Frame, Obj, const N: usize>(
 ) -> Obj::Output<'input>
 where
     Frame: container::ViewFrame<'input> + container::Container<Obj, N>,
-    Obj: container::CommonObject<Args: Clone>,
+    Obj: container::CommonObject<Args<'input>: Clone>,
 {
     let tmp = frame.get_args();
     let offset = frame.get_offsets()[ix];
@@ -339,7 +339,7 @@ pub fn reify_all<'input, Frame, Obj>(
 ) -> impl Iterator<Item = Obj::Output<'input>> + 'input
 where
     Frame: container::ViewFrame<'input> + container::DynContainer<Obj>,
-    Obj: container::CommonObject<Args: Clone + 'input> + 'static,
+    Obj: container::CommonObject<Args<'input>: Clone> + 'static,
 {
     Iterator::zip(frame.iter_offsets(), frame.iter_args()).map(move |(offset, args)| {
         Obj::parse_view_offset(frame.scope(), offset, args).expect("failed to parse")
@@ -348,13 +348,13 @@ where
 
 pub fn reify_dep<'input, Con, Obj, const N: usize>(
     view: View<'input>,
-    container: &Con,
+    container: &'input Con,
     _proxy: Obj,
     ix: usize,
 ) -> PResult<Obj::Output<'input>>
 where
     Con: container::Container<Obj, N>,
-    Obj: container::CommonObject<Args: Clone>,
+    Obj: container::CommonObject<Args<'input>: Clone>,
 {
     let tmp = container.get_args();
     let offset = container.get_offsets()[ix];
@@ -368,7 +368,7 @@ pub fn reify_all_dep<'input, Con, Obj>(
 ) -> impl Iterator<Item = Obj::Output<'input>> + 'input
 where
     Con: container::DynContainer<Obj>,
-    Obj: container::CommonObject<Args: Clone + 'input> + 'static,
+    Obj: container::CommonObject<Args<'input>: Clone> + 'static,
 {
     Iterator::zip(container.iter_offsets(), container.iter_args()).map(move |(offset, args)| {
         Obj::parse_view_offset(view, offset, args).expect("failed to parse")
@@ -389,7 +389,7 @@ pub mod obj {
     proxy!(OpentypeAnchorTable => AncTable);
 
     impl CommonObject for AncTable {
-        type Args = ();
+        type Args<'a> = ();
         type Output<'a> = Option<OpentypeAnchorTable<'a>>;
 
         fn parse_view_offset<'input>(
@@ -408,7 +408,7 @@ pub mod obj {
     proxy!(OpentypeCoverageTable => CovTable);
 
     impl CommonObject for CovTable {
-        type Args = ();
+        type Args<'a> = ();
         type Output<'a> = OpentypeCoverageTable;
 
         fn parse_view_offset<'input>(
@@ -424,7 +424,7 @@ pub mod obj {
     proxy!(OpentypeMarkArray => MarkArr);
 
     impl CommonObject for MarkArr {
-        type Args = ();
+        type Args<'a> = ();
         type Output<'a> = Option<OpentypeMarkArray<'a>>;
 
         fn parse_view_offset<'input>(
@@ -443,7 +443,7 @@ pub mod obj {
     proxy!(OpentypeBaseArray => BaseArr);
 
     impl CommonObject for BaseArr {
-        type Args = u16;
+        type Args<'a> = u16;
         type Output<'a> = Option<OpentypeBaseArray<'a>>;
 
         fn parse_view_offset<'input>(
@@ -465,7 +465,7 @@ pub mod obj {
     proxy!(OpentypeLigatureArray => LigArr);
 
     impl CommonObject for LigArr {
-        type Args = u16;
+        type Args<'a> = u16;
         type Output<'a> = Option<OpentypeLigatureArray<'a>>;
 
         fn parse_view_offset<'input>(
@@ -487,7 +487,7 @@ pub mod obj {
     proxy!(OpentypeClassDef => ClsDef);
 
     impl CommonObject for ClsDef {
-        type Args = ();
+        type Args<'a> = ();
         type Output<'a> = Option<OpentypeClassDef>;
 
         fn parse_view_offset<'input>(
@@ -507,7 +507,7 @@ pub mod obj {
     proxy!(OpentypeDeviceOrVariationIndexTable => DevTable);
 
     impl CommonObject for DevTable {
-        type Args = ();
+        type Args<'a> = ();
         type Output<'a> = Option<OpentypeDeviceOrVariationIndexTable>;
 
         fn parse_view_offset<'input>(
@@ -529,7 +529,7 @@ pub mod obj {
     proxy!(OpentypeVariationAxisRecord => AxisRec);
 
     impl CommonObject for AxisRec {
-        type Args = ();
+        type Args<'a> = ();
         type Output<'a> = OpentypeVariationAxisRecord;
 
         fn parse_view_offset<'input>(
@@ -546,13 +546,13 @@ pub mod obj {
 
     impl CommonObject for InstanceRec {
         /// Args: `(axis_count, instance_size)`
-        type Args = (u16, u16);
+        type Args<'a> = (u16, u16);
         type Output<'a> = OpentypeInstanceRecord;
 
         fn parse_view_offset<'input>(
             view: View<'input>,
             offset: usize,
-            (axis_count, instance_size): Self::Args,
+            (axis_count, instance_size): (u16, u16),
         ) -> PResult<Self::Output<'input>> {
             let mut p = Parser::from(view.offset(offset)?);
             crate::Decoder_opentype_fvar_instance_record(&mut p, axis_count, instance_size)
@@ -563,13 +563,13 @@ pub mod obj {
 
     impl CommonObject for GVarData {
         /// Args: `(len, axis_count)`
-        type Args = (usize, u16);
-        type Output<'a> = Option<OpentypeGlyphVariationData>;
+        type Args<'a> = (usize, u16);
+        type Output<'a> = Option<OpentypeGlyphVariationData<'a>>;
 
         fn parse_view_offset<'input>(
             view: View<'input>,
             offset: usize,
-            (len, axis_count): Self::Args,
+            (len, axis_count): (usize, u16),
         ) -> PResult<Self::Output<'input>> {
             if len == 0 {
                 return Ok(None);
@@ -586,13 +586,13 @@ pub mod obj {
 
     impl CommonObject for SharedTupleArr {
         /// Args: `(shared_tuple_count, axis_count)`
-        type Args = (usize, u16);
+        type Args<'a> = (usize, u16);
         type Output<'a> = Option<Vec<OpentypeGvarTupleRecord>>;
 
         fn parse_view_offset<'input>(
             view: View<'input>,
             offset: usize,
-            (shared_tuple_count, axis_count): Self::Args,
+            (shared_tuple_count, axis_count): (usize, u16),
         ) -> PResult<Self::Output<'input>> {
             if offset == 0 {
                 return Ok(None);
@@ -612,16 +612,54 @@ pub mod obj {
 
     impl CommonObject for PosLookup {
         /// Args : `extension_lookup_type`
-        type Args = u16;
+        type Args<'a> = u16;
         type Output<'a> = OpentypeGposLookupSubtable<'a>;
 
         fn parse_view_offset<'input>(
             view: View<'input>,
             offset: usize,
-            args: Self::Args,
+            lookup_type: u16,
         ) -> PResult<Self::Output<'input>> {
             let mut p = Parser::from(view.offset(offset)?);
-            crate::Decoder_opentype_layout_ground_pos(&mut p, args)
+            crate::Decoder_opentype_layout_ground_pos(&mut p, lookup_type)
+        }
+    }
+
+    proxy!(OpentypeGsubLookupSubtable => SubstLookup);
+
+    impl CommonObject for SubstLookup {
+        /// Args : `extension_lookup_type`
+        type Args<'a> = u16;
+        type Output<'a> = OpentypeGsubLookupSubtable<'a>;
+
+        fn parse_view_offset<'input>(
+            view: View<'input>,
+            offset: usize,
+            lookup_type: u16,
+        ) -> PResult<Self::Output<'input>> {
+            let mut p = Parser::from(view.offset(offset)?);
+            crate::Decoder_opentype_layout_ground_subst(&mut p, lookup_type)
+        }
+    }
+
+    proxy!(OpentypeGvarSerializedData => GvarSerData);
+
+    impl CommonObject for GvarSerData {
+        /// Args : `(shared_point_numbers, tuple_variation_headers)`
+        type Args<'a> = (bool, &'a [super::OpentypeGvarTupleVariationHeader]);
+        type Output<'a> = OpentypeGvarSerializedData;
+
+        fn parse_view_offset<'input>(
+            view: View<'input>,
+            offset: usize,
+            (shared_point_numbers, tuple_variation_headers): Self::Args<'input>,
+        ) -> PResult<Self::Output<'input>> {
+            let mut p = Parser::from(view.offset(offset)?);
+            crate::Decoder_opentype_gvar_serialized_data(
+                &mut p,
+                shared_point_numbers,
+                tuple_variation_headers,
+            )
         }
     }
 }
@@ -1135,7 +1173,7 @@ impl<'input> container::Container<obj::SharedTupleArr, 1> for OpentypeGvar<'inpu
         [self.shared_tuples_offset as usize]
     }
 
-    fn get_args(&self) -> [<obj::SharedTupleArr as container::CommonObject>::Args; 1] {
+    fn get_args(&self) -> [<obj::SharedTupleArr as container::CommonObject>::Args<'input>; 1] {
         [(self.shared_tuple_count as usize, self.axis_count)]
     }
 }
@@ -1253,15 +1291,30 @@ pub struct GvarIntermediateTuples {
     end_tuple: GvarTupleRecord,
 }
 
-pub type OpentypeGlyphVariationData = opentype_gvar_glyph_variation_data;
+pub type OpentypeGlyphVariationData<'input> = opentype_gvar_glyph_variation_data<'input>;
 
-impl Promote<OpentypeGlyphVariationData> for GlyphVariationData {
+frame!(OpentypeGlyphVariationData.data_scope);
+
+impl<'input> container::Container<obj::GvarSerData, 1> for OpentypeGlyphVariationData<'input> {
+    fn get_offsets(&self) -> [usize; 1] {
+        [self.data_offset as usize]
+    }
+
+    fn get_args(&self) -> [<obj::GvarSerData as container::CommonObject>::Args<'_>; 1] {
+        [(
+            self.tuple_variation_count.shared_point_numbers,
+            &self.tuple_variation_headers,
+        )]
+    }
+}
+
+impl<'input> Promote<OpentypeGlyphVariationData<'input>> for GlyphVariationData {
     fn promote(orig: &OpentypeGlyphVariationData) -> Self {
         GlyphVariationData {
             shared_point_numbers: orig.tuple_variation_count.shared_point_numbers,
             tuple_count: orig.tuple_variation_count.tuple_count,
             tuple_variation_headers: promote_vec(&orig.tuple_variation_headers),
-            data: Promote::promote(&orig.data),
+            data: GvarSerializedData::promote(&reify(orig, obj::GvarSerData, 0)),
         }
     }
 }
@@ -3070,6 +3123,18 @@ impl<'input> TryPromote<OpentypeGsubLookupSubtableExt<'input>> for LookupSubtabl
     }
 }
 
+frame!(OpentypeSubstExtension);
+
+impl<'input> container::Container<obj::SubstLookup, 1> for OpentypeSubstExtension<'input> {
+    fn get_offsets(&self) -> [usize; 1] {
+        [self.extension_offset.offset as usize]
+    }
+
+    fn get_args(&self) -> [u16; 1] {
+        [self.extension_lookup_type]
+    }
+}
+
 impl<'input> TryPromote<OpentypeSubstExtension<'input>> for LookupSubtable {
     type Error = ReflType<
         TPErr<OpentypeGsubLookupSubtable<'input>, LookupSubtable>,
@@ -3077,10 +3142,8 @@ impl<'input> TryPromote<OpentypeSubstExtension<'input>> for LookupSubtable {
     >;
 
     fn try_promote(orig: &OpentypeSubstExtension) -> Result<Self, Self::Error> {
-        match &orig.extension_offset.link {
-            None => unreachable!("SubstExtension Offset should not be Null"),
-            Some(ground) => LookupSubtable::try_promote(ground),
-        }
+        let raw = reify(orig, obj::SubstLookup, 0);
+        LookupSubtable::try_promote(&raw)
     }
 }
 
@@ -3137,10 +3200,10 @@ frame!(OpentypePosExtension);
 
 impl<'input> container::Container<obj::PosLookup, 1> for OpentypePosExtension<'input> {
     fn get_offsets(&self) -> [usize; 1] {
-        [self.extension_offset.offset]
+        [self.extension_offset.offset as usize]
     }
 
-    fn get_args(&self) -> [<obj::PosLookup as container::CommonObject>::Args; 1] {
+    fn get_args(&self) -> [u16; 1] {
         [self.extension_lookup_type]
     }
 }
@@ -3150,10 +3213,8 @@ impl<'input> TryPromote<OpentypePosExtension<'input>> for LookupSubtable {
         ReflType<TPErr<OpentypeGposLookupSubtable<'input>, LookupSubtable>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypePosExtension) -> Result<Self, Self::Error> {
-        match &orig.extension_offset.link {
-            None => unreachable!("PosExtension Offset should not be Null"),
-            Some(ground) => LookupSubtable::try_promote(ground),
-        }
+        let ground = reify(orig, obj::PosLookup, 0);
+        LookupSubtable::try_promote(&ground)
     }
 }
 
@@ -3219,11 +3280,7 @@ enum LookupSubtable {
 
 pub type OpentypeMarkMarkPos<'input> = opentype_layout_mark_mark_pos<'input>;
 
-impl<'input> container::ViewFrame<'input> for OpentypeMarkMarkPos<'input> {
-    fn scope(&self) -> View<'input> {
-        self.table_scope
-    }
-}
+frame!(OpentypeMarkMarkPos);
 
 impl<'input> container::Container<obj::CovTable, 2> for OpentypeMarkMarkPos<'input> {
     fn get_offsets(&self) -> [usize; 2] {
@@ -4011,16 +4068,22 @@ enum SingleSubst {
     Format2(SingleSubstFormat2),
 }
 
-impl<'input> container::ViewFrame<'input> for OpentypeSingleSubstFormat1<'input> {
-    fn scope(&self) -> View<'input> {
-        self.table_scope
+frame!(OpentypeSingleSubstFormat1);
+
+impl<'input> container::Container<obj::CovTable, 1> for OpentypeSingleSubstFormat1<'input> {
+    fn get_offsets(&self) -> [usize; 1] {
+        [self.coverage.offset as usize]
+    }
+
+    fn get_args(&self) -> [<obj::CovTable as container::CommonObject>::Args<'_>; 1] {
+        [()]
     }
 }
 
-impl Promote<OpentypeSingleSubstFormat1> for SingleSubstFormat1 {
+impl<'input> Promote<OpentypeSingleSubstFormat1<'input>> for SingleSubstFormat1 {
     fn promote(orig: &OpentypeSingleSubstFormat1) -> Self {
         SingleSubstFormat1 {
-            coverage: CoverageTable::promote(&orig.coverage.link),
+            coverage: CoverageTable::promote(&reify(orig, obj::CovTable, 0)),
             delta_glyph_id: orig.delta_glyph_id,
         }
     }
@@ -4032,10 +4095,22 @@ struct SingleSubstFormat1 {
     delta_glyph_id: s16,
 }
 
-impl Promote<OpentypeSingleSubstFormat2> for SingleSubstFormat2 {
+frame!(OpentypeSingleSubstFormat2);
+
+impl<'input> container::Container<obj::CovTable, 1> for OpentypeSingleSubstFormat2<'input> {
+    fn get_offsets(&self) -> [usize; 1] {
+        [self.coverage.offset as usize]
+    }
+
+    fn get_args(&self) -> [<obj::CovTable as container::CommonObject>::Args<'_>; 1] {
+        [()]
+    }
+}
+
+impl<'input> Promote<OpentypeSingleSubstFormat2<'input>> for SingleSubstFormat2 {
     fn promote(orig: &OpentypeSingleSubstFormat2) -> Self {
         SingleSubstFormat2 {
-            coverage: CoverageTable::promote(&orig.coverage.link),
+            coverage: CoverageTable::promote(&reify(orig, obj::CovTable, 0)),
             substitute_glyph_ids: orig.substitute_glyph_ids.clone(),
         }
     }
@@ -4994,7 +5069,8 @@ type LookupFlag = opentype_gpos_table_lookup_list_link_lookups_link_lookup_flag;
 
 pub type OpentypeGposLookupTable<'input> =
     opentype_gpos_table_lookup_list_link_lookups_link<'input>;
-pub type OpentypeGsubLookupTable = opentype_gsub_table_lookup_list_link_lookups_link;
+pub type OpentypeGsubLookupTable<'input> =
+    opentype_gsub_table_lookup_list_link_lookups_link<'input>;
 
 impl<'input> TryPromote<OpentypeGposLookupTable<'input>> for LookupTable {
     type Error =
@@ -5055,10 +5131,10 @@ impl<'input> TryPromote<OpentypeGposLookupTable<'input>> for LookupTable {
     }
 }
 
-impl TryPromote<OpentypeGsubLookupTable> for LookupTable {
+impl<'input> TryPromote<OpentypeGsubLookupTable<'input>> for LookupTable {
     type Error = ReflType<
-        TPErr<OpentypeGsubLookupSubtable<'static>, LookupSubtable>,
-        std::convert::Infallible, // for compatibility with GPOS promotion, can't use BadExtensionError as the error types woudl collide
+        TPErr<OpentypeGsubLookupSubtable<'input>, LookupSubtable>,
+        std::convert::Infallible, // for compatibility with GPOS promotion, can't use BadExtensionError as the error types would collide
     >;
 
     fn try_promote(orig: &OpentypeGsubLookupTable) -> Result<Self, Self::Error> {
@@ -5069,7 +5145,7 @@ impl TryPromote<OpentypeGsubLookupTable> for LookupTable {
             SUBST_EXTENSION_LOOKUP_TYPE => {
                 let mut extension_lookup_type: Option<u16> = None;
                 for (_ix, offset) in orig.subtables.iter().enumerate() {
-                    // FIXME - this needs to be cleaned up in both definition-site and lcoally
+                    // FIXME - this needs to be cleaned up in both definition-site and locally
                     match &offset.link {
                         None => eprintln!("empty subtable at lookup {_ix}"),
                         Some(subtable @ OpentypeGsubLookupSubtableExt::SubstExtension(ext)) => {
@@ -5145,7 +5221,7 @@ impl Promote<OpentypeFeatureList> for FeatureList {
 }
 
 pub type OpentypeGposLookupList<'input> = opentype_gpos_table_lookup_list_link<'input>;
-pub type OpentypeGsubLookupList = opentype_gsub_table_lookup_list_link;
+pub type OpentypeGsubLookupList<'input> = opentype_gsub_table_lookup_list_link<'input>;
 
 impl<'input> TryPromote<OpentypeGposLookupList<'input>> for LookupList {
     type Error =
@@ -5160,8 +5236,8 @@ impl<'input> TryPromote<OpentypeGposLookupList<'input>> for LookupList {
     }
 }
 
-impl TryPromote<OpentypeGsubLookupList> for LookupList {
-    type Error = TPErr<OpentypeGsubLookupTable, LookupTable>;
+impl<'input> TryPromote<OpentypeGsubLookupList<'input>> for LookupList {
+    type Error = TPErr<OpentypeGsubLookupTable<'input>, LookupTable>;
 
     fn try_promote(orig: &OpentypeGsubLookupList) -> Result<Self, Self::Error> {
         let mut accum = Vec::with_capacity(orig.lookups.len());
@@ -8507,10 +8583,7 @@ pub mod lookup_subtable {
                     let ground = match &subtable {
                         OpentypeGposLookupSubtableExt::PosExtension(ext) => {
                             ret.pos_extension = true;
-                            match &ext.extension_offset.link {
-                                None => unreachable!("missing link"),
-                                Some(ground) => ground,
-                            }
+                            &super::reify(ext, super::obj::PosLookup, 0)
                         }
                         OpentypeGposLookupSubtableExt::GroundPos(ground) => ground,
                     };
@@ -8547,10 +8620,7 @@ pub mod lookup_subtable {
                     let ground = match subtable {
                         OpentypeGsubLookupSubtableExt::SubstExtension(ext) => {
                             ret.subst_extension = true;
-                            match &ext.extension_offset.link {
-                                None => unreachable!("missing link"),
-                                Some(ground) => ground,
-                            }
+                            &super::reify(ext, super::obj::SubstLookup, 0)
                         }
                         OpentypeGsubLookupSubtableExt::GroundSubst(ground) => ground,
                     };
