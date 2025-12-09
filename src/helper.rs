@@ -454,6 +454,24 @@ pub fn record_auto<Name: IntoLabel + AsRef<str>>(
     record_ext(fields_persist)
 }
 
+/// Like `record_auto`, but instead of constructing a record, we are processing a list of preliminary formats for parameters (or side-effects) in order to
+/// parse the final `format`.
+///
+/// In cases where the only persisted field of `record_auto` would be the last, but we don't actually want a record, we can use `pseudo_record` instead.
+pub fn pseudo_record<Name: IntoLabel + AsRef<str>>(
+    prelim: impl IntoIterator<Item = (Name, Format), IntoIter: DoubleEndedIterator>,
+    format: Format,
+) -> Format {
+    let prelim = prelim.into_iter().map(|(label, format)| {
+        if label.as_ref().starts_with("__") {
+            (None, format)
+        } else {
+            (Some(label), format)
+        }
+    });
+    Format::chaining(prelim, format)
+}
+
 /// Bespoke record-constructor for new-style `Format`-level records.
 ///
 /// Instead of a simple label, each format is given a synthetic marker for the field-capture

@@ -1056,8 +1056,7 @@ impl<'a> RecordBuilder<'a> {
 #[serde(tag = "tag", content = "data")]
 pub enum Format {
     /// Reference to a top-level item
-    // REVIEW - is the `Option` around `Vec<ViewExpr>` useful?
-    ItemVar(usize, Vec<Expr>, Option<Vec<ViewExpr>>), // FIXME - do the exprs here need type(+) info?
+    ItemVar(usize, Vec<Expr>, Vec<ViewExpr>), // FIXME - do the exprs here need type(+) info?
     /// A format that never matches
     Fail,
     /// Matches if the end of the input has been reached
@@ -1209,6 +1208,40 @@ impl Format {
                         Box::new(format),
                         name,
                         Box::new(Format::__chain_record(captured, remaining)),
+                    )
+                }
+            }
+        }
+    }
+
+    pub fn chaining<Name: IntoLabel>(
+        formats: impl IntoIterator<Item = (Option<Name>, Format), IntoIter: DoubleEndedIterator>,
+        format: Format,
+    ) -> Format {
+        let mut remaining = formats.into_iter().rev().collect::<Vec<_>>();
+        Format::__chain_format(&mut remaining, format)
+    }
+
+    pub(crate) fn __chain_format<Name: IntoLabel>(
+        remaining: &mut Vec<(Option<Name>, Format)>,
+        ret: Format,
+    ) -> Format {
+        if remaining.is_empty() {
+            ret
+        } else {
+            let this = remaining.pop().unwrap();
+            let (label, format) = this;
+            match label {
+                None => Format::MonadSeq(
+                    Box::new(format),
+                    Box::new(Format::__chain_format(remaining, ret)),
+                ),
+                Some(name) => {
+                    let name: Label = name.into();
+                    Format::LetFormat(
+                        Box::new(format),
+                        name,
+                        Box::new(Format::__chain_format(remaining, ret)),
                     )
                 }
             }
@@ -1496,16 +1529,24 @@ impl FormatRef {
     }
 
     pub fn call(&self) -> Format {
-        Format::ItemVar(self.0, vec![], None)
+        Format::ItemVar(self.0, Vec::new(), Vec::new())
     }
 
     // REVIEW - do we need it to be `Vec` or is `impl IntoIterator<Item = Expr>` better?
     pub fn call_args(&self, args: Vec<Expr>) -> Format {
-        Format::ItemVar(self.0, args, None)
+        Format::ItemVar(self.0, args, Vec::new())
+    }
+
+    pub fn call_views(&self, views: Vec<ViewExpr>) -> Format {
+        Format::ItemVar(self.0, Vec::new(), views)
     }
 
     pub fn call_args_views(&self, args: Vec<Expr>, views: Vec<ViewExpr>) -> Format {
-        Format::ItemVar(self.0, args, Some(views))
+        Format::ItemVar(self.0, args, views)
+    }
+
+    pub fn call_view(&self, view: ViewExpr) -> Format {
+        Format::ItemVar(self.0, vec![], vec![view])
     }
 }
 
@@ -1542,6 +1583,15 @@ impl FormatModule {
         self.define_format_args_views(name, args, vec![], format)
     }
 
+    pub fn define_format_views(
+        &mut self,
+        name: impl IntoLabel,
+        views: Vec<Label>,
+        format: Format,
+    ) -> FormatRef {
+        self.define_format_args_views(name, vec![], views, format)
+    }
+
     pub fn define_format_args_views(
         &mut self,
         name: impl IntoLabel,
@@ -1575,10 +1625,6 @@ impl FormatModule {
 
     /// Iterates through every format defined in this module, constructing an invocation for each
     /// with an appropriate array of arguments with the expected `ValueType`s.
-    ///
-    /// # Notes
-    ///
-    /// Does not yet have a way of passing in parameters to view-dependent formats.
     pub fn iter_formats(&self) -> impl Iterator<Item = (usize, Format)> + '_ {
         (0..self.formats.len()).filter_map(|ix| {
             let mut x_args = Vec::with_capacity(self.args[ix].len());
@@ -1586,14 +1632,14 @@ impl FormatModule {
                 x_args.push(mk_value_expr(vt)?);
             }
             match self.views[ix].len() {
-                0 => Some((ix, Format::ItemVar(ix, x_args, None))),
+                0 => Some((ix, Format::ItemVar(ix, x_args, Vec::new()))),
                 n => {
                     let x_views = repeat_n(ViewExpr::var("dummy"), n).collect();
                     Some((
                         ix,
                         Format::LetView(
                             Label::Borrowed("dummy"),
-                            Box::new(Format::ItemVar(ix, x_args, Some(x_views))),
+                            Box::new(Format::ItemVar(ix, x_args, x_views)),
                         ),
                     ))
                 }
@@ -1619,7 +1665,7 @@ impl FormatModule {
 
     fn infer_format_type(&self, scope: &TypeScope<'_>, f: &Format) -> AResult<ValueType> {
         match f {
-            Format::ItemVar(level, arg_exprs, _arg_views) => {
+            Format::ItemVar(level, arg_exprs, arg_views) => {
                 let arg_names = self.get_args(*level);
                 if arg_names.len() != arg_exprs.len() {
                     return Err(anyhow!(
@@ -1628,15 +1674,13 @@ impl FormatModule {
                         arg_exprs.len()
                     ));
                 }
-                if let Some(arg_views) = _arg_views {
-                    let view_names = self.get_view_args(*level);
-                    if view_names.len() != arg_views.len() {
-                        return Err(anyhow!(
-                            "Expected {} views, found {}",
-                            view_names.len(),
-                            arg_views.len(),
-                        ));
-                    }
+                let view_names = self.get_view_args(*level);
+                if view_names.len() != arg_views.len() {
+                    return Err(anyhow!(
+                        "Expected {} views, found {}",
+                        view_names.len(),
+                        arg_views.len(),
+                    ));
                 }
                 for ((_name, arg_type), expr) in Iterator::zip(arg_names.iter(), arg_exprs.iter()) {
                     let t = expr.infer_type(scope)?;

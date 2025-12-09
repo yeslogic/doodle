@@ -927,7 +927,7 @@ pub(crate) mod search;
 /// Decoders with a fixed amount of lookahead
 #[derive(Clone, Debug)]
 pub enum Decoder {
-    Call(usize, Vec<(Label, Expr)>, Option<Vec<(Label, ViewExpr)>>),
+    Call(usize, Vec<(Label, Expr)>, Vec<(Label, ViewExpr)>),
     Pos,
     Fail,
     EndOfInput,
@@ -1058,16 +1058,11 @@ impl<'a> Compiler<'a> {
                 for ((name, _type), expr) in Iterator::zip(arg_names.iter(), arg_exprs.iter()) {
                     args.push((name.clone(), expr.clone()));
                 }
-                let views = if let Some(arg_views) = arg_views {
-                    let view_names = self.module.get_view_args(*level);
-                    let mut views = Vec::with_capacity(view_names.len());
-                    for (name, view) in Iterator::zip(view_names.iter(), arg_views.iter()) {
-                        views.push((name.clone(), view.clone()));
-                    }
-                    Some(views)
-                } else {
-                    None
-                };
+                let view_names = self.module.get_view_args(*level);
+                let mut views = Vec::with_capacity(view_names.len());
+                for (name, view) in Iterator::zip(view_names.iter(), arg_views.iter()) {
+                    views.push((name.clone(), view.clone()));
+                }
                 Ok(Decoder::Call(n, args, views))
             }
             Format::Phantom(_inner) => Ok(Decoder::Phantom),
@@ -1570,7 +1565,7 @@ impl Decoder {
                     let v = e.eval_value(scope);
                     new_scope.push_owned(name.clone(), v);
                 }
-                for (name, v) in vs.iter().flatten() {
+                for (name, v) in vs {
                     let vv = Self::eval_view_expr(scope, v)?;
                     new_scope.push_view(name.clone(), vv);
                 }

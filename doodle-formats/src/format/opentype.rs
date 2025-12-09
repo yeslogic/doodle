@@ -65,7 +65,7 @@ mod util {
             NestingKind::MinimalVariation => {
                 // REVIEW - it is not necessarily obvious that all FlatternInner defs can be changed to SingletonADT versions if they refer to variables in the outer record, but it seems plausible at least
                 let mut has_discriminant = false;
-                let record_inner = record(inner_fields);
+                let record_inner = record_auto(inner_fields);
                 let mut accum = Vec::with_capacity(OUTER + 1);
                 for (name, format) in outer_fields {
                     has_discriminant = has_discriminant || name == disc_field;
@@ -247,11 +247,6 @@ mod util {
         )
     }
 
-    /// Given a U32-typed position `pos32` and a U16-typed offset `offset16`, computes a target-position as the U32-typed sum of the two values.
-    pub(crate) fn pos_add_u16(pos32: Expr, offset16: Expr) -> Expr {
-        add(pos32, Expr::AsU32(Box::new(offset16)))
-    }
-
     /// Parses a u32 serving as the de-facto representation of a signed, 16.16 bit fixed-point number
     pub(crate) fn fixed32be() -> Format {
         fmt_variant("Fixed32", u32be())
@@ -407,10 +402,14 @@ mod util {
         ))
     }
 
+    // WIP
     pub(crate) const START_VAR: Expr = Expr::Var(Label::Borrowed("start"));
 
+    // WIP
     pub(crate) const START_ARG: (Label, ValueType) =
         (Label::Borrowed("start"), ValueType::Base(BaseType::U32));
+
+    pub(crate) const TABLE_VIEW: Label = Label::Borrowed("table_view");
 
     /// Given `Expr`s `table_records` and a `query_table_id` of the appropriate Rust-type (`u32`),
     /// applies `dep_format` to the `Option<T>`-kinded `Expr` yielded by a binary search over
@@ -449,70 +448,57 @@ mod util {
         dep_format(opt_match)
     }
 
-    /// Given a raw Format `format` and an absolute buffer-offset `abs_offset`,
-    /// attempts to parse `format` at `abs_offset`, wrapping it in `format_some`
-    /// if this is a sound operation.
-    ///
-    /// If the offset specified has already been exceeded, will return `format_none()`
-    /// instead.
-    pub(crate) fn link_forward_checked(abs_offset: Expr, format: Format) -> Format {
-        chain(
-            pos32(),
-            "__here",
-            cond_maybe(
-                expr_gte(abs_offset.clone(), var("__here")),
-                with_relative_offset(Some(Expr::U32(0)), abs_offset, format),
-            ),
-        )
-    }
-
     pub(crate) const CONTENT_AT_OFFSET_IDENT: &str = "link";
 
     /// Scaffolding aid for migration from Pos-arithmetic model to ViewFormat model
     ///
     /// Given a ViewExpr `base_view` that stands in for the base-position for offset arithmetic,
-    /// a possibly-zero u16-kinded `offset`, and a Format `format`, constructs a Format that
+    /// a possibly-zero `offset`, and a Format `format`, constructs a Format that
     /// parses `format` at the location `base_view + offset` iff `offset` is non-zero, and returns
     /// None otherwise (meaning that non-zero offset parses are wrapped in Some).
     // TODO[epic=eager-view-parse] - This should be phased out in favor of less-eager ViewFormat processing.
-    pub(crate) fn view_offset16(base_view: ViewExpr, offset: Expr, format: Format) -> Format {
+    pub(crate) fn parse_view_offset<K: ZeroMarker>(
+        base_view: ViewExpr,
+        offset: Expr,
+        format: Format,
+    ) -> Format {
         cond_maybe(
-            is_nonzero_u16(offset.clone()),
+            is_nonzero::<K>(offset.clone()),
             parse_from_view(base_view.offset(offset), format),
         )
     }
 
-    /// Scaffolding aid for migration from Pos-arithmetic model to ViewFormat model
+    /// Parses a u16be offset and captures `nbytes` bytes starting at that offset (relative to `view`).
     ///
-    /// Given a ViewExpr `base_view` that stands in for the base-position for offset arithmetic,
-    /// a possibly-zero u32-kinded `offset`, and a Format `format`, constructs a Format that
-    /// parses `format` at the location `base_view + offset` iff `offset` is non-zero, and returns
-    /// None otherwise (meaning that non-zero offset parses are wrapped in Some).
-    // TODO[epic=eager-view-parse] - This should be phased out in favor of less-eager ViewFormat processing.
-    pub(crate) fn view_offset32(base_view: ViewExpr, offset: Expr, format: Format) -> Format {
-        cond_maybe(
-            is_nonzero_u32(offset.clone()),
-            parse_from_view(base_view.offset(offset), format),
-        )
-    }
-
-    /// Compact format for parsing a u16be and phantom-parsing `format` at that offset (relative to a view).
-    pub(crate) fn read_phantom_view_offset16(view: ViewExpr, format: Format) -> Format {
-        record_auto([
+    /// Returns a record `{ offset: u16, data: &[u8] }`
+    pub(crate) fn capture_bytes_view_offset16(view: ViewExpr, nbytes: Expr) -> Format {
+        record([
             ("offset", u16be()),
             (
-                "#__data",
-                phantom(view_offset16(view, var("offset"), format)),
+                "data",
+                with_view(view.offset(var("offset")), capture_bytes(nbytes)),
             ),
         ])
     }
 
+    /// Record-format that reads (and stores) a u16be offset, along with a field `_data` for the phantom-parse of `format` at that offset (relative to `view`).
+    pub(crate) fn read_phantom_view_offset16(view: ViewExpr, format: Format) -> Format {
+        record_auto([
+            ("offset", u16be()),
+            (
+                "#_data",
+                phantom(parse_view_offset::<U16>(view, var("offset"), format)),
+            ),
+        ])
+    }
+
+    /// Record-format that reads (and stores) a u32be offset, along with a field `_data` for the phantom-parse of `format` at that offset (relative to `view`).
     pub(crate) fn read_phantom_view_offset32(view: ViewExpr, format: Format) -> Format {
         record_auto([
             ("offset", u32be()),
             (
                 "#_data",
-                phantom(view_offset32(view, var("offset"), format)),
+                phantom(parse_view_offset::<U32>(view, var("offset"), format)),
             ),
         ])
     }
@@ -525,83 +511,13 @@ mod util {
         let base_model = Box::new(FormatExt::from(chain(
             u16be(),
             "offset",
-            view_offset16(view.clone(), var("offset"), format.clone()),
+            parse_view_offset(view.clone(), var("offset"), format.clone()),
         )));
         let alt_model = Box::new(FormatExt::from(read_phantom_view_offset16(view, format)));
         FormatExt::Meta(MetaFormat::EngineSpecific {
             base_model,
             alt_model,
         })
-    }
-
-    /// Given a value of `base_offset` (the absolute stream-position relative to which offsets are to be interpreted),
-    /// parses a u16be as a positive delta from `base_offset` and returns the linked content parsed according
-    /// to `format` at that location.
-    ///
-    /// Returns a record `{ offset: u16, link := (offset > 0) ? Some(format) : None }`
-    ///
-    /// # Note
-    ///
-    /// Despite a valid offset being 'mandatory', there is no practical way to avoid constructing
-    /// some form of `Option`-like container to reluctantly avoid erroring out; the OpenType specification
-    /// itself says that parsers of OpenType data should "anticipate non-conformant font data that has a
-    /// NULL subtable offset where only a non-NULL value is expected."
-    ///
-    /// Thus, we have to be prepared to parse a zero-length offset and return an empty format of some kind.
-    ///
-    /// In future iterations, a distinct option-like type may be constructed to distinguish nullable offset-links
-    /// from non-nullable offset-links, but for now, behavior is identical to [`offset16_nullable`].
-    ///
-    /// See [https://learn.microsoft.com/en-us/typography/opentype/spec/otff#data-types] for more info.
-    ///
-    /// Furthermore, to handle irregular inputs that would otherwise require moving *backwards* to reach the
-    /// desired offset, `None` is returned in any case where the relative-delta to reach the target offset is
-    /// non-positive.
-    pub(crate) fn offset16_mandatory(base_offset: Expr, format: Format) -> Format {
-        shadow_check(&base_offset, "offset");
-        // REVIEW - there is an argument to be made that we should use `chain` instead of `record` to elide the offset and flatten the link
-        record([
-            ("offset", u16be()),
-            (
-                CONTENT_AT_OFFSET_IDENT,
-                if_then_else(
-                    is_nonzero_u16(var("offset")),
-                    link_forward_checked(pos_add_u16(base_offset, var("offset")), format),
-                    // NOTE - link_forward_checked  yields None if the offset has been exceeded and Some(format) otherwise
-                    fmt_none(),
-                ),
-            ),
-        ])
-    }
-
-    /// Given a U32-kinded expression `base_offset` that represents the absolute stream-position relative to
-    /// which offsets are to be interpreted, parses a u16be as a positive delta from `base_offset` and returns
-    /// the parse-result of `format` at the target stream-position (in a lookahead--style context).
-    ///
-    /// Returns a record `{ offset: u16, link := (offset > 0) ? Some(format) : None }`
-    ///
-    /// (Implicitly includes a semantic shortcut whereby an offset-value (parsed) of `0` signals
-    /// that there is no associated data, in which case `None` is yielded for the `link`.)
-    ///
-    /// # Notes
-    ///
-    /// To handle irregular inputs that would otherwise require moving *backwards* to reach the desired offset,
-    /// `None` is returned in any case where the relative-delta to reach the target offset is non-positive.
-    pub(crate) fn offset16_nullable(base_offset: Expr, format: Format) -> Format {
-        shadow_check(&base_offset, "offset");
-        // REVIEW - there is an argument to be made that we should use `chain` instead of `record` to elide the offset and flatten the link
-        record([
-            ("offset", u16be()),
-            (
-                CONTENT_AT_OFFSET_IDENT,
-                if_then_else(
-                    is_nonzero_u16(var("offset")),
-                    // NOTE - link_forward_checked  yields None if the offset has been exceeded and Some(format) otherwise
-                    link_forward_checked(pos_add_u16(base_offset, var("offset")), format),
-                    fmt_none(),
-                ),
-            ),
-        ])
     }
 
     /// Given a value of `base_offset` (the absolute stream-position relative to which offsets are to be interpreted),
@@ -650,16 +566,23 @@ mod util {
         with_relative_offset(Some(base_offset), rel_offset, format)
     }
 
-    /// Given a record `{ offset: (u16 | u32), link: ... }`, returns the value of `link`
+    /// Produces a `Format` that evaluates the delayed parse of `read_phantom_view_offset{16|32}`.
+    ///
+    /// Takes the original Format and the correct `ViewExpr` to parse relative to.
     ///
     /// # Notes
     ///
-    /// Used to avoid hard-coded/open-coded references to "link" in format definitions that
-    /// are unbound from the identifier used in `offset16_*` and `offset32`.
-    ///
-    /// When called on the result  of `offset16_nullable`
-    pub(crate) fn get_content_at_offset(offset_record: Expr) -> Expr {
-        record_proj(offset_record, CONTENT_AT_OFFSET_IDENT)
+    /// Returns a `Format @ Option<T>` where `format :~ T`
+    pub(crate) fn get_content_at_offset<K: ZeroMarker>(
+        orig_view: ViewExpr,
+        offset_record: Expr,
+        format: Format,
+    ) -> Format {
+        let offset = record_proj(offset_record, "offset");
+        cond_maybe(
+            is_nonzero::<K>(offset.clone()),
+            parse_from_view(orig_view.offset(offset), format),
+        )
     }
 }
 use util::*;
@@ -757,6 +680,8 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
             sequence_context,
             chained_sequence_context,
         );
+        let subst_extension = gsub::subst_extension(module, ground_subst);
+
         let ground_pos = gpos::ground_pos(
             module,
             class_def,
@@ -767,30 +692,28 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
             sequence_context,
             chained_sequence_context,
         );
-
-        let subst_extension = gsub::subst_extension(module, ground_subst);
         let pos_extension = gpos::pos_extension(module, ground_pos);
-        let feature_variations = layout::feature_variations(module, feature_table);
 
-        let mk_layout = |tag: u32| {
-            layout::table(
-                tag,
-                script_list,
-                feature_list,
-                ground_subst,
-                ground_pos,
-                subst_extension,
-                pos_extension,
-                feature_variations,
-            )
-        };
+        let feature_variations = layout::feature_variations(module, feature_table);
         // !SECTION
 
         // REVIEW - we might consider rewriting `layout::table` to spin off `gpos::table` and `gsub::table` more easily (self-contained)
-        let gpos_table =
-            module.define_format("opentype.gpos_table", mk_layout(util::magic(b"GPOS")));
-        let gsub_table =
-            module.define_format("opentype.gsub_table", mk_layout(util::magic(b"GSUB")));
+        let gpos_table = gpos::table(
+            module,
+            script_list,
+            feature_list,
+            ground_pos,
+            pos_extension,
+            feature_variations,
+        );
+        let gsub_table = gsub::table(
+            module,
+            script_list,
+            feature_list,
+            ground_subst,
+            subst_extension,
+            feature_variations,
+        );
 
         let base_table = base::table(
             module,
@@ -809,6 +732,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
         module.define_format_args(
             "opentype.table_directory.table_links",
             vec![
+                // WIP
                 START_ARG,
                 (
                     Label::Borrowed("tables"),
@@ -1114,6 +1038,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
 
     let ttc_header = {
         // Version 1.0
+        // WIP
         let ttc_header1 = |start: Expr| {
             record([
                 ("num_fonts", u32be()),
@@ -1128,6 +1053,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
         };
 
         // Version 2.0
+        // WIP
         let ttc_header2 = |start: Expr| {
             record([
                 ("num_fonts", u32be()),
@@ -1408,17 +1334,15 @@ mod gvar {
                     ("minor_version", util::expect_u16be(0)),
                     ("axis_count", u16be()),
                     ("shared_tuple_count", u16be()),
-                    ("shared_tuples_offset", u32be()),
                     (
-                        "#_shared_tuples",
-                        phantom(util::view_offset32(
+                        "shared_tuples",
+                        util::read_phantom_view_offset32(
                             vvar("table_view"),
-                            var("shared_tuples_offset"),
                             repeat_count(
                                 var("shared_tuple_count"),
                                 tuple_record.call_args(vec![var("axis_count")]),
                             ),
-                        )),
+                        ),
                     ),
                     ("glyph_count", u16be()),
                     ("flags", gvar_flags),
@@ -1956,11 +1880,17 @@ pub(crate) mod kern {
     }
 
     /// Helper function used to compute the number of glyphs in a left-or-right class table (for Format 2 kern subtables)
-    fn glyph_count(class_table_offset: Expr) -> Expr {
-        record_proj(
-            expr_unwrap(util::get_content_at_offset(class_table_offset)),
-            // NOTE - this corresponds to the identifier used in class_table in subtable_format2
-            "n_glyphs",
+    fn glyph_count(
+        table_view: ViewExpr,
+        class_table_offset: Expr,
+        class_table: FormatRef,
+    ) -> Format {
+        chain(
+            util::get_content_at_offset::<U16>(table_view, class_table_offset, class_table.call()),
+            "opt_table",
+            map_option(var("opt_table"), "class_table", |table| {
+                compute(record_proj(table, "n_glyphs"))
+            }),
         )
     }
 
@@ -1973,15 +1903,35 @@ pub(crate) mod kern {
     /// # Notes
     ///
     /// The indices in ClassTables are scaled (J = 2 x j ; I = 2 x M x i) to facilitate offset-arithmetic for random access (TargetOffset(i,j) = BaseOffset + I + J)
-    fn kerning_array(left_class_offset: Expr, right_class_offset: Expr) -> Format {
-        repeat_count(
-            glyph_count(left_class_offset), // N rows where there are N left-hand classes
+    ///
+    /// Requires additional parameters `table_view` and `class_table` to correctly parse the content at each class offset
+    fn kerning_array(
+        table_view: ViewExpr,
+        left_class_offset: Expr,
+        right_class_offset: Expr,
+        class_table: FormatRef,
+    ) -> Format {
+        pseudo_record(
+            [
+                (
+                    "left_glyph_count",
+                    glyph_count(table_view.clone(), left_class_offset, class_table),
+                ),
+                (
+                    "right_glyph_count",
+                    glyph_count(table_view, right_class_offset, class_table),
+                ),
+            ],
             repeat_count(
-                glyph_count(right_class_offset), // M columns
-                util::s16be(),                   // FWORD value at index (i, j)
+                expr_unwrap(var("left_glyph_count")), // N rows where there are N left-hand classes
+                repeat_count(
+                    expr_unwrap(var("right_glyph_count")), // M columns
+                    util::s16be(),                         // FWORD value at index (i, j)
+                ),
             ),
         )
     }
+
     /// Kern subtable format 2
     ///
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/kern#format-2
@@ -1996,25 +1946,33 @@ pub(crate) mod kern {
         );
         module.define_format(
             "opentype.kern.subtable.format2",
-            record([
-                ("table_start", pos32()),
-                ("row_width", u16be()), // width (in bytes) of a table row
-                (
-                    "left_class_offset",
-                    util::offset16_mandatory(var("table_start"), class_table.call()),
-                ),
-                (
-                    "right_class_offset",
-                    util::offset16_mandatory(var("table_start"), class_table.call()),
-                ),
-                (
-                    "kerning_array_offset",
-                    util::offset16_mandatory(
-                        var("table_start"),
-                        kerning_array(var("left_class_offset"), var("right_class_offset")),
+            let_view(
+                "table_view",
+                record([
+                    ("table_scope", reify_view(vvar("table_view"))),
+                    ("row_width", u16be()), // width (in bytes) of a table row
+                    (
+                        "left_class_offset",
+                        util::read_phantom_view_offset16(vvar("table_view"), class_table.call()),
                     ),
-                ),
-            ]),
+                    (
+                        "right_class_offset",
+                        util::read_phantom_view_offset16(vvar("table_view"), class_table.call()),
+                    ),
+                    (
+                        "kerning_array_offset",
+                        util::read_phantom_view_offset16(
+                            vvar("table_view"),
+                            kerning_array(
+                                vvar("table_view"),
+                                var("left_class_offset"),
+                                var("right_class_offset"),
+                                class_table,
+                            ),
+                        ),
+                    ),
+                ]),
+            ),
         )
     }
 
@@ -2055,57 +2013,68 @@ mod base {
         let base_coord = base_coord(module, device_or_variation_index_table);
         let min_max = min_max(module, tag, base_coord);
         let base_values = base_values(module, base_coord);
-        let base_lang_sys = |table_start: Expr| {
+
+        let base_lang_sys = module.define_format_views(
+            "opentype.base.base-langsys",
+            vec![Label::Borrowed("table_view")],
             record([
                 ("base_lang_sys_tag", tag.call()),
                 (
-                    "min_max_offset",
-                    util::offset16_mandatory(table_start, min_max.call()),
+                    "min_max",
+                    util::read_phantom_view_offset16(vvar("table_view"), min_max.call()),
                 ),
-            ])
-        };
+            ]),
+        );
         let base_script = module.define_format(
             "opentype.layout.base_script",
+            let_view(
+                "table_view",
+                record([
+                    ("table_scope", reify_view(vvar("table_view"))),
+                    (
+                        "base_values_offset",
+                        util::read_phantom_view_offset16(vvar("table_view"), base_values.call()),
+                    ),
+                    (
+                        "default_min_max_offset",
+                        util::read_phantom_view_offset16(vvar("table_view"), min_max.call()),
+                    ),
+                    ("base_lang_sys_count", u16be()),
+                    (
+                        "base_lang_sys_records",
+                        repeat_count(
+                            var("base_lang_sys_count"),
+                            base_lang_sys.call_views(vec![vvar("table_view")]),
+                        ),
+                    ),
+                ]),
+            ),
+        );
+        let base_script_record = module.define_format_views(
+            "opentype.base.base-script-record",
+            vec![Label::Borrowed("table_view")],
             record([
-                ("table_start", pos32()),
+                ("base_script_tag", tag.call()),
                 (
-                    "base_values_offset",
-                    util::offset16_nullable(var("table_start"), base_values.call()),
+                    "base_script",
+                    util::read_phantom_view_offset16(vvar("table_view"), base_script.call()),
                 ),
+            ]),
+        );
+        let base_script_list = let_view(
+            "table_view",
+            record([
+                ("table_scope", reify_view(vvar("table_view"))),
+                ("base_script_count", u16be()),
                 (
-                    "default_min_max_offset",
-                    util::offset16_nullable(var("table_start"), min_max.call()),
-                ),
-                ("base_lang_sys_count", u16be()),
-                (
-                    "base_lang_sys_records",
+                    "base_script_records",
                     repeat_count(
-                        var("base_lang_sys_count"),
-                        base_lang_sys(var("table_start")),
+                        var("base_script_count"),
+                        base_script_record.call_view(vvar("table_view")),
                     ),
                 ),
             ]),
         );
-        let base_script_record = |table_start: Expr| {
-            record([
-                ("base_script_tag", tag.call()),
-                (
-                    "base_script_offset",
-                    util::offset16_mandatory(table_start, base_script.call()),
-                ),
-            ])
-        };
-        let base_script_list = record([
-            ("table_start", pos32()),
-            ("base_script_count", u16be()),
-            (
-                "base_script_records",
-                repeat_count(
-                    var("base_script_count"),
-                    base_script_record(var("table_start")),
-                ),
-            ),
-        ]);
         let base_tag_list = record([
             ("base_tag_count", u16be()),
             (
@@ -2115,41 +2084,50 @@ mod base {
         ]);
         let axis_table = module.define_format(
             "opentype.layout.axis_table",
-            record([
-                ("table_start", pos32()),
-                (
-                    "base_tag_list_offset",
-                    util::offset16_nullable(var("table_start"), base_tag_list),
-                ),
-                (
-                    "base_script_list_offset",
-                    util::offset16_mandatory(var("table_start"), base_script_list),
-                ),
-            ]),
+            let_view(
+                "table_view",
+                record([
+                    ("table_scope", reify_view(vvar("table_view"))),
+                    (
+                        "base_tag_list_offset",
+                        util::read_phantom_view_offset16(vvar("table_view"), base_tag_list),
+                    ),
+                    (
+                        "base_script_list_offset",
+                        util::read_phantom_view_offset16(vvar("table_view"), base_script_list),
+                    ),
+                ]),
+            ),
         );
         module.define_format(
             "opentype.base.table",
-            // STUB - implement base table
-            record([
-                ("table_start", pos32()),
-                ("major_version", util::expect_u16be(1)),
-                ("minor_version", where_between_u16(u16be(), 0, 1)), // v1.0 and v1.1
-                (
-                    "horiz_axis_offset",
-                    util::offset16_nullable(var("table_start"), axis_table.call()),
-                ),
-                (
-                    "vert_axis_offset",
-                    util::offset16_nullable(var("table_start"), axis_table.call()),
-                ),
-                (
-                    "item_var_store_offset",
-                    cond_maybe(
-                        expr_gt(var("minor_version"), Expr::U16(0)),
-                        util::offset32(var("table_start"), item_variation_store.call()),
+            let_view(
+                "table_view",
+                record([
+                    // WIP
+                    ("table_scope", reify_view(vvar("table_view"))),
+                    ("major_version", util::expect_u16be(1)),
+                    ("minor_version", where_between_u16(u16be(), 0, 1)), // v1.0 and v1.1
+                    (
+                        "horiz_axis_offset",
+                        util::read_phantom_view_offset16(vvar("table_view"), axis_table.call()),
                     ),
-                ),
-            ]),
+                    (
+                        "vert_axis_offset",
+                        util::read_phantom_view_offset16(vvar("table_view"), axis_table.call()),
+                    ),
+                    (
+                        "item_var_store_offset",
+                        cond_maybe(
+                            expr_gt(var("minor_version"), Expr::U16(0)),
+                            util::read_phantom_view_offset32(
+                                vvar("table_view"),
+                                item_variation_store.call(),
+                            ),
+                        ),
+                    ),
+                ]),
+            ),
         )
     }
 
@@ -2159,18 +2137,21 @@ mod base {
     fn base_values(module: &mut FormatModule, base_coord: FormatRef) -> FormatRef {
         let base_values = module.define_format(
             "opentype.layout.base_values",
-            record([
-                ("table_start", pos32()),
-                ("default_baseline_index", u16be()),
-                ("base_coord_count", u16be()), // NOTE - should be equal to baseTagCount in BaseTagList
-                (
-                    "base_coord_offsets",
-                    repeat_count(
-                        var("base_coord_count"),
-                        util::offset16_mandatory(var("table_start"), base_coord.call()),
+            let_view(
+                "table_view",
+                record([
+                    ("table_scope", reify_view(vvar("table_view"))),
+                    ("default_baseline_index", u16be()),
+                    ("base_coord_count", u16be()), // NOTE - should be equal to baseTagCount in BaseTagList
+                    (
+                        "base_coord_offsets",
+                        repeat_count(
+                            var("base_coord_count"),
+                            util::read_phantom_view_offset16(vvar("table_view"), base_coord.call()),
+                        ),
                     ),
-                ),
-            ]),
+                ]),
+            ),
         );
         base_values
     }
@@ -2179,38 +2160,45 @@ mod base {
     ///
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/base#the-minmax-table-and-featminmax-record
     fn min_max(module: &mut FormatModule, tag: FormatRef, base_coord: FormatRef) -> FormatRef {
-        // TODO - refactor into dep-format or standalone function
-        let feat_min_max = |table_start: Expr| {
+        let feat_min_max = module.define_format_views(
+            "opentype.layout.feat_min_max",
+            vec![Label::Borrowed("table_view")],
             record([
                 ("feature_tag", tag.call()),
                 (
                     "min_coord_offset",
-                    util::offset16_nullable(table_start.clone(), base_coord.call()),
+                    util::read_phantom_view_offset16(vvar("table_view"), base_coord.call()),
                 ),
                 (
                     "max_coord_offset",
-                    util::offset16_nullable(table_start.clone(), base_coord.call()),
-                ),
-            ])
-        };
-        module.define_format(
-            "opentype.layout.min_max",
-            record([
-                ("table_start", pos32()),
-                (
-                    "min_coord_offset",
-                    util::offset16_nullable(var("table_start"), base_coord.call()),
-                ),
-                (
-                    "max_coord_offset",
-                    util::offset16_nullable(var("table_start"), base_coord.call()),
-                ),
-                ("feat_min_max_count", u16be()),
-                (
-                    "feat_min_max_records",
-                    repeat_count(var("feat_min_max_count"), feat_min_max(var("table_start"))),
+                    util::read_phantom_view_offset16(vvar("table_view"), base_coord.call()),
                 ),
             ]),
+        );
+        module.define_format(
+            "opentype.layout.min_max",
+            let_view(
+                "table_view",
+                record([
+                    ("table_scope", reify_view(vvar("table_view"))),
+                    (
+                        "min_coord_offset",
+                        util::read_phantom_view_offset16(vvar("table_view"), base_coord.call()),
+                    ),
+                    (
+                        "max_coord_offset",
+                        util::read_phantom_view_offset16(vvar("table_view"), base_coord.call()),
+                    ),
+                    ("feat_min_max_count", u16be()),
+                    (
+                        "feat_min_max_records",
+                        repeat_count(
+                            var("feat_min_max_count"),
+                            feat_min_max.call_views(vec![vvar("table_view")]),
+                        ),
+                    ),
+                ]),
+            ),
         )
     }
 
@@ -2221,44 +2209,79 @@ mod base {
         module: &mut FormatModule,
         device_or_variation_index_table: FormatRef,
     ) -> FormatRef {
-        // REVIEW - is "hint" an appropriate name for what this field-format is used for?
-        // NOTE - 'hint' field is a nested record of any fields beyond `{ format, coordinate }` used in a given format
-        let hint1 = Format::EMPTY;
-        let hint2 = record([("reference_glyph", u16be()), ("base_coord_point", u16be())]);
-        let hint3 = |table_start: Expr| {
+        // NOTE - 'data' field is a nested record of any fields beyond `{ format, coordinate }` used in a given format
+        let format1_data = Format::EMPTY;
+        let format2_data = record([("reference_glyph", u16be()), ("base_coord_point", u16be())]);
+        let format3_data = |table_view: ViewExpr| {
             record([(
-                "device_offset",
-                util::offset16_nullable(table_start, device_or_variation_index_table.call()),
+                "device",
+                util::read_phantom_view_offset16(
+                    table_view,
+                    device_or_variation_index_table.call(),
+                ),
             )])
         };
         module.define_format(
             "opentype.layout.base_coord",
-            record([
-                ("table_start", pos32()),
-                ("format", u16be()),
-                ("coordinate", util::s16be()),
-                // REVIEW - is "hint" an appropriate name for this extra-fields field?
-                (
-                    "hint",
-                    match_variant(
-                        var("format"),
-                        [
-                            (Pattern::U16(1), "NoHint", hint1),
-                            (Pattern::U16(2), "GlyphHint", hint2),
-                            (Pattern::U16(3), "DeviceHint", hint3(var("table_start"))),
-                            (Pattern::Wildcard, "UnknownFormat", Format::Fail),
-                        ],
+            let_view(
+                "table_view",
+                record([
+                    // WIP
+                    ("table_scope", reify_view(vvar("table_view"))),
+                    ("format", u16be()),
+                    ("coordinate", util::s16be()),
+                    (
+                        "data",
+                        match_variant(
+                            var("format"),
+                            [
+                                (Pattern::U16(1), "NoData", format1_data),
+                                (Pattern::U16(2), "GlyphData", format2_data),
+                                (
+                                    Pattern::U16(3),
+                                    "DeviceData",
+                                    format3_data(vvar("table_view")),
+                                ),
+                                (Pattern::Wildcard, "UnknownFormat", Format::Fail),
+                            ],
+                        ),
                     ),
-                ),
-            ]),
+                ]),
+            ),
         )
     }
 }
 
 mod gpos {
-    use doodle::ViewFormat;
-
     use super::*;
+
+    /// GPOS-specific LookupSubtable implementation
+    fn lookup_subtable(
+        module: &mut FormatModule,
+        pos_extension: FormatRef,
+        ground_pos: FormatRef,
+    ) -> FormatRef {
+        const EXTENSION_TYPE: u16 = 9;
+        module.define_format_args(
+            "opentype.gpos.lookup_subtable",
+            vec![(Label::Borrowed("lookup_type"), ValueType::U16)],
+            match_variant(
+                var("lookup_type"),
+                [
+                    (
+                        Pattern::U16(EXTENSION_TYPE),
+                        "PosExtension",
+                        pos_extension.call(),
+                    ),
+                    (
+                        Pattern::Wildcard,
+                        "GroundPos",
+                        ground_pos.call_args(vec![var("lookup_type")]),
+                    ),
+                ],
+            ),
+        )
+    }
 
     /// Lookup type 1 subtable: single adjustment positioning
     ///
@@ -2269,9 +2292,8 @@ mod gpos {
         value_format_flags: FormatRef,
         value_record: FormatRef,
     ) -> FormatRef {
-        let single_pos_format1 = module.define_format_args_views(
+        let single_pos_format1 = module.define_format_views(
             "opentype.layout.single_pos.format1",
-            vec![],
             vec![Label::Borrowed("table_view")],
             record([
                 ("table_scope", reify_view(vvar("table_view"))),
@@ -2287,9 +2309,8 @@ mod gpos {
                 ),
             ]),
         );
-        let single_pos_format2 = module.define_format_args_views(
+        let single_pos_format2 = module.define_format_views(
             "opentype.layout.single_pos.format2",
-            vec![],
             vec![Label::Borrowed("table_view")],
             record([
                 ("table_scope", reify_view(vvar("table_view"))),
@@ -2409,20 +2430,14 @@ mod gpos {
             ),
         );
         // TODO - refactor into dep-format or standalone function
-        let pair_pos_format1 = module.define_format_args_views(
+        let pair_pos_format1 = module.define_format_views(
             "opentype.layout.pair_pos.format1",
-            vec![],
             vec![Label::Borrowed("table_view")],
             record_auto([
                 ("table_scope", reify_view(vvar("table_view"))),
-                ("coverage_offset", u16be()),
                 (
-                    "#_coverage",
-                    phantom(util::view_offset16(
-                        vvar("table_view"),
-                        var("coverage_offset"),
-                        coverage_table.call(),
-                    )),
+                    "coverage",
+                    util::read_phantom_view_offset16(vvar("table_view"), coverage_table.call()),
                 ),
                 ("value_format1", value_format_flags.call()),
                 ("value_format2", value_format_flags.call()),
@@ -2484,9 +2499,8 @@ mod gpos {
             )])
         }
         // TODO - refactor into dep-format or standalone function
-        let pair_pos_format2 = module.define_format_args_views(
+        let pair_pos_format2 = module.define_format_views(
             "opentype.layout.pair_pos.format2",
-            vec![],
             vec![Label::Borrowed("table_view")],
             record([
                 ("table_scope", reify_view(vvar("table_view"))),
@@ -2562,31 +2576,13 @@ mod gpos {
         coverage_table: FormatRef,
         anchor_table: FormatRef,
     ) -> FormatRef {
-        // TODO - refactor into dep-format or standalone function
-        let entry_exit_record = module.define_format_args_views(
+        let entry_exit_record = module.define_format_views(
             "opentype.layout.entry_exit_record",
-            vec![],
             vec![Label::Borrowed("table_view")],
-            record_auto([
-                ("entry_anchor_offset", u16be()),
-                (
-                    "#_entry_anchor",
-                    phantom(util::view_offset16(
-                        vvar("table_view"),
-                        var("entry_anchor_offset"),
-                        anchor_table.call(),
-                    )),
-                ),
-                ("exit_anchor_offset", u16be()),
-                (
-                    "#_exit_anchor",
-                    phantom(util::view_offset16(
-                        vvar("table_view"),
-                        var("exit_anchor_offset"),
-                        anchor_table.call(),
-                    )),
-                ),
-            ]),
+            record_repeat(
+                ["entry_anchor", "exit_anchor"],
+                util::read_phantom_view_offset16(vvar("table_view"), anchor_table.call()),
+            ),
         );
         module.define_format(
             "opentype.layout.cursive_pos",
@@ -2597,21 +2593,19 @@ mod gpos {
                     ("pos_format", 1),
                     [
                         ("table_scope", reify_view(vvar("table_view"))),
-                        ("coverage_offset", u16be()),
                         (
-                            "#_coverage",
-                            phantom(util::view_offset16(
+                            "coverage",
+                            util::read_phantom_view_offset16(
                                 vvar("table_view"),
-                                var("coverage_offset"),
                                 coverage_table.call(),
-                            )),
+                            ),
                         ),
                         ("entry_exit_count", u16be()),
                         (
                             "entry_exit_records",
                             repeat_count(
                                 var("entry_exit_count"),
-                                entry_exit_record.call_args_views(vec![], vec![vvar("table_view")]),
+                                entry_exit_record.call_views(vec![vvar("table_view")]),
                             ),
                         ),
                     ],
@@ -2628,20 +2622,14 @@ mod gpos {
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/gpos#mark-array-table
     pub(crate) fn mark_array(module: &mut FormatModule, anchor_table: FormatRef) -> FormatRef {
         // TODO - refactor into dep-format or standalone function
-        let mark_record = module.define_format_args_views(
+        let mark_record = module.define_format_views(
             "opentype.layout.mark_record",
-            vec![],
             vec![Label::Borrowed("array_view")],
             record_auto([
                 ("mark_class", u16be()),
-                ("mark_anchor_offset", u16be()),
                 (
-                    "#_mark_anchor",
-                    phantom(util::view_offset16(
-                        vvar("array_view"),
-                        var("mark_anchor_offset"),
-                        anchor_table.call(),
-                    )),
+                    "mark_anchor",
+                    util::read_phantom_view_offset16(vvar("array_view"), anchor_table.call()),
                 ),
             ]),
         );
@@ -2656,7 +2644,7 @@ mod gpos {
                         "mark_records",
                         repeat_count(
                             var("mark_count"),
-                            mark_record.call_args_views(Vec::new(), vec![vvar("array_view")]),
+                            mark_record.call_views(vec![vvar("array_view")]),
                         ),
                     ),
                 ]),
@@ -2723,6 +2711,7 @@ mod gpos {
             "opentype.layout.base_array.base_record",
             vec![(Label::Borrowed("mark_class_count"), ValueType::U16)],
             vec![Label::Borrowed("_array_view")],
+            // REVIEW[epic=many-offsets-design-pattern] - for-each style
             record_auto([
                 (
                     "base_anchor_offsets",
@@ -2734,7 +2723,7 @@ mod gpos {
                     phantom(for_each(
                         var("base_anchor_offsets"),
                         "offset",
-                        util::view_offset16(
+                        util::parse_view_offset::<U16>(
                             vvar("_array_view"),
                             var("offset"),
                             anchor_table.call(),
@@ -2773,42 +2762,31 @@ mod gpos {
                     ("format", 1),
                     [
                         ("table_scope", reify_view(vvar("table_view"))),
-                        ("mark_coverage_offset", u16be()),
                         (
-                            "#_mark_coverage",
-                            phantom(util::view_offset16(
+                            "mark_coverage",
+                            util::read_phantom_view_offset16(
                                 vvar("table_view"),
-                                var("mark_coverage_offset"),
                                 coverage_table.call(),
-                            )),
+                            ),
                         ),
-                        ("base_coverage_offset", u16be()),
                         (
-                            "#_base_coverage",
-                            phantom(util::view_offset16(
+                            "base_coverage",
+                            util::read_phantom_view_offset16(
                                 vvar("table_view"),
-                                var("base_coverage_offset"),
                                 coverage_table.call(),
-                            )),
+                            ),
                         ),
                         ("mark_class_count", u16be()),
-                        ("mark_array_offset", u16be()),
                         (
-                            "#_mark_array",
-                            phantom(util::view_offset16(
-                                vvar("table_view"),
-                                var("mark_array_offset"),
-                                mark_array.call(),
-                            )),
+                            "mark_array",
+                            util::read_phantom_view_offset16(vvar("table_view"), mark_array.call()),
                         ),
-                        ("base_array_offset", u16be()),
                         (
-                            "#_base_array",
-                            phantom(util::view_offset16(
+                            "base_array",
+                            util::read_phantom_view_offset16(
                                 vvar("table_view"),
-                                var("base_array_offset"),
                                 base_array.call_args(vec![var("mark_class_count")]),
-                            )),
+                            ),
                         ),
                     ],
                     "pos",
@@ -2819,37 +2797,39 @@ mod gpos {
         )
     }
 
-    /// Subformat definition helper for MarkLigPos LigatureArray
-    fn ligature_array(module: &mut FormatModule, anchor_table: FormatRef) -> FormatRef {
-        fn ligature_attach(module: &mut FormatModule, anchor_table: FormatRef) -> FormatRef {
-            fn component_record(module: &mut FormatModule, anchor_table: FormatRef) -> FormatRef {
-                module.define_format_args_views(
-                    "opentype.layout.ligature_attach.component_record",
-                    vec![(Label::Borrowed("mark_class_count"), ValueType::U16)],
-                    vec![Label::Borrowed("table_view")],
-                    record_auto([
-                        ("record_scope", reify_view(vvar("table_view"))),
-                        (
-                            "ligature_anchor_offsets",
-                            // REVIEW[epic=read-fixed-array] - does ReadArray work better here?
-                            repeat_count(var("mark_class_count"), u16be()),
-                        ),
-                        (
-                            "#_ligature_anchors",
-                            phantom(for_each(
-                                var("ligature_anchor_offsets"),
-                                "offset",
-                                util::view_offset16(
-                                    vvar("table_view"),
-                                    var("offset"),
-                                    anchor_table.call(),
-                                ),
-                            )),
-                        ),
-                    ]),
-                )
-            }
+    mod mark_lig {
+        use super::*;
+        fn component_record(module: &mut FormatModule, anchor_table: FormatRef) -> FormatRef {
+            module.define_format_args_views(
+                "opentype.layout.ligature_attach.component_record",
+                vec![(Label::Borrowed("mark_class_count"), ValueType::U16)],
+                vec![Label::Borrowed("table_view")],
+                record_auto([
+                    // REVIEW[epic=nested-format-reify-layer] - outer-format view reified locally
+                    ("record_scope", reify_view(vvar("table_view"))),
+                    // REVIEW[epic=many-offsets-design-pattern] - for-each style
+                    (
+                        "ligature_anchor_offsets",
+                        // REVIEW[epic=read-fixedwidth-array] - does ReadArray work better here?
+                        repeat_count(var("mark_class_count"), u16be()),
+                    ),
+                    (
+                        "#_ligature_anchors",
+                        phantom(for_each(
+                            var("ligature_anchor_offsets"),
+                            "offset",
+                            util::parse_view_offset::<U16>(
+                                vvar("table_view"),
+                                var("offset"),
+                                anchor_table.call(),
+                            ),
+                        )),
+                    ),
+                ]),
+            )
+        }
 
+        fn ligature_attach(module: &mut FormatModule, anchor_table: FormatRef) -> FormatRef {
             let component_record = component_record(module, anchor_table);
 
             module.define_format_args(
@@ -2858,6 +2838,7 @@ mod gpos {
                 let_view(
                     "table_view",
                     record([
+                        // REVIEW[epic=nested-format-reify-layer] - scope reified in inner format
                         ("component_count", u16be()),
                         (
                             "component_records",
@@ -2873,35 +2854,43 @@ mod gpos {
                 ),
             )
         }
-        let ligature_attach = ligature_attach(module, anchor_table);
 
-        module.define_format_args(
-            "opentype.layout.ligature_array",
-            vec![(Label::Borrowed("mark_class_count"), ValueType::U16)],
-            let_view(
-                "array_view",
-                record_auto([
-                    ("array_scope", reify_view(vvar("array_view"))),
-                    ("ligature_count", u16be()),
-                    (
-                        "ligature_attach_offsets",
-                        repeat_count(var("ligature_count"), u16be()),
-                    ),
-                    (
-                        "#_ligature_attaches",
-                        phantom(for_each(
-                            var("ligature_attach_offsets"),
-                            "offset",
-                            util::view_offset16(
-                                vvar("array_view"),
-                                var("offset"),
-                                ligature_attach.call_args(vec![var("mark_class_count")]),
-                            ),
-                        )),
-                    ),
-                ]),
-            ),
-        )
+        /// Subformat definition helper for MarkLigPos LigatureArray
+        pub(super) fn ligature_array(
+            module: &mut FormatModule,
+            anchor_table: FormatRef,
+        ) -> FormatRef {
+            let ligature_attach = ligature_attach(module, anchor_table);
+
+            module.define_format_args(
+                "opentype.layout.ligature_array",
+                vec![(Label::Borrowed("mark_class_count"), ValueType::U16)],
+                let_view(
+                    "array_view",
+                    record_auto([
+                        ("array_scope", reify_view(vvar("array_view"))),
+                        ("ligature_count", u16be()),
+                        // REVIEW[epic=many-offsets-design-pattern] - for-each style
+                        (
+                            "ligature_attach_offsets",
+                            repeat_count(var("ligature_count"), u16be()),
+                        ),
+                        (
+                            "#_ligature_attaches",
+                            phantom(for_each(
+                                var("ligature_attach_offsets"),
+                                "offset",
+                                util::parse_view_offset::<U16>(
+                                    vvar("array_view"),
+                                    var("offset"),
+                                    ligature_attach.call_args(vec![var("mark_class_count")]),
+                                ),
+                            )),
+                        ),
+                    ]),
+                ),
+            )
+        }
     }
 
     /// Looukup type 5 subtable: mark-to-ligature attachment positioning
@@ -2913,7 +2902,7 @@ mod gpos {
         anchor_table: FormatRef,
         mark_array: FormatRef,
     ) -> FormatRef {
-        let ligature_array = ligature_array(module, anchor_table);
+        let ligature_array = mark_lig::ligature_array(module, anchor_table);
 
         module.define_format(
             "opentype.layout.mark_lig_pos",
@@ -2926,42 +2915,31 @@ mod gpos {
                     ],
                     ("format", 1),
                     [
-                        ("mark_coverage_offset", u16be()),
                         (
-                            "#_mark_coverage",
-                            phantom(util::view_offset16(
+                            "mark_coverage",
+                            util::read_phantom_view_offset16(
                                 vvar("table_view"),
-                                var("mark_coverage_offset"),
                                 coverage_table.call(),
-                            )),
+                            ),
                         ),
-                        ("ligature_coverage_offset", u16be()),
                         (
-                            "#_ligature_coverage",
-                            phantom(util::view_offset16(
+                            "ligature_coverage",
+                            util::read_phantom_view_offset16(
                                 vvar("table_view"),
-                                var("ligature_coverage_offset"),
                                 coverage_table.call(),
-                            )),
+                            ),
                         ),
                         ("mark_class_count", u16be()),
-                        ("mark_array_offset", u16be()),
                         (
-                            "#_mark_array",
-                            phantom(util::view_offset16(
-                                vvar("table_view"),
-                                var("mark_array_offset"),
-                                mark_array.call(),
-                            )),
+                            "mark_array",
+                            util::read_phantom_view_offset16(vvar("table_view"), mark_array.call()),
                         ),
-                        ("ligature_array_offset", u16be()),
                         (
-                            "#_ligature_array",
-                            phantom(util::view_offset16(
+                            "ligature_array",
+                            util::read_phantom_view_offset16(
                                 vvar("table_view"),
-                                var("ligature_array_offset"),
                                 ligature_array.call_args(vec![var("mark_class_count")]),
-                            )),
+                            ),
                         ),
                     ],
                     "pos",
@@ -2970,6 +2948,65 @@ mod gpos {
                 ),
             ),
         )
+    }
+
+    mod mark_mark {
+        use super::*;
+
+        fn mark2_record(module: &mut FormatModule, anchor_table: FormatRef) -> FormatRef {
+            module.define_format_args_views(
+                "opentype.layout.mark2_array.mark2_record",
+                vec![(Label::Borrowed("mark_class_count"), ValueType::U16)],
+                vec![Label::Borrowed("_array_view")],
+                record_auto([
+                    // REVIEW[epic=many-offsets-design-pattern] - for-each style
+                    (
+                        "mark2_anchor_offsets",
+                        repeat_count(var("mark_class_count"), u16be()),
+                    ),
+                    // REVIEW - eliminate foreach and fold phantom offsetting into repeat_count ?
+                    (
+                        "#_mark2_anchors",
+                        phantom(for_each(
+                            var("mark2_anchor_offsets"),
+                            "offset",
+                            util::parse_view_offset::<U16>(
+                                vvar("_array_view"),
+                                var("offset"),
+                                anchor_table.call(),
+                            ),
+                        )),
+                    ),
+                ]),
+            )
+        }
+
+        pub(super) fn mark2_array(module: &mut FormatModule, anchor_table: FormatRef) -> FormatRef {
+            let mark2_record = mark2_record(module, anchor_table);
+
+            module.define_format_args(
+                "opentype.layout.mark2_array",
+                vec![(Label::Borrowed("mark_class_count"), ValueType::U16)],
+                let_view(
+                    "array_view",
+                    record([
+                        // REVIEW[epic=nested-format-reify-layer] - scope reified locally in outer format
+                        ("array_scope", reify_view(vvar("array_view"))),
+                        ("mark2_count", u16be()),
+                        (
+                            "mark2_records",
+                            repeat_count(
+                                var("mark2_count"),
+                                mark2_record.call_args_views(
+                                    vec![var("mark_class_count")],
+                                    vec![vvar("array_view")],
+                                ),
+                            ),
+                        ),
+                    ]),
+                ),
+            )
+        }
     }
 
     /// Looukup type 6 subtable: mark-to-mark attachment positioning
@@ -2981,51 +3018,7 @@ mod gpos {
         anchor_table: FormatRef,
         mark_array: FormatRef,
     ) -> FormatRef {
-        let mark2_record = module.define_format_args_views(
-            "opentype.layout.mark2_array.mark2_record",
-            vec![(Label::Borrowed("mark_class_count"), ValueType::U16)],
-            vec![Label::Borrowed("_array_view")],
-            record_auto([
-                (
-                    "mark2_anchor_offsets",
-                    repeat_count(var("mark_class_count"), u16be()),
-                ),
-                // REVIEW - eliminate foreach and fold phantom offsetting into repeat_count ?
-                (
-                    "#_mark2_anchors",
-                    phantom(for_each(
-                        var("mark2_anchor_offsets"),
-                        "offset",
-                        util::view_offset16(
-                            vvar("_array_view"),
-                            var("offset"),
-                            anchor_table.call(),
-                        ),
-                    )),
-                ),
-            ]),
-        );
-        let mark2_array = module.define_format_args(
-            "opentype.layout.mark2_array",
-            vec![(Label::Borrowed("mark_class_count"), ValueType::U16)],
-            let_view(
-                "array_view",
-                record([
-                    ("array_scope", reify_view(vvar("array_view"))),
-                    ("mark2_count", u16be()),
-                    (
-                        "mark2_records",
-                        repeat_count(
-                            var("mark2_count"),
-                            mark2_record.call_args_views(
-                                vec![var("mark_class_count")],
-                                vec![vvar("array_view")],
-                            ),
-                        ),
-                    ),
-                ]),
-            ),
-        );
+        let mark2_array = mark_mark::mark2_array(module, anchor_table);
         module.define_format(
             "opentype.layout.mark_mark_pos",
             let_view(
@@ -3035,42 +3028,31 @@ mod gpos {
                     ("format", 1),
                     [
                         ("table_scope", reify_view(vvar("table_view"))),
-                        ("mark1_coverage_offset", u16be()),
                         (
-                            "#_mark1_coverage",
-                            phantom(util::view_offset16(
+                            "mark1_coverage",
+                            util::read_phantom_view_offset16(
                                 vvar("table_view"),
-                                var("mark1_coverage_offset"),
                                 coverage_table.call(),
-                            )),
-                        ),
-                        ("mark2_coverage_offset", u16be()),
-                        (
-                            "#_mark2_coverage",
-                            phantom(util::view_offset16(
-                                vvar("table_view"),
-                                var("mark2_coverage_offset"),
-                                coverage_table.call(),
-                            )),
-                        ),
-                        ("mark_class_count", u16be()),
-                        ("mark1_array_offset", u16be()),
-                        (
-                            "#_mark1_array",
-                            util::view_offset16(
-                                vvar("table_view"),
-                                var("mark1_array_offset"),
-                                mark_array.call(),
                             ),
                         ),
-                        ("mark2_array_offset", u16be()),
                         (
-                            "#_mark2_array",
-                            phantom(util::view_offset16(
+                            "mark2_coverage",
+                            util::read_phantom_view_offset16(
                                 vvar("table_view"),
-                                var("mark2_array_offset"),
+                                coverage_table.call(),
+                            ),
+                        ),
+                        ("mark_class_count", u16be()),
+                        (
+                            "mark1_array",
+                            util::read_phantom_view_offset16(vvar("table_view"), mark_array.call()),
+                        ),
+                        (
+                            "mark2_array",
+                            util::read_phantom_view_offset16(
+                                vvar("table_view"),
                                 mark2_array.call_args(vec![var("mark_class_count")]),
-                            )),
+                            ),
                         ),
                     ],
                     "pos",
@@ -3162,19 +3144,68 @@ mod gpos {
             ),
         )
     }
+
+    pub(crate) fn table(
+        module: &mut FormatModule,
+        script_list: FormatRef,
+        feature_list: FormatRef,
+        ground_pos: FormatRef,
+        pos_extension: FormatRef,
+        feature_variations: FormatRef,
+    ) -> FormatRef {
+        let lookup_subtable = lookup_subtable(module, pos_extension, ground_pos);
+        let lookup_table = module.define_format(
+            "opentype.gpos.lookup_table",
+            layout::lookup_table(lookup_subtable),
+        );
+        let lookup_list = module.define_format(
+            "opentype.gpos.lookup_list",
+            layout::lookup_list(lookup_table),
+        );
+        module.define_format(
+            "opentype.gpos_table",
+            layout::table(script_list, feature_list, lookup_list, feature_variations),
+        )
+    }
 }
 
 mod gsub {
     use super::*;
 
+    /// GSUB-specific LookupSubtable implementation
+    pub(crate) fn lookup_subtable(
+        module: &mut FormatModule,
+        subst_extension: FormatRef,
+        ground_subst: FormatRef,
+    ) -> FormatRef {
+        const EXTENSION_TYPE: u16 = 7;
+        module.define_format_args(
+            "opentype.gsub.lookup_subtable",
+            vec![(Label::from("lookup_type"), ValueType::U16)],
+            match_variant(
+                var("lookup_type"),
+                [
+                    (
+                        Pattern::U16(EXTENSION_TYPE),
+                        "SubstExtension",
+                        subst_extension.call(),
+                    ),
+                    (
+                        Pattern::Wildcard,
+                        "GroundSubst",
+                        ground_subst.call_args(vec![var("lookup_type")]),
+                    ),
+                ],
+            ),
+        )
+    }
     /// Lookup type 1 subtable: single substitution
     ///
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/gsub#lookup-type-1-subtable-single-substitution
     pub(crate) fn single_subst(module: &mut FormatModule, coverage_table: FormatRef) -> FormatRef {
         // Single substitution format 1
-        let format1 = module.define_format_args_views(
+        let format1 = module.define_format_views(
             "opentype.layout.single_subst.format1",
-            vec![],
             vec![Label::Borrowed("table_view")],
             record([
                 ("table_scope", reify_view(vvar("table_view"))),
@@ -3186,9 +3217,8 @@ mod gsub {
             ]),
         );
         // Single substitution format 2
-        let format2 = module.define_format_args_views(
+        let format2 = module.define_format_views(
             "opentype.layout.single_subst.format2",
-            vec![],
             vec![Label::Borrowed("table_view")],
             record([
                 ("table_scope", reify_view(vvar("table_view"))),
@@ -3241,40 +3271,59 @@ mod gsub {
         module: &mut FormatModule,
         coverage_table: FormatRef,
     ) -> FormatRef {
-        let sequence_table = record([
-            // NOTE - formally (according to the spec) this must never be 0, but some fonts ignore this so we don't enforce it as a mandate
-            ("glyph_count", u16be()),
-            (
-                "substitute_glyph_ids",
-                repeat_count(var("glyph_count"), u16be()),
-            ),
-        ]);
+        let sequence_table = module.define_format(
+            "opentype.layout.multiple_subst.sequence_table",
+            record([
+                // NOTE - formally (according to the spec) this must never be 0, but some fonts ignore this so we don't enforce it as a mandate
+                ("glyph_count", u16be()),
+                (
+                    "substitute_glyph_ids",
+                    repeat_count(var("glyph_count"), u16be()),
+                ),
+            ]),
+        );
         module.define_format(
             "opentype.layout.multiple_subst",
-            util::embedded_singleton_alternation(
-                [
-                    ("table_start", pos32()),
-                    ("subst_format", u16be()),
-                    (
-                        "coverage",
-                        util::offset16_mandatory(var("table_start"), coverage_table.call()),
-                    ),
-                ],
-                ("subst_format", 1),
-                [
-                    ("sequence_count", u16be()),
-                    (
-                        "sequences",
-                        repeat_count(
-                            var("sequence_count"),
-                            util::offset16_mandatory(var("table_start"), sequence_table),
+            let_view(
+                "table_view",
+                util::embedded_singleton_alternation(
+                    [
+                        ("table_scope", reify_view(vvar("table_view"))),
+                        ("subst_format", u16be()),
+                        (
+                            "coverage",
+                            util::read_phantom_view_offset16(
+                                vvar("table_view"),
+                                coverage_table.call(),
+                            ),
                         ),
-                    ),
-                ],
-                "subst",
-                "Format1",
-                // REVIEW - Consider what style we want to adopt more generally for MultipleSubst, AlternateSubst, LigatureSubst
-                util::NestingKind::MinimalVariation,
+                    ],
+                    ("subst_format", 1),
+                    [
+                        ("sequence_count", u16be()),
+                        // REVIEW[epic=many-offsets-design-pattern] - for-each style
+                        (
+                            "sequence_offsets",
+                            repeat_count(var("sequence_count"), u16be()),
+                        ),
+                        (
+                            "#_sequences",
+                            phantom(for_each(
+                                var("sequence_offsets"),
+                                "offset",
+                                util::parse_view_offset::<U16>(
+                                    vvar("table_view"),
+                                    var("offset"),
+                                    sequence_table.call(),
+                                ),
+                            )),
+                        ),
+                    ],
+                    "subst",
+                    "Format1",
+                    // REVIEW - Consider what style we want to adopt more generally for MultipleSubst, AlternateSubst, LigatureSubst
+                    util::NestingKind::MinimalVariation,
+                ),
             ),
         )
     }
@@ -3295,30 +3344,36 @@ mod gsub {
         ]);
         module.define_format(
             "opentype.layout.alternate_subst",
-            util::embedded_singleton_alternation(
-                [
-                    ("table_start", pos32()),
-                    ("subst_format", u16be()),
-                    (
-                        "coverage",
-                        util::offset16_mandatory(var("table_start"), coverage_table.call()),
-                    ),
-                ],
-                ("subst_format", 1),
-                [
-                    ("alternate_set_count", u16be()),
-                    (
-                        "alternate_sets",
-                        repeat_count(
-                            var("alternate_set_count"),
-                            util::offset16_mandatory(var("table_start"), alternate_set),
+            let_view(
+                "table_view",
+                util::embedded_singleton_alternation(
+                    [
+                        ("table_scope", reify_view(vvar("table_view"))),
+                        ("subst_format", u16be()),
+                        (
+                            "coverage",
+                            util::read_phantom_view_offset16(
+                                vvar("table_view"),
+                                coverage_table.call(),
+                            ),
                         ),
-                    ),
-                ],
-                "subst",
-                "Format1",
-                // REVIEW - Consider what style we want to adopt more generally for MultipleSubst, AlternateSubst, LigatureSubst
-                util::NestingKind::UnifiedRecord,
+                    ],
+                    ("subst_format", 1),
+                    [
+                        ("alternate_set_count", u16be()),
+                        (
+                            "alternate_sets",
+                            repeat_count(
+                                var("alternate_set_count"),
+                                util::read_phantom_view_offset16(vvar("table_view"), alternate_set),
+                            ),
+                        ),
+                    ],
+                    "subst",
+                    "Format1",
+                    // REVIEW - Consider what style we want to adopt more generally for MultipleSubst, AlternateSubst, LigatureSubst
+                    util::NestingKind::UnifiedRecord,
+                ),
             ),
         )
     }
@@ -3330,51 +3385,72 @@ mod gsub {
         module: &mut FormatModule,
         coverage_table: FormatRef,
     ) -> FormatRef {
-        let ligature_table = record([
-            ("ligature_glyph", u16be()),
-            ("component_count", u16be()),
-            (
-                "component_glyph_ids",
-                repeat_count(pred(var("component_count")), u16be()),
-            ),
-        ]);
-        let ligature_set = record([
-            ("table_start", pos32()),
-            ("ligature_count", u16be()),
-            (
-                "ligatures",
-                repeat_count(
-                    var("ligature_count"),
-                    util::offset16_mandatory(var("table_start"), ligature_table),
+        let ligature_table = module.define_format(
+            "opentype.gsub.ligature_subst.ligature_table",
+            record([
+                ("ligature_glyph", u16be()),
+                ("component_count", u16be()),
+                (
+                    "component_glyph_ids",
+                    repeat_count(pred(var("component_count")), u16be()),
                 ),
-            ),
-        ]);
-        module.define_format(
-            "opentype.layout.ligature_subst",
-            util::embedded_singleton_alternation(
-                [
-                    ("table_start", pos32()),
-                    ("subst_format", u16be()),
+            ]),
+        );
+        let ligature_set = module.define_format(
+            "opentype.gsub.ligature_subst.ligature_set",
+            let_view(
+                "set_view",
+                record([
+                    ("set_scope", reify_view(vvar("set_view"))),
+                    ("ligature_count", u16be()),
                     (
-                        "coverage",
-                        util::offset16_mandatory(var("table_start"), coverage_table.call()),
-                    ),
-                ],
-                ("subst_format", 1),
-                [
-                    ("ligature_set_count", u16be()),
-                    (
-                        "ligature_sets",
+                        "ligatures",
                         repeat_count(
-                            var("ligature_set_count"),
-                            util::offset16_mandatory(var("table_start"), ligature_set),
+                            var("ligature_count"),
+                            util::read_phantom_view_offset16(
+                                vvar("set_view"),
+                                ligature_table.call(),
+                            ),
                         ),
                     ),
-                ],
-                "subst",
-                "Format1",
-                // REVIEW - Consider what style we want to adopt more generally for MultipleSubst, AlternateSubst, LigatureSubst
-                util::NestingKind::UnifiedRecord,
+                ]),
+            ),
+        );
+        module.define_format(
+            "opentype.layout.ligature_subst",
+            let_view(
+                "table_view",
+                util::embedded_singleton_alternation(
+                    [
+                        ("table_scope", reify_view(vvar("table_view"))),
+                        ("subst_format", u16be()),
+                        (
+                            "coverage",
+                            util::read_phantom_view_offset16(
+                                vvar("table_view"),
+                                coverage_table.call(),
+                            ),
+                        ),
+                    ],
+                    ("subst_format", 1),
+                    [
+                        ("ligature_set_count", u16be()),
+                        (
+                            "ligature_sets",
+                            repeat_count(
+                                var("ligature_set_count"),
+                                util::read_phantom_view_offset16(
+                                    vvar("table_view"),
+                                    ligature_set.call(),
+                                ),
+                            ),
+                        ),
+                    ],
+                    "subst",
+                    "Format1",
+                    // REVIEW - Consider what style we want to adopt more generally for MultipleSubst, AlternateSubst, LigatureSubst
+                    util::NestingKind::UnifiedRecord,
+                ),
             ),
         )
     }
@@ -3388,39 +3464,52 @@ mod gsub {
     ) -> FormatRef {
         module.define_format(
             "opentype.layout.reverse_chain_single_subst",
-            util::embedded_singleton_alternation(
-                [("table_start", pos32()), ("subst_format", u16be())],
-                ("subst_format", 1),
-                [
-                    (
-                        "coverage",
-                        util::offset16_mandatory(var("table_start"), coverage_table.call()),
-                    ),
-                    ("backtrack_glyph_count", u16be()),
-                    (
-                        "backtrack_coverage_tables",
-                        repeat_count(
-                            var("backtrack_glyph_count"),
-                            util::offset16_mandatory(var("table_start"), coverage_table.call()),
+            let_view(
+                "table_view",
+                util::embedded_singleton_alternation(
+                    [("subst_format", u16be())],
+                    ("subst_format", 1),
+                    [
+                        ("table_scope", reify_view(vvar("table_view"))),
+                        (
+                            "coverage",
+                            util::read_phantom_view_offset16(
+                                vvar("table_view"),
+                                coverage_table.call(),
+                            ),
                         ),
-                    ),
-                    ("lookahead_glyph_count", u16be()),
-                    (
-                        "lookahead_coverage_tables",
-                        repeat_count(
-                            var("lookahead_glyph_count"),
-                            util::offset16_mandatory(var("table_start"), coverage_table.call()),
+                        ("backtrack_glyph_count", u16be()),
+                        (
+                            "backtrack_coverage_tables",
+                            repeat_count(
+                                var("backtrack_glyph_count"),
+                                util::read_phantom_view_offset16(
+                                    vvar("table_view"),
+                                    coverage_table.call(),
+                                ),
+                            ),
                         ),
-                    ),
-                    ("glyph_count", u16be()),
-                    (
-                        "substitute_glyph_ids",
-                        repeat_count(var("glyph_count"), u16be()),
-                    ),
-                ],
-                "subst",
-                "Format1",
-                util::NestingKind::UnifiedRecord,
+                        ("lookahead_glyph_count", u16be()),
+                        (
+                            "lookahead_coverage_tables",
+                            repeat_count(
+                                var("lookahead_glyph_count"),
+                                util::read_phantom_view_offset16(
+                                    vvar("table_view"),
+                                    coverage_table.call(),
+                                ),
+                            ),
+                        ),
+                        ("glyph_count", u16be()),
+                        (
+                            "substitute_glyph_ids",
+                            repeat_count(var("glyph_count"), u16be()),
+                        ),
+                    ],
+                    "subst",
+                    "Format1",
+                    util::NestingKind::UnifiedRecord,
+                ),
             ),
         )
     }
@@ -3497,12 +3586,33 @@ mod gsub {
             ),
         )
     }
+
+    pub(crate) fn table(
+        module: &mut FormatModule,
+        script_list: FormatRef,
+        feature_list: FormatRef,
+        ground_subst: FormatRef,
+        subst_extension: FormatRef,
+        feature_variations: FormatRef,
+    ) -> FormatRef {
+        let lookup_subtable = lookup_subtable(module, subst_extension, ground_subst);
+        let lookup_table = module.define_format(
+            "opentype.gsub.lookup_table",
+            layout::lookup_table(lookup_subtable),
+        );
+        let lookup_list = module.define_format(
+            "opentype.gsub.lookup_list",
+            layout::lookup_list(lookup_table),
+        );
+        module.define_format(
+            "opentype.gsub_table",
+            layout::table(script_list, feature_list, lookup_list, feature_variations),
+        )
+    }
 }
 
 /// Module for sub-formats used in both GSUB and GPOS
 mod layout {
-    use doodle::ViewFormat;
-
     use super::*;
 
     /// Format definition for ChainedSequenceContext tables
@@ -3520,36 +3630,39 @@ mod layout {
         let format3 =
             chained_sequence_colntext_format3(module, coverage_table, sequence_lookup_record);
         module.define_format(
-            "opentype.common.chained_sequence_context",
-            record([
-                ("table_start", pos32()),
-                ("format", u16be()),
-                (
-                    "subst", // REVIEW - this is a GSUB-biased field-name, do we have a better field-name for this?
-                    match_variant(
-                        var("format"),
-                        [
-                            (
-                                Pattern::U16(1),
-                                "Format1",
-                                format1.call_args(vec![var("table_start")]),
-                            ),
-                            (
-                                Pattern::U16(2),
-                                "Format2",
-                                format2.call_args(vec![var("table_start")]),
-                            ),
-                            (
-                                Pattern::U16(3),
-                                "Format3",
-                                format3.call_args(vec![var("table_start")]),
-                            ),
-                            // REVIEW[epic=catchall-policy] - do we need this catch-all?
-                            (Pattern::Wildcard, "BadFormat", Format::Fail),
-                        ],
+            "opentype.layout.chained_sequence_context",
+            let_view(
+                "table_view",
+                record([
+                    ("table_scope", reify_view(vvar("table_view"))),
+                    ("format", u16be()),
+                    (
+                        "subst", // REVIEW - this is a GSUB-biased field-name, do we have a better field-name for this?
+                        match_variant(
+                            var("format"),
+                            [
+                                (
+                                    Pattern::U16(1),
+                                    "Format1",
+                                    format1.call_views(vec![vvar("table_view")]),
+                                ),
+                                (
+                                    Pattern::U16(2),
+                                    "Format2",
+                                    format2.call_views(vec![vvar("table_view")]),
+                                ),
+                                (
+                                    Pattern::U16(3),
+                                    "Format3",
+                                    format3.call_views(vec![vvar("table_view")]),
+                                ),
+                                // REVIEW[epic=catchall-policy] - do we need this catch-all?
+                                (Pattern::Wildcard, "BadFormat", Format::Fail),
+                            ],
+                        ),
                     ),
-                ),
-            ]),
+                ]),
+            ),
         )
     }
 
@@ -3563,17 +3676,23 @@ mod layout {
         let chained_sequence_rule = chained_sequence_rule(module, sequence_lookup_record);
         module.define_format(
             "opentype.layout.chained-sequence-rule-set",
-            record([
-                ("table_start", pos32()),
-                ("chained_seq_rule_count", u16be()),
-                (
-                    "chained_seq_rules",
-                    repeat_count(
-                        var("chained_seq_rule_count"),
-                        util::offset16_mandatory(var("table_start"), chained_sequence_rule.call()),
+            let_view(
+                "table_view",
+                record([
+                    ("table_scope", reify_view(vvar("table_view"))),
+                    ("chained_seq_rule_count", u16be()),
+                    (
+                        "chained_seq_rules",
+                        repeat_count(
+                            var("chained_seq_rule_count"),
+                            util::read_phantom_view_offset16(
+                                vvar("table_view"),
+                                chained_sequence_rule.call(),
+                            ),
+                        ),
                     ),
-                ),
-            ]),
+                ]),
+            ),
         )
     }
 
@@ -3619,20 +3738,20 @@ mod layout {
         coverage_table: FormatRef,
         rule_set: FormatRef,
     ) -> FormatRef {
-        module.define_format_args(
+        module.define_format_views(
             "opentype.layout.chained-sequence-context.format1",
-            vec![(Label::Borrowed("table_start"), ValueType::U32)],
+            vec![(Label::Borrowed("table_view"))],
             record([
                 (
                     "coverage",
-                    util::offset16_mandatory(var("table_start"), coverage_table.call()),
+                    util::read_phantom_view_offset16(vvar("table_view"), coverage_table.call()),
                 ),
                 ("chained_seq_rule_set_count", u16be()),
                 (
                     "chained_seq_rule_sets",
                     repeat_count(
                         var("chained_seq_rule_set_count"),
-                        util::offset16_nullable(var("table_start"), rule_set.call()),
+                        util::read_phantom_view_offset16(vvar("table_view"), rule_set.call()),
                     ),
                 ),
             ]),
@@ -3648,32 +3767,32 @@ mod layout {
         coverage_table: FormatRef,
         rule_set: FormatRef,
     ) -> FormatRef {
-        module.define_format_args(
+        module.define_format_views(
             "opentype.layout.chained-sequence-context.format2",
-            vec![(Label::Borrowed("table_start"), ValueType::U32)],
+            vec![(Label::Borrowed("table_view"))],
             record([
                 (
                     "coverage",
-                    util::offset16_mandatory(var("table_start"), coverage_table.call()),
+                    util::read_phantom_view_offset16(vvar("table_view"), coverage_table.call()),
                 ),
                 (
                     "backtrack_class_def",
-                    util::offset16_mandatory(var("table_start"), class_def.call()),
+                    util::read_phantom_view_offset16(vvar("table_view"), class_def.call()),
                 ),
                 (
                     "input_class_def",
-                    util::offset16_mandatory(var("table_start"), class_def.call()),
+                    util::read_phantom_view_offset16(vvar("table_view"), class_def.call()),
                 ),
                 (
                     "lookahead_class_def",
-                    util::offset16_mandatory(var("table_start"), class_def.call()),
+                    util::read_phantom_view_offset16(vvar("table_view"), class_def.call()),
                 ),
                 ("chained_class_seq_rule_set_count", u16be()),
                 (
                     "chained_class_seq_rule_sets",
                     repeat_count(
                         var("chained_class_seq_rule_set_count"),
-                        util::offset16_nullable(var("table_start"), rule_set.call()),
+                        util::read_phantom_view_offset16(vvar("table_view"), rule_set.call()),
                     ),
                 ),
             ]),
@@ -3688,16 +3807,16 @@ mod layout {
         coverage_table: FormatRef,
         sequence_lookup_record: FormatRef,
     ) -> FormatRef {
-        module.define_format_args(
+        module.define_format_views(
             "opentype.layout.chained-sequence-context.format3",
-            vec![(Label::Borrowed("table_start"), ValueType::U32)],
+            vec![(Label::Borrowed("table_view"))],
             record([
                 ("backtrack_glyph_count", u16be()),
                 (
                     "backtrack_coverages",
                     repeat_count(
                         var("backtrack_glyph_count"),
-                        util::offset16_mandatory(var("table_start"), coverage_table.call()),
+                        util::read_phantom_view_offset16(vvar("table_view"), coverage_table.call()),
                     ),
                 ),
                 ("input_glyph_count", u16be()),
@@ -3705,7 +3824,7 @@ mod layout {
                     "input_coverages",
                     repeat_count(
                         var("input_glyph_count"),
-                        util::offset16_mandatory(var("table_start"), coverage_table.call()),
+                        util::read_phantom_view_offset16(vvar("table_view"), coverage_table.call()),
                     ),
                 ),
                 ("lookahead_glyph_count", u16be()),
@@ -3713,7 +3832,7 @@ mod layout {
                     "lookahead_coverages",
                     repeat_count(
                         var("lookahead_glyph_count"),
-                        util::offset16_mandatory(var("table_start"), coverage_table.call()),
+                        util::read_phantom_view_offset16(vvar("table_view"), coverage_table.call()),
                     ),
                 ),
                 ("seq_lookup_count", u16be()),
@@ -3724,14 +3843,115 @@ mod layout {
             ]),
         )
     }
+
     pub(crate) fn sequence_context(
         module: &mut FormatModule,
         class_def: FormatRef,
         coverage_table: FormatRef,
         sequence_lookup_record: FormatRef,
     ) -> FormatRef {
-        let rule_set = {
-            let rule = record([
+        let rule_set = { rule_set(module, sequence_lookup_record) };
+        let format1 = module.define_format_views(
+            "opentype.layout.sequence-context.format1",
+            vec![(Label::Borrowed("table_view"))],
+            record([
+                (
+                    "coverage",
+                    util::read_phantom_view_offset16(vvar("table_view"), coverage_table.call()),
+                ),
+                ("seq_rule_set_count", u16be()),
+                (
+                    "seq_rule_sets",
+                    repeat_count(
+                        var("seq_rule_set_count"),
+                        util::read_phantom_view_offset16(vvar("table_view"), rule_set.call()),
+                    ),
+                ),
+            ]),
+        );
+        let format2 = module.define_format_views(
+            "opentype.layout.sequence-context.format2",
+            vec![(Label::Borrowed("table_view"))],
+            record([
+                (
+                    "coverage",
+                    util::read_phantom_view_offset16(vvar("table_view"), coverage_table.call()),
+                ),
+                (
+                    "class_def",
+                    util::read_phantom_view_offset16(vvar("table_view"), class_def.call()),
+                ),
+                ("class_seq_rule_set_count", u16be()),
+                (
+                    "class_seq_rule_sets",
+                    repeat_count(
+                        var("class_seq_rule_set_count"),
+                        util::read_phantom_view_offset16(vvar("table_view"), rule_set.call()),
+                    ),
+                ),
+            ]),
+        );
+        let format3 = module.define_format_views(
+            "opentype.layout.sequence-context.format3",
+            vec![(Label::Borrowed("table_view"))],
+            record([
+                ("glyph_count", u16be()),
+                ("seq_lookup_count", u16be()),
+                (
+                    "coverage_tables",
+                    repeat_count(
+                        var("glyph_count"),
+                        util::read_phantom_view_offset16(vvar("table_view"), coverage_table.call()),
+                    ),
+                ),
+                (
+                    "seq_lookup_records",
+                    repeat_count(var("seq_lookup_count"), sequence_lookup_record.call()),
+                ),
+            ]),
+        );
+        module.define_format(
+            "opentype.layout.sequence_context",
+            let_view(
+                "table_view",
+                record([
+                    ("table_scope", reify_view(vvar("table_view"))),
+                    ("format", u16be()),
+                    (
+                        // FIXME - this name is biased to GSUB, is there a better identifier?
+                        "subst",
+                        match_variant(
+                            var("format"),
+                            [
+                                (
+                                    Pattern::U16(1),
+                                    "Format1",
+                                    format1.call_views(vec![vvar("table_view")]),
+                                ),
+                                (
+                                    Pattern::U16(2),
+                                    "Format2",
+                                    format2.call_views(vec![vvar("table_view")]),
+                                ),
+                                (
+                                    Pattern::U16(3),
+                                    "Format3",
+                                    format3.call_views(vec![vvar("table_view")]),
+                                ),
+                                // REVIEW[epic=catchall-policy] - do we need this catchall
+                                (Pattern::Wildcard, "BadFormat", Format::Fail),
+                            ],
+                        ),
+                    ),
+                ]),
+            ),
+        )
+    }
+
+    fn rule_set(module: &mut FormatModule, sequence_lookup_record: FormatRef) -> FormatRef {
+        let rule = module.define_format(
+            "opentype.layout.sequence-context.rule",
+            record([
                 ("glyph_count", where_nonzero::<U16>(u16be())),
                 ("seq_lookup_count", u16be()),
                 (
@@ -3742,103 +3962,24 @@ mod layout {
                     "seq_lookup_records",
                     repeat_count(var("seq_lookup_count"), sequence_lookup_record.call()),
                 ),
-            ]);
-            record([
-                ("table_start", pos32()),
-                ("rule_count", u16be()),
-                (
-                    "rules",
-                    repeat_count(
-                        var("rule_count"),
-                        util::offset16_mandatory(var("table_start"), rule),
-                    ),
-                ),
-            ])
-        };
-        let sequence_context_format1 = |table_start: Expr| {
-            record([
-                (
-                    "coverage",
-                    util::offset16_mandatory(table_start.clone(), coverage_table.call()),
-                ),
-                ("seq_rule_set_count", u16be()),
-                (
-                    "seq_rule_sets",
-                    repeat_count(
-                        var("seq_rule_set_count"),
-                        util::offset16_nullable(table_start, rule_set.clone()),
-                    ),
-                ),
-            ])
-        };
-        let sequence_context_format2 = |table_start: Expr| {
-            record([
-                (
-                    "coverage",
-                    util::offset16_mandatory(table_start.clone(), coverage_table.call()),
-                ),
-                (
-                    "class_def",
-                    util::offset16_mandatory(table_start.clone(), class_def.call()),
-                ),
-                ("class_seq_rule_set_count", u16be()),
-                (
-                    "class_seq_rule_sets",
-                    repeat_count(
-                        var("class_seq_rule_set_count"),
-                        util::offset16_nullable(table_start, rule_set.clone()),
-                    ),
-                ),
-            ])
-        };
-        let sequence_context_format3 = |table_start: Expr| {
-            record([
-                ("glyph_count", u16be()),
-                ("seq_lookup_count", u16be()),
-                (
-                    "coverage_tables",
-                    repeat_count(
-                        var("glyph_count"),
-                        util::offset16_mandatory(table_start, coverage_table.call()),
-                    ),
-                ),
-                (
-                    "seq_lookup_records",
-                    repeat_count(var("seq_lookup_count"), sequence_lookup_record.call()),
-                ),
-            ])
-        };
-        module.define_format(
-            "opentype.common.sequence_context",
-            record([
-                ("table_start", pos32()),
-                ("format", u16be()),
-                (
-                    "subst",
-                    match_variant(
-                        var("format"),
-                        [
-                            (
-                                Pattern::U16(1),
-                                "Format1",
-                                sequence_context_format1(var("table_start")),
-                            ),
-                            (
-                                Pattern::U16(2),
-                                "Format2",
-                                sequence_context_format2(var("table_start")),
-                            ),
-                            (
-                                Pattern::U16(3),
-                                "Format3",
-                                sequence_context_format3(var("table_start")),
-                            ),
-                            // REVIEW[epic=catchall-policy] - do we need this catchall
-                            (Pattern::Wildcard, "BadFormat", Format::Fail),
-                        ],
-                    ),
-                ),
             ]),
+        );
+        module.define_format(
+            "opentype.layout.sequence-context.rule-set",
+            let_view(
+                "table_view",
+                record([
+                    ("table_scope", reify_view(vvar("table_view"))),
+                    ("rule_count", u16be()),
+                    (
+                        "rules",
+                        repeat_count(
+                            var("rule_count"),
+                            util::read_phantom_view_offset16(vvar("table_view"), rule.call()),
+                        ),
+                    ),
+                ]),
+            ),
         )
     }
     /// Format definition for `SequenceLookup`
@@ -3846,10 +3987,11 @@ mod layout {
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#sequence-lookup-record
     pub(crate) fn sequence_lookup_record(module: &mut FormatModule) -> FormatRef {
         module.define_format(
-            "opentype.common.sequence_lookup",
+            "opentype.layout.sequence_lookup",
             record([("sequence_index", u16be()), ("lookup_list_index", u16be())]),
         )
     }
+
     /// Format definition for `FeatureList` table
     ///
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#featurelist-table
@@ -3858,19 +4000,23 @@ mod layout {
         tag: FormatRef,
         feature_table: FormatRef,
     ) -> FormatRef {
+        let feature_record = feature_record(module, tag, feature_table);
         module.define_format(
-            "opentype.common.feature_list",
-            record([
-                ("table_start", pos32()),
-                ("feature_count", u16be()),
-                (
-                    "feature_records",
-                    repeat_count(
-                        var("feature_count"),
-                        feature_record(tag, feature_table, var("table_start")),
+            "opentype.layout.feature_list",
+            let_view(
+                "list_view",
+                record([
+                    ("list_scope", reify_view(vvar("list_view"))),
+                    ("feature_count", u16be()),
+                    (
+                        "feature_records",
+                        repeat_count(
+                            var("feature_count"),
+                            feature_record.call_args_views(vec![], vec![vvar("list_view")]),
+                        ),
                     ),
-                ),
-            ]),
+                ]),
+            ),
         )
     }
 
@@ -3878,17 +4024,21 @@ mod layout {
     ///
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#featurelist-table
     fn feature_record(
+        module: &mut FormatModule,
         tag: FormatRef,
         feature_table: FormatRef,
-        feature_list_start: Expr,
-    ) -> Format {
-        record([
-            ("feature_tag", tag.call()),
-            (
-                "feature",
-                util::offset16_mandatory(feature_list_start, feature_table.call()),
-            ),
-        ])
+    ) -> FormatRef {
+        module.define_format_views(
+            "opentype.layout.feature_record",
+            vec![Label::Borrowed("list_view")],
+            record([
+                ("feature_tag", tag.call()),
+                (
+                    "feature",
+                    util::read_phantom_view_offset16(vvar("list_view"), feature_table.call()),
+                ),
+            ]),
+        )
     }
 
     /// Format definition for `FeatureTable`
@@ -3896,33 +4046,45 @@ mod layout {
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#feature-table
     pub(crate) fn feature_table(module: &mut FormatModule) -> FormatRef {
         module.define_format(
-            "opentype.common.feature_table",
-            record([
-                ("table_start", pos32()),
-                // REVIEW - `feature_params` is technically an offset16 but we don't have a good handle on what data is stored at the offset, or what FeatureRecord tags allow for parameters
-                ("feature_params", u16be()), // TODO - format of params table depends on the feature tag,
-                ("lookup_index_count", u16be()),
-                // Array of 0-based indices into LookupList (first lookup at LookupListIndex = 0)
-                (
-                    "lookup_list_indices",
-                    repeat_count(var("lookup_index_count"), u16be()),
-                ),
-            ]),
+            "opentype.layout.feature_table",
+            let_view(
+                "table_view",
+                record([
+                    ("table_scope", reify_view(vvar("table_view"))),
+                    // WIP - `feature_params` is technically an offset16 but we don't have a good handle on what data is stored at the offset, or what FeatureRecord tags allow for parameters
+                    ("feature_params", u16be()), // TODO - format of params table depends on the feature tag,
+                    ("lookup_index_count", u16be()),
+                    // Array of 0-based indices into LookupList (first lookup at LookupListIndex = 0)
+                    (
+                        "lookup_list_indices",
+                        repeat_count(var("lookup_index_count"), u16be()),
+                    ),
+                ]),
+            ),
         )
     }
 
     /// Format definition for ScriptRecord, used in ScriptList table
     ///
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#scriptlist-table
-    fn script_record(tag: FormatRef, script_table: FormatRef, script_list_start: Expr) -> Format {
-        record([
-            ("script_tag", tag.call()),
-            (
-                "script",
-                util::offset16_mandatory(script_list_start, script_table.call()),
-            ),
-        ])
+    fn script_record(
+        module: &mut FormatModule,
+        tag: FormatRef,
+        script_table: FormatRef,
+    ) -> FormatRef {
+        module.define_format_views(
+            "opentype.layout.script_record",
+            vec![Label::Borrowed("table_view")],
+            record([
+                ("script_tag", tag.call()),
+                (
+                    "script",
+                    util::read_phantom_view_offset16(vvar("table_view"), script_table.call()),
+                ),
+            ]),
+        )
     }
+
     /// Format definition for a ScriptList
     ///
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#scriptlist-table
@@ -3931,19 +4093,23 @@ mod layout {
         tag: FormatRef,
         script_table: FormatRef,
     ) -> FormatRef {
+        let script_record = script_record(module, tag, script_table);
         module.define_format(
-            "opentype.common.script_list",
-            record([
-                ("table_start", pos32()),
-                ("script_count", u16be()),
-                (
-                    "script_records",
-                    repeat_count(
-                        var("script_count"),
-                        script_record(tag, script_table, var("table_start")),
+            "opentype.layout.script_list",
+            let_view(
+                "table_view",
+                record([
+                    ("table_scope", reify_view(vvar("table_view"))),
+                    ("script_count", u16be()),
+                    (
+                        "script_records",
+                        repeat_count(
+                            var("script_count"),
+                            script_record.call_args_views(vec![], vec![vvar("table_view")]),
+                        ),
                     ),
-                ),
-            ]),
+                ]),
+            ),
         )
     }
 
@@ -3958,21 +4124,24 @@ mod layout {
         let lang_sys_record = lang_sys_record(module, tag, lang_sys);
         module.define_format(
             "opentype.layout.script_table",
-            record([
-                ("table_start", pos32()),
-                (
-                    "default_lang_sys",
-                    util::offset16_nullable(var("table_start"), lang_sys.call()),
-                ),
-                ("lang_sys_count", u16be()),
-                (
-                    "lang_sys_records",
-                    repeat_count(
-                        var("lang_sys_count"),
-                        lang_sys_record.call_args(vec![var("table_start")]),
+            let_view(
+                "script_view",
+                record([
+                    ("script_scope", reify_view(vvar("script_view"))),
+                    (
+                        "default_lang_sys",
+                        util::read_phantom_view_offset16(vvar("script_view"), lang_sys.call()),
                     ),
-                ),
-            ]),
+                    ("lang_sys_count", u16be()),
+                    (
+                        "lang_sys_records",
+                        repeat_count(
+                            var("lang_sys_count"),
+                            lang_sys_record.call_args_views(vec![], vec![vvar("script_view")]),
+                        ),
+                    ),
+                ]),
+            ),
         )
     }
 
@@ -4013,7 +4182,7 @@ mod layout {
     pub(crate) fn value_format_flags(module: &mut FormatModule) -> FormatRef {
         use BitFieldKind::*;
         module.define_format(
-            "opentype.common.value-format-flags",
+            "opentype.layout.value-format-flags",
             bit_fields_u16([
                 Reserved {
                     bit_width: 8,
@@ -4043,7 +4212,7 @@ mod layout {
             )
         };
         module.define_format_args_views(
-            "opentype.common.value_record",
+            "opentype.layout.value_record",
             vec![(Label::Borrowed("flags"), vf_flags_type.clone())],
             vec![Label::Borrowed("table_view")],
             record([
@@ -4053,65 +4222,37 @@ mod layout {
                 opt_field("y_advance", util::s16be()),
                 opt_field(
                     "x_placement_device",
-                    record_auto([
-                        ("offset", u16be()),
-                        (
-                            "__data",
-                            util::view_offset16(
-                                vvar("table_view"),
-                                var("offset"),
-                                device_or_variation_index_table.call(),
-                            ),
-                        ),
-                    ]),
+                    util::read_phantom_view_offset16(
+                        vvar("table_view"),
+                        device_or_variation_index_table.call(),
+                    ),
                 ),
                 opt_field(
                     "y_placement_device",
-                    record_auto([
-                        ("offset", u16be()),
-                        (
-                            "__data",
-                            util::view_offset16(
-                                vvar("table_view"),
-                                var("offset"),
-                                device_or_variation_index_table.call(),
-                            ),
-                        ),
-                    ]),
+                    util::read_phantom_view_offset16(
+                        vvar("table_view"),
+                        device_or_variation_index_table.call(),
+                    ),
                 ),
                 opt_field(
                     "x_advance_device",
-                    record_auto([
-                        ("offset", u16be()),
-                        (
-                            "__data",
-                            util::view_offset16(
-                                vvar("table_view"),
-                                var("offset"),
-                                device_or_variation_index_table.call(),
-                            ),
-                        ),
-                    ]),
+                    util::read_phantom_view_offset16(
+                        vvar("table_view"),
+                        device_or_variation_index_table.call(),
+                    ),
                 ),
                 opt_field(
                     "y_advance_device",
-                    record_auto([
-                        ("offset", u16be()),
-                        (
-                            "__data",
-                            util::view_offset16(
-                                vvar("table_view"),
-                                var("offset"),
-                                device_or_variation_index_table.call(),
-                            ),
-                        ),
-                    ]),
+                    util::read_phantom_view_offset16(
+                        vvar("table_view"),
+                        device_or_variation_index_table.call(),
+                    ),
                 ),
             ]),
         )
     }
 
-    /// Format registtration for LangSysRecord
+    /// Format registration for LangSysRecord
     ///
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#script-table
     pub(crate) fn lang_sys_record(
@@ -4119,14 +4260,14 @@ mod layout {
         tag: FormatRef,
         lang_sys: FormatRef,
     ) -> FormatRef {
-        module.define_format_args(
+        module.define_format_views(
             "opentype.layout.lang_sys_record",
-            vec![(Label::Borrowed("script_start"), ValueType::U32)],
+            vec![(Label::Borrowed("script_view"))],
             record([
                 ("lang_sys_tag", tag.call()),
                 (
                     "lang_sys",
-                    util::offset16_mandatory(var("script_start"), lang_sys.call()),
+                    util::read_phantom_view_offset16(vvar("script_view"), lang_sys.call()),
                 ),
             ]),
         )
@@ -4138,7 +4279,7 @@ mod layout {
     pub(crate) fn lang_sys(module: &mut FormatModule) -> FormatRef {
         // Language System Table
         module.define_format(
-            "opentype.common.langsys",
+            "opentype.layout.langsys",
             record([
                 ("lookup_order_offset", util::expect_u16be(0x0000)), // RESERVED - set to NULL [Offset16 type but it doesn't point to anything]
                 ("required_feature_index", u16be()), // 0xFFFF if no features required
@@ -4166,37 +4307,32 @@ mod layout {
             ("anchor_point", u16be()),
         ]);
         // REVIEW[epic=closure-dep-formats] - should this be a Dep-Format registration (module.define_format_args) instead?
-        let anchor_format3 = module.define_format_args_views(
-            "opentype.common.anchor_table.format3",
-            vec![],
+        let anchor_format3 = module.define_format_views(
+            "opentype.layout.anchor_table.format3",
             vec![Label::Borrowed("table_view")],
             record_auto([
                 ("table_scope", reify_view(vvar("table_view"))),
                 ("x_coordinate", util::s16be()),
                 ("y_coordinate", util::s16be()),
                 // REVIEW - each offset below is individually nullable if the other is set, but it may be invalid for them to both be null simultaneously...?
-                ("x_device_offset", u16be()),
                 (
-                    "#_x_device",
-                    phantom(view_offset16(
+                    "x_device",
+                    util::read_phantom_view_offset16(
                         vvar("table_view"),
-                        var("x_device_offset"),
                         device_or_variation_index_table.call(),
-                    )),
+                    ),
                 ),
-                ("y_device_offset", u16be()),
                 (
-                    "#_y_device",
-                    phantom(view_offset16(
+                    "y_device",
+                    util::read_phantom_view_offset16(
                         vvar("table_view"),
-                        var("y_device_offset"),
                         device_or_variation_index_table.call(),
-                    )),
+                    ),
                 ),
             ]),
         );
         module.define_format(
-            "opentype.common.anchor_table",
+            "opentype.layout.anchor_table",
             let_view(
                 "table_view",
                 record([
@@ -4224,13 +4360,8 @@ mod layout {
         )
     }
 
-    /// FeatureVariations table
-    ///
-    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#featVarTbl
-    pub(crate) fn feature_variations(
-        module: &mut FormatModule,
-        feature_table: FormatRef,
-    ) -> FormatRef {
+    /// Feature Variation Record
+    fn feature_variation_record(module: &mut FormatModule, feature_table: FormatRef) -> FormatRef {
         let condition_table = util::embedded_singleton_alternation(
             [("format", u16be())],
             ("format", 1),
@@ -4243,142 +4374,144 @@ mod layout {
             "Format1",
             util::NestingKind::UnifiedRecord,
         );
-        let condition_set = record([
-            ("table_start", pos32()),
-            ("condition_count", u16be()),
-            (
-                "condition_offsets",
-                repeat_count(
-                    var("condition_count"),
-                    util::offset32(var("table_start"), condition_table),
+        let condition_set = let_view(
+            "set_view",
+            record_auto([
+                ("set_scope", reify_view(vvar("set_view"))),
+                ("condition_count", u16be()),
+                // REVIEW[epic=many-offsets-design-pattern] - for-each style
+                (
+                    "condition_offsets",
+                    repeat_count(var("condition_count"), u32be()),
                 ),
-            ),
-        ]);
-        let feature_table_substitution_record = |table_start: Expr| {
+                (
+                    "#_conditions",
+                    phantom(for_each(
+                        var("condition_offsets"),
+                        "offset",
+                        util::parse_view_offset::<U32>(
+                            vvar("set_view"),
+                            var("offset"),
+                            condition_table,
+                        ),
+                    )),
+                ),
+            ]),
+        );
+
+        let feature_table_substitution_record = module.define_format_views(
+            "opentype.layout.feature-table-substitution-record",
+            vec![Label::Borrowed("_table_view")],
             record([
                 ("feature_index", u16be()),
+                ("alternate_feature_offset", u32be()),
                 (
-                    "alternate_feature_offset",
-                    util::offset32(table_start, feature_table.call()),
+                    "alternate_feature",
+                    phantom(util::parse_view_offset::<U32>(
+                        vvar("_table_view"),
+                        var("alternate_feature_offset"),
+                        feature_table.call(),
+                    )),
                 ),
-            ])
-        };
-        let feature_table_substitution = record([
-            ("table_start", pos32()),
-            ("major_version", util::expect_u16be(1)),
-            ("minor_version", util::expect_u16be(0)),
-            ("substitution_count", u16be()),
-            (
-                "substitutions",
-                repeat_count(
-                    var("substitution_count"),
-                    feature_table_substitution_record(var("table_start")),
-                ),
+            ]),
+        );
+        let feature_table_substitution = module.define_format(
+            "opentype.layout.feature-table-substitution",
+            let_view(
+                "table_view",
+                record_auto([
+                    ("table_scope", reify_view(vvar("table_view"))),
+                    ("major_version", util::expect_u16be(1)),
+                    ("minor_version", util::expect_u16be(0)),
+                    ("substitution_count", u16be()),
+                    (
+                        "substitutions",
+                        repeat_count(
+                            var("substitution_count"),
+                            feature_table_substitution_record.call_views(vec![vvar("table_view")]),
+                        ),
+                    ),
+                ]),
             ),
-        ]);
-        // TODO - refactor into dep-format or standalone function
-        let feature_variation_record = |table_start: Expr| {
+        );
+        module.define_format_views(
+            "opentype.layout.feature-variation-record",
+            vec![Label::Borrowed("table_view")],
             record([
                 (
-                    "condition_set_offset",
-                    util::offset32(table_start.clone(), condition_set),
+                    "condition_set",
+                    util::read_phantom_view_offset32(vvar("table_view"), condition_set),
                 ),
                 (
-                    "feature_table_substitution_offset",
-                    util::offset32(table_start, feature_table_substitution),
-                ),
-            ])
-        };
-        module.define_format(
-            "opentype.layout.feature_variations",
-            record([
-                ("table_start", pos32()),
-                ("major_version", util::expect_u16be(1)),
-                ("minor_version", util::expect_u16be(0)),
-                ("feature_variation_record_count", u32be()),
-                (
-                    "feature_variation_records",
-                    repeat_count(
-                        var("feature_variation_record_count"),
-                        feature_variation_record(var("table_start")),
+                    "feature_table_substitution",
+                    util::read_phantom_view_offset32(
+                        vvar("table_view"),
+                        feature_table_substitution.call(),
                     ),
                 ),
             ]),
         )
     }
 
-    /// LookupList table
+    /// FeatureVariations table
     ///
-    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#lookuplist-table
-    fn lookup_list(
-        tag: u32,
-        subst_extension: FormatRef,
-        ground_subst: FormatRef,
-        pos_extension: FormatRef,
-        ground_pos: FormatRef,
-    ) -> Format {
-        let lookup_table = |tag: u32| {
-            // NOTE - tag is a model-external value, lookup-type is model-internal.
-            let lookup_subtable = |tag: u32, lookup_type: Expr| -> Format {
-                const GSUB: u32 = util::magic(b"GSUB");
-                const GPOS: u32 = util::magic(b"GPOS");
-                match tag {
-                    // natural pattern-match on tag
-                    GSUB => {
-                        // in-model pattern-match on lookup-type
-                        match_variant(
-                            lookup_type,
-                            [
-                                (Pattern::U16(7), "SubstExtension", subst_extension.call()),
-                                (
-                                    Pattern::Wildcard,
-                                    "GroundSubst",
-                                    ground_subst.call_args(vec![var("lookup_type")]),
-                                ),
-                            ],
-                        )
-                    }
-                    GPOS => {
-                        // in-model pattern-match on lookup-type
-                        match_variant(
-                            lookup_type,
-                            [
-                                (Pattern::U16(9), "PosExtension", pos_extension.call()),
-                                (
-                                    Pattern::Wildcard,
-                                    "GroundPos",
-                                    ground_pos.call_args(vec![var("lookup_type")]),
-                                ),
-                            ],
-                        )
-                    }
-                    _ => Format::Fail,
-                }
-            };
-            let lookup_flag = {
-                use BitFieldKind::*;
-                // REVIEW[epic=check-zero] - consider whether this should be set to true
-                const SHOULD_CHECK_ZERO: bool = false;
-                bit_fields_u16([
-                    BitsField {
-                        bit_width: 8,
-                        field_name: "mark_attachment_class_filter",
-                    },
-                    Reserved {
-                        bit_width: 3,
-                        check_zero: SHOULD_CHECK_ZERO,
-                    },
-                    FlagBit("use_mark_filtering_set"), // Bit 4 (0x10) - indicator flag for presence of markFilteringSet field in Lookup table structure
-                    FlagBit("ignore_marks"), // Bit 3 (0x8) - if set, skips  over combining marks
-                    FlagBit("ignore_ligatures"), // Bit 2 (0x4) - if set, skips over ligatures
-                    FlagBit("ignore_base_glyphs"), // Bit 1 (0x2) - if set, skips over base glyphs
-                    FlagBit("right_to_left"), // Bit 0 (0x1) - [GPOS type 3 only] when set, last glyph matched input will be positioned on baseline
-                ])
-            };
-            // STUB - initial pass to merely provide a structure without gaps (but not full-featured coverage of each sub-component)
-            // FIXME - refine and enrich this
-            record([
-                ("table_start", pos32()),
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#featVarTbl
+    pub(crate) fn feature_variations(
+        module: &mut FormatModule,
+        feature_table: FormatRef,
+    ) -> FormatRef {
+        let feature_variation_record = feature_variation_record(module, feature_table);
+
+        module.define_format(
+            "opentype.layout.feature_variations",
+            let_view(
+                "table_view",
+                record([
+                    ("table_scope", reify_view(vvar("table_view"))),
+                    ("major_version", util::expect_u16be(1)),
+                    ("minor_version", util::expect_u16be(0)),
+                    ("feature_variation_record_count", u32be()),
+                    (
+                        "feature_variation_records",
+                        repeat_count(
+                            var("feature_variation_record_count"),
+                            feature_variation_record
+                                .call_args_views(vec![], vec![vvar("table_view")]),
+                        ),
+                    ),
+                ]),
+            ),
+        )
+    }
+
+    /// Format-factory taking a `{GPOS,GSUB}`-specific `lookup_subtable` and constructing the shape of a LookupTable around it
+    pub(crate) fn lookup_table(lookup_subtable: FormatRef) -> Format {
+        // NOTE - tag is a model-external value, lookup-type is model-internal.
+
+        let lookup_flag = {
+            use BitFieldKind::*;
+            // REVIEW[epic=check-zero] - consider whether this should be set to true
+            const SHOULD_CHECK_ZERO: bool = false;
+            bit_fields_u16([
+                BitsField {
+                    bit_width: 8,
+                    field_name: "mark_attachment_class_filter",
+                },
+                Reserved {
+                    bit_width: 3,
+                    check_zero: SHOULD_CHECK_ZERO,
+                },
+                FlagBit("use_mark_filtering_set"), // Bit 4 (0x10) - indicator flag for presence of markFilteringSet field in Lookup table structure
+                FlagBit("ignore_marks"), // Bit 3 (0x8) - if set, skips  over combining marks
+                FlagBit("ignore_ligatures"), // Bit 2 (0x4) - if set, skips over ligatures
+                FlagBit("ignore_base_glyphs"), // Bit 1 (0x2) - if set, skips over base glyphs
+                FlagBit("right_to_left"), // Bit 0 (0x1) - [GPOS type 3 only] when set, last glyph matched input will be positioned on baseline
+            ])
+        };
+        let_view(
+            "table_view",
+            record_auto([
+                ("table_scope", reify_view(vvar("table_view"))),
                 ("lookup_type", u16be()),
                 ("lookup_flag", lookup_flag),
                 ("sub_table_count", u16be()),
@@ -4386,9 +4519,9 @@ mod layout {
                     "subtables",
                     repeat_count(
                         var("sub_table_count"),
-                        util::offset16_mandatory(
-                            var("table_start"),
-                            lookup_subtable(tag, var("lookup_type")),
+                        util::read_phantom_view_offset16(
+                            vvar("table_view"),
+                            lookup_subtable.call_args(vec![var("lookup_type")]),
                         ),
                     ),
                 ),
@@ -4400,69 +4533,69 @@ mod layout {
                         fmt_none(),
                     ),
                 ),
-            ])
-        };
-        record([
-            ("table_start", pos32()),
-            ("lookup_count", u16be()),
-            (
-                "lookups",
-                repeat_count(
-                    var("lookup_count"),
-                    util::offset16_mandatory(var("table_start"), lookup_table(tag)),
-                ),
-            ),
-        ])
+            ]),
+        )
     }
 
-    /// Factory funtion used for defining GPOS and GSUB table-formatjs
+    /// LookupList table
     ///
-    // REVIEW - does the function need both GSUB and GPOS or should those be passed in?
-    pub(crate) fn table(
-        tag: u32,
-        script_list: FormatRef,
-        feature_list: FormatRef,
-        ground_subst: FormatRef,
-        ground_pos: FormatRef,
-        subst_extension: FormatRef,
-        pos_extension: FormatRef,
-        feature_variations: FormatRef,
-    ) -> Format {
-        // FIXME - this belongs above but because it is a Format and not yet FormatRef, it is not Copy and so has to be defined in the closure body
-        record([
-            ("table_start", pos32()),
-            ("major_version", util::expect_u16be(1)),
-            ("minor_version", u16be()),
-            (
-                "script_list",
-                util::offset16_mandatory(var("table_start"), script_list.call()),
-            ),
-            (
-                "feature_list",
-                util::offset16_mandatory(var("table_start"), feature_list.call()),
-            ),
-            (
-                "lookup_list",
-                util::offset16_mandatory(
-                    var("table_start"),
-                    lookup_list(
-                        tag,
-                        subst_extension,
-                        ground_subst,
-                        pos_extension,
-                        ground_pos,
+    /// Takes `lookup_table` as a GPOS/GSUB-specific definition of LookupTable (via [`lookup_table`])
+    ///
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#lookuplist-table
+    pub(crate) fn lookup_list(lookup_table: FormatRef) -> Format {
+        let_view(
+            "list_view",
+            record([
+                ("list_scope", reify_view(vvar("list_view"))),
+                ("lookup_count", u16be()),
+                (
+                    "lookups",
+                    repeat_count(
+                        var("lookup_count"),
+                        util::read_phantom_view_offset16(vvar("list_view"), lookup_table.call()),
                     ),
                 ),
-            ),
-            // FIXME - add Version 1.1-specific fields as cond_maybe on minor-version
-            (
-                "feature_variations_offset",
-                cond_maybe(
-                    expr_gt(var("minor_version"), Expr::U16(0)), // Since Major == 1 by assertion, minor > 0 implies v1.1 or (as yet unimplemented) greater
-                    util::offset32(var("table_start"), feature_variations.call()),
+            ]),
+        )
+    }
+
+    /// Factory funtion used for defining GPOS and GSUB table-formats
+    pub(crate) fn table(
+        script_list: FormatRef,
+        feature_list: FormatRef,
+        lookup_list: FormatRef,
+        feature_variations: FormatRef,
+    ) -> Format {
+        let_view(
+            "table_view",
+            record([
+                ("table_scope", reify_view(vvar("table_view"))),
+                ("major_version", util::expect_u16be(1)),
+                ("minor_version", u16be()),
+                (
+                    "script_list",
+                    util::read_phantom_view_offset16(vvar("table_view"), script_list.call()),
                 ),
-            ),
-        ])
+                (
+                    "feature_list",
+                    util::read_phantom_view_offset16(vvar("table_view"), feature_list.call()),
+                ),
+                (
+                    "lookup_list",
+                    util::read_phantom_view_offset16(vvar("table_view"), lookup_list.call()),
+                ),
+                (
+                    "feature_variations_offset",
+                    cond_maybe(
+                        expr_gt(var("minor_version"), Expr::U16(0)), // Since Major == 1 by assertion, minor > 0 implies v1.1 or (as yet unimplemented) greater
+                        util::read_phantom_view_offset32(
+                            vvar("table_view"),
+                            feature_variations.call(),
+                        ),
+                    ),
+                ),
+            ]),
+        )
     }
 }
 
@@ -4476,201 +4609,242 @@ mod gdef {
         device_or_variation_index_table: FormatRef,
         item_variation_store: FormatRef,
     ) -> FormatRef {
-        // REVIEW - should this be a module definition (to shorten type-name)?
         let mark_glyph_set = mark_glyph_set(module, coverage_table);
-        let gdef_header_version_1_2 = |gdef_start_pos: Expr| {
+        let gdef_header_version_1_2 = |table_view: ViewExpr| {
             record([(
                 "mark_glyph_sets_def",
-                util::offset16_nullable(gdef_start_pos, mark_glyph_set.call()),
+                util::read_phantom_view_offset16(table_view, mark_glyph_set.call()),
             )])
         };
-        let gdef_header_version_1_3 = |gdef_start_pos: Expr| {
-            // TODO - implement Item Variation Store
+        let gdef_header_version_1_3 = |table_view: ViewExpr| {
             record([
                 (
                     "mark_glyph_sets_def",
-                    util::offset16_nullable(gdef_start_pos.clone(), mark_glyph_set.call()),
+                    util::read_phantom_view_offset16(table_view.clone(), mark_glyph_set.call()),
                 ),
                 (
                     "item_var_store",
-                    util::offset32(gdef_start_pos, item_variation_store.call()),
+                    util::read_phantom_view_offset32(table_view, item_variation_store.call()),
                 ),
             ])
         };
-        let attach_list = { attach_list(coverage_table) };
-        let lig_caret_list = lig_caret_list(coverage_table, device_or_variation_index_table);
+        let attach_list = attach_list(module, coverage_table);
+        let lig_caret_list =
+            lig_caret_list(module, coverage_table, device_or_variation_index_table);
         module.define_format(
             "opentype.gdef.table",
-            record([
-                // Starting offset of `GDEF` table
-                ("table_start", pos32()),
-                // Major Version of `GDEF` table - only 1[.x] defined
-                ("major_version", util::expect_u16be(1)), // NOTE - only major version 1 is defined: https://learn.microsoft.com/en-us/typography/opentype/spec/gdef#gdef-table-structures
-                // Minor Version (can be [1.]0, [1.]2, or [1.]3)
-                ("minor_version", u16be()),
-                // Class definition table for glyph type (may be NULL)
-                (
-                    "glyph_class_def",
-                    util::offset16_nullable(var("table_start"), class_def.call()),
-                ),
-                // Attachment point list table (may be NULL)
-                (
-                    "attach_list",
-                    util::offset16_nullable(var("table_start"), attach_list),
-                ),
-                // Ligature caret list table (may be NULL)
-                (
-                    "lig_caret_list",
-                    util::offset16_nullable(var("table_start"), lig_caret_list),
-                ),
-                // Class definition table for mark attachment type (may be NULL)
-                (
-                    "mark_attach_class_def",
-                    util::offset16_nullable(var("table_start"), class_def.call()),
-                ),
-                // Version-specific data, if > 1.0
-                // REVIEW - do we want to flatten this variant abstraction into two Option<...> fields instead?
-                (
-                    "data",
-                    match_variant(
-                        var("minor_version"),
-                        [
-                            (Pattern::U16(0), "Version1_0", Format::EMPTY),
-                            // NOTE - the variant `Version1_1` will not actually appear in the generated type due to Void-pruning
-                            (Pattern::U16(1), "Version1_1", Format::Fail), // FIXME - should this be EMPTY instead?
-                            (
-                                Pattern::U16(2),
-                                "Version1_2",
-                                gdef_header_version_1_2(var("table_start")),
-                            ),
-                            (
-                                Pattern::U16(3),
-                                "Version1_3",
-                                gdef_header_version_1_3(var("table_start")),
-                            ),
-                            // NOTE - this case covers everything after version 1.3 - following the Fathom definition that falls back onto the latest version we support
-                            (
-                                Pattern::Wildcard,
-                                "Version1_3",
-                                gdef_header_version_1_3(var("table_start")),
-                            ),
-                        ],
+            let_view(
+                "table_view",
+                record([
+                    // Starting offset of `GDEF` table
+                    ("table_scope", reify_view(vvar("table_view"))),
+                    // Major Version of `GDEF` table - only 1[.x] defined
+                    ("major_version", util::expect_u16be(1)), // NOTE - only major version 1 is defined: https://learn.microsoft.com/en-us/typography/opentype/spec/gdef#gdef-table-structures
+                    // Minor Version (can be [1.]0, [1.]2, or [1.]3)
+                    ("minor_version", u16be()),
+                    // Class definition table for glyph type (may be NULL)
+                    (
+                        "glyph_class_def",
+                        util::read_phantom_view_offset16(vvar("table_view"), class_def.call()),
                     ),
-                ),
-            ]),
+                    // Attachment point list table (may be NULL)
+                    (
+                        "attach_list",
+                        util::read_phantom_view_offset16(vvar("table_view"), attach_list.call()),
+                    ),
+                    // Ligature caret list table (may be NULL)
+                    (
+                        "lig_caret_list",
+                        util::read_phantom_view_offset16(vvar("table_view"), lig_caret_list.call()),
+                    ),
+                    // Class definition table for mark attachment type (may be NULL)
+                    (
+                        "mark_attach_class_def",
+                        util::read_phantom_view_offset16(vvar("table_view"), class_def.call()),
+                    ),
+                    // Version-specific data, if > 1.0
+                    // REVIEW - do we want to flatten this variant abstraction into two Option<...> fields instead?
+                    (
+                        "data",
+                        match_variant(
+                            var("minor_version"),
+                            [
+                                (Pattern::U16(0), "Version1_0", Format::EMPTY),
+                                // NOTE - the variant `Version1_1` will not actually appear in the generated type due to Void-pruning
+                                (Pattern::U16(1), "Version1_1", Format::Fail), // FIXME - should this be EMPTY instead?
+                                (
+                                    Pattern::U16(2),
+                                    "Version1_2",
+                                    gdef_header_version_1_2(vvar("table_view")),
+                                ),
+                                (
+                                    Pattern::U16(3),
+                                    "Version1_3",
+                                    gdef_header_version_1_3(vvar("table_view")),
+                                ),
+                                // NOTE - this case covers everything after version 1.3 - following the Fathom definition that falls back onto the latest version we support
+                                (
+                                    Pattern::Wildcard,
+                                    "Version1_3",
+                                    gdef_header_version_1_3(vvar("table_view")),
+                                ),
+                            ],
+                        ),
+                    ),
+                ]),
+            ),
         )
     }
 
     fn lig_caret_list(
+        module: &mut FormatModule,
         coverage_table: FormatRef,
         device_or_variation_index_table: FormatRef,
-    ) -> Format {
-        let caret_value = {
-            let caret_value_format_1 = record([("coordinate", util::s16be())]);
-
-            let caret_value_format_2 = record([("caret_value_point_index", u16be())]);
-
-            let caret_value_format_3 = |table_start: Expr| {
+    ) -> FormatRef {
+        let caret_value = caret_value(module, device_or_variation_index_table);
+        let lig_glyph = module.define_format(
+            "opentype.gdef.lig_glyph",
+            let_view(
+                "table_view",
                 record([
-                    ("coordinate", util::s16be()),
+                    ("table_scope", reify_view(vvar("table_view"))),
+                    ("caret_count", u16be()),
                     (
-                        "table",
-                        util::offset16_mandatory(
-                            table_start,
-                            device_or_variation_index_table.call(),
+                        "caret_values",
+                        repeat_count(
+                            var("caret_count"),
+                            util::read_phantom_view_offset16(
+                                vvar("table_view"),
+                                caret_value.call(),
+                            ),
                         ),
                     ),
-                ])
-            };
+                ]),
+            ),
+        );
+        module.define_format(
+            "opentype.gdef.lig_caret_list",
+            let_view(
+                "list_view",
+                record([
+                    ("list_scope", reify_view(vvar("list_view"))),
+                    (
+                        "coverage",
+                        util::read_phantom_view_offset16(vvar("list_view"), coverage_table.call()),
+                    ),
+                    ("lig_glyph_count", u16be()),
+                    (
+                        "lig_glyph_offsets",
+                        repeat_count(
+                            var("lig_glyph_count"),
+                            util::read_phantom_view_offset16(vvar("list_view"), lig_glyph.call()),
+                        ),
+                    ),
+                ]),
+            ),
+        )
+    }
 
+    fn caret_value(
+        module: &mut FormatModule,
+        device_or_variation_index_table: FormatRef,
+    ) -> FormatRef {
+        let caret_value_format_1 = record([("coordinate", util::s16be())]);
+
+        let caret_value_format_2 = record([("caret_value_point_index", u16be())]);
+
+        let caret_value_format_3 = |table_view: ViewExpr| {
             record([
-                ("table_start", pos32()),
-                ("caret_value_format", u16be()),
+                ("coordinate", util::s16be()),
                 (
-                    "data",
-                    match_variant(
-                        var("caret_value_format"),
-                        [
-                            (Pattern::U16(1), "Format1", caret_value_format_1),
-                            (Pattern::U16(2), "Format2", caret_value_format_2),
-                            (
-                                Pattern::U16(3),
-                                "Format3",
-                                caret_value_format_3(var("table_start")),
-                            ),
-                            // REVIEW[epic=catchall-policy] - do we need this catch-all?
-                            (Pattern::Wildcard, "BadFormat", Format::Fail),
-                        ],
+                    "table",
+                    util::read_phantom_view_offset16(
+                        table_view,
+                        device_or_variation_index_table.call(),
                     ),
                 ),
             ])
         };
-        let lig_glyph = record([
-            ("table_start", pos32()),
-            ("caret_count", u16be()),
-            (
-                "caret_values",
-                repeat_count(
-                    var("caret_count"),
-                    util::offset16_mandatory(var("table_start"), caret_value),
-                ),
+
+        module.define_format(
+            "opentype.gdef.caret_value",
+            let_view(
+                "table_view",
+                record([
+                    ("table_scope", reify_view(vvar("table_view"))),
+                    ("caret_value_format", u16be()),
+                    (
+                        "data",
+                        match_variant(
+                            var("caret_value_format"),
+                            [
+                                (Pattern::U16(1), "Format1", caret_value_format_1),
+                                (Pattern::U16(2), "Format2", caret_value_format_2),
+                                (
+                                    Pattern::U16(3),
+                                    "Format3",
+                                    caret_value_format_3(vvar("table_view")),
+                                ),
+                                // REVIEW[epic=catchall-policy] - do we need this catch-all?
+                                (Pattern::Wildcard, "BadFormat", Format::Fail),
+                            ],
+                        ),
+                    ),
+                ]),
             ),
-        ]);
-        record([
-            ("table_start", pos32()),
-            (
-                "coverage",
-                util::offset16_mandatory(var("table_start"), coverage_table.call()),
-            ),
-            ("lig_glyph_count", u16be()),
-            (
-                "lig_glyph_offsets",
-                repeat_count(
-                    var("lig_glyph_count"),
-                    util::offset16_mandatory(var("table_start"), lig_glyph),
-                ),
-            ),
-        ])
+        )
     }
 
-    fn attach_list(coverage_table: FormatRef) -> Format {
+    fn attach_list(module: &mut FormatModule, coverage_table: FormatRef) -> FormatRef {
         let attach_point_table = record([
             ("point_count", u16be()),
             ("point_indices", repeat_count(var("point_count"), u16be())),
         ]);
 
-        record([
-            ("table_start", pos32()),
-            (
-                "coverage",
-                util::offset16_mandatory(var("table_start"), coverage_table.call()),
+        module.define_format(
+            "opentype.gdef.attach_list",
+            let_view(
+                "list_view",
+                record([
+                    ("list_scope", reify_view(vvar("list_view"))),
+                    (
+                        "coverage",
+                        util::read_phantom_view_offset16(vvar("list_view"), coverage_table.call()),
+                    ),
+                    ("glyph_count", u16be()),
+                    (
+                        "attach_point_offsets",
+                        repeat_count(
+                            var("glyph_count"),
+                            util::read_phantom_view_offset16(vvar("list_view"), attach_point_table),
+                        ),
+                    ),
+                ]),
             ),
-            ("glyph_count", u16be()),
-            (
-                "attach_point_offsets",
-                repeat_count(
-                    var("glyph_count"),
-                    util::offset16_mandatory(var("table_start"), attach_point_table),
-                ),
-            ),
-        ])
+        )
     }
 
     fn mark_glyph_set(module: &mut FormatModule, coverage_table: FormatRef) -> FormatRef {
         module.define_format(
             "opentype.gdef.mark_glyph_set",
-            record([
-                ("table_start", pos32()),
-                ("format", util::expect_u16be(1)), // FIXME - u16be() instead if this is validation fails
-                ("mark_glyph_set_count", u16be()),
-                (
-                    "coverage",
-                    repeat_count(
-                        var("mark_glyph_set_count"),
-                        util::offset32(var("table_start"), coverage_table.call()),
+            let_view(
+                "table_view",
+                record([
+                    ("table_scope", reify_view(vvar("table_view"))),
+                    ("format", util::expect_u16be(1)), // FIXME - u16be() instead if this is validation fails
+                    ("mark_glyph_set_count", u16be()),
+                    (
+                        "coverage",
+                        repeat_count(
+                            var("mark_glyph_set_count"),
+                            util::read_phantom_view_offset32(
+                                vvar("table_view"),
+                                coverage_table.call(),
+                            ),
+                        ),
                     ),
-                ),
-            ]),
+                ]),
+            ),
         )
     }
 }
@@ -4704,22 +4878,28 @@ mod common {
         let item_variation_data = item_variation_data();
         module.define_format(
             "opentype.common.item_variation_store",
-            record([
-                ("table_start", pos32()),
-                ("format", util::expect_u16be(1)),
-                (
-                    "variation_region_list_offset",
-                    util::offset32(var("table_start"), variation_region_list),
-                ),
-                ("item_variation_data_count", u16be()),
-                (
-                    "item_variation_data_offsets",
-                    repeat_count(
-                        var("item_variation_data_count"),
-                        util::offset32(var("table_start"), item_variation_data),
+            let_view(
+                "table_view",
+                record([
+                    ("table_scope", reify_view(vvar("table_view"))),
+                    ("format", util::expect_u16be(1)),
+                    (
+                        "variation_region_list_offset",
+                        util::read_phantom_view_offset32(vvar("table_view"), variation_region_list),
                     ),
-                ),
-            ]),
+                    ("item_variation_data_count", u16be()),
+                    (
+                        "item_variation_data_offsets",
+                        repeat_count(
+                            var("item_variation_data_count"),
+                            util::read_phantom_view_offset32(
+                                vvar("table_view"),
+                                item_variation_data,
+                            ),
+                        ),
+                    ),
+                ]),
+            ),
         )
     }
 
@@ -5722,10 +5902,58 @@ mod name {
     use super::*;
 
     pub(crate) fn table(module: &mut FormatModule) -> FormatRef {
+        let name_record = name_record(module);
+        let name_version_1 = name_version_1(module);
+
+        module.define_format(
+            "opentype.name.table",
+            let_view(
+                "table_view",
+                record([
+                    ("table_scope", reify_view(vvar("table_view"))),
+                    ("version", u16be()),
+                    ("name_count", u16be()),
+                    ("storage_offset", u16be()),
+                    (
+                        "name_records",
+                        repeat_count(
+                            var("name_count"),
+                            name_record
+                                .call_views(vec![vvar("table_view").offset(var("storage_offset"))]),
+                        ),
+                    ),
+                    (
+                        "data",
+                        match_variant(
+                            var("version"),
+                            [
+                                (Pattern::U16(0), "NameVersion0", Format::EMPTY),
+                                (
+                                    Pattern::U16(1),
+                                    "NameVersion1",
+                                    name_version_1.call_views(vec![
+                                        vvar("table_view").offset(var("storage_offset")),
+                                    ]),
+                                ),
+                                (
+                                    Pattern::binding("unknown"),
+                                    "NameVersionUnknown",
+                                    compute(var("unknown")),
+                                ),
+                            ],
+                        ),
+                    ),
+                ]),
+            ),
+        )
+    }
+
+    fn name_record(module: &mut FormatModule) -> FormatRef {
         let name_id = name_id();
 
-        // REVIEW - should this be a registered dep-format instead of a closure?
-        let name_record = |storage_start: Expr| -> Format {
+        module.define_format_views(
+            "opentype.name.name-record",
+            vec![Label::Borrowed("storage_view")],
             record([
                 ("platform", u16be()),
                 ("encoding", encoding_id(var("platform"))),
@@ -5733,54 +5961,24 @@ mod name {
                 ("name_id", name_id),
                 ("length", u16be()),
                 (
-                    "offset",
-                    util::offset16_mandatory(storage_start, repeat_count(var("length"), u8())),
-                ),
-            ])
-        };
-
-        let name_version_1 = name_version_1(module);
-
-        module.define_format(
-            "opentype.name.table",
-            record([
-                ("table_start", pos32()),
-                ("version", u16be()),
-                ("name_count", u16be()),
-                ("storage_offset", u16be()),
-                (
-                    "name_records",
-                    repeat_count(
-                        var("name_count"),
-                        name_record(util::pos_add_u16(var("table_start"), var("storage_offset"))),
-                    ),
-                ),
-                (
-                    "data",
-                    match_variant(
-                        var("version"),
-                        [
-                            (Pattern::U16(0), "NameVersion0", Format::EMPTY),
-                            (
-                                Pattern::U16(1),
-                                "NameVersion1",
-                                name_version_1.call_args(vec![pos_add_u16(
-                                    var("table_start"),
-                                    var("storage_offset"),
-                                )]),
+                    "string",
+                    // REVIEW - do we want to use util::capture_bytes_view_offset16 here instead?
+                    record([
+                        ("offset", u16be()),
+                        (
+                            "data", // TODO - add interpretation of raw bytes
+                            with_view(
+                                vvar("storage_view").offset(var("offset")),
+                                capture_bytes(var("length")),
                             ),
-                            (
-                                Pattern::binding("unknown"),
-                                "NameVersionUnknown",
-                                compute(var("unknown")),
-                            ),
-                        ],
-                    ),
+                        ),
+                    ]),
                 ),
             ]),
         )
     }
 
+    // TODO - attach semantics to common subset of name_id values
     fn name_id() -> Format {
         #![allow(dead_code)]
         const NID_COPYRIGHT_NOTICE: u16 = 0;
@@ -5815,29 +6013,32 @@ mod name {
         u16be()
     }
 
+    /// Naming table version 1
+    /// C.f. [https://learn.microsoft.com/en-us/typography/opentype/spec/name#naming-table-version-1]
     fn name_version_1(module: &mut FormatModule) -> FormatRef {
-        // REVIEW - should this be a registered dep-format instead of a closure?
-        let lang_tag_record = |storage_start: Expr| -> Format {
+        let lang_tag_record = module.define_format_views(
+            "opentype.name.lang-tag-record",
+            vec![Label::Borrowed("storage_view")],
             record([
                 ("length", u16be()),
                 (
-                    "offset",
-                    util::offset16_mandatory(storage_start, repeat_count(var("length"), u8())),
+                    "lang_tag",
+                    util::capture_bytes_view_offset16(vvar("storage_view"), var("length")),
                 ),
-            ])
-        };
+            ]),
+        );
 
-        module.define_format_args(
+        module.define_format_views(
             "opentype.name.name_version_1",
-            vec![(
-                Label::Borrowed("storage_start"),
-                ValueType::Base(BaseType::U32),
-            )],
+            vec![Label::Borrowed("storage_view")],
             record([
                 ("lang_tag_count", u16be()),
                 (
                     "lang_tag_records",
-                    repeat_count(var("lang_tag_count"), lang_tag_record(var("storage_start"))),
+                    repeat_count(
+                        var("lang_tag_count"),
+                        lang_tag_record.call_views(vec![vvar("storage_view")]),
+                    ),
                 ),
             ]),
         )
@@ -6024,77 +6225,80 @@ pub(crate) mod cmap {
         let cmap_subtable = module.define_format_args(
             "opentype.cmap.subtable",
             vec![(Label::Borrowed("_platform"), ValueType::Base(BaseType::U16))],
-            record([
-                ("table_start", pos32()),
-                ("format", Format::Peek(Box::new(u16be()))),
-                (
-                    "data",
-                    match_variant(
-                        var("format"),
-                        [
-                            (
-                                Pattern::U16(0),
-                                "Format0",
-                                cmap_subtable_format0.call_args(vec![var("_platform")]),
-                            ),
-                            (
-                                Pattern::U16(2),
-                                "Format2",
-                                cmap_subtable_format2.call_args(vec![var("_platform")]),
-                            ),
-                            (
-                                Pattern::U16(4),
-                                "Format4",
-                                cmap_subtable_format4.call_args(vec![var("_platform")]),
-                            ),
-                            (
-                                Pattern::U16(6),
-                                "Format6",
-                                cmap_subtable_format6.call_args(vec![var("_platform")]),
-                            ),
-                            (
-                                Pattern::U16(8),
-                                "Format8",
-                                cmap_subtable_format8.call_args(vec![var("_platform")]),
-                            ),
-                            (
-                                Pattern::U16(10),
-                                "Format10",
-                                cmap_subtable_format10.call_args(vec![var("_platform")]),
-                            ),
-                            (
-                                Pattern::U16(12),
-                                "Format12",
-                                cmap_subtable_format12.call_args(vec![var("_platform")]),
-                            ),
-                            (
-                                Pattern::U16(13),
-                                "Format13",
-                                cmap_subtable_format13.call_args(vec![var("_platform")]),
-                            ),
-                            (
-                                Pattern::U16(14),
-                                "Format14",
-                                cmap_subtable_format14.call_args(vec![var("table_start")]),
-                            ),
-                            // FIXME - leaving out unknown-table for now
-                        ],
+            let_view(
+                "table_view",
+                record([
+                    ("table_scope", reify_view(vvar("table_view"))),
+                    ("format", Format::Peek(Box::new(u16be()))),
+                    (
+                        "data",
+                        match_variant(
+                            var("format"),
+                            [
+                                (
+                                    Pattern::U16(0),
+                                    "Format0",
+                                    cmap_subtable_format0.call_args(vec![var("_platform")]),
+                                ),
+                                (
+                                    Pattern::U16(2),
+                                    "Format2",
+                                    cmap_subtable_format2.call_args(vec![var("_platform")]),
+                                ),
+                                (
+                                    Pattern::U16(4),
+                                    "Format4",
+                                    cmap_subtable_format4.call_args(vec![var("_platform")]),
+                                ),
+                                (
+                                    Pattern::U16(6),
+                                    "Format6",
+                                    cmap_subtable_format6.call_args(vec![var("_platform")]),
+                                ),
+                                (
+                                    Pattern::U16(8),
+                                    "Format8",
+                                    cmap_subtable_format8.call_args(vec![var("_platform")]),
+                                ),
+                                (
+                                    Pattern::U16(10),
+                                    "Format10",
+                                    cmap_subtable_format10.call_args(vec![var("_platform")]),
+                                ),
+                                (
+                                    Pattern::U16(12),
+                                    "Format12",
+                                    cmap_subtable_format12.call_args(vec![var("_platform")]),
+                                ),
+                                (
+                                    Pattern::U16(13),
+                                    "Format13",
+                                    cmap_subtable_format13.call_args(vec![var("_platform")]),
+                                ),
+                                (
+                                    Pattern::U16(14),
+                                    "Format14",
+                                    cmap_subtable_format14.call_views(vec![vvar("table_view")]),
+                                ),
+                                // FIXME - leaving out unknown-table for now
+                            ],
+                        ),
                     ),
-                ),
-            ]),
+                ]),
+            ),
         );
 
-        let encoding_record = module.define_format_args(
+        let encoding_record = module.define_format_views(
             "opentype.encoding_record",
-            vec![START_ARG],
+            vec![Label::Borrowed("table_view")],
             record([
                 ("platform", u16be()), // platform identifier
                 // NOTE - encoding_id nominally depends on platform_id but no recorded dependencies in fathom def
                 ("encoding", encoding_id(var("platform"))), // encoding identifier
                 (
-                    "subtable_offset",
-                    util::offset32(
-                        util::START_VAR,
+                    "subtable",
+                    util::read_phantom_view_offset32(
+                        vvar("table_view"),
                         cmap_subtable.call_args(vec![var("platform")]),
                     ),
                 ),
@@ -6102,19 +6306,22 @@ pub(crate) mod cmap {
         );
 
         module.define_format(
-            "opentype.cmap_table",
-            record([
-                ("table_start", pos32()), // start of character mapping table
-                ("version", u16be()),     // table version number
-                ("num_tables", u16be()),  // number of subsequent encoding tables
-                (
-                    "encoding_records",
-                    repeat_count(
-                        var("num_tables"),
-                        encoding_record.call_args(vec![var("table_start")]),
+            "opentype.cmap.table",
+            let_view(
+                "table_view",
+                record([
+                    ("table_scope", reify_view(vvar("table_view"))), // start of character mapping table
+                    ("version", u16be()),                            // table version number
+                    ("num_tables", u16be()), // number of subsequent encoding tables
+                    (
+                        "encoding_records",
+                        repeat_count(
+                            var("num_tables"),
+                            encoding_record.call_views(vec![vvar("table_view")]),
+                        ),
                     ),
-                ),
-            ]),
+                ]),
+            ),
         )
     }
 
@@ -6344,31 +6551,25 @@ pub(crate) mod cmap {
             ),
         ]);
 
-        let variation_selector = module.define_format_args(
+        let variation_selector = module.define_format_views(
             "opentype.variation_selector",
-            vec![(
-                Label::Borrowed("table_start"),
-                ValueType::Base(BaseType::U32),
-            )],
+            vec![TABLE_VIEW],
             record([
                 ("var_selector", util::u24be()),
                 (
                     "default_uvs_offset",
-                    util::offset32(var("table_start"), default_uvs_table),
+                    util::read_phantom_view_offset32(vvar("table_view"), default_uvs_table),
                 ),
                 (
                     "non_default_uvs_offset",
-                    util::offset32(var("table_start"), non_default_uvs_table),
+                    util::read_phantom_view_offset32(vvar("table_view"), non_default_uvs_table),
                 ),
             ]),
         );
 
-        module.define_format_args(
+        module.define_format_views(
             "opentype.cmap_subtable.format14",
-            vec![(
-                Label::Borrowed("table_start"),
-                ValueType::Base(BaseType::U32),
-            )],
+            [util::TABLE_VIEW].to_vec(),
             util::slice_record(
                 "length",
                 [
@@ -6379,7 +6580,7 @@ pub(crate) mod cmap {
                         "var_selector",
                         repeat_count(
                             var("num_var_selector_records"),
-                            variation_selector.call_args(vec![var("table_start")]),
+                            variation_selector.call_views(vec![vvar("table_view")]),
                         ),
                     ),
                 ],
@@ -6484,6 +6685,7 @@ pub(crate) mod table {
     /// Takes an expr for the start-of-file offset `sof_offset`, an Expr containing the parsed sequence-of-table-records `table-records`,
     /// a table id `id` unique to the table we are defining, and the format of the table `table_format`.
     pub(crate) fn required_table(
+        // WIP
         sof_offset: Expr,
         table_records: Expr,
         id: u32,
@@ -6513,6 +6715,7 @@ pub(crate) mod table {
     ///
     /// Instead of a table-`Format`, we take a `FormatRef` that is expected to take a single argument of kind `U32` that specifies the table-length.
     pub(crate) fn required_table_with_len(
+        // WIP
         sof_offset: Expr,
         table_records: Expr,
         id: u32,
@@ -6546,6 +6749,7 @@ pub(crate) mod table {
     }
 
     pub(crate) fn optional_table(
+        // WIP
         sof_offset: Expr,
         table_records: Expr,
         id: u32,
@@ -6638,50 +6842,54 @@ pub(crate) mod stat {
             record([("design_axes", repeat_count(design_axis_count, axis_record))])
         };
         let axis_value_offsets_array = |axis_value_count: Expr| {
-            record([
-                ("table_start", pos32()),
-                (
-                    "axis_value_offsets",
-                    repeat_count(
-                        axis_value_count,
-                        util::offset16_mandatory(var("table_start"), axis_value_table),
+            let_view(
+                "array_view",
+                record([
+                    ("array_scope", reify_view(vvar("array_view"))),
+                    (
+                        "axis_value_offsets",
+                        repeat_count(
+                            axis_value_count,
+                            util::read_phantom_view_offset16(vvar("array_view"), axis_value_table),
+                        ),
                     ),
-                ),
-            ])
+                ]),
+            )
         };
         module.define_format(
             "opentype.stat_table",
-            record([
-                ("table_start", pos32()),
-                ("major_version", util::expect_u16be(1)),
-                ("minor_version", util::expects_u16be([1, 2])), // Version 1.0 is deprecated
-                ("design_axis_size", u16be()), // size (in bytes) of each axis record
-                ("design_axis_count", u16be()), // number of axis records
-                (
-                    "design_axes_offset",
-                    util::offset32(
-                        var("table_start"),
-                        design_axes_array(var("design_axis_count")),
-                    ),
-                ), // offset is 0 iff design_axis_count is 0
-                ("axis_value_count", u16be()),
-                (
-                    "offset_to_axis_value_offsets",
-                    util::offset32(
-                        var("table_start"),
-                        axis_value_offsets_array(var("axis_value_count")),
-                    ),
-                ), // offset is 0 iff axis_value_count is 0
-                ("elided_fallback_name_id", u16be()), // omitted in version 1.0, but said version is deprecated
-            ]),
+            let_view(
+                "table_view",
+                record([
+                    ("table_scope", reify_view(vvar("table_view"))),
+                    ("major_version", util::expect_u16be(1)),
+                    ("minor_version", util::expects_u16be([1, 2])), // Version 1.0 is deprecated
+                    ("design_axis_size", u16be()), // size (in bytes) of each axis record
+                    ("design_axis_count", u16be()), // number of axis records
+                    (
+                        "design_axes",
+                        util::read_phantom_view_offset32(
+                            vvar("table_view"),
+                            design_axes_array(var("design_axis_count")),
+                        ),
+                    ), // offset is 0 iff design_axis_count is 0
+                    ("axis_value_count", u16be()),
+                    (
+                        "axis_value_offsets",
+                        util::read_phantom_view_offset32(
+                            vvar("table_view"),
+                            axis_value_offsets_array(var("axis_value_count")),
+                        ),
+                    ), // offset is 0 iff axis_value_count is 0
+                    ("elided_fallback_name_id", u16be()), // omitted in version 1.0, but said version is deprecated
+                ]),
+            ),
         )
     }
 }
 
 /// Alternate definitions for experimental purposes
 pub(crate) mod alt {
-    use doodle::ViewFormat;
-
     use super::*;
     pub(crate) fn main(module: &mut FormatModule) -> FormatRef {
         // NOTE - Microsoft defines a tag as consisting on printable ascii characters in the range 0x20 -- 0x7E (inclusive), but some vendors are non-standard so we accept anything
@@ -6768,6 +6976,7 @@ pub(crate) mod alt {
 
         let ttc_header = {
             // Version 1.0
+            // WIP
             let ttc_header1 = |start: Expr| {
                 record([
                     ("num_fonts", u32be()),
@@ -6782,6 +6991,7 @@ pub(crate) mod alt {
             };
 
             // Version 2.0
+            // WIP
             let ttc_header2 = |start: Expr| {
                 record([
                     ("num_fonts", u32be()),

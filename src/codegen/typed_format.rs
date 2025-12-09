@@ -209,7 +209,7 @@ pub enum TypedFormat<TypeRep> {
         TypeRep,
         usize,
         Vec<(Label, TypedExpr<TypeRep>)>,
-        Option<Vec<(Label, TypedViewExpr<TypeRep>)>>,
+        Vec<(Label, TypedViewExpr<TypeRep>)>,
         Rc<TypedFormat<TypeRep>>,
     ),
     ForEach(
@@ -1107,12 +1107,10 @@ mod __impls {
                         .into_iter()
                         .map(|(_lbl, arg)| Expr::from(arg))
                         .collect();
-                    let views = t_views.map(|views| {
-                        views
-                            .into_iter()
-                            .map(|(_lbl, view)| ViewExpr::from(view))
-                            .collect()
-                    });
+                    let views = t_views
+                        .into_iter()
+                        .map(|(_lbl, view)| ViewExpr::from(view))
+                        .collect();
                     Format::ItemVar(level, args, views)
                 }
                 TypedFormat::DecodeBytes(_, expr, inner) => {

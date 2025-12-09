@@ -114,7 +114,7 @@ pub(crate) enum TypedDecoder<TypeRep> {
         usize,
         (
             Vec<(Label, TypedExpr<TypeRep>)>,
-            Option<Vec<(Label, TypedViewExpr<TypeRep>)>>,
+            Vec<(Label, TypedViewExpr<TypeRep>)>,
         ),
     ),
     Fail,
@@ -348,33 +348,32 @@ impl<'a> GTCompiler<'a> {
         let dec = match format {
             // TODO - figure out what needs to be done with `_arg_views`
             TypedFormat::FormatCall(gt, level, arg_exprs, arg_views, deref) => {
-                let this_args = (arg_exprs.to_vec(), arg_views.as_ref().map(|v| v.to_vec()));
-                let sig_args =
-                    if arg_exprs.is_empty() && arg_views.as_ref().is_none_or(Vec::is_empty) {
-                        None
-                    } else {
-                        Some(
-                            arg_exprs
-                                .iter()
-                                .map(|(lab, gtx)| {
-                                    (
-                                        lab.clone(),
-                                        gtx.get_type()
-                                            .expect("found lambda in format args")
-                                            .into_owned(),
-                                    )
-                                })
-                                .chain(arg_views.into_iter().flatten().map(|(lab, _)| {
-                                    (
-                                        lab.clone(),
-                                        GenType::Inline(RustType::ViewObject(RustLt::Parametric(
-                                            Label::Borrowed(super::model::DEFAULT_LT),
-                                        ))),
-                                    )
-                                }))
-                                .collect(),
-                        )
-                    };
+                let this_args = (arg_exprs.to_vec(), arg_views.to_vec());
+                let sig_args = if arg_exprs.is_empty() && arg_views.is_empty() {
+                    None
+                } else {
+                    Some(
+                        arg_exprs
+                            .iter()
+                            .map(|(lab, gtx)| {
+                                (
+                                    lab.clone(),
+                                    gtx.get_type()
+                                        .expect("found lambda in format args")
+                                        .into_owned(),
+                                )
+                            })
+                            .chain(arg_views.into_iter().map(|(lab, _)| {
+                                (
+                                    lab.clone(),
+                                    GenType::Inline(RustType::ViewObject(RustLt::Parametric(
+                                        Label::Borrowed(super::model::DEFAULT_LT),
+                                    ))),
+                                )
+                            }))
+                            .collect(),
+                    )
+                };
                 let _f = self.module.get_format(*level);
                 let next = if _f.depends_on_next(self.module) {
                     next

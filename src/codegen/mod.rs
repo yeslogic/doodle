@@ -2670,7 +2670,7 @@ impl_toast_caselogic!(GTExpr);
 enum SimpleLogic<ExprT, ViewExprT = TypedViewExpr<GenType>> {
     Fail,
     ExpectEnd,
-    Invoke(usize, Vec<(Label, ExprT)>, Option<Vec<(Label, ViewExprT)>>),
+    Invoke(usize, Vec<(Label, ExprT)>, Vec<(Label, ViewExprT)>),
     SkipToNextMultiple(usize),
     ByteIn(ByteSet),
     Eval(RustExpr),
@@ -2692,7 +2692,7 @@ impl ToAst for SimpleLogic<GTExpr> {
             SimpleLogic::SkipRemainder => {
                 GenBlock::simple_expr(model::skip_remainder(ctxt.parser()))
             }
-            SimpleLogic::Invoke(ix_dec, args, o_views) => {
+            SimpleLogic::Invoke(ix_dec, args, views) => {
                 let fname = format!("Decoder{ix_dec}");
                 let call_args = {
                     let base_args = [ctxt.parser()];
@@ -2708,8 +2708,8 @@ impl ToAst for SimpleLogic<GTExpr> {
                                 embed_expr_owned(x)
                             }
                         })
-                        .chain(o_views.iter().flatten().map(|(_lab, x)| embed_view_expr(x)));
-                    if args.is_empty() && o_views.as_ref().is_none_or(Vec::is_empty) {
+                        .chain(views.iter().map(|(_lab, x)| embed_view_expr(x)));
+                    if args.is_empty() && views.is_empty() {
                         base_args.to_vec()
                     } else {
                         base_args.into_iter().chain(dep_args).collect()
@@ -4115,17 +4115,12 @@ impl<'a> Elaborator<'a> {
                 self.codegen.name_gen.ctxt.escape();
 
                 // TODO[epic=view-dependent-formats] - figure out what needs to be done here, beyond a simple clone
-                let t_views = if let Some(views) = views {
-                    let fm_views = &self.module.views[*level];
-                    let mut t_views = Vec::with_capacity(views.len());
-                    for (lbl, view) in Iterator::zip(fm_views.iter(), views.iter()) {
-                        let t_view = self.elaborate_view_expr(view);
-                        t_views.push((lbl.clone(), t_view));
-                    }
-                    Some(t_views)
-                } else {
-                    None
-                };
+                let fm_views = &self.module.views[*level];
+                let mut t_views = Vec::with_capacity(views.len());
+                for (lbl, view) in Iterator::zip(fm_views.iter(), views.iter()) {
+                    let t_view = self.elaborate_view_expr(view);
+                    t_views.push((lbl.clone(), t_view));
+                }
 
                 let t_inner = if let Some(val) = self.t_formats.get(level) {
                     val.clone()
