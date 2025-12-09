@@ -76,7 +76,7 @@ impl ValueType {
         match self {
             ValueType::Record(fields) => match fields.iter().find(|(l, _)| label == l) {
                 Some((_, t)) => t.clone(),
-                None => panic!("{label} not found in record type"),
+                None => panic!("record_proj: field `{label}` not found in record type"),
             },
             _ => panic!("expected record type, found {self:?}"),
         }

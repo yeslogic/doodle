@@ -1732,6 +1732,7 @@ impl TypeChecker {
             (_, UType::Hole) => Ok(left),
             (UType::Empty, _) => Ok(right),
             (_, UType::Empty) => Ok(left),
+            (UType::ViewObj, UType::ViewObj) => Ok(left),
             (UType::Seq(e1, h1), UType::Seq(e2, h2)) => {
                 if e1 == e2 {
                     if h1 <= h2 { Ok(left) } else { Ok(right) }
@@ -1746,6 +1747,14 @@ impl TypeChecker {
                 } else {
                     let inner = self.unify_utype(o1.clone(), o2.clone())?;
                     Ok(Rc::new(UType::Option(inner)))
+                }
+            }
+            (UType::PhantomData(p1), UType::PhantomData(p2)) => {
+                if p1 == p2 {
+                    Ok(left)
+                } else {
+                    let inner = self.unify_utype(p1.clone(), p2.clone())?;
+                    Ok(Rc::new(UType::PhantomData(inner)))
                 }
             }
             (UType::Base(b1), UType::Base(b2)) => {
@@ -2931,9 +2940,9 @@ impl TypeChecker {
                 self.unify_var_utype(newvar, Rc::new(UType::PhantomData(inner_var.into())))?;
                 Ok(newvar)
             }
-            Format::ItemVar(level, args, _views) => {
+            Format::ItemVar(level, args, views) => {
                 let newvar = self.get_new_uvar();
-                let level_var = if !args.is_empty() {
+                let level_var = if !args.is_empty() || !views.is_empty() {
                     let mut arg_scope = UMultiScope::new(ctxt.scope);
                     let mut view_scope = ViewMultiScope::new(&ctxt.views);
                     let expected = ctxt.module.get_args(*level);
@@ -2943,7 +2952,7 @@ impl TypeChecker {
                         self.unify_var_valuetype(v_arg, vt)?;
                     }
                     let expected = ctxt.module.get_view_args(*level);
-                    for (lbl, view_x) in Iterator::zip(expected.iter(), _views.iter().flatten()) {
+                    for (lbl, view_x) in Iterator::zip(expected.iter(), views.iter()) {
                         self.traverse_view_expr(view_x, ctxt)?;
                         view_scope.push_view(lbl.clone());
                     }
@@ -3653,7 +3662,7 @@ impl From<ConstraintError> for TCErrorKind {
 impl std::fmt::Display for TCErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::VarianceMismatch(uv, vmid, vm, constraint, pol) => match pol {
+            TCErrorKind::VarianceMismatch(uv, vmid, vm, constraint, pol) => match pol {
                 Polarity::PriorInvariant => write!(
                     f,
                     "prior constraint `{uv} {constraint}` precludes attempted unification `{uv} ⊇ {vmid} (:= {vm:?})`"
@@ -3663,8 +3672,8 @@ impl std::fmt::Display for TCErrorKind {
                     "attempted unification `{uv} {constraint}` precluded by prior constraint `{uv} ⊇ {vmid} (:= {vm:?})`"
                 ),
             },
-            Self::Unification(c_err) => write!(f, "{c_err}"),
-            Self::InfiniteType(v, constraints) => match constraints {
+            TCErrorKind::Unification(c_err) => write!(f, "{c_err}"),
+            TCErrorKind::InfiniteType(v, constraints) => match constraints {
                 Constraints::Indefinite => {
                     unreachable!("indefinite constraint `{v} = ??` is not infinite")
                 }
@@ -3685,11 +3694,11 @@ impl std::fmt::Display for TCErrorKind {
                     }
                 },
             },
-            Self::MultipleSolutions(uv, bs) => {
+            TCErrorKind::MultipleSolutions(uv, bs) => {
                 write!(f, "no unique solution for `{uv} {}`", bs.to_constraint())
             }
-            Self::NoSolution(uv) => write!(f, "no valid solutions for `{uv}`"),
-            Self::MissingView(lbl) => {
+            TCErrorKind::NoSolution(uv) => write!(f, "no valid solutions for `{uv}`"),
+            TCErrorKind::MissingView(lbl) => {
                 write!(f, "view-based parse depends on unbound identifier `{lbl}`")
             }
         }

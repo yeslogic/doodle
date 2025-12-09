@@ -1433,7 +1433,7 @@ impl Decoder {
                     let v = e.eval_with_loc(scope).as_ref().clone();
                     new_scope.push(name.clone(), v);
                 }
-                for (name, vv) in vs.iter().flatten() {
+                for (name, vv) in vs {
                     let v = Self::eval_view_expr_with_loc(scope, vv)?;
                     new_scope.push_view(name.clone(), v);
                 }

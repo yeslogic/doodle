@@ -26,7 +26,7 @@ pub enum ModelKind {
 #[serde(tag = "tag", content = "data")]
 pub enum GroundFormat {
     /// Reference to a top-level item
-    ItemVar(usize, Vec<Expr>, Option<Vec<ViewExpr>>), // FIXME - do the exprs here need type(+) info?
+    ItemVar(usize, Vec<Expr>, Vec<ViewExpr>), // FIXME - do the exprs here need type(+) info?
     /// A format that never matches
     Fail,
     /// Matches if the end of the input has been reached

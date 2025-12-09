@@ -2350,7 +2350,7 @@ impl<'module> TreePrinter<'module> {
                 if !args.is_empty() {
                     frag.append(Fragment::String("(...)".into()));
                 }
-                if !views.as_ref().is_none_or(Vec::is_empty) {
+                if !views.is_empty() {
                     // REVIEW - consider the stylistic decision of how to signify view-arguments
                     frag.append(Fragment::String("{...}".into()));
                 }
