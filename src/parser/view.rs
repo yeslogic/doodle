@@ -65,6 +65,16 @@ impl<'a> View<'a> {
         }
     }
 
+    pub fn read_u16be(&self) -> Result<u16, DoodleParseError> {
+        if self.buffer.len() < 2 {
+            return Err(DoodleParseError::Overrun(OverrunKind::EndOfStream {
+                offset: ByteOffset::from_bytes(self.start_offset + 2),
+                max_offset: ByteOffset::from_bytes(self.start_offset + self.buffer.len()),
+            }));
+        }
+        Ok(u16::from_be_bytes([self.buffer[0], self.buffer[1]]))
+    }
+
     // NOTE - we need these separate methods because RustExpr::MethodCall doesn't allow turbo-fish type-parameters
     pub fn read_array_u8(&self, len: usize) -> Result<ReadArray<'a, U8>, DoodleParseError> {
         self.as_read_array(len)

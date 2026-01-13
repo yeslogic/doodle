@@ -484,6 +484,7 @@ mod util {
     /// Record-format that reads (and stores) a u16be offset, along with a field `_data` for the phantom-parse of `format` at that offset (relative to `view`).
     pub(crate) fn read_phantom_view_offset16(view: ViewExpr, format: Format) -> Format {
         record_auto([
+            // TODO: rename "offset" -> "value" and ensure all calling-fields have 'offset' in field-identifier
             ("offset", u16be()),
             (
                 "#_data",
@@ -495,6 +496,7 @@ mod util {
     /// Record-format that reads (and stores) a u32be offset, along with a field `_data` for the phantom-parse of `format` at that offset (relative to `view`).
     pub(crate) fn read_phantom_view_offset32(view: ViewExpr, format: Format) -> Format {
         record_auto([
+            // TODO: rename "offset" -> "value" and ensure all calling-fields have 'offset' in field-identifier
             ("offset", u32be()),
             (
                 "#_data",
@@ -1905,30 +1907,28 @@ pub(crate) mod kern {
     /// The indices in ClassTables are scaled (J = 2 x j ; I = 2 x M x i) to facilitate offset-arithmetic for random access (TargetOffset(i,j) = BaseOffset + I + J)
     ///
     /// Requires additional parameters `table_view` and `class_table` to correctly parse the content at each class offset
-    fn kerning_array(
-        table_view: ViewExpr,
-        left_class_offset: Expr,
-        right_class_offset: Expr,
-        class_table: FormatRef,
-    ) -> Format {
-        pseudo_record(
-            [
-                (
-                    "left_glyph_count",
-                    glyph_count(table_view.clone(), left_class_offset, class_table),
-                ),
-                (
-                    "right_glyph_count",
-                    glyph_count(table_view, right_class_offset, class_table),
-                ),
+    fn kerning_array(module: &mut FormatModule) -> FormatRef {
+        module.define_format_args(
+            "opentype.kern.kerning_array",
+            vec![
+                (Label::Borrowed("left_glyph_count"), ValueType::U16),
+                (Label::Borrowed("right_glyph_count"), ValueType::U16),
             ],
-            repeat_count(
-                expr_unwrap(var("left_glyph_count")), // N rows where there are N left-hand classes
-                repeat_count(
-                    expr_unwrap(var("right_glyph_count")), // M columns
-                    util::s16be(),                         // FWORD value at index (i, j)
+            record([
+                ("left_glyph_count", compute(var("left_glyph_count"))),
+                ("right_glyph_count", compute(var("right_glyph_count"))),
+                (
+                    "kerning_values",
+                    // REVIEW - consider ReadArray<S16> instead
+                    repeat_count(
+                        var("left_glyph_count"), // N rows where there are N left-hand classes
+                        repeat_count(
+                            var("right_glyph_count"), // M columns
+                            util::s16be(),            // FWORD value at index (i, j)
+                        ),
+                    ),
                 ),
-            ),
+            ]),
         )
     }
 
@@ -1944,6 +1944,7 @@ pub(crate) mod kern {
                 ("class_values", repeat_count(var("n_glyphs"), u16be())), // class values for each glyph in class range
             ]),
         );
+        let kerning_array = kerning_array(module);
         module.define_format(
             "opentype.kern.subtable.format2",
             let_view(
@@ -1963,11 +1964,29 @@ pub(crate) mod kern {
                         "kerning_array_offset",
                         util::read_phantom_view_offset16(
                             vvar("table_view"),
-                            kerning_array(
-                                vvar("table_view"),
-                                var("left_class_offset"),
-                                var("right_class_offset"),
-                                class_table,
+                            pseudo_record(
+                                [
+                                    (
+                                        "left_glyph_count",
+                                        glyph_count(
+                                            vvar("table_view"),
+                                            var("left_class_offset"),
+                                            class_table,
+                                        ),
+                                    ),
+                                    (
+                                        "right_glyph_count",
+                                        glyph_count(
+                                            vvar("table_view"),
+                                            var("right_class_offset"),
+                                            class_table,
+                                        ),
+                                    ),
+                                ],
+                                kerning_array.call_args(vec![
+                                    expr_unwrap(var("left_glyph_count")),
+                                    expr_unwrap(var("right_glyph_count")),
+                                ]),
                             ),
                         ),
                     ),
@@ -2805,7 +2824,7 @@ mod gpos {
                 vec![(Label::Borrowed("mark_class_count"), ValueType::U16)],
                 vec![Label::Borrowed("table_view")],
                 record_auto([
-                    // REVIEW[epic=nested-format-reify-layer] - outer-format view reified locally
+                    // REVIEW[epic=nested-format-reify-layer] - INNER(local)
                     ("record_scope", reify_view(vvar("table_view"))),
                     // REVIEW[epic=many-offsets-design-pattern] - for-each style
                     (
@@ -2869,6 +2888,8 @@ mod gpos {
                     "array_view",
                     record_auto([
                         ("array_scope", reify_view(vvar("array_view"))),
+                        // FIXME - reduplicated from outer format for context-free expansion
+                        ("mark_class_count", compute(var("mark_class_count"))),
                         ("ligature_count", u16be()),
                         // REVIEW[epic=many-offsets-design-pattern] - for-each style
                         (
@@ -3335,15 +3356,18 @@ mod gsub {
         module: &mut FormatModule,
         coverage_table: FormatRef,
     ) -> FormatRef {
-        let alternate_set = record([
-            ("glyph_count", u16be()),
-            (
-                "alternate_glyph_ids",
-                repeat_count(var("glyph_count"), u16be()),
-            ),
-        ]);
+        let alternate_set = module.define_format(
+            "opentype.gsub.alternate_subst.alternate_set",
+            record([
+                ("glyph_count", u16be()),
+                (
+                    "alternate_glyph_ids",
+                    repeat_count(var("glyph_count"), u16be()),
+                ),
+            ]),
+        );
         module.define_format(
-            "opentype.layout.alternate_subst",
+            "opentype.gsub.alternate_subst",
             let_view(
                 "table_view",
                 util::embedded_singleton_alternation(
@@ -3365,7 +3389,10 @@ mod gsub {
                             "alternate_sets",
                             repeat_count(
                                 var("alternate_set_count"),
-                                util::read_phantom_view_offset16(vvar("table_view"), alternate_set),
+                                util::read_phantom_view_offset16(
+                                    vvar("table_view"),
+                                    alternate_set.call(),
+                                ),
                             ),
                         ),
                     ],
@@ -3615,6 +3642,16 @@ mod gsub {
 mod layout {
     use super::*;
 
+    /// Format definition for `SequenceLookup`
+    ///
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#sequence-lookup-record
+    pub(crate) fn sequence_lookup_record(module: &mut FormatModule) -> FormatRef {
+        module.define_format(
+            "opentype.layout.sequence_lookup",
+            record([("sequence_index", u16be()), ("lookup_list_index", u16be())]),
+        )
+    }
+
     /// Format definition for ChainedSequenceContext tables
     ///
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#common-formats-for-contextual-lookup-subtables
@@ -3624,16 +3661,16 @@ mod layout {
         coverage_table: FormatRef,
         sequence_lookup_record: FormatRef,
     ) -> FormatRef {
-        let rule_set = chained_sequence_rule_set(module, sequence_lookup_record);
-        let format1 = chained_sequence_context_format1(module, coverage_table, rule_set);
-        let format2 = chained_sequence_context_format2(module, class_def, coverage_table, rule_set);
-        let format3 =
-            chained_sequence_colntext_format3(module, coverage_table, sequence_lookup_record);
+        let rule_set = chained_sequence::rule_set(module, sequence_lookup_record);
+        let format1 = chained_sequence::format1(module, coverage_table, rule_set);
+        let format2 = chained_sequence::format2(module, class_def, coverage_table, rule_set);
+        let format3 = chained_sequence::format3(module, coverage_table, sequence_lookup_record);
         module.define_format(
             "opentype.layout.chained_sequence_context",
             let_view(
                 "table_view",
                 record([
+                    // REVIEW[epic=nested-format-reify-layer] - scope reified locally in outer format
                     ("table_scope", reify_view(vvar("table_view"))),
                     ("format", u16be()),
                     (
@@ -3666,182 +3703,208 @@ mod layout {
         )
     }
 
-    /// Format definition for `ChainedSequenceRuleSet` table
-    ///
-    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#chained-sequence-context-format-1-simple-glyph-contexts
-    fn chained_sequence_rule_set(
-        module: &mut FormatModule,
-        sequence_lookup_record: FormatRef,
-    ) -> FormatRef {
-        let chained_sequence_rule = chained_sequence_rule(module, sequence_lookup_record);
-        module.define_format(
-            "opentype.layout.chained-sequence-rule-set",
-            let_view(
-                "table_view",
-                record([
-                    ("table_scope", reify_view(vvar("table_view"))),
-                    ("chained_seq_rule_count", u16be()),
-                    (
-                        "chained_seq_rules",
-                        repeat_count(
-                            var("chained_seq_rule_count"),
-                            util::read_phantom_view_offset16(
-                                vvar("table_view"),
-                                chained_sequence_rule.call(),
+    mod chained_sequence {
+        use super::*;
+
+        /// Format definition for the corresponding `*Set` table for `ChainedSequenceRule` and `ChainedClassSequenceRule` tables.
+        ///
+        /// The common format encompassing both `ChainedSequenceRule` and `ChainedClassSequenceRule` is registered internally.
+        ///
+        /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#chained-sequence-context-format-1-simple-glyph-contexts
+        /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#chained-sequence-context-format-2-class-based-glyph-contexts
+        pub(crate) fn rule_set(
+            module: &mut FormatModule,
+            sequence_lookup_record: FormatRef,
+        ) -> FormatRef {
+            let chained_sequence_rule = chained_sequence_rule(module, sequence_lookup_record);
+            module.define_format(
+                "opentype.layout.chained-sequence-rule-set",
+                let_view(
+                    "table_view",
+                    record([
+                        ("table_scope", reify_view(vvar("table_view"))),
+                        ("chained_seq_rule_count", u16be()),
+                        (
+                            "chained_seq_rules",
+                            repeat_count(
+                                var("chained_seq_rule_count"),
+                                util::read_phantom_view_offset16(
+                                    vvar("table_view"),
+                                    chained_sequence_rule.call(),
+                                ),
                             ),
+                        ),
+                    ]),
+                ),
+            )
+        }
+
+        /// Format definition for `ChainedSequenceRule` table
+        ///
+        /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#chained-sequence-context-format-1-simple-glyph-contexts
+        ///
+        /// # Notes
+        ///
+        /// This format is overloaded and used also for `ChainedClassSequenceRule`, which has identical structure with the only
+        /// difference being the semantics of certain raw-numeric field data (viz. u16-arrays are class-ids instead of glyph-ids).
+        ///
+        /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#chained-sequence-context-format-2-class-based-glyph-contexts
+        pub(crate) fn chained_sequence_rule(
+            module: &mut FormatModule,
+            sequence_lookup_record: FormatRef,
+        ) -> FormatRef {
+            module.define_format(
+                "opentype.layout.chained-sequence-rule",
+                record([
+                    ("backtrack_glyph_count", u16be()),
+                    (
+                        "backtrack_sequence",
+                        repeat_count(var("backtrack_glyph_count"), u16be()), // GlyphId (format1) or ClassId (format2)
+                    ),
+                    ("input_glyph_count", u16be()),
+                    (
+                        "input_sequence",
+                        repeat_count(pred(var("input_glyph_count")), u16be()), // GlyphId (format1) or ClassId (format2)
+                    ),
+                    ("lookahead_glyph_count", u16be()),
+                    (
+                        "lookahead_sequence",
+                        repeat_count(var("lookahead_glyph_count"), u16be()), // GlyphId (format1) or ClassId (format2)
+                    ),
+                    ("seq_lookup_count", u16be()),
+                    (
+                        "seq_lookup_records",
+                        repeat_count(var("seq_lookup_count"), sequence_lookup_record.call()),
+                    ),
+                ]),
+            )
+        }
+
+        /// Format definition for ChainedSequenceContext Format 1
+        ///
+        /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#chained-sequence-context-format-1-simple-glyph-contexts
+        pub(crate) fn format1(
+            module: &mut FormatModule,
+            coverage_table: FormatRef,
+            rule_set: FormatRef,
+        ) -> FormatRef {
+            module.define_format_views(
+                "opentype.layout.chained-sequence-context.format1",
+                vec![(Label::Borrowed("table_view"))],
+                record([
+                    // REVIEW[epic=nested-format-reify-layer] - OUTER
+                    (
+                        "coverage",
+                        util::read_phantom_view_offset16(vvar("table_view"), coverage_table.call()),
+                    ),
+                    ("chained_seq_rule_set_count", u16be()),
+                    (
+                        "chained_seq_rule_sets",
+                        repeat_count(
+                            var("chained_seq_rule_set_count"),
+                            util::read_phantom_view_offset16(vvar("table_view"), rule_set.call()),
                         ),
                     ),
                 ]),
-            ),
-        )
-    }
+            )
+        }
 
-    /// Format definition for `ChainedSequenceRule` table
-    ///
-    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#chained-sequence-context-format-1-simple-glyph-contexts
-    fn chained_sequence_rule(
-        module: &mut FormatModule,
-        sequence_lookup_record: FormatRef,
-    ) -> FormatRef {
-        module.define_format(
-            "opentype.layout.chained-sequence-rule",
-            record([
-                ("backtrack_glyph_count", u16be()),
-                (
-                    "backtrack_sequence",
-                    repeat_count(var("backtrack_glyph_count"), u16be()),
-                ),
-                ("input_glyph_count", u16be()),
-                (
-                    "input_sequence",
-                    repeat_count(pred(var("input_glyph_count")), u16be()),
-                ),
-                ("lookahead_glyph_count", u16be()),
-                (
-                    "lookahead_sequence",
-                    repeat_count(var("lookahead_glyph_count"), u16be()),
-                ),
-                ("seq_lookup_count", u16be()),
-                (
-                    "seq_lookup_records",
-                    repeat_count(var("seq_lookup_count"), sequence_lookup_record.call()),
-                ),
-            ]),
-        )
-    }
-
-    /// Format definition for ChainedSequenceContext Format 1
-    ///
-    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#chained-sequence-context-format-1-simple-glyph-contexts
-    fn chained_sequence_context_format1(
-        module: &mut FormatModule,
-        coverage_table: FormatRef,
-        rule_set: FormatRef,
-    ) -> FormatRef {
-        module.define_format_views(
-            "opentype.layout.chained-sequence-context.format1",
-            vec![(Label::Borrowed("table_view"))],
-            record([
-                (
-                    "coverage",
-                    util::read_phantom_view_offset16(vvar("table_view"), coverage_table.call()),
-                ),
-                ("chained_seq_rule_set_count", u16be()),
-                (
-                    "chained_seq_rule_sets",
-                    repeat_count(
-                        var("chained_seq_rule_set_count"),
-                        util::read_phantom_view_offset16(vvar("table_view"), rule_set.call()),
-                    ),
-                ),
-            ]),
-        )
-    }
-
-    /// Format definition for ChainedSequenceContext Format 2
-    ///
-    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#chained-sequence-context-format-2-class-based-glyph-contexts
-    fn chained_sequence_context_format2(
-        module: &mut FormatModule,
-        class_def: FormatRef,
-        coverage_table: FormatRef,
-        rule_set: FormatRef,
-    ) -> FormatRef {
-        module.define_format_views(
-            "opentype.layout.chained-sequence-context.format2",
-            vec![(Label::Borrowed("table_view"))],
-            record([
-                (
-                    "coverage",
-                    util::read_phantom_view_offset16(vvar("table_view"), coverage_table.call()),
-                ),
-                (
-                    "backtrack_class_def",
-                    util::read_phantom_view_offset16(vvar("table_view"), class_def.call()),
-                ),
-                (
-                    "input_class_def",
-                    util::read_phantom_view_offset16(vvar("table_view"), class_def.call()),
-                ),
-                (
-                    "lookahead_class_def",
-                    util::read_phantom_view_offset16(vvar("table_view"), class_def.call()),
-                ),
-                ("chained_class_seq_rule_set_count", u16be()),
-                (
-                    "chained_class_seq_rule_sets",
-                    repeat_count(
-                        var("chained_class_seq_rule_set_count"),
-                        util::read_phantom_view_offset16(vvar("table_view"), rule_set.call()),
-                    ),
-                ),
-            ]),
-        )
-    }
-
-    /// Format definition for ChainedSequenceContext Format 3
-    ///
-    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#chained-sequence-context-format-3-coverage-based-glyph-contexts
-    fn chained_sequence_colntext_format3(
-        module: &mut FormatModule,
-        coverage_table: FormatRef,
-        sequence_lookup_record: FormatRef,
-    ) -> FormatRef {
-        module.define_format_views(
-            "opentype.layout.chained-sequence-context.format3",
-            vec![(Label::Borrowed("table_view"))],
-            record([
-                ("backtrack_glyph_count", u16be()),
-                (
-                    "backtrack_coverages",
-                    repeat_count(
-                        var("backtrack_glyph_count"),
+        /// Format definition for ChainedSequenceContext Format 2
+        ///
+        /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#chained-sequence-context-format-2-class-based-glyph-contexts
+        pub(crate) fn format2(
+            module: &mut FormatModule,
+            class_def: FormatRef,
+            coverage_table: FormatRef,
+            rule_set: FormatRef,
+        ) -> FormatRef {
+            module.define_format_views(
+                "opentype.layout.chained-sequence-context.format2",
+                vec![(Label::Borrowed("table_view"))],
+                record([
+                    // REVIEW[epic=nested-format-reify-layer] - OUTER
+                    (
+                        "coverage",
                         util::read_phantom_view_offset16(vvar("table_view"), coverage_table.call()),
                     ),
-                ),
-                ("input_glyph_count", u16be()),
-                (
-                    "input_coverages",
-                    repeat_count(
-                        var("input_glyph_count"),
-                        util::read_phantom_view_offset16(vvar("table_view"), coverage_table.call()),
+                    (
+                        "backtrack_class_def",
+                        util::read_phantom_view_offset16(vvar("table_view"), class_def.call()),
                     ),
-                ),
-                ("lookahead_glyph_count", u16be()),
-                (
-                    "lookahead_coverages",
-                    repeat_count(
-                        var("lookahead_glyph_count"),
-                        util::read_phantom_view_offset16(vvar("table_view"), coverage_table.call()),
+                    (
+                        "input_class_def",
+                        util::read_phantom_view_offset16(vvar("table_view"), class_def.call()),
                     ),
-                ),
-                ("seq_lookup_count", u16be()),
-                (
-                    "seq_lookup_records",
-                    repeat_count(var("seq_lookup_count"), sequence_lookup_record.call()),
-                ),
-            ]),
-        )
+                    (
+                        "lookahead_class_def",
+                        util::read_phantom_view_offset16(vvar("table_view"), class_def.call()),
+                    ),
+                    ("chained_class_seq_rule_set_count", u16be()),
+                    (
+                        "chained_class_seq_rule_sets",
+                        repeat_count(
+                            var("chained_class_seq_rule_set_count"),
+                            util::read_phantom_view_offset16(vvar("table_view"), rule_set.call()),
+                        ),
+                    ),
+                ]),
+            )
+        }
+
+        /// Format definition for ChainedSequenceContext Format 3
+        ///
+        /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#chained-sequence-context-format-3-coverage-based-glyph-contexts
+        pub(crate) fn format3(
+            module: &mut FormatModule,
+            coverage_table: FormatRef,
+            sequence_lookup_record: FormatRef,
+        ) -> FormatRef {
+            module.define_format_views(
+                "opentype.layout.chained-sequence-context.format3",
+                vec![(Label::Borrowed("table_view"))],
+                record([
+                    // REVIEW[epic=nested-format-reify-layer] - OUTER
+                    ("backtrack_glyph_count", u16be()),
+                    (
+                        "backtrack_coverages",
+                        repeat_count(
+                            var("backtrack_glyph_count"),
+                            util::read_phantom_view_offset16(
+                                vvar("table_view"),
+                                coverage_table.call(),
+                            ),
+                        ),
+                    ),
+                    ("input_glyph_count", u16be()),
+                    (
+                        "input_coverages",
+                        repeat_count(
+                            var("input_glyph_count"),
+                            util::read_phantom_view_offset16(
+                                vvar("table_view"),
+                                coverage_table.call(),
+                            ),
+                        ),
+                    ),
+                    ("lookahead_glyph_count", u16be()),
+                    (
+                        "lookahead_coverages",
+                        repeat_count(
+                            var("lookahead_glyph_count"),
+                            util::read_phantom_view_offset16(
+                                vvar("table_view"),
+                                coverage_table.call(),
+                            ),
+                        ),
+                    ),
+                    ("seq_lookup_count", u16be()),
+                    (
+                        "seq_lookup_records",
+                        repeat_count(var("seq_lookup_count"), sequence_lookup_record.call()),
+                    ),
+                ]),
+            )
+        }
     }
 
     pub(crate) fn sequence_context(
@@ -3850,66 +3913,10 @@ mod layout {
         coverage_table: FormatRef,
         sequence_lookup_record: FormatRef,
     ) -> FormatRef {
-        let rule_set = { rule_set(module, sequence_lookup_record) };
-        let format1 = module.define_format_views(
-            "opentype.layout.sequence-context.format1",
-            vec![(Label::Borrowed("table_view"))],
-            record([
-                (
-                    "coverage",
-                    util::read_phantom_view_offset16(vvar("table_view"), coverage_table.call()),
-                ),
-                ("seq_rule_set_count", u16be()),
-                (
-                    "seq_rule_sets",
-                    repeat_count(
-                        var("seq_rule_set_count"),
-                        util::read_phantom_view_offset16(vvar("table_view"), rule_set.call()),
-                    ),
-                ),
-            ]),
-        );
-        let format2 = module.define_format_views(
-            "opentype.layout.sequence-context.format2",
-            vec![(Label::Borrowed("table_view"))],
-            record([
-                (
-                    "coverage",
-                    util::read_phantom_view_offset16(vvar("table_view"), coverage_table.call()),
-                ),
-                (
-                    "class_def",
-                    util::read_phantom_view_offset16(vvar("table_view"), class_def.call()),
-                ),
-                ("class_seq_rule_set_count", u16be()),
-                (
-                    "class_seq_rule_sets",
-                    repeat_count(
-                        var("class_seq_rule_set_count"),
-                        util::read_phantom_view_offset16(vvar("table_view"), rule_set.call()),
-                    ),
-                ),
-            ]),
-        );
-        let format3 = module.define_format_views(
-            "opentype.layout.sequence-context.format3",
-            vec![(Label::Borrowed("table_view"))],
-            record([
-                ("glyph_count", u16be()),
-                ("seq_lookup_count", u16be()),
-                (
-                    "coverage_tables",
-                    repeat_count(
-                        var("glyph_count"),
-                        util::read_phantom_view_offset16(vvar("table_view"), coverage_table.call()),
-                    ),
-                ),
-                (
-                    "seq_lookup_records",
-                    repeat_count(var("seq_lookup_count"), sequence_lookup_record.call()),
-                ),
-            ]),
-        );
+        let rule_set = sequence::rule_set(module, sequence_lookup_record);
+        let format1 = sequence::format1(module, coverage_table, rule_set);
+        let format2 = sequence::format2(module, class_def, coverage_table, rule_set);
+        let format3 = sequence::format3(module, coverage_table, sequence_lookup_record);
         module.define_format(
             "opentype.layout.sequence_context",
             let_view(
@@ -3948,48 +3955,134 @@ mod layout {
         )
     }
 
-    fn rule_set(module: &mut FormatModule, sequence_lookup_record: FormatRef) -> FormatRef {
-        let rule = module.define_format(
-            "opentype.layout.sequence-context.rule",
-            record([
-                ("glyph_count", where_nonzero::<U16>(u16be())),
-                ("seq_lookup_count", u16be()),
-                (
-                    "input_sequence",
-                    repeat_count(pred(var("glyph_count")), u16be()),
-                ),
-                (
-                    "seq_lookup_records",
-                    repeat_count(var("seq_lookup_count"), sequence_lookup_record.call()),
-                ),
-            ]),
-        );
-        module.define_format(
-            "opentype.layout.sequence-context.rule-set",
-            let_view(
-                "table_view",
+    mod sequence {
+        use super::*;
+
+        fn rule(module: &mut FormatModule, sequence_lookup_record: FormatRef) -> FormatRef {
+            module.define_format(
+                "opentype.layout.sequence-context.rule",
                 record([
-                    ("table_scope", reify_view(vvar("table_view"))),
-                    ("rule_count", u16be()),
+                    ("glyph_count", where_nonzero::<U16>(u16be())),
+                    ("seq_lookup_count", u16be()),
                     (
-                        "rules",
+                        "input_sequence",
+                        repeat_count(pred(var("glyph_count")), u16be()),
+                    ),
+                    (
+                        "seq_lookup_records",
+                        repeat_count(var("seq_lookup_count"), sequence_lookup_record.call()),
+                    ),
+                ]),
+            )
+        }
+
+        pub(crate) fn rule_set(
+            module: &mut FormatModule,
+            sequence_lookup_record: FormatRef,
+        ) -> FormatRef {
+            let rule = rule(module, sequence_lookup_record);
+            module.define_format(
+                "opentype.layout.sequence-context.rule-set",
+                let_view(
+                    "table_view",
+                    record([
+                        ("table_scope", reify_view(vvar("table_view"))),
+                        ("rule_count", u16be()),
+                        (
+                            "rules",
+                            repeat_count(
+                                var("rule_count"),
+                                util::read_phantom_view_offset16(vvar("table_view"), rule.call()),
+                            ),
+                        ),
+                    ]),
+                ),
+            )
+        }
+
+        pub(crate) fn format1(
+            module: &mut FormatModule,
+            coverage_table: FormatRef,
+            rule_set: FormatRef,
+        ) -> FormatRef {
+            module.define_format_views(
+                "opentype.layout.sequence-context.format1",
+                vec![(Label::Borrowed("table_view"))],
+                record([
+                    (
+                        "coverage",
+                        util::read_phantom_view_offset16(vvar("table_view"), coverage_table.call()),
+                    ),
+                    ("seq_rule_set_count", u16be()),
+                    (
+                        "seq_rule_sets",
                         repeat_count(
-                            var("rule_count"),
-                            util::read_phantom_view_offset16(vvar("table_view"), rule.call()),
+                            var("seq_rule_set_count"),
+                            util::read_phantom_view_offset16(vvar("table_view"), rule_set.call()),
                         ),
                     ),
                 ]),
-            ),
-        )
-    }
-    /// Format definition for `SequenceLookup`
-    ///
-    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#sequence-lookup-record
-    pub(crate) fn sequence_lookup_record(module: &mut FormatModule) -> FormatRef {
-        module.define_format(
-            "opentype.layout.sequence_lookup",
-            record([("sequence_index", u16be()), ("lookup_list_index", u16be())]),
-        )
+            )
+        }
+
+        pub(crate) fn format2(
+            module: &mut FormatModule,
+            class_def: FormatRef,
+            coverage_table: FormatRef,
+            rule_set: FormatRef,
+        ) -> FormatRef {
+            module.define_format_views(
+                "opentype.layout.sequence-context.format2",
+                vec![(Label::Borrowed("table_view"))],
+                record([
+                    (
+                        "coverage",
+                        util::read_phantom_view_offset16(vvar("table_view"), coverage_table.call()),
+                    ),
+                    (
+                        "class_def",
+                        util::read_phantom_view_offset16(vvar("table_view"), class_def.call()),
+                    ),
+                    ("class_seq_rule_set_count", u16be()),
+                    (
+                        "class_seq_rule_sets",
+                        repeat_count(
+                            var("class_seq_rule_set_count"),
+                            util::read_phantom_view_offset16(vvar("table_view"), rule_set.call()),
+                        ),
+                    ),
+                ]),
+            )
+        }
+
+        pub(crate) fn format3(
+            module: &mut FormatModule,
+            coverage_table: FormatRef,
+            sequence_lookup_record: FormatRef,
+        ) -> FormatRef {
+            module.define_format_views(
+                "opentype.layout.sequence-context.format3",
+                vec![(Label::Borrowed("table_view"))],
+                record([
+                    ("glyph_count", u16be()),
+                    ("seq_lookup_count", u16be()),
+                    (
+                        "coverage_tables",
+                        repeat_count(
+                            var("glyph_count"),
+                            util::read_phantom_view_offset16(
+                                vvar("table_view"),
+                                coverage_table.call(),
+                            ),
+                        ),
+                    ),
+                    (
+                        "seq_lookup_records",
+                        repeat_count(var("seq_lookup_count"), sequence_lookup_record.call()),
+                    ),
+                ]),
+            )
+        }
     }
 
     /// Format definition for `FeatureList` table
@@ -4749,41 +4842,45 @@ mod gdef {
         module: &mut FormatModule,
         device_or_variation_index_table: FormatRef,
     ) -> FormatRef {
+        // REVIEW - should we make formatrefs for formats 1 and 2 for consistency?
         let caret_value_format_1 = record([("coordinate", util::s16be())]);
 
         let caret_value_format_2 = record([("caret_value_point_index", u16be())]);
 
-        let caret_value_format_3 = |table_view: ViewExpr| {
+        let caret_value_format_3 = module.define_format_views(
+            "opentype.gdef.caret_value.data.format3",
+            vec![Label::Borrowed("table_view")],
             record([
+                // REVIEW[epic=nested-format-reify-layer] - reified into local scope
+                ("table_scope", reify_view(vvar("table_view"))),
                 ("coordinate", util::s16be()),
                 (
                     "table",
                     util::read_phantom_view_offset16(
-                        table_view,
+                        vvar("table_view"),
                         device_or_variation_index_table.call(),
                     ),
                 ),
-            ])
-        };
+            ]),
+        );
 
         module.define_format(
             "opentype.gdef.caret_value",
             let_view(
                 "table_view",
                 record([
-                    ("table_scope", reify_view(vvar("table_view"))),
-                    ("caret_value_format", u16be()),
+                    ("format", u16be()),
                     (
                         "data",
                         match_variant(
-                            var("caret_value_format"),
+                            var("format"),
                             [
                                 (Pattern::U16(1), "Format1", caret_value_format_1),
                                 (Pattern::U16(2), "Format2", caret_value_format_2),
                                 (
                                     Pattern::U16(3),
                                     "Format3",
-                                    caret_value_format_3(vvar("table_view")),
+                                    caret_value_format_3.call_view(vvar("table_view")),
                                 ),
                                 // REVIEW[epic=catchall-policy] - do we need this catch-all?
                                 (Pattern::Wildcard, "BadFormat", Format::Fail),
@@ -4796,10 +4893,13 @@ mod gdef {
     }
 
     fn attach_list(module: &mut FormatModule, coverage_table: FormatRef) -> FormatRef {
-        let attach_point_table = record([
-            ("point_count", u16be()),
-            ("point_indices", repeat_count(var("point_count"), u16be())),
-        ]);
+        let attach_point = module.define_format(
+            "opentype.gdef.attach_point",
+            record([
+                ("point_count", u16be()),
+                ("point_indices", repeat_count(var("point_count"), u16be())),
+            ]),
+        );
 
         module.define_format(
             "opentype.gdef.attach_list",
@@ -4816,7 +4916,10 @@ mod gdef {
                         "attach_point_offsets",
                         repeat_count(
                             var("glyph_count"),
-                            util::read_phantom_view_offset16(vvar("list_view"), attach_point_table),
+                            util::read_phantom_view_offset16(
+                                vvar("list_view"),
+                                attach_point.call(),
+                            ),
                         ),
                     ),
                 ]),
@@ -4853,16 +4956,50 @@ mod common {
     use super::*;
 
     pub(crate) fn item_variation_store(module: &mut FormatModule) -> FormatRef {
-        let variation_region_list = {
-            // NOTE - all coordinates should be in range [-1.0, +1.0], and start <= peak <= end; must either all be non-positive or non-negative, or else peak must be 0 for negative start and non-negative end.
-            let region_axis_coordinates =
-                record_repeat(["start_coord", "peak_coord", "end_coord"], util::f2dot14());
-            let variation_region = |axis_count: Expr| {
-                record([(
-                    "region_axes",
-                    repeat_count(axis_count, region_axis_coordinates),
-                )])
-            };
+        let variation_region_list = variation_region_list(module);
+        let item_variation_data = item_variation_data(module);
+        module.define_format(
+            "opentype.common.item_variation_store",
+            let_view(
+                "table_view",
+                record([
+                    ("table_scope", reify_view(vvar("table_view"))),
+                    ("format", util::expect_u16be(1)),
+                    (
+                        "variation_region_list",
+                        util::read_phantom_view_offset32(
+                            vvar("table_view"),
+                            variation_region_list.call(),
+                        ),
+                    ),
+                    ("item_variation_data_count", u16be()),
+                    (
+                        "item_variation_data_list",
+                        repeat_count(
+                            var("item_variation_data_count"),
+                            util::read_phantom_view_offset32(
+                                vvar("table_view"),
+                                item_variation_data.call(),
+                            ),
+                        ),
+                    ),
+                ]),
+            ),
+        )
+    }
+
+    fn variation_region_list(module: &mut FormatModule) -> FormatRef {
+        // NOTE - all coordinates should be in range [-1.0, +1.0], and start <= peak <= end; must either all be non-positive or non-negative, or else peak must be 0 for negative start and non-negative end.
+        let region_axis_coordinates =
+            record_repeat(["start_coord", "peak_coord", "end_coord"], util::f2dot14());
+        let variation_region = |axis_count: Expr| {
+            record([(
+                "region_axes",
+                repeat_count(axis_count, region_axis_coordinates),
+            )])
+        };
+        module.define_format(
+            "opentype.common.variation-region-list",
             record([
                 ("axis_count", u16be()), // NOTE - number of variation axes; should be the same as `axis_cout` in `'fvar'` table
                 (
@@ -4873,33 +5010,7 @@ mod common {
                     "variation_regions",
                     repeat_count(var("region_count"), variation_region(var("axis_count"))),
                 ),
-            ])
-        };
-        let item_variation_data = item_variation_data();
-        module.define_format(
-            "opentype.common.item_variation_store",
-            let_view(
-                "table_view",
-                record([
-                    ("table_scope", reify_view(vvar("table_view"))),
-                    ("format", util::expect_u16be(1)),
-                    (
-                        "variation_region_list_offset",
-                        util::read_phantom_view_offset32(vvar("table_view"), variation_region_list),
-                    ),
-                    ("item_variation_data_count", u16be()),
-                    (
-                        "item_variation_data_offsets",
-                        repeat_count(
-                            var("item_variation_data_count"),
-                            util::read_phantom_view_offset32(
-                                vvar("table_view"),
-                                item_variation_data,
-                            ),
-                        ),
-                    ),
-                ]),
-            ),
+            ]),
         )
     }
 
@@ -4923,7 +5034,7 @@ mod common {
         ])
     }
 
-    pub(crate) fn item_variation_data() -> Format {
+    pub(crate) fn item_variation_data(module: &mut FormatModule) -> FormatRef {
         let delta_sets = |item_count: Expr, word_delta_count: Expr, region_index_count: Expr| {
             if_then_else(
                 record_proj(word_delta_count.clone(), "long_words"),
@@ -4953,26 +5064,29 @@ mod common {
                 ),
             )
         };
-        record([
-            ("item_count", u16be()),
-            (
-                "word_delta_count",
-                util::hi_flag_u15be("long_words", "word_count"),
-            ),
-            ("region_index_count", u16be()),
-            (
-                "region_indices",
-                repeat_count(var("region_index_count"), u16be()),
-            ),
-            (
-                "delta_sets",
-                delta_sets(
-                    var("item_count"),
-                    var("word_delta_count"),
-                    var("region_index_count"),
+        module.define_format(
+            "opentype.common.item-variation-data",
+            record([
+                ("item_count", u16be()),
+                (
+                    "word_delta_count",
+                    util::hi_flag_u15be("long_words", "word_count"),
                 ),
-            ),
-        ])
+                ("region_index_count", u16be()),
+                (
+                    "region_indices",
+                    repeat_count(var("region_index_count"), u16be()),
+                ),
+                (
+                    "delta_sets",
+                    delta_sets(
+                        var("item_count"),
+                        var("word_delta_count"),
+                        var("region_index_count"),
+                    ),
+                ),
+            ]),
+        )
     }
 
     pub(crate) fn device_or_variation_index_table(module: &mut FormatModule) -> FormatRef {
@@ -6780,82 +6894,8 @@ pub(crate) mod stat {
 
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/stat#style-attributes-header
     pub(crate) fn table(module: &mut FormatModule, tag: FormatRef) -> FormatRef {
-        let axis_record = {
-            record([
-                ("axis_tag", tag.call()),
-                ("axis_name_id", u16be()),
-                ("axis_ordering", u16be()),
-            ])
-        };
-        let axis_value_table = {
-            use BitFieldKind::*;
-            let axis_flags = bit_fields_u16([
-                Reserved {
-                    bit_width: 14,
-                    check_zero: false,
-                },
-                FlagBit("elidable_axis_value_name"), // Bit 1 - When set, indicates the 'normal' value for this axis and implies it may be omitted when composing name-strings
-                FlagBit("older_sibling_font_attribute"), // Bit 0 - When set, indicates that the axis information applies to previously released fonts in the same font-family
-            ]);
-            let axis_value = record([("axis_index", u16be()), ("value", util::fixed32be())]);
-            let f1_fields = vec![
-                ("axis_index", u16be()),
-                ("flags", axis_flags.clone()),
-                ("value_name_id", u16be()), // NameId for entries in 'name' table that provide display-string for this attribute value
-                ("value", fixed32be()),
-            ];
-            let f2_fields = vec![
-                ("axis_index", u16be()),
-                ("flags", axis_flags.clone()),
-                ("value_name_id", u16be()), // NameId for entries in 'name' table that provide display-string for this attribute value
-                ("nominal_value", fixed32be()),
-                ("range_min_value", fixed32be()),
-                ("range_max_value", fixed32be()),
-            ];
-            let f3_fields = vec![
-                ("axis_index", u16be()),
-                ("flags", axis_flags.clone()),
-                ("value_name_id", u16be()), // NameId for entries in 'name' table that provide display-string for this attribute value
-                ("value", fixed32be()),
-                ("linked_value", fixed32be()),
-            ];
-            let f4_fields = vec![
-                ("axis_count", u16be()),
-                ("flags", axis_flags.clone()),
-                ("value_name_id", u16be()), // NameId for entries in 'name' table that provide display-string for this combination of axis values
-                ("axis_values", repeat_count(var("axis_count"), axis_value)),
-            ];
-            util::embedded_variadic_alternation(
-                [("format", where_between_u16(u16be(), 1, 4))],
-                "format",
-                [
-                    (1, "Format1", f1_fields),
-                    (2, "Format2", f2_fields),
-                    (3, "Format3", f3_fields),
-                    (4, "Format4", f4_fields),
-                ],
-                "data",
-                util::NestingKind::MinimalVariation,
-            )
-        };
-        let design_axes_array = |design_axis_count: Expr| {
-            record([("design_axes", repeat_count(design_axis_count, axis_record))])
-        };
-        let axis_value_offsets_array = |axis_value_count: Expr| {
-            let_view(
-                "array_view",
-                record([
-                    ("array_scope", reify_view(vvar("array_view"))),
-                    (
-                        "axis_value_offsets",
-                        repeat_count(
-                            axis_value_count,
-                            util::read_phantom_view_offset16(vvar("array_view"), axis_value_table),
-                        ),
-                    ),
-                ]),
-            )
-        };
+        let design_axes_array = design_axes_array(module, tag);
+        let axis_value_array = axis_value_array(module);
         module.define_format(
             "opentype.stat_table",
             let_view(
@@ -6870,7 +6910,7 @@ pub(crate) mod stat {
                         "design_axes",
                         util::read_phantom_view_offset32(
                             vvar("table_view"),
-                            design_axes_array(var("design_axis_count")),
+                            design_axes_array.call_args(vec![var("design_axis_count")]),
                         ),
                     ), // offset is 0 iff design_axis_count is 0
                     ("axis_value_count", u16be()),
@@ -6878,11 +6918,109 @@ pub(crate) mod stat {
                         "axis_value_offsets",
                         util::read_phantom_view_offset32(
                             vvar("table_view"),
-                            axis_value_offsets_array(var("axis_value_count")),
+                            axis_value_array.call_args(vec![var("axis_value_count")]),
                         ),
                     ), // offset is 0 iff axis_value_count is 0
                     ("elided_fallback_name_id", u16be()), // omitted in version 1.0, but said version is deprecated
                 ]),
+            ),
+        )
+    }
+
+    fn design_axes_array(module: &mut FormatModule, tag: FormatRef) -> FormatRef {
+        let axis_record = record([
+            ("axis_tag", tag.call()),
+            ("axis_name_id", u16be()),
+            ("axis_ordering", u16be()),
+        ]);
+        module.define_format_args(
+            "opentype.stat.design_axes_array",
+            vec![(Label::Borrowed("design_axis_count"), ValueType::U16)],
+            record([(
+                "design_axes",
+                repeat_count(var("design_axis_count"), axis_record),
+            )]),
+        )
+    }
+
+    fn axis_value_array(module: &mut FormatModule) -> FormatRef {
+        let axis_value_table = axis_value_table(module);
+        module.define_format_args(
+            "opentype.stat.axis_value_array",
+            vec![(Label::Borrowed("axis_value_count"), ValueType::U16)],
+            let_view(
+                "array_view",
+                record([
+                    ("array_scope", reify_view(vvar("array_view"))),
+                    (
+                        "axis_values",
+                        repeat_count(
+                            var("axis_value_count"),
+                            util::read_phantom_view_offset16(
+                                vvar("array_view"),
+                                axis_value_table.call(),
+                            ),
+                        ),
+                    ),
+                ]),
+            ),
+        )
+    }
+
+    fn axis_value_table(module: &mut FormatModule) -> FormatRef {
+        use BitFieldKind::*;
+        let axis_flags = bit_fields_u16([
+            Reserved {
+                bit_width: 14,
+                check_zero: false,
+            },
+            FlagBit("elidable_axis_value_name"), // Bit 1 - When set, indicates the 'normal' value for this axis and implies it may be omitted when composing name-strings
+            FlagBit("older_sibling_font_attribute"), // Bit 0 - When set, indicates that the axis information applies to previously released fonts in the same font-family
+        ]);
+        let axis_value_record = record([("axis_index", u16be()), ("value", util::fixed32be())]);
+        let f1_fields = vec![
+            ("axis_index", u16be()),
+            ("flags", axis_flags.clone()),
+            ("value_name_id", u16be()), // NameId for entries in 'name' table that provide display-string for this attribute value
+            ("value", fixed32be()),
+        ];
+        let f2_fields = vec![
+            ("axis_index", u16be()),
+            ("flags", axis_flags.clone()),
+            ("value_name_id", u16be()), // NameId for entries in 'name' table that provide display-string for this attribute value
+            ("nominal_value", fixed32be()),
+            ("range_min_value", fixed32be()),
+            ("range_max_value", fixed32be()),
+        ];
+        let f3_fields = vec![
+            ("axis_index", u16be()),
+            ("flags", axis_flags.clone()),
+            ("value_name_id", u16be()), // NameId for entries in 'name' table that provide display-string for this attribute value
+            ("value", fixed32be()),
+            ("linked_value", fixed32be()),
+        ];
+        let f4_fields = vec![
+            ("axis_count", u16be()),
+            ("flags", axis_flags.clone()),
+            ("value_name_id", u16be()), // NameId for entries in 'name' table that provide display-string for this combination of axis values
+            (
+                "axis_values",
+                repeat_count(var("axis_count"), axis_value_record),
+            ),
+        ];
+        module.define_format(
+            "opentype.stat.axis_value_table",
+            util::embedded_variadic_alternation(
+                [("format", where_between_u16(u16be(), 1, 4))],
+                "format",
+                [
+                    (1, "Format1", f1_fields),
+                    (2, "Format2", f2_fields),
+                    (3, "Format3", f3_fields),
+                    (4, "Format4", f4_fields),
+                ],
+                "data",
+                util::NestingKind::MinimalVariation,
             ),
         )
     }
