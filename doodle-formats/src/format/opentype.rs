@@ -5673,31 +5673,27 @@ mod glyf {
     }
 
     fn table_entry(
-        start_offset: Expr,
+        table_view: ViewExpr,
         this_offset32: Expr,
         next_offset32: Expr,
-        glyf_description: FormatRef,
+        glyf_entry: FormatRef,
     ) -> Format {
         if_then_else(
             // NOTE - checks that the glyph is non-vacuous
             expr_gt(next_offset32, this_offset32.clone()),
-            util::linked_offset32(
-                start_offset,
-                this_offset32,
-                fmt_variant(
-                    "Glyph",
-                    record([
-                        ("number_of_contours", util::s16be()),
-                        ("x_min", util::s16be()),
-                        ("y_min", util::s16be()),
-                        ("x_max", util::s16be()),
-                        ("y_max", util::s16be()),
-                        (
-                            "description",
-                            glyf_description.call_args(vec![var("number_of_contours")]),
-                        ),
-                    ]),
-                ),
+            fmt_variant(
+                "Glyph",
+                record_auto([
+                    ("offset", compute(this_offset32)),
+                    (
+                        "#_data",
+                        phantom(util::parse_view_offset::<U32>(
+                            table_view,
+                            var("offset"),
+                            glyf_entry.call(),
+                        )),
+                    ),
+                ]),
             ),
             fmt_variant("EmptyGlyph", Format::EMPTY),
         )
@@ -5707,6 +5703,7 @@ mod glyf {
         let simple_glyf_table = simple::table(module);
         let composite_glyf_table = composite::table(module);
         let glyf_description = glyf_description(module, simple_glyf_table, composite_glyf_table);
+        let glyf_entry = glyf_entry(module, glyf_description);
 
         let offsets_type = {
             let mk_branch = |elem_t: ValueType| ValueType::Seq(Box::new(elem_t));
@@ -5726,49 +5723,71 @@ mod glyf {
         module.define_format_args(
             "opentype.glyf.table",
             vec![(Label::Borrowed("offsets"), offsets_type)],
-            chain(
-                pos32(),
-                "start_offset",
-                Format::Match(
-                    Box::new(var("offsets")),
-                    vec![
-                        (
-                            Pattern::Variant(
-                                Label::Borrowed("Offsets16"),
-                                Box::new(bind("half16s")),
-                            ),
-                            for_each_pair(
-                                var("half16s"),
-                                (scale2, scale2),
-                                ["this_offs", "next_offs"],
-                                table_entry(
-                                    var("start_offset"),
-                                    var("this_offs"),
-                                    var("next_offs"),
-                                    glyf_description,
+            let_view(
+                "table_view",
+                record([
+                    ("table_scope", reify_view(vvar("table_view"))),
+                    (
+                        "glyphs",
+                        Format::Match(
+                            Box::new(var("offsets")),
+                            vec![
+                                (
+                                    Pattern::Variant(
+                                        Label::Borrowed("Offsets16"),
+                                        Box::new(bind("half16s")),
+                                    ),
+                                    for_each_pair(
+                                        var("half16s"),
+                                        (scale2, scale2),
+                                        ["this_offs", "next_offs"],
+                                        table_entry(
+                                            vvar("table_view"),
+                                            var("this_offs"),
+                                            var("next_offs"),
+                                            glyf_entry,
+                                        ),
+                                    ),
                                 ),
-                            ),
-                        ),
-                        (
-                            Pattern::Variant(
-                                Label::Borrowed("Offsets32"),
-                                Box::new(bind("off32s")),
-                            ),
-                            for_each_pair(
-                                var("off32s"),
-                                (id, id),
-                                ["this_offs", "next_offs"],
-                                table_entry(
-                                    var("start_offset"),
-                                    var("this_offs"),
-                                    var("next_offs"),
-                                    glyf_description,
+                                (
+                                    Pattern::Variant(
+                                        Label::Borrowed("Offsets32"),
+                                        Box::new(bind("off32s")),
+                                    ),
+                                    for_each_pair(
+                                        var("off32s"),
+                                        (id, id),
+                                        ["this_offs", "next_offs"],
+                                        table_entry(
+                                            vvar("table_view"),
+                                            var("this_offs"),
+                                            var("next_offs"),
+                                            glyf_entry,
+                                        ),
+                                    ),
                                 ),
-                            ),
+                            ],
                         ),
-                    ],
-                ),
+                    ),
+                ]),
             ),
+        )
+    }
+
+    fn glyf_entry(module: &mut FormatModule, glyf_description: FormatRef) -> FormatRef {
+        module.define_format(
+            "opentype.glyf.entry",
+            record([
+                ("number_of_contours", util::s16be()),
+                ("x_min", util::s16be()),
+                ("y_min", util::s16be()),
+                ("x_max", util::s16be()),
+                ("y_max", util::s16be()),
+                (
+                    "description",
+                    glyf_description.call_args(vec![var("number_of_contours")]),
+                ),
+            ]),
         )
     }
 
@@ -5857,15 +5876,74 @@ pub(crate) mod cvt {
 pub(crate) mod post {
     use super::*;
 
+    /// Determines the number of pascal-strings to read based on the largest glyph name index in the provided array
+    ///
+    /// If the array is empty, returns `0`.
+    ///
+    /// If the array is non-empty, returns the largest glyph name index + 1,
+    /// or 0 if that result is less than or equal to `258` (the number of standard Macintosh glyph-names which are treated as
+    /// indices 0..=257).
+    fn extra_name_count(index_array: Expr) -> Expr {
+        const MACINTOSH_NAME_COUNT: u16 = 258;
+        /// Computes the max-value of an array of u16s, None if empty
+        fn array_max_u16(array: Expr) -> Expr {
+            left_fold(
+                lambda_tuple(["acc", "x"], expr_max(var("acc"), var("x"))),
+                Expr::U16(0),
+                ValueType::U16,
+                array,
+            )
+        }
+        let max_index = array_max_u16(index_array);
+        let tot_len = succ(max_index);
+        // TODO - add monus/saturating-subtraction operator
+        expr_if_else(
+            expr_lte(tot_len.clone(), Expr::U16(MACINTOSH_NAME_COUNT)),
+            Expr::U16(0),
+            sub(tot_len, Expr::U16(MACINTOSH_NAME_COUNT)),
+        )
+    }
+
+    fn version2(module: &mut FormatModule) -> FormatRef {
+        let pascal_string = module.define_format(
+            "opentype.post.pascal_string",
+            // REVIEW - is 'record with length' better than just the string itself?
+            record([
+                ("length", u8()),
+                (
+                    "string",
+                    let_view(
+                        "pascal_string_data",
+                        mk_ascii_string(with_view(
+                            vvar("pascal_string_data"),
+                            capture_bytes(var("length")),
+                        )),
+                    ),
+                ),
+            ]),
+        );
+        module.define_format(
+            "opentype.post.version2",
+            record([
+                ("num_glyphs", u16be()),
+                ("glyph_name_index", repeat_count(var("num_glyphs"), u16be())),
+                (
+                    "string_data",
+                    repeat_count(
+                        extra_name_count(var("glyph_name_index")),
+                        pascal_string.call(),
+                    ),
+                ),
+            ]),
+        )
+    }
+
     pub(crate) fn table(module: &mut FormatModule) -> FormatRef {
-        let postv2 = record([
-            ("num_glyphs", u16be()),
-            ("glyph_name_index", repeat_count(var("num_glyphs"), u16be())),
-            ("string_data", pos32()),
-        ]);
+        let version2 = version2(module);
 
         let postv2dot5 = record([
             ("num_glyphs", u16be()),
+            // TODO - ReadArray<'_, I8> would work here if we had a model compatible with it
             ("offset", repeat_count(var("num_glyphs"), util::s8())),
         ]);
 
@@ -5887,7 +5965,7 @@ pub(crate) mod post {
                         var("version"),
                         [
                             (Pattern::U32(0x0001_0000), "Version1", Format::EMPTY),
-                            (Pattern::U32(0x0002_0000), "Version2", postv2),
+                            (Pattern::U32(0x0002_0000), "Version2", version2.call()),
                             (Pattern::U32(0x0002_5000), "Version2Dot5", postv2dot5),
                             (Pattern::U32(0x0003_0000), "Version3", Format::EMPTY),
                             // NOTE - as-is, we store the unexpected version-value in the variant for debugging purposes

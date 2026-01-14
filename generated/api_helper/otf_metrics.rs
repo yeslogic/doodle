@@ -156,7 +156,12 @@ impl std::fmt::Display for Tag {
 
 // SECTION - Type aliases for stable referencing of commonly-used generated types
 pub type OpentypeFontDirectory<'input> = opentype_table_directory<'input>;
-pub type OpentypeGlyf = opentype_glyf_table;
+
+// REVIEW - consider naming for the following glyf-related items
+pub type OpentypeGlyf<'a> = opentype_glyf_table<'a>;
+pub type OpentypeGlyfEntry = opentype_glyf_table_glyphs;
+pub type OpentypeGlyph = opentype_glyf_table_glyphs_Glyph;
+pub type GlyphHeader = opentype_glyf_entry;
 pub type GlyphDescription = opentype_glyf_description;
 pub type SimpleGlyph = opentype_glyf_simple;
 
@@ -170,7 +175,7 @@ pub type OpentypeHmtxLongMetric = opentype_hmtx_table_long_metrics;
 pub type OpentypeMaxp = opentype_maxp_table;
 pub type OpentypeName<'a> = opentype_name_table<'a>;
 pub type OpentypeOs2 = opentype_os2_table;
-pub type OpentypePost = opentype_post_table;
+pub type OpentypePost<'a> = opentype_post_table<'a>;
 
 pub type OpentypeBase<'a> = opentype_base_table<'a>;
 pub type OpentypeGdef<'a> = opentype_gdef_table<'a>;
@@ -496,7 +501,7 @@ pub fn reify_opt_index<'input, Frame, Obj, const N: usize>(
 ) -> Option<Obj::Output<'input>>
 where
     Frame: container::ViewFrame<'input> + container::MultiOptContainer<Obj, N>,
-    // TODO - if contraint on Args is lifted on trait itself, remove this
+    // TODO - if constraint on Args is lifted on trait itself, remove this
     Obj: 'static + for<'a> container::CommonObject<Args<'a> = ()>,
 {
     frame.get_offset_at_index(ix).map(|offset| {
@@ -567,6 +572,21 @@ where
         .map(move |(offset, args)| Obj::parse_offset(view, offset, args))
 }
 
+pub fn reify_opt_dep<'input, Con, Obj>(
+    view: View<'input>,
+    container: &'input Con,
+    _proxy: Obj,
+) -> Option<PResult<Obj::Output<'input>>>
+where
+    Con: container::OptContainer<Obj>,
+    // TODO - if constraint on Args is lifted on trait itself, remove this
+    Obj: 'static + for<'a> container::CommonObject<Args<'a> = ()>,
+{
+    container
+        .get_offset()
+        .map(move |offset| Obj::parse_offset(view, offset, ()))
+}
+
 pub fn reify_opt_index_dep<'input, Con, Obj, const N: usize>(
     view: View<'input>,
     container: &'input Con,
@@ -575,7 +595,7 @@ pub fn reify_opt_index_dep<'input, Con, Obj, const N: usize>(
 ) -> Option<PResult<Obj::Output<'input>>>
 where
     Con: container::MultiOptContainer<Obj, N>,
-    // TODO - if contraint on Args is lifted on trait itself, remove this
+    // TODO - if constraint on Args is lifted on trait itself, remove this
     Obj: 'static + for<'a> container::CommonObject<Args<'a> = ()>,
 {
     container
@@ -596,6 +616,17 @@ pub mod obj {
             #[$doc]
             pub struct $proxy;
         };
+    }
+
+    proxy!(GlyphHeader => GlyphHdr);
+
+    impl CommonObject for GlyphHdr {
+        type Args<'a> = ();
+        type Output<'a> = GlyphHeader;
+
+        fn parse<'input>(p: &mut Parser<'input>, _: ()) -> PResult<Self::Output<'input>> {
+            crate::Decoder_opentype_glyf_entry(p)
+        }
     }
 
     proxy!(OpentypeLigCaretList => LigCarList);
@@ -1006,16 +1037,20 @@ pub mod obj {
     impl CommonObject for GVarData {
         /// Args: `(len, axis_count)`
         type Args<'a> = (usize, u16);
-        type Output<'a> = OpentypeGlyphVariationData<'a>;
+        type Output<'a> = Option<OpentypeGlyphVariationData<'a>>;
 
         fn parse<'input>(
             p: &mut Parser<'input>,
             (len, axis_count): (usize, u16),
         ) -> PResult<Self::Output<'input>> {
+            // REVIEW: is this the right layer to perform this check?
+            if len == 0 {
+                return Ok(None);
+            }
             p.start_slice(len)?;
             let ret = crate::Decoder_opentype_gvar_glyph_variation_data(p, axis_count)?;
             p.end_slice()?;
-            Ok(ret)
+            Ok(Some(ret))
         }
     }
 
@@ -1941,7 +1976,7 @@ struct GlyphVariationDataArray<'a, 'input> {
     offsets_array: &'a opentype_loca_table_offsets,
 }
 
-impl<'input> container::DynContainer<Nullable<obj::GVarData>> for OpentypeGvar<'input> {
+impl<'input> container::DynContainer<obj::GVarData> for OpentypeGvar<'input> {
     fn count(&self) -> usize {
         match &self.glyph_variation_data_offsets {
             opentype_loca_table_offsets::Offsets16(half16s) => half16s.len() - 1,
@@ -1950,13 +1985,14 @@ impl<'input> container::DynContainer<Nullable<obj::GVarData>> for OpentypeGvar<'
     }
 
     fn iter_offsets(&self) -> impl Iterator<Item = usize> {
-        let ret: Box<dyn Iterator<Item = usize>> = match &self.glyph_variation_data_offsets {
+        let ret = match &self.glyph_variation_data_offsets {
             opentype_loca_table_offsets::Offsets16(half16s) => Box::new(
                 half16s
                     .iter()
                     .map(|half16| *half16 as usize * 2)
                     .take(half16s.len() - 1),
-            ),
+            )
+                as Box<dyn Iterator<Item = usize>>,
             opentype_loca_table_offsets::Offsets32(off32s) => Box::new(
                 off32s
                     .iter()
@@ -1995,7 +2031,7 @@ impl<'input> container::SingleContainer<Nullable<obj::SharedTupleArr>> for Opent
 
 impl<'input> Promote<OpentypeGvar<'input>> for GvarMetrics {
     fn promote(orig: &OpentypeGvar<'input>) -> Self {
-        let glyph_variation_data_array = reify_all(orig, Nullable(obj::GVarData))
+        let glyph_variation_data_array = reify_all(orig, obj::GVarData)
             .map(|data| data.as_ref().map(GlyphVariationData::promote))
             .collect();
         let shared_tuples = promote_from_null(&reify(orig, Nullable(obj::SharedTupleArr)));
@@ -2998,6 +3034,81 @@ pub struct GlyfMetrics {
     glyphs: Vec<GlyphMetric>,
 }
 
+frame!(OpentypeGlyf);
+
+impl<'a> Promote<OpentypeGlyf<'a>> for GlyfMetrics {
+    fn promote(orig: &OpentypeGlyf<'a>) -> Self {
+        Self {
+            num_glyphs: orig.glyphs.len(),
+            glyphs: promote_vec_view(&orig.glyphs, container::ViewFrame::scope(orig))
+                .expect("bad parse"),
+        }
+    }
+}
+
+impl container::SingleContainer<obj::GlyphHdr> for OpentypeGlyph {
+    fn get_offset(&self) -> usize {
+        self.offset as usize
+    }
+
+    fn get_args(&self) -> () {}
+}
+
+impl container::OptContainer<obj::GlyphHdr> for OpentypeGlyfEntry {
+    fn contains_object(&self) -> bool {
+        matches!(self, OpentypeGlyfEntry::Glyph(..))
+    }
+
+    fn get_offset(&self) -> Option<usize> {
+        match self {
+            OpentypeGlyfEntry::EmptyGlyph => None,
+            OpentypeGlyfEntry::Glyph(glyf_entry) => {
+                Some(container::SingleContainer::get_offset(glyf_entry))
+            }
+        }
+    }
+}
+
+impl PromoteView<OpentypeGlyfEntry> for GlyphMetric {
+    fn promote_view(orig: &OpentypeGlyfEntry, view: View<'_>) -> PResult<Self> {
+        if let Some(raw) = reify_opt_dep(view, orig, obj::GlyphHdr) {
+            Ok(GlyphMetric::promote(&raw?))
+        } else {
+            Ok(GlyphMetric::Empty)
+        }
+    }
+}
+
+impl Promote<GlyphHeader> for GlyphMetric {
+    fn promote(orig: &GlyphHeader) -> Self {
+        match &orig.description {
+            GlyphDescription::HeaderOnly => GlyphMetric::Empty,
+            GlyphDescription::Simple(simple) => {
+                let contours = orig.number_of_contours as usize;
+                let coordinates = *simple.end_points_of_contour.last().unwrap() as usize + 1;
+                let instructions = simple.instruction_length as usize;
+                let bounding_box = bounding_box(orig);
+                GlyphMetric::Simple(SimpleGlyphMetric {
+                    contours,
+                    coordinates,
+                    instructions,
+                    bounding_box,
+                })
+            }
+            GlyphDescription::Composite(comp) => {
+                let components = comp.glyphs.len();
+                let instructions = comp.instructions.len();
+                let bounding_box = bounding_box(orig);
+                GlyphMetric::Composite(CompositeGlyphMetric {
+                    components,
+                    instructions,
+                    bounding_box,
+                })
+            }
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum GlyphMetric {
     Empty,
@@ -3931,6 +4042,24 @@ struct GdefMetrics {
     mark_attach_class_def: Option<ClassDef>,
     data: GdefTableDataMetrics,
 }
+
+impl<'a> TryPromote<OpentypeGdef<'a>> for GdefMetrics {
+    type Error = ValueParseError<TPErr<OpentypeLigCaretList<'a>, LigCaretList>>;
+
+    fn try_promote(gdef: &opentype_gdef_table<'_>) -> Result<GdefMetrics, Self::Error> {
+        Ok(GdefMetrics {
+            major_version: gdef.major_version,
+            minor_version: gdef.minor_version,
+            glyph_class_def: promote_opt(&reify_index(gdef, Nullable(obj::ClsDef), 0)),
+            attach_list: promote_opt(&reify(gdef, Nullable(obj::AttList))),
+            lig_caret_list: try_promote_opt(&reify(gdef, Nullable(obj::LigCarList)))
+                .map_err(ValueParseError::value)?,
+            mark_attach_class_def: promote_opt(&reify_index(gdef, Nullable(obj::ClsDef), 1)),
+            data: GdefTableDataMetrics::try_promote_view(&gdef.data, gdef.table_scope)?,
+        })
+    }
+}
+
 pub type OpentypeLangSys = opentype_layout_langsys;
 
 impl Promote<OpentypeLangSys> for LangSys {
@@ -7205,35 +7334,7 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
             .as_ref()
             .map(|fpgm| RawArrayMetrics(fpgm.len()));
         let loca = dir.table_links.loca.as_ref().map(|_| ());
-        let glyf = dir.table_links.glyf.as_ref().map(|glyf| {
-            let num_glyphs = glyf.len();
-            let glyphs = glyf
-                .iter()
-                .map(|g| match &g {
-                    opentype_glyf_table::EmptyGlyph => GlyphMetric::Empty,
-                    opentype_glyf_table::Glyph(gl) => match &gl.description {
-                        GlyphDescription::HeaderOnly => GlyphMetric::Empty,
-                        GlyphDescription::Simple(simple) => {
-                            GlyphMetric::Simple(SimpleGlyphMetric {
-                                contours: gl.number_of_contours as usize,
-                                coordinates: *simple.end_points_of_contour.last().unwrap() as usize
-                                    + 1,
-                                instructions: simple.instruction_length as usize,
-                                bounding_box: bounding_box(gl),
-                            })
-                        }
-                        GlyphDescription::Composite(comp) => {
-                            GlyphMetric::Composite(CompositeGlyphMetric {
-                                components: comp.glyphs.len(),
-                                instructions: comp.instructions.len(),
-                                bounding_box: bounding_box(gl),
-                            })
-                        }
-                    },
-                })
-                .collect();
-            GlyfMetrics { num_glyphs, glyphs }
-        });
+        let glyf = dir.table_links.glyf.as_ref().map(GlyfMetrics::promote);
         let prep = {
             let prep = &dir.table_links.prep;
             prep.as_ref().map(|prep| RawArrayMetrics(prep.len()))
@@ -7281,21 +7382,7 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
         let gdef = {
             let gdef = &dir.table_links.gdef;
             gdef.as_ref()
-                .map(|gdef| {
-                    TestResult::Ok(Heap::new(GdefMetrics {
-                        major_version: gdef.major_version,
-                        minor_version: gdef.minor_version,
-                        glyph_class_def: promote_opt(&reify_index(gdef, Nullable(obj::ClsDef), 0)),
-                        attach_list: promote_opt(&reify(gdef, Nullable(obj::AttList))),
-                        lig_caret_list: try_promote_opt(&reify(gdef, Nullable(obj::LigCarList)))?,
-                        mark_attach_class_def: promote_opt(&reify_index(
-                            gdef,
-                            Nullable(obj::ClsDef),
-                            1,
-                        )),
-                        data: GdefTableDataMetrics::try_promote_view(&gdef.data, gdef.table_scope)?,
-                    }))
-                })
+                .map(|gdef| TestResult::Ok(Heap::new(GdefMetrics::try_promote(gdef)?)))
                 .transpose()?
         };
         let gpos = {
@@ -7399,7 +7486,7 @@ fn is_extra(table_id: &u32) -> bool {
     }
 }
 
-fn bounding_box(gl: &opentype_glyf_table_Glyph) -> BoundingBox {
+fn bounding_box(gl: &GlyphHeader) -> BoundingBox {
     BoundingBox {
         x_min: as_s16(gl.x_min),
         y_min: as_s16(gl.y_min),
