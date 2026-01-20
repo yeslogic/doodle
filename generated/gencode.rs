@@ -1632,7 +1632,7 @@ groups: Vec<opentype_types_sequential_map_record>
 /// expected size: 8
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
-pub struct main_data_opentype_directory_TTCHeader_header_Version1_table_directories_link_table_links_cmap_encoding_records_subtable__data_data_Format14_var_selector_default_uvs_offset__data_ranges {
+pub struct main_data_opentype_directory_TTCHeader_header_Version1_table_directories_data_table_links_cmap_encoding_records_subtable__data_data_Format14_var_selector_default_uvs_offset__data_ranges {
 start_unicode_value: u32,
 additional_count: u8
 }
@@ -1642,7 +1642,7 @@ additional_count: u8
 #[derive(Debug, Clone)]
 pub struct opentype_variation_selector_default_uvs_offset__data {
 num_unicode_value_ranges: u32,
-ranges: Vec<main_data_opentype_directory_TTCHeader_header_Version1_table_directories_link_table_links_cmap_encoding_records_subtable__data_data_Format14_var_selector_default_uvs_offset__data_ranges>
+ranges: Vec<main_data_opentype_directory_TTCHeader_header_Version1_table_directories_data_table_links_cmap_encoding_records_subtable__data_data_Format14_var_selector_default_uvs_offset__data_ranges>
 }
 
 /// expected size: 4
@@ -1656,7 +1656,7 @@ _data: std::marker::PhantomData<Option<opentype_variation_selector_default_uvs_o
 /// expected size: 8
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
-pub struct main_data_opentype_directory_TTCHeader_header_Version1_table_directories_link_table_links_cmap_encoding_records_subtable__data_data_Format14_var_selector_non_default_uvs_offset__data_uvs_mappings {
+pub struct main_data_opentype_directory_TTCHeader_header_Version1_table_directories_data_table_links_cmap_encoding_records_subtable__data_data_Format14_var_selector_non_default_uvs_offset__data_uvs_mappings {
 unicode_value: u32,
 glyph_id: u16
 }
@@ -1666,7 +1666,7 @@ glyph_id: u16
 #[derive(Debug, Clone)]
 pub struct opentype_variation_selector_non_default_uvs_offset__data {
 num_uvs_mappings: u32,
-uvs_mappings: Vec<main_data_opentype_directory_TTCHeader_header_Version1_table_directories_link_table_links_cmap_encoding_records_subtable__data_data_Format14_var_selector_non_default_uvs_offset__data_uvs_mappings>
+uvs_mappings: Vec<main_data_opentype_directory_TTCHeader_header_Version1_table_directories_data_table_links_cmap_encoding_records_subtable__data_data_Format14_var_selector_non_default_uvs_offset__data_uvs_mappings>
 }
 
 /// expected size: 4
@@ -3598,7 +3598,7 @@ _data: std::marker::PhantomData<Option<opentype_gpos_lookup_list<'input>>>
 /// expected size: 12
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
-pub struct main_data_opentype_directory_TTCHeader_header_Version1_table_directories_link_table_links_gpos_feature_variations_offset__data_feature_variation_records_condition_set__data__conditions {
+pub struct main_data_opentype_directory_TTCHeader_header_Version1_table_directories_data_table_links_gpos_feature_variations_offset__data_feature_variation_records_condition_set__data__conditions {
 format: u16,
 axis_index: u16,
 filter_range_min_value: opentype_gvar_tuple_record_coordinates,
@@ -3612,7 +3612,7 @@ pub struct opentype_layout_feature_variation_record_condition_set__data<'input> 
 set_scope: View<'input>,
 condition_count: u16,
 condition_offsets: Vec<u32>,
-_conditions: std::marker::PhantomData<Vec<Option<main_data_opentype_directory_TTCHeader_header_Version1_table_directories_link_table_links_gpos_feature_variations_offset__data_feature_variation_records_condition_set__data__conditions>>>
+_conditions: std::marker::PhantomData<Vec<Option<main_data_opentype_directory_TTCHeader_header_Version1_table_directories_data_table_links_gpos_feature_variations_offset__data_feature_variation_records_condition_set__data__conditions>>>
 }
 
 /// expected size: 4
@@ -4409,7 +4409,7 @@ table_links: opentype_table_directory_table_links<'input>
 #[derive(Debug, Clone)]
 pub struct opentype_ttc_header_header_Version1_table_directories<'input> {
 offset: u32,
-link: Option<opentype_table_directory<'input>>
+data: Option<opentype_table_directory<'input>>
 }
 
 /// expected size: 32
@@ -4453,11 +4453,10 @@ header: opentype_ttc_header_header<'input>
 pub enum opentype_main_directory<'input> { TTCHeader(opentype_ttc_header<'input>), TableDirectory(opentype_table_directory<'input>) }
 
 /// expected size: 1256
-/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap] })] }, Layout { size: 64, align: 8 (1 << 3) })
+/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [Noop, InDef(InEnum { variants: [Noop, DirectHeap] })] }, Layout { size: 64, align: 8 (1 << 3) })
 /// trait-ready: unique decoder function (d#14)
 #[derive(Debug, Clone)]
 pub struct opentype_main<'input> {
-file_start: u32,
 magic: u32,
 directory: opentype_main_directory<'input>
 }
@@ -4873,7 +4872,7 @@ waldo: &'input [u8]
 }
 
 /// expected size: 1264
-/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InEnum { variants: [DirectHeap, Noop, Noop, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap] })] })] }, Noop, DirectHeap, Noop, Noop, Noop, Noop, Noop, Noop, Noop] }, Layout { size: 104, align: 8 (1 << 3) })
+/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InEnum { variants: [DirectHeap, Noop, Noop, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, InDef(InEnum { variants: [Noop, DirectHeap] })] })] }, Noop, DirectHeap, Noop, Noop, Noop, Noop, Noop, Noop, Noop] }, Layout { size: 104, align: 8 (1 << 3) })
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
 pub enum main_data<'input> { elf(elf_main), gif(gif_main), gzip(Vec<gzip_main>), jpeg(jpeg_main), mpeg4(mpeg4_main), opentype(opentype_main<'input>), peano(Vec<u32>), png(png_main), riff(riff_main), rle(rle_main), tar(tar_main), text(Vec<char>), tgz(Vec<tar_main>), tiff(tiff_main), waldo(waldo_main<'input>) }
@@ -4949,7 +4948,7 @@ buf: Vec<u8>
 }
 
 /// expected size: 1264
-/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [InDef(InEnum { variants: [DirectHeap, Noop, Noop, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [Noop, DirectHeap] })] })] }, Noop, DirectHeap, Noop, Noop, Noop, Noop, Noop, Noop, Noop] })] }, Layout { size: 104, align: 8 (1 << 3) })
+/// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [InDef(InEnum { variants: [DirectHeap, Noop, Noop, DirectHeap, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, InDef(InEnum { variants: [Noop, DirectHeap] })] })] }, Noop, DirectHeap, Noop, Noop, Noop, Noop, Noop, Noop, Noop] })] }, Layout { size: 104, align: 8 (1 << 3) })
 /// trait-unready: multiple (2) decoders exist (d#{0, 1})
 #[derive(Debug, Clone)]
 pub struct main<'input> {
@@ -6028,10 +6027,7 @@ PResult::Ok(elf_main { header, program_headers, section_headers, sections })
 
 /// d#14
 fn Decoder_opentype_main<'input>(_input: &mut Parser<'input>) -> Result<opentype_main<'input>, ParseError> {
-let file_start = {
-let x = _input.get_offset_u64();
-x as u32
-};
+let font_view = _input.view();
 let magic = {
 _input.open_peek_context();
 let ret = ((|| {
@@ -6043,22 +6039,22 @@ ret
 };
 let directory = match magic {
 65536u32 => {
-let inner = (Decoder_opentype_table_directory(_input, file_start))?;
+let inner = (Decoder_opentype_table_directory(_input, font_view))?;
 opentype_main_directory::TableDirectory(inner)
 },
 
 1330926671u32 => {
-let inner = (Decoder_opentype_table_directory(_input, file_start))?;
+let inner = (Decoder_opentype_table_directory(_input, font_view))?;
 opentype_main_directory::TableDirectory(inner)
 },
 
 1953784678u32 => {
-let inner = (Decoder_opentype_ttc_header(_input, file_start))?;
+let inner = (Decoder_opentype_ttc_header(_input, font_view))?;
 opentype_main_directory::TTCHeader(inner)
 },
 
 1953658213u32 => {
-let inner = (Decoder_opentype_table_directory(_input, file_start))?;
+let inner = (Decoder_opentype_table_directory(_input, font_view))?;
 opentype_main_directory::TableDirectory(inner)
 },
 
@@ -6066,7 +6062,7 @@ _ => {
 return Err(ParseError::FailToken(4726315105662630465u64));
 }
 };
-PResult::Ok(opentype_main { file_start, magic, directory })
+PResult::Ok(opentype_main { magic, directory })
 }
 
 /// d#15
@@ -6706,7 +6702,7 @@ PResult::Ok(rle_old_style_run { len, char, buf })
 }
 
 /// d#25
-fn Decoder_opentype_table_directory<'input>(_input: &mut Parser<'input>, font_start: u32) -> Result<opentype_table_directory<'input>, ParseError> {
+fn Decoder_opentype_table_directory<'input>(_input: &mut Parser<'input>, font_view: View<'input>) -> Result<opentype_table_directory<'input>, ParseError> {
 let sfnt_version = {
 let inner = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -6746,12 +6742,12 @@ accum.push(next_elem)
 };
 accum
 };
-let table_links = (Decoder_opentype_table_directory_table_links(_input, font_start, &table_records))?;
+let table_links = (Decoder_opentype_table_directory_table_links(_input, &table_records, font_view))?;
 PResult::Ok(opentype_table_directory { sfnt_version, num_tables, search_range, entry_selector, range_shift, table_records, table_links })
 }
 
 /// d#26
-fn Decoder_opentype_ttc_header<'input>(_input: &mut Parser<'input>, start: u32) -> Result<opentype_ttc_header<'input>, ParseError> {
+fn Decoder_opentype_ttc_header<'input>(_input: &mut Parser<'input>, font_view: View<'input>) -> Result<opentype_ttc_header<'input>, ParseError> {
 let ttc_tag = {
 let inner = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
@@ -6790,20 +6786,14 @@ let offset = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let link = match offset > 0u32 {
-true => {
-let tgt_offset = start + offset;
-let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = Some((Decoder_opentype_table_directory(_input, start))?);
-_input.close_peek_context()?;
-ret
-},
-
-false => {
+let data = if offset != 0u32 {
+let mut view_parser = Parser::from(font_view.offset(offset as usize)?);
+let view_input = &mut view_parser;
+Some((Decoder_opentype_table_directory(view_input, font_view))?)
+} else {
 None
-}
 };
-opentype_ttc_header_header_Version1_table_directories { offset, link }
+opentype_ttc_header_header_Version1_table_directories { offset, data }
 };
 accum.push(next_elem)
 };
@@ -6828,20 +6818,14 @@ let offset = {
 let x = (_input.read_byte()?, _input.read_byte()?, _input.read_byte()?, _input.read_byte()?);
 u32be(x)
 };
-let link = match offset > 0u32 {
-true => {
-let tgt_offset = start + offset;
-let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = Some((Decoder_opentype_table_directory(_input, start))?);
-_input.close_peek_context()?;
-ret
-},
-
-false => {
+let data = if offset != 0u32 {
+let mut view_parser = Parser::from(font_view.offset(offset as usize)?);
+let view_input = &mut view_parser;
+Some((Decoder_opentype_table_directory(view_input, font_view))?)
+} else {
 None
-}
 };
-opentype_ttc_header_header_Version1_table_directories { offset, link }
+opentype_ttc_header_header_Version1_table_directories { offset, data }
 };
 accum.push(next_elem)
 };
@@ -6892,19 +6876,15 @@ PResult::Ok(opentype_table_record { table_id, checksum, offset, length })
 }
 
 /// d#28
-fn Decoder_opentype_table_directory_table_links<'input>(_input: &mut Parser<'input>, start: u32, tables: &[opentype_table_record]) -> Result<opentype_table_directory_table_links<'input>, ParseError> {
+fn Decoder_opentype_table_directory_table_links<'input>(_input: &mut Parser<'input>, tables: &[opentype_table_record], font_view: View<'input>) -> Result<opentype_table_directory_table_links<'input>, ParseError> {
 let cmap = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1668112752u32, tables)).copied() {
 Some(ref matching_table) => {
-let tgt_offset = start + matching_table.offset;
-let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
+let mut view_parser = Parser::from(font_view.offset(matching_table.offset as usize)?);
+let view_input = &mut view_parser;
 let sz = matching_table.length as usize;
-_input.start_slice(sz)?;
-let ret = (Decoder_opentype_cmap_table(_input))?;
-_input.end_slice()?;
-PResult::Ok(ret)
-})())?;
-_input.close_peek_context()?;
+view_input.start_slice(sz)?;
+let ret = (Decoder_opentype_cmap_table(view_input))?;
+view_input.end_slice()?;
 ret
 },
 
@@ -6914,16 +6894,12 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 };
 let head = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1751474532u32, tables)).copied() {
 Some(ref matching_table) => {
-let tgt_offset = start + matching_table.offset;
-let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
+let mut view_parser = Parser::from(font_view.offset(matching_table.offset as usize)?);
+let view_input = &mut view_parser;
 let sz = matching_table.length as usize;
-_input.start_slice(sz)?;
-let ret = (Decoder_opentype_head_table(_input))?;
-_input.end_slice()?;
-PResult::Ok(ret)
-})())?;
-_input.close_peek_context()?;
+view_input.start_slice(sz)?;
+let ret = (Decoder_opentype_head_table(view_input))?;
+view_input.end_slice()?;
 ret
 },
 
@@ -6933,16 +6909,12 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 };
 let hhea = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1751672161u32, tables)).copied() {
 Some(ref matching_table) => {
-let tgt_offset = start + matching_table.offset;
-let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
+let mut view_parser = Parser::from(font_view.offset(matching_table.offset as usize)?);
+let view_input = &mut view_parser;
 let sz = matching_table.length as usize;
-_input.start_slice(sz)?;
-let ret = (Decoder_opentype_hhea_table(_input))?;
-_input.end_slice()?;
-PResult::Ok(ret)
-})())?;
-_input.close_peek_context()?;
+view_input.start_slice(sz)?;
+let ret = (Decoder_opentype_hhea_table(view_input))?;
+view_input.end_slice()?;
 ret
 },
 
@@ -6952,16 +6924,12 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 };
 let maxp = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1835104368u32, tables)).copied() {
 Some(ref matching_table) => {
-let tgt_offset = start + matching_table.offset;
-let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
+let mut view_parser = Parser::from(font_view.offset(matching_table.offset as usize)?);
+let view_input = &mut view_parser;
 let sz = matching_table.length as usize;
-_input.start_slice(sz)?;
-let ret = (Decoder_opentype_maxp_table(_input))?;
-_input.end_slice()?;
-PResult::Ok(ret)
-})())?;
-_input.close_peek_context()?;
+view_input.start_slice(sz)?;
+let ret = (Decoder_opentype_maxp_table(view_input))?;
+view_input.end_slice()?;
 ret
 },
 
@@ -6971,16 +6939,12 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 };
 let hmtx = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1752003704u32, tables)).copied() {
 Some(ref matching_table) => {
-let tgt_offset = start + matching_table.offset;
-let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
+let mut view_parser = Parser::from(font_view.offset(matching_table.offset as usize)?);
+let view_input = &mut view_parser;
 let sz = matching_table.length as usize;
-_input.start_slice(sz)?;
-let ret = (Decoder_opentype_hmtx_table(_input, hhea.number_of_long_metrics, maxp.num_glyphs))?;
-_input.end_slice()?;
-PResult::Ok(ret)
-})())?;
-_input.close_peek_context()?;
+view_input.start_slice(sz)?;
+let ret = (Decoder_opentype_hmtx_table(view_input, hhea.number_of_long_metrics, maxp.num_glyphs))?;
+view_input.end_slice()?;
 ret
 },
 
@@ -6990,16 +6954,12 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 };
 let name = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1851878757u32, tables)).copied() {
 Some(ref matching_table) => {
-let tgt_offset = start + matching_table.offset;
-let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
+let mut view_parser = Parser::from(font_view.offset(matching_table.offset as usize)?);
+let view_input = &mut view_parser;
 let sz = matching_table.length as usize;
-_input.start_slice(sz)?;
-let ret = (Decoder_opentype_name_table(_input))?;
-_input.end_slice()?;
-PResult::Ok(ret)
-})())?;
-_input.close_peek_context()?;
+view_input.start_slice(sz)?;
+let ret = (Decoder_opentype_name_table(view_input))?;
+view_input.end_slice()?;
 ret
 },
 
@@ -7009,17 +6969,13 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 };
 let os2 = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1330851634u32, tables)).copied() {
 Some(ref matching_table) => {
-let tgt_offset = start + matching_table.offset;
-let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
+let mut view_parser = Parser::from(font_view.offset(matching_table.offset as usize)?);
+let view_input = &mut view_parser;
 let table_len = matching_table.length;
 let sz = table_len as usize;
-_input.start_slice(sz)?;
-let ret = (Decoder_opentype_os2_table(_input, table_len))?;
-_input.end_slice()?;
-PResult::Ok(ret)
-})())?;
-_input.close_peek_context()?;
+view_input.start_slice(sz)?;
+let ret = (Decoder_opentype_os2_table(view_input, table_len))?;
+view_input.end_slice()?;
 ret
 },
 
@@ -7029,16 +6985,12 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 };
 let post = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1886352244u32, tables)).copied() {
 Some(ref matching_table) => {
-let tgt_offset = start + matching_table.offset;
-let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
+let mut view_parser = Parser::from(font_view.offset(matching_table.offset as usize)?);
+let view_input = &mut view_parser;
 let sz = matching_table.length as usize;
-_input.start_slice(sz)?;
-let ret = (Decoder_opentype_post_table(_input))?;
-_input.end_slice()?;
-PResult::Ok(ret)
-})())?;
-_input.close_peek_context()?;
+view_input.start_slice(sz)?;
+let ret = (Decoder_opentype_post_table(view_input))?;
+view_input.end_slice()?;
 ret
 },
 
@@ -7048,26 +7000,25 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 };
 let cvt = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1668707360u32, tables)).copied() {
 Some(ref table) => {
-let tgt_offset = start + table.offset;
-let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
+let mut view_parser = Parser::from(font_view.offset(table.offset as usize)?);
+let view_input = &mut view_parser;
 let sz = table.length as usize;
-_input.start_slice(sz)?;
+view_input.start_slice(sz)?;
 let ret = ((|| {
 let mut accum = Vec::new();
-while _input.remaining() > 0 {
+while view_input.remaining() > 0 {
 let matching_ix = {
-_input.open_peek_context();
-_input.read_byte()?;
+view_input.open_peek_context();
+view_input.read_byte()?;
 {
 let ret = 0;
-_input.close_peek_context()?;
+view_input.close_peek_context()?;
 ret
 }
 };
 if matching_ix == 0 {
 let next_elem = {
-let x = (_input.read_byte()?, _input.read_byte()?);
+let x = (view_input.read_byte()?, view_input.read_byte()?);
 u16be(x)
 };
 accum.push(next_elem)
@@ -7077,10 +7028,7 @@ break
 };
 PResult::Ok(accum)
 })())?;
-_input.end_slice()?;
-PResult::Ok(ret)
-})())?;
-_input.close_peek_context()?;
+view_input.end_slice()?;
 Some(ret)
 },
 
@@ -7090,25 +7038,24 @@ None
 };
 let fpgm = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1718642541u32, tables)).copied() {
 Some(ref table) => {
-let tgt_offset = start + table.offset;
-let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
+let mut view_parser = Parser::from(font_view.offset(table.offset as usize)?);
+let view_input = &mut view_parser;
 let sz = table.length as usize;
-_input.start_slice(sz)?;
+view_input.start_slice(sz)?;
 let ret = ((|| {
 let mut accum = Vec::new();
-while _input.remaining() > 0 {
+while view_input.remaining() > 0 {
 let matching_ix = {
-_input.open_peek_context();
-_input.read_byte()?;
+view_input.open_peek_context();
+view_input.read_byte()?;
 {
 let ret = 0;
-_input.close_peek_context()?;
+view_input.close_peek_context()?;
 ret
 }
 };
 if matching_ix == 0 {
-let next_elem = _input.read_byte()?;
+let next_elem = view_input.read_byte()?;
 accum.push(next_elem)
 } else {
 break
@@ -7116,10 +7063,7 @@ break
 };
 PResult::Ok(accum)
 })())?;
-_input.end_slice()?;
-PResult::Ok(ret)
-})())?;
-_input.close_peek_context()?;
+view_input.end_slice()?;
 Some(ret)
 },
 
@@ -7129,16 +7073,12 @@ None
 };
 let loca = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1819239265u32, tables)).copied() {
 Some(ref table) => {
-let tgt_offset = start + table.offset;
-let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
+let mut view_parser = Parser::from(font_view.offset(table.offset as usize)?);
+let view_input = &mut view_parser;
 let sz = table.length as usize;
-_input.start_slice(sz)?;
-let ret = (Decoder_opentype_loca_table(_input, maxp.num_glyphs, head.index_to_loc_format))?;
-_input.end_slice()?;
-PResult::Ok(ret)
-})())?;
-_input.close_peek_context()?;
+view_input.start_slice(sz)?;
+let ret = (Decoder_opentype_loca_table(view_input, maxp.num_glyphs, head.index_to_loc_format))?;
+view_input.end_slice()?;
 Some(ret)
 },
 
@@ -7148,12 +7088,11 @@ None
 };
 let glyf = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1735162214u32, tables)).copied() {
 Some(ref table) => {
-let tgt_offset = start + table.offset;
-let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
+let mut view_parser = Parser::from(font_view.offset(table.offset as usize)?);
+let view_input = &mut view_parser;
 let sz = table.length as usize;
-_input.start_slice(sz)?;
-let ret = (Decoder_opentype_glyf_table(_input, match loca {
+view_input.start_slice(sz)?;
+let ret = (Decoder_opentype_glyf_table(view_input, match loca {
 Some(ref x) => {
 x.offsets.clone()
 },
@@ -7162,10 +7101,7 @@ None => {
 opentype_loca_table_offsets::Offsets32([].to_vec())
 }
 }))?;
-_input.end_slice()?;
-PResult::Ok(ret)
-})())?;
-_input.close_peek_context()?;
+view_input.end_slice()?;
 Some(ret)
 },
 
@@ -7175,25 +7111,24 @@ None
 };
 let prep = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1886545264u32, tables)).copied() {
 Some(ref table) => {
-let tgt_offset = start + table.offset;
-let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
+let mut view_parser = Parser::from(font_view.offset(table.offset as usize)?);
+let view_input = &mut view_parser;
 let sz = table.length as usize;
-_input.start_slice(sz)?;
+view_input.start_slice(sz)?;
 let ret = ((|| {
 let mut accum = Vec::new();
-while _input.remaining() > 0 {
+while view_input.remaining() > 0 {
 let matching_ix = {
-_input.open_peek_context();
-_input.read_byte()?;
+view_input.open_peek_context();
+view_input.read_byte()?;
 {
 let ret = 0;
-_input.close_peek_context()?;
+view_input.close_peek_context()?;
 ret
 }
 };
 if matching_ix == 0 {
-let next_elem = _input.read_byte()?;
+let next_elem = view_input.read_byte()?;
 accum.push(next_elem)
 } else {
 break
@@ -7201,10 +7136,7 @@ break
 };
 PResult::Ok(accum)
 })())?;
-_input.end_slice()?;
-PResult::Ok(ret)
-})())?;
-_input.close_peek_context()?;
+view_input.end_slice()?;
 Some(ret)
 },
 
@@ -7214,16 +7146,12 @@ None
 };
 let gasp = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1734439792u32, tables)).copied() {
 Some(ref table) => {
-let tgt_offset = start + table.offset;
-let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
+let mut view_parser = Parser::from(font_view.offset(table.offset as usize)?);
+let view_input = &mut view_parser;
 let sz = table.length as usize;
-_input.start_slice(sz)?;
-let ret = (Decoder_opentype_gasp_table(_input))?;
-_input.end_slice()?;
-PResult::Ok(ret)
-})())?;
-_input.close_peek_context()?;
+view_input.start_slice(sz)?;
+let ret = (Decoder_opentype_gasp_table(view_input))?;
+view_input.end_slice()?;
 Some(ret)
 },
 
@@ -7233,16 +7161,12 @@ None
 };
 let base = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1111577413u32, tables)).copied() {
 Some(ref table) => {
-let tgt_offset = start + table.offset;
-let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
+let mut view_parser = Parser::from(font_view.offset(table.offset as usize)?);
+let view_input = &mut view_parser;
 let sz = table.length as usize;
-_input.start_slice(sz)?;
-let ret = (Decoder_opentype_base_table(_input))?;
-_input.end_slice()?;
-PResult::Ok(ret)
-})())?;
-_input.close_peek_context()?;
+view_input.start_slice(sz)?;
+let ret = (Decoder_opentype_base_table(view_input))?;
+view_input.end_slice()?;
 Some(ret)
 },
 
@@ -7252,16 +7176,12 @@ None
 };
 let gdef = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1195656518u32, tables)).copied() {
 Some(ref table) => {
-let tgt_offset = start + table.offset;
-let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
+let mut view_parser = Parser::from(font_view.offset(table.offset as usize)?);
+let view_input = &mut view_parser;
 let sz = table.length as usize;
-_input.start_slice(sz)?;
-let ret = (Decoder_opentype_gdef_table(_input))?;
-_input.end_slice()?;
-PResult::Ok(ret)
-})())?;
-_input.close_peek_context()?;
+view_input.start_slice(sz)?;
+let ret = (Decoder_opentype_gdef_table(view_input))?;
+view_input.end_slice()?;
 Some(ret)
 },
 
@@ -7271,16 +7191,12 @@ None
 };
 let gpos = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1196445523u32, tables)).copied() {
 Some(ref table) => {
-let tgt_offset = start + table.offset;
-let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
+let mut view_parser = Parser::from(font_view.offset(table.offset as usize)?);
+let view_input = &mut view_parser;
 let sz = table.length as usize;
-_input.start_slice(sz)?;
-let ret = (Decoder_opentype_gpos_table(_input))?;
-_input.end_slice()?;
-PResult::Ok(ret)
-})())?;
-_input.close_peek_context()?;
+view_input.start_slice(sz)?;
+let ret = (Decoder_opentype_gpos_table(view_input))?;
+view_input.end_slice()?;
 Some(ret)
 },
 
@@ -7290,16 +7206,12 @@ None
 };
 let gsub = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1196643650u32, tables)).copied() {
 Some(ref table) => {
-let tgt_offset = start + table.offset;
-let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
+let mut view_parser = Parser::from(font_view.offset(table.offset as usize)?);
+let view_input = &mut view_parser;
 let sz = table.length as usize;
-_input.start_slice(sz)?;
-let ret = (Decoder_opentype_gsub_table(_input))?;
-_input.end_slice()?;
-PResult::Ok(ret)
-})())?;
-_input.close_peek_context()?;
+view_input.start_slice(sz)?;
+let ret = (Decoder_opentype_gsub_table(view_input))?;
+view_input.end_slice()?;
 Some(ret)
 },
 
@@ -7309,16 +7221,12 @@ None
 };
 let fvar = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1719034226u32, tables)).copied() {
 Some(ref table) => {
-let tgt_offset = start + table.offset;
-let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
+let mut view_parser = Parser::from(font_view.offset(table.offset as usize)?);
+let view_input = &mut view_parser;
 let sz = table.length as usize;
-_input.start_slice(sz)?;
-let ret = (Decoder_opentype_fvar_table(_input))?;
-_input.end_slice()?;
-PResult::Ok(ret)
-})())?;
-_input.close_peek_context()?;
+view_input.start_slice(sz)?;
+let ret = (Decoder_opentype_fvar_table(view_input))?;
+view_input.end_slice()?;
 Some(ret)
 },
 
@@ -7328,16 +7236,12 @@ None
 };
 let gvar = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1735811442u32, tables)).copied() {
 Some(ref table) => {
-let tgt_offset = start + table.offset;
-let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
+let mut view_parser = Parser::from(font_view.offset(table.offset as usize)?);
+let view_input = &mut view_parser;
 let sz = table.length as usize;
-_input.start_slice(sz)?;
-let ret = (Decoder_opentype_gvar_table(_input))?;
-_input.end_slice()?;
-PResult::Ok(ret)
-})())?;
-_input.close_peek_context()?;
+view_input.start_slice(sz)?;
+let ret = (Decoder_opentype_gvar_table(view_input))?;
+view_input.end_slice()?;
 Some(ret)
 },
 
@@ -7347,16 +7251,12 @@ None
 };
 let kern = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1801810542u32, tables)).copied() {
 Some(ref table) => {
-let tgt_offset = start + table.offset;
-let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
+let mut view_parser = Parser::from(font_view.offset(table.offset as usize)?);
+let view_input = &mut view_parser;
 let sz = table.length as usize;
-_input.start_slice(sz)?;
-let ret = (Decoder_opentype_kern_table(_input))?;
-_input.end_slice()?;
-PResult::Ok(ret)
-})())?;
-_input.close_peek_context()?;
+view_input.start_slice(sz)?;
+let ret = (Decoder_opentype_kern_table(view_input))?;
+view_input.end_slice()?;
 Some(ret)
 },
 
@@ -7366,16 +7266,12 @@ None
 };
 let stat = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1398030676u32, tables)).copied() {
 Some(ref table) => {
-let tgt_offset = start + table.offset;
-let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
+let mut view_parser = Parser::from(font_view.offset(table.offset as usize)?);
+let view_input = &mut view_parser;
 let sz = table.length as usize;
-_input.start_slice(sz)?;
-let ret = (Decoder_opentype_stat_table(_input))?;
-_input.end_slice()?;
-PResult::Ok(ret)
-})())?;
-_input.close_peek_context()?;
+view_input.start_slice(sz)?;
+let ret = (Decoder_opentype_stat_table(view_input))?;
+view_input.end_slice()?;
 Some(ret)
 },
 
@@ -7385,16 +7281,12 @@ None
 };
 let vhea = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1986553185u32, tables)).copied() {
 Some(ref table) => {
-let tgt_offset = start + table.offset;
-let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
+let mut view_parser = Parser::from(font_view.offset(table.offset as usize)?);
+let view_input = &mut view_parser;
 let sz = table.length as usize;
-_input.start_slice(sz)?;
-let ret = (Decoder48(_input))?;
-_input.end_slice()?;
-PResult::Ok(ret)
-})())?;
-_input.close_peek_context()?;
+view_input.start_slice(sz)?;
+let ret = (Decoder48(view_input))?;
+view_input.end_slice()?;
 Some(ret)
 },
 
@@ -7404,12 +7296,11 @@ None
 };
 let vmtx = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1986884728u32, tables)).copied() {
 Some(ref table) => {
-let tgt_offset = start + table.offset;
-let _is_advance = _input.advance_or_seek(tgt_offset)?;
-let ret = ((|| {
+let mut view_parser = Parser::from(font_view.offset(table.offset as usize)?);
+let view_input = &mut view_parser;
 let sz = table.length as usize;
-_input.start_slice(sz)?;
-let ret = (Decoder49(_input, match vhea {
+view_input.start_slice(sz)?;
+let ret = (Decoder49(view_input, match vhea {
 Some(ref x) => {
 x
 },
@@ -7418,10 +7309,7 @@ _ => {
 return Err(ParseError::ExcludedBranch(18164850183020044607u64));
 }
 }.number_of_long_metrics, maxp.num_glyphs))?;
-_input.end_slice()?;
-PResult::Ok(ret)
-})())?;
-_input.close_peek_context()?;
+view_input.end_slice()?;
 Some(ret)
 },
 

@@ -13,12 +13,6 @@ mod util {
         x
     }
 
-    pub(crate) fn shadow_check(x: &Expr, name: &'static str) {
-        if x.is_shadowed_by(name) {
-            panic!("Shadow! Variable-name {name} already occurs in Expr {x:?}!");
-        }
-    }
-
     /// Marker-type for controlling how records-with-alternation are composed
     #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
     pub(crate) enum NestingKind {
@@ -403,17 +397,16 @@ mod util {
     }
 
     // WIP
-    pub(crate) const START_VAR: Expr = Expr::Var(Label::Borrowed("start"));
+    pub(crate) const FONTVIEW_VAR: ViewExpr = ViewExpr::Var(Label::Borrowed("font_view"));
 
     // WIP
-    pub(crate) const START_ARG: (Label, ValueType) =
-        (Label::Borrowed("start"), ValueType::Base(BaseType::U32));
+    pub(crate) const FONTVIEW_ARG: Label = Label::Borrowed("font_view");
 
     pub(crate) const TABLE_VIEW: Label = Label::Borrowed("table_view");
 
-    /// Given `Expr`s `table_records` and a `query_table_id` of the appropriate Rust-type (`u32`),
+    /// Given a  a 32-bit opentype tag-value `query_table_id`,
     /// applies `dep_format` to the `Option<T>`-kinded `Expr` yielded by a binary search over
-    /// `table_records ~ Seq<T>`.
+    /// `table_records` for a table with the given tag.
     ///
     /// # Notes
     ///
@@ -448,8 +441,6 @@ mod util {
         dep_format(opt_match)
     }
 
-    pub(crate) const CONTENT_AT_OFFSET_IDENT: &str = "link";
-
     /// Scaffolding aid for migration from Pos-arithmetic model to ViewFormat model
     ///
     /// Given a ViewExpr `base_view` that stands in for the base-position for offset arithmetic,
@@ -466,6 +457,25 @@ mod util {
             is_nonzero::<K>(offset.clone()),
             parse_from_view(base_view.offset(offset), format),
         )
+    }
+
+    /// Given a ViewExpr `base_view` that stands in for the base-position for offset arithmetic,
+    /// an `offset` expression, and a Format `format`, constructs a Format that
+    /// parses `format` at the location `base_view + offset`, without any decoration and without
+    /// wrapping in `Option`.
+    ///
+    /// # NOTES
+    ///
+    /// Unlike `parse_view_offset`, this method does not wrap the result in an Option, and instead
+    /// returns the result directly. This may produce nonsensical values or parse-failures if the
+    /// offset is zero, or otherwise does not directly correspond to the true offset of a valid parse
+    /// of `format`.
+    pub(crate) fn parse_view_offset_mandatory(
+        base_view: ViewExpr,
+        offset: Expr,
+        format: Format,
+    ) -> Format {
+        parse_from_view(base_view.offset(offset), format)
     }
 
     /// Parses a u16be offset and captures `nbytes` bytes starting at that offset (relative to `view`).
@@ -505,6 +515,24 @@ mod util {
         ])
     }
 
+    /// Record-format that reads (and stores) a u32be offset, along with a field `data` for the strict parse of `format` at that offset (relative to `view`).
+    ///
+    /// # NOTES
+    ///
+    /// This is a non-phantom version of `read_phantom_view_offset32` whose intended purpose is to simplify
+    /// model-migration by keeping the highest-level font-formats free of phantom-parses. Ideally, this will be
+    /// phased out, or the intended processing model otherwise clarified to determine where and when phantom-parses
+    /// are demanded.
+    pub(crate) fn read_view_offset32(view: ViewExpr, format: Format) -> Format {
+        record_auto([
+            // TODO: rename "offset" -> "value" and ensure all calling-fields have 'offset' in field-identifier
+            ("offset", u32be()),
+            (
+                "data",
+                parse_view_offset::<U32>(view, var("offset"), format),
+            ),
+        ])
+    }
     /// Reads a U16Be offset value and conditionally applies `format` to the location found at that offset
     /// relative to `view`, depending on the processing model.
     #[cfg(feature = "alt")]
@@ -520,52 +548,6 @@ mod util {
             base_model,
             alt_model,
         })
-    }
-
-    /// Given a value of `base_offset` (the absolute stream-position relative to which offsets are to be interpreted),
-    /// parses a u32be as a positive delta from `base_offset` and returns the linked content parsed according
-    /// to `format` at that location.
-    ///
-    /// Returns a record `{ offset: u32, link := (offset > 0) ? Some(format) : None }`
-    ///
-    /// (Implicitly includes a semantic shortcut whereby an offset-value (parsed) of `0` signals
-    /// that there is no associated data, in which case `None` is yielded for the `link`.)
-    ///
-    /// # Notes
-    ///
-    /// To handle irregular inputs that would otherwise require moving *backwards* to reach the desired offset,
-    /// `None` is returned in any case where the relative-delta to reach the target offset is non-positive.
-    pub(crate) fn offset32(base_offset: Expr, format: Format) -> Format {
-        shadow_check(&base_offset, "offset");
-        // FIXME - should we use `chain` instead of `record` to elide the offset and flatten the link?
-        record([
-            ("offset", u32be()),
-            (
-                CONTENT_AT_OFFSET_IDENT,
-                if_then_else(
-                    is_nonzero_u32(var("offset")),
-                    linked_offset32(base_offset, var("offset"), fmt_some(format)),
-                    fmt_none(),
-                ),
-            ),
-        ])
-    }
-
-    /// Given the appropriate Start-of-Frame absolute-stream-offset (`base_offset`) and
-    /// an SOF-relative `rel_offset`, produce a relative-seek format that
-    /// seeks to the appropriate stream-location and parses `format`.
-    ///
-    /// # Notes
-    ///
-    /// Though not directly stated, the assumed type of `sof_offset` and `target_offset` is
-    /// `U32`, and if this is not satisfied, the invocation of this function will produce a
-    /// type-error when expanded.
-    ///
-    /// Will fail at time-of-parse if seeking to the target requires going backwards from the immediate
-    /// offset we are reading from.
-    // REVIEW - double-check whether the claim that retrograde seeks will fail is still true
-    pub(crate) fn linked_offset32(base_offset: Expr, rel_offset: Expr, format: Format) -> Format {
-        with_relative_offset(Some(base_offset), rel_offset, format)
     }
 
     /// Produces a `Format` that evaluates the delayed parse of `read_phantom_view_offset{16|32}`.
@@ -594,6 +576,374 @@ const SHORT_OFFSET16: u16 = 0;
 /// Flag-value used in `head` table to mark `loca` offsets as being 32-bit
 const LONG_OFFSET32: u16 = 1;
 
+pub(crate) fn table_links(
+    module: &mut FormatModule,
+    tag: FormatRef,
+    table_type: ValueType,
+) -> FormatRef {
+    // character mapping table
+    let cmap_table = cmap::table(module);
+    let head_table = head::table(module);
+    let hhea_table = hhea::table(module);
+    let vhea_table = vhea::table(module);
+    let maxp_table = maxp::table(module);
+    let hmtx_table = hmtx::table(module);
+    let vmtx_table = vmtx::table(module);
+    let name_table = name::table(module);
+    let os2_table = os2::table(module, tag);
+    let post_table = post::table(module);
+    let cvt_table = cvt::table(module);
+    let fpgm_table = fpgm::table(module);
+    let loca_table = loca::table(module);
+    let glyf_table = glyf::table(module);
+    let prep_table = prep::table(module);
+    let gasp_table = gasp::table(module);
+    let class_def = common::class_def(module);
+    let coverage_table = common::coverage_table(module);
+    let device_or_variation_index_table = common::device_or_variation_index_table(module);
+    let item_variation_store = common::item_variation_store(module);
+    let gdef_table = gdef::table(
+        module,
+        class_def,
+        coverage_table,
+        device_or_variation_index_table,
+        item_variation_store,
+    );
+    // SECTION - bulk common definitions for GSUB and GPOS
+    let value_format_flags = layout::value_format_flags(module);
+    let vf_flags_type = module
+        .get_format_type(value_format_flags.get_level())
+        .clone();
+    let value_record = layout::value_record(module, device_or_variation_index_table, vf_flags_type);
+    let anchor_table = layout::anchor_table(module, device_or_variation_index_table);
+    let lang_sys = layout::lang_sys(module);
+    let script_table = layout::script_table(module, tag, lang_sys);
+    let script_list = layout::script_list(module, tag, script_table);
+    let feature_table = layout::feature_table(module);
+    let feature_list = layout::feature_list(module, tag, feature_table);
+    let sequence_lookup_record = layout::sequence_lookup_record(module);
+    // Sub-tables used by both GSUB and GPOS
+    let sequence_context =
+        layout::sequence_context(module, class_def, coverage_table, sequence_lookup_record);
+    let chained_sequence_context =
+        layout::chained_sequence_context(module, class_def, coverage_table, sequence_lookup_record);
+    // !SECTION
+    // SECTION - high-level definitions to support GSUB and GPOS
+    let ground_subst = gsub::ground_subst(
+        module,
+        coverage_table,
+        sequence_context,
+        chained_sequence_context,
+    );
+    let subst_extension = gsub::subst_extension(module, ground_subst);
+    let ground_pos = gpos::ground_pos(
+        module,
+        class_def,
+        coverage_table,
+        value_format_flags,
+        value_record,
+        anchor_table,
+        sequence_context,
+        chained_sequence_context,
+    );
+    let pos_extension = gpos::pos_extension(module, ground_pos);
+    let feature_variations = layout::feature_variations(module, feature_table);
+    // !SECTION
+    // REVIEW - we might consider rewriting `layout::table` to spin off `gpos::table` and `gsub::table` more easily (self-contained)
+    let gpos_table = gpos::table(
+        module,
+        script_list,
+        feature_list,
+        ground_pos,
+        pos_extension,
+        feature_variations,
+    );
+    let gsub_table = gsub::table(
+        module,
+        script_list,
+        feature_list,
+        ground_subst,
+        subst_extension,
+        feature_variations,
+    );
+    let base_table = base::table(
+        module,
+        tag,
+        device_or_variation_index_table,
+        item_variation_store,
+    );
+    // `kern` table [https://learn.microsoft.com/en-us/typography/opentype/spec/kern]
+    let kern_table = kern::table(module);
+    let stat_table = stat::table(module, tag);
+    let fvar_table = fvar::table(module, tag);
+    let gvar_table = gvar::table(module);
+
+    module.define_format_args_views(
+        "opentype.table_directory.table_links",
+        vec![(
+            Label::Borrowed("tables"),
+            ValueType::Seq(Box::new(table_type)),
+        )],
+        vec![Label::Borrowed("font_view")],
+        record_auto([
+            (
+                "cmap",
+                required_table(
+                    util::FONTVIEW_VAR,
+                    var("tables"),
+                    util::magic(b"cmap"),
+                    cmap_table.call(),
+                ),
+            ),
+            (
+                "head",
+                required_table(
+                    util::FONTVIEW_VAR,
+                    var("tables"),
+                    util::magic(b"head"),
+                    head_table.call(),
+                ),
+            ),
+            (
+                "hhea",
+                required_table(
+                    util::FONTVIEW_VAR,
+                    var("tables"),
+                    util::magic(b"hhea"),
+                    hhea_table.call(),
+                ),
+            ),
+            (
+                "maxp",
+                required_table(
+                    util::FONTVIEW_VAR,
+                    var("tables"),
+                    util::magic(b"maxp"),
+                    maxp_table.call(),
+                ),
+            ),
+            (
+                "hmtx",
+                required_table(
+                    util::FONTVIEW_VAR,
+                    var("tables"),
+                    util::magic(b"hmtx"),
+                    hmtx_table.call_args(vec![
+                        record_proj(var("hhea"), "number_of_long_metrics"),
+                        record_proj(var("maxp"), "num_glyphs"),
+                    ]),
+                ),
+            ),
+            (
+                "name",
+                required_table(
+                    util::FONTVIEW_VAR,
+                    var("tables"),
+                    util::magic(b"name"),
+                    name_table.call(),
+                ),
+            ),
+            (
+                "os2",
+                required_table_with_len(
+                    util::FONTVIEW_VAR,
+                    var("tables"),
+                    util::magic(b"OS/2"),
+                    os2_table,
+                ),
+            ),
+            (
+                "post",
+                required_table(
+                    util::FONTVIEW_VAR,
+                    var("tables"),
+                    util::magic(b"post"),
+                    post_table.call(),
+                ),
+            ),
+            // SECTION - TrueType Outline
+            (
+                "cvt",
+                optional_table(
+                    util::FONTVIEW_VAR,
+                    var("tables"),
+                    util::magic(b"cvt "),
+                    cvt_table,
+                ),
+            ),
+            (
+                "fpgm",
+                optional_table(
+                    util::FONTVIEW_VAR,
+                    var("tables"),
+                    util::magic(b"fpgm"),
+                    fpgm_table,
+                ),
+            ),
+            (
+                "loca",
+                optional_table(
+                    util::FONTVIEW_VAR,
+                    var("tables"),
+                    util::magic(b"loca"),
+                    loca_table.call_args(vec![
+                        record_proj(var("maxp"), "num_glyphs"),
+                        record_proj(var("head"), "index_to_loc_format"),
+                    ]),
+                ),
+            ),
+            (
+                "glyf",
+                optional_table(
+                    util::FONTVIEW_VAR,
+                    var("tables"),
+                    util::magic(b"glyf"),
+                    glyf_table.call_args(vec![loca_offsets(var("loca"))]),
+                ),
+            ),
+            (
+                "prep",
+                optional_table(
+                    util::FONTVIEW_VAR,
+                    var("tables"),
+                    util::magic(b"prep"),
+                    prep_table,
+                ),
+            ),
+            (
+                "gasp",
+                optional_table(
+                    util::FONTVIEW_VAR,
+                    var("tables"),
+                    util::magic(b"gasp"),
+                    gasp_table.call(),
+                ),
+            ),
+            // !SECTION
+            // SECTION - CFF Outline
+            // TODO - `CFF ` deferred for reasons of complexity
+            // TODO - `CFF2` deferred for reasons of complexity
+            // TODO - `VORG` deferred as it collocates with CFF{ ,2}
+            // !SECTION
+            // SECTION - SVG Outline
+            // FIXME - `SVG ` postponed due to rarity (15 of 659 tested fonts)
+            // !SECTION
+            // SECTION - Bitmap Glyphs
+            // FIXME - `EBDT` postponed due to rarity (15 of 659 tested fonts)
+            // FIXM - `EBLC` postponed due to rarity (15 of 659 tested fonts)
+            // FIXME - `EBSC` postponed due to rarity (no occurrences among 659 tested fonts)
+            // FIXME - `CBDT` postponed due to rarity (2 of 659 tested fonts)
+            // FIXME - `CBLC` postponed due to rarity (2 of 659 tested fonts)
+            // FIXME - `sbix` postponed due to rarity (1 of 659 tested fonts)
+            // !SECTION
+            // SECTION - Advanced Typography
+            (
+                "base",
+                optional_table(
+                    util::FONTVIEW_VAR,
+                    var("tables"),
+                    util::magic(b"BASE"),
+                    base_table.call(),
+                ),
+            ),
+            (
+                "gdef",
+                optional_table(
+                    util::FONTVIEW_VAR,
+                    var("tables"),
+                    util::magic(b"GDEF"),
+                    gdef_table.call(),
+                ),
+            ),
+            (
+                "gpos",
+                optional_table(
+                    util::FONTVIEW_VAR,
+                    var("tables"),
+                    util::magic(b"GPOS"),
+                    gpos_table.call(),
+                ),
+            ),
+            (
+                "gsub",
+                optional_table(
+                    util::FONTVIEW_VAR,
+                    var("tables"),
+                    util::magic(b"GSUB"),
+                    gsub_table.call(),
+                ),
+            ),
+            // !SECTION
+            // STUB - add more table sections
+            // SECTION - Font Variations
+            // STUB - add more tables
+            (
+                "fvar",
+                optional_table(
+                    util::FONTVIEW_VAR,
+                    var("tables"),
+                    util::magic(b"fvar"),
+                    fvar_table.call(),
+                ),
+            ),
+            (
+                "gvar",
+                optional_table(
+                    util::FONTVIEW_VAR,
+                    var("tables"),
+                    util::magic(b"gvar"),
+                    gvar_table.call(),
+                ),
+            ),
+            // !SECTION
+            // STUB - add more table sections
+            // SECTION - other tables
+            // STUB - add more tables
+            (
+                "kern",
+                optional_table(
+                    util::FONTVIEW_VAR,
+                    var("tables"),
+                    util::magic(b"kern"),
+                    kern_table.call(),
+                ),
+            ),
+            (
+                "stat",
+                optional_table(
+                    util::FONTVIEW_VAR,
+                    var("tables"),
+                    util::magic(b"STAT"),
+                    stat_table.call(),
+                ),
+            ),
+            (
+                "vhea",
+                optional_table(
+                    util::FONTVIEW_VAR,
+                    var("tables"),
+                    util::magic(b"vhea"),
+                    vhea_table.call(),
+                ),
+            ),
+            (
+                "vmtx",
+                optional_table(
+                    util::FONTVIEW_VAR,
+                    var("tables"),
+                    util::magic(b"vmtx"),
+                    vmtx_table.call_args(vec![
+                        vhea_long_metrics(var("vhea")),
+                        record_proj(var("maxp"), "num_glyphs"),
+                    ]),
+                ),
+            ),
+            // !SECTION
+            ("__skip", Format::SkipRemainder),
+        ]),
+    )
+}
+
 // ANCHOR[epic=main-fn]
 pub fn main(module: &mut FormatModule) -> FormatRef {
     // NOTE - Microsoft defines a tag as consisting on printable ascii characters in the range 0x20 -- 0x7E (inclusive), but some vendors are non-standard so we accept anything
@@ -613,399 +963,11 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
 
     // let stub_table = module.define_format("opentype.table_stub", Format::EMPTY);
 
-    let table_links = {
-        // character mapping table
-        let cmap_table = cmap::table(module);
-        let head_table = head::table(module);
-        let hhea_table = hhea::table(module);
-        let vhea_table = vhea::table(module);
-        let maxp_table = maxp::table(module);
-        let hmtx_table = hmtx::table(module);
-        let vmtx_table = vmtx::table(module);
-        let name_table = name::table(module);
-        let os2_table = os2::table(module, tag);
-        let post_table = post::table(module);
-        let cvt_table = cvt::table(module);
-        let fpgm_table = fpgm::table(module);
-        let loca_table = loca::table(module);
-        let glyf_table = glyf::table(module);
-        let prep_table = prep::table(module);
-        let gasp_table = gasp::table(module);
+    let table_links = table_links(module, tag, table_type);
 
-        let class_def = common::class_def(module);
-        let coverage_table = common::coverage_table(module);
-        let device_or_variation_index_table = common::device_or_variation_index_table(module);
-        let item_variation_store = common::item_variation_store(module);
-        let gdef_table = gdef::table(
-            module,
-            class_def,
-            coverage_table,
-            device_or_variation_index_table,
-            item_variation_store,
-        );
-
-        // SECTION - bulk common definitions for GSUB and GPOS
-        let value_format_flags = layout::value_format_flags(module);
-        let vf_flags_type = module
-            .get_format_type(value_format_flags.get_level())
-            .clone();
-
-        let value_record =
-            layout::value_record(module, device_or_variation_index_table, vf_flags_type);
-
-        let anchor_table = layout::anchor_table(module, device_or_variation_index_table);
-
-        let lang_sys = layout::lang_sys(module);
-        let script_table = layout::script_table(module, tag, lang_sys);
-        let script_list = layout::script_list(module, tag, script_table);
-
-        let feature_table = layout::feature_table(module);
-        let feature_list = layout::feature_list(module, tag, feature_table);
-
-        let sequence_lookup_record = layout::sequence_lookup_record(module);
-
-        // Sub-tables used by both GSUB and GPOS
-        let sequence_context =
-            layout::sequence_context(module, class_def, coverage_table, sequence_lookup_record);
-        let chained_sequence_context = layout::chained_sequence_context(
-            module,
-            class_def,
-            coverage_table,
-            sequence_lookup_record,
-        );
-        // !SECTION
-
-        // SECTION - high-level definitions to support GSUB and GPOS
-        let ground_subst = gsub::ground_subst(
-            module,
-            coverage_table,
-            sequence_context,
-            chained_sequence_context,
-        );
-        let subst_extension = gsub::subst_extension(module, ground_subst);
-
-        let ground_pos = gpos::ground_pos(
-            module,
-            class_def,
-            coverage_table,
-            value_format_flags,
-            value_record,
-            anchor_table,
-            sequence_context,
-            chained_sequence_context,
-        );
-        let pos_extension = gpos::pos_extension(module, ground_pos);
-
-        let feature_variations = layout::feature_variations(module, feature_table);
-        // !SECTION
-
-        // REVIEW - we might consider rewriting `layout::table` to spin off `gpos::table` and `gsub::table` more easily (self-contained)
-        let gpos_table = gpos::table(
-            module,
-            script_list,
-            feature_list,
-            ground_pos,
-            pos_extension,
-            feature_variations,
-        );
-        let gsub_table = gsub::table(
-            module,
-            script_list,
-            feature_list,
-            ground_subst,
-            subst_extension,
-            feature_variations,
-        );
-
-        let base_table = base::table(
-            module,
-            tag,
-            device_or_variation_index_table,
-            item_variation_store,
-        );
-
-        // `kern` table [https://learn.microsoft.com/en-us/typography/opentype/spec/kern]
-        let kern_table = kern::table(module);
-
-        let stat_table = stat::table(module, tag);
-        let fvar_table = fvar::table(module, tag);
-        let gvar_table = gvar::table(module);
-
-        module.define_format_args(
-            "opentype.table_directory.table_links",
-            vec![
-                // WIP
-                START_ARG,
-                (
-                    Label::Borrowed("tables"),
-                    ValueType::Seq(Box::new(table_type)),
-                ),
-            ],
-            record_auto([
-                (
-                    "cmap",
-                    required_table(
-                        util::START_VAR,
-                        var("tables"),
-                        util::magic(b"cmap"),
-                        cmap_table.call(),
-                    ),
-                ),
-                (
-                    "head",
-                    required_table(
-                        util::START_VAR,
-                        var("tables"),
-                        util::magic(b"head"),
-                        head_table.call(),
-                    ),
-                ),
-                (
-                    "hhea",
-                    required_table(
-                        util::START_VAR,
-                        var("tables"),
-                        util::magic(b"hhea"),
-                        hhea_table.call(),
-                    ),
-                ),
-                (
-                    "maxp",
-                    required_table(
-                        util::START_VAR,
-                        var("tables"),
-                        util::magic(b"maxp"),
-                        maxp_table.call(),
-                    ),
-                ),
-                (
-                    "hmtx",
-                    required_table(
-                        util::START_VAR,
-                        var("tables"),
-                        util::magic(b"hmtx"),
-                        hmtx_table.call_args(vec![
-                            record_proj(var("hhea"), "number_of_long_metrics"),
-                            record_proj(var("maxp"), "num_glyphs"),
-                        ]),
-                    ),
-                ),
-                (
-                    "name",
-                    required_table(
-                        util::START_VAR,
-                        var("tables"),
-                        util::magic(b"name"),
-                        name_table.call(),
-                    ),
-                ),
-                (
-                    "os2",
-                    required_table_with_len(
-                        util::START_VAR,
-                        var("tables"),
-                        util::magic(b"OS/2"),
-                        os2_table,
-                    ),
-                ),
-                (
-                    "post",
-                    required_table(
-                        util::START_VAR,
-                        var("tables"),
-                        util::magic(b"post"),
-                        post_table.call(),
-                    ),
-                ),
-                // SECTION - TrueType Outline
-                (
-                    "cvt",
-                    optional_table(
-                        util::START_VAR,
-                        var("tables"),
-                        util::magic(b"cvt "),
-                        cvt_table,
-                    ),
-                ),
-                (
-                    "fpgm",
-                    optional_table(
-                        util::START_VAR,
-                        var("tables"),
-                        util::magic(b"fpgm"),
-                        fpgm_table,
-                    ),
-                ),
-                (
-                    "loca",
-                    optional_table(
-                        util::START_VAR,
-                        var("tables"),
-                        util::magic(b"loca"),
-                        loca_table.call_args(vec![
-                            record_proj(var("maxp"), "num_glyphs"),
-                            record_proj(var("head"), "index_to_loc_format"),
-                        ]),
-                    ),
-                ),
-                (
-                    "glyf",
-                    optional_table(
-                        util::START_VAR,
-                        var("tables"),
-                        util::magic(b"glyf"),
-                        glyf_table.call_args(vec![loca_offsets(var("loca"))]),
-                    ),
-                ),
-                (
-                    "prep",
-                    optional_table(
-                        util::START_VAR,
-                        var("tables"),
-                        util::magic(b"prep"),
-                        prep_table,
-                    ),
-                ),
-                (
-                    "gasp",
-                    optional_table(
-                        util::START_VAR,
-                        var("tables"),
-                        util::magic(b"gasp"),
-                        gasp_table.call(),
-                    ),
-                ),
-                // !SECTION
-                // SECTION - CFF Outline
-                // TODO - `CFF ` deferred for reasons of complexity
-                // TODO - `CFF2` deferred for reasons of complexity
-                // TODO - `VORG` deferred as it collocates with CFF{ ,2}
-                // !SECTION
-                // SECTION - SVG Outline
-                // FIXME - `SVG ` postponed due to rarity (15 of 659 tested fonts)
-                // !SECTION
-                // SECTION - Bitmap Glyphs
-                // FIXME - `EBDT` postponed due to rarity (15 of 659 tested fonts)
-                // FIXM - `EBLC` postponed due to rarity (15 of 659 tested fonts)
-                // FIXME - `EBSC` postponed due to rarity (no occurrences among 659 tested fonts)
-                // FIXME - `CBDT` postponed due to rarity (2 of 659 tested fonts)
-                // FIXME - `CBLC` postponed due to rarity (2 of 659 tested fonts)
-                // FIXME - `sbix` postponed due to rarity (1 of 659 tested fonts)
-                // !SECTION
-                // SECTION - Advanced Typography
-                (
-                    "base",
-                    optional_table(
-                        util::START_VAR,
-                        var("tables"),
-                        util::magic(b"BASE"),
-                        base_table.call(),
-                    ),
-                ),
-                (
-                    "gdef",
-                    optional_table(
-                        util::START_VAR,
-                        var("tables"),
-                        util::magic(b"GDEF"),
-                        gdef_table.call(),
-                    ),
-                ),
-                (
-                    "gpos",
-                    optional_table(
-                        util::START_VAR,
-                        var("tables"),
-                        util::magic(b"GPOS"),
-                        gpos_table.call(),
-                    ),
-                ),
-                (
-                    "gsub",
-                    optional_table(
-                        util::START_VAR,
-                        var("tables"),
-                        util::magic(b"GSUB"),
-                        gsub_table.call(),
-                    ),
-                ),
-                // !SECTION
-                // STUB - add more table sections
-                // SECTION - Font Variations
-                // STUB - add more tables
-                (
-                    "fvar",
-                    optional_table(
-                        util::START_VAR,
-                        var("tables"),
-                        util::magic(b"fvar"),
-                        fvar_table.call(),
-                    ),
-                ),
-                (
-                    "gvar",
-                    optional_table(
-                        util::START_VAR,
-                        var("tables"),
-                        util::magic(b"gvar"),
-                        gvar_table.call(),
-                    ),
-                ),
-                // !SECTION
-                // STUB - add more table sections
-                // SECTION - other tables
-                // STUB - add more tables
-                (
-                    "kern",
-                    optional_table(
-                        util::START_VAR,
-                        var("tables"),
-                        util::magic(b"kern"),
-                        kern_table.call(),
-                    ),
-                ),
-                (
-                    "stat",
-                    optional_table(
-                        util::START_VAR,
-                        var("tables"),
-                        util::magic(b"STAT"),
-                        stat_table.call(),
-                    ),
-                ),
-                (
-                    "vhea",
-                    optional_table(
-                        util::START_VAR,
-                        var("tables"),
-                        util::magic(b"vhea"),
-                        vhea_table.call(),
-                    ),
-                ),
-                (
-                    "vmtx",
-                    optional_table(
-                        util::START_VAR,
-                        var("tables"),
-                        util::magic(b"vmtx"),
-                        vmtx_table.call_args(vec![
-                            vhea_long_metrics(var("vhea")),
-                            record_proj(var("maxp"), "num_glyphs"),
-                        ]),
-                    ),
-                ),
-                // !SECTION
-                ("__skip", Format::SkipRemainder),
-            ]),
-        )
-    };
-
-    let table_directory = module.define_format_args(
+    let table_directory = module.define_format_views(
         "opentype.table_directory",
-        vec![(
-            Label::Borrowed("font_start"),
-            ValueType::Base(BaseType::U32),
-        )],
+        vec![Label::Borrowed("font_view")],
         record([
             (
                 "sfnt_version",
@@ -1033,7 +995,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
             ),
             (
                 "table_links",
-                table_links.call_args(vec![var("font_start"), var("table_records")]),
+                table_links.call_args_views(vec![var("table_records")], vec![vvar("font_view")]),
             ),
         ]),
     );
@@ -1041,14 +1003,18 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
     let ttc_header = {
         // Version 1.0
         // WIP
-        let ttc_header1 = |start: Expr| {
+        let ttc_header1 = |font_view: ViewExpr| {
             record([
                 ("num_fonts", u32be()),
                 (
                     "table_directories",
                     repeat_count(
                         var("num_fonts"),
-                        util::offset32(start.clone(), table_directory.call_args(vec![start])),
+                        // REVIEW - avoiding phantom for the moment to avoid too much delayed evaluation all at once
+                        util::read_view_offset32(
+                            font_view.clone(),
+                            table_directory.call_view(font_view),
+                        ),
                     ),
                 ),
             ])
@@ -1056,14 +1022,18 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
 
         // Version 2.0
         // WIP
-        let ttc_header2 = |start: Expr| {
+        let ttc_header2 = |font_view: ViewExpr| {
             record([
                 ("num_fonts", u32be()),
                 (
                     "table_directories",
                     repeat_count(
                         var("num_fonts"),
-                        util::offset32(start.clone(), table_directory.call_args(vec![start])),
+                        // REVIEW - avoiding phantom for the moment to avoid too much delayed evaluation all at once
+                        util::read_view_offset32(
+                            font_view.clone(),
+                            table_directory.call_view(font_view),
+                        ),
                     ),
                 ),
                 ("dsig_tag", u32be()),    // either b"DSIG" or 0 if none
@@ -1072,9 +1042,9 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
             ])
         };
 
-        module.define_format_args(
+        module.define_format_views(
             "opentype.ttc_header",
-            vec![START_ARG],
+            vec![FONTVIEW_ARG],
             record_auto([
                 (
                     "ttc_tag",
@@ -1091,8 +1061,8 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                     match_variant(
                         var("major_version"),
                         [
-                            (Pattern::U16(1), "Version1", ttc_header1(util::START_VAR)),
-                            (Pattern::U16(2), "Version2", ttc_header2(util::START_VAR)),
+                            (Pattern::U16(1), "Version1", ttc_header1(util::FONTVIEW_VAR)),
+                            (Pattern::U16(2), "Version2", ttc_header2(util::FONTVIEW_VAR)),
                             // REVIEW - is this the preferred pattern (i.e. apply broadly) or do we want to fail here as well?
                             (bind("unknown"), "UnknownVersion", compute(var("unknown"))),
                         ],
@@ -1108,40 +1078,42 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
 
     module.define_format(
         "opentype.main",
-        record([
-            ("file_start", pos32()),
-            ("magic", Format::Peek(Box::new(u32be()))),
-            (
-                "directory",
-                match_variant(
-                    var("magic"),
-                    [
-                        (
-                            Pattern::U32(0x00010000),
-                            "TableDirectory",
-                            table_directory.call_args(vec![var("file_start")]),
-                        ),
-                        (
-                            Pattern::U32(util::magic(b"OTTO")),
-                            "TableDirectory",
-                            table_directory.call_args(vec![var("file_start")]),
-                        ),
-                        (
-                            Pattern::U32(util::magic(b"ttcf")),
-                            "TTCHeader",
-                            ttc_header.call_args(vec![var("file_start")]),
-                        ),
-                        // TODO - not yet sure if TrueType fonts will parse correctly under our current table_directory implementation...
-                        (
-                            Pattern::U32(util::magic(b"true")),
-                            "TableDirectory",
-                            table_directory.call_args(vec![var("file_start")]),
-                        ),
-                        (Pattern::Wildcard, "UnknownTable", unknown_table),
-                    ],
+        let_view(
+            "font_view",
+            record([
+                ("magic", Format::Peek(Box::new(u32be()))),
+                (
+                    "directory",
+                    match_variant(
+                        var("magic"),
+                        [
+                            (
+                                Pattern::U32(0x00010000),
+                                "TableDirectory",
+                                table_directory.call_view(vvar("font_view")),
+                            ),
+                            (
+                                Pattern::U32(util::magic(b"OTTO")),
+                                "TableDirectory",
+                                table_directory.call_view(vvar("font_view")),
+                            ),
+                            (
+                                Pattern::U32(util::magic(b"ttcf")),
+                                "TTCHeader",
+                                ttc_header.call_view(vvar("font_view")),
+                            ),
+                            // TODO - not yet sure if TrueType fonts will parse correctly under our current table_directory implementation...
+                            (
+                                Pattern::U32(util::magic(b"true")),
+                                "TableDirectory",
+                                table_directory.call_view(vvar("font_view")),
+                            ),
+                            (Pattern::Wildcard, "UnknownTable", unknown_table),
+                        ],
+                    ),
                 ),
-            ),
-        ]),
+            ]),
+        ),
     )
 }
 
@@ -6877,8 +6849,7 @@ pub(crate) mod table {
     /// Takes an expr for the start-of-file offset `sof_offset`, an Expr containing the parsed sequence-of-table-records `table-records`,
     /// a table id `id` unique to the table we are defining, and the format of the table `table_format`.
     pub(crate) fn required_table(
-        // WIP
-        sof_offset: Expr,
+        font_view: ViewExpr,
         table_records: Expr,
         id: u32,
         table_format: Format,
@@ -6889,8 +6860,9 @@ pub(crate) mod table {
                 [
                     (
                         pat_some(bind("matching_table")),
-                        util::linked_offset32(
-                            sof_offset,
+                        // REVIEW - should these offsets be eagerly expanded, or is phantom-read more appropriate?
+                        util::parse_view_offset_mandatory(
+                            font_view,
                             record_proj(var("matching_table"), "offset"),
                             slice(record_proj(var("matching_table"), "length"), table_format),
                         ),
@@ -6907,8 +6879,7 @@ pub(crate) mod table {
     ///
     /// Instead of a table-`Format`, we take a `FormatRef` that is expected to take a single argument of kind `U32` that specifies the table-length.
     pub(crate) fn required_table_with_len(
-        // WIP
-        sof_offset: Expr,
+        font_view: ViewExpr,
         table_records: Expr,
         id: u32,
         table_format_ref: FormatRef,
@@ -6919,8 +6890,9 @@ pub(crate) mod table {
                 [
                     (
                         pat_some(bind("matching_table")),
-                        util::linked_offset32(
-                            sof_offset,
+                        // REVIEW - should these offsets be eagerly expanded, or is phantom-read more appropriate?
+                        util::parse_view_offset_mandatory(
+                            font_view,
                             record_proj(var("matching_table"), "offset"),
                             fmt_let(
                                 "table_len",
@@ -6941,15 +6913,16 @@ pub(crate) mod table {
     }
 
     pub(crate) fn optional_table(
-        // WIP
-        sof_offset: Expr,
+        font_view: ViewExpr,
         table_records: Expr,
         id: u32,
         table_format: Format,
     ) -> Format {
         let cond_fmt = |table_match: Expr| -> Format {
-            util::linked_offset32(
-                sof_offset,
+            // REVIEW - should these offsets be eagerly expanded, or is phantom-read more appropriate?
+            // NOTE - even though the table is optional, the dep-format we process when it is present is never nullable
+            util::parse_view_offset_mandatory(
+                font_view,
                 record_proj(table_match.clone(), "offset"),
                 slice(record_proj(table_match, "length"), table_format),
             )
@@ -7128,20 +7101,18 @@ pub(crate) mod alt {
         let table_links = {
             let stat_table = stat_table(module, tag);
 
-            module.define_format_args(
+            module.define_format_args_views(
                 "opentype.table_directory.table_links",
-                vec![
-                    START_ARG,
-                    (
-                        Label::Borrowed("tables"),
-                        ValueType::Seq(Box::new(table_type)),
-                    ),
-                ],
+                vec![(
+                    Label::Borrowed("tables"),
+                    ValueType::Seq(Box::new(table_type)),
+                )],
+                vec![FONTVIEW_ARG],
                 record_auto([
                     (
                         "stat",
                         optional_table(
-                            util::START_VAR,
+                            util::FONTVIEW_VAR,
                             var("tables"),
                             util::magic(b"STAT"),
                             stat_table.call(),
@@ -7152,12 +7123,9 @@ pub(crate) mod alt {
             )
         };
 
-        let table_directory = module.define_format_args(
+        let table_directory = module.define_format_views(
             "opentype.table_directory",
-            vec![(
-                Label::Borrowed("font_start"),
-                ValueType::Base(BaseType::U32),
-            )],
+            vec![FONTVIEW_ARG],
             record([
                 (
                     "sfnt_version",
@@ -7185,7 +7153,7 @@ pub(crate) mod alt {
                 ),
                 (
                     "table_links",
-                    table_links.call_args(vec![var("font_start"), var("table_records")]),
+                    table_links.call_args_views(vec![var("table_records")], vec![FONTVIEW_VAR]),
                 ),
             ]),
         );
@@ -7193,14 +7161,17 @@ pub(crate) mod alt {
         let ttc_header = {
             // Version 1.0
             // WIP
-            let ttc_header1 = |start: Expr| {
+            let ttc_header1 = |font_view: ViewExpr| {
                 record([
                     ("num_fonts", u32be()),
                     (
                         "table_directories",
                         repeat_count(
                             var("num_fonts"),
-                            util::offset32(start.clone(), table_directory.call_args(vec![start])),
+                            util::read_view_offset32(
+                                font_view.clone(),
+                                table_directory.call_view(font_view),
+                            ),
                         ),
                     ),
                 ])
@@ -7208,14 +7179,17 @@ pub(crate) mod alt {
 
             // Version 2.0
             // WIP
-            let ttc_header2 = |start: Expr| {
+            let ttc_header2 = |font_view: ViewExpr| {
                 record([
                     ("num_fonts", u32be()),
                     (
                         "table_directories",
                         repeat_count(
                             var("num_fonts"),
-                            util::offset32(start.clone(), table_directory.call_args(vec![start])),
+                            util::read_view_offset32(
+                                font_view.clone(),
+                                table_directory.call_view(font_view),
+                            ),
                         ),
                     ),
                     ("dsig_tag", u32be()),    // either b"DSIG" or 0 if none
@@ -7224,9 +7198,9 @@ pub(crate) mod alt {
                 ])
             };
 
-            module.define_format_args(
+            module.define_format_views(
                 "opentype.ttc_header",
-                vec![START_ARG],
+                vec![FONTVIEW_ARG],
                 record_auto([
                     (
                         "ttc_tag",
@@ -7243,8 +7217,8 @@ pub(crate) mod alt {
                         match_variant(
                             var("major_version"),
                             [
-                                (Pattern::U16(1), "Version1", ttc_header1(util::START_VAR)),
-                                (Pattern::U16(2), "Version2", ttc_header2(util::START_VAR)),
+                                (Pattern::U16(1), "Version1", ttc_header1(util::FONTVIEW_VAR)),
+                                (Pattern::U16(2), "Version2", ttc_header2(util::FONTVIEW_VAR)),
                                 // REVIEW - is this the preferred pattern (i.e. apply broadly) or do we want to fail here as well?
                                 (bind("unknown"), "UnknownVersion", compute(var("unknown"))),
                             ],
@@ -7260,40 +7234,42 @@ pub(crate) mod alt {
 
         module.define_format(
             "opentype.main",
-            record([
-                ("file_start", pos32()),
-                ("magic", Format::Peek(Box::new(u32be()))),
-                (
-                    "directory",
-                    match_variant(
-                        var("magic"),
-                        [
-                            (
-                                Pattern::U32(0x00010000),
-                                "TableDirectory",
-                                table_directory.call_args(vec![var("file_start")]),
-                            ),
-                            (
-                                Pattern::U32(util::magic(b"OTTO")),
-                                "TableDirectory",
-                                table_directory.call_args(vec![var("file_start")]),
-                            ),
-                            (
-                                Pattern::U32(util::magic(b"ttcf")),
-                                "TTCHeader",
-                                ttc_header.call_args(vec![var("file_start")]),
-                            ),
-                            // TODO - not yet sure if TrueType fonts will parse correctly under our current table_directory implementation...
-                            (
-                                Pattern::U32(util::magic(b"true")),
-                                "TableDirectory",
-                                table_directory.call_args(vec![var("file_start")]),
-                            ),
-                            (Pattern::Wildcard, "UnknownTable", unknown_table),
-                        ],
+            let_view(
+                "font_view",
+                record([
+                    ("magic", Format::Peek(Box::new(u32be()))),
+                    (
+                        "directory",
+                        match_variant(
+                            var("magic"),
+                            [
+                                (
+                                    Pattern::U32(0x00010000),
+                                    "TableDirectory",
+                                    table_directory.call_view(vvar("font_view")),
+                                ),
+                                (
+                                    Pattern::U32(util::magic(b"OTTO")),
+                                    "TableDirectory",
+                                    table_directory.call_view(vvar("font_view")),
+                                ),
+                                (
+                                    Pattern::U32(util::magic(b"ttcf")),
+                                    "TTCHeader",
+                                    ttc_header.call_view(vvar("font_view")),
+                                ),
+                                // TODO - not yet sure if TrueType fonts will parse correctly under our current table_directory implementation...
+                                (
+                                    Pattern::U32(util::magic(b"true")),
+                                    "TableDirectory",
+                                    table_directory.call_view(vvar("font_view")),
+                                ),
+                                (Pattern::Wildcard, "UnknownTable", unknown_table),
+                            ],
+                        ),
                     ),
-                ),
-            ]),
+                ]),
+            ),
         )
     }
 
