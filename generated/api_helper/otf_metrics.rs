@@ -7164,7 +7164,7 @@ pub fn analyze_font(test_file: &str) -> TestResult<OpentypeMetrics> {
                 opentype_ttc_header_header::Version1(v1header) => {
                     let mut font_metrics = Vec::with_capacity(v1header.table_directories.len());
                     for font in v1header.table_directories.iter() {
-                        let tmp = match &font.link {
+                        let tmp = match &font.data {
                             Some(dir) => Some(analyze_table_directory(dir)?),
                             None => None,
                         };
@@ -7175,7 +7175,7 @@ pub fn analyze_font(test_file: &str) -> TestResult<OpentypeMetrics> {
                 opentype_ttc_header_header::Version2(v2header) => {
                     let mut font_metrics = Vec::with_capacity(v2header.table_directories.len());
                     for font in v2header.table_directories.iter() {
-                        let tmp = match &font.link {
+                        let tmp = match &font.data {
                             Some(dir) => Some(analyze_table_directory(dir)?),
                             None => None,
                         };
@@ -10064,7 +10064,7 @@ pub mod lookup_subtable {
                         let mut lookup_metrics =
                             Vec::with_capacity(v1header.table_directories.len());
                         for font in v1header.table_directories.iter() {
-                            let per_font = font.link.as_ref().map(analyze_table_directory_lookups);
+                            let per_font = font.data.as_ref().map(analyze_table_directory_lookups);
                             lookup_metrics.push(per_font);
                         }
                         lookup_metrics
@@ -10073,7 +10073,7 @@ pub mod lookup_subtable {
                         let mut lookup_metrics =
                             Vec::with_capacity(v2header.table_directories.len());
                         for font in v2header.table_directories.iter() {
-                            let per_font = font.link.as_ref().map(analyze_table_directory_lookups);
+                            let per_font = font.data.as_ref().map(analyze_table_directory_lookups);
                             lookup_metrics.push(per_font);
                         }
                         lookup_metrics

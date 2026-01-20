@@ -78,7 +78,7 @@ impl ValueType {
                 Some((_, t)) => t.clone(),
                 None => panic!("record_proj: field `{label}` not found in record type"),
             },
-            _ => panic!("expected record type, found {self:?}"),
+            _ => panic!("projection `_.{label}` failed: expected record type, found {self:?}"),
         }
     }
 
