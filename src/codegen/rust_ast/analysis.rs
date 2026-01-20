@@ -290,10 +290,7 @@ impl CanOptimize for PrimType {
             PrimType::Unit => 0,
             PrimType::Bool => const { (u8::MAX as usize + 1) - 2 },
             // Because Char is Unicode, there are invalid ranges that form niches
-            PrimType::Char => match char::UNICODE_VERSION {
-                (16, 0, 0) => const { u32::MAX as usize - UTF16_SCALAR_MAX },
-                _ => unimplemented!("unsupported Unicode version"),
-            },
+            PrimType::Char => const { u32::MAX as usize - UTF16_SCALAR_MAX },
             PrimType::U8 | PrimType::U16 | PrimType::U32 | PrimType::U64 | PrimType::Usize => 0,
         }
     }
