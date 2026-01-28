@@ -1126,17 +1126,12 @@ pub fn unwrap_singleton(expr: Expr) -> Expr {
     )
 }
 
-/// Parses a dependent format `opt_f(x)` if `expr` evaluates to `Some(x)`,
-/// or `fmt_none` when `expr` evaluates to `None`.
+/// Given a value `expr` of type ``Expr@Option<T>` and a format-closure `opt_f` of type `Expr@T -> Format@Option<U>`,
+/// parses a format that is equivalent to `opt_f(x)` if `expr` evaluates to `Some(x)`, and which yields `None` otherwise.
 ///
-/// Implicitly relies on the ValueType of the output of `opt_f` being `Option<U>`,
-/// following the style of monadic bind operations in languages like Haskell.
-///
-/// # Notes
-///
-/// To offer more fine-tuning for the generated output, a `binding_name` parameter is required,
-/// and used as the pattern-binding of `Some(_)` against `expr`, as well as the variable passed
-/// into `opt_f`.
+/// The `binding_name` argument is used for the capture-variable of the `Some(..)` match-branch, as well as the
+/// variable passed into `opt_f`. If `opt_f` relies on any external variables, care should be taken to ensure they are
+/// not shadowed by the `binding_name` identifier.
 pub fn bind_option(
     expr: Expr,
     binding_name: &'static str,
@@ -1151,12 +1146,15 @@ pub fn bind_option(
     )
 }
 
-/// Parses a dependent format `fmt_some(f(x))` if `expr` evaluates to `Some(x)`,
-/// or `fmt_none` when `expr` evaluates to `None`.
+/// Given a value `expr` of type `Expr@Option<T>` and a closure `f` of type `Expr@T -> Format@U`,
+/// returns a Format that parses `f(x) : U` if `expr` evaluates to `Some(x)`, or which yields `None` if
+/// `expr` is `None`.
 ///
-/// The output ValueType of `f` should be the parametric type `U` of whatever `Option<U>`
-/// the call should evaluate to; this following the style of functor-map operations in
-/// languages like Haskell.
+/// The argument `binding_name` is used as the identifier that the held-value of a `Some(_)` variant
+/// is bound to while evaluating `f`.
+///
+/// The ValueType `U` of the Format returned by `f(_)` will determine the ValueType of the overall Format, as `Option<U>`,
+/// as in the natural map operation o the Haskell `Maybe` functor.
 pub fn map_option(
     expr: Expr,
     binding_name: &'static str,
