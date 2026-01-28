@@ -72,6 +72,11 @@ impl ValueType {
     pub const U16: ValueType = ValueType::Base(BaseType::U16);
     pub const U32: ValueType = ValueType::Base(BaseType::U32);
 
+    /// Helper function for constructing `ValueType::Option`.
+    pub fn option(ty: Self) -> ValueType {
+        ValueType::Option(Box::new(ty))
+    }
+
     pub(crate) fn record_proj(&self, label: &str) -> ValueType {
         match self {
             ValueType::Record(fields) => match fields.iter().find(|(l, _)| label == l) {

@@ -13,6 +13,42 @@ mod util {
         x
     }
 
+    /// Given an Expr `seq` that represents a sequence of N+1 members, constructs a Format that parses a dependent
+    /// format `dep_format` N times, iterating over each pair of adjacent elements in the sequence as input.
+    ///
+    /// # Notes
+    ///
+    /// The `premap` function-pair is used to transform each of the two elements in the pair before applying `dep_format`, in case
+    /// there is a transformation we wish to perform without having to map over `seq`. The first function applies to the first member
+    /// of each given pair, and likewise the second function to the second member.
+    ///
+    /// The `labels` parameter specifies what variable-identifiers the first and second member of each pair should be bound to in
+    /// in order that they are properly in-scope when processing `dep_format`. These names must be distinct, and must not conflict with any
+    /// other higher-scoped bindings we want to avoid shadowing when processing `dep_format`.
+    pub(crate) fn for_each_pair(
+        seq: Expr,
+        premap: (impl FnOnce(Expr) -> Expr, impl FnOnce(Expr) -> Expr),
+        labels: [&'static str; 2],
+        dep_format: Format,
+    ) -> Format {
+        Format::Let(
+            Label::Borrowed("len"),
+            Box::new(pred(seq_length(seq.clone()))),
+            Box::new(for_each(
+                enum_from_to(Expr::U32(0), var("len")),
+                "ix",
+                with_tuple(
+                    Expr::Tuple(vec![
+                        premap.0(index_unchecked(seq.clone(), var("ix"))),
+                        premap.1(index_unchecked(seq.clone(), succ(var("ix")))),
+                    ]),
+                    labels,
+                    dep_format,
+                ),
+            )),
+        )
+    }
+
     /// Marker-type for controlling how records-with-alternation are composed
     #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
     pub(crate) enum NestingKind {
@@ -34,12 +70,14 @@ mod util {
     ///   will panic if it is missing.
     /// - `inner_fields` is the list of fields that belong to the sub-format dependent on `discriminant`.
     /// - `intermediate` is the name of the field that will be used to hold the `inner_fields` ADT when
-    ///   not flattened (see `nesting kind`)
+    ///   not flattened (see [`NestingKind`])
     /// - `variant_name` is the constructor-name for the sole variant of the enum that holds the `inner_fields` record
-    /// - `nesting_kind` is a template-selector that determines how to construct the return-value from the given arguments.
+    /// - `nesting_kind` is a template-selector that controls what shape of Format is returned.
     ///
-    /// We have two choices: `SingletonADT`, which constructs an embedded ADT using `intermediate` and `variant_name`; and `FlattenInner`,
-    ///   which ignores those fields and instead constructs a single flattened record, concatenating `outer_fields` and `inner_fields`
+    /// The shape of the format is determined based on `nesting_kind`:
+    ///
+    /// - `MinimalVariation` produces a record containing the `outer_fields` and a single field storing an enum-value that encompasses the `inner_fields`, making use of `intermediate` and `variant_name`
+    /// - `UnifiedRecord` ignores those fields and instead constructs a single flattened record, concatenating `outer_fields` and `inner_fields`
     ///   in the expected order, and wrapping the discriminant-field in a `Format::Where` context that ensures that the
     ///   field in question has the appropriate value.
     ///
@@ -57,7 +95,7 @@ mod util {
         let (disc_field, disc_value) = discriminant;
         let accum = match nesting_kind {
             NestingKind::MinimalVariation => {
-                // REVIEW - it is not necessarily obvious that all FlatternInner defs can be changed to SingletonADT versions if they refer to variables in the outer record, but it seems plausible at least
+                // REVIEW - it is not necessarily obvious that all UnifiedRecord defs can be changed to MinimalVariation versions if they refer to variables in the outer record, but it seems plausible at least
                 let mut has_discriminant = false;
                 let record_inner = record_auto(inner_fields);
                 let mut accum = Vec::with_capacity(OUTER + 1);
@@ -102,30 +140,25 @@ mod util {
         record_auto(accum)
     }
 
-    pub(crate) fn for_each_pair(
-        seq: Expr,
-        premap: (impl FnOnce(Expr) -> Expr, impl FnOnce(Expr) -> Expr),
-        labels: [&'static str; 2],
-        dep_format: Format,
-    ) -> Format {
-        Format::Let(
-            Label::Borrowed("len"),
-            Box::new(pred(seq_length(seq.clone()))),
-            Box::new(for_each(
-                enum_from_to(Expr::U32(0), var("len")),
-                "ix",
-                with_tuple(
-                    Expr::Tuple(vec![
-                        premap.0(index_unchecked(seq.clone(), var("ix"))),
-                        premap.1(index_unchecked(seq.clone(), succ(var("ix")))),
-                    ]),
-                    labels,
-                    dep_format,
-                ),
-            )),
-        )
-    }
-
+    /// Helper function to generically construct a record-union over a set of common fields (including a discriminant)
+    /// and a fixed-size set of variadic continuation-fields chosen based on the discriminant value.
+    ///
+    /// - `shared_fields` is a list of the `(name, format)` pairs that are invariant and precede the dependent field-set.
+    /// - `discriminant` is the label (in `outer_fields`) corresponding to a `u16`-kinded field that will be used as a discriminant for selecting the branch-specific fields.
+    /// - `branches` is a list of `(value, variant-name, inner-fields)` 3-tuples that are the (assumed-)exhaustive set of valid sub-format extensions for each legal value of `discriminant`. Any
+    ///   value of `discriminant` that is not present in `branches` will be handled as a parse-failure.
+    /// - `intermediate` is the name of the field holding the ADT-value that stores the discriminant-specific fields, when `nesting_kind` is `MinimalVariation` (in `UnifiedRecord`, this argument is ignored)
+    /// - `nesting_kind` is a template-selector that controls what shape of Format is returned.
+    ///
+    /// The shape of the format is determined based on `nesting_kind`:
+    ///
+    /// - `MinimalVariation` produces a record-format consisting of `shared_fields` as well as a final field (named by `intermediate`) for a value of the enum storing the inner-fields of `branches` one-to-one
+    /// - `UnifiedRecord` produces an enum each of whose members is the fusion of `shared_fields` and the respective inner-fields of `branches`, using parse-lookahead to determine the discriminant before
+    ///   parsing any fields destructively.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if `discriminant` specifies a field-name that is not present in `outer_fields`.
     pub(crate) fn embedded_variadic_alternation<C, const OUTER: usize, const BRANCHES: usize>(
         shared_fields: [(&'static str, Format); OUTER],
         discriminant: &'static str,
@@ -186,6 +219,8 @@ mod util {
         }
     }
 
+    /// Helper function for parsing two bytes of binary data as a big-endian packed-bits record, with the MSB as a flag-bit
+    /// with the specified identifier `flag_name` and the remaining 15 bits as a `u16`-kinded numeric field with the specified identifier `field_name`.
     pub(crate) fn hi_flag_u15be(flag_name: &'static str, field_name: &'static str) -> Format {
         bit_fields_u16([
             BitFieldKind::FlagBit(flag_name),
@@ -196,9 +231,9 @@ mod util {
         ])
     }
 
-    /// Extracts the final element of a sequence-Expr if it is not empty
+    /// Extracts the final element of a sequence-Expr provided that it is non-empty.
     ///
-    /// If the sequence is empty, the behavior is unspecified
+    /// If the sequence is empty, the behavior is unspecified.
     pub(crate) fn last_elem(seq: Expr) -> Expr {
         let last_ix = pred(seq_length(seq.clone()));
         index_unchecked(seq, last_ix)
@@ -210,7 +245,7 @@ mod util {
         record_proj(expr_unwrap(vhea), "number_of_long_metrics")
     }
 
-    /// Attemptis to index on the `offsets` key of `loca` through an option-unpacking indirection.
+    /// Attempts to index on the `offsets` key of a `loca` table through an option-unpacking indirection.
     ///
     /// Helper function to handle the fact that though loca only appears alongside glyf, both are optional tables
     pub(crate) fn loca_offsets(loca: Expr) -> Expr {
@@ -251,22 +286,26 @@ mod util {
         fmt_variant("F2Dot14", u16be())
     }
 
-    /// FIXME[epic=signedness-hack] - scaffolding to signal intent to use i8 format before it is implemented
+    // FIXME[epic=signedness-hack]
+    /// Scaffolding to signal intent to use i8 format before it is implemented.
     pub(crate) fn s8() -> Format {
         u8()
     }
 
-    /// FIXME[epic=signedness-hack] - scaffolding to signal intent to use i16 format before it is implemented
+    // FIXME[epic=signedness-hack]
+    /// Scaffolding to signal intent to use i16 format before it is implemented.
     pub(crate) fn s16be() -> Format {
         u16be()
     }
 
-    /// FIXME[epic=signedness-hack] - scaffolding to signal intent to use i32 format before it is implemented
+    // FIXME[epic=signedness-hack]
+    /// Scaffolding to signal intent to use i32 format before it is implemented.
     pub(crate) fn s32be() -> Format {
         u32be()
     }
 
-    /// FIXME[epic=signedness-hack] - scaffolding to signal intent to use i64 format before it is implemented
+    // FIXME[epic=signedness-hack]
+    /// Scaffolding to signal intent to use i64 format before it is implemented.
     pub(crate) fn s64be() -> Format {
         u64be()
     }
@@ -280,7 +319,7 @@ mod util {
         )
     }
 
-    // Placeholder for a `(u16, u16)` value-pair packed as a big-endian u32
+    /// Helper-function that parses a big-endian 32-bit value meant to be interpreted as a `(u16, u16)` value-pair (e.g. major, minor version fields)
     pub(crate) fn version16_16() -> Format {
         u32be()
     }
@@ -296,13 +335,16 @@ mod util {
         where_lambda(u16be(), "x", expr_eq(var("x"), Expr::U16(val)))
     }
 
-    /// Parses a `U16Be` value that is expected to be equal to one of `N` values in `vals`
+    /// Parses a `U16Be` value that is expected to be equal to one of the values in `vals`
+    ///
+    /// If only one value is expected, use [`expect_u16be`] instead.
     pub(crate) fn expects_u16be<const N: usize>(vals: [u16; N]) -> Format {
         where_lambda(
             u16be(),
             "x",
             expr_match(
                 var("x"),
+                // REVIEW - do we want to introduce pattern-OR to simplify the expression?
                 vals.into_iter()
                     .map(|v| (Pattern::U16(v), Expr::Bool(true)))
                     .chain(std::iter::once((Pattern::Wildcard, Expr::Bool(false)))),
@@ -310,11 +352,19 @@ mod util {
         )
     }
 
-    /// Constructs a format that peeks the value of a specific field in a given
-    /// record (or the common prefix of a union of related records), discarding the
-    /// values of all fields that come before it; the result of this speculative
-    /// parse is then associated to the original field-name (in `field_prefix`) before
-    /// finally parsing the format `dep_format` that depends on its value.
+    /// Given a logical record-structure (or common-prefix of a union-of-records),
+    /// speculatively parses the shortest prefix of fields including a field we wish to
+    /// know the value of in advance of committing to a particular parse; using the value of
+    /// said field under its original in-record identifier binding, we then parse `dep_format`.
+    ///
+    /// # NOTES
+    ///
+    /// Every field except for the final field in `field_prefix` are discarded immediately after they are parsed,
+    /// and only the value of the final field is retained in scope for the parse of `dep_format`.
+    ///
+    /// Because the lookahead-parse of `field_prefix` is unrelated to the final record-structure of `dep_format`,
+    /// the field-labels in `field_prefix` can be chosen freely. In most cases, the field-names of the record-structure
+    /// we are ultimately parsing will typically be the most sensible choice.
     pub(crate) fn peek_field_then<Name>(
         field_prefix: &[(Name, Format)],
         dep_format: Format,
@@ -344,7 +394,7 @@ mod util {
     /// Speculatively peeks the shortest prefix of fields required to witness a field with the
     /// indicated label (`length_field`), which is interpreted as a positive integer byte-length
     /// constraining the entire record (and not just subsequent fields); this value is extracted
-    /// and forms the length of a slice around parsing the complete record.
+    /// and used as the constraining size for a slice around parsing the complete record.
     ///
     /// Handles the construction of the record format from the given fields, which are provided
     /// in a raw form to allow for ease of introspection.
@@ -374,6 +424,8 @@ mod util {
     }
 
     /// Computes the maximum value of `x / 8` for `x: U16` in seq (return value wrapped in Option to handle empty list)
+    ///
+    /// Used exclusively for `cmap` subtable format 2.
     pub(crate) fn subheader_index(seq: Expr) -> Expr {
         // REVIEW - because of how narrow the use-case is, we might be able to use 0 as the init-accum value and avoid Option entirely
         expr_unwrap(left_fold(
@@ -391,17 +443,18 @@ mod util {
                 ),
             ),
             expr_none(),
-            ValueType::Option(Box::new(ValueType::Base(BaseType::U16))),
+            ValueType::option(ValueType::U16),
             seq,
         ))
     }
 
-    // WIP
-    pub(crate) const FONTVIEW_VAR: ViewExpr = ViewExpr::Var(Label::Borrowed("font_view"));
+    /// Template ViewExpr that represents the entire contents of an OTF file buffer
+    pub(crate) const FONTVIEW_VAR: ViewExpr = ViewExpr::Var(FONTVIEW_LBL);
 
-    // WIP
-    pub(crate) const FONTVIEW_ARG: Label = Label::Borrowed("font_view");
+    /// Template identifier for the View representing the entire contents of an OTF file buffer
+    pub(crate) const FONTVIEW_LBL: Label = Label::Borrowed("font_view");
 
+    /// Default identifier for the per-table local View for a given table (whether a component table or sub-format thereof)
     pub(crate) const TABLE_VIEW: Label = Label::Borrowed("table_view");
 
     /// Given a  a 32-bit opentype tag-value `query_table_id`,
@@ -672,7 +725,6 @@ pub(crate) fn table_links(
         device_or_variation_index_table,
         item_variation_store,
     );
-    // `kern` table [https://learn.microsoft.com/en-us/typography/opentype/spec/kern]
     let kern_table = kern::table(module);
     let stat_table = stat::table(module, tag);
     let fvar_table = fvar::table(module, tag);
@@ -1044,7 +1096,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
 
         module.define_format_views(
             "opentype.ttc_header",
-            vec![FONTVIEW_ARG],
+            vec![FONTVIEW_LBL],
             record_auto([
                 (
                     "ttc_tag",
@@ -1782,6 +1834,9 @@ pub(crate) mod fvar {
 pub(crate) mod kern {
     use super::*;
 
+    /// Format for `kern` table
+    ///
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/kern
     pub(crate) fn table(module: &mut FormatModule) -> FormatRef {
         let kern_subtable = subtable(module);
         module.define_format(
@@ -1797,6 +1852,9 @@ pub(crate) mod kern {
         )
     }
 
+    /// Kern subtable format
+    ///
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/kern
     fn subtable(module: &mut FormatModule) -> FormatRef {
         let kern_cov_flags = kern_cov_flags();
         // SECTION - `kern` subtable record-formats
@@ -1830,7 +1888,6 @@ pub(crate) mod kern {
         )
     }
 
-    // REVIEW - consider refactoring into FormatRef registration
     /// Kern subtable format 0
     ///
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/kern#format-0
@@ -1853,70 +1910,82 @@ pub(crate) mod kern {
         )
     }
 
-    /// Helper function used to compute the number of glyphs in a left-or-right class table (for Format 2 kern subtables)
-    fn glyph_count(
-        table_view: ViewExpr,
-        class_table_offset: Expr,
-        class_table: FormatRef,
-    ) -> Format {
-        chain(
-            util::get_content_at_offset::<U16>(table_view, class_table_offset, class_table.call()),
-            "opt_table",
-            map_option(var("opt_table"), "class_table", |table| {
-                compute(record_proj(table, "n_glyphs"))
-            }),
-        )
-    }
+    mod format2 {
+        use super::*;
 
-    /// Simultaneously 2D/1D array for kerning values
-    ///
-    /// 'Left-by-right': each row represents a left-hand glyph class, each column represents a right-hand glyph class
-    ///
-    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/kern#format-2
-    ///
-    /// # Notes
-    ///
-    /// The indices in ClassTables are scaled (J = 2 x j ; I = 2 x M x i) to facilitate offset-arithmetic for random access (TargetOffset(i,j) = BaseOffset + I + J)
-    ///
-    /// Requires additional parameters `table_view` and `class_table` to correctly parse the content at each class offset
-    fn kerning_array(module: &mut FormatModule) -> FormatRef {
-        module.define_format_args(
-            "opentype.kern.kerning_array",
-            vec![
-                (Label::Borrowed("left_glyph_count"), ValueType::U16),
-                (Label::Borrowed("right_glyph_count"), ValueType::U16),
-            ],
-            record([
-                ("left_glyph_count", compute(var("left_glyph_count"))),
-                ("right_glyph_count", compute(var("right_glyph_count"))),
-                (
-                    "kerning_values",
-                    // REVIEW - consider ReadArray<S16> instead
-                    repeat_count(
-                        var("left_glyph_count"), // N rows where there are N left-hand classes
+        /// Helper function used to compute the number of glyphs in a left-or-right class table (for Format 2 kern subtables)
+        pub(super) fn glyph_count(
+            table_view: ViewExpr,
+            class_table_offset: Expr,
+            class_table: FormatRef,
+        ) -> Format {
+            chain(
+                util::get_content_at_offset::<U16>(
+                    table_view,
+                    class_table_offset,
+                    class_table.call(),
+                ),
+                "opt_table",
+                map_option(var("opt_table"), "class_table", |table| {
+                    compute(record_proj(table, "n_glyphs"))
+                }),
+            )
+        }
+
+        /// Simultaneously 2D/1D array for kerning values
+        ///
+        /// 'Left-by-right': each row represents a left-hand glyph class, each column represents a right-hand glyph class
+        ///
+        /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/kern#format-2
+        ///
+        /// # Notes
+        ///
+        /// The indices in ClassTables are scaled (J = 2 x j ; I = 2 x M x i) to facilitate offset-arithmetic for random access (TargetOffset(i,j) = BaseOffset + I + J)
+        ///
+        /// Requires additional parameters `table_view` and `class_table` to correctly parse the content at each class offset
+        pub(super) fn kerning_array(module: &mut FormatModule) -> FormatRef {
+            module.define_format_args(
+                "opentype.kern.kerning_array",
+                vec![
+                    (Label::Borrowed("left_glyph_count"), ValueType::U16),
+                    (Label::Borrowed("right_glyph_count"), ValueType::U16),
+                ],
+                record([
+                    ("left_glyph_count", compute(var("left_glyph_count"))),
+                    ("right_glyph_count", compute(var("right_glyph_count"))),
+                    (
+                        "kerning_values",
+                        // REVIEW - consider ReadArray<S16> instead
                         repeat_count(
-                            var("right_glyph_count"), // M columns
-                            util::s16be(),            // FWORD value at index (i, j)
+                            var("left_glyph_count"), // N rows where there are N left-hand classes
+                            repeat_count(
+                                var("right_glyph_count"), // M columns
+                                util::s16be(),            // FWORD value at index (i, j)
+                            ),
                         ),
                     ),
-                ),
-            ]),
-        )
+                ]),
+            )
+        }
+
+        pub(super) fn class_table(module: &mut FormatModule) -> FormatRef {
+            module.define_format(
+                "opentype.kern.class_table",
+                record([
+                    ("first_glyph", u16be()), // first glyph in class range
+                    ("n_glyphs", u16be()),    // number of glyphs in class range
+                    ("class_values", repeat_count(var("n_glyphs"), u16be())), // class values for each glyph in class range
+                ]),
+            )
+        }
     }
 
     /// Kern subtable format 2
     ///
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/kern#format-2
     fn subtable_format2(module: &mut FormatModule) -> FormatRef {
-        let class_table = module.define_format(
-            "opentype.kern.class_table",
-            record([
-                ("first_glyph", u16be()), // first glyph in class range
-                ("n_glyphs", u16be()),    // number of glyphs in class range
-                ("class_values", repeat_count(var("n_glyphs"), u16be())), // class values for each glyph in class range
-            ]),
-        );
-        let kerning_array = kerning_array(module);
+        let class_table = format2::class_table(module);
+        let kerning_array = format2::kerning_array(module);
         module.define_format(
             "opentype.kern.subtable.format2",
             let_view(
@@ -1940,7 +2009,7 @@ pub(crate) mod kern {
                                 [
                                     (
                                         "left_glyph_count",
-                                        glyph_count(
+                                        format2::glyph_count(
                                             vvar("table_view"),
                                             var("left_class_offset"),
                                             class_table,
@@ -1948,7 +2017,7 @@ pub(crate) mod kern {
                                     ),
                                     (
                                         "right_glyph_count",
-                                        glyph_count(
+                                        format2::glyph_count(
                                             vvar("table_view"),
                                             var("right_class_offset"),
                                             class_table,
@@ -7107,7 +7176,7 @@ pub(crate) mod alt {
                     Label::Borrowed("tables"),
                     ValueType::Seq(Box::new(table_type)),
                 )],
-                vec![FONTVIEW_ARG],
+                vec![FONTVIEW_LBL],
                 record_auto([
                     (
                         "stat",
@@ -7125,7 +7194,7 @@ pub(crate) mod alt {
 
         let table_directory = module.define_format_views(
             "opentype.table_directory",
-            vec![FONTVIEW_ARG],
+            vec![FONTVIEW_LBL],
             record([
                 (
                     "sfnt_version",
@@ -7200,7 +7269,7 @@ pub(crate) mod alt {
 
             module.define_format_views(
                 "opentype.ttc_header",
-                vec![FONTVIEW_ARG],
+                vec![FONTVIEW_LBL],
                 record_auto([
                     (
                         "ttc_tag",

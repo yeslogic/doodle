@@ -1,6 +1,7 @@
 [alias]
 cg = "run --bin doodle -- format --output rust --dest generated/gencode.rs"
 cgstat = "run --bin doodle -- format --output rust --stat-only --dest micro-stat/src/gencode_stat.rs"
+testall = "test --workspace --exclude smallsorts"
 
 [profile.profiling]
 inherits = "release"
