@@ -2314,17 +2314,18 @@ mod base {
 
 mod gpos {
     use super::*;
+    use doodle::DepFormat;
 
     /// GPOS-specific LookupSubtable implementation
     fn lookup_subtable(
         module: &mut FormatModule,
         pos_extension: FormatRef,
         ground_pos: FormatRef,
-    ) -> FormatRef {
+    ) -> DepFormat<1, 0> {
         const EXTENSION_TYPE: u16 = 9;
-        module.define_format_args(
+        module.register_format_args(
             "opentype.gpos.lookup_subtable",
-            vec![(Label::Borrowed("lookup_type"), ValueType::U16)],
+            [(Label::Borrowed("lookup_type"), ValueType::U16)],
             match_variant(
                 var("lookup_type"),
                 [
@@ -3232,18 +3233,20 @@ mod gpos {
 }
 
 mod gsub {
+    use doodle::DepFormat;
+
     use super::*;
 
     /// GSUB-specific LookupSubtable implementation
     pub(crate) fn lookup_subtable(
         module: &mut FormatModule,
         subst_extension: FormatRef,
-        ground_subst: FormatRef,
-    ) -> FormatRef {
+        ground_subst: DepFormat<1, 0>,
+    ) -> DepFormat<1, 0> {
         const EXTENSION_TYPE: u16 = 7;
-        module.define_format_args(
+        module.register_format_args(
             "opentype.gsub.lookup_subtable",
-            vec![(Label::from("lookup_type"), ValueType::U16)],
+            [(Label::from("lookup_type"), ValueType::U16)],
             match_variant(
                 var("lookup_type"),
                 [
@@ -3255,7 +3258,7 @@ mod gsub {
                     (
                         Pattern::Wildcard,
                         "GroundSubst",
-                        ground_subst.call_args(vec![var("lookup_type")]),
+                        ground_subst.invoke_args([var("lookup_type")]),
                     ),
                 ],
             ),
@@ -3588,15 +3591,15 @@ mod gsub {
         coverage_table: FormatRef,
         sequence_context: FormatRef,
         chained_sequence_context: FormatRef,
-    ) -> FormatRef {
+    ) -> DepFormat<1, 0> {
         let single_subst = single_subst(module, coverage_table);
         let multiple_subst = multiple_subst(module, coverage_table);
         let alternate_subst = alternate_subst(module, coverage_table);
         let ligature_subst = ligature_subst(module, coverage_table);
         let reverse_chain_single_subst = reverse_chain_single_subst(module, coverage_table);
-        module.define_format_args(
+        module.register_format_args(
             "opentype.layout.ground_subst",
-            vec![(Label::from("lookup_type"), ValueType::Base(BaseType::U16))],
+            [(Label::from("lookup_type"), ValueType::Base(BaseType::U16))],
             match_variant(
                 var("lookup_type"),
                 [
@@ -3625,7 +3628,10 @@ mod gsub {
     /// Lookup type 7 subtable: extension substitution
     ///
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/gsub#lookup-type-7-subtable-substitution-subtable-extension
-    pub(crate) fn subst_extension(module: &mut FormatModule, ground_subst: FormatRef) -> FormatRef {
+    pub(crate) fn subst_extension(
+        module: &mut FormatModule,
+        ground_subst: DepFormat<1, 0>,
+    ) -> FormatRef {
         module.define_format(
             "opentype.layout.subst_extension",
             let_view(
@@ -3643,7 +3649,7 @@ mod gsub {
                             "extension_offset",
                             util::read_phantom_view_offset32(
                                 vvar("table_view"),
-                                ground_subst.call_args(vec![var("extension_lookup_type")]),
+                                ground_subst.invoke_args([var("extension_lookup_type")]),
                             ),
                         ),
                     ],
@@ -3659,7 +3665,7 @@ mod gsub {
         module: &mut FormatModule,
         script_list: FormatRef,
         feature_list: FormatRef,
-        ground_subst: FormatRef,
+        ground_subst: DepFormat<1, 0>,
         subst_extension: FormatRef,
         feature_variations: FormatRef,
     ) -> FormatRef {
@@ -3681,6 +3687,8 @@ mod gsub {
 
 /// Module for sub-formats used in both GSUB and GPOS
 mod layout {
+    use doodle::DepFormat;
+
     use super::*;
 
     /// Format definition for `SequenceLookup`
@@ -4619,7 +4627,7 @@ mod layout {
     }
 
     /// Format-factory taking a `{GPOS,GSUB}`-specific `lookup_subtable` and constructing the shape of a LookupTable around it
-    pub(crate) fn lookup_table(lookup_subtable: FormatRef) -> Format {
+    pub(crate) fn lookup_table(lookup_subtable: DepFormat<1, 0>) -> Format {
         // NOTE - tag is a model-external value, lookup-type is model-internal.
 
         let lookup_flag = {
@@ -4655,7 +4663,7 @@ mod layout {
                         var("sub_table_count"),
                         util::read_phantom_view_offset16(
                             vvar("table_view"),
-                            lookup_subtable.call_args(vec![var("lookup_type")]),
+                            lookup_subtable.invoke_args([var("lookup_type")]),
                         ),
                     ),
                 ),
