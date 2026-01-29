@@ -20,6 +20,10 @@ pub mod bounds;
 pub mod byte_set;
 pub mod codegen;
 pub mod decoder;
+
+pub mod dep_ref;
+pub use dep_ref::DepFormat;
+
 pub mod disjoint;
 pub mod error;
 pub mod helper;
