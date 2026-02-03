@@ -454,7 +454,7 @@ impl ToFragment for RustTraitImpl {
         if let Some(params) = trait_params {
             builder.push(params.to_fragment());
         }
-        builder.push(Fragment::Char(' '));
+        builder.push(Fragment::string(" for "));
         builder.push(on_type.to_fragment());
         builder.push(Fragment::Char(' '));
         builder.push(<TraitItem as ToFragment>::block_sep(
@@ -1273,6 +1273,11 @@ impl ToFragment for PrimType {
             PrimType::Usize => "usize",
         })
     }
+}
+
+/// Given a lifetime identifier (including leading tick), constructs a `RustLt` using that identifier.
+pub(crate) fn lt(ident: impl IntoLabel) -> RustLt {
+    RustLt::Parametric(ident.into())
 }
 
 /// AST type for Rust Lifetimes

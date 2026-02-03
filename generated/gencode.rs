@@ -10,6 +10,16 @@ pub mod api_helper;
 use doodle::prelude::*;
 use doodle::try_sub;
 
+impl CommonObject for elf_header_ident {
+type Args<'a> = ();
+
+type Output<'a> = elf_header_ident;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_elf_header_ident(p)
+}
+}
+
 /// expected size: 5
 /// trait-ready: unique decoder function (d#212)
 #[derive(Debug, Copy, Clone)]
@@ -21,15 +31,49 @@ os_abi: u8,
 abi_version: u8
 }
 
+impl CommonObject for elf_types_elf_addr {
+type Args<'a> = (bool, u8);
+
+type Output<'a> = elf_types_elf_addr;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let is_be = args.0;
+let class = args.1;
+Decoder_elf_types_elf_addr(p, is_be, class)
+}
+}
+
 /// expected size: 16
 /// trait-ready: unique decoder function (d#201)
 #[derive(Debug, Copy, Clone)]
 pub enum elf_types_elf_addr { Addr32(u32), Addr64(u64) }
 
+impl CommonObject for elf_types_elf_off {
+type Args<'a> = (bool, u8);
+
+type Output<'a> = elf_types_elf_off;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let is_be = args.0;
+let class = args.1;
+Decoder_elf_types_elf_off(p, is_be, class)
+}
+}
+
 /// expected size: 16
 /// trait-ready: unique decoder function (d#202)
 #[derive(Debug, Copy, Clone)]
 pub enum elf_types_elf_off { Off32(u32), Off64(u64) }
+
+impl CommonObject for elf_header {
+type Args<'a> = ();
+
+type Output<'a> = elf_header;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_elf_header(p)
+}
+}
 
 /// expected size: 80
 /// trait-ready: unique decoder function (d#193)
@@ -51,10 +95,34 @@ shnum: u16,
 shstrndx: u16
 }
 
+impl CommonObject for elf_types_elf_full {
+type Args<'a> = (bool, u8);
+
+type Output<'a> = elf_types_elf_full;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let is_be = args.0;
+let class = args.1;
+Decoder_elf_types_elf_full(p, is_be, class)
+}
+}
+
 /// expected size: 16
 /// trait-ready: unique decoder function (d#200)
 #[derive(Debug, Copy, Clone)]
 pub enum elf_types_elf_full { Full32(u32), Full64(u64) }
+
+impl CommonObject for elf_phdr {
+type Args<'a> = (bool, u8);
+
+type Output<'a> = elf_phdr;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let is_be = args.0;
+let class = args.1;
+Decoder_elf_phdr(p, is_be, class)
+}
+}
 
 /// expected size: 120
 /// trait-ready: unique decoder function (d#209)
@@ -69,6 +137,18 @@ filesz: elf_types_elf_full,
 memsz: elf_types_elf_full,
 flags32: Option<u32>,
 align: elf_types_elf_full
+}
+
+impl CommonObject for elf_shdr {
+type Args<'a> = (bool, u8);
+
+type Output<'a> = elf_shdr;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let is_be = args.0;
+let class = args.1;
+Decoder_elf_shdr(p, is_be, class)
+}
 }
 
 /// expected size: 112
@@ -87,6 +167,16 @@ addralign: elf_types_elf_full,
 entsize: elf_types_elf_full
 }
 
+impl CommonObject for elf_main {
+type Args<'a> = ();
+
+type Output<'a> = elf_main;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_elf_main(p)
+}
+}
+
 /// expected size: 152
 /// trait-ready: unique decoder function (d#13)
 #[derive(Debug, Clone)]
@@ -97,12 +187,32 @@ section_headers: Option<Vec<elf_shdr>>,
 sections: Option<Vec<Option<Vec<u8>>>>
 }
 
+impl CommonObject for gif_header {
+type Args<'a> = ();
+
+type Output<'a> = gif_header;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_gif_header(p)
+}
+}
+
 /// expected size: 32
 /// trait-ready: unique decoder function (d#429)
 #[derive(Debug, Clone)]
 pub struct gif_header {
 signature: (u8, u8, u8),
 version: Vec<u8>
+}
+
+impl CommonObject for gif_logical_screen_descriptor_flags {
+type Args<'a> = ();
+
+type Output<'a> = gif_logical_screen_descriptor_flags;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_gif_logical_screen_descriptor_flags(p)
+}
 }
 
 /// expected size: 4
@@ -113,6 +223,16 @@ table_flag: bool,
 color_resolution: u8,
 sort_flag: bool,
 table_size: u8
+}
+
+impl CommonObject for gif_logical_screen_descriptor {
+type Args<'a> = ();
+
+type Output<'a> = gif_logical_screen_descriptor;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_gif_logical_screen_descriptor(p)
+}
 }
 
 /// expected size: 10
@@ -135,12 +255,32 @@ g: u8,
 b: u8
 }
 
+impl CommonObject for gif_logical_screen {
+type Args<'a> = ();
+
+type Output<'a> = gif_logical_screen;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_gif_logical_screen(p)
+}
+}
+
 /// expected size: 40
 /// trait-ready: unique decoder function (d#430)
 #[derive(Debug, Clone)]
 pub struct gif_logical_screen {
 descriptor: gif_logical_screen_descriptor,
 global_color_table: Option<Vec<gif_color_table_entry>>
+}
+
+impl CommonObject for gif_graphic_control_extension_flags {
+type Args<'a> = ();
+
+type Output<'a> = gif_graphic_control_extension_flags;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_gif_graphic_control_extension_flags(p)
+}
 }
 
 /// expected size: 3
@@ -150,6 +290,16 @@ pub struct gif_graphic_control_extension_flags {
 disposal_method: u8,
 user_input_flag: bool,
 transparent_color_flag: bool
+}
+
+impl CommonObject for gif_graphic_control_extension {
+type Args<'a> = ();
+
+type Output<'a> = gif_graphic_control_extension;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_gif_graphic_control_extension(p)
+}
 }
 
 /// expected size: 10
@@ -165,12 +315,32 @@ transparent_color_index: u8,
 terminator: u8
 }
 
+impl CommonObject for gif_subblock {
+type Args<'a> = ();
+
+type Output<'a> = gif_subblock;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_gif_subblock(p)
+}
+}
+
 /// expected size: 32
 /// trait-ready: unique decoder function (d#437)
 #[derive(Debug, Clone)]
 pub struct gif_subblock {
 len_bytes: u8,
 data: Vec<u8>
+}
+
+impl CommonObject for gif_plain_text_extension {
+type Args<'a> = ();
+
+type Output<'a> = gif_plain_text_extension;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_gif_plain_text_extension(p)
+}
 }
 
 /// expected size: 40
@@ -192,6 +362,16 @@ plain_text_data: Vec<gif_subblock>,
 terminator: u8
 }
 
+impl CommonObject for gif_image_descriptor_flags {
+type Args<'a> = ();
+
+type Output<'a> = gif_image_descriptor_flags;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_gif_image_descriptor_flags(p)
+}
+}
+
 /// expected size: 4
 /// trait-ready: unique decoder function (d#446)
 #[derive(Debug, Copy, Clone)]
@@ -200,6 +380,16 @@ table_flag: bool,
 interlace_flag: bool,
 sort_flag: bool,
 table_size: u8
+}
+
+impl CommonObject for gif_image_descriptor {
+type Args<'a> = ();
+
+type Output<'a> = gif_image_descriptor;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_gif_image_descriptor(p)
+}
 }
 
 /// expected size: 14
@@ -214,6 +404,16 @@ image_height: u16,
 flags: gif_image_descriptor_flags
 }
 
+impl CommonObject for gif_table_based_image_data {
+type Args<'a> = ();
+
+type Output<'a> = gif_table_based_image_data;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_gif_table_based_image_data(p)
+}
+}
+
 /// expected size: 32
 /// trait-ready: unique decoder function (d#445)
 #[derive(Debug, Clone)]
@@ -221,6 +421,16 @@ pub struct gif_table_based_image_data {
 lzw_min_code_size: u8,
 image_data: Vec<gif_subblock>,
 terminator: u8
+}
+
+impl CommonObject for gif_table_based_image {
+type Args<'a> = ();
+
+type Output<'a> = gif_table_based_image;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_gif_table_based_image(p)
+}
 }
 
 /// expected size: 72
@@ -232,10 +442,30 @@ local_color_table: Option<Vec<gif_color_table_entry>>,
 data: gif_table_based_image_data
 }
 
+impl CommonObject for gif_graphic_rendering_block {
+type Args<'a> = ();
+
+type Output<'a> = gif_graphic_rendering_block;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_gif_graphic_rendering_block(p)
+}
+}
+
 /// expected size: 80
 /// trait-ready: unique decoder function (d#440)
 #[derive(Debug, Clone)]
 pub enum gif_graphic_rendering_block { plain_text_extension(gif_plain_text_extension), table_based_image(gif_table_based_image) }
+
+impl CommonObject for gif_graphic_block {
+type Args<'a> = ();
+
+type Output<'a> = gif_graphic_block;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_gif_graphic_block(p)
+}
+}
 
 /// expected size: 96
 /// trait-ready: unique decoder function (d#433)
@@ -243,6 +473,16 @@ pub enum gif_graphic_rendering_block { plain_text_extension(gif_plain_text_exten
 pub struct gif_graphic_block {
 graphic_control_extension: Option<gif_graphic_control_extension>,
 graphic_rendering_block: gif_graphic_rendering_block
+}
+
+impl CommonObject for gif_application_extension {
+type Args<'a> = ();
+
+type Output<'a> = gif_application_extension;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_gif_application_extension(p)
+}
 }
 
 /// expected size: 80
@@ -258,6 +498,16 @@ application_data: Vec<gif_subblock>,
 terminator: u8
 }
 
+impl CommonObject for gif_comment_extension {
+type Args<'a> = ();
+
+type Output<'a> = gif_comment_extension;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_gif_comment_extension(p)
+}
+}
+
 /// expected size: 32
 /// trait-ready: unique decoder function (d#436)
 #[derive(Debug, Clone)]
@@ -268,21 +518,61 @@ comment_data: Vec<gif_subblock>,
 terminator: u8
 }
 
+impl CommonObject for gif_special_purpose_block {
+type Args<'a> = ();
+
+type Output<'a> = gif_special_purpose_block;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_gif_special_purpose_block(p)
+}
+}
+
 /// expected size: 88
 /// trait-ready: unique decoder function (d#434)
 #[derive(Debug, Clone)]
 pub enum gif_special_purpose_block { application_extension(gif_application_extension), comment_extension(gif_comment_extension) }
+
+impl CommonObject for gif_block {
+type Args<'a> = ();
+
+type Output<'a> = gif_block;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_gif_block(p)
+}
+}
 
 /// expected size: 104
 /// trait-ready: unique decoder function (d#431)
 #[derive(Debug, Clone)]
 pub enum gif_block { graphic_block(gif_graphic_block), special_purpose_block(gif_special_purpose_block) }
 
+impl CommonObject for gif_trailer {
+type Args<'a> = ();
+
+type Output<'a> = gif_trailer;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_gif_trailer(p)
+}
+}
+
 /// expected size: 1
 /// trait-ready: unique decoder function (d#432)
 #[derive(Debug, Copy, Clone)]
 pub struct gif_trailer {
 separator: u8
+}
+
+impl CommonObject for gif_main {
+type Args<'a> = ();
+
+type Output<'a> = gif_main;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_gif_main(p)
+}
 }
 
 /// expected size: 104
@@ -295,6 +585,16 @@ blocks: Vec<gif_block>,
 trailer: gif_trailer
 }
 
+impl CommonObject for gzip_header_file_flags {
+type Args<'a> = ();
+
+type Output<'a> = gzip_header_file_flags;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_gzip_header_file_flags(p)
+}
+}
+
 /// expected size: 5
 /// trait-ready: unique decoder function (d#424)
 #[derive(Debug, Copy, Clone)]
@@ -304,6 +604,16 @@ fname: bool,
 fextra: bool,
 fhcrc: bool,
 ftext: bool
+}
+
+impl CommonObject for gzip_header {
+type Args<'a> = ();
+
+type Output<'a> = gzip_header;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_gzip_header(p)
+}
 }
 
 /// expected size: 16
@@ -318,6 +628,16 @@ compression_flags: u8,
 os_id: u8
 }
 
+impl CommonObject for gzip_fextra_subfield {
+type Args<'a> = ();
+
+type Output<'a> = gzip_fextra_subfield;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_gzip_fextra_subfield(p)
+}
+}
+
 /// expected size: 32
 /// trait-ready: unique decoder function (d#423)
 #[derive(Debug, Clone)]
@@ -326,6 +646,16 @@ si1: u8,
 si2: u8,
 len: u16,
 data: Vec<u8>
+}
+
+impl CommonObject for gzip_fextra {
+type Args<'a> = ();
+
+type Output<'a> = gzip_fextra;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_gzip_fextra(p)
+}
 }
 
 /// expected size: 32
@@ -341,6 +671,16 @@ subfields: Vec<gzip_fextra_subfield>
 #[derive(Debug, Clone)]
 pub struct gzip_fcomment {
 comment: Vec<u8>
+}
+
+impl CommonObject for gzip_fhcrc {
+type Args<'a> = ();
+
+type Output<'a> = gzip_fhcrc;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_gzip_fhcrc(p)
+}
 }
 
 /// expected size: 2
@@ -397,6 +737,16 @@ distance: u16
 #[derive(Debug, Copy, Clone)]
 pub enum deflate_uncompressed_codes_values { literal(u8), reference(deflate_fixed_huffman_codes_values_reference) }
 
+impl CommonObject for deflate_dynamic_huffman {
+type Args<'a> = ();
+
+type Output<'a> = deflate_dynamic_huffman;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_deflate_dynamic_huffman(p)
+}
+}
+
 /// expected size: 176
 /// trait-ready: unique decoder function (d#245)
 #[derive(Debug, Clone)]
@@ -431,12 +781,32 @@ code: u16,
 extra: Option<deflate_fixed_huffman_codes_values>
 }
 
+impl CommonObject for deflate_fixed_huffman {
+type Args<'a> = ();
+
+type Output<'a> = deflate_fixed_huffman;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_deflate_fixed_huffman(p)
+}
+}
+
 /// expected size: 48
 /// trait-ready: unique decoder function (d#244)
 #[derive(Debug, Clone)]
 pub struct deflate_fixed_huffman {
 codes: Vec<deflate_fixed_huffman_codes>,
 codes_values: Vec<deflate_uncompressed_codes_values>
+}
+
+impl CommonObject for deflate_uncompressed {
+type Args<'a> = ();
+
+type Output<'a> = deflate_uncompressed;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_deflate_uncompressed(p)
+}
 }
 
 /// expected size: 56
@@ -455,6 +825,16 @@ codes_values: Vec<deflate_uncompressed_codes_values>
 #[derive(Debug, Clone)]
 pub enum deflate_block_data { dynamic_huffman(deflate_dynamic_huffman), fixed_huffman(deflate_fixed_huffman), uncompressed(deflate_uncompressed) }
 
+impl CommonObject for deflate_block {
+type Args<'a> = ();
+
+type Output<'a> = deflate_block;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_deflate_block(p)
+}
+}
+
 /// expected size: 192
 /// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [Noop, Noop, InDef(InEnum { variants: [DirectHeap, Noop, Noop] })] }, Layout { size: 64, align: 8 (1 << 3) })
 /// trait-ready: unique decoder function (d#242)
@@ -465,6 +845,16 @@ r#type: u8,
 data: deflate_block_data
 }
 
+impl CommonObject for deflate_main {
+type Args<'a> = ();
+
+type Output<'a> = deflate_main;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_deflate_main(p)
+}
+}
+
 /// expected size: 72
 /// trait-ready: unique decoder function (d#241)
 #[derive(Debug, Clone)]
@@ -472,6 +862,16 @@ pub struct deflate_main {
 blocks: Vec<deflate_block>,
 codes: Vec<deflate_uncompressed_codes_values>,
 inflate: Vec<u8>
+}
+
+impl CommonObject for gzip_footer {
+type Args<'a> = ();
+
+type Output<'a> = gzip_footer;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_gzip_footer(p)
+}
 }
 
 /// expected size: 8
@@ -502,6 +902,16 @@ pub struct jpeg_soi {
 marker: u8
 }
 
+impl CommonObject for jpeg_app0_jfif {
+type Args<'a> = ();
+
+type Output<'a> = jpeg_app0_jfif;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_jpeg_app0_jfif(p)
+}
+}
+
 /// expected size: 40
 /// trait-ready: unique decoder function (d#408)
 #[derive(Debug, Clone)]
@@ -516,10 +926,31 @@ thumbnail_height: u8,
 thumbnail_pixels: Vec<Vec<gif_color_table_entry>>
 }
 
+impl CommonObject for jpeg_app0_data_data {
+type Args<'a> = (Vec<u8>,);
+
+type Output<'a> = jpeg_app0_data_data;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let identifier = args.0;
+Decoder_jpeg_app0_data_data(p, identifier)
+}
+}
+
 /// expected size: 48
 /// trait-ready: unique decoder function (d#407)
 #[derive(Debug, Clone)]
 pub enum jpeg_app0_data_data { jfif(jpeg_app0_jfif), other(Vec<u8>) }
+
+impl CommonObject for jpeg_app0_data {
+type Args<'a> = ();
+
+type Output<'a> = jpeg_app0_data;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_jpeg_app0_data(p)
+}
+}
 
 /// expected size: 72
 /// trait-ready: unique decoder function (d#406)
@@ -529,6 +960,16 @@ identifier: Vec<u8>,
 data: jpeg_app0_data_data
 }
 
+impl CommonObject for jpeg_app0 {
+type Args<'a> = ();
+
+type Output<'a> = jpeg_app0;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_jpeg_app0(p)
+}
+}
+
 /// expected size: 80
 /// trait-ready: unique decoder function (d#385)
 #[derive(Debug, Clone)]
@@ -536,6 +977,16 @@ pub struct jpeg_app0 {
 marker: jpeg_soi,
 length: u16,
 data: jpeg_app0_data
+}
+
+impl CommonObject for tiff_byte_order {
+type Args<'a> = ();
+
+type Output<'a> = tiff_byte_order;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_tiff_byte_order(p)
+}
 }
 
 /// expected size: 3
@@ -563,6 +1014,16 @@ next_ifd_offset: u32,
 next_ifd: Vec<u8>
 }
 
+impl CommonObject for tiff_main {
+type Args<'a> = ();
+
+type Output<'a> = tiff_main;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_tiff_main(p)
+}
+}
+
 /// expected size: 72
 /// trait-ready: unique decoder function (d#11)
 #[derive(Debug, Clone)]
@@ -574,12 +1035,32 @@ offset: u32,
 ifd: tiff_ifd_le
 }
 
+impl CommonObject for jpeg_app1_exif {
+type Args<'a> = ();
+
+type Output<'a> = jpeg_app1_exif;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_jpeg_app1_exif(p)
+}
+}
+
 /// expected size: 80
 /// trait-ready: unique decoder function (d#404)
 #[derive(Debug, Clone)]
 pub struct jpeg_app1_exif {
 padding: u8,
 exif: tiff_main
+}
+
+impl CommonObject for jpeg_app1_xmp {
+type Args<'a> = ();
+
+type Output<'a> = jpeg_app1_xmp;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_jpeg_app1_xmp(p)
+}
 }
 
 /// expected size: 24
@@ -589,10 +1070,31 @@ pub struct jpeg_app1_xmp {
 xmp: Vec<u8>
 }
 
+impl CommonObject for jpeg_app1_data_data {
+type Args<'a> = (Vec<u8>,);
+
+type Output<'a> = jpeg_app1_data_data;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let identifier = args.0;
+Decoder_jpeg_app1_data_data(p, identifier)
+}
+}
+
 /// expected size: 88
 /// trait-ready: unique decoder function (d#403)
 #[derive(Debug, Clone)]
 pub enum jpeg_app1_data_data { exif(jpeg_app1_exif), other(Vec<u8>), xmp(jpeg_app1_xmp) }
+
+impl CommonObject for jpeg_app1_data {
+type Args<'a> = ();
+
+type Output<'a> = jpeg_app1_data;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_jpeg_app1_data(p)
+}
+}
 
 /// expected size: 112
 /// trait-ready: unique decoder function (d#402)
@@ -602,6 +1104,16 @@ identifier: Vec<u8>,
 data: jpeg_app1_data_data
 }
 
+impl CommonObject for jpeg_app1 {
+type Args<'a> = ();
+
+type Output<'a> = jpeg_app1;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_jpeg_app1(p)
+}
+}
+
 /// expected size: 120
 /// trait-ready: unique decoder function (d#386)
 #[derive(Debug, Clone)]
@@ -609,6 +1121,16 @@ pub struct jpeg_app1 {
 marker: jpeg_soi,
 length: u16,
 data: jpeg_app1_data
+}
+
+impl CommonObject for jpeg_frame_initial_segment {
+type Args<'a> = ();
+
+type Output<'a> = jpeg_frame_initial_segment;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_jpeg_frame_initial_segment(p)
+}
 }
 
 /// expected size: 128
@@ -625,6 +1147,16 @@ length: u16,
 data: Vec<u8>
 }
 
+impl CommonObject for jpeg_class_table_id {
+type Args<'a> = ();
+
+type Output<'a> = jpeg_class_table_id;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_jpeg_class_table_id(p)
+}
+}
+
 /// expected size: 2
 /// trait-ready: unique decoder function (d#412)
 #[derive(Debug, Copy, Clone)]
@@ -633,12 +1165,32 @@ class: u8,
 table_id: u8
 }
 
+impl CommonObject for jpeg_dac_data {
+type Args<'a> = ();
+
+type Output<'a> = jpeg_dac_data;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_jpeg_dac_data(p)
+}
+}
+
 /// expected size: 3
 /// trait-ready: unique decoder function (d#411)
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_dac_data {
 class_table_id: jpeg_class_table_id,
 value: u8
+}
+
+impl CommonObject for jpeg_dac {
+type Args<'a> = ();
+
+type Output<'a> = jpeg_dac;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_jpeg_dac(p)
+}
 }
 
 /// expected size: 6
@@ -650,6 +1202,16 @@ length: u16,
 data: jpeg_dac_data
 }
 
+impl CommonObject for jpeg_dht_data {
+type Args<'a> = ();
+
+type Output<'a> = jpeg_dht_data;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_jpeg_dht_data(p)
+}
+}
+
 /// expected size: 56
 /// trait-ready: unique decoder function (d#413)
 #[derive(Debug, Clone)]
@@ -657,6 +1219,16 @@ pub struct jpeg_dht_data {
 class_table_id: jpeg_class_table_id,
 num_codes: Vec<u8>,
 values: Vec<Vec<u8>>
+}
+
+impl CommonObject for jpeg_dht {
+type Args<'a> = ();
+
+type Output<'a> = jpeg_dht;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_jpeg_dht(p)
+}
 }
 
 /// expected size: 64
@@ -668,6 +1240,16 @@ length: u16,
 data: jpeg_dht_data
 }
 
+impl CommonObject for jpeg_precision_table_id {
+type Args<'a> = ();
+
+type Output<'a> = jpeg_precision_table_id;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_jpeg_precision_table_id(p)
+}
+}
+
 /// expected size: 2
 /// trait-ready: unique decoder function (d#415)
 #[derive(Debug, Copy, Clone)]
@@ -676,10 +1258,31 @@ precision: u8,
 table_id: u8
 }
 
+impl CommonObject for jpeg_dqt_data_elements {
+type Args<'a> = (u8,);
+
+type Output<'a> = jpeg_dqt_data_elements;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let precision = args.0;
+Decoder_jpeg_dqt_data_elements(p, precision)
+}
+}
+
 /// expected size: 32
 /// trait-ready: unique decoder function (d#416)
 #[derive(Debug, Clone)]
 pub enum jpeg_dqt_data_elements { Bytes(Vec<u8>), Shorts(Vec<u16>) }
+
+impl CommonObject for jpeg_dqt_data {
+type Args<'a> = ();
+
+type Output<'a> = jpeg_dqt_data;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_jpeg_dqt_data(p)
+}
+}
 
 /// expected size: 40
 /// trait-ready: unique decoder function (d#414)
@@ -687,6 +1290,16 @@ pub enum jpeg_dqt_data_elements { Bytes(Vec<u8>), Shorts(Vec<u16>) }
 pub struct jpeg_dqt_data {
 precision_table_id: jpeg_precision_table_id,
 elements: jpeg_dqt_data_elements
+}
+
+impl CommonObject for jpeg_dqt {
+type Args<'a> = ();
+
+type Output<'a> = jpeg_dqt;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_jpeg_dqt(p)
+}
 }
 
 /// expected size: 32
@@ -698,11 +1311,31 @@ length: u16,
 data: Vec<jpeg_dqt_data>
 }
 
+impl CommonObject for jpeg_dri_data {
+type Args<'a> = ();
+
+type Output<'a> = jpeg_dri_data;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_jpeg_dri_data(p)
+}
+}
+
 /// expected size: 2
 /// trait-ready: unique decoder function (d#410)
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_dri_data {
 restart_interval: u16
+}
+
+impl CommonObject for jpeg_dri {
+type Args<'a> = ();
+
+type Output<'a> = jpeg_dri;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_jpeg_dri(p)
+}
 }
 
 /// expected size: 6
@@ -712,6 +1345,16 @@ pub struct jpeg_dri {
 marker: jpeg_soi,
 length: u16,
 data: jpeg_dri_data
+}
+
+impl CommonObject for jpeg_table_or_misc {
+type Args<'a> = ();
+
+type Output<'a> = jpeg_table_or_misc;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_jpeg_table_or_misc(p)
+}
 }
 
 /// expected size: 128
@@ -756,10 +1399,30 @@ length: u16,
 data: jpeg_sof_data
 }
 
+impl CommonObject for jpeg_frame_header {
+type Args<'a> = ();
+
+type Output<'a> = jpeg_frame_header;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_jpeg_frame_header(p)
+}
+}
+
 /// expected size: 48
 /// trait-ready: unique decoder function (d#344)
 #[derive(Debug, Clone)]
 pub enum jpeg_frame_header { sof0(jpeg_sof0), sof1(jpeg_sof0), sof10(jpeg_sof0), sof11(jpeg_sof0), sof13(jpeg_sof0), sof14(jpeg_sof0), sof15(jpeg_sof0), sof2(jpeg_sof0), sof3(jpeg_sof0), sof5(jpeg_sof0), sof6(jpeg_sof0), sof7(jpeg_sof0), sof9(jpeg_sof0) }
+
+impl CommonObject for jpeg_sos_image_component_entropy_coding_table_ids {
+type Args<'a> = ();
+
+type Output<'a> = jpeg_sos_image_component_entropy_coding_table_ids;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_jpeg_sos_image_component_entropy_coding_table_ids(p)
+}
+}
 
 /// expected size: 2
 /// trait-ready: unique decoder function (d#363)
@@ -767,6 +1430,16 @@ pub enum jpeg_frame_header { sof0(jpeg_sof0), sof1(jpeg_sof0), sof10(jpeg_sof0),
 pub struct jpeg_sos_image_component_entropy_coding_table_ids {
 dc_entropy_coding_table_id: u8,
 ac_entropy_coding_table_id: u8
+}
+
+impl CommonObject for jpeg_sos_image_component {
+type Args<'a> = ();
+
+type Output<'a> = jpeg_sos_image_component;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_jpeg_sos_image_component(p)
+}
 }
 
 /// expected size: 3
@@ -777,12 +1450,32 @@ component_selector: u8,
 entropy_coding_table_ids: jpeg_sos_image_component_entropy_coding_table_ids
 }
 
+impl CommonObject for jpeg_sos_data_approximation_bit_position {
+type Args<'a> = ();
+
+type Output<'a> = jpeg_sos_data_approximation_bit_position;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_jpeg_sos_data_approximation_bit_position(p)
+}
+}
+
 /// expected size: 2
 /// trait-ready: unique decoder function (d#362)
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_sos_data_approximation_bit_position {
 high: u8,
 low: u8
+}
+
+impl CommonObject for jpeg_sos_data {
+type Args<'a> = ();
+
+type Output<'a> = jpeg_sos_data;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_jpeg_sos_data(p)
+}
 }
 
 /// expected size: 32
@@ -796,6 +1489,16 @@ end_spectral_selection: u8,
 approximation_bit_position: jpeg_sos_data_approximation_bit_position
 }
 
+impl CommonObject for jpeg_sos {
+type Args<'a> = ();
+
+type Output<'a> = jpeg_sos;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_jpeg_sos(p)
+}
+}
+
 /// expected size: 40
 /// trait-ready: unique decoder function (d#348)
 #[derive(Debug, Clone)]
@@ -803,6 +1506,16 @@ pub struct jpeg_sos {
 marker: jpeg_soi,
 length: u16,
 data: jpeg_sos_data
+}
+
+impl CommonObject for jpeg_scan_data_entropy_coded_segment {
+type Args<'a> = ();
+
+type Output<'a> = jpeg_scan_data_entropy_coded_segment;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_jpeg_scan_data_entropy_coded_segment(p)
+}
 }
 
 /// expected size: 2
@@ -827,11 +1540,31 @@ sos: jpeg_sos,
 data: jpeg_scan_data
 }
 
+impl CommonObject for jpeg_dnl_data {
+type Args<'a> = ();
+
+type Output<'a> = jpeg_dnl_data;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_jpeg_dnl_data(p)
+}
+}
+
 /// expected size: 2
 /// trait-ready: unique decoder function (d#364)
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_dnl_data {
 num_lines: u16
+}
+
+impl CommonObject for jpeg_dnl {
+type Args<'a> = ();
+
+type Output<'a> = jpeg_dnl;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_jpeg_dnl(p)
+}
 }
 
 /// expected size: 6
@@ -841,6 +1574,16 @@ pub struct jpeg_dnl {
 marker: jpeg_soi,
 length: u16,
 data: jpeg_dnl_data
+}
+
+impl CommonObject for jpeg_frame {
+type Args<'a> = ();
+
+type Output<'a> = jpeg_frame;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_jpeg_frame(p)
+}
 }
 
 /// expected size: 344
@@ -855,6 +1598,16 @@ dnl: Option<jpeg_dnl>,
 scans: Vec<jpeg_scan>
 }
 
+impl CommonObject for jpeg_main {
+type Args<'a> = ();
+
+type Output<'a> = jpeg_main;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_jpeg_main(p)
+}
+}
+
 /// expected size: 352
 /// trait-ready: unique decoder function (d#7)
 #[derive(Debug, Clone)]
@@ -862,6 +1615,16 @@ pub struct jpeg_main {
 soi: jpeg_soi,
 frame: jpeg_frame,
 eoi: jpeg_soi
+}
+
+impl CommonObject for mpeg4_ftyp_data {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_ftyp_data;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_ftyp_data(p)
+}
 }
 
 /// expected size: 32
@@ -883,6 +1646,16 @@ size: u64,
 data: Vec<u8>
 }
 
+impl CommonObject for mpeg4_dref_data {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_dref_data;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_dref_data(p)
+}
+}
+
 /// expected size: 32
 /// trait-ready: unique decoder function (d#315)
 #[derive(Debug, Clone)]
@@ -898,6 +1671,16 @@ data: Vec<mpeg4_dref_data_data>
 #[derive(Debug, Clone)]
 pub enum mpeg4_dinf_atom_data { dref(mpeg4_dref_data), unknown(Vec<u8>) }
 
+impl CommonObject for mpeg4_dinf_atom {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_dinf_atom;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_dinf_atom(p)
+}
+}
+
 /// expected size: 56
 /// trait-ready: unique decoder function (d#300)
 #[derive(Debug, Clone)]
@@ -906,6 +1689,16 @@ size_field: u32,
 r#type: (u8, u8, u8, u8),
 size: u64,
 data: mpeg4_dinf_atom_data
+}
+
+impl CommonObject for mpeg4_meta_hdlr_data {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_meta_hdlr_data;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_meta_hdlr_data(p)
+}
 }
 
 /// expected size: 48
@@ -920,6 +1713,16 @@ reserved: (u32, u32, u32),
 name: Vec<u8>
 }
 
+impl CommonObject for mpeg4_infe_data_fields_version_lt2 {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_infe_data_fields_version_lt2;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_infe_data_fields_version_lt2(p)
+}
+}
+
 /// expected size: 80
 /// trait-ready: unique decoder function (d#334)
 #[derive(Debug, Clone)]
@@ -931,11 +1734,31 @@ content_type: Vec<u8>,
 content_encoding: Vec<u8>
 }
 
+impl CommonObject for mpeg4_infe_atom_data_extra_fields_mime {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_infe_atom_data_extra_fields_mime;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_infe_atom_data_extra_fields_mime(p)
+}
+}
+
 /// expected size: 24
 /// trait-ready: unique decoder function (d#337)
 #[derive(Debug, Clone)]
 pub struct mpeg4_infe_atom_data_extra_fields_mime {
 content_type: Vec<u8>
+}
+
+impl CommonObject for mpeg4_infe_atom_data_extra_fields_uri {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_infe_atom_data_extra_fields_uri;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_infe_atom_data_extra_fields_uri(p)
+}
 }
 
 /// expected size: 24
@@ -945,10 +1768,32 @@ pub struct mpeg4_infe_atom_data_extra_fields_uri {
 item_uri_type: Vec<u8>
 }
 
+impl CommonObject for mpeg4_infe_atom_data_extra_fields {
+type Args<'a> = ((u8, u8, u8, u8),);
+
+type Output<'a> = mpeg4_infe_atom_data_extra_fields;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let item_type = args.0;
+Decoder_mpeg4_infe_atom_data_extra_fields(p, item_type)
+}
+}
+
 /// expected size: 32
 /// trait-ready: unique decoder function (d#336)
 #[derive(Debug, Clone)]
 pub enum mpeg4_infe_atom_data_extra_fields { mime(mpeg4_infe_atom_data_extra_fields_mime), unknown, uri(mpeg4_infe_atom_data_extra_fields_uri) }
+
+impl CommonObject for mpeg4_infe_data_fields_version_gte2 {
+type Args<'a> = (u8,);
+
+type Output<'a> = mpeg4_infe_data_fields_version_gte2;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let version = args.0;
+Decoder_mpeg4_infe_data_fields_version_gte2(p, version)
+}
+}
 
 /// expected size: 72
 /// trait-ready: unique decoder function (d#335)
@@ -961,10 +1806,31 @@ item_name: Vec<u8>,
 extra_fields: mpeg4_infe_atom_data_extra_fields
 }
 
+impl CommonObject for mpeg4_infe_data_fields {
+type Args<'a> = (u8,);
+
+type Output<'a> = mpeg4_infe_data_fields;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let version = args.0;
+Decoder_mpeg4_infe_data_fields(p, version)
+}
+}
+
 /// expected size: 88
 /// trait-ready: unique decoder function (d#333)
 #[derive(Debug, Clone)]
 pub enum mpeg4_infe_data_fields { Version1(mpeg4_infe_data_fields_version_lt2), Version2(mpeg4_infe_data_fields_version_gte2) }
+
+impl CommonObject for mpeg4_iinf_atom_data_infe {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_iinf_atom_data_infe;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_iinf_atom_data_infe(p)
+}
+}
 
 /// expected size: 96
 /// trait-ready: unique decoder function (d#332)
@@ -980,6 +1846,16 @@ fields: mpeg4_infe_data_fields
 #[derive(Debug, Clone)]
 pub enum mpeg4_iinf_atom_data { infe(mpeg4_iinf_atom_data_infe), unknown(Vec<u8>) }
 
+impl CommonObject for mpeg4_iinf_atom {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_iinf_atom;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_iinf_atom(p)
+}
+}
+
 /// expected size: 120
 /// trait-ready: unique decoder function (d#331)
 #[derive(Debug, Clone)]
@@ -990,6 +1866,16 @@ size: u64,
 data: mpeg4_iinf_atom_data
 }
 
+impl CommonObject for mpeg4_iinf {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_iinf;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_iinf(p)
+}
+}
+
 /// expected size: 32
 /// trait-ready: unique decoder function (d#322)
 #[derive(Debug, Clone)]
@@ -998,6 +1884,19 @@ version: u8,
 flags: (u8, u8, u8),
 entry_count: u32,
 item_info_entry: Vec<mpeg4_iinf_atom>
+}
+
+impl CommonObject for mpeg4_iloc_extent {
+type Args<'a> = (u8, u8, u8);
+
+type Output<'a> = mpeg4_iloc_extent;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let offset_size = args.0;
+let length_size = args.1;
+let index_size = args.2;
+Decoder_mpeg4_iloc_extent(p, offset_size, length_size, index_size)
+}
 }
 
 /// expected size: 24
@@ -1021,6 +1920,16 @@ extent_count: u16,
 extents: Vec<mpeg4_iloc_extent>
 }
 
+impl CommonObject for mpeg4_iloc_atom_data {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_iloc_atom_data;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_iloc_atom_data(p)
+}
+}
+
 /// expected size: 40
 /// trait-ready: unique decoder function (d#324)
 #[derive(Debug, Clone)]
@@ -1033,6 +1942,16 @@ base_offset_size: u8,
 index_size: u8,
 item_count: u32,
 items: Vec<mpeg4_iloc_atom_data_items>
+}
+
+impl CommonObject for mpeg4_tool_atom_data_data {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_tool_atom_data_data;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_tool_atom_data_data(p)
+}
 }
 
 /// expected size: 32
@@ -1049,6 +1968,16 @@ value: Vec<u8>
 #[derive(Debug, Clone)]
 pub enum mpeg4_tool_atom_data { data(mpeg4_tool_atom_data_data), unknown(Vec<u8>) }
 
+impl CommonObject for mpeg4_tool_atom {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_tool_atom;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_tool_atom(p)
+}
+}
+
 /// expected size: 56
 /// trait-ready: unique decoder function (d#326)
 #[derive(Debug, Clone)]
@@ -1063,6 +1992,16 @@ data: mpeg4_tool_atom_data
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
 pub enum mpeg4_ilst_atom_data { tool(Vec<mpeg4_tool_atom>), unknown(Vec<u8>) }
+
+impl CommonObject for mpeg4_ilst_atom {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_ilst_atom;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_ilst_atom(p)
+}
+}
 
 /// expected size: 48
 /// trait-ready: unique decoder function (d#325)
@@ -1081,6 +2020,16 @@ pub struct mpeg4_iref_data_single_item_reference_large_data {
 from_item_ID: u32,
 reference_count: u16,
 to_item_ID: Vec<u32>
+}
+
+impl CommonObject for mpeg4_iref_data_single_item_reference_large {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_iref_data_single_item_reference_large;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_iref_data_single_item_reference_large(p)
+}
 }
 
 /// expected size: 48
@@ -1102,6 +2051,16 @@ reference_count: u16,
 to_item_ID: Vec<u16>
 }
 
+impl CommonObject for mpeg4_iref_data_single_item_reference_small {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_iref_data_single_item_reference_small;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_iref_data_single_item_reference_small(p)
+}
+}
+
 /// expected size: 48
 /// trait-ready: unique decoder function (d#329)
 #[derive(Debug, Clone)]
@@ -1117,6 +2076,16 @@ data: mpeg4_iref_data_single_item_reference_small_data
 #[derive(Debug, Clone)]
 pub enum mpeg4_iref_data_single_item_reference { large(Vec<mpeg4_iref_data_single_item_reference_large>), small(Vec<mpeg4_iref_data_single_item_reference_small>) }
 
+impl CommonObject for mpeg4_iref_data {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_iref_data;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_iref_data(p)
+}
+}
+
 /// expected size: 40
 /// trait-ready: unique decoder function (d#323)
 #[derive(Debug, Clone)]
@@ -1131,6 +2100,16 @@ single_item_reference: mpeg4_iref_data_single_item_reference
 #[derive(Debug, Copy, Clone)]
 pub enum mpeg4_pitm_atom_data_item_ID { Id16(u16), Id32(u32) }
 
+impl CommonObject for mpeg4_pitm_atom_data {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_pitm_atom_data;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_pitm_atom_data(p)
+}
+}
+
 /// expected size: 12
 /// trait-ready: unique decoder function (d#321)
 #[derive(Debug, Copy, Clone)]
@@ -1140,10 +2119,31 @@ flags: (u8, u8, u8),
 item_ID: mpeg4_pitm_atom_data_item_ID
 }
 
+impl CommonObject for mpeg4_meta_atom_data {
+type Args<'a> = ((u8, u8, u8, u8),);
+
+type Output<'a> = mpeg4_meta_atom_data;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let r#type = args.0;
+Decoder_mpeg4_meta_atom_data(p, r#type)
+}
+}
+
 /// expected size: 56
 /// trait-ready: unique decoder function (d#319)
 #[derive(Debug, Clone)]
 pub enum mpeg4_meta_atom_data { dinf(Vec<mpeg4_dinf_atom>), hdlr(mpeg4_meta_hdlr_data), idat(Vec<u8>), iinf(mpeg4_iinf), iloc(mpeg4_iloc_atom_data), ilst(Vec<mpeg4_ilst_atom>), iref(mpeg4_iref_data), pitm(mpeg4_pitm_atom_data), unknown(Vec<u8>) }
+
+impl CommonObject for mpeg4_meta_atom {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_meta_atom;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_meta_atom(p)
+}
+}
 
 /// expected size: 72
 /// trait-ready: unique decoder function (d#286)
@@ -1180,6 +2180,16 @@ duration: u64
 #[derive(Debug, Copy, Clone)]
 pub enum mpeg4_mvhd_data_fields { version0(mpeg4_mvhd_data_fields_version0), version1(mpeg4_mvhd_data_fields_version1) }
 
+impl CommonObject for mpeg4_mvhd_data {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_mvhd_data;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_mvhd_data(p)
+}
+}
+
 /// expected size: 112
 /// trait-ready: unique decoder function (d#288)
 #[derive(Debug, Clone)]
@@ -1196,6 +2206,16 @@ pre_defined: Vec<u32>,
 next_track_ID: u32
 }
 
+impl CommonObject for mpeg4_elst_data_entry {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_elst_data_entry;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_elst_data_entry(p)
+}
+}
+
 /// expected size: 12
 /// trait-ready: unique decoder function (d#318)
 #[derive(Debug, Copy, Clone)]
@@ -1203,6 +2223,16 @@ pub struct mpeg4_elst_data_entry {
 track_duration: u32,
 media_time: u32,
 media_rate: u32
+}
+
+impl CommonObject for mpeg4_elst_data {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_elst_data;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_elst_data(p)
+}
 }
 
 /// expected size: 32
@@ -1220,6 +2250,16 @@ edit_list_table: Vec<mpeg4_elst_data_entry>
 #[derive(Debug, Clone)]
 pub enum mpeg4_edts_atom_data { elst(mpeg4_elst_data), unknown(Vec<u8>) }
 
+impl CommonObject for mpeg4_edts_atom {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_edts_atom;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_edts_atom(p)
+}
+}
+
 /// expected size: 56
 /// trait-ready: unique decoder function (d#292)
 #[derive(Debug, Clone)]
@@ -1228,6 +2268,16 @@ size_field: u32,
 r#type: (u8, u8, u8, u8),
 size: u64,
 data: mpeg4_edts_atom_data
+}
+
+impl CommonObject for mpeg4_mdia_hdlr_data {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_mdia_hdlr_data;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_mdia_hdlr_data(p)
+}
 }
 
 /// expected size: 48
@@ -1244,6 +2294,16 @@ component_flags_mask: u32,
 component_name: Vec<u8>
 }
 
+impl CommonObject for mpeg4_mdhd_data {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_mdhd_data;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_mdhd_data(p)
+}
+}
+
 /// expected size: 48
 /// trait-ready: unique decoder function (d#296)
 #[derive(Debug, Copy, Clone)]
@@ -1253,6 +2313,16 @@ flags: (u8, u8, u8),
 fields: mpeg4_mvhd_data_fields,
 language: u16,
 pre_defined: u16
+}
+
+impl CommonObject for mpeg4_smhd_data {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_smhd_data;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_smhd_data(p)
+}
 }
 
 /// expected size: 8
@@ -1265,6 +2335,16 @@ balance: u16,
 reserved: u16
 }
 
+impl CommonObject for mpeg4_co64_data {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_co64_data;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_co64_data(p)
+}
+}
+
 /// expected size: 32
 /// trait-ready: unique decoder function (d#309)
 #[derive(Debug, Clone)]
@@ -1275,12 +2355,32 @@ entry_count: u32,
 chunk_offset: Vec<u64>
 }
 
+impl CommonObject for mpeg4_ctts_sample_entry {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_ctts_sample_entry;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_ctts_sample_entry(p)
+}
+}
+
 /// expected size: 8
 /// trait-ready: unique decoder function (d#312)
 #[derive(Debug, Copy, Clone)]
 pub struct mpeg4_ctts_sample_entry {
 sample_count: u32,
 sample_offset: u32
+}
+
+impl CommonObject for mpeg4_ctts_data {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_ctts_data;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_ctts_data(p)
+}
 }
 
 /// expected size: 32
@@ -1299,6 +2399,16 @@ sample_entries: Vec<mpeg4_ctts_sample_entry>
 pub struct mpeg4_sbgp_data_sample_groups {
 sample_count: u32,
 group_description_index: u32
+}
+
+impl CommonObject for mpeg4_sbgp_data {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_sbgp_data;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_sbgp_data(p)
+}
 }
 
 /// expected size: 48
@@ -1321,6 +2431,16 @@ description_length: u32,
 sample_group_entry: Vec<u8>
 }
 
+impl CommonObject for mpeg4_sgpd_data {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_sgpd_data;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_sgpd_data(p)
+}
+}
+
 /// expected size: 40
 /// trait-ready: unique decoder function (d#310)
 #[derive(Debug, Clone)]
@@ -1331,6 +2451,16 @@ grouping_type: u32,
 default_length: u32,
 entry_count: u32,
 sample_groups: Vec<mpeg4_sgpd_data_sample_groups>
+}
+
+impl CommonObject for mpeg4_stco_data {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_stco_data;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_stco_data(p)
+}
 }
 
 /// expected size: 32
@@ -1352,6 +2482,16 @@ samples_per_chunk: u32,
 sample_description_index: u32
 }
 
+impl CommonObject for mpeg4_stsc_data {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_stsc_data;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_stsc_data(p)
+}
+}
+
 /// expected size: 32
 /// trait-ready: unique decoder function (d#306)
 #[derive(Debug, Clone)]
@@ -1360,6 +2500,16 @@ version: u8,
 flags: (u8, u8, u8),
 entry_count: u32,
 chunk_entries: Vec<mpeg4_stsc_data_chunk_entries>
+}
+
+impl CommonObject for mpeg4_stsd_data {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_stsd_data;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_stsd_data(p)
+}
 }
 
 /// expected size: 32
@@ -1372,6 +2522,16 @@ entry_count: u32,
 sample_entries: Vec<mpeg4_dref_data_data>
 }
 
+impl CommonObject for mpeg4_stss_data {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_stss_data;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_stss_data(p)
+}
+}
+
 /// expected size: 32
 /// trait-ready: unique decoder function (d#305)
 #[derive(Debug, Clone)]
@@ -1380,6 +2540,16 @@ version: u8,
 flags: (u8, u8, u8),
 entry_count: u32,
 sample_number: Vec<u32>
+}
+
+impl CommonObject for mpeg4_stsz_data {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_stsz_data;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_stsz_data(p)
+}
 }
 
 /// expected size: 40
@@ -1393,12 +2563,32 @@ sample_count: u32,
 entry_size: Option<Vec<u32>>
 }
 
+impl CommonObject for mpeg4_stts_sample_entry {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_stts_sample_entry;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_stts_sample_entry(p)
+}
+}
+
 /// expected size: 8
 /// trait-ready: unique decoder function (d#313)
 #[derive(Debug, Copy, Clone)]
 pub struct mpeg4_stts_sample_entry {
 sample_count: u32,
 sample_delta: u32
+}
+
+impl CommonObject for mpeg4_stts_data {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_stts_data;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_stts_data(p)
+}
 }
 
 /// expected size: 32
@@ -1416,6 +2606,16 @@ sample_entries: Vec<mpeg4_stts_sample_entry>
 #[derive(Debug, Clone)]
 pub enum mpeg4_stbl_atom_data { co64(mpeg4_co64_data), ctts(mpeg4_ctts_data), sbgp(mpeg4_sbgp_data), sgpd(mpeg4_sgpd_data), stco(mpeg4_stco_data), stsc(mpeg4_stsc_data), stsd(mpeg4_stsd_data), stss(mpeg4_stss_data), stsz(mpeg4_stsz_data), stts(mpeg4_stts_data), unknown(Vec<u8>) }
 
+impl CommonObject for mpeg4_stbl_atom {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_stbl_atom;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_stbl_atom(p)
+}
+}
+
 /// expected size: 72
 /// trait-ready: unique decoder function (d#301)
 #[derive(Debug, Clone)]
@@ -1424,6 +2624,16 @@ size_field: u32,
 r#type: (u8, u8, u8, u8),
 size: u64,
 data: mpeg4_stbl_atom_data
+}
+
+impl CommonObject for mpeg4_vmhd_data {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_vmhd_data;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_vmhd_data(p)
+}
 }
 
 /// expected size: 32
@@ -1441,6 +2651,16 @@ opcolor: Vec<u16>
 #[derive(Debug, Clone)]
 pub enum mpeg4_minf_atom_data { dinf(Vec<mpeg4_dinf_atom>), smhd(mpeg4_smhd_data), stbl(Vec<mpeg4_stbl_atom>), unknown(Vec<u8>), vmhd(mpeg4_vmhd_data) }
 
+impl CommonObject for mpeg4_minf_atom {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_minf_atom;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_minf_atom(p)
+}
+}
+
 /// expected size: 56
 /// trait-ready: unique decoder function (d#297)
 #[derive(Debug, Clone)]
@@ -1451,10 +2671,31 @@ size: u64,
 data: mpeg4_minf_atom_data
 }
 
+impl CommonObject for mpeg4_mdia_atom_data {
+type Args<'a> = ((u8, u8, u8, u8),);
+
+type Output<'a> = mpeg4_mdia_atom_data;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let r#type = args.0;
+Decoder_mpeg4_mdia_atom_data(p, r#type)
+}
+}
+
 /// expected size: 56
 /// trait-ready: unique decoder function (d#294)
 #[derive(Debug, Clone)]
 pub enum mpeg4_mdia_atom_data { hdlr(mpeg4_mdia_hdlr_data), mdhd(mpeg4_mdhd_data), minf(Vec<mpeg4_minf_atom>), unknown(Vec<u8>) }
+
+impl CommonObject for mpeg4_mdia_atom {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_mdia_atom;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_mdia_atom(p)
+}
+}
 
 /// expected size: 72
 /// trait-ready: unique decoder function (d#293)
@@ -1493,6 +2734,16 @@ duration: u64
 #[derive(Debug, Copy, Clone)]
 pub enum mpeg4_tkhd_data_fields { version0(mpeg4_tkhd_data_fields_version0), version1(mpeg4_tkhd_data_fields_version1) }
 
+impl CommonObject for mpeg4_tkhd_data {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_tkhd_data;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_tkhd_data(p)
+}
+}
+
 /// expected size: 96
 /// trait-ready: unique decoder function (d#291)
 #[derive(Debug, Clone)]
@@ -1515,6 +2766,16 @@ height: u32
 #[derive(Debug, Clone)]
 pub enum mpeg4_trak_atom_data { edts(Vec<mpeg4_edts_atom>), mdia(Vec<mpeg4_mdia_atom>), tkhd(mpeg4_tkhd_data), unknown(Vec<u8>) }
 
+impl CommonObject for mpeg4_trak_atom {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_trak_atom;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_trak_atom(p)
+}
+}
+
 /// expected size: 120
 /// trait-ready: unique decoder function (d#289)
 #[derive(Debug, Clone)]
@@ -1529,6 +2790,16 @@ data: mpeg4_trak_atom_data
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
 pub enum mpeg4_udta_atom_data { meta(u32, Vec<mpeg4_meta_atom>), unknown(Vec<u8>) }
+
+impl CommonObject for mpeg4_udta_atom {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_udta_atom;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_udta_atom(p)
+}
+}
 
 /// expected size: 56
 /// trait-ready: unique decoder function (d#290)
@@ -1545,6 +2816,16 @@ data: mpeg4_udta_atom_data
 #[derive(Debug, Clone)]
 pub enum mpeg4_moov_atom_data { mvhd(mpeg4_mvhd_data), trak(Vec<mpeg4_trak_atom>), udta(Vec<mpeg4_udta_atom>), unknown(Vec<u8>) }
 
+impl CommonObject for mpeg4_moov_atom {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_moov_atom;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_moov_atom(p)
+}
+}
+
 /// expected size: 136
 /// trait-ready: unique decoder function (d#287)
 #[derive(Debug, Clone)]
@@ -1560,6 +2841,16 @@ data: mpeg4_moov_atom_data
 #[derive(Debug, Clone)]
 pub enum mpeg4_atom_data { free, ftyp(mpeg4_ftyp_data), mdat, meta(u32, Vec<mpeg4_meta_atom>), moov(Vec<mpeg4_moov_atom>), unknown(Vec<u8>) }
 
+impl CommonObject for mpeg4_atom {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_atom;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_atom(p)
+}
+}
+
 /// expected size: 56
 /// trait-ready: unique decoder function (d#283)
 #[derive(Debug, Clone)]
@@ -1570,11 +2861,31 @@ size: u64,
 data: mpeg4_atom_data
 }
 
+impl CommonObject for mpeg4_main {
+type Args<'a> = ();
+
+type Output<'a> = mpeg4_main;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_mpeg4_main(p)
+}
+}
+
 /// expected size: 24
 /// trait-ready: unique decoder function (d#8)
 #[derive(Debug, Clone)]
 pub struct mpeg4_main {
 atoms: Vec<mpeg4_atom>
+}
+
+impl CommonObject for opentype_table_record {
+type Args<'a> = ();
+
+type Output<'a> = opentype_table_record;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_table_record(p)
+}
 }
 
 /// expected size: 16
@@ -1587,6 +2898,17 @@ offset: u32,
 length: u32
 }
 
+impl CommonObject for opentype_cmap_subtable_format0 {
+type Args<'a> = (u16,);
+
+type Output<'a> = opentype_cmap_subtable_format0;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let _platform = args.0;
+Decoder_opentype_cmap_subtable_format0(p, _platform)
+}
+}
+
 /// expected size: 32
 /// trait-ready: unique decoder function (d#182)
 #[derive(Debug, Clone)]
@@ -1595,6 +2917,17 @@ format: u16,
 length: u16,
 language: u16,
 glyph_id_array: Vec<u8>
+}
+
+impl CommonObject for opentype_cmap_subtable_format10 {
+type Args<'a> = (u16,);
+
+type Output<'a> = opentype_cmap_subtable_format10;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let _platform = args.0;
+Decoder_opentype_cmap_subtable_format10(p, _platform)
+}
 }
 
 /// expected size: 48
@@ -1607,6 +2940,16 @@ language: u32,
 start_char_code: u32,
 num_chars: u32,
 glyph_id_array: Vec<u16>
+}
+
+impl CommonObject for opentype_types_sequential_map_record {
+type Args<'a> = ();
+
+type Output<'a> = opentype_types_sequential_map_record;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_types_sequential_map_record(p)
+}
 }
 
 /// expected size: 12
@@ -1677,6 +3020,17 @@ offset: u32,
 _data: std::marker::PhantomData<Option<opentype_variation_selector_non_default_uvs_offset__data>>
 }
 
+impl CommonObject for opentype_variation_selector {
+type Args<'a> = (View<'input>,);
+
+type Output<'a> = opentype_variation_selector;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let table_view = args.0;
+Decoder_opentype_variation_selector(p, table_view)
+}
+}
+
 /// expected size: 12
 /// trait-ready: unique decoder function (d#191)
 #[derive(Debug, Copy, Clone)]
@@ -1684,6 +3038,17 @@ pub struct opentype_variation_selector {
 var_selector: u32,
 default_uvs_offset: opentype_variation_selector_default_uvs_offset,
 non_default_uvs_offset: opentype_variation_selector_non_default_uvs_offset
+}
+
+impl CommonObject for opentype_cmap_subtable_format14 {
+type Args<'a> = (View<'input>,);
+
+type Output<'a> = opentype_cmap_subtable_format14;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let table_view = args.0;
+Decoder_opentype_cmap_subtable_format14(p, table_view)
+}
 }
 
 /// expected size: 40
@@ -1706,6 +3071,17 @@ id_delta: u16,
 id_range_offset: u16
 }
 
+impl CommonObject for opentype_cmap_subtable_format2 {
+type Args<'a> = (u16,);
+
+type Output<'a> = opentype_cmap_subtable_format2;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let _platform = args.0;
+Decoder_opentype_cmap_subtable_format2(p, _platform)
+}
+}
+
 /// expected size: 80
 /// trait-ready: unique decoder function (d#183)
 #[derive(Debug, Clone)]
@@ -1716,6 +3092,17 @@ language: u16,
 sub_header_keys: Vec<u16>,
 sub_headers: Vec<opentype_cmap_subtable_format2_sub_headers>,
 glyph_array: Vec<u16>
+}
+
+impl CommonObject for opentype_cmap_subtable_format4 {
+type Args<'a> = (u16,);
+
+type Output<'a> = opentype_cmap_subtable_format4;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let _platform = args.0;
+Decoder_opentype_cmap_subtable_format4(p, _platform)
+}
 }
 
 /// expected size: 136
@@ -1736,6 +3123,17 @@ id_range_offset: Vec<u16>,
 glyph_array: Vec<u16>
 }
 
+impl CommonObject for opentype_cmap_subtable_format6 {
+type Args<'a> = (u16,);
+
+type Output<'a> = opentype_cmap_subtable_format6;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let _platform = args.0;
+Decoder_opentype_cmap_subtable_format6(p, _platform)
+}
+}
+
 /// expected size: 40
 /// trait-ready: unique decoder function (d#185)
 #[derive(Debug, Clone)]
@@ -1746,6 +3144,17 @@ language: u16,
 first_code: u16,
 entry_count: u16,
 glyph_id_array: Vec<u16>
+}
+
+impl CommonObject for opentype_cmap_subtable_format8 {
+type Args<'a> = (u16,);
+
+type Output<'a> = opentype_cmap_subtable_format8;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let _platform = args.0;
+Decoder_opentype_cmap_subtable_format8(p, _platform)
+}
 }
 
 /// expected size: 64
@@ -1765,6 +3174,17 @@ groups: Vec<opentype_types_sequential_map_record>
 #[derive(Debug, Clone)]
 pub enum opentype_cmap_subtable_data { Format0(opentype_cmap_subtable_format0), Format10(opentype_cmap_subtable_format10), Format12(opentype_cmap_subtable_format12), Format13(opentype_cmap_subtable_format12), Format14(opentype_cmap_subtable_format14), Format2(opentype_cmap_subtable_format2), Format4(opentype_cmap_subtable_format4), Format6(opentype_cmap_subtable_format6), Format8(opentype_cmap_subtable_format8) }
 
+impl<'input> CommonObject for opentype_cmap_subtable<'input> {
+type Args<'a> = (u16,);
+
+type Output<'input> = opentype_cmap_subtable<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let _platform = args.0;
+Decoder_opentype_cmap_subtable(p, _platform)
+}
+}
+
 /// expected size: 176
 /// trait-ready: unique decoder function (d#181)
 #[derive(Debug, Clone)]
@@ -1782,6 +3202,17 @@ offset: u32,
 _data: std::marker::PhantomData<Option<opentype_cmap_subtable<'input>>>
 }
 
+impl<'input> CommonObject for opentype_encoding_record<'input> {
+type Args<'a> = (View<'input>,);
+
+type Output<'input> = opentype_encoding_record<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let table_view = args.0;
+Decoder_opentype_encoding_record(p, table_view)
+}
+}
+
 /// expected size: 8
 /// trait-ready: unique decoder function (d#180)
 #[derive(Debug, Copy, Clone)]
@@ -1789,6 +3220,16 @@ pub struct opentype_encoding_record<'input> {
 platform: u16,
 encoding: u16,
 subtable: opentype_encoding_record_subtable<'input>
+}
+
+impl<'input> CommonObject for opentype_cmap_table<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_cmap_table<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_cmap_table(p)
+}
 }
 
 /// expected size: 56
@@ -1827,6 +3268,16 @@ outline: bool,
 underline: bool,
 italic: bool,
 bold: bool
+}
+
+impl CommonObject for opentype_head_table {
+type Args<'a> = ();
+
+type Output<'a> = opentype_head_table;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_head_table(p)
+}
 }
 
 /// expected size: 64
@@ -1877,6 +3328,16 @@ metric_data_format: u16,
 number_of_long_metrics: u16
 }
 
+impl CommonObject for opentype_maxp_version1 {
+type Args<'a> = ();
+
+type Output<'a> = opentype_maxp_version1;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_maxp_version1(p)
+}
+}
+
 /// expected size: 26
 /// trait-ready: unique decoder function (d#178)
 #[derive(Debug, Copy, Clone)]
@@ -1900,6 +3361,16 @@ max_component_depth: u16
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
 pub enum opentype_maxp_table_data { MaxpPostScript, MaxpUnknown(u32), MaxpV1(opentype_maxp_version1) }
+
+impl CommonObject for opentype_maxp_table {
+type Args<'a> = ();
+
+type Output<'a> = opentype_maxp_table;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_maxp_table(p)
+}
+}
 
 /// expected size: 36
 /// trait-ready: unique decoder function (d#32)
@@ -1934,6 +3405,17 @@ offset: u16,
 data: &'input [u8]
 }
 
+impl<'input> CommonObject for opentype_name_name_record<'input> {
+type Args<'a> = (View<'input>,);
+
+type Output<'input> = opentype_name_name_record<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let storage_view = args.0;
+Decoder_opentype_name_name_record(p, storage_view)
+}
+}
+
 /// expected size: 32
 /// trait-ready: unique decoder function (d#175)
 #[derive(Debug, Copy, Clone)]
@@ -1946,12 +3428,34 @@ length: u16,
 string: opentype_name_name_record_string<'input>
 }
 
+impl<'input> CommonObject for opentype_name_lang_tag_record<'input> {
+type Args<'a> = (View<'input>,);
+
+type Output<'input> = opentype_name_lang_tag_record<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let storage_view = args.0;
+Decoder_opentype_name_lang_tag_record(p, storage_view)
+}
+}
+
 /// expected size: 24
 /// trait-ready: unique decoder function (d#177)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_name_lang_tag_record<'input> {
 length: u16,
 lang_tag: opentype_name_name_record_string<'input>
+}
+
+impl<'input> CommonObject for opentype_name_name_version_1<'input> {
+type Args<'a> = (View<'input>,);
+
+type Output<'input> = opentype_name_name_version_1<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let storage_view = args.0;
+Decoder_opentype_name_name_version_1(p, storage_view)
+}
 }
 
 /// expected size: 32
@@ -1966,6 +3470,16 @@ lang_tag_records: Vec<opentype_name_lang_tag_record<'input>>
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
 pub enum opentype_name_table_data<'input> { NameVersion0, NameVersion1(opentype_name_name_version_1<'input>), NameVersionUnknown(u16) }
+
+impl<'input> CommonObject for opentype_name_table<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_name_table<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_name_table(p)
+}
+}
 
 /// expected size: 96
 /// trait-ready: unique decoder function (d#34)
@@ -2020,6 +3534,17 @@ us_win_descent: u16,
 extra_fields_v1: Option<opentype_os2_table_data_extra_fields_v1>
 }
 
+impl CommonObject for opentype_os2_table {
+type Args<'a> = (u32,);
+
+type Output<'a> = opentype_os2_table;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let table_length = args.0;
+Decoder_opentype_os2_table(p, table_length)
+}
+}
+
 /// expected size: 120
 /// trait-ready: unique decoder function (d#35)
 #[derive(Debug, Clone)]
@@ -2052,12 +3577,32 @@ us_last_char_index: u16,
 data: Option<opentype_os2_table_data>
 }
 
+impl<'input> CommonObject for opentype_post_pascal_string<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_post_pascal_string<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_post_pascal_string(p)
+}
+}
+
 /// expected size: 16
 /// trait-ready: unique decoder function (d#174)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_post_pascal_string<'input> {
 length: u8,
 string: &'input [u8]
+}
+
+impl<'input> CommonObject for opentype_post_version2<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_post_version2<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_post_version2(p)
+}
 }
 
 /// expected size: 56
@@ -2082,6 +3627,16 @@ offset: Vec<u8>
 #[derive(Debug, Clone)]
 pub enum opentype_post_table_names<'input> { Version1, Version2(opentype_post_version2<'input>), Version2Dot5(opentype_post_table_names_Version2Dot5), Version3, VersionUnknown(u32) }
 
+impl<'input> CommonObject for opentype_post_table<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_post_table<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_post_table(p)
+}
+}
+
 /// expected size: 104
 /// trait-ready: unique decoder function (d#36)
 #[derive(Debug, Clone)]
@@ -2102,6 +3657,18 @@ names: opentype_post_table_names<'input>
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
 pub enum opentype_loca_table_offsets { Offsets16(Vec<u16>), Offsets32(Vec<u32>) }
+
+impl CommonObject for opentype_loca_table {
+type Args<'a> = (u16, u16);
+
+type Output<'a> = opentype_loca_table;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let num_glyphs = args.0;
+let index_to_loc_format = args.1;
+Decoder_opentype_loca_table(p, num_glyphs, index_to_loc_format)
+}
+}
 
 /// expected size: 32
 /// trait-ready: unique decoder function (d#37)
@@ -2162,6 +3729,16 @@ argument2: opentype_glyf_composite_acc_glyphs_argument1,
 scale: Option<opentype_glyf_composite_acc_glyphs_scale>
 }
 
+impl CommonObject for opentype_glyf_composite {
+type Args<'a> = ();
+
+type Output<'a> = opentype_glyf_composite;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_glyf_composite(p)
+}
+}
+
 /// expected size: 48
 /// trait-ready: unique decoder function (d#171)
 #[derive(Debug, Clone)]
@@ -2182,6 +3759,17 @@ y_is_same_or_positive_y_short_vector: bool,
 overlap_simple: bool
 }
 
+impl CommonObject for opentype_glyf_simple {
+type Args<'a> = (u16,);
+
+type Output<'a> = opentype_glyf_simple;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let n_contours = args.0;
+Decoder_opentype_glyf_simple(p, n_contours)
+}
+}
+
 /// expected size: 128
 /// trait-ready: unique decoder function (d#170)
 #[derive(Debug, Clone)]
@@ -2195,11 +3783,32 @@ x_coordinates: Vec<u16>,
 y_coordinates: Vec<u16>
 }
 
+impl CommonObject for opentype_glyf_description {
+type Args<'a> = (u16,);
+
+type Output<'a> = opentype_glyf_description;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let n_contours = args.0;
+Decoder_opentype_glyf_description(p, n_contours)
+}
+}
+
 /// expected size: 136
 /// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InEnum { variants: [Noop, Noop, DirectHeap] }, Layout { size: 48, align: 8 (1 << 3) })
 /// trait-ready: unique decoder function (d#169)
 #[derive(Debug, Clone)]
 pub enum opentype_glyf_description { Composite(opentype_glyf_composite), HeaderOnly, Simple(opentype_glyf_simple) }
+
+impl CommonObject for opentype_glyf_entry {
+type Args<'a> = ();
+
+type Output<'a> = opentype_glyf_entry;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_glyf_entry(p)
+}
+}
 
 /// expected size: 152
 /// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [Noop, Noop, Noop, Noop, Noop, InDef(InEnum { variants: [Noop, Noop, DirectHeap] })] }, Layout { size: 64, align: 8 (1 << 3) })
@@ -2226,6 +3835,17 @@ _data: std::marker::PhantomData<Option<opentype_glyf_entry>>
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
 pub enum opentype_glyf_table_glyphs { EmptyGlyph, Glyph(opentype_glyf_table_glyphs_Glyph) }
+
+impl<'input> CommonObject for opentype_glyf_table<'input> {
+type Args<'a> = (opentype_loca_table_offsets,);
+
+type Output<'input> = opentype_glyf_table<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let offsets = args.0;
+Decoder_opentype_glyf_table(p, offsets)
+}
+}
 
 /// expected size: 48
 /// trait-ready: unique decoder function (d#38)
@@ -2264,6 +3884,16 @@ pub enum opentype_gasp_table_gasp_ranges_range_gasp_behavior { Version0(opentype
 pub struct opentype_gasp_table_gasp_ranges {
 range_max_ppem: u16,
 range_gasp_behavior: opentype_gasp_table_gasp_ranges_range_gasp_behavior
+}
+
+impl CommonObject for opentype_gasp_table {
+type Args<'a> = ();
+
+type Output<'a> = opentype_gasp_table;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_gasp_table(p)
+}
 }
 
 /// expected size: 32
@@ -2319,6 +3949,16 @@ delta_set_inner_index: u16,
 delta_format: (u8, u8)
 }
 
+impl CommonObject for opentype_common_device_or_variation_index_table {
+type Args<'a> = ();
+
+type Output<'a> = opentype_common_device_or_variation_index_table;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_common_device_or_variation_index_table(p)
+}
+}
+
 /// expected size: 40
 /// trait-ready: unique decoder function (d#128)
 #[derive(Debug, Clone)]
@@ -2352,6 +3992,16 @@ base_coord_point: u16
 #[derive(Debug, Copy, Clone)]
 pub enum opentype_layout_base_coord_data { DeviceData(opentype_layout_base_coord_data_DeviceData), GlyphData(opentype_layout_base_coord_data_GlyphData), NoData }
 
+impl<'input> CommonObject for opentype_layout_base_coord<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_layout_base_coord<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_layout_base_coord(p)
+}
+}
+
 /// expected size: 40
 /// trait-ready: unique decoder function (d#166)
 #[derive(Debug, Copy, Clone)]
@@ -2368,6 +4018,16 @@ data: opentype_layout_base_coord_data
 pub struct opentype_layout_base_values_base_coord_offsets<'input> {
 offset: u16,
 _data: std::marker::PhantomData<Option<opentype_layout_base_coord<'input>>>
+}
+
+impl<'input> CommonObject for opentype_layout_base_values<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_layout_base_values<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_layout_base_values(p)
+}
 }
 
 /// expected size: 56
@@ -2388,6 +4048,17 @@ offset: u16,
 _data: std::marker::PhantomData<Option<opentype_layout_base_values<'input>>>
 }
 
+impl<'input> CommonObject for opentype_layout_feat_min_max<'input> {
+type Args<'a> = (View<'input>,);
+
+type Output<'input> = opentype_layout_feat_min_max<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let table_view = args.0;
+Decoder_opentype_layout_feat_min_max(p, table_view)
+}
+}
+
 /// expected size: 8
 /// trait-ready: unique decoder function (d#167)
 #[derive(Debug, Copy, Clone)]
@@ -2395,6 +4066,16 @@ pub struct opentype_layout_feat_min_max<'input> {
 feature_tag: u32,
 min_coord_offset: opentype_layout_base_values_base_coord_offsets<'input>,
 max_coord_offset: opentype_layout_base_values_base_coord_offsets<'input>
+}
+
+impl<'input> CommonObject for opentype_layout_min_max<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_layout_min_max<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_layout_min_max(p)
+}
 }
 
 /// expected size: 56
@@ -2416,12 +4097,33 @@ offset: u16,
 _data: std::marker::PhantomData<Option<opentype_layout_min_max<'input>>>
 }
 
+impl<'input> CommonObject for opentype_base_base_langsys<'input> {
+type Args<'a> = (View<'input>,);
+
+type Output<'input> = opentype_base_base_langsys<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let table_view = args.0;
+Decoder_opentype_base_base_langsys(p, table_view)
+}
+}
+
 /// expected size: 8
 /// trait-ready: unique decoder function (d#165)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_base_base_langsys<'input> {
 base_lang_sys_tag: u32,
 min_max: opentype_layout_base_script_default_min_max_offset<'input>
+}
+
+impl<'input> CommonObject for opentype_layout_base_script<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_layout_base_script<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_layout_base_script(p)
+}
 }
 
 /// expected size: 56
@@ -2441,6 +4143,17 @@ base_lang_sys_records: Vec<opentype_base_base_langsys<'input>>
 pub struct opentype_base_base_script_record_base_script<'input> {
 offset: u16,
 _data: std::marker::PhantomData<Option<opentype_layout_base_script<'input>>>
+}
+
+impl<'input> CommonObject for opentype_base_base_script_record<'input> {
+type Args<'a> = (View<'input>,);
+
+type Output<'input> = opentype_base_base_script_record<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let table_view = args.0;
+Decoder_opentype_base_base_script_record(p, table_view)
+}
 }
 
 /// expected size: 8
@@ -2466,6 +4179,16 @@ base_script_records: Vec<opentype_base_base_script_record<'input>>
 pub struct opentype_layout_axis_table_base_script_list_offset<'input> {
 offset: u16,
 _data: std::marker::PhantomData<Option<opentype_layout_axis_table_base_script_list_offset__data<'input>>>
+}
+
+impl<'input> CommonObject for opentype_layout_axis_table<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_layout_axis_table<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_layout_axis_table(p)
+}
 }
 
 /// expected size: 32
@@ -2499,6 +4222,16 @@ end_coord: opentype_gvar_tuple_record_coordinates
 #[derive(Debug, Clone)]
 pub struct opentype_common_variation_region_list_variation_regions {
 region_axes: Vec<opentype_common_variation_region_list_variation_regions_region_axes>
+}
+
+impl CommonObject for opentype_common_variation_region_list {
+type Args<'a> = ();
+
+type Output<'a> = opentype_common_variation_region_list;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_common_variation_region_list(p)
+}
 }
 
 /// expected size: 32
@@ -2547,6 +4280,16 @@ delta_data_half_word: Vec<u16>
 #[derive(Debug, Clone)]
 pub enum opentype_common_item_variation_data_delta_sets { Delta16Sets(Vec<opentype_common_item_variation_data_delta_sets_Delta16Sets>), Delta32Sets(Vec<opentype_common_item_variation_data_delta_sets_Delta32Sets>) }
 
+impl CommonObject for opentype_common_item_variation_data {
+type Args<'a> = ();
+
+type Output<'a> = opentype_common_item_variation_data;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_common_item_variation_data(p)
+}
+}
+
 /// expected size: 64
 /// trait-ready: unique decoder function (d#155)
 #[derive(Debug, Clone)]
@@ -2566,6 +4309,16 @@ offset: u32,
 _data: std::marker::PhantomData<Option<opentype_common_item_variation_data>>
 }
 
+impl<'input> CommonObject for opentype_common_item_variation_store<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_common_item_variation_store<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_common_item_variation_store(p)
+}
+}
+
 /// expected size: 56
 /// trait-ready: unique decoder function (d#153)
 #[derive(Debug, Clone)]
@@ -2583,6 +4336,16 @@ item_variation_data_list: Vec<opentype_common_item_variation_store_item_variatio
 pub struct opentype_base_table_item_var_store_offset<'input> {
 offset: u32,
 _data: std::marker::PhantomData<Option<opentype_common_item_variation_store<'input>>>
+}
+
+impl<'input> CommonObject for opentype_base_table<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_base_table<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_base_table(p)
+}
 }
 
 /// expected size: 40
@@ -2627,6 +4390,16 @@ class_range_records: Vec<opentype_class_def_data_Format2_class_range_records>
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
 pub enum opentype_class_def_data { Format1(opentype_class_def_data_Format1), Format2(opentype_class_def_data_Format2) }
+
+impl CommonObject for opentype_class_def {
+type Args<'a> = ();
+
+type Output<'a> = opentype_class_def;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_class_def(p)
+}
+}
 
 /// expected size: 48
 /// trait-ready: unique decoder function (d#93)
@@ -2674,6 +4447,16 @@ range_records: Vec<opentype_coverage_table_data_Format2_range_records>
 #[derive(Debug, Clone)]
 pub enum opentype_coverage_table_data { Format1(opentype_coverage_table_data_Format1), Format2(opentype_coverage_table_data_Format2) }
 
+impl CommonObject for opentype_coverage_table {
+type Args<'a> = ();
+
+type Output<'a> = opentype_coverage_table;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_coverage_table(p)
+}
+}
+
 /// expected size: 48
 /// trait-ready: unique decoder function (d#88)
 #[derive(Debug, Clone)]
@@ -2690,6 +4473,16 @@ offset: u16,
 _data: std::marker::PhantomData<Option<opentype_coverage_table>>
 }
 
+impl CommonObject for opentype_gdef_attach_point {
+type Args<'a> = ();
+
+type Output<'a> = opentype_gdef_attach_point;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_gdef_attach_point(p)
+}
+}
+
 /// expected size: 32
 /// trait-ready: unique decoder function (d#159)
 #[derive(Debug, Clone)]
@@ -2704,6 +4497,16 @@ point_indices: Vec<u16>
 pub struct opentype_gdef_attach_list_attach_point_offsets {
 offset: u16,
 _data: std::marker::PhantomData<Option<opentype_gdef_attach_point>>
+}
+
+impl<'input> CommonObject for opentype_gdef_attach_list<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_gdef_attach_list<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_gdef_attach_list(p)
+}
 }
 
 /// expected size: 56
@@ -2738,6 +4541,17 @@ pub struct opentype_gdef_caret_value_data_Format2 {
 caret_value_point_index: u16
 }
 
+impl<'input> CommonObject for opentype_gdef_caret_value_data_format3<'input> {
+type Args<'a> = (View<'input>,);
+
+type Output<'input> = opentype_gdef_caret_value_data_format3<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let table_view = args.0;
+Decoder_opentype_gdef_caret_value_data_format3(p, table_view)
+}
+}
+
 /// expected size: 32
 /// trait-ready: unique decoder function (d#158)
 #[derive(Debug, Copy, Clone)]
@@ -2751,6 +4565,16 @@ table: opentype_gdef_caret_value_data_format3_table
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
 pub enum opentype_gdef_caret_value_data<'input> { Format1(opentype_gdef_caret_value_data_Format1), Format2(opentype_gdef_caret_value_data_Format2), Format3(opentype_gdef_caret_value_data_format3<'input>) }
+
+impl<'input> CommonObject for opentype_gdef_caret_value<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_gdef_caret_value<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_gdef_caret_value(p)
+}
+}
 
 /// expected size: 48
 /// trait-ready: unique decoder function (d#157)
@@ -2768,6 +4592,16 @@ offset: u16,
 _data: std::marker::PhantomData<Option<opentype_gdef_caret_value<'input>>>
 }
 
+impl<'input> CommonObject for opentype_gdef_lig_glyph<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_gdef_lig_glyph<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_gdef_lig_glyph(p)
+}
+}
+
 /// expected size: 56
 /// trait-ready: unique decoder function (d#156)
 #[derive(Debug, Clone)]
@@ -2783,6 +4617,16 @@ caret_values: Vec<opentype_gdef_lig_glyph_caret_values<'input>>
 pub struct opentype_gdef_lig_caret_list_lig_glyph_offsets<'input> {
 offset: u16,
 _data: std::marker::PhantomData<Option<opentype_gdef_lig_glyph<'input>>>
+}
+
+impl<'input> CommonObject for opentype_gdef_lig_caret_list<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_gdef_lig_caret_list<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_gdef_lig_caret_list(p)
+}
 }
 
 /// expected size: 56
@@ -2809,6 +4653,16 @@ _data: std::marker::PhantomData<Option<opentype_gdef_lig_caret_list<'input>>>
 pub struct opentype_gdef_mark_glyph_set_coverage {
 offset: u32,
 _data: std::marker::PhantomData<Option<opentype_coverage_table>>
+}
+
+impl<'input> CommonObject for opentype_gdef_mark_glyph_set<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_gdef_mark_glyph_set<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_gdef_mark_glyph_set(p)
+}
 }
 
 /// expected size: 56
@@ -2849,6 +4703,16 @@ item_var_store: opentype_base_table_item_var_store_offset<'input>
 #[derive(Debug, Copy, Clone)]
 pub enum opentype_gdef_table_data<'input> { Version1_0, Version1_2(opentype_gdef_table_data_Version1_2<'input>), Version1_3(opentype_gdef_table_data_Version1_3<'input>) }
 
+impl<'input> CommonObject for opentype_gdef_table<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_gdef_table<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_gdef_table(p)
+}
+}
+
 /// expected size: 48
 /// trait-ready: unique decoder function (d#41)
 #[derive(Debug, Copy, Clone)]
@@ -2861,6 +4725,16 @@ attach_list: opentype_gdef_table_attach_list<'input>,
 lig_caret_list: opentype_gdef_table_lig_caret_list<'input>,
 mark_attach_class_def: opentype_gdef_table_glyph_class_def,
 data: opentype_gdef_table_data<'input>
+}
+
+impl CommonObject for opentype_layout_langsys {
+type Args<'a> = ();
+
+type Output<'a> = opentype_layout_langsys;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_layout_langsys(p)
+}
 }
 
 /// expected size: 32
@@ -2881,12 +4755,33 @@ offset: u16,
 _data: std::marker::PhantomData<Option<opentype_layout_langsys>>
 }
 
+impl CommonObject for opentype_layout_lang_sys_record {
+type Args<'a> = (View<'input>,);
+
+type Output<'a> = opentype_layout_lang_sys_record;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let script_view = args.0;
+Decoder_opentype_layout_lang_sys_record(p, script_view)
+}
+}
+
 /// expected size: 8
 /// trait-ready: unique decoder function (d#111)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_layout_lang_sys_record {
 lang_sys_tag: u32,
 lang_sys: opentype_layout_script_table_default_lang_sys
+}
+
+impl<'input> CommonObject for opentype_layout_script_table<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_layout_script_table<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_layout_script_table(p)
+}
 }
 
 /// expected size: 56
@@ -2907,12 +4802,33 @@ offset: u16,
 _data: std::marker::PhantomData<Option<opentype_layout_script_table<'input>>>
 }
 
+impl<'input> CommonObject for opentype_layout_script_record<'input> {
+type Args<'a> = (View<'input>,);
+
+type Output<'input> = opentype_layout_script_record<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let table_view = args.0;
+Decoder_opentype_layout_script_record(p, table_view)
+}
+}
+
 /// expected size: 8
 /// trait-ready: unique decoder function (d#108)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_layout_script_record<'input> {
 script_tag: u32,
 script: opentype_layout_script_record_script<'input>
+}
+
+impl<'input> CommonObject for opentype_layout_script_list<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_layout_script_list<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_layout_script_list(p)
+}
 }
 
 /// expected size: 56
@@ -2930,6 +4846,16 @@ script_records: Vec<opentype_layout_script_record<'input>>
 pub struct opentype_gpos_table_script_list<'input> {
 offset: u16,
 _data: std::marker::PhantomData<Option<opentype_layout_script_list<'input>>>
+}
+
+impl<'input> CommonObject for opentype_layout_feature_table<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_layout_feature_table<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_layout_feature_table(p)
+}
 }
 
 /// expected size: 56
@@ -2950,12 +4876,33 @@ offset: u16,
 _data: std::marker::PhantomData<Option<opentype_layout_feature_table<'input>>>
 }
 
+impl<'input> CommonObject for opentype_layout_feature_record<'input> {
+type Args<'a> = (View<'input>,);
+
+type Output<'input> = opentype_layout_feature_record<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let list_view = args.0;
+Decoder_opentype_layout_feature_record(p, list_view)
+}
+}
+
 /// expected size: 8
 /// trait-ready: unique decoder function (d#107)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_layout_feature_record<'input> {
 feature_tag: u32,
 feature: opentype_layout_feature_record_feature<'input>
+}
+
+impl<'input> CommonObject for opentype_layout_feature_list<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_layout_feature_list<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_layout_feature_list(p)
+}
 }
 
 /// expected size: 56
@@ -2987,12 +4934,32 @@ ignore_base_glyphs: bool,
 right_to_left: bool
 }
 
+impl CommonObject for opentype_layout_sequence_lookup {
+type Args<'a> = ();
+
+type Output<'a> = opentype_layout_sequence_lookup;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_layout_sequence_lookup(p)
+}
+}
+
 /// expected size: 4
 /// trait-ready: unique decoder function (d#92)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_layout_sequence_lookup {
 sequence_index: u16,
 lookup_list_index: u16
+}
+
+impl CommonObject for opentype_layout_chained_sequence_rule {
+type Args<'a> = ();
+
+type Output<'a> = opentype_layout_chained_sequence_rule;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_layout_chained_sequence_rule(p)
+}
 }
 
 /// expected size: 104
@@ -3017,6 +4984,16 @@ offset: u16,
 _data: std::marker::PhantomData<Option<opentype_layout_chained_sequence_rule>>
 }
 
+impl<'input> CommonObject for opentype_layout_chained_sequence_rule_set<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_layout_chained_sequence_rule_set<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_layout_chained_sequence_rule_set(p)
+}
+}
+
 /// expected size: 56
 /// trait-ready: unique decoder function (d#94)
 #[derive(Debug, Clone)]
@@ -3034,6 +5011,17 @@ offset: u16,
 _data: std::marker::PhantomData<Option<opentype_layout_chained_sequence_rule_set<'input>>>
 }
 
+impl<'input> CommonObject for opentype_layout_chained_sequence_context_format1<'input> {
+type Args<'a> = (View<'input>,);
+
+type Output<'input> = opentype_layout_chained_sequence_context_format1<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let table_view = args.0;
+Decoder_opentype_layout_chained_sequence_context_format1(p, table_view)
+}
+}
+
 /// expected size: 32
 /// trait-ready: unique decoder function (d#89)
 #[derive(Debug, Clone)]
@@ -3041,6 +5029,17 @@ pub struct opentype_layout_chained_sequence_context_format1<'input> {
 coverage: opentype_gdef_attach_list_coverage,
 chained_seq_rule_set_count: u16,
 chained_seq_rule_sets: Vec<opentype_layout_chained_sequence_context_format1_chained_seq_rule_sets<'input>>
+}
+
+impl<'input> CommonObject for opentype_layout_chained_sequence_context_format2<'input> {
+type Args<'a> = (View<'input>,);
+
+type Output<'input> = opentype_layout_chained_sequence_context_format2<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let table_view = args.0;
+Decoder_opentype_layout_chained_sequence_context_format2(p, table_view)
+}
 }
 
 /// expected size: 40
@@ -3053,6 +5052,17 @@ input_class_def: opentype_gdef_table_glyph_class_def,
 lookahead_class_def: opentype_gdef_table_glyph_class_def,
 chained_class_seq_rule_set_count: u16,
 chained_class_seq_rule_sets: Vec<opentype_layout_chained_sequence_context_format1_chained_seq_rule_sets<'input>>
+}
+
+impl CommonObject for opentype_layout_chained_sequence_context_format3 {
+type Args<'a> = (View<'input>,);
+
+type Output<'a> = opentype_layout_chained_sequence_context_format3;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let table_view = args.0;
+Decoder_opentype_layout_chained_sequence_context_format3(p, table_view)
+}
 }
 
 /// expected size: 104
@@ -3073,6 +5083,16 @@ seq_lookup_records: Vec<opentype_layout_sequence_lookup>
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
 pub enum opentype_layout_chained_sequence_context_subst<'input> { Format1(opentype_layout_chained_sequence_context_format1<'input>), Format2(opentype_layout_chained_sequence_context_format2<'input>), Format3(opentype_layout_chained_sequence_context_format3) }
+
+impl<'input> CommonObject for opentype_layout_chained_sequence_context<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_layout_chained_sequence_context<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_layout_chained_sequence_context(p)
+}
+}
 
 /// expected size: 144
 /// trait-ready: unique decoder function (d#86)
@@ -3100,6 +5120,17 @@ y_coordinate: u16,
 anchor_point: u16
 }
 
+impl<'input> CommonObject for opentype_layout_anchor_table_format3<'input> {
+type Args<'a> = (View<'input>,);
+
+type Output<'input> = opentype_layout_anchor_table_format3<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let table_view = args.0;
+Decoder_opentype_layout_anchor_table_format3(p, table_view)
+}
+}
+
 /// expected size: 32
 /// trait-ready: unique decoder function (d#127)
 #[derive(Debug, Copy, Clone)]
@@ -3115,6 +5146,16 @@ y_device: opentype_gdef_caret_value_data_format3_table
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Copy, Clone)]
 pub enum opentype_layout_anchor_table_table<'input> { Format1(opentype_layout_anchor_table_table_Format1), Format2(opentype_layout_anchor_table_table_Format2), Format3(opentype_layout_anchor_table_format3<'input>) }
+
+impl<'input> CommonObject for opentype_layout_anchor_table<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_layout_anchor_table<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_layout_anchor_table(p)
+}
+}
 
 /// expected size: 48
 /// trait-ready: unique decoder function (d#126)
@@ -3132,12 +5173,33 @@ offset: u16,
 _data: std::marker::PhantomData<Option<opentype_layout_anchor_table<'input>>>
 }
 
+impl<'input> CommonObject for opentype_layout_entry_exit_record<'input> {
+type Args<'a> = (View<'input>,);
+
+type Output<'input> = opentype_layout_entry_exit_record<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let table_view = args.0;
+Decoder_opentype_layout_entry_exit_record(p, table_view)
+}
+}
+
 /// expected size: 4
 /// trait-ready: unique decoder function (d#135)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_layout_entry_exit_record<'input> {
 entry_anchor: opentype_layout_entry_exit_record_entry_anchor<'input>,
 exit_anchor: opentype_layout_entry_exit_record_entry_anchor<'input>
+}
+
+impl<'input> CommonObject for opentype_layout_cursive_pos<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_layout_cursive_pos<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_layout_cursive_pos(p)
+}
 }
 
 /// expected size: 56
@@ -3151,12 +5213,33 @@ entry_exit_count: u16,
 entry_exit_records: Vec<opentype_layout_entry_exit_record<'input>>
 }
 
+impl<'input> CommonObject for opentype_layout_mark_record<'input> {
+type Args<'a> = (View<'input>,);
+
+type Output<'input> = opentype_layout_mark_record<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let array_view = args.0;
+Decoder_opentype_layout_mark_record(p, array_view)
+}
+}
+
 /// expected size: 4
 /// trait-ready: unique decoder function (d#129)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_layout_mark_record<'input> {
 mark_class: u16,
 mark_anchor: opentype_layout_entry_exit_record_entry_anchor<'input>
+}
+
+impl<'input> CommonObject for opentype_layout_mark_array<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_layout_mark_array<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_layout_mark_array(p)
+}
 }
 
 /// expected size: 56
@@ -3176,12 +5259,35 @@ offset: u16,
 _data: std::marker::PhantomData<Option<opentype_layout_mark_array<'input>>>
 }
 
+impl<'input> CommonObject for opentype_layout_base_array_base_record<'input> {
+type Args<'a> = (u16, View<'input>);
+
+type Output<'input> = opentype_layout_base_array_base_record<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let mark_class_count = args.0;
+let _array_view = args.1;
+Decoder_opentype_layout_base_array_base_record(p, mark_class_count, _array_view)
+}
+}
+
 /// expected size: 24
 /// trait-ready: unique decoder function (d#134)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_base_array_base_record<'input> {
 base_anchor_offsets: Vec<u16>,
 _base_anchors: std::marker::PhantomData<Vec<Option<opentype_layout_anchor_table<'input>>>>
+}
+
+impl<'input> CommonObject for opentype_layout_base_array<'input> {
+type Args<'a> = (u16,);
+
+type Output<'input> = opentype_layout_base_array<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let mark_class_count = args.0;
+Decoder_opentype_layout_base_array(p, mark_class_count)
+}
 }
 
 /// expected size: 56
@@ -3201,6 +5307,16 @@ offset: u16,
 _data: std::marker::PhantomData<Option<opentype_layout_base_array<'input>>>
 }
 
+impl<'input> CommonObject for opentype_layout_mark_base_pos<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_layout_mark_base_pos<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_layout_mark_base_pos(p)
+}
+}
+
 /// expected size: 40
 /// trait-ready: unique decoder function (d#120)
 #[derive(Debug, Copy, Clone)]
@@ -3214,6 +5330,18 @@ mark_array: opentype_layout_mark_base_pos_mark_array<'input>,
 base_array: opentype_layout_mark_base_pos_base_array<'input>
 }
 
+impl<'input> CommonObject for opentype_layout_ligature_attach_component_record<'input> {
+type Args<'a> = (u16, View<'input>);
+
+type Output<'input> = opentype_layout_ligature_attach_component_record<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let mark_class_count = args.0;
+let table_view = args.1;
+Decoder_opentype_layout_ligature_attach_component_record(p, mark_class_count, table_view)
+}
+}
+
 /// expected size: 48
 /// trait-ready: unique decoder function (d#132)
 #[derive(Debug, Clone)]
@@ -3223,12 +5351,34 @@ ligature_anchor_offsets: Vec<u16>,
 _ligature_anchors: std::marker::PhantomData<Vec<Option<opentype_layout_anchor_table<'input>>>>
 }
 
+impl<'input> CommonObject for opentype_layout_ligature_attach<'input> {
+type Args<'a> = (u16,);
+
+type Output<'input> = opentype_layout_ligature_attach<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let mark_class_count = args.0;
+Decoder_opentype_layout_ligature_attach(p, mark_class_count)
+}
+}
+
 /// expected size: 32
 /// trait-ready: unique decoder function (d#131)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_ligature_attach<'input> {
 component_count: u16,
 component_records: Vec<opentype_layout_ligature_attach_component_record<'input>>
+}
+
+impl<'input> CommonObject for opentype_layout_ligature_array<'input> {
+type Args<'a> = (u16,);
+
+type Output<'input> = opentype_layout_ligature_array<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let mark_class_count = args.0;
+Decoder_opentype_layout_ligature_array(p, mark_class_count)
+}
 }
 
 /// expected size: 56
@@ -3250,6 +5400,16 @@ offset: u16,
 _data: std::marker::PhantomData<Option<opentype_layout_ligature_array<'input>>>
 }
 
+impl<'input> CommonObject for opentype_layout_mark_lig_pos<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_layout_mark_lig_pos<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_layout_mark_lig_pos(p)
+}
+}
+
 /// expected size: 40
 /// trait-ready: unique decoder function (d#121)
 #[derive(Debug, Copy, Clone)]
@@ -3263,12 +5423,35 @@ mark_array: opentype_layout_mark_base_pos_mark_array<'input>,
 ligature_array: opentype_layout_mark_lig_pos_ligature_array<'input>
 }
 
+impl<'input> CommonObject for opentype_layout_mark2_array_mark2_record<'input> {
+type Args<'a> = (u16, View<'input>);
+
+type Output<'input> = opentype_layout_mark2_array_mark2_record<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let mark_class_count = args.0;
+let _array_view = args.1;
+Decoder_opentype_layout_mark2_array_mark2_record(p, mark_class_count, _array_view)
+}
+}
+
 /// expected size: 24
 /// trait-ready: unique decoder function (d#125)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_mark2_array_mark2_record<'input> {
 mark2_anchor_offsets: Vec<u16>,
 _mark2_anchors: std::marker::PhantomData<Vec<Option<opentype_layout_anchor_table<'input>>>>
+}
+
+impl<'input> CommonObject for opentype_layout_mark2_array<'input> {
+type Args<'a> = (u16,);
+
+type Output<'input> = opentype_layout_mark2_array<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let mark_class_count = args.0;
+Decoder_opentype_layout_mark2_array(p, mark_class_count)
+}
 }
 
 /// expected size: 56
@@ -3288,6 +5471,16 @@ offset: u16,
 _data: std::marker::PhantomData<Option<opentype_layout_mark2_array<'input>>>
 }
 
+impl<'input> CommonObject for opentype_layout_mark_mark_pos<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_layout_mark_mark_pos<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_layout_mark_mark_pos(p)
+}
+}
+
 /// expected size: 40
 /// trait-ready: unique decoder function (d#122)
 #[derive(Debug, Copy, Clone)]
@@ -3299,6 +5492,16 @@ mark2_coverage: opentype_gdef_attach_list_coverage,
 mark_class_count: u16,
 mark1_array: opentype_layout_mark_base_pos_mark_array<'input>,
 mark2_array: opentype_layout_mark_mark_pos_mark2_array<'input>
+}
+
+impl CommonObject for opentype_layout_value_format_flags {
+type Args<'a> = ();
+
+type Output<'a> = opentype_layout_value_format_flags;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_layout_value_format_flags(p)
+}
 }
 
 /// expected size: 8
@@ -3329,6 +5532,19 @@ x_advance_device: Option<opentype_gdef_caret_value_data_format3_table>,
 y_advance_device: Option<opentype_gdef_caret_value_data_format3_table>
 }
 
+impl CommonObject for opentype_layout_pair_pos_pair_value_record {
+type Args<'a> = (opentype_layout_value_format_flags, opentype_layout_value_format_flags, View<'input>);
+
+type Output<'a> = opentype_layout_pair_pos_pair_value_record;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let value_format1 = args.0;
+let value_format2 = args.1;
+let set_view = args.2;
+Decoder_opentype_layout_pair_pos_pair_value_record(p, value_format1, value_format2, set_view)
+}
+}
+
 /// expected size: 66
 /// trait-ready: unique decoder function (d#143)
 #[derive(Debug, Copy, Clone)]
@@ -3336,6 +5552,18 @@ pub struct opentype_layout_pair_pos_pair_value_record {
 second_glyph: u16,
 value_record1: Option<opentype_layout_value_record>,
 value_record2: Option<opentype_layout_value_record>
+}
+
+impl<'input> CommonObject for opentype_layout_pair_pos_pair_set<'input> {
+type Args<'a> = (opentype_layout_value_format_flags, opentype_layout_value_format_flags);
+
+type Output<'input> = opentype_layout_pair_pos_pair_set<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let value_format1 = args.0;
+let value_format2 = args.1;
+Decoder_opentype_layout_pair_pos_pair_set(p, value_format1, value_format2)
+}
 }
 
 /// expected size: 56
@@ -3355,6 +5583,17 @@ offset: u16,
 _data: std::marker::PhantomData<Option<opentype_layout_pair_pos_pair_set<'input>>>
 }
 
+impl<'input> CommonObject for opentype_layout_pair_pos_format1<'input> {
+type Args<'a> = (View<'input>,);
+
+type Output<'input> = opentype_layout_pair_pos_format1<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let table_view = args.0;
+Decoder_opentype_layout_pair_pos_format1(p, table_view)
+}
+}
+
 /// expected size: 72
 /// trait-ready: unique decoder function (d#136)
 #[derive(Debug, Clone)]
@@ -3365,6 +5604,19 @@ value_format1: opentype_layout_value_format_flags,
 value_format2: opentype_layout_value_format_flags,
 pair_set_count: u16,
 pair_sets: Vec<opentype_layout_pair_pos_format1_pair_sets<'input>>
+}
+
+impl CommonObject for opentype_layout_pair_pos_class2_record {
+type Args<'a> = (opentype_layout_value_format_flags, opentype_layout_value_format_flags, View<'input>);
+
+type Output<'a> = opentype_layout_pair_pos_class2_record;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let value_format1 = args.0;
+let value_format2 = args.1;
+let table_view = args.2;
+Decoder_opentype_layout_pair_pos_class2_record(p, value_format1, value_format2, table_view)
+}
 }
 
 /// expected size: 64
@@ -3380,6 +5632,17 @@ value_record2: Option<opentype_layout_value_record>
 #[derive(Debug, Clone)]
 pub struct opentype_layout_pair_pos_format2_class1_records {
 class2_records: Vec<opentype_layout_pair_pos_class2_record>
+}
+
+impl<'input> CommonObject for opentype_layout_pair_pos_format2<'input> {
+type Args<'a> = (View<'input>,);
+
+type Output<'input> = opentype_layout_pair_pos_format2<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let table_view = args.0;
+Decoder_opentype_layout_pair_pos_format2(p, table_view)
+}
 }
 
 /// expected size: 80
@@ -3402,12 +5665,32 @@ class1_records: Vec<opentype_layout_pair_pos_format2_class1_records>
 #[derive(Debug, Clone)]
 pub enum opentype_layout_pair_pos_subtable<'input> { Format1(opentype_layout_pair_pos_format1<'input>), Format2(opentype_layout_pair_pos_format2<'input>) }
 
+impl<'input> CommonObject for opentype_layout_pair_pos<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_layout_pair_pos<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_layout_pair_pos(p)
+}
+}
+
 /// expected size: 96
 /// trait-ready: unique decoder function (d#118)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_pair_pos<'input> {
 pos_format: u16,
 subtable: opentype_layout_pair_pos_subtable<'input>
+}
+
+impl CommonObject for opentype_layout_sequence_context_rule {
+type Args<'a> = ();
+
+type Output<'a> = opentype_layout_sequence_context_rule;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_layout_sequence_context_rule(p)
+}
 }
 
 /// expected size: 56
@@ -3428,6 +5711,16 @@ offset: u16,
 _data: std::marker::PhantomData<Option<opentype_layout_sequence_context_rule>>
 }
 
+impl<'input> CommonObject for opentype_layout_sequence_context_rule_set<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_layout_sequence_context_rule_set<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_layout_sequence_context_rule_set(p)
+}
+}
+
 /// expected size: 56
 /// trait-ready: unique decoder function (d#99)
 #[derive(Debug, Clone)]
@@ -3445,6 +5738,17 @@ offset: u16,
 _data: std::marker::PhantomData<Option<opentype_layout_sequence_context_rule_set<'input>>>
 }
 
+impl<'input> CommonObject for opentype_layout_sequence_context_format1<'input> {
+type Args<'a> = (View<'input>,);
+
+type Output<'input> = opentype_layout_sequence_context_format1<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let table_view = args.0;
+Decoder_opentype_layout_sequence_context_format1(p, table_view)
+}
+}
+
 /// expected size: 32
 /// trait-ready: unique decoder function (d#96)
 #[derive(Debug, Clone)]
@@ -3452,6 +5756,17 @@ pub struct opentype_layout_sequence_context_format1<'input> {
 coverage: opentype_gdef_attach_list_coverage,
 seq_rule_set_count: u16,
 seq_rule_sets: Vec<opentype_layout_sequence_context_format1_seq_rule_sets<'input>>
+}
+
+impl<'input> CommonObject for opentype_layout_sequence_context_format2<'input> {
+type Args<'a> = (View<'input>,);
+
+type Output<'input> = opentype_layout_sequence_context_format2<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let table_view = args.0;
+Decoder_opentype_layout_sequence_context_format2(p, table_view)
+}
 }
 
 /// expected size: 32
@@ -3462,6 +5777,17 @@ coverage: opentype_gdef_attach_list_coverage,
 class_def: opentype_gdef_table_glyph_class_def,
 class_seq_rule_set_count: u16,
 class_seq_rule_sets: Vec<opentype_layout_sequence_context_format1_seq_rule_sets<'input>>
+}
+
+impl CommonObject for opentype_layout_sequence_context_format3 {
+type Args<'a> = (View<'input>,);
+
+type Output<'a> = opentype_layout_sequence_context_format3;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let table_view = args.0;
+Decoder_opentype_layout_sequence_context_format3(p, table_view)
+}
 }
 
 /// expected size: 56
@@ -3479,6 +5805,16 @@ seq_lookup_records: Vec<opentype_layout_sequence_lookup>
 #[derive(Debug, Clone)]
 pub enum opentype_layout_sequence_context_subst<'input> { Format1(opentype_layout_sequence_context_format1<'input>), Format2(opentype_layout_sequence_context_format2<'input>), Format3(opentype_layout_sequence_context_format3) }
 
+impl<'input> CommonObject for opentype_layout_sequence_context<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_layout_sequence_context<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_layout_sequence_context(p)
+}
+}
+
 /// expected size: 96
 /// trait-ready: unique decoder function (d#85)
 #[derive(Debug, Clone)]
@@ -3486,6 +5822,17 @@ pub struct opentype_layout_sequence_context<'input> {
 table_scope: View<'input>,
 format: u16,
 subst: opentype_layout_sequence_context_subst<'input>
+}
+
+impl<'input> CommonObject for opentype_layout_single_pos_format1<'input> {
+type Args<'a> = (View<'input>,);
+
+type Output<'input> = opentype_layout_single_pos_format1<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let table_view = args.0;
+Decoder_opentype_layout_single_pos_format1(p, table_view)
+}
 }
 
 /// expected size: 72
@@ -3496,6 +5843,17 @@ table_scope: View<'input>,
 coverage: opentype_gdef_attach_list_coverage,
 value_format: opentype_layout_value_format_flags,
 value_record: opentype_layout_value_record
+}
+
+impl<'input> CommonObject for opentype_layout_single_pos_format2<'input> {
+type Args<'a> = (View<'input>,);
+
+type Output<'input> = opentype_layout_single_pos_format2<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let table_view = args.0;
+Decoder_opentype_layout_single_pos_format2(p, table_view)
+}
 }
 
 /// expected size: 64
@@ -3514,12 +5872,33 @@ value_records: Vec<opentype_layout_value_record>
 #[derive(Debug, Clone)]
 pub enum opentype_layout_single_pos_subtable<'input> { Format1(opentype_layout_single_pos_format1<'input>), Format2(opentype_layout_single_pos_format2<'input>) }
 
+impl<'input> CommonObject for opentype_layout_single_pos<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_layout_single_pos<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_layout_single_pos(p)
+}
+}
+
 /// expected size: 88
 /// trait-ready: unique decoder function (d#117)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_single_pos<'input> {
 pos_format: u16,
 subtable: opentype_layout_single_pos_subtable<'input>
+}
+
+impl<'input> CommonObject for opentype_layout_ground_pos<'input> {
+type Args<'a> = (u16,);
+
+type Output<'input> = opentype_layout_ground_pos<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let lookup_type = args.0;
+Decoder_opentype_layout_ground_pos(p, lookup_type)
+}
 }
 
 /// expected size: 152
@@ -3535,6 +5914,16 @@ offset: u32,
 _data: std::marker::PhantomData<Option<opentype_layout_ground_pos<'input>>>
 }
 
+impl<'input> CommonObject for opentype_layout_pos_extension<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_layout_pos_extension<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_layout_pos_extension(p)
+}
+}
+
 /// expected size: 32
 /// trait-ready: unique decoder function (d#115)
 #[derive(Debug, Copy, Clone)]
@@ -3543,6 +5932,17 @@ format: u16,
 table_scope: View<'input>,
 extension_lookup_type: u16,
 extension_offset: opentype_layout_pos_extension_extension_offset<'input>
+}
+
+impl<'input> CommonObject for opentype_gpos_lookup_subtable<'input> {
+type Args<'a> = (u16,);
+
+type Output<'input> = opentype_gpos_lookup_subtable<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let lookup_type = args.0;
+Decoder_opentype_gpos_lookup_subtable(p, lookup_type)
+}
 }
 
 /// expected size: 160
@@ -3556,6 +5956,16 @@ pub enum opentype_gpos_lookup_subtable<'input> { GroundPos(opentype_layout_groun
 pub struct opentype_gpos_lookup_table_subtables<'input> {
 offset: u16,
 _data: std::marker::PhantomData<Option<opentype_gpos_lookup_subtable<'input>>>
+}
+
+impl<'input> CommonObject for opentype_gpos_lookup_table<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_gpos_lookup_table<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_gpos_lookup_table(p)
+}
 }
 
 /// expected size: 64
@@ -3576,6 +5986,16 @@ mark_filtering_set: Option<u16>
 pub struct opentype_gpos_lookup_list_lookups<'input> {
 offset: u16,
 _data: std::marker::PhantomData<Option<opentype_gpos_lookup_table<'input>>>
+}
+
+impl<'input> CommonObject for opentype_gpos_lookup_list<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_gpos_lookup_list<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_gpos_lookup_list(p)
+}
 }
 
 /// expected size: 56
@@ -3623,6 +6043,17 @@ offset: u32,
 _data: std::marker::PhantomData<Option<opentype_layout_feature_variation_record_condition_set__data<'input>>>
 }
 
+impl<'input> CommonObject for opentype_layout_feature_table_substitution_record<'input> {
+type Args<'a> = (View<'input>,);
+
+type Output<'input> = opentype_layout_feature_table_substitution_record<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let _table_view = args.0;
+Decoder_opentype_layout_feature_table_substitution_record(p, _table_view)
+}
+}
+
 /// expected size: 8
 /// trait-ready: unique decoder function (d#75)
 #[derive(Debug, Copy, Clone)]
@@ -3630,6 +6061,16 @@ pub struct opentype_layout_feature_table_substitution_record<'input> {
 feature_index: u16,
 alternate_feature_offset: u32,
 alternate_feature: std::marker::PhantomData<Option<opentype_layout_feature_table<'input>>>
+}
+
+impl<'input> CommonObject for opentype_layout_feature_table_substitution<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_layout_feature_table_substitution<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_layout_feature_table_substitution(p)
+}
 }
 
 /// expected size: 56
@@ -3651,12 +6092,33 @@ offset: u32,
 _data: std::marker::PhantomData<Option<opentype_layout_feature_table_substitution<'input>>>
 }
 
+impl<'input> CommonObject for opentype_layout_feature_variation_record<'input> {
+type Args<'a> = (View<'input>,);
+
+type Output<'input> = opentype_layout_feature_variation_record<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let table_view = args.0;
+Decoder_opentype_layout_feature_variation_record(p, table_view)
+}
+}
+
 /// expected size: 8
 /// trait-ready: unique decoder function (d#73)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_layout_feature_variation_record<'input> {
 condition_set: opentype_layout_feature_variation_record_condition_set<'input>,
 feature_table_substitution: opentype_layout_feature_variation_record_feature_table_substitution<'input>
+}
+
+impl<'input> CommonObject for opentype_layout_feature_variations<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_layout_feature_variations<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_layout_feature_variations(p)
+}
 }
 
 /// expected size: 56
@@ -3678,6 +6140,16 @@ offset: u32,
 _data: std::marker::PhantomData<Option<opentype_layout_feature_variations<'input>>>
 }
 
+impl<'input> CommonObject for opentype_gpos_table<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_gpos_table<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_gpos_table(p)
+}
+}
+
 /// expected size: 48
 /// trait-ready: unique decoder function (d#42)
 #[derive(Debug, Copy, Clone)]
@@ -3689,6 +6161,16 @@ script_list: opentype_gpos_table_script_list<'input>,
 feature_list: opentype_gpos_table_feature_list<'input>,
 lookup_list: opentype_gpos_table_lookup_list<'input>,
 feature_variations_offset: Option<opentype_gpos_table_feature_variations_offset<'input>>
+}
+
+impl CommonObject for opentype_gsub_alternate_subst_alternate_set {
+type Args<'a> = ();
+
+type Output<'a> = opentype_gsub_alternate_subst_alternate_set;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_gsub_alternate_subst_alternate_set(p)
+}
 }
 
 /// expected size: 32
@@ -3707,6 +6189,16 @@ offset: u16,
 _data: std::marker::PhantomData<Option<opentype_gsub_alternate_subst_alternate_set>>
 }
 
+impl<'input> CommonObject for opentype_gsub_alternate_subst<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_gsub_alternate_subst<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_gsub_alternate_subst(p)
+}
+}
+
 /// expected size: 56
 /// trait-ready: unique decoder function (d#83)
 #[derive(Debug, Clone)]
@@ -3716,6 +6208,16 @@ subst_format: u16,
 coverage: opentype_gdef_attach_list_coverage,
 alternate_set_count: u16,
 alternate_sets: Vec<opentype_gsub_alternate_subst_alternate_sets>
+}
+
+impl CommonObject for opentype_gsub_ligature_subst_ligature_table {
+type Args<'a> = ();
+
+type Output<'a> = opentype_gsub_ligature_subst_ligature_table;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_gsub_ligature_subst_ligature_table(p)
+}
 }
 
 /// expected size: 32
@@ -3735,6 +6237,16 @@ offset: u16,
 _data: std::marker::PhantomData<Option<opentype_gsub_ligature_subst_ligature_table>>
 }
 
+impl<'input> CommonObject for opentype_gsub_ligature_subst_ligature_set<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_gsub_ligature_subst_ligature_set<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_gsub_ligature_subst_ligature_set(p)
+}
+}
+
 /// expected size: 56
 /// trait-ready: unique decoder function (d#101)
 #[derive(Debug, Clone)]
@@ -3752,6 +6264,16 @@ offset: u16,
 _data: std::marker::PhantomData<Option<opentype_gsub_ligature_subst_ligature_set<'input>>>
 }
 
+impl<'input> CommonObject for opentype_layout_ligature_subst<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_layout_ligature_subst<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_layout_ligature_subst(p)
+}
+}
+
 /// expected size: 56
 /// trait-ready: unique decoder function (d#84)
 #[derive(Debug, Clone)]
@@ -3761,6 +6283,16 @@ subst_format: u16,
 coverage: opentype_gdef_attach_list_coverage,
 ligature_set_count: u16,
 ligature_sets: Vec<opentype_layout_ligature_subst_ligature_sets<'input>>
+}
+
+impl CommonObject for opentype_layout_multiple_subst_sequence_table {
+type Args<'a> = ();
+
+type Output<'a> = opentype_layout_multiple_subst_sequence_table;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_layout_multiple_subst_sequence_table(p)
+}
 }
 
 /// expected size: 32
@@ -3785,6 +6317,16 @@ _sequences: std::marker::PhantomData<Vec<Option<opentype_layout_multiple_subst_s
 #[derive(Debug, Clone)]
 pub enum opentype_layout_multiple_subst_subst { Format1(opentype_layout_multiple_subst_subst_Format1) }
 
+impl<'input> CommonObject for opentype_layout_multiple_subst<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_layout_multiple_subst<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_layout_multiple_subst(p)
+}
+}
+
 /// expected size: 72
 /// trait-ready: unique decoder function (d#82)
 #[derive(Debug, Clone)]
@@ -3793,6 +6335,16 @@ table_scope: View<'input>,
 subst_format: u16,
 coverage: opentype_gdef_attach_list_coverage,
 subst: opentype_layout_multiple_subst_subst
+}
+
+impl<'input> CommonObject for opentype_layout_reverse_chain_single_subst<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_layout_reverse_chain_single_subst<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_layout_reverse_chain_single_subst(p)
+}
 }
 
 /// expected size: 112
@@ -3810,6 +6362,17 @@ glyph_count: u16,
 substitute_glyph_ids: Vec<u16>
 }
 
+impl<'input> CommonObject for opentype_layout_single_subst_format1<'input> {
+type Args<'a> = (View<'input>,);
+
+type Output<'input> = opentype_layout_single_subst_format1<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let table_view = args.0;
+Decoder_opentype_layout_single_subst_format1(p, table_view)
+}
+}
+
 /// expected size: 32
 /// trait-ready: unique decoder function (d#105)
 #[derive(Debug, Copy, Clone)]
@@ -3817,6 +6380,17 @@ pub struct opentype_layout_single_subst_format1<'input> {
 table_scope: View<'input>,
 coverage: opentype_gdef_attach_list_coverage,
 delta_glyph_id: u16
+}
+
+impl<'input> CommonObject for opentype_layout_single_subst_format2<'input> {
+type Args<'a> = (View<'input>,);
+
+type Output<'input> = opentype_layout_single_subst_format2<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let table_view = args.0;
+Decoder_opentype_layout_single_subst_format2(p, table_view)
+}
 }
 
 /// expected size: 56
@@ -3834,12 +6408,33 @@ substitute_glyph_ids: Vec<u16>
 #[derive(Debug, Clone)]
 pub enum opentype_layout_single_subst_subst<'input> { Format1(opentype_layout_single_subst_format1<'input>), Format2(opentype_layout_single_subst_format2<'input>) }
 
+impl<'input> CommonObject for opentype_layout_single_subst<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_layout_single_subst<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_layout_single_subst(p)
+}
+}
+
 /// expected size: 72
 /// trait-ready: unique decoder function (d#81)
 #[derive(Debug, Clone)]
 pub struct opentype_layout_single_subst<'input> {
 subst_format: u16,
 subst: opentype_layout_single_subst_subst<'input>
+}
+
+impl<'input> CommonObject for opentype_layout_ground_subst<'input> {
+type Args<'a> = (u16,);
+
+type Output<'input> = opentype_layout_ground_subst<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let lookup_type = args.0;
+Decoder_opentype_layout_ground_subst(p, lookup_type)
+}
 }
 
 /// expected size: 152
@@ -3855,6 +6450,16 @@ offset: u32,
 _data: std::marker::PhantomData<Option<opentype_layout_ground_subst<'input>>>
 }
 
+impl<'input> CommonObject for opentype_layout_subst_extension<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_layout_subst_extension<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_layout_subst_extension(p)
+}
+}
+
 /// expected size: 32
 /// trait-ready: unique decoder function (d#79)
 #[derive(Debug, Copy, Clone)]
@@ -3863,6 +6468,17 @@ format: u16,
 table_scope: View<'input>,
 extension_lookup_type: u16,
 extension_offset: opentype_layout_subst_extension_extension_offset<'input>
+}
+
+impl<'input> CommonObject for opentype_gsub_lookup_subtable<'input> {
+type Args<'a> = (u16,);
+
+type Output<'input> = opentype_gsub_lookup_subtable<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let lookup_type = args.0;
+Decoder_opentype_gsub_lookup_subtable(p, lookup_type)
+}
 }
 
 /// expected size: 160
@@ -3876,6 +6492,16 @@ pub enum opentype_gsub_lookup_subtable<'input> { GroundSubst(opentype_layout_gro
 pub struct opentype_gsub_lookup_table_subtables<'input> {
 offset: u16,
 _data: std::marker::PhantomData<Option<opentype_gsub_lookup_subtable<'input>>>
+}
+
+impl<'input> CommonObject for opentype_gsub_lookup_table<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_gsub_lookup_table<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_gsub_lookup_table(p)
+}
 }
 
 /// expected size: 64
@@ -3898,6 +6524,16 @@ offset: u16,
 _data: std::marker::PhantomData<Option<opentype_gsub_lookup_table<'input>>>
 }
 
+impl<'input> CommonObject for opentype_gsub_lookup_list<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_gsub_lookup_list<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_gsub_lookup_list(p)
+}
+}
+
 /// expected size: 56
 /// trait-ready: unique decoder function (d#71)
 #[derive(Debug, Clone)]
@@ -3913,6 +6549,16 @@ lookups: Vec<opentype_gsub_lookup_list_lookups<'input>>
 pub struct opentype_gsub_table_lookup_list<'input> {
 offset: u16,
 _data: std::marker::PhantomData<Option<opentype_gsub_lookup_list<'input>>>
+}
+
+impl<'input> CommonObject for opentype_gsub_table<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_gsub_table<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_gsub_table(p)
+}
 }
 
 /// expected size: 48
@@ -3935,6 +6581,16 @@ pub struct opentype_fvar_variation_axis_record_flags {
 hidden_axis: bool
 }
 
+impl CommonObject for opentype_fvar_variation_axis_record {
+type Args<'a> = ();
+
+type Output<'a> = opentype_fvar_variation_axis_record;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_fvar_variation_axis_record(p)
+}
+}
+
 /// expected size: 32
 /// trait-ready: unique decoder function (d#66)
 #[derive(Debug, Copy, Clone)]
@@ -3947,11 +6603,34 @@ flags: opentype_fvar_variation_axis_record_flags,
 axis_name_id: u16
 }
 
+impl CommonObject for opentype_fvar_user_tuple {
+type Args<'a> = (u16,);
+
+type Output<'a> = opentype_fvar_user_tuple;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let axis_count = args.0;
+Decoder_opentype_fvar_user_tuple(p, axis_count)
+}
+}
+
 /// expected size: 24
 /// trait-ready: unique decoder function (d#68)
 #[derive(Debug, Clone)]
 pub struct opentype_fvar_user_tuple {
 coordinates: Vec<opentype_head_table_font_revision>
+}
+
+impl CommonObject for opentype_fvar_instance_record {
+type Args<'a> = (u16, u16);
+
+type Output<'a> = opentype_fvar_instance_record;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let axis_count = args.0;
+let instance_size = args.1;
+Decoder_opentype_fvar_instance_record(p, axis_count, instance_size)
+}
 }
 
 /// expected size: 32
@@ -3962,6 +6641,16 @@ subfamily_nameid: u16,
 flags: u16,
 coordinates: opentype_fvar_user_tuple,
 postscript_nameid: Option<u16>
+}
+
+impl<'input> CommonObject for opentype_fvar_table<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_fvar_table<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_fvar_table(p)
+}
 }
 
 /// expected size: 40
@@ -3979,6 +6668,17 @@ instance_size: u16,
 _axes: std::marker::PhantomData<Vec<opentype_fvar_variation_axis_record>>,
 offset_instances: u16,
 _instances: std::marker::PhantomData<Vec<opentype_fvar_instance_record>>
+}
+
+impl CommonObject for opentype_gvar_tuple_record {
+type Args<'a> = (u16,);
+
+type Output<'a> = opentype_gvar_tuple_record;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let axis_count = args.0;
+Decoder_opentype_gvar_tuple_record(p, axis_count)
+}
 }
 
 /// expected size: 24
@@ -4029,6 +6729,17 @@ start_tuple: opentype_gvar_tuple_record,
 end_tuple: opentype_gvar_tuple_record
 }
 
+impl CommonObject for opentype_gvar_tuple_variation_header {
+type Args<'a> = (u16,);
+
+type Output<'a> = opentype_gvar_tuple_variation_header;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let axis_count = args.0;
+Decoder_opentype_gvar_tuple_variation_header(p, axis_count)
+}
+}
+
 /// expected size: 80
 /// trait-ready: unique decoder function (d#61)
 #[derive(Debug, Clone)]
@@ -4051,6 +6762,16 @@ point_run_count: u8
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
 pub enum opentype_var_packed_point_numbers_run_points { Points16(Vec<u16>), Points8(Vec<u8>) }
+
+impl CommonObject for opentype_var_packed_point_numbers_runs {
+type Args<'a> = ();
+
+type Output<'a> = opentype_var_packed_point_numbers_runs;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_var_packed_point_numbers_runs(p)
+}
+}
 
 /// expected size: 40
 /// trait-ready: unique decoder function (d#65)
@@ -4090,12 +6811,35 @@ private_point_numbers: Option<(u16, Vec<opentype_var_packed_point_numbers_runs>)
 x_and_y_coordinate_deltas: (u16, Vec<opentype_gvar_serialized_data_per_tuple_variation_data_x_and_y_coordinate_deltas>)
 }
 
+impl CommonObject for opentype_gvar_serialized_data {
+type Args<'a> = (bool, Vec<opentype_gvar_tuple_variation_header>);
+
+type Output<'a> = opentype_gvar_serialized_data;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let shared_point_numbers = args.0;
+let tuple_var_headers = args.1;
+Decoder_opentype_gvar_serialized_data(p, shared_point_numbers, tuple_var_headers)
+}
+}
+
 /// expected size: 56
 /// trait-ready: unique decoder function (d#62)
 #[derive(Debug, Clone)]
 pub struct opentype_gvar_serialized_data {
 shared_point_numbers: Option<(u16, Vec<opentype_var_packed_point_numbers_runs>)>,
 per_tuple_variation_data: Vec<opentype_gvar_serialized_data_per_tuple_variation_data>
+}
+
+impl<'input> CommonObject for opentype_gvar_glyph_variation_data<'input> {
+type Args<'a> = (u16,);
+
+type Output<'input> = opentype_gvar_glyph_variation_data<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let axis_count = args.0;
+Decoder_opentype_gvar_glyph_variation_data(p, axis_count)
+}
 }
 
 /// expected size: 56
@@ -4107,6 +6851,16 @@ tuple_variation_count: opentype_gvar_glyph_variation_data_tuple_variation_count,
 data_offset: u16,
 tuple_variation_headers: Vec<opentype_gvar_tuple_variation_header>,
 _data: std::marker::PhantomData<opentype_gvar_serialized_data>
+}
+
+impl<'input> CommonObject for opentype_gvar_table<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_gvar_table<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_gvar_table(p)
+}
 }
 
 /// expected size: 80
@@ -4146,6 +6900,16 @@ right: u16,
 value: u16
 }
 
+impl CommonObject for opentype_kern_subtable_format0 {
+type Args<'a> = ();
+
+type Output<'a> = opentype_kern_subtable_format0;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_kern_subtable_format0(p)
+}
+}
+
 /// expected size: 32
 /// trait-ready: unique decoder function (d#55)
 #[derive(Debug, Clone)]
@@ -4155,6 +6919,16 @@ search_range: u16,
 entry_selector: u16,
 range_shift: u16,
 kern_pairs: Vec<opentype_kern_subtable_format0_kern_pairs>
+}
+
+impl CommonObject for opentype_kern_class_table {
+type Args<'a> = ();
+
+type Output<'a> = opentype_kern_class_table;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_kern_class_table(p)
+}
 }
 
 /// expected size: 32
@@ -4174,6 +6948,18 @@ offset: u16,
 _data: std::marker::PhantomData<Option<opentype_kern_class_table>>
 }
 
+impl CommonObject for opentype_kern_kerning_array {
+type Args<'a> = (u16, u16);
+
+type Output<'a> = opentype_kern_kerning_array;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let left_glyph_count = args.0;
+let right_glyph_count = args.1;
+Decoder_opentype_kern_kerning_array(p, left_glyph_count, right_glyph_count)
+}
+}
+
 /// expected size: 32
 /// trait-ready: unique decoder function (d#58)
 #[derive(Debug, Clone)]
@@ -4189,6 +6975,16 @@ kerning_values: Vec<Vec<u16>>
 pub struct opentype_kern_subtable_format2_kerning_array_offset {
 offset: u16,
 _data: std::marker::PhantomData<Option<opentype_kern_kerning_array>>
+}
+
+impl<'input> CommonObject for opentype_kern_subtable_format2<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_kern_subtable_format2<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_kern_subtable_format2(p)
+}
 }
 
 /// expected size: 32
@@ -4207,6 +7003,16 @@ kerning_array_offset: opentype_kern_subtable_format2_kerning_array_offset
 #[derive(Debug, Clone)]
 pub enum opentype_kern_kern_subtable_data<'input> { Format0(opentype_kern_subtable_format0), Format2(opentype_kern_subtable_format2<'input>) }
 
+impl<'input> CommonObject for opentype_kern_kern_subtable<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_kern_kern_subtable<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_kern_kern_subtable(p)
+}
+}
+
 /// expected size: 56
 /// trait-ready: unique decoder function (d#54)
 #[derive(Debug, Clone)]
@@ -4215,6 +7021,16 @@ version: u16,
 length: u16,
 coverage: opentype_kern_kern_subtable_coverage,
 data: opentype_kern_kern_subtable_data<'input>
+}
+
+impl<'input> CommonObject for opentype_kern_table<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_kern_table<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_kern_table(p)
+}
 }
 
 /// expected size: 32
@@ -4233,6 +7049,17 @@ pub struct opentype_stat_design_axes_array_design_axes {
 axis_tag: u32,
 axis_name_id: u16,
 axis_ordering: u16
+}
+
+impl CommonObject for opentype_stat_design_axes_array {
+type Args<'a> = (u16,);
+
+type Output<'a> = opentype_stat_design_axes_array;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let design_axis_count = args.0;
+Decoder_opentype_stat_design_axes_array(p, design_axis_count)
+}
 }
 
 /// expected size: 24
@@ -4314,6 +7141,16 @@ axis_values: Vec<opentype_stat_axis_value_table_data_Format4_axis_values>
 #[derive(Debug, Clone)]
 pub enum opentype_stat_axis_value_table_data { Format1(opentype_stat_axis_value_table_data_Format1), Format2(opentype_stat_axis_value_table_data_Format2), Format3(opentype_stat_axis_value_table_data_Format3), Format4(opentype_stat_axis_value_table_data_Format4) }
 
+impl CommonObject for opentype_stat_axis_value_table {
+type Args<'a> = ();
+
+type Output<'a> = opentype_stat_axis_value_table;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_stat_axis_value_table(p)
+}
+}
+
 /// expected size: 48
 /// trait-ready: unique decoder function (d#52)
 #[derive(Debug, Clone)]
@@ -4328,6 +7165,17 @@ data: opentype_stat_axis_value_table_data
 pub struct opentype_stat_axis_value_array_axis_values {
 offset: u16,
 _data: std::marker::PhantomData<Option<opentype_stat_axis_value_table>>
+}
+
+impl<'input> CommonObject for opentype_stat_axis_value_array<'input> {
+type Args<'a> = (u16,);
+
+type Output<'input> = opentype_stat_axis_value_array<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let axis_value_count = args.0;
+Decoder_opentype_stat_axis_value_array(p, axis_value_count)
+}
 }
 
 /// expected size: 48
@@ -4346,6 +7194,16 @@ offset: u32,
 _data: std::marker::PhantomData<Option<opentype_stat_axis_value_array<'input>>>
 }
 
+impl<'input> CommonObject for opentype_stat_table<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_stat_table<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_stat_table(p)
+}
+}
+
 /// expected size: 48
 /// trait-ready: unique decoder function (d#47)
 #[derive(Debug, Copy, Clone)]
@@ -4359,6 +7217,18 @@ design_axes: opentype_stat_table_design_axes,
 axis_value_count: u16,
 axis_value_offsets: opentype_stat_table_axis_value_offsets<'input>,
 elided_fallback_name_id: u16
+}
+
+impl<'input> CommonObject for opentype_table_directory_table_links<'input> {
+type Args<'a> = (Vec<opentype_table_record>, View<'input>);
+
+type Output<'input> = opentype_table_directory_table_links<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let tables = args.0;
+let font_view = args.1;
+Decoder_opentype_table_directory_table_links(p, tables, font_view)
+}
 }
 
 /// expected size: 1200
@@ -4389,6 +7259,17 @@ kern: Option<opentype_kern_table<'input>>,
 stat: Option<opentype_stat_table<'input>>,
 vhea: Option<opentype_hhea_table>,
 vmtx: Option<opentype_hmtx_table>
+}
+
+impl<'input> CommonObject for opentype_table_directory<'input> {
+type Args<'a> = (View<'input>,);
+
+type Output<'input> = opentype_table_directory<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let font_view = args.0;
+Decoder_opentype_table_directory(p, font_view)
+}
 }
 
 /// expected size: 1240
@@ -4436,6 +7317,17 @@ dsig_offset: u32
 #[derive(Debug, Clone)]
 pub enum opentype_ttc_header_header<'input> { UnknownVersion(u16), Version1(opentype_ttc_header_header_Version1<'input>), Version2(opentype_ttc_header_header_Version2<'input>) }
 
+impl<'input> CommonObject for opentype_ttc_header<'input> {
+type Args<'a> = (View<'input>,);
+
+type Output<'input> = opentype_ttc_header<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let font_view = args.0;
+Decoder_opentype_ttc_header(p, font_view)
+}
+}
+
 /// expected size: 56
 /// trait-ready: unique decoder function (d#26)
 #[derive(Debug, Clone)]
@@ -4452,6 +7344,16 @@ header: opentype_ttc_header_header<'input>
 #[derive(Debug, Clone)]
 pub enum opentype_main_directory<'input> { TTCHeader(opentype_ttc_header<'input>), TableDirectory(opentype_table_directory<'input>) }
 
+impl<'input> CommonObject for opentype_main<'input> {
+type Args<'a> = ();
+
+type Output<'input> = opentype_main<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_main(p)
+}
+}
+
 /// expected size: 1256
 /// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [Noop, InDef(InEnum { variants: [Noop, DirectHeap] })] }, Layout { size: 64, align: 8 (1 << 3) })
 /// trait-ready: unique decoder function (d#14)
@@ -4459,6 +7361,16 @@ pub enum opentype_main_directory<'input> { TTCHeader(opentype_ttc_header<'input>
 pub struct opentype_main<'input> {
 magic: u32,
 directory: opentype_main_directory<'input>
+}
+
+impl CommonObject for png_ihdr_data {
+type Args<'a> = ();
+
+type Output<'a> = png_ihdr_data;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_png_ihdr_data(p)
+}
 }
 
 /// expected size: 16
@@ -4472,6 +7384,16 @@ color_type: u8,
 compression_method: u8,
 filter_method: u8,
 interlace_method: u8
+}
+
+impl CommonObject for png_ihdr {
+type Args<'a> = ();
+
+type Output<'a> = png_ihdr;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_png_ihdr(p)
+}
 }
 
 /// expected size: 28
@@ -4507,10 +7429,31 @@ pub struct png_trns_color_type_3 {
 palette_index: u8
 }
 
+impl CommonObject for png_bkgd {
+type Args<'a> = (png_ihdr,);
+
+type Output<'a> = png_bkgd;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let ihdr = args.0;
+Decoder_png_bkgd(p, ihdr)
+}
+}
+
 /// expected size: 8
 /// trait-ready: unique decoder function (d#262)
 #[derive(Debug, Copy, Clone)]
 pub enum png_bkgd { color_type_0(png_trns_color_type_0), color_type_2(png_trns_color_type_2), color_type_3(png_trns_color_type_3), color_type_4(png_trns_color_type_0), color_type_6(png_trns_color_type_2) }
+
+impl CommonObject for png_chrm {
+type Args<'a> = ();
+
+type Output<'a> = png_chrm;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_png_chrm(p)
+}
+}
 
 /// expected size: 32
 /// trait-ready: unique decoder function (d#254)
@@ -4526,11 +7469,31 @@ blue_x: u32,
 blue_y: u32
 }
 
+impl CommonObject for png_gama {
+type Args<'a> = ();
+
+type Output<'a> = png_gama;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_png_gama(p)
+}
+}
+
 /// expected size: 4
 /// trait-ready: unique decoder function (d#255)
 #[derive(Debug, Copy, Clone)]
 pub struct png_gama {
 gamma: u32
+}
+
+impl CommonObject for png_hist {
+type Args<'a> = ();
+
+type Output<'a> = png_hist;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_png_hist(p)
+}
 }
 
 /// expected size: 24
@@ -4568,6 +7531,16 @@ data: deflate_main,
 adler32: u32
 }
 
+impl CommonObject for png_iccp {
+type Args<'a> = ();
+
+type Output<'a> = png_iccp;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_png_iccp(p)
+}
+}
+
 /// expected size: 128
 /// trait-ready: unique decoder function (d#256)
 #[derive(Debug, Clone)]
@@ -4587,6 +7560,16 @@ pub enum png_itxt_text_compressed { invalid(Vec<u8>), valid(Vec<char>) }
 #[derive(Debug, Clone)]
 pub enum png_itxt_text { compressed(png_itxt_text_compressed), uncompressed(Vec<char>) }
 
+impl CommonObject for png_itxt {
+type Args<'a> = ();
+
+type Output<'a> = png_itxt;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_png_itxt(p)
+}
+}
+
 /// expected size: 120
 /// trait-ready: unique decoder function (d#259)
 #[derive(Debug, Clone)]
@@ -4597,6 +7580,16 @@ compression_method: u8,
 language_tag: Vec<u8>,
 translated_keyword: Vec<char>,
 text: png_itxt_text
+}
+
+impl CommonObject for png_phys {
+type Args<'a> = ();
+
+type Output<'a> = png_phys;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_png_phys(p)
+}
 }
 
 /// expected size: 12
@@ -4642,6 +7635,17 @@ sig_blue_bits: u8,
 sig_alpha_bits: u8
 }
 
+impl CommonObject for png_sbit {
+type Args<'a> = (png_ihdr,);
+
+type Output<'a> = png_sbit;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let ihdr = args.0;
+Decoder_png_sbit(p, ihdr)
+}
+}
+
 /// expected size: 5
 /// trait-ready: unique decoder function (d#257)
 #[derive(Debug, Copy, Clone)]
@@ -4674,6 +7678,16 @@ frequency: u16
 #[derive(Debug, Clone)]
 pub enum png_splt_palette { sample_depth_u16(Vec<png_splt_palette_sample_depth_u16>), sample_depth_u8(Vec<png_splt_palette_sample_depth_u8>) }
 
+impl CommonObject for png_splt {
+type Args<'a> = ();
+
+type Output<'a> = png_splt;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_png_splt(p)
+}
+}
+
 /// expected size: 64
 /// trait-ready: unique decoder function (d#265)
 #[derive(Debug, Clone)]
@@ -4683,11 +7697,31 @@ sample_depth: u8,
 palette: png_splt_palette
 }
 
+impl CommonObject for png_srgb {
+type Args<'a> = ();
+
+type Output<'a> = png_srgb;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_png_srgb(p)
+}
+}
+
 /// expected size: 1
 /// trait-ready: unique decoder function (d#258)
 #[derive(Debug, Copy, Clone)]
 pub struct png_srgb {
 rendering_intent: u8
+}
+
+impl CommonObject for png_text {
+type Args<'a> = ();
+
+type Output<'a> = png_text;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_png_text(p)
+}
 }
 
 /// expected size: 48
@@ -4696,6 +7730,16 @@ rendering_intent: u8
 pub struct png_text {
 keyword: Vec<u8>,
 text: Vec<u8>
+}
+
+impl CommonObject for png_time {
+type Args<'a> = ();
+
+type Output<'a> = png_time;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_png_time(p)
+}
 }
 
 /// expected size: 8
@@ -4710,10 +7754,31 @@ minute: u8,
 second: u8
 }
 
+impl CommonObject for png_trns {
+type Args<'a> = (png_ihdr,);
+
+type Output<'a> = png_trns;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let ihdr = args.0;
+Decoder_png_trns(p, ihdr)
+}
+}
+
 /// expected size: 32
 /// trait-ready: unique decoder function (d#253)
 #[derive(Debug, Clone)]
 pub enum png_trns { color_type_0(png_trns_color_type_0), color_type_2(png_trns_color_type_2), color_type_3(Vec<png_trns_color_type_3>) }
+
+impl CommonObject for png_ztxt {
+type Args<'a> = ();
+
+type Output<'a> = png_ztxt;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_png_ztxt(p)
+}
+}
 
 /// expected size: 56
 /// trait-ready: unique decoder function (d#261)
@@ -4729,6 +7794,17 @@ compressed_text: Vec<char>
 #[derive(Debug, Clone)]
 pub enum png_chunk_data { PLTE(Vec<gif_color_table_entry>), bKGD(png_bkgd), cHRM(png_chrm), gAMA(png_gama), hIST(png_hist), iCCP(png_iccp), iTXt(png_itxt), pHYs(png_phys), sBIT(png_sbit), sPLT(png_splt), sRGB(png_srgb), tEXt(png_text), tIME(png_time), tRNS(png_trns), unknown(Vec<u8>), zTXt(png_ztxt) }
 
+impl CommonObject for png_chunk {
+type Args<'a> = (png_ihdr,);
+
+type Output<'a> = png_chunk;
+
+fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
+let ihdr = args.0;
+Decoder_png_chunk(p, ihdr)
+}
+}
+
 /// expected size: 168
 /// trait-ready: unique decoder function (d#236)
 #[derive(Debug, Clone)]
@@ -4739,6 +7815,16 @@ data: png_chunk_data,
 crc: u32
 }
 
+impl CommonObject for png_iend {
+type Args<'a> = ();
+
+type Output<'a> = png_iend;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_png_iend(p)
+}
+}
+
 /// expected size: 12
 /// trait-ready: unique decoder function (d#239)
 #[derive(Debug, Copy, Clone)]
@@ -4746,6 +7832,16 @@ pub struct png_iend {
 length: u32,
 tag: (u8, u8, u8, u8),
 crc: u32
+}
+
+impl CommonObject for png_main {
+type Args<'a> = ();
+
+type Output<'a> = png_main;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_png_main(p)
+}
 }
 
 /// expected size: 208
@@ -4760,6 +7856,16 @@ more_chunks: Vec<png_chunk>,
 iend: png_iend
 }
 
+impl CommonObject for riff_chunk {
+type Args<'a> = ();
+
+type Output<'a> = riff_chunk;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_riff_chunk(p)
+}
+}
+
 /// expected size: 40
 /// trait-ready: unique decoder function (d#234)
 #[derive(Debug, Clone)]
@@ -4770,12 +7876,32 @@ data: Vec<u8>,
 pad: Option<u8>
 }
 
+impl CommonObject for riff_subchunks {
+type Args<'a> = ();
+
+type Output<'a> = riff_subchunks;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_riff_subchunks(p)
+}
+}
+
 /// expected size: 32
 /// trait-ready: unique decoder function (d#232)
 #[derive(Debug, Clone)]
 pub struct riff_subchunks {
 tag: (u8, u8, u8, u8),
 chunks: Vec<riff_chunk>
+}
+
+impl CommonObject for riff_main {
+type Args<'a> = ();
+
+type Output<'a> = riff_main;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_riff_main(p)
+}
 }
 
 /// expected size: 48
@@ -4788,11 +7914,31 @@ data: riff_subchunks,
 pad: Option<u8>
 }
 
+impl CommonObject for rle_new_style {
+type Args<'a> = ();
+
+type Output<'a> = rle_new_style;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_rle_new_style(p)
+}
+}
+
 /// expected size: 24
 /// trait-ready: unique decoder function (d#22)
 #[derive(Debug, Clone)]
 pub struct rle_new_style {
 data: Vec<u8>
+}
+
+impl CommonObject for rle_old_style_run {
+type Args<'a> = ();
+
+type Output<'a> = rle_old_style_run;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_rle_old_style_run(p)
+}
 }
 
 /// expected size: 32
@@ -4804,12 +7950,32 @@ char: u8,
 buf: Vec<u8>
 }
 
+impl CommonObject for rle_old_style {
+type Args<'a> = ();
+
+type Output<'a> = rle_old_style;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_rle_old_style(p)
+}
+}
+
 /// expected size: 48
 /// trait-ready: unique decoder function (d#21)
 #[derive(Debug, Clone)]
 pub struct rle_old_style {
 runs: Vec<rle_old_style_run>,
 data: Vec<u8>
+}
+
+impl CommonObject for rle_main {
+type Args<'a> = ();
+
+type Output<'a> = rle_main;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_rle_main(p)
+}
 }
 
 /// expected size: 56
@@ -4822,6 +7988,16 @@ pub enum rle_main { new_style(rle_new_style), old_style(rle_old_style) }
 #[derive(Debug, Clone)]
 pub struct tar_ascii_string_opt0_nonempty {
 string: Vec<u8>
+}
+
+impl CommonObject for tar_header {
+type Args<'a> = ();
+
+type Output<'a> = tar_header;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_tar_header(p)
+}
 }
 
 /// expected size: 328
@@ -4847,6 +8023,16 @@ prefix: tar_ascii_string_opt0_nonempty,
 pad: Vec<u8>
 }
 
+impl CommonObject for tar_header_with_data {
+type Args<'a> = ();
+
+type Output<'a> = tar_header_with_data;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_tar_header_with_data(p)
+}
+}
+
 /// expected size: 352
 /// trait-ready: unique decoder function (d#222)
 #[derive(Debug, Clone)]
@@ -4860,6 +8046,16 @@ file: Vec<u8>
 #[derive(Debug, Clone)]
 pub struct tar_main {
 contents: Vec<tar_header_with_data>
+}
+
+impl<'input> CommonObject for waldo_main<'input> {
+type Args<'a> = ();
+
+type Output<'input> = waldo_main<'input>;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_waldo_main(p)
+}
 }
 
 /// expected size: 40
@@ -4882,6 +8078,16 @@ pub enum main_data<'input> { elf(elf_main), gif(gif_main), gzip(Vec<gzip_main>),
 #[derive(Debug, Copy, Clone)]
 pub struct tar_header_size_lhs {
 value: u32
+}
+
+impl CommonObject for png_idat {
+type Args<'a> = ();
+
+type Output<'a> = png_idat;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_png_idat(p)
+}
 }
 
 /// expected size: 40
@@ -4917,6 +8123,16 @@ repeats: u8,
 field_set: opentype_glyf_simple_flags
 }
 
+impl CommonObject for opentype_glyph_description_simple_flags_raw {
+type Args<'a> = ();
+
+type Output<'a> = opentype_glyph_description_simple_flags_raw;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_opentype_glyph_description_simple_flags_raw(p)
+}
+}
+
 /// expected size: 7
 /// trait-ready: unique decoder function (d#172)
 #[derive(Debug, Copy, Clone)]
@@ -4936,6 +8152,16 @@ on_curve_point: bool
 pub struct opentype_common_device_or_variation_index_table_delta_format_lhs {
 __skipped0: u16,
 __skipped1: u16
+}
+
+impl CommonObject for rle_new_style_run {
+type Args<'a> = ();
+
+type Output<'a> = rle_new_style_run;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_rle_new_style_run(p)
+}
 }
 
 /// expected size: 32
@@ -4968,6 +8194,16 @@ expand_vertical: u8
 #[derive(Debug, Copy, Clone)]
 pub struct jpeg_exp_data {
 expand_horizontal_vertical: jpeg_exp_data_expand_horizontal_vertical
+}
+
+impl CommonObject for jpeg_exp {
+type Args<'a> = ();
+
+type Output<'a> = jpeg_exp;
+
+fn parse<'input>(p: &mut Parser<'input>, _: ()) -> Result<Self::Output<'input>, ParseError> {
+Decoder_jpeg_exp(p)
+}
 }
 
 /// expected size: 6
@@ -33865,4 +37101,3 @@ return Err(ParseError::FalsifiedWhere(13319962755558045565u64));
 };
 PResult::Ok(jpeg_exp_data { expand_horizontal_vertical })
 }
-
