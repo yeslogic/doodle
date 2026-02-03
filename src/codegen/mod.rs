@@ -15,6 +15,7 @@ use crate::{
     Arith, BaseKind, BaseType, CommonOp, DynFormat, Endian, Expr, Format, FormatModule, IntRel,
     IntoLabel, Label, MatchTree, Pattern, StyleHint, UnaryOp, ViewExpr, ViewFormat,
     byte_set::ByteSet,
+    codegen::model::traits::TraitObject,
     decoder::extract_pair,
     parser::error::TraceHash,
     typecheck::{TypeChecker, UType, UVar, WHNFSolution},
@@ -3664,6 +3665,11 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
         ;
     let catalog = catalog::make_index(&type_decls, &sourcemap.decoder_skels);
 
+    let type_parse_info = model::traits::object_api::TypeParseInfo {
+        catalog: &catalog,
+        decoders: &sourcemap.decoder_skels,
+    };
+
     for (type_decl, (ix, path)) in type_decls.into_iter() {
         let name = elaborator
             .codegen
@@ -3678,7 +3684,10 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
         } else {
             TraitSet::DebugClone
         };
-        let it = RustItem::pub_decl_with_traits(RustDecl::TypeDef(name, type_decl.clone()), traits);
+        let it = RustItem::pub_decl_with_traits(
+            RustDecl::TypeDef(name.clone(), type_decl.clone()),
+            traits,
+        );
         let comments = {
             let mut tmp = Vec::new();
             let sz_comment = format!(
@@ -3695,10 +3704,26 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
                 None => unreachable!("missing key in catalog: {ix}"),
                 Some(dec_ixs) => match dec_ixs.len() {
                     0 => format!("trait-orphaned: no decoder functions provided"),
-                    1 => format!(
-                        "trait-ready: unique decoder function (d#{})",
-                        dec_ixs.as_ref()[0]
-                    ),
+                    1 => {
+                        // TODO - decide on a better scheme but this should work for testing purposes
+                        items.push(RustItem::from_decl(RustDecl::TraitImpl(
+                            model::traits::object_api::CommonObject::generate_impl(
+                                Box::new(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(
+                                    *ix,
+                                    name.clone(),
+                                    type_decl
+                                        .lt_param()
+                                        .map(|lt| Box::new(UseParams::from_lt(lt.clone()))),
+                                )))),
+                                type_parse_info,
+                            ),
+                        )));
+
+                        format!(
+                            "trait-ready: unique decoder function (d#{})",
+                            dec_ixs.as_ref()[0]
+                        )
+                    }
                     n => format!(
                         "trait-unready: multiple ({n}) decoders exist (d#{:?})",
                         dec_ixs

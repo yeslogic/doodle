@@ -5,120 +5,7 @@ use super::{GenBlock, GenExpr, GenStmt};
 #[allow(unused_imports)]
 use crate::Format as _;
 
-pub mod traits {
-    use super::*;
-    use crate::codegen::rust_ast::analysis::{SourceContext, read_width::ReadWidth as _};
-
-    pub(crate) trait TraitObject {
-        type TypeInfo<'a>;
-
-        /// Returns the raw name of the trait
-        fn get_name() -> &'static str;
-
-        // /// Returns how many lifetime parameters the trait takes
-        // fn lt_params() -> usize;
-
-        // /// Returns how many type parameters the trait takes
-        // fn ty_params() -> usize;
-
-        // fn satisfies_requirements(
-        //     on_type: &RustType,
-        //     type_info: Self::TypeInfo<'_>,
-        // ) -> bool;
-
-        fn generate_impl(on_type: Box<RustType>, type_info: Self::TypeInfo<'_>) -> RustTraitImpl;
-    }
-
-    pub mod smallsorts {
-        use super::*;
-
-        #[expect(dead_code)]
-        pub struct ReadBinaryDep;
-
-        pub struct ReadFixedSizeDep;
-
-        impl TraitObject for ReadFixedSizeDep {
-            type TypeInfo<'a> = &'a SourceContext<'a>;
-
-            fn get_name() -> &'static str {
-                "ReadFixedSizeDep"
-            }
-
-            // fn lt_params() -> usize {
-            //     0
-            // }
-
-            // fn ty_params() -> usize {
-            //     0
-            // }
-
-            // fn satisfies_requirements(
-            //     on_type: &RustType,
-            //     type_info: Self::TypeInfo<'_>,
-            // ) -> bool {
-            //     on_type.read_width(type_info).as_fixed().is_some()
-            // }
-
-            fn generate_impl(
-                on_type: Box<RustType>,
-                type_info: Self::TypeInfo<'_>,
-            ) -> RustTraitImpl {
-                let body = {
-                    let size_method = {
-                        let body = {
-                            let size = on_type.read_width(type_info).as_fixed().unwrap();
-                            let val_size = RustExpr::num_lit(size);
-                            vec![RustStmt::Return(ReturnKind::Implicit, val_size)]
-                        };
-                        let sig = {
-                            // FIXME - add qualification scoping to RustType Verbatim to avoid this hardcoding
-                            let arg_type = RustType::Verbatim(
-                                lbl("Self::Args"),
-                                Some(Box::new(UseParams::from_lt(RustLt::WILD))),
-                            );
-                            let ret = RustType::from(PrimType::Usize);
-                            FnSig::new(vec![(lbl("args"), arg_type)], Some(ret))
-                        };
-                        RustFn::new("size", None, sig, body)
-                    };
-                    vec![TraitItem::Method(size_method)]
-                };
-                RustTraitImpl {
-                    param_bindings: None,
-                    trait_params: None,
-                    trait_name: Label::from(Self::get_name()),
-                    on_type,
-                    body,
-                }
-            }
-        }
-    }
-
-    // SECTION - boilerplate for trait implementation
-
-    /// Produces an `impl ReadFixedSizeDep` block as a standalone item, assuming that `ReadBinaryDep`
-    /// will be implemented separately.
-    #[expect(dead_code)]
-    pub fn impl_standalone_read_fixed_size_dep(
-        on_type: Box<RustType>,
-        context: &SourceContext<'_>,
-    ) -> RustDecl {
-        let impl_block = smallsorts::ReadFixedSizeDep::generate_impl(on_type, context);
-        RustDecl::TraitImpl(impl_block)
-    }
-
-    #[expect(dead_code)]
-    pub fn impl_standalone_read_binary_dep(
-        _on_type: Box<RustType>,
-        _context: &SourceContext<'_>,
-    ) -> RustDecl {
-        // let impl_block = smallsorts::ReadBinaryDep::generate_impl(on_type, context);
-        // RustDecl::TraitImpl(impl_block)
-        todo!()
-    }
-
-    // !SECTION
-}
+pub mod traits;
 
 // NOTE - this marks whether `allsorts::binary::read::ReadArray` is `Copy`
 pub(crate) const READ_ARRAY_IS_COPY: bool = true;
@@ -127,6 +14,17 @@ pub(crate) const READ_ARRAY_IS_COPY: bool = true;
 // we wish to record certain properties of it abstractly without difficult-to-track hardcoding
 pub(crate) const VIEW_OBJECT_IS_COPY: bool = true;
 
+/// Helper macro for producing RustExprs for method-calls on parser objects, as well as generic function calls
+///
+/// Used for ease-of-implementation of template-fns that are defined in this module for performing abstract operations using parser objects and prelude functions
+///
+/// # Examples
+///
+/// ```ignore
+/// call!(p, skip_remainder) // $p.skip_remainder()
+/// call!(p, skip_align, align) // $p.skip_align($align)
+/// call!(fn parse_huffman, code_lengths, values) // parse_huffman($code_lengths, $values)
+/// ```
 macro_rules! call {
     ( $parser:expr, $method:ident ) => {
         RustExpr::MethodCall(
@@ -193,9 +91,12 @@ pub const BITS_RET: &str = "ret";
 // !SECTION
 
 /// SECTION - magic strings related to RepeatLogic
+
+// NOTE - Repeat0 Continue-On-Match (R0COM)
 pub const R0COM_ACCUM: &str = "accum";
 pub const R0COM_ELEM: &str = "next_elem";
 
+// NOTE - Repeat1 Break-On-Match (R1BOM)
 pub const R1BOM_ACCUM: &str = "accum";
 pub const R1BOM_ELEM: &str = "next_elem";
 
@@ -251,6 +152,7 @@ pub const WHERE_CHECK: &str = "is_valid";
 
 // !SECTION
 
+/// Template function for constructing a ViewObject `RustType` with a given lifetime parameter
 pub fn view_obj_type(lt: RustLt) -> RustType {
     RustType::ViewObject(lt)
 }

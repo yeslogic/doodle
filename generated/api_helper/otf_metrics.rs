@@ -295,37 +295,7 @@ pub mod container {
         fn scope(&self) -> View<'input>;
     }
 
-    /// Trait implemented over marker-type proxies that implement the most natural parse for their
-    pub trait CommonObject {
-        type Args<'a>: Sized;
-        type Output<'a>: Sized;
-
-        fn parse<'input>(
-            p: &mut Parser<'input>,
-            args: Self::Args<'input>,
-        ) -> PResult<Self::Output<'input>>;
-
-        fn parse_offset<'input>(
-            view: View<'input>,
-            offset: usize,
-            args: Self::Args<'input>,
-        ) -> PResult<Self::Output<'input>> {
-            let mut p = Parser::from(view.offset(offset)?);
-            Self::parse(&mut p, args)
-        }
-
-        fn parse_nullable_offset<'input>(
-            view: View<'input>,
-            offset: usize,
-            args: Self::Args<'input>,
-        ) -> PResult<Option<Self::Output<'input>>> {
-            if offset == 0 {
-                Ok(None)
-            } else {
-                Ok(Some(Self::parse_offset(view, offset, args)?))
-            }
-        }
-    }
+    pub use doodle::prelude::CommonObject;
 
     pub trait SingleContainer<Obj>
     where
@@ -1501,11 +1471,15 @@ where
 // !SECTION
 
 // SECTION - Generic (but niche-use-case) helper definitions
+
+// REVIEW - do we still need this?
 /// Lexically distinct Option for values that are theoretically non-Nullable and have no FromNull instance.
 type Link<T> = Option<T>;
 
 /// Wrapper type for CommonObject artifacts for offsets that are intended to be nullable (which yields Option<T::Output>)
 pub(crate) struct Nullable<T>(pub T);
+
+/// Wrapper type for CommonObject artifacts that are explicitly intended to be non-nullable (panics at runtime if offset is 0)
 pub(crate) struct Mandatory<T>(pub T);
 
 impl<O: container::CommonObject> container::CommonObject for Nullable<O> {
@@ -4547,11 +4521,7 @@ pub(crate) struct Mark2Record {
 
 pub type OpentypeMarkLigPos<'input> = opentype_layout_mark_lig_pos<'input>;
 
-impl<'input> container::ViewFrame<'input> for OpentypeMarkLigPos<'input> {
-    fn scope(&self) -> View<'input> {
-        self.table_scope
-    }
-}
+frame!(OpentypeMarkLigPos);
 
 impl<'input> container::MultiContainer<obj::CovTable, 2> for OpentypeMarkLigPos<'input> {
     fn get_offset_array(&self) -> [usize; 2] {

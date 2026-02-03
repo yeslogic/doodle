@@ -12,6 +12,38 @@ pub use smallsorts::{
     binary::{U8, U16Be, U32Be, U64Be, read::ReadArray},
 };
 
+/// Trait implemented over marker-type proxies that implement the most natural parse for their
+pub trait CommonObject {
+    type Args<'a>: Sized;
+    type Output<'a>: Sized;
+
+    fn parse<'input>(
+        p: &mut Parser<'input>,
+        args: Self::Args<'input>,
+    ) -> PResult<Self::Output<'input>>;
+
+    fn parse_offset<'input>(
+        view: View<'input>,
+        offset: usize,
+        args: Self::Args<'input>,
+    ) -> PResult<Self::Output<'input>> {
+        let mut p = Parser::from(view.offset(offset)?);
+        Self::parse(&mut p, args)
+    }
+
+    fn parse_nullable_offset<'input>(
+        view: View<'input>,
+        offset: usize,
+        args: Self::Args<'input>,
+    ) -> PResult<Option<Self::Output<'input>>> {
+        if offset == 0 {
+            Ok(None)
+        } else {
+            Ok(Some(Self::parse_offset(view, offset, args)?))
+        }
+    }
+}
+
 /// Performs a checked_sub operation, returning an error if the result would be negative
 #[macro_export]
 macro_rules! try_sub {
