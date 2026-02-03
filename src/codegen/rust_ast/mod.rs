@@ -783,6 +783,9 @@ impl RustType {
         }
     }
 
+    /// Converts any special-cases of `RustType` that should be borrowed before being used in signatures of, or when passed in as arguments to, top-level decoder functions.
+    ///
+    /// Returns `ty` if no conversion is necessary (i.e. the type need not be borrowed or has no special-case rules), and a borrow of `ty` for lifetime `lt` and mutability `m` otherwise.
     pub fn selective_borrow(lt: Option<RustLt>, m: Mut, ty: RustType) -> Self {
         if ty.should_borrow_for_arg() {
             Self::borrow_of(lt, m, ty)
@@ -862,6 +865,29 @@ impl RustType {
             RustType::Verbatim(_, rust_params) => rust_params.as_deref()?.lt_params.first(),
             RustType::ReadArray(lt, _) | RustType::ViewObject(lt) => Some(lt),
         }
+    }
+
+    pub(crate) fn alpha_convert_lifetime(&mut self, new_lt: RustLt) {
+        match self {
+            RustType::Atom(atom_type) => atom_type.alpha_convert_lifetime(new_lt),
+            RustType::AnonTuple(rust_types) => rust_types
+                .iter_mut()
+                .for_each(|t| t.alpha_convert_lifetime(new_lt.clone())),
+            RustType::Verbatim(_, rust_params) => {
+                if let Some(rust_params) = rust_params.as_deref_mut() {
+                    assert_eq!(rust_params.lt_params.len(), 1);
+                    rust_params.lt_params[0] = new_lt;
+                }
+            }
+            RustType::ReadArray(lt, _) | RustType::ViewObject(lt) => *lt = new_lt,
+        }
+    }
+}
+
+fn hotswap_lt(params: &mut Option<Box<UseParams>>, new_lt: RustLt) {
+    if let Some(params) = params.as_deref_mut() {
+        assert_eq!(params.lt_params.len(), 1);
+        params.lt_params[0] = new_lt;
     }
 }
 
@@ -1089,6 +1115,17 @@ impl AtomType {
             },
             AtomType::Prim(..) => None,
             AtomType::Comp(ct) => ct.lt_param(),
+        }
+    }
+
+    fn alpha_convert_lifetime(&mut self, new_lt: RustLt) {
+        match self {
+            AtomType::TypeRef(local_type) => match local_type {
+                LocalType::LocalDef(_, _, params) => hotswap_lt(params, new_lt),
+                _ => (),
+            },
+            AtomType::Prim(..) => (),
+            AtomType::Comp(ct) => ct.alpha_convert_lifetime(new_lt),
         }
     }
 }
@@ -1329,6 +1366,23 @@ impl CompType {
             CompType::Result(t, _) => t.lt_param(),
             CompType::Borrow(rust_lt, _, t) => rust_lt.as_ref().or_else(|| t.lt_param()),
             CompType::PhantomData(t) => t.lt_param(),
+        }
+    }
+
+    fn alpha_convert_lifetime(&mut self, new_lt: RustLt) {
+        match self {
+            CompType::Vec(t) => t.alpha_convert_lifetime(new_lt),
+            CompType::RawSlice(t) => t.alpha_convert_lifetime(new_lt),
+            CompType::Option(t) => t.alpha_convert_lifetime(new_lt),
+            CompType::Result(t, _) => {
+                t.alpha_convert_lifetime(new_lt);
+            }
+            CompType::Borrow(Some(rust_lt), _, t) => {
+                *rust_lt = new_lt.clone();
+                t.alpha_convert_lifetime(new_lt);
+            }
+            CompType::Borrow(None, _, t) => t.alpha_convert_lifetime(new_lt),
+            CompType::PhantomData(t) => t.alpha_convert_lifetime(new_lt),
         }
     }
 }
