@@ -23,9 +23,13 @@ pub(crate) trait TraitObject {
 }
 
 pub mod object_api {
-    use crate::codegen::{DecoderFn, catalog::CrossIndex, decoder_fname, typed_format::{GenType, TypedExpr}};
     use super::*;
-
+    use crate::codegen::{
+        DecoderFn,
+        catalog::CrossIndex,
+        decoder_fname,
+        typed_format::{GenType, TypedExpr},
+    };
 
     #[derive(Clone, Copy)]
     pub(crate) struct TypeParseInfo<'a> {
@@ -35,7 +39,6 @@ pub mod object_api {
 
     pub struct CommonObject;
 
-
     impl TraitObject for CommonObject {
         type TypeInfo<'a> = TypeParseInfo<'a>;
 
@@ -44,86 +47,101 @@ pub mod object_api {
         }
 
         fn generate_impl(on_type: Box<RustType>, type_info: Self::TypeInfo<'_>) -> RustTraitImpl {
+            const IMPL_LIFETIME: &str = "'a";
+            const GAT_LIFETIME: &str = "'x";
+            const METHOD_LIFETIME: &str = "'input";
+
             let trait_name = lbl(Self::get_name());
-            let RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(ix, _, params))) = on_type.as_ref() else {
-                unreachable!("unexpected non-local type-reference encountered during {trait_name} trait-impl generation: {on_type:?}")
+            let RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(ix, name, params))) =
+                on_type.as_ref()
+            else {
+                unreachable!(
+                    "unexpected non-local type-reference encountered during {trait_name} trait-impl generation: {on_type:?}"
+                )
             };
+
+            let selftype_with_lt = |lt: RustLt| {
+                RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(
+                    *ix,
+                    name.clone(),
+                    params.as_ref().map(|_| Box::new(UseParams::from_lt(lt))),
+                )))
+            };
+
             let param_bindings = match params {
                 None => None,
-                Some(params) => {
-                    match &params.lt_params[..] {
-                        [] => None,
-                        [lt] => {
-                            let lt_var = lt.as_ref().clone();
-                            Some(Box::new(DefParams::from_lt(lt_var)))
-                        }
-                        _ => unreachable!("unexpected number of lifetime parameters encountered during {trait_name} trait-impl generation: {on_type:?}"),
-                    }
-                }
+                Some(params) => match &params.lt_params[..] {
+                    [] => None,
+                    [_lt] => Some(Box::new(DefParams::from_lt(lbl(IMPL_LIFETIME)))),
+                    _ => unreachable!(
+                        "unexpected number of lifetime parameters encountered during {trait_name} trait-impl generation: {on_type:?}"
+                    ),
+                },
             };
             let trait_params = None;
             let body = {
                 let canonical_decoder = {
                     let decoder_ix_set = type_info.catalog.get(*ix).unwrap();
                     match decoder_ix_set.len() {
-                        0 => unreachable!("unexpected empty decoder list encountered during {trait_name} trait-impl generation: {on_type:?}"),
+                        0 => unreachable!(
+                            "unexpected empty decoder list encountered during {trait_name} trait-impl generation: {on_type:?}"
+                        ),
                         1 => {
                             let decoder_ix = decoder_ix_set.as_ref()[0];
                             let decoder_fn = &type_info.decoders[decoder_ix];
                             decoder_fn
-                        },
-                        2.. => unreachable!("unexpected ambiguous decoder list ({decoder_ix_set:?}) encountered during {trait_name} trait-impl generation: {on_type:?}"),
+                        }
+                        2.. => unreachable!(
+                            "unexpected ambiguous decoder list ({decoder_ix_set:?}) encountered during {trait_name} trait-impl generation: {on_type:?}"
+                        ),
                     }
                 };
                 let extra_args = match &canonical_decoder.extra_args {
-                    Some(extra_args) if !extra_args.is_empty() => {
-                        Some(extra_args)
-                    }
+                    Some(extra_args) if !extra_args.is_empty() => Some(extra_args),
                     None => None,
                     Some(_) => {
                         // NOTE - this panic is really for fringe-case discovery, it should eventually be merged with the `None` handling after we are confident there isn't a bug
-                        unreachable!("unexpected Some([]) extra_args found in decoder: {canonical_decoder:?}")
+                        unreachable!(
+                            "unexpected Some([]) extra_args found in decoder: {canonical_decoder:?}"
+                        )
                     }
                 };
                 // NOTE - the body may change as the trait is redesigned in future iterations
                 let def_gat_args = {
-                    let params = Some(Box::new(DefParams::from_lt(lbl("'a"))));
+                    let params = Some(Box::new(DefParams::from_lt(lbl(GAT_LIFETIME))));
                     let rhs = {
                         match extra_args {
                             None => RustType::Atom(AtomType::Prim(PrimType::Unit)),
                             Some(extra_args) => {
                                 let mut accum = Vec::with_capacity(extra_args.len());
                                 for (_ident, ty) in extra_args.iter() {
-                                    accum.push(ty.to_rust_type())
+                                    let mut ty0 = ty.to_rust_type();
+                                    ty0.alpha_convert_lifetime(lt(GAT_LIFETIME));
+                                    accum.push(RustType::selective_borrow(
+                                        Some(lt(GAT_LIFETIME)),
+                                        Mut::Immutable,
+                                        ty0,
+                                    ));
                                 }
                                 RustType::AnonTuple(accum)
                             }
                         }
                     };
-                    let decl = TraitItem::AssocType(
-                        lbl("Args"),
-                        params,
-                        Box::new(rhs),
-                    );
+                    let decl = TraitItem::AssocType(lbl("Args"), params, Box::new(rhs));
                     decl
                 };
                 let def_gat_output = {
                     // REVIEW - this GAT may be subject to redesign, but for now we have `Self::Output = Self`.
-                    let lt_ident = match on_type.lt_param() {
-                        None => &lbl("'a"),
-                        Some(lt) => lt.as_ref(),
-                    };
-                    let rhs = on_type.clone();
+                    let rhs = selftype_with_lt(lt(GAT_LIFETIME));
                     TraitItem::AssocType(
                         lbl("Output"),
-                        Some(Box::new(DefParams::from_lt(lt_ident.clone()))),
-                        rhs,
+                        Some(Box::new(DefParams::from_lt(lbl(GAT_LIFETIME)))),
+                        Box::new(rhs),
                     )
                 };
                 let def_method_parse = {
-                    const LT_PARAM: &str = "'input";
                     let params = Some(DefParams {
-                        lt_params: vec![lbl(LT_PARAM)],
+                        lt_params: vec![lbl(METHOD_LIFETIME)],
                         ty_params: vec![],
                     });
                     let sig = {
@@ -131,7 +149,7 @@ pub mod object_api {
                             let arg0 = {
                                 let name = lbl("p");
                                 let ty = {
-                                    let params = UseParams::from_lt(lt(LT_PARAM));
+                                    let params = UseParams::from_lt(lt(METHOD_LIFETIME));
                                     RustType::borrow_of(
                                         None,
                                         Mut::Mutable,
@@ -145,7 +163,7 @@ pub mod object_api {
                                     let name = lbl("args");
                                     let ty = RustType::Verbatim(
                                         lbl("Self::Args"),
-                                        Some(Box::new(UseParams::from_lt(lt(LT_PARAM)))),
+                                        Some(Box::new(UseParams::from_lt(lt(METHOD_LIFETIME)))),
                                     );
                                     (name, ty)
                                 } else {
@@ -157,7 +175,10 @@ pub mod object_api {
                         FnSig::new(
                             args,
                             Some(RustType::result_of(
-                                RustType::Verbatim(lbl("Self::Output"), Some(Box::new(UseParams::from_lt(lt(LT_PARAM))))),
+                                RustType::Verbatim(
+                                    lbl("Self::Output"),
+                                    Some(Box::new(UseParams::from_lt(lt(METHOD_LIFETIME)))),
+                                ),
                                 RustType::imported("ParseError"),
                             )),
                         )
@@ -175,7 +196,8 @@ pub mod object_api {
                             if let Some(args) = extra_args {
                                 for (ix, (ident, _)) in args.iter().enumerate() {
                                     stmts.push(RustStmt::assign(
-                                        ident.clone(), RustExpr::local("args").at_pos(ix)
+                                        ident.clone(),
+                                        RustExpr::local("args").at_pos(ix),
                                     ));
                                     accum.push(RustExpr::local(ident.clone()))
                                 }
@@ -183,12 +205,8 @@ pub mod object_api {
 
                             accum
                         };
-                        let call = {
-                            RustExpr::FunctionCall(
-                                Box::new(RustExpr::local(fname)),
-                                args,
-                            )
-                        };
+                        let call =
+                            { RustExpr::FunctionCall(Box::new(RustExpr::local(fname)), args) };
                         stmts.push(RustStmt::Return(ReturnKind::Implicit, call));
                         stmts
                     };
@@ -200,7 +218,7 @@ pub mod object_api {
                 param_bindings,
                 trait_name,
                 trait_params,
-                on_type,
+                on_type: Box::new(selftype_with_lt(lt(IMPL_LIFETIME))),
                 body,
             }
         }
@@ -237,10 +255,7 @@ pub mod smallsorts {
         //     on_type.read_width(type_info).as_fixed().is_some()
         // }
 
-        fn generate_impl(
-            on_type: Box<RustType>,
-            type_info: Self::TypeInfo<'_>,
-        ) -> RustTraitImpl {
+        fn generate_impl(on_type: Box<RustType>, type_info: Self::TypeInfo<'_>) -> RustTraitImpl {
             let body = {
                 let size_method = {
                     let body = {
