@@ -37,8 +37,7 @@ type Args<'x> = (bool, u8);
 type Output<'x> = elf_types_elf_addr;
 
 fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let is_be = args.0;
-let class = args.1;
+let (is_be, class) = args;
 Decoder_elf_types_elf_addr(p, is_be, class)
 }
 }
@@ -54,8 +53,7 @@ type Args<'x> = (bool, u8);
 type Output<'x> = elf_types_elf_off;
 
 fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let is_be = args.0;
-let class = args.1;
+let (is_be, class) = args;
 Decoder_elf_types_elf_off(p, is_be, class)
 }
 }
@@ -101,8 +99,7 @@ type Args<'x> = (bool, u8);
 type Output<'x> = elf_types_elf_full;
 
 fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let is_be = args.0;
-let class = args.1;
+let (is_be, class) = args;
 Decoder_elf_types_elf_full(p, is_be, class)
 }
 }
@@ -118,8 +115,7 @@ type Args<'x> = (bool, u8);
 type Output<'x> = elf_phdr;
 
 fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let is_be = args.0;
-let class = args.1;
+let (is_be, class) = args;
 Decoder_elf_phdr(p, is_be, class)
 }
 }
@@ -145,8 +141,7 @@ type Args<'x> = (bool, u8);
 type Output<'x> = elf_shdr;
 
 fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let is_be = args.0;
-let class = args.1;
+let (is_be, class) = args;
 Decoder_elf_shdr(p, is_be, class)
 }
 }
@@ -1886,9 +1881,7 @@ type Args<'x> = (u8, u8, u8);
 type Output<'x> = mpeg4_iloc_extent;
 
 fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let offset_size = args.0;
-let length_size = args.1;
-let index_size = args.2;
+let (offset_size, length_size, index_size) = args;
 Decoder_mpeg4_iloc_extent(p, offset_size, length_size, index_size)
 }
 }
@@ -3642,8 +3635,7 @@ type Args<'x> = (u16, u16);
 type Output<'x> = opentype_loca_table;
 
 fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let num_glyphs = args.0;
-let index_to_loc_format = args.1;
+let (num_glyphs, index_to_loc_format) = args;
 Decoder_opentype_loca_table(p, num_glyphs, index_to_loc_format)
 }
 }
@@ -5227,8 +5219,7 @@ type Args<'x> = (u16, View<'x>);
 type Output<'x> = opentype_layout_base_array_base_record<'x>;
 
 fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let mark_class_count = args.0;
-let _array_view = args.1;
+let (mark_class_count, _array_view) = args;
 Decoder_opentype_layout_base_array_base_record(p, mark_class_count, _array_view)
 }
 }
@@ -5297,8 +5288,7 @@ type Args<'x> = (u16, View<'x>);
 type Output<'x> = opentype_layout_ligature_attach_component_record<'x>;
 
 fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let mark_class_count = args.0;
-let table_view = args.1;
+let (mark_class_count, table_view) = args;
 Decoder_opentype_layout_ligature_attach_component_record(p, mark_class_count, table_view)
 }
 }
@@ -5388,8 +5378,7 @@ type Args<'x> = (u16, View<'x>);
 type Output<'x> = opentype_layout_mark2_array_mark2_record<'x>;
 
 fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let mark_class_count = args.0;
-let _array_view = args.1;
+let (mark_class_count, _array_view) = args;
 Decoder_opentype_layout_mark2_array_mark2_record(p, mark_class_count, _array_view)
 }
 }
@@ -5496,9 +5485,7 @@ type Args<'x> = (opentype_layout_value_format_flags, opentype_layout_value_forma
 type Output<'x> = opentype_layout_pair_pos_pair_value_record;
 
 fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let value_format1 = args.0;
-let value_format2 = args.1;
-let set_view = args.2;
+let (value_format1, value_format2, set_view) = args;
 Decoder_opentype_layout_pair_pos_pair_value_record(p, value_format1, value_format2, set_view)
 }
 }
@@ -5518,8 +5505,7 @@ type Args<'x> = (opentype_layout_value_format_flags, opentype_layout_value_forma
 type Output<'x> = opentype_layout_pair_pos_pair_set<'x>;
 
 fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let value_format1 = args.0;
-let value_format2 = args.1;
+let (value_format1, value_format2) = args;
 Decoder_opentype_layout_pair_pos_pair_set(p, value_format1, value_format2)
 }
 }
@@ -5569,9 +5555,7 @@ type Args<'x> = (opentype_layout_value_format_flags, opentype_layout_value_forma
 type Output<'x> = opentype_layout_pair_pos_class2_record;
 
 fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let value_format1 = args.0;
-let value_format2 = args.1;
-let table_view = args.2;
+let (value_format1, value_format2, table_view) = args;
 Decoder_opentype_layout_pair_pos_class2_record(p, value_format1, value_format2, table_view)
 }
 }
@@ -6569,8 +6553,7 @@ type Args<'x> = (u16, u16);
 type Output<'x> = opentype_fvar_instance_record;
 
 fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let axis_count = args.0;
-let instance_size = args.1;
+let (axis_count, instance_size) = args;
 Decoder_opentype_fvar_instance_record(p, axis_count, instance_size)
 }
 }
@@ -6757,8 +6740,7 @@ type Args<'x> = (bool, &'x [opentype_gvar_tuple_variation_header]);
 type Output<'x> = opentype_gvar_serialized_data;
 
 fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let shared_point_numbers = args.0;
-let tuple_var_headers = args.1;
+let (shared_point_numbers, tuple_var_headers) = args;
 Decoder_opentype_gvar_serialized_data(p, shared_point_numbers, tuple_var_headers)
 }
 }
@@ -6893,8 +6875,7 @@ type Args<'x> = (u16, u16);
 type Output<'x> = opentype_kern_kerning_array;
 
 fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let left_glyph_count = args.0;
-let right_glyph_count = args.1;
+let (left_glyph_count, right_glyph_count) = args;
 Decoder_opentype_kern_kerning_array(p, left_glyph_count, right_glyph_count)
 }
 }
@@ -7162,8 +7143,7 @@ type Args<'x> = (&'x [opentype_table_record], View<'x>);
 type Output<'x> = opentype_table_directory_table_links<'x>;
 
 fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let tables = args.0;
-let font_view = args.1;
+let (tables, font_view) = args;
 Decoder_opentype_table_directory_table_links(p, tables, font_view)
 }
 }
