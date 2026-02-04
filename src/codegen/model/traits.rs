@@ -39,6 +39,26 @@ pub mod object_api {
 
     pub struct CommonObject;
 
+    const IMPL_LIFETIME: &str = "'a";
+    const GAT_LIFETIME: &str = "'x";
+    const METHOD_LIFETIME: &str = "'input";
+
+    fn convert_extra_args(extra_args: &[(Label, GenType)]) -> RustType {
+        fn convert_arg_tuple((_, ty): &(Label, GenType)) -> RustType {
+            let mut ty0 = ty.to_rust_type();
+            ty0.alpha_convert_lifetime(lt(GAT_LIFETIME));
+            RustType::selective_borrow(Some(lt(GAT_LIFETIME)), Mut::Immutable, ty0)
+        }
+        match extra_args {
+            [] => RustType::from(PrimType::Unit),
+            [arg] => convert_arg_tuple(arg),
+            args => {
+                let args = args.iter().map(convert_arg_tuple).collect();
+                RustType::AnonTuple(args)
+            }
+        }
+    }
+
     impl TraitObject for CommonObject {
         type TypeInfo<'a> = TypeParseInfo<'a>;
 
@@ -47,10 +67,6 @@ pub mod object_api {
         }
 
         fn generate_impl(on_type: Box<RustType>, type_info: Self::TypeInfo<'_>) -> RustTraitImpl {
-            const IMPL_LIFETIME: &str = "'a";
-            const GAT_LIFETIME: &str = "'x";
-            const METHOD_LIFETIME: &str = "'input";
-
             let trait_name = lbl(Self::get_name());
             let RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(ix, name, params))) =
                 on_type.as_ref()
@@ -97,36 +113,13 @@ pub mod object_api {
                     }
                 };
                 let extra_args = match &canonical_decoder.extra_args {
-                    Some(extra_args) if !extra_args.is_empty() => Some(extra_args),
-                    None => None,
-                    Some(_) => {
-                        // NOTE - this panic is really for fringe-case discovery, it should eventually be merged with the `None` handling after we are confident there isn't a bug
-                        unreachable!(
-                            "unexpected Some([]) extra_args found in decoder: {canonical_decoder:?}"
-                        )
-                    }
+                    Some(extra_args) => extra_args.as_slice(),
+                    None => &[],
                 };
                 // NOTE - the body may change as the trait is redesigned in future iterations
                 let def_gat_args = {
                     let params = Some(Box::new(DefParams::from_lt(lbl(GAT_LIFETIME))));
-                    let rhs = {
-                        match extra_args {
-                            None => RustType::Atom(AtomType::Prim(PrimType::Unit)),
-                            Some(extra_args) => {
-                                let mut accum = Vec::with_capacity(extra_args.len());
-                                for (_ident, ty) in extra_args.iter() {
-                                    let mut ty0 = ty.to_rust_type();
-                                    ty0.alpha_convert_lifetime(lt(GAT_LIFETIME));
-                                    accum.push(RustType::selective_borrow(
-                                        Some(lt(GAT_LIFETIME)),
-                                        Mut::Immutable,
-                                        ty0,
-                                    ));
-                                }
-                                RustType::AnonTuple(accum)
-                            }
-                        }
-                    };
+                    let rhs = convert_extra_args(extra_args);
                     let decl = TraitItem::AssocType(lbl("Args"), params, Box::new(rhs));
                     decl
                 };
@@ -139,6 +132,7 @@ pub mod object_api {
                         Box::new(rhs),
                     )
                 };
+
                 let def_method_parse = {
                     let params = Some(DefParams {
                         lt_params: vec![lbl(METHOD_LIFETIME)],
@@ -159,15 +153,23 @@ pub mod object_api {
                                 (name, ty)
                             };
                             let arg1 = {
-                                if extra_args.is_some() {
-                                    let name = lbl("args");
-                                    let ty = RustType::Verbatim(
-                                        lbl("Self::Args"),
-                                        Some(Box::new(UseParams::from_lt(lt(METHOD_LIFETIME)))),
-                                    );
-                                    (name, ty)
-                                } else {
-                                    (lbl("_"), RustType::from(PrimType::Unit))
+                                match extra_args {
+                                    [] => (lbl("_"), RustType::from(PrimType::Unit)),
+                                    [(ident, _)] => {
+                                        let ty = RustType::Verbatim(
+                                            lbl("Self::Args"),
+                                            Some(Box::new(UseParams::from_lt(lt(METHOD_LIFETIME)))),
+                                        );
+                                        (ident.clone(), ty)
+                                    }
+                                    _ => {
+                                        let name = lbl("args");
+                                        let ty = RustType::Verbatim(
+                                            lbl("Self::Args"),
+                                            Some(Box::new(UseParams::from_lt(lt(METHOD_LIFETIME)))),
+                                        );
+                                        (name, ty)
+                                    }
                                 }
                             };
                             vec![arg0, arg1]
@@ -185,7 +187,7 @@ pub mod object_api {
                     };
                     let body = {
                         let fname = decoder_fname(canonical_decoder.ixlabel);
-                        let num_extra_args = extra_args.map_or(0, Vec::len);
+                        let num_extra_args = extra_args.len();
                         let mut stmts = Vec::with_capacity(num_extra_args + 1);
                         let args = {
                             let mut accum = Vec::with_capacity(num_extra_args + 1);
@@ -193,25 +195,31 @@ pub mod object_api {
                             let parser_arg = RustExpr::local("p");
                             accum.push(parser_arg);
 
-                            if let Some(args) = extra_args {
-                                for (ix, (ident, _)) in args.iter().enumerate() {
-                                    stmts.push(RustStmt::assign(
-                                        ident.clone(),
-                                        RustExpr::local("args").at_pos(ix),
-                                    ));
-                                    accum.push(RustExpr::local(ident.clone()))
+                            match extra_args {
+                                [] => (),
+                                [(ident, _)] => {
+                                    accum.push(RustExpr::local(ident.clone()));
+                                }
+                                args => {
+                                    for (ix, (ident, _)) in args.iter().enumerate() {
+                                        stmts.push(RustStmt::assign(
+                                            ident.clone(),
+                                            RustExpr::local("args").at_pos(ix),
+                                        ));
+                                        accum.push(RustExpr::local(ident.clone()))
+                                    }
                                 }
                             }
-
                             accum
                         };
-                        let call =
-                            { RustExpr::FunctionCall(Box::new(RustExpr::local(fname)), args) };
+                        let call = RustExpr::FunctionCall(Box::new(RustExpr::local(fname)), args);
                         stmts.push(RustStmt::Return(ReturnKind::Implicit, call));
                         stmts
                     };
+
                     TraitItem::Method(RustFn::new("parse", params, sig, body))
                 };
+
                 vec![def_gat_args, def_gat_output, def_method_parse]
             };
             RustTraitImpl {

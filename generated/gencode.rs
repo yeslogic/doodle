@@ -927,12 +927,11 @@ thumbnail_pixels: Vec<Vec<gif_color_table_entry>>
 }
 
 impl CommonObject for jpeg_app0_data_data {
-type Args<'x> = (&'x [u8],);
+type Args<'x> = &'x [u8];
 
 type Output<'x> = jpeg_app0_data_data;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let identifier = args.0;
+fn parse<'input>(p: &mut Parser<'input>, identifier: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_jpeg_app0_data_data(p, identifier)
 }
 }
@@ -1071,12 +1070,11 @@ xmp: Vec<u8>
 }
 
 impl CommonObject for jpeg_app1_data_data {
-type Args<'x> = (&'x [u8],);
+type Args<'x> = &'x [u8];
 
 type Output<'x> = jpeg_app1_data_data;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let identifier = args.0;
+fn parse<'input>(p: &mut Parser<'input>, identifier: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_jpeg_app1_data_data(p, identifier)
 }
 }
@@ -1259,12 +1257,11 @@ table_id: u8
 }
 
 impl CommonObject for jpeg_dqt_data_elements {
-type Args<'x> = (u8,);
+type Args<'x> = u8;
 
 type Output<'x> = jpeg_dqt_data_elements;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let precision = args.0;
+fn parse<'input>(p: &mut Parser<'input>, precision: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_jpeg_dqt_data_elements(p, precision)
 }
 }
@@ -1769,12 +1766,11 @@ item_uri_type: Vec<u8>
 }
 
 impl CommonObject for mpeg4_infe_atom_data_extra_fields {
-type Args<'x> = ((u8, u8, u8, u8),);
+type Args<'x> = (u8, u8, u8, u8);
 
 type Output<'x> = mpeg4_infe_atom_data_extra_fields;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let item_type = args.0;
+fn parse<'input>(p: &mut Parser<'input>, item_type: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_mpeg4_infe_atom_data_extra_fields(p, item_type)
 }
 }
@@ -1785,12 +1781,11 @@ Decoder_mpeg4_infe_atom_data_extra_fields(p, item_type)
 pub enum mpeg4_infe_atom_data_extra_fields { mime(mpeg4_infe_atom_data_extra_fields_mime), unknown, uri(mpeg4_infe_atom_data_extra_fields_uri) }
 
 impl CommonObject for mpeg4_infe_data_fields_version_gte2 {
-type Args<'x> = (u8,);
+type Args<'x> = u8;
 
 type Output<'x> = mpeg4_infe_data_fields_version_gte2;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let version = args.0;
+fn parse<'input>(p: &mut Parser<'input>, version: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_mpeg4_infe_data_fields_version_gte2(p, version)
 }
 }
@@ -1807,12 +1802,11 @@ extra_fields: mpeg4_infe_atom_data_extra_fields
 }
 
 impl CommonObject for mpeg4_infe_data_fields {
-type Args<'x> = (u8,);
+type Args<'x> = u8;
 
 type Output<'x> = mpeg4_infe_data_fields;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let version = args.0;
+fn parse<'input>(p: &mut Parser<'input>, version: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_mpeg4_infe_data_fields(p, version)
 }
 }
@@ -2120,12 +2114,11 @@ item_ID: mpeg4_pitm_atom_data_item_ID
 }
 
 impl CommonObject for mpeg4_meta_atom_data {
-type Args<'x> = ((u8, u8, u8, u8),);
+type Args<'x> = (u8, u8, u8, u8);
 
 type Output<'x> = mpeg4_meta_atom_data;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let r#type = args.0;
+fn parse<'input>(p: &mut Parser<'input>, r#type: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_mpeg4_meta_atom_data(p, r#type)
 }
 }
@@ -2672,12 +2665,11 @@ data: mpeg4_minf_atom_data
 }
 
 impl CommonObject for mpeg4_mdia_atom_data {
-type Args<'x> = ((u8, u8, u8, u8),);
+type Args<'x> = (u8, u8, u8, u8);
 
 type Output<'x> = mpeg4_mdia_atom_data;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let r#type = args.0;
+fn parse<'input>(p: &mut Parser<'input>, r#type: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_mpeg4_mdia_atom_data(p, r#type)
 }
 }
@@ -2899,12 +2891,11 @@ length: u32
 }
 
 impl CommonObject for opentype_cmap_subtable_format0 {
-type Args<'x> = (u16,);
+type Args<'x> = u16;
 
 type Output<'x> = opentype_cmap_subtable_format0;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let _platform = args.0;
+fn parse<'input>(p: &mut Parser<'input>, _platform: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_cmap_subtable_format0(p, _platform)
 }
 }
@@ -2920,12 +2911,11 @@ glyph_id_array: Vec<u8>
 }
 
 impl CommonObject for opentype_cmap_subtable_format10 {
-type Args<'x> = (u16,);
+type Args<'x> = u16;
 
 type Output<'x> = opentype_cmap_subtable_format10;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let _platform = args.0;
+fn parse<'input>(p: &mut Parser<'input>, _platform: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_cmap_subtable_format10(p, _platform)
 }
 }
@@ -3021,12 +3011,11 @@ _data: std::marker::PhantomData<Option<opentype_variation_selector_non_default_u
 }
 
 impl CommonObject for opentype_variation_selector {
-type Args<'x> = (View<'x>,);
+type Args<'x> = View<'x>;
 
 type Output<'x> = opentype_variation_selector;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let table_view = args.0;
+fn parse<'input>(p: &mut Parser<'input>, table_view: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_variation_selector(p, table_view)
 }
 }
@@ -3041,12 +3030,11 @@ non_default_uvs_offset: opentype_variation_selector_non_default_uvs_offset
 }
 
 impl CommonObject for opentype_cmap_subtable_format14 {
-type Args<'x> = (View<'x>,);
+type Args<'x> = View<'x>;
 
 type Output<'x> = opentype_cmap_subtable_format14;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let table_view = args.0;
+fn parse<'input>(p: &mut Parser<'input>, table_view: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_cmap_subtable_format14(p, table_view)
 }
 }
@@ -3072,12 +3060,11 @@ id_range_offset: u16
 }
 
 impl CommonObject for opentype_cmap_subtable_format2 {
-type Args<'x> = (u16,);
+type Args<'x> = u16;
 
 type Output<'x> = opentype_cmap_subtable_format2;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let _platform = args.0;
+fn parse<'input>(p: &mut Parser<'input>, _platform: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_cmap_subtable_format2(p, _platform)
 }
 }
@@ -3095,12 +3082,11 @@ glyph_array: Vec<u16>
 }
 
 impl CommonObject for opentype_cmap_subtable_format4 {
-type Args<'x> = (u16,);
+type Args<'x> = u16;
 
 type Output<'x> = opentype_cmap_subtable_format4;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let _platform = args.0;
+fn parse<'input>(p: &mut Parser<'input>, _platform: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_cmap_subtable_format4(p, _platform)
 }
 }
@@ -3124,12 +3110,11 @@ glyph_array: Vec<u16>
 }
 
 impl CommonObject for opentype_cmap_subtable_format6 {
-type Args<'x> = (u16,);
+type Args<'x> = u16;
 
 type Output<'x> = opentype_cmap_subtable_format6;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let _platform = args.0;
+fn parse<'input>(p: &mut Parser<'input>, _platform: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_cmap_subtable_format6(p, _platform)
 }
 }
@@ -3147,12 +3132,11 @@ glyph_id_array: Vec<u16>
 }
 
 impl CommonObject for opentype_cmap_subtable_format8 {
-type Args<'x> = (u16,);
+type Args<'x> = u16;
 
 type Output<'x> = opentype_cmap_subtable_format8;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let _platform = args.0;
+fn parse<'input>(p: &mut Parser<'input>, _platform: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_cmap_subtable_format8(p, _platform)
 }
 }
@@ -3175,12 +3159,11 @@ groups: Vec<opentype_types_sequential_map_record>
 pub enum opentype_cmap_subtable_data { Format0(opentype_cmap_subtable_format0), Format10(opentype_cmap_subtable_format10), Format12(opentype_cmap_subtable_format12), Format13(opentype_cmap_subtable_format12), Format14(opentype_cmap_subtable_format14), Format2(opentype_cmap_subtable_format2), Format4(opentype_cmap_subtable_format4), Format6(opentype_cmap_subtable_format6), Format8(opentype_cmap_subtable_format8) }
 
 impl<'a> CommonObject for opentype_cmap_subtable<'a> {
-type Args<'x> = (u16,);
+type Args<'x> = u16;
 
 type Output<'x> = opentype_cmap_subtable<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let _platform = args.0;
+fn parse<'input>(p: &mut Parser<'input>, _platform: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_cmap_subtable(p, _platform)
 }
 }
@@ -3203,12 +3186,11 @@ _data: std::marker::PhantomData<Option<opentype_cmap_subtable<'input>>>
 }
 
 impl<'a> CommonObject for opentype_encoding_record<'a> {
-type Args<'x> = (View<'x>,);
+type Args<'x> = View<'x>;
 
 type Output<'x> = opentype_encoding_record<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let table_view = args.0;
+fn parse<'input>(p: &mut Parser<'input>, table_view: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_encoding_record(p, table_view)
 }
 }
@@ -3406,12 +3388,11 @@ data: &'input [u8]
 }
 
 impl<'a> CommonObject for opentype_name_name_record<'a> {
-type Args<'x> = (View<'x>,);
+type Args<'x> = View<'x>;
 
 type Output<'x> = opentype_name_name_record<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let storage_view = args.0;
+fn parse<'input>(p: &mut Parser<'input>, storage_view: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_name_name_record(p, storage_view)
 }
 }
@@ -3429,12 +3410,11 @@ string: opentype_name_name_record_string<'input>
 }
 
 impl<'a> CommonObject for opentype_name_lang_tag_record<'a> {
-type Args<'x> = (View<'x>,);
+type Args<'x> = View<'x>;
 
 type Output<'x> = opentype_name_lang_tag_record<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let storage_view = args.0;
+fn parse<'input>(p: &mut Parser<'input>, storage_view: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_name_lang_tag_record(p, storage_view)
 }
 }
@@ -3448,12 +3428,11 @@ lang_tag: opentype_name_name_record_string<'input>
 }
 
 impl<'a> CommonObject for opentype_name_name_version_1<'a> {
-type Args<'x> = (View<'x>,);
+type Args<'x> = View<'x>;
 
 type Output<'x> = opentype_name_name_version_1<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let storage_view = args.0;
+fn parse<'input>(p: &mut Parser<'input>, storage_view: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_name_name_version_1(p, storage_view)
 }
 }
@@ -3535,12 +3514,11 @@ extra_fields_v1: Option<opentype_os2_table_data_extra_fields_v1>
 }
 
 impl CommonObject for opentype_os2_table {
-type Args<'x> = (u32,);
+type Args<'x> = u32;
 
 type Output<'x> = opentype_os2_table;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let table_length = args.0;
+fn parse<'input>(p: &mut Parser<'input>, table_length: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_os2_table(p, table_length)
 }
 }
@@ -3760,12 +3738,11 @@ overlap_simple: bool
 }
 
 impl CommonObject for opentype_glyf_simple {
-type Args<'x> = (u16,);
+type Args<'x> = u16;
 
 type Output<'x> = opentype_glyf_simple;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let n_contours = args.0;
+fn parse<'input>(p: &mut Parser<'input>, n_contours: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_glyf_simple(p, n_contours)
 }
 }
@@ -3784,12 +3761,11 @@ y_coordinates: Vec<u16>
 }
 
 impl CommonObject for opentype_glyf_description {
-type Args<'x> = (u16,);
+type Args<'x> = u16;
 
 type Output<'x> = opentype_glyf_description;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let n_contours = args.0;
+fn parse<'input>(p: &mut Parser<'input>, n_contours: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_glyf_description(p, n_contours)
 }
 }
@@ -3837,12 +3813,11 @@ _data: std::marker::PhantomData<Option<opentype_glyf_entry>>
 pub enum opentype_glyf_table_glyphs { EmptyGlyph, Glyph(opentype_glyf_table_glyphs_Glyph) }
 
 impl<'a> CommonObject for opentype_glyf_table<'a> {
-type Args<'x> = (opentype_loca_table_offsets,);
+type Args<'x> = opentype_loca_table_offsets;
 
 type Output<'x> = opentype_glyf_table<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let offsets = args.0;
+fn parse<'input>(p: &mut Parser<'input>, offsets: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_glyf_table(p, offsets)
 }
 }
@@ -4049,12 +4024,11 @@ _data: std::marker::PhantomData<Option<opentype_layout_base_values<'input>>>
 }
 
 impl<'a> CommonObject for opentype_layout_feat_min_max<'a> {
-type Args<'x> = (View<'x>,);
+type Args<'x> = View<'x>;
 
 type Output<'x> = opentype_layout_feat_min_max<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let table_view = args.0;
+fn parse<'input>(p: &mut Parser<'input>, table_view: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_layout_feat_min_max(p, table_view)
 }
 }
@@ -4098,12 +4072,11 @@ _data: std::marker::PhantomData<Option<opentype_layout_min_max<'input>>>
 }
 
 impl<'a> CommonObject for opentype_base_base_langsys<'a> {
-type Args<'x> = (View<'x>,);
+type Args<'x> = View<'x>;
 
 type Output<'x> = opentype_base_base_langsys<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let table_view = args.0;
+fn parse<'input>(p: &mut Parser<'input>, table_view: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_base_base_langsys(p, table_view)
 }
 }
@@ -4146,12 +4119,11 @@ _data: std::marker::PhantomData<Option<opentype_layout_base_script<'input>>>
 }
 
 impl<'a> CommonObject for opentype_base_base_script_record<'a> {
-type Args<'x> = (View<'x>,);
+type Args<'x> = View<'x>;
 
 type Output<'x> = opentype_base_base_script_record<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let table_view = args.0;
+fn parse<'input>(p: &mut Parser<'input>, table_view: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_base_base_script_record(p, table_view)
 }
 }
@@ -4542,12 +4514,11 @@ caret_value_point_index: u16
 }
 
 impl<'a> CommonObject for opentype_gdef_caret_value_data_format3<'a> {
-type Args<'x> = (View<'x>,);
+type Args<'x> = View<'x>;
 
 type Output<'x> = opentype_gdef_caret_value_data_format3<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let table_view = args.0;
+fn parse<'input>(p: &mut Parser<'input>, table_view: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_gdef_caret_value_data_format3(p, table_view)
 }
 }
@@ -4756,12 +4727,11 @@ _data: std::marker::PhantomData<Option<opentype_layout_langsys>>
 }
 
 impl CommonObject for opentype_layout_lang_sys_record {
-type Args<'x> = (View<'x>,);
+type Args<'x> = View<'x>;
 
 type Output<'x> = opentype_layout_lang_sys_record;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let script_view = args.0;
+fn parse<'input>(p: &mut Parser<'input>, script_view: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_layout_lang_sys_record(p, script_view)
 }
 }
@@ -4803,12 +4773,11 @@ _data: std::marker::PhantomData<Option<opentype_layout_script_table<'input>>>
 }
 
 impl<'a> CommonObject for opentype_layout_script_record<'a> {
-type Args<'x> = (View<'x>,);
+type Args<'x> = View<'x>;
 
 type Output<'x> = opentype_layout_script_record<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let table_view = args.0;
+fn parse<'input>(p: &mut Parser<'input>, table_view: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_layout_script_record(p, table_view)
 }
 }
@@ -4877,12 +4846,11 @@ _data: std::marker::PhantomData<Option<opentype_layout_feature_table<'input>>>
 }
 
 impl<'a> CommonObject for opentype_layout_feature_record<'a> {
-type Args<'x> = (View<'x>,);
+type Args<'x> = View<'x>;
 
 type Output<'x> = opentype_layout_feature_record<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let list_view = args.0;
+fn parse<'input>(p: &mut Parser<'input>, list_view: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_layout_feature_record(p, list_view)
 }
 }
@@ -5012,12 +4980,11 @@ _data: std::marker::PhantomData<Option<opentype_layout_chained_sequence_rule_set
 }
 
 impl<'a> CommonObject for opentype_layout_chained_sequence_context_format1<'a> {
-type Args<'x> = (View<'x>,);
+type Args<'x> = View<'x>;
 
 type Output<'x> = opentype_layout_chained_sequence_context_format1<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let table_view = args.0;
+fn parse<'input>(p: &mut Parser<'input>, table_view: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_layout_chained_sequence_context_format1(p, table_view)
 }
 }
@@ -5032,12 +4999,11 @@ chained_seq_rule_sets: Vec<opentype_layout_chained_sequence_context_format1_chai
 }
 
 impl<'a> CommonObject for opentype_layout_chained_sequence_context_format2<'a> {
-type Args<'x> = (View<'x>,);
+type Args<'x> = View<'x>;
 
 type Output<'x> = opentype_layout_chained_sequence_context_format2<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let table_view = args.0;
+fn parse<'input>(p: &mut Parser<'input>, table_view: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_layout_chained_sequence_context_format2(p, table_view)
 }
 }
@@ -5055,12 +5021,11 @@ chained_class_seq_rule_sets: Vec<opentype_layout_chained_sequence_context_format
 }
 
 impl CommonObject for opentype_layout_chained_sequence_context_format3 {
-type Args<'x> = (View<'x>,);
+type Args<'x> = View<'x>;
 
 type Output<'x> = opentype_layout_chained_sequence_context_format3;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let table_view = args.0;
+fn parse<'input>(p: &mut Parser<'input>, table_view: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_layout_chained_sequence_context_format3(p, table_view)
 }
 }
@@ -5121,12 +5086,11 @@ anchor_point: u16
 }
 
 impl<'a> CommonObject for opentype_layout_anchor_table_format3<'a> {
-type Args<'x> = (View<'x>,);
+type Args<'x> = View<'x>;
 
 type Output<'x> = opentype_layout_anchor_table_format3<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let table_view = args.0;
+fn parse<'input>(p: &mut Parser<'input>, table_view: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_layout_anchor_table_format3(p, table_view)
 }
 }
@@ -5174,12 +5138,11 @@ _data: std::marker::PhantomData<Option<opentype_layout_anchor_table<'input>>>
 }
 
 impl<'a> CommonObject for opentype_layout_entry_exit_record<'a> {
-type Args<'x> = (View<'x>,);
+type Args<'x> = View<'x>;
 
 type Output<'x> = opentype_layout_entry_exit_record<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let table_view = args.0;
+fn parse<'input>(p: &mut Parser<'input>, table_view: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_layout_entry_exit_record(p, table_view)
 }
 }
@@ -5214,12 +5177,11 @@ entry_exit_records: Vec<opentype_layout_entry_exit_record<'input>>
 }
 
 impl<'a> CommonObject for opentype_layout_mark_record<'a> {
-type Args<'x> = (View<'x>,);
+type Args<'x> = View<'x>;
 
 type Output<'x> = opentype_layout_mark_record<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let array_view = args.0;
+fn parse<'input>(p: &mut Parser<'input>, array_view: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_layout_mark_record(p, array_view)
 }
 }
@@ -5280,12 +5242,11 @@ _base_anchors: std::marker::PhantomData<Vec<Option<opentype_layout_anchor_table<
 }
 
 impl<'a> CommonObject for opentype_layout_base_array<'a> {
-type Args<'x> = (u16,);
+type Args<'x> = u16;
 
 type Output<'x> = opentype_layout_base_array<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let mark_class_count = args.0;
+fn parse<'input>(p: &mut Parser<'input>, mark_class_count: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_layout_base_array(p, mark_class_count)
 }
 }
@@ -5352,12 +5313,11 @@ _ligature_anchors: std::marker::PhantomData<Vec<Option<opentype_layout_anchor_ta
 }
 
 impl<'a> CommonObject for opentype_layout_ligature_attach<'a> {
-type Args<'x> = (u16,);
+type Args<'x> = u16;
 
 type Output<'x> = opentype_layout_ligature_attach<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let mark_class_count = args.0;
+fn parse<'input>(p: &mut Parser<'input>, mark_class_count: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_layout_ligature_attach(p, mark_class_count)
 }
 }
@@ -5371,12 +5331,11 @@ component_records: Vec<opentype_layout_ligature_attach_component_record<'input>>
 }
 
 impl<'a> CommonObject for opentype_layout_ligature_array<'a> {
-type Args<'x> = (u16,);
+type Args<'x> = u16;
 
 type Output<'x> = opentype_layout_ligature_array<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let mark_class_count = args.0;
+fn parse<'input>(p: &mut Parser<'input>, mark_class_count: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_layout_ligature_array(p, mark_class_count)
 }
 }
@@ -5444,12 +5403,11 @@ _mark2_anchors: std::marker::PhantomData<Vec<Option<opentype_layout_anchor_table
 }
 
 impl<'a> CommonObject for opentype_layout_mark2_array<'a> {
-type Args<'x> = (u16,);
+type Args<'x> = u16;
 
 type Output<'x> = opentype_layout_mark2_array<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let mark_class_count = args.0;
+fn parse<'input>(p: &mut Parser<'input>, mark_class_count: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_layout_mark2_array(p, mark_class_count)
 }
 }
@@ -5584,12 +5542,11 @@ _data: std::marker::PhantomData<Option<opentype_layout_pair_pos_pair_set<'input>
 }
 
 impl<'a> CommonObject for opentype_layout_pair_pos_format1<'a> {
-type Args<'x> = (View<'x>,);
+type Args<'x> = View<'x>;
 
 type Output<'x> = opentype_layout_pair_pos_format1<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let table_view = args.0;
+fn parse<'input>(p: &mut Parser<'input>, table_view: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_layout_pair_pos_format1(p, table_view)
 }
 }
@@ -5635,12 +5592,11 @@ class2_records: Vec<opentype_layout_pair_pos_class2_record>
 }
 
 impl<'a> CommonObject for opentype_layout_pair_pos_format2<'a> {
-type Args<'x> = (View<'x>,);
+type Args<'x> = View<'x>;
 
 type Output<'x> = opentype_layout_pair_pos_format2<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let table_view = args.0;
+fn parse<'input>(p: &mut Parser<'input>, table_view: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_layout_pair_pos_format2(p, table_view)
 }
 }
@@ -5739,12 +5695,11 @@ _data: std::marker::PhantomData<Option<opentype_layout_sequence_context_rule_set
 }
 
 impl<'a> CommonObject for opentype_layout_sequence_context_format1<'a> {
-type Args<'x> = (View<'x>,);
+type Args<'x> = View<'x>;
 
 type Output<'x> = opentype_layout_sequence_context_format1<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let table_view = args.0;
+fn parse<'input>(p: &mut Parser<'input>, table_view: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_layout_sequence_context_format1(p, table_view)
 }
 }
@@ -5759,12 +5714,11 @@ seq_rule_sets: Vec<opentype_layout_sequence_context_format1_seq_rule_sets<'input
 }
 
 impl<'a> CommonObject for opentype_layout_sequence_context_format2<'a> {
-type Args<'x> = (View<'x>,);
+type Args<'x> = View<'x>;
 
 type Output<'x> = opentype_layout_sequence_context_format2<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let table_view = args.0;
+fn parse<'input>(p: &mut Parser<'input>, table_view: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_layout_sequence_context_format2(p, table_view)
 }
 }
@@ -5780,12 +5734,11 @@ class_seq_rule_sets: Vec<opentype_layout_sequence_context_format1_seq_rule_sets<
 }
 
 impl CommonObject for opentype_layout_sequence_context_format3 {
-type Args<'x> = (View<'x>,);
+type Args<'x> = View<'x>;
 
 type Output<'x> = opentype_layout_sequence_context_format3;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let table_view = args.0;
+fn parse<'input>(p: &mut Parser<'input>, table_view: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_layout_sequence_context_format3(p, table_view)
 }
 }
@@ -5825,12 +5778,11 @@ subst: opentype_layout_sequence_context_subst<'input>
 }
 
 impl<'a> CommonObject for opentype_layout_single_pos_format1<'a> {
-type Args<'x> = (View<'x>,);
+type Args<'x> = View<'x>;
 
 type Output<'x> = opentype_layout_single_pos_format1<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let table_view = args.0;
+fn parse<'input>(p: &mut Parser<'input>, table_view: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_layout_single_pos_format1(p, table_view)
 }
 }
@@ -5846,12 +5798,11 @@ value_record: opentype_layout_value_record
 }
 
 impl<'a> CommonObject for opentype_layout_single_pos_format2<'a> {
-type Args<'x> = (View<'x>,);
+type Args<'x> = View<'x>;
 
 type Output<'x> = opentype_layout_single_pos_format2<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let table_view = args.0;
+fn parse<'input>(p: &mut Parser<'input>, table_view: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_layout_single_pos_format2(p, table_view)
 }
 }
@@ -5891,12 +5842,11 @@ subtable: opentype_layout_single_pos_subtable<'input>
 }
 
 impl<'a> CommonObject for opentype_layout_ground_pos<'a> {
-type Args<'x> = (u16,);
+type Args<'x> = u16;
 
 type Output<'x> = opentype_layout_ground_pos<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let lookup_type = args.0;
+fn parse<'input>(p: &mut Parser<'input>, lookup_type: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_layout_ground_pos(p, lookup_type)
 }
 }
@@ -5935,12 +5885,11 @@ extension_offset: opentype_layout_pos_extension_extension_offset<'input>
 }
 
 impl<'a> CommonObject for opentype_gpos_lookup_subtable<'a> {
-type Args<'x> = (u16,);
+type Args<'x> = u16;
 
 type Output<'x> = opentype_gpos_lookup_subtable<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let lookup_type = args.0;
+fn parse<'input>(p: &mut Parser<'input>, lookup_type: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_gpos_lookup_subtable(p, lookup_type)
 }
 }
@@ -6044,12 +5993,11 @@ _data: std::marker::PhantomData<Option<opentype_layout_feature_variation_record_
 }
 
 impl<'a> CommonObject for opentype_layout_feature_table_substitution_record<'a> {
-type Args<'x> = (View<'x>,);
+type Args<'x> = View<'x>;
 
 type Output<'x> = opentype_layout_feature_table_substitution_record<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let _table_view = args.0;
+fn parse<'input>(p: &mut Parser<'input>, _table_view: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_layout_feature_table_substitution_record(p, _table_view)
 }
 }
@@ -6093,12 +6041,11 @@ _data: std::marker::PhantomData<Option<opentype_layout_feature_table_substitutio
 }
 
 impl<'a> CommonObject for opentype_layout_feature_variation_record<'a> {
-type Args<'x> = (View<'x>,);
+type Args<'x> = View<'x>;
 
 type Output<'x> = opentype_layout_feature_variation_record<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let table_view = args.0;
+fn parse<'input>(p: &mut Parser<'input>, table_view: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_layout_feature_variation_record(p, table_view)
 }
 }
@@ -6363,12 +6310,11 @@ substitute_glyph_ids: Vec<u16>
 }
 
 impl<'a> CommonObject for opentype_layout_single_subst_format1<'a> {
-type Args<'x> = (View<'x>,);
+type Args<'x> = View<'x>;
 
 type Output<'x> = opentype_layout_single_subst_format1<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let table_view = args.0;
+fn parse<'input>(p: &mut Parser<'input>, table_view: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_layout_single_subst_format1(p, table_view)
 }
 }
@@ -6383,12 +6329,11 @@ delta_glyph_id: u16
 }
 
 impl<'a> CommonObject for opentype_layout_single_subst_format2<'a> {
-type Args<'x> = (View<'x>,);
+type Args<'x> = View<'x>;
 
 type Output<'x> = opentype_layout_single_subst_format2<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let table_view = args.0;
+fn parse<'input>(p: &mut Parser<'input>, table_view: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_layout_single_subst_format2(p, table_view)
 }
 }
@@ -6427,12 +6372,11 @@ subst: opentype_layout_single_subst_subst<'input>
 }
 
 impl<'a> CommonObject for opentype_layout_ground_subst<'a> {
-type Args<'x> = (u16,);
+type Args<'x> = u16;
 
 type Output<'x> = opentype_layout_ground_subst<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let lookup_type = args.0;
+fn parse<'input>(p: &mut Parser<'input>, lookup_type: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_layout_ground_subst(p, lookup_type)
 }
 }
@@ -6471,12 +6415,11 @@ extension_offset: opentype_layout_subst_extension_extension_offset<'input>
 }
 
 impl<'a> CommonObject for opentype_gsub_lookup_subtable<'a> {
-type Args<'x> = (u16,);
+type Args<'x> = u16;
 
 type Output<'x> = opentype_gsub_lookup_subtable<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let lookup_type = args.0;
+fn parse<'input>(p: &mut Parser<'input>, lookup_type: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_gsub_lookup_subtable(p, lookup_type)
 }
 }
@@ -6604,12 +6547,11 @@ axis_name_id: u16
 }
 
 impl CommonObject for opentype_fvar_user_tuple {
-type Args<'x> = (u16,);
+type Args<'x> = u16;
 
 type Output<'x> = opentype_fvar_user_tuple;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let axis_count = args.0;
+fn parse<'input>(p: &mut Parser<'input>, axis_count: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_fvar_user_tuple(p, axis_count)
 }
 }
@@ -6671,12 +6613,11 @@ _instances: std::marker::PhantomData<Vec<opentype_fvar_instance_record>>
 }
 
 impl CommonObject for opentype_gvar_tuple_record {
-type Args<'x> = (u16,);
+type Args<'x> = u16;
 
 type Output<'x> = opentype_gvar_tuple_record;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let axis_count = args.0;
+fn parse<'input>(p: &mut Parser<'input>, axis_count: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_gvar_tuple_record(p, axis_count)
 }
 }
@@ -6730,12 +6671,11 @@ end_tuple: opentype_gvar_tuple_record
 }
 
 impl CommonObject for opentype_gvar_tuple_variation_header {
-type Args<'x> = (u16,);
+type Args<'x> = u16;
 
 type Output<'x> = opentype_gvar_tuple_variation_header;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let axis_count = args.0;
+fn parse<'input>(p: &mut Parser<'input>, axis_count: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_gvar_tuple_variation_header(p, axis_count)
 }
 }
@@ -6832,12 +6772,11 @@ per_tuple_variation_data: Vec<opentype_gvar_serialized_data_per_tuple_variation_
 }
 
 impl<'a> CommonObject for opentype_gvar_glyph_variation_data<'a> {
-type Args<'x> = (u16,);
+type Args<'x> = u16;
 
 type Output<'x> = opentype_gvar_glyph_variation_data<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let axis_count = args.0;
+fn parse<'input>(p: &mut Parser<'input>, axis_count: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_gvar_glyph_variation_data(p, axis_count)
 }
 }
@@ -7052,12 +6991,11 @@ axis_ordering: u16
 }
 
 impl CommonObject for opentype_stat_design_axes_array {
-type Args<'x> = (u16,);
+type Args<'x> = u16;
 
 type Output<'x> = opentype_stat_design_axes_array;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let design_axis_count = args.0;
+fn parse<'input>(p: &mut Parser<'input>, design_axis_count: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_stat_design_axes_array(p, design_axis_count)
 }
 }
@@ -7168,12 +7106,11 @@ _data: std::marker::PhantomData<Option<opentype_stat_axis_value_table>>
 }
 
 impl<'a> CommonObject for opentype_stat_axis_value_array<'a> {
-type Args<'x> = (u16,);
+type Args<'x> = u16;
 
 type Output<'x> = opentype_stat_axis_value_array<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let axis_value_count = args.0;
+fn parse<'input>(p: &mut Parser<'input>, axis_value_count: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_stat_axis_value_array(p, axis_value_count)
 }
 }
@@ -7262,12 +7199,11 @@ vmtx: Option<opentype_hmtx_table>
 }
 
 impl<'a> CommonObject for opentype_table_directory<'a> {
-type Args<'x> = (View<'x>,);
+type Args<'x> = View<'x>;
 
 type Output<'x> = opentype_table_directory<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let font_view = args.0;
+fn parse<'input>(p: &mut Parser<'input>, font_view: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_table_directory(p, font_view)
 }
 }
@@ -7318,12 +7254,11 @@ dsig_offset: u32
 pub enum opentype_ttc_header_header<'input> { UnknownVersion(u16), Version1(opentype_ttc_header_header_Version1<'input>), Version2(opentype_ttc_header_header_Version2<'input>) }
 
 impl<'a> CommonObject for opentype_ttc_header<'a> {
-type Args<'x> = (View<'x>,);
+type Args<'x> = View<'x>;
 
 type Output<'x> = opentype_ttc_header<'x>;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let font_view = args.0;
+fn parse<'input>(p: &mut Parser<'input>, font_view: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_opentype_ttc_header(p, font_view)
 }
 }
@@ -7430,12 +7365,11 @@ palette_index: u8
 }
 
 impl CommonObject for png_bkgd {
-type Args<'x> = (png_ihdr,);
+type Args<'x> = png_ihdr;
 
 type Output<'x> = png_bkgd;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let ihdr = args.0;
+fn parse<'input>(p: &mut Parser<'input>, ihdr: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_png_bkgd(p, ihdr)
 }
 }
@@ -7636,12 +7570,11 @@ sig_alpha_bits: u8
 }
 
 impl CommonObject for png_sbit {
-type Args<'x> = (png_ihdr,);
+type Args<'x> = png_ihdr;
 
 type Output<'x> = png_sbit;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let ihdr = args.0;
+fn parse<'input>(p: &mut Parser<'input>, ihdr: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_png_sbit(p, ihdr)
 }
 }
@@ -7755,12 +7688,11 @@ second: u8
 }
 
 impl CommonObject for png_trns {
-type Args<'x> = (png_ihdr,);
+type Args<'x> = png_ihdr;
 
 type Output<'x> = png_trns;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let ihdr = args.0;
+fn parse<'input>(p: &mut Parser<'input>, ihdr: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_png_trns(p, ihdr)
 }
 }
@@ -7795,12 +7727,11 @@ compressed_text: Vec<char>
 pub enum png_chunk_data { PLTE(Vec<gif_color_table_entry>), bKGD(png_bkgd), cHRM(png_chrm), gAMA(png_gama), hIST(png_hist), iCCP(png_iccp), iTXt(png_itxt), pHYs(png_phys), sBIT(png_sbit), sPLT(png_splt), sRGB(png_srgb), tEXt(png_text), tIME(png_time), tRNS(png_trns), unknown(Vec<u8>), zTXt(png_ztxt) }
 
 impl CommonObject for png_chunk {
-type Args<'x> = (png_ihdr,);
+type Args<'x> = png_ihdr;
 
 type Output<'x> = png_chunk;
 
-fn parse<'input>(p: &mut Parser<'input>, args: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
-let ihdr = args.0;
+fn parse<'input>(p: &mut Parser<'input>, ihdr: Self::Args<'input>) -> Result<Self::Output<'input>, ParseError> {
 Decoder_png_chunk(p, ihdr)
 }
 }
@@ -37101,3 +37032,4 @@ return Err(ParseError::FalsifiedWhere(13319962755558045565u64));
 };
 PResult::Ok(jpeg_exp_data { expand_horizontal_vertical })
 }
+
