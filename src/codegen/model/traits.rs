@@ -201,13 +201,16 @@ pub mod object_api {
                                     accum.push(RustExpr::local(ident.clone()));
                                 }
                                 args => {
-                                    for (ix, (ident, _)) in args.iter().enumerate() {
-                                        stmts.push(RustStmt::assign(
-                                            ident.clone(),
-                                            RustExpr::local("args").at_pos(ix),
-                                        ));
+                                    let mut bindings = Vec::with_capacity(args.len());
+                                    for (ident, _) in args {
+                                        bindings.push(RustPattern::CatchAll(Some(ident.clone())));
                                         accum.push(RustExpr::local(ident.clone()))
                                     }
+                                    let lhs_pat = RustPattern::TupleLiteral(bindings);
+                                    stmts.push(RustStmt::LetPattern(
+                                        lhs_pat,
+                                        RustExpr::local("args"),
+                                    ))
                                 }
                             }
                             accum

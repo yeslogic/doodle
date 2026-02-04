@@ -407,7 +407,6 @@ impl ToFragment for DeclDerives {
 
 #[derive(Clone, Debug)]
 pub enum TraitItem {
-    #[expect(dead_code)]
     AssocType(Label, Option<Box<DefParams>>, Box<RustType>),
     Method(RustFn),
 }
