@@ -581,425 +581,38 @@ pub mod obj {
             use super::$real;
             pub struct $proxy;
         };
-        ($real:ident =>  $proxy:ident @ $doc:meta ) => {
+        ($real:ident = $proxy:ident) => {
             use super::$real;
-            #[$doc]
             pub struct $proxy;
+
+            impl CommonObject for $proxy {
+                type Args<'a> = <$real as CommonObject>::Args<'a>;
+                type Output<'a> = <$real as CommonObject>::Output<'a>;
+
+                fn parse<'input>(
+                    p: &mut Parser<'input>,
+                    args: Self::Args<'input>,
+                ) -> PResult<Self::Output<'input>> {
+                    <$real as CommonObject>::parse(p, args)
+                }
+            }
         };
-    }
-
-    proxy!(GlyphHeader => GlyphHdr);
-
-    impl CommonObject for GlyphHdr {
-        type Args<'a> = ();
-        type Output<'a> = GlyphHeader;
-
-        fn parse<'input>(p: &mut Parser<'input>, _: ()) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_glyf_entry(p)
-        }
-    }
-
-    proxy!(OpentypeLigCaretList => LigCarList);
-
-    impl CommonObject for LigCarList {
-        type Args<'a> = ();
-        type Output<'a> = OpentypeLigCaretList<'a>;
-
-        fn parse<'input>(p: &mut Parser<'input>, _: ()) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_gdef_lig_caret_list(p)
-        }
-    }
-
-    proxy!(OpentypeAttachList => AttList);
-
-    impl CommonObject for AttList {
-        type Args<'a> = ();
-        type Output<'a> = OpentypeAttachList<'a>;
-
-        fn parse<'input>(p: &mut Parser<'input>, _: ()) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_gdef_attach_list(p)
-        }
-    }
-
-    proxy!(OpentypeKerningArray => KernArr);
-
-    impl CommonObject for KernArr {
-        /// Args: `(left_glyph_count, right_glyph_count)`
-        type Args<'a> = (u16, u16);
-        type Output<'a> = OpentypeKerningArray;
-
-        fn parse<'input>(
-            p: &mut Parser<'input>,
-            (left_glyph_count, right_glyph_count): (u16, u16),
-        ) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_kern_kerning_array(p, left_glyph_count, right_glyph_count)
-        }
-    }
-
-    proxy!(OpentypeKernClassTable => KernCls);
-
-    impl CommonObject for KernCls {
-        type Args<'a> = ();
-        type Output<'a> = OpentypeKernClassTable;
-
-        fn parse<'input>(p: &mut Parser<'input>, _: ()) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_kern_class_table(p)
-        }
-    }
-
-    proxy!(OpentypeRuleSet => SeqRuleSet);
-
-    impl CommonObject for SeqRuleSet {
-        type Args<'a> = ();
-        type Output<'a> = OpentypeRuleSet<'a>;
-
-        fn parse<'input>(p: &mut Parser<'input>, _: ()) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_layout_sequence_context_rule_set(p)
-        }
-    }
-
-    proxy!(OpentypeRule => SeqRule);
-
-    impl CommonObject for SeqRule {
-        type Args<'a> = ();
-        type Output<'a> = OpentypeRule;
-
-        fn parse<'input>(p: &mut Parser<'input>, _: ()) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_layout_sequence_context_rule(p)
-        }
-    }
-
-    proxy!(OpentypeChainedRuleSet => ChainRuleSet);
-
-    impl CommonObject for ChainRuleSet {
-        type Args<'a> = ();
-        type Output<'a> = OpentypeChainedRuleSet<'a>;
-
-        fn parse<'input>(
-            p: &mut Parser<'input>,
-            _: Self::Args<'input>,
-        ) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_layout_chained_sequence_rule_set(p)
-        }
-    }
-
-    proxy!(OpentypeChainedRule => ChainRule);
-
-    impl CommonObject for ChainRule {
-        type Args<'a> = ();
-        type Output<'a> = OpentypeChainedRule;
-
-        fn parse<'input>(p: &mut Parser<'input>, _: ()) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_layout_chained_sequence_rule(p)
-        }
-    }
-
-    proxy!(OpentypeAlternateSet => AltSet);
-
-    impl CommonObject for AltSet {
-        type Args<'a> = ();
-        type Output<'a> = OpentypeAlternateSet;
-
-        fn parse<'input>(p: &mut Parser<'input>, _: ()) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_gsub_alternate_subst_alternate_set(p)
-        }
-    }
-
-    proxy!(OpentypeLigature => LigTable);
-
-    impl CommonObject for LigTable {
-        type Args<'a> = ();
-        type Output<'a> = OpentypeLigature;
-
-        fn parse<'input>(p: &mut Parser<'input>, _: ()) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_gsub_ligature_subst_ligature_table(p)
-        }
-    }
-
-    proxy!(OpentypeLigatureSet => LigSet);
-
-    impl CommonObject for LigSet {
-        type Args<'a> = ();
-        type Output<'a> = OpentypeLigatureSet<'a>;
-
-        fn parse<'input>(p: &mut Parser<'input>, _: ()) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_gsub_ligature_subst_ligature_set(p)
-        }
-    }
-
-    proxy!(OpentypeLigatureAttach => LigAtt);
-
-    impl CommonObject for LigAtt {
-        ///  Args: `mark_class_count`
-        type Args<'a> = u16;
-        type Output<'a> = OpentypeLigatureAttach<'a>;
-
-        fn parse<'input>(
-            p: &mut Parser<'input>,
-            mark_class_count: u16,
-        ) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_layout_ligature_attach(p, mark_class_count)
-        }
-    }
-
-    proxy!(OpentypeMark2Array => Mark2Arr);
-
-    impl CommonObject for Mark2Arr {
-        /// Args: `mark_class_count`
-        type Args<'a> = u16;
-        type Output<'a> = OpentypeMark2Array<'a>;
-
-        fn parse<'input>(
-            p: &mut Parser<'input>,
-            mark_class_count: u16,
-        ) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_layout_mark2_array(p, mark_class_count)
-        }
-    }
-
-    proxy!(OpentypeCaretValue => CaretVal);
-
-    impl CommonObject for CaretVal {
-        type Args<'a> = ();
-        type Output<'a> = OpentypeCaretValue<'a>;
-
-        fn parse<'input>(p: &mut Parser<'input>, _: ()) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_gdef_caret_value(p)
-        }
-    }
-
-    proxy!(OpentypeLigGlyph => LigGlyph);
-
-    impl CommonObject for LigGlyph {
-        type Args<'a> = ();
-        type Output<'a> = OpentypeLigGlyph<'a>;
-
-        fn parse<'input>(p: &mut Parser<'input>, _: ()) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_gdef_lig_glyph(p)
-        }
-    }
-
-    proxy!(OpentypeAttachPoint => AttPoint);
-
-    impl CommonObject for AttPoint {
-        type Args<'a> = ();
-        type Output<'a> = OpentypeAttachPoint;
-
-        fn parse<'input>(p: &mut Parser<'input>, _: ()) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_gdef_attach_point(p)
-        }
-    }
-
-    proxy!(OpentypeItemVariationStore => ItemVarStore);
-
-    impl CommonObject for ItemVarStore {
-        type Args<'a> = ();
-        type Output<'a> = OpentypeItemVariationStore<'a>;
-
-        fn parse<'input>(p: &mut Parser<'input>, _args: ()) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_common_item_variation_store(p)
-        }
-    }
-
-    proxy!(OpentypeMarkGlyphSet => MarkGlSet);
-
-    impl CommonObject for MarkGlSet {
-        type Args<'a> = ();
-        type Output<'a> = OpentypeMarkGlyphSet<'a>;
-
-        fn parse<'input>(p: &mut Parser<'input>, _: ()) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_gdef_mark_glyph_set(p)
-        }
-    }
-
-    proxy!(OpentypeAxisValue => AxisValTbl);
-
-    impl CommonObject for AxisValTbl {
-        type Args<'a> = ();
-        type Output<'a> = OpentypeAxisValue;
-
-        fn parse<'input>(p: &mut Parser<'input>, _args: ()) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_stat_axis_value_table(p)
-        }
-    }
-
-    proxy!(OpentypeAxisValueArray => AxisValueArr);
-
-    impl CommonObject for AxisValueArr {
-        /// Args: `axis_value_count`
-        type Args<'a> = u16;
-        type Output<'a> = OpentypeAxisValueArray<'a>;
-
-        fn parse<'input>(
-            p: &mut Parser<'input>,
-            axis_value_count: u16,
-        ) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_stat_axis_value_array(p, axis_value_count)
-        }
-    }
-
-    proxy!(OpentypeDesignAxesArray => DAxisArray);
-
-    impl CommonObject for DAxisArray {
-        /// Args: `design_axis_count`
-        type Args<'a> = u16;
-        type Output<'a> = OpentypeDesignAxesArray;
-
-        fn parse<'input>(
-            p: &mut Parser<'input>,
-            design_axis_count: u16,
-        ) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_stat_design_axes_array(p, design_axis_count)
-        }
-    }
-
-    proxy!(OpentypeCmapSubtable => CmapSub);
-
-    impl CommonObject for CmapSub {
-        /// Args: `platform_id`
-        type Args<'a> = u16;
-        type Output<'a> = OpentypeCmapSubtable<'a>;
-
-        fn parse<'input>(
-            p: &mut Parser<'input>,
-            platform_id: u16,
-        ) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_cmap_subtable(p, platform_id)
-        }
-    }
-
-    proxy!(OpentypeItemVariationData => ItemVarData);
-
-    impl CommonObject for ItemVarData {
-        type Args<'a> = ();
-        type Output<'a> = OpentypeItemVariationData;
-
-        fn parse<'input>(p: &mut Parser<'input>, _: ()) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_common_item_variation_data(p)
-        }
-    }
-
-    proxy!(OpentypeVariationRegionList => VarRegList);
-
-    impl CommonObject for VarRegList {
-        type Args<'a> = ();
-        type Output<'a> = OpentypeVariationRegionList;
-
-        fn parse<'input>(p: &mut Parser<'input>, _: ()) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_common_variation_region_list(p)
-        }
-    }
-
-    proxy!(OpentypeAnchorTable => AncTable);
-
-    impl CommonObject for AncTable {
-        type Args<'a> = ();
-        type Output<'a> = OpentypeAnchorTable<'a>;
-
-        fn parse<'input>(p: &mut Parser<'input>, _: ()) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_layout_anchor_table(p)
-        }
-    }
-
-    proxy!(OpentypeCoverageTable => CovTable);
-
-    impl CommonObject for CovTable {
-        type Args<'a> = ();
-        type Output<'a> = OpentypeCoverageTable;
-
-        fn parse<'input>(p: &mut Parser<'input>, _: ()) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_coverage_table(p)
-        }
-    }
-
-    proxy!(OpentypeMarkArray => MarkArr);
-
-    impl CommonObject for MarkArr {
-        type Args<'a> = ();
-        type Output<'a> = OpentypeMarkArray<'a>;
-
-        fn parse<'input>(p: &mut Parser<'input>, _args: ()) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_layout_mark_array(p)
-        }
-    }
-
-    proxy!(OpentypeBaseArray => BaseArr);
-
-    impl CommonObject for BaseArr {
-        /// Args : `mark_class_count`
-        type Args<'a> = u16;
-        type Output<'a> = OpentypeBaseArray<'a>;
-
-        fn parse<'input>(
-            p: &mut Parser<'input>,
-            mark_class_count: u16,
-        ) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_layout_base_array(p, mark_class_count)
-        }
-    }
-
-    proxy!(OpentypeLigatureArray => LigArr);
-
-    impl CommonObject for LigArr {
-        /// Args : `mark_class_count`
-        type Args<'a> = u16;
-        type Output<'a> = OpentypeLigatureArray<'a>;
-
-        fn parse<'input>(
-            p: &mut Parser<'input>,
-            mark_class_count: u16,
-        ) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_layout_ligature_array(p, mark_class_count)
-        }
-    }
-
-    proxy!(OpentypeClassDef => ClsDef @ doc = "ClassDef");
-
-    impl CommonObject for ClsDef {
-        type Args<'a> = ();
-        type Output<'a> = OpentypeClassDef;
-
-        fn parse<'input>(p: &mut Parser<'input>, _: ()) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_class_def(p)
-        }
-    }
-
-    proxy!(OpentypeDeviceOrVariationIndexTable => DevTable);
-
-    impl CommonObject for DevTable {
-        type Args<'a> = ();
-        type Output<'a> = OpentypeDeviceOrVariationIndexTable;
-
-        fn parse<'input>(p: &mut Parser<'input>, _: ()) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_common_device_or_variation_index_table(p)
-        }
-    }
-
-    proxy!(OpentypeVariationAxisRecord => AxisRec);
-
-    impl CommonObject for AxisRec {
-        type Args<'a> = ();
-        type Output<'a> = OpentypeVariationAxisRecord;
-
-        fn parse<'input>(p: &mut Parser<'input>, _: ()) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_fvar_variation_axis_record(p)
-        }
-    }
-
-    proxy!(OpentypeInstanceRecord => InstanceRec);
-
-    impl CommonObject for InstanceRec {
-        /// Args: `(axis_count, instance_size)`
-        type Args<'a> = (u16, u16);
-        type Output<'a> = OpentypeInstanceRecord;
-
-        fn parse<'input>(
-            p: &mut Parser<'input>,
-
-            (axis_count, instance_size): (u16, u16),
-        ) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_fvar_instance_record(p, axis_count, instance_size)
-        }
+        ($real:ident <$lt:lifetime> = $proxy:ident) => {
+            use super::$real;
+            pub struct $proxy;
+
+            impl CommonObject for $proxy {
+                type Args<'a> = <$real<'a> as CommonObject>::Args<'a>;
+                type Output<'a> = <$real<'a> as CommonObject>::Output<'a>;
+
+                fn parse<'input>(
+                    p: &mut Parser<'input>,
+                    args: Self::Args<'input>,
+                ) -> PResult<Self::Output<'input>> {
+                    <$real<'input> as CommonObject>::parse(p, args)
+                }
+            }
+        };
     }
 
     proxy!(OpentypeGlyphVariationData => GVarData);
@@ -1043,211 +656,56 @@ pub mod obj {
         }
     }
 
-    proxy!(OpentypeGposLookupSubtable => PosLookup);
-
-    impl CommonObject for PosLookup {
-        /// Args : lookup_type`
-        type Args<'a> = u16;
-        type Output<'a> = OpentypeGposLookupSubtable<'a>;
-
-        fn parse<'input>(
-            p: &mut Parser<'input>,
-            lookup_type: u16,
-        ) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_layout_ground_pos(p, lookup_type)
-        }
-    }
-
-    proxy!(OpentypeGsubLookupSubtable => SubstLookup);
-
-    impl CommonObject for SubstLookup {
-        /// Args : `lookup_type`
-        type Args<'a> = u16;
-        type Output<'a> = OpentypeGsubLookupSubtable<'a>;
-
-        fn parse<'input>(
-            p: &mut Parser<'input>,
-            lookup_type: u16,
-        ) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_layout_ground_subst(p, lookup_type)
-        }
-    }
-
-    proxy!(OpentypeGvarSerializedData => GvarSerData);
-
-    impl CommonObject for GvarSerData {
-        /// Args : `(shared_point_numbers, tuple_variation_headers)`
-        type Args<'a> = (bool, &'a [super::OpentypeGvarTupleVariationHeader]);
-        type Output<'a> = OpentypeGvarSerializedData;
-
-        fn parse<'input>(
-            p: &mut Parser<'input>,
-            (shared_point_numbers, tuple_variation_headers): Self::Args<'input>,
-        ) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_gvar_serialized_data(
-                p,
-                shared_point_numbers,
-                tuple_variation_headers,
-            )
-        }
-    }
-
-    proxy!(OpentypeSequenceTable => SeqTable);
-
-    impl CommonObject for SeqTable {
-        type Args<'a> = ();
-        type Output<'a> = OpentypeSequenceTable;
-
-        fn parse<'input>(p: &mut Parser<'input>, _: ()) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_layout_multiple_subst_sequence_table(p)
-        }
-    }
-
-    proxy!(OpentypeGposLookupSubtableExt => PosSubtable);
-
-    impl CommonObject for PosSubtable {
-        /// Args : `lookup_type`
-        type Args<'a> = u16;
-        type Output<'a> = OpentypeGposLookupSubtableExt<'a>;
-
-        fn parse<'input>(
-            p: &mut Parser<'input>,
-            lookup_type: u16,
-        ) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_gpos_lookup_subtable(p, lookup_type)
-        }
-    }
-
-    proxy!(OpentypeGsubLookupSubtableExt => SubstSubtable);
-
-    impl CommonObject for SubstSubtable {
-        /// Args : `lookup_type`
-        type Args<'a> = u16;
-        type Output<'a> = OpentypeGsubLookupSubtableExt<'a>;
-
-        fn parse<'input>(
-            p: &mut Parser<'input>,
-            lookup_type: u16,
-        ) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_gsub_lookup_subtable(p, lookup_type)
-        }
-    }
-
-    proxy!(OpentypeGposLookupTable => PosLookupTable);
-
-    impl CommonObject for PosLookupTable {
-        type Args<'a> = ();
-        type Output<'a> = OpentypeGposLookupTable<'a>;
-
-        fn parse<'input>(p: &mut Parser<'input>, _: ()) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_gpos_lookup_table(p)
-        }
-    }
-
-    proxy!(OpentypeGsubLookupTable => SubstLookupTable);
-
-    impl CommonObject for SubstLookupTable {
-        type Args<'a> = ();
-        type Output<'a> = OpentypeGsubLookupTable<'a>;
-
-        fn parse<'input>(p: &mut Parser<'input>, _: ()) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_gsub_lookup_table(p)
-        }
-    }
-
-    proxy!(OpentypeScriptList => ScrList);
-
-    impl CommonObject for ScrList {
-        type Args<'a> = ();
-        type Output<'a> = OpentypeScriptList<'a>;
-
-        fn parse<'input>(p: &mut Parser<'input>, _: ()) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_layout_script_list(p)
-        }
-    }
-
-    proxy!(OpentypeScriptTable => ScrTable);
-
-    impl CommonObject for ScrTable {
-        type Args<'a> = ();
-        type Output<'a> = OpentypeScriptTable<'a>;
-
-        fn parse<'input>(p: &mut Parser<'input>, _: ()) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_layout_script_table(p)
-        }
-    }
-
-    proxy!(OpentypeFeatureList => FeatList);
-
-    impl CommonObject for FeatList {
-        type Args<'a> = ();
-        type Output<'a> = OpentypeFeatureList<'a>;
-
-        fn parse<'input>(p: &mut Parser<'input>, _: ()) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_layout_feature_list(p)
-        }
-    }
-
-    proxy!(OpentypeGposLookupList => PosLookups);
-
-    impl CommonObject for PosLookups {
-        type Args<'a> = ();
-        type Output<'a> = OpentypeGposLookupList<'a>;
-
-        fn parse<'input>(p: &mut Parser<'input>, _: ()) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_gpos_lookup_list(p)
-        }
-    }
-
-    proxy!(OpentypeGsubLookupList => SubstLookups);
-
-    impl CommonObject for SubstLookups {
-        type Args<'a> = ();
-        type Output<'a> = OpentypeGsubLookupList<'a>;
-
-        fn parse<'input>(
-            p: &mut Parser<'input>,
-            _: Self::Args<'input>,
-        ) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_gsub_lookup_list(p)
-        }
-    }
-
-    proxy!(OpentypeFeatureVariations => FeatVar);
-
-    impl CommonObject for FeatVar {
-        type Args<'a> = ();
-        type Output<'a> = OpentypeFeatureVariations<'a>;
-
-        fn parse<'input>(p: &mut Parser<'input>, _: ()) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_layout_feature_variations(p)
-        }
-    }
-
-    proxy!(OpentypeLangSys => LangSys);
-
-    impl CommonObject for LangSys {
-        type Args<'a> = ();
-        type Output<'a> = OpentypeLangSys;
-
-        fn parse<'input>(
-            p: &mut Parser<'input>,
-            _: Self::Args<'input>,
-        ) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_layout_langsys(p)
-        }
-    }
-
-    proxy!(OpentypeFeatureTable => FeatTable);
-
-    impl CommonObject for FeatTable {
-        type Args<'a> = ();
-        type Output<'a> = OpentypeFeatureTable<'a>;
-
-        fn parse<'input>(p: &mut Parser<'input>, _: ()) -> PResult<Self::Output<'input>> {
-            crate::Decoder_opentype_layout_feature_table(p)
-        }
-    }
+    proxy!(GlyphHeader = GlyphHdr);
+    proxy!(OpentypeLigCaretList<'a> = LigCarList);
+    proxy!(OpentypeAttachList<'a> = AttList);
+    proxy!(OpentypeKerningArray = KernArr);
+    proxy!(OpentypeKernClassTable = KernCls);
+    proxy!(OpentypeRuleSet<'a> = SeqRuleSet);
+    proxy!(OpentypeRule = SeqRule);
+    proxy!(OpentypeChainedRuleSet<'a> = ChainRuleSet);
+    proxy!(OpentypeChainedRule = ChainRule);
+    proxy!(OpentypeAlternateSet = AltSet);
+    proxy!(OpentypeLigature = LigTable);
+    proxy!(OpentypeLigatureSet<'a> = LigSet);
+    proxy!(OpentypeLigatureAttach<'a> = LigAtt);
+    proxy!(OpentypeMark2Array<'a> = Mark2Arr);
+    proxy!(OpentypeCaretValue<'a> = CaretVal);
+    proxy!(OpentypeLigGlyph<'a> = LigGlyph);
+    proxy!(OpentypeAttachPoint = AttPoint);
+    proxy!(OpentypeItemVariationStore<'a> = ItemVarStore);
+    proxy!(OpentypeMarkGlyphSet<'a> = MarkGlSet);
+    proxy!(OpentypeAxisValue = AxisValTbl);
+    proxy!(OpentypeAxisValueArray<'a> = AxisValueArr);
+    proxy!(OpentypeDesignAxesArray = DAxisArray);
+    proxy!(OpentypeCmapSubtable<'a> = CmapSub);
+    proxy!(OpentypeItemVariationData = ItemVarData);
+    proxy!(OpentypeVariationRegionList = VarRegList);
+    proxy!(OpentypeAnchorTable<'a> = AncTable);
+    proxy!(OpentypeCoverageTable = CovTable);
+    proxy!(OpentypeMarkArray<'a> = MarkArr);
+    proxy!(OpentypeBaseArray<'a> = BaseArr);
+    proxy!(OpentypeLigatureArray<'a> = LigArr);
+    proxy!(OpentypeClassDef = ClsDef);
+    proxy!(OpentypeDeviceOrVariationIndexTable = DevTable);
+    proxy!(OpentypeVariationAxisRecord = AxisRec);
+    proxy!(OpentypeInstanceRecord = InstanceRec);
+    proxy!(OpentypeGposLookupSubtable<'a> = PosLookup);
+    proxy!(OpentypeGsubLookupSubtable<'a> = SubstLookup);
+    proxy!(OpentypeGvarSerializedData = GvarSerData);
+    proxy!(OpentypeSequenceTable = SeqTable);
+    proxy!(OpentypeGposLookupSubtableExt<'a> = PosSubtable);
+    proxy!(OpentypeGsubLookupSubtableExt<'a> = SubstSubtable);
+    proxy!(OpentypeGposLookupTable<'a> = PosLookupTable);
+    proxy!(OpentypeGsubLookupTable<'a> = SubstLookupTable);
+    proxy!(OpentypeScriptList<'a> = ScrList);
+    proxy!(OpentypeScriptTable<'a> = ScrTable);
+    proxy!(OpentypeFeatureList<'a> = FeatList);
+    proxy!(OpentypeGposLookupList<'a> = PosLookups);
+    proxy!(OpentypeGsubLookupList<'a> = SubstLookups);
+    proxy!(OpentypeFeatureVariations<'a> = FeatVar);
+    proxy!(OpentypeLangSys = LangSys);
+    proxy!(OpentypeFeatureTable<'a> = FeatTable);
 }
 
 /// Union over errors that arise during parsing, and generic-type errors arising in manual post-conversion
