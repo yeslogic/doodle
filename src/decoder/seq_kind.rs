@@ -3,6 +3,7 @@ use std::{borrow::Cow, fmt::Debug, ops::Index};
 use serde::Serialize;
 
 #[derive(Clone, PartialEq, Debug, Serialize, Hash, Eq)]
+#[serde(tag = "tag", content = "data")]
 // NOTE - T must be clone in order for `Dup` to be well-founded, as non-Clone values cannot be duped
 pub enum SeqKind<T: Clone> {
     Strict(Vec<T>),

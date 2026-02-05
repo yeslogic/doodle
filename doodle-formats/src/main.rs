@@ -263,19 +263,33 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
             let program = Compiler::compile_program(&module, &format)?;
 
             let input = fs::read(filename)?;
-            let (value, _) = program.run(ReadCtxt::new(&input))?;
-
             match output {
-                FileOutput::Debug => println!("{value:?}"),
-                FileOutput::Json => serde_json::to_writer(std::io::stdout(), &value).unwrap(),
-                FileOutput::Tree if !trace => {
-                    doodle::output::tree::print_decoded_value(&module, &value, &format);
+                FileOutput::Debug => {
+                    let (value, _) = program.run(ReadCtxt::new(&input))?;
+                    println!("{value:?}");
+                }
+                FileOutput::Json => {
+                    if trace {
+                        let (p_value, _) = program.run_with_loc(ReadCtxt::new(&input))?;
+                        serde_json::to_writer(std::io::stdout(), &p_value).unwrap()
+                    } else {
+                        let (value, _) = program.run(ReadCtxt::new(&input))?;
+                        serde_json::to_writer(std::io::stdout(), &value).unwrap()
+                    }
                 }
                 FileOutput::Tree => {
-                    let (p_value, _) = program.run_with_loc(ReadCtxt::new(&input))?;
-                    doodle::output::tree::print_parsed_decoded_value(&module, &p_value, &format);
+                    if trace {
+                        let (p_value, _) = program.run_with_loc(ReadCtxt::new(&input))?;
+                        doodle::output::tree::print_parsed_decoded_value(
+                            &module, &p_value, &format,
+                        );
+                    } else {
+                        let (value, _) = program.run(ReadCtxt::new(&input))?;
+                        doodle::output::tree::print_decoded_value(&module, &value, &format);
+                    }
                 }
                 FileOutput::Flat => {
+                    let (value, _) = program.run(ReadCtxt::new(&input))?;
                     doodle::output::flat::print_decoded_value(&module, &value, &format);
                 }
             }
