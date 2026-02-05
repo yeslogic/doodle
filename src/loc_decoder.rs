@@ -11,10 +11,11 @@ use crate::read::ReadCtxt;
 use crate::{
     Arith, BaseKind, DynFormat, Endian, Expr, Format, IntRel, Label, Pattern, UnaryOp, ViewExpr,
 };
+use serde::Serialize;
 use std::borrow::Cow;
 use std::cmp::Ordering;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Serialize)]
 pub enum ParseLoc {
     InBuffer {
         offset: usize,
@@ -124,9 +125,10 @@ impl ParseLoc {
 }
 
 /// Helper type for associating a [`ParseLoc`] with a value of a generic type.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize)]
 pub struct Parsed<T: Clone> {
     pub(crate) loc: ParseLoc,
+    #[serde(rename = "data")]
     pub(crate) inner: T,
 }
 
@@ -143,7 +145,8 @@ impl<T: Clone> AsRef<T> for Parsed<T> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
+#[serde(tag = "tag", content = "data")]
 pub enum ParsedValue {
     /// Flat parses of the sub-set of `Value` variants that do not contain any embedded `Value` terms
     Flat(Parsed<Value>),
@@ -408,6 +411,14 @@ impl ParsedValue {
             }
             (Pattern::Option(None), ParsedValue::Option(None)) => true,
             (Pattern::Option(Some(p)), ParsedValue::Option(Some(v))) => v.matches_inner(scope, p),
+            (Pattern::Int(bounds), ParsedValue::Flat(Parsed { inner: v, .. })) => match v {
+                Value::U8(n) => bounds.contains(usize::from(*n)),
+                Value::U16(n) => bounds.contains(usize::from(*n)),
+                Value::U32(n) => bounds.contains(usize::try_from(*n).unwrap()),
+                Value::U64(n) => bounds.contains(usize::try_from(*n).unwrap()),
+                Value::Usize(n) => bounds.contains(*n),
+                _ => false,
+            },
             _ => false,
         }
     }
@@ -792,9 +803,18 @@ impl Expr {
             Expr::AsU8(x) => Cow::Owned(ParsedValue::from_evaluated(
                 match x.eval_value_with_loc(scope) {
                     Value::U8(x) => Value::U8(x),
-                    Value::U16(x) => Value::U8(u8::try_from(x).unwrap()),
-                    Value::U32(x) => Value::U8(u8::try_from(x).unwrap()),
-                    Value::U64(x) => Value::U8(u8::try_from(x).unwrap()),
+                    Value::U16(x) => Value::U8(u8::try_from(x).unwrap_or_else(|err| {
+                        panic!("cannot perform AsU8 cast on u16 {x}: {err}")
+                    })),
+                    Value::U32(x) => Value::U8(u8::try_from(x).unwrap_or_else(|err| {
+                        panic!("cannot perform AsU8 cast on u32 {x}: {err}")
+                    })),
+                    Value::U64(x) => Value::U8(u8::try_from(x).unwrap_or_else(|err| {
+                        panic!("cannot perform AsU8 cast on u64 {x}: {err}")
+                    })),
+                    Value::Usize(x) => Value::U8(u8::try_from(x).unwrap_or_else(|err| {
+                        panic!("cannot perform AsU8 cast on usize {x}: {err}")
+                    })),
                     x => panic!("cannot convert {x:?} to U8"),
                 },
             )),

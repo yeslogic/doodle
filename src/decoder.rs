@@ -149,6 +149,7 @@ impl Value {
             (Pattern::Int(bounds), Value::U16(n)) => bounds.contains(usize::from(*n)),
             (Pattern::Int(bounds), Value::U32(n)) => bounds.contains(usize::try_from(*n).unwrap()),
             (Pattern::Int(bounds), Value::U64(n)) => bounds.contains(usize::try_from(*n).unwrap()),
+            (Pattern::Int(bounds), Value::Usize(n)) => bounds.contains(*n),
             (Pattern::Char(c0), Value::Char(c1)) => c0 == c1,
             (Pattern::Tuple(ps), Value::Tuple(vs)) if ps.len() == vs.len() => {
                 for (p, v) in Iterator::zip(ps.iter(), vs.iter()) {
@@ -247,6 +248,8 @@ impl Value {
     /// # Panics
     ///
     /// Panics if the value is not numeric.
+    ///
+    /// May additionally panic in rare cases such as `u64`-to-`usize` conversion on 32-bit architectures.
     pub(crate) fn unwrap_usize(&self) -> usize {
         match self {
             Value::U8(n) => usize::from(*n),
@@ -979,7 +982,7 @@ pub struct Program {
 }
 
 impl Program {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let decoders = Vec::new();
         Program { decoders }
     }
