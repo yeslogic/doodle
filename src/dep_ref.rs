@@ -64,6 +64,15 @@ impl crate::FormatModule {
         self.register_format_args_views(name, [], views, format)
     }
 
+    pub fn register_format_view(
+        &mut self,
+        name: impl IntoLabel,
+        view: Label,
+        format: Format,
+    ) -> DepFormat<0, 1> {
+        self.register_format_args_views(name, [], [view], format)
+    }
+
     pub fn register_format_args_views<const N: usize, const M: usize>(
         &mut self,
         name: impl IntoLabel,
@@ -71,23 +80,7 @@ impl crate::FormatModule {
         views: [Label; M],
         format: Format,
     ) -> DepFormat<N, M> {
-        let mut scope = TypeScope::new();
-        for (arg_name, arg_type) in &args {
-            scope.push(arg_name.clone(), arg_type.clone());
-        }
-        for view_name in &views {
-            scope.push_view(view_name.clone());
-        }
-        let format_type = match self.infer_format_type(&scope, &format) {
-            Ok(t) => t,
-            Err(msg) => panic!("{msg}"),
-        };
-        let level = self.names.len();
-        self.names.push(name.into());
-        self.args.push(args.to_vec());
-        self.views.push(views.to_vec());
-        self.formats.push(format);
-        self.format_types.push(format_type);
-        lift(FormatRef(level))
+        let format_ref = self.define_format_args_views(name, args.to_vec(), views.to_vec(), format);
+        lift::<N, M>(format_ref)
     }
 }
