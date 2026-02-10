@@ -28,3 +28,5 @@ smallsorts = { path = "smallsorts/", version = "0.1.0" }
 intmap = "3.1.2"
 smallvec = "1.15.1"
 vec-collections = "0.4.3"
+log = "0.4.29"
+stderrlog = "0.6.0"

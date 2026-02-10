@@ -240,21 +240,21 @@ impl ParsedValue {
     /// Mostly useful for handling `Format::Map`.
     fn inherit(orig: &ParsedValue, v: Value) -> ParsedValue {
         let mut tmp = Self::from_evaluated(v);
-        tmp.transpose(orig.get_loc());
+        tmp.translate(orig.get_loc());
         tmp
     }
 
     /// Overwrites a `ParsedValue`'s associated `ParseLoc` using the provided argument, discarding its previous value.
-    pub fn transpose(&mut self, new_loc: ParseLoc) {
+    pub fn translate(&mut self, new_loc: ParseLoc) {
         match self {
             ParsedValue::Flat(p) => p.loc = new_loc,
             ParsedValue::Tuple(p) => p.loc = new_loc,
             ParsedValue::Record(p) => p.loc = new_loc,
             ParsedValue::Seq(p) => p.loc = new_loc,
-            ParsedValue::Variant(_, inner) => inner.transpose(new_loc),
-            ParsedValue::Branch(_, inner) => inner.transpose(new_loc),
-            ParsedValue::Mapped(_, image) => image.transpose(new_loc),
-            ParsedValue::Option(Some(inner)) => inner.transpose(new_loc),
+            ParsedValue::Variant(_, inner) => inner.translate(new_loc),
+            ParsedValue::Branch(_, inner) => inner.translate(new_loc),
+            ParsedValue::Mapped(_, image) => image.translate(new_loc),
+            ParsedValue::Option(Some(inner)) => inner.translate(new_loc),
             ParsedValue::Option(None) => {}
         }
     }
@@ -303,7 +303,7 @@ impl ParsedValue {
             ParsedValue::Record(Parsed { inner: fields, .. }) => {
                 match fields.iter().find(|(l, _)| label == l) {
                     Some((_, v)) => v,
-                    None => panic!("{label} not found in record"),
+                    None => panic!("`{label}` not found in record: {self:?}"),
                 }
             }
             _ => panic!("expected record, found {self:?}"),
@@ -342,84 +342,78 @@ impl ParsedValue {
     }
 
     pub fn matches_inner(&self, scope: &mut LocMultiScope<'_>, pattern: &Pattern) -> bool {
-        match (pattern, self) {
-            (Pattern::Binding(name), head) => {
-                scope.push(name.clone(), head.clone());
+        match pattern {
+            Pattern::Binding(name) => {
+                scope.push(name.clone(), self.clone());
                 true
             }
-            (Pattern::Wildcard, _) => true,
-            (
-                Pattern::Bool(b0),
-                ParsedValue::Flat(Parsed {
+            Pattern::Wildcard => true,
+            Pattern::Bool(b0) => matches!(self, ParsedValue::Flat(Parsed {
                     inner: Value::Bool(b1),
                     ..
-                }),
-            ) => b0 == b1,
-            (
-                Pattern::U8(i0),
-                ParsedValue::Flat(Parsed {
+                }) if b0 == b1),
+            Pattern::U8(i0) => matches!(self, ParsedValue::Flat(Parsed {
                     inner: Value::U8(i1),
                     ..
-                }),
-            ) => i0 == i1,
-            (
-                Pattern::U16(i0),
-                ParsedValue::Flat(Parsed {
+                }) if i0 == i1),
+            Pattern::U16(i0) => matches!(self, ParsedValue::Flat(Parsed {
                     inner: Value::U16(i1),
                     ..
-                }),
-            ) => i0 == i1,
-            (
-                Pattern::U32(i0),
-                ParsedValue::Flat(Parsed {
+                }) if i0 == i1),
+            Pattern::U32(i0) => matches!(self, ParsedValue::Flat(Parsed {
                     inner: Value::U32(i1),
                     ..
-                }),
-            ) => i0 == i1,
-            (
-                Pattern::U64(i0),
-                ParsedValue::Flat(Parsed {
+                }) if i0 == i1),
+            Pattern::U64(i0) => matches!(self, ParsedValue::Flat(Parsed {
                     inner: Value::U64(i1),
                     ..
-                }),
-            ) => i0 == i1,
-            (
-                Pattern::Char(c0),
-                ParsedValue::Flat(Parsed {
+                }) if i0 == i1),
+            Pattern::Char(c0) => matches!(self, ParsedValue::Flat(Parsed {
                     inner: Value::Char(c1),
                     ..
-                }),
-            ) => c0 == c1,
-            (Pattern::Tuple(ps), ParsedValue::Tuple(vs)) if ps.len() == vs.inner.len() => {
-                for (p, v) in Iterator::zip(ps.iter(), vs.inner.iter()) {
-                    if !v.matches_inner(scope, p) {
-                        return false;
+                }) if c0 == c1),
+            Pattern::Tuple(ps) => match self {
+                ParsedValue::Tuple(vs) if ps.len() == vs.inner.len() => {
+                    for (p, v) in Iterator::zip(ps.iter(), vs.inner.iter()) {
+                        if !v.matches_inner(scope, p) {
+                            return false;
+                        }
                     }
+                    true
                 }
-                true
-            }
-            (Pattern::Seq(ps), ParsedValue::Seq(vs)) if ps.len() == vs.inner.len() => {
-                for (p, v) in Iterator::zip(ps.iter(), vs.inner.iter()) {
-                    if !v.matches_inner(scope, p) {
-                        return false;
-                    }
-                }
-                true
-            }
-            (Pattern::Variant(label0, p), ParsedValue::Variant(label1, v)) if label0 == label1 => {
-                v.matches_inner(scope, p)
-            }
-            (Pattern::Option(None), ParsedValue::Option(None)) => true,
-            (Pattern::Option(Some(p)), ParsedValue::Option(Some(v))) => v.matches_inner(scope, p),
-            (Pattern::Int(bounds), ParsedValue::Flat(Parsed { inner: v, .. })) => match v {
-                Value::U8(n) => bounds.contains(usize::from(*n)),
-                Value::U16(n) => bounds.contains(usize::from(*n)),
-                Value::U32(n) => bounds.contains(usize::try_from(*n).unwrap()),
-                Value::U64(n) => bounds.contains(usize::try_from(*n).unwrap()),
-                Value::Usize(n) => bounds.contains(*n),
                 _ => false,
             },
-            _ => false,
+            Pattern::Seq(ps) => match self {
+                ParsedValue::Seq(vs) if ps.len() == vs.inner.len() => {
+                    for (p, v) in Iterator::zip(ps.iter(), vs.inner.iter()) {
+                        if !v.matches_inner(scope, p) {
+                            return false;
+                        }
+                    }
+                    true
+                }
+                _ => false,
+            },
+            Pattern::Variant(label0, p) => match self {
+                ParsedValue::Variant(label1, v) if label0 == label1 => v.matches_inner(scope, p),
+                _ => false,
+            },
+            Pattern::Option(None) => matches!(self, ParsedValue::Option(None)),
+            Pattern::Option(Some(p)) => match self {
+                ParsedValue::Option(Some(v)) => v.matches_inner(scope, p),
+                _ => false,
+            },
+            Pattern::Int(bounds) => match self {
+                ParsedValue::Flat(Parsed { inner: v, .. }) => match v {
+                    Value::U8(n) => bounds.contains(usize::from(*n)),
+                    Value::U16(n) => bounds.contains(usize::from(*n)),
+                    Value::U32(n) => bounds.contains(usize::try_from(*n).unwrap()),
+                    Value::U64(n) => bounds.contains(usize::try_from(*n).unwrap()),
+                    Value::Usize(n) => bounds.contains(*n),
+                    _ => false,
+                },
+                _ => false,
+            },
         }
     }
 

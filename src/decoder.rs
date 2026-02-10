@@ -17,9 +17,7 @@ use seq_kind::sub_range;
 pub use seq_kind::{SeqKind, ValueSeq};
 
 pub(crate) fn extract_pair<T>(mut vec: Vec<T>) -> (T, T) {
-    if vec.len() != 2 {
-        panic!("expected pair");
-    }
+    assert_eq!(vec.len(), 2, "expected pair");
     unsafe {
         // Safe because we checked the length above
         let second = vec.pop().unwrap_unchecked();
@@ -134,46 +132,58 @@ impl Value {
     }
 
     fn matches_inner<'a>(&'a self, scope: &mut MultiScope<'a>, pattern: &Pattern) -> bool {
-        match (pattern, self) {
-            (Pattern::Binding(name), head) => {
-                scope.push(name.clone(), head);
+        match pattern {
+            Pattern::Binding(name) => {
+                scope.push(name.clone(), self);
                 true
             }
-            (Pattern::Wildcard, _) => true,
-            (Pattern::Bool(b0), Value::Bool(b1)) => b0 == b1,
-            (Pattern::U8(i0), Value::U8(i1)) => i0 == i1,
-            (Pattern::U16(i0), Value::U16(i1)) => i0 == i1,
-            (Pattern::U32(i0), Value::U32(i1)) => i0 == i1,
-            (Pattern::U64(i0), Value::U64(i1)) => i0 == i1,
-            (Pattern::Int(bounds), Value::U8(n)) => bounds.contains(usize::from(*n)),
-            (Pattern::Int(bounds), Value::U16(n)) => bounds.contains(usize::from(*n)),
-            (Pattern::Int(bounds), Value::U32(n)) => bounds.contains(usize::try_from(*n).unwrap()),
-            (Pattern::Int(bounds), Value::U64(n)) => bounds.contains(usize::try_from(*n).unwrap()),
-            (Pattern::Int(bounds), Value::Usize(n)) => bounds.contains(*n),
-            (Pattern::Char(c0), Value::Char(c1)) => c0 == c1,
-            (Pattern::Tuple(ps), Value::Tuple(vs)) if ps.len() == vs.len() => {
-                for (p, v) in Iterator::zip(ps.iter(), vs.iter()) {
-                    if !v.matches_inner(scope, p) {
-                        return false;
+            Pattern::Wildcard => true,
+            Pattern::Bool(b0) => matches!(self, Value::Bool(b1) if b0 == b1),
+            Pattern::U8(i0) => matches!(self, Value::U8(i1) if i0 == i1),
+            Pattern::U16(i0) => matches!(self, Value::U16(i1) if i0 == i1),
+            Pattern::U32(i0) => matches!(self, Value::U32(i1) if i0 == i1),
+            Pattern::U64(i0) => matches!(self, Value::U64(i1) if i0 == i1),
+            Pattern::Int(bounds) => match self {
+                Value::U8(n) => bounds.contains(usize::from(*n)),
+                Value::U16(n) => bounds.contains(usize::from(*n)),
+                Value::U32(n) => bounds.contains(usize::try_from(*n).unwrap()),
+                Value::U64(n) => bounds.contains(usize::try_from(*n).unwrap()),
+                Value::Usize(n) => bounds.contains(*n),
+                _ => false,
+            },
+            Pattern::Char(c0) => matches!(self, Value::Char(c1) if c0 == c1),
+            Pattern::Tuple(ps) => match self {
+                Value::Tuple(vs) if ps.len() == vs.len() => {
+                    for (p, v) in Iterator::zip(ps.iter(), vs.iter()) {
+                        if !v.matches_inner(scope, p) {
+                            return false;
+                        }
                     }
+                    true
                 }
-                true
-            }
-            (Pattern::Seq(ps), Value::Seq(vs)) if ps.len() == vs.len() => {
-                for (p, v) in Iterator::zip(ps.iter(), vs.iter()) {
-                    if !v.matches_inner(scope, p) {
-                        return false;
+                _ => false,
+            },
+            Pattern::Seq(ps) => match self {
+                Value::Seq(vs) if ps.len() == vs.len() => {
+                    for (p, v) in Iterator::zip(ps.iter(), vs.iter()) {
+                        if !v.matches_inner(scope, p) {
+                            return false;
+                        }
                     }
+                    true
                 }
-                true
-            }
+                _ => false,
+            },
 
-            (Pattern::Variant(label0, p), Value::Variant(label1, v)) if label0 == label1 => {
-                v.matches_inner(scope, p)
-            }
-            (Pattern::Option(None), Value::Option(None)) => true,
-            (Pattern::Option(Some(p)), Value::Option(Some(v))) => v.matches_inner(scope, p),
-            _ => false,
+            Pattern::Variant(label0, p) => match self {
+                Value::Variant(label1, v) if label0 == label1 => v.matches_inner(scope, p),
+                _ => false,
+            },
+            Pattern::Option(None) => matches!(self, Value::Option(None)),
+            Pattern::Option(Some(p)) => match self {
+                Value::Option(Some(v)) => v.matches_inner(scope, p),
+                _ => false,
+            },
         }
     }
 

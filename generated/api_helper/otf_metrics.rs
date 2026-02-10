@@ -1,3 +1,5 @@
+use std::num::{NonZero, NonZeroU16};
+
 use super::util::{EnumLen, U16Set, Wec, trisect_unchecked};
 use super::*;
 use derive_builder::Builder;
@@ -75,6 +77,9 @@ pub struct Config {
 
     #[builder(default)]
     verbosity: Verbosity,
+
+    #[builder(default)]
+    locale: LocaleSelector,
 }
 
 impl Config {
@@ -382,11 +387,13 @@ where
 {
     let args = frame.get_args();
     let offset = frame.get_offset();
-    Obj::parse_offset(frame.scope(), offset, args).expect(&format!(
-        "failed to parse (reify::<{}, {}>)",
-        std::any::type_name::<Frame>(),
-        std::any::type_name::<Obj>()
-    ))
+    Obj::parse_offset(frame.scope(), offset, args).unwrap_or_else(|e| {
+        panic!(
+            "failed to parse (reify::<{}, {}>): {e}",
+            std::any::type_name::<Frame>(),
+            std::any::type_name::<Obj>()
+        )
+    })
 }
 
 pub fn reify_index<'input, Frame, Obj, const N: usize>(
@@ -400,11 +407,13 @@ where
 {
     let tmp = frame.get_args_array();
     let offset = frame.get_offset_array()[ix];
-    Obj::parse_offset(frame.scope(), offset, tmp[ix].clone()).expect(&format!(
-        "failed to parse (reify_index::<{}, {}>(.., {ix})",
-        std::any::type_name::<Frame>(),
-        std::any::type_name::<Obj>()
-    ))
+    Obj::parse_offset(frame.scope(), offset, tmp[ix].clone()).unwrap_or_else(|e| {
+        panic!(
+            "failed to parse (reify_index::<{}, {}>(.., {ix}): {e}",
+            std::any::type_name::<Frame>(),
+            std::any::type_name::<Obj>(),
+        )
+    })
 }
 
 pub fn reify_all_index<'input, Frame, Obj, const N: usize>(
@@ -421,11 +430,13 @@ where
     let args_iter = frame.iter_args_at_index(ix);
     Iterator::zip(offset_iter, args_iter).map(move |(offset, args)| {
         // REVIEW - should individual failure-to-parse cause the entire iteration to panic?
-        Obj::parse_offset(frame.scope(), offset, args).expect(&format!(
-            "failed to parse (reify_all_index::<{}, {}>(.., {ix})",
-            std::any::type_name::<Frame>(),
-            std::any::type_name::<Obj>()
-        ))
+        Obj::parse_offset(frame.scope(), offset, args).unwrap_or_else(|e| {
+            panic!(
+                "failed to parse (reify_all_index::<{}, {}>(.., {ix}): {e}",
+                std::any::type_name::<Frame>(),
+                std::any::type_name::<Obj>()
+            )
+        })
     })
 }
 
@@ -439,11 +450,13 @@ where
 {
     // REVIEW - should individual failure-to-parse cause the entire iteration to panic?
     Iterator::zip(frame.iter_offsets(), frame.iter_args()).map(move |(offset, args)| {
-        Obj::parse_offset(frame.scope(), offset, args).expect(&format!(
-            "failed to parse (reify_all::<{}, {}>)",
-            std::any::type_name::<Frame>(),
-            std::any::type_name::<Obj>()
-        ))
+        Obj::parse_offset(frame.scope(), offset, args).unwrap_or_else(|e| {
+            panic!(
+                "failed to parse (reify_all::<{}, {}>): {e}",
+                std::any::type_name::<Frame>(),
+                std::any::type_name::<Obj>()
+            )
+        })
     })
 }
 
@@ -456,11 +469,13 @@ where
     Obj: 'static + for<'a> container::CommonObject<Args<'a> = ()>,
 {
     frame.get_offset().map(|offset| {
-        Obj::parse_offset(frame.scope(), offset, ()).expect(&format!(
-            "failed to parse (reify_opt::<{}, {}>)",
-            std::any::type_name::<Frame>(),
-            std::any::type_name::<Obj>()
-        ))
+        Obj::parse_offset(frame.scope(), offset, ()).unwrap_or_else(|e| {
+            panic!(
+                "failed to parse (reify_opt::<{}, {}>): {e}",
+                std::any::type_name::<Frame>(),
+                std::any::type_name::<Obj>()
+            )
+        })
     })
 }
 
@@ -475,11 +490,13 @@ where
     Obj: 'static + for<'a> container::CommonObject<Args<'a> = ()>,
 {
     frame.get_offset_at_index(ix).map(|offset| {
-        Obj::parse_offset(frame.scope(), offset, ()).expect(&format!(
-            "failed to parse (reify_opt_index::<{}, {}>(.., {ix}))",
-            std::any::type_name::<Frame>(),
-            std::any::type_name::<Obj>()
-        ))
+        Obj::parse_offset(frame.scope(), offset, ()).unwrap_or_else(|e| {
+            panic!(
+                "failed to parse (reify_opt_index::<{}, {}>(.., {ix})): {e}",
+                std::any::type_name::<Frame>(),
+                std::any::type_name::<Obj>()
+            )
+        })
     })
 }
 
@@ -1150,7 +1167,7 @@ impl<'input> container::SingleContainer<Nullable<obj::AttList>> for OpentypeGdef
         self.attach_list.offset as usize
     }
 
-    fn get_args(&self) -> () {}
+    fn get_args(&self) {}
 }
 
 impl<'input> container::SingleContainer<Nullable<obj::LigCarList>> for OpentypeGdef<'input> {
@@ -1158,7 +1175,7 @@ impl<'input> container::SingleContainer<Nullable<obj::LigCarList>> for OpentypeG
         self.lig_caret_list.offset as usize
     }
 
-    fn get_args(&self) -> () {}
+    fn get_args(&self) {}
 }
 
 frame!(OpentypeGpos);
@@ -1168,7 +1185,7 @@ impl<'input> container::SingleContainer<Mandatory<obj::ScrList>> for OpentypeGpo
         self.script_list.offset as usize
     }
 
-    fn get_args(&self) -> () {}
+    fn get_args(&self) {}
 }
 
 impl<'input> container::SingleContainer<Mandatory<obj::FeatList>> for OpentypeGpos<'input> {
@@ -1176,7 +1193,7 @@ impl<'input> container::SingleContainer<Mandatory<obj::FeatList>> for OpentypeGp
         self.feature_list.offset as usize
     }
 
-    fn get_args(&self) -> () {}
+    fn get_args(&self) {}
 }
 
 impl<'input> container::SingleContainer<Mandatory<obj::PosLookups>> for OpentypeGpos<'input> {
@@ -1184,7 +1201,7 @@ impl<'input> container::SingleContainer<Mandatory<obj::PosLookups>> for Opentype
         self.lookup_list.offset as usize
     }
 
-    fn get_args(&self) -> () {}
+    fn get_args(&self) {}
 }
 
 impl<'input> container::OptContainer<Nullable<obj::FeatVar>> for OpentypeGpos<'input> {
@@ -1205,7 +1222,7 @@ impl<'input> container::SingleContainer<Mandatory<obj::ScrList>> for OpentypeGsu
         self.script_list.offset as usize
     }
 
-    fn get_args(&self) -> () {}
+    fn get_args(&self) {}
 }
 
 impl<'input> container::SingleContainer<Mandatory<obj::FeatList>> for OpentypeGsub<'input> {
@@ -1213,7 +1230,7 @@ impl<'input> container::SingleContainer<Mandatory<obj::FeatList>> for OpentypeGs
         self.feature_list.offset as usize
     }
 
-    fn get_args(&self) -> () {}
+    fn get_args(&self) {}
 }
 
 impl<'input> container::SingleContainer<Mandatory<obj::SubstLookups>> for OpentypeGsub<'input> {
@@ -1221,7 +1238,7 @@ impl<'input> container::SingleContainer<Mandatory<obj::SubstLookups>> for Openty
         self.lookup_list.offset as usize
     }
 
-    fn get_args(&self) -> () {}
+    fn get_args(&self) {}
 }
 
 impl<'input> container::OptContainer<Nullable<obj::FeatVar>> for OpentypeGsub<'input> {
@@ -2171,20 +2188,30 @@ pub enum PlatformEncodingLanguageId {
     Windows(WindowsEncodingId, WindowsLanguageId),       // 3
 }
 
+// STUB
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, Default)]
+pub enum LocaleSelector {
+    #[default]
+    English,
+}
+
 impl PlatformEncodingLanguageId {
-    // NOTE - implicitly hardcoded to assume 'our locale' is English
-    fn matches_locale(&self, buf: &str) -> bool {
+    fn matches_locale(&self, buf: &str, locale: LocaleSelector) -> bool {
         match self {
-            PlatformEncodingLanguageId::Unicode(_) => buf.is_ascii(),
+            PlatformEncodingLanguageId::Unicode(_) => match locale {
+                LocaleSelector::English => buf.is_ascii(),
+            },
             PlatformEncodingLanguageId::Macintosh(macintosh_encoding_id, macintosh_language_id) => {
-                match macintosh_encoding_id {
-                    MacintoshEncodingId::Roman => macintosh_language_id.is_english(),
-                    _ => false,
+                match locale {
+                    LocaleSelector::English => match macintosh_encoding_id {
+                        MacintoshEncodingId::Roman => macintosh_language_id.is_english(),
+                        _ => false,
+                    },
                 }
             }
-            PlatformEncodingLanguageId::Windows(_, windows_language_id) => {
-                windows_language_id.is_english()
-            }
+            PlatformEncodingLanguageId::Windows(_, windows_language_id) => match locale {
+                LocaleSelector::English => windows_language_id.is_english(),
+            },
         }
     }
 
@@ -2325,7 +2352,7 @@ impl TryFrom<u16> for MacintoshEncodingId {
 pub enum MacintoshLanguageId {
     English, // 0
     // STUB - for this API, we don't necessarily need to have a full list of all languages as first-class variants, but it might be nice for later if we decide to present certain languages preferentially on a per-font basis
-    Other(u16), // 1..=150
+    Other(NonZeroU16), // 1..=150
 }
 
 impl TryFrom<u16> for MacintoshLanguageId {
@@ -2335,7 +2362,7 @@ impl TryFrom<u16> for MacintoshLanguageId {
         match value {
             // NOTE - only values 0..=150 are populated according to [this spec](https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6name.html)
             0 => Ok(MacintoshLanguageId::English),
-            1..=150 => Ok(MacintoshLanguageId::Other(value)),
+            1..=150 => Ok(MacintoshLanguageId::Other(NonZero::new(value).unwrap())),
             bad_value => Err(UnknownValueError {
                 what: String::from("Macintosh language ID"),
                 bad_value,
@@ -2910,7 +2937,7 @@ impl<'a> container::SingleContainer<Nullable<obj::MarkGlSet>> for OpentypeGdefDa
         self.mark_glyph_sets_def.offset as usize
     }
 
-    fn get_args(&self) -> () {}
+    fn get_args(&self) {}
 }
 pub type OpentypeGdefData1Dot3<'a> = opentype_gdef_table_data_Version1_3<'a>;
 
@@ -2919,7 +2946,7 @@ impl<'a> container::SingleContainer<Nullable<obj::MarkGlSet>> for OpentypeGdefDa
         self.mark_glyph_sets_def.offset as usize
     }
 
-    fn get_args(&self) -> () {}
+    fn get_args(&self) {}
 }
 
 impl<'a> container::SingleContainer<Nullable<obj::ItemVarStore>> for OpentypeGdefData1Dot3<'a> {
@@ -2927,7 +2954,7 @@ impl<'a> container::SingleContainer<Nullable<obj::ItemVarStore>> for OpentypeGde
         self.item_var_store.offset as usize
     }
 
-    fn get_args(&self) -> () {}
+    fn get_args(&self) {}
 }
 
 impl<'a> TryPromoteView<OpentypeGdefTableData<'a>> for GdefTableDataMetrics {
@@ -3098,7 +3125,7 @@ impl<'a> container::SingleContainer<obj::CovTable> for OpentypeAttachList<'a> {
         self.coverage.offset as usize
     }
 
-    fn get_args(&self) -> () {}
+    fn get_args(&self) {}
 }
 
 impl<'a> container::DynContainer<obj::AttPoint> for OpentypeAttachList<'a> {
@@ -3533,7 +3560,7 @@ impl PromoteView<OpentypeLangSysRecord> for LangSysRecord {
 #[derive(Clone, Debug)]
 struct LangSysRecord {
     lang_sys_tag: Tag,
-    lang_sys: Link<LangSys>,
+    lang_sys: Option<LangSys>,
 }
 
 pub type OpentypeScriptTable<'input> = opentype_layout_script_table<'input>;
@@ -4339,6 +4366,12 @@ pub type OpentypeReverseChainSingleSubst<'a> = opentype_layout_reverse_chain_sin
 
 frame!(OpentypeReverseChainSingleSubst);
 
+impl<'a> OpentypeReverseChainSingleSubst<'a> {
+    pub const INPUT_COVERAGE_IX: usize = 0;
+    pub const BACKTRACK_COVERAGE_IX: usize = 1;
+    pub const LOOKAHEAD_COVERAGE_IX: usize = 2;
+}
+
 impl<'a> container::MultiDynContainer<Mandatory<obj::CovTable>, 3>
     for OpentypeReverseChainSingleSubst<'a>
 {
@@ -4352,19 +4385,21 @@ impl<'a> container::MultiDynContainer<Mandatory<obj::CovTable>, 3>
 
     fn iter_offsets_at_index(&self, ix: usize) -> impl Iterator<Item = usize> {
         match ix {
-            0 => Box::new(std::iter::once(self.coverage.offset as usize))
+            Self::INPUT_COVERAGE_IX => Box::new(std::iter::once(self.coverage.offset as usize))
                 as Box<dyn Iterator<Item = usize>>,
-            1 => Box::new(
+            Self::BACKTRACK_COVERAGE_IX => Box::new(
                 self.backtrack_coverage_tables
                     .iter()
                     .map(|offs| offs.offset as usize),
             ),
-            2 => Box::new(
+            Self::LOOKAHEAD_COVERAGE_IX => Box::new(
                 self.lookahead_coverage_tables
                     .iter()
                     .map(|offs| offs.offset as usize),
             ),
-            _ => unreachable!("bad index {ix}"),
+            _ => {
+                unreachable!("MultiDynContainer::iter_offsets_at_index: out-of-bounds ({ix} >= 3)")
+            }
         }
     }
 
@@ -4417,7 +4452,7 @@ impl<'a> container::SingleContainer<Mandatory<obj::CovTable>> for OpentypeLigatu
         self.coverage.offset as usize
     }
 
-    fn get_args(&self) -> () {}
+    fn get_args(&self) {}
 }
 
 impl<'a> container::DynContainer<Mandatory<obj::LigSet>> for OpentypeLigatureSubst<'a> {
@@ -4513,9 +4548,7 @@ impl<'a> container::SingleContainer<Mandatory<obj::CovTable>> for OpentypeAltern
         self.coverage.offset as usize
     }
 
-    fn get_args(&self) -> <Mandatory<obj::CovTable> as container::CommonObject>::Args<'_> {
-        ()
-    }
+    fn get_args(&self) {}
 }
 
 impl<'a> container::DynContainer<Mandatory<obj::AltSet>> for OpentypeAlternateSubst<'a> {
@@ -4578,7 +4611,7 @@ impl<'input> container::SingleContainer<Mandatory<obj::CovTable>>
         self.coverage.offset as usize
     }
 
-    fn get_args(&self) -> () {}
+    fn get_args(&self) {}
 }
 
 impl container::DynContainer<obj::SeqTable> for OpentypeMultipleSubstFormat1 {
@@ -4888,7 +4921,7 @@ impl<'a> container::SingleContainer<Mandatory<obj::CovTable>>
         self.coverage.offset as usize
     }
 
-    fn get_args(&self) -> () {}
+    fn get_args(&self) {}
 }
 
 impl<'a> container::DynContainer<Nullable<obj::ChainRuleSet>>
@@ -4940,7 +4973,7 @@ impl<'a> container::SingleContainer<Mandatory<obj::CovTable>>
         self.coverage.offset as usize
     }
 
-    fn get_args(&self) -> () {}
+    fn get_args(&self) {}
 }
 
 impl<'a> container::MultiContainer<Mandatory<obj::ClsDef>, 3>
@@ -5001,6 +5034,12 @@ impl<'a> PromoteView<OpentypeChainedSequenceContextFormat2<'a>> for ChainedSeque
     }
 }
 
+impl OpentypeChainedSequenceContextFormat3 {
+    pub const BACKTRACK_COVERAGE_IX: usize = 0;
+    pub const INPUT_COVERAGE_IX: usize = 1;
+    pub const LOOKAHEAD_COVERAGE_IX: usize = 2;
+}
+
 impl container::MultiDynContainer<Mandatory<obj::CovTable>, 3>
     for OpentypeChainedSequenceContextFormat3
 {
@@ -5014,10 +5053,10 @@ impl container::MultiDynContainer<Mandatory<obj::CovTable>, 3>
 
     fn iter_offsets_at_index(&self, ix: usize) -> impl Iterator<Item = usize> {
         let slice: &[_] = match ix {
-            0 => &self.backtrack_coverages,
-            1 => &self.input_coverages,
-            2 => &self.lookahead_coverages,
-            _ => unreachable!("bad index {ix}"),
+            Self::BACKTRACK_COVERAGE_IX => &self.backtrack_coverages,
+            Self::INPUT_COVERAGE_IX => &self.input_coverages,
+            Self::LOOKAHEAD_COVERAGE_IX => &self.lookahead_coverages,
+            _ => unreachable!("MultiDynContainer:iter_offsets_at_index: out-of-bounds ({ix} >= 3)"),
         };
         slice.iter().map(|offs| offs.offset as usize)
     }
@@ -5038,9 +5077,11 @@ impl PromoteView<OpentypeChainedSequenceContextFormat3> for ChainedSequenceConte
                 container::MultiDynContainer::counts(orig)[ix],
             )
         };
-        let backtrack_coverages = follow(0)?;
-        let input_coverages = follow(1)?;
-        let lookahead_coverages = follow(2)?;
+        let backtrack_coverages =
+            follow(OpentypeChainedSequenceContextFormat3::BACKTRACK_COVERAGE_IX)?;
+        let input_coverages = follow(OpentypeChainedSequenceContextFormat3::INPUT_COVERAGE_IX)?;
+        let lookahead_coverages =
+            follow(OpentypeChainedSequenceContextFormat3::LOOKAHEAD_COVERAGE_IX)?;
         Ok(Self {
             backtrack_coverages,
             input_coverages,
@@ -5111,7 +5152,7 @@ impl<'a> container::SingleContainer<Mandatory<obj::CovTable>>
         self.coverage.offset as usize
     }
 
-    fn get_args(&self) -> () {}
+    fn get_args(&self) {}
 }
 
 impl<'a> container::DynContainer<Nullable<obj::SeqRuleSet>> for OpentypeSequenceContextFormat1<'a> {
@@ -5158,7 +5199,7 @@ impl<'a> container::SingleContainer<Mandatory<obj::CovTable>>
         self.coverage.offset as usize
     }
 
-    fn get_args(&self) -> () {}
+    fn get_args(&self) {}
 }
 
 impl<'a> container::SingleContainer<Mandatory<obj::ClsDef>> for OpentypeSequenceContextFormat2<'a> {
@@ -5166,7 +5207,7 @@ impl<'a> container::SingleContainer<Mandatory<obj::ClsDef>> for OpentypeSequence
         self.class_def.offset as usize
     }
 
-    fn get_args(&self) -> () {}
+    fn get_args(&self) {}
 }
 
 impl<'a> container::DynContainer<Nullable<obj::SeqRuleSet>> for OpentypeSequenceContextFormat2<'a> {
@@ -5330,7 +5371,7 @@ impl<'input> container::SingleContainer<Mandatory<obj::CovTable>> for OpentypeCu
         self.coverage.offset as usize
     }
 
-    fn get_args(&self) -> () {}
+    fn get_args(&self) {}
 }
 
 impl<'input> TryPromote<OpentypeCursivePos<'input>> for CursivePos {
@@ -5581,7 +5622,7 @@ impl<'a> container::SingleContainer<Mandatory<obj::CovTable>> for OpentypePairPo
         self.coverage.offset as usize
     }
 
-    fn get_args(&self) -> () {}
+    fn get_args(&self) {}
 }
 
 impl<'input> TryPromote<OpentypePairPosFormat1<'input>> for PairPosFormat1 {
@@ -5851,7 +5892,7 @@ impl<'input> container::SingleContainer<obj::CovTable> for OpentypeSinglePosForm
         self.coverage.offset as usize
     }
 
-    fn get_args(&self) -> () {}
+    fn get_args(&self) {}
 }
 
 impl<'input> TryPromote<OpentypeSinglePosFormat2<'input>> for SinglePosFormat2 {
@@ -5925,12 +5966,12 @@ impl TryPromoteView<OpentypeValueRecord> for ValueRecord {
             Option<DeviceOrVariationIndexTable>,
             ValueParseError<Self::Error<'input>>,
         > {
-            Ok(try_promote_opt(
+            try_promote_opt(
                 &reify_opt_index_dep(view, orig, Nullable(obj::DevTable), ix)
                     .transpose()?
                     .flatten(),
             )
-            .map_err(ValueParseError::value)?)
+            .map_err(ValueParseError::value)
         };
         Ok(ValueRecord {
             x_placement: orig.x_placement.map(as_s16),
@@ -5995,20 +6036,19 @@ impl<'input> TryPromote<OpentypeGposLookupTable<'input>> for LookupTable {
             POS_EXTENSION_LOOKUP_TYPE => {
                 let mut extension_lookup_type: Option<u16> = None;
 
-                for (_ix, raw) in subtable_iter.enumerate() {
+                for raw in subtable_iter {
                     match &raw {
                         OpentypeGposLookupSubtableExt::PosExtension(ext) => {
-                            if let Some(tmp) =
+                            if let Some(lookup_type) =
                                 extension_lookup_type.replace(ext.extension_lookup_type)
+                                && lookup_type != ext.extension_lookup_type
                             {
-                                if tmp != ext.extension_lookup_type {
-                                    // FIXME - we don't have an error type that makes this easy to fold into the returned error, so we panic for now
-                                    let _err = BadExtensionError::InconsistentLookup(
-                                        tmp,
-                                        ext.extension_lookup_type,
-                                    );
-                                    panic!("{_err}");
-                                }
+                                let _err = BadExtensionError::InconsistentLookup(
+                                    lookup_type,
+                                    ext.extension_lookup_type,
+                                );
+                                // FIXME - we don't have an error type that makes this easy to fold into the returned error, so we panic for now
+                                panic!("{_err}");
                             }
                             subtables.push(LookupSubtable::try_promote(&raw)?);
                         }
@@ -6020,7 +6060,7 @@ impl<'input> TryPromote<OpentypeGposLookupTable<'input>> for LookupTable {
                 extension_lookup_type.unwrap_or(POS_EXTENSION_LOOKUP_TYPE)
             }
             ground_type => {
-                for (_ix, raw) in subtable_iter.enumerate() {
+                for raw in subtable_iter {
                     let subtable = LookupSubtable::try_promote(&raw)?;
                     subtables.push(subtable);
                 }
@@ -6070,20 +6110,19 @@ impl<'input> TryPromote<OpentypeGsubLookupTable<'input>> for LookupTable {
         let lookup_type = match orig.lookup_type {
             SUBST_EXTENSION_LOOKUP_TYPE => {
                 let mut extension_lookup_type: Option<u16> = None;
-                for (_ix, raw) in subtable_iter.enumerate() {
+                for raw in subtable_iter {
                     match &raw {
                         OpentypeGsubLookupSubtableExt::SubstExtension(ext) => {
-                            if let Some(tmp) =
+                            if let Some(lookup_type) =
                                 extension_lookup_type.replace(ext.extension_lookup_type)
+                                && lookup_type != ext.extension_lookup_type
                             {
-                                if tmp != ext.extension_lookup_type {
-                                    // FIXME - we don't have an error type that makes this easy to fold into the returned error, so we panic for now
-                                    let _err = BadExtensionError::InconsistentLookup(
-                                        tmp,
-                                        ext.extension_lookup_type,
-                                    );
-                                    panic!("{_err}");
-                                }
+                                let _err = BadExtensionError::InconsistentLookup(
+                                    lookup_type,
+                                    ext.extension_lookup_type,
+                                );
+                                // FIXME - we don't have an error type that makes this easy to fold into the returned error, so we panic for now
+                                panic!("{_err}");
                             }
                             subtables.push(LookupSubtable::try_promote(&raw)?);
                         }
@@ -6095,7 +6134,7 @@ impl<'input> TryPromote<OpentypeGsubLookupTable<'input>> for LookupTable {
                 extension_lookup_type.unwrap_or(SUBST_EXTENSION_LOOKUP_TYPE)
             }
             ground_type => {
-                for (_ix, raw) in subtable_iter.enumerate() {
+                for raw in subtable_iter {
                     let subtable = LookupSubtable::try_promote(&raw)?;
                     subtables.push(subtable);
                 }
@@ -6201,7 +6240,7 @@ impl<'input> TryPromote<OpentypeGsubLookupList<'input>> for LookupList {
 
     fn try_promote(orig: &OpentypeGsubLookupList) -> Result<Self, Self::Error> {
         let mut accum = Vec::with_capacity(container::DynContainer::count(orig));
-        for (_ix, raw) in reify_all(orig, Mandatory(obj::SubstLookupTable)).enumerate() {
+        for raw in reify_all(orig, Mandatory(obj::SubstLookupTable)) {
             accum.push(LookupTable::try_promote(&raw)?);
         }
         Ok(accum)
@@ -6381,14 +6420,11 @@ impl<'a> container::MultiContainer<Mandatory<obj::KernCls>, 2> for OpentypeKernS
 
 impl<'a> OpentypeKernSubtableFormat2<'a> {
     fn n_glyphs_in_class(view: View<'_>, offset: usize) -> u16 {
-        assert!(offset != 0);
+        assert_ne!(offset, 0, "offset should be non-zero");
         let field_shift = size_of::<u16>();
 
-        let start_of_field = view
-            .offset(offset as usize + field_shift)
-            .expect("bad offset");
-        let value = start_of_field.read_u16be().expect("bad value");
-        value
+        let start_of_field = view.offset(offset + field_shift).expect("bad offset");
+        start_of_field.read_u16be().expect("bad value")
     }
 
     pub fn left_glyph_count(&self) -> u16 {
@@ -6549,6 +6585,51 @@ impl Ctxt {
 }
 // !SECTION
 
+// NOTE - scaffolding to mark the values we currently parse into u16 but which are logically i16, to flag changes to the gencode API as they crop up
+#[inline(always)]
+const fn as_s16(v: u16) -> i16 {
+    v as i16
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(u16)]
+enum DirectionHint {
+    FullyMixed = 0,
+    StrongLR = 1,
+    NeutralLR = 2,
+    StrongRL = -1i16 as u16,
+    NeutralRL = -2i16 as u16,
+}
+
+impl TryFrom<u16> for DirectionHint {
+    type Error = Local<UnknownValueError<u16>>;
+
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        match value as i16 {
+            0 => Ok(DirectionHint::FullyMixed),
+            1 => Ok(DirectionHint::StrongLR),
+            2 => Ok(DirectionHint::NeutralLR),
+            -1 => Ok(DirectionHint::StrongRL),
+            -2 => Ok(DirectionHint::NeutralRL),
+            _ => Err(UnknownValueError {
+                what: String::from("direction-hint"),
+                bad_value: value,
+            }),
+        }
+    }
+}
+
+impl std::fmt::Display for DirectionHint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DirectionHint::FullyMixed => write!(f, "Fully Mixed-Direction"),
+            DirectionHint::StrongLR => write!(f, "Strong LTR only"),
+            DirectionHint::NeutralLR => write!(f, "Strong LTR or Neutral"),
+            DirectionHint::StrongRL => write!(f, "Strong RTL only"),
+            DirectionHint::NeutralRL => write!(f, "Strong RTL or Neutral"),
+        }
+    }
+}
 /// Common error type for marking a parsed value as unexpected/unknown relative to a set of predefined values we recognize
 #[derive(Debug)]
 pub struct UnknownValueError<T> {
@@ -6705,8 +6786,8 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
                     opentype_name_table_data::NameVersion0 => None,
                     opentype_name_table_data::NameVersion1(v1data) => {
                         let mut tmp = Vec::with_capacity(v1data.lang_tag_records.len());
-                        for (_ix, record) in v1data.lang_tag_records.iter().enumerate() {
-                            let lang_tag = utf16be_convert(&record.lang_tag.data);
+                        for record in v1data.lang_tag_records.iter() {
+                            let lang_tag = utf16be_convert(record.lang_tag.data);
                             tmp.push(LangTagRecord { lang_tag })
                         }
                         Some(tmp)
@@ -6900,17 +6981,191 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
     })
 }
 
+pub mod table {
+    use super::UnknownValueError;
+
+    #[repr(u32)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+    pub enum TableKind {
+        // Required (C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/otff#required-tables)
+        Cmap = u32::from_be_bytes(*b"cmap"),
+        Head = u32::from_be_bytes(*b"head"),
+        Hhea = u32::from_be_bytes(*b"hhea"),
+        Hmtx = u32::from_be_bytes(*b"hmtx"),
+        Maxp = u32::from_be_bytes(*b"maxp"),
+        Name = u32::from_be_bytes(*b"name"),
+        Os2 = u32::from_be_bytes(*b"OS/2"),
+        Post = u32::from_be_bytes(*b"post"),
+        // TrueType Outlines (C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/otff#tables-related-to-truetype-outlines)
+        Cvt = u32::from_be_bytes(*b"cvt "),
+        Fpgm = u32::from_be_bytes(*b"fpgm"),
+        Loca = u32::from_be_bytes(*b"loca"),
+        Glyf = u32::from_be_bytes(*b"glyf"),
+        Prep = u32::from_be_bytes(*b"prep"),
+        Gasp = u32::from_be_bytes(*b"gasp"),
+        // CFF Outlines (C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/otff#tables-related-to-cff-outlines)
+        Cff = u32::from_be_bytes(*b"CFF "),
+        Cff2 = u32::from_be_bytes(*b"CFF2"),
+        Vorg = u32::from_be_bytes(*b"VORG"),
+        // SVG Outlines (C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/otff#table-related-to-svg-outlines)
+        Svg = u32::from_be_bytes(*b"SVG "),
+        // Bitmap Glyphs (C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/otff#tables-related-to-bitmap-glyphs)
+        Ebdt = u32::from_be_bytes(*b"EBDT"),
+        Eblc = u32::from_be_bytes(*b"EBLC"),
+        Ebsc = u32::from_be_bytes(*b"EBSC"),
+        Cbdt = u32::from_be_bytes(*b"CBDT"),
+        Cblc = u32::from_be_bytes(*b"CBLC"),
+        Sbix = u32::from_be_bytes(*b"sbix"),
+        // Advanced Typographic (C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/otff#advanced-typographic-tables)
+        Base = u32::from_be_bytes(*b"BASE"),
+        Gdef = u32::from_be_bytes(*b"GDEF"),
+        Gpos = u32::from_be_bytes(*b"GPOS"),
+        Gsub = u32::from_be_bytes(*b"GSUB"),
+        Jstf = u32::from_be_bytes(*b"JSTF"),
+        Math = u32::from_be_bytes(*b"MATH"),
+        // Font Variations (C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/otff#tables-used-for-opentype-font-variations)
+        Avar = u32::from_be_bytes(*b"avar"),
+        Cvar = u32::from_be_bytes(*b"cvar"),
+        Fvar = u32::from_be_bytes(*b"fvar"),
+        Gvar = u32::from_be_bytes(*b"gvar"),
+        Hvar = u32::from_be_bytes(*b"HVAR"),
+        Mvar = u32::from_be_bytes(*b"MVAR"),
+        Stat = u32::from_be_bytes(*b"STAT"),
+        Vvar = u32::from_be_bytes(*b"VVAR"),
+        // Color fonts (C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/otff#tables-related-to-color-fonts)
+        Colr = u32::from_be_bytes(*b"COLR"),
+        Cpal = u32::from_be_bytes(*b"CPAL"),
+        // Other (C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/otff#other-opentype-tables)
+        Dsig = u32::from_be_bytes(*b"DSIG"),
+        Hdmx = u32::from_be_bytes(*b"hdmx"),
+        Kern = u32::from_be_bytes(*b"kern"),
+        Ltsh = u32::from_be_bytes(*b"LTSH"),
+        Merg = u32::from_be_bytes(*b"MERG"),
+        Meta = u32::from_be_bytes(*b"meta"),
+        Pclt = u32::from_be_bytes(*b"PCLT"),
+        Vdmx = u32::from_be_bytes(*b"VDMX"),
+        Vhea = u32::from_be_bytes(*b"vhea"),
+        Vmtx = u32::from_be_bytes(*b"vmtx"),
+    }
+
+    impl Ord for TableKind {
+        fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+            (*self as u32).cmp(&(*other as u32))
+        }
+    }
+
+    impl PartialOrd for TableKind {
+        fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+            Some(self.cmp(other))
+        }
+    }
+
+    impl From<TableKind> for u32 {
+        fn from(value: TableKind) -> Self {
+            value as u32
+        }
+    }
+
+    impl TryFrom<u32> for TableKind {
+        type Error = UnknownValueError<u32>;
+
+        fn try_from(value: u32) -> Result<Self, Self::Error> {
+            match value {
+                val if val == TableKind::Cmap as u32 => Ok(TableKind::Cmap),
+                val if val == TableKind::Head as u32 => Ok(TableKind::Head),
+                val if val == TableKind::Hhea as u32 => Ok(TableKind::Hhea),
+                val if val == TableKind::Hmtx as u32 => Ok(TableKind::Hmtx),
+                val if val == TableKind::Maxp as u32 => Ok(TableKind::Maxp),
+                val if val == TableKind::Name as u32 => Ok(TableKind::Name),
+                val if val == TableKind::Os2 as u32 => Ok(TableKind::Os2),
+                val if val == TableKind::Post as u32 => Ok(TableKind::Post),
+                val if val == TableKind::Cvt as u32 => Ok(TableKind::Cvt),
+                val if val == TableKind::Fpgm as u32 => Ok(TableKind::Fpgm),
+                val if val == TableKind::Loca as u32 => Ok(TableKind::Loca),
+                val if val == TableKind::Glyf as u32 => Ok(TableKind::Glyf),
+                val if val == TableKind::Prep as u32 => Ok(TableKind::Prep),
+                val if val == TableKind::Gasp as u32 => Ok(TableKind::Gasp),
+                val if val == TableKind::Cff as u32 => Ok(TableKind::Cff),
+                val if val == TableKind::Cff2 as u32 => Ok(TableKind::Cff2),
+                val if val == TableKind::Vorg as u32 => Ok(TableKind::Vorg),
+                val if val == TableKind::Svg as u32 => Ok(TableKind::Svg),
+                val if val == TableKind::Ebdt as u32 => Ok(TableKind::Ebdt),
+                val if val == TableKind::Eblc as u32 => Ok(TableKind::Eblc),
+                val if val == TableKind::Ebsc as u32 => Ok(TableKind::Ebsc),
+                val if val == TableKind::Cbdt as u32 => Ok(TableKind::Cbdt),
+                val if val == TableKind::Cblc as u32 => Ok(TableKind::Cblc),
+                val if val == TableKind::Sbix as u32 => Ok(TableKind::Sbix),
+                val if val == TableKind::Base as u32 => Ok(TableKind::Base),
+                val if val == TableKind::Gdef as u32 => Ok(TableKind::Gdef),
+                val if val == TableKind::Gpos as u32 => Ok(TableKind::Gpos),
+                val if val == TableKind::Gsub as u32 => Ok(TableKind::Gsub),
+                val if val == TableKind::Jstf as u32 => Ok(TableKind::Jstf),
+                val if val == TableKind::Math as u32 => Ok(TableKind::Math),
+                val if val == TableKind::Avar as u32 => Ok(TableKind::Avar),
+                val if val == TableKind::Cvar as u32 => Ok(TableKind::Cvar),
+                val if val == TableKind::Fvar as u32 => Ok(TableKind::Fvar),
+                val if val == TableKind::Gvar as u32 => Ok(TableKind::Gvar),
+                val if val == TableKind::Hvar as u32 => Ok(TableKind::Hvar),
+                val if val == TableKind::Mvar as u32 => Ok(TableKind::Mvar),
+                val if val == TableKind::Stat as u32 => Ok(TableKind::Stat),
+                val if val == TableKind::Vvar as u32 => Ok(TableKind::Vvar),
+                val if val == TableKind::Colr as u32 => Ok(TableKind::Colr),
+                val if val == TableKind::Cpal as u32 => Ok(TableKind::Cpal),
+                val if val == TableKind::Dsig as u32 => Ok(TableKind::Dsig),
+                val if val == TableKind::Hdmx as u32 => Ok(TableKind::Hdmx),
+                val if val == TableKind::Kern as u32 => Ok(TableKind::Kern),
+                val if val == TableKind::Ltsh as u32 => Ok(TableKind::Ltsh),
+                val if val == TableKind::Merg as u32 => Ok(TableKind::Merg),
+                val if val == TableKind::Meta as u32 => Ok(TableKind::Meta),
+                val if val == TableKind::Pclt as u32 => Ok(TableKind::Pclt),
+                val if val == TableKind::Vdmx as u32 => Ok(TableKind::Vdmx),
+                val if val == TableKind::Vhea as u32 => Ok(TableKind::Vhea),
+                val if val == TableKind::Vmtx as u32 => Ok(TableKind::Vmtx),
+                other => Err(UnknownValueError {
+                    what: String::from("TableKind"),
+                    bad_value: other,
+                }),
+            }
+        }
+    }
+
+    impl TableKind {
+        // REVIEW - this should be kept up-to-date
+        pub fn is_implemented(self) -> bool {
+            use TableKind::*;
+            match self {
+                // Required
+                Cmap | Head | Hhea | Hmtx | Maxp | Name | Os2 | Post => true,
+                // TrueType Outline
+                Cvt | Fpgm | Loca | Glyf | Prep | Gasp => true,
+                // CFF Outline
+                Cff | Cff2 | Vorg => false,
+                // SVG
+                Svg => false,
+                // Bitmap
+                Ebdt | Eblc | Ebsc | Cbdt | Cblc | Sbix => false,
+                // Typographical
+                Base | Gdef | Gpos | Gsub => true,
+                Jstf | Math => false,
+                // Variation
+                Fvar | Gvar | Stat => true,
+                Avar | Cvar | Hvar | Mvar | Vvar => false,
+                // Color
+                Colr | Cpal => false,
+                // Extra
+                Kern | Vhea | Vmtx => true,
+                Dsig | Hdmx | Ltsh | Merg | Meta | Pclt | Vdmx => false,
+            }
+        }
+    }
+}
+
 /// Returns `true` if `table_id` is not a first-class OpenType table in our current implementation
 fn is_extra(table_id: &u32) -> bool {
-    let bytes = table_id.to_be_bytes();
-    match &bytes {
-        b"cmap" | b"head" | b"hhea" | b"hmtx" | b"maxp" | b"name" | b"OS/2" | b"post" => false,
-        b"cvt " | b"fpgm" | b"loca" | b"glyf" | b"prep" | b"gasp" => false,
-        b"GDEF" | b"GPOS" | b"GSUB" | b"BASE" => false,
-        b"fvar" | b"gvar" => false,
-        b"kern" | b"STAT" | b"vhea" | b"vmtx" => false,
-        // FIXME - update with more cases as we handle more table records
-        _ => true,
+    use table::TableKind;
+    match TableKind::try_from(*table_id) {
+        Ok(table_kind) => !table_kind.is_implemented(),
+        Err(e) => unreachable!("is_extra: {e}"),
     }
 }
 
@@ -6923,2945 +7178,11 @@ fn bounding_box(gl: &GlyphHeader) -> BoundingBox {
     }
 }
 
-pub fn show_opentype_stats(metrics: &OpentypeMetrics, conf: &Config) {
-    match metrics {
-        OpentypeMetrics::MultiFont(multi) => {
-            println!(
-                "TTC: version {} ({} fonts)",
-                format_version_major_minor(multi.version.0, multi.version.1),
-                multi.num_fonts
-            );
-            for (i, o_font) in multi.font_metrics.iter().enumerate() {
-                match o_font.as_ref() {
-                    Some(font) => {
-                        println!("=== Font @ Index {i} ===");
-                        show_font_metrics(font, conf);
-                    }
-                    None => {
-                        println!("=== Skipping Index {i} ===");
-                    }
-                }
-            }
-        }
-        OpentypeMetrics::SingleFont(single) => show_font_metrics(single, conf),
-    }
-}
-
-fn show_magic(magic: u32) {
-    println!("(sfntVersion: {})", format_magic(magic));
-}
-
-// REVIEW - less commonly used due to implementation of `Tag` type, which diverges in Display slightly
-fn format_magic(magic: u32) -> String {
-    let bytes = magic.to_be_bytes();
-    let show = |b: u8| {
-        if b.is_ascii_alphanumeric() {
-            String::from(b as char)
-        } else {
-            format!("{b:02x}")
-        }
-    };
-    format!(
-        "{}{}{}{}",
-        show(bytes[0]),
-        show(bytes[1]),
-        show(bytes[2]),
-        show(bytes[3])
-    )
-}
-
-fn show_font_metrics(font: &SingleFontMetrics, conf: &Config) {
-    if !conf.extra_only {
-        show_magic(font.sfnt_version);
-        show_required_metrics(&font.required, conf);
-        show_optional_metrics(&font.optional, conf);
-    }
-    show_extra_magic(&font.extraMagic);
-}
-
-fn show_extra_magic(table_ids: &[u32]) {
-    for id in table_ids.iter() {
-        println!("{}: [MISSING IMPL]", format_magic(*id));
-    }
-}
-
-fn show_required_metrics(required: &RequiredTableMetrics, conf: &Config) {
-    show_cmap_metrics(&required.cmap, conf);
-    show_head_metrics(&required.head, conf);
-    show_hhea_metrics(&required.hhea, conf);
-    show_hmtx_metrics(&required.hmtx, conf);
-    show_maxp_metrics(&required.maxp, conf);
-    show_name_metrics(&required.name, conf);
-    show_os2_metrics(&required.os2, conf);
-    show_post_metrics(&required.post, conf);
-}
-
-fn show_optional_metrics(optional: &OptionalTableMetrics, conf: &Config) {
-    show_cvt_metrics(&optional.cvt, conf);
-    show_fpgm_metrics(&optional.fpgm, conf);
-    show_loca_metrics(&optional.loca, conf);
-    show_glyf_metrics(&optional.glyf, conf);
-    show_prep_metrics(&optional.prep, conf);
-    show_gasp_metrics(&optional.gasp, conf);
-
-    // STUB - anything between gasp and gdef go here
-
-    show_base_metrics(&optional.base, conf);
-    show_gdef_metrics(optional.gdef.as_deref(), conf);
-    show_layout_metrics(
-        optional.gpos.as_deref(),
-        Ctxt::from(TableDiscriminator::Gpos),
-        conf,
-    );
-    show_layout_metrics(
-        optional.gsub.as_deref(),
-        Ctxt::from(TableDiscriminator::Gsub),
-        conf,
-    );
-
-    show_fvar_metrics(optional.fvar.as_deref(), conf);
-    show_gvar_metrics(optional.gvar.as_deref(), conf);
-
-    show_kern_metrics(&optional.kern, conf);
-    show_stat_metrics(optional.stat.as_deref(), conf);
-    show_vhea_metrics(&optional.vhea, conf);
-    show_vmtx_metrics(&optional.vmtx, conf);
-}
-
-fn show_gvar_metrics(gvar: Option<&GvarMetrics>, conf: &Config) {
-    let Some(gvar) = gvar else { return };
-    if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
-        fn display_shared_tuples(
-            shared_tuples: &[GvarTupleRecord],
-        ) -> display::TokenStream<'static> {
-            fn display_shared_tuple_record(
-                tuple: &GvarTupleRecord,
-            ) -> display::TokenStream<'static> {
-                use display::{tok, toks};
-                const COORD_BOOKEND: usize = 4;
-                arrayfmt::display_items_inline(
-                    &tuple.coordinates,
-                    |coord| toks(format!("{}", coord)),
-                    COORD_BOOKEND,
-                    |n_skipped| toks(format!("...({n_skipped} skipped)...")),
-                )
-            }
-
-            use display::toks;
-            const RECORDS_BOOKEND: usize = 4;
-            arrayfmt::display_items_elided(
-                shared_tuples,
-                |shared_tuple_ix, record| {
-                    toks(format!("[{shared_tuple_ix}]: "))
-                        .pre_indent(4)
-                        .chain(display_shared_tuple_record(record))
-                },
-                RECORDS_BOOKEND,
-                |start, stop| toks(format!("\t{HT}(skipping shared tuples {start}..{stop})")),
-            )
-        }
-        fn display_glyph_variation_data_array(
-            array: &[Option<GlyphVariationData>],
-        ) -> display::TokenStream<'_> {
-            fn display_glyph_variation_data(
-                table: &GlyphVariationData,
-            ) -> display::TokenStream<'static> {
-                fn display_tuple_variation_header(
-                    header: &GvarTupleVariationHeader,
-                ) -> display::TokenStream<'static> {
-                    display::Token::from(format!(
-                        "Header (size: {} bytes)",
-                        header.variation_data_size
-                    ))
-                    .into()
-                    // WIP
-                }
-
-                match &table.tuple_variation_headers[..] {
-                    [] => unreachable!("empty tuple variation headers"), // FIXME - final version should not panic, but we want to figure out whether this case happens
-                    [header] => {
-                        display_tuple_variation_header(header)
-                        // WIP - we may want to show more than just the header in future
-                    }
-                    headers => {
-                        let headers_str = arrayfmt::display_items_elided(
-                            headers,
-                            |ix, header| {
-                                toks(format!("[{ix}]: "))
-                                    .pre_indent(6)
-                                    .chain(display_tuple_variation_header(header))
-                            },
-                            4,
-                            |start, stop| {
-                                toks(format!(
-                                    "(skipping tuple variation headers {start}..{stop})"
-                                ))
-                                .pre_indent(5)
-                            },
-                        );
-                        // WIP - we may want to show more than just the headers in future
-                        LineBreak.then(headers_str)
-                    }
-                }
-            }
-
-            use display::{Token::LineBreak, toks};
-            const TABLE_BOOKEND: usize = 4;
-            arrayfmt::display_nullable(
-                array,
-                |ix, table| {
-                    toks(format!("[{ix}]: "))
-                        .pre_indent(4)
-                        .chain(display_glyph_variation_data(table))
-                },
-                TABLE_BOOKEND,
-                |n, (start, stop)| {
-                    toks(format!(
-                        "(skipping {n} glyph variation data tables between indices {start}..{stop})"
-                    ))
-                    .pre_indent(3)
-                },
-            )
-        }
-
-        // WIP
-        println!(
-            "gvar: version {}",
-            format_version_major_minor(gvar.major_version, gvar.minor_version)
-        );
-        println!("\tShared Tuples ({} total):", gvar.shared_tuples.len());
-        display_shared_tuples(&gvar.shared_tuples).println();
-        println!(
-            "\tGlyph Variation Data ({} glyphs):",
-            gvar.glyph_variation_data_array.len()
-        );
-        display_glyph_variation_data_array(&gvar.glyph_variation_data_array).println();
-        // WIP
-    } else {
-        print!(
-            "gvar: version {}",
-            format_version_major_minor(gvar.major_version, gvar.minor_version)
-        );
-        println!(
-            "; {} shared tuples, {} glyph variation data tables",
-            gvar.shared_tuples.len(),
-            gvar.glyph_variation_data_array.len(),
-        );
-    }
-}
-
-fn show_fvar_metrics(fvar: Option<&FvarMetrics>, conf: &Config) {
-    let Some(fvar) = fvar else { return };
-    if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
-        println!(
-            "fvar: version {}",
-            format_version_major_minor(fvar.major_version, fvar.minor_version)
-        );
-        println!("\tAxes:");
-        fn display_variation_axis_record(
-            axis: &VariationAxisRecord,
-        ) -> display::TokenStream<'static> {
-            display::Token::from(format!(
-                "'{}' axis: [{}, {}] (default: {}){}{:?}",
-                axis.axis_tag,
-                axis.min_value,
-                axis.max_value,
-                axis.default_value,
-                if axis.flags.hidden_axis {
-                    " (hidden) "
-                } else {
-                    " "
-                },
-                axis.axis_name_id,
-            ))
-            .into()
-        }
-        fn display_instance_record(
-            instance: &InstanceRecord,
-            conf: &Config,
-        ) -> display::TokenStream<'static> {
-            display::Token::from(format!(
-                "Subfamily={:?};{} ",
-                instance.subfamily_nameid,
-                match instance.postscript_nameid {
-                    None => String::new(),
-                    Some(name_id) => format!(" Postscript={name_id:?};"),
-                },
-            ))
-            .then(arrayfmt::display_items_inline(
-                &instance.coordinates,
-                |coord| display::Token::from(format!("{coord:+}")).into(),
-                conf.inline_bookend,
-                |n_skipped| {
-                    display::Token::from(format!("...(skipping {n_skipped} coordinates)...")).into()
-                },
-            ))
-        }
-
-        // FIXME: rewerite into pure TokenStream
-        arrayfmt::display_items_elided(
-            &fvar.axes,
-            |ix, axis| {
-                display::Token::from(format!("\t\t[{ix}]: "))
-                    .then(display_variation_axis_record(axis))
-            },
-            conf.bookend_size,
-            |start, stop| {
-                display::Token::from(format!("\t(skipping axis records {start}..{stop})")).into()
-            },
-        )
-        .println();
-        println!("\tInstances:");
-        arrayfmt::display_items_elided(
-            &fvar.instances,
-            |ix, instance| {
-                display::Token::from(format!("\t\t[{ix}]: "))
-                    .then(display_instance_record(instance, conf))
-            },
-            conf.bookend_size,
-            |start, stop| {
-                display::Token::from(format!("\t(skipping instance records {start}..{stop})"))
-                    .into()
-            },
-        )
-        .println();
-    } else {
-        // FIXME - rewrite into pure TokenStream
-        print!(
-            "fvar: version {}",
-            format_version_major_minor(fvar.major_version, fvar.minor_version)
-        );
-        println!(
-            "; {} axes, {} instances",
-            fvar.axes.len(),
-            fvar.instances.len()
-        );
-    }
-}
-
-fn show_cvt_metrics(cvt: &Option<CvtMetrics>, _conf: &Config) {
-    let Some(RawArrayMetrics(count)) = cvt else {
-        return;
-    };
-
-    println!("cvt: FWORD[{count}]")
-}
-
-fn show_fpgm_metrics(fpgm: &Option<FpgmMetrics>, _conf: &Config) {
-    if let Some(RawArrayMetrics(count)) = fpgm {
-        println!("fpgm: uint8[{count}]")
-    }
-}
-
-fn show_prep_metrics(prep: &Option<PrepMetrics>, _conf: &Config) {
-    if let Some(RawArrayMetrics(count)) = prep {
-        println!("prep: uint8[{count}]")
-    }
-}
-
-fn show_loca_metrics(loca: &Option<LocaMetrics>, _conf: &Config) {
-    if let Some(()) = loca {
-        println!("loca: (details omitted)")
-    }
-}
-
-fn show_gdef_metrics(gdef: Option<&GdefMetrics>, conf: &Config) {
-    if let Some(GdefMetrics {
-        major_version,
-        minor_version,
-        glyph_class_def,
-        attach_list,
-        lig_caret_list,
-        mark_attach_class_def,
-        data,
-    }) = gdef
-    {
-        // WIP
-        println!(
-            "GDEF: version {}",
-            format_version_major_minor(*major_version, *minor_version)
-        );
-        if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
-            if let Some(glyph_class_def) = glyph_class_def {
-                show_glyph_class_def(glyph_class_def, conf);
-            }
-            if let Some(attach_list) = attach_list {
-                display_attach_list(attach_list, conf).println(); // WIP
-            }
-            if let Some(lig_caret_list) = lig_caret_list {
-                // WIP
-                display_lig_caret_list(lig_caret_list, conf).println();
-            }
-            if let Some(mark_attach_class_def) = mark_attach_class_def {
-                show_mark_attach_class_def(mark_attach_class_def, conf);
-            }
-            match &data.mark_glyph_sets_def {
-                // WIP
-                None => println!("\tMarkGlyphSet: <none>"),
-                Some(mgs) => display_mark_glyph_set(mgs, conf).println(),
-            }
-            match &data.item_var_store {
-                None => println!("\tItemVariationStore: <none>"),
-                Some(ivs) => display_item_variation_store(ivs, conf).println(),
-            }
-        }
-    }
-}
-
-fn show_base_metrics(base: &Option<BaseMetrics>, _conf: &Config) {
-    if let Some(BaseMetrics {
-        major_version,
-        minor_version,
-    }) = base
-    {
-        println!(
-            "BASE: version {}",
-            format_version_major_minor(*major_version, *minor_version)
-        )
-        // STUB - add print methods (possibly gated by verbosity levels) as BaseMetrics gets more fields
-    }
-}
-
-fn format_table_disc(disc: TableDiscriminator) -> &'static str {
-    match disc {
-        TableDiscriminator::Gpos => "GPOS",
-        TableDiscriminator::Gsub => "GSUB",
-    }
-}
-
-fn show_layout_metrics(layout: Option<&LayoutMetrics>, ctxt: Ctxt, conf: &Config) {
-    if let Some(LayoutMetrics {
-        major_version,
-        minor_version,
-        script_list,
-        feature_list,
-        lookup_list,
-        feature_variations: _feature_variations,
-    }) = layout
-    {
-        println!(
-            "{}: version {}",
-            format_table_disc(ctxt.get_disc().expect("Ctxt missing TableDiscriminator")),
-            format_version_major_minor(*major_version, *minor_version)
-        );
-        if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
-            show_script_list(script_list, conf);
-            show_feature_list(feature_list, conf);
-            display_lookup_list(lookup_list, ctxt, conf).println();
-        }
-    }
-}
-
-fn show_script_list(script_list: &ScriptList, conf: &Config) {
-    use display::{Token::LineBreak, toks};
-    if script_list.is_empty() {
-        println!("\tScriptList [empty]");
-    } else {
-        println!("\tScriptList");
-        arrayfmt::display_items_elided(
-            script_list,
-            |ix, item| {
-                let Some(ScriptTable {
-                    default_lang_sys,
-                    lang_sys_records,
-                }) = &item.script
-                else {
-                    unreachable!("missing ScriptTable at index {ix} in ScriptList");
-                };
-
-                toks(format!("[{ix}]: {}", item.script_tag))
-                    .pre_indent(4)
-                    .glue(LineBreak, {
-                        match default_lang_sys {
-                            None => display_lang_sys_records(lang_sys_records, conf),
-                            langsys @ Some(..) => toks("[Default LangSys]: ")
-                                .pre_indent(5)
-                                .chain(display_langsys(langsys, conf))
-                                .glue(LineBreak, display_lang_sys_records(lang_sys_records, conf)),
-                        }
-                    })
-            },
-            conf.bookend_size,
-            |start, stop| toks(format!("skipping ScriptRecords {start}..{stop}")),
-        )
-        .println()
-    }
-}
-
-fn display_lang_sys_records(
-    lang_sys_records: &[LangSysRecord],
-    conf: &Config,
-) -> display::TokenStream<'static> {
-    use display::{Token::LineBreak, toks};
-    if lang_sys_records.is_empty() {
-        toks("LangSysRecords: <empty list>").pre_indent(5)
-    } else {
-        toks("LangSysRecords:").pre_indent(5).glue(
-            LineBreak,
-            arrayfmt::display_items_elided(
-                lang_sys_records,
-                |ix, item| {
-                    toks(format!("[{ix}]: {}; ", item.lang_sys_tag))
-                        .pre_indent(6)
-                        .chain(display_langsys(&item.lang_sys, conf))
-                },
-                conf.bookend_size,
-                |start, stop| {
-                    toks(format!("(skipping LangSysRecords {start}..{stop})")).pre_indent(5)
-                },
-            ),
-        )
-    }
-}
-
-fn display_langsys(lang_sys: &Link<LangSys>, conf: &Config) -> display::TokenStream<'static> {
-    let Some(LangSys {
-        lookup_order_offset,
-        required_feature_index,
-        feature_indices,
-    }) = lang_sys
-    else {
-        unreachable!("missing langsys");
-    };
-    debug_assert_eq!(*lookup_order_offset, 0);
-    match required_feature_index {
-        0xFFFF => display::Token::from(format!("feature-indices: ")),
-        other => display::Token::from(format!("feature-indices (required: {other}): ")),
-    }
-    .then(arrayfmt::display_items_inline(
-        feature_indices,
-        |ix: &u16| display::Token::from(format!("{ix}")).into(),
-        conf.inline_bookend,
-        |num_skipped: usize| display::Token::from(format!("...({num_skipped} skipped)...")).into(),
-    ))
-}
-
-fn show_feature_list(feature_list: &FeatureList, conf: &Config) {
-    if feature_list.is_empty() {
-        // FIXME - turn into pure tokenstream
-        println!("\tFeatureList [empty]");
-    } else {
-        println!("\tFeatureList");
-        arrayfmt::display_items_elided(
-            feature_list,
-            |ix, item| {
-                let FeatureRecord {
-                    feature_tag,
-                    feature,
-                } = item;
-                display::Token::from(format!("\t\t[{ix}]: {feature_tag}"))
-                    .then(show_feature_table(feature, conf))
-            },
-            conf.bookend_size,
-            |start, stop| {
-                display::Token::from(format!("\t    (skipping FeatureIndices {start}..{stop})"))
-                    .into()
-            },
-        )
-        .println()
-    }
-}
-
-fn show_feature_table(table: &FeatureTable, conf: &Config) -> display::TokenStream<'static> {
-    let FeatureTable {
-        feature_params,
-        lookup_list_indices,
-    } = table;
-
-    let stream = arrayfmt::display_items_inline(
-        lookup_list_indices,
-        |index| display::Token::from(format!("{index}")).into(),
-        conf.inline_bookend,
-        |num_skipped| display::Token::from(format!("...({num_skipped} skipped)...")).into(),
-    );
-    match feature_params {
-        0 => stream,
-        offset => {
-            display::Token::from(format!("[parameters located at SoF+{offset}B]")).then(stream)
-        }
-    }
-}
-
-fn display_lookup_list(
-    lookup_list: &LookupList,
-    ctxt: Ctxt,
-    conf: &Config,
-) -> display::TokenStream<'static> {
-    display::tok("\tLookupList:").then(display::Token::LineBreak.then(
-        arrayfmt::display_items_elided(
-            lookup_list,
-            move |ix, table| {
-                display::tok(format!("\t\t[{ix}]: ")).then(display_lookup_table(table, ctxt, conf))
-            },
-            conf.bookend_size,
-            |start, stop| display::toks(format!("\t    (skipping LookupTables {start}..{stop})")),
-        ),
-    ))
-}
-
-fn display_lookup_table(
-    table: &LookupTable,
-    ctxt: Ctxt,
-    conf: &Config,
-) -> display::TokenStream<'static> {
-    // NOTE - because we print the kind of the lookup here, we don't need to list it for every element
-    // LINK[format-lookup-subtable] -  (see format_lookup_subtable below)
-    let mut stream = display::Token::from(format!(
-        "LookupTable: kind={}",
-        format_lookup_type(ctxt, table.lookup_type),
-    ))
-    .then(display_lookup_flags(&table.lookup_flag));
-    if let Some(filtering_set) = table.mark_filtering_set {
-        stream = stream.chain(
-            display::Token::from(format!(
-                ", markFilteringSet=GDEF->MarkGlyphSet[{filtering_set}]"
-            ))
-            .into(),
-        );
-    }
-    stream.chain(
-        display::Token::InlineText(": ".into()).then(arrayfmt::display_items_inline(
-            &table.subtables,
-            |subtable| display_lookup_subtable(subtable, false, conf),
-            conf.inline_bookend,
-            |n_skipped| display::Token::from(format!("...({n_skipped} skipped)...")).into(),
-        )),
-    )
-}
-
-// ANCHOR[format-lookup-subtable]
-fn display_lookup_subtable(
-    subtable: &LookupSubtable,
-    show_lookup_type: bool,
-    conf: &Config,
-) -> display::TokenStream<'static> {
-    use display::{tok, toks};
-    // STUB - because the subtables are both partial (more variants exist) and abridged (existing variants are missing details), reimplement as necessary
-    // FIXME - refactor so contents is a pure tokenstream
-    // WIP
-    let (label, contents) = match subtable {
-        LookupSubtable::SinglePos(single_pos) => {
-            let contents = {
-                match single_pos {
-                    SinglePos::Format1(SinglePosFormat1 { value_record, .. }) => {
-                        tok("single").then(display_value_record(value_record).paren())
-                    }
-                    SinglePos::Format2(SinglePosFormat2 { coverage, .. }) => {
-                        tok("array").then(display_coverage_table(coverage).paren())
-                    }
-                }
-            };
-            ("SinglePos", contents)
-        }
-        LookupSubtable::PairPos(pair_pos) => {
-            let contents = {
-                match pair_pos {
-                    PairPos::Format1(PairPosFormat1 { coverage, .. }) => {
-                        tok("byGlyph").then(display_coverage_table(coverage).paren())
-                    }
-                    PairPos::Format2(PairPosFormat2 {
-                        coverage,
-                        class_def1,
-                        class_def2,
-                        class1_records,
-                    }) => {
-                        let rows = class1_records.rows();
-                        let cols = class1_records.width();
-
-                        validate_class_count(class_def1, rows);
-                        validate_class_count(class_def2, cols);
-
-                        // REVIEW - if not too verbose, we might want a compact overview of the Class1Record array, specifically which index-pairs constitute actual adjustments
-                        let _populated_class_pairs: Vec<(usize, usize)> = {
-                            Iterator::zip(0..rows, 0..cols)
-                                .filter(|ixpair| {
-                                    let it = &class1_records[*ixpair];
-                                    it.value_record1.is_some() || it.value_record2.is_some()
-                                })
-                                .collect()
-                        };
-                        // maximum number of index-pairs we are willing to display inline (chosen arbitrarily)
-                        // TODO - should this be a more general parameter in the Config type?
-                        const MAX_POPULATION: usize = 3;
-                        if _populated_class_pairs.len() <= MAX_POPULATION {
-                            tok(format!("byClass{:?}", _populated_class_pairs,))
-                                .then(display_coverage_table(coverage).surround(tok("("), tok(")")))
-                        } else {
-                            tok(format!(
-                                "byClass[{} ∈ {rows} x {cols}]",
-                                _populated_class_pairs.len(),
-                            ))
-                            .then(display_coverage_table(coverage).paren())
-                        }
-                    }
-                }
-            };
-            ("PairPos", contents)
-        }
-        LookupSubtable::CursivePos(CursivePos { coverage, .. }) => {
-            let contents = tok("entryExit").then(display_coverage_table(coverage).paren());
-            ("CursivePos", contents)
-        }
-        LookupSubtable::MarkBasePos(MarkBasePos {
-            mark_coverage,
-            base_coverage,
-            mark_array,
-            base_array,
-        }) => {
-            let contents = {
-                let mut mark_iter = mark_coverage.iter();
-                let mut base_iter = base_coverage.iter();
-                let mark_lhs = tok("Mark").then(display_coverage_table(mark_coverage).paren());
-                let base_lhs = tok("Base").then(display_coverage_table(base_coverage).paren());
-                let mark_rhs =
-                    tok("MarkArray").then(display_mark_array(mark_array, &mut mark_iter).bracket());
-                let base_rhs =
-                    tok("BaseArray").then(display_base_array(base_array, &mut base_iter).bracket());
-                let lhs = mark_lhs.glue(tok("+"), base_lhs);
-                let rhs = mark_rhs.glue(tok("+"), base_rhs);
-                lhs.glue(tok("=>"), rhs)
-            };
-            ("MarkBasePos", contents)
-        }
-        LookupSubtable::MarkLigPos(MarkLigPos {
-            mark_coverage,
-            ligature_coverage,
-            mark_array,
-            ligature_array,
-        }) => {
-            let contents = {
-                let mut mark_iter = mark_coverage.iter();
-                let mut ligature_iter = ligature_coverage.iter();
-                let mark_lhs = tok("Mark").then(display_coverage_table(mark_coverage).paren());
-                let lig_lhs =
-                    tok("Ligature").then(display_coverage_table(ligature_coverage).paren());
-                let mark_rhs =
-                    tok("MarkArray").then(display_mark_array(mark_array, &mut mark_iter).bracket());
-                let lig_rhs = tok("LigatureArray")
-                    .then(display_ligature_array(ligature_array, &mut ligature_iter).bracket());
-                let lhs = mark_lhs.glue(tok("+"), lig_lhs);
-                let rhs = mark_rhs.glue(tok("+"), lig_rhs);
-                lhs.glue(tok("=>"), rhs)
-            };
-            ("MarkLigPos", contents)
-        }
-        LookupSubtable::MarkMarkPos(MarkMarkPos {
-            mark1_coverage,
-            mark2_coverage,
-            mark1_array,
-            mark2_array,
-        }) => {
-            let contents = {
-                let mut mark1_iter = mark1_coverage.iter();
-                let mut mark2_iter = mark2_coverage.iter();
-                let mark_lhs = tok("Mark").then(display_coverage_table(mark1_coverage).paren());
-                let mark2_lhs = tok("Mark").then(display_coverage_table(mark2_coverage).paren());
-                let mark_rhs = tok("MarkArray")
-                    .then(display_mark_array(mark1_array, &mut mark1_iter).bracket());
-                let mark2_rhs = tok("Mark2Array")
-                    .then(display_mark2_array(mark2_array, &mut mark2_iter).bracket());
-                let lhs = mark_lhs.glue(tok("+"), mark2_lhs);
-                let rhs = mark_rhs.glue(tok("+"), mark2_rhs);
-                lhs.glue(tok("=>"), rhs)
-            };
-            ("MarkMarkPos", contents)
-        }
-        LookupSubtable::SingleSubst(single_subst) => {
-            let contents = match single_subst {
-                SingleSubst::Format1(SingleSubstFormat1 {
-                    coverage,
-                    delta_glyph_id,
-                }) => {
-                    display_coverage_table(coverage).chain(toks(format!("=>({delta_glyph_id:+})")))
-                }
-                SingleSubst::Format2(SingleSubstFormat2 {
-                    coverage,
-                    substitute_glyph_ids,
-                }) => {
-                    let iter = coverage.iter();
-                    display_coverage_table(coverage).glue(
-                        tok("=>"),
-                        arrayfmt::display_coverage_linked_array(
-                            substitute_glyph_ids,
-                            iter,
-                            |orig_glyph, subst_glyph| {
-                                toks(format!(
-                                    "{}->{}",
-                                    format_glyphid_hex(orig_glyph, true),
-                                    format_glyphid_hex(*subst_glyph, true),
-                                ))
-                            },
-                            conf.inline_bookend,
-                            |n_skipped| toks(format!("...(skipping {n_skipped} substs)...")),
-                        ),
-                    )
-                }
-            };
-            ("SingleSubst", contents)
-        }
-        LookupSubtable::MultipleSubst(multi_subst) => {
-            let contents = {
-                let MultipleSubst {
-                    coverage,
-                    subst: MultipleSubstFormat1 { sequences },
-                } = &multi_subst;
-                // REVIEW - is this the right balance of specificity and brevity?
-                display_coverage_table(coverage)
-                    .chain(toks(format!("=>SequenceTable[{}]", sequences.len())))
-            };
-            ("MultipleSubst", contents)
-        }
-        LookupSubtable::AlternateSubst(AlternateSubst {
-            coverage,
-            alternate_sets,
-        }) => {
-            let contents = {
-                display_coverage_table(coverage)
-                    .glue(tok("=>"), display_alternate_sets(alternate_sets))
-            };
-            ("AlternateSubst", contents)
-        }
-        LookupSubtable::LigatureSubst(LigatureSubst {
-            coverage,
-            ligature_sets,
-        }) => {
-            // WIP
-            let contents = display_ligature_sets(ligature_sets, coverage.iter());
-            ("LigatureSubst", contents)
-        }
-        LookupSubtable::ReverseChainSingleSubst(ReverseChainSingleSubst {
-            coverage,
-            backtrack_coverages,
-            lookahead_coverages,
-            substitute_glyph_ids,
-            ..
-        }) => {
-            let contents = {
-                // REVIEW - since we are already within an inline elision context, try to avoid taking up too much space per item, but this might not want to be a hardcoded value
-                const INLINE_INLINE_BOOKEND: usize = 1;
-                // FIXME - show_lookup_table calls this function through display_items_inline already, so we might want to reduce how many values we are willing to show proportionally
-                let backtrack_pattern = if backtrack_coverages.is_empty() {
-                    display::TokenStream::empty()
-                } else {
-                    arrayfmt::display_items_inline(
-                        backtrack_coverages,
-                        display_coverage_table,
-                        INLINE_INLINE_BOOKEND,
-                        |n| display::toks(format!("(..{n}..)")),
-                    )
-                    .surround(tok("(?<="), tok(")"))
-                };
-                let input_pattern = display_coverage_table(coverage);
-                let lookahead_pattern = if lookahead_coverages.is_empty() {
-                    display::TokenStream::empty()
-                } else {
-                    arrayfmt::display_items_inline(
-                        lookahead_coverages,
-                        display_coverage_table,
-                        INLINE_INLINE_BOOKEND,
-                        |n| display::toks(format!("(..{n}..)")),
-                    )
-                    .surround(tok("(?="), tok(")"))
-                };
-                let substitute_ids = format_glyphid_array_hex(substitute_glyph_ids, true);
-
-                backtrack_pattern
-                    .chain(input_pattern)
-                    .chain(lookahead_pattern)
-                    .chain(toks(format!("=>{substitute_ids}")))
-            };
-            ("RevChainSingleSubst", contents)
-        }
-        LookupSubtable::SequenceContext(seq_ctx) => {
-            let contents = match seq_ctx {
-                SequenceContext::Format1(SequenceContextFormat1 { coverage, .. }) => {
-                    tok("Glyphs").then(display_coverage_table(coverage).paren())
-                }
-                SequenceContext::Format2(SequenceContextFormat2 { coverage, .. }) => {
-                    tok("Classes").then(display_coverage_table(coverage).paren())
-                }
-                SequenceContext::Format3(SequenceContextFormat3 {
-                    coverage_tables,
-                    seq_lookup_records,
-                    ..
-                }) => {
-                    // REVIEW - since we are already within an inline elision context, try to avoid taking up too much space per item, but this might not want to be a hardcoded value
-                    const INLINE_INLINE_BOOKEND: usize = 1;
-                    // FIXME - show_lookup_table calls this function through display_items_inline already, so we might want to reduce how many values we are willing to show proportionally
-                    let input_pattern = arrayfmt::display_items_inline(
-                        coverage_tables,
-                        display_coverage_table,
-                        INLINE_INLINE_BOOKEND,
-                        |n| toks(format!("(..{n}..)")),
-                    );
-                    let seq_lookups = arrayfmt::display_items_inline(
-                        seq_lookup_records,
-                        display_sequence_lookup,
-                        INLINE_INLINE_BOOKEND,
-                        |n| toks(format!("(..{n}..)")),
-                    );
-                    input_pattern.glue(tok("=>"), seq_lookups)
-                }
-            };
-            ("SeqCtx", contents)
-        }
-        LookupSubtable::ChainedSequenceContext(chain_ctx) => {
-            let contents = match chain_ctx {
-                ChainedSequenceContext::Format1(ChainedSequenceContextFormat1 {
-                    coverage, ..
-                }) => {
-                    // TODO - even if it means overly verbose output, this might be too little info to be useful compared to discriminant-only display
-                    tok("ChainedGlyphs").then(display_coverage_table(coverage).paren())
-                }
-                ChainedSequenceContext::Format2(ChainedSequenceContextFormat2 {
-                    coverage, ..
-                }) => {
-                    // TODO - even if it means overly verbose output, this might be too little info to be useful compared to discriminant-only display
-                    // REVIEW - consider what other details (e.g. class-def summary metrics) to show in implicitly- or explicitly-verbose display format
-                    tok("ChainedClasses").then(display_coverage_table(coverage).paren())
-                }
-                ChainedSequenceContext::Format3(ChainedSequenceContextFormat3 {
-                    backtrack_coverages,
-                    input_coverages,
-                    lookahead_coverages,
-                    seq_lookup_records,
-                    ..
-                }) => {
-                    // REVIEW - since we are already within an inline elision context, try to avoid taking up too much space per item, but this might not want to be a hardcoded value
-                    const INLINE_INLINE_BOOKEND: usize = 1;
-                    // FIXME - show_lookup_table calls this function through display_items_inline already, so we might want to reduce how many values we are willing to show proportionally
-                    let backtrack_pattern = if backtrack_coverages.is_empty() {
-                        display::TokenStream::empty()
-                    } else {
-                        arrayfmt::display_items_inline(
-                            backtrack_coverages,
-                            display_coverage_table,
-                            INLINE_INLINE_BOOKEND,
-                            |n| toks(format!("(..{n}..)")),
-                        )
-                        .surround(tok("(?<="), tok(")"))
-                    };
-                    let input_pattern = arrayfmt::display_items_inline(
-                        input_coverages,
-                        display_coverage_table,
-                        INLINE_INLINE_BOOKEND,
-                        |n| toks(format!("(..{n}..)")),
-                    );
-                    let lookahead_pattern = if lookahead_coverages.is_empty() {
-                        display::TokenStream::empty()
-                    } else {
-                        arrayfmt::display_items_inline(
-                            lookahead_coverages,
-                            display_coverage_table,
-                            INLINE_INLINE_BOOKEND,
-                            |n| toks(format!("(..{n}..)")),
-                        )
-                        .surround(tok("(?="), tok(")"))
-                    };
-                    let seq_lookups = arrayfmt::display_items_inline(
-                        seq_lookup_records,
-                        display_sequence_lookup,
-                        INLINE_INLINE_BOOKEND,
-                        |n| toks(format!("(..{n}..)")),
-                    );
-                    backtrack_pattern
-                        .chain(input_pattern)
-                        .chain(lookahead_pattern)
-                        .glue(tok("=>"), seq_lookups)
-                }
-            };
-            ("ChainSeqCtx", contents)
-        }
-    };
-    let label = tok(label);
-    // WIP
-    if show_lookup_type {
-        label.then(contents)
-    } else {
-        contents
-    }
-}
-
-fn show_stat_metrics(stat: Option<&StatMetrics>, conf: &Config) {
-    fn display_design_axis(axis: &DesignAxis, _conf: &Config) -> display::TokenStream<'static> {
-        display::toks(format!(
-            "Tag={} ; Axis NameID={} ; Ordering={}",
-            axis.axis_tag, axis.axis_name_id.0, axis.axis_ordering
-        ))
-    }
-    fn display_axis_value(value: &AxisValue, conf: &Config) -> display::TokenStream<'static> {
-        fn format_axis_value_flags(flags: &AxisValueFlags) -> String {
-            let mut set_flags = Vec::new();
-            if flags.elidable_axis_value_name {
-                // REVIEW - is there a pithier, but not obfuscating, string we can use instead?
-                set_flags.push("ELIDABLE_AXIS_VALUE_NAME");
-            }
-            if flags.older_sibling_font_attribute {
-                // REVIEW - is there a pithier, but not obfuscating, string we can use instead?
-                set_flags.push("OLDER_SIBLING_FONT_ATTRIBUTE");
-            }
-            if set_flags.is_empty() {
-                String::new()
-            } else {
-                format!(" (Flags: {})", set_flags.join(" | "))
-            }
-        }
-
-        use display::{tok, toks};
-        match value {
-            AxisValue::Format1(AxisValueFormat1 {
-                axis_index,
-                flags,
-                value_name_id,
-                value,
-            }) => toks(format!(
-                "Axis[{}]{}: {:?} = {}",
-                axis_index,
-                format_axis_value_flags(flags),
-                value_name_id,
-                value
-            )),
-            AxisValue::Format2(AxisValueFormat2 {
-                axis_index,
-                flags,
-                value_name_id,
-                nominal_value,
-                range_min_value,
-                range_max_value,
-            }) => toks(format!(
-                "Axis[{}]{}: {:?} = {} ∈ [{}, {}]",
-                axis_index,
-                format_axis_value_flags(flags),
-                value_name_id,
-                nominal_value,
-                range_min_value,
-                range_max_value
-            )),
-            AxisValue::Format3(AxisValueFormat3 {
-                axis_index,
-                flags,
-                value_name_id,
-                value,
-                linked_value,
-            }) => toks(format!(
-                "Axis[{}]{}: {:?} = {} (-> {})",
-                axis_index,
-                format_axis_value_flags(flags),
-                value_name_id,
-                value,
-                linked_value
-            )),
-            AxisValue::Format4(AxisValueFormat4 {
-                flags,
-                value_name_id,
-                axis_values,
-            }) => tok(format!(
-                "{:?}{}: ",
-                value_name_id,
-                format_axis_value_flags(flags),
-            ))
-            .then(arrayfmt::display_items_inline(
-                axis_values,
-                |axis_value| {
-                    display::toks(format!(
-                        "Axis[{}] = {}",
-                        axis_value.axis_index, axis_value.value
-                    ))
-                },
-                conf.inline_bookend,
-                |n_skipped| {
-                    display::toks(format!("...(skipping {n_skipped} AxisValue records)..."))
-                },
-            )),
-        }
-    }
-    if let Some(stat) = stat {
-        println!(
-            "STAT: version {} (elidedFallbackName: name[id={}])",
-            format_version_major_minor(stat.major_version, stat.minor_version),
-            stat.elided_fallback_name_id.0
-        );
-        if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
-            match stat.design_axes.len() {
-                0 => (),
-                n => {
-                    // FIXME - promote to first-class tokenstream
-                    println!("\tDesignAxes: {n} total");
-                    arrayfmt::display_items_elided(
-                        &stat.design_axes,
-                        |ix, d_axis| {
-                            display::tok(format!("\t\t[{ix}]: "))
-                                .then(display_design_axis(d_axis, conf))
-                        },
-                        conf.bookend_size,
-                        |start, stop| {
-                            display::toks(format!(
-                                "\t(skipping design-axes from index {start}..{stop})"
-                            ))
-                        },
-                    )
-                    .println()
-                }
-            }
-            match stat.axis_values.len() {
-                0 => (),
-                n => {
-                    println!("\tAxisValues: {n} total");
-                    arrayfmt::display_items_elided(
-                        &stat.axis_values,
-                        |ix, a_value| {
-                            display::tok(format!("\t\t[{ix}]: "))
-                                .then(display_axis_value(a_value, conf))
-                        },
-                        conf.bookend_size,
-                        |start, stop| {
-                            display::toks(format!(
-                                "\t(skipping design-axes from index {start}..{stop})"
-                            ))
-                        },
-                    )
-                    .println()
-                }
-            }
-        }
-    }
-}
-
-fn show_kern_metrics(kern: &Option<KernMetrics>, conf: &Config) {
-    use display::{tok, toks};
-    fn display_kern_subtable(
-        subtable: &KernSubtable,
-        conf: &Config,
-    ) -> display::TokenStream<'static> {
-        use display::{tok, toks};
-        fn format_kern_flags(flags: KernFlags) -> String {
-            let mut params = Vec::new();
-            if flags.r#override {
-                params.push("override");
-            }
-            if flags.cross_stream {
-                params.push("x-stream")
-            }
-            if flags.minimum {
-                params.push("min")
-            } else {
-                params.push("kern")
-            }
-            if flags.horizontal {
-                params.push("h")
-            } else {
-                params.push("v")
-            }
-
-            params.join(" | ")
-        }
-
-        fn display_kern_subtable_data(
-            subtable_data: &KernSubtableData,
-            conf: &Config,
-        ) -> display::TokenStream<'static> {
-            use display::{tok, toks};
-            match subtable_data {
-                KernSubtableData::Format0(KernSubtableFormat0 { kern_pairs }) => {
-                    arrayfmt::display_items_inline(
-                        kern_pairs,
-                        |kern_pair| {
-                            toks(format!(
-                                "({},{}) {:+}",
-                                format_glyphid_hex(kern_pair.left, true),
-                                format_glyphid_hex(kern_pair.right, true),
-                                kern_pair.value
-                            ))
-                        },
-                        conf.inline_bookend,
-                        |n| toks(format!("(..{n}..)")),
-                    )
-                }
-                KernSubtableData::Format2(KernSubtableFormat2 {
-                    left_class,
-                    right_class,
-                    kerning_array,
-                }) => {
-                    fn display_kern_class_table(
-                        table: &KernClassTable,
-                        conf: &Config,
-                    ) -> display::TokenStream<'static> {
-                        use display::{tok, toks};
-                        tok(format!(
-                            "Classes[first={}, nGlyphs={}]: ",
-                            format_glyphid_hex(table.first_glyph, true),
-                            table.n_glyphs,
-                        ))
-                        .then(arrayfmt::display_items_inline(
-                            &table.class_values,
-                            |id| toks(u16::to_string(id)),
-                            conf.inline_bookend,
-                            |n| toks(format!("(..{n}..)")),
-                        ))
-                    }
-                    fn display_kerning_array(
-                        array: &KerningArray,
-                        conf: &Config,
-                    ) -> display::TokenStream<'static> {
-                        arrayfmt::display_wec_rows_elided(
-                            &array.0,
-                            |ix, row| {
-                                display::tok(format!("\t\t[{ix}]: ")).then(
-                                    arrayfmt::display_items_inline(
-                                        row,
-                                        |kern_val| display::toks(format!("{kern_val:+}")),
-                                        conf.inline_bookend,
-                                        |n| display::toks(format!("(..{n}..)")),
-                                    ),
-                                )
-                            },
-                            conf.bookend_size / 2, // FIXME - magic constant adjustment
-                            |start, stop| {
-                                display::toks(format!(
-                                    "\t\t(skipping kerning array rows {start}..{stop})"
-                                ))
-                            },
-                        )
-                    }
-                    let left = tok("LeftClass=").then(display_kern_class_table(left_class, conf));
-
-                    let right =
-                        tok("RightClass=").then(display_kern_class_table(right_class, conf));
-                    let kern =
-                        tok("KerningArray:").then(display_kerning_array(kerning_array, conf));
-                    left.glue(tok("\t"), right).glue(tok("\t"), kern)
-                }
-            }
-        }
-
-        tok(format!(
-            "KernSubtable ({}): ",
-            format_kern_flags(subtable.flags)
-        ))
-        .then(display_kern_subtable_data(&subtable.data, conf))
-    }
-
-    if let Some(kern) = kern {
-        if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
-            println!("kern");
-            arrayfmt::display_items_elided(
-                &kern.subtables,
-                |ix, subtable| {
-                    toks(format!("[{ix}]: "))
-                        .pre_indent(2)
-                        .chain(display_kern_subtable(subtable, conf))
-                },
-                conf.bookend_size,
-                |start, stop| {
-                    toks(format!("(skipping kern subtables {start}..{stop})")).pre_indent(1)
-                },
-            )
-            .println();
-        } else {
-            println!("kern: {} kerning subtables", kern.subtables.len());
-        }
-    }
-}
-
-fn display_mark2_array(
-    arr: &Mark2Array,
-    coverage: &mut impl Iterator<Item = u16>,
-) -> display::TokenStream<'static> {
-    use display::toks;
-
-    fn display_mark2_record(mark2_record: &Mark2Record, cov: u16) -> display::TokenStream<'static> {
-        const CLASS_ANCHORS: usize = 2;
-        use display::{tok, toks};
-        tok(format!("{}: ", format_glyphid_hex(cov, true),)).then(
-            arrayfmt::display_inline_nullable(
-                &mark2_record.mark2_anchors,
-                |ix, anchor| tok(format!("[{ix}]=>")).then(display_anchor_table(anchor)),
-                CLASS_ANCHORS,
-                |n, (start, end)| {
-                    toks(format!(
-                        "...(skipping {n} indices spanning {start}..={end})..."
-                    ))
-                },
-            ),
-        )
-    }
-
-    const MARK2_ARRAY_BOOKEND: usize = 2;
-    arrayfmt::display_items_inline(
-        &arr.mark2_records,
-        |mark2_record| {
-            display_mark2_record(mark2_record, coverage.next().expect("missing coverage"))
-        },
-        MARK2_ARRAY_BOOKEND,
-        |n| toks(format!("...(skipping {n} Mark2Records)...")),
-    )
-}
-
-fn display_ligature_array(
-    ligature_array: &LigatureArray,
-    coverage: &mut impl Iterator<Item = u16>,
-) -> display::TokenStream<'static> {
-    fn display_ligature_attach(
-        ligature_attach: &LigatureAttach,
-        cov: u16,
-    ) -> display::TokenStream<'static> {
-        fn display_component_record(
-            component_record: &ComponentRecord,
-        ) -> display::TokenStream<'static> {
-            use display::{tok, toks};
-            const CLASS_ANCHOR_BOOKEND: usize = 2;
-            arrayfmt::display_inline_nullable(
-                &component_record.ligature_anchors,
-                |ix, anchor| tok(format!("[{ix}]=>")).then(display_anchor_table(anchor)),
-                CLASS_ANCHOR_BOOKEND,
-                |n_skipped, (first, last)| {
-                    toks(format!(
-                        "...(skipping {n_skipped} indices from {first} to {last})..."
-                    ))
-                },
-            )
-        }
-
-        use display::{tok, toks};
-        const COMPONENTS_BOOKEND: usize = 1;
-        tok(format!("{cov:04x}=")).then(arrayfmt::display_items_inline(
-            &ligature_attach.component_records,
-            display_component_record,
-            COMPONENTS_BOOKEND,
-            |_| toks(".."),
-        ))
-    }
-
-    use display::toks;
-    const ATTACHES_INLINE: usize = 2;
-    arrayfmt::display_items_inline(
-        &ligature_array.ligature_attach,
-        |attach| display_ligature_attach(attach, coverage.next().expect("missing coverage")),
-        ATTACHES_INLINE,
-        |n_skipped| toks(format!("...(skipping {n_skipped})...")),
-    )
-}
-
-fn display_base_array(
-    base_array: &BaseArray,
-    coverage: &mut impl Iterator<Item = u16>,
-) -> display::TokenStream<'static> {
-    fn display_base_record(base_record: &BaseRecord, cov: u16) -> display::TokenStream<'static> {
-        use display::{tok, toks};
-        const CLASS_ANCHOR_BOOKEND: usize = 2;
-        tok(format!("{cov:04x}: ")).then(arrayfmt::display_inline_nullable(
-            &base_record.base_anchors,
-            |ix, anchor| tok(format!("[{ix}]=>")).then(display_anchor_table(anchor)),
-            CLASS_ANCHOR_BOOKEND,
-            |n_skipped, (first, last)| {
-                toks(format!(
-                    "...(skipping {n_skipped} indices from {first} to {last})..."
-                ))
-            },
-        ))
-    }
-
-    use display::toks;
-    const BASE_ARRAY_BOOKEND: usize = 2;
-    arrayfmt::display_items_inline(
-        &base_array.base_records,
-        |base_record| display_base_record(base_record, coverage.next().expect("missing coverage")),
-        BASE_ARRAY_BOOKEND,
-        |n_skipped| toks(format!("...({n_skipped} skipped)...")),
-    )
-}
-
-fn display_mark_array(
-    mark_array: &MarkArray,
-    coverage: &mut impl Iterator<Item = u16>,
-) -> display::TokenStream<'static> {
-    fn display_mark_record(mark_record: &MarkRecord, cov: u16) -> display::TokenStream<'static> {
-        use display::{tok, toks};
-        tok(format!("{cov:04x}=({}, ", mark_record.mark_class,)).then(
-            display_anchor_table(mark_record.mark_anchor.as_ref().expect("broken link"))
-                .chain(toks(")")),
-        )
-    }
-
-    // FIXME[magic] - arbitrary local bookending const
-    const MARK_ARRAY_BOOKEND: usize = 2;
-    arrayfmt::display_items_inline(
-        &mark_array.mark_records,
-        |mark_record| display_mark_record(mark_record, coverage.next().expect("missing coverage")),
-        MARK_ARRAY_BOOKEND,
-        |n_skipped| display::toks(format!("...({n_skipped} skipped)...")),
-    )
-}
-
-fn display_anchor_table(anchor: &AnchorTable) -> display::TokenStream<'static> {
-    use display::{tok, toks};
-    match anchor {
-        AnchorTable::Format1(AnchorTableFormat1 {
-            x_coordinate,
-            y_coordinate,
-        }) => toks(format!(
-            "({}, {})",
-            as_s16(*x_coordinate),
-            as_s16(*y_coordinate)
-        )),
-        AnchorTable::Format2(f2) => toks(format!(
-            "({}, {})@[{}]",
-            as_s16(f2.x_coordinate),
-            as_s16(f2.y_coordinate),
-            f2.anchor_point
-        )),
-        AnchorTable::Format3(AnchorTableFormat3 {
-            x_coordinate,
-            y_coordinate,
-            x_device,
-            y_device,
-        }) => {
-            let extra = match (x_device, y_device) {
-                (None, None) => unreachable!(
-                    "unexpected both-Null DeviceOrVariationIndexTable-offsets in AnchorTable::Format3"
-                ),
-                (Some(x), Some(y)) => {
-                    // FIXME - refactor format_device_or_variation_index_table to be TokenStream
-                    toks(format!(
-                        "×({}, {})",
-                        format_device_or_variation_index_table(x),
-                        format_device_or_variation_index_table(y)
-                    ))
-                }
-                (Some(x), None) => {
-                    // FIXME - refactor format_device_or_variation_index_table to be TokenStream
-                    toks(format!(
-                        "×({}, ⅈ)",
-                        format_device_or_variation_index_table(x)
-                    ))
-                }
-                (None, Some(y)) => {
-                    // FIXME - refactor format_device_or_variation_index_table to be TokenStream
-                    toks(format!(
-                        "×(ⅈ, {})",
-                        format_device_or_variation_index_table(y)
-                    ))
-                }
-            };
-            tok(format!(
-                "({}, {})",
-                as_s16(*x_coordinate),
-                as_s16(*y_coordinate),
-            ))
-            .then(extra)
-        }
-    }
-}
-
-fn display_ligature_sets(
-    lig_sets: &[LigatureSet],
-    mut coverage: impl Iterator<Item = u16>,
-) -> display::TokenStream<'static> {
-    fn display_ligature_set(lig_set: &LigatureSet, cov: u16) -> display::TokenStream<'static> {
-        fn display_ligature(lig: &Ligature, cov: u16) -> display::TokenStream<'static> {
-            // FIXME - refactor format_glyphid_array_hex to be TokenStream
-            display::toks(format!(
-                "(#{cov:04x}.{} => {})",
-                format_glyphid_array_hex(&lig.component_glyph_ids, false),
-                lig.ligature_glyph,
-            ))
-        }
-        // FIXME[magic] - arbitrary local bookending const
-        const LIG_BOOKEND: usize = 2;
-        arrayfmt::display_items_inline(
-            &lig_set.ligatures,
-            |lig| display_ligature(lig, cov),
-            LIG_BOOKEND,
-            |n_skipped| display::toks(format!("...({n_skipped} skipped)...")),
-        )
-    }
-    match lig_sets {
-        [set] => display_ligature_set(set, coverage.next().expect("missing coverage")),
-        more => {
-            const LIG_SET_BOOKEND: usize = 1;
-            arrayfmt::display_coverage_linked_array(
-                more,
-                coverage,
-                |cov, lig_set| display_ligature_set(lig_set, cov),
-                LIG_SET_BOOKEND,
-                |_| display::toks(".."),
-            )
-        }
-    }
-}
-
-fn display_alternate_sets(alt_sets: &[AlternateSet]) -> display::TokenStream<'static> {
-    fn display_alternate_set(alt_set: &AlternateSet) -> display::TokenStream<'static> {
-        use display::toks;
-        const ALT_GLYPH_BOOKEND: usize = 2;
-        arrayfmt::display_items_inline(
-            &alt_set.alternate_glyph_ids,
-            |glyph_id| toks(format_glyphid_hex(*glyph_id, true)),
-            ALT_GLYPH_BOOKEND,
-            |_| toks("..".to_string()),
-        )
-    }
-    match alt_sets {
-        [set] => display_alternate_set(set),
-        more => {
-            const ALT_SET_BOOKEND: usize = 1;
-            arrayfmt::display_items_inline(more, display_alternate_set, ALT_SET_BOOKEND, |count| {
-                display::toks(format!("...({count} skipped)..."))
-            })
-        }
-    }
-}
-
-fn display_sequence_lookup(sl: &SequenceLookup) -> display::TokenStream<'static> {
-    let s_ix = sl.sequence_index;
-    let ll_ix = sl.lookup_list_index;
-    // NOTE - the number in `\[_\]` is meant to mimic the index display of the display_items_elided formatting of LookupList, so it is the lookup index. The number after `@` is the positional index to apply the lookup to
-    display::toks(format!("[{ll_ix}]@{s_ix}"))
-}
-
-/// Checks that the given ClassDef (assumed to be Some) contains the expected number of classes.
-///
-/// Panics if opt_classdef is None.
-fn validate_class_count(class_def: &ClassDef, expected_classes: usize) {
-    match class_def {
-        ClassDef::Format1 {
-            class_value_array,
-            start_glyph_id: _start_id,
-        } => {
-            let max = expected_classes as u16;
-            let mut actual_set = U16Set::new();
-            actual_set.insert(0);
-            for (_ix, value) in class_value_array.iter().enumerate() {
-                if *value >= max {
-                    panic!(
-                        "expecting {expected_classes} starting at 0, found ClassValue {value} (>= {max}) at index {_ix} (glyph id: {})",
-                        *_start_id + _ix as u16
-                    );
-                }
-                let _ = actual_set.insert(*value);
-            }
-            assert_eq!(
-                actual_set.len(),
-                expected_classes,
-                "expected to find {expected_classes} ClassDefs, found {}-element set {:?}",
-                actual_set.len(),
-                actual_set
-            );
-        }
-        ClassDef::Format2 {
-            class_range_records,
-        } => {
-            let max = expected_classes as u16;
-            let mut actual_set = U16Set::new();
-            actual_set.insert(0);
-            for (_ix, rr) in class_range_records.iter().enumerate() {
-                let value = rr.value;
-                if value >= max {
-                    panic!(
-                        "expecting {expected_classes} starting at 0, found ClassValue {value} (>= {max}) at index {_ix} (glyph range: {} -> {})",
-                        rr.start_glyph_id, rr.end_glyph_id
-                    );
-                }
-                let _ = actual_set.insert(value);
-            }
-            assert_eq!(
-                actual_set.len(),
-                expected_classes,
-                "expected to find {expected_classes} ClassDefs, found {}-element set {:?}",
-                actual_set.len(),
-                actual_set
-            );
-        }
-    }
-}
-
-fn display_value_record(record: &ValueRecord) -> display::TokenStream<'static> {
-    let ValueRecord {
-        x_placement,
-        y_placement,
-        x_advance,
-        y_advance,
-        x_placement_device,
-        y_placement_device,
-        x_advance_device,
-        y_advance_device,
-    } = record;
-    use display::{tok, toks};
-    const NUM_FRAGMENTS: usize = 4;
-    let mut buf = Vec::with_capacity(NUM_FRAGMENTS);
-
-    // helper to indicate whether a field exists
-    let elide = |opt_val: &Option<_>| -> Option<&'static str> { opt_val.as_ref().map(|_| "(..)") };
-
-    buf.extend(display_opt_xy("placement", *x_placement, *y_placement));
-    buf.extend(display_opt_xy("advance", *x_advance, *y_advance));
-    buf.extend(display_opt_xy(
-        "placement(device)",
-        elide(x_placement_device),
-        elide(y_placement_device),
-    ));
-    buf.extend(display_opt_xy(
-        "advance(device)",
-        elide(x_advance_device),
-        elide(y_advance_device),
-    ));
-
-    if buf.is_empty() {
-        // REVIEW - this is highly unlikely, right..?
-        toks("<Empty ValueRecord>")
-    } else {
-        display::TokenStream::join_with(buf, tok("; "))
-    }
-}
-
-fn display_opt_xy<T>(
-    what: &str,
-    x: Option<T>,
-    y: Option<T>,
-) -> Option<display::TokenStream<'static>>
-where
-    T: std::fmt::Display,
-{
-    use display::toks;
-    match (x, y) {
-        (None, None) => None,
-        (Some(x), Some(y)) => Some(toks(format!("{what}: ({x},{y})"))),
-        (Some(x), None) => Some(toks(format!("{what}[x]: {x}"))),
-        (None, Some(y)) => Some(toks(format!("{what}[y]: {y}"))),
-    }
-}
-
-/// Prints a summary of a given `LookupFlag` value, including logic to avoid printing anything for the default flag value.
-///
-/// Because of this elision, will also print a prefix that separates the displayed content from the previous field
-fn display_lookup_flags(flags: &LookupFlag) -> display::TokenStream<'static> {
-    fn display_lookup_flag(flags: &LookupFlag) -> display::TokenStream<'static> {
-        let mut set_flags = Vec::new();
-        if flags.right_to_left {
-            set_flags.push("RIGHT_TO_LEFT");
-        }
-        if flags.ignore_base_glyphs {
-            set_flags.push("IGNORE_BASE_GLYPHS");
-        }
-        if flags.ignore_ligatures {
-            set_flags.push("IGNORE_LIGATURES");
-        }
-        if flags.ignore_marks {
-            set_flags.push("IGNORE_MARKS");
-        }
-        if flags.use_mark_filtering_set {
-            set_flags.push("USE_MARK_FILTERING_SET");
-        }
-
-        let str_flags = if set_flags.is_empty() {
-            String::from("∅")
-        } else {
-            set_flags.join(" | ")
-        };
-
-        let str_macf = match flags.mark_attachment_class_filter {
-            // NOTE - If we are not filtering by mark attachment class, we don't need to print anything for that field
-            0 => String::new(),
-            // REVIEW - if horizontal space is at a premium, we may want to shorten or partially elide the label-string
-            n => format!("; mark_attachment_class_filter = {n}"),
-        };
-
-        display::Token::from(format!("LookupFlag ({str_flags}{str_macf})")).into()
-    }
-
-    if flags.mark_attachment_class_filter != 0
-        || flags.right_to_left
-        || flags.ignore_ligatures
-        || flags.ignore_base_glyphs
-        || flags.ignore_marks
-        || flags.use_mark_filtering_set
-    {
-        display::tok(", flags=").then(display_lookup_flag(flags))
-    } else {
-        // FIXME - add special case for empty-string TokenStream
-        display::toks("")
-    }
-}
-
-fn format_lookup_type(ctxt: Ctxt, ltype: u16) -> &'static str {
-    match ctxt.get_disc() {
-        None => unreachable!("format_lookup_kind called with neutral (whence := None) Ctxt"),
-        Some(TableDiscriminator::Gpos) => match ltype {
-            1 => "SinglePos",
-            2 => "PairPos",
-            3 => "CursivePos",
-            4 => "MarkBasePos",
-            5 => "MarkLigPos",
-            6 => "MarkMarkPos",
-            7 => "SequenceContext",
-            8 => "ChainedSequenceContext",
-            9 => "PosExt",
-            _ => unreachable!("unexpected GPOS lookup-type {ltype} (expected 1..=9)"),
-        },
-        Some(TableDiscriminator::Gsub) => match ltype {
-            1 => "SingleSubst",
-            2 => "MultipleSubst",
-            3 => "AlternateSubst",
-            4 => "LigatureSubst",
-            5 => "SequenceContext",
-            6 => "ChainedSequenceContext",
-            7 => "SubstExt",
-            8 => "ReverseChainedSingleSubst",
-            _ => unreachable!("unexpected GSUB lookup-type {ltype} (expected 1..=8)"),
-        },
-    }
-}
-
-fn display_mark_glyph_set(mgs: &MarkGlyphSet, conf: &Config) -> display::TokenStream<'static> {
-    use display::{Token::LineBreak, tok, toks};
-    tok("\tMarkGlyphSet:").then(LineBreak.then(arrayfmt::display_items_elided(
-        &mgs.coverage,
-        |ix, item| match item {
-            None => toks(format!("\t\t[{ix}]: <none>")).into(),
-            Some(covt) => {
-                tok(format!("\t\t[{ix}]: ")).then(display_coverage_table_summary(covt, conf))
-            }
-        },
-        conf.bookend_size,
-        |start, stop| toks(format!("\t    (skipping coverage tables {start}..{stop})")),
-    )))
-}
-
-fn display_item_variation_store(
-    ivs: &ItemVariationStore,
-    conf: &Config,
-) -> display::TokenStream<'static> {
-    fn display_variation_regions(
-        vrl: &VariationRegionList,
-        conf: &Config,
-    ) -> display::TokenStream<'static> {
-        fn display_variation_axes(
-            per_region: &[RegionAxisCoordinates],
-            conf: &Config,
-        ) -> display::TokenStream<'static> {
-            use display::toks;
-            display::TokenStream::join_with(
-                vec![
-                    arrayfmt::display_table_column_horiz(
-                        "\t\t start |",
-                        per_region,
-                        |coords| toks(format!("{:.03}", coords.start_coord)),
-                        conf.inline_bookend,
-                        |n_skipped| toks(format!("..{n_skipped:02}..")),
-                    ),
-                    arrayfmt::display_table_column_horiz(
-                        "\t\t  peak |",
-                        per_region,
-                        |coords| toks(format!("{:.03}", coords.peak_coord)),
-                        conf.inline_bookend,
-                        |n_skipped| toks(format!("..{n_skipped:02}..")),
-                    ),
-                    arrayfmt::display_table_column_horiz(
-                        "\t\t   end |",
-                        per_region,
-                        |coords| toks(format!("{:.03}", coords.end_coord)),
-                        conf.inline_bookend,
-                        |n_skipped| toks(format!("..{n_skipped:02}..")),
-                    ),
-                ],
-                display::Token::LineBreak,
-            )
-        }
-        use display::{Token::LineBreak, tok, toks};
-
-        tok(format!(
-            "\t    VariationRegions: {} regions ({} axes)",
-            vrl.0.len(),
-            vrl.0[0].len()
-        ))
-        .then(LineBreak.then(arrayfmt::display_items_elided(
-            &vrl.0,
-            |ix, per_region| {
-                tok(format!("\t\t[{ix}]:"))
-                    .then(LineBreak.then(display_variation_axes(per_region, conf)))
-            },
-            conf.bookend_size,
-            |start_ix, end_ix| toks(format!("\t    (skipping regions {start_ix}..{end_ix})")),
-        )))
-    }
-    fn display_variation_data_array(
-        ivda: &[Option<ItemVariationData>],
-        conf: &Config,
-    ) -> display::TokenStream<'static> {
-        fn display_variation_data(
-            ivd: &ItemVariationData,
-            conf: &Config,
-        ) -> display::TokenStream<'static> {
-            fn display_delta_sets(
-                _sets: &DeltaSets,
-                _conf: &Config,
-            ) -> display::TokenStream<'static> {
-                // STUB - figure out what we actually want to show
-                toks(format!("\t\t\t<show_delta_sets: incomplete>"))
-            }
-
-            use display::{Token::LineBreak, tok, toks};
-
-            let full_bits = if ivd.long_words { 32 } else { 16 };
-
-            tok("ItemVariationData:")
-                .then(LineBreak.then(
-                    tok(format!("\t\t\t{} region indices: ", ivd.region_index_count)).then(
-                        arrayfmt::display_items_inline(
-                            &ivd.region_indices,
-                            |ix| toks(format!("{ix}")),
-                            conf.inline_bookend,
-                            |n_skipped| toks(format!("...({n_skipped})...")),
-                        ),
-                    ),
-                ))
-                .chain(
-                    tok(format!(
-                        "\t\t\t{} delta-sets ({} full [{}-bit], {} half [{}-bit]): ",
-                        ivd.item_count,
-                        ivd.word_count,
-                        full_bits,
-                        ivd.region_index_count - ivd.word_count,
-                        full_bits >> 1
-                    ))
-                    .then(LineBreak.then(display_delta_sets(&ivd.delta_sets, conf))),
-                )
-        }
-        use display::{Token::LineBreak, tok, toks};
-        // WIP - refactor using pre-indent+glue
-        tok(format!("\t    ItemVariationData[{}]", ivda.len())).then(LineBreak.then(
-            arrayfmt::display_items_elided(
-                ivda,
-                |ix, o_ivd| match o_ivd {
-                    Some(ivd) => {
-                        tok(format!("\t\t[{ix}]: ")).then(display_variation_data(ivd, conf))
-                    }
-                    None => toks(format!("\t\t[{ix}]: <NONE>")),
-                },
-                conf.bookend_size,
-                |start_ix, stop_ix| {
-                    toks(format!(
-                        "\t    ...(skipping entries {start_ix}..{stop_ix})..."
-                    ))
-                },
-            ),
-        ))
-    }
-    use display::{Token::LineBreak, tok, toks};
-
-    tok("\tItemVariationStore:")
-        .then(LineBreak.then(display_variation_regions(&ivs.variation_region_list, conf)))
-        .chain(LineBreak.then(display_variation_data_array(
-            &ivs.item_variation_data_list,
-            conf,
-        )))
-}
-
-fn display_lig_caret_list(
-    lig_caret_list: &LigCaretList,
-    conf: &Config,
-) -> display::TokenStream<'static> {
-    use display::{Token::LineBreak, tok, toks};
-    toks("LigCaretList:")
-        .glue(
-            LineBreak,
-            display_coverage_table_summary(&lig_caret_list.coverage, conf).pre_indent(4),
-        )
-        .glue(
-            LineBreak,
-            arrayfmt::display_items_elided(
-                &lig_caret_list.lig_glyphs,
-                |ix, lig_glyph| {
-                    toks(format!("[{ix}]: "))
-                        .pre_indent(4)
-                        .chain(arrayfmt::display_items_inline(
-                            &lig_glyph.caret_values,
-                            display_caret_value,
-                            conf.inline_bookend,
-                            |num_skipped| toks(format!("...({num_skipped})...")),
-                        ))
-                },
-                conf.bookend_size,
-                |start, stop| toks(format!("(skipping LigGlyphs {start}..{stop})")).pre_indent(3),
-            ),
-        )
-
-    // NOTE - since coverage tables are used in MarkGlyphSet, we don't want to force-indent within the `show_coverage_table` function, so we do it before instead.
-}
-
-fn display_caret_value(cv: &Link<CaretValue>) -> display::TokenStream<'static> {
-    // FIXME - refactor each branch to produce tokenstream
-    display::toks(match cv {
-        None => unreachable!("caret value null link"),
-        Some(cv) => match cv {
-            // REVIEW - this isn't really a canonical abbreviation, so we might adjust what we show for Design Units (Format 1)
-            CaretValue::DesignUnits(du) => format!("{du}du"),
-            CaretValue::ContourPoint(ix) => format!("#{ix}"),
-            CaretValue::DesignUnitsWithTable { coordinate, device } => match device {
-                None => unreachable!("dev-table in caret value format 3 with null offset"),
-                Some(table) => {
-                    format!(
-                        "{}du+{}",
-                        coordinate,
-                        format_device_or_variation_index_table(table) // WIP
-                    )
-                }
-            },
-        },
-    })
-}
-
-// TODO - refactor into display model
-fn format_device_or_variation_index_table(table: &DeviceOrVariationIndexTable) -> String {
-    match table {
-        DeviceOrVariationIndexTable::Device(dev_table) => format_device_table(dev_table),
-        DeviceOrVariationIndexTable::VariationIndex(var_ix_table) => {
-            format_variation_index_table(var_ix_table)
-        }
-        DeviceOrVariationIndexTable::NonStandard { delta_format } => {
-            format!("[<DeltaFormat {delta_format}>]")
-        }
-    }
-}
-
-// TODO - refactor into display model
-fn format_device_table(dev_table: &DeviceTable) -> String {
-    // REVIEW - we are so far down the stack there is very little we can display inline for the delta-values, but we have them on hand if we wish to show them in some abbreviated form...
-    format!("{}..{}", dev_table.start_size, dev_table.end_size)
-}
-
-// TODO - refactor into display model
-fn format_variation_index_table(var_ix_table: &VariationIndexTable) -> String {
-    format!(
-        "{}->{}",
-        var_ix_table.delta_set_outer_index, var_ix_table.delta_set_inner_index
-    )
-}
-
-fn display_attach_list(attach_list: &AttachList, conf: &Config) -> display::TokenStream<'static> {
-    use display::{Token::LineBreak, tok, toks};
-    fn display_attach_point(point_indices: &[u16], conf: &Config) -> display::TokenStream<'static> {
-        arrayfmt::display_items_inline(
-            point_indices,
-            |point_ix| toks(u16::to_string(point_ix)),
-            conf.inline_bookend,
-            |num_skipped| toks(format!("...({num_skipped})...")),
-        )
-    }
-
-    // WIP
-    toks("AttachList:")
-        .pre_indent(2)
-        .glue(
-            LineBreak,
-            display_coverage_table_summary(&attach_list.coverage, conf).pre_indent(4),
-        )
-        .glue(
-            LineBreak,
-            arrayfmt::display_items_elided(
-                &attach_list.attach_points,
-                |ix, AttachPoint { point_indices }| {
-                    toks(format!("[{ix}]: "))
-                        .pre_indent(4)
-                        .chain(display_attach_point(point_indices, conf))
-                },
-                conf.bookend_size,
-                |start, stop| {
-                    toks(format!(
-                        "(skipping attach points for glyphs {start}..{stop})"
-                    ))
-                    .pre_indent(3)
-                },
-            ),
-        )
-}
-
-fn format_glyphid_hex(glyph: u16, is_standalone: bool) -> String {
-    if is_standalone {
-        format!("#{glyph:04x}")
-    } else {
-        format!("{glyph:04x}")
-    }
-}
-
-/// Compact inline display of an array representing a sequence (rather than a set) of glyphIds
-// REVIEW - we have no cap on how long a glyphId sequence we are willing to show unabridged and we might want one in theory
-fn format_glyphid_array_hex(glyphs: &impl AsRef<[u16]>, is_standalone: bool) -> String {
-    let glyph_array = glyphs.as_ref();
-
-    const BYTES_PER_GLYPH: usize = 2;
-
-    // Display prefix and associated overhead in bytes
-    const PREFIX: &str = "#";
-    const BYTE_OVERHEAD_PREFIX: usize = PREFIX.len();
-
-    // how many extra String-bytes we use per glyph, not counting the glyph itself
-    const GLUE: &str = ".";
-    const BYTE_OVERHEAD_PER_GLYPH: usize = GLUE.len();
-
-    // If the number of GLUE-strings we need is less than N (viz. the number of glyphs), this is the difference between N and the actual number we use
-    const PER_GLYPH_OVERCOUNT: usize = 1;
-
-    if glyph_array.is_empty() {
-        // Short-circuit for empty-glyph array
-        return String::from("ε");
-    }
-    let nglyphs = glyph_array.len();
-
-    // We would use saturating-sub instead of raw `-` on nglyphs and PER_GLYPH_OVERCOUNT but nglyphs is not zero if we are here.
-    let nbytes = (if is_standalone {
-        BYTE_OVERHEAD_PREFIX
-    } else {
-        0
-    }) + (nglyphs * BYTES_PER_GLYPH)
-        + (BYTE_OVERHEAD_PER_GLYPH * (nglyphs - PER_GLYPH_OVERCOUNT));
-
-    // Initialize a buffer with enough capacity it ought not need to reallocate or grow
-    let mut buffer = String::with_capacity(nbytes);
-
-    // Fill the buffer
-    if is_standalone {
-        buffer.push_str(PREFIX);
-    }
-
-    for (ix, glyph) in glyph_array.iter().enumerate() {
-        if ix > 0 {
-            buffer.push_str(GLUE);
-        }
-        // REVIEW - do we want to eliminate zero-padding for compactness, or keep it for consistency/legibility?
-        buffer.push_str(&format_glyphid_hex(*glyph, false));
-    }
-    buffer
-}
-
-fn display_coverage_table(cov: &CoverageTable) -> display::TokenStream<'static> {
-    use display::{tok, toks};
-    match cov {
-        CoverageTable::Format1 { glyph_array } => {
-            let num_glyphs = glyph_array.len();
-            match glyph_array.as_slice() {
-                [] => toks("∅"),
-                [id] => toks(format!("[{id}]")),
-                [first, .., last] => toks(format!("[{num_glyphs} ∈ [{first},{last}]]")),
-            }
-        }
-        CoverageTable::Format2 { range_records } => match range_records.as_slice() {
-            [] => toks("∅"),
-            [rr] => toks(format!("[∀: {}..={}]", rr.start_glyph_id, rr.end_glyph_id)),
-            [first, .., last] => {
-                let num_glyphs: u16 = range_records
-                    .iter()
-                    .map(|rr| rr.end_glyph_id - rr.start_glyph_id + 1)
-                    .sum();
-                let num_ranges = range_records.len();
-                let min_glyph = first.start_glyph_id;
-                let max_glyph = last.end_glyph_id;
-                toks(format!(
-                    "[{num_ranges} ranges; {num_glyphs} ∈ [{min_glyph},{max_glyph}]]"
-                ))
-            }
-        },
-    }
-}
-
-fn display_coverage_table_summary(
-    cov: &CoverageTable,
-    conf: &Config,
-) -> display::TokenStream<'static> {
-    use display::{tok, toks};
-    match cov {
-        CoverageTable::Format1 { glyph_array } => {
-            tok("Glyphs Covered: ").then(arrayfmt::display_items_inline(
-                glyph_array,
-                |item| toks(format!("{item}")),
-                conf.inline_bookend,
-                |num_skipped| toks(format!("...({num_skipped})...")),
-            ))
-        }
-        CoverageTable::Format2 { range_records } => {
-            tok("Glyph Ranges Covered: ").then(arrayfmt::display_items_inline(
-                range_records,
-                display_coverage_range_record,
-                conf.inline_bookend,
-                |num_skipped| toks(format!("...({num_skipped})...")),
-            ))
-        }
-    }
-}
-
-fn show_mark_attach_class_def(mark_attach_class_def: &ClassDef, conf: &Config) {
-    println!("\tMarkAttachClassDef:");
-    show_class_def(mark_attach_class_def, format_mark_attach_class, conf);
-}
-
-fn format_mark_attach_class(mark_attach_class: &u16) -> String {
-    // STUB - if we come up with a semantic association for specific numbers, add branches here
-    format!("{mark_attach_class}")
-}
-
-fn show_glyph_class_def(class_def: &ClassDef, conf: &Config) {
-    println!("\tGlyphClassDef:");
-    show_class_def(class_def, show_glyph_class, conf)
-}
-
-fn show_class_def<L: Into<Label>>(
-    class_def: &ClassDef,
-    show_fn: impl Fn(&u16) -> L,
-    conf: &Config,
-) {
-    use display::{tok, toks};
-    // WIP
-    match *class_def {
-        ClassDef::Format1 {
-            start_glyph_id,
-            ref class_value_array,
-        } => {
-            match start_glyph_id {
-                0 => (),
-                // REVIEW - indent level model might be useful instead of ad-hoc tabs and spaces
-                1 => println!("\t    (skipping uncovered glyph 0)"),
-                n => println!("\t    (skipping uncovered glyphs 0..{n})"),
-            }
-            arrayfmt::display_items_elided(
-                class_value_array,
-                |ix, item| {
-                    let gix = start_glyph_id as usize + ix;
-                    tok(format!("\t\tGlyph [{gix}]: ")).then(toks(show_fn(item)))
-                },
-                conf.bookend_size,
-                |start, stop| {
-                    toks(format!(
-                        "\t    (skipping glyphs {}..{})",
-                        format_glyphid_hex(start_glyph_id + start as u16, false),
-                        format_glyphid_hex(start_glyph_id + stop as u16, false),
-                    ))
-                },
-            )
-            .println() // WIP
-        }
-        ClassDef::Format2 {
-            ref class_range_records,
-        } => arrayfmt::display_items_elided(
-            class_range_records,
-            |_ix, class_range| {
-                tok(format!(
-                    "\t\t({} -> {}): ",
-                    class_range.start_glyph_id, class_range.end_glyph_id,
-                ))
-                .then(toks(show_fn(&class_range.value)))
-            },
-            conf.bookend_size,
-            |start, stop| {
-                let low_end = class_range_records[start].start_glyph_id;
-                let high_end = class_range_records[stop - 1].end_glyph_id;
-                toks(format!(
-                    "\t    (skipping ranges covering glyphs {low_end}..={high_end})",
-                ))
-            },
-        )
-        .println(), // WIP
-    }
-}
-
-fn display_coverage_range_record(
-    coverage_range: &CoverageRangeRecord,
-) -> display::TokenStream<'static> {
-    let span = coverage_range.end_glyph_id - coverage_range.start_glyph_id;
-    let end_coverage_index = coverage_range.value + span;
-    display::toks(format!(
-        "({} -> {}): {}(->{})",
-        coverage_range.start_glyph_id,
-        coverage_range.end_glyph_id,
-        coverage_range.value,
-        end_coverage_index
-    ))
-}
-
-fn show_gasp_metrics(gasp: &Option<GaspMetrics>, conf: &Config) {
-    if let Some(GaspMetrics {
-        version,
-        num_ranges,
-        ranges,
-    }) = gasp
-    {
-        fn display_gasp_range(_ix: usize, range: &GaspRange) -> display::TokenStream<'static> {
-            use display::{tok, toks};
-
-            let GaspBehaviorFlags {
-                symmetric_smoothing: syms,
-                symmetric_gridfit: symgrift,
-                dogray: dg,
-                gridfit: grift,
-            } = range.range_gasp_behavior;
-            // NOTE - Meanings attributed [here](https://learn.microsoft.com/en-us/typography/opentype/spec/gasp)
-            let disp = {
-                let mut sep = ""; // Dynamic separator that starts out empty but becomes " | " if any flag-string is pushed
-                let mut buffer = String::new();
-                for flag in [
-                    if syms { "SYMMETRIC_SMOOTHING" } else { "" },
-                    if symgrift { "SYMMETRIC_GRIDFIT" } else { "" },
-                    if dg { "DOGRAY" } else { "" },
-                    if grift { "GRIDFIT" } else { "" },
-                ]
-                .iter()
-                {
-                    if flag.is_empty() {
-                        continue;
-                    } else {
-                        buffer.push_str(sep);
-                        buffer.push_str(flag);
-                        sep = " | ";
-                    }
-                }
-                if buffer.is_empty() {
-                    toks("(no flags)")
-                } else {
-                    toks(format!("({buffer})"))
-                }
-            };
-            if _ix == 0 && range.range_max_ppem == 0xFFFF {
-                tok("\t[∀ PPEM] ").then(disp)
-            } else {
-                tok(format!("\t[PPEM <= {}]  ", range.range_max_ppem)).then(disp)
-            }
-        }
-        println!("gasp: version {version}, {num_ranges} ranges");
-        if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
-            arrayfmt::display_items_elided(
-                ranges,
-                display_gasp_range,
-                conf.bookend_size,
-                |start, stop| {
-                    display::toks(format!(
-                        "    skipping gasp ranges for max_ppem values {}..={}",
-                        ranges[start].range_max_ppem,
-                        ranges[stop - 1].range_max_ppem
-                    ))
-                },
-            )
-            .println(); // WIP
-        }
-    }
-}
-
-fn format_version16dot16(v: u32) -> String {
-    let major = (v >> 16) as u16;
-    let minor = ((v & 0xf000) >> 12) as u16;
-    format_version_major_minor(major, minor)
-}
-
-fn format_version_major_minor(major: u16, minor: u16) -> String {
-    format!("{major}.{minor}")
-}
-
-fn show_cmap_metrics(cmap: &Cmap, conf: &Config) {
-    use display::{Token::LineBreak, tok, toks};
-
-    tok(format!("cmap: version {}", cmap.version))
-        .then(if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
-            let show_record = |ix: usize, record: &EncodingRecord| {
-                // TODO[enrichment]: if we implement subtables and more verbosity levels, show subtable details
-                let EncodingRecord {
-                    platform,
-                    encoding,
-                    subtable: _subtable,
-                } = record;
-                toks(format!(
-                    "\t[{ix}]: platform={platform}, encoding={encoding}"
-                ))
-            };
-            LineBreak.then(arrayfmt::display_items_elided(
-                &cmap.encoding_records,
-                show_record,
-                conf.bookend_size,
-                |start, stop| toks(format!("\t(skipping encoding records {start}..{stop})")),
-            ))
-        } else {
-            toks(format!(", {} encoding tables", cmap.encoding_records.len()))
-        })
-        .println() // WIP
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-#[repr(u16)]
-enum DirectionHint {
-    FullyMixed = 0,
-    StrongLR = 1,
-    NeutralLR = 2,
-    StrongRL = 0xffff,  // -1
-    NeutralRL = 0xfffe, // -2
-}
-
-impl TryFrom<u16> for DirectionHint {
-    type Error = Local<UnknownValueError<u16>>;
-
-    fn try_from(value: u16) -> Result<Self, Self::Error> {
-        match value {
-            0 => Ok(DirectionHint::FullyMixed),
-            1 => Ok(DirectionHint::StrongLR),
-            2 => Ok(DirectionHint::NeutralLR),
-            0xffff => Ok(DirectionHint::StrongRL),
-            0xfffe => Ok(DirectionHint::NeutralRL),
-            _ => Err(UnknownValueError {
-                what: String::from("direction-hint"),
-                bad_value: value,
-            }),
-        }
-    }
-}
-
-impl std::fmt::Display for DirectionHint {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            DirectionHint::FullyMixed => write!(f, "Fully Mixed-Direction"),
-            DirectionHint::StrongLR => write!(f, "Strong LTR only"),
-            DirectionHint::NeutralLR => write!(f, "Strong LTR or Neutral"),
-            DirectionHint::StrongRL => write!(f, "Strong RTL only"),
-            DirectionHint::NeutralRL => write!(f, "Strong RTL or Neutral"),
-        }
-    }
-}
-
-fn show_head_metrics(head: &HeadMetrics, _conf: &Config) {
-    println!(
-        "head: version {}, {}",
-        format_version_major_minor(head.major_version, head.minor_version),
-        head.dir_hint,
-    );
-}
-
-fn show_hhea_metrics(hhea: &HheaMetrics, _conf: &Config) {
-    println!(
-        "hhea: table version {}, {} horizontal long metrics",
-        format_version_major_minor(hhea.major_version, hhea.minor_version),
-        hhea.num_lhm,
-    );
-}
-
-fn show_vhea_metrics(vhea: &Option<VheaMetrics>, _conf: &Config) {
-    if let Some(vhea) = vhea {
-        println!(
-            "vhea: table version {}, {} vertical long metrics",
-            format_version_major_minor(vhea.major_version, vhea.minor_version),
-            vhea.num_lvm,
-        )
-    }
-}
-
-fn show_hmtx_metrics(hmtx: &HmtxMetrics, conf: &Config) {
-    fn display_unified(ix: usize, hmet: &UnifiedBearing) -> display::TokenStream<'static> {
-        use display::toks;
-        match &hmet.advance_width {
-            Some(width) => toks(format!(
-                "\tGlyph ID [{ix}]: advanceWidth={width}, lsb={}",
-                hmet.left_side_bearing
-            )),
-            None => toks(format!("\tGlyph ID [{ix}]: lsb={}", hmet.left_side_bearing)),
-        }
-    }
-    use display::{Token::LineBreak, tok, toks};
-    if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
-        tok("hmtx")
-            .then(LineBreak.then(arrayfmt::display_items_elided(
-                &hmtx.0,
-                display_unified,
-                conf.bookend_size,
-                |start, stop| toks(format!("{HT}(skipping hmetrics {start}..{stop})")),
-            )))
-            .println()
-    } else {
-        println!("hmtx: {} hmetrics", hmtx.0.len())
-    }
-}
-
-fn show_vmtx_metrics(vmtx: &Option<VmtxMetrics>, conf: &Config) {
-    fn display_unified(ix: usize, vmet: &UnifiedBearing) -> display::TokenStream<'static> {
-        use display::{tok, toks};
-        const INDENT_LEVEL: u8 = 2;
-
-        match &vmet.advance_width {
-            // FIXME - `_width` is a misnomer, should be `_height`
-            Some(height) => toks(format!(
-                "Glyph ID [{ix}]: advanceHeight={height}, tsb={}",
-                vmet.left_side_bearing // FIXME - `left` is a misnomer, should be `top`
-            ))
-            .pre_indent(INDENT_LEVEL),
-            None => toks(format!("Glyph ID [{ix}]: tsb={}", vmet.left_side_bearing))
-                .pre_indent(INDENT_LEVEL), // FIXME - `left` is a misnomer, should be `top`
-        }
-    }
-    use display::{Token::LineBreak, tok, toks};
-
-    // FIXME - add mechanism for auto-computation of current indent level
-    const INDENT_LEVEL: u8 = 1;
-    if let Some(vmtx) = vmtx {
-        let disp = if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
-            tok("vmtx").then(LineBreak.then(arrayfmt::display_items_elided(
-                &vmtx.0,
-                display_unified,
-                conf.bookend_size,
-                |start, stop| {
-                    toks(format!("(skipping vmetrics {start}..{stop})")).pre_indent(INDENT_LEVEL)
-                },
-            )))
-        } else {
-            toks(format!("vmtx: {} vmetrics", vmtx.0.len()))
-        };
-        disp.println()
-    }
-}
-
-fn show_maxp_metrics(maxp: &MaxpMetrics, _conf: &Config) {
-    match maxp {
-        MaxpMetrics::Postscript { version } => println!(
-            "maxp: version {} (PostScript)",
-            format_version16dot16(*version)
-        ),
-        MaxpMetrics::UnknownVersion { version } => println!(
-            "maxp: version {} (not recognized)",
-            format_version16dot16(*version)
-        ),
-        // STUB - currently limited by definition of Version1 variant, but the information available in the type may be enriched later
-        MaxpMetrics::Version1 { version } => println!(
-            "maxp: version {} (contents omitted)",
-            format_version16dot16(*version)
-        ),
-    }
-}
-
-fn show_name_metrics(name: &NameMetrics, conf: &Config) {
-    // STUB - add more details if appropriate
-    match &name.lang_tag_records {
-        Some(records) => {
-            println!(
-                "name: version {}, {} name_records, {} language tag records",
-                name.version,
-                name.name_count,
-                records.len()
-            );
-        }
-        None => println!(
-            "name: version {}, {} name_records",
-            name.version, name.name_count
-        ),
-    }
-    if conf.verbosity.is_at_least(VerboseLevel::Baseline) {
-        let mut no_name_yet = true;
-        for record in name.name_records.iter() {
-            match record {
-                // STUB - if there are any more name records we care about, add them here
-                &NameRecord {
-                    name_id: NameId::FULL_FONT_NAME,
-                    plat_encoding_lang,
-                    ref buf,
-                } => {
-                    if no_name_yet && plat_encoding_lang.matches_locale(buf) {
-                        println!("\tFull Font Name: {buf}");
-                        no_name_yet = false;
-                    }
-                }
-                _ => continue,
-            }
-        }
-    }
-}
-
-fn show_os2_metrics(os2: &Os2Metrics, _conf: &Config) {
-    // TODO - Metrics type is a stub, enrich if anything is 'interesting'
-    println!("os/2: version {}", os2.version);
-}
-
-fn show_post_metrics(post: &PostMetrics, _conf: &Config) {
-    // STUB - Metrics is just an alias for the raw type, enrich and refactor if appropriate
-    println!(
-        "post: version {} ({})",
-        format_version16dot16(post.version),
-        if post.is_fixed_pitch {
-            "monospaced"
-        } else {
-            "proportionally spaced"
-        }
-    );
-}
-
-// NOTE - scaffolding to mark the values we currently parse into u16 but which are logically i16, to flag changes to the gencode API as they crop up
-#[inline(always)]
-const fn as_s16(v: u16) -> i16 {
-    v as i16
-}
-
-fn show_glyf_metrics(glyf: &Option<GlyfMetrics>, conf: &Config) {
-    fn display_glyph_metric(ix: usize, glyf: &GlyphMetric) -> display::TokenStream<'static> {
-        use display::{tok, toks};
-        const INDENT_LEVEL: u8 = 2;
-
-        tok(format!("[{ix}]: "))
-            .then(match glyf {
-                GlyphMetric::Empty => toks("<empty>"),
-                GlyphMetric::Simple(simple) => toks(format!(
-                    "Simple Glyph [{} contours, {} coordinates, {} instructions, xy: {}]",
-                    simple.contours, simple.coordinates, simple.instructions, simple.bounding_box
-                )),
-                GlyphMetric::Composite(composite) => toks(format!(
-                    "Composite Glyph [{} components, {} instructions, xy: {}]",
-                    composite.components, composite.instructions, composite.bounding_box,
-                )),
-            })
-            .pre_indent(INDENT_LEVEL)
-    }
-
-    use display::{Token::LineBreak, tok, toks};
-    const INDENT_LEVEL: u8 = 1;
-    let disp = if let Some(glyf) = glyf.as_ref() {
-        let hdr = tok(format!("glyf: {} glyphs", glyf.num_glyphs));
-        if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
-            hdr.then(LineBreak.then(arrayfmt::display_items_elided(
-                glyf.glyphs.as_slice(),
-                display_glyph_metric,
-                conf.bookend_size,
-                |start, stop| {
-                    toks(format!("(skipping glyphs {start}..{stop})")).pre_indent(INDENT_LEVEL)
-                },
-            )))
-        } else {
-            hdr.into()
-        }
-    } else {
-        toks("glyf: <not present>")
-    };
-    disp.println()
-}
-
-pub mod lookup_subtable {
-    use super::{
-        OpentypeGposLookupSubtable, OpentypeGposLookupSubtableExt, OpentypeGsubLookupSubtable,
-        OpentypeGsubLookupSubtableExt, Parser, TestResult, UnknownValueError,
-    };
-    use crate::{
-        Decoder_opentype_main,
-        api_helper::otf_metrics::{Mandatory, obj},
-        opentype_main_directory, opentype_ttc_header_header,
-    };
-
-    #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Default)]
-    struct Both {
-        gsub: bool,
-        gpos: bool,
-    }
-
-    #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Default)]
-    pub struct LookupSet {
-        single_pos: bool,
-        pair_pos: bool,
-        cursive_pos: bool,
-        mark_base_pos: bool,
-        mark_lig_pos: bool,
-        mark_mark_pos: bool,
-        pos_extension: bool,
-
-        sequence_context: Both,
-        chained_sequence_context: Both,
-
-        single_subst: bool,
-        multiple_subst: bool,
-        alternate_subst: bool,
-        ligature_subst: bool,
-        subst_extension: bool,
-        reverse_chain_single_subst: bool,
-    }
-
-    pub enum SingleOrMulti<T> {
-        Single(T),
-        Multi(Vec<Option<T>>),
-    }
-
-    pub fn analyze_font_lookups(test_file: &str) -> TestResult<SingleOrMulti<LookupSet>> {
-        let buffer = std::fs::read(std::path::Path::new(test_file))?;
-        let mut input = Parser::new(&buffer);
-        let font = Decoder_opentype_main(&mut input)?;
-        match font.directory {
-            opentype_main_directory::TTCHeader(multi) => {
-                let ret = match multi.header {
-                    opentype_ttc_header_header::UnknownVersion(n) => {
-                        return Err(Box::new(UnknownValueError {
-                            what: "ttc header version".to_string(),
-                            bad_value: n,
-                        }));
-                    }
-                    opentype_ttc_header_header::Version1(v1header) => {
-                        let mut lookup_metrics =
-                            Vec::with_capacity(v1header.table_directories.len());
-                        for font in v1header.table_directories.iter() {
-                            let per_font = font.data.as_ref().map(analyze_table_directory_lookups);
-                            lookup_metrics.push(per_font);
-                        }
-                        lookup_metrics
-                    }
-                    opentype_ttc_header_header::Version2(v2header) => {
-                        let mut lookup_metrics =
-                            Vec::with_capacity(v2header.table_directories.len());
-                        for font in v2header.table_directories.iter() {
-                            let per_font = font.data.as_ref().map(analyze_table_directory_lookups);
-                            lookup_metrics.push(per_font);
-                        }
-                        lookup_metrics
-                    }
-                };
-                Ok(SingleOrMulti::Multi(ret))
-            }
-            opentype_main_directory::TableDirectory(single) => Ok(SingleOrMulti::Single(
-                analyze_table_directory_lookups(&single),
-            )),
-        }
-    }
-
-    fn analyze_table_directory_lookups(dir: &super::opentype_table_directory) -> LookupSet {
-        let mut ret = LookupSet::default();
-        if let Some(lookup_list) = dir
-            .table_links
-            .gpos
-            .as_ref()
-            .map(|gpos| super::reify(gpos, Mandatory(obj::PosLookups)))
-        {
-            for entry in super::reify_all(&lookup_list, Mandatory(obj::PosLookupTable)) {
-                if let Some(subtable) = super::reify_all(&entry, Mandatory(obj::PosSubtable)).next()
-                {
-                    let ground = match &subtable {
-                        OpentypeGposLookupSubtableExt::PosExtension(ext) => {
-                            ret.pos_extension = true;
-                            &super::reify(ext, super::obj::PosLookup)
-                        }
-                        OpentypeGposLookupSubtableExt::GroundPos(ground) => ground,
-                    };
-                    match ground {
-                        OpentypeGposLookupSubtable::SinglePos(..) => ret.single_pos = true,
-                        OpentypeGposLookupSubtable::PairPos(..) => ret.pair_pos = true,
-                        OpentypeGposLookupSubtable::CursivePos(..) => ret.cursive_pos = true,
-                        OpentypeGposLookupSubtable::MarkBasePos(..) => ret.mark_base_pos = true,
-                        OpentypeGposLookupSubtable::MarkLigPos(..) => ret.mark_lig_pos = true,
-                        OpentypeGposLookupSubtable::MarkMarkPos(..) => ret.mark_mark_pos = true,
-                        OpentypeGposLookupSubtable::SequenceContext(..) => {
-                            ret.sequence_context.gpos = true
-                        }
-                        OpentypeGposLookupSubtable::ChainedSequenceContext(..) => {
-                            ret.chained_sequence_context.gpos = true
-                        }
-                    }
-                }
-            }
-        }
-        if let Some(lookup_list) = dir
-            .table_links
-            .gsub
-            .as_ref()
-            .map(|gsub| super::reify(gsub, Mandatory(obj::SubstLookups)))
-        {
-            for entry in super::reify_all(&lookup_list, Mandatory(obj::SubstLookupTable)) {
-                if let Some(subtable) = super::reify_all(&entry, super::obj::SubstSubtable).next() {
-                    let ground = match &subtable {
-                        OpentypeGsubLookupSubtableExt::SubstExtension(ext) => {
-                            ret.subst_extension = true;
-                            &super::reify(ext, super::obj::SubstLookup)
-                        }
-                        OpentypeGsubLookupSubtableExt::GroundSubst(ground) => ground,
-                    };
-                    match ground {
-                        OpentypeGsubLookupSubtable::SingleSubst(..) => ret.single_subst = true,
-                        OpentypeGsubLookupSubtable::MultipleSubst(..) => ret.multiple_subst = true,
-                        OpentypeGsubLookupSubtable::AlternateSubst(..) => {
-                            ret.alternate_subst = true
-                        }
-                        OpentypeGsubLookupSubtable::LigatureSubst(..) => ret.ligature_subst = true,
-                        OpentypeGsubLookupSubtable::ReverseChainSingleSubst(..) => {
-                            ret.reverse_chain_single_subst = true
-                        }
-                        OpentypeGsubLookupSubtable::SequenceContext(..) => {
-                            ret.sequence_context.gsub = true
-                        }
-                        OpentypeGsubLookupSubtable::ChainedSequenceContext(..) => {
-                            ret.chained_sequence_context.gsub = true
-                        }
-                    }
-                }
-            }
-        }
-        ret
-    }
-
-    pub fn collate_lookups_table<S: std::fmt::Display>(samples: &[(S, SingleOrMulti<LookupSet>)]) {
-        let header = [
-            "Pos1", "Pos2", "Pos3", "Pos4", "Pos5", "Pos6", "Pos7", "Pos8", "Pos9", "Sub1", "Sub2",
-            "Sub3", "Sub4", "Sub5", "Sub6", "Sub7", "Sub8", "Location",
-        ];
-        let header_line = header.join("\t");
-
-        fn write_lookups(buf: &mut String, lookups: LookupSet) {
-            let show_bool = |buf: &mut String, value: bool| {
-                if value {
-                    buf.push_str("✅\t")
-                } else {
-                    buf.push_str("❌\t")
-                }
-            };
-
-            show_bool(buf, lookups.single_pos);
-            show_bool(buf, lookups.pair_pos);
-            show_bool(buf, lookups.cursive_pos);
-            show_bool(buf, lookups.mark_base_pos);
-            show_bool(buf, lookups.mark_lig_pos);
-            show_bool(buf, lookups.mark_mark_pos);
-            show_bool(buf, lookups.pos_extension);
-            show_bool(buf, lookups.sequence_context.gpos);
-            show_bool(buf, lookups.chained_sequence_context.gpos);
-            show_bool(buf, lookups.single_subst);
-            show_bool(buf, lookups.multiple_subst);
-            show_bool(buf, lookups.alternate_subst);
-            show_bool(buf, lookups.ligature_subst);
-            show_bool(buf, lookups.subst_extension);
-            show_bool(buf, lookups.reverse_chain_single_subst);
-            show_bool(buf, lookups.sequence_context.gsub);
-            show_bool(buf, lookups.chained_sequence_context.gsub);
-        }
-
-        println!("{header_line}");
-        for (sample, lookups) in samples.iter() {
-            match lookups {
-                SingleOrMulti::Single(lookups) => {
-                    let mut line = String::new();
-                    write_lookups(&mut line, *lookups);
-                    println!("{line}{sample}")
-                }
-                SingleOrMulti::Multi(font_lookups) => {
-                    for (ix, opt_lookups) in font_lookups.iter().enumerate() {
-                        if let Some(lookups) = opt_lookups {
-                            let mut line = String::new();
-                            write_lookups(&mut line, *lookups);
-                            println!("{line}{sample}[{ix}]")
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-mod display {
-
-    pub fn tok(str: impl Into<doodle::Label>) -> Token {
-        Token::InlineText(str.into())
-    }
-
-    pub fn toks(str: impl Into<doodle::Label>) -> TokenStream<'static> {
-        TokenStream::from(Token::InlineText(str.into()))
-    }
-
-    #[derive(Clone)]
-    pub enum Token {
-        InlineText(doodle::Label),
-        LineBreak,
-    }
-
-    impl std::fmt::Display for Token {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            match self {
-                Token::InlineText(s) => write!(f, "{s}"),
-                Token::LineBreak => write!(f, "\n"),
-            }
-        }
-    }
-
-    impl Token {
-        pub fn then(self, stream: TokenStream<'_>) -> TokenStream<'_> {
-            <Token as Into<TokenStream<'static>>>::into(self).chain(stream)
-        }
-    }
-
-    impl From<String> for Token {
-        fn from(s: String) -> Self {
-            Token::InlineText(s.into())
-        }
-    }
-
-    impl From<Token> for TokenStream<'static> {
-        fn from(value: Token) -> Self {
-            TokenStream {
-                inner: Box::new(std::iter::once(value)),
-            }
-        }
-    }
-
-    #[must_use]
-    pub struct TokenStream<'a> {
-        inner: Box<dyn Iterator<Item = Token> + 'a>,
-    }
-
-    impl<'a> TokenStream<'a> {
-        // FIXME - join_with will double-separate if empty is encountered
-        pub fn empty() -> TokenStream<'static> {
-            TokenStream {
-                inner: Box::new(std::iter::empty()),
-            }
-        }
-
-        pub fn from_stream(stream: impl Iterator<Item = Token> + 'a) -> Self {
-            TokenStream {
-                inner: Box::new(stream),
-            }
-        }
-
-        pub fn write_to<W: std::io::Write>(self, mut w: W) -> std::io::Result<()> {
-            for token in self.inner {
-                write!(w, "{token}")?
-            }
-            Ok(())
-        }
-
-        pub fn print(self) {
-            let oput = std::io::stdout().lock();
-            let mut buf = std::io::BufWriter::new(oput);
-            self.write_to(&mut buf).unwrap();
-        }
-
-        pub fn println(self) {
-            self.chain(TokenStream::from(Token::LineBreak)).print()
-        }
-
-        pub fn into_string(self) -> String {
-            let mut buf = String::new();
-            for token in self.inner {
-                buf.push_str(&token.to_string());
-            }
-            buf
-        }
-
-        pub fn group_lines(self) -> TokenStream<'static> {
-            let mut lines = Vec::new();
-            let mut line = String::new();
-            for token in self.inner {
-                match token {
-                    Token::InlineText(s) => line.push_str(&s),
-                    Token::LineBreak => {
-                        lines.push(Token::InlineText(std::borrow::Cow::Owned(line.clone())));
-                        line.clear();
-                    }
-                }
-            }
-            TokenStream {
-                inner: Box::new(lines.into_iter()),
-            }
-        }
-
-        pub fn chain(self, other: Self) -> Self {
-            TokenStream {
-                inner: Box::new(self.inner.chain(other.inner)),
-            }
-        }
-
-        pub fn glue(self, glue: Token, other: Self) -> Self {
-            Self {
-                inner: Box::new(self.inner.chain(std::iter::once(glue).chain(other.inner))),
-            }
-        }
-
-        pub fn surround(self, before: Token, after: Token) -> Self {
-            Self {
-                inner: Box::new(
-                    std::iter::once(before)
-                        .chain(self.inner)
-                        .chain(std::iter::once(after)),
-                ),
-            }
-        }
-
-        /// Surrounds the TokenStream with `'('..')'`
-        pub fn paren(self) -> Self {
-            self.surround(tok("("), tok(")"))
-        }
-
-        /// Surrounds the TokenStream with `'['..']'`
-        pub fn bracket(self) -> Self {
-            self.surround(tok("["), tok("]"))
-        }
-
-        pub fn break_line(self) -> TokenStream<'a> {
-            TokenStream {
-                inner: Box::new(self.inner.chain(std::iter::once(Token::LineBreak))),
-            }
-        }
-
-        /// Prepends indentation to the first line of the stream, measured 4-space half-tabs.
-        ///
-        /// Will prefer using `'\t'` for indentation, and will include a final half-tab iff `stops` is odd.
-        pub fn pre_indent(self, stops: u8) -> Self {
-            let tabs = stops / 2;
-            let hts = stops % 2;
-
-            let mut indent = String::new();
-            for _ in 0..tabs {
-                indent.push('\t');
-            }
-            for _ in 0..hts {
-                indent.push_str(super::HT);
-            }
-            tok(indent).then(self)
-        }
-
-        pub fn join_with(streams: Vec<TokenStream<'static>>, sep: Token) -> TokenStream<'a> {
-            TokenStream {
-                inner: Box::new(IntersperseIter::new(
-                    Box::new(streams.into_iter().map(|s| s.inner)),
-                    sep,
-                )),
-            }
-        }
-    }
-
-    pub struct IntersperseIter<'a, T: Clone> {
-        items: Box<dyn Iterator<Item = Box<dyn Iterator<Item = T> + 'a>>>,
-        rest: Box<dyn Iterator<Item = T> + 'a>,
-        sep: T,
-        non_empty: bool,
-    }
-
-    impl<'a, T: 'static + Clone> IntersperseIter<'a, T> {
-        pub fn new(
-            items: Box<dyn Iterator<Item = Box<dyn Iterator<Item = T> + 'a>>>,
-            sep: T,
-        ) -> Self {
-            Self {
-                items,
-                rest: Box::new(std::iter::empty()),
-                sep,
-                non_empty: false,
-            }
-        }
-    }
-
-    impl<'a, T: Clone> std::iter::Iterator for IntersperseIter<'a, T> {
-        type Item = T;
-
-        fn next(&mut self) -> Option<Self::Item> {
-            match self.rest.next() {
-                None => match self.items.next() {
-                    None => None,
-                    Some(iter) => {
-                        self.rest = iter;
-                        if self.non_empty {
-                            self.non_empty = false;
-                            Some(self.sep.clone())
-                        } else {
-                            self.next()
-                        }
-                    }
-                },
-                Some(item) => {
-                    self.non_empty = true;
-                    Some(item)
-                }
-            }
-        }
-    }
-}
+// SECTION - show/format/display functions for outputting processed font-file information
+pub mod output;
+// !SECTION
+
+pub mod display;
 
 // TODO - rewrite the functions to either be Write-generic or used Fragment-like output model to avoid duplication between I/O show and String formatting functions
 mod arrayfmt {
@@ -10133,5 +7454,217 @@ mod arrayfmt {
         }
 
         tok(heading).then(TokenStream::join_with(buf, tok(" ")))
+    }
+}
+pub mod lookup_subtable {
+    use super::{
+        OpentypeGposLookupSubtable, OpentypeGposLookupSubtableExt, OpentypeGsubLookupSubtable,
+        OpentypeGsubLookupSubtableExt, Parser, TestResult, UnknownValueError,
+    };
+    use crate::{
+        Decoder_opentype_main,
+        api_helper::otf_metrics::{Mandatory, obj},
+        opentype_main_directory, opentype_ttc_header_header,
+    };
+
+    #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Default)]
+    struct Both {
+        gsub: bool,
+        gpos: bool,
+    }
+
+    #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Default)]
+    pub struct LookupSet {
+        single_pos: bool,
+        pair_pos: bool,
+        cursive_pos: bool,
+        mark_base_pos: bool,
+        mark_lig_pos: bool,
+        mark_mark_pos: bool,
+        pos_extension: bool,
+
+        sequence_context: Both,
+        chained_sequence_context: Both,
+
+        single_subst: bool,
+        multiple_subst: bool,
+        alternate_subst: bool,
+        ligature_subst: bool,
+        subst_extension: bool,
+        reverse_chain_single_subst: bool,
+    }
+
+    pub enum SingleOrMulti<T> {
+        Single(T),
+        Multi(Vec<Option<T>>),
+    }
+
+    pub fn analyze_font_lookups(test_file: &str) -> TestResult<SingleOrMulti<LookupSet>> {
+        let buffer = std::fs::read(std::path::Path::new(test_file))?;
+        let mut input = Parser::new(&buffer);
+        let font = Decoder_opentype_main(&mut input)?;
+        match font.directory {
+            opentype_main_directory::TTCHeader(multi) => {
+                let ret = match multi.header {
+                    opentype_ttc_header_header::UnknownVersion(n) => {
+                        return Err(Box::new(UnknownValueError {
+                            what: "ttc header version".to_string(),
+                            bad_value: n,
+                        }));
+                    }
+                    opentype_ttc_header_header::Version1(v1header) => {
+                        let mut lookup_metrics =
+                            Vec::with_capacity(v1header.table_directories.len());
+                        for font in v1header.table_directories.iter() {
+                            let per_font = font.data.as_ref().map(analyze_table_directory_lookups);
+                            lookup_metrics.push(per_font);
+                        }
+                        lookup_metrics
+                    }
+                    opentype_ttc_header_header::Version2(v2header) => {
+                        let mut lookup_metrics =
+                            Vec::with_capacity(v2header.table_directories.len());
+                        for font in v2header.table_directories.iter() {
+                            let per_font = font.data.as_ref().map(analyze_table_directory_lookups);
+                            lookup_metrics.push(per_font);
+                        }
+                        lookup_metrics
+                    }
+                };
+                Ok(SingleOrMulti::Multi(ret))
+            }
+            opentype_main_directory::TableDirectory(single) => Ok(SingleOrMulti::Single(
+                analyze_table_directory_lookups(&single),
+            )),
+        }
+    }
+
+    fn analyze_table_directory_lookups(dir: &super::opentype_table_directory) -> LookupSet {
+        let mut ret = LookupSet::default();
+        if let Some(lookup_list) = dir
+            .table_links
+            .gpos
+            .as_ref()
+            .map(|gpos| super::reify(gpos, Mandatory(obj::PosLookups)))
+        {
+            for entry in super::reify_all(&lookup_list, Mandatory(obj::PosLookupTable)) {
+                if let Some(subtable) = super::reify_all(&entry, Mandatory(obj::PosSubtable)).next()
+                {
+                    let ground = match &subtable {
+                        OpentypeGposLookupSubtableExt::PosExtension(ext) => {
+                            ret.pos_extension = true;
+                            &super::reify(ext, super::obj::PosLookup)
+                        }
+                        OpentypeGposLookupSubtableExt::GroundPos(ground) => ground,
+                    };
+                    match ground {
+                        OpentypeGposLookupSubtable::SinglePos(..) => ret.single_pos = true,
+                        OpentypeGposLookupSubtable::PairPos(..) => ret.pair_pos = true,
+                        OpentypeGposLookupSubtable::CursivePos(..) => ret.cursive_pos = true,
+                        OpentypeGposLookupSubtable::MarkBasePos(..) => ret.mark_base_pos = true,
+                        OpentypeGposLookupSubtable::MarkLigPos(..) => ret.mark_lig_pos = true,
+                        OpentypeGposLookupSubtable::MarkMarkPos(..) => ret.mark_mark_pos = true,
+                        OpentypeGposLookupSubtable::SequenceContext(..) => {
+                            ret.sequence_context.gpos = true
+                        }
+                        OpentypeGposLookupSubtable::ChainedSequenceContext(..) => {
+                            ret.chained_sequence_context.gpos = true
+                        }
+                    }
+                }
+            }
+        }
+        if let Some(lookup_list) = dir
+            .table_links
+            .gsub
+            .as_ref()
+            .map(|gsub| super::reify(gsub, Mandatory(obj::SubstLookups)))
+        {
+            for entry in super::reify_all(&lookup_list, Mandatory(obj::SubstLookupTable)) {
+                if let Some(subtable) = super::reify_all(&entry, super::obj::SubstSubtable).next() {
+                    let ground = match &subtable {
+                        OpentypeGsubLookupSubtableExt::SubstExtension(ext) => {
+                            ret.subst_extension = true;
+                            &super::reify(ext, super::obj::SubstLookup)
+                        }
+                        OpentypeGsubLookupSubtableExt::GroundSubst(ground) => ground,
+                    };
+                    match ground {
+                        OpentypeGsubLookupSubtable::SingleSubst(..) => ret.single_subst = true,
+                        OpentypeGsubLookupSubtable::MultipleSubst(..) => ret.multiple_subst = true,
+                        OpentypeGsubLookupSubtable::AlternateSubst(..) => {
+                            ret.alternate_subst = true
+                        }
+                        OpentypeGsubLookupSubtable::LigatureSubst(..) => ret.ligature_subst = true,
+                        OpentypeGsubLookupSubtable::ReverseChainSingleSubst(..) => {
+                            ret.reverse_chain_single_subst = true
+                        }
+                        OpentypeGsubLookupSubtable::SequenceContext(..) => {
+                            ret.sequence_context.gsub = true
+                        }
+                        OpentypeGsubLookupSubtable::ChainedSequenceContext(..) => {
+                            ret.chained_sequence_context.gsub = true
+                        }
+                    }
+                }
+            }
+        }
+        ret
+    }
+
+    pub fn collate_lookups_table<S: std::fmt::Display>(samples: &[(S, SingleOrMulti<LookupSet>)]) {
+        let header = [
+            "Pos1", "Pos2", "Pos3", "Pos4", "Pos5", "Pos6", "Pos7", "Pos8", "Pos9", "Sub1", "Sub2",
+            "Sub3", "Sub4", "Sub5", "Sub6", "Sub7", "Sub8", "Location",
+        ];
+        let header_line = header.join("\t");
+
+        fn write_lookups(buf: &mut String, lookups: LookupSet) {
+            let show_bool = |buf: &mut String, value: bool| {
+                if value {
+                    buf.push_str("✅\t")
+                } else {
+                    buf.push_str("❌\t")
+                }
+            };
+
+            show_bool(buf, lookups.single_pos);
+            show_bool(buf, lookups.pair_pos);
+            show_bool(buf, lookups.cursive_pos);
+            show_bool(buf, lookups.mark_base_pos);
+            show_bool(buf, lookups.mark_lig_pos);
+            show_bool(buf, lookups.mark_mark_pos);
+            show_bool(buf, lookups.pos_extension);
+            show_bool(buf, lookups.sequence_context.gpos);
+            show_bool(buf, lookups.chained_sequence_context.gpos);
+            show_bool(buf, lookups.single_subst);
+            show_bool(buf, lookups.multiple_subst);
+            show_bool(buf, lookups.alternate_subst);
+            show_bool(buf, lookups.ligature_subst);
+            show_bool(buf, lookups.subst_extension);
+            show_bool(buf, lookups.reverse_chain_single_subst);
+            show_bool(buf, lookups.sequence_context.gsub);
+            show_bool(buf, lookups.chained_sequence_context.gsub);
+        }
+
+        println!("{header_line}");
+        for (sample, lookups) in samples.iter() {
+            match lookups {
+                SingleOrMulti::Single(lookups) => {
+                    let mut line = String::new();
+                    write_lookups(&mut line, *lookups);
+                    println!("{line}{sample}")
+                }
+                SingleOrMulti::Multi(font_lookups) => {
+                    for (ix, opt_lookups) in font_lookups.iter().enumerate() {
+                        if let Some(lookups) = opt_lookups {
+                            let mut line = String::new();
+                            write_lookups(&mut line, *lookups);
+                            println!("{line}{sample}[{ix}]")
+                        }
+                    }
+                }
+            }
+        }
     }
 }

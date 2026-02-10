@@ -1,4 +1,4 @@
-use crate::{Expr, Format, FormatRef, IntoLabel, Label, TypeScope, ValueType, ViewExpr};
+use crate::{Expr, Format, FormatRef, IntoLabel, Label, ValueType, ViewExpr};
 
 #[derive(Copy, Clone)]
 pub struct DepFormat<const E: usize, const V: usize> {

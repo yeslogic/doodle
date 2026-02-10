@@ -7,13 +7,15 @@ use std::{
     rc::Rc,
 };
 
+use anyhow::{Result as AResult, anyhow};
+use log::info;
+use serde::Serialize;
+
 use crate::{
     BaseKind, BaseType, ByteSet, DynFormat, Endian, Expr, Format, FormatModule, FormatRef,
     IntoLabel, IxHeap, Label, Pattern, StyleHint, TypeScope, ValueKind, ValueType, ViewExpr,
     typecheck::UnificationError, valuetype::Container,
 };
-use anyhow::{Result as AResult, anyhow};
-use serde::Serialize;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub enum ModelKind {
@@ -353,15 +355,30 @@ impl ValueTypeExt {
 
     pub fn is_numeric(&self) -> bool {
         match self {
-            ValueTypeExt::Base(BaseType::U8) => true,
-            ValueTypeExt::Base(BaseType::U16) => true,
-            ValueTypeExt::Base(BaseType::U32) => true,
-            ValueTypeExt::Base(BaseType::U64) => true,
+            ValueTypeExt::Base(bt) => bt.is_numeric(),
             ValueTypeExt::EngineSpecific {
                 base_model,
                 alt_model,
             } => base_model.is_numeric() && alt_model.is_numeric(),
-            _ => false,
+            ValueTypeExt::Tuple(ts) if ts.len() == 1 && ts[0].is_numeric() => {
+                // NOTE - 1-tuples of numeric values are arguably numeric and might be useful to know about
+                info!("encountered 1-tuple of numeric value-type {:?}", ts[0]);
+                false
+            }
+            ValueTypeExt::Union(bs) if !bs.is_empty() && bs.iter().all(|(_, t)| t.is_numeric()) => {
+                // NOTE - unions over branches all of which are numeric are arguably numeric and might be useful to know about
+                info!("encountered union over entirely numeric branches: {:?}", bs);
+                false
+            }
+            ValueTypeExt::Any
+            | ValueTypeExt::Empty
+            | ValueTypeExt::Option(..)
+            | ValueTypeExt::Record(..)
+            | ValueTypeExt::Tuple(..)
+            | ValueTypeExt::Union(..)
+            | ValueTypeExt::ViewObj
+            | ValueTypeExt::Seq(..)
+            | ValueTypeExt::PhantomData(..) => false,
         }
     }
 
