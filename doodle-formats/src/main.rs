@@ -121,6 +121,8 @@ thread_local! {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
+    stderrlog::new().module(module_path!()).init().unwrap();
+
     match Command::parse() {
         Command::Census => {
             let mut module = FormatModule::new();
@@ -354,28 +356,37 @@ fn test_codegen() {
     let _ = generate_code(&module, &format);
 }
 
+/// Utility module for crawling a format tree and collecting the set of formats used within it.
 mod census {
     use doodle::ViewFormat;
 
     use super::*;
     use std::collections::BTreeSet;
 
+    /// Population-data for a tree rooted in a given format, represented as a set of strings.
     pub struct FormatPop {
         pub store: BTreeSet<&'static str>,
     }
 
     impl FormatPop {
+        /// Constructs an empty population-set.
         pub fn new() -> Self {
             FormatPop {
                 store: BTreeSet::new(),
             }
         }
 
+        /// Adds a member to the population-set, if it is not present already.
         fn add_format(&mut self, format: &'static str) {
             self.store.insert(format);
         }
     }
 
+    /// Crawls a format tree, adding each encountered format of sufficient complexity to the population-set.
+    ///
+    /// Typically, the formats that end up in the population-set (as opposed to being silently ignored) are those that
+    /// add a significant layer of complexity to the parse and which are more likely to cause bugs in the interpreter or
+    /// generated code if mishandled.
     pub fn crawl(format: &Format, module: &FormatModule, pop: &mut FormatPop) {
         match format {
             Format::ItemVar(level, ..) => {
@@ -498,6 +509,12 @@ mod census {
     }
 }
 
+/// Returns the most relevant identifying string for a `Format`.
+///
+/// A `Format::ItemVar` returns the name of the format at the given level.
+/// A `Format::Variant` returns the name of the variant in question.
+///
+/// All other format inputs will result in a panic.
 fn get_name<'a>(f: &Format, module: &'a FormatModule) -> &'a str {
     match f {
         Format::ItemVar(level, ..) => module.get_name(*level),
@@ -506,6 +523,10 @@ fn get_name<'a>(f: &Format, module: &'a FormatModule) -> &'a str {
     }
 }
 
+/// Returns a `BTreeMap` of `FormatPop`s for each format in `f`.
+///
+/// Assumes that `f` is the top-level format containing a `Format::UnionNondet` over high-level format variants.
+///
 fn run_census<'a>(
     entrypoint: &Format,
     module: &'a FormatModule,

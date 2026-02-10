@@ -2,7 +2,7 @@ use clap::Parser;
 use doodle_gencode::api_helper::otf_metrics::{
     Config, ConfigBuilder, VerboseLevel, Verbosity, analyze_font, analyze_font_fast,
     lookup_subtable::{analyze_font_lookups, collate_lookups_table},
-    show_opentype_stats,
+    output::show_opentype_stats,
 };
 
 #[derive(Parser)]
