@@ -1,5 +1,3 @@
-use std::backtrace;
-
 use super::display::{
     Token::{self, LineBreak},
     TokenStream, tok, toks,
