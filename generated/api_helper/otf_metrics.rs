@@ -13,8 +13,7 @@ use fixed::types::{I2F14, I16F16};
 /// Half-Tab for partial indentation
 const HT: &str = "    ";
 
-// SECTION - Command-line configurable options for what to show
-
+// SECTION - CLI-related utilities
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Default)]
 #[repr(u8)]
 pub enum VerboseLevel {
@@ -64,10 +63,11 @@ impl From<VerboseLevel> for Verbosity {
 #[builder(setter(into))]
 #[builder(build_fn(error = "std::convert::Infallible"))]
 pub struct Config {
-    // STUB - Currently only controls bookending, and whether to dump only uncovered tables
+    /// Controls how many leading and trailing values to show (before abbreviating) in multi-line display of array-based values. Default: 8
     #[builder(default = "8")]
     bookend_size: usize,
 
+    /// Controls how many leading and trailing values to show (before abbreviating) in inline display of array-based values. Default: 3
     #[builder(default = "3")]
     inline_bookend: usize,
 
@@ -75,16 +75,13 @@ pub struct Config {
     #[builder(default = "false")]
     extra_only: bool,
 
+    /// Determines the verbosity level of the output. Default: `VerboseLevel::Baseline`
     #[builder(default)]
     verbosity: Verbosity,
 
+    /// The locale to apply when selecting which records to show while parsing `name` tables. Default: English
     #[builder(default)]
     locale: LocaleSelector,
-}
-
-impl Config {
-    const DEFAULT_BOOKEND_SIZE: usize = 8;
-    const DEFAULT_INLINE_BOOKEND: usize = 3;
 }
 
 impl std::default::Default for Config {
@@ -95,18 +92,7 @@ impl std::default::Default for Config {
 // !SECTION
 
 pub type OpentypeTag = u32;
-
-impl From<u32> for Tag {
-    fn from(value: u32) -> Self {
-        Self(value)
-    }
-}
-
-impl From<Tag> for u32 {
-    fn from(value: Tag) -> Self {
-        value.0
-    }
-}
+pub use allsorts::tag::DisplayTag as Tag;
 
 impl Promote<OpentypeTag> for Tag {
     fn promote(orig: &OpentypeTag) -> Self {
@@ -134,28 +120,6 @@ impl Promote<OpentypeF2Dot14> for F2Dot14 {
         match orig {
             OpentypeF2Dot14::F2Dot14(raw) => I2F14::from_bits(*raw as i16),
         }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash)]
-#[repr(transparent)]
-struct Tag(pub u32);
-
-impl std::fmt::Display for Tag {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let bytes = self.0.to_be_bytes();
-        let mut write = move |b: u8| {
-            if !b.is_ascii_control() {
-                use std::fmt::Write;
-                f.write_char(b as char)
-            } else {
-                write!(f, "\\x{b:02x}")
-            }
-        };
-        for byte in bytes {
-            write(byte)?;
-        }
-        Ok(())
     }
 }
 
@@ -1047,6 +1011,12 @@ impl<Sem, T> SemVec<Sem, T> {
     }
 }
 
+impl<Sem, T> AsRef<[T]> for SemVec<Sem, T> {
+    fn as_ref(&self) -> &[T] {
+        self.inner.as_ref()
+    }
+}
+
 impl<Sem, T> From<Vec<T>> for SemVec<Sem, T> {
     fn from(v: Vec<T>) -> Self {
         Self {
@@ -1065,6 +1035,12 @@ impl<Sem, T> FromIterator<T> for SemVec<Sem, T> {
             inner: Vec::from_iter(iter),
             __proxy: std::marker::PhantomData,
         }
+    }
+}
+
+impl<Sem: SemDisplay> std::fmt::Display for SemVec<Sem, u16> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Sem::fmt_u16_array(&self.inner, f)
     }
 }
 
@@ -1098,10 +1074,42 @@ impl<Sem, T> std::ops::Deref for SemVec<Sem, T> {
 
 /// Marker type for SemVec (or any types above it) holding GlyphId-semantics u16 values
 #[derive(Clone)]
-struct GlyphId;
+pub(crate) struct GlyphId;
 /// Marker type for SemVec (or any types above it) holding ClassId-semantics u16 values
 #[derive(Clone)]
-struct ClassId;
+pub(crate) struct ClassId;
+
+pub(crate) trait SemDisplay {
+    fn fmt_u16(raw: u16, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
+
+    fn fmt_u16_array(raw: &[u16], f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if raw.is_empty() {
+            write!(f, "ε")
+        } else {
+            let Some((head, rest)) = raw.split_first() else {
+                unreachable!()
+            };
+            Self::fmt_u16(*head, f)?;
+            for g in rest {
+                write!(f, ".")?;
+                Self::fmt_u16(*g, f)?;
+            }
+            Ok(())
+        }
+    }
+}
+
+impl SemDisplay for GlyphId {
+    fn fmt_u16(raw: u16, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{raw:04x}")
+    }
+}
+
+impl SemDisplay for ClassId {
+    fn fmt_u16(raw: u16, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "C{raw}")
+    }
+}
 
 // !SECTION
 /// Crate-private micro-module for compile-time 'same-type' assertions that can be chained
@@ -2112,7 +2120,7 @@ struct HmtxMetrics(Vec<UnifiedBearing>);
 #[derive(Clone, Debug)]
 struct VmtxMetrics(Vec<UnifiedBearing>);
 
-/// Unified Left-or-TOP side bearing
+/// Unified Left-or-Top side bearing
 #[derive(Copy, Clone, Debug)]
 struct UnifiedBearing {
     advance_width: Option<u16>, // FIXME - name is misleading as this also represents 'advance_height' for vmtx
@@ -3012,7 +3020,7 @@ struct GdefTableDataMetrics {
 */
 type GlyphClass = u16; // REVIEW - consider replacing with semantically distinguished const-enum
 
-fn show_glyph_class(gc: &GlyphClass) -> &'static str {
+fn format_glyph_class(gc: &GlyphClass) -> &'static str {
     // REVIEW - to the extent we present this info, decide whether to include semantics, numerals, or both
     match gc {
         0 => "0(none)",
@@ -3033,6 +3041,66 @@ enum ClassDef {
     Format2 {
         class_range_records: Vec<ClassRangeRecord>,
     },
+}
+
+impl ClassDef {
+    /// Checks that the number of classes described by `self` is exactly `expected_classes`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the number of classes does not match `expected_classes`.
+    pub(crate) fn validate_class_count(&self, expected_classes: usize) {
+        match self {
+            ClassDef::Format1 {
+                class_value_array,
+                start_glyph_id: _start_id,
+            } => {
+                let max = expected_classes as u16;
+                let mut actual_set = U16Set::new();
+                actual_set.insert(0);
+                for (_ix, value) in class_value_array.iter().enumerate() {
+                    if *value >= max {
+                        panic!(
+                            "expecting {expected_classes} starting at 0, found ClassValue {value} (>= {max}) at index {_ix} (glyph id: {})",
+                            *_start_id + _ix as u16
+                        );
+                    }
+                    let _ = actual_set.insert(*value);
+                }
+                assert_eq!(
+                    actual_set.len(),
+                    expected_classes,
+                    "expected to find {expected_classes} ClassDefs, found {}-element set {:?}",
+                    actual_set.len(),
+                    actual_set
+                );
+            }
+            ClassDef::Format2 {
+                class_range_records,
+            } => {
+                let max = expected_classes as u16;
+                let mut actual_set = U16Set::new();
+                actual_set.insert(0);
+                for (_ix, rr) in class_range_records.iter().enumerate() {
+                    let value = rr.value;
+                    if value >= max {
+                        panic!(
+                            "expecting {expected_classes} starting at 0, found ClassValue {value} (>= {max}) at index {_ix} (glyph range: {} -> {})",
+                            rr.start_glyph_id, rr.end_glyph_id
+                        );
+                    }
+                    let _ = actual_set.insert(value);
+                }
+                assert_eq!(
+                    actual_set.len(),
+                    expected_classes,
+                    "expected to find {expected_classes} ClassDefs, found {}-element set {:?}",
+                    actual_set.len(),
+                    actual_set
+                );
+            }
+        }
+    }
 }
 
 impl FromNull for ClassDef {
@@ -4429,7 +4497,7 @@ impl<'a> Promote<OpentypeReverseChainSingleSubst<'a>> for ReverseChainSingleSubs
             backtrack_coverages,
             lookahead_coverages,
             glyph_count: orig.glyph_count,
-            substitute_glyph_ids: orig.substitute_glyph_ids.clone(),
+            substitute_glyph_ids: SemVec::from(orig.substitute_glyph_ids.clone()),
         }
     }
 }
@@ -4440,7 +4508,7 @@ struct ReverseChainSingleSubst {
     backtrack_coverages: Vec<CoverageTable>,
     lookahead_coverages: Vec<CoverageTable>,
     glyph_count: u16, // NOTE - this field is technically extraneous due to being equal to `substitute_glyph_ids.len() as u16`
-    substitute_glyph_ids: Vec<u16>,
+    substitute_glyph_ids: SemVec<GlyphId, u16>,
 }
 
 pub type OpentypeLigatureSubst<'a> = opentype_layout_ligature_subst<'a>;
@@ -4517,7 +4585,7 @@ pub type OpentypeLigature = opentype_gsub_ligature_subst_ligature_table;
 struct Ligature {
     ligature_glyph: u16,
     component_count: u16,
-    component_glyph_ids: Vec<u16>,
+    component_glyph_ids: SemVec<GlyphId, u16>,
 }
 
 impl Promote<OpentypeLigature> for Ligature {
@@ -4525,7 +4593,7 @@ impl Promote<OpentypeLigature> for Ligature {
         Ligature {
             ligature_glyph: orig.ligature_glyph,
             component_count: orig.component_count,
-            component_glyph_ids: orig.component_glyph_ids.clone(),
+            component_glyph_ids: SemVec::from(orig.component_glyph_ids.clone()),
         }
     }
 }
@@ -7184,278 +7252,7 @@ pub mod output;
 
 pub mod display;
 
-// TODO - rewrite the functions to either be Write-generic or used Fragment-like output model to avoid duplication between I/O show and String formatting functions
-mod arrayfmt {
-    use super::display::{
-        Token::{self, LineBreak},
-        TokenStream, tok, toks,
-    };
-    use crate::api_helper::util::{EnumLen, Wec, trisect_unchecked};
-
-    /// Generic helper for displaying an array of possibly-None elements, skipping over
-    /// all None-values and only showing up to the first, and last `N` elements, where
-    /// `N` is determined by `bookend` (shows all elements if the lenght is less than or equal to `2 * bookend`).
-    ///
-    /// The `show_fn` function is used to display individual elements, and takes both the index and the value of the element in question.
-    ///
-    /// The `ellipsis` function is used to signal information about the skipped middle-elements (if any), and takes two arguments:
-    /// the number of elements that were skipped over (after filtering out None-values), and a tuple `(start, stop)` where `start` is the first
-    /// element-index skipped and `stop` is the element-index where display resumes.
-    pub(crate) fn display_nullable<T>(
-        opt_items: &[Option<T>],
-        mut show_fn: impl FnMut(usize, &T) -> TokenStream<'static>,
-        bookend: usize,
-        ellipsis: impl Fn(usize, (usize, usize)) -> TokenStream<'static>,
-    ) -> TokenStream<'static> {
-        let items: Vec<(usize, &T)> = opt_items
-            .iter()
-            .enumerate()
-            .filter_map(|(ix, opt)| opt.as_ref().map(|v| (ix, v)))
-            .collect();
-        let mut buffer =
-            Vec::<TokenStream<'static>>::with_capacity(Ord::min(items.len(), bookend * 2 + 1));
-
-        let count = items.len();
-
-        if count > bookend * 2 {
-            let (left_bookend, middle, right_bookend) =
-                unsafe { trisect_unchecked(&items, bookend, bookend) };
-
-            for (ix, it) in left_bookend {
-                buffer.push(show_fn(*ix, it));
-            }
-
-            let n_skipped = count - bookend * 2;
-            assert_eq!(middle.len(), n_skipped);
-            buffer.push(ellipsis(n_skipped, (middle[0].0, middle[n_skipped - 1].0)));
-
-            for (ix, it) in right_bookend {
-                buffer.push(show_fn(*ix, it));
-            }
-        } else {
-            for (ix, it) in items.into_iter() {
-                buffer.push(show_fn(ix, it));
-            }
-        }
-        TokenStream::join_with(buffer, LineBreak)
-    }
-
-    /// Generic helper for displaying an array of possibly-None elements, skipping over
-    /// all None-values and only showing up to the first, and last `N` elements, where
-    /// `N` is determined by `bookend` (shows all elements if the lenght is less than or equal to `2 * bookend`).
-    ///
-    /// The `show_fn` function is used to display individual elements, and takes both the index and the value of the element in question.
-    ///
-    /// The `ellipsis` function is used to signal information about the skipped middle-elements (if any), and takes two arguments:
-    /// the number of elements that were skipped over (after filtering out None-values), and a tuple `(start, stop)` where `start` is the first
-    /// element-index skipped and `stop` is the element-index where display resumes.
-    pub(crate) fn display_inline_nullable<T>(
-        opt_items: &[Option<T>],
-        mut show_fn: impl FnMut(usize, &T) -> TokenStream<'static>,
-        bookend: usize,
-        ellipsis: impl Fn(usize, (usize, usize)) -> TokenStream<'static>,
-    ) -> TokenStream<'static> {
-        let items: Vec<(usize, &T)> = opt_items
-            .iter()
-            .enumerate()
-            .filter_map(|(ix, opt)| opt.as_ref().map(|v| (ix, v)))
-            .collect();
-        let mut buffer =
-            Vec::<TokenStream<'static>>::with_capacity(Ord::min(items.len(), bookend * 2 + 1));
-
-        let count = items.len();
-
-        if count > bookend * 2 {
-            let (left_bookend, middle, right_bookend) =
-                unsafe { trisect_unchecked(&items, bookend, bookend) };
-
-            for (ix, it) in left_bookend {
-                buffer.push(show_fn(*ix, it));
-            }
-
-            let n_skipped = count - bookend * 2;
-            assert_eq!(middle.len(), n_skipped);
-            buffer.push(ellipsis(n_skipped, (middle[0].0, middle[n_skipped - 1].0)));
-
-            for (ix, it) in right_bookend {
-                buffer.push(show_fn(*ix, it));
-            }
-        } else {
-            for (ix, it) in items.into_iter() {
-                buffer.push(show_fn(ix, it));
-            }
-        }
-        TokenStream::join_with(buffer, tok(", ")).bracket()
-    }
-
-    /// Generic helper for displaying an array of elements, showing at most `bookend` elements at the start and end of the array and a single ellipsis if the array is longer than `2 * bookend`.
-    ///
-    /// Each element that is to be displayed is formatted using the provided closure `fmt_fn`.
-    ///
-    /// All elements will be written on the same line, and so the `fmt_fn` closure should not include any line-breaks.
-    ///
-    /// The `ellipsis` function is used to signal information about the skipped middle-elements (if any), and takes the number of elements that were skipped over.
-    pub(crate) fn display_items_inline<T>(
-        items: &[T],
-        mut fmt_fn: impl FnMut(&T) -> TokenStream<'static>,
-        bookend: usize,
-        ellipsis: impl Fn(usize) -> TokenStream<'static>,
-    ) -> TokenStream<'static> {
-        // Allocate a buffer big enough to hold one string per item in the array, or enough items to show both bookends and one ellipsis-string
-        let mut buffer =
-            Vec::<TokenStream<'static>>::with_capacity(Ord::min(items.len(), bookend * 2 + 1));
-
-        let count = items.len();
-        if count > bookend * 2 {
-            for item in &items[..bookend] {
-                buffer.push(fmt_fn(item));
-            }
-
-            buffer.push(ellipsis(count - bookend * 2));
-
-            for item in &items[count - bookend..] {
-                buffer.push(fmt_fn(item));
-            }
-        } else {
-            buffer.extend(items.iter().map(fmt_fn));
-        }
-        TokenStream::join_with(buffer, tok(", ")).bracket()
-    }
-
-    /// Enumerates the contents of a slice, showing only the first and last `bookend` items if the slice is long enough.
-    ///
-    /// Each item is shown with `show_fn`, and `fn_message` is used to signal the range of indices skipped.
-    /// If the slice length is less than or equal to `2 * bookend`, all elements are displayed and `ellipsis` is not called.
-    pub(crate) fn display_items_elided<T>(
-        items: &[T],
-        show_fn: impl Fn(usize, &T) -> TokenStream<'static>,
-        bookend: usize,
-        ellipsis: impl Fn(usize, usize) -> TokenStream<'static>,
-    ) -> TokenStream<'static> {
-        let mut buffer =
-            Vec::<TokenStream<'static>>::with_capacity(Ord::min(items.len(), bookend * 2 + 1));
-
-        let count = items.len();
-        if count > bookend * 2 {
-            for (ix, item) in items.iter().enumerate().take(bookend) {
-                buffer.push(show_fn(ix, item));
-            }
-
-            buffer.push(ellipsis(bookend, count - bookend));
-
-            for (ix, item) in items.iter().enumerate().skip(count - bookend) {
-                buffer.push(show_fn(ix, item));
-            }
-        } else {
-            buffer.extend(items.iter().enumerate().map(|(ix, item)| show_fn(ix, item)));
-        }
-        TokenStream::join_with(buffer, LineBreak)
-    }
-
-    // Enumerates the contents of a Wec<T>, showing only the first and last `bookend` rows if the Wec is tall enough.
-    ///
-    /// Each row is shown with `show_fn`, and the `elision_message` is printed (along with the range of indices skipped)
-    /// if the slice length exceeds than 2 * `bookend`, in between the initial and terminal span of `bookend` items.
-    // TODO - move into arrayfmt module
-    pub(crate) fn display_wec_rows_elided<T>(
-        matrix: &Wec<T>,
-        show_fn: impl Fn(usize, &[T]) -> TokenStream<'static>,
-        bookend: usize,
-        fn_message: impl Fn(usize, usize) -> TokenStream<'static>,
-    ) -> TokenStream<'static> {
-        let count = matrix.rows();
-        let mut lines = Vec::with_capacity(Ord::min(count, bookend * 2 + 1));
-
-        if count > bookend * 2 {
-            for ix in 0..bookend {
-                lines.push(show_fn(ix, &matrix[ix]));
-            }
-            lines.push(fn_message(bookend, count - bookend));
-            for ix in (count - bookend)..count {
-                lines.push(show_fn(ix, &matrix[ix]));
-            }
-        } else {
-            let mut lines = Vec::with_capacity(count);
-            lines.extend(
-                matrix
-                    .iter_rows()
-                    .enumerate()
-                    .map(|(ix, row)| show_fn(ix, row)),
-            );
-        }
-        TokenStream::join_with(lines, LineBreak)
-    }
-
-    pub(crate) fn display_coverage_linked_array<T>(
-        items: &[T],
-        coverage: impl Iterator<Item = u16>,
-        mut fmt_fn: impl FnMut(u16, &T) -> TokenStream<'static>,
-        bookend: usize,
-        ellipsis: impl FnOnce(usize) -> TokenStream<'static>,
-    ) -> TokenStream<'static> {
-        let count = items.len();
-        let mut buffer = Vec::with_capacity(Ord::min(count, bookend * 2 + 1));
-
-        let mut ix_iter = EnumLen::new(coverage, count);
-
-        if count > bookend * 2 {
-            for (ix, glyph_id) in ix_iter.iter_with().take(bookend) {
-                buffer.push(fmt_fn(glyph_id, &items[ix]));
-            }
-
-            let n_skipped = count - bookend * 2;
-
-            buffer.push(ellipsis(n_skipped));
-
-            for (ix, glyph_id) in ix_iter.iter_with().skip(n_skipped).take(bookend) {
-                buffer.push(fmt_fn(glyph_id, &items[ix]));
-            }
-        } else {
-            for (ix, glyph_id) in ix_iter.iter_with() {
-                buffer.push(fmt_fn(glyph_id, &items[ix]));
-            }
-        }
-
-        // NOTE - boolean control-flag for strictness; when false, will not return an error if there are leftover items in the coverage iterator
-        const FORBID_LEFTOVER_COVERAGE: bool = false;
-
-        match ix_iter.finish(FORBID_LEFTOVER_COVERAGE) {
-            Ok(_) => {}
-            Err(e) => panic!("format_coverage_linked_array found error: {e}"),
-        }
-        TokenStream::join_with(buffer, tok(", ")).bracket()
-    }
-
-    pub(crate) fn display_table_column_horiz<A>(
-        heading: &'static str,
-        items: &[A],
-        mut show_fn: impl FnMut(&A) -> TokenStream<'static>,
-        bookend: usize,
-        ellipsis: impl FnOnce(usize) -> TokenStream<'static>,
-    ) -> TokenStream<'static> {
-        let count = items.len();
-        let mut buf = Vec::with_capacity(Ord::min(count, 2 * bookend + 1));
-        if count > 2 * bookend {
-            let (left_bookend, _middle, right_bookend) =
-                unsafe { trisect_unchecked(items, bookend, bookend) };
-
-            for it in left_bookend {
-                buf.push(show_fn(it));
-            }
-
-            let n_skipped = count - bookend * 2;
-            buf.push(ellipsis(n_skipped));
-
-            for it in right_bookend {
-                buf.push(show_fn(it));
-            }
-        } else {
-            buf.extend(items.iter().map(show_fn));
-        }
-
-        tok(heading).then(TokenStream::join_with(buf, tok(" ")))
-    }
-}
+mod arrayfmt;
 pub mod lookup_subtable {
     use super::{
         OpentypeGposLookupSubtable, OpentypeGposLookupSubtableExt, OpentypeGsubLookupSubtable,

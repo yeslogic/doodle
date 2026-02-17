@@ -7,7 +7,7 @@ use std::{collections::BTreeSet, ops::Index};
 /// (`Wec` because 'W' is visually similar to 'VV', for "V[ec]Vec")
 #[derive(Clone)]
 pub struct Wec<T> {
-    _store: Vec<T>,
+    store: Vec<T>,
     width: usize,
 }
 
@@ -25,12 +25,12 @@ impl<T> Index<usize> for Wec<T> {
 
     fn index(&self, index: usize) -> &[T] {
         assert!(
-            self.width * (index + 1) <= self._store.len(),
+            self.width * (index + 1) <= self.store.len(),
             "Index<usize> called with out-of-range row index"
         );
         let row_start = self.width * index;
         let row_end = self.width * (index + 1);
-        &self._store[row_start..row_end]
+        &self.store[row_start..row_end]
     }
 }
 
@@ -44,17 +44,17 @@ impl<T> Index<(usize, usize)> for Wec<T> {
             "Index<(usize, usize)> called with out-of-range column index"
         );
         assert!(
-            major * (self.width + 1) <= self._store.len(),
+            major * (self.width + 1) <= self.store.len(),
             "Index<(usize, usize)> called with out-of-range row index"
         );
-        &self._store[self.width * major + minor]
+        &self.store[self.width * major + minor]
     }
 }
 
 impl<T> Wec<T> {
     pub fn new(width: usize) -> Self {
         Self {
-            _store: Vec::new(),
+            store: Vec::new(),
             width,
         }
     }
@@ -66,17 +66,17 @@ impl<T> Wec<T> {
             "capacity must be a multiple of width: {capacity} % {width} != 0"
         );
         Self {
-            _store: Vec::with_capacity(capacity),
+            store: Vec::with_capacity(capacity),
             width,
         }
     }
 
     pub fn rows(&self) -> usize {
-        self._store.len() / self.width
+        self.store.len() / self.width
     }
 
     pub fn height(&self) -> usize {
-        self._store.len() / self.width
+        self.store.len() / self.width
     }
 
     pub fn cols(&self) -> usize {
@@ -88,22 +88,22 @@ impl<T> Wec<T> {
     }
 
     pub fn size(&self) -> usize {
-        self._store.len()
+        self.store.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self._store.is_empty()
+        self.store.is_empty()
     }
 
     /// Returns dimensions of array, in `(rows, cols)` order.
     pub fn dims(&self) -> (usize, usize) {
-        (self._store.len() / self.width, self.width)
+        (self.store.len() / self.width, self.width)
     }
 
     /// Pushes a single row to the end of the Wec.
     pub fn push_row(&mut self, row: &mut Vec<T>) {
         assert_eq!(row.len(), self.width);
-        self._store.append(row)
+        self.store.append(row)
     }
 
     pub fn extend_full_row(&mut self, row: &[T])
@@ -117,7 +117,7 @@ impl<T> Wec<T> {
             self.width,
             row.len()
         );
-        self._store.extend_from_slice(row)
+        self.store.extend_from_slice(row)
     }
 
     pub fn from_vec(store: Vec<T>, width: usize) -> Self {
@@ -129,16 +129,13 @@ impl<T> Wec<T> {
                 "{_len}-element vector would have {_rem} extra elements during conversion to {width}-column matrix"
             );
         }
-        Wec {
-            _store: store,
-            width,
-        }
+        Wec { store, width }
     }
 
     /// Attempts to index into a Wec using a pre-computed `i * width + j` index, as if the `Wec`
     /// were a one-dimensional `Vec` with the same elements.
     pub fn index_raw(&self, raw_index: usize) -> Option<&T> {
-        self._store.get(raw_index)
+        self.store.get(raw_index)
     }
 
     pub fn iter_rows(&self) -> impl Iterator<Item = &[T]> {
@@ -150,7 +147,7 @@ impl<T> Extend<Vec<T>> for Wec<T> {
     fn extend<I: IntoIterator<Item = Vec<T>>>(&mut self, iter: I) {
         for mut row in iter {
             debug_assert_eq!(row.len(), self.width);
-            self._store.append(&mut row);
+            self.store.append(&mut row);
         }
     }
 }
@@ -159,7 +156,7 @@ impl<T> Extend<T> for Wec<T> {
     fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
         let mut tmp = iter.into_iter().collect::<Vec<T>>();
         debug_assert_eq!(tmp.len() % self.width, 0);
-        self._store.append(&mut tmp);
+        self.store.append(&mut tmp);
     }
 }
 
@@ -346,5 +343,24 @@ impl<T, I: Iterator<Item = T>> EnumLen<T, I> {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_enum_len() {
+        let mut iter = vec![1, 2, 3, 4].into_iter();
+        let mut el = super::EnumLen::new(&mut iter, 4);
+
+        let iter_0_1: Vec<(usize, usize)> = el.iter_with().take(1).collect();
+        assert_eq!(iter_0_1, vec![(0, 1)]);
+
+        // checks that when we call `iter_with` again, we resume iteration where we left off, and the indices are correct
+        let iter_2_3_3_4: Vec<(usize, usize)> = el.iter_with().skip(1).take(2).collect();
+        assert_eq!(iter_2_3_3_4, vec![(2, 3), (3, 4)]);
+
+        // checks that the length-promise is upheld and the iterator is fully consumed, so `finish` returns `Ok`
+        assert!(el.finish(true).is_ok());
     }
 }
