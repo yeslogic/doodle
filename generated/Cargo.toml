@@ -46,3 +46,5 @@ clap = { version = "4.2", features = ["derive"] }
 derive_builder = "0.20.2"
 fixed = "1.28.0"
 cfg-if = "1.0.0"
+log = "0.4.29"
+stderrlog = "0.6.0"
