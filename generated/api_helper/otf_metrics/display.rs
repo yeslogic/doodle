@@ -68,23 +68,38 @@ impl<'a> TokenStream<'a> {
     }
 
     /// Writes the tokens in `self` to `w`.
-    pub fn write_to<W: std::io::Write>(self, mut w: W) -> std::io::Result<()> {
+    ///
+    /// If successful, returns `Ok(true)` if at least one token was written and `Ok(false)` if `self` was empty.
+    pub fn write_to<W: std::io::Write>(self, mut w: W) -> std::io::Result<bool> {
+        let mut has_written = false;
         for token in self.inner {
-            write!(w, "{token}")?
+            write!(w, "{token}")?;
+            has_written = true;
         }
-        Ok(())
+        Ok(has_written)
     }
 
     /// Prints the tokens in `self` to stdout.
-    pub fn print(self) {
-        let oput = std::io::stdout().lock();
-        let mut buf = std::io::BufWriter::new(oput);
-        self.write_to(&mut buf).unwrap();
+    pub fn print(self) -> bool {
+        if cfg!(test) {
+            // In tests, we don't want to print anything.
+            let mut buf = std::io::sink();
+            return self.write_to(&mut buf).unwrap();
+        } else {
+            let oput = std::io::stdout().lock();
+            let buf = &mut std::io::BufWriter::new(oput);
+            self.write_to(buf).unwrap()
+        }
     }
 
     /// Prints the tokens in `self` to stdout, with a single trailing newline.
+    ///
+    /// If `self` is empty, no newline is printed.
     pub fn println(self) {
-        self.chain(TokenStream::from(Token::LineBreak)).print()
+        let has_printed = self.print();
+        if has_printed {
+            println!();
+        }
     }
 
     /// Serializes `self` into a contiguous string.
