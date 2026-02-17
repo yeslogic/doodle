@@ -30,6 +30,7 @@ type RunError = Box<dyn std::error::Error + Sync + Send + 'static>;
 type RunResult<T> = Result<T, RunError>;
 
 pub fn main() -> RunResult<()> {
+    stderrlog::new().module(module_path!()).init()?;
     let mut conf_builder = ConfigBuilder::default();
     let params = Params::parse();
     conf_builder.extra_only(params.extra_only);

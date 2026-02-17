@@ -15,6 +15,8 @@ pub fn toks(str: impl Into<doodle::Label>) -> TokenStream<'static> {
 pub enum Token {
     InlineText(doodle::Label),
     LineBreak,
+    IncreaseIndent,
+    DecreaseIndent,
 }
 
 impl std::fmt::Display for Token {
@@ -22,6 +24,7 @@ impl std::fmt::Display for Token {
         match self {
             Token::InlineText(s) => write!(f, "{s}"),
             Token::LineBreak => write!(f, "\n"),
+            Token::IncreaseIndent | Token::DecreaseIndent => Ok(()), // No visual representation for indent tokens, since they are handled implicitly by `IndentIter`
         }
     }
 }
@@ -72,7 +75,8 @@ impl<'a> TokenStream<'a> {
     /// If successful, returns `Ok(true)` if at least one token was written and `Ok(false)` if `self` was empty.
     pub fn write_to<W: std::io::Write>(self, mut w: W) -> std::io::Result<bool> {
         let mut has_written = false;
-        for token in self.inner {
+        let writer = IndentIter::new(Indent::default(), self.inner);
+        for token in writer {
             write!(w, "{token}")?;
             has_written = true;
         }
@@ -120,6 +124,8 @@ impl<'a> TokenStream<'a> {
         for token in self.inner {
             match token {
                 Token::InlineText(s) => line.push_str(&s),
+                Token::DecreaseIndent => lines.push(Token::DecreaseIndent),
+                Token::IncreaseIndent => lines.push(Token::IncreaseIndent),
                 Token::LineBreak => {
                     lines.push(Token::InlineText(std::borrow::Cow::Owned(line.clone())));
                     line.clear();
@@ -173,21 +179,19 @@ impl<'a> TokenStream<'a> {
         }
     }
 
-    /// Prepends indentation to the first line of the stream, measured in 4-space half-tabs.
+    /// Returns a new `TokenStream` where each line in `self` is indented by `stops` half-tabs (i.e. 4 spaces).
     ///
     /// Will prefer using `'\t'` for indentation, and will include a final half-tab iff `stops` is odd.
-    pub fn pre_indent(self, stops: u8) -> Self {
-        let tabs = stops / 2;
-        let hts = stops % 2;
-
-        let mut indent = String::new();
-        for _ in 0..tabs {
-            indent.push('\t');
+    pub fn indent_by(self, stops: u8) -> Self {
+        let increase = std::iter::repeat(Token::IncreaseIndent).take(stops as usize);
+        let decrease = std::iter::repeat(Token::DecreaseIndent).take(stops as usize);
+        TokenStream {
+            inner: Box::new(
+                increase
+                    .chain(self.inner)
+                    .chain(decrease), // We rely on the fact that `IndentIter` will ignore all indent tokens at the end of the stream, so we can safely append the necessary `DecreaseIndent` tokens here without worrying about trailing newlines in `self`
+            ),
         }
-        for _ in 0..hts {
-            indent.push_str(super::HT);
-        }
-        tok(indent).then(self)
     }
 
     /// Joins a stream of streams with a given separator.
@@ -199,6 +203,75 @@ impl<'a> TokenStream<'a> {
             )),
         }
     }
+}
+
+pub struct IndentIter<'a> {
+    level: Indent,
+    stream: Box<dyn Iterator<Item = Token> + 'a>,
+    at_line_start: bool,
+    // Temporary cache for the next token to be emitted by `stream`, to avoid indenting after the final linebreak in `stream`
+    next_token: Option<Token>,
+}
+
+impl<'a> IndentIter<'a> {
+    fn new(level: Indent, stream: Box<dyn Iterator<Item = Token> + 'a>) -> Self {
+        Self {
+            level,
+            stream,
+            at_line_start: true,
+            next_token: None,
+        }
+    }
+}
+
+impl<'a> Iterator for IndentIter<'a> {
+    type Item = Token;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(tok) = self.next_token.take() {
+            return Some(tok);
+        } else {
+            let next = self.stream.next();
+            match next {
+                Some(Token::LineBreak) => {
+                    self.at_line_start = true;
+                    return next;
+                }
+                Some(Token::IncreaseIndent) => {
+                    self.level.0 += 1;
+                    return self.next();
+                }
+                Some(Token::DecreaseIndent) => {
+                    self.level.0 = self.level.0.saturating_sub(1);
+                    return self.next();
+                }
+                Some(tok) => {
+                    if self.at_line_start {
+                        self.next_token = Some(tok);
+                        self.at_line_start = false;
+                        let full_tabs = self.level.0 / 2;
+                        let partial_tabs = self.level.0 % 2;
+
+                        let indent_str = "\t".repeat(full_tabs as usize)
+                            + if partial_tabs > 0 { Indent::HT } else { "" };
+                        return Some(Token::InlineText(indent_str.into()));
+                    } else {
+                        return Some(tok);
+                    }
+                }
+                None => return None,
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+/// Newtype representing indentation level, measured in 4-space half-tabs.
+pub struct Indent(u8);
+
+impl Indent {
+    /// Half-Tab for partial indentation
+    pub const HT: &str = "    ";
 }
 
 pub struct IntersperseIter<'a, T: Clone> {

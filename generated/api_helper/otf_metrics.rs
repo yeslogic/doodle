@@ -10,9 +10,6 @@ use encoding::{
 };
 use fixed::types::{I2F14, I16F16};
 
-/// Half-Tab for partial indentation
-const HT: &str = "    ";
-
 // SECTION - CLI-related utilities
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Default)]
 #[repr(u8)]
@@ -7229,11 +7226,16 @@ pub mod table {
 }
 
 /// Returns `true` if `table_id` is not a first-class OpenType table in our current implementation
+///
+/// Returns `false` if `table_id` is recognized and supported, or if it is not recognized to begin with.
 fn is_extra(table_id: &u32) -> bool {
     use table::TableKind;
     match TableKind::try_from(*table_id) {
         Ok(table_kind) => !table_kind.is_implemented(),
-        Err(e) => unreachable!("is_extra: {e}"),
+        Err(e) => {
+            log::warn!("is_extra: unknown table id {}: {e}", output::display_u32_ascii(*table_id).into_string());
+            false
+        }
     }
 }
 
