@@ -182,14 +182,37 @@ impl<'a> TokenStream<'a> {
     /// Returns a new `TokenStream` where each line in `self` is indented by `stops` half-tabs (i.e. 4 spaces).
     ///
     /// Will prefer using `'\t'` for indentation, and will include a final half-tab iff `stops` is odd.
-    pub fn indent_by(self, stops: u8) -> Self {
-        let increase = std::iter::repeat(Token::IncreaseIndent).take(stops as usize);
-        let decrease = std::iter::repeat(Token::DecreaseIndent).take(stops as usize);
+    ///
+    /// Can take a negative value, but the formatting will be incorrect when underflowing the current absolute indentation level.
+    pub fn indent_by(self, stops: i8) -> Self {
+        // REVIEW - we can change the implementation of IndentIter to support negative stops as equivalent-to-zero and thereby avoid the underflow misalignment-on-reset
+        match stops.signum() {
+            0 => return self,
+            1 => (),
+            -1 => return self.decrease_indent_by(-stops as u8),
+            _ => unreachable!(),
+        }
+
+        let shift = std::iter::repeat(Token::IncreaseIndent).take(stops as usize);
+        let reset = std::iter::repeat(Token::DecreaseIndent).take(stops as usize);
         TokenStream {
             inner: Box::new(
-                increase
-                    .chain(self.inner)
-                    .chain(decrease), // We rely on the fact that `IndentIter` will ignore all indent tokens at the end of the stream, so we can safely append the necessary `DecreaseIndent` tokens here without worrying about trailing newlines in `self`
+                shift.chain(self.inner).chain(reset), // We rely on the fact that `IndentIter` will ignore all indent tokens at the end of the stream, so we can safely append the necessary `DecreaseIndent` tokens here without worrying about trailing newlines in `self`
+            ),
+        }
+    }
+
+    /// Internal helper for `indent_by` to decrease indentation by a positive number of stops.
+    ///
+    /// # Notes
+    ///
+    /// If the current indentation level is less than `stops`, the subsequent re-indentation will be incorrect, as the underflow is silently ignored.
+    fn decrease_indent_by(self, stops: u8) -> Self {
+        let shift = std::iter::repeat(Token::DecreaseIndent).take(stops as usize);
+        let reset = std::iter::repeat(Token::IncreaseIndent).take(stops as usize);
+        TokenStream {
+            inner: Box::new(
+                shift.chain(self.inner).chain(reset), // We rely on the fact that `IndentIter` will ignore all indent tokens at the end of the stream, so we can safely append the necessary `DecreaseIndent` tokens here without worrying about trailing newlines in `self`
             ),
         }
     }

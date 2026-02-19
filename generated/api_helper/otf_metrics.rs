@@ -3009,11 +3009,13 @@ struct GdefTableDataMetrics {
 }
 
 /**
+```ignore
    0 <=> No Glyph Class assigned (implicit default)
    1 <=> Base glyph (single character, spacing glyph)
    2 <=> Ligature glyph (multiple character, spacing glyph)
    3 <=> Mark glyph (non-spacing combining glyph)
    4 <=> Component glyph (part of a single character, spacing glyph)
+```
 */
 type GlyphClass = u16; // REVIEW - consider replacing with semantically distinguished const-enum
 
@@ -7233,7 +7235,10 @@ fn is_extra(table_id: &u32) -> bool {
     match TableKind::try_from(*table_id) {
         Ok(table_kind) => !table_kind.is_implemented(),
         Err(e) => {
-            log::warn!("is_extra: unknown table id {}: {e}", output::display_u32_ascii(*table_id).into_string());
+            log::warn!(
+                "is_extra: unknown table id {}: {e}",
+                output::display_u32_ascii(*table_id).into_string()
+            );
             false
         }
     }
