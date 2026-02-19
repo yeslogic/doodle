@@ -3,6 +3,7 @@ use super::display::{
     TokenStream, tok, toks,
 };
 use super::*;
+use log::error;
 
 // TODO - refactor into more cleanly encapsulated TokenStream producers and consumers
 
@@ -81,15 +82,21 @@ fn display_extra_tags(table_ids: &[u32]) -> TokenStream<'static> {
     TokenStream::join_with(lines, LineBreak)
 }
 
+// FIXME - rewrite into pure TokenStream
 fn show_required_metrics(required: &RequiredTableMetrics, conf: &Config) {
     display_cmap_metrics(&required.cmap, conf).println();
     // WIP - display_head_metrics(..).println();
     show_head_metrics(&required.head, conf);
     // WIP - display_hhea_metrics(..).println();
     show_hhea_metrics(&required.hhea, conf);
-    display_hmtx_metrics(&required.hmtx, conf).println();
-    // WIP - display_maxp_metrics(..).println();
-    show_maxp_metrics(&required.maxp, conf);
+    TokenStream::join_with(
+        vec![
+            display_hmtx_metrics(&required.hmtx, conf),
+            display_maxp_metrics(&required.maxp, conf),
+        ],
+        LineBreak,
+    )
+    .println();
     // WIP - display_name_metrics(..).println();
     show_name_metrics(&required.name, conf);
     // WIP - display_os2_metrics(..).println();
@@ -98,6 +105,7 @@ fn show_required_metrics(required: &RequiredTableMetrics, conf: &Config) {
     show_post_metrics(&required.post, conf);
 }
 
+// FIXME - rewrite into pure TokenStream
 fn show_optional_metrics(optional: &OptionalTableMetrics, conf: &Config) {
     // WIP - display_cvt_metrics(..).println();
     show_cvt_metrics(&optional.cvt, conf);
@@ -105,42 +113,39 @@ fn show_optional_metrics(optional: &OptionalTableMetrics, conf: &Config) {
     show_fpgm_metrics(&optional.fpgm, conf);
     // WIP - display_loca_metrics(..).println();
     show_loca_metrics(&optional.loca, conf);
-    // WIP - display_glyf_metrics(..).println();
-    glyf::show_glyf_metrics(&optional.glyf, conf);
+    display_glyf_metrics(&optional.glyf, conf).println();
     // WIP - display_prep_metrics(..).println();
     show_prep_metrics(&optional.prep, conf);
-    display_gasp_metrics(&optional.gasp, conf).println();
 
-    // STUB - anything between gasp and base go here
-
-    // TODO - refactor into proper TokenStreams
-    display_base_metrics(&optional.base, conf).println();
-    // WIP - display_gdef_metrics(..).println();
-    show_gdef_metrics(optional.gdef.as_deref(), conf);
-    display_layout_metrics(
-        optional.gpos.as_deref(),
-        Ctxt::from(TableDiscriminator::Gpos),
-        conf,
+    TokenStream::join_with(
+        vec![
+            display_gasp_metrics(&optional.gasp, conf),
+            // STUB - anything between gasp and base go here
+            display_base_metrics(&optional.base, conf),
+            display_gdef_metrics(optional.gdef.as_deref(), conf),
+            display_layout_metrics(
+                optional.gpos.as_deref(),
+                Ctxt::from(TableDiscriminator::Gpos),
+                conf,
+            ),
+            display_layout_metrics(
+                optional.gsub.as_deref(),
+                Ctxt::from(TableDiscriminator::Gsub),
+                conf,
+            ),
+            display_fvar_metrics(optional.fvar.as_deref(), conf),
+            display_gvar_metrics(optional.gvar.as_deref(), conf),
+            display_kern_metrics(&optional.kern, conf),
+        ],
+        LineBreak,
     )
     .println();
-    display_layout_metrics(
-        optional.gsub.as_deref(),
-        Ctxt::from(TableDiscriminator::Gsub),
-        conf,
-    )
-    .println();
 
-    display_fvar_metrics(optional.fvar.as_deref(), conf).println();
-    display_gvar_metrics(optional.gvar.as_deref(), conf).println();
-
-    // WIP - display_kern_metrics(..).println();
-    show_kern_metrics(&optional.kern, conf);
     // WIP - display_stat_metrics(..).println();
     show_stat_metrics(optional.stat.as_deref(), conf);
     // WIP - display_vhea_metrics(..).println();
     show_vhea_metrics(&optional.vhea, conf);
-    // WIP - display_vmtx_metrics(..).println();
-    show_vmtx_metrics(&optional.vmtx, conf);
+    display_vmtx_metrics(&optional.vmtx, conf).println();
 }
 
 use gvar::display_gvar_metrics;
@@ -155,12 +160,16 @@ mod gvar {
         let Some(gvar) = gvar else {
             return TokenStream::empty();
         };
+
+        let heading = toks(format!(
+            "gvar: version {}",
+            format_version_major_minor(gvar.major_version, gvar.minor_version)
+        ));
         if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
-            toks(format!(
-                "gvar: version {}",
-                format_version_major_minor(gvar.major_version, gvar.minor_version)
-            ))
-            .glue(
+            // NOTE - Signed difference in indentation levels (measured in half-tabs) between each table field and its multiline contents
+            const ADVANCE: i8 = 1;
+
+            heading.glue(
                 LineBreak,
                 TokenStream::join_with(
                     vec![
@@ -168,23 +177,20 @@ mod gvar {
                             "Shared Tuples ({} total):",
                             gvar.shared_tuples.len()
                         )),
-                        display_shared_tuples(&gvar.shared_tuples),
+                        display_shared_tuples(&gvar.shared_tuples).indent_by(ADVANCE),
                         toks(format!(
                             "Glyph Variation Data ({} glyphs):",
                             gvar.glyph_variation_data_array.len()
                         )),
-                        display_glyph_variation_data_array(&gvar.glyph_variation_data_array),
+                        display_glyph_variation_data_array(&gvar.glyph_variation_data_array)
+                            .indent_by(ADVANCE),
                     ],
                     LineBreak,
                 )
-                .indent_by(2),
+                .indent_by(1),
             )
         } else {
-            tok(format!(
-                "gvar: version {}",
-                format_version_major_minor(gvar.major_version, gvar.minor_version)
-            ))
-            .then(toks(format!(
+            heading.chain(toks(format!(
                 "; {} shared tuples, {} glyph variation data tables",
                 gvar.shared_tuples.len(),
                 gvar.glyph_variation_data_array.len(),
@@ -192,64 +198,78 @@ mod gvar {
         }
     }
 
+    /// Tokenizer for GVAR `GvarTupleVariationHeader` (inline)
     fn display_tuple_variation_header(header: &GvarTupleVariationHeader) -> TokenStream<'static> {
         toks(format!(
             "Header (size: {} bytes)",
             header.variation_data_size
         ))
-        // STUB
+        // STUB - consider what
     }
 
+    /// Tokenizer for GVAR `GlyphVariationData` (conditionally inline/multiline)
+    ///
+    /// When there is only one tuple variation header (or none), we continue to display it inline.
+    /// When there are multiple tuple variation headers, a linebreak is inserted before displaying them in a multiline fashion.
     fn display_glyph_variation_data(table: &GlyphVariationData) -> TokenStream<'static> {
-        match &table.tuple_variation_headers[..] {
-            [] => unreachable!("empty tuple variation headers"), // FIXME - final version should not panic, but we want to figure out whether this case happens
-            [header] => {
-                display_tuple_variation_header(header)
-                // WIP - we may want to show more than just the header in future
+        let headers = match &table.tuple_variation_headers[..] {
+            [] => {
+                error!(
+                    "[display_glyph_variation_data]: empty array of tuple variation headers encountered"
+                );
+                toks("<No GlyphVariation Data>")
             }
+            [header] => display_tuple_variation_header(header),
             headers => {
+                // FIXME[epic=magic] - arbitrary local bookending const
+                const LOCAL_BOOKEND: usize = 4;
+
+                const ITEM_ADVANCE: i8 = 1;
+                const ELISION_DELTA: i8 = -1;
+
                 let headers_str = arrayfmt::display_items_elided(
                     headers,
                     |ix, header| {
-                        toks(format!("[{ix}]: "))
-                            .chain(display_tuple_variation_header(header))
-                            .indent_by(2)
+                        toks(format!("[{ix}]: ")).chain(display_tuple_variation_header(header))
                     },
-                    4,
+                    LOCAL_BOOKEND,
                     |start, stop| {
                         toks(format!(
                             "(skipping tuple variation headers {start}..{stop})"
                         ))
-                        .indent_by(1)
+                        .indent_by(ELISION_DELTA)
                     },
-                );
-                // WIP - we may want to show more than just the headers in future
+                )
+                .indent_by(ITEM_ADVANCE);
                 LineBreak.then(headers_str)
             }
-        }
+        };
+        // STUB - determine whether to emit any information for table.data
+        headers
     }
 
+    /// Tokenizer for arrays of GlyphVariationData (multiline)
     fn display_glyph_variation_data_array(
         array: &[Option<GlyphVariationData>],
     ) -> TokenStream<'static> {
+        // FIXME[epic=magic-const] - arbitrary local bookending const
         const TABLE_BOOKEND: usize = 4;
+
         arrayfmt::display_nullable(
             array,
-            |ix, table| {
-                toks(format!("[{ix}]: "))
-                    .chain(display_glyph_variation_data(table))
-                    .indent_by(2)
-            },
+            |ix, table| tok(format!("[{ix}]: ")).then(display_glyph_variation_data(table)),
             TABLE_BOOKEND,
             |n, (start, stop)| {
                 toks(format!(
                     "(skipping {n} glyph variation data tables between indices {start}..{stop})"
                 ))
-                .indent_by(1)
+                .indent_by(-1)
             },
         )
+        .indent_by(1)
     }
 
+    /// Tokenizer for GVAR shared tuple records (inline)
     fn display_shared_tuple_record(tuple: &GvarTupleRecord) -> TokenStream<'static> {
         const COORD_BOOKEND: usize = 4;
         arrayfmt::display_items_inline(
@@ -261,16 +281,16 @@ mod gvar {
     }
 
     fn display_shared_tuples(shared_tuples: &[GvarTupleRecord]) -> TokenStream<'static> {
+        // FIXME[epic=magic-const] - arbitrary local bookending const
         const RECORDS_BOOKEND: usize = 4;
+
         arrayfmt::display_items_elided(
             shared_tuples,
             |shared_tuple_ix, record| {
-                toks(format!("[{shared_tuple_ix}]: "))
-                    .chain(display_shared_tuple_record(record))
-                    .indent_by(2)
+                toks(format!("[{shared_tuple_ix}]: ")).chain(display_shared_tuple_record(record))
             },
             RECORDS_BOOKEND,
-            |start, stop| toks(format!("(skipping shared tuples {start}..{stop})")).indent_by(1),
+            |start, stop| toks(format!("(skipping shared tuples {start}..{stop})")).indent_by(-1),
         )
     }
 }
@@ -301,7 +321,7 @@ mod fvar {
                             |ix, axis| {
                                 tok(format!("[{ix}]: "))
                                     .then(display_variation_axis_record(axis))
-                                    .indent_by(2)
+                                    .indent_by(1)
                             },
                             conf.bookend_size,
                             |start, stop| toks(format!("(skipping axis records {start}..{stop})")),
@@ -315,7 +335,7 @@ mod fvar {
                             |ix, instance| {
                                 tok(format!("[{ix}]: "))
                                     .then(display_instance_record(instance, conf))
-                                    .indent_by(2)
+                                    .indent_by(1)
                             },
                             conf.bookend_size,
                             |start, stop| {
@@ -323,7 +343,7 @@ mod fvar {
                             },
                         ),
                     )
-                    .indent_by(2),
+                    .indent_by(1),
             )
         } else {
             tok(format!(
@@ -404,14 +424,16 @@ fn show_loca_metrics(loca: &Option<LocaMetrics>, _conf: &Config) {
     }
 }
 
-use gdef::show_gdef_metrics;
+use gdef::display_gdef_metrics;
 
 mod gdef {
     use super::*;
 
-    // FIXME - rewrite into pure TokenStream
-    pub(super) fn show_gdef_metrics(gdef: Option<&GdefMetrics>, conf: &Config) {
-        if let Some(GdefMetrics {
+    pub(super) fn display_gdef_metrics(
+        gdef: Option<&GdefMetrics>,
+        conf: &Config,
+    ) -> TokenStream<'static> {
+        let Some(GdefMetrics {
             major_version,
             minor_version,
             glyph_class_def,
@@ -420,42 +442,43 @@ mod gdef {
             mark_attach_class_def,
             data,
         }) = gdef
-        {
-            // WIP
-            println!(
-                "GDEF: version {}",
-                format_version_major_minor(*major_version, *minor_version)
-            );
-            if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
-                // FIXME - rewrite into single TokenStream
-                if let Some(glyph_class_def) = glyph_class_def {
-                    show_glyph_class_def(glyph_class_def, conf);
-                }
-                if let Some(attach_list) = attach_list {
-                    display_attach_list(attach_list, conf)
-                        .indent_by(2)
-                        .println();
-                }
-                if let Some(lig_caret_list) = lig_caret_list {
-                    display_lig_caret_list(lig_caret_list, conf)
-                        .indent_by(2)
-                        .println();
-                }
-                if let Some(mark_attach_class_def) = mark_attach_class_def {
-                    show_mark_attach_class_def(mark_attach_class_def, conf);
-                }
-                match &data.mark_glyph_sets_def {
-                    // WIP
-                    None => println!("MarkGlyphSet: <none>"),
-                    Some(mgs) => display_mark_glyph_set(mgs, conf).indent_by(2).println(),
-                }
-                match &data.item_var_store {
-                    None => println!("\tItemVariationStore: <none>"),
-                    Some(ivs) => display_item_variation_store(ivs, conf)
-                        .indent_by(2)
-                        .println(),
-                }
+        else {
+            return TokenStream::empty();
+        };
+        let heading = toks(format!(
+            "GDEF: version {}",
+            format_version_major_minor(*major_version, *minor_version)
+        ));
+        if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
+            let mut components = Vec::new();
+
+            if let Some(glyph_class_def) = glyph_class_def {
+                components.push(display_glyph_class_def(glyph_class_def, conf));
             }
+            if let Some(attach_list) = attach_list {
+                components.push(display_attach_list(attach_list, conf));
+            }
+            if let Some(lig_caret_list) = lig_caret_list {
+                components.push(display_lig_caret_list(lig_caret_list, conf));
+            }
+            if let Some(mark_attach_class_def) = mark_attach_class_def {
+                components.push(display_mark_attach_class_def(mark_attach_class_def, conf));
+            }
+            match &data.mark_glyph_sets_def {
+                None => components.push(toks("MarkGlyphSet: <none>")),
+                Some(mgs) => components.push(display_mark_glyph_set(mgs, conf)),
+            }
+            match &data.item_var_store {
+                None => components.push(toks("ItemVariationStore: <none>")),
+                Some(ivs) => components.push(display_item_variation_store(ivs, conf)),
+            }
+
+            heading.glue(
+                LineBreak,
+                TokenStream::join_with(components, LineBreak).indent_by(1),
+            )
+        } else {
+            heading
         }
     }
     fn display_attach_point(point_indices: &[u16], conf: &Config) -> TokenStream<'static> {
@@ -467,81 +490,104 @@ mod gdef {
         )
     }
 
+    /// Tokenizer for `AttachList` (multiline)
     fn display_attach_list(attach_list: &AttachList, conf: &Config) -> TokenStream<'static> {
-        toks("AttachList:")
-            .glue(
+        toks("AttachList:").glue(
+            LineBreak,
+            TokenStream::join_with(
+                vec![
+                    display_coverage_table_full(&attach_list.coverage, conf),
+                    display_attach_point_array(&attach_list.attach_points, conf),
+                ],
                 LineBreak,
-                display_coverage_table_full(&attach_list.coverage, conf).indent_by(2),
             )
-            .glue(
-                LineBreak,
-                arrayfmt::display_items_elided(
-                    &attach_list.attach_points,
-                    |ix, AttachPoint { point_indices }| {
-                        toks(format!("[{ix}]: "))
-                            .indent_by(2)
-                            .chain(display_attach_point(point_indices, conf))
-                    },
-                    conf.bookend_size,
-                    |start, stop| {
-                        toks(format!(
-                            "(skipping attach points for glyphs {start}..{stop})"
-                        ))
-                        .indent_by(1)
-                    },
-                ),
-            )
+            .indent_by(1),
+        )
     }
 
+    /// Tokenizer for arrays of AttachPoints (multiline)
+    fn display_attach_point_array(array: &[AttachPoint], conf: &Config) -> TokenStream<'static> {
+        arrayfmt::display_items_elided(
+            array,
+            |ix, AttachPoint { point_indices }| {
+                toks(format!("[{ix}]: "))
+                    .chain(display_attach_point(point_indices, conf))
+                    .indent_by(1)
+            },
+            conf.bookend_size,
+            |start, stop| {
+                toks(format!(
+                    "(skipping attach points for glyphs {start}..{stop})"
+                ))
+            },
+        )
+    }
+
+    /// Tokenizer for `LigCaretList` (multiline)
     fn display_lig_caret_list(
         lig_caret_list: &LigCaretList,
         conf: &Config,
     ) -> TokenStream<'static> {
-        toks("LigCaretList:")
-            .glue(
+        toks("LigCaretList:").glue(
+            LineBreak,
+            TokenStream::join_with(
+                vec![
+                    display_coverage_table_full(&lig_caret_list.coverage, conf),
+                    display_lig_glyph_array(&lig_caret_list.lig_glyphs, conf),
+                ],
                 LineBreak,
-                display_coverage_table_full(&lig_caret_list.coverage, conf).indent_by(2),
             )
-            .glue(
-                LineBreak,
-                arrayfmt::display_items_elided(
-                    &lig_caret_list.lig_glyphs,
-                    |ix, lig_glyph| {
-                        toks(format!("[{ix}]: ")).indent_by(2).chain(
-                            arrayfmt::display_items_inline(
-                                &lig_glyph.caret_values,
-                                display_caret_value,
-                                conf.inline_bookend,
-                                |num_skipped| toks(format!("...({num_skipped})...")),
-                            ),
-                        )
-                    },
-                    conf.bookend_size,
-                    |start, stop| {
-                        toks(format!("(skipping LigGlyphs {start}..{stop})")).indent_by(1)
-                    },
-                ),
-            )
+            .indent_by(1),
+        )
     }
 
-    // FIXME - rewrite into pure TokenStream
-    fn show_mark_attach_class_def(mark_attach_class_def: &ClassDef, conf: &Config) {
-        println!("\tMarkAttachClassDef:");
-        display_class_def(mark_attach_class_def, display_mark_attach_class, conf).println();
+    /// Tokenizer for arrays of LigGlyphs (multiline)
+    fn display_lig_glyph_array(array: &[LigGlyph], conf: &Config) -> TokenStream<'static> {
+        arrayfmt::display_items_elided(
+            array,
+            |ix, lig_glyph| {
+                toks(format!("[{ix}]: "))
+                    .chain(arrayfmt::display_items_inline(
+                        &lig_glyph.caret_values,
+                        display_caret_value,
+                        conf.inline_bookend,
+                        |num_skipped| toks(format!("...({num_skipped})...")),
+                    ))
+                    .indent_by(1)
+            },
+            conf.bookend_size,
+            |start, stop| toks(format!("(skipping LigGlyphs {start}..{stop})")),
+        )
     }
 
-    // FIXME - rewrite into pure TokenStream
-    fn show_glyph_class_def(class_def: &ClassDef, conf: &Config) {
-        println!("\tGlyphClassDef:");
-        display_class_def(class_def, display_glyph_class, conf).println();
+    /// Tokenizer for GDEF mark-attach `ClassDef` (multiline)
+    fn display_mark_attach_class_def(
+        mark_attach_class_def: &ClassDef,
+        conf: &Config,
+    ) -> TokenStream<'static> {
+        toks("MarkAttachClassDef:").glue(
+            LineBreak,
+            display_class_def(mark_attach_class_def, display_mark_attach_class, conf).indent_by(1),
+        )
     }
 
+    /// Tokenizer for GDEF glyph `ClassDef` (multiline)
+    fn display_glyph_class_def(class_def: &ClassDef, conf: &Config) -> TokenStream<'static> {
+        toks("GlyphClassDef:").glue(
+            LineBreak,
+            display_class_def(class_def, display_glyph_class, conf).indent_by(1),
+        )
+    }
+
+    /// Tokenizer for MarkAttachClass (Uint16) values (inline)
     fn display_mark_attach_class(mark_attach_class: &u16) -> TokenStream<'static> {
-        // STUB - if we come up with a semantic association for specific numbers, add branches here
+        // TODO - if we come up with a semantic association for specific numbers, add branches here
         toks(format!("{mark_attach_class}"))
     }
 
+    /// Tokenizer for GlyphClass (Uint16) values (inline)
     fn display_glyph_class(class: &u16) -> TokenStream<'static> {
+        // REVIEW - consider replacing with semantically distinguished const-enum and matching on that instead of raw numbers
         toks(format_glyph_class(class))
     }
 
@@ -557,13 +603,12 @@ mod gdef {
                             tok(format!("[{ix}]: ")).then(display_coverage_table_full(covt, conf))
                         }
                     })
-                    .indent_by(2)
+                    .indent_by(1)
                 },
                 conf.bookend_size,
-                |start, stop| {
-                    toks(format!("(skipping coverage tables {start}..{stop})")).indent_by(1)
-                },
-            ),
+                |start, stop| toks(format!("(skipping coverage tables {start}..{stop})")),
+            )
+            .indent_by(1),
         )
     }
 
@@ -617,6 +662,8 @@ mod gdef {
         )
         .indent_by(1)
     }
+
+    /// Tokenizer for arrays of ItemVariationData (multiline)
     fn display_variation_data_array(
         ivda: &[Option<ItemVariationData>],
         conf: &Config,
@@ -625,18 +672,13 @@ mod gdef {
             LineBreak,
             arrayfmt::display_items_elided(
                 ivda,
-                |ix, o_ivd| {
-                    match o_ivd {
-                        Some(ivd) => {
-                            tok(format!("[{ix}]: ")).then(display_variation_data(ivd, conf))
-                        }
-                        None => toks(format!("[{ix}]: <NONE>")),
-                    }
-                    .indent_by(2)
+                |ix, o_ivd| match o_ivd {
+                    Some(ivd) => tok(format!("[{ix}]: ")).then(display_variation_data(ivd, conf)),
+                    None => toks(format!("[{ix}]: <NONE>")),
                 },
                 conf.bookend_size,
                 |start_ix, stop_ix| {
-                    toks(format!("...(skipping entries {start_ix}..{stop_ix})...")).indent_by(1)
+                    toks(format!("...(skipping entries {start_ix}..{stop_ix})...")).indent_by(-1)
                 },
             )
             .indent_by(2),
@@ -652,7 +694,7 @@ mod gdef {
                     &ivd.region_indices,
                     |ix| toks(format!("{ix}")),
                     conf.inline_bookend,
-                    |n_skipped| toks(format!("...({n_skipped})...")),
+                    |n_skipped| toks(format!("..({n_skipped})..")),
                 ))
                 .glue(
                     LineBreak,
@@ -666,7 +708,7 @@ mod gdef {
                     ))
                     .glue(LineBreak, display_delta_sets(&ivd.delta_sets, conf)),
                 )
-                .indent_by(2),
+                .indent_by(1),
         )
     }
 
@@ -738,33 +780,37 @@ mod layout {
         ctxt: Ctxt,
         conf: &Config,
     ) -> TokenStream<'static> {
-        if let Some(LayoutMetrics {
+        let Some(LayoutMetrics {
             major_version,
             minor_version,
             script_list,
             feature_list,
             lookup_list,
-            feature_variations: _feature_variations,
+            ..
         }) = layout
-        {
-            let minimal = toks(format!(
-                "{}: version {}",
-                name_for_table_disc(ctxt.get_disc().expect("Ctxt missing TableDiscriminator")),
-                format_version_major_minor(*major_version, *minor_version)
-            ));
-            if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
-                minimal.glue(
+        else {
+            return TokenStream::empty();
+        };
+        let minimal = toks(format!(
+            "{}: version {}",
+            name_for_table_disc(ctxt.get_disc().expect("Ctxt missing TableDiscriminator")),
+            format_version_major_minor(*major_version, *minor_version)
+        ));
+        if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
+            minimal.glue(
+                LineBreak,
+                TokenStream::join_with(
+                    vec![
+                        display_script_list(script_list, conf),
+                        display_feature_list(feature_list, conf),
+                        display_lookup_list(lookup_list, ctxt, conf),
+                    ],
                     LineBreak,
-                    display_script_list(script_list, conf)
-                        .glue(LineBreak, display_feature_list(feature_list, conf))
-                        .glue(LineBreak, display_lookup_list(lookup_list, ctxt, conf))
-                        .indent_by(2),
                 )
-            } else {
-                minimal
-            }
+                .indent_by(2),
+            )
         } else {
-            TokenStream::empty()
+            minimal
         }
     }
 
@@ -785,38 +831,45 @@ mod layout {
                 LineBreak,
                 arrayfmt::display_items_elided(
                     script_list,
-                    |ix, item| {
-                        let Some(ScriptTable {
-                            default_lang_sys,
-                            lang_sys_records,
-                        }) = &item.script
-                        else {
-                            unreachable!("missing ScriptTable at index {ix} in ScriptList");
-                        };
-
-                        toks(format!("[{ix}]: {}", item.script_tag))
-                            .glue(LineBreak, {
-                                match default_lang_sys {
-                                    None => display_lang_sys_records(lang_sys_records, conf),
-                                    langsys @ Some(..) => toks("[Default LangSys]: ")
-                                        .indent_by(1)
-                                        .chain(display_langsys(langsys, conf))
-                                        .glue(
-                                            LineBreak,
-                                            display_lang_sys_records(lang_sys_records, conf),
-                                        ),
-                                }
-                            })
-                            .indent_by(1)
-                    },
+                    |ix, item| display_script_record(ix, item, conf),
                     conf.bookend_size,
-                    |start, stop| toks(format!("skipping ScriptRecords {start}..{stop}")),
+                    |start, stop| {
+                        toks(format!("skipping ScriptRecords {start}..{stop}")).indent_by(-1)
+                    },
                 )
-                .indent_by(1),
+                .indent_by(2),
             )
         }
     }
 
+    /// Tokenizer for ScriptRecord (multiline)
+    fn display_script_record(
+        ix: usize,
+        item: &ScriptRecord,
+        conf: &Config,
+    ) -> TokenStream<'static> {
+        let Some(ScriptTable {
+            default_lang_sys,
+            lang_sys_records,
+        }) = &item.script
+        else {
+            // REVIEW - should this be a panic?
+            unreachable!("missing ScriptTable at index {ix} in ScriptList");
+        };
+
+        let ix_display = toks(format!("[{ix}]: {}", item.script_tag));
+        let extra = match default_lang_sys {
+            None => display_lang_sys_records(lang_sys_records, conf),
+            langsys @ Some(..) => toks("[Default LangSys]: ")
+                .chain(display_langsys(langsys, conf))
+                .glue(LineBreak, display_lang_sys_records(lang_sys_records, conf))
+                .indent_by(1),
+        };
+
+        ix_display.glue(LineBreak, extra)
+    }
+
+    /// Tokenizer for LangSysRecords (multiline)
     fn display_lang_sys_records(
         lang_sys_records: &[LangSysRecord],
         conf: &Config,
@@ -831,12 +884,13 @@ mod layout {
                     |ix, item| {
                         toks(format!("[{ix}]: {}; ", item.lang_sys_tag))
                             .chain(display_langsys(&item.lang_sys, conf))
-                            .indent_by(1)
                     },
                     conf.bookend_size,
-                    |start, stop| toks(format!("(skipping LangSysRecords {start}..{stop})")),
+                    |start, stop| {
+                        toks(format!("(skipping LangSysRecords {start}..{stop})")).indent_by(-1)
+                    },
                 )
-                .indent_by(1),
+                .indent_by(2),
             )
         }
     }
@@ -883,12 +937,13 @@ mod layout {
                      }| {
                         tok(format!("[{ix}]: {feature_tag}"))
                             .then(display_feature_table(feature, conf))
-                            .indent_by(1)
                     },
                     conf.bookend_size,
-                    |start, stop| toks(format!("(skipping FeatureIndices {start}..{stop})")),
+                    |start, stop| {
+                        toks(format!("(skipping FeatureIndices {start}..{stop})")).indent_by(-1)
+                    },
                 )
-                .indent_by(1),
+                .indent_by(2),
             )
         }
     }
@@ -923,14 +978,14 @@ mod layout {
             arrayfmt::display_items_elided(
                 lookup_list,
                 move |ix, table| {
-                    toks(format!("[{ix}]: "))
-                        .chain(display_lookup_table(table, ctxt, conf))
-                        .indent_by(1)
+                    toks(format!("[{ix}]: ")).chain(display_lookup_table(table, ctxt, conf))
                 },
                 conf.bookend_size,
-                |start, stop| toks(format!("(skipping LookupTables {start}..{stop})")),
+                |start, stop| {
+                    toks(format!("(skipping LookupTables {start}..{stop})")).indent_by(-1)
+                },
             )
-            .indent_by(1),
+            .indent_by(2),
         )
     }
 
@@ -1970,28 +2025,38 @@ mod stat {
     }
 }
 
-use kern::show_kern_metrics;
+use kern::display_kern_metrics;
 mod kern {
     use super::*;
-    pub(super) fn show_kern_metrics(kern: &Option<KernMetrics>, conf: &Config) {
-        if let Some(kern) = kern {
-            if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
-                println!("kern");
+
+    /// Tokenizer for KernMEtrics
+    pub(super) fn display_kern_metrics(
+        kern: &Option<KernMetrics>,
+        conf: &Config,
+    ) -> TokenStream<'static> {
+        let Some(kern) = kern else {
+            return TokenStream::empty();
+        };
+
+        let heading = toks(format!("kern: {} kerning subtables", kern.subtables.len()));
+
+        if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
+            heading.glue(
+                LineBreak,
                 arrayfmt::display_items_elided(
                     &kern.subtables,
                     |ix, subtable| {
-                        toks(format!("[{ix}]: "))
-                            .indent_by(1)
-                            .chain(display_kern_subtable(subtable, conf))
+                        toks(format!("[{ix}]: ")).chain(display_kern_subtable(subtable, conf))
                     },
                     conf.bookend_size,
-                    |start, stop| toks(format!("(skipping kern subtables {start}..{stop})")),
+                    |start, stop| {
+                        toks(format!("(skipping kern subtables {start}..{stop})")).indent_by(-1)
+                    },
                 )
-                .indent_by(1)
-                .println(); // WIP
-            } else {
-                println!("kern: {} kerning subtables", kern.subtables.len());
-            }
+                .indent_by(2),
+            )
+        } else {
+            heading
         }
     }
     fn format_kern_flags(flags: KernFlags) -> String {
@@ -2016,6 +2081,7 @@ mod kern {
         params.join(" | ")
     }
 
+    /// Tokenizer for KerningArray (multiline).
     fn display_kerning_array(array: &KerningArray, conf: &Config) -> TokenStream<'static> {
         arrayfmt::display_wec_rows_elided(
             &array.0,
@@ -2028,10 +2094,14 @@ mod kern {
                 ))
             },
             conf.bookend_size / 2, // FIXME - magic constant adjustment
-            |start, stop| toks(format!("(skipping kerning array rows {start}..{stop})")),
-        ).indent_by(4) // REVIEW - check that this is the correct indentation level
+            |start, stop| {
+                toks(format!("(skipping kerning array rows {start}..{stop})")).indent_by(-1)
+            },
+        )
+        .indent_by(1)
     }
 
+    /// Tokenizer for KernClassTable (inline).
     fn display_kern_class_table(table: &KernClassTable, conf: &Config) -> TokenStream<'static> {
         tok(format!(
             "Classes[first={}, nGlyphs={}]: ",
@@ -2046,6 +2116,7 @@ mod kern {
         ))
     }
 
+    /// Tokenizer for KernSubtableData (inline or multiline).
     fn display_kern_subtable_data(
         subtable_data: &KernSubtableData,
         conf: &Config,
@@ -2071,10 +2142,13 @@ mod kern {
                 right_class,
                 kerning_array,
             }) => {
+                // REVIEW - consider whether we are using too much horizontal space for the inline display
                 let left = tok("LeftClass=").then(display_kern_class_table(left_class, conf));
-
                 let right = tok("RightClass=").then(display_kern_class_table(right_class, conf));
-                let kern = tok("KerningArray:").then(display_kerning_array(kerning_array, conf));
+                let kern = toks("KerningArray:").glue(
+                    LineBreak,
+                    display_kerning_array(kerning_array, conf).indent_by(1),
+                );
                 left.glue(tok("\t"), right).glue(tok("\t"), kern)
             }
         }
@@ -2102,8 +2176,8 @@ fn display_class_def(
         } => {
             let toks_init = match start_glyph_id {
                 0 => TokenStream::empty(),
-                1 => toks("(skipping uncovered glyph 0)").indent_by(3),
-                n => toks(format!("(skipping uncovered glyphs 0..{n})")).indent_by(3),
+                1 => toks("(skipping uncovered glyph 0)"),
+                n => toks(format!("(skipping uncovered glyphs 0..{n})")),
             };
             let toks_array = arrayfmt::display_items_elided(
                 class_value_array,
@@ -2111,7 +2185,6 @@ fn display_class_def(
                     let gix = start_glyph_id as usize + ix;
                     tok(format!("Glyph {}: ", format_glyphid_hex(gix as u16, false)))
                         .then(show_fn(item))
-                        .indent_by(4)
                 },
                 conf.bookend_size,
                 |start, stop| {
@@ -2120,11 +2193,11 @@ fn display_class_def(
                         format_glyphid_hex(start_glyph_id + start as u16, false),
                         format_glyphid_hex(start_glyph_id + stop as u16, false),
                     ))
-                    .indent_by(3)
+                    .indent_by(-1)
                 },
-            );
-            // WIP
-            TokenStream::join_with(vec![toks_init, toks_array], LineBreak)
+            )
+            .indent_by(1);
+            TokenStream::join_with(vec![toks_init, toks_array.indent_by(1)], LineBreak)
         }
         ClassDef::Format2 {
             ref class_range_records,
@@ -2137,7 +2210,6 @@ fn display_class_def(
                     format_glyphid_hex(class_range.end_glyph_id, false),
                 ))
                 .then(show_fn(&class_range.value))
-                .indent_by(4)
             },
             conf.bookend_size,
             |start, stop| {
@@ -2146,9 +2218,10 @@ fn display_class_def(
                 toks(format!(
                     "(skipping ranges covering glyphs {low_end}..={high_end})",
                 ))
-                .indent_by(3)
+                .indent_by(-1)
             },
-        ),
+        )
+        .indent_by(2),
     }
 }
 
@@ -2436,8 +2509,11 @@ mod cmap {
                     &cmap.encoding_records,
                     display_encoding_record,
                     conf.bookend_size,
-                    |start, stop| toks(format!("\t(skipping encoding records {start}..{stop})")),
-                ),
+                    |start, stop| {
+                        toks(format!("(skipping encoding records {start}..{stop})")).indent_by(-1)
+                    },
+                )
+                .indent_by(2),
             )
         } else {
             heading.chain(toks(format!(
@@ -2447,6 +2523,7 @@ mod cmap {
         }
     }
 
+    /// Tokenizer for an indexed `EncodingRecord` (inline).
     fn display_encoding_record(ix: usize, record: &EncodingRecord) -> TokenStream<'static> {
         // TODO[epic=enrichment]: if we implement subtables and more verbosity levels, show subtable details
         let EncodingRecord {
@@ -2454,7 +2531,7 @@ mod cmap {
             encoding,
             subtable: _subtable,
         } = record;
-        toks(format!("[{ix}]: platform={platform}, encoding={encoding}")).indent_by(2)
+        toks(format!("[{ix}]: platform={platform}, encoding={encoding}"))
     }
 }
 
@@ -2493,14 +2570,17 @@ mod hmtx {
 
     pub(crate) fn display_hmtx_metrics(hmtx: &HmtxMetrics, conf: &Config) -> TokenStream<'static> {
         if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
-            toks("hmtx").glue(
+            toks("hmtx:").glue(
                 LineBreak,
                 arrayfmt::display_items_elided(
                     &hmtx.0,
                     display_unified_bearing,
                     conf.bookend_size,
-                    |start, stop| toks(format!("(skipping hmetrics {start}..{stop})")).indent_by(1),
-                ),
+                    |start, stop| {
+                        toks(format!("(skipping hmetrics {start}..{stop})")).indent_by(-1)
+                    },
+                )
+                .indent_by(2),
             )
         } else {
             toks(format!("hmtx: {} hmetrics", hmtx.0.len()))
@@ -2509,47 +2589,49 @@ mod hmtx {
     fn display_unified_bearing(ix: usize, hmet: &UnifiedBearing) -> TokenStream<'static> {
         match &hmet.advance_width {
             Some(width) => toks(format!(
-                "\tGlyph ID [{ix}]: advanceWidth={width}, lsb={}",
+                "Glyph ID [{ix}]: advanceWidth={width}, lsb={}",
                 hmet.left_side_bearing
             )),
-            None => toks(format!("\tGlyph ID [{ix}]: lsb={}", hmet.left_side_bearing)),
+            None => toks(format!("Glyph ID [{ix}]: lsb={}", hmet.left_side_bearing)),
         }
     }
 }
 
-use vmtx::show_vmtx_metrics;
+use vmtx::display_vmtx_metrics;
 mod vmtx {
     use super::*;
 
     // FIXME - refactor into pure TokenStream
-    pub(crate) fn show_vmtx_metrics(vmtx: &Option<VmtxMetrics>, conf: &Config) {
-        // TODO - add mechanism for auto-computation of current indent level
-        const INDENT_LEVEL: u8 = 1;
-        if let Some(vmtx) = vmtx {
-            let disp = if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
-                toks("vmtx").glue(
-                    LineBreak,
-                    arrayfmt::display_items_elided(
-                        &vmtx.0,
-                        display_unified_bearing,
-                        conf.bookend_size,
-                        |start, stop| {
-                            toks(format!("(skipping vmetrics {start}..{stop})"))
-                                .indent_by(INDENT_LEVEL)
-                        },
-                    ),
+    pub(crate) fn display_vmtx_metrics(
+        vmtx: &Option<VmtxMetrics>,
+        conf: &Config,
+    ) -> TokenStream<'static> {
+        let Some(vmtx) = vmtx else {
+            return TokenStream::empty();
+        };
+
+        let heading = toks(format!("vmtx: {} vmetrics", vmtx.0.len()));
+
+        if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
+            heading.glue(
+                LineBreak,
+                arrayfmt::display_items_elided(
+                    &vmtx.0,
+                    display_unified_bearing,
+                    conf.bookend_size,
+                    |start, stop| {
+                        toks(format!("(skipping vmetrics {start}..{stop})")).indent_by(-1)
+                    },
                 )
-            } else {
-                toks(format!("vmtx: {} vmetrics", vmtx.0.len()))
-            };
-            disp.println()
+                .indent_by(2),
+            )
+        } else {
+            heading
         }
     }
 
+    /// Tokenizer for a `vmtx` UnifiedBearing (inline)
     fn display_unified_bearing(ix: usize, vmet: &UnifiedBearing) -> TokenStream<'static> {
-        // TODO - add mechanism for auto-computation of current indent level
-        const INDENT_LEVEL: u8 = 2;
-
         // FIXME - `_width` is a misnomer, should be `_height`
         match &vmet.advance_width {
             Some(height) => toks(format!(
@@ -2559,26 +2641,24 @@ mod vmtx {
             // FIXME - `left` is a misnomer, should be `top`
             None => toks(format!("Glyph ID [{ix}]: tsb={}", vmet.left_side_bearing)),
         }
-        .indent_by(INDENT_LEVEL)
     }
 }
 
-// FIXME - rewrite into pure TokenStream
-fn show_maxp_metrics(maxp: &MaxpMetrics, _conf: &Config) {
+fn display_maxp_metrics(maxp: &MaxpMetrics, _conf: &Config) -> TokenStream<'static> {
     match maxp {
-        MaxpMetrics::Postscript { version } => println!(
+        MaxpMetrics::Postscript { version } => toks(format!(
             "maxp: version {} (PostScript)",
             format_version16dot16(*version)
-        ),
-        MaxpMetrics::UnknownVersion { version } => println!(
+        )),
+        MaxpMetrics::UnknownVersion { version } => toks(format!(
             "maxp: version {} (not recognized)",
             format_version16dot16(*version)
-        ),
+        )),
         // STUB - currently limited by definition of Version1 variant, but the information available in the type may be enriched later
-        MaxpMetrics::Version1 { version } => println!(
+        MaxpMetrics::Version1 { version } => toks(format!(
             "maxp: version {} (contents omitted)",
             format_version16dot16(*version)
-        ),
+        )),
     }
 }
 
@@ -2638,38 +2718,32 @@ fn show_post_metrics(post: &PostMetrics, _conf: &Config) {
     );
 }
 
-use glyf::show_glyf_metrics;
+use glyf::display_glyf_metrics;
 mod glyf {
     use super::*;
 
     // FIXME - refactor into pure TokenStream
-    pub(crate) fn show_glyf_metrics(glyf: &Option<GlyfMetrics>, conf: &Config) {
-        // TODO - add mechanism for auto-computation of current indent level
-        const INDENT_LEVEL: u8 = 1;
-        let disp = if let Some(glyf) = glyf.as_ref() {
-            let hdr = tok(format!("glyf: {} glyphs", glyf.num_glyphs));
-            if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
-                hdr.then(LineBreak.then(arrayfmt::display_items_elided(
-                    glyf.glyphs.as_slice(),
-                    display_glyph_metric,
-                    conf.bookend_size,
-                    |start, stop| {
-                        toks(format!("(skipping glyphs {start}..{stop})")).indent_by(INDENT_LEVEL)
-                    },
-                )))
-            } else {
-                hdr.into()
-            }
-        } else {
-            toks("glyf: <not present>")
+    pub(crate) fn display_glyf_metrics(
+        glyf: &Option<GlyfMetrics>,
+        conf: &Config,
+    ) -> TokenStream<'static> {
+        let Some(glyf) = glyf.as_ref() else {
+            return TokenStream::empty();
         };
-        disp.println()
+        let hdr = tok(format!("glyf: {} glyphs", glyf.num_glyphs));
+        if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
+            hdr.then(LineBreak.then(arrayfmt::display_items_elided(
+                glyf.glyphs.as_slice(),
+                display_glyph_metric,
+                conf.bookend_size,
+                |start, stop| toks(format!("(skipping glyphs {start}..{stop})")),
+            )))
+        } else {
+            hdr.into()
+        }
     }
 
     fn display_glyph_metric(ix: usize, glyf: &GlyphMetric) -> TokenStream<'static> {
-        // TODO - add mechanism for auto-computation of current indent level
-        const INDENT_LEVEL: u8 = 2;
-
         tok(format!("[{ix}]: "))
             .then(match glyf {
                 GlyphMetric::Empty => toks("<empty>"),
@@ -2682,6 +2756,6 @@ mod glyf {
                     composite.components, composite.instructions, composite.bounding_box,
                 )),
             })
-            .indent_by(INDENT_LEVEL)
+            .indent_by(1)
     }
 }
