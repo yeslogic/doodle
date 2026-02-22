@@ -438,6 +438,8 @@ dependencies = [
  "doodle",
  "encoding",
  "fixed",
+ "log",
+ "stderrlog",
 ]
 
 [[package]]
