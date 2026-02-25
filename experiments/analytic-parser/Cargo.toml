@@ -1,10 +1,10 @@
 [package]
 name = "analytic-parser"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [build-dependencies]
-lalrpop = "0.22.0"
+lalrpop = "0.23.0"
 
 [dependencies]
 lalrpop-util = { version = "0.21.0", features = ["lexer", "unicode"] }
