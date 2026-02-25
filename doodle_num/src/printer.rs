@@ -2,12 +2,12 @@ use std::borrow::Cow;
 use std::rc::Rc;
 
 use fragment::Fragment;
-use precedence::{cond_paren, Precedence};
+use precedence::{Precedence, cond_paren};
 
+use crate::codegen::{ToFragment, synthesize};
 use crate::core::{BasicBinOp, BasicUnaryOp, BinOp, Expr, MachineRep, NumRep, TypedConst, UnaryOp};
 use crate::elaborator::inference::InferenceEngine;
 use crate::elaborator::{Elaborator, IntType, TypedBinOp, TypedCast, TypedExpr, TypedUnaryOp};
-use crate::gen::{synthesize, ToFragment};
 
 pub(crate) mod fragment {
     use std::borrow::Cow;
@@ -269,10 +269,7 @@ fn compile_typed_bin_op(bin_op: &TypedBinOp<IntType>) -> Fragment {
 }
 
 fn compile_typed_unary_op(unary_op: &'_ TypedUnaryOp<IntType>) -> Fragment {
-    let token = match unary_op.inner.get_op() {
-        BasicUnaryOp::Negate => "~",
-        BasicUnaryOp::AbsVal => "abs",
-    };
+    let token = unary_op.inner.get_op().to_static_str();
     let (t_in, t_out) = unary_op.sig;
     if t_in == t_out {
         Fragment::String(Cow::Borrowed(token))
@@ -308,6 +305,8 @@ fn compile_unary_op<'a>(unary_op: &UnaryOp) -> Fragment {
     let token = match unary_op.get_op() {
         BasicUnaryOp::Negate => "~",
         BasicUnaryOp::AbsVal => "abs",
+        BasicUnaryOp::IntSucc => "succ",
+        BasicUnaryOp::IntPred => "pred",
     };
     if let Some(rep) = unary_op.cast_rep() {
         Fragment::cat(
@@ -430,7 +429,9 @@ fn compile_elab_postfix<'a>(
             .cat(Fragment::String(Cow::Borrowed(rep.to_static_str())))
     } else {
         // NOTE - this would normally be a panic but we are content to observe it without failing
-        eprintln!("[WARNING]: Postfix operation (assumed to be Cast) has mismatched NumRep and IntType...");
+        eprintln!(
+            "[WARNING]: Postfix operation (assumed to be Cast) has mismatched NumRep and IntType..."
+        );
         compile_typed_expr(inner, inner_prec)
             .cat(Fragment::String(Cow::Borrowed(" as ")))
             .cat(Fragment::String(Cow::Borrowed(rep.to_static_str())))
@@ -479,7 +480,7 @@ fn compile_typed_expr(t_expr: &TypedExpr<IntType>, prec: Precedence) -> Fragment
             prec,
             Precedence::ABSNEG,
         ),
-        TypedExpr::ElabCast(t, TypedCast { _rep, .. }, inner) => cond_paren(
+        TypedExpr::ElabCast(t, TypedCast { rep: _rep, .. }, inner) => cond_paren(
             compile_elab_postfix(*t, *_rep, inner, Precedence::CAST),
             prec,
             Precedence::CAST,

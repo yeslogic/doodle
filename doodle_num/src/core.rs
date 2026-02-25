@@ -1,5 +1,6 @@
 use num_bigint::BigInt;
-use num_traits::{Signed, Zero};
+use num_traits::{One as _, Signed, Zero};
+use serde::Serialize;
 use std::borrow::Cow;
 
 pub type Number = BigInt;
@@ -14,30 +15,50 @@ pub enum BasicBinOp {
     Rem,
 }
 
+impl BasicBinOp {
+    pub const fn to_static_str(self) -> &'static str {
+        match self {
+            BasicBinOp::Add => "+",
+            BasicBinOp::Sub => "-",
+            BasicBinOp::Mul => "*",
+            BasicBinOp::Div => "/",
+            BasicBinOp::Rem => "%",
+        }
+    }
+}
+
 impl std::fmt::Display for BasicBinOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            BasicBinOp::Add => write!(f, "+"),
-            BasicBinOp::Sub => write!(f, "-"),
-            BasicBinOp::Mul => write!(f, "*"),
-            BasicBinOp::Div => write!(f, "/"),
-            BasicBinOp::Rem => write!(f, "%"),
-        }
+        f.write_str(self.to_static_str())
     }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum BasicUnaryOp {
+    /// Arithmetic negation
     Negate,
+    /// Absolute value
     AbsVal,
+    /// The successor function over any integral type (behavior unspecified when applied to max_val)
+    IntSucc,
+    /// The predecessor function over any integral type (behavior unspecified when applied to min_val)
+    IntPred,
+}
+
+impl BasicUnaryOp {
+    pub const fn to_static_str(self) -> &'static str {
+        match self {
+            BasicUnaryOp::Negate => "~",
+            BasicUnaryOp::AbsVal => "abs",
+            BasicUnaryOp::IntSucc => "succ",
+            BasicUnaryOp::IntPred => "pred",
+        }
+    }
 }
 
 impl std::fmt::Display for BasicUnaryOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            BasicUnaryOp::Negate => write!(f, "~"),
-            BasicUnaryOp::AbsVal => write!(f, "abs"),
-        }
+        f.write_str(self.to_static_str())
     }
 }
 
@@ -239,7 +260,7 @@ macro_rules! bounds_of {
 }
 
 impl MachineRep {
-    pub(crate) fn as_bounds(self) -> Bounds {
+    pub fn as_bounds(self) -> Bounds {
         let (min, max) = match self {
             Self::U8 => bounds_of!(u8),
             Self::U16 => bounds_of!(u16),
@@ -253,32 +274,31 @@ impl MachineRep {
         Bounds { min, max }
     }
 
-    pub(crate) const fn is_signed(self) -> bool {
+    pub const fn is_signed(self) -> bool {
         self.is_signed
     }
 
-    pub(crate) fn compare_width(self, other: Self) -> std::cmp::Ordering {
+    pub fn compare_width(self, other: Self) -> std::cmp::Ordering {
         self.bit_width.cmp(&other.bit_width)
     }
 
-    pub(crate) fn encompasses(self, other: Self) -> bool {
+    pub fn encompasses(self, other: Self) -> bool {
         self.as_bounds().encompasses(&other.as_bounds())
     }
 }
 
 impl NumRep {
-    pub(crate) fn as_bounds(self) -> Option<Bounds> {
+    pub fn as_bounds(self) -> Option<Bounds> {
         match self {
             NumRep::Auto => return None,
             NumRep::Concrete(mr) => Some(mr.as_bounds()),
         }
     }
 
-    pub(crate) const fn is_auto(self) -> bool {
+    pub const fn is_auto(self) -> bool {
         matches!(self, NumRep::Auto)
     }
 }
-
 
 /// Value-level numeric constant with an accompanying representation.
 ///
@@ -286,8 +306,25 @@ impl NumRep {
 /// that will be assumed is determined contextually based on the operation the value is
 /// involved in. Top-level TypedConst values (i.e. those that where no further arithmetic is to
 /// be performed on) should not be `Auto`-representation.
-#[derive(Clone, PartialEq, Debug)]
-pub struct TypedConst(pub BigInt, pub NumRep);
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize)]
+pub struct TypedConst(
+    #[serde(serialize_with = "ser_bigint")] pub BigInt,
+    #[serde(serialize_with = "ser_num_rep")] pub NumRep,
+);
+
+fn ser_bigint<S>(value: &BigInt, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    serializer.serialize_str(&value.to_string())
+}
+
+fn ser_num_rep<S>(value: &NumRep, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    serializer.serialize_str(value.to_static_str())
+}
 
 impl std::fmt::Display for TypedConst {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -298,6 +335,11 @@ impl std::fmt::Display for TypedConst {
 }
 
 impl TypedConst {
+    pub fn new<N>(n: N, rep: NumRep) -> Self
+    where BigInt: From<N> {
+        Self(BigInt::from(n), rep)
+    }
+
     /// Returns `true` if the stored `NumRep` is abstract (i.e. `Auto`).
     pub fn is_abstract(self) -> bool {
         self.1.is_auto()
@@ -307,7 +349,7 @@ impl TypedConst {
     /// implicit bounds of the `NumRep` it is associated with. This always true when for `NumRep::Auto`,
     /// and otherwise is true when the value is in the bounds of the concrete `NumRep`.
     pub fn is_representable(&self) -> bool {
-        let TypedConst(ref n, rep) = self;
+        let TypedConst(n, rep) = self;
         if let Some(bounds) = rep.as_bounds() {
             n >= &bounds.min && n <= &bounds.max
         } else {
@@ -341,6 +383,40 @@ impl TypedConst {
     /// Returns the NumRep of a `TypedConst`.
     pub fn get_rep(&self) -> NumRep {
         self.1
+    }
+}
+
+impl TypedConst {
+    pub fn from_u8(value: u8) -> TypedConst {
+        TypedConst(BigInt::from(value), NumRep::Concrete(MachineRep::U8))
+    }
+
+    pub fn from_u16(value: u16) -> TypedConst {
+        TypedConst(BigInt::from(value), NumRep::Concrete(MachineRep::U16))
+    }
+
+    pub fn from_u32(value: u32) -> TypedConst {
+        TypedConst(BigInt::from(value), NumRep::Concrete(MachineRep::U32))
+    }
+
+    pub fn from_u64(value: u64) -> TypedConst {
+        TypedConst(BigInt::from(value), NumRep::Concrete(MachineRep::U64))
+    }
+
+    pub fn from_i8(value: i8) -> TypedConst {
+        TypedConst(BigInt::from(value), NumRep::Concrete(MachineRep::I8))
+    }
+
+    pub fn from_i16(value: i16) -> TypedConst {
+        TypedConst(BigInt::from(value), NumRep::Concrete(MachineRep::I16))
+    }
+
+    pub fn from_i32(value: i32) -> TypedConst {
+        TypedConst(BigInt::from(value), NumRep::Concrete(MachineRep::I32))
+    }
+
+    pub fn from_i64(value: i64) -> TypedConst {
+        TypedConst(BigInt::from(value), NumRep::Concrete(MachineRep::I64))
     }
 }
 
@@ -382,11 +458,29 @@ impl std::fmt::Display for Value {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq, Hash)]
 pub struct BinOp {
+    #[serde(serialize_with = "ser_basic_binop")]
     op: BasicBinOp,
     // If None: op(T, T | auto) -> T, op(T0, T1) { T0 != T1 } -> ambiguous; otherwise, forces rep for `Some(rep)``
+    #[serde(serialize_with = "ser_machine_rep")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     out_rep: Option<MachineRep>,
+}
+
+fn ser_basic_binop<S>(op: &BasicBinOp, s: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    s.serialize_str(op.to_static_str())
+}
+
+fn ser_machine_rep<S>(rep: &Option<MachineRep>, s: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let Some(rep) = rep else { unreachable!() };
+    s.serialize_str(rep.to_static_str())
 }
 
 impl std::fmt::Display for BinOp {
@@ -411,16 +505,26 @@ impl BinOp {
         self.out_rep.is_some_and(predicate)
     }
 
-    pub(crate) fn get_op(&self) -> BasicBinOp {
+    pub fn get_op(&self) -> BasicBinOp {
         self.op
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize)]
 pub struct UnaryOp {
-    op: BasicUnaryOp,
+    #[serde(serialize_with = "ser_basic_unaryop")]
+    pub op: BasicUnaryOp,
     // If None, will pick the same type as the input (even if this produces a temporary unrepresentable)
-    out_rep: Option<MachineRep>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(serialize_with = "ser_machine_rep")]
+    pub out_rep: Option<MachineRep>,
+}
+
+fn ser_basic_unaryop<S>(op: &BasicUnaryOp, s: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    s.serialize_str(op.to_static_str())
 }
 
 impl std::fmt::Display for UnaryOp {
@@ -445,7 +549,7 @@ impl UnaryOp {
         self.out_rep.is_some_and(predicate)
     }
 
-    pub(crate) fn get_op(&self) -> BasicUnaryOp {
+    pub fn get_op(&self) -> BasicUnaryOp {
         self.op
     }
 }
@@ -482,7 +586,10 @@ impl std::fmt::Display for EvalError {
             EvalError::DivideByZero => write!(f, "attempted division by zero"),
             EvalError::RemainderNonPositive => write!(f, "remainder rhs must be positive"),
             EvalError::Ambiguous(rep0, rep1) => {
-                write!(f, "operation over {rep0} and {rep1} must have an explicit output representation to be evaluated")
+                write!(
+                    f,
+                    "operation over {rep0} and {rep1} must have an explicit output representation to be evaluated"
+                )
             }
         }
     }
@@ -555,6 +662,20 @@ impl Expr {
                         };
                         Ok(Value::Const(TypedConst(n.abs(), rep_out)))
                     }
+                    (BasicUnaryOp::IntSucc, Value::Const(TypedConst(n, rep))) => {
+                        let rep_out = match unary_op.out_rep {
+                            Some(rep) => NumRep::Concrete(rep),
+                            None => rep,
+                        };
+                        Ok(Value::Const(TypedConst(n + BigInt::one(), rep_out)))
+                    }
+                    (BasicUnaryOp::IntPred, Value::Const(TypedConst(n, rep))) => {
+                        let rep_out = match unary_op.out_rep {
+                            Some(rep) => NumRep::Concrete(rep),
+                            None => rep,
+                        };
+                        Ok(Value::Const(TypedConst(n - BigInt::one(), rep_out)))
+                    }
                 }
             }
             Expr::Cast(mach_rep, expr) => {
@@ -608,11 +729,13 @@ mod tests {
             Box::new(Expr::Const(one.clone())),
             Box::new(Expr::Const(one)),
         );
-        assert!(should_be_two
-            .eval()?
-            .as_const()
-            .unwrap()
-            .eq_num(&BigInt::from(2)));
+        assert!(
+            should_be_two
+                .eval()?
+                .as_const()
+                .unwrap()
+                .eq_num(&BigInt::from(2))
+        );
         Ok(())
     }
 
