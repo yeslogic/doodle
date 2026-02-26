@@ -1,11 +1,11 @@
 use std::borrow::Cow;
 
-use crate::core::{BasicBinOp, BasicUnaryOp, BinOp, MachineRep, UnaryOp};
-use crate::elaborator::{IntType, PrimInt, Sig1, Sig2, TypedExpr};
-use crate::printer::fragment::Fragment;
+use crate::numeric::core::{BasicBinOp, BasicUnaryOp, BinOp, MachineRep, UnaryOp};
+use crate::numeric::elaborator::{IntType, PrimInt, Sig1, Sig2, TypedExpr};
+use crate::numeric::printer::fragment::Fragment;
 
 pub mod ast {
-    use crate::{core::TypedConst, elaborator::PrimInt};
+    use crate::numeric::{core::TypedConst, elaborator::PrimInt};
 
     pub type Label = std::borrow::Cow<'static, str>;
 

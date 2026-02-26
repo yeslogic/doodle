@@ -6,6 +6,9 @@ pub(crate) mod analysis;
 pub(crate) mod rebind;
 pub(crate) mod resolve;
 
+use crate::numeric::elaborator::IntType as ExtIntType;
+use crate::numeric::elaborator::PrimInt as ExtPrimInt;
+
 use crate::codegen::model::{DEFAULT_LT, READ_ARRAY_IS_COPY, VIEW_OBJECT_IS_COPY};
 use crate::output::{Fragment, FragmentBuilder};
 
@@ -771,7 +774,7 @@ impl RustType {
                     LocalType::LocalDef(_ix, ..) => false,
                     LocalType::External(..) => false,
                 },
-                AtomType::Prim(..) => false,
+                AtomType::Prim(..) | AtomType::PrimExt(..) => false,
             },
             // REVIEW - are there cases where we want to selectively borrow anon-tuples (and if so, distributive or unified)?
             RustType::AnonTuple(_elts) => false,
@@ -901,6 +904,7 @@ impl RustType {
         match self {
             RustType::Atom(at) => match at {
                 AtomType::Prim(..) => true,
+                AtomType::PrimExt(..) => true,
                 // Without passing around high-level type-maps, we can't check any externally-defined or local ad-hoc types for Copy-safety
                 AtomType::TypeRef(..) => false,
                 AtomType::Comp(ct) => match ct {
@@ -1102,6 +1106,7 @@ where
 {
     TypeRef(LocalType),
     Prim(PrimType),
+    PrimExt(PrimExtType),
     Comp(CompType<T, U>),
 }
 
@@ -1112,7 +1117,7 @@ impl AtomType {
                 LocalType::LocalDef(_, _, params) => params.as_deref()?.lt_params.first(),
                 _ => None,
             },
-            AtomType::Prim(..) => None,
+            AtomType::Prim(..) | AtomType::PrimExt(..) => None,
             AtomType::Comp(ct) => ct.lt_param(),
         }
     }
@@ -1123,7 +1128,7 @@ impl AtomType {
                 LocalType::LocalDef(_, _, params) => hotswap_lt(params, new_lt),
                 _ => (),
             },
-            AtomType::Prim(..) => (),
+            AtomType::Prim(..) | AtomType::PrimExt(..) => (),
             AtomType::Comp(ct) => ct.alpha_convert_lifetime(new_lt),
         }
     }
@@ -1169,6 +1174,7 @@ where
         match self {
             AtomType::TypeRef(local_type) => local_type.to_fragment(),
             AtomType::Prim(pt) => pt.to_fragment(),
+            AtomType::PrimExt(p_ext) => p_ext.to_fragment(),
             AtomType::Comp(ct) => ct.to_fragment(),
         }
     }
@@ -1311,6 +1317,41 @@ impl ToFragment for PrimType {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug, PartialOrd, Ord, Hash)]
+pub(crate) enum PrimExtType {
+    I8,
+    I16,
+    I32,
+    I64,
+}
+
+impl ToFragment for PrimExtType {
+    fn to_fragment(&self) -> Fragment {
+        Fragment::string(match self {
+            PrimExtType::I8 => "i8",
+            PrimExtType::I16 => "i16",
+            PrimExtType::I32 => "i32",
+            PrimExtType::I64 => "i64",
+        })
+    }
+}
+
+impl From<ExtIntType> for AtomType {
+    fn from(value: ExtIntType) -> Self {
+        let ExtIntType::Prim(ext_prim) = value;
+        match ext_prim {
+            ExtPrimInt::U8 => AtomType::Prim(PrimType::U8),
+            ExtPrimInt::U16 => AtomType::Prim(PrimType::U16),
+            ExtPrimInt::U32 => AtomType::Prim(PrimType::U32),
+            ExtPrimInt::U64 => AtomType::Prim(PrimType::U64),
+            ExtPrimInt::I8 => AtomType::PrimExt(PrimExtType::I8),
+            ExtPrimInt::I16 => AtomType::PrimExt(PrimExtType::I16),
+            ExtPrimInt::I32 => AtomType::PrimExt(PrimExtType::I32),
+            ExtPrimInt::I64 => AtomType::PrimExt(PrimExtType::I64),
+        }
+    }
+}
+
 /// Given a lifetime identifier (including leading tick), constructs a `RustLt` using that identifier.
 pub(crate) fn lt(ident: impl IntoLabel) -> RustLt {
     RustLt::Parametric(ident.into())
@@ -1450,6 +1491,12 @@ impl From<AtomType> for RustType {
 
 impl From<PrimType> for RustType {
     fn from(value: PrimType) -> Self {
+        Self::from(AtomType::from(value))
+    }
+}
+
+impl From<ExtIntType> for RustType {
+    fn from(value: ExtIntType) -> Self {
         Self::from(AtomType::from(value))
     }
 }

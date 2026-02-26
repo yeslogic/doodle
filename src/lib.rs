@@ -13,6 +13,7 @@ use serde::Serialize;
 
 use crate::bounds::Bounds;
 use crate::byte_set::ByteSet;
+use crate::numeric::core::Expr as NumExpr;
 use crate::read::ReadCtxt;
 
 pub mod alt;
@@ -30,6 +31,7 @@ pub mod helper;
 pub mod loc_decoder;
 pub mod marker;
 pub use marker::{BaseKind, Endian};
+pub mod numeric;
 pub mod output;
 pub mod parser;
 mod precedence;
@@ -150,6 +152,9 @@ pub enum Expr {
     Variant(Label, Box<Expr>),
     Seq(Vec<Expr>),
 
+    // REVIEW - the type-hint (BaseType) here is not expressive enough to cover negatives yet
+    Numeric(BaseType, Box<NumExpr>),
+
     Match(Box<Expr>, Vec<(Pattern, Expr)>),
     Destructure(Box<Expr>, Pattern, Box<Expr>),
 
@@ -237,6 +242,8 @@ impl Expr {
             Expr::U16(_n) => Ok(ValueType::Base(BaseType::U16)),
             Expr::U32(_n) => Ok(ValueType::Base(BaseType::U32)),
             Expr::U64(_n) => Ok(ValueType::Base(BaseType::U64)),
+            // REVIEW - negatives are not yet part of BaseType
+            Expr::Numeric(bt, _) => Ok(ValueType::Base(*bt)),
             Expr::Tuple(exprs) => {
                 let mut ts = Vec::new();
                 for expr in exprs {
