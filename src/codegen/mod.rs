@@ -15,7 +15,7 @@ use crate::{
     Arith, BaseKind, BaseType, CommonOp, DynFormat, Endian, Expr, Format, FormatModule, IntRel,
     IntoLabel, Label, MatchTree, Pattern, StyleHint, UnaryOp, ViewExpr, ViewFormat,
     byte_set::ByteSet,
-    codegen::model::traits::TraitObject,
+    codegen::{model::traits::TraitObject, util::FxHash},
     decoder::extract_pair,
     parser::error::TraceHash,
     typecheck::{TypeChecker, UType, UVar, WHNFSolution},
@@ -117,6 +117,9 @@ impl CodeGen {
         match tc.expand_var(var) {
             Expansion::Empty => RustType::UNIT.into(),
             Expansion::Base(bt) => Self::lift_base(bt),
+            Expansion::Outcome(ext_var) => {
+                unreachable!("unexpected outcome external-metavariable: {ext_var}")
+            }
             Expansion::Record(fields) => {
                 if let Some(decl) = self.metavariables.get(&var) {
                     let (type_name, (ix, is_new)) = self.name_gen.get_name(decl);
@@ -3951,6 +3954,7 @@ pub struct Elaborator<'a> {
     t_formats: StableMap<usize, Rc<GTFormat>, BTree>,
     tc: TypeChecker,
     codegen: CodeGen,
+    embeds: StableMap<usize, crate::numeric::elaborator::ElabRc, FxHash>,
 }
 
 impl<'a> Elaborator<'a> {
@@ -4075,6 +4079,7 @@ impl<'a> Elaborator<'a> {
             t_formats: Default::default(),
             tc,
             codegen,
+            embeds: Default::default(),
         }
     }
 
@@ -4581,6 +4586,24 @@ impl<'a> Elaborator<'a> {
         )
     }
 
+    fn get_engine_from_index(&mut self, index: usize) -> Option<&mut crate::numeric::elaborator::ElabRc> {
+        use super::typecheck::Expansion;
+        let var = UVar::new(index);
+        let var = self.tc.get_canonical_uvar(var);
+        match self.tc.expand_var(var) {
+            Expansion::Outcome(ext_var) => {
+                let ent = self.embeds.entry(ext_var.to_usize())
+                    .or_insert_with(|| {
+                        let ie = self.tc.get_extern(ext_var).expect("failed to get extern for embedded numeric engine");
+                        let elab = crate::numeric::elaborator::ElabRc::new(ie.clone());
+                        elab
+                    });
+                Some(ent)
+            }
+            _ => None
+        }
+    }
+
     fn elaborate_expr(&mut self, expr: &Expr) -> GTExpr {
         let index = self.get_and_increment_index();
         match expr {
@@ -4596,6 +4619,14 @@ impl<'a> Elaborator<'a> {
             Expr::U16(n) => TypedExpr::U16(*n),
             Expr::U32(n) => TypedExpr::U32(*n),
             Expr::U64(n) => TypedExpr::U64(*n),
+            Expr::Numeric(hint, n) => {
+                let Some(engine) = self.get_engine_from_index(index) else {
+                    panic!("failed to get numeric engine for numeric subtree");
+                };
+                let elab_n = engine.elaborate_expr_as(n).expect("failed to elaborate numeric expression");
+                let gt0: GenType = PrimType::from(*hint).into();
+                TypedExpr::Numeric(gt0, Box::new(elab_n))
+            }
             Expr::Tuple(elts) => {
                 let mut t_elts = Vec::with_capacity(elts.len());
                 self.codegen

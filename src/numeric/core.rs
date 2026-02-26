@@ -62,7 +62,7 @@ impl std::fmt::Display for BasicUnaryOp {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
+#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash,)]
 pub enum BitWidth {
     Bits8,
     Bits16,
@@ -463,7 +463,7 @@ pub struct BinOp {
     #[serde(serialize_with = "ser_basic_binop")]
     op: BasicBinOp,
     // If None: op(T, T | auto) -> T, op(T0, T1) { T0 != T1 } -> ambiguous; otherwise, forces rep for `Some(rep)``
-    #[serde(serialize_with = "ser_machine_rep")]
+    #[serde(serialize_with = "ser_opt_machine_rep")]
     #[serde(skip_serializing_if = "Option::is_none")]
     out_rep: Option<MachineRep>,
 }
@@ -475,11 +475,20 @@ where
     s.serialize_str(op.to_static_str())
 }
 
-fn ser_machine_rep<S>(rep: &Option<MachineRep>, s: S) -> Result<S::Ok, S::Error>
+fn ser_opt_machine_rep<S>(rep: &Option<MachineRep>, s: S) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
 {
-    let Some(rep) = rep else { unreachable!() };
+    match rep {
+        None => s.serialize_none(),
+        Some(rep) => ser_machine_rep(rep, s),
+    }
+}
+
+fn ser_machine_rep<S>(rep: &MachineRep, s: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
     s.serialize_str(rep.to_static_str())
 }
 
@@ -516,7 +525,7 @@ pub struct UnaryOp {
     pub op: BasicUnaryOp,
     // If None, will pick the same type as the input (even if this produces a temporary unrepresentable)
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(serialize_with = "ser_machine_rep")]
+    #[serde(serialize_with = "ser_opt_machine_rep")]
     pub out_rep: Option<MachineRep>,
 }
 
@@ -554,12 +563,13 @@ impl UnaryOp {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash, Serialize)]
+#[serde(tag = "tag", content = "data")]
 pub enum Expr {
     Const(TypedConst),
     BinOp(BinOp, Box<Expr>, Box<Expr>),
     UnaryOp(UnaryOp, Box<Expr>),
-    Cast(MachineRep, Box<Expr>),
+    Cast(#[serde(serialize_with = "ser_machine_rep")] MachineRep, Box<Expr>),
 }
 
 impl std::fmt::Debug for Expr {

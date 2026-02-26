@@ -538,10 +538,10 @@ dependencies = [
  "anyhow",
  "clap",
  "cons-rs",
- "doodle_num",
  "expect-test",
  "intmap",
  "log",
+ "num-bigint",
  "num-traits",
  "proptest",
  "rustc-hash",
@@ -580,16 +580,6 @@ dependencies = [
  "fixed",
  "log",
  "stderrlog",
-]
-
-[[package]]
-name = "doodle_num"
-version = "0.1.0"
-dependencies = [
- "num-bigint",
- "num-traits",
- "proptest",
- "serde",
 ]
 
 [[package]]

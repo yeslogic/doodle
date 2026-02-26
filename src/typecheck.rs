@@ -3,9 +3,270 @@ use crate::{
     Arith, BaseType, DynFormat, Expr, Format, FormatModule, Label, Pattern, UnaryOp, ValueType,
     ViewExpr, ViewFormat,
 };
+use std::cell::RefCell;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     rc::Rc,
+};
+
+pub(crate) mod inference;
+
+mod scope {
+    use std::collections::BTreeSet;
+
+    use super::UVar;
+    use crate::{FormatModule, Label};
+
+    #[derive(Debug, Clone, Copy, Default)]
+    pub(crate) enum UScope<'a> {
+        #[default]
+        Empty,
+        Multi(&'a UMultiScope<'a>),
+        Single(USingleScope<'a>),
+    }
+
+    impl<'a> UScope<'a> {
+        pub const fn new() -> Self {
+            Self::Empty
+        }
+
+        pub(crate) fn get_uvar_by_name(&self, name: &str) -> Option<UVar> {
+            match self {
+                UScope::Empty => None,
+                UScope::Multi(multi) => multi.get_uvar_by_name(name),
+                UScope::Single(single) => single.get_uvar_by_name(name),
+            }
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    pub(crate) struct UMultiScope<'a> {
+        pub(crate) parent: &'a UScope<'a>,
+        pub(crate) entries: Vec<(Label, UVar)>,
+    }
+
+    impl<'a> UMultiScope<'a> {
+        pub fn new(parent: &'a UScope<'a>) -> Self {
+            Self {
+                parent,
+                entries: Vec::new(),
+            }
+        }
+
+        pub fn with_capacity(parent: &'a UScope<'a>, capacity: usize) -> Self {
+            Self {
+                parent,
+                entries: Vec::with_capacity(capacity),
+            }
+        }
+
+        pub fn push(&mut self, name: Label, v: UVar) {
+            self.entries.push((name, v));
+        }
+
+        pub(crate) fn get_uvar_by_name(&self, name: &str) -> Option<UVar> {
+            for (n, v) in self.entries.iter().rev() {
+                if n == name {
+                    return Some(*v);
+                }
+            }
+            self.parent.get_uvar_by_name(name)
+        }
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    pub(crate) struct USingleScope<'a> {
+        pub(crate) parent: &'a UScope<'a>,
+        pub(crate) name: &'a str,
+        pub(crate) uvar: UVar,
+    }
+
+    impl<'a> USingleScope<'a> {
+        pub const fn new(parent: &'a UScope<'a>, name: &'a str, uvar: UVar) -> USingleScope<'a> {
+            Self { parent, name, uvar }
+        }
+
+        pub(crate) fn get_uvar_by_name(&self, name: &str) -> Option<UVar> {
+            if self.name == name {
+                return Some(self.uvar);
+            }
+            self.parent.get_uvar_by_name(name)
+        }
+    }
+
+    #[derive(Clone, Copy, Debug, Default)]
+    pub(crate) enum ViewScope<'a> {
+        #[default]
+        Empty,
+        Single(ViewSingleScope<'a>),
+        Multi(&'a ViewMultiScope<'a>),
+    }
+
+    impl<'a> ViewScope<'a> {
+        pub const fn new() -> Self {
+            Self::Empty
+        }
+
+        pub(crate) fn includes_name(&self, name: &str) -> bool {
+            match self {
+                ViewScope::Empty => false,
+                ViewScope::Single(s) => s.includes_name(name),
+                ViewScope::Multi(m) => m.includes_name(name),
+            }
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    pub(crate) struct ViewMultiScope<'a> {
+        pub(crate) parent: &'a ViewScope<'a>,
+        pub(crate) entries: BTreeSet<Label>,
+    }
+
+    impl<'a> ViewMultiScope<'a> {
+        pub fn new(parent: &'a ViewScope<'a>) -> Self {
+            Self {
+                parent,
+                entries: BTreeSet::new(),
+            }
+        }
+
+        /// Records the presence of a view-kinded dep-format parameter in this scope.
+        ///
+        /// # Panics
+        ///
+        /// Will panic if the same identifier is added twice to the same local scope (but not if it is
+        /// re-used across layers of scope).
+        pub fn push_view(&mut self, name: Label) {
+            // FIXME - the clone cost ought to be avoidable but
+            let _name = name.clone();
+            if !self.entries.insert(name) {
+                unreachable!("duplicate parameter identifier in format view-params: {_name}");
+            }
+        }
+
+        pub(crate) fn includes_name(&self, name: &str) -> bool
+where {
+            self.entries.contains(name) || self.parent.includes_name(name)
+        }
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    pub(crate) struct ViewSingleScope<'a> {
+        pub(crate) parent: &'a ViewScope<'a>,
+        pub(crate) name: &'a str,
+    }
+
+    impl<'a> ViewSingleScope<'a> {
+        pub const fn new(parent: &'a ViewScope<'a>, name: &'a str) -> ViewSingleScope<'a> {
+            Self { parent, name }
+        }
+
+        pub(crate) fn includes_name(&self, name: &str) -> bool {
+            self.name == name || self.parent.includes_name(name)
+        }
+    }
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub(crate) enum DynScope<'a> {
+        Empty,
+        Single(DynSingleScope<'a>),
+    }
+
+    impl<'a> DynScope<'a> {
+        pub const fn new() -> Self {
+            Self::Empty
+        }
+
+        pub(crate) fn get_dynf_var_by_name(&self, label: &str) -> Option<UVar> {
+            match self {
+                DynScope::Empty => None,
+                DynScope::Single(single) => single.get_dynf_var_by_name(label),
+            }
+        }
+    }
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub(crate) struct DynSingleScope<'a> {
+        pub(crate) parent: &'a DynScope<'a>,
+        pub(crate) name: &'a str,
+        pub(crate) dynf_var: UVar,
+    }
+
+    impl<'a> DynSingleScope<'a> {
+        pub const fn new(parent: &'a DynScope<'a>, name: &'a str, dynf_var: UVar) -> Self {
+            Self {
+                parent,
+                name,
+                dynf_var,
+            }
+        }
+
+        pub(crate) fn get_dynf_var_by_name(&self, label: &str) -> Option<UVar> {
+            if label == self.name {
+                Some(self.dynf_var)
+            } else {
+                self.parent.get_dynf_var_by_name(label)
+            }
+        }
+    }
+
+    #[derive(Clone, Copy, Debug)]
+    pub(crate) struct Ctxt<'a> {
+        pub(crate) module: &'a FormatModule,
+        pub(crate) scope: &'a UScope<'a>,
+        pub(crate) dyn_s: DynScope<'a>,
+        pub(crate) views: ViewScope<'a>,
+    }
+
+    impl<'a> Ctxt<'a> {
+        pub const fn new(module: &'a FormatModule, scope: &'a UScope<'a>) -> Self {
+            Self {
+                module,
+                scope,
+                dyn_s: DynScope::new(),
+                views: ViewScope::new(),
+            }
+        }
+        /// Returns a copy of `self` with the given `UScope` instead of `self.scope`.
+        pub(crate) fn with_scope(&'a self, scope: &'a UScope<'a>) -> Ctxt<'a> {
+            Self {
+                module: self.module,
+                dyn_s: self.dyn_s,
+                views: self.views,
+                scope,
+            }
+        }
+
+        pub(crate) fn with_view_binding(&'a self, name: &'a str) -> Ctxt<'a> {
+            Self {
+                module: self.module,
+                dyn_s: self.dyn_s,
+                scope: self.scope,
+                views: ViewScope::Single(ViewSingleScope::new(&self.views, name)),
+            }
+        }
+
+        pub(crate) fn with_view_bindings(&'a self, views: &'a ViewMultiScope<'a>) -> Ctxt<'a> {
+            Self {
+                module: self.module,
+                dyn_s: self.dyn_s,
+                views: ViewScope::Multi(views),
+                scope: self.scope,
+            }
+        }
+
+        pub(crate) fn with_dyn_binding(&'a self, name: &'a str, dynf_var: UVar) -> Ctxt<'a> {
+            Self {
+                module: self.module,
+                dyn_s: DynScope::Single(DynSingleScope::new(&self.dyn_s, name, dynf_var)),
+                scope: self.scope,
+                views: self.views.clone(),
+            }
+        }
+    }
+}
+use scope::{
+    Ctxt, UMultiScope, UScope, USingleScope, ViewMultiScope,
 };
 
 /// Perform a `?` operation but add additional trace-context to TCError values if encountered
@@ -32,7 +293,7 @@ macro_rules! try_with {
 /// Unification variable for use in typechecking
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
-pub struct UVar(usize);
+pub struct UVar(pub(crate) usize);
 
 impl UVar {
     pub fn new(ix: usize) -> Self {
@@ -44,8 +305,22 @@ impl UVar {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
+pub struct ExtVar(pub(crate) usize);
+
+impl ExtVar {
+    pub fn new(ix: usize) -> Self {
+        Self(ix)
+    }
+
+    pub fn to_usize(self) -> usize {
+        self.0
+    }
+}
+
 /// Unification type, equivalent to ValueType up to abstraction
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum UType {
     /// Reserved case for Formats that fundamentally cannot be parsed successfully (Format::Fail and implied failure-cases)
     Empty,
@@ -62,6 +337,8 @@ pub enum UType {
     /// For `std::option::Option<InnerType>`
     Option(Rc<UType>),
     PhantomData(Rc<UType>),
+    /// Type equivalent to the ascribed type of the root node of an embedded numeric-inference-engine
+    ExternVar(ExtVar),
 }
 
 impl UType {
@@ -103,6 +380,12 @@ impl From<UVar> for UType {
 impl From<UVar> for Rc<UType> {
     fn from(value: UVar) -> Self {
         Rc::new(UType::Var(value))
+    }
+}
+
+impl From<ExtVar> for Rc<UType> {
+    fn from(value: ExtVar) -> Self {
+        Rc::new(UType::ExternVar(value))
     }
 }
 
@@ -153,255 +436,6 @@ impl UType {
     }
 }
 
-#[derive(Debug, Clone, Copy, Default)]
-pub(crate) enum UScope<'a> {
-    #[default]
-    Empty,
-    Multi(&'a UMultiScope<'a>),
-    Single(USingleScope<'a>),
-}
-
-impl<'a> UScope<'a> {
-    pub const fn new() -> Self {
-        Self::Empty
-    }
-
-    fn get_uvar_by_name(&self, name: &str) -> Option<UVar> {
-        match self {
-            UScope::Empty => None,
-            UScope::Multi(multi) => multi.get_uvar_by_name(name),
-            UScope::Single(single) => single.get_uvar_by_name(name),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct UMultiScope<'a> {
-    parent: &'a UScope<'a>,
-    entries: Vec<(Label, UVar)>,
-}
-
-impl<'a> UMultiScope<'a> {
-    pub fn new(parent: &'a UScope<'a>) -> Self {
-        Self {
-            parent,
-            entries: Vec::new(),
-        }
-    }
-
-    pub fn with_capacity(parent: &'a UScope<'a>, capacity: usize) -> Self {
-        Self {
-            parent,
-            entries: Vec::with_capacity(capacity),
-        }
-    }
-
-    pub fn push(&mut self, name: Label, v: UVar) {
-        self.entries.push((name, v));
-    }
-
-    fn get_uvar_by_name(&self, name: &str) -> Option<UVar> {
-        for (n, v) in self.entries.iter().rev() {
-            if n == name {
-                return Some(*v);
-            }
-        }
-        self.parent.get_uvar_by_name(name)
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct USingleScope<'a> {
-    parent: &'a UScope<'a>,
-    name: &'a str,
-    uvar: UVar,
-}
-
-impl<'a> USingleScope<'a> {
-    pub const fn new(parent: &'a UScope<'a>, name: &'a str, uvar: UVar) -> USingleScope<'a> {
-        Self { parent, name, uvar }
-    }
-
-    fn get_uvar_by_name(&self, name: &str) -> Option<UVar> {
-        if self.name == name {
-            return Some(self.uvar);
-        }
-        self.parent.get_uvar_by_name(name)
-    }
-}
-
-#[derive(Clone, Copy, Debug, Default)]
-pub(crate) enum ViewScope<'a> {
-    #[default]
-    Empty,
-    Single(ViewSingleScope<'a>),
-    Multi(&'a ViewMultiScope<'a>),
-}
-
-impl<'a> ViewScope<'a> {
-    pub const fn new() -> Self {
-        Self::Empty
-    }
-
-    fn includes_name(&self, name: &str) -> bool {
-        match self {
-            ViewScope::Empty => false,
-            ViewScope::Single(s) => s.includes_name(name),
-            ViewScope::Multi(m) => m.includes_name(name),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct ViewMultiScope<'a> {
-    parent: &'a ViewScope<'a>,
-    entries: BTreeSet<Label>,
-}
-
-impl<'a> ViewMultiScope<'a> {
-    pub fn new(parent: &'a ViewScope<'a>) -> Self {
-        Self {
-            parent,
-            entries: BTreeSet::new(),
-        }
-    }
-
-    /// Records the presence of a view-kinded dep-format parameter in this scope.
-    ///
-    /// # Panics
-    ///
-    /// Will panic if the same identifier is added twice to the same local scope (but not if it is
-    /// re-used across layers of scope).
-    pub fn push_view(&mut self, name: Label) {
-        // FIXME - the clone cost ought to be avoidable but
-        let _name = name.clone();
-        if !self.entries.insert(name) {
-            unreachable!("duplicate parameter identifier in format view-params: {_name}");
-        }
-    }
-
-    fn includes_name(&self, name: &str) -> bool
-where {
-        self.entries.contains(name) || self.parent.includes_name(name)
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct ViewSingleScope<'a> {
-    parent: &'a ViewScope<'a>,
-    name: &'a str,
-}
-
-impl<'a> ViewSingleScope<'a> {
-    pub const fn new(parent: &'a ViewScope<'a>, name: &'a str) -> ViewSingleScope<'a> {
-        Self { parent, name }
-    }
-
-    fn includes_name(&self, name: &str) -> bool {
-        self.name == name || self.parent.includes_name(name)
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum DynScope<'a> {
-    Empty,
-    Single(DynSingleScope<'a>),
-}
-
-impl<'a> DynScope<'a> {
-    pub const fn new() -> Self {
-        Self::Empty
-    }
-
-    pub(crate) fn get_dynf_var_by_name(&self, label: &str) -> Option<UVar> {
-        match self {
-            DynScope::Empty => None,
-            DynScope::Single(single) => single.get_dynf_var_by_name(label),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct DynSingleScope<'a> {
-    parent: &'a DynScope<'a>,
-    name: &'a str,
-    dynf_var: UVar,
-}
-
-impl<'a> DynSingleScope<'a> {
-    pub const fn new(parent: &'a DynScope<'a>, name: &'a str, dynf_var: UVar) -> Self {
-        Self {
-            parent,
-            name,
-            dynf_var,
-        }
-    }
-
-    fn get_dynf_var_by_name(&self, label: &str) -> Option<UVar> {
-        if label == self.name {
-            Some(self.dynf_var)
-        } else {
-            self.parent.get_dynf_var_by_name(label)
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct Ctxt<'a> {
-    pub(crate) module: &'a FormatModule,
-    pub(crate) scope: &'a UScope<'a>,
-    pub(crate) dyn_s: DynScope<'a>,
-    pub(crate) views: ViewScope<'a>,
-}
-
-impl<'a> Ctxt<'a> {
-    /// Returns a copy of `self` with the given `UScope` instead of `self.scope`.
-    pub(crate) fn with_scope(&'a self, scope: &'a UScope<'a>) -> Ctxt<'a> {
-        Self {
-            module: self.module,
-            dyn_s: self.dyn_s,
-            views: self.views,
-            scope,
-        }
-    }
-
-    pub(crate) fn with_view_binding(&'a self, name: &'a str) -> Ctxt<'a> {
-        Self {
-            module: self.module,
-            dyn_s: self.dyn_s,
-            scope: self.scope,
-            views: ViewScope::Single(ViewSingleScope::new(&self.views, name)),
-        }
-    }
-
-    pub(crate) fn with_view_bindings(&'a self, views: &'a ViewMultiScope<'a>) -> Ctxt<'a> {
-        Self {
-            module: self.module,
-            dyn_s: self.dyn_s,
-            views: ViewScope::Multi(views),
-            scope: self.scope,
-        }
-    }
-
-    pub(crate) fn with_dyn_binding(&'a self, name: &'a str, dynf_var: UVar) -> Ctxt<'a> {
-        Self {
-            module: self.module,
-            dyn_s: DynScope::Single(DynSingleScope::new(&self.dyn_s, name, dynf_var)),
-            scope: self.scope,
-            views: self.views.clone(),
-        }
-    }
-
-    pub const fn new(module: &'a FormatModule, scope: &'a UScope<'a>) -> Self {
-        Self {
-            module,
-            scope,
-            dyn_s: DynScope::new(),
-            views: ViewScope::new(),
-        }
-    }
-}
-
 impl UType {
     /// Returns an iterator over any embedded UTypes during occurs-checks.
     ///
@@ -409,9 +443,12 @@ impl UType {
     /// the receiver are all returned eventually, and in whatever order is most convenient.
     pub fn iter_embedded<'a>(&'a self) -> Box<dyn Iterator<Item = Rc<UType>> + 'a> {
         match self {
-            UType::Empty | UType::ViewObj | UType::Hole | UType::Var(..) | UType::Base(..) => {
-                Box::new(std::iter::empty())
-            }
+            UType::Empty
+            | UType::ViewObj
+            | UType::Hole
+            | UType::Var(..)
+            | UType::ExternVar(..)
+            | UType::Base(..) => Box::new(std::iter::empty()),
             UType::Tuple(ts) => Box::new(ts.iter().cloned()),
             UType::Record(fs) => Box::new(fs.iter().map(|(_l, t)| t.clone())),
             UType::Seq(t, _) | UType::Option(t) | UType::PhantomData(t) => {
@@ -429,16 +466,6 @@ pub(crate) enum VType {
     ImplicitTuple(Vec<Rc<UType>>),
     ImplicitRecord(Vec<(Label, Rc<UType>)>),
     IndefiniteUnion(VMId),
-}
-
-/// Mutably updated state-engine for performing complete type-inference on a top-level `Format`.
-#[derive(Debug)]
-pub struct TypeChecker {
-    // TODO - implement segmented store to keep dep-format solving from interfering with proper sequencing
-    constraints: Vec<Constraints>,
-    aliases: Vec<Alias>, // set of non-identity meta-variables that are aliased to ?ix
-    varmaps: VarMapMap, // logically separate table of meta-context variant-maps for indirect aliasing
-    level_vars: HashMap<usize, UVar>,
 }
 
 /// Association type that identifies the relationship between a metavariable and the possibly-empty set
@@ -513,9 +540,19 @@ impl Alias {
     }
 }
 
+/// Association table between the label for a branch-variant and the type of its contents
+type VarMap = HashMap<Label, Rc<UType>>;
+
+/// Bookkeeping structure that stores the association tables for each union-kinded metavariable constraint (as the underlying value of a VMId),
+/// as well as keeping track of the next VMId to use if a novel union-kinded constraint is encountered
+///
+/// During type unification, co-aliased meta-variables that start out with distinct constraint VMIds will be merged, along with the
+/// corresponding VarMaps in question (provided unification is non-conflicting), pruning the entry for one of the two key VMIds.
 #[derive(Debug)]
 struct VarMapMap {
+    /// Mapping from VMId to VarMap
     store: HashMap<usize, VarMap>,
+    /// Next available VMId value to use
     next_id: usize,
 }
 
@@ -558,25 +595,38 @@ impl VarMapMap {
 #[repr(transparent)]
 pub struct VMId(usize);
 
+/// Type representing the general constraints on a metavariable.
+///
+/// By default, any meta-variable that is fully unconstrained will have `Constraints::Indefinite` as its value.
+///
+/// Otherwise, a metavariable will have either `Constraints::Variant` or `Constraints::Invariant` as its value,
+/// depending on whether it is observed to be a tagged union-member or an untagged value, respectively.
 #[derive(Clone, Debug, Default)]
 pub enum Constraints {
     #[default]
-    Indefinite, // default value before union-type distinction is made
-    Variant(VMId), // indirect index into typechecker meta-context 'varmap' hashmap
-    Invariant(Constraint), // for all type meta-variables, inferred non-variant constraint
+    /// Default value before any inference is possible. Erased by any non-trivial unification
+    Indefinite,
+    /// Indirection via a VarMap Identifier (VMId) to a partial set of observed variants.
+    Variant(VMId),
+    /// Inferred constraints on a metavariable that is not a tagged union-member. Unification against `Constraints::Variant` may yet be possible but only in select cases.
+    Invariant(Constraint),
+    // TODO: add `Numeric`/`Engine` for incremental integration of InferenceEngine
 }
 
 impl Constraints {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self::Indefinite
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Constraint {
-    Equiv(Rc<UType>), // direct equivalence with a UType, which should not be a bare `UType::Var` (that is what TypeChecker.equivalences is for)
-    Elem(BaseSet), // implicit restriction to a narrowed set of ground-types (e.g. from `Expr::AsU32`)
-    Proj(ProjShape), // constraints implied by projections
+    /// Direct equivalence with a UType, which should not be a bare `UType::Var` (as that is implied by the independently-tracked Alias value for a metavariable)
+    Equiv(Rc<UType>),
+    /// Member of a set of ground-types (e.g. in the case of the inner expression of  `Expr::AsU32(..)`)
+    Elem(BaseSet),
+    /// Constraints implied by projections into a parametric type (e.g. Option, Seq), a Tuple, or a Record
+    Proj(ProjShape),
 }
 
 impl Constraint {
@@ -591,6 +641,7 @@ impl Constraint {
     }
 }
 
+/// Type representing each possible shape of a projective constraint on a higher-order metavariable
 #[derive(Clone, Debug, PartialEq)]
 pub enum ProjShape {
     TupleWith(BTreeMap<usize, UVar>), // required associations of meta-variables at given indices of an uncertain tuple
@@ -631,363 +682,479 @@ impl ProjShape {
     }
 }
 
-/// Abstraction over explicit collections of BaseType values that could be in any order
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum BaseSet {
-    /// Singleton set of any BaseType, even non-integral ones
-    Single(BaseType),
-    /// Some subset of U8, U16, U32, U64
-    U(UintSet),
-}
+pub mod base_set {
+    use super::*;
+    use crate::BaseType;
 
-impl BaseSet {
-    #[allow(non_upper_case_globals)]
-    pub const UAny: Self = Self::U(UintSet::ANY);
-
-    #[allow(non_upper_case_globals)]
-    pub const USome: Self = Self::U(UintSet::ANY32);
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
-pub enum IntWidth {
-    Bits8 = 0,
-    Bits16 = 1,
-    Bits32 = 2,
-    Bits64 = 3,
-}
-
-impl IntWidth {
-    pub const MAX8: usize = u8::MAX as usize;
-    pub const MAX16: usize = u16::MAX as usize;
-    pub const MAX32: usize = u32::MAX as usize;
-    pub const MAX64: usize = u64::MAX as usize;
-
-    pub fn to_base_type(self) -> BaseType {
-        match self {
-            IntWidth::Bits8 => BaseType::U8,
-            IntWidth::Bits16 => BaseType::U16,
-            IntWidth::Bits32 => BaseType::U32,
-            IntWidth::Bits64 => BaseType::U64,
-        }
+    /// Abstraction over explicit collections of BaseType values that could be in any order
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+    pub enum BaseSet {
+        /// Singleton set of any BaseType, even non-integral ones
+        Single(BaseType),
+        /// Some subset of U8, U16, U32, U64
+        U(UintSet),
     }
-}
 
-impl crate::Bounds {
-    pub fn min_required_width(&self) -> IntWidth {
-        let max = self.max.unwrap_or(self.min);
-        match () {
-            _ if max <= IntWidth::MAX8 => IntWidth::Bits8,
-            _ if max <= IntWidth::MAX16 => IntWidth::Bits16,
-            _ if max <= IntWidth::MAX32 => IntWidth::Bits32,
-            _ => IntWidth::Bits64,
-        }
+    impl BaseSet {
+        #[allow(non_upper_case_globals)]
+        pub const UAny: Self = Self::U(UintSet::ANY);
+
+        #[allow(non_upper_case_globals)]
+        pub const USome: Self = Self::U(UintSet::ANY32);
     }
-}
 
-/// Abstraction over rankings of candidate values in a set, where the least-value `Rank` is the default
-/// unless it is tied with anything else.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Rank {
-    Excluded,
-    At(u8),
-}
-
-impl Rank {
-    pub const fn is_excluded(self) -> bool {
-        matches!(self, Rank::Excluded)
+    #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
+    pub enum IntWidth {
+        Bits8 = 0,
+        Bits16 = 1,
+        Bits32 = 2,
+        Bits64 = 3,
     }
-}
 
-impl PartialOrd for Rank {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
+    impl IntWidth {
+        pub const MAX8: usize = u8::MAX as usize;
+        pub const MAX16: usize = u16::MAX as usize;
+        pub const MAX32: usize = u32::MAX as usize;
+        pub const MAX64: usize = u64::MAX as usize;
 
-impl Ord for Rank {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        match (self, other) {
-            (Rank::At(n), Rank::At(m)) => {
-                // NOTE -  we call reverse this because we want lower numbers to be the maximum rank
-                n.cmp(m).reverse()
+        pub fn to_base_type(self) -> BaseType {
+            match self {
+                IntWidth::Bits8 => BaseType::U8,
+                IntWidth::Bits16 => BaseType::U16,
+                IntWidth::Bits32 => BaseType::U32,
+                IntWidth::Bits64 => BaseType::U64,
             }
-            (Rank::At(_), Rank::Excluded) => std::cmp::Ordering::Greater,
-            (Rank::Excluded, Rank::At(_)) => std::cmp::Ordering::Less,
-            (Rank::Excluded, Rank::Excluded) => std::cmp::Ordering::Equal,
         }
     }
-}
 
-#[derive(Clone, Copy, Hash, PartialEq, Eq)]
-pub struct UintSet {
-    // Array with ranks for U8, U16, U32, U64 in that order
-    ranks: [Rank; 4],
-}
-
-impl std::fmt::Debug for UintSet {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("RankedUintSet")
-            .field("ranks", &self.ranks)
-            .finish()
+    impl crate::Bounds {
+        pub fn min_required_width(&self) -> IntWidth {
+            let max = self.max.unwrap_or(self.min);
+            match () {
+                _ if max <= IntWidth::MAX8 => IntWidth::Bits8,
+                _ if max <= IntWidth::MAX16 => IntWidth::Bits16,
+                _ if max <= IntWidth::MAX32 => IntWidth::Bits32,
+                _ => IntWidth::Bits64,
+            }
+        }
     }
-}
 
-impl std::fmt::Display for UintSet {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let this = self.normalize();
-        if this.is_empty() {
-            write!(f, "{{}}")
-        } else {
-            write!(f, "{{ ")?;
-            let labels = ["U8", "U16", "U32", "U64"];
-            let mut ix_ranks = this
-                .ranks
-                .into_iter()
-                .enumerate()
-                .collect::<Vec<(usize, Rank)>>();
-            ix_ranks.sort_by(|(_, r1), (_, r2)| r1.cmp(r2).reverse());
-            let mut last_rank = None;
-            for (ix, r) in ix_ranks {
-                if r.is_excluded() {
-                    break;
+    /// Abstraction over rankings of candidate values in a set, where the least-value `Rank` is the default
+    /// unless it is tied with anything else.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub enum Rank {
+        Excluded,
+        At(u8),
+    }
+
+    impl Rank {
+        pub const fn is_excluded(self) -> bool {
+            matches!(self, Rank::Excluded)
+        }
+    }
+
+    impl PartialOrd for Rank {
+        fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+            Some(self.cmp(other))
+        }
+    }
+
+    impl Ord for Rank {
+        fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+            match (self, other) {
+                (Rank::At(n), Rank::At(m)) => {
+                    // NOTE -  we call reverse this because we want lower numbers to be the maximum rank
+                    n.cmp(m).reverse()
                 }
-                match last_rank {
-                    None => {
-                        write!(f, "{}", labels[ix])?;
+                (Rank::At(_), Rank::Excluded) => std::cmp::Ordering::Greater,
+                (Rank::Excluded, Rank::At(_)) => std::cmp::Ordering::Less,
+                (Rank::Excluded, Rank::Excluded) => std::cmp::Ordering::Equal,
+            }
+        }
+    }
+
+    #[derive(Clone, Copy, Hash, PartialEq, Eq)]
+    pub struct UintSet {
+        // Array with ranks for U8, U16, U32, U64 in that order
+        pub(crate) ranks: [Rank; 4],
+    }
+
+    impl std::fmt::Debug for UintSet {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.debug_struct("RankedUintSet")
+                .field("ranks", &self.ranks)
+                .finish()
+        }
+    }
+
+    impl std::fmt::Display for UintSet {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            let this = self.normalize();
+            if this.is_empty() {
+                write!(f, "{{}}")
+            } else {
+                write!(f, "{{ ")?;
+                let labels = ["U8", "U16", "U32", "U64"];
+                let mut ix_ranks = this
+                    .ranks
+                    .into_iter()
+                    .enumerate()
+                    .collect::<Vec<(usize, Rank)>>();
+                ix_ranks.sort_by(|(_, r1), (_, r2)| r1.cmp(r2).reverse());
+                let mut last_rank = None;
+                for (ix, r) in ix_ranks {
+                    if r.is_excluded() {
+                        break;
                     }
-                    Some(r0) => {
-                        if r < r0 {
-                            write!(f, " > {}", labels[ix])?;
-                        } else {
-                            write!(f, ", {}", labels[ix])?;
+                    match last_rank {
+                        None => {
+                            write!(f, "{}", labels[ix])?;
+                        }
+                        Some(r0) => {
+                            if r < r0 {
+                                write!(f, " > {}", labels[ix])?;
+                            } else {
+                                write!(f, ", {}", labels[ix])?;
+                            }
                         }
                     }
+                    last_rank = Some(r);
                 }
-                last_rank = Some(r);
-            }
-            write!(f, " }}")
-        }
-    }
-}
-
-impl UintSet {
-    pub const ANY_DEFAULT_U32: Self = Self {
-        ranks: [Rank::At(1), Rank::At(1), Rank::At(0), Rank::At(1)],
-    };
-    pub const ANY_DEFAULT_U64: Self = Self {
-        ranks: [Rank::At(1), Rank::At(1), Rank::At(1), Rank::At(0)],
-    };
-
-    pub fn contains(&self, b: BaseType) -> bool {
-        self.ranks[b.int_width() as usize] != Rank::Excluded
-    }
-
-    pub fn normalize(self) -> Self {
-        let mut ranks = self.ranks;
-        for rank in ranks.iter_mut() {
-            let orig_val = *rank;
-            if orig_val == Rank::Excluded {
-                continue;
-            }
-            let count_gte = (self.ranks.iter().filter(|r| **r >= orig_val).count() - 1) as u8;
-            *rank = Rank::At(count_gte);
-        }
-        Self { ranks }
-    }
-
-    pub fn intersection(self, other: Self) -> Self {
-        let mut ranks = [Rank::Excluded; 4];
-        let this = self.normalize();
-        let other = other.normalize();
-        for (ix, (r1, r2)) in Iterator::zip(this.ranks.iter(), other.ranks.iter()).enumerate() {
-            if matches!(r1, Rank::Excluded) || matches!(r2, Rank::Excluded) {
-                continue;
-            }
-            ranks[ix] = Ord::max(*r1, *r2);
-        }
-        Self { ranks }.normalize()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.ranks == [Rank::Excluded; 4]
-    }
-
-    pub fn get_unique_solution(self) -> Option<BaseType> {
-        let this = self.normalize();
-        let mut candidate = None;
-        let mut max_rank = Rank::Excluded;
-        let mut is_unique = true;
-        for (ix, r) in this.ranks.into_iter().enumerate() {
-            match r {
-                Rank::Excluded => continue,
-                Rank::At(_n) => match r.cmp(&max_rank) {
-                    std::cmp::Ordering::Greater => {
-                        max_rank = r;
-                        candidate = Some(ix);
-                        is_unique = true;
-                    }
-                    std::cmp::Ordering::Less => continue,
-                    std::cmp::Ordering::Equal => {
-                        is_unique = false;
-                    }
-                },
+                write!(f, " }}")
             }
         }
-        if let Some(ix) = candidate {
-            if is_unique {
-                Some(match ix {
-                    0 => BaseType::U8,
-                    1 => BaseType::U16,
-                    2 => BaseType::U32,
-                    3 => BaseType::U64,
-                    _ => unreachable!(),
-                })
+    }
+
+    impl UintSet {
+        pub const ANY_DEFAULT_U32: Self = Self {
+            ranks: [Rank::At(1), Rank::At(1), Rank::At(0), Rank::At(1)],
+        };
+        pub const ANY_DEFAULT_U64: Self = Self {
+            ranks: [Rank::At(1), Rank::At(1), Rank::At(1), Rank::At(0)],
+        };
+
+        pub fn contains(&self, b: BaseType) -> bool {
+            self.ranks[b.int_width() as usize] != Rank::Excluded
+        }
+
+        pub fn normalize(self) -> Self {
+            let mut ranks = self.ranks;
+            for rank in ranks.iter_mut() {
+                let orig_val = *rank;
+                if orig_val == Rank::Excluded {
+                    continue;
+                }
+                let count_gte = (self.ranks.iter().filter(|r| **r >= orig_val).count() - 1) as u8;
+                *rank = Rank::At(count_gte);
+            }
+            Self { ranks }
+        }
+
+        pub fn intersection(self, other: Self) -> Self {
+            let mut ranks = [Rank::Excluded; 4];
+            let this = self.normalize();
+            let other = other.normalize();
+            for (ix, (r1, r2)) in Iterator::zip(this.ranks.iter(), other.ranks.iter()).enumerate() {
+                if matches!(r1, Rank::Excluded) || matches!(r2, Rank::Excluded) {
+                    continue;
+                }
+                ranks[ix] = Ord::max(*r1, *r2);
+            }
+            Self { ranks }.normalize()
+        }
+
+        pub fn is_empty(&self) -> bool {
+            self.ranks == [Rank::Excluded; 4]
+        }
+
+        pub fn get_unique_solution(self) -> Option<BaseType> {
+            let this = self.normalize();
+            let mut candidate = None;
+            let mut max_rank = Rank::Excluded;
+            let mut is_unique = true;
+            for (ix, r) in this.ranks.into_iter().enumerate() {
+                match r {
+                    Rank::Excluded => continue,
+                    Rank::At(_n) => match r.cmp(&max_rank) {
+                        std::cmp::Ordering::Greater => {
+                            max_rank = r;
+                            candidate = Some(ix);
+                            is_unique = true;
+                        }
+                        std::cmp::Ordering::Less => continue,
+                        std::cmp::Ordering::Equal => {
+                            is_unique = false;
+                        }
+                    },
+                }
+            }
+            if let Some(ix) = candidate {
+                if is_unique {
+                    Some(match ix {
+                        0 => BaseType::U8,
+                        1 => BaseType::U16,
+                        2 => BaseType::U32,
+                        3 => BaseType::U64,
+                        _ => unreachable!(),
+                    })
+                } else {
+                    None
+                }
             } else {
                 None
             }
+        }
+    }
+
+    impl UintSet {
+        // unrestricted and non-defaulting if more than one solution
+        pub const ANY: UintSet = UintSet {
+            ranks: [Rank::At(3); 4],
+        };
+        // U8 or U16, default solution is U8
+        pub const SHORT8: UintSet = UintSet {
+            ranks: [Rank::At(0), Rank::At(1), Rank::Excluded, Rank::Excluded],
+        };
+
+        // Some member of the restricted set of any whose width is no less than the given IntWidth
+        pub const fn at_least(val: IntWidth) -> Self {
+            let ranks = match val {
+                IntWidth::Bits8 => [Rank::At(3), Rank::At(3), Rank::At(3), Rank::At(3)],
+                IntWidth::Bits16 => [Rank::Excluded, Rank::At(2), Rank::At(2), Rank::At(2)],
+                IntWidth::Bits32 => [Rank::Excluded, Rank::Excluded, Rank::At(1), Rank::At(1)],
+                IntWidth::Bits64 => [Rank::Excluded, Rank::Excluded, Rank::Excluded, Rank::At(0)],
+            };
+            UintSet { ranks }
+        }
+
+        // unrestricted but resolves if ambiguous to the given IntWidth, unless precluded
+        pub const fn any_default(val: IntWidth) -> Self {
+            let ranks = match val {
+                IntWidth::Bits8 => [Rank::At(0), Rank::At(3), Rank::At(3), Rank::At(3)],
+                IntWidth::Bits16 => [Rank::At(3), Rank::At(0), Rank::At(3), Rank::At(3)],
+                IntWidth::Bits32 => [Rank::At(3), Rank::At(3), Rank::At(0), Rank::At(3)],
+                IntWidth::Bits64 => [Rank::At(3), Rank::At(3), Rank::At(3), Rank::At(0)],
+            };
+            UintSet { ranks }
+        }
+    }
+
+    impl UintSet {
+        pub const ANY32: Self = Self::any_default(IntWidth::Bits32);
+    }
+
+    impl BaseType {
+        pub fn int_width(&self) -> IntWidth {
+            match self {
+                BaseType::U8 => IntWidth::Bits8,
+                BaseType::U16 => IntWidth::Bits16,
+                BaseType::U32 => IntWidth::Bits32,
+                BaseType::U64 => IntWidth::Bits64,
+                _ => unreachable!("cannot measure int-width of non-integral BaseType {self:?}"),
+            }
+        }
+    }
+
+    impl UintSet {
+        // pub fn intersection(self, other: Self) -> Self {
+        //     match (self, other) {
+        //         (x, y) if x == y => x,
+        //         (UintSet::ANY, x) | (x, UintSet::ANY) => x, // Any is the identity under intersection
+        //         (UintSet::SHORT8, _) | (_, UintSet::SHORT8) => Self::SHORT8,
+        //         (UintSet::at_least(w1), UintSet::at_least(w2)) => Self::at_least(Ord::max(w1, w2)),
+        //         // Technically ambiguous cases
+        //         (UintSet::any_default(w1), UintSet::any_default(w2)) => Self::any_default(Ord::max(w1, w2)),
+        //         (UintSet::any_default(w_dft), UintSet::at_least(w_min)) | (UintSet::at_least(w_min), UintSet::any_default(w_dft)) => {
+        //             panic!("unresolvable UintSet intersection: AnyDefault({w_dft:?}) & AtLeast({w_min:?})")
+        //         }
+        //     }
+        // }
+
+        // pub fn get_unique_solution(self) -> Option<BaseType> {
+        //     match self {
+        //         UintSet::Any => None,
+        //         UintSet::AnyDefault(width) => Some(width.to_base_type()),
+        //         UintSet::Short8 => Some(BaseType::U8),
+        //         UintSet::AtLeast(IntWidth::Bits64) => Some(BaseType::U64),
+        //         UintSet::AtLeast(_) => None,
+        //     }
+        // }
+    }
+
+    impl BaseSet {
+        pub fn unify(&self, other: &Self) -> Result<Self, ConstraintError> {
+            match (self, other) {
+                (BaseSet::Single(b1), BaseSet::Single(b2)) => {
+                    if b1 == b2 {
+                        Ok(*self)
+                    } else {
+                        Err(ConstraintError::Unsatisfiable(
+                            Constraint::Elem(*self),
+                            Constraint::Elem(*other),
+                        ))
+                    }
+                }
+                (BaseSet::U(u), BaseSet::Single(b)) | (BaseSet::Single(b), BaseSet::U(u)) => {
+                    if u.contains(*b) {
+                        Ok(BaseSet::Single(*b))
+                    } else {
+                        Err(UnificationError::Unsatisfiable(
+                            self.to_constraint(),
+                            other.to_constraint(),
+                        ))
+                    }
+                }
+                (BaseSet::U(u1), BaseSet::U(u2)) => Ok(BaseSet::U(u1.intersection(*u2))),
+            }
+        }
+
+        /// Constructs the simplest-possible constraint from `self`, in particular substituting
+        /// `Equiv(BaseType(b))` in place of `Elem(Single(b))`.
+        pub fn to_constraint(self) -> Constraint {
+            match self {
+                BaseSet::Single(b) => Constraint::Equiv(Rc::new(UType::Base(b))),
+                _ => Constraint::Elem(self),
+            }
+        }
+
+        pub(crate) fn get_unique_solution(&self, v: UVar) -> TCResult<BaseType> {
+            match self {
+                BaseSet::Single(b) => Ok(*b),
+                BaseSet::U(u) => {
+                    if u.is_empty() {
+                        return Err(TCErrorKind::NoSolution(v).into());
+                    }
+                    match u.get_unique_solution() {
+                        Some(b) => Ok(b),
+                        None => Err(TCErrorKind::MultipleSolutions(v, *self).into()),
+                    }
+                }
+            }
+        }
+    }
+
+    impl std::fmt::Display for BaseSet {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                BaseSet::Single(t) => write!(f, "{{ {t:?} }}"),
+                BaseSet::U(ranked_set) => ranked_set.fmt(f),
+            }
+        }
+    }
+}
+use base_set::{BaseSet, UintSet, IntWidth};
+
+#[derive(Debug, Default)]
+pub(crate) struct EmbeddedResolver {
+    subtrees: HashMap<ExtVar, Rc<RefCell<inference::InferenceEngine>>>,
+    aliases: HashMap<ExtVar, Alias>,
+    outcomes: HashMap<ExtVar, Option<crate::numeric::elaborator::IntType>>,
+}
+
+impl EmbeddedResolver {
+    pub fn new() -> Self {
+        Self {
+            subtrees: HashMap::new(),
+            aliases: HashMap::new(),
+            outcomes: HashMap::new(),
+        }
+    }
+
+    /// Internal call to insert a novel subtree into the resolver
+    ///
+    /// The ExtVar should not already have a subtree stored.
+    fn insert_subtree(&mut self, ext_var: ExtVar, engine: Rc<RefCell<inference::InferenceEngine>>) {
+        assert!(!self.subtrees.contains_key(&ext_var));
+        self.subtrees.insert(ext_var, engine);
+    }
+
+    pub(crate) fn get_subtree(&self, ext_var: ExtVar) -> Option<Rc<RefCell<inference::InferenceEngine>>> {
+        self.subtrees.get(&ext_var).cloned()
+    }
+
+    pub(crate) fn get_or_init_subtree(&mut self, ext_var: ExtVar) -> Rc<RefCell<inference::InferenceEngine>> {
+        self.subtrees.entry(ext_var).or_insert_with(|| {
+            let engine = inference::InferenceEngine::new();
+            Rc::new(RefCell::new(engine))
+        }).clone()
+    }
+
+    pub(crate) fn solve(&mut self, ext_var: ExtVar) -> Option<crate::numeric::elaborator::IntType> {
+        if let Some(result) = self.outcomes.get(&ext_var) {
+            return result.clone();
+        }
+
+        let engine = self.get_or_init_subtree(ext_var);
+        let result = (*engine).borrow_mut().reify(UVar::new(0).into());
+        self.outcomes.insert(ext_var, result.clone());
+        result
+    }
+
+    pub(crate) fn resolve(&mut self, ext_var: ExtVar) -> Option<Rc<inference::InferenceEngine>> {
+        if let Some(result) = self.outcomes.get(&ext_var) {
+            if let Some(_) = result {
+                return self.get_subtree(ext_var);
+            } else {
+                return None;
+            }
+        }
+
+        let engine = self.get_or_init_subtree(ext_var);
+        let result = (*engine).borrow_mut().reify(UVar::new(0).into());
+        self.set_outcome(ext_var, result.clone());
+        result
+    }
+
+    fn set_outcome(&mut self, ext_var: ExtVar, outcome: Option<crate::numeric::elaborator::IntType>) {
+        let mut res = outcome;
+
+        // FIXME - this is currently broken, as it doesn't canonicalize the aliases before attempting to iterate through them
+        if let Some(alias) = self.aliases.get(&ext_var) {
+            for aliased in alias.iter_fwd_refs() {
+                // FIXME - this is also broken because it is order-dependent (res might be updated only after seeing a certain alias, which would yield different behavior before and after)
+                res = self.unify_outcome(*aliased, res);
+            }
+        }
+
+        self.outcomes.insert(ext_var, res);
+    }
+
+    fn unify_outcome(&mut self, ext_var: ExtVar, outcome: Option<crate::numeric::elaborator::IntType>) -> Option<crate::numeric::elaborator::IntType> {
+        if let Some(prior) = self.outcomes.get(&ext_var) {
+            match (prior, outcome) {
+                (None, None) => return None,
+                (None, Some(_)) => {
+                    self.outcomes.insert(ext_var, outcome);
+                    return outcome;
+                }
+                (Some(_), None) => return prior.clone(),
+                (Some(i0), Some(i1)) if *i0 == i1 => return Some(i1),
+                (Some(old), Some(new)) => {
+                    unreachable!("aliased solutions disagree ({ext_var}): {old:?} != {new:?}")
+                }
+            }
         } else {
-            None
+            self.outcomes.insert(ext_var, outcome);
+            return outcome;
         }
     }
 }
 
-impl UintSet {
-    // unrestricted and non-defaulting if more than one solution
-    pub const ANY: UintSet = UintSet {
-        ranks: [Rank::At(3); 4],
-    };
-    // U8 or U16, default solution is U8
-    pub const SHORT8: UintSet = UintSet {
-        ranks: [Rank::At(0), Rank::At(1), Rank::Excluded, Rank::Excluded],
-    };
-
-    // Some member of the restricted set of any whose width is no less than the given IntWidth
-    pub const fn at_least(val: IntWidth) -> Self {
-        let ranks = match val {
-            IntWidth::Bits8 => [Rank::At(3), Rank::At(3), Rank::At(3), Rank::At(3)],
-            IntWidth::Bits16 => [Rank::Excluded, Rank::At(2), Rank::At(2), Rank::At(2)],
-            IntWidth::Bits32 => [Rank::Excluded, Rank::Excluded, Rank::At(1), Rank::At(1)],
-            IntWidth::Bits64 => [Rank::Excluded, Rank::Excluded, Rank::Excluded, Rank::At(0)],
-        };
-        UintSet { ranks }
-    }
-
-    // unrestricted but resolves if ambiguous to the given IntWidth, unless precluded
-    pub const fn any_default(val: IntWidth) -> Self {
-        let ranks = match val {
-            IntWidth::Bits8 => [Rank::At(0), Rank::At(3), Rank::At(3), Rank::At(3)],
-            IntWidth::Bits16 => [Rank::At(3), Rank::At(0), Rank::At(3), Rank::At(3)],
-            IntWidth::Bits32 => [Rank::At(3), Rank::At(3), Rank::At(0), Rank::At(3)],
-            IntWidth::Bits64 => [Rank::At(3), Rank::At(3), Rank::At(3), Rank::At(0)],
-        };
-        UintSet { ranks }
-    }
+/// Mutably updated state-engine for performing complete type-inference on a top-level `Format`.
+#[derive(Debug)]
+pub struct TypeChecker {
+    // TODO - implement segmented store to keep dep-format solving from interfering with proper sequencing
+    /// Stores, at each index `ix`, the incrementally refined constraints on the types that are valid assignments to meta-variable `?ix`
+    constraints: Vec<Constraints>,
+    /// Stores, at each index `ix`, the set of unique meta-variables that are aliased to meta-variable `?ix` (excluding `?ix` itself)
+    aliases: Vec<Alias>,
+    /// Associations between VMId in meta-variable constraints and the incrementally refined VarMap for the union-type it corresponds to
+    varmaps: VarMapMap,
+    /// Association between ItemVar/FormatRef levels in the FormatModule and the UVar they are mapped to
+    level_vars: HashMap<usize, UVar>,
+    /// Scaffolding for compartmentalized external type inference in the arithmetic extension grammar
+    sub_extension: EmbeddedResolver,
 }
-
-impl UintSet {
-    pub const ANY32: Self = Self::any_default(IntWidth::Bits32);
-}
-
-impl BaseType {
-    pub fn int_width(&self) -> IntWidth {
-        match self {
-            BaseType::U8 => IntWidth::Bits8,
-            BaseType::U16 => IntWidth::Bits16,
-            BaseType::U32 => IntWidth::Bits32,
-            BaseType::U64 => IntWidth::Bits64,
-            _ => unreachable!("cannot measure int-width of non-integral BaseType {self:?}"),
-        }
-    }
-}
-
-impl UintSet {
-    // pub fn intersection(self, other: Self) -> Self {
-    //     match (self, other) {
-    //         (x, y) if x == y => x,
-    //         (UintSet::ANY, x) | (x, UintSet::ANY) => x, // Any is the identity under intersection
-    //         (UintSet::SHORT8, _) | (_, UintSet::SHORT8) => Self::SHORT8,
-    //         (UintSet::at_least(w1), UintSet::at_least(w2)) => Self::at_least(Ord::max(w1, w2)),
-    //         // Technically ambiguous cases
-    //         (UintSet::any_default(w1), UintSet::any_default(w2)) => Self::any_default(Ord::max(w1, w2)),
-    //         (UintSet::any_default(w_dft), UintSet::at_least(w_min)) | (UintSet::at_least(w_min), UintSet::any_default(w_dft)) => {
-    //             panic!("unresolvable UintSet intersection: AnyDefault({w_dft:?}) & AtLeast({w_min:?})")
-    //         }
-    //     }
-    // }
-
-    // pub fn get_unique_solution(self) -> Option<BaseType> {
-    //     match self {
-    //         UintSet::Any => None,
-    //         UintSet::AnyDefault(width) => Some(width.to_base_type()),
-    //         UintSet::Short8 => Some(BaseType::U8),
-    //         UintSet::AtLeast(IntWidth::Bits64) => Some(BaseType::U64),
-    //         UintSet::AtLeast(_) => None,
-    //     }
-    // }
-}
-
-impl BaseSet {
-    pub fn unify(&self, other: &Self) -> Result<Self, ConstraintError> {
-        match (self, other) {
-            (BaseSet::Single(b1), BaseSet::Single(b2)) => {
-                if b1 == b2 {
-                    Ok(*self)
-                } else {
-                    Err(ConstraintError::Unsatisfiable(
-                        Constraint::Elem(*self),
-                        Constraint::Elem(*other),
-                    ))
-                }
-            }
-            (BaseSet::U(u), BaseSet::Single(b)) | (BaseSet::Single(b), BaseSet::U(u)) => {
-                if u.contains(*b) {
-                    Ok(BaseSet::Single(*b))
-                } else {
-                    Err(UnificationError::Unsatisfiable(
-                        self.to_constraint(),
-                        other.to_constraint(),
-                    ))
-                }
-            }
-            (BaseSet::U(u1), BaseSet::U(u2)) => Ok(BaseSet::U(u1.intersection(*u2))),
-        }
-    }
-
-    /// Constructs the simplest-possible constraint from `self`, in particular substituting
-    /// `Equiv(BaseType(b))` in place of `Elem(Single(b))`.
-    pub fn to_constraint(self) -> Constraint {
-        match self {
-            BaseSet::Single(b) => Constraint::Equiv(Rc::new(UType::Base(b))),
-            _ => Constraint::Elem(self),
-        }
-    }
-
-    fn get_unique_solution(&self, v: UVar) -> TCResult<BaseType> {
-        match self {
-            BaseSet::Single(b) => Ok(*b),
-            BaseSet::U(u) => {
-                if u.is_empty() {
-                    return Err(TCErrorKind::NoSolution(v).into());
-                }
-                match u.get_unique_solution() {
-                    Some(b) => Ok(b),
-                    None => Err(TCErrorKind::MultipleSolutions(v, *self).into()),
-                }
-            }
-        }
-    }
-}
-
-impl std::fmt::Display for BaseSet {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            BaseSet::Single(t) => write!(f, "{{ {t:?} }}"),
-            BaseSet::U(ranked_set) => ranked_set.fmt(f),
-        }
-    }
-}
-
-type VarMap = HashMap<Label, Rc<UType>>;
 
 // SECTION - Construction and instantiation in the meta-context
 impl TypeChecker {
@@ -998,6 +1165,7 @@ impl TypeChecker {
             aliases: Vec::new(),
             varmaps: VarMapMap::new(),
             level_vars: HashMap::new(),
+            externs: EmbeddedResolver::new(),
         }
     }
 
@@ -1173,6 +1341,10 @@ impl TypeChecker {
     /// a sanity check to eliminate potential infinite types from consideration.
     ///
     /// Will avoid panicking at all costs, even if it requires returning a non-WHNF variable.
+    ///
+    /// # Panics
+    ///
+    /// Will only ever panic if `t` is an infinite type.
     fn to_whnf_vtype(&self, t: Rc<UType>) -> VType {
         assert!(!self.is_infinite_type(t.clone()));
         match t.as_ref() {
@@ -1369,9 +1541,11 @@ impl TypeChecker {
         }
     }
 
+    /// Performs an 'occurs-check' that determines if a variable `v` occurs in a [`UType`] `t`, used
+    /// for detecting infinite types.
     fn occurs_in(&self, v: UVar, t: impl AsRef<UType>) -> TCResult<()> {
         match t.as_ref() {
-            UType::Hole | UType::Empty | UType::ViewObj | UType::Base(_) => Ok(()),
+            UType::Hole | UType::Empty | UType::ViewObj | UType::ExternVar(..) | UType::Base(_) => Ok(()),
             &UType::Var(v1) => {
                 if self.is_aliased(v, v1) {
                     Err(TCErrorKind::InfiniteType(v, self.constraints[v.0].clone()).into())
@@ -3345,6 +3519,7 @@ impl TypeChecker {
                 unreachable!("reify: UType::Hole should be erased by any non-Hole unification!");
             }
             UType::ViewObj => Some(AugValueType::ViewObj),
+            UType::ExternVar(_ext_var) => None,
             &UType::Var(uv) => {
                 let v = self.get_canonical_uvar(uv);
                 match self.substitute_uvar_vtype(v) {
@@ -3431,6 +3606,7 @@ impl WHNFSolution {
 pub(crate) enum Expansion {
     Empty,
     Base(BaseType),
+    Outcome(ExtVar),
     Record(Vec<(Label, WHNFSolution)>),
     Union(BTreeMap<Label, WHNFSolution>),
     Seq(WHNFSolution, SeqBorrowHint),
@@ -3440,8 +3616,12 @@ pub(crate) enum Expansion {
     PhantomData(WHNFSolution),
 }
 
-// SECTION - specialized methods for codegen purposes
+// SECTION - specialized methods for elaboration and codegen purposes
 impl TypeChecker {
+    pub(crate) fn get_extern(&self, ext_var: ExtVar) -> Option<Rc<inference::InferenceEngine>> {
+        self.externs.get(&ext_var).cloned()
+    }
+
     pub(crate) fn expand_var(&self, var: UVar) -> Expansion {
         let v = self.get_canonical_uvar(var);
         match &self.constraints[v.0] {
@@ -3756,7 +3936,7 @@ pub fn typecheck(module: &FormatModule, f: &Format) -> TCResult<Option<ValueType
 pub type TCResult<T> = Result<T, TCError>;
 
 mod __impl {
-    use crate::FormatModule;
+    use crate::{FormatModule, typecheck::ExtVar};
 
     use super::{Constraint, Ctxt, ProjShape, UScope, UVar, VMId};
     use std::borrow::{Borrow, BorrowMut};
@@ -3783,6 +3963,12 @@ mod __impl {
     impl std::fmt::Display for UVar {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             write!(f, "?{}", self.0)
+        }
+    }
+
+    impl std::fmt::Display for ExtVar {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "#{}", self.0)
         }
     }
 

@@ -4,10 +4,10 @@ use std::rc::Rc;
 use fragment::Fragment;
 use precedence::{Precedence, cond_paren};
 
-use crate::codegen::{ToFragment, synthesize};
-use crate::core::{BasicBinOp, BasicUnaryOp, BinOp, Expr, MachineRep, NumRep, TypedConst, UnaryOp};
-use crate::elaborator::inference::InferenceEngine;
-use crate::elaborator::{Elaborator, IntType, TypedBinOp, TypedCast, TypedExpr, TypedUnaryOp};
+use crate::numeric::codegen::{ToFragment, synthesize};
+use crate::numeric::core::{BasicBinOp, BasicUnaryOp, BinOp, Expr, MachineRep, NumRep, TypedConst, UnaryOp};
+use crate::typecheck::inference::InferenceEngine;
+use crate::numeric::elaborator::{Elaborator, IntType, TypedBinOp, TypedCast, TypedExpr, TypedUnaryOp};
 
 pub(crate) mod fragment {
     use std::borrow::Cow;

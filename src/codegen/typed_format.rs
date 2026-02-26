@@ -619,6 +619,10 @@ where
     U16(u16),
     U32(u32),
     U64(u64),
+    Numeric(
+        TypeRep,
+        Box<crate::numeric::elaborator::TypedExpr<TypeRep>>,
+    ),
     Tuple(TypeRep, Vec<TypedExpr<TypeRep, VarId>>),
     TupleProj(TypeRep, Box<TypedExpr<TypeRep, VarId>>, usize),
     Record(TypeRep, Vec<(Label, TypedExpr<TypeRep, VarId>)>),
@@ -742,6 +746,10 @@ impl<TypeRep> std::hash::Hash for TypedExpr<TypeRep> {
             TypedExpr::U16(n) => n.hash(state),
             TypedExpr::U32(n) => n.hash(state),
             TypedExpr::U64(n) => n.hash(state),
+            TypedExpr::Numeric(hint, n) => {
+                hint.hash(state);
+                n.hash(state);
+            }
             TypedExpr::Tuple(_, ts) => ts.hash(state),
             TypedExpr::TupleProj(_, tup, ix) => {
                 tup.hash(state);
@@ -877,12 +885,16 @@ impl TypedExpr<GenType> {
             | TypedExpr::U32Le(_)
             | TypedExpr::AsU32(_)
             | TypedExpr::U32(_)
+            // FIXME[epic=seqlen-always-u32]: consider revising this hardcoded type-association
             | TypedExpr::SeqLength(_) => Some(Cow::Owned(GenType::from(PrimType::U32))),
             TypedExpr::U64Be(_) | TypedExpr::U64Le(_) | TypedExpr::AsU64(_) | TypedExpr::U64(_) => {
                 Some(Cow::Owned(GenType::from(PrimType::U64)))
             }
             TypedExpr::AsChar(_) => Some(Cow::Owned(GenType::from(PrimType::Char))),
+
+
             TypedExpr::Var(gt, ..)
+            | TypedExpr::Numeric(gt, ..)
             | TypedExpr::Tuple(gt, ..)
             | TypedExpr::TupleProj(gt, ..)
             | TypedExpr::Record(gt, ..)
@@ -975,6 +987,7 @@ impl<TypeRep> std::hash::Hash for TypedPattern<TypeRep> {
 
 mod __impls {
     use super::{GenType, TypedDynFormat, TypedExpr, TypedFormat, TypedPattern, TypedViewFormat};
+    use crate::numeric::elaborator::IntType as ExtIntType;
     use crate::{
         DynFormat, Expr, Format, Pattern, ViewExpr, ViewFormat,
         codegen::{
@@ -1000,6 +1013,12 @@ mod __impls {
 
     impl From<PrimType> for GenType {
         fn from(value: PrimType) -> Self {
+            GenType::Inline(RustType::from(value))
+        }
+    }
+
+    impl From<ExtIntType> for GenType {
+        fn from(value: ExtIntType) -> Self {
             GenType::Inline(RustType::from(value))
         }
     }
