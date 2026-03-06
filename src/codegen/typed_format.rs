@@ -8,6 +8,7 @@ use crate::bounds::Bounds;
 use crate::byte_set::ByteSet;
 use crate::codegen::rust_ast::{RustLt, RustParams, UseParams};
 use crate::{Arith, BaseKind, Endian, IntRel, Label, StyleHint, TypeHint, UnaryOp};
+use crate::numeric::elaborator::TypedExpr as TypedNumExpr;
 
 pub(crate) mod variables;
 
@@ -76,6 +77,11 @@ impl GenType {
             GenType::Inline(rust_type) => rust_type.lt_param(),
             GenType::Def(_, rust_type_decl) => rust_type_decl.lt_param(),
         }
+    }
+
+    pub(crate) fn try_to_num_type(&self) -> Option<super::rust_ast::NumType> {
+        let rust_type = self.to_rust_type();
+        rust_type.try_as_num()
     }
 }
 
@@ -619,10 +625,7 @@ where
     U16(u16),
     U32(u32),
     U64(u64),
-    Numeric(
-        TypeRep,
-        Box<crate::numeric::elaborator::TypedExpr<TypeRep>>,
-    ),
+    Numeric(Box<TypedNumExpr<TypeRep>>),
     Tuple(TypeRep, Vec<TypedExpr<TypeRep, VarId>>),
     TupleProj(TypeRep, Box<TypedExpr<TypeRep, VarId>>, usize),
     Record(TypeRep, Vec<(Label, TypedExpr<TypeRep, VarId>)>),
@@ -746,8 +749,7 @@ impl<TypeRep> std::hash::Hash for TypedExpr<TypeRep> {
             TypedExpr::U16(n) => n.hash(state),
             TypedExpr::U32(n) => n.hash(state),
             TypedExpr::U64(n) => n.hash(state),
-            TypedExpr::Numeric(hint, n) => {
-                hint.hash(state);
+            TypedExpr::Numeric(n) => {
                 n.hash(state);
             }
             TypedExpr::Tuple(_, ts) => ts.hash(state),
@@ -892,9 +894,9 @@ impl TypedExpr<GenType> {
             }
             TypedExpr::AsChar(_) => Some(Cow::Owned(GenType::from(PrimType::Char))),
 
+            TypedExpr::Numeric(n) => Some(Cow::Borrowed(n.get_type())),
 
             TypedExpr::Var(gt, ..)
-            | TypedExpr::Numeric(gt, ..)
             | TypedExpr::Tuple(gt, ..)
             | TypedExpr::TupleProj(gt, ..)
             | TypedExpr::Record(gt, ..)
@@ -1071,6 +1073,7 @@ mod __impls {
                 TypedExpr::Destructure(_, head, pattern, expr) => {
                     Expr::Destructure(rebox(head), pattern.into(), rebox(expr))
                 }
+                TypedExpr::Numeric(n) => Expr::Numeric(rebox(n)),
                 TypedExpr::Lambda(_, name, inner) => Expr::Lambda(name, rebox(inner)),
                 TypedExpr::IntRel(_, rel, x, y) => Expr::IntRel(rel, rebox(x), rebox(y)),
                 TypedExpr::Arith(_, op, x, y) => Expr::Arith(op, rebox(x), rebox(y)),

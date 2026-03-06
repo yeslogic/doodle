@@ -3,6 +3,8 @@ use num_traits::{One as _, Signed, Zero};
 use serde::Serialize;
 use std::borrow::Cow;
 
+use crate::bounds::Bounds as UBounds;
+
 pub type Number = BigInt;
 
 /// Standalone ground operations on two numeric arguments
@@ -340,8 +342,8 @@ impl TypedConst {
         Self(BigInt::from(n), rep)
     }
 
-    /// Returns `true` if the stored `NumRep` is abstract (i.e. `Auto`).
-    pub fn is_abstract(self) -> bool {
+    /// Returns `true` if `self` has an abstracted representation, i.e. if its rep is [`NumRep::Auto`].
+    pub fn is_abstract(&self) -> bool {
         self.1.is_auto()
     }
 
@@ -378,6 +380,58 @@ impl TypedConst {
     /// Saves the construction of a new TypedConst compared to [`eq_val`] if the query is made starting with a BigInt in mind.
     pub fn eq_num(&self, other: &BigInt) -> bool {
         &self.0 == other
+    }
+
+    /// Returns `true` if and only if `self` is notionally equivalent to the `M`-value `other` and
+    /// has a nominal representation that is compatible with `rep`.
+    ///
+    /// Whether or not `Auto` is allowed is determined by the feature flag `"pattern_match_auto_rep"`.
+    pub fn pat_matches<M>(&self, other: M, rep: MachineRep) -> bool
+    where
+        BigInt: From<M>
+    {
+        ((cfg!(feature = "pattern_match_auto_rep") && self.is_abstract())
+           || self.1 == NumRep::Concrete(rep)
+        ) && &self.0 == &BigInt::from(other)
+    }
+
+    /// Returns true if `self` can be considered to match `Pattern::U8(other)`.
+    pub fn matches_u8(&self, other: u8) -> bool {
+        self.pat_matches(other, MachineRep::U8)
+    }
+
+    /// Returns true if `self` can be considered to match `Pattern::U16(other)`.
+    pub fn matches_u16(&self, other: u16) -> bool {
+        self.pat_matches(other, MachineRep::U16)
+    }
+
+    /// Returns true if `self` can be considered to match `Pattern::U32(other)`.
+    pub fn matches_u32(&self, other: u32) -> bool {
+        self.pat_matches(other, MachineRep::U32)
+    }
+
+    /// Returns true if `self` can be considered to match `Pattern::U64(other)`.
+    pub fn matches_u64(&self, other: u64) -> bool {
+        self.pat_matches(other, MachineRep::U64)
+    }
+
+    /// Returns `true` if the raw value of `self` falls within the bounds of `bounds`.
+    fn falls_within(&self, bounds: UBounds) -> bool {
+        use num_bigint::BigUint;
+
+        if self.0.is_negative() {
+            return false;
+        }
+        let this = self.0.magnitude();
+
+        this >= &BigUint::from(bounds.min()) && bounds.max.map(|max| this <= &BigUint::from(max)).unwrap_or(true)
+
+    }
+
+    /// Returns `true` if `self` can be considered to match `Pattern::Int(bounds)`
+    pub fn matches_int_range(&self, bounds: UBounds) -> bool {
+        // WIP - do we need to check for representation or representability?
+        self.falls_within(bounds)
     }
 
     /// Returns the NumRep of a `TypedConst`.
@@ -461,11 +515,11 @@ impl std::fmt::Display for Value {
 #[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq, Hash)]
 pub struct BinOp {
     #[serde(serialize_with = "ser_basic_binop")]
-    op: BasicBinOp,
+    pub op: BasicBinOp,
     // If None: op(T, T | auto) -> T, op(T0, T1) { T0 != T1 } -> ambiguous; otherwise, forces rep for `Some(rep)``
     #[serde(serialize_with = "ser_opt_machine_rep")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    out_rep: Option<MachineRep>,
+    pub out_rep: Option<MachineRep>,
 }
 
 fn ser_basic_binop<S>(op: &BasicBinOp, s: S) -> Result<S::Ok, S::Error>
@@ -702,7 +756,7 @@ impl Expr {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::*;
+    use crate::numeric::core::*;
     use num_traits::One;
     use proptest::prelude::*;
 
@@ -728,6 +782,20 @@ mod tests {
         prop_oneof![abstract_strategy(), concrete_strategy(),].boxed()
     }
 
+    fn machine_strategy() -> BoxedStrategy<MachineRep> {
+        prop_oneof![
+            Just(MachineRep::U8),
+            Just(MachineRep::U16),
+            Just(MachineRep::U32),
+            Just(MachineRep::U64),
+            Just(MachineRep::I8),
+            Just(MachineRep::I16),
+            Just(MachineRep::I32),
+            Just(MachineRep::I64),
+        ]
+        .boxed()
+    }
+
     #[test]
     fn one_plus_one_is_two() -> Result<(), EvalError> {
         let one = TypedConst(BigInt::one(), NumRep::AUTO);
@@ -751,12 +819,12 @@ mod tests {
 
     proptest! {
         #[test]
-        fn cast_works(orig in numrep_strategy(), tgt in numrep_strategy()) {
+        fn cast_works(orig in numrep_strategy(), tgt in machine_strategy()) {
             let one = TypedConst(BigInt::one(), orig);
             let casted_one = Expr::Cast(tgt.into(), Box::new(Expr::Const(one)));
             let val = casted_one.eval().unwrap();
             let rep = val.as_const().unwrap().get_rep();
-            prop_assert_eq!(rep, tgt);
+            prop_assert_eq!(rep, NumRep::Concrete(tgt));
         }
 
         #[test]

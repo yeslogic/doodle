@@ -136,10 +136,21 @@ impl Rebindable for RustEntity {
     }
 }
 
+impl Rebindable for FnEntity {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
+        match self {
+            FnEntity::Specific { fname } | FnEntity::Synthetic { fname, .. } => {
+                fname.rebind(table);
+            }
+        }
+    }
+}
+
 impl Rebindable for RustExpr {
     fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         match self {
             RustExpr::Void => (),
+            RustExpr::ConstNum(..) => (),
             RustExpr::Entity(ent) => ent.rebind(table),
             RustExpr::ResultOk(.., inner) | RustExpr::ResultErr(inner) => {
                 inner.rebind(table);
@@ -151,6 +162,10 @@ impl Rebindable for RustExpr {
                 args.rebind(table);
             }
             RustExpr::FieldAccess(head, _) => head.rebind(table),
+            RustExpr::Invoke(f, args) => {
+                f.rebind(table);
+                args.rebind(table);
+            }
             RustExpr::FunctionCall(f, args) => {
                 f.rebind(table);
                 args.rebind(table);
@@ -229,6 +244,12 @@ impl Rebindable for RustClosureHead {
         match self {
             RustClosureHead::Thunk => (),
             RustClosureHead::SimpleVar(_, otyp) => otyp.rebind(table),
+            RustClosureHead::VarList(vars) => {
+                for (_, otyp) in vars.iter_mut() {
+                    // NOTE - in practice nothing will be rebound because the params are all prim-int types
+                    otyp.rebind(table)
+                }
+            }
         }
     }
 }
@@ -391,7 +412,7 @@ impl Rebindable for AtomType {
     fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
         match self {
             AtomType::TypeRef(tref) => tref.rebind(table),
-            AtomType::Prim(_) => (),
+            AtomType::Prim(_) | AtomType::Signed(_) => (),
             AtomType::Comp(comp_type) => comp_type.rebind(table),
         }
     }

@@ -1,12 +1,10 @@
-use std::collections::HashSet;
-
 use crate::numeric::core::{Bounds, Expr, MachineRep, NumRep};
 use crate::numeric::elaborator::{IntType, PrimInt, PRIM_INTS};
 use super::UVar;
 
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
-pub enum NUType {
+pub(crate) enum NUType {
     Var(UVar),
     Int(IntType),
 }
@@ -118,7 +116,6 @@ pub struct InferenceEngine {
 
 #[derive(Debug)]
 pub enum InferenceError {
-    // Unrepresentable(TypedConst, IntType),
     BadUnification(Constraint, Constraint),
     Ambiguous,
     NoSolution,
@@ -427,10 +424,10 @@ impl InferenceEngine {
                 !self.aliases[a1].contains_fwd_ref(a),
                 "forward ref of ?{a2} is also a forward_ref of ?{a1}, somehow"
             );
-            self.repoint(a1, a);
+            unsafe { self.repoint(a1, a) };
         }
         self.aliases[a1].add_forward_ref(a2);
-        self.transfer_constraints(a1, a2)
+        unsafe { self.transfer_constraints(a1, a2) }
     }
 
     fn unify_utype(&mut self, left: NUType, right: NUType) -> InferenceResult<NUType> {

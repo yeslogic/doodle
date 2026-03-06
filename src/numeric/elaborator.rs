@@ -1,3 +1,5 @@
+use crate::codegen::rust_ast::{AtomType, MachineSint, MachineUint, PrimType, RustType};
+use crate::codegen::typed_format::GenType;
 use crate::numeric::core::{BinOp, Expr, MachineRep, NumRep, TypedConst, UnaryOp};
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
@@ -10,6 +12,28 @@ pub enum PrimInt {
     I16,
     I32,
     I64,
+}
+
+impl From<MachineUint> for PrimInt {
+    fn from(value: MachineUint) -> Self {
+        match value {
+            MachineUint::U8 => PrimInt::U8,
+            MachineUint::U16 => PrimInt::U16,
+            MachineUint::U32 => PrimInt::U32,
+            MachineUint::U64 => PrimInt::U64,
+        }
+    }
+}
+
+impl From<MachineSint> for PrimInt {
+    fn from(value: MachineSint) -> Self {
+        match value {
+            MachineSint::I8 => PrimInt::I8,
+            MachineSint::I16 => PrimInt::I16,
+            MachineSint::I32 => PrimInt::I32,
+            MachineSint::I64 => PrimInt::I64,
+        }
+    }
 }
 
 impl serde::Serialize for PrimInt {
@@ -99,6 +123,14 @@ impl From<PrimInt> for MachineRep {
     }
 }
 
+impl From<IntType> for MachineRep {
+    fn from(value: IntType) -> Self {
+        match value {
+            IntType::Prim(prim) => MachineRep::from(prim),
+        }
+    }
+}
+
 impl From<IntType> for NumRep {
     fn from(value: IntType) -> Self {
         match value {
@@ -140,9 +172,37 @@ impl IntType {
     }
 }
 
+// WIP - consider what extra information is required
+#[derive(Debug)]
+pub struct TryFromGenTypeError(GenType);
+
 impl std::fmt::Display for IntType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.to_static_str())
+        f.write_str(self.to_static_str())
+    }
+}
+
+impl std::fmt::Display for TryFromGenTypeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "failed to convert GenType to IntType: {:?}", self.0)
+    }
+}
+
+impl std::error::Error for TryFromGenTypeError {}
+
+impl TryFrom<GenType> for IntType {
+    type Error = TryFromGenTypeError;
+
+    fn try_from(value: GenType) -> Result<Self, Self::Error> {
+        match value {
+            GenType::Inline(RustType::Atom(AtomType::Signed(sint))) => {
+                Ok(IntType::Prim(PrimInt::from(sint)))
+            }
+            GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::Unsigned(uint)))) => {
+                Ok(IntType::Prim(PrimInt::from(uint)))
+            }
+            _ => Err(TryFromGenTypeError(value)),
+        }
     }
 }
 
@@ -157,6 +217,37 @@ pub(crate) enum TypedExpr<TypeRep> {
     ),
     ElabUnaryOp(TypeRep, TypedUnaryOp<TypeRep>, Box<TypedExpr<TypeRep>>),
     ElabCast(TypeRep, TypedCast<TypeRep>, Box<TypedExpr<TypeRep>>),
+}
+
+pub(crate) trait MapType: Sized {
+    type Rep;
+    type Output<A>;
+
+    fn map_type<T>(self, f: &impl Fn(Self::Rep) -> T) -> Self::Output<T> {
+        let g = |x: Self::Rep| Ok(f(x));
+        let Ok(ret) = self.try_map_type::<T, std::convert::Infallible>(&g);
+        ret
+    }
+
+    fn try_map_type<T, E>(
+        self,
+        f: &impl Fn(Self::Rep) -> Result<T, E>,
+    ) -> Result<Self::Output<T>, E>;
+}
+
+impl<X> MapType for Box<X>
+where
+    X: MapType,
+{
+    type Rep = X::Rep;
+    type Output<A> = Box<X::Output<A>>;
+
+    fn try_map_type<T, E>(
+        self,
+        f: &impl Fn(Self::Rep) -> Result<T, E>,
+    ) -> Result<Self::Output<T>, E> {
+        Ok(Box::new((*self).try_map_type(f)?))
+    }
 }
 
 impl<TypeRep> std::hash::Hash for TypedExpr<TypeRep> {
@@ -194,13 +285,114 @@ impl<T> TypedExpr<T> {
     }
 }
 
+mod __impls {
+    use super::*;
+
+    #[allow(clippy::boxed_local)]
+    fn rebox<T, U: From<T>>(b: Box<T>) -> Box<U> {
+        Box::new(U::from(*b))
+    }
+
+    impl<TypeRep> From<TypedBinOp<TypeRep>> for BinOp {
+        fn from(value: TypedBinOp<TypeRep>) -> Self {
+            value.inner
+        }
+    }
+
+    impl<TypeRep> From<TypedUnaryOp<TypeRep>> for UnaryOp {
+        fn from(value: TypedUnaryOp<TypeRep>) -> Self {
+            value.inner
+        }
+    }
+
+    impl<TypeRep> From<TypedExpr<TypeRep>> for Expr {
+        fn from(value: TypedExpr<TypeRep>) -> Self {
+            match value {
+                TypedExpr::ElabConst(_, c) => Expr::Const(c),
+                TypedExpr::ElabBinOp(_, op, lhs, rhs) => {
+                    Expr::BinOp(op.into(), rebox(lhs), rebox(rhs))
+                }
+                TypedExpr::ElabUnaryOp(_, op, inner) => Expr::UnaryOp(op.into(), rebox(inner)),
+                TypedExpr::ElabCast(_, cast, inner) => Expr::Cast(cast.rep, rebox(inner)),
+            }
+        }
+    }
+}
+
+impl<TypeRep> MapType for TypedExpr<TypeRep> {
+    type Rep = TypeRep;
+    type Output<A> = TypedExpr<A>;
+
+    fn try_map_type<T, E>(
+        self,
+        f: &impl Fn(Self::Rep) -> Result<T, E>,
+    ) -> Result<Self::Output<T>, E> {
+        match self {
+            TypedExpr::ElabConst(t, c) => Ok(TypedExpr::ElabConst(f(t)?, c)),
+            TypedExpr::ElabBinOp(t, op, l, r) => Ok(TypedExpr::ElabBinOp(
+                f(t)?,
+                op.try_map_type(f)?,
+                l.try_map_type(f)?,
+                r.try_map_type(f)?,
+            )),
+            TypedExpr::ElabUnaryOp(t, op, x) => Ok(TypedExpr::ElabUnaryOp(
+                f(t)?,
+                op.try_map_type(f)?,
+                x.try_map_type(f)?,
+            )),
+            TypedExpr::ElabCast(t, c, x) => {
+                Ok(TypedExpr::ElabCast(f(t)?, c.try_map_type(f)?, x.try_map_type(f)?))
+            }
+        }
+    }
+}
+
 pub(crate) type Sig1<T> = (T, T);
 pub(crate) type Sig2<T> = ((T, T), T);
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+impl<X> MapType for Sig1<X> {
+    type Rep = X;
+    type Output<A> = Sig1<A>;
+
+    fn try_map_type<T, E>(
+        self,
+        f: &impl Fn(Self::Rep) -> Result<T, E>,
+    ) -> Result<Self::Output<T>, E> {
+        let (i, o) = self;
+        Ok((f(i)?, f(o)?))
+    }
+}
+
+impl<X> MapType for Sig2<X> {
+    type Rep = X;
+    type Output<A> = Sig2<A>;
+
+    fn try_map_type<T, E>(
+        self,
+        f: &impl Fn(Self::Rep) -> Result<T, E>,
+    ) -> Result<Self::Output<T>, E> {
+        let ((i0, i1), o) = self;
+        Ok(((f(i0)?, f(i1)?), f(o)?))
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TypedBinOp<TypeRep> {
     pub sig: Sig2<TypeRep>,
     pub inner: BinOp,
+}
+
+impl<TypeRep> MapType for TypedBinOp<TypeRep> {
+    type Rep = TypeRep;
+    type Output<A> = TypedBinOp<A>;
+
+    fn try_map_type<T, E>(self, f: &impl Fn(TypeRep) -> Result<T, E>) -> Result<TypedBinOp<T>, E> {
+        let sig = self.sig.try_map_type(f)?;
+        Ok(TypedBinOp {
+            inner: self.inner,
+            sig,
+        })
+    }
 }
 
 impl<TypeRep> std::hash::Hash for TypedBinOp<TypeRep> {
@@ -215,6 +407,19 @@ pub struct TypedUnaryOp<TypeRep> {
     pub inner: UnaryOp,
 }
 
+impl<TypeRep> MapType for TypedUnaryOp<TypeRep> {
+    type Rep = TypeRep;
+    type Output<A> = TypedUnaryOp<A>;
+
+    fn try_map_type<T, E>(self, f: &impl Fn(TypeRep) -> Result<T, E>) -> Result<TypedUnaryOp<T>, E> {
+        let sig = self.sig.try_map_type(f)?;
+        Ok(TypedUnaryOp {
+            inner: self.inner,
+            sig,
+        })
+    }
+}
+
 impl<TypeRep> std::hash::Hash for TypedUnaryOp<TypeRep> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.inner.hash(state);
@@ -224,7 +429,23 @@ impl<TypeRep> std::hash::Hash for TypedUnaryOp<TypeRep> {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TypedCast<TypeRep> {
     pub sig: Sig1<TypeRep>,
-    pub rep: NumRep,
+    pub rep: MachineRep,
+}
+
+impl<TypeRep> MapType for TypedCast<TypeRep> {
+    type Rep = TypeRep;
+    type Output<A> = TypedCast<A>;
+
+    fn try_map_type<T, E>(
+        self,
+        f: &impl Fn(Self::Rep) -> Result<T, E>,
+    ) -> Result<Self::Output<T>, E> {
+        let sig = self.sig.try_map_type(f)?;
+        Ok(TypedCast {
+            rep: self.rep,
+            sig,
+        })
+    }
 }
 
 impl<TypeRep> std::hash::Hash for TypedCast<TypeRep> {
@@ -329,7 +550,6 @@ where
                 ))
             }
             &Expr::Cast(rep, ref inner) => {
-                let rep = NumRep::Concrete(rep);
                 let t_inner = self.elaborate_expr_as::<T>(inner)?;
                 let t = self.get_type_from_index(index)?;
                 Ok(TypedExpr::ElabCast(
@@ -378,7 +598,6 @@ where
                 ))
             }
             &Expr::Cast(rep, ref inner) => {
-                let rep = NumRep::Concrete(rep);
                 let t_inner = self.elaborate_expr(inner)?;
                 let t = self.get_type_from_index(index)?;
                 Ok(TypedExpr::ElabCast(

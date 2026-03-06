@@ -1350,7 +1350,10 @@ mod __impls {
                 Expr::U16(_n) => Ok(ValueTypeExt::Base(BaseType::U16)),
                 Expr::U32(_n) => Ok(ValueTypeExt::Base(BaseType::U32)),
                 Expr::U64(_n) => Ok(ValueTypeExt::Base(BaseType::U64)),
-                Expr::Numeric(hint, _) => Ok(ValueTypeExt::Base(*hint)),
+                Expr::Numeric(_) => {
+                    // WIP[epic=embedded-num]
+                    unimplemented!("infer_type_ext unimplemented for Expr::Numeric")
+                }
                 Expr::Tuple(exprs) => {
                     let mut ts = Vec::new();
                     for expr in exprs {

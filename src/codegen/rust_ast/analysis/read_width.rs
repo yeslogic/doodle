@@ -1,6 +1,5 @@
 use crate::codegen::rust_ast::{
-    AtomType, CompType, LocalType, PrimType, RustStruct, RustType, RustTypeDecl, RustTypeDef,
-    RustVariant, analysis::SourceContext,
+    AtomType, CompType, LocalType, MachineSint, MachineUint, PrimType, RustStruct, RustType, RustTypeDecl, RustTypeDef, RustVariant, analysis::SourceContext
 };
 
 use super::ASTContext;
@@ -115,6 +114,7 @@ impl ReadWidth for AtomType {
     fn read_width(&self, context: &SourceContext<'_>) -> ValueWidth {
         match self {
             AtomType::Prim(p) => p.read_width(()),
+            AtomType::Signed(px) => px.read_width(()),
             AtomType::Comp(c) => c.read_width(context),
             AtomType::TypeRef(lt) => lt.read_width(context),
         }
@@ -123,15 +123,34 @@ impl ReadWidth for AtomType {
 
 impl ReadWidth for PrimType {
     fn read_width(&self, _: ()) -> ValueWidth {
-        match self {
-            PrimType::U8 => ValueWidth::Fixed(size_of::<u8>()),
-            PrimType::U16 => ValueWidth::Fixed(size_of::<u16>()),
-            PrimType::U32 => ValueWidth::Fixed(size_of::<u32>()),
-            PrimType::U64 => ValueWidth::Fixed(size_of::<u64>()),
+        match *self {
+            PrimType::Unsigned(ut) => ut.read_width(()),
             PrimType::Unit => ValueWidth::ZERO,
             PrimType::Bool => ValueWidth::VAR,
             PrimType::Char => ValueWidth::VAR,
             PrimType::Usize => ValueWidth::VAR,
+        }
+    }
+}
+
+impl ReadWidth for MachineUint {
+    fn read_width(&self, context: Self::Context<'_>) -> ValueWidth {
+        match self {
+            MachineUint::U8 => ValueWidth::Fixed(size_of::<u8>()),
+            MachineUint::U16 => ValueWidth::Fixed(size_of::<u16>()),
+            MachineUint::U32 => ValueWidth::Fixed(size_of::<u32>()),
+            MachineUint::U64 => ValueWidth::Fixed(size_of::<u64>()),
+        }
+    }
+}
+
+impl ReadWidth for MachineSint {
+    fn read_width(&self, _: ()) -> ValueWidth {
+        match self {
+            MachineSint::I8 => ValueWidth::Fixed(size_of::<i8>()),
+            MachineSint::I16 => ValueWidth::Fixed(size_of::<i16>()),
+            MachineSint::I32 => ValueWidth::Fixed(size_of::<i32>()),
+            MachineSint::I64 => ValueWidth::Fixed(size_of::<i64>()),
         }
     }
 }
