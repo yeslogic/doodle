@@ -6,6 +6,8 @@ use std::ops::Neg;
 use std::rc::Rc;
 
 // SECTION - Evaluation model for arbitrary operations over machine integer types
+
+/// Cached, lazy answer for a mathematical operation performed on arbitrary-precision integers
 #[derive(Clone)]
 pub struct IndirectEval {
     value: Rc<LazyCell<BigInt, Box<dyn FnOnce() -> BigInt>>>,
@@ -19,14 +21,20 @@ impl std::fmt::Debug for IndirectEval {
     }
 }
 
+/// Encapsulated outcome-state for operations performed on arbitrary-precision integers that
+/// ultimately are to be coerced into a machine integer (the parameter `T`).
 #[derive(Clone, Debug)]
 pub enum Eval<T> {
+    /// Overall evaluation involve mathematically unsound operations (e.g. div or mod zero).
     NaN,
+    /// A directly expressible solution of (numeric) type `T`.
     Direct(T),
+    /// Mathematically sound operations that cannot be expressed within `T` directly.
     Indirect(IndirectEval),
 }
 
 impl<T> Eval<T> {
+    /// Returns `true` if and only if `self` is `NaN` (inexpressible or unsound).
     pub const fn is_nan(&self) -> bool {
         matches!(self, &Eval::NaN)
     }
@@ -50,12 +58,14 @@ where
     }
 }
 
+/// Error type for failed coercion of `Eval<T>` into `T` (via [`Eval::eval`])
 pub enum EvalError {
     Indirect(BigInt),
     NotANumber,
 }
 
 impl<T: Copy> Eval<T> {
+    /// Attempts to evaluate `self` as a value of type `T`, returning `Err` if `self` is `NaN` or `Indirect`.
     pub fn eval(&self) -> Result<T, EvalError> {
         match self {
             Eval::NaN => Err(EvalError::NotANumber),
@@ -72,7 +82,7 @@ impl<T: Copy> Eval<T> {
 // SECTION - Binary Operation Backend
 
 /// Macro for bulk definition of homogenously typed binary operations with a checked version provided by a trait (`num_traits`), where
-/// `None`` indicates underflow or overflow, falling back on available saturating and wrapping variants of the same operation for indirect computations
+/// `None` indicates underflow or overflow, falling back on available saturating and wrapping variants of the same operation for indirect computations
 macro_rules! homogenous {
     ( $( $tr:ident, $meth:ident => $( ( $fname:ident , $t:ty ) ),+ $(,)? );+ $(;)? ) => {
         $(
@@ -803,6 +813,7 @@ where
 
 // SECTION - Pure Casts
 
+/// Macro for generating cast-functions for casts that are total.
 macro_rules! direct_cast {
     ($($from:ty => $( ($fname:ident, $to:ty) ),+ $(,)? );+ $(;)? ) => {
         $(
@@ -815,6 +826,7 @@ macro_rules! direct_cast {
     }
 }
 
+/// Macro for generating cast-functions for casts that might fail.
 macro_rules! attempt_cast {
     ($($from:ty => $( ($fname:ident, $to:ty) ),+ $(,)? );+ $(;)? ) => {
         $(

@@ -1,6 +1,6 @@
 use super::{MemSize, aligned_size};
 use crate::codegen::rust_ast::{
-    AtomType, CompType, LocalType, PrimType, RustStruct, RustType, RustTypeDecl, RustTypeDef,
+    AtomType, CompType, LocalType, PrimType, MachineSint, RustStruct, RustType, RustTypeDecl, RustTypeDef,
     RustVariant,
 };
 use core::alloc::Layout;
@@ -204,6 +204,7 @@ impl HeapOptimize for AtomType {
     fn heap_hint(&self, strategy: HeapStrategy, context: Self::Context<'_>) -> HeapOutcome {
         match self {
             AtomType::Prim(pt) => pt.heap_hint(strategy, ()),
+            AtomType::Signed(pxt) => pxt.heap_hint(strategy, ()),
             AtomType::Comp(ct) => ct.heap_hint(strategy, context),
             AtomType::TypeRef(lt) => lt.heap_hint(strategy, context),
         }
@@ -211,6 +212,13 @@ impl HeapOptimize for AtomType {
 }
 
 impl HeapOptimize for PrimType {
+    fn heap_hint(&self, _: HeapStrategy, context: Self::Context<'_>) -> HeapOutcome {
+        (HeapAction::Noop, mk_layout(self, context))
+    }
+}
+
+
+impl HeapOptimize for MachineSint {
     fn heap_hint(&self, _: HeapStrategy, context: Self::Context<'_>) -> HeapOutcome {
         (HeapAction::Noop, mk_layout(self, context))
     }

@@ -448,6 +448,7 @@ impl ParsedValue {
             | Value::U16(_)
             | Value::U32(_)
             | Value::U64(_)
+            | Value::Numeric(_)
             | Value::View { .. }
             | Value::Usize(_)
             | Value::EnumFromTo(_)
@@ -539,6 +540,14 @@ impl Expr {
             Expr::U16(i) => Cow::Owned(ParsedValue::from_evaluated(Value::U16(*i))),
             Expr::U32(i) => Cow::Owned(ParsedValue::from_evaluated(Value::U32(*i))),
             Expr::U64(i) => Cow::Owned(ParsedValue::from_evaluated(Value::U64(*i))),
+            Expr::Numeric(n) => {
+                let num_val = n.eval();
+                match num_val {
+                    Ok(v) => Cow::Owned(ParsedValue::from_evaluated(Value::from(v))),
+                    // WIP[epic=embedded-num] - this is a hack for now
+                    Err(e) => panic!("{e}"),
+                }
+            }
             Expr::Tuple(exprs) => Cow::Owned(ParsedValue::from_evaluated(Value::Tuple(
                 exprs
                     .iter()

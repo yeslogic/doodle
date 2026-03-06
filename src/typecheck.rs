@@ -1,9 +1,9 @@
+use crate::typecheck::inference::InferenceError;
 use crate::valuetype::{SeqBorrowHint, augmented::AugValueType};
 use crate::{
     Arith, BaseType, DynFormat, Expr, Format, FormatModule, Label, Pattern, UnaryOp, ValueType,
     ViewExpr, ViewFormat,
 };
-use std::cell::RefCell;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     rc::Rc,
@@ -1046,99 +1046,39 @@ use base_set::{BaseSet, UintSet, IntWidth};
 
 #[derive(Debug, Default)]
 pub(crate) struct EmbeddedResolver {
-    subtrees: HashMap<ExtVar, Rc<RefCell<inference::InferenceEngine>>>,
-    aliases: HashMap<ExtVar, Alias>,
+    subtrees: Vec<Rc<inference::InferenceEngine>>,
+    aliases: Vec<Alias>,
     outcomes: HashMap<ExtVar, Option<crate::numeric::elaborator::IntType>>,
 }
 
 impl EmbeddedResolver {
-    pub fn new() -> Self {
+    fn new() -> Self {
         Self {
-            subtrees: HashMap::new(),
-            aliases: HashMap::new(),
+            subtrees: Vec::new(),
+            aliases: Vec::new(),
             outcomes: HashMap::new(),
         }
     }
 
-    /// Internal call to insert a novel subtree into the resolver
-    ///
-    /// The ExtVar should not already have a subtree stored.
-    fn insert_subtree(&mut self, ext_var: ExtVar, engine: Rc<RefCell<inference::InferenceEngine>>) {
-        assert!(!self.subtrees.contains_key(&ext_var));
-        self.subtrees.insert(ext_var, engine);
+    fn init_new_extvar(&mut self, engine: inference::InferenceEngine) -> ExtVar {
+        let ext_var = ExtVar(self.subtrees.len());
+        self.subtrees.push(Rc::new(engine));
+        self.aliases.push(Alias::new());
+        ext_var
     }
 
-    pub(crate) fn get_subtree(&self, ext_var: ExtVar) -> Option<Rc<RefCell<inference::InferenceEngine>>> {
-        self.subtrees.get(&ext_var).cloned()
-    }
-
-    pub(crate) fn get_or_init_subtree(&mut self, ext_var: ExtVar) -> Rc<RefCell<inference::InferenceEngine>> {
-        self.subtrees.entry(ext_var).or_insert_with(|| {
-            let engine = inference::InferenceEngine::new();
-            Rc::new(RefCell::new(engine))
-        }).clone()
-    }
-
-    pub(crate) fn solve(&mut self, ext_var: ExtVar) -> Option<crate::numeric::elaborator::IntType> {
-        if let Some(result) = self.outcomes.get(&ext_var) {
-            return result.clone();
+    // WIP - figure out correct return type
+    fn resolve_alias(&self, var0: ExtVar, var1: ExtVar) -> () {
+        if var0 == var1 {
+            return;
         }
 
-        let engine = self.get_or_init_subtree(ext_var);
-        let result = (*engine).borrow_mut().reify(UVar::new(0).into());
-        self.outcomes.insert(ext_var, result.clone());
-        result
-    }
-
-    pub(crate) fn resolve(&mut self, ext_var: ExtVar) -> Option<Rc<inference::InferenceEngine>> {
-        if let Some(result) = self.outcomes.get(&ext_var) {
-            if let Some(_) = result {
-                return self.get_subtree(ext_var);
-            } else {
-                return None;
-            }
-        }
-
-        let engine = self.get_or_init_subtree(ext_var);
-        let result = (*engine).borrow_mut().reify(UVar::new(0).into());
-        self.set_outcome(ext_var, result.clone());
-        result
-    }
-
-    fn set_outcome(&mut self, ext_var: ExtVar, outcome: Option<crate::numeric::elaborator::IntType>) {
-        let mut res = outcome;
-
-        // FIXME - this is currently broken, as it doesn't canonicalize the aliases before attempting to iterate through them
-        if let Some(alias) = self.aliases.get(&ext_var) {
-            for aliased in alias.iter_fwd_refs() {
-                // FIXME - this is also broken because it is order-dependent (res might be updated only after seeing a certain alias, which would yield different behavior before and after)
-                res = self.unify_outcome(*aliased, res);
-            }
-        }
-
-        self.outcomes.insert(ext_var, res);
-    }
-
-    fn unify_outcome(&mut self, ext_var: ExtVar, outcome: Option<crate::numeric::elaborator::IntType>) -> Option<crate::numeric::elaborator::IntType> {
-        if let Some(prior) = self.outcomes.get(&ext_var) {
-            match (prior, outcome) {
-                (None, None) => return None,
-                (None, Some(_)) => {
-                    self.outcomes.insert(ext_var, outcome);
-                    return outcome;
-                }
-                (Some(_), None) => return prior.clone(),
-                (Some(i0), Some(i1)) if *i0 == i1 => return Some(i1),
-                (Some(old), Some(new)) => {
-                    unreachable!("aliased solutions disagree ({ext_var}): {old:?} != {new:?}")
-                }
-            }
-        } else {
-            self.outcomes.insert(ext_var, outcome);
-            return outcome;
-        }
+        // STUB
+        todo!()
     }
 }
+
+
 
 /// Mutably updated state-engine for performing complete type-inference on a top-level `Format`.
 #[derive(Debug)]
@@ -1165,7 +1105,7 @@ impl TypeChecker {
             aliases: Vec::new(),
             varmaps: VarMapMap::new(),
             level_vars: HashMap::new(),
-            externs: EmbeddedResolver::new(),
+            sub_extension: EmbeddedResolver::new(),
         }
     }
 
@@ -1208,6 +1148,10 @@ impl TypeChecker {
         self.constraints.push(Constraints::new());
         self.aliases.push(Alias::new());
         ret
+    }
+
+    fn init_extvar(&mut self, engine: inference::InferenceEngine) -> ExtVar {
+        self.sub_extension.init_new_extvar(engine)
     }
 
     fn infer_var_scope_pattern(
@@ -2334,6 +2278,27 @@ impl TypeChecker {
             Expr::U16(_) => self.init_var_simple(UType::Base(BaseType::U16))?.0,
             Expr::U32(_) => self.init_var_simple(UType::Base(BaseType::U32))?.0,
             Expr::U64(_) => self.init_var_simple(UType::Base(BaseType::U64))?.0,
+            Expr::Numeric(expr) => {
+                let newvar = self.get_new_uvar();
+
+                let mut engine = inference::InferenceEngine::new();
+
+                // create a dummy extvar for error reporting, which we don't end up using elsewhere
+                let _ext_var = ExtVar(self.sub_extension.subtrees.len());
+
+                // WIP - figure out what to do with Rep
+                let (sub_var, _rep) = engine.infer_var_expr(expr)
+                    .map_err(|e| TCErrorKind::from((newvar, _ext_var, e)))?;
+                assert_eq!(sub_var, UVar(0), "expected sub-var ({newvar} = {_ext_var}) to be ?0, found {sub_var}");
+
+                let ext_var = self.sub_extension.init_new_extvar(engine);
+                self.unify_var_utype(
+                    newvar,
+                    Rc::new(UType::ExternVar(ext_var))
+                )?;
+
+                newvar
+            }
             Expr::Tuple(ts) => {
                 let newvar = self.get_new_uvar();
                 let mut uts = Vec::with_capacity(ts.len());
@@ -3618,8 +3583,12 @@ pub(crate) enum Expansion {
 
 // SECTION - specialized methods for elaboration and codegen purposes
 impl TypeChecker {
-    pub(crate) fn get_extern(&self, ext_var: ExtVar) -> Option<Rc<inference::InferenceEngine>> {
-        self.externs.get(&ext_var).cloned()
+    pub(crate) fn get_extern(&self, ext_var: ExtVar) -> Rc<inference::InferenceEngine> {
+        let ix = ext_var.0;
+        if ix >= self.sub_extension.subtrees.len() {
+            unreachable!("invalid external var {ext_var} (out-of-range): {ix} >= {}", self.sub_extension.subtrees.len());
+        }
+        self.sub_extension.subtrees[ix].clone()
     }
 
     pub(crate) fn expand_var(&self, var: UVar) -> Expansion {
@@ -3671,6 +3640,7 @@ impl TypeChecker {
             }
             UType::ViewObj => Expansion::ViewObj,
             UType::Var(uv) => self.expand_var(*uv),
+            UType::ExternVar(ext_var) => Expansion::Outcome(*ext_var),
             UType::Base(g) => Expansion::Base(*g),
             UType::Empty => Expansion::Empty,
             UType::Tuple(ts) => {
@@ -3801,6 +3771,7 @@ pub enum TCErrorKind {
     MultipleSolutions(UVar, BaseSet),
     NoSolution(UVar),
     MissingView(Label),
+    Inference(UVar, ExtVar, inference::InferenceError),
 }
 
 impl From<TypeError> for TCErrorKind {
@@ -3836,6 +3807,12 @@ where
 impl From<ConstraintError> for TCErrorKind {
     fn from(value: ConstraintError) -> Self {
         Self::Unification(value)
+    }
+}
+
+impl From<(UVar, ExtVar, InferenceError)> for TCErrorKind {
+    fn from((v, ext_var, err): (UVar, ExtVar, InferenceError)) -> Self {
+        Self::Inference(v, ext_var, err)
     }
 }
 
@@ -3881,6 +3858,9 @@ impl std::fmt::Display for TCErrorKind {
             TCErrorKind::MissingView(lbl) => {
                 write!(f, "view-based parse depends on unbound identifier `{lbl}`")
             }
+            TCErrorKind::Inference(v, ext_v, err) => {
+                write!(f, "inference failed for `{v} = {ext_v}`: {err}")
+            }
         }
     }
 }
@@ -3889,6 +3869,7 @@ impl std::error::Error for TCErrorKind {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Unification(u_err) => Some(u_err),
+            Self::Inference(_, _, err) => Some(err),
             _ => None,
         }
     }

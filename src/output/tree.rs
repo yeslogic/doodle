@@ -202,6 +202,10 @@ impl<'module> TreePrinter<'module> {
         }
     }
 
+    /// Returns `true` for values that are 'atomic', i.e. cannot be subdivided into sub-values.
+    ///
+    /// Non-trivial tuples, records, sequences, and ranges, as well as any shallow embedding thereof,
+    /// are considered non-atomic.
     fn is_atomic_value(&self, value: &Value, format: Option<&Format>) -> bool {
         if let Some(format) = format {
             if self.flags.pretty_ascii_strings && format.is_ascii_string_format(self.module) {
@@ -213,6 +217,7 @@ impl<'module> TreePrinter<'module> {
             Value::Bool(_) => true,
             Value::U8(_) | Value::U16(_) | Value::U32(_) | Value::U64(_) => true,
             Value::Usize(_) => true,
+            Value::Numeric(_) => true,
             Value::View { .. } => true,
             Value::Tuple(values) => values.is_empty(),
             Value::Record(fields) => fields.is_empty(),
@@ -247,9 +252,12 @@ impl<'module> TreePrinter<'module> {
                     self.is_atomic_value(value.as_ref(), Some(format))
                 }
                 // expose wrapped format contents
+                // REVIEW[epic=correctness] - have we covered all appropriate cases?
                 Some(Format::Let(.., inner))
                 | Some(Format::Hint(.., inner))
                 | Some(Format::WithRelativeOffset(.., inner))
+                | Some(Format::ParseFromView(.., inner))
+                | Some(Format::DecodeBytes(.., inner))
                 | Some(Format::MonadSeq(.., inner))
                 | Some(Format::LetFormat(.., inner)) => {
                     self.is_atomic_value(value.as_ref(), Some(inner))
@@ -258,7 +266,7 @@ impl<'module> TreePrinter<'module> {
                 f => panic!("expected format suitable for branch: {f:?}"),
             },
             Value::Option(None) => true,
-            // REVIEW - do we have a better alternative to passing in `None` on the following line?
+            // FIXME[epic=workaround-hack] - we cannot easily reconstruct the format corresponding to the inner value, so we discard the format-hint
             Value::Option(Some(value)) => self.is_atomic_value(value, None),
             Value::PhantomData => true,
         }
@@ -273,6 +281,7 @@ impl<'module> TreePrinter<'module> {
         self.is_atomic_value(value.into_cow_value().as_ref(), format)
     }
 
+    /// Unwraps `Format::ItemVar` levels, returning the first unwrapped non-`Format::ItemVar` format
     fn unwrap_itemvars<'a>(&'a self, format: &'a Format) -> &'a Format {
         match format {
             &Format::ItemVar(level, ..) => self.unwrap_itemvars(self.module.get_format(level)),
@@ -280,6 +289,8 @@ impl<'module> TreePrinter<'module> {
         }
     }
 
+    /// Generates a fragment that identifies the location of a value within the input buffer,
+    /// or as being synthetic.
     fn compile_location(&self, loc: ParseLoc) -> Fragment {
         match loc {
             ParseLoc::InBuffer { offset, length } => {
@@ -289,6 +300,8 @@ impl<'module> TreePrinter<'module> {
         }
     }
 
+    /// Given the Fragment `frag` representing a value, and a location `loc` we wish to attach to it,
+    /// generates a fragment that annotates the value-fragment with a fragment identifying the location.
     fn compile_with_location(&self, frag: Fragment, loc: ParseLoc) -> Fragment {
         Fragment::intervene(
             frag,
@@ -302,14 +315,16 @@ impl<'module> TreePrinter<'module> {
         match value {
             ParsedValue::Flat(Parsed { loc, inner }) => {
                 let symbol = match inner {
-                    Value::Bool(true) => Fragment::String("true".into()),
-                    Value::Bool(false) => Fragment::String("false".into()),
-                    Value::U8(i) => Fragment::DisplayAtom(Rc::new(*i)),
-                    Value::U16(i) => Fragment::DisplayAtom(Rc::new(*i)),
-                    Value::U32(i) => Fragment::DisplayAtom(Rc::new(*i)),
-                    Value::U64(i) => Fragment::DisplayAtom(Rc::new(*i)),
-                    Value::Char(c) => Fragment::DebugAtom(Rc::new(*c)),
-                    _ => unreachable!("found non-flat Value in ParsedValue::Flat: {inner:?}"),
+                    // Non-flat cases listed in order they are handled in the outer match
+                    Value::Tuple(..)
+                    | Value::Seq(..)
+                    | Value::Record(..)
+                    | Value::Variant(..)
+                    | Value::Mapped(..)
+                    | Value::Branch(..)
+                    | Value::Option(..) => unreachable!("found non-flat Value in ParsedValue::Flat: {inner:?}"),
+                    // fall-through to all flat cases here
+                    value => self.compile_value(value),
                 };
                 self.compile_with_location(symbol, *loc)
             }
@@ -753,6 +768,7 @@ impl<'module> TreePrinter<'module> {
             Value::U32(i) => Fragment::DisplayAtom(Rc::new(*i)),
             Value::U64(i) => Fragment::DisplayAtom(Rc::new(*i)),
             Value::Usize(i) => Fragment::DisplayAtom(Rc::new(*i)),
+            Value::Numeric(n) => Fragment::DisplayAtom(n.clone()),
             Value::Char(c) => Fragment::DebugAtom(Rc::new(*c)),
             Value::View { offset } => Fragment::string(format!("VIEW[+{offset}]")),
             Value::Tuple(vals) => self.compile_tuple(vals, None),
@@ -2052,6 +2068,9 @@ impl<'module> TreePrinter<'module> {
                 .cat(Fragment::String(" }".into()))
                 .group(),
             Expr::Seq(..) => Fragment::String("[..]".into()),
+            Expr::Numeric(n_tree) => {
+                crate::numeric::printer::compile_expr(n_tree, prec)
+            }
         }
     }
 

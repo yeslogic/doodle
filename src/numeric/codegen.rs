@@ -1,64 +1,20 @@
 use std::borrow::Cow;
 
-use crate::numeric::core::{BasicBinOp, BasicUnaryOp, BinOp, MachineRep, UnaryOp};
-use crate::numeric::elaborator::{IntType, PrimInt, Sig1, Sig2, TypedExpr};
-use crate::numeric::printer::fragment::Fragment;
+use crate::Label;
+use crate::codegen::ToFragment;
+use crate::codegen::rust_ast::RustPrimLit;
+use crate::codegen::{
+    rust_ast::{
+        ClosureBody, FnEntity, NumType, RustClosure, RustClosureHead, RustEntity, RustExpr,
+    },
+    typed_format::GenType,
+};
+use crate::output::Fragment;
 
-pub mod ast {
-    use crate::numeric::{core::TypedConst, elaborator::PrimInt};
-
-    pub type Label = std::borrow::Cow<'static, str>;
-
-    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-    pub enum SType {
-        RustPrimInt(PrimInt),
-    }
-
-    #[derive(Clone, Debug)]
-    pub enum AstEntity {
-        Unqualified(Label),
-        Qualified(Vec<Label>, Label),
-    }
-
-    impl From<Label> for AstEntity {
-        fn from(l: Label) -> Self {
-            AstEntity::Unqualified(l)
-        }
-    }
-
-    #[derive(Clone, Debug)]
-    pub enum FnEntity {
-        Specific {
-            fname: AstEntity,
-        },
-        Synthetic {
-            fname: AstEntity,
-            type_params: Vec<SType>,
-        },
-    }
-
-    #[derive(Clone, Debug)]
-    pub enum AstValue {
-        Var(Label),
-        StringLit(Label),
-        Const(TypedConst, Option<SType>),
-    }
-
-    #[derive(Clone, Debug)]
-    pub struct AstClosure {
-        pub head_args: Vec<Label>,
-        pub body: Box<AstExpr>,
-    }
-
-    #[derive(Clone, Debug)]
-    pub enum AstExpr {
-        Value(AstValue),
-        Invoke(FnEntity, Vec<AstExpr>),
-        Closure(AstClosure),
-    }
-}
-
-use ast::{AstClosure, AstEntity, AstExpr, AstValue, FnEntity, Label, SType};
+use super::{
+    core::{BasicBinOp, BasicUnaryOp, BinOp, MachineRep, UnaryOp},
+    elaborator::{IntType, MapType, PrimInt, Sig1, Sig2, TypedExpr},
+};
 
 #[derive(Clone, Copy, Debug)]
 enum BinOpClass<T> {
@@ -250,31 +206,30 @@ fn induce_cast_fname(class: UnaryOpClass<PrimInt>) -> Label {
     Label::Owned(str)
 }
 
-fn synthesize_unary(op: UnaryOp) -> AstExpr {
+fn synthesize_unary(op: UnaryOp) -> RustExpr {
     let ent = {
         let (qual, meth) = match op.get_op() {
             BasicUnaryOp::Negate => ("Neg", "neg"),
             BasicUnaryOp::AbsVal => ("Signed", "abs"),
+            // WIP[epic=embedded-num] - trait does not yet exist
             BasicUnaryOp::IntPred => ("Numeric", "pred"),
             BasicUnaryOp::IntSucc => ("Numeric", "succ"),
         };
-        AstEntity::Qualified(vec![Label::Borrowed(qual)], Label::Borrowed(meth))
+        RustEntity::Scoped(vec![Label::Borrowed(qual)], Label::Borrowed(meth))
     };
     let closure = {
         let input = Label::Borrowed("x");
-        let head_args = vec![input.clone()];
-        let body = {
+        let invocation = {
             let fn_spec = FnEntity::Specific { fname: ent };
-            let fn_args = vec![AstExpr::Value(AstValue::Var(input))];
-            let invocation = AstExpr::Invoke(fn_spec, fn_args);
-            Box::new(invocation)
+            let fn_args = vec![RustExpr::Entity(RustEntity::Local(input.clone()))];
+            RustExpr::Invoke(fn_spec, fn_args)
         };
-        AstClosure { head_args, body }
+        RustClosure::new_transform(input, None, invocation)
     };
-    AstExpr::Closure(closure)
+    RustExpr::Closure(closure)
 }
 
-fn synthesize_binop(op: BinOp) -> AstExpr {
+fn synthesize_binop(op: BinOp) -> RustExpr {
     let ent = {
         let qual = Label::Borrowed("BigInt");
         let meth = match op.get_op() {
@@ -284,58 +239,68 @@ fn synthesize_binop(op: BinOp) -> AstExpr {
             BasicBinOp::Div => "checked_div",
             BasicBinOp::Rem => "checked_rem",
         };
-        AstEntity::Qualified(vec![qual], Label::Borrowed(meth))
+        RustEntity::Scoped(vec![qual], Label::Borrowed(meth))
     };
     let closure = {
         let lhs = Label::Borrowed("x");
         let rhs = Label::Borrowed("y");
-        let head_args = vec![lhs.clone(), rhs.clone()];
+        let head_args = vec![(lhs.clone(), None), (rhs.clone(), None)];
         let body = {
             let fn_spec = FnEntity::Specific { fname: ent };
-            let fn_args = vec![
-                AstExpr::Value(AstValue::Var(lhs)),
-                AstExpr::Value(AstValue::Var(rhs)),
-            ];
-            let invocation = AstExpr::Invoke(fn_spec, fn_args);
+            let fn_args = vec![RustExpr::local(lhs), RustExpr::local(rhs)];
+            let invocation = RustExpr::Invoke(fn_spec, fn_args);
             Box::new(invocation)
         };
-        AstClosure { head_args, body }
+        RustClosure::from_parts(
+            RustClosureHead::VarList(head_args),
+            ClosureBody::Expression(body),
+        )
     };
-    AstExpr::Closure(closure)
+    RustExpr::Closure(closure)
 }
 
-pub fn synthesize(model: &TypedExpr<IntType>) -> ast::AstExpr {
+pub(crate) fn synthesize(model: &TypedExpr<GenType>) -> RustExpr {
     match model {
-        TypedExpr::ElabConst(t, typed_const) => AstExpr::Value(AstValue::Const(
-            typed_const.clone(),
-            Some(ast::SType::RustPrimInt(t.to_prim())),
-        )),
+        TypedExpr::ElabConst(t, typed_const) => {
+            let const_val = typed_const.clone();
+            let num_type = match t.try_to_num_type() {
+                None => unreachable!("numeric constants must be numeric types"),
+                Some(t) => Some(t),
+            };
+            RustExpr::ConstNum(const_val, num_type)
+        }
         TypedExpr::ElabBinOp(_, op, lhs, rhs) => {
+            let coerce = |t: GenType| IntType::try_from(t);
             let lhs = synthesize(lhs);
             let rhs = synthesize(rhs);
-            match classify_binary(op.sig) {
+            let sig = op
+                .sig
+                .clone()
+                .try_map_type(&coerce)
+                .expect("failed to coerce binop signature");
+            match classify_binary(sig) {
                 class @ (BinOpClass::Pure(..)
                 | BinOpClass::HomWide(..)
-                | BinOpClass::HetWide(..)) => AstExpr::Invoke(
+                | BinOpClass::HetWide(..)) => RustExpr::Invoke(
                     FnEntity::Specific {
-                        fname: induce_binary_fname(op.inner, class).into(),
+                        fname: RustEntity::Local(induce_binary_fname(op.inner, class)),
                     },
                     vec![lhs, rhs],
                 ),
                 class @ (BinOpClass::HomLossy(t1 @ t0, t2) | BinOpClass::HetLossy(t0, t1, t2)) => {
-                    AstExpr::Invoke(
+                    RustExpr::Invoke(
                         FnEntity::Synthetic {
-                            fname: Label::Borrowed(SYNTHETIC_BINOP).into(),
+                            fname: RustEntity::Local(Label::Borrowed(SYNTHETIC_BINOP)),
                             type_params: vec![
-                                SType::RustPrimInt(t0),
-                                SType::RustPrimInt(t1),
-                                SType::RustPrimInt(t2),
+                                NumType::from(t0),
+                                NumType::from(t1),
+                                NumType::from(t2),
                             ],
                         },
                         vec![
                             lhs,
                             rhs,
-                            AstExpr::Value(AstValue::StringLit(induce_binary_fname(
+                            RustExpr::PrimitiveLit(RustPrimLit::String(induce_binary_fname(
                                 op.inner, class,
                             ))),
                             synthesize_binop(op.inner),
@@ -346,21 +311,27 @@ pub fn synthesize(model: &TypedExpr<IntType>) -> ast::AstExpr {
         }
         TypedExpr::ElabUnaryOp(_, op, input) => {
             let input = synthesize(input);
-            match classify_unary(Some(op.inner.get_op()), op.sig) {
-                class @ (UnaryOpClass::Pure(..) | UnaryOpClass::NonLossy(..)) => AstExpr::Invoke(
+            let coerce = |t: GenType| IntType::try_from(t);
+            let sig = op
+                .sig
+                .clone()
+                .try_map_type(&coerce)
+                .expect("failed to coerce unaryop signature");
+            match classify_unary(Some(op.inner.get_op()), sig) {
+                class @ (UnaryOpClass::Pure(..) | UnaryOpClass::NonLossy(..)) => RustExpr::Invoke(
                     FnEntity::Specific {
-                        fname: AstEntity::Unqualified(induce_unary_fname(op.inner, class)),
+                        fname: RustEntity::Local(induce_unary_fname(op.inner, class)),
                     },
                     vec![input],
                 ),
-                class @ UnaryOpClass::Lossy(t0, t1) => AstExpr::Invoke(
+                class @ UnaryOpClass::Lossy(t0, t1) => RustExpr::Invoke(
                     FnEntity::Synthetic {
-                        fname: AstEntity::Unqualified(Label::Borrowed(SYNTHETIC_UNARY)),
-                        type_params: vec![SType::RustPrimInt(t0), SType::RustPrimInt(t1)],
+                        fname: RustEntity::Local(Label::Borrowed(SYNTHETIC_UNARY)),
+                        type_params: vec![NumType::from(t0), NumType::from(t1)],
                     },
                     vec![
                         input,
-                        AstExpr::Value(AstValue::StringLit(induce_unary_fname(op.inner, class))),
+                        RustExpr::PrimitiveLit(RustPrimLit::String(induce_unary_fname(op.inner, class))),
                         synthesize_unary(op.inner),
                     ],
                 ),
@@ -368,108 +339,22 @@ pub fn synthesize(model: &TypedExpr<IntType>) -> ast::AstExpr {
         }
         TypedExpr::ElabCast(_, cast, input) => {
             let input = synthesize(input);
-            match classify_unary(None, cast.sig) {
+            let coerce = |t: GenType| IntType::try_from(t);
+            let sig = cast
+                .sig
+                .clone()
+                .try_map_type(&coerce)
+                .expect("failed to coerce cast signature");
+            match classify_unary(None, sig) {
                 // NOTE - we avoid function stubbing for no-op casts (i.e. T -> T)
                 UnaryOpClass::Pure(_) => input,
-                class @ (UnaryOpClass::Lossy(..) | UnaryOpClass::NonLossy(..)) => AstExpr::Invoke(
+                class @ (UnaryOpClass::Lossy(..) | UnaryOpClass::NonLossy(..)) => RustExpr::Invoke(
                     FnEntity::Specific {
-                        fname: AstEntity::Unqualified(induce_cast_fname(class)),
+                        fname: RustEntity::Local(induce_cast_fname(class)),
                     },
                     vec![input],
                 ),
             }
-        }
-    }
-}
-
-pub(crate) trait ToFragment {
-    fn to_fragment(&self) -> Fragment;
-}
-
-impl ToFragment for AstClosure {
-    fn to_fragment(&self) -> Fragment {
-        let head_args = Fragment::seq(
-            self.head_args.iter().cloned().map(Fragment::String),
-            Some(Fragment::String(Cow::Borrowed(", "))),
-        );
-        let preamble = head_args.delimit(Fragment::Char('|'), Fragment::Char('|'));
-        let body = self
-            .body
-            .to_fragment()
-            .delimit(Fragment::Char('{'), Fragment::Char('}'));
-        preamble.cat(Fragment::Char(' ')).cat(body)
-    }
-}
-
-impl ToFragment for AstEntity {
-    fn to_fragment(&self) -> Fragment {
-        match self {
-            AstEntity::Unqualified(lbl) => Fragment::String(lbl.clone()),
-            AstEntity::Qualified(path_elts, lbl) => Fragment::seq(
-                path_elts
-                    .iter()
-                    .chain(std::iter::once(lbl))
-                    .cloned()
-                    .map(Fragment::String),
-                Some(Fragment::String(Cow::Borrowed("::"))),
-            ),
-        }
-    }
-}
-
-impl ToFragment for AstValue {
-    fn to_fragment(&self) -> Fragment {
-        match self {
-            AstValue::StringLit(s) => {
-                Fragment::String(s.clone()).delimit(Fragment::Char('"'), Fragment::Char('"'))
-            }
-            AstValue::Var(vname) => Fragment::String(vname.clone()),
-            AstValue::Const(typed_const, stype) => Fragment::String(Cow::Owned(format!(
-                "{}{}",
-                typed_const.as_raw_value(),
-                match stype {
-                    None => "",
-                    Some(t) => match t {
-                        SType::RustPrimInt(prim_int) => prim_int.to_static_str(),
-                    },
-                }
-            ))),
-        }
-    }
-}
-
-impl ToFragment for FnEntity {
-    fn to_fragment(&self) -> Fragment {
-        match self {
-            FnEntity::Specific { fname } => fname.to_fragment(),
-            FnEntity::Synthetic { fname, type_params } => fname.to_fragment().cat(
-                Fragment::seq(
-                    type_params.iter().map(|t| match t {
-                        SType::RustPrimInt(p) => Fragment::String(Cow::Borrowed(p.to_static_str())),
-                    }),
-                    Some(Fragment::String(Cow::Borrowed(", "))),
-                )
-                .delimit(Fragment::Char('<'), Fragment::Char('>')),
-            ),
-        }
-    }
-}
-
-impl ToFragment for AstExpr {
-    fn to_fragment(&self) -> Fragment {
-        match self {
-            AstExpr::Closure(closure) => closure.to_fragment(),
-            AstExpr::Invoke(fn_spec, args) => {
-                let args = args.iter().map(ToFragment::to_fragment);
-                let paren_list = Fragment::seq(
-                    args,
-                    Some(Fragment::String(std::borrow::Cow::Borrowed(", "))),
-                )
-                .delimit(Fragment::Char('('), Fragment::Char(')'));
-                let fn_spec = fn_spec.to_fragment();
-                fn_spec.cat(paren_list)
-            }
-            AstExpr::Value(ast_value) => ast_value.to_fragment(),
         }
     }
 }

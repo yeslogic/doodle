@@ -1,16 +1,19 @@
+use std::borrow::Cow;
+use std::collections::HashMap;
+use std::rc::Rc;
+
+use anyhow::{Result as AResult, anyhow};
+use serde::Serialize;
+
 use crate::byte_set::ByteSet;
 use crate::error::{DecodeError, DecodeResult};
+use crate::numeric::{TypedConst, core::Value as NumValue};
 use crate::read::ReadCtxt;
 use crate::{
     Arith, DynFormat, Expr, Format, FormatModule, IntRel, MatchTree, Next, TypeScope, ValueType,
     ViewExpr, pattern::Pattern,
 };
 use crate::{BaseKind, Endian, IntoLabel, Label, MaybeTyped, TypeHint, UnaryOp, ViewFormat};
-use anyhow::{Result as AResult, anyhow};
-use serde::Serialize;
-use std::borrow::Cow;
-use std::collections::HashMap;
-use std::rc::Rc;
 
 pub mod seq_kind;
 use seq_kind::sub_range;
@@ -26,6 +29,13 @@ pub(crate) fn extract_pair<T>(mut vec: Vec<T>) -> (T, T) {
     }
 }
 
+impl From<NumValue> for Value {
+    fn from(value: NumValue) -> Self {
+        let NumValue::Const(c) = value;
+        Value::Numeric(Rc::new(c))
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 #[serde(tag = "tag", content = "data")]
 pub enum Value {
@@ -36,8 +46,13 @@ pub enum Value {
     U64(u64),
     Char(char),
     Usize(usize),
+    // WIP[epic=embedded-num] - implement proper support for Numeric
+    Numeric(Rc<TypedConst>),
     View { offset: usize },
+    PhantomData,
+    // REVIEW - should EnumFromTo be considered a flat value?
     EnumFromTo(std::ops::Range<usize>),
+    // vvvv Non-flat values vvvv
     Option(Option<Box<Value>>),
     Tuple(Vec<Value>),
     Record(Vec<(Label, Value)>),
@@ -45,7 +60,6 @@ pub enum Value {
     Seq(SeqKind<Value>),
     Mapped(Box<Value>, Box<Value>),
     Branch(usize, Box<Value>),
-    PhantomData,
 }
 
 impl From<usize> for Value {
@@ -66,6 +80,7 @@ impl std::fmt::Display for Value {
             Value::U64(i) => write!(f, "{i}"),
             Value::Char(c) => write!(f, "{c:?}"),
             Value::Usize(i) => write!(f, "{i}"),
+            Value::Numeric(n) => write!(f, "{n}"),
             Value::View { offset } => write!(f, "View[+{offset}]"),
             Value::EnumFromTo(r) => write!(f, "{r:?}"),
             Value::Option(v) => match v {
@@ -131,6 +146,7 @@ impl Value {
         }
     }
 
+    // WIP[epic=embedded-num] - no support for negative values or signed constants yet
     fn matches_inner<'a>(&'a self, scope: &mut MultiScope<'a>, pattern: &Pattern) -> bool {
         match pattern {
             Pattern::Binding(name) => {
@@ -139,16 +155,33 @@ impl Value {
             }
             Pattern::Wildcard => true,
             Pattern::Bool(b0) => matches!(self, Value::Bool(b1) if b0 == b1),
-            Pattern::U8(i0) => matches!(self, Value::U8(i1) if i0 == i1),
-            Pattern::U16(i0) => matches!(self, Value::U16(i1) if i0 == i1),
-            Pattern::U32(i0) => matches!(self, Value::U32(i1) if i0 == i1),
-            Pattern::U64(i0) => matches!(self, Value::U64(i1) if i0 == i1),
+            Pattern::U8(i0) => match self {
+                Value::U8(i1) if i0 == i1 => true,
+                Value::Numeric(n) => n.matches_u8(*i0),
+                _ => false
+            },
+            Pattern::U16(i0) => match self {
+                Value::U16(i1) if i0 == i1 => true,
+                Value::Numeric(n) => n.matches_u16(*i0),
+                _ => false,
+            }
+            Pattern::U32(i0) => match self {
+                Value::U32(i1) if i0==i1 => true,
+                Value::Numeric(n) => n.matches_u32(*i0),
+                _ => false
+            },
+            Pattern::U64(i0) => match self {
+                Value::U64(i1) if i0==i1 => true,
+                Value::Numeric(n) => n.matches_u64(*i0),
+                _ => false
+            },
             Pattern::Int(bounds) => match self {
                 Value::U8(n) => bounds.contains(usize::from(*n)),
                 Value::U16(n) => bounds.contains(usize::from(*n)),
                 Value::U32(n) => bounds.contains(usize::try_from(*n).unwrap()),
                 Value::U64(n) => bounds.contains(usize::try_from(*n).unwrap()),
                 Value::Usize(n) => bounds.contains(*n),
+                Value::Numeric(n) => n.matches_int_range(*bounds),
                 _ => false,
             },
             Pattern::Char(c0) => matches!(self, Value::Char(c1) if c0 == c1),
@@ -315,6 +348,13 @@ impl Expr {
             Expr::U16(i) => Cow::Owned(Value::U16(*i)),
             Expr::U32(i) => Cow::Owned(Value::U32(*i)),
             Expr::U64(i) => Cow::Owned(Value::U64(*i)),
+            Expr::Numeric(n) => {
+                match n.eval() {
+                    Ok(v) => Cow::Owned(v.into()),
+                    // WIP[epic=embedded-num] - we probably want a more sensible outcome than panic
+                    Err(e) => panic!("{e}"),
+                }
+            }
             Expr::Tuple(exprs) => Cow::Owned(Value::Tuple(
                 exprs.iter().map(|expr| expr.eval_value(scope)).collect(),
             )),

@@ -152,8 +152,7 @@ pub enum Expr {
     Variant(Label, Box<Expr>),
     Seq(Vec<Expr>),
 
-    // REVIEW - the type-hint (BaseType) here is not expressive enough to cover negatives yet
-    Numeric(BaseType, Box<NumExpr>),
+    Numeric(Box<NumExpr>),
 
     Match(Box<Expr>, Vec<(Pattern, Expr)>),
     Destructure(Box<Expr>, Pattern, Box<Expr>),
@@ -242,8 +241,8 @@ impl Expr {
             Expr::U16(_n) => Ok(ValueType::Base(BaseType::U16)),
             Expr::U32(_n) => Ok(ValueType::Base(BaseType::U32)),
             Expr::U64(_n) => Ok(ValueType::Base(BaseType::U64)),
-            // REVIEW - negatives are not yet part of BaseType
-            Expr::Numeric(bt, _) => Ok(ValueType::Base(*bt)),
+            // FIXME[epic=embedded-num] - this is a hack for now
+            Expr::Numeric(_) => Ok(ValueType::Any),
             Expr::Tuple(exprs) => {
                 let mut ts = Vec::new();
                 for expr in exprs {
@@ -618,6 +617,10 @@ impl Expr {
             Expr::Unary(_, x) => x.is_shadowed_by(name),
             Expr::Dup(x, y) => x.is_shadowed_by(name) || y.is_shadowed_by(name),
             Expr::Bool(_) | Expr::U8(_) | Expr::U16(_) | Expr::U32(_) | Expr::U64(_) => false,
+            Expr::Numeric(_) => {
+                // WIP[epic=embedded-num] - we need to figure out how variables work in Numeric subtree extension
+                unimplemented!("shadowing model for numerics is not yet implemented")
+            }
             Expr::Tuple(ts) => ts.iter().any(|x| x.is_shadowed_by(name)),
             Expr::TupleProj(tup, _) => tup.is_shadowed_by(name),
             Expr::Record(fs) => {

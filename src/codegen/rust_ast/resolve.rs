@@ -135,6 +135,7 @@ impl Resolvable for RustExpr {
     fn resolve(&mut self, ctx: &SourceContext<'_>) {
         match self {
             RustExpr::Void => (),
+            RustExpr::ConstNum(..) => (),
             RustExpr::Owned(owned) => owned.resolve(ctx),
             RustExpr::OwnedOption(_, owned_kind) => {
                 if let OwnedKind::Unresolved(lens) = owned_kind {
@@ -154,6 +155,9 @@ impl Resolvable for RustExpr {
             RustExpr::PrimitiveLit(..) | RustExpr::Entity(..) => (),
             RustExpr::MethodCall(recv, .., args) => {
                 recv.resolve(ctx);
+                args.resolve(ctx);
+            }
+            RustExpr::Invoke(_, args) => {
                 args.resolve(ctx);
             }
             RustExpr::FunctionCall(fun, args) => {
@@ -244,11 +248,11 @@ impl Resolvable for OwnedRustExpr {
     }
 }
 
-/// Produces a `Solution` for a RustType based on a SourceContext
+/// Produces a [`Solution`] for a RustType based on a SourceContext
 fn solve_type(ty: &RustType, ctx: &SourceContext<'_>) -> Solution {
     match ty {
         RustType::Atom(at) => match at {
-            AtomType::Prim(_) => Solution {
+            AtomType::Prim(_) | AtomType::Signed(_) => Solution {
                 is_copy: true,
                 is_ref: false,
             },

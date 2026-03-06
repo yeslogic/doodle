@@ -558,11 +558,10 @@ where
     Ty: ToFragment,
 {
     fn to_fragment(&self) -> Fragment {
-        let all = self
-            .lt_params
-            .iter()
-            .map(Lt::to_fragment)
-            .chain(self.ty_params.iter().map(Ty::to_fragment));
+        let all = Iterator::chain(
+            self.lt_params.iter().map(Lt::to_fragment),
+            self.ty_params.iter().map(Ty::to_fragment),
+        );
         Fragment::seq(all, Some(Fragment::string(", ")))
             .delimit(Fragment::Char('<'), Fragment::Char('>'))
     }
@@ -774,7 +773,7 @@ impl RustType {
                     LocalType::LocalDef(_ix, ..) => false,
                     LocalType::External(..) => false,
                 },
-                AtomType::Prim(..) | AtomType::PrimExt(..) => false,
+                AtomType::Prim(..) | AtomType::Signed(..) => false,
             },
             // REVIEW - are there cases where we want to selectively borrow anon-tuples (and if so, distributive or unified)?
             RustType::AnonTuple(_elts) => false,
@@ -884,6 +883,21 @@ impl RustType {
             RustType::ReadArray(lt, _) | RustType::ViewObject(lt) => *lt = new_lt,
         }
     }
+
+    pub(crate) fn try_as_num(&self) -> Option<NumType> {
+        match self {
+            RustType::Atom(at) => match at {
+                AtomType::Prim(PrimType::Unsigned(ut)) => Some(NumType::U(*ut)),
+                AtomType::Signed(it) => Some(NumType::I(*it)),
+                AtomType::Prim(_other) => None,
+                AtomType::Comp(..) | AtomType::TypeRef(..) => None,
+            },
+            RustType::AnonTuple(..)
+            | RustType::ReadArray(..)
+            | RustType::Verbatim(..)
+            | RustType::ViewObject(..) => None,
+        }
+    }
 }
 
 fn hotswap_lt(params: &mut Option<Box<UseParams>>, new_lt: RustLt) {
@@ -904,7 +918,7 @@ impl RustType {
         match self {
             RustType::Atom(at) => match at {
                 AtomType::Prim(..) => true,
-                AtomType::PrimExt(..) => true,
+                AtomType::Signed(..) => true,
                 // Without passing around high-level type-maps, we can't check any externally-defined or local ad-hoc types for Copy-safety
                 AtomType::TypeRef(..) => false,
                 AtomType::Comp(ct) => match ct {
@@ -1106,7 +1120,7 @@ where
 {
     TypeRef(LocalType),
     Prim(PrimType),
-    PrimExt(PrimExtType),
+    Signed(MachineSint),
     Comp(CompType<T, U>),
 }
 
@@ -1117,7 +1131,7 @@ impl AtomType {
                 LocalType::LocalDef(_, _, params) => params.as_deref()?.lt_params.first(),
                 _ => None,
             },
-            AtomType::Prim(..) | AtomType::PrimExt(..) => None,
+            AtomType::Prim(..) | AtomType::Signed(..) => None,
             AtomType::Comp(ct) => ct.lt_param(),
         }
     }
@@ -1128,7 +1142,7 @@ impl AtomType {
                 LocalType::LocalDef(_, _, params) => hotswap_lt(params, new_lt),
                 _ => (),
             },
-            AtomType::Prim(..) | AtomType::PrimExt(..) => (),
+            AtomType::Prim(..) | AtomType::Signed(..) => (),
             AtomType::Comp(ct) => ct.alpha_convert_lifetime(new_lt),
         }
     }
@@ -1174,7 +1188,7 @@ where
         match self {
             AtomType::TypeRef(local_type) => local_type.to_fragment(),
             AtomType::Prim(pt) => pt.to_fragment(),
-            AtomType::PrimExt(p_ext) => p_ext.to_fragment(),
+            AtomType::Signed(p_ext) => p_ext.to_fragment(),
             AtomType::Comp(ct) => ct.to_fragment(),
         }
     }
@@ -1239,11 +1253,38 @@ impl TryFrom<PrimType> for MarkerType {
 
     fn try_from(pt: PrimType) -> Result<Self, Self::Error> {
         match pt {
-            PrimType::U8 => Ok(MarkerType::U8),
-            PrimType::U16 => Ok(MarkerType::U16Be),
-            PrimType::U32 => Ok(MarkerType::U32Be),
-            PrimType::U64 => Ok(MarkerType::U64Be),
+            PrimType::Unsigned(mu) => Ok(mu.into()),
             _ => Err(InvalidMarkerTypeError(pt)),
+        }
+    }
+}
+
+impl From<MachineUint> for MarkerType {
+    fn from(mu: MachineUint) -> Self {
+        match mu {
+            MachineUint::U8 => MarkerType::U8,
+            MachineUint::U16 => MarkerType::U16Be,
+            MachineUint::U32 => MarkerType::U32Be,
+            MachineUint::U64 => MarkerType::U64Be,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum MachineUint {
+    U8,
+    U16,
+    U32,
+    U64,
+}
+
+impl MachineUint {
+    pub const fn to_static_str(self) -> &'static str {
+        match self {
+            MachineUint::U8 => "u8",
+            MachineUint::U16 => "u16",
+            MachineUint::U32 => "u32",
+            MachineUint::U64 => "u64",
         }
     }
 }
@@ -1251,21 +1292,22 @@ impl TryFrom<PrimType> for MarkerType {
 #[derive(Clone, Copy, PartialEq, Eq, Debug, PartialOrd, Ord, Hash)]
 pub(crate) enum PrimType {
     Unit,
-    U8,
-    U16,
-    U32,
-    U64,
     Bool,
     Char,
+    Unsigned(MachineUint),
     Usize,
 }
 
 impl PrimType {
+    pub const U8: PrimType = PrimType::Unsigned(MachineUint::U8);
+    pub const U16: PrimType = PrimType::Unsigned(MachineUint::U16);
+    pub const U32: PrimType = PrimType::Unsigned(MachineUint::U32);
+    pub const U64: PrimType = PrimType::Unsigned(MachineUint::U64);
+}
+
+impl PrimType {
     fn is_numeric(&self) -> bool {
-        matches!(
-            self,
-            PrimType::U8 | PrimType::U16 | PrimType::U32 | PrimType::U64 | PrimType::Usize
-        )
+        matches!(self, PrimType::Unsigned(..) | PrimType::Usize)
     }
 
     fn compare_width(pt0: PrimType, pt1: PrimType) -> Option<Ordering> {
@@ -1306,33 +1348,36 @@ impl ToFragment for PrimType {
     fn to_fragment(&self) -> Fragment {
         Fragment::string(match self {
             PrimType::Unit => "()",
-            PrimType::U8 => "u8",
-            PrimType::U16 => "u16",
-            PrimType::U32 => "u32",
-            PrimType::U64 => "u64",
             PrimType::Bool => "bool",
             PrimType::Char => "char",
             PrimType::Usize => "usize",
+            PrimType::Unsigned(mu) => mu.to_static_str(),
         })
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, PartialOrd, Ord, Hash)]
-pub(crate) enum PrimExtType {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum MachineSint {
     I8,
     I16,
     I32,
     I64,
 }
 
-impl ToFragment for PrimExtType {
+impl MachineSint {
+    pub const fn to_static_str(self) -> &'static str {
+        match self {
+            MachineSint::I8 => "i8",
+            MachineSint::I16 => "i16",
+            MachineSint::I32 => "i32",
+            MachineSint::I64 => "i64",
+        }
+    }
+}
+
+impl ToFragment for MachineSint {
     fn to_fragment(&self) -> Fragment {
-        Fragment::string(match self {
-            PrimExtType::I8 => "i8",
-            PrimExtType::I16 => "i16",
-            PrimExtType::I32 => "i32",
-            PrimExtType::I64 => "i64",
-        })
+        Fragment::string(self.to_static_str())
     }
 }
 
@@ -1344,10 +1389,10 @@ impl From<ExtIntType> for AtomType {
             ExtPrimInt::U16 => AtomType::Prim(PrimType::U16),
             ExtPrimInt::U32 => AtomType::Prim(PrimType::U32),
             ExtPrimInt::U64 => AtomType::Prim(PrimType::U64),
-            ExtPrimInt::I8 => AtomType::PrimExt(PrimExtType::I8),
-            ExtPrimInt::I16 => AtomType::PrimExt(PrimExtType::I16),
-            ExtPrimInt::I32 => AtomType::PrimExt(PrimExtType::I32),
-            ExtPrimInt::I64 => AtomType::PrimExt(PrimExtType::I64),
+            ExtPrimInt::I8 => AtomType::Signed(MachineSint::I8),
+            ExtPrimInt::I16 => AtomType::Signed(MachineSint::I16),
+            ExtPrimInt::I32 => AtomType::Signed(MachineSint::I32),
+            ExtPrimInt::I64 => AtomType::Signed(MachineSint::I64),
         }
     }
 }
@@ -1579,14 +1624,14 @@ pub(crate) enum RustEntity {
     Scoped(Vec<Label>, Label),
 }
 
-impl RustEntity {
+impl ToFragment for RustEntity {
     fn to_fragment(&self) -> Fragment {
         match self {
-            RustEntity::Local(v) => v.to_fragment(),
-            RustEntity::Scoped(path, v) => Fragment::seq(
+            RustEntity::Local(lbl) => lbl.to_fragment(),
+            RustEntity::Scoped(path, lbl) => Fragment::seq(
                 path.iter()
-                    .chain(std::iter::once(v))
-                    .map(|scope| scope.to_fragment()),
+                    .chain(std::iter::once(lbl))
+                    .map(Label::to_fragment),
                 Some(Fragment::string("::")),
             ),
         }
@@ -1797,16 +1842,61 @@ impl Lens<RustType> {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum NumType {
+    U(MachineUint),
+    I(MachineSint),
+}
+
+impl NumType {
+    pub const fn to_static_str(&self) -> &'static str {
+        match self {
+            NumType::U(p) => p.to_static_str(),
+            NumType::I(p) => p.to_static_str(),
+        }
+    }
+}
+
+impl From<ExtPrimInt> for NumType {
+    fn from(value: ExtPrimInt) -> Self {
+        match value {
+            ExtPrimInt::U8 => NumType::U(MachineUint::U8),
+            ExtPrimInt::U16 => NumType::U(MachineUint::U16),
+            ExtPrimInt::U32 => NumType::U(MachineUint::U32),
+            ExtPrimInt::U64 => NumType::U(MachineUint::U64),
+            ExtPrimInt::I8 => NumType::I(MachineSint::I8),
+            ExtPrimInt::I16 => NumType::I(MachineSint::I16),
+            ExtPrimInt::I32 => NumType::I(MachineSint::I32),
+            ExtPrimInt::I64 => NumType::I(MachineSint::I64),
+        }
+    }
+}
+
+impl From<MachineUint> for NumType {
+    fn from(v: MachineUint) -> Self {
+        Self::U(v)
+    }
+}
+
+impl From<MachineSint> for NumType {
+    fn from(v: MachineSint) -> Self {
+        Self::I(v)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub(crate) enum RustExpr {
     /// Vacuous expression used in place of hardcoded `()`
     Void,
     Entity(RustEntity),
+    ConstNum(crate::numeric::TypedConst, Option<NumType>),
     PrimitiveLit(RustPrimLit),
     ArrayLit(Vec<RustExpr>),
-    MethodCall(Box<RustExpr>, MethodSpecifier, Vec<RustExpr>), // NOTE - to avoid nesting parentheses, we avoid chaining `FieldAccess` and `FunctionCall` and instead use a distinguished variant
-    FieldAccess(Box<RustExpr>, SubIdent), // can be used for receiver methods as well, with FunctionCall
-    FunctionCall(Box<RustExpr>, Vec<RustExpr>), // can be used for tuple constructors as well
+    /// When calling a method on a receiver, MethodCall is preferred over FieldAccess + FunctionCall
+    MethodCall(Box<RustExpr>, MethodSpecifier, Vec<RustExpr>),
+    FieldAccess(Box<RustExpr>, SubIdent),
+    /// Used for function-calls and tuple-struct constructor expressions
+    FunctionCall(Box<RustExpr>, Vec<RustExpr>),
     Tuple(Vec<RustExpr>),
     Struct(Constructor, StructExpr),
     Owned(OwnedRustExpr),
@@ -1825,6 +1915,22 @@ pub(crate) enum RustExpr {
     ResultErr(Box<RustExpr>),
     Macro(RustMacro),
     OwnedOption(Box<RustExpr>, OwnedKind),
+    // WIP - merge candidate with FunctionCall
+    Invoke(FnEntity, Vec<RustExpr>),
+}
+
+/// AST type for 'function entities', which are either identifiers to stdlib/prelude functions
+/// or synthetic functions (e.g. locally defined closures)
+#[derive(Clone, Debug)]
+pub enum FnEntity {
+    /// Function already visible in the local scope via stdlib or prelude imports
+    Specific { fname: RustEntity },
+    /// Function that is defined only within the source-map of the RustModule, and does not otherwise exist
+    Synthetic {
+        fname: RustEntity,
+        // FIXME - NumType here is a holdover from analytic-engine, where FnEntity originated
+        type_params: Vec<NumType>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -2126,10 +2232,13 @@ impl RustExpr {
         Self::PrimitiveLit(RustPrimLit::String(str.into()))
     }
 
-    /// Attempts to infer and return the (primitive) type of the given `RustExpr`,
-    /// returning `None` if the expression is not a primitive type or otherwise
-    /// cannot be inferred without further context or more complicated heuristics.
-    pub fn try_get_primtype(&self) -> Option<PrimType> {
+    /// Attempts to solve for the PrimType of a given `RustExpr`, for soundness and purity checking
+    /// (when determining whether an expression can have side-effects and therefore can be elided
+    /// if its value is not required).
+    ///
+    /// Returning `None` if the expression cannot be statically determined to have a primitive type,
+    /// or if determining the type is sufficiently complex.
+    fn try_get_primtype(&self) -> Option<PrimType> {
         match self {
             RustExpr::Void => Some(PrimType::Unit),
             RustExpr::Entity(_) => None,
@@ -2144,6 +2253,12 @@ impl RustExpr {
                 },
                 RustPrimLit::Char(..) => Some(PrimType::Char),
                 RustPrimLit::String(..) => None,
+            },
+            RustExpr::ConstNum(_, hint) => match hint {
+                Some(NumType::U(pt)) => Some(PrimType::Unsigned(*pt)),
+                // WIP[epic=embedded-num] - depending on how we proceed, this may require changing
+                Some(NumType::I(_)) => None,
+                None => None,
             },
             RustExpr::Macro(RustMacro::Matches(..)) => Some(PrimType::Bool),
             RustExpr::Macro(RustMacro::Vec(..)) => None,
@@ -2240,10 +2355,20 @@ impl RustExpr {
                     }
                 }
             }
-            RustExpr::FunctionCall(..) => {
+            RustExpr::FunctionCall(_fn, _args) => {
                 // FIXME - there may be some functions we can predict the return values of, but for now we can leave this alone
-                // REVIEW - we might want to log the number of times we hit this branch, and with what values, to see if there are any obvious cases to handle
+                log::info!(
+                    "try_get_primtype: encountered `FunctionCall` expression; fn = {_fn:?}, args = {{RustExpr}}[{}]",
+                    _args.len()
+                );
                 None
+            }
+            RustExpr::Invoke(fn_ent, ..) => {
+                match fn_ent {
+                    // FIXME - as with FunctionCall above, there may be some functions we can predict the return values of, but for now we are just trying to get things working
+                    FnEntity::Specific { .. } => None,
+                    FnEntity::Synthetic { .. } => None,
+                }
             }
             RustExpr::ResultOk(..) | RustExpr::ResultErr(..) => None,
             RustExpr::Owned(OwnedRustExpr { expr, .. }) => match &**expr {
@@ -2296,6 +2421,7 @@ impl RustExpr {
     pub fn is_pure(&self) -> bool {
         match self {
             RustExpr::Void => true,
+            RustExpr::ConstNum(_, _) => true,
             RustExpr::Entity(..) => true,
             RustExpr::Macro(RustMacro::Matches(expr, ..)) => expr.is_pure(),
             RustExpr::Macro(RustMacro::Vec(vec_expr)) => match vec_expr {
@@ -2319,6 +2445,10 @@ impl RustExpr {
             }
             // NOTE - there is no guaranteed-accurate static heuristic to distinguish pure fn's from those with possible side-effects
             RustExpr::FunctionCall(..) | RustExpr::MethodCall(..) => false,
+            RustExpr::Invoke(_fn_ent, _args) => {
+                // FIXME - we currently only use invoke for functions in the numeric sub-model, but those are sometimes impure
+                false
+            }
             RustExpr::FieldAccess(expr, ..) => expr.is_pure(),
             RustExpr::Tuple(tuple) => tuple.iter().all(Self::is_pure),
             RustExpr::Struct(_, assigns) => match assigns {
@@ -2409,6 +2539,7 @@ impl RustExpr {
             }
             RustExpr::Entity(..) => false,
             RustExpr::PrimitiveLit(..) => false,
+            RustExpr::ConstNum(..) => false,
             RustExpr::BlockScope(stmts, _) => !stmts.is_empty(),
             RustExpr::Control(..) => true,
             RustExpr::Struct(_, StructExpr::Empty) => false,
@@ -2448,6 +2579,10 @@ impl RustExpr {
             }
             RustExpr::FunctionCall(fun, args) => {
                 fun.is_complex() || args.iter().any(RustExpr::is_complex)
+            }
+            RustExpr::Invoke(_fn_ent, args) => {
+                // NOTE - we aren't testing on _fn_ent because it is always going to be a function-identifier and not any complex expression
+                args.iter().any(RustExpr::is_complex)
             }
 
             // 1 + 1 cases
@@ -2607,11 +2742,34 @@ impl ToFragment for VecExpr {
     }
 }
 
+impl ToFragment for FnEntity {
+    fn to_fragment(&self) -> Fragment {
+        match self {
+            FnEntity::Specific { fname } => fname.to_fragment(),
+            FnEntity::Synthetic { fname, type_params } => fname.to_fragment().cat(
+                Fragment::seq(
+                    type_params
+                        .iter()
+                        .map(|t: &NumType| Fragment::string(t.to_static_str())),
+                    Some(Fragment::String(Cow::Borrowed(", "))),
+                )
+                .delimit(Fragment::Char('<'), Fragment::Char('>')),
+            ),
+        }
+    }
+}
+
 impl ToFragmentExt for RustExpr {
     fn to_fragment_precedence(&self, prec: Precedence) -> Fragment {
         match self {
             RustExpr::Void => Fragment::Empty,
             RustExpr::Entity(e) => e.to_fragment(),
+            RustExpr::ConstNum(val, hint) => {
+                let num_frag = Fragment::string(val.as_raw_value().to_string());
+                let hint_frag =
+                    Fragment::opt(*hint, |ty: NumType| Fragment::string(ty.to_static_str()));
+                num_frag.cat(hint_frag)
+            }
             RustExpr::PrimitiveLit(pl) => pl.to_fragment(),
             RustExpr::ArrayLit(elts) => Fragment::seq(
                 elts.iter()
@@ -2670,7 +2828,7 @@ impl ToFragmentExt for RustExpr {
             RustExpr::Owned(OwnedRustExpr {
                 kind: OwnedKind::Deref,
                 expr,
-            }) => Fragment::Char('*').cat(expr.to_fragment_precedence(Precedence::Prefix)),
+            }) => Fragment::Char('*').cat(expr.to_fragment_precedence(Precedence::PTR_PREFIX)),
             RustExpr::OwnedOption(expr, OwnedKind::Deref) => expr
                 .to_fragment_precedence(Precedence::Projection)
                 .intervene(Fragment::Char('.'), Fragment::string("copied()")),
@@ -2689,6 +2847,14 @@ impl ToFragmentExt for RustExpr {
                 .intervene(Fragment::Char('.'), name.to_fragment()),
             RustExpr::FunctionCall(f, args) => cond_paren(
                 f.to_fragment_precedence(Precedence::INVOKE)
+                    .cat(ToFragmentExt::paren_list_prec(args, Precedence::Top)),
+                prec,
+                Precedence::INVOKE,
+            ),
+            // TODO - merge into FunctionCall
+            RustExpr::Invoke(f_ent, args) => cond_paren(
+                f_ent
+                    .to_fragment()
                     .cat(ToFragmentExt::paren_list_prec(args, Precedence::Top)),
                 prec,
                 Precedence::INVOKE,
@@ -2717,10 +2883,10 @@ impl ToFragmentExt for RustExpr {
                 .to_fragment()
                 .cat(contents.to_fragment()),
             RustExpr::Borrow(expr) => {
-                Fragment::Char('&').cat(expr.to_fragment_precedence(Precedence::Prefix))
+                Fragment::Char('&').cat(expr.to_fragment_precedence(Precedence::PTR_PREFIX))
             }
             RustExpr::BorrowMut(expr) => {
-                Fragment::string("&mut ").cat(expr.to_fragment_precedence(Precedence::Prefix))
+                Fragment::string("&mut ").cat(expr.to_fragment_precedence(Precedence::PTR_PREFIX))
             }
             RustExpr::Try(expr) => expr
                 .to_fragment_precedence(Precedence::Projection)
@@ -2833,9 +2999,6 @@ pub(crate) fn vec_stmts_to_block(stmts: Vec<RustStmt>) -> Option<(Vec<RustStmt>,
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct RustClosure(RustClosureHead, ClosureBody);
-
-#[derive(Clone, Debug)]
 pub(crate) enum ClosureBody {
     Expression(Box<RustExpr>),
     Statements(Vec<RustStmt>),
@@ -2863,9 +3026,44 @@ impl ToFragment for ClosureBody {
 pub(crate) enum RustClosureHead {
     Thunk,
     SimpleVar(Label, Option<RustType>),
+    VarList(Vec<(Label, Option<RustType>)>),
 }
 
+impl ToFragment for RustClosureHead {
+    fn to_fragment(&self) -> Fragment {
+        match self {
+            RustClosureHead::Thunk => Fragment::string("||"),
+            RustClosureHead::SimpleVar(lbl, sig) => lbl
+                .to_fragment()
+                .intervene(
+                    Fragment::string(": "),
+                    Fragment::opt(sig.as_ref(), RustType::to_fragment),
+                )
+                .delimit(Fragment::Char('|'), Fragment::Char('|')),
+            RustClosureHead::VarList(args) => Fragment::seq(
+                args.iter().map(|(lbl, opt_sig)| {
+                    lbl.to_fragment().intervene(
+                        Fragment::string(": "),
+                        Fragment::opt(opt_sig.as_ref(), RustType::to_fragment),
+                    )
+                }),
+                Some(Fragment::string(", ")),
+            )
+            .delimit(Fragment::Char('|'), Fragment::Char('|')),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct RustClosure(RustClosureHead, ClosureBody);
+
 impl RustClosure {
+    /// Constructs a `RustClosure` from its component parts.
+    pub fn from_parts(head: RustClosureHead, body: ClosureBody) -> Self {
+        Self(head, body)
+    }
+    /// Takes a standalone expression and returns a zero-argument closure (i.e. a thunk)
+    /// that returns it.
     pub fn thunk_expr(expr: RustExpr) -> RustClosure {
         RustClosure(
             RustClosureHead::Thunk,
@@ -2873,6 +3071,8 @@ impl RustClosure {
         )
     }
 
+    /// Takes an iterable container (e.g. array, Vec) of [`RustStmt`]s and returns a
+    /// thunk whose body contains the statements in order.
     pub fn thunk_body(stmts: impl IntoIterator<Item = RustStmt>) -> RustClosure {
         RustClosure(
             RustClosureHead::Thunk,
@@ -2907,21 +3107,6 @@ impl RustClosure {
             RustClosureHead::SimpleVar(head.into(), value_t),
             ClosureBody::Expression(Box::new(body)),
         )
-    }
-}
-
-impl ToFragment for RustClosureHead {
-    fn to_fragment(&self) -> Fragment {
-        match self {
-            RustClosureHead::Thunk => Fragment::string("||"),
-            RustClosureHead::SimpleVar(lbl, sig) => lbl
-                .to_fragment()
-                .intervene(
-                    Fragment::string(": "),
-                    Fragment::opt(sig.as_ref(), RustType::to_fragment),
-                )
-                .delimit(Fragment::Char('|'), Fragment::Char('|')),
-        }
     }
 }
 
@@ -3736,13 +3921,29 @@ pub mod short_circuit {
         RustMatchCase, RustOp, RustStmt, StructExpr, VecExpr,
     };
 
+    /// Purity-rank for individual AST items.
+    ///
+    /// This is used to determine whether sub-sections of a function or closure body
+    /// would unintentionally violate operational boundaries (e.g. a return keyword in an inner block)
+    /// and therefore need to be wrapped in a closure to prevent short-circuiting from happening across
+    /// a scope boundary.
     #[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
     pub enum EvalPurity {
-        /// Can never constitute a short-circuit
+        /// Rank 0, i.e. fully pure: Regardless of the context in which the item appears, the evaluation does not cause control-flow to short-circuit.
+        ///
+        /// If every sub-item of a block-scope is Pure, it will never require closure indirection.
         Pure = 0,
-        /// Short-circuit if and only if it is the only non-pure term in a terminal value-producing node
+        /// Rank 1, i.e. contains one or more Try operations (but no `return` keywords)
+        ///
+        /// Any expression, statement, or block that contains a mix of Rank-0 and (at least one) Rank-1 sub-nodes will be Rank-1.
+        ///
+        /// Boundary-breaking may be exhibited by Rank-1 items, except for Rank-1 expressions that are terminal (i.e. the implicit return-value)
+        /// within their bounding function-context (whether a standalone function or inline closure).
         Try = 1,
-        /// Explicit `return` keyword -- constitutes a potential short-circuit regardless of context
+        /// Rank 2, i.e. Explicit `return` keyword
+        ///
+        /// Any expression that contains a `return _` statement is Rank-2, and such
+        /// nodes can cause boundary-breaking short-circuits regardless of wider context.
         Return = 2,
     }
 
@@ -3796,7 +3997,7 @@ pub mod short_circuit {
 
     pub trait ValueCheckpoint {
         /// Returns `true` if, as a value-producing AST node, `self` would need to be wrapped in `Ok(..)` in order to
-        /// properly encompass internal short-circuiting.
+        /// properly account for internal short-circuiting (via `?` somewhere in its subtree).
         fn needs_ok(&self) -> bool;
     }
 
@@ -3806,6 +4007,8 @@ pub mod short_circuit {
                 RustExpr::ResultOk(..) => false,
                 RustExpr::BlockScope(.., ret) => ret.needs_ok(),
                 RustExpr::Control(ctrl) => ctrl.needs_ok(),
+                // REVIEW - is this correct?
+                RustExpr::Void => false,
                 _ => true,
             }
         }
@@ -3990,11 +4193,14 @@ pub mod short_circuit {
                 RustExpr::ArrayLit(exprs) => exprs.is_short_circuiting(),
                 RustExpr::Entity(..) => false,
                 RustExpr::PrimitiveLit(..) => false,
+                RustExpr::ConstNum(..) => false,
                 RustExpr::MethodCall(recv, _, args) => {
                     recv.is_short_circuiting() || args.is_short_circuiting()
                 }
                 RustExpr::FieldAccess(expr, ..) => expr.is_short_circuiting(),
-                RustExpr::FunctionCall(.., args) => args.is_short_circuiting(),
+                RustExpr::FunctionCall(.., args) | RustExpr::Invoke(.., args) => {
+                    args.is_short_circuiting()
+                }
                 RustExpr::Tuple(elts) => elts.is_short_circuiting(),
                 RustExpr::Struct(.., struct_expr) => struct_expr.is_short_circuiting(),
                 RustExpr::Owned(OwnedRustExpr { expr: inner, .. })
@@ -4068,12 +4274,15 @@ pub mod short_circuit {
                 RustExpr::Void => EvalPurity::Pure,
                 RustExpr::ArrayLit(exprs) => exprs.check_eval_purity(),
                 RustExpr::Entity(..) | RustExpr::PrimitiveLit(..) => EvalPurity::Pure,
+                RustExpr::ConstNum(..) => EvalPurity::Pure,
                 RustExpr::Closure(..) => EvalPurity::Pure,
                 RustExpr::MethodCall(recv, _, args) => {
                     recv.check_eval_purity() | args.check_eval_purity()
                 }
                 RustExpr::FieldAccess(expr, ..) => expr.check_eval_purity(),
-                RustExpr::FunctionCall(.., args) => args.check_eval_purity(),
+                RustExpr::FunctionCall(.., args) | RustExpr::Invoke(.., args) => {
+                    args.check_eval_purity()
+                }
                 RustExpr::Tuple(elts) => elts.check_eval_purity(),
                 RustExpr::Struct(.., struct_expr) => struct_expr.check_eval_purity(),
                 RustExpr::Owned(OwnedRustExpr { expr: inner, .. })
@@ -4189,20 +4398,22 @@ pub use short_circuit::{ShortCircuit, ShortCircuitExt, ValueCheckpoint};
 
 pub mod var_container {
     use super::{
-        ClosureBody, MatchCaseLHS, OwnedRustExpr, RustCatchAll, RustClosure, RustClosureHead,
-        RustControl, RustEntity, RustExpr, RustMacro, RustMatchBody, RustMatchCase, RustOp,
-        RustPattern, RustStmt, StructExpr, VecExpr,
+        ClosureBody, FnEntity, MatchCaseLHS, OwnedRustExpr, RustCatchAll, RustClosure,
+        RustClosureHead, RustControl, RustEntity, RustExpr, RustMacro, RustMatchBody,
+        RustMatchCase, RustOp, RustPattern, RustStmt, StructExpr, VecExpr,
     };
 
+    /// A trait for AST nodes that can contain novel bindings to variable identifiers
     pub trait VarBinder {
-        /// Returns `true` if self introduces a binding of `var` that
-        /// shadows the same identifier's bindings from any external scopes.
+        /// Returns `true` if the current node introduces a new binding for the variable `var`, which
+        /// would shadow any existing bindings of the same variable from outer scopes.
         fn binds_var<Name: AsRef<str> + ?Sized>(&self, var: &Name) -> bool;
     }
 
+    /// A trait for AST nodes that can contain references to arbitrarily named variables.
     pub trait VarContainer {
-        /// Returns `true` if an unbound (external) reference is made to a variable
-        /// of the specified identifier.
+        /// Returns `true` if `self` contains at least one unbound (i.e. implicitly external) reference to a variable
+        /// with the specified identifier `var`.
         fn contains_var_ref<Name>(&self, var: &Name) -> bool
         where
             Name: AsRef<str> + ?Sized;
@@ -4359,6 +4570,19 @@ pub mod var_container {
         }
     }
 
+    impl VarContainer for FnEntity {
+        fn contains_var_ref<Name>(&self, var: &Name) -> bool
+        where
+            Name: AsRef<str> + ?Sized,
+        {
+            match self {
+                FnEntity::Specific { fname } | FnEntity::Synthetic { fname, .. } => {
+                    fname.contains_var_ref(var)
+                }
+            }
+        }
+    }
+
     impl VarContainer for RustExpr {
         fn contains_var_ref<Name>(&self, var: &Name) -> bool
         where
@@ -4370,6 +4594,9 @@ pub mod var_container {
                 RustExpr::FieldAccess(expr, ..) => expr.contains_var_ref(var),
                 RustExpr::MethodCall(recv, .., args) => {
                     recv.contains_var_ref(var) || args.iter().any(|arg| arg.contains_var_ref(var))
+                }
+                RustExpr::Invoke(fn_ent, args) => {
+                    fn_ent.contains_var_ref(var) || args.iter().any(|arg| arg.contains_var_ref(var))
                 }
                 RustExpr::FunctionCall(fun, args) => {
                     fun.contains_var_ref(var) || args.iter().any(|arg| arg.contains_var_ref(var))
@@ -4394,6 +4621,7 @@ pub mod var_container {
                 RustExpr::Macro(RustMacro::Vec(vec_expr)) => vec_expr.contains_var_ref(var),
                 RustExpr::Control(ctrl) => ctrl.contains_var_ref(var),
                 RustExpr::PrimitiveLit(..) => false,
+                RustExpr::ConstNum(..) => false,
                 RustExpr::ArrayLit(rust_exprs) => {
                     rust_exprs.iter().any(|elt| elt.contains_var_ref(var))
                 }
@@ -4450,6 +4678,9 @@ pub mod var_container {
             match &self.0 {
                 RustClosureHead::Thunk => false,
                 RustClosureHead::SimpleVar(head_var, ..) => head_var.as_ref() == var.as_ref(),
+                RustClosureHead::VarList(head_vars, ..) => head_vars
+                    .iter()
+                    .any(|(lbl0, _)| lbl0.as_ref() == lbl0.as_ref()),
             }
         }
     }

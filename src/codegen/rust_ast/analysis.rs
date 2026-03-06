@@ -230,6 +230,7 @@ impl CanOptimize for AtomType {
     fn niches(&self, context: &SourceContext<'_>) -> usize {
         match self {
             AtomType::Prim(pt) => pt.niches(()),
+            AtomType::Signed(pxt) => pxt.niches(()),
             AtomType::Comp(ct) => ct.niches(context),
             AtomType::TypeRef(lt) => lt.niches(context),
         }
@@ -240,6 +241,7 @@ impl MemSize for AtomType {
     fn size_hint(&self, context: &SourceContext<'_>) -> usize {
         match self {
             AtomType::Prim(pt) => pt.size_hint(()),
+            AtomType::Signed(pxt) => pxt.size_hint(()),
             AtomType::Comp(ct) => ct.size_hint(context),
             AtomType::TypeRef(lt) => lt.size_hint(context),
         }
@@ -248,6 +250,7 @@ impl MemSize for AtomType {
     fn align_hint(&self, context: &SourceContext<'_>) -> usize {
         match self {
             AtomType::Prim(pt) => pt.align_hint(()),
+            AtomType::Signed(pxt) => pxt.align_hint(()),
             AtomType::Comp(ct) => ct.align_hint(context),
             AtomType::TypeRef(lt) => lt.align_hint(context),
         }
@@ -258,6 +261,7 @@ impl CopyEligible for AtomType {
     fn copy_hint(&self, context: &SourceContext<'_>) -> bool {
         match self {
             AtomType::Prim(pt) => pt.copy_hint(()),
+            AtomType::Signed(pxt) => pxt.copy_hint(()),
             AtomType::Comp(ct) => ct.copy_hint(context),
             AtomType::TypeRef(lt) => lt.copy_hint(context),
         }
@@ -286,19 +290,20 @@ const UTF16_SCALAR_MAX: usize = 0x10FFF;
 
 impl CanOptimize for PrimType {
     fn niches(&self, _: ()) -> usize {
-        match self {
+        match *self {
             PrimType::Unit => 0,
             PrimType::Bool => const { (u8::MAX as usize + 1) - 2 },
             // Because Char is Unicode, there are invalid ranges that form niches
             PrimType::Char => const { u32::MAX as usize - UTF16_SCALAR_MAX },
-            PrimType::U8 | PrimType::U16 | PrimType::U32 | PrimType::U64 | PrimType::Usize => 0,
+            PrimType::Usize => 0,
+            PrimType::Unsigned(ut) => ut.niches(()),
         }
     }
 }
 
 impl MemSize for PrimType {
     fn size_hint(&self, _: ()) -> usize {
-        one_to_one! { size self,
+        one_to_one! { size *self,
             Unit => (),
             U8 => u8,
             U16 => u16,
@@ -311,7 +316,7 @@ impl MemSize for PrimType {
     }
 
     fn align_hint(&self, _: ()) -> usize {
-        one_to_one! { align self,
+        one_to_one! { align *self,
             Unit => (),
             U8 => u8,
             U16 => u16,
@@ -327,16 +332,91 @@ impl MemSize for PrimType {
 impl CopyEligible for PrimType {
     fn copy_hint(&self, _: ()) -> bool {
         // NOTE - as implemented, all PrimTypes are copy, but we don't want to hardcode this and forget if we add non-Copy primtypes later on
+        match self {
+            PrimType::Unsigned(ut) => ut.copy_hint(()),
+            PrimType::Usize | PrimType::Unit | PrimType::Bool | PrimType::Char => true,
+        }
+    }
+}
+
+impl ASTContext for MachineUint {
+    type Context<'a> = ();
+}
+
+impl CanOptimize for MachineUint {
+    fn niches(&self, _: ()) -> usize {
+        match self {
+            MachineUint::U8 | MachineUint::U16 | MachineUint::U32 | MachineUint::U64 => 0,
+        }
+    }
+}
+
+impl MemSize for MachineUint {
+    fn size_hint(&self, _: ()) -> usize {
+        one_to_one! { size self,
+            U8 => u8,
+            U16 => u16,
+            U32 => u32,
+            U64 => u64
+        }
+    }
+
+    fn align_hint(&self, _: ()) -> usize {
+        one_to_one! { align self,
+            U8 => u8,
+            U16 => u16,
+            U32 => u32,
+            U64 => u64
+        }
+    }
+}
+
+impl CopyEligible for MachineUint {
+    fn copy_hint(&self, _: ()) -> bool {
         matches!(
             self,
-            PrimType::U8
-                | PrimType::U16
-                | PrimType::U32
-                | PrimType::U64
-                | PrimType::Usize
-                | PrimType::Unit
-                | PrimType::Bool
-                | PrimType::Char
+            MachineUint::U8 | MachineUint::U16 | MachineUint::U32 | MachineUint::U64
+        )
+    }
+}
+
+impl ASTContext for MachineSint {
+    type Context<'a> = ();
+}
+
+impl CanOptimize for MachineSint {
+    fn niches(&self, _: ()) -> usize {
+        match self {
+            MachineSint::I8 | MachineSint::I16 | MachineSint::I32 | MachineSint::I64 => 0,
+        }
+    }
+}
+
+impl MemSize for MachineSint {
+    fn size_hint(&self, _: ()) -> usize {
+        one_to_one! { size self,
+            I8 => i8,
+            I16 => i16,
+            I32 => i32,
+            I64 => i64
+        }
+    }
+
+    fn align_hint(&self, _: ()) -> usize {
+        one_to_one! { align self,
+            I8 => i8,
+            I16 => i16,
+            I32 => i32,
+            I64 => i64
+        }
+    }
+}
+
+impl CopyEligible for MachineSint {
+    fn copy_hint(&self, _: ()) -> bool {
+        matches!(
+            self,
+            MachineSint::I8 | MachineSint::I16 | MachineSint::I32 | MachineSint::I64
         )
     }
 }

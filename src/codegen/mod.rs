@@ -22,6 +22,8 @@ use crate::{
     valuetype::{SeqBorrowHint, ValueType},
 };
 
+use crate::numeric::elaborator::TypedExpr as TypedNumExpr;
+
 use std::{
     borrow::Cow,
     cell::OnceCell,
@@ -118,7 +120,14 @@ impl CodeGen {
             Expansion::Empty => RustType::UNIT.into(),
             Expansion::Base(bt) => Self::lift_base(bt),
             Expansion::Outcome(ext_var) => {
-                unreachable!("unexpected outcome external-metavariable: {ext_var}")
+                let ie = tc.get_extern(ext_var).clone();
+                let proxy = UVar(0);
+                let res = ie.reify(proxy.into());
+                if let Some(it) = res {
+                    return GenType::from(it);
+                } else {
+                    panic!("bad reification of external variable: {ext_var}");
+                }
             }
             Expansion::Record(fields) => {
                 if let Some(decl) = self.metavariables.get(&var) {
@@ -964,6 +973,7 @@ enum ExprInfo {
 
 fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
     match expr {
+        TypedExpr::Numeric(num) => embed_numeric_expr(num, info),
         TypedExpr::Record(gt, fields) => {
             let tname = match gt {
                 GenType::Def((_, tname), _) => tname,
@@ -1325,6 +1335,12 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
     }
 }
 
+fn embed_numeric_expr(num: &TypedNumExpr<GenType>, info: ExprInfo) -> RustExpr {
+    // WIP[epic=embedded-num]
+    use crate::numeric::codegen::synthesize;
+    synthesize(num)
+}
+
 fn embed_match_expr(
     expr: &GTExpr,
     expr_type: &GenType,
@@ -1462,6 +1478,12 @@ fn refutability_check<A: std::fmt::Debug + Clone>(
                         "external type '{t}' cannot be resolved without further information"
                     ),
                 },
+                AtomType::Signed(pxt) => match pxt {
+                    // WIP[epic=embedded-num] - Int can't cover negative values yet, so these are all refutable
+                    MachineSint::I8 | MachineSint::I16 | MachineSint::I32 | MachineSint::I64 => {
+                        Refutability::Refutable
+                    }
+                },
                 AtomType::Prim(pt) => match pt {
                     PrimType::Unit => {
                         if cases.is_empty() {
@@ -1470,13 +1492,9 @@ fn refutability_check<A: std::fmt::Debug + Clone>(
                             Refutability::Irrefutable
                         }
                     }
+                    // FIXME - handle Pattern::Int properly
                     // these cases have too many values to practically cover...
-                    PrimType::U8
-                    | PrimType::U16
-                    | PrimType::U32
-                    | PrimType::U64
-                    | PrimType::Char => Refutability::Indeterminate,
-                    //
+                    PrimType::Unsigned(_) | PrimType::Char => Refutability::Indeterminate,
                     PrimType::Bool => {
                         // mask for inclusion with indices 0: false, 1: true
                         let mut cover_mask = [false, false];
@@ -4586,21 +4604,23 @@ impl<'a> Elaborator<'a> {
         )
     }
 
-    fn get_engine_from_index(&mut self, index: usize) -> Option<&mut crate::numeric::elaborator::ElabRc> {
+    fn get_engine_from_index(
+        &mut self,
+        index: usize,
+    ) -> Option<&mut crate::numeric::elaborator::ElabRc> {
         use super::typecheck::Expansion;
         let var = UVar::new(index);
         let var = self.tc.get_canonical_uvar(var);
         match self.tc.expand_var(var) {
             Expansion::Outcome(ext_var) => {
-                let ent = self.embeds.entry(ext_var.to_usize())
-                    .or_insert_with(|| {
-                        let ie = self.tc.get_extern(ext_var).expect("failed to get extern for embedded numeric engine");
-                        let elab = crate::numeric::elaborator::ElabRc::new(ie.clone());
-                        elab
-                    });
+                let ent = self.embeds.entry(ext_var.to_usize()).or_insert_with(|| {
+                    let ie = self.tc.get_extern(ext_var);
+                    let elab = crate::numeric::elaborator::ElabRc::new(ie.clone());
+                    elab
+                });
                 Some(ent)
             }
-            _ => None
+            _ => None,
         }
     }
 
@@ -4619,13 +4639,15 @@ impl<'a> Elaborator<'a> {
             Expr::U16(n) => TypedExpr::U16(*n),
             Expr::U32(n) => TypedExpr::U32(*n),
             Expr::U64(n) => TypedExpr::U64(*n),
-            Expr::Numeric(hint, n) => {
+            Expr::Numeric(n) => {
+                // WIP[epic=embedded-num] - engine retrieval model needs more work
                 let Some(engine) = self.get_engine_from_index(index) else {
                     panic!("failed to get numeric engine for numeric subtree");
                 };
-                let elab_n = engine.elaborate_expr_as(n).expect("failed to elaborate numeric expression");
-                let gt0: GenType = PrimType::from(*hint).into();
-                TypedExpr::Numeric(gt0, Box::new(elab_n))
+                let elab_n = engine
+                    .elaborate_expr_as::<GenType>(n)
+                    .expect("failed to elaborate numeric expression");
+                TypedExpr::Numeric(Box::new(elab_n))
             }
             Expr::Tuple(elts) => {
                 let mut t_elts = Vec::with_capacity(elts.len());
@@ -5377,6 +5399,37 @@ mod tests {
         let inner = module.define_format("test.inner", ANY_BYTE);
         let outer = module.define_format("test.outer", record([("inner", inner.call())]));
         let output = produce_string_gencode(&module, &outer.call());
+        println!("{}", output);
+    }
+
+    #[test]
+    fn test_numtree_codegen() {
+        use crate::numeric::core;
+        let mut module = FormatModule::new();
+        let f = module.define_format("test.math", compute(Expr::Numeric(Box::new(core::Expr::Const(core::TypedConst(
+            8u8.into(), core::NumRep::Concrete(core::MachineRep::U8)
+        ))))));
+        let output = produce_string_gencode(&module, &f.call());
+        println!("{}", output);
+    }
+
+
+    #[test]
+    fn test_math_codegen() {
+        let tree = {
+            use crate::numeric::core::*;
+            let eightu8 = Expr::Const(TypedConst(
+            8u8.into(), NumRep::Concrete(MachineRep::U8)
+           ));
+            let oneu16 = Expr::Const(TypedConst(
+            1u16.into(), NumRep::Concrete(MachineRep::U16)
+            ));
+            let sumu32 = Expr::BinOp(BinOp { op: BasicBinOp::Add, out_rep: Some(MachineRep::U32) }, Box::new(eightu8), Box::new(oneu16));
+            sumu32
+        };
+        let mut module = FormatModule::new();
+        let f = module.define_format("test.math", compute(Expr::Numeric(Box::new(tree))));
+        let output = produce_string_gencode(&module, &f.call());
         println!("{}", output);
     }
 }
