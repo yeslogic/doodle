@@ -116,18 +116,22 @@ pub(crate) enum Relation {
 pub(crate) trait IntransitiveOrd {
     fn relate(&self, other: &Self) -> Relation;
 
+    #[expect(dead_code)]
     fn congruent(&self, other: &Self) -> bool {
         matches!(self.relate(other), Relation::Congruent)
     }
 
+    #[expect(dead_code)]
     fn inferior(&self, other: &Self) -> bool {
         matches!(self.relate(other), Relation::Inferior)
     }
 
+    #[expect(dead_code)]
     fn superior(&self, other: &Self) -> bool {
         matches!(self.relate(other), Relation::Superior)
     }
 
+    #[expect(dead_code)]
     fn disjoint(&self, other: &Self) -> bool {
         matches!(self.relate(other), Relation::Disjoint)
     }

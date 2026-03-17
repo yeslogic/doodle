@@ -309,6 +309,7 @@ pub enum ValueTypeExt {
     Empty,
     ViewObj,
     Base(BaseType),
+    UnknownNumeric,
     Tuple(Vec<ValueTypeExt>),
     Record(Vec<(Label, ValueTypeExt)>),
     Union(BTreeMap<Label, ValueTypeExt>),
@@ -328,6 +329,7 @@ impl From<ValueType> for ValueTypeExt {
             ValueType::Empty => ValueTypeExt::Empty,
             ValueType::ViewObj => ValueTypeExt::ViewObj,
             ValueType::Base(b) => ValueTypeExt::Base(b),
+            ValueType::UnknownNumeric => ValueTypeExt::UnknownNumeric,
             ValueType::Tuple(v) => {
                 ValueTypeExt::Tuple(v.into_iter().map(ValueTypeExt::from).collect())
             }
@@ -356,6 +358,7 @@ impl ValueTypeExt {
     pub fn is_numeric(&self) -> bool {
         match self {
             ValueTypeExt::Base(bt) => bt.is_numeric(),
+            ValueTypeExt::UnknownNumeric => true,
             ValueTypeExt::EngineSpecific {
                 base_model,
                 alt_model,
@@ -387,9 +390,9 @@ impl ValueTypeExt {
         match self {
             ValueTypeExt::Any => false,
             ValueTypeExt::Empty => false,
-            // NOTE - potentially misleading case
             ValueTypeExt::ViewObj => false,
             ValueTypeExt::Base(_) => false,
+            ValueTypeExt::UnknownNumeric => false,
             ValueTypeExt::PhantomData(inner) => inner.depends_on_model(),
             ValueTypeExt::Tuple(ts) => ts.iter().any(|t| t.depends_on_model()),
             ValueTypeExt::Record(items) => items.iter().any(|(_, t)| t.depends_on_model()),
@@ -548,10 +551,6 @@ impl ValueTypeExt {
                 ModelKind::BaseModel => base_model.normalize(model),
                 ModelKind::AltModel => alt_model.normalize(model),
             },
-            ValueTypeExt::Any
-            | ValueTypeExt::ViewObj
-            | ValueTypeExt::Empty
-            | ValueTypeExt::Base(_) => Cow::Borrowed(self),
             ValueTypeExt::Tuple(ts) => Cow::Owned(ValueTypeExt::Tuple(
                 ts.iter().map(|t| t.normalize(model).into_owned()).collect(),
             )),
@@ -575,6 +574,11 @@ impl ValueTypeExt {
             ValueTypeExt::PhantomData(inner) => Cow::Owned(ValueTypeExt::PhantomData(Box::new(
                 inner.normalize(model).into_owned(),
             ))),
+            ValueTypeExt::Any
+            | ValueTypeExt::Empty
+            | ValueTypeExt::ViewObj
+            | ValueTypeExt::Base(_)
+            | ValueTypeExt::UnknownNumeric => unreachable!("excluded by depends_on_model short-circuit"),
         }
     }
 
@@ -731,6 +735,7 @@ impl ValueTypeExt {
             ValueTypeExt::Empty => Some(ValueType::Empty),
             ValueTypeExt::ViewObj => Some(ValueType::ViewObj),
             ValueTypeExt::Base(b) => Some(ValueType::Base(*b)),
+            ValueTypeExt::UnknownNumeric => Some(ValueType::UnknownNumeric),
             ValueTypeExt::Tuple(v) => {
                 let mut vs = Vec::with_capacity(v.len());
                 for v in v {
@@ -777,6 +782,7 @@ impl ValueTypeExt {
             ValueTypeExt::Empty => ValueType::Empty,
             ValueTypeExt::ViewObj => ValueType::ViewObj,
             ValueTypeExt::Base(b) => ValueType::Base(b),
+            ValueTypeExt::UnknownNumeric => ValueType::UnknownNumeric,
             ValueTypeExt::Tuple(v) => {
                 let mut vs = Vec::with_capacity(v.len());
                 for v in v {
@@ -1351,8 +1357,8 @@ mod __impls {
                 Expr::U32(_n) => Ok(ValueTypeExt::Base(BaseType::U32)),
                 Expr::U64(_n) => Ok(ValueTypeExt::Base(BaseType::U64)),
                 Expr::Numeric(_) => {
-                    // WIP[epic=embedded-num]
-                    unimplemented!("infer_type_ext unimplemented for Expr::Numeric")
+                    // FIXME[epic=embedded-num] - this is a hack for now
+                    Ok(ValueTypeExt::Any)
                 }
                 Expr::Tuple(exprs) => {
                     let mut ts = Vec::new();

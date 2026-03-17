@@ -1,7 +1,7 @@
 use num_bigint::BigInt;
 use num_traits::{One as _, Signed, Zero};
 use serde::Serialize;
-use std::borrow::Cow;
+use std::{borrow::Cow, cmp::Ordering};
 
 use crate::bounds::Bounds as UBounds;
 
@@ -64,7 +64,7 @@ impl std::fmt::Display for BasicUnaryOp {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash,)]
+#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
 pub enum BitWidth {
     Bits8,
     Bits16,
@@ -153,6 +153,32 @@ impl MachineRep {
                 BitWidth::Bits32 => "u32",
                 BitWidth::Bits64 => "u64",
             }
+        }
+    }
+
+    /// Returns `true` if every value of `other` is a valid value of `self`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use doodle::numeric::core::MachineRep;
+    ///
+    /// assert!(MachineRep::U32.is_superset(MachineRep::U32));
+    /// assert!(MachineRep::U32.is_superset(MachineRep::U16));
+    /// assert!(MachineRep::I32.is_superset(MachineRep::U16));
+    /// assert!(!MachineRep::I32.is_superset(MachineRep::U32));
+    /// assert!(MachineRep::I32.is_superset(MachineRep::I8));
+    /// assert!(!MachineRep::U32.is_superset(MachineRep::I8));
+    /// ```
+    pub fn is_superset(self, other: MachineRep) -> bool {
+        match (
+            self.is_signed,
+            other.is_signed,
+            self.bit_width.cmp(&other.bit_width),
+        ) {
+            (true, false, Ordering::Greater) => true,
+            (a, b, Ordering::Equal | Ordering::Greater) if a == b => true,
+            _ => false,
         }
     }
 }
@@ -255,6 +281,9 @@ impl Bounds {
     }
 }
 
+/// Macro for constructing the (min, max) bounds-pair of any numeric type `T` for which:
+///   - Associated `MIN` and `MAX` consts are defined
+///   - `BigInt` has a `From<T>` impl
 macro_rules! bounds_of {
     ( $t:ty ) => {
         (Number::from(<$t>::MIN), Number::from(<$t>::MAX))
@@ -276,20 +305,25 @@ impl MachineRep {
         Bounds { min, max }
     }
 
+    /// Returns `true` if `self` represents a signed type.
     pub const fn is_signed(self) -> bool {
         self.is_signed
     }
 
+    /// Returns a comparison between `self.bit_width` and `other.bit_width`.
     pub fn compare_width(self, other: Self) -> std::cmp::Ordering {
         self.bit_width.cmp(&other.bit_width)
     }
 
+    /// Returns `true` if every value that is representable within `other` is also representable
+    /// as a value within `self`.
     pub fn encompasses(self, other: Self) -> bool {
         self.as_bounds().encompasses(&other.as_bounds())
     }
 }
 
 impl NumRep {
+    /// Returns `Some(bounds)` if `self` is a concrete machine-rep, or `None` if `self` is `Auto`.
     pub fn as_bounds(self) -> Option<Bounds> {
         match self {
             NumRep::Auto => return None,
@@ -338,7 +372,9 @@ impl std::fmt::Display for TypedConst {
 
 impl TypedConst {
     pub fn new<N>(n: N, rep: NumRep) -> Self
-    where BigInt: From<N> {
+    where
+        BigInt: From<N>,
+    {
         Self(BigInt::from(n), rep)
     }
 
@@ -385,14 +421,20 @@ impl TypedConst {
     /// Returns `true` if and only if `self` is notionally equivalent to the `M`-value `other` and
     /// has a nominal representation that is compatible with `rep`.
     ///
-    /// Whether or not `Auto` is allowed is determined by the feature flag `"pattern_match_auto_rep"`.
+    /// # Notes
+    ///
+    /// If the feature-flag `"pattern_matches_auto_rep"` is set, then `self._rep() == NumRep::Auto`
+    /// is treated as a wildcard and will match for any choice of `rep`.
+    ///
+    /// If that same feature-flag is not enabled, then `self.get_rep() == NumRep::Auto` is treated
+    /// as a non-match and will always return `false`.
     pub fn pat_matches<M>(&self, other: M, rep: MachineRep) -> bool
     where
-        BigInt: From<M>
+        BigInt: From<M>,
     {
-        ((cfg!(feature = "pattern_match_auto_rep") && self.is_abstract())
-           || self.1 == NumRep::Concrete(rep)
-        ) && &self.0 == &BigInt::from(other)
+        ((cfg!(feature = "pattern_matches_auto_rep") && self.is_abstract())
+            || self.1 == NumRep::Concrete(rep))
+            && &self.0 == &BigInt::from(other)
     }
 
     /// Returns true if `self` can be considered to match `Pattern::U8(other)`.
@@ -424,13 +466,16 @@ impl TypedConst {
         }
         let this = self.0.magnitude();
 
-        this >= &BigUint::from(bounds.min()) && bounds.max.map(|max| this <= &BigUint::from(max)).unwrap_or(true)
-
+        this >= &BigUint::from(bounds.min())
+            && bounds
+                .max
+                .map(|max| this <= &BigUint::from(max))
+                .unwrap_or(true)
     }
 
-    /// Returns `true` if `self` can be considered to match `Pattern::Int(bounds)`
+    /// Returns `true` if `self` should be considered a match for pattern `Pattern::Int(bounds)`
     pub fn matches_int_range(&self, bounds: UBounds) -> bool {
-        // WIP - do we need to check for representation or representability?
+        // REVIEW - if self.0 exceeds the maximum of the nominal type of the pattern, but bounds.max is None, what behavior is correct?
         self.falls_within(bounds)
     }
 
@@ -472,6 +517,12 @@ impl TypedConst {
     pub fn from_i64(value: i64) -> TypedConst {
         TypedConst(BigInt::from(value), NumRep::Concrete(MachineRep::I64))
     }
+
+    #[cfg(test)]
+    /// Replaces the rep of a TypedConst.
+    fn replace_rep(self, rep: MachineRep) -> TypedConst {
+        TypedConst(self.0, NumRep::Concrete(rep))
+    }
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -483,9 +534,6 @@ pub enum Value {
 impl Value {
     /// Returns `true` if `self` is representable:
     ///   - If `self` is a constant value, it must itself be representable
-    ///   - If `self` is Some(x), `x` must be representable
-    ///
-    /// `None` is always representable.
     pub fn is_representable(&self) -> bool {
         match self {
             Value::Const(c) => c.is_representable(),
@@ -520,6 +568,16 @@ pub struct BinOp {
     #[serde(serialize_with = "ser_opt_machine_rep")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub out_rep: Option<MachineRep>,
+}
+
+impl BinOp {
+    #[cfg(test)]
+    fn replace_rep(self, rep: MachineRep) -> Self {
+        BinOp {
+            op: self.op,
+            out_rep: Some(rep),
+        }
+    }
 }
 
 fn ser_basic_binop<S>(op: &BasicBinOp, s: S) -> Result<S::Ok, S::Error>
@@ -600,6 +658,16 @@ impl std::fmt::Display for UnaryOp {
 }
 
 impl UnaryOp {
+    #[cfg(test)]
+    fn replace_rep(self, rep: MachineRep) -> Self {
+        UnaryOp {
+            op: self.op,
+            out_rep: Some(rep),
+        }
+    }
+}
+
+impl UnaryOp {
     pub const fn new(op: BasicUnaryOp, out_rep: Option<MachineRep>) -> Self {
         Self { op, out_rep }
     }
@@ -623,7 +691,22 @@ pub enum Expr {
     Const(TypedConst),
     BinOp(BinOp, Box<Expr>, Box<Expr>),
     UnaryOp(UnaryOp, Box<Expr>),
-    Cast(#[serde(serialize_with = "ser_machine_rep")] MachineRep, Box<Expr>),
+    Cast(
+        #[serde(serialize_with = "ser_machine_rep")] MachineRep,
+        Box<Expr>,
+    ),
+}
+
+impl Expr {
+    #[cfg(test)]
+    fn replace_rep(self, rep: MachineRep) -> Self {
+        match self {
+            Self::Cast(_, inner) => Self::Cast(rep, inner),
+            Self::BinOp(op, lhs, rhs) => Self::BinOp(op.replace_rep(rep), lhs, rhs),
+            Self::UnaryOp(op, inner) => Self::UnaryOp(op.replace_rep(rep), inner),
+            Self::Const(c) => Self::Const(c.replace_rep(rep)),
+        }
+    }
 }
 
 impl std::fmt::Debug for Expr {
@@ -661,7 +744,142 @@ impl std::fmt::Display for EvalError {
 
 impl std::error::Error for EvalError {}
 
+#[derive(Debug, Clone)]
+pub struct Strict<T> {
+    pub value: T,
+    pub is_valid: bool,
+}
+
+pub type StrictValue = Strict<Value>;
+
+impl StrictValue {
+    pub fn new(value: Value) -> Self {
+        let is_valid = value.is_representable();
+        Self {
+            value,
+            is_valid,
+        }
+    }
+
+    pub fn is_valid(&self) -> bool {
+        self.is_valid
+    }
+
+    pub fn map<E>(self, f: impl FnOnce(Value) -> Result<Value, E>) -> Result<Self, E> {
+        let value = f(self.value)?;
+        let is_valid = self.is_valid && value.is_representable();
+        Ok(Strict {
+            value,
+            is_valid,
+        })
+    }
+
+    pub fn map2<E>(
+        self,
+        other: Self,
+        f: impl FnOnce(Value, Value) -> Result<Value, E>,
+    ) -> Result<Self, E> {
+        let value = f(self.value, other.value)?;
+        let is_valid = self.is_valid && other.is_valid && value.is_representable();
+        Ok(Strict {
+            value,
+            is_valid,
+        })
+    }
+}
+
 impl Expr {
+    /// Like `eval`, except that the representability of every individual sub-term is also checked,
+    /// and if any term is unrepresentable, the validity flag of the return-value will be `false`.
+    pub fn eval_strict(&self) -> Result<Strict<Value>, EvalError> {
+        match self {
+            Expr::Const(typed_const) => Ok(Strict::new(Value::Const(typed_const.clone()))),
+            Expr::BinOp(bin_op, lhs, rhs) => {
+                let lhs = lhs.eval_strict()?;
+                let rhs = rhs.eval_strict()?;
+                let BinOp { op, out_rep } = *bin_op;
+                lhs.map2(rhs, |lhs: Value, rhs: Value| {
+                    let (raw, rep0, rep1) = match (op, lhs, rhs) {
+                        (BasicBinOp::Add, Value::Const(lhs), Value::Const(rhs)) => {
+                            (lhs.0 + rhs.0, lhs.1, rhs.1)
+                        }
+                        (BasicBinOp::Sub, Value::Const(lhs), Value::Const(rhs)) => {
+                            (lhs.0 - rhs.0, lhs.1, rhs.1)
+                        }
+                        (BasicBinOp::Mul, Value::Const(lhs), Value::Const(rhs)) => {
+                            (lhs.0 * rhs.0, lhs.1, rhs.1)
+                        }
+                        (BasicBinOp::Div, Value::Const(lhs), Value::Const(rhs)) => {
+                            if rhs.0.is_zero() {
+                                return Err(EvalError::DivideByZero);
+                            }
+                            (lhs.0 / rhs.0, lhs.1, rhs.1)
+                        }
+                        (BasicBinOp::Rem, Value::Const(lhs), Value::Const(rhs)) => {
+                            if rhs.0.is_positive() {
+                                (lhs.0 % rhs.0, lhs.1, rhs.1)
+                            } else {
+                                return Err(EvalError::RemainderNonPositive);
+                            }
+                        } // (_, Value::Opt(..), _) | (_, _, Value::Opt(..)) => {
+                          //     return Err(EvalError::ArithOrCastOption)
+                          // }
+                    };
+                    let rep_out = match out_rep {
+                        Some(rep) => NumRep::Concrete(rep),
+                        None => {
+                            if rep0 == rep1 || rep1.is_auto() {
+                                rep0
+                            } else if rep0.is_auto() {
+                                rep1
+                            } else {
+                                return Err(EvalError::Ambiguous(rep0, rep1));
+                            }
+                        }
+                    };
+                    Ok(Value::Const(TypedConst(raw, rep_out)))
+                })
+            }
+            Expr::UnaryOp(unary_op, expr) => {
+                expr.eval_strict()?.map(|expr| match (unary_op.op, expr) {
+                    (BasicUnaryOp::Negate, Value::Const(TypedConst(n, rep))) => {
+                        let rep_out = match unary_op.out_rep {
+                            Some(rep) => NumRep::Concrete(rep),
+                            None => rep,
+                        };
+                        Ok(Value::Const(TypedConst(-n, rep_out)))
+                    }
+                    (BasicUnaryOp::AbsVal, Value::Const(TypedConst(n, rep))) => {
+                        let rep_out = match unary_op.out_rep {
+                            Some(rep) => NumRep::Concrete(rep),
+                            None => rep,
+                        };
+                        Ok(Value::Const(TypedConst(n.abs(), rep_out)))
+                    }
+                    (BasicUnaryOp::IntSucc, Value::Const(TypedConst(n, rep))) => {
+                        let rep_out = match unary_op.out_rep {
+                            Some(rep) => NumRep::Concrete(rep),
+                            None => rep,
+                        };
+                        Ok(Value::Const(TypedConst(n + BigInt::one(), rep_out)))
+                    }
+                    (BasicUnaryOp::IntPred, Value::Const(TypedConst(n, rep))) => {
+                        let rep_out = match unary_op.out_rep {
+                            Some(rep) => NumRep::Concrete(rep),
+                            None => rep,
+                        };
+                        Ok(Value::Const(TypedConst(n - BigInt::one(), rep_out)))
+                    }
+                })
+            }
+            Expr::Cast(mach_rep, expr) => expr.eval_strict()?.map(|val| match val {
+                Value::Const(TypedConst(num, _rep)) => {
+                    Ok(Value::Const(TypedConst(num, NumRep::Concrete(*mach_rep))))
+                }
+            }),
+        }
+    }
+
     pub fn eval(&self) -> Result<Value, EvalError> {
         match self {
             Expr::Const(typed_const) => Ok(Value::Const(typed_const.clone())),
@@ -755,46 +973,249 @@ impl Expr {
 }
 
 #[cfg(test)]
-mod tests {
-    use crate::numeric::core::*;
-    use num_traits::One;
+pub mod strategy {
+    use super::*;
     use proptest::prelude::*;
 
-    fn abstract_strategy() -> BoxedStrategy<NumRep> {
-        prop_oneof![Just(NumRep::AUTO)].boxed()
+    pub fn unsigned_rep_strategy() -> impl Strategy<Value = NumRep> {
+        machine_uint_strategy().prop_map(NumRep::Concrete)
     }
 
-    fn concrete_strategy() -> BoxedStrategy<NumRep> {
-        prop_oneof![
-            Just(NumRep::U8),
-            Just(NumRep::U16),
-            Just(NumRep::U32),
-            Just(NumRep::U64),
-            Just(NumRep::I8),
-            Just(NumRep::I16),
-            Just(NumRep::I32),
-            Just(NumRep::I64),
-        ]
-        .boxed()
+    pub fn signed_rep_strategy() -> impl Strategy<Value = NumRep> {
+        machine_sint_strategy().prop_map(NumRep::Concrete)
     }
 
-    fn numrep_strategy() -> BoxedStrategy<NumRep> {
-        prop_oneof![abstract_strategy(), concrete_strategy(),].boxed()
+    fn concrete_rep_strategy() -> impl Strategy<Value = NumRep> {
+        machine_strategy().prop_map(NumRep::Concrete)
     }
 
-    fn machine_strategy() -> BoxedStrategy<MachineRep> {
+    pub fn numrep_strategy() -> BoxedStrategy<NumRep> {
+        prop_oneof![Just(NumRep::Auto), concrete_rep_strategy()].boxed()
+    }
+
+    fn machine_uint_strategy() -> impl Strategy<Value = MachineRep> {
         prop_oneof![
             Just(MachineRep::U8),
             Just(MachineRep::U16),
             Just(MachineRep::U32),
             Just(MachineRep::U64),
+        ]
+    }
+
+    fn machine_sint_strategy() -> impl Strategy<Value = MachineRep> {
+        prop_oneof![
             Just(MachineRep::I8),
             Just(MachineRep::I16),
             Just(MachineRep::I32),
             Just(MachineRep::I64),
         ]
+    }
+
+    pub fn machine_strategy() -> impl Strategy<Value = MachineRep> {
+        prop_oneof![machine_uint_strategy(), machine_sint_strategy(),]
+    }
+
+    pub fn small_positive() -> impl Strategy<Value = TypedConst> {
+        (1..=64u8).prop_map(|val| TypedConst::from_u8(val))
+    }
+
+    pub fn small_negative() -> impl Strategy<Value = TypedConst> {
+        (-64..=-1i8).prop_map(|val| TypedConst::from_i8(val))
+    }
+
+    pub fn arb_const_from_rep(rep: MachineRep) -> BoxedStrategy<TypedConst> {
+        match rep {
+            MachineRep::U8 => any::<u8>().prop_map(TypedConst::from_u8).boxed(),
+            MachineRep::U16 => any::<u16>().prop_map(TypedConst::from_u16).boxed(),
+            MachineRep::U32 => any::<u32>().prop_map(TypedConst::from_u32).boxed(),
+            MachineRep::U64 => any::<u64>().prop_map(TypedConst::from_u64).boxed(),
+            MachineRep::I8 => any::<i8>().prop_map(TypedConst::from_i8).boxed(),
+            MachineRep::I16 => any::<i16>().prop_map(TypedConst::from_i16).boxed(),
+            MachineRep::I32 => any::<i32>().prop_map(TypedConst::from_i32).boxed(),
+            MachineRep::I64 => any::<i64>().prop_map(TypedConst::from_i64).boxed(),
+        }
+    }
+
+    pub fn unary_with_rep(rep: MachineRep, term: &BoxedStrategy<Expr>) -> BoxedStrategy<Expr> {
+        fn expr_pred(x: Expr, rep: MachineRep) -> Expr {
+            Expr::UnaryOp(
+                UnaryOp {
+                    op: BasicUnaryOp::IntPred,
+                    out_rep: Some(rep),
+                },
+                Box::new(x),
+            )
+        }
+        fn expr_succ(x: Expr, rep: MachineRep) -> Expr {
+            Expr::UnaryOp(
+                UnaryOp {
+                    op: BasicUnaryOp::IntSucc,
+                    out_rep: Some(rep),
+                },
+                Box::new(x),
+            )
+        }
+        fn expr_negate(x: Expr, rep: MachineRep) -> Expr {
+            Expr::UnaryOp(
+                UnaryOp {
+                    op: BasicUnaryOp::Negate,
+                    out_rep: Some(rep),
+                },
+                Box::new(x),
+            )
+        }
+        fn expr_abs(x: Expr, rep: MachineRep) -> Expr {
+            Expr::UnaryOp(
+                UnaryOp {
+                    op: BasicUnaryOp::AbsVal,
+                    out_rep: Some(rep),
+                },
+                Box::new(x),
+            )
+        }
+
+        // TODO - swap in arb_expr_with_rep once all shallow constructions are tested
+        let strat = Strategy::prop_union(
+            term.clone().prop_map(move |x| expr_pred(x, rep)).boxed(),
+            term.clone().prop_map(move |x| expr_succ(x, rep)).boxed(),
+        );
+
+        if rep.is_signed() {
+            prop_oneof![
+                strat,
+                term.clone().prop_map(move |x| expr_negate(x, rep)),
+                term.clone().prop_map(move |x| expr_abs(x, rep)),
+            ]
+            .boxed()
+        } else {
+            prop_oneof![strat, term.clone().prop_map(move |x| expr_abs(x, rep)),].boxed()
+        }
+    }
+
+    fn subset_rep(rep: MachineRep) -> BoxedStrategy<MachineRep> {
+        machine_strategy()
+            .prop_filter(
+                "sub-expression reps must fit into output rep",
+                move |rep1| rep.is_superset(*rep1),
+            )
+            .boxed()
+    }
+
+    pub fn binary_with_rep(rep: MachineRep, term: &BoxedStrategy<Expr>) -> BoxedStrategy<Expr> {
+        fn expr_add(x: Expr, y: Expr, rep: MachineRep) -> Expr {
+            Expr::BinOp(
+                BinOp {
+                    op: BasicBinOp::Add,
+                    out_rep: Some(rep),
+                },
+                Box::new(x),
+                Box::new(y),
+            )
+        }
+        fn expr_sub(x: Expr, y: Expr, rep: MachineRep) -> Expr {
+            Expr::BinOp(
+                BinOp {
+                    op: BasicBinOp::Sub,
+                    out_rep: Some(rep),
+                },
+                Box::new(x),
+                Box::new(y),
+            )
+        }
+        fn expr_mul(x: Expr, y: Expr, rep: MachineRep) -> Expr {
+            Expr::BinOp(
+                BinOp {
+                    op: BasicBinOp::Mul,
+                    out_rep: Some(rep),
+                },
+                Box::new(x),
+                Box::new(y),
+            )
+        }
+        fn expr_div(x: Expr, y: Expr, rep: MachineRep) -> Expr {
+            Expr::BinOp(
+                BinOp {
+                    op: BasicBinOp::Div,
+                    out_rep: Some(rep),
+                },
+                Box::new(x),
+                Box::new(y),
+            )
+        }
+        fn expr_rem(x: Expr, y: Expr, rep: MachineRep) -> Expr {
+            Expr::BinOp(
+                BinOp {
+                    op: BasicBinOp::Rem,
+                    out_rep: Some(rep),
+                },
+                Box::new(x),
+                Box::new(y),
+            )
+        }
+
+        prop_compose! {
+            fn term_pair(rep: MachineRep, term1: BoxedStrategy<Expr>, term2: BoxedStrategy<Expr>)
+                        (rep1 in subset_rep(rep), rep2 in subset_rep(rep), tc1 in term1, tc2 in term2) -> (Expr, Expr) {
+                            (tc1.replace_rep(rep1), tc2.replace_rep(rep2))
+            }
+        }
+
+        prop_oneof![
+            term_pair(rep, term.clone(), term.clone()).prop_map(move |(l, r)| expr_add(l, r, rep)),
+            term_pair(rep, term.clone(), term.clone()).prop_map(move |(l, r)| expr_sub(l, r, rep)),
+            term_pair(rep, term.clone(), term.clone()).prop_map(move |(l, r)| expr_mul(l, r, rep)),
+            term_pair(rep, term.clone(), term.clone()).prop_map(move |(l, r)| expr_div(l, r, rep)),
+            term_pair(rep, term.clone(), term.clone()).prop_map(move |(l, r)| expr_rem(l, r, rep)),
+        ]
         .boxed()
     }
+
+    prop_compose! {
+        fn cast_to_rep(rep: MachineRep, term: &BoxedStrategy<Expr>)
+                       (x in term.clone(), r in subset_rep(rep)) -> Expr {
+            if r == rep {
+                return x.replace_rep(r);
+            }
+            Expr::Cast(rep, Box::new(x.replace_rep(r)))
+        }
+    }
+
+    pub fn arb_expr_with_rep(rep: MachineRep) -> BoxedStrategy<Expr> {
+        let depth = 8;
+        let max_nodes = 64;
+
+        let leaf = arb_const_from_rep(rep).prop_map(Expr::Const);
+
+        leaf.prop_recursive(depth, max_nodes, 2, move |inner| {
+            let term = inner.boxed();
+            prop_oneof![
+                unary_with_rep(rep, &term),
+                binary_with_rep(rep, &term),
+                cast_to_rep(rep, &term),
+            ]
+        })
+        .boxed()
+    }
+
+    pub fn any_expr() -> impl Strategy<Value = Expr> {
+        machine_strategy()
+            .prop_flat_map(|rep| arb_expr_with_rep(rep))
+            .prop_filter("exprs must be well-typed", |x| {
+                let mut ie = crate::typecheck::inference::InferenceEngine::new();
+                let Ok((v, _)) = ie.infer_var_expr(x) else {
+                    return false;
+                };
+                ie.reify(v.into()).is_some() && x.eval_strict().is_ok_and(|x| x.is_valid())
+            })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::strategy::*;
+    use crate::numeric::core::*;
+    use num_traits::One;
+    use proptest::prelude::*;
 
     #[test]
     fn one_plus_one_is_two() -> Result<(), EvalError> {

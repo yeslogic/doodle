@@ -1568,6 +1568,8 @@ impl TryFrom<ValueType> for RustType {
             ValueType::Base(BaseType::U32) => Ok(PrimType::U32.into()),
             ValueType::Base(BaseType::U64) => Ok(PrimType::U64.into()),
             ValueType::Base(BaseType::Char) => Ok(PrimType::Char.into()),
+            // WIP[epic=embedded-num] - double-check this behavior
+            ValueType::UnknownNumeric => Err(value),
             ValueType::Tuple(mut vs) => {
                 let mut buf = Vec::with_capacity(vs.len());
                 for v in vs.drain(..) {

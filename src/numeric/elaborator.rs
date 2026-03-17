@@ -76,7 +76,7 @@ pub struct TryFromAutoError;
 
 impl std::fmt::Display for TryFromAutoError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "cannot convert `NumRep::AUTO` to `PrimInt`")
+        write!(f, "cannot convert `NumRep::Auto` to `PrimInt`")
     }
 }
 
@@ -207,7 +207,7 @@ impl TryFrom<GenType> for IntType {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum TypedExpr<TypeRep> {
+pub enum TypedExpr<TypeRep> {
     ElabConst(TypeRep, TypedConst),
     ElabBinOp(
         TypeRep,
@@ -217,37 +217,6 @@ pub(crate) enum TypedExpr<TypeRep> {
     ),
     ElabUnaryOp(TypeRep, TypedUnaryOp<TypeRep>, Box<TypedExpr<TypeRep>>),
     ElabCast(TypeRep, TypedCast<TypeRep>, Box<TypedExpr<TypeRep>>),
-}
-
-pub(crate) trait MapType: Sized {
-    type Rep;
-    type Output<A>;
-
-    fn map_type<T>(self, f: &impl Fn(Self::Rep) -> T) -> Self::Output<T> {
-        let g = |x: Self::Rep| Ok(f(x));
-        let Ok(ret) = self.try_map_type::<T, std::convert::Infallible>(&g);
-        ret
-    }
-
-    fn try_map_type<T, E>(
-        self,
-        f: &impl Fn(Self::Rep) -> Result<T, E>,
-    ) -> Result<Self::Output<T>, E>;
-}
-
-impl<X> MapType for Box<X>
-where
-    X: MapType,
-{
-    type Rep = X::Rep;
-    type Output<A> = Box<X::Output<A>>;
-
-    fn try_map_type<T, E>(
-        self,
-        f: &impl Fn(Self::Rep) -> Result<T, E>,
-    ) -> Result<Self::Output<T>, E> {
-        Ok(Box::new((*self).try_map_type(f)?))
-    }
 }
 
 impl<TypeRep> std::hash::Hash for TypedExpr<TypeRep> {
@@ -285,6 +254,40 @@ impl<T> TypedExpr<T> {
     }
 }
 
+/// Trait for converting elaborated AST-nodes from one decoration-type to another
+/// in a consistent fashion.
+pub(crate) trait MapType: Sized {
+    /// The original decorator-type of `Self`
+    type Rep;
+    /// For a given decorator-type `A`, what type `Self` would become after conversion.
+    type Output<A>;
+
+    /// Convert `Self` into `Self::Output<T>` using `f` to convert from `Self::Rep` to `T`.
+    ///
+    /// Suitable when conversion from `Rep` to `T` is infallible.
+    ///
+    /// # Notes
+    ///
+    /// A default implementation is defined in terms of `try_map_type` using `std::convert::Infallible`.
+    fn map_type<T>(self, f: &impl Fn(Self::Rep) -> T) -> Self::Output<T> {
+        let g = |x: Self::Rep| Ok(f(x));
+        let Ok(ret) = self.try_map_type::<T, std::convert::Infallible>(&g);
+        ret
+    }
+
+    /// Attempt to convert `Self` into `Self::Output<T>` using `f` to convert from `Self::Rep` to `T`.
+    ///
+    /// Suitable when conversion from `Rep` to `T` is fallible.
+    ///
+    /// # Errors
+    ///
+    /// If any individual call to `f` yields an error, `try_map_type` should return that error.
+    fn try_map_type<T, E>(
+        self,
+        f: &impl Fn(Self::Rep) -> Result<T, E>,
+    ) -> Result<Self::Output<T>, E>;
+}
+
 mod __impls {
     use super::*;
 
@@ -316,6 +319,21 @@ mod __impls {
                 TypedExpr::ElabCast(_, cast, inner) => Expr::Cast(cast.rep, rebox(inner)),
             }
         }
+    }
+}
+
+impl<X> MapType for Box<X>
+where
+    X: MapType,
+{
+    type Rep = X::Rep;
+    type Output<A> = Box<X::Output<A>>;
+
+    fn try_map_type<T, E>(
+        self,
+        f: &impl Fn(Self::Rep) -> Result<T, E>,
+    ) -> Result<Self::Output<T>, E> {
+        Ok(Box::new((*self).try_map_type(f)?))
     }
 }
 
