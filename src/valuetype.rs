@@ -50,6 +50,8 @@ pub enum ValueType {
     ViewObj,
     PhantomData(Box<ValueType>),
     Base(BaseType),
+    /// Like [`Any`], but known to be a numeric type so any expressions that expect numerics should be considered valid.
+    UnknownNumeric,
     Tuple(Vec<ValueType>),
     Record(Vec<(Label, ValueType)>),
     Union(BTreeMap<Label, ValueType>),
@@ -119,6 +121,9 @@ impl ValueType {
 
             (ValueType::Empty, rhs) => Ok(rhs.clone()),
             (lhs, ValueType::Empty) => Ok(lhs.clone()),
+
+            (ValueType::UnknownNumeric, rhs) if rhs.is_numeric() => Ok(rhs.clone()),
+            (lhs, ValueType::UnknownNumeric) if lhs.is_numeric() => Ok(lhs.clone()),
 
             (ValueType::ViewObj, ValueType::ViewObj) => Ok(ValueType::ViewObj),
             (ValueType::Base(b1), ValueType::Base(b2)) => {
@@ -192,6 +197,7 @@ impl ValueType {
     pub(crate) fn is_numeric(&self) -> bool {
         match self {
             ValueType::Base(b) => b.is_numeric(),
+            ValueType::UnknownNumeric => true,
             _ => false,
         }
     }
@@ -241,6 +247,7 @@ pub(crate) mod augmented {
         Empty,
         ViewObj,
         Base(BaseType),
+        UnknownNumeric,
         Tuple(Vec<AugValueType>),
         Record(Vec<(Label, AugValueType)>),
         Union(BTreeMap<Label, AugValueType>),
@@ -256,6 +263,7 @@ pub(crate) mod augmented {
     impl From<ValueType> for AugValueType {
         fn from(t: ValueType) -> Self {
             match t {
+                ValueType::UnknownNumeric => AugValueType::UnknownNumeric,
                 ValueType::Any => AugValueType::Any,
                 ValueType::Empty => AugValueType::Empty,
                 ValueType::ViewObj => AugValueType::ViewObj,
@@ -284,6 +292,7 @@ pub(crate) mod augmented {
                 AugValueType::Any => ValueType::Any,
                 AugValueType::Empty => ValueType::Empty,
                 AugValueType::ViewObj => ValueType::ViewObj,
+                AugValueType::UnknownNumeric => ValueType::UnknownNumeric,
                 AugValueType::Base(b) => ValueType::Base(b),
                 AugValueType::Tuple(ts) => {
                     ValueType::Tuple(ts.into_iter().map(From::from).collect())

@@ -88,14 +88,14 @@ fn compile_unary_op<'a>(unary_op: &UnaryOp) -> Fragment {
     let token = match unary_op.get_op() {
         BasicUnaryOp::Negate => "~",
         BasicUnaryOp::AbsVal => "abs",
-        BasicUnaryOp::IntSucc => "succ",
-        BasicUnaryOp::IntPred => "pred",
+        BasicUnaryOp::IntSucc => "++",
+        BasicUnaryOp::IntPred => "--",
     };
     if let Some(rep) = unary_op.cast_rep() {
         Fragment::cat(
             Fragment::String(Cow::Borrowed(token)),
             Fragment::String(Cow::Borrowed(rep.to_static_str())),
-        )
+        ).cat(Fragment::Char(' '))
     } else {
         Fragment::String(Cow::Borrowed(token))
     }
@@ -136,6 +136,11 @@ pub(crate) fn compile_expr(expr: &Expr, prec: Precedence) -> Fragment {
                 Precedence::DIV_REM,
             ),
         },
+        Expr::UnaryOp(unary_op @ UnaryOp { op: BasicUnaryOp::IntPred | BasicUnaryOp::IntSucc, .. }, expr) => cond_paren(
+            compile_prefix(unary_op, expr, Precedence::INVOKE),
+            prec,
+            Precedence::INVOKE,
+        ),
         Expr::UnaryOp(unary_op, expr) => cond_paren(
             compile_prefix(unary_op, expr, Precedence::UNARY),
             prec,
@@ -149,7 +154,7 @@ pub(crate) fn compile_expr(expr: &Expr, prec: Precedence) -> Fragment {
     }
 }
 
-fn show_expr(expr: &Expr) -> String {
+pub(crate) fn show_expr(expr: &Expr) -> String {
     format!("{}", compile_expr(expr, Precedence::TOP))
 }
 

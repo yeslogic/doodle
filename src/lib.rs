@@ -75,6 +75,9 @@ fn mk_value_expr(vt: &ValueType) -> Option<Expr> {
             BaseType::U64 => Expr::U64(0),
             BaseType::Char => Expr::AsChar(Box::new(Expr::U32(0))),
         }),
+        ValueType::UnknownNumeric => Some(Expr::Numeric(Box::new(NumExpr::Const(
+            numeric::TypedConst::from_u8(0),
+        )))),
         ValueType::Tuple(ts) => {
             let mut xs = Vec::with_capacity(ts.len());
             for t in ts {
@@ -241,8 +244,7 @@ impl Expr {
             Expr::U16(_n) => Ok(ValueType::Base(BaseType::U16)),
             Expr::U32(_n) => Ok(ValueType::Base(BaseType::U32)),
             Expr::U64(_n) => Ok(ValueType::Base(BaseType::U64)),
-            // FIXME[epic=embedded-num] - this is a hack for now
-            Expr::Numeric(_) => Ok(ValueType::Any),
+            Expr::Numeric(_) => Ok(ValueType::UnknownNumeric),
             Expr::Tuple(exprs) => {
                 let mut ts = Vec::new();
                 for expr in exprs {
@@ -317,6 +319,9 @@ impl Expr {
                 (ValueType::Base(b1), ValueType::Base(b2)) if b1 == b2 && b1.is_numeric() => {
                     Ok(ValueType::Base(b1))
                 }
+                (ValueType::Base(b), ValueType::UnknownNumeric) |
+                (ValueType::UnknownNumeric, ValueType::Base(b)) if b.is_numeric() => Ok(ValueType::Base(b)),
+                (ValueType::UnknownNumeric, ValueType::UnknownNumeric) => Ok(ValueType::UnknownNumeric),
                 (x, y) => Err(anyhow!(
                     "mismatched operand types for {_arith:?}: {x:?}, {y:?}"
                 )),
@@ -327,29 +332,28 @@ impl Expr {
             },
             Expr::Unary(_op @ (UnaryOp::IntSucc | UnaryOp::IntPred), x) => {
                 match x.infer_type(scope)? {
-                    ValueType::Base(b) if b.is_numeric() => Ok(ValueType::Base(b)),
+                    t if t.is_numeric() => Ok(t),
                     x => Err(anyhow!("unexpected operand type for {_op:?}: {x:?}")),
                 }
             }
-
             Expr::AsU8(x) => match x.infer_type(scope)? {
-                ValueType::Base(b) if b.is_numeric() => Ok(ValueType::Base(BaseType::U8)),
+                t if t.is_numeric() => Ok(ValueType::Base(BaseType::U8)),
                 x => Err(anyhow!("unsound type cast AsU8(_ : {x:?})")),
             },
             Expr::AsU16(x) => match x.infer_type(scope)? {
-                ValueType::Base(b) if b.is_numeric() => Ok(ValueType::Base(BaseType::U16)),
+                t if t.is_numeric() => Ok(ValueType::Base(BaseType::U16)),
                 x => Err(anyhow!("unsound type cast AsU16(_ : {x:?})")),
             },
             Expr::AsU32(x) => match x.infer_type(scope)? {
-                ValueType::Base(b) if b.is_numeric() => Ok(ValueType::Base(BaseType::U32)),
+                t if t.is_numeric() => Ok(ValueType::Base(BaseType::U32)),
                 x => Err(anyhow!("unsound type cast AsU32(_ : {x:?})")),
             },
             Expr::AsU64(x) => match x.infer_type(scope)? {
-                ValueType::Base(b) if b.is_numeric() => Ok(ValueType::Base(BaseType::U64)),
+                t if t.is_numeric() => Ok(ValueType::Base(BaseType::U64)),
                 x => Err(anyhow!("cannot convert {x:?} to U64")),
             },
             Expr::AsChar(x) => match x.infer_type(scope)? {
-                ValueType::Base(b) if b.is_numeric() => Ok(ValueType::Base(BaseType::Char)),
+                t if t.is_numeric() => Ok(ValueType::Base(BaseType::Char)),
                 x => Err(anyhow!("unsound type cast AsChar(_ : {x:?})")),
             },
             Expr::U16Be(bytes) => {
@@ -413,12 +417,14 @@ impl Expr {
                 }
             }
             Expr::SeqLength(seq) => match seq.infer_type(scope)? {
+                // REVIEW[epic=seqlen-always-u32] - is UnknownNumeric better here?
                 ValueType::Seq(_t) => Ok(ValueType::Base(BaseType::U32)),
                 other => Err(anyhow!("seq-length called on non-sequence type: {other:?}")),
             },
             Expr::SeqIx(seq, index) => match seq.infer_type(scope)? {
                 ValueType::Seq(t) => {
                     let index_type = index.infer_type(scope)?;
+                    // REVIEW[epic=seqlen-always-u32] - this should share whatever type SeqLen gets
                     if index_type != ValueType::Base(BaseType::U32) {
                         return Err(anyhow!(
                             "SeqIx `index` param: expected U32, found {index_type:?}"
@@ -428,6 +434,7 @@ impl Expr {
                 }
                 other => Err(anyhow!("SeqIx: expected Seq, found {other:?}")),
             },
+            // REVIEW[epic=seqlen-always-u32] - start and length should share whatever type SeqLen gets
             Expr::SubSeq(seq, start, length) => match seq.infer_type(scope)? {
                 ValueType::Seq(t) => {
                     let start_type = start.infer_type(scope)?;
@@ -446,6 +453,7 @@ impl Expr {
                 }
                 other => Err(anyhow!("SubSeq: expected Seq, found {other:?}")),
             },
+            // REVIEW[epic=seqlen-always-u32] - start and length should share whatever type SeqLen gets
             Expr::SubSeqInflate(seq, start, length) => match seq.infer_type(scope)? {
                 ValueType::Seq(t) => {
                     let start_type = start.infer_type(scope)?;
@@ -555,6 +563,7 @@ impl Expr {
                 let start_type = start.infer_type(scope)?;
                 let end_type = end.infer_type(scope)?;
 
+                // REVIEW[epic=embedded-num] - is UnknownNumeric acceptable (or likely) in this position?
                 if !matches!(start_type, ValueType::Base(b) if b.is_numeric()) {
                     return Err(anyhow!("EnumFromTo: start is not numeric: {start_type:?}"));
                 } else if start_type != end_type {
@@ -565,6 +574,7 @@ impl Expr {
 
                 Ok(ValueType::Seq(Box::new(start_type)))
             }
+            // REVIEW[epic=dup32] - is there a better way to handle this?
             Expr::Dup(count, expr) => {
                 if count.infer_type(scope)? != ValueType::Base(BaseType::U32) {
                     return Err(anyhow!("Dup: count is not U32: {count:?}"));
@@ -618,8 +628,8 @@ impl Expr {
             Expr::Dup(x, y) => x.is_shadowed_by(name) || y.is_shadowed_by(name),
             Expr::Bool(_) | Expr::U8(_) | Expr::U16(_) | Expr::U32(_) | Expr::U64(_) => false,
             Expr::Numeric(_) => {
-                // WIP[epic=embedded-num] - we need to figure out how variables work in Numeric subtree extension
-                unimplemented!("shadowing model for numerics is not yet implemented")
+                // WIP[epic=embedded-num] - at least for now, numerics cannot contain any variables
+                false
             }
             Expr::Tuple(ts) => ts.iter().any(|x| x.is_shadowed_by(name)),
             Expr::TupleProj(tup, _) => tup.is_shadowed_by(name),

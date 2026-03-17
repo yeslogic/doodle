@@ -544,7 +544,7 @@ impl Expr {
                 let num_val = n.eval();
                 match num_val {
                     Ok(v) => Cow::Owned(ParsedValue::from_evaluated(Value::from(v))),
-                    // WIP[epic=embedded-num] - this is a hack for now
+                    // WIP[epic=embedded-num] - we probably want a more sensible outcome than panic
                     Err(e) => panic!("{e}"),
                 }
             }

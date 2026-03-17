@@ -265,9 +265,7 @@ where {
         }
     }
 }
-use scope::{
-    Ctxt, UMultiScope, UScope, USingleScope, ViewMultiScope,
-};
+use scope::{Ctxt, UMultiScope, UScope, USingleScope, ViewMultiScope};
 
 /// Perform a `?` operation but add additional trace-context to TCError values if encountered
 ///
@@ -404,7 +402,7 @@ impl UType {
     /// Will return `None` if the conversion failed due to the presence of a Union-type at any layer.
     pub(crate) fn from_valuetype(vt: &ValueType) -> Option<UType> {
         match vt {
-            ValueType::Any => Some(Self::Hole),
+            ValueType::Any | ValueType::UnknownNumeric => Some(Self::Hole),
             ValueType::Empty => Some(Self::Empty),
             ValueType::ViewObj => Some(Self::ViewObj),
             ValueType::PhantomData(inner) => {
@@ -1042,13 +1040,25 @@ pub mod base_set {
         }
     }
 }
-use base_set::{BaseSet, UintSet, IntWidth};
+use base_set::{BaseSet, IntWidth, UintSet};
+
+/// Type for indicating the solution-state of an ExtVar (num-tree root-node type)
+#[derive(Copy, Clone, Debug, Default)]
+pub(crate) enum NumSolution {
+    #[default]
+    /// Solution has not yet been found
+    Unsolved,
+    /// Solution has been found but was elided due to aliasing; should not be stored for canonical ExtVars
+    Elided,
+    /// Canonical solution-state before elision is performed on non-canonical ExtVars
+    Solved(Option<crate::numeric::elaborator::IntType>),
+}
 
 #[derive(Debug, Default)]
 pub(crate) struct EmbeddedResolver {
     subtrees: Vec<Rc<inference::InferenceEngine>>,
     aliases: Vec<Alias>,
-    outcomes: HashMap<ExtVar, Option<crate::numeric::elaborator::IntType>>,
+    outcomes: HashMap<ExtVar, NumSolution>,
 }
 
 impl EmbeddedResolver {
@@ -1067,18 +1077,405 @@ impl EmbeddedResolver {
         ext_var
     }
 
-    // WIP - figure out correct return type
-    fn resolve_alias(&self, var0: ExtVar, var1: ExtVar) -> () {
-        if var0 == var1 {
-            return;
+    /// Returns the canonical-among-aliased ExtVar for `ext_var`.
+    ///
+    /// # Notes
+    ///
+    /// This method is only suitable for lookups of root-solutions for mutual-satisfiability
+    /// of External and natural constraints. It should not be used for elaboration purposes, as even two
+    /// aliased ext-vars are not interchangeable when crawling their respective sub-trees for recursive elaboration.
+    fn get_canonical_ext_var(&self, ext_v: ExtVar) -> ExtVar {
+        match self.aliases[ext_v.0] {
+            Alias::Canonical(_) | Alias::Ground => ext_v,
+            Alias::BackRef(ix) => ExtVar(ix),
+        }
+    }
+
+    fn force_outcome(&mut self, ext: ExtVar) -> TCResult<NumSolution> {
+        let sol = self.outcomes.get(&ext).copied().unwrap_or_default();
+        match sol {
+            NumSolution::Elided => {
+                let can = self.get_canonical_ext_var(ext);
+                assert!(can < ext);
+                let sol0 = self.force_outcome(can)?;
+                Ok(sol0)
+            }
+            NumSolution::Unsolved {
+
+            }
+        }
+    }
+
+    /// Immediately after the subtree corresponding to an `ExtVar` has been solved, ensure that
+    /// the novel solution is compatible with the imputed solutions of any and all other ext-vars
+    /// to which the original was aliased.
+    ///
+    /// Assumes that the association in `outcomes` has already been updated.
+    fn enforce_aliasing(&mut self, solved_var: ExtVar, sol: NumSolution) -> TCResult<()> {
+        match &self.alias[solved_var.0] {
+            Alias::Ground => Ok(()),
+            alias @ Alias::Canonical(_) => {
+                for ix in alias.iter_fwd_refs() {
+                    let other_ext = ExtVar(ix);
+                    let outcome = self.outcomes.entry(other_ext).or_default();
+                    match *outcome {
+                        NumSolution::Unsolved => {
+                            // NOTE - avoid over-eager evaluation of unsolved non-canonical ext-vars
+                            continue
+                        }
+                        NumSolution::Elided => continue,
+                        NumSolution::Solved(other_sol) => {
+
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+
+    /// Introduces a new alias between the subtree-root ext-variables `var0` and `var1`.
+    ///
+    /// Returns an error if the implied equivalence cannot be satisfied.
+    fn resolve_alias(&mut self, v1: ExtVar, v2: ExtVar) -> TCResult<NumSolution> {
+        if v1 == v2 {
+            let sol = self.outcomes.get(&v1).copied().unwrap_or_default();
+            return Ok(sol);
         }
 
-        // STUB
-        todo!()
+        // NOTE - even if the solutions for the sub-trees are the same, the equivalence between them
+        // does not obviate the need to store both inference-engines for individual elaboration.
+
+        // short-circuit if already equated
+        match (&self.aliases[v1.0], &self.aliases[v2.0]) {
+            (Alias::Ground, Alias::Ground) => {
+                if v1 < v2 {
+                    unsafe {
+                        self.repoint(v1.0, v2.0);
+                        self.synchronize_outcomes(v1.0, v2.0)
+                    }
+                } else {
+                    unsafe {
+                        self.repoint(v2.0, v1.0);
+                        self.synchronize_outcomes(v2.0, v1.0)
+                    }
+                }
+            }
+            (Alias::Ground, &Alias::BackRef(can_ix)) if v1.0 > can_ix => unsafe {
+                self.repoint(can_ix, v1.0);
+                self.synchronize_outcomes(can_ix, v1.0)
+            },
+            (Alias::Ground, &Alias::BackRef(can_ix)) if v1.0 < can_ix => {
+                debug_assert!(
+                    self.aliases[can_ix].is_canonical_nonempty(),
+                    "half-alias ?{can_ix}-|<-{v2}"
+                );
+                debug_assert!(
+                    !self.aliases[can_ix].contains_fwd_ref(v1.0),
+                    "retrograde half-aliased 'forward' ref ?{can_ix}->|-{v1}"
+                );
+                unsafe { self.recanonicalize(v1.0, can_ix) }
+            }
+            (Alias::Ground, &Alias::BackRef(_can_ix)) => {
+                // we can only get here if v1.0 == can_ix, but this is not valid as v1 ought be Canonical
+                unreachable!("unexpected half-alias {v1}-|<-{v2}");
+            }
+            (&Alias::BackRef(can_ix), Alias::Ground) if v2.0 > can_ix => unsafe {
+                self.repoint(can_ix, v2.0);
+                self.synchronize_outcomes(can_ix, v2.0)
+            },
+            (&Alias::BackRef(can_ix), Alias::Ground) if v2.0 < can_ix => {
+                debug_assert!(
+                    self.aliases[can_ix].is_canonical_nonempty(),
+                    "half-alias ?{can_ix}-|<-{v1}"
+                );
+                debug_assert!(
+                    !self.aliases[can_ix].contains_fwd_ref(v2.0),
+                    "retrograde half-aliased 'forward' ref ?{can_ix}->|-{v2}"
+                );
+                unsafe { self.recanonicalize(v2.0, can_ix) }
+            }
+            (&Alias::BackRef(_can_ix), Alias::Ground) => {
+                unreachable!("unexpected half-alias {v2}-|<-{v1}");
+            }
+            (Alias::Ground, Alias::Canonical(_)) => {
+                if v1.0 < v2.0 {
+                    debug_assert!(
+                        !self.aliases[v2.0].contains_fwd_ref(v1.0),
+                        "retrograde half-aliased 'forward' ref {v2}->|-{v1}"
+                    );
+                    unsafe { self.recanonicalize(v1.0, v2.0) }
+                } else {
+                    unsafe {
+                        self.repoint(v2.0, v1.0);
+                        self.synchronize_outcomes(v2.0, v1.0)
+                    }
+                }
+            }
+            (Alias::Canonical(_), Alias::Ground) => {
+                if v2.0 < v1.0 {
+                    debug_assert!(
+                        !self.aliases[v1.0].contains_fwd_ref(v2.0),
+                        "retrograde half-aliased 'forward' ref {v1}->|-{v2}"
+                    );
+                    unsafe { self.recanonicalize(v2.0, v1.0) }
+                } else {
+                    unsafe {
+                        self.repoint(v1.0, v2.0);
+                        self.synchronize_outcomes(v1.0, v2.0)
+                    }
+                }
+            }
+            (&Alias::BackRef(ix1), &Alias::BackRef(ix2)) => {
+                if ix1 < ix2 {
+                    unsafe { self.recanonicalize(ix1, ix2) }
+                } else if ix2 < ix1 {
+                    unsafe { self.recanonicalize(ix2, ix1) }
+                } else {
+                    // the two are equal so nothing needs to be changed; we will check both are forward-aliased, however
+                    let common = &self.aliases[ix1];
+                    debug_assert!(
+                        common.contains_fwd_ref(v1.0),
+                        "unexpected half-alias ?{ix1}<-{v1}"
+                    );
+                    debug_assert!(
+                        common.contains_fwd_ref(v2.0),
+                        "unexpected half-alias ?{ix1}<-{v2}"
+                    );
+                    // WIP[epic=embedded-num] - unclear what to do to check all outcomes are the same without
+                    Ok(*self.outcomes.get(&v1).unwrap())
+                }
+            }
+            (a1 @ Alias::BackRef(tgt), a2 @ Alias::Canonical(fwd_refs)) => {
+                let left = fwd_refs.contains(&v1.0);
+                let right = *tgt == v2.0;
+
+                match (left, right) {
+                    (true, true) => {
+                        return Ok(*self.outcomes.get(&v2).unwrap());
+                    }
+                    (true, false) | (false, true) => unreachable!(
+                        "mismatched back- and forward-references for {v1} ({a1:?}) and {v2} ({a2:?})"
+                    ),
+                    (false, false) => (),
+                }
+
+                let ix1 = *tgt;
+                let ix2 = v2.0;
+
+                // check not the actual indices, but the canonical indices for tie-breaking
+                if ix1 < ix2 {
+                    unsafe { self.recanonicalize(ix1, ix2) }
+                } else {
+                    unsafe { self.recanonicalize(ix2, ix1) }
+                }
+            }
+            (a1 @ Alias::Canonical(fwd_refs), a2 @ Alias::BackRef(tgt)) => {
+                let left = fwd_refs.contains(&v2.0);
+                let right = *tgt == v1.0;
+
+                match (left, right) {
+                    (true, true) => {
+                        return Ok(*self.outcomes.get(&v1).unwrap());
+                    }
+                    (true, false) | (false, true) => unreachable!(
+                        "mismatched forward- and back-references for {v1} ({a1:?}) and {v2} ({a2:?})"
+                    ),
+                    (false, false) => (),
+                }
+
+                let ix1 = v1.0;
+                let ix2 = *tgt;
+
+                // check not the actual indices, but the canonical indices for tie-breaking
+                if ix1 < ix2 {
+                    unsafe { self.recanonicalize(ix1, ix2) }
+                } else {
+                    unsafe { self.recanonicalize(ix2, ix1) }
+                }
+            }
+            (Alias::Canonical(_), Alias::Canonical(_)) => {
+                if v1 < v2 {
+                    unsafe { self.recanonicalize(v1.0, v2.0) }
+                } else {
+                    unsafe { self.recanonicalize(v2.0, v1.0) }
+                }
+            }
+        }
+    }
+
+    /// Rewrites the aliasing of `self` so that `lo<->hi` is enforced, without any other changes.
+    ///
+    /// Assumes that this aliasing does not exist already, and may cause unexpected but not undefined behavior
+    /// if called in a context that does not check certain preconditions.
+    ///
+    /// # Safety
+    ///
+    /// Like [`Self::recanonicalize`], this method is niche enough to not be suitable for calls in a neutral context,
+    /// and may be marked safe after code stabilizes. Otherwise it is not known to lead to any UB.
+    /// Guards are enforced in advance.
+    unsafe fn repoint(&mut self, lo: usize, hi: usize) {
+        self.aliases[hi].set_backref(lo);
+        self.aliases[lo].add_forward_ref(hi);
+    }
+
+    /// Modifies the aliasing table of `self` so that the alias stored at `a1` is canonical and takes over
+    /// the old status of canonical `a2`, modifying its back-references and unifying with its constraints
+    ///
+    /// # Safety
+    ///
+    /// As this method is designed to be internal with a specific singular use-case, there are a number of preconditions that must either be
+    /// assumed or asserted, in order to ensure that the call is sound and valid. These preconditions are numerous enough to merit unsafe status for
+    /// the call to this method, at least as a temporary linting-helper, to avoid unguarded calls from neutral contexts.
+    ///
+    /// Preconditions:
+    /// - `a1 < a2`
+    /// - `a1` has no back-references, and is allowed (but not required) to have forward-references
+    /// - `a2` has no back-references, and is allowed (but not required) to have forward-references
+    unsafe fn recanonicalize(&mut self, a1: usize, a2: usize) -> TCResult<NumSolution> {
+        let tmp = self.aliases[a2].set_backref(a1);
+        let iter = tmp.iter_fwd_refs();
+        for a in iter {
+            assert!(
+                !self.aliases[a1].contains_fwd_ref(a),
+                "forward ref of ?{a2} is also a forward ref of ?{a1}, somehow"
+            );
+            unsafe { self.repoint(a1, a) };
+        }
+        self.aliases[a1].add_forward_ref(a2);
+        unsafe { self.synchronize_outcomes(a1, a2) }
+    }
+
+
+
+    /// Given two `NumSolutions` that are propositionally equated via unification or aliasing, return
+    /// the solved outcome, or err if the solutions are incompatible.
+    ///
+    /// The boolean flag `permit_elision` controls how the function handles `NumSolution::Elided`.
+    ///
+    /// - If `true`, will treat `NumSolution::Elided` as `NumSolution::Unsolved`
+    /// - If `false`, it will panic.
+    fn reconcile_solutions(&mut self, lo_outcome: &mut NumSolution, hi_outcome: &mut NumSolution, permit_elision: bool) -> TCResult<NumSolution> {
+        let (sol_lo, sol_hi) = match (*lo_outcome, *hi_outcome) {
+            (NumSolution::Unsolved, NumSolution::Unsolved) => {
+                // REVIEW[epic=embedded-num] - do we actually want to fully defer the computation, or should we at least solve `lo`?
+                return Ok(NumSolution::Unsolved);
+            }
+            (NumSolution::Elided, _) | (_, NumSolution::Elided) => {
+                panic!("unexpected elided solution in synchronize_outcomes")
+            }
+            (NumSolution::Solved(s), NumSolution::Unsolved) => {
+                // NOTE[epic=embedded-num] - rather than solve `hi` here, we leave the alias-unification to be solved later once we request the solution for `hi`.
+                return Ok(NumSolution::Solved(s));
+            }
+            (NumSolution::Unsolved, NumSolution::Solved(sol_hi)) => {
+                let ie_lo = self.subtrees[lo].clone();
+                let sol_lo = ie_lo.reify(UVar(0).into());
+                (sol_lo, sol_hi)
+            }
+            (NumSolution::Solved(sol_lo), NumSolution::Solved(sol_hi)) => (sol_lo, sol_hi),
+        };
+
+        match (sol_lo, sol_hi) {
+            (Some(sol_lo), Some(sol_hi)) if sol_lo == sol_hi => {
+                *hi_outcome = NumSolution::Elided;
+                Ok(NumSolution::Solved(Some(sol_lo)))
+            }
+            (None, None) => {
+                *hi_outcome = NumSolution::Elided;
+                // REVIEW - is 'no solution' something we want to continue beyond discovery of?
+                Ok(NumSolution::Solved(None))
+            }
+            _ => {
+                // WIP[epic=embedded-num] - this currently panics but we actually want to return an appropriate error that we have no variant for yet
+                // REVIEW[epic=embedded-num] - if we find Some(sol) and None, are they truly incompatible or should we replace the None with Some(sol)?
+
+                panic!("incompatible num-solutions for #{lo} and #{hi}: {sol_lo:?} != {sol_hi:?}");
+            }
+        }
+    }
+
+    /// Modifies internal state to establish all expected post-conditions of the novel aliasing `lo->|<-hi`.
+    ///
+    /// Specifically, will adjust the entries for `lo` and `hi` in `self.outcomes` such that, if both are solved,
+    /// the two solutions are unified (and will return Err if their unification is unsatisfiable).
+    ///
+    /// If `lo` is unsolved and `hi` is solved, will force the solution of `lo` and peform the same unification, after
+    /// which (if not Err) the entry for `hi` is elided and the entry for `lo` is updated (and returned).
+    ///
+    /// If `lo` is solved and `hi` is unsolved, will merely return the entry for `lo` and leave reconciliation of the
+    /// deferred solution of `hi` to be handled when the solution is manifested at a later time.
+    ///
+    /// If `lo` is elided, or if `hi` is elided, will panic.
+    ///
+    /// Preconditions:
+    ///   - `lo < hi`
+    ///   - Neither `lo` nor `hi` have elided solutions
+    ///   - `lo` is canonical
+    ///   - `hi` was formerly canonical but has been repointed to `lo`.
+    unsafe fn synchronize_outcomes(&mut self, lo: usize, hi: usize) -> TCResult<NumSolution> {
+        assert!(lo < hi);
+        {
+            let _lo_entry = self.outcomes.entry(ExtVar(lo)).or_default();
+            let _hi_entry = self.outcomes.entry(ExtVar(hi)).or_default();
+        }
+        let [Some(lo_outcome), Some(hi_outcome)] =
+            self.outcomes.get_disjoint_mut([&ExtVar(lo), &ExtVar(hi)])
+        else {
+            unreachable!()
+        };
+
+        let (sol_lo, sol_hi) = match (*lo_outcome, *hi_outcome) {
+            (NumSolution::Unsolved, NumSolution::Unsolved) => {
+                // REVIEW[epic=embedded-num] - do we actually want to fully defer the computation, or should we at least solve `lo`?
+                return Ok(NumSolution::Unsolved);
+            }
+            (NumSolution::Elided, _) | (_, NumSolution::Elided) => {
+                panic!("unexpected elided solution in synchronize_outcomes")
+            }
+            (NumSolution::Solved(s), NumSolution::Unsolved) => {
+                // NOTE[epic=embedded-num] - rather than solve `hi` here, we leave the alias-unification to be solved later once we request the solution for `hi`.
+                return Ok(NumSolution::Solved(s));
+            }
+            (NumSolution::Unsolved, NumSolution::Solved(sol_hi)) => {
+                let ie_lo = self.subtrees[lo].clone();
+                let sol_lo = ie_lo.reify(UVar(0).into());
+                (sol_lo, sol_hi)
+            }
+            (NumSolution::Solved(sol_lo), NumSolution::Solved(sol_hi)) => (sol_lo, sol_hi),
+        };
+
+        match (sol_lo, sol_hi) {
+            (Some(sol_lo), Some(sol_hi)) if sol_lo == sol_hi => {
+                *hi_outcome = NumSolution::Elided;
+                Ok(NumSolution::Solved(Some(sol_lo)))
+            }
+            (None, None) => {
+                *hi_outcome = NumSolution::Elided;
+                // REVIEW - is 'no solution' something we want to continue beyond discovery of?
+                Ok(NumSolution::Solved(None))
+            }
+            _ => {
+                // WIP[epic=embedded-num] - this currently panics but we actually want to return an appropriate error that we have no variant for yet
+                // REVIEW[epic=embedded-num] - if we find Some(sol) and None, are they truly incompatible or should we replace the None with Some(sol)?
+
+                panic!("incompatible num-solutions for #{lo} and #{hi}: {sol_lo:?} != {sol_hi:?}");
+            }
+        }
+    }
+
+    fn peek_solution(&self, ext: ExtVar) -> NumSolution {
+        match self.outcomes.get(&ext) {
+            None | Some(NumSolution::Unsolved) => NumSolution::Unsolved,
+            Some(NumSolution::Elided) => {
+                let can = self.get_canonical_ext_var(ext);
+                assert!(can < ext, "canonical alias {can} must be less than non-canonical {ext} (based on Elided)");
+                self.peek_solution(can)
+            }
+            Some(NumSolution::Solved(sol)) => NumSolution::Solved(*sol),
+        }
     }
 }
-
-
 
 /// Mutably updated state-engine for performing complete type-inference on a top-level `Format`.
 #[derive(Debug)]
@@ -1489,7 +1886,9 @@ impl TypeChecker {
     /// for detecting infinite types.
     fn occurs_in(&self, v: UVar, t: impl AsRef<UType>) -> TCResult<()> {
         match t.as_ref() {
-            UType::Hole | UType::Empty | UType::ViewObj | UType::ExternVar(..) | UType::Base(_) => Ok(()),
+            UType::Hole | UType::Empty | UType::ViewObj | UType::ExternVar(..) | UType::Base(_) => {
+                Ok(())
+            }
             &UType::Var(v1) => {
                 if self.is_aliased(v, v1) {
                     Err(TCErrorKind::InfiniteType(v, self.constraints[v.0].clone()).into())
@@ -1615,6 +2014,76 @@ impl TypeChecker {
 
 // SECTION - Pairwise unification steps
 impl TypeChecker {
+    /// Attempts to resolve the unification of an `ExtVar` with a metavariable constraint.
+    fn unify_ext_var_constraint(&mut self, ext: ExtVar, constraint: Constraint) -> TCResult<()> {
+        match constraint {
+            Constraint::Elem(bs) => match bs {
+                BaseSet::Single(bty) => {
+                    self.unify_extvar_basetype(ext, bty)?;
+                    Ok(())
+                }
+                BaseSet::U(uints) => {
+                    self.unify_ext_var_uintset(ext, uints)?;
+                    Ok(())
+                }
+            }
+            Constraint::Equiv(utype) => match utype.as_ref() {
+                UType::ExternVar(ext0) => {
+                    // ext-var unification is handled in sub_extension
+                    if ext == *ext0 {
+                        Ok(())
+                    } else {
+                        self.sub_extension.resolve_alias(*ext0, ext)?;
+                        Ok(())
+                    }
+                }
+                UType::Empty | UType::Hole => {
+                    // unification does not introduce any new constraints
+                    Ok(())
+                }
+                UType::Var(var) => {
+                    self.unify_var_extvar(var, ext)?;
+                    Ok(())
+                }
+                UType::Base(base_type) => todo!(),
+                UType::ViewObj |
+                UType::Tuple(..) |
+                UType::Record(..) |
+                UType::Seq(..) |
+                UType::Option(..) | UType::PhantomData(..) => {
+                    return Err(TCError::from(TCErrorKind::NonNumericEmbedded(ext, constraint)))
+                }
+            }
+            Constraint::Proj(_) => return Err(TCError::from(TCErrorKind::NonNumericEmbedded(ext, constraint))),
+        }
+    }
+
+    fn unify_extvar_basetype(&mut self, ext: ExtVar, basetype: BaseType) -> TCResult<()> {
+        if !basetype.is_numeric() {
+            return Err(TCError::from(TCErrorKind::NonNumericEmbedded(ext, Constraint::Elem(BaseSet::Single(basetype)))));
+        }
+
+        let sub = &mut self.sub_extension;
+
+        match sub.peek_solution(ext) {
+            NumSolution::Unsolved => {
+                sub.
+            },
+            NumSolution::Elided => unreachable!("elided solutions are never base-case"),
+            NumSolution::Solved(sol) => match sol {
+                Some(crate::numeric::elaborator::IntType::Prim(p)) => match p {
+
+                }
+                None => todo!(),
+            }
+        }
+    }
+
+    fn unify_extvar_uintset(&mut self, ext: ExtVar, uintset: UintSet) -> TCResult<()> {
+
+    }
+
+
     /// Attempts to add a direct (non-Variant) constraint to an existing, possibly recently-created UVar
     ///
     /// Will panic if the UVar is pointing to a Variant Constraints structure and therefore cannot have
@@ -1926,6 +2395,22 @@ impl TypeChecker {
                 self.occurs(v)?;
                 Ok(Rc::new(UType::Var(v)))
             }
+            (&UType::ExternVar(ext1), &UType::ExternVar(ext2)) => {
+                self.unify_extern_var_pair(ext1, ext2)?;
+                Ok(Rc::new(UType::ExternVar(Ord::min(ext1, ext2))))
+            }
+            (&UType::ExternVar(ext), _) => {
+                let constraint = Constraint::Equiv(right.clone());
+                let _ = self.unify_ext_var_constraint(ext, constraint)?;
+                // self.occurs_extern(ext)?;
+                Ok(Rc::new(UType::ExternVar(ext)))
+            }
+            (_, &UType::ExternVar(ext)) => {
+                let constraint = Constraint::Equiv(left.clone());
+                let _ = self.unify_ext_var_constraint(ext, constraint)?;
+                // self.occurs_extern(ext)?;
+                Ok(Rc::new(UType::ExternVar(ext)))
+            }
             // all the remaining cases are mismatched UType constructors
             _ => Err(UnificationError::Unsatisfiable(left, right).into()),
         }
@@ -1955,6 +2440,7 @@ impl TypeChecker {
     fn unify_utype_baseset(&mut self, ut: Rc<UType>, bs: BaseSet) -> TCResult<Constraint> {
         match ut.as_ref() {
             UType::Var(uv) => self.unify_var_baseset(*uv, bs),
+            UType::ExternVar(ext_v) => self.unify_extern_var_baseset(*ext_v, bs),
             UType::Base(b) => {
                 let ret = bs.unify(&BaseSet::Single(*b))?.to_constraint();
                 Ok(ret)
@@ -1975,6 +2461,13 @@ impl TypeChecker {
     fn unify_var_baseset(&mut self, uv: UVar, bs: BaseSet) -> TCResult<Constraint> {
         let constraint = bs.to_constraint();
         self.unify_var_constraint(uv, constraint)
+    }
+
+    /// Unifies an ExtVar against a BaseSet, forcing resolution of the ExtVar to a concrete type
+    /// and then validating the concrete type against the BaseSet.
+    fn unify_extern_var_baseset(&self, ext_v: ExtVar, bs: BaseSet) -> TCResult<Constraint> {
+        // FIXME[epic=embedded-num] - for now, unification is ex-post-facto
+        let engine = self.get_extern(ext_v);
     }
 
     /// Attempt to unify a [`UVar`] with a [`ValueType`], primarily for use with `Expr::FlatMapAccum`.
@@ -2287,15 +2780,17 @@ impl TypeChecker {
                 let _ext_var = ExtVar(self.sub_extension.subtrees.len());
 
                 // WIP - figure out what to do with Rep
-                let (sub_var, _rep) = engine.infer_var_expr(expr)
+                let (sub_var, _rep) = engine
+                    .infer_var_expr(expr)
                     .map_err(|e| TCErrorKind::from((newvar, _ext_var, e)))?;
-                assert_eq!(sub_var, UVar(0), "expected sub-var ({newvar} = {_ext_var}) to be ?0, found {sub_var}");
+                assert_eq!(
+                    sub_var,
+                    UVar(0),
+                    "expected sub-var ({newvar} = {_ext_var}) to be ?0, found {sub_var}"
+                );
 
                 let ext_var = self.sub_extension.init_new_extvar(engine);
-                self.unify_var_utype(
-                    newvar,
-                    Rc::new(UType::ExternVar(ext_var))
-                )?;
+                self.unify_var_utype(newvar, Rc::new(UType::ExternVar(ext_var)))?;
 
                 newvar
             }
@@ -2741,6 +3236,13 @@ impl TypeChecker {
 
 // SECTION - low-level methods dealing with UVar aliasing concerns
 impl TypeChecker {
+    /// Performs re-aliasing, recanonicalization, and any other constraint propagation as necessary,
+    /// to establish direct equality requirements between two external variables
+    fn unify_extern_var_pair(&mut self, ext1: ExtVar, ext2: ExtVar) -> TCResult<()> {
+        // FIXME[epic=embedded-num] - figure out correct return type, and anything else that needs to be done in the method body
+        self.sub_extension.resolve_alias(ext1, ext2)
+    }
+
     /// Performs re-aliasing, recanonicalization, constraint propagation, and constraint unification
     /// to establish direct equality requirements between two meta-variables.
     fn unify_var_pair(&mut self, v1: UVar, v2: UVar) -> TCResult<&Constraints> {
@@ -2909,7 +3411,7 @@ impl TypeChecker {
     ///
     /// # Safety
     ///
-    /// As this method is designed ot be internal with a specific singular use-case, there are a number of preconditions that must either be
+    /// As this method is designed to be internal with a specific singular use-case, there are a number of preconditions that must either be
     /// assumed or asserted, in order to ensure that the call is sound and valid. These preconditions are numerous enough to merit unsafe status for
     /// the call to this method, at least as a temporary linting-helper, to avoid unguarded calls from neutral contexts.
     ///
@@ -2946,7 +3448,12 @@ impl TypeChecker {
         self.aliases[lo].add_forward_ref(hi);
     }
 
-    /// Ensure that all constraints on `a2` are inherited by `a1`, with the reverse occurring as a side-effect.
+    /// Ensures that all constraints on `a2` are inherited by `a1`, with the reverse occurring as a side-effect.
+    ///
+    /// # Safety
+    ///
+    /// While no inherently unsafe functions are called, the caller must ensure that certain preconditions are met,
+    ///
     unsafe fn transfer_constraints(&mut self, a1: usize, a2: usize) -> TCResult<&Constraints> {
         let v1 = UVar(a1);
         let v2 = UVar(a2);
@@ -3583,10 +4090,14 @@ pub(crate) enum Expansion {
 
 // SECTION - specialized methods for elaboration and codegen purposes
 impl TypeChecker {
+    /// Retrieves the associated InferenceEngine for a given ExtVar.
     pub(crate) fn get_extern(&self, ext_var: ExtVar) -> Rc<inference::InferenceEngine> {
         let ix = ext_var.0;
         if ix >= self.sub_extension.subtrees.len() {
-            unreachable!("invalid external var {ext_var} (out-of-range): {ix} >= {}", self.sub_extension.subtrees.len());
+            unreachable!(
+                "invalid external var {ext_var} (out-of-range): {ix} >= {}",
+                self.sub_extension.subtrees.len()
+            );
         }
         self.sub_extension.subtrees[ix].clone()
     }
@@ -3772,6 +4283,7 @@ pub enum TCErrorKind {
     NoSolution(UVar),
     MissingView(Label),
     Inference(UVar, ExtVar, inference::InferenceError),
+    NonNumericEmbedded(ExtVar, Constraint),
 }
 
 impl From<TypeError> for TCErrorKind {

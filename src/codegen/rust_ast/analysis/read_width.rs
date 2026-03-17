@@ -134,7 +134,7 @@ impl ReadWidth for PrimType {
 }
 
 impl ReadWidth for MachineUint {
-    fn read_width(&self, context: Self::Context<'_>) -> ValueWidth {
+    fn read_width(&self, _: ()) -> ValueWidth {
         match self {
             MachineUint::U8 => ValueWidth::Fixed(size_of::<u8>()),
             MachineUint::U16 => ValueWidth::Fixed(size_of::<u16>()),

@@ -1,38 +1,54 @@
-use std::borrow::Cow;
-
 use crate::Label;
-use crate::codegen::ToFragment;
-use crate::codegen::rust_ast::RustPrimLit;
-use crate::codegen::{
-    rust_ast::{
-        ClosureBody, FnEntity, NumType, RustClosure, RustClosureHead, RustEntity, RustExpr,
-    },
-    typed_format::GenType,
-};
-use crate::output::Fragment;
+use crate::codegen::{rust_ast::{ClosureBody, FnEntity, NumType, RustClosure, RustClosureHead, RustEntity, RustExpr, RustPrimLit}, typed_format::GenType};
 
 use super::{
     core::{BasicBinOp, BasicUnaryOp, BinOp, MachineRep, UnaryOp},
     elaborator::{IntType, MapType, PrimInt, Sig1, Sig2, TypedExpr},
 };
 
+/// Classification-type for the behavior of a binary operation based on its inherent semantics and the value-type signature.
+///
+/// The positional argument representing the type of the output always follows the positional arguments for each operand, and the operand-types
+/// are given in left-to-right order.
 #[derive(Clone, Copy, Debug)]
-enum BinOpClass<T> {
+pub(crate) enum BinOpClass<T> {
+    /// Classification for signatures of the form `A -> A -> A`, i.e. operand-types and output-type are all identical.
     Pure(T),
+    /// Any operation with signature `A -> A -> B` where `B` is strictly wider than `A`.
     HomWide(T, T),
+    /// Any operation with signature `A -> B -> C` where `C` is strictly wider than both `A` and `B`.
     HetWide(T, T, T),
+    /// Classification for signatures of the form `A -> A -> B` where `B` is strictly narrower than `A`.
     HomLossy(T, T),
+    /// Classification for signatures of the form `A -> B -> C` where either (or both) of `A` and `B` is wider than `C`.
     HetLossy(T, T, T),
 }
 
+/// Classification-type for the behavior of a unary operation based on its inherent semantics and the value-type signature.
 #[derive(Clone, Copy, Debug)]
-enum UnaryOpClass<T> {
+pub(crate) enum UnaryOpClass<T> {
     Pure(T),
     NonLossy(T, T),
     Lossy(T, T),
 }
 
-fn classify_binary(sig: Sig2<IntType>) -> BinOpClass<PrimInt> {
+/// Returns the relevant operational class of a binary operation with a given `(left, right, output)` type-signature:
+///   - Pure: the operation's output has the same representation as its inputs, though the operation might yield unrepresentable outcomes for certain value-combinations.
+///   - HomWide: operands have the same type and the operation's output has a strictly wider representation than its inputs, but the operation might still yield unrepresentable outcomes for certain value-combinations (e.g. division or remainder by zero, unsigned subtraction of a greater value from a smaller value).
+///   - HomLossy: operands have the same type and the operation's output has a strictly narrower representation than its inputs, and the operation will yield unrepresentable outputs for a large number of value-combinations.
+///   - HetWide: operands have different types and the operation's output has a strictly wider representation than either input, but the operation might still yield unrepresentable outcomes for certain value-combinations (e.g. division or remainder by zero, unsigned subtraction of a greater value from a smaller value).
+///   - HetLossy: operands have different types and the operation's output has a strictly narrower representation than at least one input, and the operation will yield unrepresentable outputs for a large number of value-combinations.
+///
+/// # Notes
+///
+/// The primary usage of this function is as a heuristic to determine whether a backend function that performs the requested operation has
+/// been implemented via macro-based boilerplating in `crate::numeric::eval`.
+///
+/// Operations that are `HetLossy` or `homLossy` will generally be assumed to have been left out of boilerplating, and will instead be
+/// performed via calls to `eval_fallback` during code-generation.
+///
+/// Any `Pure`, `HomWide`, or `HetWide` operations will be assumed to have an accompanying backend function with a predictable template identifier.
+pub(crate) fn classify_binary(sig: Sig2<IntType>) -> BinOpClass<PrimInt> {
     let ((l, r), o) = sig;
     let l = l.to_prim();
     let r = r.to_prim();
@@ -57,9 +73,23 @@ fn classify_binary(sig: Sig2<IntType>) -> BinOpClass<PrimInt> {
     }
 }
 
-// NOTE - depending on the op, widening vs lossy might be affected (e.g. Abs(i8) fits in u8)
-// FIXME - while this technically works, there is some fuzziness with regard to the intended semantics vs what we are effectively measuring (i.e. did we bother implementing a backend function we can call)
-fn classify_unary(op: Option<BasicUnaryOp>, sig: Sig1<IntType>) -> UnaryOpClass<PrimInt> {
+/// Returns the relevant operational class of a unary operation with a given `(input, output)` type-signature:
+///   - Pure: the operation's output has the same representation as its input, though the operation might yield unrepresentable outcomes in certain corner-cases
+///   - NonLossy: the operation's output has a strictly wider representation than its input and will never yield unrepresentable outcomes for representable operands
+///   - Lossy: the operation's output has a different representation from its input, and will yield unrepresentable outcomes for certain ranges of representable operands
+///
+/// When `op` is `None`, the signature is assumed to represent a mathematical-value-preserving type-cast operation.
+///
+/// # Notes
+///
+/// The primary usage of this function is as a heuristic to determine whether a backend function that performs the requested operation has
+/// been implemented via macro-based boilerplating in `crate::numeric::eval`.
+///
+/// Operations that are `Lossy` will generally be assumed to have been left out of boilerplating, and will instead be
+/// performed via calls to `eval_unary_fallback` during code-generation.
+///
+/// Any `Pure` or `NonLossy` operations will be assumed to have an accompanying backend function with a predictable template identifier.
+pub(crate) fn classify_unary(op: Option<BasicUnaryOp>, sig: Sig1<IntType>) -> UnaryOpClass<PrimInt> {
     let (i, o) = sig;
     let i = i.to_prim();
     let o = o.to_prim();
@@ -97,7 +127,6 @@ fn classify_unary(op: Option<BasicUnaryOp>, sig: Sig1<IntType>) -> UnaryOpClass<
             }
         }
         Some(BasicUnaryOp::IntPred) => {
-            // REVIEW - this might be misimplemented
             if irep == orep {
                 UnaryOpClass::Pure(i)
             } else if pred_is_nonlossy(irep, orep) {
@@ -107,7 +136,6 @@ fn classify_unary(op: Option<BasicUnaryOp>, sig: Sig1<IntType>) -> UnaryOpClass<
             }
         }
         Some(BasicUnaryOp::IntSucc) => {
-            // REVIEW - this might be misimplemented
             if irep == orep {
                 UnaryOpClass::Pure(i)
             } else if succ_is_nonlossy(irep, orep) {
@@ -119,6 +147,7 @@ fn classify_unary(op: Option<BasicUnaryOp>, sig: Sig1<IntType>) -> UnaryOpClass<
     }
 }
 
+/// Heuristic for whether `Abs(X: source) -> target` is a non-lossy operation (i.e. a representable input-value will never yield an unrepresentable output-value).
 fn absval_is_nonlossy(source: MachineRep, target: MachineRep) -> bool {
     if source.is_signed() {
         // Signed -> Unsigned is non-lossy if the target-precision is greater-than-or-equal to target precision

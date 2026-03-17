@@ -973,7 +973,7 @@ enum ExprInfo {
 
 fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
     match expr {
-        TypedExpr::Numeric(num) => embed_numeric_expr(num, info),
+        TypedExpr::Numeric(num) => embed_numeric_expr(num),
         TypedExpr::Record(gt, fields) => {
             let tname = match gt {
                 GenType::Def((_, tname), _) => tname,
@@ -1335,8 +1335,8 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
     }
 }
 
-fn embed_numeric_expr(num: &TypedNumExpr<GenType>, info: ExprInfo) -> RustExpr {
-    // WIP[epic=embedded-num]
+/// Constructs the appropriate `RustExpr` for an embedded (typed) numeric-subtree expression.
+fn embed_numeric_expr(num: &TypedNumExpr<GenType>) -> RustExpr {
     use crate::numeric::codegen::synthesize;
     synthesize(num)
 }
@@ -3659,6 +3659,9 @@ impl ToAst for DynamicLogic<GTExpr> {
 }
 
 // ANCHOR[epic=main-fn] - `generate_code` function
+/// Generates Rust code for a given `top_format` that is treated as the entry-point into a
+/// format-module `module`. Any formats within `module` that are inaccessible via exploration
+/// of `top_format` may be omitted from the resulting code-output.
 pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragment + use<> {
     let mut items = Vec::new();
 
@@ -5170,7 +5173,8 @@ impl<'a> TypedDynScope<'a> {
 mod tests {
     use super::*;
     use crate::TypeHint;
-    use crate::helper::{ANY_BYTE, compute, record};
+    use crate::helper::{ANY_BYTE, compute, record, var, succ};
+    use proptest::prelude::*;
 
     fn population_check(module: &FormatModule, f: &Format, label: Option<&'static str>) {
         let tc = TypeChecker::infer_module(module, f).unwrap();
@@ -5205,6 +5209,8 @@ mod tests {
         );
     }
 
+    /// Returns a string containing the generated code for the given format and any registerd
+    /// subformats thereof within `module`.
     fn produce_string_gencode(module: &FormatModule, f: &Format) -> String {
         generate_code(module, f).to_fragment().to_string()
     }
@@ -5413,7 +5419,6 @@ mod tests {
         println!("{}", output);
     }
 
-
     #[test]
     fn test_math_codegen() {
         let tree = {
@@ -5431,6 +5436,30 @@ mod tests {
         let f = module.define_format("test.math", compute(Expr::Numeric(Box::new(tree))));
         let output = produce_string_gencode(&module, &f.call());
         println!("{}", output);
+    }
+
+    fn is_valid_output(output: &str) -> bool {
+        // FIXME - write a more sophisticated check
+        output.len() > 0
+    }
+
+    proptest! {
+        #[test]
+        fn test_numtree_codegen_proptest(tree in crate::numeric::core::strategy::any_expr()) {
+            use std::io::Write;
+            let mut log = std::fs::File::options().create(true).append(true).open("pbt.log").unwrap();
+            writeln!(&mut log, "## {}", crate::numeric::printer::show_expr(&tree)).unwrap();
+            let mut module = FormatModule::new();
+            let f = module.define_format("test.arb", compute(Expr::Numeric(Box::new(tree))));
+            let g = module.define_format("test.arb2", record([
+                ("a", f.call()),
+                ("b", compute(succ(var("a")))),
+            ]));
+            let output = produce_string_gencode(&module, &g.call());
+            writeln!(&mut log, "{}", output).unwrap();
+            writeln!(&mut log, "\n\n").unwrap();
+            prop_assert!(is_valid_output(&output))
+        }
     }
 }
 
