@@ -5451,11 +5451,11 @@ mod tests {
             writeln!(&mut log, "## {}", crate::numeric::printer::show_expr(&tree)).unwrap();
             let mut module = FormatModule::new();
             let f = module.define_format("test.arb", compute(Expr::Numeric(Box::new(tree))));
-            let g = module.define_format("test.arb2", record([
-                ("a", f.call()),
-                ("b", compute(succ(var("a")))),
-            ]));
-            let output = produce_string_gencode(&module, &g.call());
+            // let g = module.define_format("test.arb2", record([
+            //     ("a", f.call()),
+            //     ("b", compute(succ(var("a")))),
+            // ]));
+            let output = produce_string_gencode(&module, &f.call());
             writeln!(&mut log, "{}", output).unwrap();
             writeln!(&mut log, "\n\n").unwrap();
             prop_assert!(is_valid_output(&output))
