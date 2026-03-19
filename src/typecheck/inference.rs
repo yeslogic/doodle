@@ -4,7 +4,7 @@ use super::UVar;
 
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
-pub(crate) enum NUType {
+pub enum NUType {
     Var(UVar),
     Int(IntType),
 }
