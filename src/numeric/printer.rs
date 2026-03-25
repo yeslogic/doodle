@@ -7,9 +7,13 @@ use crate::output::Fragment;
 use crate::precedence::{Precedence, cond_paren};
 
 use crate::numeric::codegen::synthesize;
-use crate::numeric::core::{BasicBinOp, BasicUnaryOp, BinOp, Expr, MachineRep, NumRep, TypedConst, UnaryOp};
+use crate::numeric::core::{
+    BasicBinOp, BasicUnaryOp, BinOp, Expr, MachineRep, NumRep, TypedConst, UnaryOp,
+};
+use crate::numeric::elaborator::{
+    Elaborator, IntType, MapType, TypedBinOp, TypedCast, TypedExpr, TypedUnaryOp,
+};
 use crate::typecheck::inference::InferenceEngine;
-use crate::numeric::elaborator::{Elaborator, IntType, MapType, TypedBinOp, TypedCast, TypedExpr, TypedUnaryOp};
 
 fn compile_bin_op(bin_op: &BinOp) -> Fragment {
     let token = match bin_op.get_op() {
@@ -95,7 +99,8 @@ fn compile_unary_op<'a>(unary_op: &UnaryOp) -> Fragment {
         Fragment::cat(
             Fragment::String(Cow::Borrowed(token)),
             Fragment::String(Cow::Borrowed(rep.to_static_str())),
-        ).cat(Fragment::Char(' '))
+        )
+        .cat(Fragment::Char(' '))
     } else {
         Fragment::String(Cow::Borrowed(token))
     }
@@ -136,7 +141,13 @@ pub(crate) fn compile_expr(expr: &Expr, prec: Precedence) -> Fragment {
                 Precedence::DIV_REM,
             ),
         },
-        Expr::UnaryOp(unary_op @ UnaryOp { op: BasicUnaryOp::IntPred | BasicUnaryOp::IntSucc, .. }, expr) => cond_paren(
+        Expr::UnaryOp(
+            unary_op @ UnaryOp {
+                op: BasicUnaryOp::IntPred | BasicUnaryOp::IntSucc,
+                ..
+            },
+            expr,
+        ) => cond_paren(
             compile_prefix(unary_op, expr, Precedence::INVOKE),
             prec,
             Precedence::INVOKE,
@@ -315,8 +326,8 @@ pub fn print_conversion(expr: &Expr) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use num_bigint::BigInt;
     use crate::numeric::core::*;
+    use num_bigint::BigInt;
 
     #[test]
     fn test_print_conversion() {

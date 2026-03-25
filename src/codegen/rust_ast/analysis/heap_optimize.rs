@@ -1,7 +1,7 @@
 use super::{MemSize, aligned_size};
 use crate::codegen::rust_ast::{
-    AtomType, CompType, LocalType, PrimType, MachineSint, RustStruct, RustType, RustTypeDecl, RustTypeDef,
-    RustVariant,
+    AtomType, CompType, LocalType, MachineSint, PrimType, RustStruct, RustType, RustTypeDecl,
+    RustTypeDef, RustVariant,
 };
 use core::alloc::Layout;
 use std::num::NonZeroUsize;
@@ -216,7 +216,6 @@ impl HeapOptimize for PrimType {
         (HeapAction::Noop, mk_layout(self, context))
     }
 }
-
 
 impl HeapOptimize for MachineSint {
     fn heap_hint(&self, _: HeapStrategy, context: Self::Context<'_>) -> HeapOutcome {

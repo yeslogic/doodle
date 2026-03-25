@@ -5181,7 +5181,7 @@ impl<'a> TypedDynScope<'a> {
 mod tests {
     use super::*;
     use crate::TypeHint;
-    use crate::helper::{ANY_BYTE, compute, record, var, succ};
+    use crate::helper::{ANY_BYTE, compute, record, succ, var};
     use proptest::prelude::*;
 
     fn population_check(module: &FormatModule, f: &Format, label: Option<&'static str>) {
@@ -5420,9 +5420,12 @@ mod tests {
     fn test_numtree_codegen() {
         use crate::numeric::core;
         let mut module = FormatModule::new();
-        let f = module.define_format("test.math", compute(Expr::Numeric(Box::new(core::Expr::Const(core::TypedConst(
-            8u8.into(), core::NumRep::Concrete(core::MachineRep::U8)
-        ))))));
+        let f = module.define_format(
+            "test.math",
+            compute(Expr::Numeric(Box::new(core::Expr::Const(
+                core::TypedConst(8u8.into(), core::NumRep::Concrete(core::MachineRep::U8)),
+            )))),
+        );
         let output = produce_string_gencode(&module, &f.call());
         println!("{}", output);
     }
@@ -5431,13 +5434,16 @@ mod tests {
     fn test_math_codegen() {
         let tree = {
             use crate::numeric::core::*;
-            let eightu8 = Expr::Const(TypedConst(
-            8u8.into(), NumRep::Concrete(MachineRep::U8)
-           ));
-            let oneu16 = Expr::Const(TypedConst(
-            1u16.into(), NumRep::Concrete(MachineRep::U16)
-            ));
-            let sumu32 = Expr::BinOp(BinOp { op: BasicBinOp::Add, out_rep: Some(MachineRep::U32) }, Box::new(eightu8), Box::new(oneu16));
+            let eightu8 = Expr::Const(TypedConst(8u8.into(), NumRep::Concrete(MachineRep::U8)));
+            let oneu16 = Expr::Const(TypedConst(1u16.into(), NumRep::Concrete(MachineRep::U16)));
+            let sumu32 = Expr::BinOp(
+                BinOp {
+                    op: BasicBinOp::Add,
+                    out_rep: Some(MachineRep::U32),
+                },
+                Box::new(eightu8),
+                Box::new(oneu16),
+            );
             sumu32
         };
         let mut module = FormatModule::new();
@@ -5455,8 +5461,19 @@ mod tests {
     fn test_numtree_codegen_proptest() {
         let log = std::fs::File::create("pbt.log").unwrap();
         let handle = std::cell::RefCell::new(log);
+        proptest!(|(tree in crate::numeric::core::strategy::any_expr())| {
+            let mut log = handle.borrow_mut();
+            use std::io::Write;
+            writeln!(&mut log, "## {}", crate::numeric::printer::show_expr(&tree)).unwrap();
+            let mut module = FormatModule::new();
+            let f = module.define_format("test.arb", compute(Expr::Numeric(Box::new(tree))));
+            let output = produce_string_gencode(&module, &f.call());
+            writeln!(&mut log, "{}", output).unwrap();
+            writeln!(&mut log, "\n\n").unwrap();
+            prop_assert!(is_valid_output(&output))
+        });
         proptest!(|(tree in crate::numeric::core::strategy::unsigned_expr())| {
-        let mut log = handle.borrow_mut();
+            let mut log = handle.borrow_mut();
             use std::io::Write;
             writeln!(&mut log, "## {}", crate::numeric::printer::show_expr(&tree)).unwrap();
             let mut module = FormatModule::new();
@@ -5471,7 +5488,6 @@ mod tests {
             prop_assert!(is_valid_output(&output))
         })
     }
-
 }
 
 mod __impls {

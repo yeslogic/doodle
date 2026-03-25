@@ -322,7 +322,9 @@ impl<'module> TreePrinter<'module> {
                     | Value::Variant(..)
                     | Value::Mapped(..)
                     | Value::Branch(..)
-                    | Value::Option(..) => unreachable!("found non-flat Value in ParsedValue::Flat: {inner:?}"),
+                    | Value::Option(..) => {
+                        unreachable!("found non-flat Value in ParsedValue::Flat: {inner:?}")
+                    }
                     // fall-through to all flat cases here
                     value => self.compile_value(value),
                 };
@@ -2068,9 +2070,7 @@ impl<'module> TreePrinter<'module> {
                 .cat(Fragment::String(" }".into()))
                 .group(),
             Expr::Seq(..) => Fragment::String("[..]".into()),
-            Expr::Numeric(n_tree) => {
-                crate::numeric::printer::compile_expr(n_tree, prec)
-            }
+            Expr::Numeric(n_tree) => crate::numeric::printer::compile_expr(n_tree, prec),
         }
     }
 

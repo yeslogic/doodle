@@ -535,9 +535,12 @@ where
     BigInt: From<Lhs> + From<Rhs>,
     Res: TryFrom<BigInt, Error = TryFromBigIntError<BigInt>>,
 {
-    eprintln!("[INFO]: encountered fallback operation `{_op_hint} : (({}, {}) -> {})` that may benefit from standalone function",
-         type_name::<Lhs>(), type_name::<Rhs>(), type_name::<Res>()
-     );
+    eprintln!(
+        "[INFO]: encountered fallback operation `{_op_hint} : (({}, {}) -> {})` that may benefit from standalone function",
+        type_name::<Lhs>(),
+        type_name::<Rhs>(),
+        type_name::<Res>()
+    );
     let big_l = BigInt::from(lhs);
     let big_r = BigInt::from(rhs);
     let o_big_res = checked_op(&big_l, &big_r);
@@ -799,7 +802,11 @@ where
     BigInt: From<In>,
     Out: TryFrom<BigInt, Error = TryFromBigIntError<BigInt>>,
 {
-    eprintln!("[INFO]: encountered fallback operation `{_op_hint} : ({} -> {})` that may benefit from standalone function", type_name::<In>(), type_name::<Out>());
+    eprintln!(
+        "[INFO]: encountered fallback operation `{_op_hint} : ({} -> {})` that may benefit from standalone function",
+        type_name::<In>(),
+        type_name::<Out>()
+    );
     let big_x = BigInt::from(x);
     let big_res = op(&big_x);
     match <Out as TryFrom<BigInt>>::try_from(big_res) {

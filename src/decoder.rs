@@ -158,22 +158,22 @@ impl Value {
             Pattern::U8(i0) => match self {
                 Value::U8(i1) if i0 == i1 => true,
                 Value::Numeric(n) => n.matches_u8(*i0),
-                _ => false
+                _ => false,
             },
             Pattern::U16(i0) => match self {
                 Value::U16(i1) if i0 == i1 => true,
                 Value::Numeric(n) => n.matches_u16(*i0),
                 _ => false,
-            }
+            },
             Pattern::U32(i0) => match self {
-                Value::U32(i1) if i0==i1 => true,
+                Value::U32(i1) if i0 == i1 => true,
                 Value::Numeric(n) => n.matches_u32(*i0),
-                _ => false
+                _ => false,
             },
             Pattern::U64(i0) => match self {
-                Value::U64(i1) if i0==i1 => true,
+                Value::U64(i1) if i0 == i1 => true,
                 Value::Numeric(n) => n.matches_u64(*i0),
-                _ => false
+                _ => false,
             },
             Pattern::Int(bounds) => match self {
                 Value::U8(n) => bounds.contains(usize::from(*n)),
