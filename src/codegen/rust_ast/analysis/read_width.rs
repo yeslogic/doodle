@@ -1,5 +1,6 @@
 use crate::codegen::rust_ast::{
-    AtomType, CompType, LocalType, MachineSint, MachineUint, PrimType, RustStruct, RustType, RustTypeDecl, RustTypeDef, RustVariant, analysis::SourceContext
+    AtomType, CompType, LocalType, MachineSint, MachineUint, PrimType, RustStruct, RustType,
+    RustTypeDecl, RustTypeDef, RustVariant, analysis::SourceContext,
 };
 
 use super::ASTContext;

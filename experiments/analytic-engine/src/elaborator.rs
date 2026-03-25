@@ -332,11 +332,9 @@ pub(crate) mod inference {
                 },
                 Constraint::Encompasses(bounds) => {
                     let IntType::Prim(candidate) = candidate;
-                    Some(
-                        bounds.is_encompassed_by(
-                            &<PrimInt as Into<MachineRep>>::into(candidate).as_bounds()
-                        ),
-                    )
+                    Some(bounds.is_encompassed_by(
+                        &<PrimInt as Into<MachineRep>>::into(candidate).as_bounds(),
+                    ))
                 }
             }
         }
@@ -735,8 +733,7 @@ pub(crate) mod inference {
                 UType::Int(int_type) => {
                     let IntType::Prim(candidate) = int_type;
                     let soluble = bounds.is_encompassed_by(
-                        &<PrimInt as Into<MachineRep>>::into(candidate)
-                            .as_bounds(),
+                        &<PrimInt as Into<MachineRep>>::into(candidate).as_bounds(),
                     );
                     if soluble {
                         Ok(Constraint::Equiv(utype))

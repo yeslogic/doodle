@@ -755,10 +755,7 @@ pub type StrictValue = Strict<Value>;
 impl StrictValue {
     pub fn new(value: Value) -> Self {
         let is_valid = value.is_representable();
-        Self {
-            value,
-            is_valid,
-        }
+        Self { value, is_valid }
     }
 
     pub fn is_valid(&self) -> bool {
@@ -768,10 +765,7 @@ impl StrictValue {
     pub fn map<E>(self, f: impl FnOnce(Value) -> Result<Value, E>) -> Result<Self, E> {
         let value = f(self.value)?;
         let is_valid = self.is_valid && value.is_representable();
-        Ok(Strict {
-            value,
-            is_valid,
-        })
+        Ok(Strict { value, is_valid })
     }
 
     pub fn map2<E>(
@@ -781,10 +775,7 @@ impl StrictValue {
     ) -> Result<Self, E> {
         let value = f(self.value, other.value)?;
         let is_valid = self.is_valid && other.is_valid && value.is_representable();
-        Ok(Strict {
-            value,
-            is_valid,
-        })
+        Ok(Strict { value, is_valid })
     }
 }
 
@@ -1217,7 +1208,8 @@ pub mod strategy {
                 let Ok((v, _)) = ie.infer_var_expr(x) else {
                     return false;
                 };
-                ie.reify(v.into()).is_some_and(|t| !t.to_prim().is_signed()) && x.eval_strict().is_ok_and(|x| x.is_valid())
+                ie.reify(v.into()).is_some_and(|t| !t.to_prim().is_signed())
+                    && x.eval_strict().is_ok_and(|x| x.is_valid())
             })
     }
 }

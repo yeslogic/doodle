@@ -16,7 +16,10 @@ pub enum PrimInt {
 
 impl PrimInt {
     pub const fn is_signed(self) -> bool {
-        matches!(self, PrimInt::I8 | PrimInt::I16 | PrimInt::I32 | PrimInt::I64)
+        matches!(
+            self,
+            PrimInt::I8 | PrimInt::I16 | PrimInt::I32 | PrimInt::I64
+        )
     }
 
     pub const fn to_static_str(self) -> &'static str {
@@ -368,9 +371,11 @@ impl<TypeRep> MapType for TypedExpr<TypeRep> {
                 op.try_map_type(f)?,
                 x.try_map_type(f)?,
             )),
-            TypedExpr::ElabCast(t, c, x) => {
-                Ok(TypedExpr::ElabCast(f(t)?, c.try_map_type(f)?, x.try_map_type(f)?))
-            }
+            TypedExpr::ElabCast(t, c, x) => Ok(TypedExpr::ElabCast(
+                f(t)?,
+                c.try_map_type(f)?,
+                x.try_map_type(f)?,
+            )),
         }
     }
 }
@@ -439,7 +444,10 @@ impl<TypeRep> MapType for TypedUnaryOp<TypeRep> {
     type Rep = TypeRep;
     type Output<A> = TypedUnaryOp<A>;
 
-    fn try_map_type<T, E>(self, f: &impl Fn(TypeRep) -> Result<T, E>) -> Result<TypedUnaryOp<T>, E> {
+    fn try_map_type<T, E>(
+        self,
+        f: &impl Fn(TypeRep) -> Result<T, E>,
+    ) -> Result<TypedUnaryOp<T>, E> {
         let sig = self.sig.try_map_type(f)?;
         Ok(TypedUnaryOp {
             inner: self.inner,
@@ -469,10 +477,7 @@ impl<TypeRep> MapType for TypedCast<TypeRep> {
         f: &impl Fn(Self::Rep) -> Result<T, E>,
     ) -> Result<Self::Output<T>, E> {
         let sig = self.sig.try_map_type(f)?;
-        Ok(TypedCast {
-            rep: self.rep,
-            sig,
-        })
+        Ok(TypedCast { rep: self.rep, sig })
     }
 }
 

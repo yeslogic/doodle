@@ -89,7 +89,6 @@ pub(crate) enum MonoLevel {
     Postfix,
 }
 
-
 /// Intransitive partial relation over operator subclasses
 ///
 /// The relation is not transitive, but it is anti-symmetric.
@@ -180,9 +179,7 @@ impl IntransitiveOrd for ArithLevel {
 impl IntransitiveOrd for MonoLevel {
     fn relate(&self, other: &Self) -> Relation {
         match (self, other) {
-            (Self::Prefix, Self::Prefix) | (Self::Postfix, Self::Postfix) => {
-                Relation::Congruent
-            }
+            (Self::Prefix, Self::Prefix) | (Self::Postfix, Self::Postfix) => Relation::Congruent,
             (Self::Prefix, Self::Postfix) => Relation::Superior,
             (Self::Postfix, Self::Prefix) => Relation::Inferior,
         }
@@ -291,7 +288,6 @@ impl Precedence {
     pub(crate) const CAST_PREFIX: Self = Precedence::Mono(MonoLevel::Prefix);
     pub(crate) const PROJ: Self = Precedence::Projection;
     pub(crate) const ATOM: Self = Precedence::Atomic;
-
 
     pub(crate) const PTR_PREFIX: Self = Precedence::Mono(MonoLevel::Prefix);
     // NOTE - ported from crate::numeric::printer

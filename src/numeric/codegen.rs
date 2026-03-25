@@ -1,5 +1,11 @@
 use crate::Label;
-use crate::codegen::{rust_ast::{ClosureBody, FnEntity, NumType, RustClosure, RustClosureHead, RustEntity, RustExpr, RustPrimLit}, typed_format::GenType};
+use crate::codegen::{
+    rust_ast::{
+        ClosureBody, FnEntity, NumType, RustClosure, RustClosureHead, RustEntity, RustExpr,
+        RustPrimLit,
+    },
+    typed_format::GenType,
+};
 
 use super::{
     core::{BasicBinOp, BasicUnaryOp, BinOp, MachineRep, UnaryOp},
@@ -89,7 +95,10 @@ pub(crate) fn classify_binary(sig: Sig2<IntType>) -> BinOpClass<PrimInt> {
 /// performed via calls to `eval_unary_fallback` during code-generation.
 ///
 /// Any `Pure` or `NonLossy` operations will be assumed to have an accompanying backend function with a predictable template identifier.
-pub(crate) fn classify_unary(op: Option<BasicUnaryOp>, sig: Sig1<IntType>) -> UnaryOpClass<PrimInt> {
+pub(crate) fn classify_unary(
+    op: Option<BasicUnaryOp>,
+    sig: Sig1<IntType>,
+) -> UnaryOpClass<PrimInt> {
     let (i, o) = sig;
     let i = i.to_prim();
     let o = o.to_prim();
@@ -360,7 +369,9 @@ pub(crate) fn synthesize(model: &TypedExpr<GenType>) -> RustExpr {
                     },
                     vec![
                         input,
-                        RustExpr::PrimitiveLit(RustPrimLit::String(induce_unary_fname(op.inner, class))),
+                        RustExpr::PrimitiveLit(RustPrimLit::String(induce_unary_fname(
+                            op.inner, class,
+                        ))),
                         synthesize_unary(op.inner),
                     ],
                 ),

@@ -1,7 +1,6 @@
-use crate::numeric::core::{Bounds, Expr, MachineRep, NumRep};
-use crate::numeric::elaborator::{IntType, PrimInt, PRIM_INTS};
 use super::UVar;
-
+use crate::numeric::core::{Bounds, Expr, MachineRep, NumRep};
+use crate::numeric::elaborator::{IntType, PRIM_INTS, PrimInt};
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum NUType {
@@ -80,7 +79,7 @@ impl Constraint {
                 let IntType::Prim(candidate) = candidate;
                 Some(
                     bounds.is_encompassed_by(
-                        &<PrimInt as Into<MachineRep>>::into(candidate).as_bounds()
+                        &<PrimInt as Into<MachineRep>>::into(candidate).as_bounds(),
                     ),
                 )
             }
@@ -97,7 +96,9 @@ impl Constraint {
                     solutions.push(*prim_int);
                 }
                 Some(false) => (),
-                None => panic!("unexpected call to get_unique_solution on `{self}` (either trivial or insoluble)"),
+                None => panic!(
+                    "unexpected call to get_unique_solution on `{self}` (either trivial or insoluble)"
+                ),
             }
         }
         match solutions.as_slice() {
@@ -127,12 +128,27 @@ pub enum InferenceError {
 impl std::fmt::Display for InferenceError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            InferenceError::BadUnification(cx1, cx2) => write!(f, "constraints `{}` and `{}` cannot be unified", cx1, cx2),
-            InferenceError::Ambiguous => write!(f, "mixed-type binary operation must have out_rep on operation to avoid ambiguity"),
-            InferenceError::Eval(e) => write!(f, "inference abandoned due to evaluation error: {}", e),
-            InferenceError::NoSolution => write!(f, "no valid assignment of PrimInt types produce a fully representable tree"),
-            InferenceError::MultipleSolutions => write!(f, "multiple assignments of PrimInt produce a fully representable tree, in absence of tie-breaking mechanism"),
-            InferenceError::UnconstrainedVar(v) => write!(f, "unconstrained variable {v} cannot be solved"),
+            InferenceError::BadUnification(cx1, cx2) => {
+                write!(f, "constraints `{}` and `{}` cannot be unified", cx1, cx2)
+            }
+            InferenceError::Ambiguous => write!(
+                f,
+                "mixed-type binary operation must have out_rep on operation to avoid ambiguity"
+            ),
+            InferenceError::Eval(e) => {
+                write!(f, "inference abandoned due to evaluation error: {}", e)
+            }
+            InferenceError::NoSolution => write!(
+                f,
+                "no valid assignment of PrimInt types produce a fully representable tree"
+            ),
+            InferenceError::MultipleSolutions => write!(
+                f,
+                "multiple assignments of PrimInt produce a fully representable tree, in absence of tie-breaking mechanism"
+            ),
+            InferenceError::UnconstrainedVar(v) => {
+                write!(f, "unconstrained variable {v} cannot be solved")
+            }
         }
     }
 }
@@ -231,8 +247,7 @@ impl InferenceEngine {
             (_, Constraints::Indefinite) => Ok(self.replace_constraints_from_index(a2, a1)),
             (Constraints::Invariant(c1), Constraints::Invariant(c2)) => {
                 let c0 = self.unify_constraint_pair(c1.clone(), c2.clone())?;
-                let _ =
-                    self.replace_constraints_with_value(a1, Constraints::Invariant(c0.clone()));
+                let _ = self.replace_constraints_with_value(a1, Constraints::Invariant(c0.clone()));
                 let _ = self.replace_constraints_with_value(a2, Constraints::Invariant(c0));
                 Ok(&self.constraints[a1])
             }
@@ -480,10 +495,8 @@ impl InferenceEngine {
             }
             NUType::Int(int_type) => {
                 let IntType::Prim(candidate) = int_type;
-                let soluble = bounds.is_encompassed_by(
-                    &<PrimInt as Into<MachineRep>>::into(candidate)
-                        .as_bounds(),
-                );
+                let soluble = bounds
+                    .is_encompassed_by(&<PrimInt as Into<MachineRep>>::into(candidate).as_bounds());
                 if soluble {
                     Ok(Constraint::Equiv(utype))
                 } else {
@@ -614,7 +627,9 @@ impl InferenceEngine {
                                         }
                                         None => {
                                             // FIXME - this isn't a hard error necessarily, but our model isn't complex enough for non-TypedConst values to emerge
-                                            unimplemented!("Value::AsConst returned None (unexpectedly) when called from InferenceEngine::infer_var_expr");
+                                            unimplemented!(
+                                                "Value::AsConst returned None (unexpectedly) when called from InferenceEngine::infer_var_expr"
+                                            );
                                         }
                                     },
                                     Err(e) => {
@@ -695,7 +710,9 @@ impl InferenceEngine {
                                         }
                                         None => {
                                             // FIXME - this isn't a hard error necessarily, but our model isn't complex enough for non-TypedConst values to emerge
-                                            unimplemented!("Value::AsConst returned None (unexpectedly) when called from InferenceEngine::infer_var_expr");
+                                            unimplemented!(
+                                                "Value::AsConst returned None (unexpectedly) when called from InferenceEngine::infer_var_expr"
+                                            );
                                         }
                                     },
                                     Err(e) => {
@@ -777,7 +794,9 @@ impl InferenceEngine {
                     },
                     None => match &self.constraints[v.0] {
                         Constraints::Indefinite => Err(InferenceError::UnconstrainedVar(v)),
-                        Constraints::Invariant(..) => unreachable!("only Indefinite constraints should yield None for substitute_uvar_vtype"),
+                        Constraints::Invariant(..) => unreachable!(
+                            "only Indefinite constraints should yield None for substitute_uvar_vtype"
+                        ),
                     },
                 }
             }

@@ -279,7 +279,6 @@ impl NumRep {
     }
 }
 
-
 /// Value-level numeric constant with an accompanying representation.
 ///
 /// If the representation is `Auto`, the exact choice of concrete representation

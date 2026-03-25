@@ -578,7 +578,9 @@ impl ValueTypeExt {
             | ValueTypeExt::Empty
             | ValueTypeExt::ViewObj
             | ValueTypeExt::Base(_)
-            | ValueTypeExt::UnknownNumeric => unreachable!("excluded by depends_on_model short-circuit"),
+            | ValueTypeExt::UnknownNumeric => {
+                unreachable!("excluded by depends_on_model short-circuit")
+            }
         }
     }
 

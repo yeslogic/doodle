@@ -1,5 +1,7 @@
 //! Convenience functions for constructing numeric expressions
-use crate::numeric::core::{BasicBinOp, BasicUnaryOp, BinOp, Expr, MachineRep, TypedConst, UnaryOp};
+use crate::numeric::core::{
+    BasicBinOp, BasicUnaryOp, BinOp, Expr, MachineRep, TypedConst, UnaryOp,
+};
 
 /// Helper for `Expr::Const`
 pub fn expr_const(c: TypedConst) -> Expr {

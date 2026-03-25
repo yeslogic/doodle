@@ -2691,9 +2691,7 @@ impl TypeChecker {
     fn unify_utype_baseset(&mut self, ut: Rc<UType>, bs: BaseSet) -> TCResult<Constraint> {
         match ut.as_ref() {
             UType::Var(uv) => self.unify_var_baseset(*uv, bs),
-            UType::ExternVar(ext_v) => {
-                self.unify_extvar_baseset_as_constraint(*ext_v, bs)
-            }
+            UType::ExternVar(ext_v) => self.unify_extvar_baseset_as_constraint(*ext_v, bs),
             UType::Base(b) => {
                 let ret = bs.unify(&BaseSet::Single(*b))?.to_constraint();
                 Ok(ret)
@@ -2725,7 +2723,9 @@ impl TypeChecker {
         bs: BaseSet,
     ) -> TCResult<Constraint> {
         let IntType::Prim(pt) = self.resolve_extvar(ext_v)?;
-        if let Ok(bt) = pt.try_into() && bs.contains(bt) {
+        if let Ok(bt) = pt.try_into()
+            && bs.contains(bt)
+        {
             Ok(Constraint::Equiv(Rc::new(UType::Base(bt))))
         } else {
             Err(TCErrorKind::UnexpectedSolution(ext_v, pt, bs).into())

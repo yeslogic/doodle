@@ -3,6 +3,7 @@ use std::borrow::Cow;
 use std::ops::{Bound, RangeBounds};
 
 pub use crate::byte_set::ByteSet;
+pub use crate::numeric::eval::*;
 pub use crate::parser::{
     Parser, View,
     error::{PResult, ParseError},
@@ -11,7 +12,6 @@ pub use smallsorts::{
     self as allsorts,
     binary::{U8, U16Be, U32Be, U64Be, read::ReadArray},
 };
-pub use crate::numeric::eval::*;
 
 /// Trait implemented over marker-type proxies that implement the most natural parse for their
 pub trait CommonObject {

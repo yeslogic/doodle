@@ -7,8 +7,8 @@ use super::{AtomType, LocalType};
 use crate::bounds::Bounds;
 use crate::byte_set::ByteSet;
 use crate::codegen::rust_ast::{RustLt, RustParams, UseParams};
-use crate::{Arith, BaseKind, Endian, IntRel, Label, StyleHint, TypeHint, UnaryOp};
 use crate::numeric::elaborator::TypedExpr as TypedNumExpr;
+use crate::{Arith, BaseKind, Endian, IntRel, Label, StyleHint, TypeHint, UnaryOp};
 
 pub(crate) mod variables;
 

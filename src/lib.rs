@@ -319,9 +319,15 @@ impl Expr {
                 (ValueType::Base(b1), ValueType::Base(b2)) if b1 == b2 && b1.is_numeric() => {
                     Ok(ValueType::Base(b1))
                 }
-                (ValueType::Base(b), ValueType::UnknownNumeric) |
-                (ValueType::UnknownNumeric, ValueType::Base(b)) if b.is_numeric() => Ok(ValueType::Base(b)),
-                (ValueType::UnknownNumeric, ValueType::UnknownNumeric) => Ok(ValueType::UnknownNumeric),
+                (ValueType::Base(b), ValueType::UnknownNumeric)
+                | (ValueType::UnknownNumeric, ValueType::Base(b))
+                    if b.is_numeric() =>
+                {
+                    Ok(ValueType::Base(b))
+                }
+                (ValueType::UnknownNumeric, ValueType::UnknownNumeric) => {
+                    Ok(ValueType::UnknownNumeric)
+                }
                 (x, y) => Err(anyhow!(
                     "mismatched operand types for {_arith:?}: {x:?}, {y:?}"
                 )),
