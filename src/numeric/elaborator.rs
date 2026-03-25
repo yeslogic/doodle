@@ -14,6 +14,31 @@ pub enum PrimInt {
     I64,
 }
 
+impl PrimInt {
+    pub const fn is_signed(self) -> bool {
+        matches!(self, PrimInt::I8 | PrimInt::I16 | PrimInt::I32 | PrimInt::I64)
+    }
+
+    pub const fn to_static_str(self) -> &'static str {
+        match self {
+            PrimInt::U8 => "u8",
+            PrimInt::U16 => "u16",
+            PrimInt::U32 => "u32",
+            PrimInt::U64 => "u64",
+            PrimInt::I8 => "i8",
+            PrimInt::I16 => "i16",
+            PrimInt::I32 => "i32",
+            PrimInt::I64 => "i64",
+        }
+    }
+}
+
+impl std::fmt::Display for PrimInt {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_static_str())
+    }
+}
+
 impl From<MachineUint> for PrimInt {
     fn from(value: MachineUint) -> Self {
         match value {
@@ -42,21 +67,6 @@ impl serde::Serialize for PrimInt {
         S: serde::Serializer,
     {
         serializer.serialize_str(self.to_static_str())
-    }
-}
-
-impl PrimInt {
-    pub const fn to_static_str(self) -> &'static str {
-        match self {
-            PrimInt::U8 => "u8",
-            PrimInt::U16 => "u16",
-            PrimInt::U32 => "u32",
-            PrimInt::U64 => "u64",
-            PrimInt::I8 => "i8",
-            PrimInt::I16 => "i16",
-            PrimInt::I32 => "i32",
-            PrimInt::I64 => "i64",
-        }
     }
 }
 

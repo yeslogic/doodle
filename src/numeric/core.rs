@@ -1208,6 +1208,18 @@ pub mod strategy {
                 ie.reify(v.into()).is_some() && x.eval_strict().is_ok_and(|x| x.is_valid())
             })
     }
+
+    pub fn unsigned_expr() -> impl Strategy<Value = Expr> {
+        machine_uint_strategy()
+            .prop_flat_map(|rep| arb_expr_with_rep(rep))
+            .prop_filter("exprs must be well-typed", |x| {
+                let mut ie = crate::typecheck::inference::InferenceEngine::new();
+                let Ok((v, _)) = ie.infer_var_expr(x) else {
+                    return false;
+                };
+                ie.reify(v.into()).is_some_and(|t| !t.to_prim().is_signed()) && x.eval_strict().is_ok_and(|x| x.is_valid())
+            })
+    }
 }
 
 #[cfg(test)]

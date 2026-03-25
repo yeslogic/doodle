@@ -18,7 +18,7 @@ use crate::{
     codegen::{model::traits::TraitObject, util::FxHash},
     decoder::extract_pair,
     parser::error::TraceHash,
-    typecheck::{TypeChecker, UType, UVar, WHNFSolution},
+    typecheck::{ExtVar, TypeChecker, UType, UVar, WHNFSolution},
     valuetype::{SeqBorrowHint, ValueType},
 };
 
@@ -3972,6 +3972,7 @@ impl<'a> Generator<'a> {
 pub struct Elaborator<'a> {
     module: &'a FormatModule,
     next_index: usize,
+    next_ext_index: usize,
     t_formats: StableMap<usize, Rc<GTFormat>, BTree>,
     tc: TypeChecker,
     codegen: CodeGen,
@@ -3986,14 +3987,30 @@ impl<'a> Elaborator<'a> {
         ret
     }
 
-    /// Increment the current `tree_index` by 1.
+    /// Increment the current `next_ext_index` by 1 and return its un-incremented value.
+    pub fn get_and_increment_ext_index(&mut self) -> usize {
+        let ret = self.next_ext_index;
+        self.next_ext_index += 1;
+        ret
+    }
+
+    /// Increment the current `next_index` by 1.
     pub fn increment_index(&mut self) {
         self.next_index += 1;
+    }
+
+    pub fn increment_ext_index(&mut self) {
+        self.next_ext_index += 1;
     }
 
     /// Return the current `tree_index` without mutation.
     pub fn get_index(&self) -> usize {
         self.next_index
+    }
+
+    /// Return the current `ext_index` without mutation.
+    pub fn get_ext_index(&self) -> usize {
+        self.next_ext_index
     }
 
     fn elaborate_dynamic_format(&mut self, dynf: &DynFormat) -> TypedDynFormat<GenType> {
@@ -4097,6 +4114,7 @@ impl<'a> Elaborator<'a> {
         Self {
             module,
             next_index: 0,
+            next_ext_index: 0,
             t_formats: Default::default(),
             tc,
             codegen,
@@ -4607,24 +4625,16 @@ impl<'a> Elaborator<'a> {
         )
     }
 
-    fn get_engine_from_index(
+    fn get_engine_from_ext_index(
         &mut self,
-        index: usize,
-    ) -> Option<&mut crate::numeric::elaborator::ElabRc> {
-        use super::typecheck::Expansion;
-        let var = UVar::new(index);
-        let var = self.tc.get_canonical_uvar(var);
-        match self.tc.expand_var(var) {
-            Expansion::Outcome(ext_var) => {
-                let ent = self.embeds.entry(ext_var.to_usize()).or_insert_with(|| {
-                    let ie = self.tc.get_extern(ext_var);
-                    let elab = crate::numeric::elaborator::ElabRc::new(ie.clone());
-                    elab
-                });
-                Some(ent)
-            }
-            _ => None,
-        }
+        ext_index: usize,
+    ) -> &mut crate::numeric::elaborator::ElabRc {
+        let ent = self.embeds.entry(ext_index).or_insert_with(|| {
+            let ie = self.tc.get_extern(ExtVar::new(ext_index));
+            let elab = crate::numeric::elaborator::ElabRc::new(ie.clone());
+            elab
+        });
+        ent
     }
 
     fn elaborate_expr(&mut self, expr: &Expr) -> GTExpr {
@@ -4643,10 +4653,8 @@ impl<'a> Elaborator<'a> {
             Expr::U32(n) => TypedExpr::U32(*n),
             Expr::U64(n) => TypedExpr::U64(*n),
             Expr::Numeric(n) => {
-                // WIP[epic=embedded-num] - engine retrieval model needs more work
-                let Some(engine) = self.get_engine_from_index(index) else {
-                    panic!("failed to get numeric engine for numeric subtree");
-                };
+                let ext_index = self.get_and_increment_ext_index();
+                let engine = self.get_engine_from_ext_index(ext_index);
                 let elab_n = engine
                     .elaborate_expr_as::<GenType>(n)
                     .expect("failed to elaborate numeric expression");
@@ -5443,24 +5451,27 @@ mod tests {
         output.len() > 0
     }
 
-    proptest! {
-        #[test]
-        fn test_numtree_codegen_proptest(tree in crate::numeric::core::strategy::any_expr()) {
+    #[test]
+    fn test_numtree_codegen_proptest() {
+        let log = std::fs::File::create("pbt.log").unwrap();
+        let handle = std::cell::RefCell::new(log);
+        proptest!(|(tree in crate::numeric::core::strategy::unsigned_expr())| {
+        let mut log = handle.borrow_mut();
             use std::io::Write;
-            let mut log = std::fs::File::options().create(true).append(true).open("pbt.log").unwrap();
             writeln!(&mut log, "## {}", crate::numeric::printer::show_expr(&tree)).unwrap();
             let mut module = FormatModule::new();
             let f = module.define_format("test.arb", compute(Expr::Numeric(Box::new(tree))));
-            // let g = module.define_format("test.arb2", record([
-            //     ("a", f.call()),
-            //     ("b", compute(succ(var("a")))),
-            // ]));
-            let output = produce_string_gencode(&module, &f.call());
+            let g = module.define_format("test.arb2", record([
+                ("a", f.call()),
+                ("b", compute(succ(var("a")))),
+            ]));
+            let output = produce_string_gencode(&module, &g.call());
             writeln!(&mut log, "{}", output).unwrap();
             writeln!(&mut log, "\n\n").unwrap();
             prop_assert!(is_valid_output(&output))
-        }
+        })
     }
+
 }
 
 mod __impls {
