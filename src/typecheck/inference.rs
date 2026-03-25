@@ -121,17 +121,18 @@ pub enum InferenceError {
     NoSolution,
     MultipleSolutions,
     Eval(crate::numeric::core::EvalError),
+    UnconstrainedVar(UVar),
 }
 
 impl std::fmt::Display for InferenceError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            // InferenceError::Unrepresentable(c, int_type) => write!(f, "inference requires that `{}` be assigned type `{}`, which cannot represent it", c, int_type),
             InferenceError::BadUnification(cx1, cx2) => write!(f, "constraints `{}` and `{}` cannot be unified", cx1, cx2),
             InferenceError::Ambiguous => write!(f, "mixed-type binary operation must have out_rep on operation to avoid ambiguity"),
             InferenceError::Eval(e) => write!(f, "inference abandoned due to evaluation error: {}", e),
             InferenceError::NoSolution => write!(f, "no valid assignment of PrimInt types produce a fully representable tree"),
             InferenceError::MultipleSolutions => write!(f, "multiple assignments of PrimInt produce a fully representable tree, in absence of tie-breaking mechanism"),
+            InferenceError::UnconstrainedVar(v) => write!(f, "unconstrained variable {v} cannot be solved"),
         }
     }
 }
@@ -762,28 +763,30 @@ impl InferenceEngine {
 }
 
 impl InferenceEngine {
-    pub fn reify(&self, t: NUType) -> Option<IntType> {
+    pub fn reify_err(&self, t: NUType) -> InferenceResult<IntType> {
         match t {
             NUType::Var(uv) => {
                 let v = self.get_canonical_uvar(uv);
-                match self.substitute_uvar_vtype(v) {
-                    Ok(Some(t0)) => match t0 {
-                        NVType::Int(int_type) => Some(int_type),
-                        NVType::Within(bounds) => match Constraint::get_unique_solution(
+                match self.substitute_uvar_vtype(v)? {
+                    Some(t0) => match t0 {
+                        NVType::Int(int_type) => Ok(int_type),
+                        NVType::Within(bounds) => Constraint::get_unique_solution(
                             &Constraint::Encompasses(bounds.clone()),
-                        ) {
-                            Ok(int_type) => Some(int_type),
-                            Err(_) => None,
-                        },
-                        NVType::Abstract(utype) => self.reify(utype),
+                        ),
+                        NVType::Abstract(utype) => self.reify_err(utype),
                     },
-                    Err(_) => None,
-                    Ok(None) => match &self.constraints[v.0] {
-                        _ => None,
+                    None => match &self.constraints[v.0] {
+                        Constraints::Indefinite => Err(InferenceError::UnconstrainedVar(v)),
+                        Constraints::Invariant(..) => unreachable!("only Indefinite constraints should yield None for substitute_uvar_vtype"),
                     },
                 }
             }
-            NUType::Int(i) => Some(i),
+            NUType::Int(i) => Ok(i),
         }
+    }
+
+    #[inline(always)]
+    pub fn reify(&self, t: NUType) -> Option<IntType> {
+        self.reify_err(t).ok()
     }
 }

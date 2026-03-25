@@ -4,13 +4,21 @@ use crate::{
     Arith, BaseType, DynFormat, Expr, Format, FormatModule, Label, Pattern, UnaryOp, ValueType,
     ViewExpr, ViewFormat,
 };
-use std::cell::RefCell;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     rc::Rc,
 };
 
 pub(crate) mod inference;
+use crate::numeric::elaborator::{IntType, PrimInt};
+
+/// Helper function for constructing a tuple of the form `(min(a, b), max(a, b))`.
+///
+/// Used primarily for case-analysis in aliasing logic.
+#[inline(always)]
+fn min_max<T: PartialOrd>(a: T, b: T) -> (T, T) {
+    if a < b { (a, b) } else { (b, a) }
+}
 
 mod scope {
     use std::collections::BTreeSet;
@@ -654,92 +662,6 @@ impl Constraint {
     }
 }
 
-/// Aggregate context-free constraint-set to store for ExtVars
-#[derive(Clone, Debug, Default)]
-pub struct ExtConstraintSet {
-    eq_vars: Option<BTreeSet<UVar>>,
-    eq_exts: Option<BTreeSet<ExtVar>>,
-    el_single: Option<BaseType>,
-    el_uintset: Option<UintSet>,
-}
-
-impl ExtConstraintSet {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    #[expect(unused)]
-    pub fn is_empty(&self) -> bool {
-        self.eq_vars.as_ref().is_none_or(|v| v.is_empty())
-            && self.eq_exts.as_ref().is_none_or(|v| v.is_empty())
-            && self.el_single.is_none()
-            && self.el_uintset.is_none()
-    }
-
-    pub fn merge(&mut self, other: &ExtConstraintSet) -> TCResult<()> {
-        self.eq_vars
-            .get_or_insert_with(BTreeSet::new)
-            .extend(other.eq_vars.iter().flatten());
-        self.eq_exts
-            .get_or_insert_with(BTreeSet::new)
-            .extend(other.eq_exts.iter().flatten());
-        if let Some(a) = self.el_single
-            && let Some(b) = other.el_single
-            && a != b
-        {
-            return Err(TCErrorKind::Unification(UnificationError::Unsatisfiable(
-                Constraint::Elem(BaseSet::Single(a)),
-                Constraint::Elem(BaseSet::Single(b)),
-            ))
-            .into());
-        } else {
-            self.el_single = self.el_single.or(other.el_single)
-        }
-        if let Some(a) = self.el_uintset && let Some(b) = other.el_uintset {
-            self.el_uintset = Some(a.intersection(b));
-        } else {
-            self.el_uintset = self.el_uintset.or(other.el_uintset);
-        }
-        Ok(())
-    }
-
-    #[expect(dead_code)]
-    pub fn insert(&mut self, constraint: Constraint, ext: ExtVar) -> TCResult<()> {
-        let other = Self::lift(constraint, ext)?;
-        self.merge(&other)
-    }
-
-    pub fn lift(constraint: Constraint, ext: ExtVar) -> TCResult<Self> {
-        let mut this = Self::new();
-        let constraint = constraint.normalize();
-        match &constraint {
-            Constraint::Equiv(ut) => match ut.as_ref() {
-                UType::Var(v) => {
-                    this.eq_vars = Some(BTreeSet::from([*v]));
-                }
-                UType::ExternVar(e) => {
-                    if *e != ext {
-                        this.eq_exts = Some(BTreeSet::from([*e]));
-                    }
-                }
-                _ => return Err(TCErrorKind::NonNumericEmbedded(
-                    ext,
-                    constraint,
-                ).into()),
-            },
-            Constraint::Elem(set) => match set {
-                BaseSet::Single(b) => this.el_single = Some(*b),
-                BaseSet::U(s) => this.el_uintset = Some(*s),
-            }
-            Constraint::Proj(..) => return Err(TCErrorKind::NonNumericEmbedded(
-                ext,
-                constraint,
-            ).into()),
-        }
-        Ok(this)
-    }
-}
-
 /// Type representing each possible shape of a projective constraint on a higher-order metavariable
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ProjShape {
@@ -784,6 +706,7 @@ impl ProjShape {
 pub mod base_set {
     use super::*;
     use crate::BaseType;
+    use crate::numeric::elaborator::PrimInt;
 
     /// Abstraction over explicit collections of BaseType values that could be in any order
     #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -795,6 +718,38 @@ pub mod base_set {
     }
 
     impl BaseSet {
+        pub fn contains(self, base: BaseType) -> bool {
+            match self {
+                BaseSet::Single(b) => b == base,
+                BaseSet::U(us) => us.contains(base),
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct TryFromSignedPrimIntError(PrimInt);
+
+    impl std::fmt::Display for TryFromSignedPrimIntError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "unable to convert signed-integer-type {}", self.0)
+        }
+    }
+
+    impl TryFrom<PrimInt> for BaseType {
+        type Error = TryFromSignedPrimIntError;
+
+        fn try_from(value: PrimInt) -> Result<Self, Self::Error> {
+            match value {
+                PrimInt::U8 => Ok(BaseType::U8),
+                PrimInt::U16 => Ok(BaseType::U16),
+                PrimInt::U32 => Ok(BaseType::U32),
+                PrimInt::U64 => Ok(BaseType::U64),
+                _ => Err(TryFromSignedPrimIntError(value)),
+            }
+        }
+    }
+
+    impl BaseSet {
         #[allow(non_upper_case_globals)]
         pub const UAny: Self = Self::U(UintSet::ANY);
 
@@ -802,6 +757,7 @@ pub mod base_set {
         pub const USome: Self = Self::U(UintSet::ANY32);
     }
 
+    // REVIEW - merge candidate with crate::numeric::core::BitWidth
     #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
     pub enum IntWidth {
         Bits8 = 0,
@@ -842,7 +798,9 @@ pub mod base_set {
     /// unless it is tied with anything else.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub enum Rank {
+        /// The value is not in the set
         Excluded,
+        /// The value is in the set and has priority rank `n` (lower numbers are higher priority)
         At(u8),
     }
 
@@ -936,6 +894,8 @@ pub mod base_set {
             self.ranks[b.int_width() as usize] != Rank::Excluded
         }
 
+        /// Normalizes all inhabited ranks such that the lowest rank is `Rank::At(0)`,
+        /// and each successive rank-value is exactly one more than its predecessor.
         pub fn normalize(self) -> Self {
             let mut ranks = self.ranks;
             for rank in ranks.iter_mut() {
@@ -949,6 +909,8 @@ pub mod base_set {
             Self { ranks }
         }
 
+        /// Returns a `UintSet` whose solution-set is the intersection of `self` and `other`,
+        /// using the lower-priority rank for each member-element that neither one excludes.
         pub fn intersection(self, other: Self) -> Self {
             let mut ranks = [Rank::Excluded; 4];
             let this = self.normalize();
@@ -962,10 +924,18 @@ pub mod base_set {
             Self { ranks }.normalize()
         }
 
+        /// Returns `true` if the solution-set of `self` is empty.
         pub fn is_empty(&self) -> bool {
             self.ranks == [Rank::Excluded; 4]
         }
 
+        /// Given a `UintSet`, determines the unique solution it has, if any.
+        ///
+        /// If multiple solutions exist, but there is one solution with a higher-priority
+        /// rank than all others, that solution is returned.
+        ///
+        /// If no solutions exist (i.e. the set is empty), or if there is more than one
+        /// solution ascribed with the highest-priority rank, then `None` is returned.
         pub fn get_unique_solution(self) -> Option<BaseType> {
             let this = self.normalize();
             let mut candidate = None;
@@ -1116,6 +1086,17 @@ pub mod base_set {
             }
         }
 
+        /// Returns `Some(UType)` if `self` is a singleton `BaseSet`, and `None` otherwise.
+        ///
+        /// Will not attempt to solve the set if it is not an explicit singleton, i.e. `BaseSet::U` regardless
+        /// of whether it has a unique solution.
+        pub fn try_to_utype(self) -> Option<Rc<UType>> {
+            match self {
+                BaseSet::Single(b) => Some(Rc::new(UType::Base(b))),
+                BaseSet::U(_) => None,
+            }
+        }
+
         pub(crate) fn get_unique_solution(&self, v: UVar) -> TCResult<BaseType> {
             match self {
                 BaseSet::Single(b) => Ok(*b),
@@ -1152,7 +1133,7 @@ pub enum NumSolution {
     /// Solution has been found but was elided due to aliasing; should not be stored for canonical ExtVars
     Elided,
     /// Canonical solution-state before elision is performed on non-canonical ExtVars
-    Solved(Option<crate::numeric::elaborator::IntType>),
+    Solved(crate::numeric::elaborator::IntType),
 }
 
 impl std::fmt::Display for NumSolution {
@@ -1160,13 +1141,7 @@ impl std::fmt::Display for NumSolution {
         match self {
             NumSolution::Unsolved => write!(f, "⁇"),
             NumSolution::Elided => write!(f, "…"),
-            NumSolution::Solved(sol) => {
-                if let Some(sol) = sol {
-                    write!(f, "{sol}")
-                } else {
-                    write!(f, "⊥")
-                }
-            }
+            NumSolution::Solved(sol) => write!(f, "{sol}"),
         }
     }
 }
@@ -1176,7 +1151,6 @@ pub(crate) struct EmbeddedResolver {
     subtrees: Vec<Rc<inference::InferenceEngine>>,
     aliases: Vec<Alias>,
     outcomes: HashMap<ExtVar, NumSolution>,
-    constraints: HashMap<ExtVar, Rc<RefCell<ExtConstraintSet>>>,
 }
 
 // SECTION - EmbeddedResolver core functionality
@@ -1187,7 +1161,6 @@ impl EmbeddedResolver {
             subtrees: Vec::new(),
             aliases: Vec::new(),
             outcomes: HashMap::new(),
-            constraints: HashMap::new(),
         }
     }
 
@@ -1196,7 +1169,7 @@ impl EmbeddedResolver {
         let ext_var = ExtVar(self.subtrees.len());
         self.subtrees.push(Rc::new(engine));
         self.aliases.push(Alias::new());
-        // NOTE - we leave constraints and outcomes alone because they they are keyed, not indexed linearly
+        // NOTE - we leave outcomes alone because it is keyed, not indexed linearly
         ext_var
     }
 }
@@ -1204,16 +1177,116 @@ impl EmbeddedResolver {
 
 // SECTION - methods related to querying outcomes on individual ExtVars
 impl EmbeddedResolver {
+    pub(crate) fn solve(&mut self, ext: ExtVar) -> TCResult<crate::numeric::elaborator::IntType> {
+        match self.outcomes.get(&ext) {
+            None | Some(NumSolution::Unsolved) => {
+                match &self.aliases[ext.0] {
+                    a @ (Alias::Canonical(_) | Alias::Ground) => {
+                        let sol = self.solve_standalone(ext)?;
+                        // if ground, this iteration will be a no-op
+                        {
+                            // we have to collect the indices beforehand to avoid borrow-conflicts
+                            let other_vars = a.iter_fwd_refs().map(ExtVar).collect::<Vec<_>>();
+                            for other_var in other_vars {
+                                self.solve_and_elide(other_var, sol)?;
+                            }
+                        }
+                        self.outcomes.insert(ext, NumSolution::Solved(sol));
+                        Ok(sol)
+                    }
+                    Alias::BackRef(can_ix) => {
+                        let can = ExtVar(*can_ix);
+                        match self.peek_solution(can) {
+                            NumSolution::Elided => {
+                                unreachable!("invalid state: elided solution on canonical alias")
+                            }
+                            NumSolution::Unsolved => {
+                                // if the canonical alias has not been solved yet, we solve it and update all its forward-refs to Elided (if they agree on the same solution)
+                                let sol = self.solve_standalone(ext)?;
+                                // if ground, this iteration will be a no-op
+                                {
+                                    // we have to collect the indices beforehand to avoid borrow-conflicts
+                                    let other_vars = self.aliases[*can_ix]
+                                        .iter_fwd_refs()
+                                        .map(ExtVar)
+                                        .collect::<Vec<_>>();
+                                    for other_var in other_vars {
+                                        self.solve_and_elide(other_var, sol)?;
+                                    }
+                                }
+                                self.outcomes.insert(ext, NumSolution::Solved(sol));
+                                Ok(sol)
+                            }
+                            NumSolution::Solved(sol) => {
+                                // since sol already exists, we assume all other aliases agree
+                                self.solve_and_elide(ext, sol)?;
+                                Ok(sol)
+                            }
+                        }
+                    }
+                }
+            }
+            Some(NumSolution::Elided) => {
+                let can = self.get_canonical_extvar(ext);
+                assert!(
+                    can < ext,
+                    "canonical alias {can} must be less than non-canonical {ext} (based on Elided)"
+                );
+                self.solve(can)
+            }
+            Some(NumSolution::Solved(sol)) => Ok(*sol),
+        }
+    }
+
+    /// Performs standalone inference to determine the solution for `ext`.
+    ///
+    /// Should only be called when no outcome is registered, either on `ext` or its canonical alias.
+    ///
+    /// Does not mutate the resolver (i.e. no alias-updates or outcome-updates).
+    fn solve_standalone(&self, ext: ExtVar) -> TCResult<crate::numeric::elaborator::IntType> {
+        let engine = self.subtrees[ext.0].clone();
+        engine
+            .reify_err(UVar(0).into())
+            .map_err(|e| TCErrorKind::Inference(ext, e).into())
+    }
+
+    /// Given a non-canonical ExtVar `ext` and a canonical-alias solution `sol`, performs the necessary
+    /// checks and updates according to the following:
+    ///
+    ///   - If the outcome `ext` is already `Elided`, does nothing and returns early.
+    ///   - If the outcome `ext` is not Solved, solves it.
+    ///   - Once a non elided-solution for `ext` is found, ensures it is equal to `sol`, and then replaces with `Elided`.
+    fn solve_and_elide(
+        &mut self,
+        ext: ExtVar,
+        sol: crate::numeric::elaborator::IntType,
+    ) -> TCResult<()> {
+        let sol1 = match self.outcomes.get(&ext) {
+            Some(NumSolution::Elided) => return Ok(()),
+            Some(NumSolution::Unsolved) | None => self.solve_standalone(ext)?,
+            Some(NumSolution::Solved(sol1)) => *sol1,
+        };
+        if sol == sol1 {
+            self.outcomes.insert(ext, NumSolution::Elided);
+            Ok(())
+        } else {
+            Err(TCErrorKind::IrreconcilableNumSolutions(
+                NumSolution::Solved(sol),
+                NumSolution::Solved(sol1),
+            )
+            .into())
+        }
+    }
+
     /// Returns the current solution-state for `ext`, or that of its canonical alias if it is a non-canonical alias
     /// with an elided solution.
     ///
     /// Does not mutate the resolver, perform any new inference, or enforce any constraints or alias-unifications.
-    #[expect(dead_code)]
     fn peek_solution(&self, ext: ExtVar) -> NumSolution {
         match self.outcomes.get(&ext) {
             None | Some(NumSolution::Unsolved) => NumSolution::Unsolved,
             Some(NumSolution::Elided) => {
-                let can = self.get_canonical_ext_var(ext);
+                let can = self.get_canonical_extvar(ext);
                 assert!(
                     can < ext,
                     "canonical alias {can} must be less than non-canonical {ext} (based on Elided)"
@@ -1228,27 +1301,29 @@ impl EmbeddedResolver {
     /// associated with, storing the novel answer and returning it.
     ///
     /// Additionally returns a boolean value that indicates whether the solution was novel (i.e. whether
-    /// it was solved as a result of this method's invocation). If `true`, any constraints or alias-unifications
-    /// the caller is responsible for enforcing must be performed; otherwise, `false` is returned.
+    /// it was solved as a result of this method's invocation).
+    ///  - If `true`, the caller should perform any alias-unifications required byh novel solutions.
+    ///  - If `false`, the solution was already recorded, and so no updates should be necessary.
+    ///
+    /// This function does not perform any alias unifications or updates; however,
+    /// in the case of unsolved subtrees, this function will update the `outcomes` table
+    /// accordingly, for the single-variable in question.
     ///
     /// Recurses if `ext` is a non-canonical alias with an `Elided` solution.
-    fn force_outcome(&mut self, ext: ExtVar) -> TCResult<(NumSolution, bool)> {
+    fn ensure_outcome(&mut self, ext: ExtVar) -> TCResult<(NumSolution, bool)> {
+        // FIXME - there are various checks being skipped, e.g. elided => canonical recursion must be solved, etc.
         let sol = self.outcomes.get(&ext).copied().unwrap_or_default();
         match sol {
             NumSolution::Elided => {
-                let can = self.get_canonical_ext_var(ext);
+                let can = self.get_canonical_extvar(ext);
                 assert!(
                     can < ext,
                     "canonical alias {can} must be less than non-canonical {ext} (based on Elided)"
                 );
-                self.force_outcome(can)
+                self.ensure_outcome(can)
             }
             NumSolution::Unsolved => {
-                let ie = self.subtrees[ext.0].clone();
-                let ret = ie.reify(UVar(0).into());
-                if ret.is_none() {
-                    // FIXME[epic=embedded-num] - placeholder for any special-case handling of extvars that are insoluble as-is
-                }
+                let ret = self.solve_standalone(ext)?;
                 let sol = NumSolution::Solved(ret);
                 self.outcomes.insert(ext, sol);
                 Ok((sol, true))
@@ -1299,7 +1374,7 @@ impl EmbeddedResolver {
                     NumSolution::Elided | NumSolution::Unsolved => Ok(()),
                     sol_hi @ NumSolution::Solved(_) => {
                         // force the canonical ext-var to be solved, and reconcile with it
-                        self.force_outcome(ExtVar(ix))?;
+                        self.ensure_outcome(ExtVar(ix))?;
                         let sol_lo = self.outcomes.entry(ExtVar(ix)).or_default();
                         let (sol0, sol1) = Self::reconcile_solution_pair((*sol_lo, sol_hi), false)?;
                         // REVIEW[epic=embedded-num] - do we need to check on the values of sol0 and sol1 beyond equality?
@@ -1332,7 +1407,7 @@ impl EmbeddedResolver {
     /// This method is only suitable for lookups of root-solutions for mutual-satisfiability
     /// of External and natural constraints. It should not be used for elaboration purposes, as even two
     /// aliased ext-vars are not interchangeable when crawling their respective sub-trees for recursive elaboration.
-    pub(crate) fn get_canonical_ext_var(&self, ext_v: ExtVar) -> ExtVar {
+    pub(crate) fn get_canonical_extvar(&self, ext_v: ExtVar) -> ExtVar {
         match self.aliases[ext_v.0] {
             Alias::Canonical(_) | Alias::Ground => ext_v,
             Alias::BackRef(ix) => ExtVar(ix),
@@ -1346,100 +1421,124 @@ impl EmbeddedResolver {
     /// Returns an error if the implied equivalence cannot be satisfied.
     fn resolve_alias(&mut self, v1: ExtVar, v2: ExtVar) -> TCResult<NumSolution> {
         if v1 == v2 {
-            let sol = self.outcomes.get(&v1).copied().unwrap_or_default();
+            let sol = *self.outcomes.entry(v1).or_default();
             return Ok(sol);
         }
 
-        // NOTE - even if the solutions for the sub-trees are the same, the equivalence between them
-        // does not obviate the need to store both inference-engines for individual elaboration.
-
-        // short-circuit if already equated
         match (&self.aliases[v1.0], &self.aliases[v2.0]) {
             (Alias::Ground, Alias::Ground) => {
-                if v1 < v2 {
-                    unsafe {
-                        self.repoint(v1.0, v2.0);
-                        self.synchronize_outcomes(v1.0, v2.0)
-                    }
+                /*
+                 * Ground-Ground: simple repoint that makes the lower-indexed ext-var canonical,
+                 * and ensures that their outcomes are synchronized.
+                 */
+                let (lo, hi) = min_max(v1.0, v2.0);
+                unsafe { self.insert_ground(lo, hi) }
+            }
+            (Alias::Ground, &Alias::BackRef(can_ix)) => {
+                /*
+                 * x = Ground, y = BackRef(z):
+                 *   if x > z, then insert x into the alias-group of z and synchronize outcomes of z and x
+                 *   if x < z, then have x inherit canonical status of z using recanonicalize
+                 *   (panic if x = z: impossible because x-|<-y would then be only half-aliased)
+                 */
+                if v1.0 > can_ix {
+                    let lo = can_ix;
+                    let hi = v1.0;
+                    unsafe { self.insert_ground(lo, hi) }
+                } else if v1.0 < can_ix {
+                    let lo = v1.0;
+                    let hi = can_ix;
+                    debug_assert!(
+                        self.aliases[hi].is_canonical_nonempty(),
+                        "half-alias ?{hi}-|<-{v2}"
+                    );
+                    debug_assert!(
+                        !self.aliases[hi].contains_fwd_ref(lo),
+                        "retrograde half-aliased 'forward' ref ?{hi}->|-{v1}"
+                    );
+                    unsafe { self.recanonicalize(lo, hi) }
                 } else {
-                    unsafe {
-                        self.repoint(v2.0, v1.0);
-                        self.synchronize_outcomes(v2.0, v1.0)
-                    }
+                    // we can only get here if v1.0 == can_ix, but this is not valid as v1 should then be Canonical and not Ground
+                    unreachable!("unexpected half-alias {v1}-|<-{v2}");
                 }
             }
-            (Alias::Ground, &Alias::BackRef(can_ix)) if v1.0 > can_ix => unsafe {
-                self.repoint(can_ix, v1.0);
-                self.synchronize_outcomes(can_ix, v1.0)
-            },
-            (Alias::Ground, &Alias::BackRef(can_ix)) if v1.0 < can_ix => {
-                debug_assert!(
-                    self.aliases[can_ix].is_canonical_nonempty(),
-                    "half-alias ?{can_ix}-|<-{v2}"
-                );
-                debug_assert!(
-                    !self.aliases[can_ix].contains_fwd_ref(v1.0),
-                    "retrograde half-aliased 'forward' ref ?{can_ix}->|-{v1}"
-                );
-                unsafe { self.recanonicalize(v1.0, can_ix) }
-            }
-            (Alias::Ground, &Alias::BackRef(_can_ix)) => {
-                // we can only get here if v1.0 == can_ix, but this is not valid as v1 ought be Canonical
-                unreachable!("unexpected half-alias {v1}-|<-{v2}");
-            }
-            (&Alias::BackRef(can_ix), Alias::Ground) if v2.0 > can_ix => unsafe {
-                self.repoint(can_ix, v2.0);
-                self.synchronize_outcomes(can_ix, v2.0)
-            },
-            (&Alias::BackRef(can_ix), Alias::Ground) if v2.0 < can_ix => {
-                debug_assert!(
-                    self.aliases[can_ix].is_canonical_nonempty(),
-                    "half-alias ?{can_ix}-|<-{v1}"
-                );
-                debug_assert!(
-                    !self.aliases[can_ix].contains_fwd_ref(v2.0),
-                    "retrograde half-aliased 'forward' ref ?{can_ix}->|-{v2}"
-                );
-                unsafe { self.recanonicalize(v2.0, can_ix) }
-            }
-            (&Alias::BackRef(_can_ix), Alias::Ground) => {
-                unreachable!("unexpected half-alias {v2}-|<-{v1}");
+            (&Alias::BackRef(can_ix), Alias::Ground) => {
+                /*
+                 * x = BackRef(z), y = Ground:
+                 *   if y > z, then insert y into the alias-group of z and synchronize outcomes of z and y
+                 *   if y < z, then have y inherit canonical status of z using recanonicalize
+                 *   (panic if y = z: impossible because y-|<-x would then be only half-aliased)
+                 */
+                if v2.0 > can_ix {
+                    let lo = can_ix;
+                    let hi = v2.0;
+                    unsafe { self.insert_ground(lo, hi) }
+                } else if v2.0 < can_ix {
+                    let lo = v2.0;
+                    let hi = can_ix;
+                    debug_assert!(
+                        self.aliases[hi].is_canonical_nonempty(),
+                        "half-alias ?{hi}-|<-{v1}"
+                    );
+                    debug_assert!(
+                        !self.aliases[hi].contains_fwd_ref(lo),
+                        "retrograde half-aliased 'forward' ref ?{hi}->|-{v2}"
+                    );
+                    unsafe { self.recanonicalize(lo, hi) }
+                } else {
+                    unreachable!("unexpected half-alias {v2}-|<-{v1}");
+                }
             }
             (Alias::Ground, Alias::Canonical(_)) => {
+                /*
+                 * x = Ground, y = Canonical:
+                 *   if x < y, recanonicalize x for the alias-group of y and insert y into it, after synchronizing outcomes.
+                 *   if x > y, simply insert x into the alias-group for y without any shifts, and synchronize outcomes
+                 */
                 if v1.0 < v2.0 {
+                    let lo = v1.0;
+                    let hi = v2.0;
                     debug_assert!(
-                        !self.aliases[v2.0].contains_fwd_ref(v1.0),
+                        !self.aliases[hi].contains_fwd_ref(lo),
                         "retrograde half-aliased 'forward' ref {v2}->|-{v1}"
                     );
-                    unsafe { self.recanonicalize(v1.0, v2.0) }
+                    unsafe { self.recanonicalize(lo, hi) }
                 } else {
-                    unsafe {
-                        self.repoint(v2.0, v1.0);
-                        self.synchronize_outcomes(v2.0, v1.0)
-                    }
+                    // v2 < v1
+                    let lo = v2.0;
+                    let hi = v1.0;
+                    unsafe { self.insert_ground(lo, hi) }
                 }
             }
             (Alias::Canonical(_), Alias::Ground) => {
+                /*
+                 * x = Canonical, y = Ground:
+                 *   if x > y, recanonicalize y for the alias-group of x and insert x into it, after synchronizing outcomes.
+                 *   if x < y, simply insert y into the alias-group for x without any shifts, and synchronize outcomes
+                 */
                 if v2.0 < v1.0 {
+                    let lo = v2.0;
+                    let hi = v1.0;
                     debug_assert!(
                         !self.aliases[v1.0].contains_fwd_ref(v2.0),
                         "retrograde half-aliased 'forward' ref {v1}->|-{v2}"
                     );
-                    unsafe { self.recanonicalize(v2.0, v1.0) }
+                    unsafe { self.recanonicalize(lo, hi) }
                 } else {
-                    unsafe {
-                        self.repoint(v1.0, v2.0);
-                        self.synchronize_outcomes(v1.0, v2.0)
-                    }
+                    let lo = v1.0;
+                    let hi = v2.0;
+                    unsafe { self.insert_ground(lo, hi) }
                 }
             }
             (&Alias::BackRef(ix1), &Alias::BackRef(ix2)) => {
-                if ix1 < ix2 {
-                    unsafe { self.recanonicalize(ix1, ix2) }
-                } else if ix2 < ix1 {
-                    unsafe { self.recanonicalize(ix2, ix1) }
-                } else {
-                    // the two are equal so nothing needs to be changed; we will check both are forward-aliased, however
+                /*
+                 * x = BackRef(z), y = BackRef(w):
+                 *   if z < w, recanonicalize z for the alias-group of w
+                 *   if z > w, recanonicalize w for the alias-group of z
+                 *   if z = w, check that the alias-group is well-formed and return the outcome for z
+                 */
+                if ix1 == ix2 {
+                    // z = w, so x and y are in the same alias-group
                     let common = &self.aliases[ix1];
                     debug_assert!(
                         common.contains_fwd_ref(v1.0),
@@ -1449,65 +1548,94 @@ impl EmbeddedResolver {
                         common.contains_fwd_ref(v2.0),
                         "unexpected half-alias ?{ix1}<-{v2}"
                     );
-                    // WIP[epic=embedded-num] - unclear what to do to check all outcomes are the same without
-                    Ok(*self.outcomes.get(&v1).unwrap())
+                    let v0 = ExtVar(ix1);
+                    let Some(ret) = self.outcomes.get(&v0) else {
+                        // FIXME - in this case, do we want to insert an Unsolved outcome instead?
+                        unreachable!("canonical ext-var {v0} has no registered outcome");
+                    };
+                    Ok(*ret)
+                } else {
+                    let (lo, hi) = if ix1 < ix2 { (ix1, ix2) } else { (ix2, ix1) };
+                    unsafe { self.recanonicalize(lo, hi) }
                 }
             }
             (a1 @ Alias::BackRef(tgt), a2 @ Alias::Canonical(fwd_refs)) => {
-                let left = fwd_refs.contains(&v1.0);
-                let right = *tgt == v2.0;
+                /*
+                 * x = BackRef(z), y = Canonical(S):
+                 *   - if x ∈ S and y = z, return the outcome for y
+                 *   - if x ∉ s and y != z, recanonicalize the lesser of y and z for the alias-group of the greater
+                 *   - otherwise, panic due to inconsistent back- and forward-references
+                 */
+                let is_forward_aliased = fwd_refs.contains(&v1.0);
+                let is_backward_aliased = *tgt == v2.0;
 
-                match (left, right) {
+                match (is_forward_aliased, is_backward_aliased) {
                     (true, true) => {
                         return Ok(*self.outcomes.get(&v2).unwrap());
                     }
-                    (true, false) | (false, true) => unreachable!(
+                    (false, false) => {
+                        let z = *tgt;
+                        let y = v2.0;
+
+                        let (lo, hi) = if z < y { (z, y) } else { (y, z) };
+                        unsafe { self.recanonicalize(lo, hi) }
+                    }
+                    _ => unreachable!(
                         "mismatched back- and forward-references for {v1} ({a1:?}) and {v2} ({a2:?})"
                     ),
-                    (false, false) => (),
-                }
-
-                let ix1 = *tgt;
-                let ix2 = v2.0;
-
-                // check not the actual indices, but the canonical indices for tie-breaking
-                if ix1 < ix2 {
-                    unsafe { self.recanonicalize(ix1, ix2) }
-                } else {
-                    unsafe { self.recanonicalize(ix2, ix1) }
                 }
             }
             (a1 @ Alias::Canonical(fwd_refs), a2 @ Alias::BackRef(tgt)) => {
-                let left = fwd_refs.contains(&v2.0);
-                let right = *tgt == v1.0;
+                /*
+                 * x = Canonical(S), y = BackRef(z):
+                 *   - if y ∈ S and x = z, return the outcome for x
+                 *   - if y ∉ s and x != z, recanonicalize the lesser of x and z for the alias-group of the greater
+                 *   - otherwise, panic due to inconsistent back- and forward-references
+                 */
+                let is_forward_aliased = fwd_refs.contains(&v2.0);
+                let is_backward_aliased = *tgt == v1.0;
 
-                match (left, right) {
+                match (is_forward_aliased, is_backward_aliased) {
                     (true, true) => {
                         return Ok(*self.outcomes.get(&v1).unwrap());
                     }
-                    (true, false) | (false, true) => unreachable!(
+                    (false, false) => {
+                        let x = v1.0;
+                        let z = *tgt;
+
+                        let (lo, hi) = min_max(x, z);
+                        unsafe { self.recanonicalize(lo, hi) }
+                    }
+                    _ => unreachable!(
                         "mismatched forward- and back-references for {v1} ({a1:?}) and {v2} ({a2:?})"
                     ),
-                    (false, false) => (),
-                }
-
-                let ix1 = v1.0;
-                let ix2 = *tgt;
-
-                // check not the actual indices, but the canonical indices for tie-breaking
-                if ix1 < ix2 {
-                    unsafe { self.recanonicalize(ix1, ix2) }
-                } else {
-                    unsafe { self.recanonicalize(ix2, ix1) }
                 }
             }
             (Alias::Canonical(_), Alias::Canonical(_)) => {
-                if v1 < v2 {
-                    unsafe { self.recanonicalize(v1.0, v2.0) }
-                } else {
-                    unsafe { self.recanonicalize(v2.0, v1.0) }
-                }
+                /*
+                 * x = Canonical(S), y = Canonical(T): recanonicalize the lesser of x and y over the union of S and T
+                 */
+                let (lo, hi) = min_max(v1.0, v2.0);
+                unsafe { self.recanonicalize(lo, hi) }
             }
+        }
+    }
+
+    /// Rewrites the aliasing of `self` so that `lo<->hi` is enforced, where `lo` is canonical for its
+    /// alias-group and `hi` is ground-aliased, and `lo < hi`.
+    ///
+    /// Additionally synchronizes the outcomes between `lo` and `hi`.
+    ///
+    /// # Safety
+    ///
+    /// This method is not known to cause UB, but it is an internal-facing call that may lead to
+    /// corrupted alias-state if called in a context that does not check certain preconditions.
+    ///
+    /// In particular, these preconditions are: `lo < hi`, `lo` must be canonical, and `hi` must be ground-aliased.
+    unsafe fn insert_ground(&mut self, lo: usize, hi: usize) -> TCResult<NumSolution> {
+        unsafe {
+            self.repoint(lo, hi);
+            self.synchronize_outcomes(lo, hi)
         }
     }
 
@@ -1526,8 +1654,26 @@ impl EmbeddedResolver {
         self.aliases[lo].add_forward_ref(hi);
     }
 
-    /// Modifies the aliasing table of `self` so that the alias stored at `a1` is canonical and takes over
-    /// the old status of canonical `a2`, modifying its back-references and unifying with its constraints
+    /// Modifies the aliasing table of `self` to merge the aliasing-groups given by two
+    /// canonical indices `lo` and `hi`, where `lo` < `hi`; the new group's canonical element
+    /// will be `lo`, whose forward references will include:
+    ///     - All existing forward-references for the original alias-group of `lo`
+    ///     - All existing forward-references for the original alias-group of `hi`
+    ///     - The newly de-canonicalized `hi`
+    ///
+    /// Also ensures that all back-references of `hi` now point to `lo` instead, as well as that
+    /// `hi` itself becomes a back-ref to `lo`.
+    ///
+    /// In addition to fixing the aliasing-table, also synchronizes outcomes between `lo` and `hi`,
+    /// taken as representative members of the notionally-common solutions for the members of their
+    /// respective former aliasing groups.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if the aliasing-table is in an inconsistent state at the time of call
+    /// (specifically, if the aliasing-groups of `lo` and `hi` have a non-empty intersection),
+    /// or otherwise under the same conditions that [`Self::synchronize_outcomes`] panics:
+    /// `lo >= hi` or `lo` is non-canonical.
     ///
     /// # Safety
     ///
@@ -1536,21 +1682,23 @@ impl EmbeddedResolver {
     /// the call to this method, at least as a temporary linting-helper, to avoid unguarded calls from neutral contexts.
     ///
     /// Preconditions:
-    /// - `a1 < a2`
-    /// - `a1` has no back-references, and is allowed (but not required) to have forward-references
-    /// - `a2` has no back-references, and is allowed (but not required) to have forward-references
-    unsafe fn recanonicalize(&mut self, a1: usize, a2: usize) -> TCResult<NumSolution> {
-        let tmp = self.aliases[a2].set_backref(a1);
+    /// - `lo < hi`
+    /// - `lo` has no back-references; it is allowed (but not required) to have forward-references
+    /// - `hi` has no back-references; it is allowed (but not required) to have forward-references
+    unsafe fn recanonicalize(&mut self, lo: usize, hi: usize) -> TCResult<NumSolution> {
+        // tmp is the old aliasing-group of `hi` after overwriting `hi` to back-reference `lo`
+        let tmp = self.aliases[hi].set_backref(lo);
         let iter = tmp.iter_fwd_refs();
         for a in iter {
+            // double-checks that none of the members of the previous aliasing-group of `hi` are included in the aliasing-group of `lo`
             assert!(
-                !self.aliases[a1].contains_fwd_ref(a),
-                "forward ref of ?{a2} is also a forward ref of ?{a1}, somehow"
+                !self.aliases[lo].contains_fwd_ref(a),
+                "forward ref of ?{hi} is also a forward ref of ?{lo}, somehow"
             );
-            unsafe { self.repoint(a1, a) };
+            unsafe { self.repoint(lo, a) };
         }
-        self.aliases[a1].add_forward_ref(a2);
-        unsafe { self.synchronize_outcomes(a1, a2) }
+        self.aliases[lo].add_forward_ref(hi);
+        unsafe { self.synchronize_outcomes(lo, hi) }
     }
 
     /// Modifies internal state to establish all expected post-conditions of the novel aliasing `lo->|<-hi`.
@@ -1579,7 +1727,7 @@ impl EmbeddedResolver {
         assert!(self.is_canonical(lo));
 
         // ensure that the canonical ExtVar `#lo` does not have an unsolved subtree
-        let (_sol, _is_novel) = self.force_outcome(ExtVar(lo))?;
+        let (_sol, _is_novel) = self.ensure_outcome(ExtVar(lo))?;
 
         // If no solution has been inserted for `hi` yet, create an entry for it storing `NumSolution::Unsolved`.
         {
@@ -1597,50 +1745,7 @@ impl EmbeddedResolver {
         *lo_outcome = new_sol_lo;
         *hi_outcome = new_sol_hi;
 
-        // synchronize constraints between hi and lo as well
-        // FIXME[epic=embedded-num] - this alone might not be enough/correct
-        unsafe { self.transfer_constraints(lo, hi)? };
         Ok(new_sol_lo)
-    }
-
-    /// Ensures that all constraints on `a2` are inherited by `a1`, with the reverse occurring as a side-effect.
-    ///
-    /// # Safety
-    ///
-    /// While no inherently unsafe functions are called, the caller must ensure that certain preconditions are met,
-    unsafe fn transfer_constraints(&mut self, a1: usize, a2: usize) -> TCResult<()> {
-        let v1 = ExtVar(a1);
-        let v2 = ExtVar(a2);
-        if v1 == v2 {
-            return Ok(());
-        }
-
-        match (self.constraints.get(&v1), self.constraints.get(&v2)) {
-            (None, None) => {},
-            (None, Some(_)) => self.replace_constraints_from_index(v1, v2),
-            (Some(_), None) => self.replace_constraints_from_index(v2, v1),
-            (Some(c1), Some(c2)) => {
-                let c0 = c1.clone();
-                c0.borrow_mut().merge(&*c2.borrow())?;
-                let _ = self.overwrite_constraint_set(v1, c0.clone());
-                let _ = self.overwrite_constraint_set(v2, c0);
-            }
-        }
-        Ok(())
-    }
-
-    /// Overwrites the [`ExtConstraintSet`] for the specified key `tgt` with the immediate value at the specified key `src`, returning
-    /// an up-to-date reference to the value at the rewritten index.
-    fn replace_constraints_from_index(&mut self, tgt: ExtVar, src: ExtVar) {
-        assert_ne!(tgt, src);
-        let val = self.constraints[&src].clone();
-        self.overwrite_constraint_set(tgt, val)
-    }
-
-    /// Overwrites the constraints at the specified index with the provided value, returning
-    /// an up-to-date reference to the target-indexed [`Constraints`]` element.
-    fn overwrite_constraint_set(&mut self, k: ExtVar, val: Rc<RefCell<ExtConstraintSet>>) {
-        self.constraints.insert(k, val);
     }
 }
 // !SECTION
@@ -1692,20 +1797,14 @@ impl EmbeddedResolver {
             }
         };
 
-        match (orig_lo, orig_hi) {
-            (Some(sol_lo), Some(sol_hi)) if sol_lo == sol_hi => {
-                Ok((NumSolution::Solved(Some(sol_lo)), NumSolution::Elided))
-            }
-            (None, None) => {
-                // REVIEW - is 'no solution' something we want to continue beyond discovery of?
-                Ok((NumSolution::Solved(None), NumSolution::Elided))
-            }
-            // REVIEW[epic=embedded-num] - if we find Some(sol) and None, are they truly incompatible or should we replace the None with Some(sol)?
-            _ => Err(TCErrorKind::IrreconcilableNumSolutions(
+        if orig_lo == orig_hi {
+            Ok((NumSolution::Solved(orig_lo), NumSolution::Elided))
+        } else {
+            Err(TCErrorKind::IrreconcilableNumSolutions(
                 NumSolution::Solved(orig_lo),
                 NumSolution::Solved(orig_hi),
             )
-            .into()),
+            .into())
         }
     }
 }
@@ -2244,96 +2343,6 @@ impl TypeChecker {
 
 // SECTION - Pairwise unification steps
 impl TypeChecker {
-    /// Performs a check that a given `Constraint` is well-formed as a constraint on an `ExtVar`.
-    ///
-    /// Returns `Some(cx)` where `cx` is a non-trivial constraint equivalent to `constraint` if `constraint` is well-formed, or `None`
-    /// if `constraint` is trivial (i.e. does not constrain the `ExtVar`).
-    ///
-    /// Returns an `Err` if `constraint` cannot be satisfied by any numeric type-assignment for `ext`.
-    ///
-    /// Takes an `ExtVar` value for error-reporting purposes only, and otherwise only considers the `Constraint` itself.
-    fn validate_constraint_numeric(
-        &self,
-        ext: ExtVar,
-        constraint: &Constraint,
-    ) -> TCResult<Option<Constraint>> {
-        match constraint {
-            Constraint::Equiv(utype) => match utype.as_ref() {
-                UType::Seq(..)
-                | UType::Tuple(..)
-                | UType::Record(..)
-                | UType::PhantomData(..)
-                | UType::Option(..)
-                | UType::Base(BaseType::Bool | BaseType::Char)
-                | UType::ViewObj => {
-                    Err(TCErrorKind::NonNumericEmbedded(ext, constraint.clone()).into())
-                }
-
-                UType::Hole | UType::Empty => Ok(None),
-
-                UType::Var(uv) => self.validate_uvar_numeric(ext, *uv),
-                UType::Base(BaseType::U8 | BaseType::U16 | BaseType::U32 | BaseType::U64) => {
-                    Ok(Some(constraint.clone()))
-                }
-                UType::ExternVar(ext1) => {
-                    if ext == *ext1 {
-                        log::warn!("found attempted constraint unification of {ext} with itself");
-                        Ok(None)
-                    } else {
-                        Ok(Some(constraint.clone()))
-                    }
-                }
-            },
-            Constraint::Elem(..) => Ok(Some(constraint.clone())),
-            Constraint::Proj(..) => {
-                Err(TCErrorKind::NonNumericEmbedded(ext, constraint.clone()).into())
-            }
-        }
-    }
-
-    /// Performs a sub-check for `Equiv(uvar)` being a (potentially) satisfiable constraint on `ext`.
-    ///
-    /// Returns `Some(cx)` where `cx` is a non-trivial constraint equivalent to `constraint` if `constraint` is well-formed, or `None`
-    /// if `constraint` is trivial (i.e. does not constrain the `ExtVar`).
-    ///
-    /// Takes an `ExtVar` value for error-reporting purposes only, and otherwise only considers the `Constraint` itself.
-    fn validate_uvar_numeric(&self, ext: ExtVar, uvar: UVar) -> TCResult<Option<Constraint>> {
-        let can = self.get_canonical_uvar(uvar);
-        let cx = &self.constraints[can.0];
-        match cx {
-            Constraints::Indefinite => {
-                // If the UVar has not been solved yet, we cannot rule out it being numeric, nor can we conclude it is trivial
-                Ok(Some(Constraint::Equiv(Rc::new(UType::Var(uvar)))))
-            }
-            Constraints::Variant(vmid) => {
-                Err(TCErrorKind::VariantConstraintEmbedded(ext, uvar, *vmid).into())
-            }
-            Constraints::Invariant(constraint) => {
-                // FIXME - avoid cycles
-                self.validate_constraint_numeric(ext, constraint)
-            }
-        }
-    }
-
-    fn attach_constraint_to_extvar(
-        &mut self,
-        ext: ExtVar,
-        constraint: Constraint,
-    ) -> TCResult<()> {
-        if let Some(cx) = self.validate_constraint_numeric(ext, &constraint)? {
-            let other = ExtConstraintSet::lift(cx, ext)?;
-            let cxs = self.sub_extension.constraints.entry(ext).or_default();
-            cxs.borrow_mut().merge(&other)?;
-        }
-        Ok(())
-    }
-
-    /// Attempts to resolve the unification of an `ExtVar` with a metavariable constraint.
-    fn unify_ext_var_constraint(&mut self, ext: ExtVar, constraint: Constraint) -> TCResult<()> {
-        // TODO[epic=embedded-num] - do we want to do any work-saving in case the constraint is already known to be unsatisfiable?
-        self.attach_constraint_to_extvar(ext, constraint)
-    }
-
     /// Attempts to add a direct (non-Variant) constraint to an existing, possibly recently-created UVar
     ///
     /// Will panic if the UVar is pointing to a Variant Constraints structure and therefore cannot have
@@ -2632,6 +2641,15 @@ impl TypeChecker {
                 self.unify_var_pair(v1, v2)?;
                 Ok(Rc::new(UType::Var(Ord::min(v1, v2))))
             }
+            (&UType::ExternVar(ext1), &UType::ExternVar(ext2)) => {
+                self.unify_extvar_pair(ext1, ext2)?;
+                Ok(Rc::new(UType::ExternVar(Ord::min(ext1, ext2))))
+            }
+            (&UType::Var(v), &UType::ExternVar(ext)) | (&UType::ExternVar(ext), &UType::Var(v)) => {
+                self.unify_var_extvar(v, ext)
+            }
+            (&UType::ExternVar(ext), _) => self.unify_extvar_utype(ext, right.clone()),
+            (_, &UType::ExternVar(ext)) => self.unify_extvar_utype(ext, left.clone()),
             (&UType::Var(v), _) => {
                 let constraint = Constraint::Equiv(right.clone());
                 let _ = self.unify_var_constraint(v, constraint)?;
@@ -2643,22 +2661,6 @@ impl TypeChecker {
                 let _ = self.unify_var_constraint(v, constraint)?;
                 self.occurs(v)?;
                 Ok(Rc::new(UType::Var(v)))
-            }
-            (&UType::ExternVar(ext1), &UType::ExternVar(ext2)) => {
-                self.unify_extern_var_pair(ext1, ext2)?;
-                Ok(Rc::new(UType::ExternVar(Ord::min(ext1, ext2))))
-            }
-            (&UType::ExternVar(ext), _) => {
-                let constraint = Constraint::Equiv(right.clone());
-                let _ = self.unify_ext_var_constraint(ext, constraint)?;
-                // self.occurs_extern(ext)?;
-                Ok(Rc::new(UType::ExternVar(ext)))
-            }
-            (_, &UType::ExternVar(ext)) => {
-                let constraint = Constraint::Equiv(left.clone());
-                let _ = self.unify_ext_var_constraint(ext, constraint)?;
-                // self.occurs_extern(ext)?;
-                Ok(Rc::new(UType::ExternVar(ext)))
             }
             // all the remaining cases are mismatched UType constructors
             _ => Err(UnificationError::Unsatisfiable(left, right).into()),
@@ -2689,7 +2691,9 @@ impl TypeChecker {
     fn unify_utype_baseset(&mut self, ut: Rc<UType>, bs: BaseSet) -> TCResult<Constraint> {
         match ut.as_ref() {
             UType::Var(uv) => self.unify_var_baseset(*uv, bs),
-            UType::ExternVar(ext_v) => self.unify_extern_var_baseset(*ext_v, bs),
+            UType::ExternVar(ext_v) => {
+                self.unify_extvar_baseset_as_constraint(*ext_v, bs)
+            }
             UType::Base(b) => {
                 let ret = bs.unify(&BaseSet::Single(*b))?.to_constraint();
                 Ok(ret)
@@ -2712,13 +2716,76 @@ impl TypeChecker {
         self.unify_var_constraint(uv, constraint)
     }
 
-    /// Unifies an ExtVar against a BaseSet, forcing resolution of the ExtVar to a concrete type
-    /// and then validating the concrete type against the BaseSet.
-    fn unify_extern_var_baseset(&mut self, ext_v: ExtVar, bs: BaseSet) -> TCResult<Constraint> {
-        // FIXME[epic=embedded-num] - do we check for satisfiability at this layer, or reserve that for later?
-        let constraint = Constraint::Elem(bs);
-        self.unify_ext_var_constraint(ext_v, constraint.clone())?;
-        Ok(constraint)
+    /// Handles case-logic for Constraint-level unification of `Equiv(ExternVar(ext_v))` and `Elem(bs)`.
+    ///
+    /// Returns a `Constraint` if the unification is sound, or an `Err` otherwise.
+    fn unify_extvar_baseset_as_constraint(
+        &mut self,
+        ext_v: ExtVar,
+        bs: BaseSet,
+    ) -> TCResult<Constraint> {
+        let IntType::Prim(pt) = self.resolve_extvar(ext_v)?;
+        if let Ok(bt) = pt.try_into() && bs.contains(bt) {
+            Ok(Constraint::Equiv(Rc::new(UType::Base(bt))))
+        } else {
+            Err(TCErrorKind::UnexpectedSolution(ext_v, pt, bs).into())
+        }
+    }
+
+    /// Attempts to unify a [`PrimInt`] with a [`BaseType`], returning the unified [`UType`] if successful.
+    ///
+    /// Returns an `Err` if the unification is not possible.
+    ///
+    /// # Notes
+    ///
+    /// For error-tracking purposes, the caller may wish to attach extra context using
+    /// [`TCError::with_trace`] to indicate the `ExtVar` or `UVar` whose unification
+    /// is being attempted.
+    fn unify_primint_basetype(prim: PrimInt, base: BaseType) -> TCResult<Rc<UType>> {
+        let reason = match base {
+            BaseType::Char | BaseType::Bool => CrossLayerBadnessReason::NonNumeric,
+            BaseType::U8 => match prim {
+                PrimInt::U8 => return Ok(Rc::new(UType::Base(BaseType::U8))),
+                _ => {
+                    if prim.is_signed() {
+                        CrossLayerBadnessReason::Unsupported
+                    } else {
+                        CrossLayerBadnessReason::Mismatched
+                    }
+                }
+            },
+            BaseType::U16 => match prim {
+                PrimInt::U16 => return Ok(Rc::new(UType::Base(BaseType::U16))),
+                _ => {
+                    if prim.is_signed() {
+                        CrossLayerBadnessReason::Unsupported
+                    } else {
+                        CrossLayerBadnessReason::Mismatched
+                    }
+                }
+            },
+            BaseType::U32 => match prim {
+                PrimInt::U32 => return Ok(Rc::new(UType::Base(BaseType::U32))),
+                _ => {
+                    if prim.is_signed() {
+                        CrossLayerBadnessReason::Unsupported
+                    } else {
+                        CrossLayerBadnessReason::Mismatched
+                    }
+                }
+            },
+            BaseType::U64 => match prim {
+                PrimInt::U64 => return Ok(Rc::new(UType::Base(BaseType::U64))),
+                _ => {
+                    if prim.is_signed() {
+                        CrossLayerBadnessReason::Unsupported
+                    } else {
+                        CrossLayerBadnessReason::Mismatched
+                    }
+                }
+            },
+        };
+        Err(TCErrorKind::BadEquivalence { prim, base, reason }.into())
     }
 
     /// Attempt to unify a [`UVar`] with a [`ValueType`], primarily for use with `Expr::FlatMapAccum`.
@@ -2989,6 +3056,95 @@ impl TypeChecker {
         // return the de-facto vmid for both variables
         Ok(lo)
     }
+
+    /// Computes or retrieves a stored solution for an `ExtVar`, as an `IntType`.
+    fn resolve_extvar(&mut self, ext_v: ExtVar) -> TCResult<IntType> {
+        self.sub_extension.solve(ext_v)
+    }
+
+    /// Computes or retrieves a stored solution for an `ExtVar`, as an `UType`.
+    ///
+    /// In addition to standard error-conditions from ExtVar resolution, this method
+    /// will also fail if the resulting solution cannot be directly modelled as a UType
+    /// (i.e. it is a signed PrimInt).
+    fn resolve_extvar_as_utype(&mut self, ext_v: ExtVar) -> TCResult<Rc<UType>> {
+        let sub = &mut self.sub_extension;
+        let IntType::Prim(prim) = sub.solve(ext_v)?;
+        let bt = match prim {
+            PrimInt::U8 => BaseType::U8,
+            PrimInt::U16 => BaseType::U16,
+            PrimInt::U32 => BaseType::U32,
+            PrimInt::U64 => BaseType::U64,
+            PrimInt::I8 | PrimInt::I16 | PrimInt::I32 | PrimInt::I64 => {
+                return Err(TCErrorKind::UTypeFromSigned(ext_v, prim).into());
+            }
+        };
+        Ok(Rc::new(UType::Base(bt)))
+    }
+
+    /// If `v` has a direct-equality constraint against an `ExtVar`, return that `ExtVar`.
+    /// Returns `None` in all other cases.
+    fn expand_var_to_extvar(&self, v: UVar) -> Option<ExtVar> {
+        let v0 = self.get_canonical_uvar(v);
+
+        if let Constraints::Invariant(c) = &self.constraints[v0.0]
+            && let Constraint::Equiv(t) = c
+            && let UType::ExternVar(ext) = t.as_ref()
+        {
+            Some(*ext)
+        } else {
+            None
+        }
+    }
+
+    /// Performs unification of a standard-model metavariable `v` against a numeric-extension metavariable `ext`.
+    ///
+    /// If `v` already points to a numeric-extension metavariable, performs numeric-layer metavariable unification.
+    /// Otherwise, forces a solution to `ext` (and coerces it to be a UType), and unifies `v` against that solution.
+    ///
+    /// In either case, if successful, returns the original metavariable `v` as a `UType`.
+    fn unify_var_extvar(&mut self, v: UVar, ext: ExtVar) -> TCResult<Rc<UType>> {
+        if let Some(ext0) = self.expand_var_to_extvar(v) {
+            self.unify_extvar_pair(ext0, ext)?;
+        } else {
+            let typ = self.resolve_extvar_as_utype(ext)?;
+            self.unify_var_utype(v, typ)?;
+        }
+        Ok(Rc::new(UType::ExternVar(ext)))
+    }
+
+    /// Internal function for unifying non-variable UTypes against extvars.
+    ///
+    /// To maintain elaborator state, the value eturned will always be the original `extvar`, presuming
+    /// that unification succeeds.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if `utype` is either `Var` or `ExternVar`.
+    fn unify_extvar_utype(&mut self, ext: ExtVar, utype: Rc<UType>) -> TCResult<Rc<UType>> {
+        match utype.as_ref() {
+            UType::ExternVar(..) => unreachable!("unify_extvar_utype called with UType::ExternVar"),
+            UType::Var(..) => unreachable!("unify_extvar_utype called with UType::Var"),
+            UType::Empty | UType::Hole => Ok(Rc::new(UType::ExternVar(ext))),
+
+            // REVIEW - Bool and Char are also handled by `unify_primint_basetype`, but the error-variant will differ in that case
+            UType::Base(BaseType::Bool | BaseType::Char)
+            | UType::ViewObj
+            | UType::Tuple(..)
+            | UType::Record(..)
+            | UType::Seq(..)
+            | UType::Option(..)
+            | UType::PhantomData(..) => Err(TCError::from(
+                TCErrorKind::NonNumericExtVarUnification(ext, utype),
+            )),
+
+            UType::Base(btype) => {
+                let IntType::Prim(ptype) = self.resolve_extvar(ext)?;
+                let _ret = try_with!(Self::unify_primint_basetype(ptype, *btype) => ext);
+                Ok(Rc::new(UType::ExternVar(ext)))
+            }
+        }
+    }
 }
 // !SECTION
 
@@ -3031,9 +3187,9 @@ impl TypeChecker {
                 let _ext_var = ExtVar(self.sub_extension.subtrees.len());
 
                 // WIP - figure out what to do with Rep
-                let (sub_var, _rep) = engine
+                let (sub_var, _rep) = try_with!(engine
                     .infer_var_expr(expr)
-                    .map_err(|e| TCErrorKind::from((newvar, _ext_var, e)))?;
+                    .map_err(|e| TCErrorKind::Inference(_ext_var, e)) => format!("failed inference on {newvar} @ Numeric({expr:?})"));
                 assert_eq!(
                     sub_var,
                     UVar(0),
@@ -3489,10 +3645,12 @@ impl TypeChecker {
 impl TypeChecker {
     /// Performs re-aliasing, recanonicalization, and any other constraint propagation as necessary,
     /// to establish direct equality requirements between two external variables
-    fn unify_extern_var_pair(&mut self, ext1: ExtVar, ext2: ExtVar) -> TCResult<()> {
-        // FIXME[epic=embedded-num] - figure out correct return type, and anything else that needs to be done in the method body
+    ///
+    /// Returns the canonical external variable that both `ext1` and `ext2` should now be aliased
+    /// with.
+    fn unify_extvar_pair(&mut self, ext1: ExtVar, ext2: ExtVar) -> TCResult<ExtVar> {
         self.sub_extension.resolve_alias(ext1, ext2)?;
-        Ok(())
+        Ok(self.sub_extension.get_canonical_extvar(ext1))
     }
 
     /// Performs re-aliasing, recanonicalization, constraint propagation, and constraint unification
@@ -3781,6 +3939,11 @@ impl TypeChecker {
             Alias::Canonical(_) | Alias::Ground => v,
             Alias::BackRef(ix) => UVar(ix),
         }
+    }
+
+    /// Public interface for [`SubExtension::get_canonical_extvar`].
+    pub fn get_canonical_extvar(&self, ext_v: ExtVar) -> ExtVar {
+        self.sub_extension.get_canonical_extvar(ext_v)
     }
 
     /// Checks whether two UVars are equated via aliasing.
@@ -4526,6 +4689,12 @@ impl std::fmt::Display for TCError {
     }
 }
 
+impl std::error::Error for TCError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        self.err.source()
+    }
+}
+
 #[derive(Debug)]
 pub enum TCErrorKind {
     VarianceMismatch(UVar, VMId, VarMap, Constraint, Polarity), // attempted unification of a variant and non-variant constraint
@@ -4534,51 +4703,29 @@ pub enum TCErrorKind {
     MultipleSolutions(UVar, BaseSet),
     NoSolution(UVar),
     MissingView(Label),
-    Inference(UVar, ExtVar, inference::InferenceError),
-    NonNumericEmbedded(ExtVar, Constraint),
-    VariantConstraintEmbedded(ExtVar, UVar, VMId),
+    Inference(ExtVar, inference::InferenceError),
+    // FIXME - trim down these variants a bit
+    /// Two numeric solutions cannot be reconciled (across aliased ExtVar)
     IrreconcilableNumSolutions(NumSolution, NumSolution),
+    /// ExtVar unified with an explicitly non-numeric UType
+    NonNumericExtVarUnification(ExtVar, Rc<UType>),
+    /// Equating a PrimInt with a non-numeric BaseType
+    BadEquivalence {
+        prim: PrimInt,
+        base: BaseType,
+        reason: CrossLayerBadnessReason,
+    },
+    UTypeFromSigned(ExtVar, PrimInt),
+    /// ExtVar solution (PrimInt) cannot be reconciled with expectations of BaseSet constraint
+    UnexpectedSolution(ExtVar, PrimInt, BaseSet),
 }
 
-impl From<TypeError> for TCErrorKind {
-    fn from(value: TypeError) -> Self {
-        Self::Unification(value.into())
-    }
-}
-
-impl From<TypeError> for TCError {
-    fn from(value: TypeError) -> Self {
-        Self::from(TCErrorKind::Unification(value.into()))
-    }
-}
-
-impl From<ConstraintError> for TCError {
-    fn from(value: ConstraintError) -> Self {
-        Self::from(TCErrorKind::Unification(value))
-    }
-}
-
-impl<T> From<(ConstraintError, T)> for TCError
-where
-    T: std::fmt::Debug + 'static + Send + Sync,
-{
-    fn from(value: (ConstraintError, T)) -> Self {
-        Self {
-            err: Box::new(TCErrorKind::Unification(value.0)),
-            _trace: vec![Box::new(value.1)],
-        }
-    }
-}
-
-impl From<ConstraintError> for TCErrorKind {
-    fn from(value: ConstraintError) -> Self {
-        Self::Unification(value)
-    }
-}
-
-impl From<(UVar, ExtVar, InferenceError)> for TCErrorKind {
-    fn from((v, ext_var, err): (UVar, ExtVar, InferenceError)) -> Self {
-        Self::Inference(v, ext_var, err)
+impl TCErrorKind {
+    fn with_trace<T>(self, trace: T) -> TCError
+    where
+        T: std::fmt::Debug + Send + Sync + 'static,
+    {
+        TCError::from(self).with_trace(trace)
     }
 }
 
@@ -4624,20 +4771,35 @@ impl std::fmt::Display for TCErrorKind {
             TCErrorKind::MissingView(lbl) => {
                 write!(f, "view-based parse depends on unbound identifier `{lbl}`")
             }
-            TCErrorKind::Inference(v, ext_v, err) => {
-                write!(f, "inference failed for `{v} = {ext_v}`: {err}")
+            TCErrorKind::Inference(ext_v, err) => {
+                write!(f, "inference failed for extension-var `{ext_v}`: {err}")
             }
-            TCErrorKind::NonNumericEmbedded(ext_var, constraint) => {
+            TCErrorKind::NonNumericExtVarUnification(ext_var, utype) => {
                 write!(
                     f,
-                    "cannot unify numeric-extension `{ext_var}` with non-numeric constraint `{constraint}`"
+                    "cannot reconcile numeric-extension `{ext_var}` with non-numeric unification-type `{utype:?}`"
                 )
             }
             TCErrorKind::IrreconcilableNumSolutions(lhs, rhs) => {
                 write!(f, "cannot reconcile numeric solutions `{lhs}` and `{rhs}`")
             }
-            TCErrorKind::VariantConstraintEmbedded(ext_var, uvar, vmid) => {
-                write!(f, "cannot unify `{ext_var}` with variant metavariable `{uvar} = {vmid}`")
+            TCErrorKind::UnexpectedSolution(ext, pt, bs) => {
+                write!(
+                    f,
+                    "found prim-int type `{pt}` for numeric extension `{ext}`, but unification requires `{bs}`"
+                )
+            }
+            TCErrorKind::BadEquivalence { prim, base, reason } => {
+                write!(
+                    f,
+                    "bad equivalence (unification on ExtVar) between prim-int type `{prim}` and base type `{base}`: {reason}",
+                )
+            }
+            TCErrorKind::UTypeFromSigned(ext, prim) => {
+                write!(
+                    f,
+                    "failed to convert signed prim-int type `{prim}` (solution for {ext}) to utype for unification purposes",
+                )
             }
         }
     }
@@ -4647,15 +4809,75 @@ impl std::error::Error for TCErrorKind {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Unification(u_err) => Some(u_err),
-            Self::Inference(_, _, err) => Some(err),
+            Self::Inference(_, err) => Some(err),
             _ => None,
         }
     }
 }
 
-impl std::error::Error for TCError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        self.err.source()
+/// Classification for error-condition of [`TCErrorKind::BadEquivalence`]
+/// for improved clarity of error-reporting.
+#[derive(Clone, Copy, Debug)]
+pub enum CrossLayerBadnessReason {
+    /// Supported PrimInt paired with non-matching BaseType
+    Mismatched,
+    /// PrimInt does not have any direct analogue in BaseType layer (i.e. it is Signed)
+    Unsupported,
+    /// BaseType is not numeric
+    NonNumeric,
+}
+
+impl std::fmt::Display for CrossLayerBadnessReason {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CrossLayerBadnessReason::Mismatched => write!(f, "mismatched precision"),
+            CrossLayerBadnessReason::Unsupported => {
+                write!(f, "signed-int unification not supported")
+            }
+            CrossLayerBadnessReason::NonNumeric => write!(f, "base-type is not numeric"),
+        }
+    }
+}
+
+impl From<TypeError> for TCErrorKind {
+    fn from(value: TypeError) -> Self {
+        Self::Unification(value.into())
+    }
+}
+
+impl From<TypeError> for TCError {
+    fn from(value: TypeError) -> Self {
+        Self::from(TCErrorKind::Unification(value.into()))
+    }
+}
+
+impl From<ConstraintError> for TCError {
+    fn from(value: ConstraintError) -> Self {
+        Self::from(TCErrorKind::Unification(value))
+    }
+}
+
+impl<T> From<(ConstraintError, T)> for TCError
+where
+    T: std::fmt::Debug + 'static + Send + Sync,
+{
+    fn from(value: (ConstraintError, T)) -> Self {
+        Self {
+            err: Box::new(TCErrorKind::Unification(value.0)),
+            _trace: vec![Box::new(value.1)],
+        }
+    }
+}
+
+impl From<ConstraintError> for TCErrorKind {
+    fn from(value: ConstraintError) -> Self {
+        Self::Unification(value)
+    }
+}
+
+impl From<(ExtVar, InferenceError)> for TCErrorKind {
+    fn from((ext_var, err): (ExtVar, InferenceError)) -> Self {
+        Self::Inference(ext_var, err)
     }
 }
 
