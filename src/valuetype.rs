@@ -1,4 +1,4 @@
-use crate::typecheck::UnificationError;
+use crate::typecheck::error::UnificationError;
 use anyhow::{Result as AResult, anyhow};
 use serde::Serialize;
 use std::collections::{BTreeMap, HashSet};
@@ -259,14 +259,16 @@ impl From<ValueType> for TypeHint {
 
 pub(crate) mod augmented {
     use super::*;
+    use crate::numeric::elaborator::PrimInt;
 
     #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
     pub enum AugValueType {
         Any,
         Empty,
         ViewObj,
-        Base(BaseType),
         UnknownNumeric,
+        Base(BaseType),
+        Int(PrimInt),
         Tuple(Vec<AugValueType>),
         Record(Vec<(Label, AugValueType)>),
         Union(BTreeMap<Label, AugValueType>),
@@ -311,6 +313,14 @@ pub(crate) mod augmented {
                 AugValueType::Any => ValueType::Any,
                 AugValueType::Empty => ValueType::Empty,
                 AugValueType::ViewObj => ValueType::ViewObj,
+                // FIXME[epic=embedded-num, epic=hack] - valuetype does not yet support concrete signed-ints, so we have to treat non-base concrete primitive-integers as UnknownNumeric for now
+                AugValueType::Int(int_t) => {
+                    match BaseType::try_from(int_t) {
+                        // FIXME - this is a hack to allow us to use concrete PrimInts in AugValueType while we still have the old numeric system in ValueType; once we migrate ValueType to use PrimInt, we can remove this and just have AugValueType::Int map directly to ValueType::Int
+                        Ok(base_t) => ValueType::Base(base_t),
+                        Err(_e) => ValueType::UnknownNumeric,
+                    }
+                }
                 AugValueType::UnknownNumeric => ValueType::UnknownNumeric,
                 AugValueType::Base(b) => ValueType::Base(b),
                 AugValueType::Tuple(ts) => {

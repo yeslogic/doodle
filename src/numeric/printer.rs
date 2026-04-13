@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::rc::Rc;
 
+use crate::Label;
 use crate::codegen::ToFragment;
 use crate::codegen::typed_format::GenType;
 use crate::output::Fragment;
@@ -162,6 +163,7 @@ pub(crate) fn compile_expr(expr: &Expr, prec: Precedence) -> Fragment {
             prec,
             Precedence::CAST,
         ),
+        Expr::NumVar(name) => Fragment::DisplayAtom(Rc::new(name.clone())),
     }
 }
 
@@ -182,6 +184,11 @@ fn compile_elab_const(t: IntType, typed_const: &TypedConst) -> Fragment {
             ),
         )
     }
+}
+
+fn compile_elab_var(t: IntType, name: &Label) -> Fragment {
+    Fragment::String(name.clone())
+        .intervene(Fragment::Char('@'), Fragment::string(t.to_static_str()))
 }
 
 fn compile_elab_binop(
@@ -284,6 +291,7 @@ fn compile_typed_expr(t_expr: &TypedExpr<IntType>, prec: Precedence) -> Fragment
             prec,
             Precedence::CAST,
         ),
+        TypedExpr::ElabNumVar(t, v) => compile_elab_var(*t, v),
     }
 }
 

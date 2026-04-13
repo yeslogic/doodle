@@ -1,3 +1,4 @@
+use crate::Label;
 use crate::codegen::rust_ast::{AtomType, MachineSint, MachineUint, PrimType, RustType};
 use crate::codegen::typed_format::GenType;
 use crate::numeric::core::{BinOp, Expr, MachineRep, NumRep, TypedConst, UnaryOp};
@@ -73,7 +74,7 @@ impl serde::Serialize for PrimInt {
     }
 }
 
-pub(crate) const PRIM_INTS: [PrimInt; 8] = [
+pub const PRIM_INTS: [PrimInt; 8] = [
     PrimInt::U8,
     PrimInt::U16,
     PrimInt::U32,
@@ -167,9 +168,26 @@ impl From<PrimInt> for NumRep {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum IntType {
     Prim(PrimInt),
+}
+
+mod __impl {
+    use super::{IntType, PrimInt};
+    impl From<PrimInt> for IntType {
+        fn from(value: PrimInt) -> Self {
+            IntType::Prim(value)
+        }
+    }
+
+    impl From<IntType> for PrimInt {
+        fn from(value: IntType) -> Self {
+            match value {
+                IntType::Prim(prim) => prim,
+            }
+        }
+    }
 }
 
 impl IntType {
@@ -230,6 +248,7 @@ pub enum TypedExpr<TypeRep> {
     ),
     ElabUnaryOp(TypeRep, TypedUnaryOp<TypeRep>, Box<TypedExpr<TypeRep>>),
     ElabCast(TypeRep, TypedCast<TypeRep>, Box<TypedExpr<TypeRep>>),
+    ElabNumVar(TypeRep, Label),
 }
 
 impl<TypeRep> std::hash::Hash for TypedExpr<TypeRep> {
@@ -252,6 +271,9 @@ impl<TypeRep> std::hash::Hash for TypedExpr<TypeRep> {
                 c.hash(state);
                 e.hash(state);
             }
+            TypedExpr::ElabNumVar(_, l) => {
+                l.hash(state);
+            }
         }
     }
 }
@@ -263,6 +285,7 @@ impl<T> TypedExpr<T> {
             TypedExpr::ElabBinOp(t, _, _, _) => t,
             TypedExpr::ElabUnaryOp(t, _, _) => t,
             TypedExpr::ElabCast(t, _, _) => t,
+            TypedExpr::ElabNumVar(t, _) => t,
         }
     }
 }
@@ -330,6 +353,7 @@ mod __impls {
                 }
                 TypedExpr::ElabUnaryOp(_, op, inner) => Expr::UnaryOp(op.into(), rebox(inner)),
                 TypedExpr::ElabCast(_, cast, inner) => Expr::Cast(cast.rep, rebox(inner)),
+                TypedExpr::ElabNumVar(_, l) => Expr::NumVar(l),
             }
         }
     }
@@ -376,6 +400,7 @@ impl<TypeRep> MapType for TypedExpr<TypeRep> {
                 c.try_map_type(f)?,
                 x.try_map_type(f)?,
             )),
+            TypedExpr::ElabNumVar(t, l) => Ok(TypedExpr::ElabNumVar(f(t)?, l)),
         }
     }
 }
@@ -487,7 +512,7 @@ impl<TypeRep> std::hash::Hash for TypedCast<TypeRep> {
     }
 }
 
-use crate::typecheck::{UVar, inference::InferenceEngine};
+use crate::typecheck::{NVar, inference::InferenceEngine};
 
 /// Alias for whatever value-type we use to associate a failed reification with some indication of what went wrong, or where
 type Hint = usize;
@@ -539,13 +564,15 @@ where
     }
 
     fn get_type_from_index(&self, index: usize) -> ElaborationResult<IntType> {
-        let uvar = UVar::new(index);
-        let Some(t) = self.engine.reify(uvar.into()) else {
+        let var = NVar::new(index);
+        // FIXME[epic=embedded-num] - figure out how to register DepSolutions, or store it to pass in below
+        let Some(t) = self.engine.reify(var.into()) else {
             return Err(ElaborationError::BadReification(index));
         };
         Ok(t)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn elaborate_expr_as<T>(&mut self, expr: &Expr) -> ElaborationResult<TypedExpr<T>>
     where
         T: From<IntType> + Clone,
@@ -594,6 +621,10 @@ where
                     Box::new(t_inner),
                 ))
             }
+            Expr::NumVar(name) => {
+                let t = self.get_type_from_index(index)?;
+                Ok(TypedExpr::ElabNumVar(T::from(t), name.clone()))
+            }
         }
     }
 
@@ -641,6 +672,10 @@ where
                     },
                     Box::new(t_inner),
                 ))
+            }
+            Expr::NumVar(name) => {
+                let t = self.get_type_from_index(index)?;
+                Ok(TypedExpr::ElabNumVar(t, name.clone()))
             }
         }
     }

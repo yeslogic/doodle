@@ -3,7 +3,11 @@ use num_traits::{One as _, Signed, Zero};
 use serde::Serialize;
 use std::{borrow::Cow, cmp::Ordering};
 
-use crate::bounds::Bounds as UBounds;
+pub const VOID: &'static VoidScope = &VoidScope;
+
+use crate::decoder::UnknownVarError;
+use crate::scope::{EvalScope, VoidScope};
+use crate::{Label, bounds::Bounds as UBounds};
 
 pub type Number = BigInt;
 
@@ -695,6 +699,8 @@ pub enum Expr {
         #[serde(serialize_with = "ser_machine_rep")] MachineRep,
         Box<Expr>,
     ),
+    /// Numerically-typed variable reference
+    NumVar(Label),
 }
 
 impl Expr {
@@ -705,6 +711,20 @@ impl Expr {
             Self::BinOp(op, lhs, rhs) => Self::BinOp(op.replace_rep(rep), lhs, rhs),
             Self::UnaryOp(op, inner) => Self::UnaryOp(op.replace_rep(rep), inner),
             Self::Const(c) => Self::Const(c.replace_rep(rep)),
+            Self::NumVar(_) => self,
+        }
+    }
+
+    #[cfg(test)]
+    fn iter_vars(&self) -> impl '_ + Iterator<Item = &'_ str> {
+        match self {
+            Self::NumVar(label) => {
+                Box::new(std::iter::once(label.as_ref())) as Box<dyn Iterator<Item = &'_ str>>
+            }
+            Self::Const(_) => Box::new(std::iter::empty()),
+            Self::BinOp(_, lhs, rhs) => Box::new(lhs.iter_vars().chain(rhs.iter_vars())),
+            Self::UnaryOp(_, inner) => inner.iter_vars(),
+            Self::Cast(_, inner) => inner.iter_vars(),
         }
     }
 }
@@ -716,6 +736,7 @@ impl std::fmt::Debug for Expr {
             Self::BinOp(op, lhs, rhs) => write!(f, "({:?} {} {:?})", lhs, op, rhs),
             Self::UnaryOp(op, inner) => write!(f, "{}({:?})", op, inner),
             Self::Cast(rep, inner) => write!(f, "Cast({:?}, {:?})", inner, rep),
+            Self::NumVar(lab) => write!(f, "NumVar({})", lab),
         }
     }
 }
@@ -725,6 +746,94 @@ pub enum EvalError {
     DivideByZero,
     RemainderNonPositive,
     Ambiguous(NumRep, NumRep),
+    UnknownVar(UnknownVarError),
+    BadVariable(CoerceValueError),
+}
+
+impl From<UnknownVarError> for EvalError {
+    fn from(value: UnknownVarError) -> Self {
+        EvalError::UnknownVar(value)
+    }
+}
+
+impl From<CoerceValueError> for EvalError {
+    fn from(value: CoerceValueError) -> Self {
+        EvalError::BadVariable(value)
+    }
+}
+
+#[derive(Debug)]
+pub struct CoerceValueError {
+    bad_value: crate::decoder::Value,
+}
+
+impl std::fmt::Display for CoerceValueError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "coerce-to-numeric failed for non-numeric value: {}",
+            self.bad_value
+        )
+    }
+}
+
+impl<'a> TryFrom<&'a crate::decoder::Value> for StrictValue {
+    type Error = CoerceValueError;
+
+    fn try_from(value: &'a crate::decoder::Value) -> Result<Self, Self::Error> {
+        use crate::decoder::Value as Raw;
+        match value {
+            Raw::Mapped(_, v) | Raw::Branch(_, v) => Self::try_from(&**v),
+            Raw::Numeric(typed_const) => {
+                Ok(StrictValue::new(Value::Const((&**typed_const).clone())))
+            }
+            Raw::U8(i) => Ok(StrictValue::from_u8(*i)),
+            Raw::U16(i) => Ok(StrictValue::from_u16(*i)),
+            Raw::U32(i) => Ok(StrictValue::from_u32(*i)),
+            Raw::U64(i) => Ok(StrictValue::from_u64(*i)),
+            Raw::Usize(i) => {
+                log::warn!(
+                    "StrictValue::try_from: Value::Usize coerced as auto-rep, inference may fail..."
+                );
+                Ok(StrictValue::new(Value::Const(TypedConst::new(
+                    *i,
+                    NumRep::Auto,
+                ))))
+            }
+            Raw::Bool(..)
+            | Raw::Char(..)
+            | Raw::View { .. }
+            | Raw::PhantomData
+            | Raw::EnumFromTo(..)
+            | Raw::Option(..)
+            | Raw::Tuple(..)
+            | Raw::Record(..)
+            | Raw::Variant(..)
+            | Raw::Seq(..) => Err(CoerceValueError {
+                bad_value: value.clone(),
+            }),
+        }
+    }
+}
+
+impl<'a> TryFrom<&'a crate::loc_decoder::ParsedValue> for StrictValue {
+    type Error = CoerceValueError;
+
+    fn try_from(value: &'a crate::loc_decoder::ParsedValue) -> Result<Self, Self::Error> {
+        use crate::loc_decoder::{Parsed, ParsedValue as Raw};
+
+        match value {
+            Raw::Flat(Parsed { inner, .. }) => Self::try_from(inner),
+            Raw::Mapped(_, v) | Raw::Branch(_, v) => Self::try_from(&**v),
+            Raw::Tuple(..)
+            | Raw::Record(..)
+            | Raw::Variant(..)
+            | Raw::Seq(..)
+            | Raw::Option(..) => Err(CoerceValueError {
+                bad_value: value.clone_into_value(),
+            }),
+        }
+    }
 }
 
 impl std::fmt::Display for EvalError {
@@ -738,6 +847,8 @@ impl std::fmt::Display for EvalError {
                     "operation over {rep0} and {rep1} must have an explicit output representation to be evaluated"
                 )
             }
+            EvalError::UnknownVar(var_err) => write!(f, "{var_err}"),
+            EvalError::BadVariable(val_err) => write!(f, "{val_err}"),
         }
     }
 }
@@ -751,6 +862,14 @@ pub struct Strict<T> {
 }
 
 pub type StrictValue = Strict<Value>;
+
+impl<'a> TryFrom<&'a std::convert::Infallible> for StrictValue {
+    type Error = CoerceValueError;
+
+    fn try_from(_value: &'a std::convert::Infallible) -> Result<Self, Self::Error> {
+        unreachable!("StrictValue cannot be constructed from Infallible")
+    }
+}
 
 impl StrictValue {
     pub fn new(value: Value) -> Self {
@@ -779,15 +898,59 @@ impl StrictValue {
     }
 }
 
+impl StrictValue {
+    pub fn from_u8(i: u8) -> Self {
+        let value = Value::Const(TypedConst::from_u8(i));
+        Self {
+            value,
+            is_valid: true,
+        }
+    }
+
+    pub fn from_u16(i: u16) -> Self {
+        let value = Value::Const(TypedConst::from_u16(i));
+        Self {
+            value,
+            is_valid: true,
+        }
+    }
+
+    pub fn from_u32(i: u32) -> Self {
+        let value = Value::Const(TypedConst::from_u32(i));
+        Self {
+            value,
+            is_valid: true,
+        }
+    }
+
+    pub fn from_u64(i: u64) -> Self {
+        let value = Value::Const(TypedConst::from_u64(i));
+        Self {
+            value,
+            is_valid: true,
+        }
+    }
+
+    // STUB - from_i* are not yet implemented, but they wouldn't have an immediate use-case
+}
+
+#[expect(dead_code)]
+pub(crate) type EvalResult<T> = std::result::Result<T, EvalError>;
+
 impl Expr {
     /// Like `eval`, except that the representability of every individual sub-term is also checked,
     /// and if any term is unrepresentable, the validity flag of the return-value will be `false`.
-    pub fn eval_strict(&self) -> Result<Strict<Value>, EvalError> {
+    pub fn eval_strict<'a, S, V>(&self, scope: &'a S) -> Result<Strict<Value>, EvalError>
+    where
+        S: 'a + EvalScope<'a, Output = &'a V, Error = UnknownVarError>,
+        V: 'static,
+        StrictValue: for<'x> TryFrom<&'x V, Error = CoerceValueError>,
+    {
         match self {
             Expr::Const(typed_const) => Ok(Strict::new(Value::Const(typed_const.clone()))),
             Expr::BinOp(bin_op, lhs, rhs) => {
-                let lhs = lhs.eval_strict()?;
-                let rhs = rhs.eval_strict()?;
+                let lhs = lhs.eval_strict(scope)?;
+                let rhs = rhs.eval_strict(scope)?;
                 let BinOp { op, out_rep } = *bin_op;
                 lhs.map2(rhs, |lhs: Value, rhs: Value| {
                     let (raw, rep0, rep1) = match (op, lhs, rhs) {
@@ -832,51 +995,62 @@ impl Expr {
                 })
             }
             Expr::UnaryOp(unary_op, expr) => {
-                expr.eval_strict()?.map(|expr| match (unary_op.op, expr) {
-                    (BasicUnaryOp::Negate, Value::Const(TypedConst(n, rep))) => {
-                        let rep_out = match unary_op.out_rep {
-                            Some(rep) => NumRep::Concrete(rep),
-                            None => rep,
-                        };
-                        Ok(Value::Const(TypedConst(-n, rep_out)))
-                    }
-                    (BasicUnaryOp::AbsVal, Value::Const(TypedConst(n, rep))) => {
-                        let rep_out = match unary_op.out_rep {
-                            Some(rep) => NumRep::Concrete(rep),
-                            None => rep,
-                        };
-                        Ok(Value::Const(TypedConst(n.abs(), rep_out)))
-                    }
-                    (BasicUnaryOp::IntSucc, Value::Const(TypedConst(n, rep))) => {
-                        let rep_out = match unary_op.out_rep {
-                            Some(rep) => NumRep::Concrete(rep),
-                            None => rep,
-                        };
-                        Ok(Value::Const(TypedConst(n + BigInt::one(), rep_out)))
-                    }
-                    (BasicUnaryOp::IntPred, Value::Const(TypedConst(n, rep))) => {
-                        let rep_out = match unary_op.out_rep {
-                            Some(rep) => NumRep::Concrete(rep),
-                            None => rep,
-                        };
-                        Ok(Value::Const(TypedConst(n - BigInt::one(), rep_out)))
-                    }
-                })
+                expr.eval_strict(scope)?
+                    .map(|expr| match (unary_op.op, expr) {
+                        (BasicUnaryOp::Negate, Value::Const(TypedConst(n, rep))) => {
+                            let rep_out = match unary_op.out_rep {
+                                Some(rep) => NumRep::Concrete(rep),
+                                None => rep,
+                            };
+                            Ok(Value::Const(TypedConst(-n, rep_out)))
+                        }
+                        (BasicUnaryOp::AbsVal, Value::Const(TypedConst(n, rep))) => {
+                            let rep_out = match unary_op.out_rep {
+                                Some(rep) => NumRep::Concrete(rep),
+                                None => rep,
+                            };
+                            Ok(Value::Const(TypedConst(n.abs(), rep_out)))
+                        }
+                        (BasicUnaryOp::IntSucc, Value::Const(TypedConst(n, rep))) => {
+                            let rep_out = match unary_op.out_rep {
+                                Some(rep) => NumRep::Concrete(rep),
+                                None => rep,
+                            };
+                            Ok(Value::Const(TypedConst(n + BigInt::one(), rep_out)))
+                        }
+                        (BasicUnaryOp::IntPred, Value::Const(TypedConst(n, rep))) => {
+                            let rep_out = match unary_op.out_rep {
+                                Some(rep) => NumRep::Concrete(rep),
+                                None => rep,
+                            };
+                            Ok(Value::Const(TypedConst(n - BigInt::one(), rep_out)))
+                        }
+                    })
             }
-            Expr::Cast(mach_rep, expr) => expr.eval_strict()?.map(|val| match val {
+            Expr::Cast(mach_rep, expr) => expr.eval_strict(scope)?.map(|val| match val {
                 Value::Const(TypedConst(num, _rep)) => {
                     Ok(Value::Const(TypedConst(num, NumRep::Concrete(*mach_rep))))
                 }
             }),
+            Expr::NumVar(lbl) => {
+                let raw = scope.lookup_var(lbl)?;
+                let val = raw.try_into()?;
+                Ok(val)
+            }
         }
     }
 
-    pub fn eval(&self) -> Result<Value, EvalError> {
+    pub fn eval<'a, S, V>(&self, scope: &'a S) -> Result<Value, EvalError>
+    where
+        S: 'a + EvalScope<'a, Output = &'a V, Error = UnknownVarError>,
+        V: 'static,
+        StrictValue: for<'x> TryFrom<&'x V, Error = CoerceValueError>,
+    {
         match self {
             Expr::Const(typed_const) => Ok(Value::Const(typed_const.clone())),
             Expr::BinOp(bin_op, lhs, rhs) => {
-                let lhs = lhs.eval()?;
-                let rhs = rhs.eval()?;
+                let lhs = lhs.eval(scope)?;
+                let rhs = rhs.eval(scope)?;
                 let BinOp { op, out_rep } = *bin_op;
                 let (raw, rep0, rep1) = match (op, lhs, rhs) {
                     (BasicBinOp::Add, Value::Const(lhs), Value::Const(rhs)) => {
@@ -919,7 +1093,7 @@ impl Expr {
                 Ok(Value::Const(TypedConst(raw, rep_out)))
             }
             Expr::UnaryOp(unary_op, expr) => {
-                let expr = expr.eval()?;
+                let expr = expr.eval(scope)?;
                 match (unary_op.op, expr) {
                     (BasicUnaryOp::Negate, Value::Const(TypedConst(n, rep))) => {
                         let rep_out = match unary_op.out_rep {
@@ -952,12 +1126,17 @@ impl Expr {
                 }
             }
             Expr::Cast(mach_rep, expr) => {
-                let val = expr.eval()?;
+                let val = expr.eval(scope)?;
                 match val {
                     Value::Const(TypedConst(num, _rep)) => {
                         Ok(Value::Const(TypedConst(num, NumRep::Concrete(*mach_rep))))
                     }
                 }
+            }
+            Expr::NumVar(lbl) => {
+                let raw = scope.lookup_var(lbl)?;
+                let val: StrictValue = raw.try_into()?;
+                Ok(val.value)
             }
         }
     }
@@ -1171,11 +1350,28 @@ pub mod strategy {
         }
     }
 
-    pub fn arb_expr_with_rep(rep: MachineRep) -> BoxedStrategy<Expr> {
+    pub fn arb_expr_with_rep<const N: usize>(
+        rep: MachineRep,
+        vars: [(&'static str, MachineRep); N],
+    ) -> BoxedStrategy<Expr> {
         let depth = 8;
         let max_nodes = 64;
 
-        let leaf = arb_const_from_rep(rep).prop_map(Expr::Const);
+        let leaf = if vars.is_empty() {
+            arb_const_from_rep(rep).prop_map(Expr::Const).boxed()
+        } else {
+            prop_oneof![
+                arb_const_from_rep(rep).prop_map(Expr::Const),
+                prop::sample::select(vars.to_vec()).prop_map(move |(s, r)| {
+                    if r == rep {
+                        Expr::NumVar((*s).into())
+                    } else {
+                        Expr::Cast(rep, Box::new(Expr::NumVar((*s).into())))
+                    }
+                }),
+            ]
+            .boxed()
+        };
 
         leaf.prop_recursive(depth, max_nodes, 2, move |inner| {
             let term = inner.boxed();
@@ -1190,32 +1386,61 @@ pub mod strategy {
 
     pub fn any_expr() -> impl Strategy<Value = Expr> {
         machine_strategy()
-            .prop_flat_map(|rep| arb_expr_with_rep(rep))
+            .prop_flat_map(|rep| arb_expr_with_rep(rep, []))
             .prop_filter("exprs must be well-typed", |x| {
                 let mut ie = crate::typecheck::inference::InferenceEngine::new();
                 let Ok((v, _)) = ie.infer_var_expr(x) else {
                     return false;
                 };
-                ie.reify(v.into()).is_some() && x.eval_strict().is_ok_and(|x| x.is_valid())
+                ie.reify(v.into()).is_some() && x.eval_strict(VOID).is_ok_and(|x| x.is_valid())
+            })
+    }
+
+    pub fn any_expr_with_vars<const N: usize>(
+        vars: [(&'static str, MachineRep); N],
+    ) -> impl Strategy<Value = Expr> {
+        machine_strategy()
+            .prop_flat_map(move |rep| arb_expr_with_rep(rep, vars))
+            .prop_filter("expr must contain a var if any", move |x| {
+                if vars.is_empty() {
+                    return true;
+                }
+                let mut it = x.iter_vars();
+                it.next().is_some()
             })
     }
 
     pub fn unsigned_expr() -> impl Strategy<Value = Expr> {
         machine_uint_strategy()
-            .prop_flat_map(|rep| arb_expr_with_rep(rep))
+            .prop_flat_map(|rep| arb_expr_with_rep(rep, []))
             .prop_filter("exprs must be well-typed", |x| {
                 let mut ie = crate::typecheck::inference::InferenceEngine::new();
                 let Ok((v, _)) = ie.infer_var_expr(x) else {
                     return false;
                 };
                 ie.reify(v.into()).is_some_and(|t| !t.to_prim().is_signed())
-                    && x.eval_strict().is_ok_and(|x| x.is_valid())
+                    && x.eval_strict(VOID).is_ok_and(|x| x.is_valid())
+            })
+    }
+
+    pub fn unsigned_expr_with_vars<const N: usize>(
+        vars: [(&'static str, MachineRep); N],
+    ) -> impl Strategy<Value = Expr> {
+        machine_uint_strategy()
+            .prop_flat_map(move |rep| arb_expr_with_rep(rep, vars))
+            .prop_filter("expr must contain a var if any", move |x| {
+                if vars.is_empty() {
+                    return true;
+                }
+                let mut it = x.iter_vars();
+                it.next().is_some()
             })
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use super::VOID;
     use super::strategy::*;
     use crate::numeric::core::*;
     use num_traits::One;
@@ -1234,7 +1459,7 @@ mod tests {
         );
         assert!(
             should_be_two
-                .eval()?
+                .eval(VOID)?
                 .as_const()
                 .unwrap()
                 .eq_num(&BigInt::from(2))
@@ -1247,7 +1472,7 @@ mod tests {
         fn cast_works(orig in numrep_strategy(), tgt in machine_strategy()) {
             let one = TypedConst(BigInt::one(), orig);
             let casted_one = Expr::Cast(tgt.into(), Box::new(Expr::Const(one)));
-            let val = casted_one.eval().unwrap();
+            let val = casted_one.eval(VOID).unwrap();
             let rep = val.as_const().unwrap().get_rep();
             prop_assert_eq!(rep, NumRep::Concrete(tgt));
         }
@@ -1264,7 +1489,7 @@ mod tests {
                 Box::new(Expr::Const(one)),
                 Box::new(Expr::Const(rep_one)),
             );
-            let actual = two_should_be_rep.eval().unwrap().as_const().unwrap().get_rep();
+            let actual = two_should_be_rep.eval(VOID).unwrap().as_const().unwrap().get_rep();
             prop_assert_eq!(actual, rep);
         }
     }

@@ -48,7 +48,9 @@ pub enum Value {
     Usize(usize),
     // WIP[epic=embedded-num] - implement proper support for Numeric
     Numeric(Rc<TypedConst>),
-    View { offset: usize },
+    View {
+        offset: usize,
+    },
     PhantomData,
     // REVIEW - should EnumFromTo be considered a flat value?
     EnumFromTo(std::ops::Range<usize>),
@@ -58,7 +60,9 @@ pub enum Value {
     Record(Vec<(Label, Value)>),
     Variant(Label, Box<Value>),
     Seq(SeqKind<Value>),
+    /// Mapped: (Raw Preimage Value, Mapped Nominal Value)
     Mapped(Box<Value>, Box<Value>),
+    /// Branch: (Branch Index, Nominal Value)
     Branch(usize, Box<Value>),
 }
 
@@ -300,6 +304,9 @@ impl Value {
             Value::U32(n) => usize::try_from(*n).unwrap(),
             Value::U64(n) => usize::try_from(*n).unwrap(),
             Value::Usize(n) => *n,
+            Value::Numeric(_tc) => {
+                unimplemented!("unwrap_usize: conversion from TypedConst not yet supported")
+            }
             other => panic!("value is not a number: {other:?}"),
         }
     }
@@ -311,6 +318,9 @@ impl Value {
             Value::U16(..) | Value::U32(..) | Value::U64(..) | Value::Usize(..) => panic!(
                 "value is numeric but not u8 (this may be a soft error, or even success, in future)"
             ),
+            Value::Numeric(_tc) => {
+                unimplemented!("get_as_u8: conversion from TypedConst not yet supported")
+            }
             _ => panic!("value is not a number"),
         }
     }
@@ -342,14 +352,14 @@ impl Value {
 impl Expr {
     pub fn eval<'a>(&'a self, scope: &'a Scope<'a>) -> Cow<'a, Value> {
         match self {
-            Expr::Var(name) => Cow::Borrowed(scope.get_value_by_name(name)),
+            Expr::Var(name) => Cow::Borrowed(scope.get_value_by_name(name).unwrap()),
             Expr::Bool(b) => Cow::Owned(Value::Bool(*b)),
             Expr::U8(i) => Cow::Owned(Value::U8(*i)),
             Expr::U16(i) => Cow::Owned(Value::U16(*i)),
             Expr::U32(i) => Cow::Owned(Value::U32(*i)),
             Expr::U64(i) => Cow::Owned(Value::U64(*i)),
             Expr::Numeric(n) => {
-                match n.eval() {
+                match n.eval(scope) {
                     Ok(v) => Cow::Owned(v.into()),
                     // WIP[epic=embedded-num] - we probably want a more sensible outcome than panic
                     Err(e) => panic!("{e}"),
@@ -1385,7 +1395,6 @@ impl<'a> Compiler<'a> {
     }
 }
 
-// REVIEW - View cannot be added to ScopeEntry without hiding the `View<'a>` or adding lifetime parameters
 #[derive(Clone, Debug)]
 pub enum ScopeEntry<Value: Clone> {
     Value(Value),
@@ -1433,10 +1442,21 @@ pub struct ViewScope<'a> {
 // REVIEW - do we want a specialized type for holding views?
 pub type View<'a> = ReadCtxt<'a>;
 
+#[derive(Debug)]
+pub struct UnknownVarError(pub(crate) Label);
+
+impl std::fmt::Display for UnknownVarError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "reference to unknown variable: `{}`", self.0)
+    }
+}
+
+impl std::error::Error for UnknownVarError {}
+
 impl<'a> Scope<'a> {
-    fn get_value_by_name(&self, name: &str) -> &Value {
+    pub(crate) fn get_value_by_name(&self, name: &str) -> Result<&Value, UnknownVarError> {
         match self {
-            Scope::Empty => panic!("value not found: {name}"),
+            Scope::Empty => Err(UnknownVarError(Label::Owned(name.to_string()))),
             Scope::Multi(multi) => multi.get_value_by_name(name),
             Scope::Single(single) => single.get_value_by_name(name),
             Scope::Decoder(decoder) => decoder.parent.get_value_by_name(name),
@@ -1502,13 +1522,16 @@ impl<'a> MultiScope<'a> {
         self.entries.push((name.into(), ViewOrValue::View(view)));
     }
 
-    fn get_value_by_name(&self, name: &str) -> &Value {
+    fn get_value_by_name(&self, name: &str) -> Result<&Value, UnknownVarError> {
         for (n, v) in self.entries.iter().rev() {
             if n == name {
                 if let ViewOrValue::Value(v) = v {
-                    return v;
+                    return Ok(v);
                 } else {
-                    // TODO - should view-shadows-value cases be errors?
+                    log::warn!(
+                        "MultiScope::get_value_by_name: query for `{name}` encountered a view-binding before any value-bindings, skipping..."
+                    );
+                    continue;
                 }
             }
         }
@@ -1539,9 +1562,9 @@ impl<'a> SingleScope<'a> {
         }
     }
 
-    fn get_value_by_name(&self, name: &str) -> &Value {
+    fn get_value_by_name(&self, name: &str) -> Result<&Value, UnknownVarError> {
         if self.name == name {
-            self.value
+            Ok(self.value)
         } else {
             self.parent.get_value_by_name(name)
         }
@@ -1549,7 +1572,7 @@ impl<'a> SingleScope<'a> {
 
     fn get_bindings(&self, bindings: &mut Vec<(Label, ScopeEntry<Value>)>) {
         bindings.push((
-            self.name.to_string().into(),
+            Label::Owned(self.name.to_string()),
             ScopeEntry::Value(self.value.clone()),
         ));
         self.parent.get_bindings(bindings);

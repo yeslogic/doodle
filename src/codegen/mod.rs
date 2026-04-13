@@ -1,29 +1,3 @@
-pub(crate) mod catalog;
-pub(crate) mod model;
-mod name;
-pub(crate) mod rust_ast;
-mod trace;
-mod typed_decoder;
-pub(crate) mod typed_format;
-mod util;
-
-use rebind::Rebindable;
-use resolve::Resolvable;
-pub use rust_ast::ToFragment;
-
-use crate::{
-    Arith, BaseKind, BaseType, CommonOp, DynFormat, Endian, Expr, Format, FormatModule, IntRel,
-    IntoLabel, Label, MatchTree, Pattern, StyleHint, UnaryOp, ViewExpr, ViewFormat,
-    byte_set::ByteSet,
-    codegen::{model::traits::TraitObject, util::FxHash},
-    decoder::extract_pair,
-    parser::error::TraceHash,
-    typecheck::{ExtVar, TypeChecker, UType, UVar, WHNFSolution},
-    valuetype::{SeqBorrowHint, ValueType},
-};
-
-use crate::numeric::elaborator::TypedExpr as TypedNumExpr;
-
 use std::{
     borrow::Cow,
     cell::OnceCell,
@@ -31,24 +5,61 @@ use std::{
     hash::{Hash, Hasher},
     rc::Rc,
 };
-mod ixlabel;
-mod path_names;
-
-use ixlabel::IxLabel;
-use name::{Derivation, NameAtom};
-use path_names::NameGen;
-use rust_ast::analysis::{
-    CopyEligible,
-    heap_optimize::{HeapOptimize, HeapStrategy},
-};
-use rust_ast::*;
-use util::{BTree, MapLike, StableMap};
 
 use trace::get_and_increment_seed;
+
+use crate::{
+    Arith, BaseKind, BaseType, CommonOp, DynFormat, Endian, Expr, Format, FormatModule, IntRel,
+    IntoLabel, Label, MatchTree, Pattern, StyleHint, UnaryOp, ViewExpr, ViewFormat,
+    byte_set::ByteSet,
+    decoder::extract_pair,
+    numeric::elaborator::{TypedBinOp, TypedCast, TypedUnaryOp},
+    parser::error::TraceHash,
+    typecheck::{TypeChecker, UType, UVar, WHNFSolution},
+    valuetype::{SeqBorrowHint, ValueType},
+};
+
+use crate::numeric::{
+    core::Expr as NumExpr,
+    elaborator::{IntType as NumIntType, TypedExpr as TypedNumExpr},
+};
+
+pub(crate) mod catalog;
+
+mod ixlabel;
+use ixlabel::IxLabel;
+
+pub(crate) mod model;
+use model::traits::TraitObject;
+mod name;
+use name::{Derivation, NameAtom};
+mod path_names;
+use path_names::NameGen;
+
+pub(crate) mod rust_ast;
+pub use rust_ast::ToFragment;
+use rust_ast::{
+    analysis::{
+        CopyEligible,
+        heap_optimize::{HeapOptimize, HeapStrategy},
+    },
+    rebind::Rebindable,
+    resolve::Resolvable,
+    *,
+};
+
+mod trace;
+
+mod typed_decoder;
 use typed_decoder::{GTCompiler, GTDecoder, TypedDecoder};
+
+pub(crate) mod typed_format;
 use typed_format::{
     GenType, TypedDynFormat, TypedExpr, TypedFormat, TypedPattern, TypedViewExpr, TypedViewFormat,
 };
+
+mod util;
+use util::{BTree, MapLike, StableMap};
 
 pub(crate) type Typed<T> = (T, GenType);
 
@@ -103,9 +114,17 @@ impl CodeGen {
         }
     }
 
+    fn lift_int<T>(int_t: NumIntType) -> T
+    where
+        T: From<AtomType>,
+    {
+        AtomType::from(int_t).into()
+    }
+
     fn lift_whnf_solution(&mut self, tc: &TypeChecker, sol: WHNFSolution, lt: &RustLt) -> RustType {
         match sol {
             WHNFSolution::Base(bt) => Self::lift_base(bt),
+            WHNFSolution::Int(it) => Self::lift_int(it),
             WHNFSolution::Var(var) => self.lift_uvar(tc, var, lt).to_rust_type(),
         }
     }
@@ -119,16 +138,7 @@ impl CodeGen {
         match tc.expand_var(var) {
             Expansion::Empty => RustType::UNIT.into(),
             Expansion::Base(bt) => Self::lift_base(bt),
-            Expansion::Outcome(ext_var) => {
-                let ie = tc.get_extern(ext_var).clone();
-                let proxy = UVar(0);
-                let res = ie.reify(proxy.into());
-                if let Some(it) = res {
-                    return GenType::from(it);
-                } else {
-                    panic!("bad reification of external variable: {ext_var}");
-                }
-            }
+            Expansion::Int(it) => Self::lift_int(it.into()),
             Expansion::Record(fields) => {
                 if let Some(decl) = self.metavariables.get(&var) {
                     let (type_name, (ix, is_new)) = self.name_gen.get_name(decl);
@@ -179,6 +189,9 @@ impl CodeGen {
                     let variant = match branch_sol {
                         WHNFSolution::Base(bt) => {
                             RustVariant::Tuple(name, vec![Self::lift_base(*bt)])
+                        }
+                        WHNFSolution::Int(it) => {
+                            RustVariant::Tuple(name, vec![Self::lift_int(*it)])
                         }
                         WHNFSolution::Var(branch_v) => {
                             let def = tc.expand_var(*branch_v);
@@ -973,7 +986,7 @@ enum ExprInfo {
 
 fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
     match expr {
-        TypedExpr::Numeric(num) => embed_numeric_expr(num),
+        TypedExpr::Numeric(_gt, num) => embed_numeric_expr(num),
         TypedExpr::Record(gt, fields) => {
             let tname = match gt {
                 GenType::Def((_, tname), _) => tname,
@@ -3972,11 +3985,9 @@ impl<'a> Generator<'a> {
 pub struct Elaborator<'a> {
     module: &'a FormatModule,
     next_index: usize,
-    next_ext_index: usize,
     t_formats: StableMap<usize, Rc<GTFormat>, BTree>,
     tc: TypeChecker,
     codegen: CodeGen,
-    embeds: StableMap<usize, crate::numeric::elaborator::ElabRc, FxHash>,
 }
 
 impl<'a> Elaborator<'a> {
@@ -3987,30 +3998,14 @@ impl<'a> Elaborator<'a> {
         ret
     }
 
-    /// Increment the current `next_ext_index` by 1 and return its un-incremented value.
-    pub fn get_and_increment_ext_index(&mut self) -> usize {
-        let ret = self.next_ext_index;
-        self.next_ext_index += 1;
-        ret
-    }
-
     /// Increment the current `next_index` by 1.
     pub fn increment_index(&mut self) {
         self.next_index += 1;
     }
 
-    pub fn increment_ext_index(&mut self) {
-        self.next_ext_index += 1;
-    }
-
     /// Return the current `tree_index` without mutation.
     pub fn get_index(&self) -> usize {
         self.next_index
-    }
-
-    /// Return the current `ext_index` without mutation.
-    pub fn get_ext_index(&self) -> usize {
-        self.next_ext_index
     }
 
     fn elaborate_dynamic_format(&mut self, dynf: &DynFormat) -> TypedDynFormat<GenType> {
@@ -4114,11 +4109,9 @@ impl<'a> Elaborator<'a> {
         Self {
             module,
             next_index: 0,
-            next_ext_index: 0,
             t_formats: Default::default(),
             tc,
             codegen,
-            embeds: Default::default(),
         }
     }
 
@@ -4625,16 +4618,56 @@ impl<'a> Elaborator<'a> {
         )
     }
 
-    fn get_engine_from_ext_index(
-        &mut self,
-        ext_index: usize,
-    ) -> &mut crate::numeric::elaborator::ElabRc {
-        let ent = self.embeds.entry(ext_index).or_insert_with(|| {
-            let ie = self.tc.get_extern(ExtVar::new(ext_index));
-            let elab = crate::numeric::elaborator::ElabRc::new(ie.clone());
-            elab
-        });
-        ent
+    fn elaborate_num_tree(&mut self, n_expr: &NumExpr) -> TypedNumExpr<GenType> {
+        let index = self.get_and_increment_index();
+        match n_expr {
+            NumExpr::Const(typed_const) => {
+                let t = self.get_gt_from_index(index);
+                TypedNumExpr::ElabConst(t, typed_const.clone())
+            }
+            NumExpr::BinOp(bin_op, x, y) => {
+                let t_x = self.elaborate_num_tree(x);
+                let t_y = self.elaborate_num_tree(y);
+                let gt = self.get_gt_from_index(index);
+                TypedNumExpr::ElabBinOp(
+                    gt.clone(),
+                    TypedBinOp {
+                        sig: ((t_x.get_type().clone(), t_y.get_type().clone()), gt),
+                        inner: *bin_op,
+                    },
+                    Box::new(t_x),
+                    Box::new(t_y),
+                )
+            }
+            NumExpr::UnaryOp(unary_op, inner) => {
+                let t_inner = self.elaborate_num_tree(inner);
+                let gt = self.get_gt_from_index(index);
+                TypedNumExpr::ElabUnaryOp(
+                    gt.clone(),
+                    TypedUnaryOp {
+                        sig: (t_inner.get_type().clone(), gt),
+                        inner: *unary_op,
+                    },
+                    Box::new(t_inner),
+                )
+            }
+            &NumExpr::Cast(rep, ref inner) => {
+                let t_inner = self.elaborate_num_tree(inner);
+                let gt = self.get_gt_from_index(index);
+                TypedNumExpr::ElabCast(
+                    gt.clone(),
+                    TypedCast {
+                        sig: (t_inner.get_type().clone(), gt),
+                        rep,
+                    },
+                    Box::new(t_inner),
+                )
+            }
+            NumExpr::NumVar(name) => {
+                let gt = self.get_gt_from_index(index);
+                TypedNumExpr::ElabNumVar(gt, name.clone())
+            }
+        }
     }
 
     fn elaborate_expr(&mut self, expr: &Expr) -> GTExpr {
@@ -4653,12 +4686,9 @@ impl<'a> Elaborator<'a> {
             Expr::U32(n) => TypedExpr::U32(*n),
             Expr::U64(n) => TypedExpr::U64(*n),
             Expr::Numeric(n) => {
-                let ext_index = self.get_and_increment_ext_index();
-                let engine = self.get_engine_from_ext_index(ext_index);
-                let elab_n = engine
-                    .elaborate_expr_as::<GenType>(n)
-                    .expect("failed to elaborate numeric expression");
-                TypedExpr::Numeric(Box::new(elab_n))
+                let elab_n = self.elaborate_num_tree(n);
+                let gt = self.get_gt_from_index(index);
+                TypedExpr::Numeric(gt, Box::new(elab_n))
             }
             Expr::Tuple(elts) => {
                 let mut t_elts = Vec::with_capacity(elts.len());
@@ -5177,11 +5207,218 @@ impl<'a> TypedDynScope<'a> {
     }
 }
 
+mod __impls {
+    use super::*;
+
+    impl<'a> Default for ProdCtxt<'a> {
+        fn default() -> Self {
+            Self {
+                input_varname: &Cow::Borrowed(""),
+            }
+        }
+    }
+
+    // SECTION - upcasts and conversions to Gen{Stmt,Expr,Block}
+    impl From<RustExpr> for GenBlock {
+        fn from(value: RustExpr) -> Self {
+            GenBlock {
+                stmts: Vec::new(),
+                ret: Some(GenExpr::Embed(value)),
+            }
+        }
+    }
+
+    impl From<GenExpr> for GenBlock {
+        fn from(value: GenExpr) -> Self {
+            GenBlock {
+                stmts: Vec::new(),
+                ret: Some(value),
+            }
+        }
+    }
+
+    impl From<GenControl> for GenBlock {
+        fn from(value: GenControl) -> Self {
+            GenBlock {
+                stmts: Vec::new(),
+                ret: Some(GenExpr::Control(Box::new(value))),
+            }
+        }
+    }
+
+    impl From<GenControl> for GenExpr {
+        fn from(value: GenControl) -> Self {
+            GenExpr::Control(Box::new(value))
+        }
+    }
+
+    impl From<Vec<GenStmt>> for GenBlock {
+        fn from(stmts: Vec<GenStmt>) -> Self {
+            GenBlock { stmts, ret: None }
+        }
+    }
+
+    impl From<RustStmt> for GenStmt {
+        fn from(value: RustStmt) -> Self {
+            GenStmt::Embed(value)
+        }
+    }
+
+    impl From<RustExpr> for GenStmt {
+        fn from(value: RustExpr) -> Self {
+            GenStmt::Expr(GenExpr::Embed(value))
+        }
+    }
+
+    impl From<GenExpr> for GenStmt {
+        fn from(value: GenExpr) -> Self {
+            GenStmt::Expr(value)
+        }
+    }
+
+    impl From<RustControl<GenBlock>> for GenStmt {
+        fn from(value: RustControl<GenBlock>) -> Self {
+            GenStmt::Expr(GenExpr::Control(Box::new(value)))
+        }
+    }
+
+    impl From<RustExpr> for GenExpr {
+        fn from(value: RustExpr) -> Self {
+            GenExpr::Embed(value)
+        }
+    }
+    // !SECTION
+
+    // SECTION - downcasts and conversions to Rust{Stmt,Expr}
+    impl From<GenBlock> for RustExpr {
+        fn from(value: GenBlock) -> Self {
+            let (stmts, ret) = value.synthesize();
+
+            // REVIEW - do we always want an explicit Unit here?
+            let val = ret.unwrap_or(RustExpr::Void);
+
+            if stmts.is_empty() {
+                val
+            } else {
+                RustExpr::BlockScope(stmts, Box::new(val))
+            }
+        }
+    }
+
+    impl From<GenBlock> for Vec<RustStmt> {
+        fn from(value: GenBlock) -> Vec<RustStmt> {
+            value.flatten()
+        }
+    }
+
+    impl From<GenStmt> for RustStmt {
+        fn from(value: GenStmt) -> Self {
+            match value {
+                GenStmt::Expr(gen_expr) => RustStmt::Expr(RustExpr::from(gen_expr)),
+                GenStmt::Embed(stmt) => stmt,
+                GenStmt::BindOnce(bind_name, block) => RustStmt::assign(bind_name, block.into()),
+            }
+        }
+    }
+
+    impl From<GenExpr> for RustExpr {
+        fn from(value: GenExpr) -> Self {
+            match value {
+                GenExpr::BlockScope(block) => RustExpr::from(*block),
+                GenExpr::Embed(expr) | GenExpr::TyValCon(.., expr) => expr,
+                GenExpr::Control(ctrl) => {
+                    RustExpr::Control(Box::new(RustControl::translate(*ctrl)))
+                }
+                GenExpr::WrapSome(expr) => RustExpr::from(*expr).wrap_some(),
+                GenExpr::ResultOk(qual, expr) => RustExpr::from(*expr).wrap_ok(qual),
+                GenExpr::ResultErr(expr) => RustExpr::from(*expr).err(),
+                GenExpr::Try(expr) => RustExpr::from(*expr).wrap_try(),
+                GenExpr::CallThunk(thunk) => {
+                    let closure = if thunk.thunk_body.ret.is_none() {
+                        RustClosure::thunk_body(thunk.thunk_body.flatten())
+                    } else {
+                        RustClosure::thunk_expr(RustExpr::from(thunk.thunk_body))
+                    };
+                    RustExpr::Closure(closure).call()
+                }
+            }
+        }
+    }
+    // !SECTION
+
+    impl From<&ByteSet> for ByteCriterion {
+        fn from(value: &ByteSet) -> Self {
+            if value.is_full() {
+                ByteCriterion::Any
+            } else {
+                match value.len() {
+                    1 => {
+                        let elt = value.min_elem().expect("len == 1 but no min_elem");
+                        ByteCriterion::MustBe(elt)
+                    }
+                    255 => {
+                        let elt = (!value)
+                            .min_elem()
+                            .expect("len == 255 but no min_elem (on negation)");
+                        ByteCriterion::OtherThan(elt)
+                    }
+                    2..=254 => ByteCriterion::WithinSet(*value),
+                    other => unreachable!("unexpected byteset len in catch-all: {other}"),
+                }
+            }
+        }
+    }
+
+    impl ShortCircuit for GenBlock {
+        fn is_short_circuiting(&self) -> bool {
+            self.stmts.is_short_circuiting()
+                || self.ret.as_ref().is_some_and(GenExpr::is_short_circuiting)
+        }
+    }
+
+    impl ShortCircuit for GenStmt {
+        fn is_short_circuiting(&self) -> bool {
+            match self {
+                GenStmt::Expr(gen_expr) => gen_expr.is_short_circuiting(),
+                GenStmt::Embed(stmt) => stmt.is_short_circuiting(),
+                GenStmt::BindOnce(_, block) => block.is_short_circuiting(),
+            }
+        }
+    }
+
+    impl ShortCircuit for GenExpr {
+        fn is_short_circuiting(&self) -> bool {
+            match self {
+                GenExpr::Embed(expr) => expr.is_short_circuiting(),
+                GenExpr::TyValCon(expr) => expr.is_short_circuiting(),
+                GenExpr::Control(ctrl) => ctrl.is_short_circuiting(),
+                GenExpr::ResultOk(.., expr)
+                | GenExpr::ResultErr(expr)
+                | GenExpr::WrapSome(expr) => expr.is_short_circuiting(),
+                GenExpr::BlockScope(block) => block.is_short_circuiting(),
+                GenExpr::Try(..) => true,
+                GenExpr::CallThunk(..) => false,
+            }
+        }
+    }
+
+    impl<ExprT> Rebindable for DecoderFn<ExprT> {
+        fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
+            if let Some(ref mut name) = self.adhoc_name {
+                if table.contains_key(&*name) {
+                    *name = table.index(&*name).clone();
+                }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::TypeHint;
     use crate::helper::{ANY_BYTE, compute, record, succ, var};
+    use crate::numeric::MachineRep;
     use proptest::prelude::*;
 
     fn population_check(module: &FormatModule, f: &Format, label: Option<&'static str>) {
@@ -5486,212 +5723,21 @@ mod tests {
             writeln!(&mut log, "{}", output).unwrap();
             writeln!(&mut log, "\n\n").unwrap();
             prop_assert!(is_valid_output(&output))
+        });
+        let strat = crate::numeric::core::strategy::any_expr_with_vars([("x", MachineRep::U8)]);
+        proptest!(|(tree in strat)| {
+            let mut log = handle.borrow_mut();
+            use std::io::Write;
+            writeln!(&mut log, "## {}", crate::numeric::printer::show_expr(&tree)).unwrap();
+            let mut module = FormatModule::new();
+            let f = module.define_format("test.arb_var", record([
+                ("x", Format::Byte(ByteSet::full())),
+                ("tree", compute(Expr::Numeric(Box::new(tree)))),
+            ]));
+            let output = produce_string_gencode(&module, &f.call());
+            writeln!(&mut log, "{}", output).unwrap();
+            writeln!(&mut log, "\n\n").unwrap();
+            prop_assert!(is_valid_output(&output))
         })
-    }
-}
-
-mod __impls {
-    use super::*;
-
-    impl<'a> Default for ProdCtxt<'a> {
-        fn default() -> Self {
-            Self {
-                input_varname: &Cow::Borrowed(""),
-            }
-        }
-    }
-
-    // SECTION - upcasts and conversions to Gen{Stmt,Expr,Block}
-    impl From<RustExpr> for GenBlock {
-        fn from(value: RustExpr) -> Self {
-            GenBlock {
-                stmts: Vec::new(),
-                ret: Some(GenExpr::Embed(value)),
-            }
-        }
-    }
-
-    impl From<GenExpr> for GenBlock {
-        fn from(value: GenExpr) -> Self {
-            GenBlock {
-                stmts: Vec::new(),
-                ret: Some(value),
-            }
-        }
-    }
-
-    impl From<GenControl> for GenBlock {
-        fn from(value: GenControl) -> Self {
-            GenBlock {
-                stmts: Vec::new(),
-                ret: Some(GenExpr::Control(Box::new(value))),
-            }
-        }
-    }
-
-    impl From<GenControl> for GenExpr {
-        fn from(value: GenControl) -> Self {
-            GenExpr::Control(Box::new(value))
-        }
-    }
-
-    impl From<Vec<GenStmt>> for GenBlock {
-        fn from(stmts: Vec<GenStmt>) -> Self {
-            GenBlock { stmts, ret: None }
-        }
-    }
-
-    impl From<RustStmt> for GenStmt {
-        fn from(value: RustStmt) -> Self {
-            GenStmt::Embed(value)
-        }
-    }
-
-    impl From<RustExpr> for GenStmt {
-        fn from(value: RustExpr) -> Self {
-            GenStmt::Expr(GenExpr::Embed(value))
-        }
-    }
-
-    impl From<GenExpr> for GenStmt {
-        fn from(value: GenExpr) -> Self {
-            GenStmt::Expr(value)
-        }
-    }
-
-    impl From<RustControl<GenBlock>> for GenStmt {
-        fn from(value: RustControl<GenBlock>) -> Self {
-            GenStmt::Expr(GenExpr::Control(Box::new(value)))
-        }
-    }
-
-    impl From<RustExpr> for GenExpr {
-        fn from(value: RustExpr) -> Self {
-            GenExpr::Embed(value)
-        }
-    }
-    // !SECTION
-
-    // SECTION - downcasts and conversions to Rust{Stmt,Expr}
-    impl From<GenBlock> for RustExpr {
-        fn from(value: GenBlock) -> Self {
-            let (stmts, ret) = value.synthesize();
-
-            // REVIEW - do we always want an explicit Unit here?
-            let val = ret.unwrap_or(RustExpr::Void);
-
-            if stmts.is_empty() {
-                val
-            } else {
-                RustExpr::BlockScope(stmts, Box::new(val))
-            }
-        }
-    }
-
-    impl From<GenBlock> for Vec<RustStmt> {
-        fn from(value: GenBlock) -> Vec<RustStmt> {
-            value.flatten()
-        }
-    }
-
-    impl From<GenStmt> for RustStmt {
-        fn from(value: GenStmt) -> Self {
-            match value {
-                GenStmt::Expr(gen_expr) => RustStmt::Expr(RustExpr::from(gen_expr)),
-                GenStmt::Embed(stmt) => stmt,
-                GenStmt::BindOnce(bind_name, block) => RustStmt::assign(bind_name, block.into()),
-            }
-        }
-    }
-
-    impl From<GenExpr> for RustExpr {
-        fn from(value: GenExpr) -> Self {
-            match value {
-                GenExpr::BlockScope(block) => RustExpr::from(*block),
-                GenExpr::Embed(expr) | GenExpr::TyValCon(.., expr) => expr,
-                GenExpr::Control(ctrl) => {
-                    RustExpr::Control(Box::new(RustControl::translate(*ctrl)))
-                }
-                GenExpr::WrapSome(expr) => RustExpr::from(*expr).wrap_some(),
-                GenExpr::ResultOk(qual, expr) => RustExpr::from(*expr).wrap_ok(qual),
-                GenExpr::ResultErr(expr) => RustExpr::from(*expr).err(),
-                GenExpr::Try(expr) => RustExpr::from(*expr).wrap_try(),
-                GenExpr::CallThunk(thunk) => {
-                    let closure = if thunk.thunk_body.ret.is_none() {
-                        RustClosure::thunk_body(thunk.thunk_body.flatten())
-                    } else {
-                        RustClosure::thunk_expr(RustExpr::from(thunk.thunk_body))
-                    };
-                    RustExpr::Closure(closure).call()
-                }
-            }
-        }
-    }
-    // !SECTION
-
-    impl From<&ByteSet> for ByteCriterion {
-        fn from(value: &ByteSet) -> Self {
-            if value.is_full() {
-                ByteCriterion::Any
-            } else {
-                match value.len() {
-                    1 => {
-                        let elt = value.min_elem().expect("len == 1 but no min_elem");
-                        ByteCriterion::MustBe(elt)
-                    }
-                    255 => {
-                        let elt = (!value)
-                            .min_elem()
-                            .expect("len == 255 but no min_elem (on negation)");
-                        ByteCriterion::OtherThan(elt)
-                    }
-                    2..=254 => ByteCriterion::WithinSet(*value),
-                    other => unreachable!("unexpected byteset len in catch-all: {other}"),
-                }
-            }
-        }
-    }
-
-    impl ShortCircuit for GenBlock {
-        fn is_short_circuiting(&self) -> bool {
-            self.stmts.is_short_circuiting()
-                || self.ret.as_ref().is_some_and(GenExpr::is_short_circuiting)
-        }
-    }
-
-    impl ShortCircuit for GenStmt {
-        fn is_short_circuiting(&self) -> bool {
-            match self {
-                GenStmt::Expr(gen_expr) => gen_expr.is_short_circuiting(),
-                GenStmt::Embed(stmt) => stmt.is_short_circuiting(),
-                GenStmt::BindOnce(_, block) => block.is_short_circuiting(),
-            }
-        }
-    }
-
-    impl ShortCircuit for GenExpr {
-        fn is_short_circuiting(&self) -> bool {
-            match self {
-                GenExpr::Embed(expr) => expr.is_short_circuiting(),
-                GenExpr::TyValCon(expr) => expr.is_short_circuiting(),
-                GenExpr::Control(ctrl) => ctrl.is_short_circuiting(),
-                GenExpr::ResultOk(.., expr)
-                | GenExpr::ResultErr(expr)
-                | GenExpr::WrapSome(expr) => expr.is_short_circuiting(),
-                GenExpr::BlockScope(block) => block.is_short_circuiting(),
-                GenExpr::Try(..) => true,
-                GenExpr::CallThunk(..) => false,
-            }
-        }
-    }
-
-    impl<ExprT> Rebindable for DecoderFn<ExprT> {
-        fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
-            if let Some(ref mut name) = self.adhoc_name {
-                if table.contains_key(&*name) {
-                    *name = table.index(&*name).clone();
-                }
-            }
-        }
     }
 }
