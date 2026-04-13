@@ -14,7 +14,7 @@ use serde::Serialize;
 use crate::{
     BaseKind, BaseType, ByteSet, DynFormat, Endian, Expr, Format, FormatModule, FormatRef,
     IntoLabel, IxHeap, Label, Pattern, StyleHint, TypeScope, ValueKind, ValueType, ViewExpr,
-    typecheck::UnificationError, valuetype::Container,
+    typecheck::error::UnificationError, valuetype::Container,
 };
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Eq, Ord, Hash)]

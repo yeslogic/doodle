@@ -367,7 +367,7 @@ fn compile_expr(expr: &Expr, prec: Precedence) -> Fragment {
     }
 }
 
-fn show_expr(expr: &Expr) -> String {
+pub fn show_expr(expr: &Expr) -> String {
     format!("{}", compile_expr(expr, Precedence::TOP))
 }
 
@@ -533,7 +533,7 @@ mod tests {
             Expr::BinOp(
                 BinOp::new(BasicBinOp::Add, None),
                 Box::new(Expr::BinOp(
-                    BinOp::new(BasicBinOp::Add, Some(NumRep::U32.into())),
+                    BinOp::new(BasicBinOp::Add, Some(MachineRep::U32)),
                     Box::new(Expr::Const(TypedConst(BigInt::from(10), NumRep::U32))),
                     Box::new(Expr::Const(TypedConst(BigInt::from(-1), NumRep::I32))),
                 )),

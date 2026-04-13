@@ -1,8 +1,8 @@
 use crate::byte_set::ByteSet;
 use crate::decoder::View;
 use crate::decoder::{
-    Compiler, Decoder, Program, ScopeEntry, SeqKind, Value, ValueSeq, cow_map, cow_remap,
-    extract_pair,
+    Compiler, Decoder, Program, ScopeEntry, SeqKind, UnknownVarError, Value, ValueSeq, cow_map,
+    cow_remap, extract_pair,
     search::{find_index_by_key_sorted, find_index_by_key_unsorted},
     seq_kind::sub_range,
 };
@@ -534,14 +534,14 @@ impl ParsedValue {
 impl Expr {
     pub fn eval_with_loc<'a>(&'a self, scope: &'a LocScope<'a>) -> Cow<'a, ParsedValue> {
         match self {
-            Expr::Var(name) => Cow::Borrowed(scope.get_value_by_name(name)),
+            Expr::Var(name) => Cow::Borrowed(scope.get_value_by_name(name).unwrap()),
             Expr::Bool(b) => Cow::Owned(ParsedValue::from_evaluated(Value::Bool(*b))),
             Expr::U8(i) => Cow::Owned(ParsedValue::from_evaluated(Value::U8(*i))),
             Expr::U16(i) => Cow::Owned(ParsedValue::from_evaluated(Value::U16(*i))),
             Expr::U32(i) => Cow::Owned(ParsedValue::from_evaluated(Value::U32(*i))),
             Expr::U64(i) => Cow::Owned(ParsedValue::from_evaluated(Value::U64(*i))),
             Expr::Numeric(n) => {
-                let num_val = n.eval();
+                let num_val = n.eval(scope);
                 match num_val {
                     Ok(v) => Cow::Owned(ParsedValue::from_evaluated(Value::from(v))),
                     // WIP[epic=embedded-num] - we probably want a more sensible outcome than panic
@@ -1273,9 +1273,9 @@ pub struct LocViewScope<'a> {
 }
 
 impl<'a> LocScope<'a> {
-    fn get_value_by_name(&self, name: &str) -> &ParsedValue {
+    pub(crate) fn get_value_by_name(&self, name: &str) -> Result<&ParsedValue, UnknownVarError> {
         match self {
-            LocScope::Empty => panic!("value not found: {name}"),
+            LocScope::Empty => Err(UnknownVarError(Label::Owned(name.to_string()))),
             LocScope::Multi(multi) => multi.get_value_by_name(name),
             LocScope::Single(single) => single.get_value_by_name(name),
             LocScope::Decoder(decoder) => decoder.parent.get_value_by_name(name),
@@ -1335,13 +1335,16 @@ impl<'a> LocMultiScope<'a> {
             .push((name.into(), ViewOrParsedValue::View(view)))
     }
 
-    fn get_value_by_name(&self, name: &str) -> &ParsedValue {
+    fn get_value_by_name(&self, name: &str) -> Result<&ParsedValue, UnknownVarError> {
         for (n, vv) in self.entries.iter().rev() {
             if n == name {
                 if let Some(v) = vv.try_as_value() {
-                    return v;
+                    return Ok(v);
                 } else {
-                    // REVIEW - consider whether view-shadows-value cases should be errors
+                    log::warn!(
+                        "LocMultiScope::get_value_by_name: query for `{name}` encountered a view-binding before any value-bindings, skipping..."
+                    );
+                    continue;
                 }
             }
         }
@@ -1376,9 +1379,9 @@ impl<'a> LocSingleScope<'a> {
         }
     }
 
-    fn get_value_by_name(&self, name: &str) -> &ParsedValue {
+    fn get_value_by_name(&self, name: &str) -> Result<&ParsedValue, UnknownVarError> {
         if self.name == name {
-            self.value
+            Ok(self.value)
         } else {
             self.parent.get_value_by_name(name)
         }

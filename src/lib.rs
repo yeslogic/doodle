@@ -38,8 +38,10 @@ mod precedence;
 pub mod prelude;
 pub mod read;
 
+mod scope;
+
 mod typecheck;
-pub use typecheck::{TCError, TCResult, typecheck};
+pub use typecheck::{TCResult, error::TCError, typecheck, base_set};
 mod util;
 pub(crate) use util::IxHeap;
 

@@ -9,6 +9,7 @@ edition = "2024"
 [features]
 default = []
 pattern_matches_auto_rep = []
+__unify_mixed_to_int = []
 
 [[bin]]
 name = "doodle"
@@ -35,3 +36,4 @@ vec-collections = "0.4.3"
 log = "0.4.29"
 stderrlog = "0.6.0"
 num-bigint = "0.4"
+cfg-if = "1.0.4"
