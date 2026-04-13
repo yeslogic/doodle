@@ -1,10 +1,13 @@
-use super::UVar;
-use crate::numeric::core::{Bounds, Expr, MachineRep, NumRep};
-use crate::numeric::elaborator::{IntType, PRIM_INTS, PrimInt};
+use super::NVar;
+use super::base_set::IntSet;
+use crate::numeric::{
+    core::{Bounds, Expr, MachineRep, NumRep},
+    elaborator::{IntType, PRIM_INTS, PrimInt},
+};
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum NUType {
-    Var(UVar),
+    Var(NVar),
     Int(IntType),
 }
 
@@ -14,8 +17,8 @@ impl From<IntType> for NUType {
     }
 }
 
-impl From<UVar> for NUType {
-    fn from(value: UVar) -> Self {
+impl From<NVar> for NUType {
+    fn from(value: NVar) -> Self {
         NUType::Var(value)
     }
 }
@@ -24,6 +27,7 @@ impl From<UVar> for NUType {
 pub(crate) enum NVType {
     Int(IntType),
     Within(Bounds),
+    // REVIEW - is this variant strictly necessary for InferenceEngine?
     Abstract(NUType),
 }
 
@@ -39,6 +43,73 @@ pub enum Constraints {
 impl Constraints {
     pub fn new() -> Constraints {
         Constraints::Indefinite
+    }
+}
+
+#[allow(dead_code)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum NumConstraint {
+    Int(IntType),
+    // Must be able to represent all values within the specified range
+    Encompasses(crate::numeric::core::Bounds),
+}
+
+impl std::fmt::Display for NumConstraint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            NumConstraint::Int(it) => write!(f, "= {it}"),
+            NumConstraint::Encompasses(bounds) => write!(f, "∈ {}", bounds),
+        }
+    }
+}
+
+#[allow(dead_code)]
+impl NumConstraint {
+    /// Returns `Some(true)` if this constraint is definitely satisfiable by a given type-assignment.
+    ///
+    /// If the constraint is known to be unsatisfiable by the assignment, returns `Some(false)` instead.
+    ///
+    /// Otherwise, returns `None` if the constraint cannot be determined statically.
+    pub(crate) fn is_satisfied_by(&self, candidate: IntType) -> Option<bool> {
+        match self {
+            NumConstraint::Int(int_type) => Some(int_type == &candidate),
+            NumConstraint::Encompasses(bounds) => {
+                let IntType::Prim(candidate) = candidate;
+                Some(bounds.is_encompassed_by(
+                    &<PrimInt as Into<crate::numeric::MachineRep>>::into(candidate).as_bounds(),
+                ))
+            }
+        }
+    }
+
+    // NOTE - should only be called on Encompasses
+    pub(crate) fn get_unique_solution(&self) -> InferenceResult<IntType> {
+        debug_assert!(matches!(self, NumConstraint::Encompasses(_)));
+        // REVIEW - there are smarter ways of calculating this
+        let mut solutions = Vec::with_capacity(8);
+        for prim_int in PRIM_INTS.iter() {
+            match self.is_satisfied_by(IntType::Prim(*prim_int)) {
+                Some(true) => {
+                    solutions.push(*prim_int);
+                }
+                Some(false) => (),
+                None => panic!(
+                    "unexpected call to get_unique_solution on `{self}` (either trivial or insoluble)"
+                ),
+            }
+        }
+        match solutions.as_slice() {
+            [] => Err(InferenceError::NoSolution),
+            [uniq] => Ok(IntType::Prim(*uniq)),
+            _ => Err(InferenceError::MultipleSolutions),
+        }
+    }
+
+    pub(crate) fn to_int_set(&self) -> IntSet {
+        match self {
+            NumConstraint::Int(it) => IntSet::Single(it.to_prim()),
+            NumConstraint::Encompasses(bounds) => IntSet::from_bounds(bounds),
+        }
     }
 }
 
@@ -65,10 +136,11 @@ impl From<NUType> for Constraint {
 }
 
 impl Constraint {
-    /// Speculatively checks if this constraint is definitely satisfiable (as-is) by a given type-assignment.
+    /// Returns `Some(true)` if this constraint is definitely satisfiable by a given type-assignment.
     ///
-    /// If this is not statically deterministic, returns `None`.
-    /// Returns `Some(true)` if the constraint is satisfiable by the assignment, and `Some(false)` otherwise.
+    /// If the constraint is known to be unsatisfiable by the assignment, returns `Some(false)` instead.
+    ///
+    /// Otherwise, returns `None` if the constraint cannot be determined statically.
     pub(crate) fn is_satisfied_by(&self, candidate: IntType) -> Option<bool> {
         match self {
             Constraint::Equiv(utype) => match utype {
@@ -88,6 +160,7 @@ impl Constraint {
 
     // NOTE - should only be called on Encompasses
     pub(crate) fn get_unique_solution(&self) -> InferenceResult<IntType> {
+        debug_assert!(matches!(self, Constraint::Encompasses(_)));
         // REVIEW - there are smarter ways of calculating this
         let mut solutions = Vec::with_capacity(8);
         for prim_int in PRIM_INTS.iter() {
@@ -109,78 +182,33 @@ impl Constraint {
     }
 }
 
+use super::error::{InferenceError, InferenceResult};
+
 #[derive(Debug)]
 pub struct InferenceEngine {
     constraints: Vec<Constraints>,
     aliases: Vec<Alias>,
+    // global_deps: GlobalDeps,
 }
-
-#[derive(Debug)]
-pub enum InferenceError {
-    BadUnification(Constraint, Constraint),
-    Ambiguous,
-    NoSolution,
-    MultipleSolutions,
-    Eval(crate::numeric::core::EvalError),
-    UnconstrainedVar(UVar),
-}
-
-impl std::fmt::Display for InferenceError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            InferenceError::BadUnification(cx1, cx2) => {
-                write!(f, "constraints `{}` and `{}` cannot be unified", cx1, cx2)
-            }
-            InferenceError::Ambiguous => write!(
-                f,
-                "mixed-type binary operation must have out_rep on operation to avoid ambiguity"
-            ),
-            InferenceError::Eval(e) => {
-                write!(f, "inference abandoned due to evaluation error: {}", e)
-            }
-            InferenceError::NoSolution => write!(
-                f,
-                "no valid assignment of PrimInt types produce a fully representable tree"
-            ),
-            InferenceError::MultipleSolutions => write!(
-                f,
-                "multiple assignments of PrimInt produce a fully representable tree, in absence of tie-breaking mechanism"
-            ),
-            InferenceError::UnconstrainedVar(v) => {
-                write!(f, "unconstrained variable {v} cannot be solved")
-            }
-        }
-    }
-}
-
-impl std::error::Error for InferenceError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            InferenceError::Eval(e) => Some(e),
-            _ => None,
-        }
-    }
-}
-
-pub type InferenceResult<T> = Result<T, InferenceError>;
 
 impl InferenceEngine {
     pub fn new() -> Self {
         Self {
             constraints: Vec::new(),
             aliases: Vec::new(),
+            // global_deps: GlobalDeps::new(),
         }
     }
 
-    pub fn init_var_simple(&mut self, typ: NUType) -> InferenceResult<(UVar, NUType)> {
-        let newvar = self.get_new_uvar();
+    pub fn init_var_simple(&mut self, typ: NUType) -> InferenceResult<(NVar, NUType)> {
+        let newvar = self.get_new_nvar();
         let constr = Constraint::Equiv(typ);
         self.unify_var_constraint(newvar, constr)?;
         Ok((newvar, typ))
     }
 
-    fn get_new_uvar(&mut self) -> UVar {
-        let ret = UVar(self.constraints.len());
+    fn get_new_nvar(&mut self) -> NVar {
+        let ret = NVar(self.constraints.len());
         self.constraints.push(Constraints::new());
         self.aliases.push(Alias::new());
         ret
@@ -195,19 +223,19 @@ impl InferenceEngine {
 }
 
 impl InferenceEngine {
-    fn get_canonical_uvar(&self, v: UVar) -> UVar {
+    fn get_canonical(&self, v: NVar) -> NVar {
         match self.aliases[v.0] {
             Alias::Canonical(_) | Alias::Ground => v,
-            Alias::BackRef(ix) => UVar(ix),
+            Alias::BackRef(ix) => NVar(ix),
         }
     }
 
     fn unify_var_constraint(
         &mut self,
-        uvar: UVar,
+        var: NVar,
         constraint: Constraint,
     ) -> InferenceResult<Constraint> {
-        let can_ix = self.get_canonical_uvar(uvar).0;
+        let can_ix = self.get_canonical(var).0;
 
         match &self.constraints[can_ix] {
             Constraints::Indefinite => {
@@ -227,11 +255,29 @@ impl InferenceEngine {
         }
     }
 
+    /// Repoints `hi` back to `lo` and adds a forward reference from `lo` to `hi`.
+    ///
+    /// # Safety
+    ///
+    /// This method is not known to cause UB, but it is an internal-facing call that may lead to
+    /// corrupted alias-state if called in a context that does not check certain preconditions. In particular,
+    ///  - `lo` < `hi`
+    ///  - `lo` must be canonical
     unsafe fn repoint(&mut self, lo: usize, hi: usize) {
         self.aliases[hi].set_backref(lo);
         self.aliases[lo].add_forward_ref(hi);
     }
 
+    /// Given two indices `a1` and `a2` extracted from aliased `NVar`s, reconciles the constraints
+    /// stored at both indices and updates the stored constraints-values accordingly.
+    ///
+    /// Will return an InferenceError if both indices point to `Invariant` constraints that cannot be reconciled.
+    ///
+    /// # Safety
+    ///
+    /// This method does not involve any UB, but is a low-level internal that should only be called in the context
+    /// of a larger alias-and-unify operation, as in `unify_var_pair`. It is marked `unsafe` to provide a linting
+    /// error when used malapropos.
     unsafe fn transfer_constraints(
         &mut self,
         a1: usize,
@@ -255,6 +301,8 @@ impl InferenceEngine {
     }
 
     #[must_use]
+    /// Overwrites the [`Constraints`] at the specified index `tgt_ix` with the immediate value at the specified index `src_ix`, returning
+    /// a reference to the value at the rewritten index.
     fn replace_constraints_from_index(&mut self, tgt_ix: usize, src_ix: usize) -> &Constraints {
         assert_ne!(tgt_ix, src_ix);
         let val = self.constraints[src_ix].clone();
@@ -262,12 +310,18 @@ impl InferenceEngine {
     }
 
     #[must_use]
+    /// Overwrites the [`Constraints`] at the specified index with the provided value, returning
+    /// a reference to the updated value.
     fn replace_constraints_with_value(&mut self, ix: usize, val: Constraints) -> &Constraints {
         self.constraints[ix] = val;
         &self.constraints[ix]
     }
 
-    fn unify_var_pair(&mut self, v1: UVar, v2: UVar) -> InferenceResult<&Constraints> {
+    /// Performs unification between two variables, returning a reference to the resulting [`Constraints`]
+    /// that now apply to both.
+    ///
+    /// Handles both aliasing and constraint-unification.
+    fn unify_var_pair(&mut self, v1: NVar, v2: NVar) -> InferenceResult<&Constraints> {
         if v1 == v2 {
             return Ok(&self.constraints[v1.0]);
         }
@@ -490,8 +544,8 @@ impl InferenceEngine {
         bounds: &Bounds,
     ) -> InferenceResult<Constraint> {
         match utype {
-            NUType::Var(uvar) => {
-                self.unify_var_constraint(uvar, Constraint::Encompasses(bounds.clone()))
+            NUType::Var(var) => {
+                self.unify_var_constraint(var, Constraint::Encompasses(bounds.clone()))
             }
             NUType::Int(int_type) => {
                 let IntType::Prim(candidate) = int_type;
@@ -509,19 +563,23 @@ impl InferenceEngine {
         }
     }
 
-    fn unify_var_utype(&mut self, uvar: UVar, utype: NUType) -> InferenceResult<()> {
-        let _ = self.unify_var_constraint(uvar, Constraint::Equiv(utype))?;
+    fn unify_var_utype(&mut self, var: NVar, utype: NUType) -> InferenceResult<()> {
+        let _ = self.unify_var_constraint(var, Constraint::Equiv(utype))?;
         Ok(())
     }
 
-    fn unify_var_rep(&mut self, uvar: UVar, rep: NumRep) -> InferenceResult<()> {
+    fn unify_var_rep(&mut self, var: NVar, rep: NumRep) -> InferenceResult<()> {
         if rep.is_auto() {
             return Ok(());
         }
         let t = NUType::Int(IntType::Prim(PrimInt::try_from(rep).unwrap()));
-        self.unify_var_utype(uvar, t)
+        self.unify_var_utype(var, t)
     }
 
+    /// Unifies two constraints applying to the same metavariable and returns
+    /// the resultant constraint.
+    ///
+    /// Returns an error if the constraints cannot be unified.
     fn unify_constraint_pair(
         &mut self,
         c1: Constraint,
@@ -549,13 +607,16 @@ impl InferenceEngine {
 }
 
 impl InferenceEngine {
-    pub(crate) fn infer_var_expr(&mut self, e: &Expr) -> InferenceResult<(UVar, NumRep)> {
+    pub(crate) fn infer_var_expr<'a>(&mut self, e: &Expr) -> InferenceResult<(NVar, NumRep)> {
         let (top_var, top_rep) = match e {
+            Expr::NumVar(v_ident) => {
+                return Err(InferenceError::UnscopedVariable(v_ident.clone()));
+            }
             Expr::Const(typed_const) => {
                 let rep = typed_const.get_rep();
                 let var = match rep {
                     NumRep::AUTO => {
-                        let this_var = self.get_new_uvar();
+                        let this_var = self.get_new_nvar();
                         self.unify_var_constraint(
                             this_var,
                             Constraint::Encompasses(Bounds::singleton(
@@ -600,7 +661,7 @@ impl InferenceEngine {
                 (var, rep)
             }
             Expr::BinOp(bin_op, lhs, rhs) => {
-                let this_var = self.get_new_uvar();
+                let this_var = self.get_new_nvar();
                 let (l_var, l_rep) = self.infer_var_expr(&lhs)?;
                 let (r_var, r_rep) = self.infer_var_expr(&rhs)?;
                 let cast_rep = bin_op.cast_rep();
@@ -612,33 +673,6 @@ impl InferenceEngine {
                             self.unify_var_rep(this_var, NumRep::Concrete(rep))?;
                             NumRep::Concrete(rep)
                         } else {
-                            {
-                                // REVIEW - do we need to go this far?
-                                match e.eval() {
-                                    Ok(v) => match v.as_const() {
-                                        Some(c) => {
-                                            // NOTE - if there is a const-evaluable result for the computation, use it to refine our constraints on which types satisfy the aliased Auto
-                                            let bounds =
-                                                Bounds::singleton(c.as_raw_value().clone());
-                                            self.unify_var_constraint(
-                                                this_var,
-                                                Constraint::Encompasses(bounds),
-                                            )?;
-                                        }
-                                        None => {
-                                            // FIXME - this isn't a hard error necessarily, but our model isn't complex enough for non-TypedConst values to emerge
-                                            unimplemented!(
-                                                "Value::AsConst returned None (unexpectedly) when called from InferenceEngine::infer_var_expr"
-                                            );
-                                        }
-                                    },
-                                    Err(e) => {
-                                        // NOTE - If the computation will fail regardless, there is no need to infer the type-information of the AST
-                                        // REVIEW - make sure that we are confident in EvalErrors being sound reasons to fail type-inference, both now and going forward
-                                        return Err(InferenceError::Eval(e));
-                                    }
-                                }
-                            }
                             NumRep::AUTO
                         }
                     }
@@ -684,7 +718,7 @@ impl InferenceEngine {
                 (this_var, this_rep)
             }
             Expr::UnaryOp(unary_op, expr) => {
-                let this_var = self.get_new_uvar();
+                let this_var = self.get_new_nvar();
                 let (inner_var, inner_rep) = self.infer_var_expr(&expr)?;
                 let cast_rep = unary_op.cast_rep();
                 let this_rep = match inner_rep {
@@ -695,33 +729,6 @@ impl InferenceEngine {
                             self.unify_var_rep(this_var, rep)?;
                             rep
                         } else {
-                            {
-                                // REVIEW - do we need to go this far?
-                                match e.eval() {
-                                    Ok(v) => match v.as_const() {
-                                        Some(c) => {
-                                            // NOTE - if there is a const-evaluable result for the computation, use it to refine our constraints on which types satisfy the aliased Auto
-                                            let bounds =
-                                                Bounds::singleton(c.as_raw_value().clone());
-                                            self.unify_var_constraint(
-                                                this_var,
-                                                Constraint::Encompasses(bounds),
-                                            )?;
-                                        }
-                                        None => {
-                                            // FIXME - this isn't a hard error necessarily, but our model isn't complex enough for non-TypedConst values to emerge
-                                            unimplemented!(
-                                                "Value::AsConst returned None (unexpectedly) when called from InferenceEngine::infer_var_expr"
-                                            );
-                                        }
-                                    },
-                                    Err(e) => {
-                                        // NOTE - If the computation will fail regardless, there is no need to infer the type-information of the AST
-                                        // REVIEW - make sure that we are confident in EvalErrors being sound reasons to fail type-inference, both now and going forward
-                                        return Err(InferenceError::Eval(e));
-                                    }
-                                }
-                            }
                             NumRep::AUTO
                         }
                     }
@@ -739,7 +746,7 @@ impl InferenceEngine {
                 (this_var, this_rep)
             }
             &Expr::Cast(rep, ref expr) => {
-                let this_var = self.get_new_uvar();
+                let this_var = self.get_new_nvar();
                 let (inner_var, inner_rep) = self.infer_var_expr(&expr)?;
                 let rep = rep.into();
                 if inner_rep.is_auto() {
@@ -752,39 +759,45 @@ impl InferenceEngine {
         Ok((top_var, top_rep))
     }
 
-    fn to_whnf_vtype(&self, t: NUType) -> NVType {
-        match t {
+    fn to_whnf_vtype(&self, t: NUType) -> InferenceResult<NVType> {
+        Ok(match t {
             NUType::Var(v) => {
-                let v0 = self.get_canonical_uvar(v);
+                let v0 = self.get_canonical(v);
                 match &self.constraints[v0.0] {
-                    Constraints::Indefinite => NVType::Abstract(v0.into()),
-                    Constraints::Invariant(Constraint::Equiv(ut)) => self.to_whnf_vtype(*ut),
+                    Constraints::Indefinite => {
+                        // REVIEW - does this case ever happen in practice?
+                        log::info!("var {} is indefinite", v0);
+                        NVType::Abstract(v0.into())
+                    }
+                    Constraints::Invariant(Constraint::Equiv(ut)) => self.to_whnf_vtype(*ut)?,
                     Constraints::Invariant(Constraint::Encompasses(bounds)) => {
                         NVType::Within(bounds.clone())
                     }
                 }
             }
             NUType::Int(int_type) => NVType::Int(int_type),
-        }
+        })
     }
 
-    pub(crate) fn substitute_uvar_vtype(&self, v: UVar) -> InferenceResult<Option<NVType>> {
-        match &self.constraints[self.get_canonical_uvar(v).0] {
+    pub(crate) fn substitute_nvar_nvtype(&self, v: NVar) -> InferenceResult<Option<NVType>> {
+        match &self.constraints[self.get_canonical(v).0] {
             Constraints::Indefinite => Ok(None),
             Constraints::Invariant(cx) => Ok(match cx {
-                Constraint::Equiv(ut) => Some(self.to_whnf_vtype(*ut)),
+                Constraint::Equiv(ut) => Some(self.to_whnf_vtype(*ut)?),
                 Constraint::Encompasses(bounds) => Some(NVType::Within(bounds.clone())),
             }),
         }
     }
 }
 
+impl InferenceEngine {}
+
 impl InferenceEngine {
     pub fn reify_err(&self, t: NUType) -> InferenceResult<IntType> {
         match t {
             NUType::Var(uv) => {
-                let v = self.get_canonical_uvar(uv);
-                match self.substitute_uvar_vtype(v)? {
+                let v = self.get_canonical(uv);
+                match self.substitute_nvar_nvtype(v)? {
                     Some(t0) => match t0 {
                         NVType::Int(int_type) => Ok(int_type),
                         NVType::Within(bounds) => Constraint::get_unique_solution(
@@ -807,5 +820,159 @@ impl InferenceEngine {
     #[inline(always)]
     pub fn reify(&self, t: NUType) -> Option<IntType> {
         self.reify_err(t).ok()
+    }
+}
+
+#[cfg(any())]
+mod __unused {
+    use super::*;
+
+    /// Global-dependency object for capturing relevant scope details and
+    /// handling UVar-dependencies within `InferenceEngine`.
+    #[derive(Debug, Default)]
+    pub(crate) struct GlobalDeps {
+        /// Mappings extracted from `UScope` associating each `NumVar` ident to the UVar it is bound to
+        idents: HashMap<Label, UVar>,
+        /// Memoized set of all `UVar`s whose solutions must be known for the numeric-tree to be solvable
+        global_vars: OnceCell<BTreeSet<UVar>>,
+        /// Incrementally collected store of solutions for `UVar`s
+        solutions: RefCell<DepSolutions>,
+    }
+
+    impl GlobalDeps {
+        /// Constructs a new `GlobalDeps` object.
+        ///
+        /// Will contain no bindings, variables, or solutions.
+        pub fn new() -> Self {
+            Self::default()
+        }
+
+        /// Returns `true` if this `GlobalDeps` object has any registered dependencies.
+        pub fn has_any_deps(&self) -> bool {
+            !self.idents.is_empty()
+        }
+
+        /// Inserts a new global-variable binding informed by a `UScope` parameter passed in at time-of-inference.
+        ///
+        /// # Panics
+        ///
+        /// Will panic if, for any reason, two different UVar values are inserted under
+        /// the same label.
+        fn insert(&mut self, label: Label, global: UVar) {
+            use std::collections::hash_map::Entry;
+            let entry = self.idents.entry(label);
+            match entry {
+                Entry::Occupied(occ) => {
+                    let lab = occ.key();
+                    let prior = *occ.get();
+                    if prior != global {
+                        unreachable!(
+                            "GlobalDeps::insert: entry for identifier `{lab}` inserted twice with different values: {prior} != {global}"
+                        );
+                    }
+                    return;
+                }
+                Entry::Vacant(vac) => {
+                    vac.insert(global);
+                }
+            }
+        }
+
+        /// Returns (or initializes) a memoized set of all `UVar`s that the numeric-tree being
+        /// typechecked depends on.
+        pub fn get_all_dependencies(&self) -> &BTreeSet<UVar> {
+            self.global_vars.get_or_init(|| {
+                let mut vars = BTreeSet::new();
+                for (_, var) in self.idents.iter() {
+                    vars.insert(*var);
+                }
+                vars
+            })
+        }
+
+        /// Returns `true` if there is at least one dependent `UVar` whose solution has not
+        /// yet been determined.
+        pub fn has_any_unsolved(&self) -> bool {
+            let table = self.solutions.borrow();
+            let deps = self.get_all_dependencies();
+
+            if table.len() < self.idents.len() {
+                // if there are fewer entries in the DepSolutions table than dependencies, we are necessarily missing some
+                return true;
+            }
+            // due to keys being unique, if the number of keys in the table is equal to the number
+            // of dependencies, we can assume that the table's keys are equiv
+
+            for (var, sol) in table.iter() {
+                if !sol.is_definite() {
+                    return true;
+                }
+                debug_assert!(deps.contains(var));
+            }
+            return false;
+        }
+
+        pub fn get_indefinite_dependencies(&self) -> BTreeSet<UVar> {
+            let mut vars = BTreeSet::new();
+            let table = self.solutions.borrow();
+            for (_, var) in self.idents.iter() {
+                if !table.get(var).is_some_and(VarSolution::is_definite) {
+                    vars.insert(*var);
+                }
+            }
+            vars
+        }
+
+        pub fn update_solutions(&self, solutions: &DepSolutions) {
+            let mut table = self.solutions.borrow_mut();
+            for (var, solution) in solutions.iter() {
+                if !solution.is_definite() {
+                    continue;
+                }
+                if let Some(prior) = table.insert(*var, *solution)
+                    && prior.is_definite()
+                    && prior != *solution
+                {
+                    unreachable!(
+                        "GlobalDeps::update_solutions: entry for metavariable {var} inserted twice with different values: {prior} != {solution}"
+                    );
+                }
+            }
+        }
+
+        /// Performs a lookup for the solution of a metavariable.
+        ///
+        /// Returns `None` if the metavariable has not yet been solved.
+        fn lookup(&self, v: UVar) -> Option<IntType> {
+            #[cfg(debug_assertions)]
+            {
+                let deps = self.get_all_dependencies();
+                debug_assert!(deps.contains(&v));
+            }
+            let table = self.solutions.borrow();
+            table.get(&v).copied().and_then(VarSolution::coerce_int)
+        }
+    }
+
+    impl InferenceEngine {
+        pub(crate) fn has_global_deps(&self) -> bool {
+            self.global_deps.has_any_deps()
+        }
+
+        pub(crate) fn get_dep_vars(&self) -> &BTreeSet<UVar> {
+            self.global_deps.get_all_dependencies()
+        }
+
+        pub(crate) fn get_unsolved_deps(&self) -> BTreeSet<UVar> {
+            self.global_deps.get_indefinite_dependencies()
+        }
+
+        pub(crate) fn has_unsolved_deps(&self) -> bool {
+            self.global_deps.has_any_unsolved()
+        }
+
+        pub(crate) fn update_solutions(&self, solutions: &DepSolutions) {
+            self.global_deps.update_solutions(solutions);
+        }
     }
 }

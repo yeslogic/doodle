@@ -1,16 +1,34 @@
-use crate::typecheck::inference::InferenceError;
-use crate::valuetype::{SeqBorrowHint, augmented::AugValueType};
-use crate::{
-    Arith, BaseType, DynFormat, Expr, Format, FormatModule, Label, Pattern, UnaryOp, ValueType,
-    ViewExpr, ViewFormat,
-};
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     rc::Rc,
 };
 
+use crate::numeric::{
+    MachineRep, NumRep,
+    core::{BitWidth, Bounds as ZBounds, Expr as NExpr},
+    elaborator::{IntType, PrimInt},
+};
+use crate::valuetype::{SeqBorrowHint, augmented::AugValueType};
+use crate::{
+    Arith, BaseType, DynFormat, Expr, Format, FormatModule, Label, Pattern, UnaryOp, ValueType,
+    ViewExpr, ViewFormat,
+};
+
+pub mod base_set;
+#[cfg(any())]
+use base_set::PrimIntSet;
+use base_set::{BaseSet, IntSet, UintSet};
+
+pub(crate) mod deps;
+#[cfg(any())]
+use deps::{DepGraph, DepPath, DepSolutions, VarSolution};
+
+pub(crate) mod error;
+use error::{
+    CrossLayerNumericError, InferenceError, Polarity, TCError, TCErrorKind, UnificationError,
+};
+
 pub(crate) mod inference;
-use crate::numeric::elaborator::{IntType, PrimInt};
 
 /// Helper function for constructing a tuple of the form `(min(a, b), max(a, b))`.
 ///
@@ -20,7 +38,7 @@ fn min_max<T: PartialOrd>(a: T, b: T) -> (T, T) {
     if a < b { (a, b) } else { (b, a) }
 }
 
-mod scope {
+pub(crate) mod scope {
     use std::collections::BTreeSet;
 
     use super::UVar;
@@ -153,8 +171,7 @@ mod scope {
             }
         }
 
-        pub(crate) fn includes_name(&self, name: &str) -> bool
-where {
+        pub(crate) fn includes_name(&self, name: &str) -> bool {
             self.entries.contains(name) || self.parent.includes_name(name)
         }
     }
@@ -297,37 +314,41 @@ macro_rules! try_with {
     };
 }
 
-/// Unification variable for use in typechecking
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[repr(transparent)]
-pub struct UVar(pub(crate) usize);
+macro_rules! define_metavariable {
+    ( $( $name:ident $(, $attr:meta )* );+ $(;)? ) => {
+        $(
+            $(
+                #[$attr]
+            )?
+            #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+            #[repr(transparent)]
+            pub struct $name(pub(crate) usize);
 
-impl UVar {
-    pub fn new(ix: usize) -> Self {
-        Self(ix)
-    }
+            impl $name {
+                #[inline(always)]
+                pub const fn new(ix: usize) -> Self {
+                    Self(ix)
+                }
 
-    pub fn to_usize(self) -> usize {
-        self.0
-    }
+                #[inline(always)]
+                #[allow(deprecated)]
+                pub const fn to_usize(self) -> usize {
+                    self.0
+                }
+            }
+        )+
+    };
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[repr(transparent)]
-pub struct ExtVar(pub(crate) usize);
-
-impl ExtVar {
-    pub fn new(ix: usize) -> Self {
-        Self(ix)
-    }
-
-    pub fn to_usize(self) -> usize {
-        self.0
-    }
+define_metavariable! {
+    UVar, doc = "Generic unification metavariable used by [TypeChecker]";
+    // TVar, doc = "Tree (forest-index) metavariable used by [TypeChecker] to refer to (the root-type of) embedded numeric trees", deprecated;
+    NVar, doc = "Local unification metavariable used by [InferenceEngine]";
 }
 
+// SECTION - UType definition and impls
 /// Unification type, equivalent to ValueType up to abstraction
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum UType {
     /// Reserved case for Formats that fundamentally cannot be parsed successfully (Format::Fail and implied failure-cases)
     Empty,
@@ -344,8 +365,8 @@ pub enum UType {
     /// For `std::option::Option<InnerType>`
     Option(Rc<UType>),
     PhantomData(Rc<UType>),
-    /// Type equivalent to the ascribed type of the root node of an embedded numeric-inference-engine
-    ExternVar(ExtVar),
+    // REVIEW[epic=embedded-num] - should this be PrimInt instead?
+    Int(IntType),
 }
 
 impl UType {
@@ -363,36 +384,6 @@ impl UType {
 
     pub fn seq_array(self: Rc<Self>) -> Self {
         Self::Seq(self, SeqBorrowHint::ReadArray)
-    }
-}
-
-impl From<BaseType> for UType {
-    fn from(value: BaseType) -> Self {
-        Self::Base(value)
-    }
-}
-
-impl From<BaseType> for Rc<UType> {
-    fn from(value: BaseType) -> Self {
-        Rc::new(UType::from(value))
-    }
-}
-
-impl From<UVar> for UType {
-    fn from(value: UVar) -> Self {
-        Self::Var(value)
-    }
-}
-
-impl From<UVar> for Rc<UType> {
-    fn from(value: UVar) -> Self {
-        Rc::new(UType::Var(value))
-    }
-}
-
-impl From<ExtVar> for Rc<UType> {
-    fn from(value: ExtVar) -> Self {
-        Rc::new(UType::ExternVar(value))
     }
 }
 
@@ -454,7 +445,7 @@ impl UType {
             | UType::ViewObj
             | UType::Hole
             | UType::Var(..)
-            | UType::ExternVar(..)
+            | UType::Int(..)
             | UType::Base(..) => Box::new(std::iter::empty()),
             UType::Tuple(ts) => Box::new(ts.iter().cloned()),
             UType::Record(fs) => Box::new(fs.iter().map(|(_l, t)| t.clone())),
@@ -464,17 +455,23 @@ impl UType {
         }
     }
 }
+// !SECTION
 
+// SECTION - VType definition
 /// Representation of an inferred type that is either fully-known or partly-known
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum VType {
     Base(BaseSet),
+    Int(IntSet),
+    /// Leaf-node used for partial solutions whose complete form depends on a UType
     Abstract(Rc<UType>),
     ImplicitTuple(Vec<Rc<UType>>),
     ImplicitRecord(Vec<(Label, Rc<UType>)>),
     IndefiniteUnion(VMId),
 }
+// !SECTION
 
+// SECTION - Alias definition and impls
 /// Association type that identifies the relationship between a metavariable and the possibly-empty set
 /// of other meta-variables that must agree in order for the tree to be well-typed.
 #[derive(Clone, Debug, Default)]
@@ -489,6 +486,12 @@ impl Alias {
     /// New, empty alias-set
     pub const fn new() -> Alias {
         Self::Ground
+    }
+
+    #[expect(dead_code)]
+    /// Returns `true` if `self` is [`Alias::Canonical`] or [`Alias::Ground`].
+    pub const fn is_canonical(&self) -> bool {
+        matches!(self, Alias::Canonical(..) | Alias::Ground)
     }
 
     /// Returns `true` if `self` is the canonical alias of at least one other metavariable (i.e. [`Alias::Canonical`] over a non-empty set).
@@ -546,7 +549,9 @@ impl Alias {
         }
     }
 }
+// !SECTION
 
+// SECTION - VarMapMap definition and impls
 /// Association table between the label for a branch-variant and the type of its contents
 type VarMap = HashMap<Label, Rc<UType>>;
 
@@ -597,7 +602,9 @@ impl VarMapMap {
         ret
     }
 }
+// !SECTIOn
 
+// SECTIOn - Constraints definition and impls
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 #[repr(transparent)]
 pub struct VMId(usize);
@@ -617,7 +624,6 @@ pub enum Constraints {
     Variant(VMId),
     /// Inferred constraints on a metavariable that is not a tagged union-member. Unification against `Constraints::Variant` may yet be possible but only in select cases.
     Invariant(Constraint),
-    // TODO: add `Numeric`/`Engine` for incremental integration of InferenceEngine
 }
 
 impl Constraints {
@@ -625,8 +631,10 @@ impl Constraints {
         Self::Indefinite
     }
 }
+// !SECTION
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+// SECTION - Constraint definition and impls
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Constraint {
     /// Direct equivalence with a UType, which should not be a bare `UType::Var` (as that is implied by the independently-tracked Alias value for a metavariable)
     Equiv(Rc<UType>),
@@ -634,6 +642,8 @@ pub enum Constraint {
     Elem(BaseSet),
     /// Constraints implied by projections into a parametric type (e.g. Option, Seq), a Tuple, or a Record
     Proj(ProjShape),
+    /// Constraints applied to a known-numeric node
+    NumTree(IntSet),
 }
 
 impl Constraint {
@@ -661,9 +671,10 @@ impl Constraint {
         }
     }
 }
+// !SECTION
 
 /// Type representing each possible shape of a projective constraint on a higher-order metavariable
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ProjShape {
     TupleWith(BTreeMap<usize, UVar>), // required associations of meta-variables at given indices of an uncertain tuple
     RecordWith(BTreeMap<Label, UVar>), // required associations of meta-variables at given fields of an uncertain record
@@ -703,1112 +714,485 @@ impl ProjShape {
     }
 }
 
-pub mod base_set {
+#[cfg(any())]
+mod __unused {
+    #[cfg(any())]
+    /// Type for indicating the solution-state of an TVar (num-tree root-node type)
+    #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+    pub enum NumSolution {
+        #[default]
+        /// Solution has not yet been found
+        Unsolved,
+        /// Solution has been found but was elided due to aliasing; should not be stored for canonical TVars
+        Elided,
+        /// Canonical solution-state before elision is performed on non-canonical TVars
+        Solved(IntType),
+    }
+
+    impl std::fmt::Display for NumSolution {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                NumSolution::Unsolved => write!(f, "⁇"),
+                NumSolution::Elided => write!(f, "…"),
+                NumSolution::Solved(sol) => write!(f, "{sol}"),
+            }
+        }
+    }
+
     use super::*;
-    use crate::BaseType;
-    use crate::numeric::elaborator::PrimInt;
-
-    /// Abstraction over explicit collections of BaseType values that could be in any order
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-    pub enum BaseSet {
-        /// Singleton set of any BaseType, even non-integral ones
-        Single(BaseType),
-        /// Some subset of U8, U16, U32, U64
-        U(UintSet),
+    #[derive(Debug, Default)]
+    pub(crate) struct EmbeddedResolver {
+        subtrees: Vec<Rc<InferenceEngine>>,
+        aliases: Vec<Alias>,
+        outcomes: HashMap<TVar, NumSolution>,
     }
 
-    impl BaseSet {
-        pub fn contains(self, base: BaseType) -> bool {
-            match self {
-                BaseSet::Single(b) => b == base,
-                BaseSet::U(us) => us.contains(base),
+    // SECTION - EmbeddedResolver core functionality
+    impl EmbeddedResolver {
+        /// Constructs a new, empty `EmbeddedResolver`.
+        pub(crate) fn new() -> Self {
+            Self {
+                subtrees: Vec::new(),
+                aliases: Vec::new(),
+                outcomes: HashMap::new(),
             }
         }
-    }
 
-    #[derive(Debug)]
-    pub struct TryFromSignedPrimIntError(PrimInt);
-
-    impl std::fmt::Display for TryFromSignedPrimIntError {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "unable to convert signed-integer-type {}", self.0)
-        }
-    }
-
-    impl TryFrom<PrimInt> for BaseType {
-        type Error = TryFromSignedPrimIntError;
-
-        fn try_from(value: PrimInt) -> Result<Self, Self::Error> {
-            match value {
-                PrimInt::U8 => Ok(BaseType::U8),
-                PrimInt::U16 => Ok(BaseType::U16),
-                PrimInt::U32 => Ok(BaseType::U32),
-                PrimInt::U64 => Ok(BaseType::U64),
-                _ => Err(TryFromSignedPrimIntError(value)),
-            }
-        }
-    }
-
-    impl BaseSet {
-        #[allow(non_upper_case_globals)]
-        pub const UAny: Self = Self::U(UintSet::ANY);
-
-        #[allow(non_upper_case_globals)]
-        pub const USome: Self = Self::U(UintSet::ANY32);
-    }
-
-    // REVIEW - merge candidate with crate::numeric::core::BitWidth
-    #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
-    pub enum IntWidth {
-        Bits8 = 0,
-        Bits16 = 1,
-        Bits32 = 2,
-        Bits64 = 3,
-    }
-
-    impl IntWidth {
-        pub const MAX8: usize = u8::MAX as usize;
-        pub const MAX16: usize = u16::MAX as usize;
-        pub const MAX32: usize = u32::MAX as usize;
-        pub const MAX64: usize = u64::MAX as usize;
-
-        pub fn to_base_type(self) -> BaseType {
-            match self {
-                IntWidth::Bits8 => BaseType::U8,
-                IntWidth::Bits16 => BaseType::U16,
-                IntWidth::Bits32 => BaseType::U32,
-                IntWidth::Bits64 => BaseType::U64,
-            }
-        }
-    }
-
-    impl crate::Bounds {
-        pub fn min_required_width(&self) -> IntWidth {
-            let max = self.max.unwrap_or(self.min);
-            match () {
-                _ if max <= IntWidth::MAX8 => IntWidth::Bits8,
-                _ if max <= IntWidth::MAX16 => IntWidth::Bits16,
-                _ if max <= IntWidth::MAX32 => IntWidth::Bits32,
-                _ => IntWidth::Bits64,
-            }
-        }
-    }
-
-    /// Abstraction over rankings of candidate values in a set, where the least-value `Rank` is the default
-    /// unless it is tied with anything else.
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    pub enum Rank {
-        /// The value is not in the set
-        Excluded,
-        /// The value is in the set and has priority rank `n` (lower numbers are higher priority)
-        At(u8),
-    }
-
-    impl Rank {
-        pub const fn is_excluded(self) -> bool {
-            matches!(self, Rank::Excluded)
-        }
-    }
-
-    impl PartialOrd for Rank {
-        fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-            Some(self.cmp(other))
-        }
-    }
-
-    impl Ord for Rank {
-        fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-            match (self, other) {
-                (Rank::At(n), Rank::At(m)) => {
-                    // NOTE -  we call reverse this because we want lower numbers to be the maximum rank
-                    n.cmp(m).reverse()
-                }
-                (Rank::At(_), Rank::Excluded) => std::cmp::Ordering::Greater,
-                (Rank::Excluded, Rank::At(_)) => std::cmp::Ordering::Less,
-                (Rank::Excluded, Rank::Excluded) => std::cmp::Ordering::Equal,
-            }
-        }
-    }
-
-    #[derive(Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
-    pub struct UintSet {
-        // Array with ranks for U8, U16, U32, U64 in that order
-        pub(crate) ranks: [Rank; 4],
-    }
-
-    impl std::fmt::Debug for UintSet {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            f.debug_struct("RankedUintSet")
-                .field("ranks", &self.ranks)
-                .finish()
-        }
-    }
-
-    impl std::fmt::Display for UintSet {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            let this = self.normalize();
-            if this.is_empty() {
-                write!(f, "{{}}")
-            } else {
-                write!(f, "{{ ")?;
-                let labels = ["U8", "U16", "U32", "U64"];
-                let mut ix_ranks = this
-                    .ranks
-                    .into_iter()
-                    .enumerate()
-                    .collect::<Vec<(usize, Rank)>>();
-                ix_ranks.sort_by(|(_, r1), (_, r2)| r1.cmp(r2).reverse());
-                let mut last_rank = None;
-                for (ix, r) in ix_ranks {
-                    if r.is_excluded() {
-                        break;
-                    }
-                    match last_rank {
-                        None => {
-                            write!(f, "{}", labels[ix])?;
-                        }
-                        Some(r0) => {
-                            if r < r0 {
-                                write!(f, " > {}", labels[ix])?;
-                            } else {
-                                write!(f, ", {}", labels[ix])?;
-                            }
-                        }
-                    }
-                    last_rank = Some(r);
-                }
-                write!(f, " }}")
-            }
-        }
-    }
-
-    impl UintSet {
-        pub const ANY_DEFAULT_U32: Self = Self {
-            ranks: [Rank::At(1), Rank::At(1), Rank::At(0), Rank::At(1)],
-        };
-        pub const ANY_DEFAULT_U64: Self = Self {
-            ranks: [Rank::At(1), Rank::At(1), Rank::At(1), Rank::At(0)],
-        };
-
-        pub fn contains(&self, b: BaseType) -> bool {
-            self.ranks[b.int_width() as usize] != Rank::Excluded
+        /// Initializes a new TVar with the given InferenceEngine, returning the TVar.
+        fn init_new_treevar(&mut self, engine: inference::InferenceEngine) -> TVar {
+            let ext_var = TVar(self.subtrees.len());
+            self.subtrees.push(Rc::new(engine));
+            self.aliases.push(Alias::new());
+            // NOTE - we leave outcomes alone because it is keyed, not indexed linearly
+            ext_var
         }
 
-        /// Normalizes all inhabited ranks such that the lowest rank is `Rank::At(0)`,
-        /// and each successive rank-value is exactly one more than its predecessor.
-        pub fn normalize(self) -> Self {
-            let mut ranks = self.ranks;
-            for rank in ranks.iter_mut() {
-                let orig_val = *rank;
-                if orig_val == Rank::Excluded {
-                    continue;
-                }
-                let count_gte = (self.ranks.iter().filter(|r| **r >= orig_val).count() - 1) as u8;
-                *rank = Rank::At(count_gte);
-            }
-            Self { ranks }
+        /// Returns the set of `UVar` that the tree at index `tree_v` depends on.
+        fn get_dependencies(&self, tree_v: TVar) -> &BTreeSet<UVar> {
+            &self.subtrees[tree_v.0].get_dep_vars()
+        }
+    }
+    // !SECTION
+
+    // SECTION - methods for low-level management of tree-var alias-groups
+    impl EmbeddedResolver {
+        /// Returns `true` if the TVar `var` is canonical for its alias-group.
+        pub fn is_canonical(&self, ix: usize) -> bool {
+            matches!(&self.aliases[ix], Alias::Canonical(_) | Alias::Ground)
         }
 
-        /// Returns a `UintSet` whose solution-set is the intersection of `self` and `other`,
-        /// using the lower-priority rank for each member-element that neither one excludes.
-        pub fn intersection(self, other: Self) -> Self {
-            let mut ranks = [Rank::Excluded; 4];
-            let this = self.normalize();
-            let other = other.normalize();
-            for (ix, (r1, r2)) in Iterator::zip(this.ranks.iter(), other.ranks.iter()).enumerate() {
-                if matches!(r1, Rank::Excluded) || matches!(r2, Rank::Excluded) {
-                    continue;
-                }
-                ranks[ix] = Ord::max(*r1, *r2);
-            }
-            Self { ranks }.normalize()
-        }
-
-        /// Returns `true` if the solution-set of `self` is empty.
-        pub fn is_empty(&self) -> bool {
-            self.ranks == [Rank::Excluded; 4]
-        }
-
-        /// Given a `UintSet`, determines the unique solution it has, if any.
+        /// Returns the canonical-among-aliased TVar for `ext_var`.
         ///
-        /// If multiple solutions exist, but there is one solution with a higher-priority
-        /// rank than all others, that solution is returned.
+        /// # Notes
         ///
-        /// If no solutions exist (i.e. the set is empty), or if there is more than one
-        /// solution ascribed with the highest-priority rank, then `None` is returned.
-        pub fn get_unique_solution(self) -> Option<BaseType> {
-            let this = self.normalize();
-            let mut candidate = None;
-            let mut max_rank = Rank::Excluded;
-            let mut is_unique = true;
-            for (ix, r) in this.ranks.into_iter().enumerate() {
-                match r {
-                    Rank::Excluded => continue,
-                    Rank::At(_n) => match r.cmp(&max_rank) {
-                        std::cmp::Ordering::Greater => {
-                            max_rank = r;
-                            candidate = Some(ix);
-                            is_unique = true;
-                        }
-                        std::cmp::Ordering::Less => continue,
-                        std::cmp::Ordering::Equal => {
-                            is_unique = false;
-                        }
-                    },
+        /// This method is only suitable for lookups of root-solutions for mutual-satisfiability
+        /// of External and natural constraints. It should not be used for elaboration purposes, as even two
+        /// aliased ext-vars are not interchangeable when crawling their respective sub-trees for recursive elaboration.
+        pub(crate) fn get_canonical_treevar(&self, ext_v: TVar) -> TVar {
+            match self.aliases[ext_v.0] {
+                Alias::Canonical(_) | Alias::Ground => ext_v,
+                Alias::BackRef(ix) => TVar(ix),
+            }
+        }
+
+        /// Introduces a new alias between the subtree-root ext-variables `var0` and `var1`.
+        ///
+        /// Returns the solution for the canonical ext-var in the resulting alias-group.
+        ///
+        /// Returns an error if the implied equivalence cannot be satisfied.
+        fn resolve_alias(&mut self, v1: TVar, v2: TVar) -> TCResult<NumSolution> {
+            if v1 == v2 {
+                let sol = *self.outcomes.entry(v1).or_default();
+                return Ok(sol);
+            }
+
+            match (&self.aliases[v1.0], &self.aliases[v2.0]) {
+                (Alias::Ground, Alias::Ground) => {
+                    /*
+                     * Ground-Ground: simple repoint that makes the lower-indexed ext-var canonical,
+                     * and ensures that their outcomes are synchronized.
+                     */
+                    let (lo, hi) = min_max(v1.0, v2.0);
+                    unsafe { self.insert_ground(lo, hi) }
                 }
-            }
-            if let Some(ix) = candidate {
-                if is_unique {
-                    Some(match ix {
-                        0 => BaseType::U8,
-                        1 => BaseType::U16,
-                        2 => BaseType::U32,
-                        3 => BaseType::U64,
-                        _ => unreachable!(),
-                    })
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        }
-    }
-
-    impl UintSet {
-        // unrestricted and non-defaulting if more than one solution
-        pub const ANY: UintSet = UintSet {
-            ranks: [Rank::At(3); 4],
-        };
-        // U8 or U16, default solution is U8
-        pub const SHORT8: UintSet = UintSet {
-            ranks: [Rank::At(0), Rank::At(1), Rank::Excluded, Rank::Excluded],
-        };
-
-        // Some member of the restricted set of any whose width is no less than the given IntWidth
-        pub const fn at_least(val: IntWidth) -> Self {
-            let ranks = match val {
-                IntWidth::Bits8 => [Rank::At(3), Rank::At(3), Rank::At(3), Rank::At(3)],
-                IntWidth::Bits16 => [Rank::Excluded, Rank::At(2), Rank::At(2), Rank::At(2)],
-                IntWidth::Bits32 => [Rank::Excluded, Rank::Excluded, Rank::At(1), Rank::At(1)],
-                IntWidth::Bits64 => [Rank::Excluded, Rank::Excluded, Rank::Excluded, Rank::At(0)],
-            };
-            UintSet { ranks }
-        }
-
-        // unrestricted but resolves if ambiguous to the given IntWidth, unless precluded
-        pub const fn any_default(val: IntWidth) -> Self {
-            let ranks = match val {
-                IntWidth::Bits8 => [Rank::At(0), Rank::At(3), Rank::At(3), Rank::At(3)],
-                IntWidth::Bits16 => [Rank::At(3), Rank::At(0), Rank::At(3), Rank::At(3)],
-                IntWidth::Bits32 => [Rank::At(3), Rank::At(3), Rank::At(0), Rank::At(3)],
-                IntWidth::Bits64 => [Rank::At(3), Rank::At(3), Rank::At(3), Rank::At(0)],
-            };
-            UintSet { ranks }
-        }
-    }
-
-    impl UintSet {
-        pub const ANY32: Self = Self::any_default(IntWidth::Bits32);
-    }
-
-    impl BaseType {
-        pub fn int_width(&self) -> IntWidth {
-            match self {
-                BaseType::U8 => IntWidth::Bits8,
-                BaseType::U16 => IntWidth::Bits16,
-                BaseType::U32 => IntWidth::Bits32,
-                BaseType::U64 => IntWidth::Bits64,
-                _ => unreachable!("cannot measure int-width of non-integral BaseType {self:?}"),
-            }
-        }
-    }
-
-    impl UintSet {
-        // pub fn intersection(self, other: Self) -> Self {
-        //     match (self, other) {
-        //         (x, y) if x == y => x,
-        //         (UintSet::ANY, x) | (x, UintSet::ANY) => x, // Any is the identity under intersection
-        //         (UintSet::SHORT8, _) | (_, UintSet::SHORT8) => Self::SHORT8,
-        //         (UintSet::at_least(w1), UintSet::at_least(w2)) => Self::at_least(Ord::max(w1, w2)),
-        //         // Technically ambiguous cases
-        //         (UintSet::any_default(w1), UintSet::any_default(w2)) => Self::any_default(Ord::max(w1, w2)),
-        //         (UintSet::any_default(w_dft), UintSet::at_least(w_min)) | (UintSet::at_least(w_min), UintSet::any_default(w_dft)) => {
-        //             panic!("unresolvable UintSet intersection: AnyDefault({w_dft:?}) & AtLeast({w_min:?})")
-        //         }
-        //     }
-        // }
-
-        // pub fn get_unique_solution(self) -> Option<BaseType> {
-        //     match self {
-        //         UintSet::Any => None,
-        //         UintSet::AnyDefault(width) => Some(width.to_base_type()),
-        //         UintSet::Short8 => Some(BaseType::U8),
-        //         UintSet::AtLeast(IntWidth::Bits64) => Some(BaseType::U64),
-        //         UintSet::AtLeast(_) => None,
-        //     }
-        // }
-    }
-
-    impl BaseSet {
-        pub fn unify(&self, other: &Self) -> Result<Self, ConstraintError> {
-            match (self, other) {
-                (BaseSet::Single(b1), BaseSet::Single(b2)) => {
-                    if b1 == b2 {
-                        Ok(*self)
+                (Alias::Ground, &Alias::BackRef(can_ix)) => {
+                    /*
+                     * x = Ground, y = BackRef(z):
+                     *   if x > z, then insert x into the alias-group of z and synchronize outcomes of z and x
+                     *   if x < z, then have x inherit canonical status of z using recanonicalize
+                     *   (panic if x = z: impossible because x-|<-y would then be only half-aliased)
+                     */
+                    if v1.0 > can_ix {
+                        let lo = can_ix;
+                        let hi = v1.0;
+                        unsafe { self.insert_ground(lo, hi) }
+                    } else if v1.0 < can_ix {
+                        let lo = v1.0;
+                        let hi = can_ix;
+                        debug_assert!(
+                            self.aliases[hi].is_canonical_nonempty(),
+                            "half-alias ?{hi}-|<-{v2}"
+                        );
+                        debug_assert!(
+                            !self.aliases[hi].contains_fwd_ref(lo),
+                            "retrograde half-aliased 'forward' ref ?{hi}->|-{v1}"
+                        );
+                        unsafe { self.recanonicalize(lo, hi) }
                     } else {
-                        Err(ConstraintError::Unsatisfiable(
-                            Constraint::Elem(*self),
-                            Constraint::Elem(*other),
-                        ))
+                        // we can only get here if v1.0 == can_ix, but this is not valid as v1 should then be Canonical and not Ground
+                        unreachable!("unexpected half-alias {v1}-|<-{v2}");
                     }
                 }
-                (BaseSet::U(u), BaseSet::Single(b)) | (BaseSet::Single(b), BaseSet::U(u)) => {
-                    if u.contains(*b) {
-                        Ok(BaseSet::Single(*b))
+                (&Alias::BackRef(can_ix), Alias::Ground) => {
+                    /*
+                     * x = BackRef(z), y = Ground:
+                     *   if y > z, then insert y into the alias-group of z and synchronize outcomes of z and y
+                     *   if y < z, then have y inherit canonical status of z using recanonicalize
+                     *   (panic if y = z: impossible because y-|<-x would then be only half-aliased)
+                     */
+                    if v2.0 > can_ix {
+                        let lo = can_ix;
+                        let hi = v2.0;
+                        unsafe { self.insert_ground(lo, hi) }
+                    } else if v2.0 < can_ix {
+                        let lo = v2.0;
+                        let hi = can_ix;
+                        debug_assert!(
+                            self.aliases[hi].is_canonical_nonempty(),
+                            "half-alias ?{hi}-|<-{v1}"
+                        );
+                        debug_assert!(
+                            !self.aliases[hi].contains_fwd_ref(lo),
+                            "retrograde half-aliased 'forward' ref ?{hi}->|-{v2}"
+                        );
+                        unsafe { self.recanonicalize(lo, hi) }
                     } else {
-                        Err(UnificationError::Unsatisfiable(
-                            self.to_constraint(),
-                            other.to_constraint(),
-                        ))
+                        unreachable!("unexpected half-alias {v2}-|<-{v1}");
                     }
                 }
-                (BaseSet::U(u1), BaseSet::U(u2)) => Ok(BaseSet::U(u1.intersection(*u2))),
-            }
-        }
-
-        /// Constructs the simplest-possible constraint from `self`, in particular substituting
-        /// `Equiv(BaseType(b))` in place of `Elem(Single(b))`.
-        pub fn to_constraint(self) -> Constraint {
-            match self {
-                BaseSet::Single(b) => Constraint::Equiv(Rc::new(UType::Base(b))),
-                _ => Constraint::Elem(self),
-            }
-        }
-
-        /// Returns `Some(UType)` if `self` is a singleton `BaseSet`, and `None` otherwise.
-        ///
-        /// Will not attempt to solve the set if it is not an explicit singleton, i.e. `BaseSet::U` regardless
-        /// of whether it has a unique solution.
-        pub fn try_to_utype(self) -> Option<Rc<UType>> {
-            match self {
-                BaseSet::Single(b) => Some(Rc::new(UType::Base(b))),
-                BaseSet::U(_) => None,
-            }
-        }
-
-        pub(crate) fn get_unique_solution(&self, v: UVar) -> TCResult<BaseType> {
-            match self {
-                BaseSet::Single(b) => Ok(*b),
-                BaseSet::U(u) => {
-                    if u.is_empty() {
-                        return Err(TCErrorKind::NoSolution(v).into());
-                    }
-                    match u.get_unique_solution() {
-                        Some(b) => Ok(b),
-                        None => Err(TCErrorKind::MultipleSolutions(v, *self).into()),
+                (Alias::Ground, Alias::Canonical(_)) => {
+                    /*
+                     * x = Ground, y = Canonical:
+                     *   if x < y, recanonicalize x for the alias-group of y and insert y into it, after synchronizing outcomes.
+                     *   if x > y, simply insert x into the alias-group for y without any shifts, and synchronize outcomes
+                     */
+                    if v1.0 < v2.0 {
+                        let lo = v1.0;
+                        let hi = v2.0;
+                        debug_assert!(
+                            !self.aliases[hi].contains_fwd_ref(lo),
+                            "retrograde half-aliased 'forward' ref {v2}->|-{v1}"
+                        );
+                        unsafe { self.recanonicalize(lo, hi) }
+                    } else {
+                        // v2 < v1
+                        let lo = v2.0;
+                        let hi = v1.0;
+                        unsafe { self.insert_ground(lo, hi) }
                     }
                 }
-            }
-        }
-    }
-
-    impl std::fmt::Display for BaseSet {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            match self {
-                BaseSet::Single(t) => write!(f, "{{ {t:?} }}"),
-                BaseSet::U(ranked_set) => ranked_set.fmt(f),
-            }
-        }
-    }
-}
-use base_set::{BaseSet, IntWidth, UintSet};
-
-/// Type for indicating the solution-state of an ExtVar (num-tree root-node type)
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
-pub enum NumSolution {
-    #[default]
-    /// Solution has not yet been found
-    Unsolved,
-    /// Solution has been found but was elided due to aliasing; should not be stored for canonical ExtVars
-    Elided,
-    /// Canonical solution-state before elision is performed on non-canonical ExtVars
-    Solved(crate::numeric::elaborator::IntType),
-}
-
-impl std::fmt::Display for NumSolution {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            NumSolution::Unsolved => write!(f, "⁇"),
-            NumSolution::Elided => write!(f, "…"),
-            NumSolution::Solved(sol) => write!(f, "{sol}"),
-        }
-    }
-}
-
-#[derive(Debug, Default)]
-pub(crate) struct EmbeddedResolver {
-    subtrees: Vec<Rc<inference::InferenceEngine>>,
-    aliases: Vec<Alias>,
-    outcomes: HashMap<ExtVar, NumSolution>,
-}
-
-// SECTION - EmbeddedResolver core functionality
-impl EmbeddedResolver {
-    /// Constructs a new, empty `EmbeddedResolver`.
-    pub(crate) fn new() -> Self {
-        Self {
-            subtrees: Vec::new(),
-            aliases: Vec::new(),
-            outcomes: HashMap::new(),
-        }
-    }
-
-    /// Initializes a new ExtVar with the given InferenceEngine, returning the ExtVar.
-    fn init_new_extvar(&mut self, engine: inference::InferenceEngine) -> ExtVar {
-        let ext_var = ExtVar(self.subtrees.len());
-        self.subtrees.push(Rc::new(engine));
-        self.aliases.push(Alias::new());
-        // NOTE - we leave outcomes alone because it is keyed, not indexed linearly
-        ext_var
-    }
-}
-// !SECTION
-
-// SECTION - methods related to querying outcomes on individual ExtVars
-impl EmbeddedResolver {
-    pub(crate) fn solve(&mut self, ext: ExtVar) -> TCResult<crate::numeric::elaborator::IntType> {
-        match self.outcomes.get(&ext) {
-            None | Some(NumSolution::Unsolved) => {
-                match &self.aliases[ext.0] {
-                    a @ (Alias::Canonical(_) | Alias::Ground) => {
-                        let sol = self.solve_standalone(ext)?;
-                        // if ground, this iteration will be a no-op
-                        {
-                            // we have to collect the indices beforehand to avoid borrow-conflicts
-                            let other_vars = a.iter_fwd_refs().map(ExtVar).collect::<Vec<_>>();
-                            for other_var in other_vars {
-                                self.solve_and_elide(other_var, sol)?;
-                            }
-                        }
-                        self.outcomes.insert(ext, NumSolution::Solved(sol));
-                        Ok(sol)
-                    }
-                    Alias::BackRef(can_ix) => {
-                        let can = ExtVar(*can_ix);
-                        match self.peek_solution(can) {
-                            NumSolution::Elided => {
-                                unreachable!("invalid state: elided solution on canonical alias")
-                            }
-                            NumSolution::Unsolved => {
-                                // if the canonical alias has not been solved yet, we solve it and update all its forward-refs to Elided (if they agree on the same solution)
-                                let sol = self.solve_standalone(ext)?;
-                                // if ground, this iteration will be a no-op
-                                {
-                                    // we have to collect the indices beforehand to avoid borrow-conflicts
-                                    let other_vars = self.aliases[*can_ix]
-                                        .iter_fwd_refs()
-                                        .map(ExtVar)
-                                        .collect::<Vec<_>>();
-                                    for other_var in other_vars {
-                                        self.solve_and_elide(other_var, sol)?;
-                                    }
-                                }
-                                self.outcomes.insert(ext, NumSolution::Solved(sol));
-                                Ok(sol)
-                            }
-                            NumSolution::Solved(sol) => {
-                                // since sol already exists, we assume all other aliases agree
-                                self.solve_and_elide(ext, sol)?;
-                                Ok(sol)
-                            }
-                        }
+                (Alias::Canonical(_), Alias::Ground) => {
+                    /*
+                     * x = Canonical, y = Ground:
+                     *   if x > y, recanonicalize y for the alias-group of x and insert x into it, after synchronizing outcomes.
+                     *   if x < y, simply insert y into the alias-group for x without any shifts, and synchronize outcomes
+                     */
+                    if v2.0 < v1.0 {
+                        let lo = v2.0;
+                        let hi = v1.0;
+                        debug_assert!(
+                            !self.aliases[v1.0].contains_fwd_ref(v2.0),
+                            "retrograde half-aliased 'forward' ref {v1}->|-{v2}"
+                        );
+                        unsafe { self.recanonicalize(lo, hi) }
+                    } else {
+                        let lo = v1.0;
+                        let hi = v2.0;
+                        unsafe { self.insert_ground(lo, hi) }
                     }
                 }
-            }
-            Some(NumSolution::Elided) => {
-                let can = self.get_canonical_extvar(ext);
-                assert!(
-                    can < ext,
-                    "canonical alias {can} must be less than non-canonical {ext} (based on Elided)"
-                );
-                self.solve(can)
-            }
-            Some(NumSolution::Solved(sol)) => Ok(*sol),
-        }
-    }
-
-    /// Performs standalone inference to determine the solution for `ext`.
-    ///
-    /// Should only be called when no outcome is registered, either on `ext` or its canonical alias.
-    ///
-    /// Does not mutate the resolver (i.e. no alias-updates or outcome-updates).
-    fn solve_standalone(&self, ext: ExtVar) -> TCResult<crate::numeric::elaborator::IntType> {
-        let engine = self.subtrees[ext.0].clone();
-        engine
-            .reify_err(UVar(0).into())
-            .map_err(|e| TCErrorKind::Inference(ext, e).into())
-    }
-
-    /// Given a non-canonical ExtVar `ext` and a canonical-alias solution `sol`, performs the necessary
-    /// checks and updates according to the following:
-    ///
-    ///   - If the outcome `ext` is already `Elided`, does nothing and returns early.
-    ///   - If the outcome `ext` is not Solved, solves it.
-    ///   - Once a non elided-solution for `ext` is found, ensures it is equal to `sol`, and then replaces with `Elided`.
-    fn solve_and_elide(
-        &mut self,
-        ext: ExtVar,
-        sol: crate::numeric::elaborator::IntType,
-    ) -> TCResult<()> {
-        let sol1 = match self.outcomes.get(&ext) {
-            Some(NumSolution::Elided) => return Ok(()),
-            Some(NumSolution::Unsolved) | None => self.solve_standalone(ext)?,
-            Some(NumSolution::Solved(sol1)) => *sol1,
-        };
-        if sol == sol1 {
-            self.outcomes.insert(ext, NumSolution::Elided);
-            Ok(())
-        } else {
-            Err(TCErrorKind::IrreconcilableNumSolutions(
-                NumSolution::Solved(sol),
-                NumSolution::Solved(sol1),
-            )
-            .into())
-        }
-    }
-
-    /// Returns the current solution-state for `ext`, or that of its canonical alias if it is a non-canonical alias
-    /// with an elided solution.
-    ///
-    /// Does not mutate the resolver, perform any new inference, or enforce any constraints or alias-unifications.
-    fn peek_solution(&self, ext: ExtVar) -> NumSolution {
-        match self.outcomes.get(&ext) {
-            None | Some(NumSolution::Unsolved) => NumSolution::Unsolved,
-            Some(NumSolution::Elided) => {
-                let can = self.get_canonical_extvar(ext);
-                assert!(
-                    can < ext,
-                    "canonical alias {can} must be less than non-canonical {ext} (based on Elided)"
-                );
-                self.peek_solution(can)
-            }
-            Some(NumSolution::Solved(sol)) => NumSolution::Solved(*sol),
-        }
-    }
-
-    /// Given an `ExtVar`, either retrieves a pre-computed solution, or solves the subtree it is
-    /// associated with, storing the novel answer and returning it.
-    ///
-    /// Additionally returns a boolean value that indicates whether the solution was novel (i.e. whether
-    /// it was solved as a result of this method's invocation).
-    ///  - If `true`, the caller should perform any alias-unifications required byh novel solutions.
-    ///  - If `false`, the solution was already recorded, and so no updates should be necessary.
-    ///
-    /// This function does not perform any alias unifications or updates; however,
-    /// in the case of unsolved subtrees, this function will update the `outcomes` table
-    /// accordingly, for the single-variable in question.
-    ///
-    /// Recurses if `ext` is a non-canonical alias with an `Elided` solution.
-    fn ensure_outcome(&mut self, ext: ExtVar) -> TCResult<(NumSolution, bool)> {
-        // FIXME - there are various checks being skipped, e.g. elided => canonical recursion must be solved, etc.
-        let sol = self.outcomes.get(&ext).copied().unwrap_or_default();
-        match sol {
-            NumSolution::Elided => {
-                let can = self.get_canonical_extvar(ext);
-                assert!(
-                    can < ext,
-                    "canonical alias {can} must be less than non-canonical {ext} (based on Elided)"
-                );
-                self.ensure_outcome(can)
-            }
-            NumSolution::Unsolved => {
-                let ret = self.solve_standalone(ext)?;
-                let sol = NumSolution::Solved(ret);
-                self.outcomes.insert(ext, sol);
-                Ok((sol, true))
-            }
-            NumSolution::Solved(_) => return Ok((sol, false)),
-        }
-    }
-
-    /// Immediately after the subtree corresponding to an `ExtVar` has been solved, ensure that
-    /// the novel solution is compatible with the imputed solutions of any and all other ext-vars
-    /// to which the original was aliased.
-    ///
-    /// Assumes that the association in `outcomes` has already been updated.
-    #[expect(dead_code)]
-    fn enforce_aliasing(&mut self, solved_var: ExtVar, sol: NumSolution) -> TCResult<()> {
-        // FIXME - change type signature to accept Option<IntType> to avoid needless casework
-        assert!(matches!(sol, NumSolution::Solved(_)));
-
-        match &self.aliases[solved_var.0] {
-            Alias::Ground => Ok(()),
-            alias @ Alias::Canonical(_) => {
-                for ix in alias.iter_fwd_refs() {
-                    let other_ext = ExtVar(ix);
-                    let outcome = self.outcomes.entry(other_ext).or_default();
-                    match *outcome {
-                        NumSolution::Unsolved => {
-                            // NOTE - avoid over-eager evaluation of unsolved non-canonical ext-vars
-                            continue;
-                        }
-                        NumSolution::Elided => continue,
-                        other_sol @ NumSolution::Solved(_) => {
-                            let (sol0, sol1) =
-                                Self::reconcile_solution_pair((sol, other_sol), false)?;
-                            assert_eq!(
-                                sol, sol0,
-                                "original solution to {solved_var} changed from {sol} to {sol0} during reconciliation with {other_sol}"
-                            );
-                            if other_sol != sol1 {
-                                *outcome = sol1;
-                            }
-                        }
-                    }
-                }
-                Ok(())
-            }
-            &Alias::BackRef(ix) => {
-                match sol {
-                    NumSolution::Elided | NumSolution::Unsolved => Ok(()),
-                    sol_hi @ NumSolution::Solved(_) => {
-                        // force the canonical ext-var to be solved, and reconcile with it
-                        self.ensure_outcome(ExtVar(ix))?;
-                        let sol_lo = self.outcomes.entry(ExtVar(ix)).or_default();
-                        let (sol0, sol1) = Self::reconcile_solution_pair((*sol_lo, sol_hi), false)?;
-                        // REVIEW[epic=embedded-num] - do we need to check on the values of sol0 and sol1 beyond equality?
-                        if *sol_lo != sol0 {
-                            *sol_lo = sol0;
-                        }
-                        if sol_hi != sol1 {
-                            self.outcomes.entry(ExtVar(ix)).and_modify(|s| *s = sol1);
-                        }
-                        Ok(())
-                    }
-                }
-            }
-        }
-    }
-}
-// !SECTION
-
-// SECTION - methods for low-level management of ext-var alias-groups
-impl EmbeddedResolver {
-    /// Returns `true` if the ExtVar `var` is canonical for its alias-group.
-    pub fn is_canonical(&self, ix: usize) -> bool {
-        matches!(&self.aliases[ix], Alias::Canonical(_) | Alias::Ground)
-    }
-
-    /// Returns the canonical-among-aliased ExtVar for `ext_var`.
-    ///
-    /// # Notes
-    ///
-    /// This method is only suitable for lookups of root-solutions for mutual-satisfiability
-    /// of External and natural constraints. It should not be used for elaboration purposes, as even two
-    /// aliased ext-vars are not interchangeable when crawling their respective sub-trees for recursive elaboration.
-    pub(crate) fn get_canonical_extvar(&self, ext_v: ExtVar) -> ExtVar {
-        match self.aliases[ext_v.0] {
-            Alias::Canonical(_) | Alias::Ground => ext_v,
-            Alias::BackRef(ix) => ExtVar(ix),
-        }
-    }
-
-    /// Introduces a new alias between the subtree-root ext-variables `var0` and `var1`.
-    ///
-    /// Returns the solution for the canonical ext-var in the resulting alias-group.
-    ///
-    /// Returns an error if the implied equivalence cannot be satisfied.
-    fn resolve_alias(&mut self, v1: ExtVar, v2: ExtVar) -> TCResult<NumSolution> {
-        if v1 == v2 {
-            let sol = *self.outcomes.entry(v1).or_default();
-            return Ok(sol);
-        }
-
-        match (&self.aliases[v1.0], &self.aliases[v2.0]) {
-            (Alias::Ground, Alias::Ground) => {
-                /*
-                 * Ground-Ground: simple repoint that makes the lower-indexed ext-var canonical,
-                 * and ensures that their outcomes are synchronized.
-                 */
-                let (lo, hi) = min_max(v1.0, v2.0);
-                unsafe { self.insert_ground(lo, hi) }
-            }
-            (Alias::Ground, &Alias::BackRef(can_ix)) => {
-                /*
-                 * x = Ground, y = BackRef(z):
-                 *   if x > z, then insert x into the alias-group of z and synchronize outcomes of z and x
-                 *   if x < z, then have x inherit canonical status of z using recanonicalize
-                 *   (panic if x = z: impossible because x-|<-y would then be only half-aliased)
-                 */
-                if v1.0 > can_ix {
-                    let lo = can_ix;
-                    let hi = v1.0;
-                    unsafe { self.insert_ground(lo, hi) }
-                } else if v1.0 < can_ix {
-                    let lo = v1.0;
-                    let hi = can_ix;
-                    debug_assert!(
-                        self.aliases[hi].is_canonical_nonempty(),
-                        "half-alias ?{hi}-|<-{v2}"
-                    );
-                    debug_assert!(
-                        !self.aliases[hi].contains_fwd_ref(lo),
-                        "retrograde half-aliased 'forward' ref ?{hi}->|-{v1}"
-                    );
-                    unsafe { self.recanonicalize(lo, hi) }
-                } else {
-                    // we can only get here if v1.0 == can_ix, but this is not valid as v1 should then be Canonical and not Ground
-                    unreachable!("unexpected half-alias {v1}-|<-{v2}");
-                }
-            }
-            (&Alias::BackRef(can_ix), Alias::Ground) => {
-                /*
-                 * x = BackRef(z), y = Ground:
-                 *   if y > z, then insert y into the alias-group of z and synchronize outcomes of z and y
-                 *   if y < z, then have y inherit canonical status of z using recanonicalize
-                 *   (panic if y = z: impossible because y-|<-x would then be only half-aliased)
-                 */
-                if v2.0 > can_ix {
-                    let lo = can_ix;
-                    let hi = v2.0;
-                    unsafe { self.insert_ground(lo, hi) }
-                } else if v2.0 < can_ix {
-                    let lo = v2.0;
-                    let hi = can_ix;
-                    debug_assert!(
-                        self.aliases[hi].is_canonical_nonempty(),
-                        "half-alias ?{hi}-|<-{v1}"
-                    );
-                    debug_assert!(
-                        !self.aliases[hi].contains_fwd_ref(lo),
-                        "retrograde half-aliased 'forward' ref ?{hi}->|-{v2}"
-                    );
-                    unsafe { self.recanonicalize(lo, hi) }
-                } else {
-                    unreachable!("unexpected half-alias {v2}-|<-{v1}");
-                }
-            }
-            (Alias::Ground, Alias::Canonical(_)) => {
-                /*
-                 * x = Ground, y = Canonical:
-                 *   if x < y, recanonicalize x for the alias-group of y and insert y into it, after synchronizing outcomes.
-                 *   if x > y, simply insert x into the alias-group for y without any shifts, and synchronize outcomes
-                 */
-                if v1.0 < v2.0 {
-                    let lo = v1.0;
-                    let hi = v2.0;
-                    debug_assert!(
-                        !self.aliases[hi].contains_fwd_ref(lo),
-                        "retrograde half-aliased 'forward' ref {v2}->|-{v1}"
-                    );
-                    unsafe { self.recanonicalize(lo, hi) }
-                } else {
-                    // v2 < v1
-                    let lo = v2.0;
-                    let hi = v1.0;
-                    unsafe { self.insert_ground(lo, hi) }
-                }
-            }
-            (Alias::Canonical(_), Alias::Ground) => {
-                /*
-                 * x = Canonical, y = Ground:
-                 *   if x > y, recanonicalize y for the alias-group of x and insert x into it, after synchronizing outcomes.
-                 *   if x < y, simply insert y into the alias-group for x without any shifts, and synchronize outcomes
-                 */
-                if v2.0 < v1.0 {
-                    let lo = v2.0;
-                    let hi = v1.0;
-                    debug_assert!(
-                        !self.aliases[v1.0].contains_fwd_ref(v2.0),
-                        "retrograde half-aliased 'forward' ref {v1}->|-{v2}"
-                    );
-                    unsafe { self.recanonicalize(lo, hi) }
-                } else {
-                    let lo = v1.0;
-                    let hi = v2.0;
-                    unsafe { self.insert_ground(lo, hi) }
-                }
-            }
-            (&Alias::BackRef(ix1), &Alias::BackRef(ix2)) => {
-                /*
-                 * x = BackRef(z), y = BackRef(w):
-                 *   if z < w, recanonicalize z for the alias-group of w
-                 *   if z > w, recanonicalize w for the alias-group of z
-                 *   if z = w, check that the alias-group is well-formed and return the outcome for z
-                 */
-                if ix1 == ix2 {
-                    // z = w, so x and y are in the same alias-group
-                    let common = &self.aliases[ix1];
-                    debug_assert!(
-                        common.contains_fwd_ref(v1.0),
-                        "unexpected half-alias ?{ix1}<-{v1}"
-                    );
-                    debug_assert!(
-                        common.contains_fwd_ref(v2.0),
-                        "unexpected half-alias ?{ix1}<-{v2}"
-                    );
-                    let v0 = ExtVar(ix1);
-                    let Some(ret) = self.outcomes.get(&v0) else {
-                        // FIXME - in this case, do we want to insert an Unsolved outcome instead?
-                        unreachable!("canonical ext-var {v0} has no registered outcome");
-                    };
-                    Ok(*ret)
-                } else {
-                    let (lo, hi) = if ix1 < ix2 { (ix1, ix2) } else { (ix2, ix1) };
-                    unsafe { self.recanonicalize(lo, hi) }
-                }
-            }
-            (a1 @ Alias::BackRef(tgt), a2 @ Alias::Canonical(fwd_refs)) => {
-                /*
-                 * x = BackRef(z), y = Canonical(S):
-                 *   - if x ∈ S and y = z, return the outcome for y
-                 *   - if x ∉ s and y != z, recanonicalize the lesser of y and z for the alias-group of the greater
-                 *   - otherwise, panic due to inconsistent back- and forward-references
-                 */
-                let is_forward_aliased = fwd_refs.contains(&v1.0);
-                let is_backward_aliased = *tgt == v2.0;
-
-                match (is_forward_aliased, is_backward_aliased) {
-                    (true, true) => {
-                        return Ok(*self.outcomes.get(&v2).unwrap());
-                    }
-                    (false, false) => {
-                        let z = *tgt;
-                        let y = v2.0;
-
-                        let (lo, hi) = if z < y { (z, y) } else { (y, z) };
+                (&Alias::BackRef(ix1), &Alias::BackRef(ix2)) => {
+                    /*
+                     * x = BackRef(z), y = BackRef(w):
+                     *   if z < w, recanonicalize z for the alias-group of w
+                     *   if z > w, recanonicalize w for the alias-group of z
+                     *   if z = w, check that the alias-group is well-formed and return the outcome for z
+                     */
+                    if ix1 == ix2 {
+                        // z = w, so x and y are in the same alias-group
+                        let common = &self.aliases[ix1];
+                        debug_assert!(
+                            common.contains_fwd_ref(v1.0),
+                            "unexpected half-alias ?{ix1}<-{v1}"
+                        );
+                        debug_assert!(
+                            common.contains_fwd_ref(v2.0),
+                            "unexpected half-alias ?{ix1}<-{v2}"
+                        );
+                        let v0 = TVar(ix1);
+                        let Some(ret) = self.outcomes.get(&v0) else {
+                            // FIXME - in this case, do we want to insert an Unsolved outcome instead?
+                            unreachable!("canonical ext-var {v0} has no registered outcome");
+                        };
+                        Ok(*ret)
+                    } else {
+                        let (lo, hi) = if ix1 < ix2 { (ix1, ix2) } else { (ix2, ix1) };
                         unsafe { self.recanonicalize(lo, hi) }
                     }
-                    _ => unreachable!(
-                        "mismatched back- and forward-references for {v1} ({a1:?}) and {v2} ({a2:?})"
-                    ),
+                }
+                (a1 @ Alias::BackRef(tgt), a2 @ Alias::Canonical(fwd_refs)) => {
+                    /*
+                     * x = BackRef(z), y = Canonical(S):
+                     *   - if x ∈ S and y = z, return the outcome for y
+                     *   - if x ∉ s and y != z, recanonicalize the lesser of y and z for the alias-group of the greater
+                     *   - otherwise, panic due to inconsistent back- and forward-references
+                     */
+                    let is_forward_aliased = fwd_refs.contains(&v1.0);
+                    let is_backward_aliased = *tgt == v2.0;
+
+                    match (is_forward_aliased, is_backward_aliased) {
+                        (true, true) => {
+                            return Ok(*self.outcomes.get(&v2).unwrap());
+                        }
+                        (false, false) => {
+                            let z = *tgt;
+                            let y = v2.0;
+
+                            let (lo, hi) = if z < y { (z, y) } else { (y, z) };
+                            unsafe { self.recanonicalize(lo, hi) }
+                        }
+                        _ => unreachable!(
+                            "mismatched back- and forward-references for {v1} ({a1:?}) and {v2} ({a2:?})"
+                        ),
+                    }
+                }
+                (a1 @ Alias::Canonical(fwd_refs), a2 @ Alias::BackRef(tgt)) => {
+                    /*
+                     * x = Canonical(S), y = BackRef(z):
+                     *   - if y ∈ S and x = z, return the outcome for x
+                     *   - if y ∉ s and x != z, recanonicalize the lesser of x and z for the alias-group of the greater
+                     *   - otherwise, panic due to inconsistent back- and forward-references
+                     */
+                    let is_forward_aliased = fwd_refs.contains(&v2.0);
+                    let is_backward_aliased = *tgt == v1.0;
+
+                    match (is_forward_aliased, is_backward_aliased) {
+                        (true, true) => {
+                            return Ok(*self.outcomes.get(&v1).unwrap());
+                        }
+                        (false, false) => {
+                            let x = v1.0;
+                            let z = *tgt;
+
+                            let (lo, hi) = min_max(x, z);
+                            unsafe { self.recanonicalize(lo, hi) }
+                        }
+                        _ => unreachable!(
+                            "mismatched forward- and back-references for {v1} ({a1:?}) and {v2} ({a2:?})"
+                        ),
+                    }
+                }
+                (Alias::Canonical(_), Alias::Canonical(_)) => {
+                    /*
+                     * x = Canonical(S), y = Canonical(T): recanonicalize the lesser of x and y over the union of S and T
+                     */
+                    let (lo, hi) = min_max(v1.0, v2.0);
+                    unsafe { self.recanonicalize(lo, hi) }
                 }
             }
-            (a1 @ Alias::Canonical(fwd_refs), a2 @ Alias::BackRef(tgt)) => {
-                /*
-                 * x = Canonical(S), y = BackRef(z):
-                 *   - if y ∈ S and x = z, return the outcome for x
-                 *   - if y ∉ s and x != z, recanonicalize the lesser of x and z for the alias-group of the greater
-                 *   - otherwise, panic due to inconsistent back- and forward-references
-                 */
-                let is_forward_aliased = fwd_refs.contains(&v2.0);
-                let is_backward_aliased = *tgt == v1.0;
+        }
 
-                match (is_forward_aliased, is_backward_aliased) {
-                    (true, true) => {
-                        return Ok(*self.outcomes.get(&v1).unwrap());
-                    }
-                    (false, false) => {
-                        let x = v1.0;
-                        let z = *tgt;
-
-                        let (lo, hi) = min_max(x, z);
-                        unsafe { self.recanonicalize(lo, hi) }
-                    }
-                    _ => unreachable!(
-                        "mismatched forward- and back-references for {v1} ({a1:?}) and {v2} ({a2:?})"
-                    ),
-                }
-            }
-            (Alias::Canonical(_), Alias::Canonical(_)) => {
-                /*
-                 * x = Canonical(S), y = Canonical(T): recanonicalize the lesser of x and y over the union of S and T
-                 */
-                let (lo, hi) = min_max(v1.0, v2.0);
-                unsafe { self.recanonicalize(lo, hi) }
+        /// Rewrites the aliasing of `self` so that `lo<->hi` is enforced, where `lo` is canonical for its
+        /// alias-group and `hi` is ground-aliased, and `lo < hi`.
+        ///
+        /// Additionally synchronizes the outcomes between `lo` and `hi`.
+        ///
+        /// # Safety
+        ///
+        /// This method is not known to cause UB, but it is an internal-facing call that may lead to
+        /// corrupted alias-state if called in a context that does not check certain preconditions.
+        ///
+        /// In particular, these preconditions are: `lo < hi`, `lo` must be canonical, and `hi` must be ground-aliased.
+        unsafe fn insert_ground(&mut self, lo: usize, hi: usize) -> TCResult<NumSolution> {
+            unsafe {
+                self.repoint(lo, hi);
+                self.synchronize_outcomes(lo, hi)
             }
         }
-    }
 
-    /// Rewrites the aliasing of `self` so that `lo<->hi` is enforced, where `lo` is canonical for its
-    /// alias-group and `hi` is ground-aliased, and `lo < hi`.
-    ///
-    /// Additionally synchronizes the outcomes between `lo` and `hi`.
-    ///
-    /// # Safety
-    ///
-    /// This method is not known to cause UB, but it is an internal-facing call that may lead to
-    /// corrupted alias-state if called in a context that does not check certain preconditions.
-    ///
-    /// In particular, these preconditions are: `lo < hi`, `lo` must be canonical, and `hi` must be ground-aliased.
-    unsafe fn insert_ground(&mut self, lo: usize, hi: usize) -> TCResult<NumSolution> {
-        unsafe {
-            self.repoint(lo, hi);
-            self.synchronize_outcomes(lo, hi)
+        /// Rewrites the aliasing of `self` so that `lo<->hi` is enforced, without any other changes.
+        ///
+        /// Assumes that this aliasing does not exist already, and may cause unexpected but not undefined behavior
+        /// if called in a context that does not check certain preconditions.
+        ///
+        /// # Safety
+        ///
+        /// Like [`Self::recanonicalize`], this method is niche enough to not be suitable for calls in a neutral context,
+        /// and may be marked safe after code stabilizes. Otherwise it is not known to lead to any UB.
+        /// Guards are enforced in advance.
+        unsafe fn repoint(&mut self, lo: usize, hi: usize) {
+            self.aliases[hi].set_backref(lo);
+            self.aliases[lo].add_forward_ref(hi);
         }
-    }
 
-    /// Rewrites the aliasing of `self` so that `lo<->hi` is enforced, without any other changes.
-    ///
-    /// Assumes that this aliasing does not exist already, and may cause unexpected but not undefined behavior
-    /// if called in a context that does not check certain preconditions.
-    ///
-    /// # Safety
-    ///
-    /// Like [`Self::recanonicalize`], this method is niche enough to not be suitable for calls in a neutral context,
-    /// and may be marked safe after code stabilizes. Otherwise it is not known to lead to any UB.
-    /// Guards are enforced in advance.
-    unsafe fn repoint(&mut self, lo: usize, hi: usize) {
-        self.aliases[hi].set_backref(lo);
-        self.aliases[lo].add_forward_ref(hi);
-    }
-
-    /// Modifies the aliasing table of `self` to merge the aliasing-groups given by two
-    /// canonical indices `lo` and `hi`, where `lo` < `hi`; the new group's canonical element
-    /// will be `lo`, whose forward references will include:
-    ///     - All existing forward-references for the original alias-group of `lo`
-    ///     - All existing forward-references for the original alias-group of `hi`
-    ///     - The newly de-canonicalized `hi`
-    ///
-    /// Also ensures that all back-references of `hi` now point to `lo` instead, as well as that
-    /// `hi` itself becomes a back-ref to `lo`.
-    ///
-    /// In addition to fixing the aliasing-table, also synchronizes outcomes between `lo` and `hi`,
-    /// taken as representative members of the notionally-common solutions for the members of their
-    /// respective former aliasing groups.
-    ///
-    /// # Panics
-    ///
-    /// Will panic if the aliasing-table is in an inconsistent state at the time of call
-    /// (specifically, if the aliasing-groups of `lo` and `hi` have a non-empty intersection),
-    /// or otherwise under the same conditions that [`Self::synchronize_outcomes`] panics:
-    /// `lo >= hi` or `lo` is non-canonical.
-    ///
-    /// # Safety
-    ///
-    /// As this method is designed to be internal with a specific singular use-case, there are a number of preconditions that must either be
-    /// assumed or asserted, in order to ensure that the call is sound and valid. These preconditions are numerous enough to merit unsafe status for
-    /// the call to this method, at least as a temporary linting-helper, to avoid unguarded calls from neutral contexts.
-    ///
-    /// Preconditions:
-    /// - `lo < hi`
-    /// - `lo` has no back-references; it is allowed (but not required) to have forward-references
-    /// - `hi` has no back-references; it is allowed (but not required) to have forward-references
-    unsafe fn recanonicalize(&mut self, lo: usize, hi: usize) -> TCResult<NumSolution> {
-        // tmp is the old aliasing-group of `hi` after overwriting `hi` to back-reference `lo`
-        let tmp = self.aliases[hi].set_backref(lo);
-        let iter = tmp.iter_fwd_refs();
-        for a in iter {
-            // double-checks that none of the members of the previous aliasing-group of `hi` are included in the aliasing-group of `lo`
-            assert!(
-                !self.aliases[lo].contains_fwd_ref(a),
-                "forward ref of ?{hi} is also a forward ref of ?{lo}, somehow"
-            );
-            unsafe { self.repoint(lo, a) };
+        /// Modifies the aliasing table of `self` to merge the aliasing-groups given by two
+        /// canonical indices `lo` and `hi`, where `lo` < `hi`; the new group's canonical element
+        /// will be `lo`, whose forward references will include:
+        ///     - All existing forward-references for the original alias-group of `lo`
+        ///     - All existing forward-references for the original alias-group of `hi`
+        ///     - The newly de-canonicalized `hi`
+        ///
+        /// Also ensures that all back-references of `hi` now point to `lo` instead, as well as that
+        /// `hi` itself becomes a back-ref to `lo`.
+        ///
+        /// In addition to fixing the aliasing-table, also synchronizes outcomes between `lo` and `hi`,
+        /// taken as representative members of the notionally-common solutions for the members of their
+        /// respective former aliasing groups.
+        ///
+        /// # Panics
+        ///
+        /// Will panic if the aliasing-table is in an inconsistent state at the time of call
+        /// (specifically, if the aliasing-groups of `lo` and `hi` have a non-empty intersection),
+        /// or otherwise under the same conditions that [`Self::synchronize_outcomes`] panics:
+        /// `lo >= hi` or `lo` is non-canonical.
+        ///
+        /// # Safety
+        ///
+        /// As this method is designed to be internal with a specific singular use-case, there are a number of preconditions that must either be
+        /// assumed or asserted, in order to ensure that the call is sound and valid. These preconditions are numerous enough to merit unsafe status for
+        /// the call to this method, at least as a temporary linting-helper, to avoid unguarded calls from neutral contexts.
+        ///
+        /// Preconditions:
+        /// - `lo < hi`
+        /// - `lo` has no back-references; it is allowed (but not required) to have forward-references
+        /// - `hi` has no back-references; it is allowed (but not required) to have forward-references
+        unsafe fn recanonicalize(&mut self, lo: usize, hi: usize) -> TCResult<NumSolution> {
+            // tmp is the old aliasing-group of `hi` after overwriting `hi` to back-reference `lo`
+            let tmp = self.aliases[hi].set_backref(lo);
+            let iter = tmp.iter_fwd_refs();
+            for a in iter {
+                // double-checks that none of the members of the previous aliasing-group of `hi` are included in the aliasing-group of `lo`
+                assert!(
+                    !self.aliases[lo].contains_fwd_ref(a),
+                    "forward ref of ?{hi} is also a forward ref of ?{lo}, somehow"
+                );
+                unsafe { self.repoint(lo, a) };
+            }
+            self.aliases[lo].add_forward_ref(hi);
+            unsafe { self.synchronize_outcomes(lo, hi) }
         }
-        self.aliases[lo].add_forward_ref(hi);
-        unsafe { self.synchronize_outcomes(lo, hi) }
-    }
 
-    /// Modifies internal state to establish all expected post-conditions of the novel aliasing `lo->|<-hi`.
-    ///
-    /// Specifically, will adjust the entries for `lo` and `hi` in `self.outcomes` such that, if both are solved,
-    /// the two solutions are unified (and will return Err if their unification is unsatisfiable).
-    ///
-    /// If `lo` is unsolved and `hi` is solved, will force the solution of `lo` and peform the same unification, after
-    /// which (if not Err) the entry for `hi` is elided and the entry for `lo` is updated (and returned).
-    ///
-    /// If `lo` is solved and `hi` is unsolved, will merely return the entry for `lo` and leave reconciliation of the
-    /// deferred solution of `hi` to be handled when the solution is manifested at a later time.
-    ///
-    /// If `lo` is elided, or if `hi` is elided, will panic.
-    ///
-    /// The return-value is the outcome of the ExtVar with index `lo`, after enforcing its unification with `hi`.
-    ///
-    /// Preconditions:
-    ///   - `lo < hi`
-    ///   - Neither `lo` nor `hi` have elided solutions
-    ///   - `lo` is canonical
-    ///   - `hi` was formerly canonical but has been repointed to `lo`.
-    ///   - All previous members of the alias-group of `lo` have compatible solution-states with that of `lo`
-    unsafe fn synchronize_outcomes(&mut self, lo: usize, hi: usize) -> TCResult<NumSolution> {
-        assert!(lo < hi);
-        assert!(self.is_canonical(lo));
+        /// Modifies internal state to establish all expected post-conditions of the novel aliasing `lo->|<-hi`.
+        ///
+        /// Specifically, will adjust the entries for `lo` and `hi` in `self.outcomes` such that, if both are solved,
+        /// the two solutions are unified (and will return Err if their unification is unsatisfiable).
+        ///
+        /// If `lo` is unsolved and `hi` is solved, will force the solution of `lo` and peform the same unification, after
+        /// which (if not Err) the entry for `hi` is elided and the entry for `lo` is updated (and returned).
+        ///
+        /// If `lo` is solved and `hi` is unsolved, will merely return the entry for `lo` and leave reconciliation of the
+        /// deferred solution of `hi` to be handled when the solution is manifested at a later time.
+        ///
+        /// If `lo` is elided, or if `hi` is elided, will panic.
+        ///
+        /// The return-value is the outcome of the TVar with index `lo`, after enforcing its unification with `hi`.
+        ///
+        /// Preconditions:
+        ///   - `lo < hi`
+        ///   - Neither `lo` nor `hi` have elided solutions
+        ///   - `lo` is canonical
+        ///   - `hi` was formerly canonical but has been repointed to `lo`.
+        ///   - All previous members of the alias-group of `lo` have compatible solution-states with that of `lo`
+        unsafe fn synchronize_outcomes(&mut self, lo: usize, hi: usize) -> TCResult<NumSolution> {
+            assert!(lo < hi);
+            assert!(self.is_canonical(lo));
 
-        // ensure that the canonical ExtVar `#lo` does not have an unsolved subtree
-        let (_sol, _is_novel) = self.ensure_outcome(ExtVar(lo))?;
+            // ensure that the canonical TVar `#lo` does not have an unsolved subtree
+            let (_sol, _is_novel) = self.ensure_outcome(TVar(lo))?;
 
-        // If no solution has been inserted for `hi` yet, create an entry for it storing `NumSolution::Unsolved`.
-        {
-            let _hi_entry = self.outcomes.entry(ExtVar(hi)).or_default();
-        }
-        let (lo_outcome, hi_outcome) =
-            match self.outcomes.get_disjoint_mut([&ExtVar(lo), &ExtVar(hi)]) {
+            // If no solution has been inserted for `hi` yet, create an entry for it storing `NumSolution::Unsolved`.
+            {
+                let _hi_entry = self.outcomes.entry(TVar(hi)).or_default();
+            }
+            let (lo_outcome, hi_outcome) = match self
+                .outcomes
+                .get_disjoint_mut([&TVar(lo), &TVar(hi)])
+            {
                 [Some(lo_outcome), Some(hi_outcome)] => (lo_outcome, hi_outcome),
                 [None, _] => unreachable!("[BUG]: force_outcome failed to create entry for #{lo}"),
                 [_, None] => unreachable!("[BUG]: failed to create entry for #{hi}"),
             };
 
-        let (new_sol_lo, new_sol_hi) =
-            Self::reconcile_solution_pair((*lo_outcome, *hi_outcome), false)?;
-        *lo_outcome = new_sol_lo;
-        *hi_outcome = new_sol_hi;
+            let (new_sol_lo, new_sol_hi) =
+                Self::reconcile_solution_pair((*lo_outcome, *hi_outcome), false)?;
+            *lo_outcome = new_sol_lo;
+            *hi_outcome = new_sol_hi;
 
-        Ok(new_sol_lo)
-    }
-}
-// !SECTION
-
-// SECTION - low level solution-unification
-impl EmbeddedResolver {
-    /// Given a pair of `NumSolution`s that correspond to two aliased `ExtVar`s,
-    /// returns a pair of mutually satisfiable `NumSolution`s to replace the original pair.
-    ///
-    /// It is implicitly assumed that the first `NumSolution` corresponds to the lower-indexed `ExtVar`
-    /// of a co-aliased pair, which is the canonical `ExtVar` in its aliasing group.
-    ///
-    /// # Panics
-    ///
-    /// The boolean flag `permit_elision` controls how the function handles `NumSolution::Elided` in the second pair-element.
-    /// - If `true`, will treat `NumSolution::Elided` as `NumSolution::Unsolved`
-    /// - If `false`, this method will panic.
-    ///
-    /// This method will always panic if the first pair-element is `NumSolution::Elided`.
-    ///
-    /// It will also panic if the first-pair-element is `NumSolution::Unsolved` (unless the second element is also `NumSolution::Unsolved`), which should be precluded by the caller
-    /// through [`EmbeddedResolver::force_outcome`].
-    fn reconcile_solution_pair(
-        sols: (NumSolution, NumSolution),
-        permit_elision: bool,
-    ) -> TCResult<(NumSolution, NumSolution)> {
-        let (orig_lo, orig_hi) = match sols {
-            (NumSolution::Solved(sol_lo), NumSolution::Solved(sol_hi)) => (sol_lo, sol_hi),
-            (NumSolution::Unsolved, NumSolution::Unsolved) => {
-                // REVIEW[epic=embedded-num] - is it proper to return the same solutions, or do we want to enforce the constraint that `sol.0` should at least be solved?
-                return Ok(sols);
-            }
-            (NumSolution::Elided, _) => unreachable!(
-                "reconcile_solution_pair: canonical ExtVar should not have elided solution"
-            ),
-            (_, NumSolution::Elided) if !permit_elision => {
-                panic!(
-                    "reconcile_solution_pair: unexpected elided solution for non-canonical ExtVar with permit_elision=false"
-                );
-            }
-            (NumSolution::Solved(_), NumSolution::Unsolved | NumSolution::Elided) => {
-                // NOTE[epic=embedded-num] - rather than solve `hi` here, we leave the alias-unification to be solved later once we request the solution for `hi`.
-                return Ok(sols);
-            }
-            (NumSolution::Unsolved, sol_hi) => {
-                panic!(
-                    "reconcile_solution_pair: canonical ext-var is unsolved, but non-canonical ext-var is solved with {sol_hi}"
-                );
-            }
-        };
-
-        if orig_lo == orig_hi {
-            Ok((NumSolution::Solved(orig_lo), NumSolution::Elided))
-        } else {
-            Err(TCErrorKind::IrreconcilableNumSolutions(
-                NumSolution::Solved(orig_lo),
-                NumSolution::Solved(orig_hi),
-            )
-            .into())
+            Ok(new_sol_lo)
         }
     }
+    // !SECTION
+
+    // SECTION - low level solution-unification
+    impl EmbeddedResolver {
+        /// Given a pair of `NumSolution`s that correspond to two aliased `TVar`s,
+        /// returns a pair of mutually satisfiable `NumSolution`s to replace the original pair.
+        ///
+        /// It is implicitly assumed that the first `NumSolution` corresponds to the lower-indexed `TVar`
+        /// of a co-aliased pair, which is the canonical `TVar` in its aliasing group.
+        ///
+        /// # Panics
+        ///
+        /// The boolean flag `permit_elision` controls how the function handles `NumSolution::Elided` in the second pair-element.
+        /// - If `true`, will treat `NumSolution::Elided` as `NumSolution::Unsolved`
+        /// - If `false`, this method will panic.
+        ///
+        /// This method will always panic if the first pair-element is `NumSolution::Elided`.
+        ///
+        /// It will also panic if the first-pair-element is `NumSolution::Unsolved` (unless the second element is also `NumSolution::Unsolved`), which should be precluded by the caller
+        /// through [`EmbeddedResolver::force_outcome`].
+        fn reconcile_solution_pair(
+            sols: (NumSolution, NumSolution),
+            permit_elision: bool,
+        ) -> TCResult<(NumSolution, NumSolution)> {
+            let (orig_lo, orig_hi) = match sols {
+                (NumSolution::Solved(sol_lo), NumSolution::Solved(sol_hi)) => (sol_lo, sol_hi),
+                (NumSolution::Unsolved, NumSolution::Unsolved) => {
+                    // REVIEW[epic=embedded-num] - is it proper to return the same solutions, or do we want to enforce the constraint that `sol.0` should at least be solved?
+                    return Ok(sols);
+                }
+                (NumSolution::Elided, _) => unreachable!(
+                    "reconcile_solution_pair: canonical TVar should not have elided solution"
+                ),
+                (_, NumSolution::Elided) if !permit_elision => {
+                    panic!(
+                        "reconcile_solution_pair: unexpected elided solution for non-canonical TVar with permit_elision=false"
+                    );
+                }
+                (NumSolution::Solved(_), NumSolution::Unsolved | NumSolution::Elided) => {
+                    // NOTE[epic=embedded-num] - rather than solve `hi` here, we leave the alias-unification to be solved later once we request the solution for `hi`.
+                    return Ok(sols);
+                }
+                (NumSolution::Unsolved, sol_hi) => {
+                    panic!(
+                        "reconcile_solution_pair: canonical ext-var is unsolved, but non-canonical ext-var is solved with {sol_hi}"
+                    );
+                }
+            };
+
+            if orig_lo == orig_hi {
+                Ok((NumSolution::Solved(orig_lo), NumSolution::Elided))
+            } else {
+                Err(TCErrorKind::IrreconcilableNumSolutions(
+                    NumSolution::Solved(orig_lo),
+                    NumSolution::Solved(orig_hi),
+                )
+                .into())
+            }
+        }
+    }
+    // !SECTION
 }
-// !SECTION
 
 /// Mutably updated state-engine for performing complete type-inference on a top-level `Format`.
 #[derive(Debug)]
@@ -1822,8 +1206,8 @@ pub struct TypeChecker {
     varmaps: VarMapMap,
     /// Association between ItemVar/FormatRef levels in the FormatModule and the UVar they are mapped to
     level_vars: HashMap<usize, UVar>,
-    /// Scaffolding for compartmentalized external type inference in the arithmetic extension grammar
-    sub_extension: EmbeddedResolver,
+    // /// Scaffolding for compartmentalized external type inference in the arithmetic extension grammar
+    // sub_extension: EmbeddedResolver,
 }
 
 // SECTION - Construction and instantiation in the meta-context
@@ -1835,7 +1219,7 @@ impl TypeChecker {
             aliases: Vec::new(),
             varmaps: VarMapMap::new(),
             level_vars: HashMap::new(),
-            sub_extension: EmbeddedResolver::new(),
+            // sub_extension: EmbeddedResolver::new(),
         }
     }
 
@@ -1878,6 +1262,15 @@ impl TypeChecker {
         self.constraints.push(Constraints::new());
         self.aliases.push(Alias::new());
         ret
+    }
+
+    /// Same as [`get_new_uvar`], but additionally informs the initial constraints to indicate that the type
+    /// must be numeric
+    fn get_new_uvar_numtree(&mut self) -> UVar {
+        let var = self.get_new_uvar();
+        let constr = Constraint::NumTree(IntSet::ZAny);
+        self.unify_var_constraint(var, constr).unwrap();
+        var
     }
 
     fn infer_var_scope_pattern(
@@ -2024,6 +1417,7 @@ impl TypeChecker {
                     Constraints::Invariant(Constraint::Equiv(ut)) => self.to_whnf_vtype(ut.clone()),
                     Constraints::Invariant(Constraint::Elem(bs)) => VType::Base(*bs),
                     Constraints::Invariant(Constraint::Proj(ps)) => self.proj_shape_to_vtype(ps),
+                    Constraints::Invariant(Constraint::NumTree(is)) => VType::Int(*is),
                     Constraints::Variant(vmid) => VType::IndefiniteUnion(*vmid),
                     Constraints::Indefinite => VType::Abstract(v0.into()),
                 }
@@ -2122,7 +1516,7 @@ impl TypeChecker {
 
                 self.unify_var_constraint(
                     newvar,
-                    Constraint::Elem(BaseSet::U(UintSet::any_default(IntWidth::Bits16))),
+                    Constraint::Elem(BaseSet::U(UintSet::any_default(BitWidth::Bits16))),
                 )?;
                 Ok(newvar)
             }
@@ -2146,6 +1540,20 @@ impl TypeChecker {
             }
         }
     }
+
+    /// Attempts to coerce `prim` to a member of `bs` and returns a constraint `c` if successful, or an error otherwise.
+    fn unify_primint_baseset(prim: PrimInt, bs: BaseSet) -> TCResult<Constraint> {
+        if bs.is_empty() {
+            return Err(CrossLayerNumericError::EmptyBase.into());
+        }
+
+        let ps = IntSet::try_from_base_set(bs)?;
+        if !ps.contains(prim) {
+            return Err(CrossLayerNumericError::PrimNotInBaseSet(prim, bs).into());
+        } else {
+            Ok(Constraint::NumTree(IntSet::Single(prim)))
+        }
+    }
 }
 // !SECTION
 
@@ -2156,6 +1564,104 @@ impl TypeChecker {
     #[cfg_attr(not(test), allow(dead_code))]
     pub fn check_uvar_sanity(&self) {
         assert_eq!(self.constraints.len(), self.aliases.len());
+    }
+
+    #[cfg(any())]
+    /// Given a `TVar` `tree_v` representing a numeric tree, and the set of `UVar`s that the associated
+    /// numeric-tree depends on, determines whether the dependency-graph is non-cyclic, and therefore soluble.
+    ///
+    /// A cycle is formed whenever a num-tree transitively depends on its own root-type.
+    pub fn is_non_cyclic(&self, tree_v: TVar, deps: &BTreeSet<UVar>) -> bool {
+        if deps.is_empty() {
+            true
+        } else {
+            let mut graph = DepGraph::new(tree_v);
+            let path = DepPath::new();
+            self.tree_occurs(tree_v, deps, &mut graph, path).is_ok()
+        }
+    }
+
+    #[cfg(any())]
+    /// Helper for [`TypeChecker::is_non_cyclic`].
+    ///
+    /// Searches the constraints over a set of `UVar`s to find any implied dependencies on `tree_v`,
+    /// or on any secondary trees within `trees`.
+    fn tree_occurs(
+        &self,
+        tree_var: TVar,
+        deps: &BTreeSet<UVar>,
+        graph: &mut DepGraph,
+        path: DepPath,
+    ) -> TCResult<()> {
+        for v in deps.iter() {
+            let v = self.get_canonical_uvar(*v);
+            let mut local = path.clone();
+            local.push_link((tree_var, v));
+            self.check_cycle_in_constraints(v, graph, local, &self.constraints[v.0])?;
+        }
+        Ok(())
+    }
+
+    #[cfg(any())]
+    fn check_cycle_in_constraints(
+        &self,
+        v: UVar,
+        graph: &mut DepGraph,
+        path: DepPath,
+        constraints: &Constraints,
+    ) -> TCResult<()> {
+        match constraints {
+            Constraints::Indefinite => Ok(()),
+            Constraints::Variant(_v) => unreachable!(
+                "tree-var {} should not depend on variant constraints ({_v})",
+                path.deepest_tree(graph.origin)
+            ),
+            Constraints::Invariant(c) => match c {
+                Constraint::Equiv(utype) => self.check_cycle_in(v, graph, path, utype),
+                Constraint::Elem(..) => Ok(()),
+                Constraint::Proj(_proj) => unreachable!(
+                    "tree-var {} should not depend on projective constraint ({_proj:?})",
+                    path.deepest_tree(graph.origin)
+                ),
+            },
+        }
+    }
+
+    #[cfg(any())]
+    fn check_cycle_in(
+        &self,
+        v: UVar,
+        graph: &mut DepGraph,
+        path: DepPath,
+        t: impl AsRef<UType>,
+    ) -> TCResult<()> {
+        match t.as_ref() {
+            UType::Hole | UType::Empty | UType::Base(_) => Ok(()),
+            UType::TreeRoot(tree) => {
+                let is_new = graph.add_path(*tree, path.clone())?;
+                if is_new {
+                    let deps = self.sub_extension.get_dependencies(*tree);
+                    self.tree_occurs(*tree, deps, graph, path)
+                } else {
+                    Ok(())
+                }
+            }
+            &UType::Var(v1) => {
+                unreachable!("alias-equivalence {v}={v1} found while checking for cycles");
+            }
+            UType::ViewObj
+            | UType::Tuple(..)
+            | UType::Record(..)
+            | UType::Seq(..)
+            | UType::Option(..)
+            | UType::PhantomData(..) => {
+                unreachable!(
+                    "tree-var {} should not depend on non-numeric type ({:?})",
+                    path.deepest_tree(graph.origin),
+                    t.as_ref()
+                );
+            }
+        }
     }
 
     /// Returns `true` if `t` describes an infinite type, considering
@@ -2189,7 +1695,7 @@ impl TypeChecker {
                 Ok(())
             }
             Constraints::Invariant(c) => match c {
-                Constraint::Elem(_) => Ok(()),
+                Constraint::Elem(_) | Constraint::NumTree(_) => Ok(()),
                 Constraint::Equiv(t) => self.occurs_in(v, t),
                 Constraint::Proj(p) => match p {
                     ProjShape::TupleWith(ix_vars) => {
@@ -2215,9 +1721,7 @@ impl TypeChecker {
     /// for detecting infinite types.
     fn occurs_in(&self, v: UVar, t: impl AsRef<UType>) -> TCResult<()> {
         match t.as_ref() {
-            UType::Hole | UType::Empty | UType::ViewObj | UType::ExternVar(..) | UType::Base(_) => {
-                Ok(())
-            }
+            UType::Hole | UType::Empty | UType::ViewObj | UType::Int(..) | UType::Base(_) => Ok(()),
             &UType::Var(v1) => {
                 if self.is_aliased(v, v1) {
                     Err(TCErrorKind::InfiniteType(v, self.constraints[v.0].clone()).into())
@@ -2396,6 +1900,7 @@ impl TypeChecker {
             Constraints::Variant(_) => unreachable!("cannot solve tuple projection on union"),
             Constraints::Invariant(c) => match c {
                 Constraint::Elem(_) => unreachable!("cannot solve tuple projection on base-set"),
+                Constraint::NumTree(_) => unreachable!("cannot solve tuple projection on int-set"),
                 Constraint::Equiv(ut) => match ut.as_ref() {
                     UType::Tuple(ts) => {
                         assert!(ts.len() > ix);
@@ -2435,6 +1940,7 @@ impl TypeChecker {
             Constraints::Variant(_) => unreachable!("cannot solve record projection on union"),
             Constraints::Invariant(c) => match c {
                 Constraint::Elem(_) => unreachable!("cannot solve record projection on base-set"),
+                Constraint::NumTree(_) => unreachable!("cannot solve record projection on int-set"),
                 Constraint::Equiv(ut) => match ut.as_ref() {
                     UType::Record(fs) => {
                         let fld_type = fs
@@ -2481,6 +1987,7 @@ impl TypeChecker {
             Constraints::Variant(_) => unreachable!("cannot solve param projection on union"),
             Constraints::Invariant(c) => match c {
                 Constraint::Elem(_) => unreachable!("cannot solve param projection on base-set"),
+                Constraint::NumTree(_) => unreachable!("cannot solve param projection on int-set"),
                 Constraint::Equiv(ut) => match ut.as_ref() {
                     UType::Option(inner) => {
                         let param_t = inner.clone();
@@ -2514,6 +2021,7 @@ impl TypeChecker {
             Constraints::Variant(_) => unreachable!("cannot solve elem projection on union"),
             Constraints::Invariant(c) => match c {
                 Constraint::Elem(_) => unreachable!("cannot solve elem projection on base-set"),
+                Constraint::NumTree(_) => unreachable!("cannot solve elem projection on int-set"),
                 Constraint::Equiv(ut) => match ut.as_ref() {
                     UType::Seq(inner, _) => {
                         let elem_t = inner.clone();
@@ -2641,15 +2149,16 @@ impl TypeChecker {
                 self.unify_var_pair(v1, v2)?;
                 Ok(Rc::new(UType::Var(Ord::min(v1, v2))))
             }
-            (&UType::ExternVar(ext1), &UType::ExternVar(ext2)) => {
-                self.unify_extvar_pair(ext1, ext2)?;
-                Ok(Rc::new(UType::ExternVar(Ord::min(ext1, ext2))))
+            (&UType::Int(it1), &UType::Int(it2)) => {
+                if it1 == it2 {
+                    Ok(left)
+                } else {
+                    Err(UnificationError::Unsatisfiable(left, right).into())
+                }
             }
-            (&UType::Var(v), &UType::ExternVar(ext)) | (&UType::ExternVar(ext), &UType::Var(v)) => {
-                self.unify_var_extvar(v, ext)
+            (&UType::Int(it), &UType::Base(bt)) | (&UType::Base(bt), &UType::Int(it)) => {
+                Self::unify_primint_basetype(it.to_prim(), bt)
             }
-            (&UType::ExternVar(ext), _) => self.unify_extvar_utype(ext, right.clone()),
-            (_, &UType::ExternVar(ext)) => self.unify_extvar_utype(ext, left.clone()),
             (&UType::Var(v), _) => {
                 let constraint = Constraint::Equiv(right.clone());
                 let _ = self.unify_var_constraint(v, constraint)?;
@@ -2683,17 +2192,27 @@ impl TypeChecker {
 
     /// Unifies a UType against a BaseSet, updating any variable constraints in the process.
     ///
-    /// Returns a copy of the novel Constraint implied by the unification
-    /// if `ut` is `Base`, `Var`, or `Hole` (in the case of `Hole`, no additional inference is performed
-    /// and the constraint is directly returned without any further unification).
+    /// Returns a copy of the novel Constraint implied by the unification.
     ///
-    /// Otherwise, returns an `Err` indicating that the unification was not possible.
+    /// Will succeed if `ut` is ground-shape (non-structural), which is generally
+    /// true of variants `Base`, `Int`, `Var`, and `Hole`.
+    ///
+    /// In the case of `UType::Hole`, simply returns the constraint-form of `bs` without
+    /// any further unification.
+    ///
+    /// For `Int` and `Base`, attempts to reconcile the inner type against the `BaseSet`,
+    /// possibly failing if this is not possible.
+    ///
+    /// For `Var`, recursively applies the constraint of `bs` to the variable in question.
+    ///
+    /// For failed ground-unifications, or shapeful UTypes, returns an `Err` indicating
+    /// that the unification was not possible.
     fn unify_utype_baseset(&mut self, ut: Rc<UType>, bs: BaseSet) -> TCResult<Constraint> {
         match ut.as_ref() {
             UType::Var(uv) => self.unify_var_baseset(*uv, bs),
-            UType::ExternVar(ext_v) => self.unify_extvar_baseset_as_constraint(*ext_v, bs),
+            UType::Int(it) => Self::unify_primint_baseset(it.to_prim(), bs),
             UType::Base(b) => {
-                let ret = bs.unify(&BaseSet::Single(*b))?.to_constraint();
+                let ret = bs.unify(BaseSet::Single(*b))?.to_constraint();
                 Ok(ret)
             }
             UType::Hole => Ok(bs.to_constraint()),
@@ -2705,6 +2224,46 @@ impl TypeChecker {
         }
     }
 
+    /// Unifies a UType against an IntSet, updating any variable constraints in the process.
+    ///
+    /// Returns a copy of the novel Constraint implied by the unification.
+    ///
+    /// Will fail outright unless  `ut` is a ground-UType (viz. non-shapeful), which is generally
+    /// true of variants `Base`, `Int`, `Var`, and `Hole`.
+    ///
+    /// In the case of `UType::Hole`, simply returns the constraint-form of `is` without
+    /// any further unification.
+    ///
+    /// For `Int` and `Base`, attempts to reconcile the inner type against the `IntSet`,
+    /// possibly failing if this is not possible.
+    ///
+    /// For `Var`, recursively applies the constraint of `is` to the variable in question.
+    ///
+    /// For failed ground-unifications, or shapeful UTypes, returns an `Err` indicating
+    /// that the unification was not possible.
+    fn unify_utype_intset(&mut self, ut: Rc<UType>, ints: IntSet) -> TCResult<Constraint> {
+        match ut.as_ref() {
+            UType::Var(uv) => self.unify_var_intset(*uv, ints),
+            UType::Int(it) => {
+                let p = it.to_prim();
+                let ret = ints.unify(IntSet::Single(p))?;
+                Ok(ret.to_constraint())
+            }
+            UType::Base(b) => Self::unify_basetype_intset(*b, ints),
+            UType::Hole => Ok(ints.to_constraint()),
+            _other => Err(UnificationError::Unsatisfiable(
+                Constraint::Equiv(ut),
+                ints.to_constraint(),
+            )
+            .into()),
+        }
+    }
+
+    fn unify_var_intset(&mut self, uv: UVar, is: IntSet) -> TCResult<Constraint> {
+        let constraint = is.to_constraint();
+        self.unify_var_constraint(uv, constraint)
+    }
+
     /// Unifies a UVar against a BaseSet, updating any aliased-variable constraints in the process.
     ///
     /// Returns a copy of the novel Constraint implied by the unification if it was sound.
@@ -2714,78 +2273,25 @@ impl TypeChecker {
         self.unify_var_constraint(uv, constraint)
     }
 
-    /// Handles case-logic for Constraint-level unification of `Equiv(ExternVar(ext_v))` and `Elem(bs)`.
-    ///
-    /// Returns a `Constraint` if the unification is sound, or an `Err` otherwise.
-    fn unify_extvar_baseset_as_constraint(
-        &mut self,
-        ext_v: ExtVar,
-        bs: BaseSet,
-    ) -> TCResult<Constraint> {
-        let IntType::Prim(pt) = self.resolve_extvar(ext_v)?;
-        if let Ok(bt) = pt.try_into()
-            && bs.contains(bt)
-        {
-            Ok(Constraint::Equiv(Rc::new(UType::Base(bt))))
-        } else {
-            Err(TCErrorKind::UnexpectedSolution(ext_v, pt, bs).into())
-        }
-    }
-
     /// Attempts to unify a [`PrimInt`] with a [`BaseType`], returning the unified [`UType`] if successful.
+    ///
+    /// No guarantees are made as to whether the UType, if successful, will store a `Base` or `Int` variant, so
+    /// both cases should be handled properly by the caller.
     ///
     /// Returns an `Err` if the unification is not possible.
     ///
     /// # Notes
     ///
     /// For error-tracking purposes, the caller may wish to attach extra context using
-    /// [`TCError::with_trace`] to indicate the `ExtVar` or `UVar` whose unification
+    /// [`TCError::with_trace`] to indicate the `UVar` whose unification
     /// is being attempted.
     fn unify_primint_basetype(prim: PrimInt, base: BaseType) -> TCResult<Rc<UType>> {
-        let reason = match base {
-            BaseType::Char | BaseType::Bool => CrossLayerBadnessReason::NonNumeric,
-            BaseType::U8 => match prim {
-                PrimInt::U8 => return Ok(Rc::new(UType::Base(BaseType::U8))),
-                _ => {
-                    if prim.is_signed() {
-                        CrossLayerBadnessReason::Unsupported
-                    } else {
-                        CrossLayerBadnessReason::Mismatched
-                    }
-                }
-            },
-            BaseType::U16 => match prim {
-                PrimInt::U16 => return Ok(Rc::new(UType::Base(BaseType::U16))),
-                _ => {
-                    if prim.is_signed() {
-                        CrossLayerBadnessReason::Unsupported
-                    } else {
-                        CrossLayerBadnessReason::Mismatched
-                    }
-                }
-            },
-            BaseType::U32 => match prim {
-                PrimInt::U32 => return Ok(Rc::new(UType::Base(BaseType::U32))),
-                _ => {
-                    if prim.is_signed() {
-                        CrossLayerBadnessReason::Unsupported
-                    } else {
-                        CrossLayerBadnessReason::Mismatched
-                    }
-                }
-            },
-            BaseType::U64 => match prim {
-                PrimInt::U64 => return Ok(Rc::new(UType::Base(BaseType::U64))),
-                _ => {
-                    if prim.is_signed() {
-                        CrossLayerBadnessReason::Unsupported
-                    } else {
-                        CrossLayerBadnessReason::Mismatched
-                    }
-                }
-            },
-        };
-        Err(TCErrorKind::BadEquivalence { prim, base, reason }.into())
+        let prim0 = PrimInt::try_from(base).map_err(CrossLayerNumericError::TryFromBase)?;
+        if prim == prim0 {
+            Ok(Rc::new(UType::Base(base)))
+        } else {
+            Err(CrossLayerNumericError::NonMatching(prim, base).into())
+        }
     }
 
     /// Attempt to unify a [`UVar`] with a [`ValueType`], primarily for use with `Expr::FlatMapAccum`.
@@ -2834,6 +2340,7 @@ impl TypeChecker {
     /// If any subordinate unification results in an error, short-circuits and returns this error to the caller instead.
     fn unify_constraint_pair(&mut self, c1: Constraint, c2: Constraint) -> TCResult<Constraint> {
         match (c1, c2) {
+            // SECTION - homogenous recursive unification
             (Constraint::Equiv(t1), Constraint::Equiv(t2)) => {
                 if t1 == t2 {
                     Ok(Constraint::Equiv(t1.clone()))
@@ -2842,177 +2349,218 @@ impl TypeChecker {
                     Ok(Constraint::Equiv(t0))
                 }
             }
+            (Constraint::Elem(bs1), Constraint::Elem(bs2)) => {
+                let bs0 = bs1.unify(bs2)?;
+                Ok(bs0.to_constraint())
+            }
+            (Constraint::Proj(p1), Constraint::Proj(p2)) => match p1 {
+                ProjShape::TupleWith(t1) => match p2 {
+                    ProjShape::TupleWith(t2) => {
+                        if t1 == t2 {
+                            return Ok(Constraint::Proj(ProjShape::TupleWith(t1)));
+                        }
+
+                        let mut t0 = BTreeMap::new();
+
+                        let keys_t1 = t1.keys().copied().collect::<HashSet<_>>();
+                        let keys_t2 = t2.keys().copied().collect::<HashSet<_>>();
+
+                        let keys_t0 = HashSet::union(&keys_t1, &keys_t2);
+
+                        for key in keys_t0.into_iter() {
+                            match (t1.get(key), t2.get(key)) {
+                                (Some(var1), Some(var2)) => {
+                                    self.unify_var_pair(*var1, *var2)?;
+                                    t0.insert(*key, Ord::min(*var1, *var2));
+                                }
+                                (Some(var), None) | (None, Some(var)) => {
+                                    t0.insert(*key, *var);
+                                }
+                                _ => unreachable!("key must be in at least one of t1, t2"),
+                            }
+                        }
+
+                        Ok(Constraint::Proj(ProjShape::TupleWith(t0)))
+                    }
+                    _ => Err(UnificationError::Unsatisfiable(
+                        Constraint::Proj(ProjShape::TupleWith(t1)),
+                        Constraint::Proj(p2),
+                    )
+                    .into()),
+                },
+                ProjShape::RecordWith(r1) => match p2 {
+                    ProjShape::RecordWith(r2) => {
+                        if r1 == r2 {
+                            return Ok(Constraint::Proj(ProjShape::RecordWith(r1)));
+                        }
+
+                        let mut r0 = BTreeMap::new();
+
+                        let keys_r1 = r1.keys().cloned().collect::<HashSet<_>>();
+                        let keys_r2 = r2.keys().cloned().collect::<HashSet<_>>();
+
+                        let keys_r0 = HashSet::union(&keys_r1, &keys_r2);
+
+                        for key in keys_r0.into_iter() {
+                            match (r1.get(key), r2.get(key)) {
+                                (Some(var1), Some(var2)) => {
+                                    self.unify_var_pair(*var1, *var2)?;
+                                    r0.insert(key.clone(), Ord::min(*var1, *var2));
+                                }
+                                (Some(var), None) | (None, Some(var)) => {
+                                    r0.insert(key.clone(), *var);
+                                }
+                                _ => unreachable!("key must be in at least one of r1, r2"),
+                            }
+                        }
+
+                        Ok(Constraint::Proj(ProjShape::RecordWith(r0)))
+                    }
+                    _ => Err(UnificationError::Unsatisfiable(
+                        Constraint::Proj(ProjShape::RecordWith(r1)),
+                        Constraint::Proj(p2),
+                    )
+                    .into()),
+                },
+                ProjShape::SeqOf(elt_var1) => match p2 {
+                    ProjShape::SeqOf(elt_var2) => {
+                        self.unify_var_pair(elt_var1, elt_var2)?;
+                        Ok(Constraint::Proj(ProjShape::SeqOf(elt_var1)))
+                    }
+                    _ => Err(UnificationError::Unsatisfiable(
+                        Constraint::Proj(ProjShape::SeqOf(elt_var1)),
+                        Constraint::Proj(p1),
+                    )
+                    .into()),
+                },
+                ProjShape::OptOf(param_var1) => match p2 {
+                    ProjShape::OptOf(param_var2) => {
+                        self.unify_var_pair(param_var1, param_var2)?;
+                        Ok(Constraint::Proj(ProjShape::OptOf(param_var1)))
+                    }
+                    _ => Err(UnificationError::Unsatisfiable(
+                        Constraint::Proj(ProjShape::OptOf(param_var1)),
+                        Constraint::Proj(p2),
+                    )
+                    .into()),
+                },
+            },
+            // !SECTION
+
+            // SECTION - compatible heterogenous constraint-pairs
             (Constraint::Equiv(ut), Constraint::Elem(bs))
             | (Constraint::Elem(bs), Constraint::Equiv(ut)) => {
                 Ok(self.unify_utype_baseset(ut.clone(), bs)?)
             }
-            (Constraint::Elem(bs1), Constraint::Elem(bs2)) => {
-                let bs0 = bs1.unify(&bs2)?;
-                Ok(bs0.to_constraint())
-            }
-            (
-                Constraint::Proj(ProjShape::TupleWith(t1)),
-                Constraint::Proj(ProjShape::TupleWith(t2)),
-            ) => {
-                if t1 == t2 {
-                    return Ok(Constraint::Proj(ProjShape::TupleWith(t1)));
-                }
 
-                let mut t0 = BTreeMap::new();
-
-                let keys_t1 = t1.keys().copied().collect::<HashSet<_>>();
-                let keys_t2 = t2.keys().copied().collect::<HashSet<_>>();
-
-                let keys_t0 = HashSet::union(&keys_t1, &keys_t2);
-
-                for key in keys_t0.into_iter() {
-                    match (t1.get(key), t2.get(key)) {
-                        (Some(var1), Some(var2)) => {
-                            self.unify_var_pair(*var1, *var2)?;
-                            t0.insert(*key, Ord::min(*var1, *var2));
-                        }
-                        (Some(var), None) | (None, Some(var)) => {
-                            t0.insert(*key, *var);
-                        }
-                        _ => unreachable!("key must be in at least one of t1, t2"),
-                    }
-                }
-
-                Ok(Constraint::Proj(ProjShape::TupleWith(t0)))
-            }
-            (
-                Constraint::Proj(ProjShape::RecordWith(r1)),
-                Constraint::Proj(ProjShape::RecordWith(r2)),
-            ) => {
-                if r1 == r2 {
-                    return Ok(Constraint::Proj(ProjShape::RecordWith(r1)));
-                }
-
-                let mut r0 = BTreeMap::new();
-
-                let keys_r1 = r1.keys().cloned().collect::<HashSet<_>>();
-                let keys_r2 = r2.keys().cloned().collect::<HashSet<_>>();
-
-                let keys_r0 = HashSet::union(&keys_r1, &keys_r2);
-
-                for key in keys_r0.into_iter() {
-                    match (r1.get(key), r2.get(key)) {
-                        (Some(var1), Some(var2)) => {
-                            self.unify_var_pair(*var1, *var2)?;
-                            r0.insert(key.clone(), Ord::min(*var1, *var2));
-                        }
-                        (Some(var), None) | (None, Some(var)) => {
-                            r0.insert(key.clone(), *var);
-                        }
-                        _ => unreachable!("key must be in at least one of r1, r2"),
-                    }
-                }
-
-                Ok(Constraint::Proj(ProjShape::RecordWith(r0)))
-            }
-            (
-                Constraint::Proj(ProjShape::SeqOf(elt_var1)),
-                Constraint::Proj(ProjShape::SeqOf(elt_var2)),
-            ) => {
-                self.unify_var_pair(elt_var1, elt_var2)?;
-                Ok(Constraint::Proj(ProjShape::SeqOf(elt_var1)))
-            }
-            (
-                Constraint::Proj(ProjShape::OptOf(param_var1)),
-                Constraint::Proj(ProjShape::OptOf(param_var2)),
-            ) => {
-                self.unify_var_pair(param_var1, param_var2)?;
-                Ok(Constraint::Proj(ProjShape::OptOf(param_var1)))
-            }
             (ref c1 @ Constraint::Proj(ref p), ref c2 @ Constraint::Equiv(ref ut))
             | (ref c1 @ Constraint::Equiv(ref ut), ref c2 @ Constraint::Proj(ref p)) => {
                 match (p, ut.as_ref()) {
-                    (ProjShape::RecordWith(fld_p), UType::Record(fld_ut)) => {
-                        let keys_p = fld_p.keys().cloned().collect::<HashSet<_>>();
-                        let mut keys_ut = HashSet::new();
-
-                        for (fld, ut) in fld_ut.iter() {
-                            keys_ut.insert(fld.clone());
-                            if let Some(var) = fld_p.get(fld) {
-                                self.unify_var_utype(*var, ut.clone())?;
-                            }
-                        }
-
-                        if keys_ut.is_superset(&keys_p) {
-                            Ok(Constraint::Equiv(ut.clone()))
-                        } else {
-                            Err(UnificationError::Unsatisfiable(c1.clone(), c2.clone()).into())
-                        }
-                    }
-                    (ProjShape::TupleWith(elt_p), UType::Tuple(elt_ut)) => {
-                        let keys_p = elt_p.keys().copied().collect::<HashSet<_>>();
-                        let mut keys_ut = HashSet::new();
-
-                        for (ix, ut) in elt_ut.iter().enumerate() {
-                            keys_ut.insert(ix);
-                            if let Some(var) = elt_p.get(&ix) {
-                                self.unify_var_utype(*var, ut.clone())?;
-                            }
-                        }
-
-                        if keys_ut.is_superset(&keys_p) {
-                            Ok(Constraint::Equiv(ut.clone()))
-                        } else {
-                            Err(UnificationError::Unsatisfiable(c1.clone(), c2.clone()).into())
-                        }
-                    }
-                    (ProjShape::SeqOf(elem_v), UType::Seq(elem_t, _)) => {
-                        self.unify_var_utype(*elem_v, elem_t.clone())?;
-                        Ok(Constraint::Equiv(ut.clone()))
-                    }
-                    (ProjShape::OptOf(param_v), UType::Option(param_t)) => {
-                        self.unify_var_utype(*param_v, param_t.clone())?;
-                        Ok(Constraint::Equiv(ut.clone()))
-                    }
                     (proj, UType::Var(var)) => {
                         self.unify_var_constraint(*var, Constraint::Proj(proj.clone()))
                     }
-                    (ProjShape::RecordWith(flds), other) => {
-                        unreachable!("could not match Record-Shape {flds:?} against {other:?}")
-                    }
-                    (ProjShape::TupleWith(elts), other) => {
-                        unreachable!("could not match Tuple-Shape {elts:?} against {other:?}")
-                    }
-                    (ProjShape::SeqOf(_), other) => {
-                        unreachable!("could not match Seq-Shape against {other:?}")
-                    }
-                    (ProjShape::OptOf(_), other) => {
-                        unreachable!("could not match Opt-Shape against {other:?}")
-                    }
+                    (ProjShape::RecordWith(fld_p), typ) => match typ {
+                        UType::Record(fld_ut) => {
+                            let keys_p = fld_p.keys().cloned().collect::<HashSet<_>>();
+                            let mut keys_ut = HashSet::new();
+
+                            for (fld, ut) in fld_ut.iter() {
+                                keys_ut.insert(fld.clone());
+                                if let Some(var) = fld_p.get(fld) {
+                                    self.unify_var_utype(*var, ut.clone())?;
+                                }
+                            }
+
+                            if keys_ut.is_superset(&keys_p) {
+                                Ok(Constraint::Equiv(ut.clone()))
+                            } else {
+                                Err(UnificationError::Unsatisfiable(c1.clone(), c2.clone()).into())
+                            }
+                        }
+
+                        other => {
+                            unreachable!("could not match Record-Shape {fld_p:?} against {other:?}")
+                        }
+                    },
+                    (ProjShape::TupleWith(elt_p), typ) => match typ {
+                        UType::Tuple(elt_ut) => {
+                            let keys_p = elt_p.keys().copied().collect::<HashSet<_>>();
+                            let mut keys_ut = HashSet::new();
+
+                            for (ix, ut) in elt_ut.iter().enumerate() {
+                                keys_ut.insert(ix);
+                                if let Some(var) = elt_p.get(&ix) {
+                                    self.unify_var_utype(*var, ut.clone())?;
+                                }
+                            }
+
+                            if keys_ut.is_superset(&keys_p) {
+                                Ok(Constraint::Equiv(ut.clone()))
+                            } else {
+                                Err(UnificationError::Unsatisfiable(c1.clone(), c2.clone()).into())
+                            }
+                        }
+                        other => {
+                            unreachable!("could not match Tuple-Shape {elt_p:?} against {other:?}")
+                        }
+                    },
+                    (ProjShape::SeqOf(elem_v), typ) => match typ {
+                        UType::Seq(elem_t, _) => {
+                            self.unify_var_utype(*elem_v, elem_t.clone())?;
+                            Ok(Constraint::Equiv(ut.clone()))
+                        }
+                        other => {
+                            unreachable!("could not match Seq-Shape against {other:?}")
+                        }
+                    },
+                    (ProjShape::OptOf(param_v), typ) => match typ {
+                        UType::Option(param_t) => {
+                            self.unify_var_utype(*param_v, param_t.clone())?;
+                            Ok(Constraint::Equiv(ut.clone()))
+                        }
+                        other => {
+                            unreachable!("could not match Opt-Shape against {other:?}")
+                        }
+                    },
                 }
             }
             (
-                ref c1 @ Constraint::Proj(ProjShape::RecordWith(..)),
-                ref c2 @ Constraint::Proj(
-                    ProjShape::SeqOf(..) | ProjShape::TupleWith(..) | ProjShape::OptOf(..),
-                ),
+                ref c1 @ (Constraint::Elem(_) | Constraint::NumTree(_)),
+                ref c2 @ Constraint::Proj(_),
             )
             | (
-                ref c1 @ Constraint::Proj(ProjShape::TupleWith(..)),
-                ref c2 @ Constraint::Proj(
-                    ProjShape::SeqOf(..) | ProjShape::RecordWith(..) | ProjShape::OptOf(..),
-                ),
-            )
-            | (
-                ref c1 @ Constraint::Proj(ProjShape::SeqOf(..)),
-                ref c2 @ Constraint::Proj(
-                    ProjShape::TupleWith(..) | ProjShape::RecordWith(..) | ProjShape::OptOf(..),
-                ),
-            )
-            | (
-                ref c1 @ Constraint::Proj(ProjShape::OptOf(..)),
-                ref c2 @ Constraint::Proj(
-                    ProjShape::TupleWith(..) | ProjShape::RecordWith(..) | ProjShape::SeqOf(..),
-                ),
-            )
-            | (ref c1 @ Constraint::Elem(_), ref c2 @ Constraint::Proj(_))
-            | (ref c1 @ Constraint::Proj(_), ref c2 @ Constraint::Elem(_)) => {
-                Err(UnificationError::Unsatisfiable(c1.clone(), c2.clone()).into())
+                ref c1 @ Constraint::Proj(_),
+                ref c2 @ (Constraint::Elem(_) | Constraint::NumTree(_)),
+            ) => Err(UnificationError::Unsatisfiable(c1.clone(), c2.clone()).into()),
+            (Constraint::NumTree(is1), Constraint::NumTree(is2)) => {
+                if is1 == is2 {
+                    return Ok(Constraint::NumTree(is1));
+                }
+                match (is1.is_empty(), is2.is_empty()) {
+                    (true, true) => {
+                        log::warn!("unify_constraint_pair: unification between two empty IntSets")
+                    }
+                    (true, false) | (false, true) => log::warn!(
+                        "unify_constraint_pair: unification between empty and non-empty IntSet: `{is1}`, `{is2}`"
+                    ),
+                    _ => {}
+                }
+
+                let ret = is1.unify(is2)?;
+                if ret.is_empty() {
+                    log::warn!(
+                        "unify_constraint_pair: unification between IntSets resulted in empty IntSet: `{is1}`, `{is2}`"
+                    );
+                }
+                Ok(Constraint::NumTree(ret))
+            }
+
+            (Constraint::Equiv(ut), Constraint::NumTree(set))
+            | (Constraint::NumTree(set), Constraint::Equiv(ut)) => self.unify_utype_intset(ut, set),
+
+            (Constraint::Elem(base_set), Constraint::NumTree(int_set))
+            | (Constraint::NumTree(int_set), Constraint::Elem(base_set)) => {
+                self.unify_baseset_intset(base_set, int_set)
             }
         }
     }
@@ -3057,96 +2605,496 @@ impl TypeChecker {
         Ok(lo)
     }
 
-    /// Computes or retrieves a stored solution for an `ExtVar`, as an `IntType`.
-    fn resolve_extvar(&mut self, ext_v: ExtVar) -> TCResult<IntType> {
-        self.sub_extension.solve(ext_v)
+    /// Trial unification between a `BaseSet` and an `IntSet`, primarily for use in unifying `Elem` and `NumTree` constraints against each other.
+    fn unify_baseset_intset(&self, base: BaseSet, int: IntSet) -> TCResult<Constraint> {
+        if base.is_empty() {
+            return Err(CrossLayerNumericError::EmptyBase.into());
+        }
+        if int.is_empty() {
+            return Err(CrossLayerNumericError::EmptyInt.into());
+        }
+
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "__unify_mixed_to_int")] {
+                // -> NumTree
+                let other = IntSet::from_base_set(base);
+                let res = int.unify(other)?;
+                Ok(Constraint::NumTree(res))
+            } else {
+                // -> Elem
+                let other = try_with!( int.to_base_set().map_err(TCError::from) => ("unify_baseset_intset @ IntSet::to_base_set", int) );
+                let res = base.unify(other)?;
+                Ok(Constraint::Elem(res))
+            }
+        }
     }
 
-    /// Computes or retrieves a stored solution for an `ExtVar`, as an `UType`.
-    ///
-    /// In addition to standard error-conditions from ExtVar resolution, this method
-    /// will also fail if the resulting solution cannot be directly modelled as a UType
-    /// (i.e. it is a signed PrimInt).
-    fn resolve_extvar_as_utype(&mut self, ext_v: ExtVar) -> TCResult<Rc<UType>> {
-        let sub = &mut self.sub_extension;
-        let IntType::Prim(prim) = sub.solve(ext_v)?;
-        let bt = match prim {
-            PrimInt::U8 => BaseType::U8,
-            PrimInt::U16 => BaseType::U16,
-            PrimInt::U32 => BaseType::U32,
-            PrimInt::U64 => BaseType::U64,
-            PrimInt::I8 | PrimInt::I16 | PrimInt::I32 | PrimInt::I64 => {
-                return Err(TCErrorKind::UTypeFromSigned(ext_v, prim).into());
-            }
+    /// Trial unification of a `BaseType` against an `IntSet`.
+    fn unify_basetype_intset(b: BaseType, ints: IntSet) -> Result<Constraint, TCError> {
+        let p = PrimInt::try_from(b)?;
+
+        let ret = ints.unify(IntSet::Single(p))?;
+        if ret.is_empty() {
+            return Err(CrossLayerNumericError::BaseNotInIntSet(b, ints).into());
         };
-        Ok(Rc::new(UType::Base(bt)))
-    }
-
-    /// If `v` has a direct-equality constraint against an `ExtVar`, return that `ExtVar`.
-    /// Returns `None` in all other cases.
-    fn expand_var_to_extvar(&self, v: UVar) -> Option<ExtVar> {
-        let v0 = self.get_canonical_uvar(v);
-
-        if let Constraints::Invariant(c) = &self.constraints[v0.0]
-            && let Constraint::Equiv(t) = c
-            && let UType::ExternVar(ext) = t.as_ref()
-        {
-            Some(*ext)
-        } else {
-            None
-        }
-    }
-
-    /// Performs unification of a standard-model metavariable `v` against a numeric-extension metavariable `ext`.
-    ///
-    /// If `v` already points to a numeric-extension metavariable, performs numeric-layer metavariable unification.
-    /// Otherwise, forces a solution to `ext` (and coerces it to be a UType), and unifies `v` against that solution.
-    ///
-    /// In either case, if successful, returns the original metavariable `v` as a `UType`.
-    fn unify_var_extvar(&mut self, v: UVar, ext: ExtVar) -> TCResult<Rc<UType>> {
-        if let Some(ext0) = self.expand_var_to_extvar(v) {
-            self.unify_extvar_pair(ext0, ext)?;
-        } else {
-            let typ = self.resolve_extvar_as_utype(ext)?;
-            self.unify_var_utype(v, typ)?;
-        }
-        Ok(Rc::new(UType::ExternVar(ext)))
-    }
-
-    /// Internal function for unifying non-variable UTypes against extvars.
-    ///
-    /// To maintain elaborator state, the value eturned will always be the original `extvar`, presuming
-    /// that unification succeeds.
-    ///
-    /// # Panics
-    ///
-    /// Will panic if `utype` is either `Var` or `ExternVar`.
-    fn unify_extvar_utype(&mut self, ext: ExtVar, utype: Rc<UType>) -> TCResult<Rc<UType>> {
-        match utype.as_ref() {
-            UType::ExternVar(..) => unreachable!("unify_extvar_utype called with UType::ExternVar"),
-            UType::Var(..) => unreachable!("unify_extvar_utype called with UType::Var"),
-            UType::Empty | UType::Hole => Ok(Rc::new(UType::ExternVar(ext))),
-
-            // REVIEW - Bool and Char are also handled by `unify_primint_basetype`, but the error-variant will differ in that case
-            UType::Base(BaseType::Bool | BaseType::Char)
-            | UType::ViewObj
-            | UType::Tuple(..)
-            | UType::Record(..)
-            | UType::Seq(..)
-            | UType::Option(..)
-            | UType::PhantomData(..) => Err(TCError::from(
-                TCErrorKind::NonNumericExtVarUnification(ext, utype),
-            )),
-
-            UType::Base(btype) => {
-                let IntType::Prim(ptype) = self.resolve_extvar(ext)?;
-                let _ret = try_with!(Self::unify_primint_basetype(ptype, *btype) => ext);
-                Ok(Rc::new(UType::ExternVar(ext)))
-            }
-        }
+        Ok(ret.to_constraint())
     }
 }
-// !SECTION
+
+#[cfg(any())]
+mod __unused_tc {
+    use super::*;
+    // SECTION - Methods related to resolution of TVars
+    impl TypeChecker {
+        #[cfg(any())]
+        /// Retrieves the associated InferenceEngine for a given TVar.
+        pub(crate) fn fetch_subtree_inference(
+            &self,
+            ext_var: TVar,
+        ) -> Rc<inference::InferenceEngine> {
+            let ix = ext_var.0;
+            if ix >= self.sub_extension.subtrees.len() {
+                unreachable!(
+                    "invalid external var {ext_var} (out-of-range): {ix} >= {}",
+                    self.sub_extension.subtrees.len()
+                );
+            }
+            self.sub_extension.subtrees[ix].clone()
+        }
+
+        /// Performs unification of a standard-model metavariable `v` against a numeric-extension metavariable `ext`.
+        ///
+        /// If `v` already points to a numeric-extension metavariable, performs numeric-layer metavariable unification.
+        /// Otherwise, forces a solution to `ext` (and coerces it to be a UType), and unifies `v` against that solution.
+        ///
+        /// In either case, if successful, returns the original metavariable `v` as a `UType`.
+        fn unify_var_treevar(
+            &mut self,
+            v: UVar,
+            ext: TVar,
+            scope: &UScope<'_>,
+        ) -> TCResult<Rc<UType>> {
+            if let Some(ext0) = self.expand_var_to_treevar(v) {
+                self.unify_tree_var_pair(ext0, ext)?;
+            } else {
+                let typ = self.resolve_treevar_as_utype(ext)?;
+                self.unify_var_utype(v, typ)?;
+            }
+            Ok(Rc::new(UType::TreeRoot(ext)))
+        }
+
+        /// Internal function for unifying non-variable UTypes against treevars.
+        ///
+        /// To maintain elaborator state, the value eturned will always be the original `treevar`, presuming
+        /// that unification succeeds.
+        ///
+        /// # Panics
+        ///
+        /// Will panic if `utype` is either `Var` or `ExternVar`.
+        fn unify_treevar_utype(&mut self, tvar: TVar, utype: Rc<UType>) -> TCResult<Rc<UType>> {
+            match utype.as_ref() {
+                UType::TreeRoot(..) => {
+                    unreachable!("unify_treevar_utype called with UType::ExternVar")
+                }
+                UType::Var(..) => unreachable!("unify_treevar_utype called with UType::Var"),
+                UType::Empty | UType::Hole => Ok(Rc::new(UType::TreeRoot(tvar))),
+
+                // REVIEW - Bool and Char are also handled by `unify_primint_basetype`, but the error-variant will differ in that case
+                UType::Base(BaseType::Bool | BaseType::Char)
+                | UType::ViewObj
+                | UType::Tuple(..)
+                | UType::Record(..)
+                | UType::Seq(..)
+                | UType::Option(..)
+                | UType::PhantomData(..) => Err(TCError::from(
+                    TCErrorKind::NonNumericTreeUnification(tvar, utype),
+                )),
+
+                UType::Base(btype) => {
+                    let IntType::Prim(ptype) = self.resolve_treevar(tvar)?;
+                    let _ret = try_with!(Self::unify_primint_basetype(ptype, *btype) => tvar);
+                    Ok(Rc::new(UType::TreeRoot(tvar)))
+                }
+            }
+        }
+
+        /// Given a `TVar`, returns a map from each `UVar` its tree depends on to the `IntType`
+        /// it is resolved to.
+        ///
+        /// Will fail if any of the dependent `UVars` cannot be resolved to an `IntType`.
+        ///
+        /// # Panics
+        ///
+        /// Will panic if the dependency-graph of `tree_v` includes any cyclic dependencies
+        /// from a `TVar` to itself.
+        fn solve_dependencies_for_tree(&self, tree_v: TVar) -> TCResult<DepSolutions> {
+            let deps = self.sub_extension.get_dependencies(tree_v);
+            assert!(self.is_non_cyclic(tree_v, deps));
+            self.solve_dependency_set(deps)
+        }
+
+        /// Internal-facing call for solving a set of dependent `UVars`.
+        fn solve_dependency_set(&self, deps: &BTreeSet<UVar>) -> TCResult<DepSolutions> {
+            let mut solutions = BTreeMap::new();
+            for uv in deps {
+                let sol = self.get_dep_var_solution(*uv)?;
+                solutions.insert(*uv, sol);
+            }
+            Ok(solutions)
+        }
+
+        /// Speculatively resolves a `UVar` into an `IntType`.
+        ///
+        /// Returns an error if the type-shape of the `UVar` is not an atomic numeric type,
+        /// or if it does not (yet) have a unique solution.
+        fn get_dep_var_solution(&mut self, uv: UVar) -> TCResult<VarSolution> {
+            let cx = &self.constraints[uv.0];
+            match cx {
+                Constraints::Variant(..) => {
+                    Err(TCErrorKind::InsolubleNumDependency(uv, cx.clone()).into())
+                }
+                Constraints::Indefinite => Ok(VarSolution::Indefinite),
+                Constraints::Invariant(c) => match c {
+                    Constraint::Equiv(ut) => match ut.as_ref() {
+                        UType::Base(BaseType::Char | BaseType::Bool) => {
+                            Err(TCErrorKind::InsolubleNumDependency(uv, cx.clone()).into())
+                        }
+                        UType::Base(bt) => Ok(VarSolution::Definite(IntType::Prim(
+                            PrimInt::try_from(*bt).unwrap(),
+                        ))),
+                        UType::Empty | UType::Hole => Ok(VarSolution::Indefinite),
+                        UType::Var(other) => unreachable!("bad Var=Var constraint: {uv} = {other}"),
+                        UType::TreeRoot(tree) => match self.resolve_treevar(*tree) {
+                            Ok(t) => Ok(VarSolution::Definite(t)),
+                            Err(e) => match e.err.as_ref() {
+                                // FIXME - determine which other error-cases should be promoted to `VarSolution::Indefinite`
+                                TCErrorKind::Inference(
+                                    _,
+                                    inference::InferenceError::MissingGlobal(..),
+                                ) => Ok(VarSolution::Indefinite),
+                                _ => Err(e),
+                            },
+                        },
+                        UType::ViewObj
+                        | UType::Option(..)
+                        | UType::Seq(..)
+                        | UType::PhantomData(..)
+                        | UType::Record(..)
+                        | UType::Tuple(..) => {
+                            Err(TCErrorKind::InsolubleNumDependency(uv, cx.clone()).into())
+                        }
+                    },
+                    Constraint::Elem(bs) => match bs {
+                        BaseSet::Single(BaseType::Char | BaseType::Bool) => {
+                            Err(TCErrorKind::InsolubleNumDependency(uv, cx.clone()).into())
+                        }
+                        BaseSet::Single(bt) => Ok(VarSolution::Definite(IntType::Prim(
+                            PrimInt::try_from(*bt).unwrap(),
+                        ))),
+                        BaseSet::U(set) => {
+                            if set.is_empty() {
+                                Err(TCErrorKind::InsolubleNumDependency(uv, cx.clone()).into())
+                            } else {
+                                match set.get_unique_solution() {
+                                    Some(base) => Ok(VarSolution::Definite(IntType::Prim(
+                                        PrimInt::try_from(base).unwrap(),
+                                    ))),
+                                    // FIXME - how can we tell the difference between 'multiple solutions that will get narrowed to one' and 'multiple solutions that will never get narrowed'?
+                                    None => Ok(VarSolution::Indefinite),
+                                }
+                            }
+                        }
+                    },
+                    Constraint::Proj(..) => {
+                        Err(TCErrorKind::InsolubleNumDependency(uv, cx.clone()).into())
+                    }
+                },
+            }
+        }
+
+        /// Computes or retrieves a stored solution for an `TVar`, as an `IntType`.
+        fn resolve_treevar(&mut self, ext_v: TVar) -> TCResult<IntType> {
+            let table = self.solve_dependencies_for_tree(ext_v)?;
+            self.solve_tree_with_deps(ext_v, &table)
+        }
+
+        /// Computes or retrieves a stored solution for an `TVar`, as an `UType`.
+        ///
+        /// In addition to standard error-conditions from TVar resolution, this method
+        /// will also fail if the resulting solution cannot be directly modelled as a UType
+        /// (i.e. it is a signed PrimInt).
+        fn resolve_treevar_as_utype(&mut self, tvar: TVar) -> TCResult<Rc<UType>> {
+            let IntType::Prim(prim) = self.resolve_treevar(tvar)?;
+            let bt = match prim {
+                PrimInt::U8 => BaseType::U8,
+                PrimInt::U16 => BaseType::U16,
+                PrimInt::U32 => BaseType::U32,
+                PrimInt::U64 => BaseType::U64,
+                PrimInt::I8 | PrimInt::I16 | PrimInt::I32 | PrimInt::I64 => {
+                    return Err(TCErrorKind::UTypeFromSigned(tvar, prim).into());
+                }
+            };
+            Ok(Rc::new(UType::Base(bt)))
+        }
+
+        /// If `v` has a direct-equality constraint against a `TVar`, return that `TVar`.
+        /// Returns `None` in all other cases.
+        fn expand_var_to_treevar(&self, v: UVar) -> Option<TVar> {
+            let v0 = self.get_canonical_uvar(v);
+
+            if let Constraints::Invariant(c) = &self.constraints[v0.0]
+                && let Constraint::Equiv(t) = c
+                && let UType::TreeRoot(ext) = t.as_ref()
+            {
+                Some(*ext)
+            } else {
+                None
+            }
+        }
+
+        /// Given a `tree_v` representing a numeric tree-root, and a possibly-empty mapping over all its dependent
+        /// UVars to the concrete types those resolve to, attempt to solve the TVar's type.
+        pub(crate) fn solve_tree_with_deps(
+            &mut self,
+            tree_v: TVar,
+            table: &DepSolutions,
+        ) -> TCResult<IntType> {
+            let this = &mut self.sub_extension;
+            match this.outcomes.get(&tree_v) {
+                None | Some(NumSolution::Unsolved) => {
+                    match &this.aliases[tree_v.0] {
+                        a @ (Alias::Canonical(_) | Alias::Ground) => {
+                            let sol = self.solve_tree_standalone(tree_v, table)?;
+                            // if ground, this iteration will be a no-op
+                            {
+                                // we have to collect the indices beforehand to avoid borrow-conflicts
+                                let other_vars = a.iter_fwd_refs().map(TVar).collect::<Vec<_>>();
+                                for other_var in other_vars {
+                                    self.solve_tree_and_elide(other_var, sol)?;
+                                }
+                            }
+                            this.outcomes.insert(tree_v, NumSolution::Solved(sol));
+                            Ok(sol)
+                        }
+                        Alias::BackRef(can_ix) => {
+                            let can = TVar(*can_ix);
+                            match self.peek_tree_solution(can) {
+                                NumSolution::Elided => {
+                                    unreachable!(
+                                        "invalid state: elided solution on canonical alias"
+                                    )
+                                }
+                                NumSolution::Unsolved => {
+                                    // if the canonical alias has not been solved yet, we solve it and update all its forward-refs to Elided (if they agree on the same solution)
+                                    // FIXME - the table being passed in is not correct for any other num-tree!!!
+                                    let sol = self.solve_tree_standalone(tree_v, table)?;
+                                    // if ground, this iteration will be a no-op
+                                    {
+                                        // we have to collect the indices beforehand to avoid borrow-conflicts
+                                        let other_vars = this.aliases[*can_ix]
+                                            .iter_fwd_refs()
+                                            .map(TVar)
+                                            .collect::<Vec<_>>();
+                                        for other_var in other_vars {
+                                            self.solve_tree_and_elide(other_var, sol)?;
+                                        }
+                                    }
+                                    this.outcomes.insert(tree_v, NumSolution::Solved(sol));
+                                    Ok(sol)
+                                }
+                                NumSolution::Solved(sol) => {
+                                    // since sol already exists, we assume all other aliases agree
+                                    self.solve_tree_and_elide(tree_v, sol)?;
+                                    Ok(sol)
+                                }
+                            }
+                        }
+                    }
+                }
+                Some(NumSolution::Elided) => {
+                    let can = self.get_canonical_treevar(tree_v);
+                    assert!(
+                        can < tree_v,
+                        "canonical alias {can} must be less than non-canonical {tree_v} (based on Elided)"
+                    );
+                    let table = self.solve_dependencies_for_tree(can)?;
+                    self.solve_tree_with_deps(can, &table)
+                }
+                Some(NumSolution::Solved(sol)) => Ok(*sol),
+            }
+        }
+
+        /// Performs standalone inference to determine the solution for `tree_v`.
+        ///
+        /// Should only be called when no outcome is registered, either on `tree_v` or its canonical alias.
+        ///
+        /// Does not mutate the resolver (i.e. no alias-updates or outcome-updates).
+        fn solve_tree_standalone(&self, tree_v: TVar) -> TCResult<IntType> {
+            let engine = self.sub_extension.subtrees[tree_v.0].clone();
+            let table = {
+                let deps = engine.get_unsolved_deps();
+                self.solve_dependency_set(&deps)?
+            };
+            engine.update_solutions(&table);
+            engine
+                .reify_err(NVar(0).into())
+                .map_err(|e| TCErrorKind::Inference(tree_v, e).into())
+        }
+
+        /// Given a non-canonical TVar `ext` and a canonical-alias solution `sol`, performs the necessary
+        /// checks and updates according to the following:
+        ///
+        ///   - If the outcome `ext` is already `Elided`, does nothing and returns early.
+        ///   - If the outcome `ext` is not Solved, solves it.
+        ///   - Once a non elided-solution for `ext` is found, ensures it is equal to `sol`, and then replaces with `Elided`.
+        fn solve_tree_and_elide(&mut self, tree: TVar, sol: IntType) -> TCResult<()> {
+            let sol1 = match self.sub_extension.outcomes.get(&tree) {
+                Some(NumSolution::Elided) => return Ok(()),
+                Some(NumSolution::Unsolved) | None => self.solve_tree_standalone(tree)?,
+                Some(NumSolution::Solved(sol1)) => *sol1,
+            };
+            if sol == sol1 {
+                self.sub_extension
+                    .outcomes
+                    .insert(tree, NumSolution::Elided);
+                Ok(())
+            } else {
+                Err(TCErrorKind::IrreconcilableNumSolutions(
+                    NumSolution::Solved(sol),
+                    NumSolution::Solved(sol1),
+                )
+                .into())
+            }
+        }
+
+        /// Immediately after the subtree corresponding to an `TVar` has been solved, ensure that
+        /// the novel solution is compatible with the imputed solutions of any and all other ext-vars
+        /// to which the original was aliased.
+        ///
+        /// Assumes that the association in `outcomes` has already been updated.
+        #[expect(dead_code)]
+        fn enforce_tree_aliasing(&mut self, solved_var: TVar, sol: NumSolution) -> TCResult<()> {
+            // FIXME - change type signature to accept Option<IntType> to avoid needless casework
+            assert!(matches!(sol, NumSolution::Solved(_)));
+
+            match &self.aliases[solved_var.0] {
+                Alias::Ground => Ok(()),
+                alias @ Alias::Canonical(_) => {
+                    for ix in alias.iter_fwd_refs() {
+                        let other_t = TVar(ix);
+                        let outcome = self.sub_extension.outcomes.entry(other_t).or_default();
+                        match *outcome {
+                            NumSolution::Unsolved => {
+                                // NOTE - avoid over-eager evaluation of unsolved non-canonical ext-vars
+                                continue;
+                            }
+                            NumSolution::Elided => continue,
+                            other_sol @ NumSolution::Solved(_) => {
+                                let (sol0, sol1) = EmbeddedResolver::reconcile_solution_pair(
+                                    (sol, other_sol),
+                                    false,
+                                )?;
+                                assert_eq!(
+                                    sol, sol0,
+                                    "original solution to {solved_var} changed from {sol} to {sol0} during reconciliation with {other_sol}"
+                                );
+                                if other_sol != sol1 {
+                                    *outcome = sol1;
+                                }
+                            }
+                        }
+                    }
+                    Ok(())
+                }
+                &Alias::BackRef(ix) => {
+                    match sol {
+                        NumSolution::Elided | NumSolution::Unsolved => Ok(()),
+                        sol_hi @ NumSolution::Solved(_) => {
+                            // force the canonical ext-var to be solved, and reconcile with it
+                            self.ensure_tree_outcome(TVar(ix))?;
+                            let sol_lo = self.sub_extension.outcomes.entry(TVar(ix)).or_default();
+                            let (sol0, sol1) = EmbeddedResolver::reconcile_solution_pair(
+                                (*sol_lo, sol_hi),
+                                false,
+                            )?;
+                            // REVIEW[epic=embedded-num] - do we need to check on the values of sol0 and sol1 beyond equality?
+                            if *sol_lo != sol0 {
+                                *sol_lo = sol0;
+                            }
+                            if sol_hi != sol1 {
+                                (&mut self.sub_extension)
+                                    .outcomes
+                                    .entry(TVar(ix))
+                                    .and_modify(|s| *s = sol1);
+                            }
+                            Ok(())
+                        }
+                    }
+                }
+            }
+        }
+        /// Returns the current solution-state for `ext`, or that of its canonical alias if it is a non-canonical alias
+        /// with an elided solution.
+        ///
+        /// Does not mutate the resolver, perform any new inference, or enforce any constraints or alias-unifications.
+        fn peek_tree_solution(&self, ext: TVar) -> NumSolution {
+            match self.sub_extension.outcomes.get(&ext) {
+                None | Some(NumSolution::Unsolved) => NumSolution::Unsolved,
+                Some(NumSolution::Elided) => {
+                    let can = self.get_canonical_treevar(ext);
+                    assert!(
+                        can < ext,
+                        "canonical alias {can} must be less than non-canonical {ext} (based on Elided)"
+                    );
+                    self.peek_tree_solution(can)
+                }
+                Some(NumSolution::Solved(sol)) => NumSolution::Solved(*sol),
+            }
+        }
+
+        /// Given an `TVar`, either retrieves a pre-computed solution, or solves the subtree it is
+        /// associated with, storing the novel answer and returning it.
+        ///
+        /// Additionally returns a boolean value that indicates whether the solution was novel (i.e. whether
+        /// it was solved as a result of this method's invocation).
+        ///  - If `true`, the caller should perform any alias-unifications required byh novel solutions.
+        ///  - If `false`, the solution was already recorded, and so no updates should be necessary.
+        ///
+        /// This function does not perform any alias unifications or updates; however,
+        /// in the case of unsolved subtrees, this function will update the `outcomes` table
+        /// accordingly, for the single-variable in question.
+        ///
+        /// Recurses if `ext` is a non-canonical alias with an `Elided` solution.
+        fn ensure_tree_outcome(&mut self, ext: TVar) -> TCResult<(NumSolution, bool)> {
+            // FIXME - there are various checks being skipped, e.g. elided => canonical recursion must be solved, etc.
+            let sol = self
+                .sub_extension
+                .outcomes
+                .get(&ext)
+                .copied()
+                .unwrap_or_default();
+            match sol {
+                NumSolution::Elided => {
+                    let can = self.get_canonical_treevar(ext);
+                    assert!(
+                        can < ext,
+                        "canonical alias {can} must be less than non-canonical {ext} (based on Elided)"
+                    );
+                    self.ensure_tree_outcome(can)
+                }
+                NumSolution::Unsolved => {
+                    let ret = self.solve_tree_standalone(ext)?;
+                    let sol = NumSolution::Solved(ret);
+                    self.sub_extension.outcomes.insert(ext, sol);
+                    Ok((sol, true))
+                }
+                NumSolution::Solved(_) => return Ok((sol, false)),
+            }
+        }
+    }
+
+    // !SECTION
+}
 
 // SECTION - mid-to-high-level model-type inference rules
 impl TypeChecker {
@@ -3179,27 +3127,11 @@ impl TypeChecker {
             Expr::U32(_) => self.init_var_simple(UType::Base(BaseType::U32))?.0,
             Expr::U64(_) => self.init_var_simple(UType::Base(BaseType::U64))?.0,
             Expr::Numeric(expr) => {
-                let newvar = self.get_new_uvar();
-
-                let mut engine = inference::InferenceEngine::new();
-
-                // create a dummy extvar for error reporting, which we don't end up using elsewhere
-                let _ext_var = ExtVar(self.sub_extension.subtrees.len());
-
-                // WIP - figure out what to do with Rep
-                let (sub_var, _rep) = try_with!(engine
-                    .infer_var_expr(expr)
-                    .map_err(|e| TCErrorKind::Inference(_ext_var, e)) => format!("failed inference on {newvar} @ Numeric({expr:?})"));
-                assert_eq!(
-                    sub_var,
-                    UVar(0),
-                    "expected sub-var ({newvar} = {_ext_var}) to be ?0, found {sub_var}"
-                );
-
-                let ext_var = self.sub_extension.init_new_extvar(engine);
-                self.unify_var_utype(newvar, Rc::new(UType::ExternVar(ext_var)))?;
-
-                newvar
+                // instantiate a new var for the Expr anchoring the root of the NumExpr
+                let anchor_var = self.get_new_uvar();
+                let (root_var, _rep) = self.infer_var_num_tree(expr, scope)?;
+                self.unify_var_pair(anchor_var, root_var)?;
+                anchor_var
             }
             Expr::Tuple(ts) => {
                 let newvar = self.get_new_uvar();
@@ -3598,6 +3530,332 @@ impl TypeChecker {
         Ok(Rc::new(UType::Var(var)))
     }
 
+    fn infer_var_num_tree(&mut self, e: &NExpr, scope: &'_ UScope<'_>) -> TCResult<(UVar, NumRep)> {
+        let (top_var, top_rep) = match e {
+            NExpr::NumVar(v_ident) => {
+                let occ_var = self.get_new_uvar_numtree();
+                match scope.get_uvar_by_name(v_ident) {
+                    Some(uv) => {
+                        self.unify_var_pair(occ_var, uv)?;
+                        let rep = self.get_var_numrep(occ_var)?;
+                        (occ_var, rep)
+                    }
+                    None => {
+                        return Err(TCErrorKind::Inference(
+                            occ_var,
+                            InferenceError::UnscopedVariable(v_ident.clone()),
+                        )
+                        .into());
+                    }
+                }
+            }
+            NExpr::Const(tc) => {
+                let rep = tc.get_rep();
+                let var = match rep {
+                    NumRep::AUTO => {
+                        let this_var = self.get_new_uvar_numtree();
+                        let bounds = ZBounds::singleton(tc.as_raw_value().clone());
+                        self.unify_var_constraint(
+                            this_var,
+                            Constraint::NumTree(IntSet::from_bounds(&bounds)),
+                        )?;
+                        this_var
+                    }
+                    NumRep::U8 => {
+                        self.init_var_simple(UType::Int(IntType::Prim(PrimInt::U8)))?
+                            .0
+                    }
+                    NumRep::I8 => {
+                        self.init_var_simple(UType::Int(IntType::Prim(PrimInt::I8)))?
+                            .0
+                    }
+                    NumRep::U16 => {
+                        self.init_var_simple(UType::Int(IntType::Prim(PrimInt::U16)))?
+                            .0
+                    }
+                    NumRep::I16 => {
+                        self.init_var_simple(UType::Int(IntType::Prim(PrimInt::I16)))?
+                            .0
+                    }
+                    NumRep::U32 => {
+                        self.init_var_simple(UType::Int(IntType::Prim(PrimInt::U32)))?
+                            .0
+                    }
+                    NumRep::I32 => {
+                        self.init_var_simple(UType::Int(IntType::Prim(PrimInt::I32)))?
+                            .0
+                    }
+                    NumRep::U64 => {
+                        self.init_var_simple(UType::Int(IntType::Prim(PrimInt::U64)))?
+                            .0
+                    }
+                    NumRep::I64 => {
+                        self.init_var_simple(UType::Int(IntType::Prim(PrimInt::I64)))?
+                            .0
+                    }
+                };
+                (var, rep)
+            }
+            NExpr::BinOp(bin_op, lhs, rhs) => {
+                let this_var = self.get_new_uvar_numtree();
+                let (l_var, l_rep) = self.infer_var_num_tree(&lhs, scope)?;
+                let (r_var, r_rep) = self.infer_var_num_tree(&rhs, scope)?;
+                let cast_rep = bin_op.cast_rep();
+                let this_rep = match (l_rep, r_rep) {
+                    (NumRep::AUTO, NumRep::AUTO) => {
+                        self.unify_var_pair(this_var, l_var)?;
+                        self.unify_var_pair(this_var, r_var)?;
+                        if let Some(rep) = cast_rep {
+                            self.unify_var_rep(this_var, NumRep::Concrete(rep))?;
+                            NumRep::Concrete(rep)
+                        } else {
+                            NumRep::AUTO
+                        }
+                    }
+                    (rep0, rep1) if rep0 == rep1 => {
+                        if let Some(rep) = cast_rep {
+                            let rep = rep.into();
+                            self.unify_var_rep(this_var, rep)?;
+                            rep
+                        } else {
+                            self.unify_var_rep(this_var, rep0)?;
+                            rep0
+                        }
+                    }
+                    (rep0, rep1) => {
+                        if let Some(rep) = cast_rep {
+                            let rep = rep.into();
+                            self.unify_var_rep(this_var, rep)?;
+                            if l_rep.is_auto() {
+                                debug_assert!(!r_rep.is_auto());
+                                self.unify_var_pair(this_var, l_var)?;
+                            }
+                            if r_rep.is_auto() {
+                                debug_assert!(!l_rep.is_auto());
+                                self.unify_var_pair(this_var, r_var)?;
+                            }
+                            rep
+                        } else {
+                            if l_rep.is_auto() {
+                                debug_assert!(!r_rep.is_auto());
+                                self.unify_var_rep(this_var, rep1)?;
+                                self.unify_var_rep(l_var, rep1)?;
+                                rep1
+                            } else if r_rep.is_auto() {
+                                self.unify_var_rep(this_var, rep0)?;
+                                self.unify_var_rep(r_var, rep0)?;
+                                rep0
+                            } else {
+                                return Err(TCErrorKind::from((
+                                    this_var,
+                                    InferenceError::Ambiguous,
+                                ))
+                                .into());
+                            }
+                        }
+                    }
+                };
+                (this_var, this_rep)
+            }
+            NExpr::UnaryOp(unary_op, expr) => {
+                let this_var = self.get_new_uvar_numtree();
+                let (inner_var, inner_rep) = self.infer_var_num_tree(expr, scope)?;
+                let cast_rep = unary_op.cast_rep();
+                let this_rep = match inner_rep {
+                    NumRep::AUTO => {
+                        self.unify_var_pair(this_var, inner_var)?;
+                        if let Some(m_rep) = cast_rep {
+                            let n_rep = NumRep::Concrete(m_rep);
+                            self.unify_var_rep(this_var, n_rep)?;
+                            n_rep
+                        } else {
+                            NumRep::AUTO
+                        }
+                    }
+                    rep0 => {
+                        if let Some(m_rep) = cast_rep {
+                            let n_rep = m_rep.into();
+                            self.unify_var_rep(this_var, n_rep)?;
+                            n_rep
+                        } else {
+                            self.unify_var_rep(this_var, rep0)?;
+                            rep0
+                        }
+                    }
+                };
+                (this_var, this_rep)
+            }
+            &NExpr::Cast(cast_m_rep, ref expr) => {
+                let this_var = self.get_new_uvar_numtree();
+                let (inner_var, inner_rep) = self.infer_var_num_tree(expr, scope)?;
+                let cast_rep = NumRep::Concrete(cast_m_rep);
+                if inner_rep.is_auto() {
+                    self.unify_var_rep(inner_var, cast_rep)?;
+                }
+                self.unify_var_rep(this_var, cast_rep)?;
+                (this_var, cast_rep)
+            }
+        };
+        Ok((top_var, top_rep))
+    }
+
+    /// Given a NumRep, attempts to unify its implied type with the metavariable.
+    ///
+    /// Will only fail for `NumRep::Auto` when the the variable has non-numeric constraints already
+    fn unify_var_rep(&mut self, var: UVar, rep: NumRep) -> TCResult<()> {
+        if rep.is_auto() {
+            self.check_var_is_numeric(var)?;
+            return Ok(());
+        }
+        let t = UType::Int(IntType::Prim(PrimInt::try_from(rep).unwrap()));
+        self.unify_var_utype(var, Rc::new(t))
+    }
+
+    fn check_var_is_numeric(&self, var: UVar) -> TCResult<()> {
+        let var0 = self.get_canonical_uvar(var);
+        let cx = &self.constraints[var0.0];
+        match cx {
+            Constraints::Indefinite => {}
+            Constraints::Variant(..) => return Err(TCErrorKind::NonNumeric(var, cx.clone()).into()),
+            Constraints::Invariant(c) => match c {
+                Constraint::Equiv(ut) => match ut.as_ref() {
+                    UType::Empty => {
+                        log::warn!("check_var_is_numeric: {var} ~ Empty");
+                    }
+                    UType::Hole => {
+                        log::warn!("check_var_is_numeric: {var} ~ Hole");
+                    }
+                    UType::Var(v) => {
+                        unreachable!(
+                            "var-var equivalence should have been aliased instead: {var} -> {var0} ~ {v}"
+                        )
+                    }
+                    UType::Int(..) => {}
+                    UType::Base(b) if b.is_numeric() => {}
+                    _ => return Err(TCErrorKind::NonNumeric(var, cx.clone()).into()),
+                },
+                Constraint::Elem(bs) => match bs {
+                    BaseSet::Single(b) if b.is_numeric() => {}
+                    BaseSet::U(set) if !set.is_empty() => {}
+                    BaseSet::U(set) => {
+                        log::warn!("check_var_is_numeric: {var} ~ {set}");
+                    }
+                    _ => return Err(TCErrorKind::NonNumeric(var, cx.clone()).into()),
+                },
+                Constraint::Proj(_proj) => {
+                    return Err(TCErrorKind::NonNumeric(var, cx.clone()).into());
+                }
+                Constraint::NumTree(..) => {}
+            },
+        }
+        Ok(())
+    }
+
+    /// Speculatively determines the `NumRep` corresponding to the type of a meta-variable.
+    ///
+    /// If a single solution is not found, returns `NumRep::Auto`.
+    fn get_var_numrep(&self, uv: UVar) -> TCResult<NumRep> {
+        let var = self.get_canonical_uvar(uv);
+        let cx = &self.constraints[var.0];
+        match cx {
+            Constraints::Indefinite => Ok(NumRep::Auto),
+            Constraints::Variant(_id) => Err(TCErrorKind::NonNumeric(uv, cx.clone()).into()),
+            Constraints::Invariant(c) => match c {
+                Constraint::Equiv(ut) => match ut.as_ref() {
+                    UType::Empty => {
+                        log::warn!("get_var_numrep: {uv} ~ Empty");
+                        Ok(NumRep::Auto)
+                    }
+                    UType::Hole => {
+                        log::warn!("get_var_numrep: {uv} ~ Hole");
+                        Ok(NumRep::Auto)
+                    }
+                    UType::ViewObj => Err(TCErrorKind::NonNumeric(uv, cx.clone()).into()),
+                    UType::Var(uvar) => {
+                        log::warn!("get_var_numrep: {uv} -> {var} ~ Var({uvar})");
+                        if *uvar == var {
+                            unreachable!("canonical uvar {var} equated to itself");
+                        } else if self.get_canonical_uvar(*uvar) == var {
+                            unreachable!(
+                                "canonical uvar {var} equated to member of its own alias-group ({uvar})"
+                            );
+                        } else {
+                            unreachable!(
+                                "get_var_numrep: {uv} ~ Var({uvar}) (not in its alias-group)"
+                            );
+                        }
+                    }
+                    UType::Base(bt) => match bt {
+                        BaseType::Char | BaseType::Bool => {
+                            Err(TCErrorKind::NonNumeric(uv, cx.clone()).into())
+                        }
+                        _ => {
+                            // unwrap is safe because char and bool are precluded already
+                            let pt = PrimInt::try_from(*bt).unwrap();
+                            let rep = MachineRep::from(pt);
+                            Ok(NumRep::Concrete(rep))
+                        }
+                    },
+                    UType::Tuple(..)
+                    | UType::Record(..)
+                    | UType::Seq(..)
+                    | UType::Option(..)
+                    | UType::PhantomData(..) => Err(TCErrorKind::NonNumeric(uv, cx.clone()).into()),
+                    UType::Int(it) => Ok(NumRep::Concrete(it.to_prim().into())),
+                },
+                Constraint::Elem(bs) => match bs {
+                    BaseSet::Single(bt) => {
+                        let prim = PrimInt::try_from(*bt)
+                            .map_err(|_| TCErrorKind::NonNumeric(uv, cx.clone()))?;
+                        let rep = MachineRep::from(prim);
+                        Ok(NumRep::Concrete(rep))
+                    }
+                    BaseSet::U(set) => match set.as_singleton() {
+                        Some(bt) => {
+                            // Uintset only contains numeric base-types, so this unwrap is safe
+                            let prim = PrimInt::try_from(bt).unwrap();
+                            let rep = MachineRep::from(prim);
+                            Ok(NumRep::Concrete(rep))
+                        }
+                        None => {
+                            if set.is_empty() {
+                                Err(TCErrorKind::NoSolution(uv).into())
+                            } else {
+                                log::info!(
+                                    "get_var_numrep: {uv} ~ Elem({set}) has multiple potential solutions, inferring Auto"
+                                );
+                                Ok(NumRep::Auto)
+                            }
+                        }
+                    },
+                },
+                Constraint::Proj(..) => Err(TCErrorKind::NonNumeric(uv, cx.clone()).into()),
+                Constraint::NumTree(is) => match is {
+                    IntSet::Single(pt) => {
+                        let rep = MachineRep::from(*pt);
+                        Ok(NumRep::Concrete(rep))
+                    }
+                    IntSet::Z(set) => match set.as_singleton() {
+                        Some(pt) => {
+                            let rep = MachineRep::from(pt);
+                            Ok(NumRep::Concrete(rep))
+                        }
+                        None => {
+                            if set.is_empty() {
+                                Err(TCErrorKind::NoSolution(uv).into())
+                            } else {
+                                log::info!(
+                                    "get_var_numrep: {uv} ~ NumTree({set:?}) has multiple potential solutions, inferring Auto"
+                                );
+                                Ok(NumRep::Auto)
+                            }
+                        }
+                    },
+                },
+            },
+        }
+    }
+
     fn infer_vars_expr_lambda<'a>(
         &mut self,
         expr: &Expr,
@@ -3634,6 +3892,7 @@ impl TypeChecker {
             Constraints::Invariant(c) => match c {
                 Constraint::Equiv(ut) => Some(self.to_whnf_vtype(ut.clone())),
                 Constraint::Elem(bs) => Some(VType::Base(*bs)),
+                Constraint::NumTree(is) => Some(VType::Int(*is)),
                 Constraint::Proj(ps) => Some(self.proj_shape_to_vtype(ps)),
             },
         })
@@ -3648,9 +3907,10 @@ impl TypeChecker {
     ///
     /// Returns the canonical external variable that both `ext1` and `ext2` should now be aliased
     /// with.
-    fn unify_extvar_pair(&mut self, ext1: ExtVar, ext2: ExtVar) -> TCResult<ExtVar> {
+    #[cfg(any())]
+    fn unify_tree_var_pair(&mut self, ext1: TVar, ext2: TVar) -> TCResult<TVar> {
         self.sub_extension.resolve_alias(ext1, ext2)?;
-        Ok(self.sub_extension.get_canonical_extvar(ext1))
+        Ok(self.sub_extension.get_canonical_treevar(ext1))
     }
 
     /// Performs re-aliasing, recanonicalization, constraint propagation, and constraint unification
@@ -3941,9 +4201,10 @@ impl TypeChecker {
         }
     }
 
-    /// Public interface for [`SubExtension::get_canonical_extvar`].
-    pub fn get_canonical_extvar(&self, ext_v: ExtVar) -> ExtVar {
-        self.sub_extension.get_canonical_extvar(ext_v)
+    /// Public interface for [`SubExtension::get_canonical_treevar`].
+    #[cfg(any())]
+    pub fn get_canonical_treevar(&self, ext_v: TVar) -> TVar {
+        self.sub_extension.get_canonical_treevar(ext_v)
     }
 
     /// Checks whether two UVars are equated via aliasing.
@@ -4300,7 +4561,7 @@ impl TypeChecker {
             }
             Format::Pos => {
                 let newvar = self.get_new_uvar();
-                self.unify_var_baseset(newvar, BaseSet::U(UintSet::any_default(IntWidth::Bits64)))?;
+                self.unify_var_baseset(newvar, BaseSet::U(UintSet::any_default(BitWidth::Bits64)))?;
                 Ok(newvar)
             }
             Format::LetFormat(f0, name, f) => {
@@ -4393,26 +4654,33 @@ impl TypeChecker {
 
     /// Attempt to fully solve a `UType` until all free meta-variables are replaced with concrete type-assignments
     ///
-    /// Returns None if at least one meta-variable cannot be reduced without more information, or if any unification
-    /// is insoluble.
+    /// Returns None if at least one meta-variable cannot be reduced without more information, or if any constraint
+    /// is insoluble as-is.
     ///
     /// # Panics
     ///
-    /// Will panic if [`UType::Hole`] is encountered, or if any `UVar` has an unresolved record- or tuple- `ProjShape` constraint.
+    /// Will panic if any `UVar` has an unresolved record- or tuple- `ProjShape` constraint.
     pub(crate) fn reify(&self, t: Rc<UType>) -> Option<AugValueType> {
         match t.as_ref() {
             UType::Hole => {
-                // REVIEW - should this simply return None instead? or maybe ValueType::Any?
-                unreachable!("reify: UType::Hole should be erased by any non-Hole unification!");
+                log::error!(
+                    "attempted to reify a UType::Hole, which should have been erased by unification with any non-Hole type! This likely indicates a bug in the unification algorithm, or an attempt to reify a type before unification is complete."
+                );
+                None
             }
             UType::ViewObj => Some(AugValueType::ViewObj),
-            UType::ExternVar(_ext_var) => None,
+            // FIXME - add AugValueType to specify actual numeric type
+            &UType::Int(it) => Some(AugValueType::Int(it.to_prim())),
             &UType::Var(uv) => {
                 let v = self.get_canonical_uvar(uv);
                 match self.substitute_uvar_vtype(v) {
                     Ok(Some(t0)) => match t0 {
                         VType::Base(bs) => match bs.get_unique_solution(uv) {
                             Ok(b) => Some(AugValueType::Base(b)),
+                            Err(_e) => None,
+                        },
+                        VType::Int(is) => match is.get_unique_solution(uv) {
+                            Ok(i) => Some(AugValueType::Int(i)),
                             Err(_e) => None,
                         },
                         VType::Abstract(ut) => self.reify(ut),
@@ -4431,7 +4699,7 @@ impl TypeChecker {
                     }
                 }
             }
-            UType::Base(g) => Some(AugValueType::Base(*g)),
+            &UType::Base(base_t) => Some(AugValueType::Base(base_t)),
             UType::Empty => Some(AugValueType::Empty),
             UType::Tuple(ts) => {
                 let mut vts = Vec::with_capacity(ts.len());
@@ -4470,10 +4738,15 @@ impl TypeChecker {
 }
 // !SECTION
 
+/// Atomic type for step-by-step expansion.
+///
+/// Used to fill in gaps in an [`Expansion`], recording either a concrete
+/// ground-type or a meta-variable that must be further expanded.
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum WHNFSolution {
     Var(UVar),
     Base(BaseType),
+    Int(IntType),
 }
 
 impl WHNFSolution {
@@ -4481,6 +4754,7 @@ impl WHNFSolution {
         match ty {
             UType::Var(v) => Self::Var(*v),
             UType::Base(b) => Self::Base(*b),
+            UType::Int(i) => Self::Int(*i),
             _ => panic!("non-whnf utype encountered during coercion: {ty:?}"),
         }
     }
@@ -4493,7 +4767,7 @@ impl WHNFSolution {
 pub(crate) enum Expansion {
     Empty,
     Base(BaseType),
-    Outcome(ExtVar),
+    Int(PrimInt),
     Record(Vec<(Label, WHNFSolution)>),
     Union(BTreeMap<Label, WHNFSolution>),
     Seq(WHNFSolution, SeqBorrowHint),
@@ -4505,18 +4779,6 @@ pub(crate) enum Expansion {
 
 // SECTION - specialized methods for elaboration and codegen purposes
 impl TypeChecker {
-    /// Retrieves the associated InferenceEngine for a given ExtVar.
-    pub(crate) fn get_extern(&self, ext_var: ExtVar) -> Rc<inference::InferenceEngine> {
-        let ix = ext_var.0;
-        if ix >= self.sub_extension.subtrees.len() {
-            unreachable!(
-                "invalid external var {ext_var} (out-of-range): {ix} >= {}",
-                self.sub_extension.subtrees.len()
-            );
-        }
-        self.sub_extension.subtrees[ix].clone()
-    }
-
     pub(crate) fn expand_var(&self, var: UVar) -> Expansion {
         let v = self.get_canonical_uvar(var);
         match &self.constraints[v.0] {
@@ -4526,6 +4788,10 @@ impl TypeChecker {
                 Constraint::Equiv(utype) => self.expand_type(utype.clone()),
                 Constraint::Elem(bs) => match bs.get_unique_solution(v) {
                     Ok(b) => Expansion::Base(b),
+                    Err(e) => panic!("{e}"),
+                },
+                Constraint::NumTree(is) => match is.get_unique_solution(v) {
+                    Ok(i) => Expansion::Int(i),
                     Err(e) => panic!("{e}"),
                 },
                 Constraint::Proj(proj_shape) => match proj_shape {
@@ -4566,8 +4832,8 @@ impl TypeChecker {
             }
             UType::ViewObj => Expansion::ViewObj,
             UType::Var(uv) => self.expand_var(*uv),
-            UType::ExternVar(ext_var) => Expansion::Outcome(*ext_var),
-            UType::Base(g) => Expansion::Base(*g),
+            UType::Int(int_t) => Expansion::Int(int_t.to_prim()),
+            UType::Base(base_t) => Expansion::Base(*base_t),
             UType::Empty => Expansion::Empty,
             UType::Tuple(ts) => {
                 let mut vts = Vec::with_capacity(ts.len());
@@ -4622,278 +4888,6 @@ impl TypeChecker {
     }
 }
 
-pub(crate) type TypeError = UnificationError<Rc<UType>>;
-pub(crate) type ConstraintError = UnificationError<Constraint>;
-
-impl From<TypeError> for ConstraintError {
-    fn from(value: TypeError) -> Self {
-        match value {
-            UnificationError::Unsatisfiable(lt, rt) => {
-                let lc = Constraint::Equiv(lt);
-                let rc = Constraint::Equiv(rt);
-                UnificationError::Unsatisfiable(lc, rc)
-            }
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-// Generic error in unification between two type-constraints, which are represented generically
-pub enum UnificationError<T: std::fmt::Debug> {
-    // Incompatible(UVar, T, T), // two independent assertions about a UVar are incompatible
-    Unsatisfiable(T, T), // a single non-variable assertion is directly unsatisfiable
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-/// Marker enum to track which of an invariant and variant constraints came first
-pub enum Polarity {
-    /// Attempting to add variants onto an invariant metavariable
-    PriorInvariant,
-    /// Attempting to enforce invariant constraints on a Variant metavariable
-    PriorVariant,
-}
-
-#[derive(Debug)]
-pub struct TCError {
-    err: Box<TCErrorKind>,
-    _trace: Vec<Box<dyn std::fmt::Debug + 'static + Send + Sync>>,
-}
-
-impl From<TCErrorKind> for TCError {
-    fn from(value: TCErrorKind) -> Self {
-        Self {
-            err: Box::new(value),
-            _trace: Vec::new(),
-        }
-    }
-}
-
-impl TCError {
-    #[allow(dead_code)]
-    fn with_trace<T>(mut self, trace: T) -> Self
-    where
-        T: std::fmt::Debug + Send + Sync + 'static,
-    {
-        self._trace.push(Box::new(trace));
-        self
-    }
-}
-
-impl std::fmt::Display for TCError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "{} (", self.err)?;
-        for item in self._trace.iter() {
-            writeln!(f, "\t{item:?}")?;
-        }
-        write!(f, ")")
-    }
-}
-
-impl std::error::Error for TCError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        self.err.source()
-    }
-}
-
-#[derive(Debug)]
-pub enum TCErrorKind {
-    VarianceMismatch(UVar, VMId, VarMap, Constraint, Polarity), // attempted unification of a variant and non-variant constraint
-    Unification(ConstraintError),
-    InfiniteType(UVar, Constraints),
-    MultipleSolutions(UVar, BaseSet),
-    NoSolution(UVar),
-    MissingView(Label),
-    Inference(ExtVar, inference::InferenceError),
-    // FIXME - trim down these variants a bit
-    /// Two numeric solutions cannot be reconciled (across aliased ExtVar)
-    IrreconcilableNumSolutions(NumSolution, NumSolution),
-    /// ExtVar unified with an explicitly non-numeric UType
-    NonNumericExtVarUnification(ExtVar, Rc<UType>),
-    /// Equating a PrimInt with a non-numeric BaseType
-    BadEquivalence {
-        prim: PrimInt,
-        base: BaseType,
-        reason: CrossLayerBadnessReason,
-    },
-    UTypeFromSigned(ExtVar, PrimInt),
-    /// ExtVar solution (PrimInt) cannot be reconciled with expectations of BaseSet constraint
-    UnexpectedSolution(ExtVar, PrimInt, BaseSet),
-}
-
-impl TCErrorKind {
-    fn with_trace<T>(self, trace: T) -> TCError
-    where
-        T: std::fmt::Debug + Send + Sync + 'static,
-    {
-        TCError::from(self).with_trace(trace)
-    }
-}
-
-impl std::fmt::Display for TCErrorKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            TCErrorKind::VarianceMismatch(uv, vmid, vm, constraint, pol) => match pol {
-                Polarity::PriorInvariant => write!(
-                    f,
-                    "prior constraint `{uv} {constraint}` precludes attempted unification `{uv} ⊇ {vmid} (:= {vm:?})`"
-                ),
-                Polarity::PriorVariant => write!(
-                    f,
-                    "attempted unification `{uv} {constraint}` precluded by prior constraint `{uv} ⊇ {vmid} (:= {vm:?})`"
-                ),
-            },
-            TCErrorKind::Unification(c_err) => write!(f, "{c_err}"),
-            TCErrorKind::InfiniteType(v, constraints) => match constraints {
-                Constraints::Indefinite => {
-                    unreachable!("indefinite constraint `{v} = ??` is not infinite")
-                }
-                Constraints::Variant(vmid) => write!(
-                    f,
-                    "`{v} ⊇ {vmid}` constitutes an infinite type ({v} or alias occurs within {vmid})"
-                ),
-                Constraints::Invariant(inv) => match inv {
-                    Constraint::Equiv(t) => write!(
-                        f,
-                        "`{v} = {t:?}` is an infinite type ({v} or alias occurs within the rhs utype)"
-                    ),
-                    Constraint::Elem(_) => {
-                        unreachable!("`{v} {inv}` is not infinite, but we thought it was")
-                    }
-                    Constraint::Proj(ps) => {
-                        write!(f, "`{v} ~ {ps:?}` constitutes an infinite type")
-                    }
-                },
-            },
-            TCErrorKind::MultipleSolutions(uv, bs) => {
-                write!(f, "no unique solution for `{uv} {}`", bs.to_constraint())
-            }
-            TCErrorKind::NoSolution(uv) => write!(f, "no valid solutions for `{uv}`"),
-            TCErrorKind::MissingView(lbl) => {
-                write!(f, "view-based parse depends on unbound identifier `{lbl}`")
-            }
-            TCErrorKind::Inference(ext_v, err) => {
-                write!(f, "inference failed for extension-var `{ext_v}`: {err}")
-            }
-            TCErrorKind::NonNumericExtVarUnification(ext_var, utype) => {
-                write!(
-                    f,
-                    "cannot reconcile numeric-extension `{ext_var}` with non-numeric unification-type `{utype:?}`"
-                )
-            }
-            TCErrorKind::IrreconcilableNumSolutions(lhs, rhs) => {
-                write!(f, "cannot reconcile numeric solutions `{lhs}` and `{rhs}`")
-            }
-            TCErrorKind::UnexpectedSolution(ext, pt, bs) => {
-                write!(
-                    f,
-                    "found prim-int type `{pt}` for numeric extension `{ext}`, but unification requires `{bs}`"
-                )
-            }
-            TCErrorKind::BadEquivalence { prim, base, reason } => {
-                write!(
-                    f,
-                    "bad equivalence (unification on ExtVar) between prim-int type `{prim}` and base type `{base}`: {reason}",
-                )
-            }
-            TCErrorKind::UTypeFromSigned(ext, prim) => {
-                write!(
-                    f,
-                    "failed to convert signed prim-int type `{prim}` (solution for {ext}) to utype for unification purposes",
-                )
-            }
-        }
-    }
-}
-
-impl std::error::Error for TCErrorKind {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::Unification(u_err) => Some(u_err),
-            Self::Inference(_, err) => Some(err),
-            _ => None,
-        }
-    }
-}
-
-/// Classification for error-condition of [`TCErrorKind::BadEquivalence`]
-/// for improved clarity of error-reporting.
-#[derive(Clone, Copy, Debug)]
-pub enum CrossLayerBadnessReason {
-    /// Supported PrimInt paired with non-matching BaseType
-    Mismatched,
-    /// PrimInt does not have any direct analogue in BaseType layer (i.e. it is Signed)
-    Unsupported,
-    /// BaseType is not numeric
-    NonNumeric,
-}
-
-impl std::fmt::Display for CrossLayerBadnessReason {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            CrossLayerBadnessReason::Mismatched => write!(f, "mismatched precision"),
-            CrossLayerBadnessReason::Unsupported => {
-                write!(f, "signed-int unification not supported")
-            }
-            CrossLayerBadnessReason::NonNumeric => write!(f, "base-type is not numeric"),
-        }
-    }
-}
-
-impl From<TypeError> for TCErrorKind {
-    fn from(value: TypeError) -> Self {
-        Self::Unification(value.into())
-    }
-}
-
-impl From<TypeError> for TCError {
-    fn from(value: TypeError) -> Self {
-        Self::from(TCErrorKind::Unification(value.into()))
-    }
-}
-
-impl From<ConstraintError> for TCError {
-    fn from(value: ConstraintError) -> Self {
-        Self::from(TCErrorKind::Unification(value))
-    }
-}
-
-impl<T> From<(ConstraintError, T)> for TCError
-where
-    T: std::fmt::Debug + 'static + Send + Sync,
-{
-    fn from(value: (ConstraintError, T)) -> Self {
-        Self {
-            err: Box::new(TCErrorKind::Unification(value.0)),
-            _trace: vec![Box::new(value.1)],
-        }
-    }
-}
-
-impl From<ConstraintError> for TCErrorKind {
-    fn from(value: ConstraintError) -> Self {
-        Self::Unification(value)
-    }
-}
-
-impl From<(ExtVar, InferenceError)> for TCErrorKind {
-    fn from((ext_var, err): (ExtVar, InferenceError)) -> Self {
-        Self::Inference(ext_var, err)
-    }
-}
-
-impl<T: std::fmt::Debug> std::fmt::Display for UnificationError<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            // UnificationError::Incompatible(var, lhs, rhs) => { write!( f, "incompatible equivalences `{var} = {lhs:?}` && `{var} = {rhs:?}`") }
-            UnificationError::Unsatisfiable(lhs, rhs) => {
-                write!(f, "unsatisfiable equivalence  `{lhs:?} = {rhs:?}`")
-            }
-        }
-    }
-}
-
-impl<T: std::fmt::Debug> std::error::Error for UnificationError<T> {}
-
 /// Perform a standalone type-inference on a format within a format-module, returning
 /// the inferred value-type, if one could be inferred.
 ///
@@ -4917,16 +4911,29 @@ pub fn typecheck(module: &FormatModule, f: &Format) -> TCResult<Option<ValueType
 pub type TCResult<T> = Result<T, TCError>;
 
 mod __impl {
-    use crate::{FormatModule, typecheck::ExtVar};
-
-    use super::{Constraint, Ctxt, ProjShape, UScope, UVar, VMId};
     use std::borrow::{Borrow, BorrowMut};
+    use std::rc::Rc;
+
+    use crate::{BaseType, FormatModule};
+
+    use super::{Constraint, Constraints, Ctxt, NVar, ProjShape, UScope, UType, UVar, VMId};
+
+    impl std::fmt::Display for Constraints {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                Self::Indefinite => write!(f, "∈ 𝕌"),
+                Self::Variant(vm_id) => write!(f, "↦ {vm_id}"),
+                Self::Invariant(c) => write!(f, "{c}"),
+            }
+        }
+    }
 
     impl std::fmt::Display for Constraint {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             match self {
                 Constraint::Equiv(ut) => write!(f, "= {ut:?}"),
                 Constraint::Elem(bs) => write!(f, "∈ {bs}"),
+                Constraint::NumTree(is) => write!(f, "∈ {is}"),
                 Constraint::Proj(ps) => match ps {
                     ProjShape::TupleWith(ts) => write!(
                         f,
@@ -4947,9 +4954,53 @@ mod __impl {
         }
     }
 
-    impl std::fmt::Display for ExtVar {
+    #[cfg(any())]
+    impl std::fmt::Display for TVar {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             write!(f, "#{}", self.0)
+        }
+    }
+
+    impl std::fmt::Display for NVar {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "%{}", self.0)
+        }
+    }
+
+    impl std::fmt::Display for VMId {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "${}", self.0)
+        }
+    }
+
+    impl From<BaseType> for UType {
+        fn from(value: BaseType) -> Self {
+            Self::Base(value)
+        }
+    }
+
+    impl From<BaseType> for Rc<UType> {
+        fn from(value: BaseType) -> Self {
+            Rc::new(UType::from(value))
+        }
+    }
+
+    impl From<UVar> for UType {
+        fn from(value: UVar) -> Self {
+            Self::Var(value)
+        }
+    }
+
+    impl From<UVar> for Rc<UType> {
+        fn from(value: UVar) -> Self {
+            Rc::new(UType::Var(value))
+        }
+    }
+
+    #[cfg(any())]
+    impl From<TVar> for Rc<UType> {
+        fn from(value: TVar) -> Self {
+            Rc::new(UType::TreeRoot(value))
         }
     }
 
@@ -4986,12 +5037,6 @@ mod __impl {
     impl BorrowMut<usize> for UVar {
         fn borrow_mut(&mut self) -> &mut usize {
             &mut self.0
-        }
-    }
-
-    impl std::fmt::Display for VMId {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "${}", self.0)
         }
     }
 

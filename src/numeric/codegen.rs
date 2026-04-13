@@ -299,6 +299,7 @@ fn synthesize_binop(op: BinOp) -> RustExpr {
 
 pub(crate) fn synthesize(model: &TypedExpr<GenType>) -> RustExpr {
     match model {
+        TypedExpr::ElabNumVar(_, name) => RustExpr::Entity(RustEntity::Local(name.clone())),
         TypedExpr::ElabConst(t, typed_const) => {
             let const_val = typed_const.clone();
             let num_type = match t.try_to_num_type() {
