@@ -715,8 +715,7 @@ impl Expr {
         }
     }
 
-    #[cfg(test)]
-    fn iter_vars(&self) -> impl '_ + Iterator<Item = &'_ str> {
+    pub(crate) fn iter_vars(&self) -> impl '_ + Iterator<Item = &'_ str> {
         match self {
             Self::NumVar(label) => {
                 Box::new(std::iter::once(label.as_ref())) as Box<dyn Iterator<Item = &'_ str>>

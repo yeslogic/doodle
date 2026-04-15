@@ -1492,7 +1492,7 @@ fn refutability_check<A: std::fmt::Debug + Clone>(
                     ),
                 },
                 AtomType::Signed(pxt) => match pxt {
-                    // WIP[epic=embedded-num] - Int can't cover negative values yet, so these are all refutable
+                    // NOTE[epic=embedded-num] - Int can't cover negative values yet, so these are all refutable
                     MachineSint::I8 | MachineSint::I16 | MachineSint::I32 | MachineSint::I64 => {
                         Refutability::Refutable
                     }

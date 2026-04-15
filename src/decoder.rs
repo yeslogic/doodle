@@ -46,7 +46,7 @@ pub enum Value {
     U64(u64),
     Char(char),
     Usize(usize),
-    // WIP[epic=embedded-num] - implement proper support for Numeric
+    // TODO[epic=embedded-num] - implement proper support for Numeric
     Numeric(Rc<TypedConst>),
     View {
         offset: usize,
@@ -150,7 +150,7 @@ impl Value {
         }
     }
 
-    // WIP[epic=embedded-num] - no support for negative values or signed constants yet
+    // TODO[epic=embedded-num] - no support for negative values or signed constants yet
     fn matches_inner<'a>(&'a self, scope: &mut MultiScope<'a>, pattern: &Pattern) -> bool {
         match pattern {
             Pattern::Binding(name) => {
@@ -361,7 +361,7 @@ impl Expr {
             Expr::Numeric(n) => {
                 match n.eval(scope) {
                     Ok(v) => Cow::Owned(v.into()),
-                    // WIP[epic=embedded-num] - we probably want a more sensible outcome than panic
+                    // REVIEW[epic=embedded-num] - we probably want a more sensible outcome than panic
                     Err(e) => panic!("{e}"),
                 }
             }

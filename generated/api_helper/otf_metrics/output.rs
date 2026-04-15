@@ -1076,7 +1076,7 @@ mod layout {
     }
 
     fn display_chained_rule<Sem: SemDisplay>(rule: &ChainedRule<Sem>) -> TokenStream<'static> {
-        // FIXME[epic=magic-const]
+        // FIXME[epic=magic-const] - arbitrary local bookending const
         const THIS_BOOKEND: usize = 1;
         let backtrack = if rule.backtrack_sequence.is_empty() {
             TokenStream::empty()
@@ -1109,7 +1109,7 @@ mod layout {
         glyph: u16,
         set: &ChainedRuleSet<Sem>,
     ) -> TokenStream<'static> {
-        // FIXME[epic=magic-const]
+        // FIXME[epic=magic-const] - arbitrary local bookending const
         const THIS_BOOKEND: usize = 1;
         tok(format!("{{{}=>", format_glyphid_hex(glyph, true)))
             .then(arrayfmt::display_items_inline(
