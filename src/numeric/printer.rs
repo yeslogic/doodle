@@ -16,6 +16,8 @@ use crate::numeric::elaborator::{
 };
 use crate::typecheck::inference::InferenceEngine;
 
+use super::core::{CastOp, CastSemantics};
+
 fn compile_bin_op(bin_op: &BinOp) -> Fragment {
     let token = match bin_op.get_op() {
         BasicBinOp::Add => "+",
@@ -74,12 +76,17 @@ fn compile_prefix(op: &UnaryOp, inner: &Expr, inner_prec: Precedence) -> Fragmen
     Fragment::cat(compile_unary_op(op), compile_expr(inner, inner_prec))
 }
 
-fn compile_postfix<'a>(
-    token: &'static str,
-    rep: MachineRep,
-    inner: &Expr,
-    inner_prec: Precedence,
-) -> Fragment {
+fn compile_cast_op<'a>(cast_op: CastOp, inner: &Expr, inner_prec: Precedence) -> Fragment {
+    let (token, rep) = match cast_op {
+        CastOp {
+            out_rep,
+            cast_semantics: CastSemantics::Arithmetic,
+        } => (" as ", out_rep),
+        CastOp {
+            out_rep,
+            cast_semantics: CastSemantics::Bitwise,
+        } => (" as(rust) ", out_rep),
+    };
     Fragment::cat(
         compile_expr(inner, inner_prec),
         Fragment::cat(
@@ -158,8 +165,8 @@ pub(crate) fn compile_expr(expr: &Expr, prec: Precedence) -> Fragment {
             prec,
             Precedence::UNARY,
         ),
-        Expr::Cast(num_rep, expr) => cond_paren(
-            compile_postfix(" as ", *num_rep, expr, Precedence::CAST),
+        Expr::Cast(cast_op, expr) => cond_paren(
+            compile_cast_op(*cast_op, expr, Precedence::CAST),
             prec,
             Precedence::CAST,
         ),
@@ -222,26 +229,28 @@ fn compile_elab_prefix(
     }
 }
 
-fn compile_elab_postfix<'a>(
+fn compile_elab_cast_op<'a>(
     t: IntType,
-    rep: MachineRep,
+    op: CastOp,
     inner: &TypedExpr<IntType>,
     inner_prec: Precedence,
 ) -> Fragment {
+    let (token, rep) = match op.cast_semantics {
+        CastSemantics::Arithmetic => (" as ", op.out_rep),
+        CastSemantics::Bitwise => (" as(rust) ", op.out_rep),
+    };
     if MachineRep::from(t) == rep {
         // If the int-type is directly analogous to the original rep, omit the type-annotation
         compile_typed_expr(inner, inner_prec)
-            .cat(Fragment::String(Cow::Borrowed(" as ")))
+            .cat(Fragment::String(Cow::Borrowed(token)))
             .cat(Fragment::String(Cow::Borrowed(rep.to_static_str())))
     } else {
         // NOTE - this would normally be a panic but we are content to observe it without failing
-        eprintln!(
-            "[WARNING]: Postfix operation (assumed to be Cast) has mismatched NumRep and IntType..."
-        );
+        log::warn!("Cast-Operation has mismatched output-MachineRep and IntType-annotation...");
         compile_typed_expr(inner, inner_prec)
-            .cat(Fragment::String(Cow::Borrowed(" as ")))
+            .cat(Fragment::String(Cow::Borrowed(token)))
             .cat(Fragment::String(Cow::Borrowed(rep.to_static_str())))
-            .cat(Fragment::String(Cow::Borrowed(" :: ")))
+            .cat(Fragment::String(Cow::Borrowed("~")))
             .cat(Fragment::String(Cow::Borrowed(t.to_static_str())))
     }
 }
@@ -286,8 +295,8 @@ fn compile_typed_expr(t_expr: &TypedExpr<IntType>, prec: Precedence) -> Fragment
             prec,
             Precedence::UNARY,
         ),
-        TypedExpr::ElabCast(t, TypedCast { rep: _rep, .. }, inner) => cond_paren(
-            compile_elab_postfix(*t, *_rep, inner, Precedence::CAST),
+        TypedExpr::ElabCast(t, TypedCast { op, .. }, inner) => cond_paren(
+            compile_elab_cast_op(*t, *op, inner, Precedence::CAST),
             prec,
             Precedence::CAST,
         ),

@@ -1,7 +1,9 @@
 use crate::Label;
+
 use crate::codegen::rust_ast::{AtomType, MachineSint, MachineUint, PrimType, RustType};
 use crate::codegen::typed_format::GenType;
-use crate::numeric::core::{BinOp, Expr, MachineRep, NumRep, TypedConst, UnaryOp};
+
+use super::core::{BinOp, CastOp, Expr, MachineRep, NumRep, TypedConst, UnaryOp};
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 pub enum PrimInt {
@@ -352,7 +354,7 @@ mod __impls {
                     Expr::BinOp(op.into(), rebox(lhs), rebox(rhs))
                 }
                 TypedExpr::ElabUnaryOp(_, op, inner) => Expr::UnaryOp(op.into(), rebox(inner)),
-                TypedExpr::ElabCast(_, cast, inner) => Expr::Cast(cast.rep, rebox(inner)),
+                TypedExpr::ElabCast(_, cast, inner) => Expr::Cast(cast.op, rebox(inner)),
                 TypedExpr::ElabNumVar(_, l) => Expr::NumVar(l),
             }
         }
@@ -490,7 +492,7 @@ impl<TypeRep> std::hash::Hash for TypedUnaryOp<TypeRep> {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TypedCast<TypeRep> {
     pub sig: Sig1<TypeRep>,
-    pub rep: MachineRep,
+    pub op: CastOp,
 }
 
 impl<TypeRep> MapType for TypedCast<TypeRep> {
@@ -502,13 +504,13 @@ impl<TypeRep> MapType for TypedCast<TypeRep> {
         f: &impl Fn(Self::Rep) -> Result<T, E>,
     ) -> Result<Self::Output<T>, E> {
         let sig = self.sig.try_map_type(f)?;
-        Ok(TypedCast { rep: self.rep, sig })
+        Ok(TypedCast { op: self.op, sig })
     }
 }
 
 impl<TypeRep> std::hash::Hash for TypedCast<TypeRep> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.rep.hash(state);
+        self.op.hash(state);
     }
 }
 
@@ -608,14 +610,14 @@ where
                     Box::new(t_inner),
                 ))
             }
-            &Expr::Cast(rep, ref inner) => {
+            &Expr::Cast(op, ref inner) => {
                 let t_inner = self.elaborate_expr_as::<T>(inner)?;
                 let t = self.get_type_from_index(index)?;
                 Ok(TypedExpr::ElabCast(
                     T::from(t),
                     TypedCast {
                         sig: (t_inner.get_type().clone(), T::from(t)),
-                        rep,
+                        op,
                     },
                     Box::new(t_inner),
                 ))
@@ -660,14 +662,14 @@ where
                     Box::new(t_inner),
                 ))
             }
-            &Expr::Cast(rep, ref inner) => {
+            &Expr::Cast(op, ref inner) => {
                 let t_inner = self.elaborate_expr(inner)?;
                 let t = self.get_type_from_index(index)?;
                 Ok(TypedExpr::ElabCast(
                     t,
                     TypedCast {
                         sig: (*t_inner.get_type(), t),
-                        rep,
+                        op,
                     },
                     Box::new(t_inner),
                 ))

@@ -2337,24 +2337,28 @@ impl TypeChecker {
             Expr::AsU8(x) => {
                 let newvar = self.init_var_simple(UType::Base(BaseType::U8))?.0;
                 let xvar = self.infer_var_expr(x.as_ref(), scope)?;
+                // FIXME[epic=embedded-num] - change to unify_var_intset(xvar, IntSet::ZAny)
                 let _cx = self.unify_var_baseset(xvar, BaseSet::UAny)?;
                 newvar
             }
             Expr::AsU16(x) => {
                 let newvar = self.init_var_simple(UType::Base(BaseType::U16))?.0;
                 let xvar = self.infer_var_expr(x.as_ref(), scope)?;
+                // FIXME[epic=embedded-num] - change to unify_var_intset(xvar, IntSet::ZAny)
                 let _cx = self.unify_var_baseset(xvar, BaseSet::UAny)?;
                 newvar
             }
             Expr::AsU32(x) => {
                 let newvar = self.init_var_simple(UType::Base(BaseType::U32))?.0;
                 let xvar = self.infer_var_expr(x.as_ref(), scope)?;
+                // FIXME[epic=embedded-num] - change to unify_var_intset(xvar, IntSet::ZAny)
                 let _cx = self.unify_var_baseset(xvar, BaseSet::UAny)?;
                 newvar
             }
             Expr::AsU64(x) => {
                 let newvar = self.init_var_simple(UType::Base(BaseType::U64))?.0;
                 let xvar = self.infer_var_expr(x.as_ref(), scope)?;
+                // FIXME[epic=embedded-num] - change to unify_var_intset(xvar, IntSet::ZAny)
                 let _cx = self.unify_var_baseset(xvar, BaseSet::UAny)?;
                 newvar
             }
@@ -2750,10 +2754,11 @@ impl TypeChecker {
                 };
                 (this_var, this_rep)
             }
-            &NExpr::Cast(cast_m_rep, ref expr) => {
+            &NExpr::Cast(cast_op, ref expr) => {
                 let this_var = self.get_new_uvar_numtree();
                 let (inner_var, inner_rep) = self.infer_var_num_tree(expr, scope)?;
-                let cast_rep = NumRep::Concrete(cast_m_rep);
+                let m_rep = cast_op.out_rep;
+                let cast_rep = NumRep::Concrete(m_rep);
                 if inner_rep.is_auto() {
                     self.unify_var_rep(inner_var, cast_rep)?;
                 }

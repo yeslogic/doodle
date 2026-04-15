@@ -3,6 +3,8 @@ use crate::numeric::core::{
     BasicBinOp, BasicUnaryOp, BinOp, Expr, MachineRep, TypedConst, UnaryOp,
 };
 
+use super::core::CastOp;
+
 /// Helper for `Expr::Const`
 pub fn expr_const(c: TypedConst) -> Expr {
     Expr::Const(c)
@@ -31,5 +33,11 @@ pub fn unary_with_rep(op: BasicUnaryOp, out_rep: Option<MachineRep>, expr: Expr)
 }
 
 pub fn cast(rep: MachineRep, expr: Expr) -> Expr {
-    Expr::Cast(rep, Box::new(expr))
+    let op = CastOp::arith(rep);
+    Expr::Cast(op, Box::new(expr))
+}
+
+pub fn cast_bitwise(rep: MachineRep, expr: Expr) -> Expr {
+    let op = CastOp::bitwise(rep);
+    Expr::Cast(op, Box::new(expr))
 }

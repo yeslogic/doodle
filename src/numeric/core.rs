@@ -689,16 +689,58 @@ impl UnaryOp {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize)]
+pub struct CastOp {
+    #[serde(serialize_with = "ser_machine_rep")]
+    pub out_rep: MachineRep,
+    #[serde(skip_serializing_if = "CastSemantics::is_arithmetic")]
+    pub cast_semantics: CastSemantics,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Default, Serialize)]
+pub enum CastSemantics {
+    #[default]
+    Arithmetic,
+    Bitwise,
+}
+
+impl CastSemantics {
+    pub const fn is_arithmetic(&self) -> bool {
+        matches!(self, CastSemantics::Arithmetic)
+    }
+}
+
+impl CastOp {
+    #[cfg(test)]
+    fn replace_rep(self, rep: MachineRep) -> Self {
+        CastOp {
+            out_rep: rep,
+            cast_semantics: self.cast_semantics,
+        }
+    }
+
+    pub fn arith(out_rep: MachineRep) -> Self {
+        CastOp {
+            out_rep,
+            cast_semantics: CastSemantics::Arithmetic,
+        }
+    }
+
+    pub fn bitwise(out_rep: MachineRep) -> Self {
+        CastOp {
+            out_rep,
+            cast_semantics: CastSemantics::Bitwise,
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, Hash, Serialize)]
 #[serde(tag = "tag", content = "data")]
 pub enum Expr {
     Const(TypedConst),
     BinOp(BinOp, Box<Expr>, Box<Expr>),
     UnaryOp(UnaryOp, Box<Expr>),
-    Cast(
-        #[serde(serialize_with = "ser_machine_rep")] MachineRep,
-        Box<Expr>,
-    ),
+    Cast(CastOp, Box<Expr>),
     /// Numerically-typed variable reference
     NumVar(Label),
 }
@@ -707,7 +749,7 @@ impl Expr {
     #[cfg(test)]
     fn replace_rep(self, rep: MachineRep) -> Self {
         match self {
-            Self::Cast(_, inner) => Self::Cast(rep, inner),
+            Self::Cast(c, inner) => Self::Cast(c.replace_rep(rep), inner),
             Self::BinOp(op, lhs, rhs) => Self::BinOp(op.replace_rep(rep), lhs, rhs),
             Self::UnaryOp(op, inner) => Self::UnaryOp(op.replace_rep(rep), inner),
             Self::Const(c) => Self::Const(c.replace_rep(rep)),
@@ -880,6 +922,10 @@ impl StrictValue {
         self.is_valid
     }
 
+    /// Maps a function over the inner `Value` of `self`, returning a new `StrictValue` with the mapped value and an updated validity flag.
+    ///
+    /// If self already had an invalid value, the resulting `StrictValue` will also be invalid regardless of the output of `f`.
+    /// Otherwise, the validity of the resulting `StrictValue` will depend on whether the output of `f` is representable.
     pub fn map<E>(self, f: impl FnOnce(Value) -> Result<Value, E>) -> Result<Self, E> {
         let value = f(self.value)?;
         let is_valid = self.is_valid && value.is_representable();
@@ -935,6 +981,78 @@ impl StrictValue {
 
 #[expect(dead_code)]
 pub(crate) type EvalResult<T> = std::result::Result<T, EvalError>;
+
+fn bitwise_cast(num: BigInt, rep_in: NumRep, rep_out: MachineRep) -> BigInt {
+    match (rep_in, rep_out) {
+        (NumRep::Auto, _) => {
+            log::warn!(
+                "Bitwise cast from auto-rep, assuming output rep for representability check..."
+            );
+            num
+        }
+        // FIXME - implement support for the non-trivial cases here, and also consider the implications for the representability checks of the output value
+        (NumRep::Concrete(r0), r1) => match (r0, r1) {
+            // SECTION - Same-size casts - C.f. https://doc.rust-lang.org/reference/expressions/operator-expr.html#r-expr.as.numeric.int-same-size
+            (MachineRep::U8, MachineRep::I8) => todo!("same-size cast from u8 to i8"),
+            (MachineRep::I8, MachineRep::U8) => todo!("same-size cast from i8 to u8"),
+            (MachineRep::U16, MachineRep::I16) => todo!("same-size cast from u16 to i16"),
+            (MachineRep::I16, MachineRep::U16) => todo!("same-size cast from i16 to u16"),
+            (MachineRep::U32, MachineRep::I32) => todo!("same-size cast from u32 to i32"),
+            (MachineRep::I32, MachineRep::U32) => todo!("same-size cast from i32 to u32"),
+            (MachineRep::U64, MachineRep::I64) => todo!("same-size cast from u64 to i64"),
+            (MachineRep::I64, MachineRep::U64) => todo!("same-size cast from i64 to u64"),
+            // !SECTION
+            // SECTION - Truncating casts - C.f https://doc.rust-lang.org/reference/expressions/operator-expr.html#r-expr.as.numeric.int-truncation
+            (MachineRep::U16, MachineRep::U8) => todo!("truncating cast from u16 to u8"),
+            (MachineRep::U32, MachineRep::U8) => todo!("truncating cast from u32 to u8"),
+            (MachineRep::U32, MachineRep::U16) => todo!("truncating cast from u32 to u16"),
+            (MachineRep::U64, MachineRep::U8) => todo!("truncating cast from u64 to u8"),
+            (MachineRep::U64, MachineRep::U16) => todo!("truncating cast from u64 to u16"),
+            (MachineRep::U64, MachineRep::U32) => todo!("truncating cast from u64 to u32"),
+            (MachineRep::I16, MachineRep::I8) => todo!("truncating cast from i16 to i8"),
+            (MachineRep::I32, MachineRep::I8) => todo!("truncating cast from i32 to i8"),
+            (MachineRep::I32, MachineRep::I16) => todo!("truncating cast from i32 to i16"),
+            (MachineRep::I64, MachineRep::I8) => todo!("truncating cast from i64 to i8"),
+            (MachineRep::I64, MachineRep::I16) => todo!("truncating cast from i64 to i16"),
+            (MachineRep::I64, MachineRep::I32) => todo!("truncating cast from i64 to i32"),
+
+            (MachineRep::U16, MachineRep::I8) => todo!("truncating cast from u16 to i8"),
+            (MachineRep::U32, MachineRep::I8) => todo!("truncating cast from u32 to i8"),
+            (MachineRep::U32, MachineRep::I16) => todo!("truncating cast from u32 to i16"),
+            (MachineRep::U64, MachineRep::I8) => todo!("truncating cast from u64 to i8"),
+            (MachineRep::U64, MachineRep::I16) => todo!("truncating cast from u64 to i16"),
+            (MachineRep::U64, MachineRep::I32) => todo!("truncating cast from u64 to i32"),
+
+            (MachineRep::I16, MachineRep::U8) => todo!("truncating cast from i16 to u8"),
+            (MachineRep::I32, MachineRep::U8) => todo!("truncating cast from i32 to u8"),
+            (MachineRep::I32, MachineRep::U16) => todo!("truncating cast from i32 to u16"),
+            (MachineRep::I64, MachineRep::U8) => todo!("truncating cast from i64 to u8"),
+            (MachineRep::I64, MachineRep::U16) => todo!("truncating cast from i64 to u16"),
+            (MachineRep::I64, MachineRep::U32) => todo!("truncating cast from i64 to u32"),
+            // !SECTION
+            // SECTION - Sign-extending casts - C.f. https://doc.rust-lang.org/reference/expressions/operator-expr.html#r-expr.as.numeric.int-extension
+            (MachineRep::I8, MachineRep::U16) => todo!("sign-extending cast from i8 to u16"),
+            (MachineRep::I8, MachineRep::U32) => todo!("sign-extending cast from i8 to u32"),
+            (MachineRep::I8, MachineRep::U64) => todo!("sign-extending cast from i8 to u64"),
+            (MachineRep::I16, MachineRep::U32) => todo!("sign-extending cast from i16 to u32"),
+            (MachineRep::I16, MachineRep::U64) => todo!("sign-extending cast from i16 to u64"),
+            (MachineRep::I32, MachineRep::U64) => todo!("sign-extending cast from i32 to u64"),
+            // !SECTION
+            // SECTION - No-op casts, for identity and zero-extension
+            | (MachineRep::U8, _) // ~I8
+            | (MachineRep::I8, _) // ~(U8 | U16 | U32 | U64)
+            | (MachineRep::U16, _) // ~(U8 | I8 | I16)
+            | (MachineRep::I16, _) // ~(U8 | I8 | U16 | U32 | U64)
+            | (MachineRep::U32, _) // ~(U8 | I8 | U16 | I16 | I32)
+            | (MachineRep::I32, _) // ~(U8 | I8 | U16 | I16 | U32 | I64)
+            | (MachineRep::U64, MachineRep::U64)
+            | (MachineRep::I64, MachineRep::I64)
+            => num,
+            // !SECTION
+
+        },
+    }
+}
 
 impl Expr {
     /// Like `eval`, except that the representability of every individual sub-term is also checked,
@@ -1026,9 +1144,17 @@ impl Expr {
                         }
                     })
             }
-            Expr::Cast(mach_rep, expr) => expr.eval_strict(scope)?.map(|val| match val {
-                Value::Const(TypedConst(num, _rep)) => {
-                    Ok(Value::Const(TypedConst(num, NumRep::Concrete(*mach_rep))))
+            Expr::Cast(cast_op, expr) => expr.eval_strict(scope)?.map(|val| match val {
+                Value::Const(TypedConst(num, rep)) => {
+                    let num0 = if cast_op.cast_semantics.is_arithmetic() {
+                        num
+                    } else {
+                        bitwise_cast(num, rep, cast_op.out_rep)
+                    };
+                    Ok(Value::Const(TypedConst(
+                        num0,
+                        NumRep::Concrete(cast_op.out_rep),
+                    )))
                 }
             }),
             Expr::NumVar(lbl) => {
@@ -1124,13 +1250,21 @@ impl Expr {
                     }
                 }
             }
-            Expr::Cast(mach_rep, expr) => {
+            Expr::Cast(cast_op, expr) => {
                 let val = expr.eval(scope)?;
-                match val {
-                    Value::Const(TypedConst(num, _rep)) => {
-                        Ok(Value::Const(TypedConst(num, NumRep::Concrete(*mach_rep))))
+                let num0 = match val {
+                    Value::Const(TypedConst(num, rep)) => {
+                        if cast_op.cast_semantics.is_arithmetic() {
+                            num
+                        } else {
+                            bitwise_cast(num, rep, cast_op.out_rep)
+                        }
                     }
-                }
+                };
+                Ok(Value::Const(TypedConst(
+                    num0,
+                    NumRep::Concrete(cast_op.out_rep),
+                )))
             }
             Expr::NumVar(lbl) => {
                 let raw = scope.lookup_var(lbl)?;
@@ -1345,7 +1479,7 @@ pub mod strategy {
             if r == rep {
                 return x.replace_rep(r);
             }
-            Expr::Cast(rep, Box::new(x.replace_rep(r)))
+            Expr::Cast(CastOp::arith(rep), Box::new(x.replace_rep(r)))
         }
     }
 
@@ -1365,7 +1499,7 @@ pub mod strategy {
                     if r == rep {
                         Expr::NumVar((*s).into())
                     } else {
-                        Expr::Cast(rep, Box::new(Expr::NumVar((*s).into())))
+                        Expr::Cast(CastOp::arith(rep), Box::new(Expr::NumVar((*s).into())))
                     }
                 }),
             ]
@@ -1470,7 +1604,7 @@ mod tests {
         #[test]
         fn cast_works(orig in numrep_strategy(), tgt in machine_strategy()) {
             let one = TypedConst(BigInt::one(), orig);
-            let casted_one = Expr::Cast(tgt.into(), Box::new(Expr::Const(one)));
+            let casted_one = Expr::Cast(CastOp::arith(tgt), Box::new(Expr::Const(one)));
             let val = casted_one.eval(VOID).unwrap();
             let rep = val.as_const().unwrap().get_rep();
             prop_assert_eq!(rep, NumRep::Concrete(tgt));
