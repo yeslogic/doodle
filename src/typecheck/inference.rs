@@ -745,10 +745,10 @@ impl InferenceEngine {
                 };
                 (this_var, this_rep)
             }
-            &Expr::Cast(rep, ref expr) => {
+            &Expr::Cast(op, ref expr) => {
                 let this_var = self.get_new_nvar();
                 let (inner_var, inner_rep) = self.infer_var_expr(&expr)?;
-                let rep = rep.into();
+                let rep = op.out_rep.into();
                 if inner_rep.is_auto() {
                     self.unify_var_rep(inner_var, rep)?;
                 }

@@ -4651,14 +4651,14 @@ impl<'a> Elaborator<'a> {
                     Box::new(t_inner),
                 )
             }
-            &NumExpr::Cast(rep, ref inner) => {
+            &NumExpr::Cast(op, ref inner) => {
                 let t_inner = self.elaborate_num_tree(inner);
                 let gt = self.get_gt_from_index(index);
                 TypedNumExpr::ElabCast(
                     gt.clone(),
                     TypedCast {
                         sig: (t_inner.get_type().clone(), gt),
-                        rep,
+                        op,
                     },
                     Box::new(t_inner),
                 )
