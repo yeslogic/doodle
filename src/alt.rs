@@ -1358,10 +1358,7 @@ mod __impls {
                 Expr::U16(_n) => Ok(ValueTypeExt::Base(BaseType::U16)),
                 Expr::U32(_n) => Ok(ValueTypeExt::Base(BaseType::U32)),
                 Expr::U64(_n) => Ok(ValueTypeExt::Base(BaseType::U64)),
-                Expr::Numeric(_) => {
-                    // FIXME[epic=embedded-num] - this is a hack for now
-                    Ok(ValueTypeExt::Any)
-                }
+                Expr::Numeric(_) => Ok(ValueTypeExt::UnknownNumeric),
                 Expr::Tuple(exprs) => {
                     let mut ts = Vec::new();
                     for expr in exprs {
