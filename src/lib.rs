@@ -41,7 +41,7 @@ pub mod read;
 mod scope;
 
 mod typecheck;
-pub use typecheck::{TCResult, error::TCError, typecheck, base_set};
+pub use typecheck::{TCResult, base_set, error::TCError, typecheck};
 mod util;
 pub(crate) use util::IxHeap;
 
@@ -635,10 +635,7 @@ impl Expr {
             Expr::Unary(_, x) => x.is_shadowed_by(name),
             Expr::Dup(x, y) => x.is_shadowed_by(name) || y.is_shadowed_by(name),
             Expr::Bool(_) | Expr::U8(_) | Expr::U16(_) | Expr::U32(_) | Expr::U64(_) => false,
-            Expr::Numeric(_) => {
-                // WIP[epic=embedded-num] - at least for now, numerics cannot contain any variables
-                false
-            }
+            Expr::Numeric(num_tree) => num_tree.iter_vars().any(|v| v == name),
             Expr::Tuple(ts) => ts.iter().any(|x| x.is_shadowed_by(name)),
             Expr::TupleProj(tup, _) => tup.is_shadowed_by(name),
             Expr::Record(fs) => {

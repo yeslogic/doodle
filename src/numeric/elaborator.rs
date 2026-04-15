@@ -565,7 +565,6 @@ where
 
     fn get_type_from_index(&self, index: usize) -> ElaborationResult<IntType> {
         let var = NVar::new(index);
-        // FIXME[epic=embedded-num] - figure out how to register DepSolutions, or store it to pass in below
         let Some(t) = self.engine.reify(var.into()) else {
             return Err(ElaborationError::BadReification(index));
         };

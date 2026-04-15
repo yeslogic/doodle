@@ -249,7 +249,7 @@ fn synthesize_unary(op: UnaryOp) -> RustExpr {
         let (qual, meth) = match op.get_op() {
             BasicUnaryOp::Negate => ("Neg", "neg"),
             BasicUnaryOp::AbsVal => ("Signed", "abs"),
-            // WIP[epic=embedded-num] - trait does not yet exist
+            // FIXME[epic=embedded-num] - trait does not yet exist
             BasicUnaryOp::IntPred => ("Numeric", "pred"),
             BasicUnaryOp::IntSucc => ("Numeric", "succ"),
         };

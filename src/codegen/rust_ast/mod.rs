@@ -1568,7 +1568,7 @@ impl TryFrom<ValueType> for RustType {
             ValueType::Base(BaseType::U32) => Ok(PrimType::U32.into()),
             ValueType::Base(BaseType::U64) => Ok(PrimType::U64.into()),
             ValueType::Base(BaseType::Char) => Ok(PrimType::Char.into()),
-            // WIP[epic=embedded-num] - double-check this behavior
+            // REVIEW[epic=embedded-num] - double-check this behavior
             ValueType::UnknownNumeric => Err(value),
             ValueType::Tuple(mut vs) => {
                 let mut buf = Vec::with_capacity(vs.len());
@@ -2258,7 +2258,7 @@ impl RustExpr {
             },
             RustExpr::ConstNum(_, hint) => match hint {
                 Some(NumType::U(pt)) => Some(PrimType::Unsigned(*pt)),
-                // WIP[epic=embedded-num] - depending on how we proceed, this may require changing
+                // REVIEW[epic=embedded-num] - depending on how we proceed, this may require changing
                 Some(NumType::I(_)) => None,
                 None => None,
             },
