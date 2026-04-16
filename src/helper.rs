@@ -10,6 +10,9 @@ use crate::{
 };
 use crate::{Endian, bounds::Bounds};
 
+use crate::numeric::core::Expr as NumExpr;
+use crate::numeric::helper as num;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BitFieldKind {
     /// Bool-typed 1-bit flag value (`0b1 => true, 0b0 => false`)
@@ -1828,6 +1831,22 @@ pub fn opaque_bytes() -> Format {
 /// Helper function for [`Format::Phantom`].
 pub fn phantom(format: Format) -> Format {
     Format::Phantom(Box::new(format))
+}
+
+/// Helper function for [`Expr::Numeric`].
+pub fn numeric(n_expr: NumExpr) -> Expr {
+    Expr::Numeric(Box::new(n_expr))
+}
+
+/// Helper function for parsing a numeric expression and leaving it as a numeric value, without any additional transformation.
+pub fn mk_numeric(f: Format) -> Format {
+    map_numeric(f, |x| x)
+}
+
+/// Helper function for parsing a numeric expression and applying a NumExpr transformation to the resulting value.
+pub fn map_numeric(f: Format, map_fn: impl FnOnce(NumExpr) -> NumExpr) -> Format {
+    const IDENT: &str = "raw";
+    chain(f, IDENT, compute(numeric(map_fn(num::num_var(IDENT)))))
 }
 
 #[cfg(test)]
