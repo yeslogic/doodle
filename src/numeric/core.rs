@@ -982,7 +982,29 @@ impl StrictValue {
 #[expect(dead_code)]
 pub(crate) type EvalResult<T> = std::result::Result<T, EvalError>;
 
-fn bitwise_cast(num: BigInt, rep_in: NumRep, rep_out: MachineRep) -> BigInt {
+macro_rules! bigint_as {
+    ($x:expr, $in:ty, $out:ty) => {{
+        let raw_in: $in = $x
+            .try_into()
+            .expect("failed to coerce value for cast operation");
+        let raw_out = raw_in as $out;
+        raw_out.into()
+    }};
+}
+
+/// Performs a bitwise cast from `rep_in` to `rep_out` on the value `num`, assuming that `num` is representable within `rep_in`.
+///
+/// # Examples
+///
+/// ```
+/// # use num_bigint::BigInt;
+/// use doodle::numeric::core::{NumRep, MachineRep, bitwise_cast};
+/// let num = BigInt::from(255);
+/// let rep_in = NumRep::Concrete(MachineRep::U8);
+/// let rep_out = MachineRep::I8;
+/// assert_eq!(bitwise_cast(num, rep_in, rep_out), BigInt::from(-1));
+/// ```
+pub fn bitwise_cast(num: BigInt, rep_in: NumRep, rep_out: MachineRep) -> BigInt {
     match (rep_in, rep_out) {
         (NumRep::Auto, _) => {
             log::warn!(
@@ -990,53 +1012,52 @@ fn bitwise_cast(num: BigInt, rep_in: NumRep, rep_out: MachineRep) -> BigInt {
             );
             num
         }
-        // FIXME - implement support for the non-trivial cases here, and also consider the implications for the representability checks of the output value
         (NumRep::Concrete(r0), r1) => match (r0, r1) {
             // SECTION - Same-size casts - C.f. https://doc.rust-lang.org/reference/expressions/operator-expr.html#r-expr.as.numeric.int-same-size
-            (MachineRep::U8, MachineRep::I8) => todo!("same-size cast from u8 to i8"),
-            (MachineRep::I8, MachineRep::U8) => todo!("same-size cast from i8 to u8"),
-            (MachineRep::U16, MachineRep::I16) => todo!("same-size cast from u16 to i16"),
-            (MachineRep::I16, MachineRep::U16) => todo!("same-size cast from i16 to u16"),
-            (MachineRep::U32, MachineRep::I32) => todo!("same-size cast from u32 to i32"),
-            (MachineRep::I32, MachineRep::U32) => todo!("same-size cast from i32 to u32"),
-            (MachineRep::U64, MachineRep::I64) => todo!("same-size cast from u64 to i64"),
-            (MachineRep::I64, MachineRep::U64) => todo!("same-size cast from i64 to u64"),
+            (MachineRep::U8, MachineRep::I8) => bigint_as!(num, u8, i8),
+            (MachineRep::I8, MachineRep::U8) => bigint_as!(num, i8, u8),
+            (MachineRep::U16, MachineRep::I16) => bigint_as!(num, u16, i16),
+            (MachineRep::I16, MachineRep::U16) => bigint_as!(num, i16, u16),
+            (MachineRep::U32, MachineRep::I32) => bigint_as!(num, u32, i32),
+            (MachineRep::I32, MachineRep::U32) => bigint_as!(num, i32, u32),
+            (MachineRep::U64, MachineRep::I64) => bigint_as!(num, u64, i64),
+            (MachineRep::I64, MachineRep::U64) => bigint_as!(num, i64, u64),
             // !SECTION
             // SECTION - Truncating casts - C.f https://doc.rust-lang.org/reference/expressions/operator-expr.html#r-expr.as.numeric.int-truncation
-            (MachineRep::U16, MachineRep::U8) => todo!("truncating cast from u16 to u8"),
-            (MachineRep::U32, MachineRep::U8) => todo!("truncating cast from u32 to u8"),
-            (MachineRep::U32, MachineRep::U16) => todo!("truncating cast from u32 to u16"),
-            (MachineRep::U64, MachineRep::U8) => todo!("truncating cast from u64 to u8"),
-            (MachineRep::U64, MachineRep::U16) => todo!("truncating cast from u64 to u16"),
-            (MachineRep::U64, MachineRep::U32) => todo!("truncating cast from u64 to u32"),
-            (MachineRep::I16, MachineRep::I8) => todo!("truncating cast from i16 to i8"),
-            (MachineRep::I32, MachineRep::I8) => todo!("truncating cast from i32 to i8"),
-            (MachineRep::I32, MachineRep::I16) => todo!("truncating cast from i32 to i16"),
-            (MachineRep::I64, MachineRep::I8) => todo!("truncating cast from i64 to i8"),
-            (MachineRep::I64, MachineRep::I16) => todo!("truncating cast from i64 to i16"),
-            (MachineRep::I64, MachineRep::I32) => todo!("truncating cast from i64 to i32"),
+            (MachineRep::U16, MachineRep::U8) => bigint_as!(num, u16, u8),
+            (MachineRep::U32, MachineRep::U8) => bigint_as!(num, u32, u8),
+            (MachineRep::U32, MachineRep::U16) => bigint_as!(num, u32, u16),
+            (MachineRep::U64, MachineRep::U8) => bigint_as!(num, u64, u8),
+            (MachineRep::U64, MachineRep::U16) => bigint_as!(num, u64, u16),
+            (MachineRep::U64, MachineRep::U32) => bigint_as!(num, u64, u32),
+            (MachineRep::I16, MachineRep::I8) => bigint_as!(num, i16, i8),
+            (MachineRep::I32, MachineRep::I8) => bigint_as!(num, i32, i8),
+            (MachineRep::I32, MachineRep::I16) => bigint_as!(num, i32, i16),
+            (MachineRep::I64, MachineRep::I8) => bigint_as!(num, i64, i8),
+            (MachineRep::I64, MachineRep::I16) => bigint_as!(num, i64, i16),
+            (MachineRep::I64, MachineRep::I32) => bigint_as!(num, i64, i32),
 
-            (MachineRep::U16, MachineRep::I8) => todo!("truncating cast from u16 to i8"),
-            (MachineRep::U32, MachineRep::I8) => todo!("truncating cast from u32 to i8"),
-            (MachineRep::U32, MachineRep::I16) => todo!("truncating cast from u32 to i16"),
-            (MachineRep::U64, MachineRep::I8) => todo!("truncating cast from u64 to i8"),
-            (MachineRep::U64, MachineRep::I16) => todo!("truncating cast from u64 to i16"),
-            (MachineRep::U64, MachineRep::I32) => todo!("truncating cast from u64 to i32"),
+            (MachineRep::U16, MachineRep::I8) => bigint_as!(num, u16, i8),
+            (MachineRep::U32, MachineRep::I8) => bigint_as!(num, u32, i8),
+            (MachineRep::U32, MachineRep::I16) => bigint_as!(num, u32, i16),
+            (MachineRep::U64, MachineRep::I8) => bigint_as!(num, u64, i8),
+            (MachineRep::U64, MachineRep::I16) => bigint_as!(num, u64, i16),
+            (MachineRep::U64, MachineRep::I32) => bigint_as!(num, u64, i32),
 
-            (MachineRep::I16, MachineRep::U8) => todo!("truncating cast from i16 to u8"),
-            (MachineRep::I32, MachineRep::U8) => todo!("truncating cast from i32 to u8"),
-            (MachineRep::I32, MachineRep::U16) => todo!("truncating cast from i32 to u16"),
-            (MachineRep::I64, MachineRep::U8) => todo!("truncating cast from i64 to u8"),
-            (MachineRep::I64, MachineRep::U16) => todo!("truncating cast from i64 to u16"),
-            (MachineRep::I64, MachineRep::U32) => todo!("truncating cast from i64 to u32"),
+            (MachineRep::I16, MachineRep::U8) => bigint_as!(num, i16, u8),
+            (MachineRep::I32, MachineRep::U8) => bigint_as!(num, i32, u8),
+            (MachineRep::I32, MachineRep::U16) => bigint_as!(num, i32, u16),
+            (MachineRep::I64, MachineRep::U8) => bigint_as!(num, i64, u8),
+            (MachineRep::I64, MachineRep::U16) => bigint_as!(num, i64, u16),
+            (MachineRep::I64, MachineRep::U32) => bigint_as!(num, i64, u32),
             // !SECTION
             // SECTION - Sign-extending casts - C.f. https://doc.rust-lang.org/reference/expressions/operator-expr.html#r-expr.as.numeric.int-extension
-            (MachineRep::I8, MachineRep::U16) => todo!("sign-extending cast from i8 to u16"),
-            (MachineRep::I8, MachineRep::U32) => todo!("sign-extending cast from i8 to u32"),
-            (MachineRep::I8, MachineRep::U64) => todo!("sign-extending cast from i8 to u64"),
-            (MachineRep::I16, MachineRep::U32) => todo!("sign-extending cast from i16 to u32"),
-            (MachineRep::I16, MachineRep::U64) => todo!("sign-extending cast from i16 to u64"),
-            (MachineRep::I32, MachineRep::U64) => todo!("sign-extending cast from i32 to u64"),
+            (MachineRep::I8, MachineRep::U16) => bigint_as!(num, i8, u16),
+            (MachineRep::I8, MachineRep::U32) => bigint_as!(num, i8, u32),
+            (MachineRep::I8, MachineRep::U64) => bigint_as!(num, i8, u64),
+            (MachineRep::I16, MachineRep::U32) => bigint_as!(num, i16, u32),
+            (MachineRep::I16, MachineRep::U64) => bigint_as!(num, i16, u64),
+            (MachineRep::I32, MachineRep::U64) => bigint_as!(num, i32, u64),
             // !SECTION
             // SECTION - No-op casts, for identity and zero-extension
             | (MachineRep::U8, _) // ~I8
