@@ -235,3 +235,14 @@ mod rle {
         check_output(output, expected)
     }
 }
+
+mod numbers {
+    use super::*;
+
+    #[test]
+    fn test_decode_test_numbers() {
+        let output = doodle().args(["file", "test1.numbers"]).output().unwrap();
+        let expected = expect_test::expect_file!("expected/decode/test1.numbers.stdout");
+        check_output(output, expected)
+    }
+}

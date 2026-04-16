@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Main where
 
 import Data.Binary qualified as BN
@@ -57,7 +59,7 @@ main = do
       gen <- newIOGenM stdGen
       values <- randListN (fromIntegral n) gen
       let builders = [writeRep rep val | (rep, val) <- values]
-          finalBuilder = mconcat builders
+          finalBuilder = BD.byteString "NUMS" <> mconcat builders
       handle <- openBinaryFile fileName WriteMode
       BD.hPutBuilder handle finalBuilder
       hClose handle
