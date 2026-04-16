@@ -81,6 +81,7 @@ const SELECTORS: &[(&[&str], FormatSelector)] = &[
     (&["gzip"], FormatSelector::Gzip),
     (&["jpeg", "jpg"], FormatSelector::Jpeg),
     (&["mp4", "mpeg4"], FormatSelector::Mp4),
+    (&["numbers"], FormatSelector::Numbers),
     (&["peano"], FormatSelector::Peano),
     (&["png"], FormatSelector::Png),
     (&["riff"], FormatSelector::Riff),
@@ -103,6 +104,7 @@ enum FormatSelector {
     Gzip,
     Jpeg,
     Mp4,
+    Numbers,
     Opentype,
     Peano,
     Png,
@@ -219,6 +221,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
                             let tiff = format::tiff::main(&mut module);
                             format::jpeg::main(&mut module, tiff).call()
                         }
+                        FormatSelector::Numbers => format::numbers::main(&mut module).call(),
                         FormatSelector::Mp4 => format::mpeg4::main(&mut module).call(),
                         FormatSelector::Peano => format::peano::main(&mut module).call(),
                         FormatSelector::Png => {

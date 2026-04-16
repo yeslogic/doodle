@@ -1,9 +1,12 @@
 //! Convenience functions for constructing numeric expressions
-use crate::numeric::core::{
-    BasicBinOp, BasicUnaryOp, BinOp, Expr, MachineRep, TypedConst, UnaryOp,
-};
+use super::core::{BasicBinOp, BasicUnaryOp, BinOp, Expr, MachineRep, TypedConst, UnaryOp};
+use crate::IntoLabel;
 
 use super::core::CastOp;
+
+pub fn num_var(name: impl IntoLabel) -> Expr {
+    Expr::NumVar(name.into())
+}
 
 /// Helper for `Expr::Const`
 pub fn expr_const(c: TypedConst) -> Expr {
