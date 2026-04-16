@@ -42,6 +42,9 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
     );
     module.define_format(
         "numbers.main",
-        record_auto([("__magic", is_bytes(b"NUMS")), ("values", repeat(num_value.call()))]),
+        record_auto([
+            ("__magic", is_bytes(b"NUMS")),
+            ("values", repeat(num_value.call())),
+        ]),
     )
 }
