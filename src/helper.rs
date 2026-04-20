@@ -1833,6 +1833,11 @@ pub fn phantom(format: Format) -> Format {
     Format::Phantom(Box::new(format))
 }
 
+/// Helper function for [`Format::Compute`] over [`Expr::Numeric`].
+pub fn compute_numeric(n_expr: NumExpr) -> Format {
+    compute(numeric(n_expr))
+}
+
 /// Helper function for [`Expr::Numeric`].
 pub fn numeric(n_expr: NumExpr) -> Expr {
     Expr::Numeric(Box::new(n_expr))
