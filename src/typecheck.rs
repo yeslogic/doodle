@@ -4317,20 +4317,11 @@ mod tests {
 
     #[test]
     fn test_standalone_auto_arith_inference() -> TCResult<()> {
-        use crate::{
-            helper::*,
-            numeric::{
-                core::{NumRep, TypedConst},
-                helper as num,
-            },
-        };
+        use crate::helper::{add, compute, poly_zero, record, var};
 
         let mut tc = TypeChecker::new();
         let f: Format = record([
-            (
-                "x",
-                compute_numeric(num::expr_const(TypedConst::new(0, NumRep::Auto))),
-            ),
+            ("x", compute(poly_zero())),
             ("y", compute(add(var("x"), Expr::U32(1)))),
         ]);
         let module = FormatModule::new();

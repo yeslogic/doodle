@@ -375,11 +375,20 @@ impl std::fmt::Display for TypedConst {
 }
 
 impl TypedConst {
+    /// Constructs a new `TypedConst` from a value and a representation.
     pub fn new<N>(n: N, rep: NumRep) -> Self
     where
         BigInt: From<N>,
     {
         Self(BigInt::from(n), rep)
+    }
+
+    /// Constructs a new `TypedConst` from a value, with an `Auto` representation.
+    pub fn new_auto<N>(n: N) -> Self
+    where
+        BigInt: From<N>,
+    {
+        Self(BigInt::from(n), NumRep::Auto)
     }
 
     /// Returns `true` if `self` has an abstracted representation, i.e. if its rep is [`NumRep::Auto`].
@@ -719,6 +728,7 @@ impl CastOp {
         }
     }
 
+    /// Constructs a `CastOp` with `Arithmetic` semantics, where the abstract mathematical value of the inner expression is preserved as much as possible within the bounds of the target representation.
     pub fn arith(out_rep: MachineRep) -> Self {
         CastOp {
             out_rep,
@@ -726,6 +736,7 @@ impl CastOp {
         }
     }
 
+    /// Constructs a `CastOp` with `Bitwise` semantics, i.e. a natural Rust `as`-keyword cast between the machine-integer types corresponding to the original and target representations.
     pub fn bitwise(out_rep: MachineRep) -> Self {
         CastOp {
             out_rep,
