@@ -229,10 +229,14 @@ impl NumRep {
 }
 
 /// Representative min and max bounds for a numeric type
-#[derive(Clone, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
+///
+/// Both ends are inclusive, and `min <= max`.
+#[derive(Clone, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize)]
 pub struct Bounds {
-    min: Number,
-    max: Number,
+    #[serde(serialize_with = "ser_bigint")]
+    pub min: Number,
+    #[serde(serialize_with = "ser_bigint")]
+    pub max: Number,
 }
 
 impl std::fmt::Display for Bounds {
@@ -282,6 +286,10 @@ impl Bounds {
                 max: Ord::max(&self.max, &bs2.max).clone(),
             })
         }
+    }
+
+    pub(crate) fn contains(&self, val: &BigInt) -> bool {
+        self.min <= *val && self.max >= *val
     }
 }
 
@@ -352,7 +360,7 @@ pub struct TypedConst(
     #[serde(serialize_with = "ser_num_rep")] pub NumRep,
 );
 
-fn ser_bigint<S>(value: &BigInt, serializer: S) -> Result<S::Ok, S::Error>
+pub(crate) fn ser_bigint<S>(value: &BigInt, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
 {

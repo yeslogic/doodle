@@ -1663,24 +1663,28 @@ pub(crate) enum RustPrimLit {
     String(Label),
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub(crate) enum RustNumLit {
     U8(u8),
     U16(u16),
     U32(u32),
     U64(u64),
     Usize(usize),
+    SomeInt(BigInt),
 }
 
-impl From<RustNumLit> for usize {
-    fn from(value: RustNumLit) -> Self {
-        match value {
+impl TryFrom<RustNumLit> for usize {
+    type Error = <BigInt as TryInto<usize>>::Error;
+
+    fn try_from(value: RustNumLit) -> Result<Self, Self::Error> {
+        Ok(match value {
             RustNumLit::U8(n) => n as usize,
             RustNumLit::U16(n) => n as usize,
             RustNumLit::U32(n) => n as usize,
             RustNumLit::U64(n) => n as usize,
             RustNumLit::Usize(n) => n,
-        }
+            RustNumLit::SomeInt(big) => big.try_into()?,
+        })
     }
 }
 
@@ -1692,6 +1696,7 @@ impl ToFragment for RustNumLit {
             RustNumLit::U32(n) => Fragment::string(format!("{n}u32")),
             RustNumLit::U64(n) => Fragment::string(format!("{n}u64")),
             RustNumLit::Usize(n) => Fragment::string(format!("{n}")),
+            RustNumLit::SomeInt(z) => Fragment::string(z.to_string()),
         }
     }
 }
@@ -2252,6 +2257,7 @@ impl RustExpr {
                     RustNumLit::U32(..) => Some(PrimType::U32),
                     RustNumLit::U64(..) => Some(PrimType::U64),
                     RustNumLit::Usize(..) => Some(PrimType::Usize),
+                    RustNumLit::SomeInt(..) => None,
                 },
                 RustPrimLit::Char(..) => Some(PrimType::Char),
                 RustPrimLit::String(..) => None,
@@ -2654,7 +2660,7 @@ impl RustExpr {
 
     pub(crate) fn get_const(&self) -> Option<usize> {
         match self {
-            RustExpr::PrimitiveLit(RustPrimLit::Numeric(rnl)) => Some(usize::from(*rnl)),
+            RustExpr::PrimitiveLit(RustPrimLit::Numeric(rnl)) => usize::try_from(rnl.clone()).ok(),
             _ => None,
         }
     }
@@ -4396,6 +4402,7 @@ pub mod short_circuit {
         }
     }
 }
+use num_bigint::BigInt;
 pub use short_circuit::{ShortCircuit, ShortCircuitExt, ValueCheckpoint};
 
 pub mod var_container {

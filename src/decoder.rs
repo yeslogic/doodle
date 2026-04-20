@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use anyhow::{Result as AResult, anyhow};
+use num_bigint::BigInt;
 use serde::Serialize;
 
 use crate::byte_set::ByteSet;
@@ -188,6 +189,24 @@ impl Value {
                 Value::Numeric(n) => n.matches_int_range(*bounds),
                 _ => false,
             },
+            Pattern::ZConst(z) => match self {
+                Value::U8(n) => z == &BigInt::from(*n),
+                Value::U16(n) => z == &BigInt::from(*n),
+                Value::U32(n) => z == &BigInt::from(*n),
+                Value::U64(n) => z == &BigInt::from(*n),
+                Value::Usize(n) => z == &BigInt::from(*n),
+                Value::Numeric(n) => n.eq_num(z),
+                _ => false,
+            },
+            Pattern::ZRange(range) => match self {
+                Value::U8(n) => range.contains(&BigInt::from(*n)),
+                Value::U16(n) => range.contains(&BigInt::from(*n)),
+                Value::U32(n) => range.contains(&BigInt::from(*n)),
+                Value::U64(n) => range.contains(&BigInt::from(*n)),
+                Value::Usize(n) => range.contains(&BigInt::from(*n)),
+                Value::Numeric(n) => range.contains(n.as_raw_value()),
+                _ => false,
+            }
             Pattern::Char(c0) => matches!(self, Value::Char(c1) if c0 == c1),
             Pattern::Tuple(ps) => match self {
                 Value::Tuple(vs) if ps.len() == vs.len() => {

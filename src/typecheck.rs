@@ -3,11 +3,11 @@ use std::{
     rc::Rc,
 };
 
-use crate::numeric::{
+use crate::{base_set::PrimIntSet, numeric::{
     MachineRep, NumRep,
     core::{BitWidth, Bounds as ZBounds, Expr as NExpr},
     elaborator::{IntType, PrimInt},
-};
+}};
 use crate::valuetype::{SeqBorrowHint, augmented::AugValueType};
 use crate::{
     Arith, BaseType, DynFormat, Expr, Format, FormatModule, Label, Pattern, UnaryOp, ValueType,
@@ -766,13 +766,12 @@ impl TypeChecker {
     /// otherwise untyped Format-tree nodes
     ///
     /// This should never return `Err(_)` unless something catastrophic has happened, or it was called
-    /// with an improper `UTYpe` (e.g. one that references an out-of-range UVar at the time it was constructed)
+    /// with an improper `UType` (e.g. one that references an out-of-range UVar at the time it was constructed)
     fn init_var_simple(&mut self, typ: UType) -> TCResult<(UVar, Rc<UType>)> {
         let newvar = self.get_new_uvar();
         let rc = Rc::new(typ);
         let constr = Constraint::Equiv(rc.clone());
         self.unify_var_constraint(newvar, constr)?;
-        // FIXME - not sure whether to return rc or newvar
         Ok((newvar, rc))
     }
 
@@ -831,7 +830,31 @@ impl TypeChecker {
             Pattern::Int(bounds) => {
                 let var = self.get_new_uvar();
                 let width = bounds.min_required_width();
-                self.unify_utype_baseset(var.into(), BaseSet::U(UintSet::at_least(width)))?;
+                self.unify_var_baseset(var, BaseSet::U(UintSet::at_least(width)))?;
+                Ok(var)
+            }
+            Pattern::ZConst(n) => {
+                let var = self.get_new_uvar();
+                let c = inference::Constraint::Encompasses(ZBounds::singleton(n.clone()));
+                let mut iset = PrimIntSet::ANY;
+                for p in crate::numeric::elaborator::PRIM_INTS {
+                    if c.is_satisfied_by(IntType::Prim(p)) == Some(false) {
+                        iset.remove(p);
+                    }
+                }
+                self.unify_var_intset(var, IntSet::Z(iset))?;
+                Ok(var)
+            }
+            Pattern::ZRange(bounds) => {
+                let var = self.get_new_uvar();
+                let c = inference::Constraint::Encompasses(bounds.clone());
+                let mut iset = PrimIntSet::ANY;
+                for p in crate::numeric::elaborator::PRIM_INTS {
+                    if c.is_satisfied_by(IntType::Prim(p)) == Some(false) {
+                        iset.remove(p);
+                    }
+                }
+                self.unify_var_intset(var, IntSet::Z(iset))?;
                 Ok(var)
             }
             Pattern::Char(_) => {
@@ -897,7 +920,8 @@ impl TypeChecker {
         let new_scope = UScope::Multi(&tmp);
         let new_ctxt = ctxt.with_scope(&new_scope);
         let local_rhs_var = self.infer_var_format(rhs_format, new_ctxt)?;
-        self.unify_var_utype(pvar, head_t)?;
+        let _tmp = ("unify_utype_format_match_case", pvar, format!("{:?}", head_t));
+        try_with!( self.unify_var_utype(pvar, head_t) => _tmp );
         self.unify_var_pair(rhs_var, local_rhs_var)?;
         Ok(())
     }
@@ -915,7 +939,8 @@ impl TypeChecker {
         let tmp = child.clone();
         let new_scope = UScope::Multi(&tmp);
         let local_rhs_var = self.infer_var_expr(rhs_expr, &new_scope)?;
-        self.unify_var_utype(pvar, head_t)?;
+        let _tmp = ("unify_utype_expr_match_case", pvar, format!("{:?}", head_t));
+        try_with!(self.unify_var_utype(pvar, head_t) => _tmp);
         self.unify_var_pair(rhs_var, local_rhs_var)?;
         Ok(())
     }
@@ -1301,7 +1326,7 @@ impl TypeChecker {
                 let id = *vmid;
                 let vm = self.varmaps.get_varmap(id);
                 if let Some(prior) = vm.get(&cname) {
-                    let updated = self.unify_utype(prior.clone(), inner)?;
+                    let updated = try_with!( self.unify_utype(prior.clone(), inner) => ("add_uvar_variant", v, cname) );
                     if updated.as_ref() != self.varmaps.get_varmap(id).get(&cname).unwrap().as_ref()
                     {
                         self.varmaps.get_varmap_mut(id).insert(cname, updated);
@@ -1399,7 +1424,7 @@ impl TypeChecker {
                     format!("{uvar} {prior}"),
                     format!("{uvar} {constraint}"),
                 );
-                let ret = self.unify_constraint_pair(c1, constraint)?;
+                let ret = try_with!( self.unify_constraint_pair(c1, constraint) => _tmp );
                 self.constraints[can_ix] = Constraints::Invariant(ret.clone());
                 Ok(ret)
             }
@@ -1469,7 +1494,8 @@ impl TypeChecker {
                             .unwrap()
                             .1
                             .clone();
-                        self.unify_var_utype(fld_var, fld_type)?;
+                        let _tmp = ("unify_var_proj_field", rec_var, fname, fld_var, format!("{:?}", fld_type));
+                        try_with!(self.unify_var_utype(fld_var, fld_type) => _tmp);
                         Ok(())
                     }
                     UType::Var(v_other) => {
@@ -1511,7 +1537,8 @@ impl TypeChecker {
                 Constraint::Equiv(ut) => match ut.as_ref() {
                     UType::Option(inner) => {
                         let param_t = inner.clone();
-                        self.unify_var_utype(param_v, param_t)?;
+                        let _tmp = ("unify_var_proj_param", opt_v, param_v, format!("{:?}", param_t));
+                        try_with!(self.unify_var_utype(param_v, param_t) => _tmp);
                         Ok(())
                     }
                     other => unreachable!("expected UType::Option, found {other:?}"),
@@ -1545,7 +1572,8 @@ impl TypeChecker {
                 Constraint::Equiv(ut) => match ut.as_ref() {
                     UType::Seq(inner, _) => {
                         let elem_t = inner.clone();
-                        self.unify_var_utype(elem_v, elem_t)?;
+                        let _tmp = ("unify_var_proj_elem", seq_v, elem_v, format!("{:?}", elem_t));
+                        try_with!(self.unify_var_utype(elem_v, elem_t) => _tmp);
                         Ok(())
                     }
                     other => unreachable!("expected UType::Seq, found {other:?}"),
@@ -1610,7 +1638,7 @@ impl TypeChecker {
                 if e1 == e2 {
                     if h1 <= h2 { Ok(left) } else { Ok(right) }
                 } else {
-                    let inner = self.unify_utype(e1.clone(), e2.clone())?;
+                    let inner = try_with!( self.unify_utype(e1.clone(), e2.clone()) => "unify_utype@Seq|Seq" );
                     Ok(Rc::new(UType::Seq(inner, Ord::min(*h1, *h2))))
                 }
             }
@@ -1618,7 +1646,7 @@ impl TypeChecker {
                 if o1 == o2 {
                     Ok(left)
                 } else {
-                    let inner = self.unify_utype(o1.clone(), o2.clone())?;
+                    let inner = try_with!( self.unify_utype(o1.clone(), o2.clone()) => "unify_utype@Option|Option" );
                     Ok(Rc::new(UType::Option(inner)))
                 }
             }
@@ -1626,7 +1654,7 @@ impl TypeChecker {
                 if p1 == p2 {
                     Ok(left)
                 } else {
-                    let inner = self.unify_utype(p1.clone(), p2.clone())?;
+                    let inner = try_with!(self.unify_utype(p1.clone(), p2.clone()) => "unify_utype@PhantomData|PhantomData");
                     Ok(Rc::new(UType::PhantomData(inner)))
                 }
             }
@@ -1644,8 +1672,8 @@ impl TypeChecker {
                     return Ok(left);
                 }
                 let mut ts0 = Vec::with_capacity(ts1.len());
-                for (t1, t2) in Iterator::zip(ts1.iter(), ts2.iter()) {
-                    ts0.push(self.unify_utype(t1.clone(), t2.clone())?);
+                for (_ix, (t1, t2)) in Iterator::zip(ts1.iter(), ts2.iter()).enumerate() {
+                    ts0.push(try_with!(self.unify_utype(t1.clone(), t2.clone()) => ("unify_utype@Tuple|Tuple", _ix)));
                 }
                 Ok(Rc::new(UType::Tuple(ts0)))
             }
@@ -1661,7 +1689,7 @@ impl TypeChecker {
                     if l1 != l2 {
                         return Err(UnificationError::Unsatisfiable(left, right).into());
                     }
-                    fs0.push((l1.clone(), self.unify_utype(f1.clone(), f2.clone())?));
+                    fs0.push((l1.clone(), try_with!( self.unify_utype(f1.clone(), f2.clone()) => ("unify_utype@Record|Record", l2.clone()) )));
                 }
                 Ok(Rc::new(UType::Record(fs0)))
             }
@@ -1681,13 +1709,23 @@ impl TypeChecker {
             }
             (&UType::Var(v), _) => {
                 let constraint = Constraint::Equiv(right.clone());
-                let _ = self.unify_var_constraint(v, constraint)?;
+                let _tmp = (
+                    "unify_utype@Var|_",
+                    format!("var: {}", v),
+                    format!("other: {:?}", right),
+                );
+                let _ = try_with!(self.unify_var_constraint(v, constraint) => _tmp);
                 self.occurs(v)?;
                 Ok(Rc::new(UType::Var(v)))
             }
             (_, &UType::Var(v)) => {
                 let constraint = Constraint::Equiv(left.clone());
-                let _ = self.unify_var_constraint(v, constraint)?;
+                let _tmp = (
+                    "unify_utype@_|Var",
+                    format!("var: {}", v),
+                    format!("other: {:?}", left),
+                );
+                let _ = try_with!( self.unify_var_constraint(v, constraint) => _tmp );
                 self.occurs(v)?;
                 Ok(Rc::new(UType::Var(v)))
             }
@@ -1704,7 +1742,8 @@ impl TypeChecker {
                 Ok(())
             }
             _ => {
-                self.unify_var_constraint(v1, Constraint::Equiv(solution.clone()))?;
+                let _tmp = ("unify_var_utype", v1, format!("{:?}", solution));
+                try_with!( self.unify_var_constraint(v1, Constraint::Equiv(solution.clone())) => _tmp );
                 Ok(())
             }
         }
@@ -1781,7 +1820,8 @@ impl TypeChecker {
 
     fn unify_var_intset(&mut self, uv: UVar, is: IntSet) -> TCResult<Constraint> {
         let constraint = is.to_constraint();
-        self.unify_var_constraint(uv, constraint)
+        let _tmp = ("unify_var_intset", uv, is);
+        Ok(try_with!(self.unify_var_constraint(uv, constraint) => _tmp))
     }
 
     /// Unifies a UVar against a BaseSet, updating any aliased-variable constraints in the process.
@@ -1790,7 +1830,8 @@ impl TypeChecker {
     /// Otherwise, returns an `Err` indicating that the unification was not possible.
     fn unify_var_baseset(&mut self, uv: UVar, bs: BaseSet) -> TCResult<Constraint> {
         let constraint = bs.to_constraint();
-        self.unify_var_constraint(uv, constraint)
+        let _tmp = ("unify_var_baseset", uv, bs);
+        Ok(try_with!(self.unify_var_constraint(uv, constraint) => _tmp))
     }
 
     /// Attempts to unify a [`PrimInt`] with a [`BaseType`], returning the unified [`UType`] if successful.
@@ -1817,7 +1858,10 @@ impl TypeChecker {
     /// Attempt to unify a [`UVar`] with a [`ValueType`], primarily for use with `Expr::FlatMapAccum`.
     fn unify_var_valuetype(&mut self, uv: UVar, vt: &ValueType) -> TCResult<()> {
         match UType::from_valuetype(vt) {
-            Some(ref ut) => self.unify_var_utype(uv, Rc::new(ut.clone()))?,
+            Some(ref ut) => {
+                let _tmp = ("unify_var_valuetype", uv, format!("{:?}", vt));
+                try_with!(self.unify_var_utype(uv, Rc::new(ut.clone())) => _tmp)
+            }
             _ => match vt {
                 ValueType::Union(branches) => {
                     self.unify_var_valuetype_union(uv, branches)?;
@@ -1865,7 +1909,7 @@ impl TypeChecker {
                 if t1 == t2 {
                     Ok(Constraint::Equiv(t1.clone()))
                 } else {
-                    let t0 = self.unify_utype(t1.clone(), t2.clone())?;
+                    let t0 = try_with!( self.unify_utype(t1.clone(), t2.clone()) => "unify_constraint_pair" );
                     Ok(Constraint::Equiv(t0))
                 }
             }
@@ -1987,7 +2031,8 @@ impl TypeChecker {
                             for (fld, ut) in fld_ut.iter() {
                                 keys_ut.insert(fld.clone());
                                 if let Some(var) = fld_p.get(fld) {
-                                    self.unify_var_utype(*var, ut.clone())?;
+                                    let _tmp = ("unify_constraint_pair@Proj<->Equiv", fld.clone(), *var, format!("{:?}", ut));
+                                    try_with!(self.unify_var_utype(*var, ut.clone()) => _tmp);
                                 }
                             }
 
@@ -2105,7 +2150,7 @@ impl TypeChecker {
         for (vname, inner) in hi_entries.into_iter() {
             if let Some(t_lo) = self.varmaps.get_varmap(lo).get(&vname) {
                 let t_hi = inner;
-                let unified = self.unify_utype(t_lo.clone(), t_hi.clone())?;
+                let unified = try_with!(self.unify_utype(t_lo.clone(), t_hi.clone()) => ("unify_varmaps", v1, vmid1, v2, vmid2));
                 let _ = self.varmaps.get_varmap_mut(lo).insert(vname, unified);
             } else {
                 self.varmaps.get_varmap_mut(lo).insert(vname, inner);
@@ -3170,7 +3215,8 @@ impl TypeChecker {
             unsafe { self.repoint(a1, a) };
         }
         self.aliases[a1].add_forward_ref(a2);
-        unsafe { self.transfer_constraints(a1, a2) }
+        let _tmp = ("recanonicalize", UVar(a1), UVar(a2));
+        Ok(try_with!( unsafe { self.transfer_constraints(a1, a2) } => _tmp))
     }
 
     /// Rewrites the aliasing of `self` so that `lo<->hi` is enforced, without any other changes.
@@ -3238,7 +3284,8 @@ impl TypeChecker {
                 }
             }
             (Constraints::Invariant(c1), Constraints::Invariant(c2)) => {
-                let c0 = self.unify_constraint_pair(c1.clone(), c2.clone())?;
+                let _tmp = ("transfer_constraints", UVar(a1), UVar(a2));
+                let c0 = try_with!(self.unify_constraint_pair(c1.clone(), c2.clone()) => _tmp);
                 let _ =
                     self.replace_constraints_with_value(v1.0, Constraints::Invariant(c0.clone()));
                 let _ = self.replace_constraints_with_value(v2.0, Constraints::Invariant(c0));

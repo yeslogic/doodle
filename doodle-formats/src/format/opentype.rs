@@ -1,6 +1,8 @@
+use doodle::numeric::core::MachineRep;
+use doodle::numeric::helper as num;
 use doodle::{
-    BaseType, Expr, Format, FormatModule, FormatRef, Label, Pattern, ValueType, ViewExpr,
-    bounds::Bounds, helper::*,
+    BaseType, DepFormat, Expr, Format, FormatModule, FormatRef, Label, Pattern, ValueType,
+    ViewExpr, bounds::Bounds, helper::*,
 };
 
 mod util {
@@ -259,20 +261,18 @@ mod util {
         mul(as_u32(half), Expr::U32(2))
     }
 
-    /// Converts a `u8` value to an `i16` value within the `Expr` model
-    /// according to a bit-flag for signedness `pos_bit` (`1` for positive, `0` for negative).
-    // FIXME - this currently yields the u16 value with the same machine-rep as the nominal i16 value we want
-    pub(crate) fn u8_to_i16(x: Expr, is_positive: Expr) -> Expr {
+    /// Given a variable identifier `var_name` representing a `u8` value, along with a bit-flag `is_positive` (`1` for positive, `0` for negative),
+    /// yields an expression of type `i16` with the magnitude of the original `u8` value and the appropriate signedness.
+    pub(crate) fn map_var_u8_to_i16(var_name: &'static str, is_positive: Expr) -> Expr {
+        use doodle::numeric::BasicUnaryOp;
         expr_if_else(
             is_positive,
-            as_u16(x.clone()),
-            expr_match(
-                x,
-                [
-                    (Pattern::U8(0), Expr::U16(0)),
-                    (bind("n"), sub(Expr::U16(u16::MAX), pred(as_u16(var("n"))))),
-                ],
-            ),
+            numeric(num::cast_bitwise(MachineRep::I16, num::num_var(var_name))),
+            numeric(num::unary_with_rep(
+                BasicUnaryOp::Negate,
+                Some(MachineRep::I16),
+                num::num_var(var_name),
+            )),
         )
     }
 
@@ -286,28 +286,24 @@ mod util {
         fmt_variant("F2Dot14", u16be())
     }
 
-    // FIXME[epic=signedness-hack]
-    /// Scaffolding to signal intent to use i8 format before it is implemented.
+    /// Parses a u8 value and performs a bitwise cast to i8.
     pub(crate) fn s8() -> Format {
-        u8()
+        i8()
     }
 
-    // FIXME[epic=signedness-hack]
-    /// Scaffolding to signal intent to use i16 format before it is implemented.
+    /// Parses a u16 value and performs a bitwise cast to i16.
     pub(crate) fn s16be() -> Format {
-        u16be()
+        i16be()
     }
 
-    // FIXME[epic=signedness-hack]
-    /// Scaffolding to signal intent to use i32 format before it is implemented.
+    /// Parses a u32 value and performs a bitwise cast to i32.
     pub(crate) fn s32be() -> Format {
-        u32be()
+        i32be()
     }
 
-    // FIXME[epic=signedness-hack]
-    /// Scaffolding to signal intent to use i64 format before it is implemented.
+    /// Parses a u64 value and performs a bitwise cast to i64.
     pub(crate) fn s64be() -> Format {
-        u64be()
+        i64be()
     }
 
     /// Helper function for parsing a big-endian u24 (3-byte) value
@@ -1222,7 +1218,7 @@ mod gvar {
             is_finished,
             update_totlen,
             Expr::U16(0),
-            ValueType::Base(BaseType::U16),
+            ValueType::U16,
             run,
         )
     }
@@ -1253,13 +1249,13 @@ mod gvar {
     /// - `array_start :~ U32`: absolute position corresponding to the logical start-of-array (which offsets are implicitly relative to)
     /// - `this_offset32 :~ U32`: relative offset where the GlyphVariationData table begins
     /// - `next_offset32 :~ U32`: relative offset where the immediately following GlyphVariationData table begins
-    /// - `data_table`: Format definition for GlyphVariationData table
+    /// - `data_table`: Format definition for GlyphVariationData table, parametric over `axis_count`
     fn data_table_array_entry(
         axis_count: Expr,
         array_view: ViewExpr,
         this_offset32: Expr,
         next_offset32: Expr,
-        data_table: FormatRef,
+        data_table: DepFormat<1, 0>,
     ) -> Format {
         cond_maybe(
             // NOTE - checks that the GlyphVariationData table is non-zero length
@@ -1270,7 +1266,7 @@ mod gvar {
                 // FIXME[epic=eager-view-parse] - this parse is more eager than we actually want
                 parse_from_view(
                     array_view.offset(this_offset32),
-                    slice(var("len"), data_table.call_args(vec![axis_count])),
+                    slice(var("len"), data_table.invoke_args([axis_count])),
                 ),
             ),
         )
@@ -1283,8 +1279,8 @@ mod gvar {
     ///
     /// - `axis_count :~ U16`: axis-count passed in from the gvar header
     /// - `offsets :~ Offsets16([U16]) | Offsets32([U32])`: array of offsets stored in the gvar header
-    /// - `data_table`: Format definition for GlyphVariationData table
-    fn data_table_array(axis_count: Expr, offsets: Expr, data_table: FormatRef) -> Format {
+    /// - `data_table`: Format definition for GlyphVariationData table, parametric in `axis_count`
+    fn data_table_array(axis_count: Expr, offsets: Expr, data_table: DepFormat<1, 0>) -> Format {
         let_view(
             "array_view",
             Format::Match(
@@ -1366,7 +1362,7 @@ mod gvar {
                             vvar("table_view"),
                             repeat_count(
                                 var("shared_tuple_count"),
-                                tuple_record.call_args(vec![var("axis_count")]),
+                                tuple_record.invoke_args([var("axis_count")]),
                             ),
                         ),
                     ),
@@ -1400,7 +1396,10 @@ mod gvar {
     /// GlyphVariationData table format definition
     ///
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/gvar#the-glyphvariationdata-table-array
-    fn glyph_variation_data(module: &mut FormatModule, tuple_record: FormatRef) -> FormatRef {
+    fn glyph_variation_data(
+        module: &mut FormatModule,
+        tuple_record: DepFormat<1, 0>,
+    ) -> DepFormat<1, 0> {
         use BitFieldKind::*;
         let tuple_variation_header = tuple_variation_header(module, tuple_record);
         let packed_point_numbers = packed_point_numbers(module);
@@ -1418,12 +1417,9 @@ mod gvar {
             },
         ]);
 
-        module.define_format_args(
+        module.register_format_args(
             "opentype.gvar.glyph_variation_data",
-            vec![(
-                Label::Borrowed("axis_count"),
-                ValueType::Base(BaseType::U16),
-            )],
+            [(Label::Borrowed("axis_count"), ValueType::U16)],
             let_view(
                 "data_view",
                 record_auto([
@@ -1434,7 +1430,7 @@ mod gvar {
                         "tuple_variation_headers",
                         repeat_count(
                             record_proj(var("tuple_variation_count"), "tuple_count"),
-                            tuple_variation_header.call_args(vec![var("axis_count")]),
+                            tuple_variation_header.invoke_args([var("axis_count")]),
                         ),
                     ),
                     (
@@ -1462,7 +1458,7 @@ mod gvar {
     fn serialized_data(
         module: &mut FormatModule,
         packed_point_numbers: FormatRef,
-        tuple_variation_header: FormatRef,
+        tuple_variation_header: DepFormat<1, 0>,
     ) -> FormatRef {
         let header_type = module
             .get_format_type(tuple_variation_header.get_level())
@@ -1575,7 +1571,7 @@ mod gvar {
     ///
     /// If the `point_count` is only satisfied after reading a run that contains more than enough point-numbers
     /// proceeds no differently than if the exact count of point-number values were read.
-    fn point_number_runs(module: &mut FormatModule) -> FormatRef {
+    fn point_number_runs(module: &mut FormatModule) -> DepFormat<1, 0> {
         let run = point_number_run(module);
         let update_totlen = lambda_tuple(
             ["acc", "run"],
@@ -1588,9 +1584,9 @@ mod gvar {
                 ))),
             ),
         );
-        module.define_format_args(
+        module.register_format_args(
             "opentype.var.packed-point-numbers.runs",
-            vec![(Label::Borrowed("point_count"), ValueType::U16)],
+            [(Label::Borrowed("point_count"), ValueType::U16)],
             accum_until(
                 lambda_tuple(
                     ["totlen", "_seq"],
@@ -1598,7 +1594,7 @@ mod gvar {
                 ),
                 update_totlen,
                 Expr::U16(0),
-                ValueType::Base(BaseType::U16),
+                ValueType::U16,
                 run.call(),
             ),
         )
@@ -1620,22 +1616,26 @@ mod gvar {
                 chain(
                     byte_in(1..=127),
                     "point_count",
-                    runs.call_args(vec![as_u16(var("point_count"))]),
+                    runs.invoke_args([as_u16(var("point_count"))]),
                 ),
                 chain(
                     byte_in(128..=255),
                     "hi",
-                    chain(
-                        u8(),
-                        "lo",
-                        runs.call_args(vec![u15be(var("hi"), var("lo"))]),
-                    ),
+                    chain(u8(), "lo", runs.invoke_args([u15be(var("hi"), var("lo"))])),
                 ),
             ]),
         )
     }
 
-    fn tuple_variation_header(module: &mut FormatModule, tuple_record: FormatRef) -> FormatRef {
+    /// GVAR TupleVariationHeader format definition
+    ///
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/otvarcommonformats#tuplevariationheader
+    ///
+    /// Parametric over `axis_count :~ U16`.
+    fn tuple_variation_header(
+        module: &mut FormatModule,
+        tuple_record: DepFormat<1, 0>,
+    ) -> DepFormat<1, 0> {
         use BitFieldKind::*;
         const SHOULD_CHECK_ZERO: bool = false;
         let tuple_index = bit_fields_u16([
@@ -1651,9 +1651,9 @@ mod gvar {
                 field_name: "tuple_index",
             },
         ]);
-        module.define_format_args(
+        module.register_format_args(
             "opentype.gvar.tuple_variation_header",
-            vec![(Label::Borrowed("axis_count"), ValueType::U16)],
+            [(Label::Borrowed("axis_count"), ValueType::U16)],
             record([
                 ("variation_data_size", u16be()), // size, in bytes, of serialized data for this tuple variation table
                 ("tuple_index", tuple_index),
@@ -1661,7 +1661,7 @@ mod gvar {
                     "peak_tuple",
                     cond_maybe(
                         record_proj(var("tuple_index"), "embedded_peak_tuple"),
-                        tuple_record.call_args(vec![var("axis_count")]),
+                        tuple_record.invoke_args([var("axis_count")]),
                     ),
                 ),
                 (
@@ -1670,7 +1670,7 @@ mod gvar {
                         record_proj(var("tuple_index"), "intermediate_region"),
                         record_repeat(
                             ["start_tuple", "end_tuple"],
-                            tuple_record.call_args(vec![var("axis_count")]),
+                            tuple_record.invoke_args([var("axis_count")]),
                         ),
                     ),
                 ),
@@ -1681,11 +1681,13 @@ mod gvar {
     /// Definition for Tuple Records used in variation tables
     ///
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/otvarcommonformats#tuple-records
-    /// TODO - change namespace from `gvar` to `var`, move to common submodule for multi-table sub-formats
-    fn tuple_record(module: &mut FormatModule) -> FormatRef {
-        module.define_format_args(
+    ///
+    /// Parametric over `axis_count :~ U16`.
+    // TODO - change namespace from `gvar` to `var`, move to common submodule for multi-table sub-formats
+    fn tuple_record(module: &mut FormatModule) -> DepFormat<1, 0> {
+        module.register_format_args(
             "opentype.gvar.tuple_record",
-            vec![(Label::Borrowed("axis_count"), ValueType::U16)],
+            [(Label::Borrowed("axis_count"), ValueType::U16)],
             record([(
                 "coordinates",
                 repeat_count(var("axis_count"), util::f2dot14()),
@@ -1695,6 +1697,8 @@ mod gvar {
 }
 
 pub(crate) mod fvar {
+    use doodle::DepFormat;
+
     use super::*;
 
     pub(crate) fn table(module: &mut FormatModule, tag: FormatRef) -> FormatRef {
@@ -1750,8 +1754,7 @@ pub(crate) mod fvar {
                         var("instance_count"),
                         slice(
                             var("instance_size"),
-                            instance_record
-                                .call_args(vec![var("axis_count"), var("instance_size")]),
+                            instance_record.invoke_args([var("axis_count"), var("instance_size")]),
                         ),
                     ),
                 )),
@@ -1770,18 +1773,20 @@ pub(crate) mod fvar {
     /// InstanceRecord format implementation
     ///
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/fvar#instancerecord
-    fn instance_record(module: &mut FormatModule) -> FormatRef {
+    ///
+    /// Parametric over `axis_count :~ U16` and `instance_size :~ U16`.
+    fn instance_record(module: &mut FormatModule) -> DepFormat<2, 0> {
         let user_tuple = user_tuple(module);
-        module.define_format_args(
+        module.register_format_args(
             "opentype.fvar.instance_record",
-            vec![
+            [
                 (Label::Borrowed("axis_count"), ValueType::U16),
                 (Label::Borrowed("instance_size"), ValueType::U16),
             ],
             record([
                 ("subfamily_nameid", u16be()),
                 ("flags", util::expect_u16be(0)), // reserved for future use, should be set to 0,
-                ("coordinates", user_tuple.call_args(vec![var("axis_count")])),
+                ("coordinates", user_tuple.invoke_args([var("axis_count")])),
                 (
                     "postscript_nameid",
                     cond_maybe(
@@ -1797,10 +1802,12 @@ pub(crate) mod fvar {
     /// UserTuple record (part of `InstanceRecord`)
     ///
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/fvar#instancerecord
-    fn user_tuple(module: &mut FormatModule) -> FormatRef {
-        module.define_format_args(
+    ///
+    /// Parametric over `axis_count :~ U16`.
+    fn user_tuple(module: &mut FormatModule) -> DepFormat<1, 0> {
+        module.register_format_args(
             "opentype.fvar.user_tuple",
-            vec![(Label::Borrowed("axis_count"), ValueType::U16)],
+            [(Label::Borrowed("axis_count"), ValueType::U16)],
             record([(
                 "coordinates",
                 repeat_count(var("axis_count"), util::fixed32be()),
@@ -1943,10 +1950,10 @@ pub(crate) mod kern {
         /// The indices in ClassTables are scaled (J = 2 x j ; I = 2 x M x i) to facilitate offset-arithmetic for random access (TargetOffset(i,j) = BaseOffset + I + J)
         ///
         /// Requires additional parameters `table_view` and `class_table` to correctly parse the content at each class offset
-        pub(super) fn kerning_array(module: &mut FormatModule) -> FormatRef {
-            module.define_format_args(
+        pub(super) fn kerning_array(module: &mut FormatModule) -> DepFormat<2, 0> {
+            module.register_format_args(
                 "opentype.kern.kerning_array",
-                vec![
+                [
                     (Label::Borrowed("left_glyph_count"), ValueType::U16),
                     (Label::Borrowed("right_glyph_count"), ValueType::U16),
                 ],
@@ -2024,7 +2031,7 @@ pub(crate) mod kern {
                                         ),
                                     ),
                                 ],
-                                kerning_array.call_args(vec![
+                                kerning_array.invoke_args([
                                     expr_unwrap(var("left_glyph_count")),
                                     expr_unwrap(var("right_glyph_count")),
                                 ]),
@@ -2317,10 +2324,12 @@ mod gpos {
     use doodle::DepFormat;
 
     /// GPOS-specific LookupSubtable implementation
+    ///
+    /// Parametric over `lookup_type :~ U16`.
     fn lookup_subtable(
         module: &mut FormatModule,
         pos_extension: FormatRef,
-        ground_pos: FormatRef,
+        ground_pos: DepFormat<1, 0>,
     ) -> DepFormat<1, 0> {
         const EXTENSION_TYPE: u16 = 9;
         module.register_format_args(
@@ -2337,7 +2346,7 @@ mod gpos {
                     (
                         Pattern::Wildcard,
                         "GroundPos",
-                        ground_pos.call_args(vec![var("lookup_type")]),
+                        ground_pos.invoke_args([var("lookup_type")]),
                     ),
                 ],
             ),
@@ -2768,10 +2777,10 @@ mod gpos {
         anchor_table: FormatRef,
         mark_array: FormatRef,
     ) -> FormatRef {
-        let base_record = module.define_format_args_views(
+        let base_record = module.register_format_args_views(
             "opentype.layout.base_array.base_record",
-            vec![(Label::Borrowed("mark_class_count"), ValueType::U16)],
-            vec![Label::Borrowed("_array_view")],
+            [(Label::Borrowed("mark_class_count"), ValueType::U16)],
+            [Label::Borrowed("_array_view")],
             // REVIEW[epic=many-offsets-design-pattern] - for-each style
             record_auto([
                 (
@@ -2793,9 +2802,9 @@ mod gpos {
                 ),
             ]),
         );
-        let base_array = module.define_format_args(
+        let base_array = module.register_format_args(
             "opentype.layout.base_array",
-            vec![(Label::Borrowed("mark_class_count"), ValueType::U16)],
+            [(Label::Borrowed("mark_class_count"), ValueType::U16)],
             let_view(
                 "array_view",
                 record_auto([
@@ -2805,10 +2814,8 @@ mod gpos {
                         "base_records",
                         repeat_count(
                             var("base_count"),
-                            base_record.call_args_views(
-                                vec![var("mark_class_count")],
-                                vec![vvar("array_view")],
-                            ),
+                            base_record
+                                .invoke_args_views([var("mark_class_count")], [vvar("array_view")]),
                         ),
                     ),
                 ]),
@@ -2846,7 +2853,7 @@ mod gpos {
                             "base_array",
                             util::read_phantom_view_offset16(
                                 vvar("table_view"),
-                                base_array.call_args(vec![var("mark_class_count")]),
+                                base_array.invoke_args([var("mark_class_count")]),
                             ),
                         ),
                     ],
@@ -2860,11 +2867,17 @@ mod gpos {
 
     mod mark_lig {
         use super::*;
-        fn component_record(module: &mut FormatModule, anchor_table: FormatRef) -> FormatRef {
-            module.define_format_args_views(
+
+        /// Opentype Component Record (GPOS Mark-Lig Attachment) format definition
+        ///
+        /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/gpos#lookup-type-5-subtable-mark-to-ligature-attachment-positioning
+        ///
+        /// Parametric in `mark_class_count :~ U16` and `table_view ~ <LigatureAttach table frame>`.
+        fn component_record(module: &mut FormatModule, anchor_table: FormatRef) -> DepFormat<1, 1> {
+            module.register_format_args_views(
                 "opentype.layout.ligature_attach.component_record",
-                vec![(Label::Borrowed("mark_class_count"), ValueType::U16)],
-                vec![Label::Borrowed("table_view")],
+                [(Label::Borrowed("mark_class_count"), ValueType::U16)],
+                [Label::Borrowed("table_view")],
                 record_auto([
                     // REVIEW[epic=nested-format-reify-layer] - INNER(local)
                     ("record_scope", reify_view(vvar("table_view"))),
@@ -2890,12 +2903,17 @@ mod gpos {
             )
         }
 
-        fn ligature_attach(module: &mut FormatModule, anchor_table: FormatRef) -> FormatRef {
+        /// Opentype Ligature Attach (GPOS Mark-Lig Attachment) format definition
+        ///
+        /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/gpos#lookup-type-5-subtable-mark-to-ligature-attachment-positioning
+        ///
+        /// Parametric in `mark_class_count :~ U16`
+        fn ligature_attach(module: &mut FormatModule, anchor_table: FormatRef) -> DepFormat<1, 0> {
             let component_record = component_record(module, anchor_table);
 
-            module.define_format_args(
+            module.register_format_args(
                 "opentype.layout.ligature_attach",
-                vec![(Label::Borrowed("mark_class_count"), ValueType::U16)],
+                [(Label::Borrowed("mark_class_count"), ValueType::U16)],
                 let_view(
                     "table_view",
                     record([
@@ -2905,9 +2923,9 @@ mod gpos {
                             "component_records",
                             repeat_count(
                                 var("component_count"),
-                                component_record.call_args_views(
-                                    vec![var("mark_class_count")],
-                                    vec![vvar("table_view")],
+                                component_record.invoke_args_views(
+                                    [var("mark_class_count")],
+                                    [vvar("table_view")],
                                 ),
                             ),
                         ),
@@ -2920,12 +2938,12 @@ mod gpos {
         pub(super) fn ligature_array(
             module: &mut FormatModule,
             anchor_table: FormatRef,
-        ) -> FormatRef {
+        ) -> DepFormat<1, 0> {
             let ligature_attach = ligature_attach(module, anchor_table);
 
-            module.define_format_args(
+            module.register_format_args(
                 "opentype.layout.ligature_array",
-                vec![(Label::Borrowed("mark_class_count"), ValueType::U16)],
+                [(Label::Borrowed("mark_class_count"), ValueType::U16)],
                 let_view(
                     "array_view",
                     record_auto([
@@ -2946,7 +2964,7 @@ mod gpos {
                                 util::parse_view_offset::<U16>(
                                     vvar("array_view"),
                                     var("offset"),
-                                    ligature_attach.call_args(vec![var("mark_class_count")]),
+                                    ligature_attach.invoke_args([var("mark_class_count")]),
                                 ),
                             )),
                         ),
@@ -3001,7 +3019,7 @@ mod gpos {
                             "ligature_array",
                             util::read_phantom_view_offset16(
                                 vvar("table_view"),
-                                ligature_array.call_args(vec![var("mark_class_count")]),
+                                ligature_array.invoke_args([var("mark_class_count")]),
                             ),
                         ),
                     ],
@@ -3016,11 +3034,16 @@ mod gpos {
     mod mark_mark {
         use super::*;
 
-        fn mark2_record(module: &mut FormatModule, anchor_table: FormatRef) -> FormatRef {
-            module.define_format_args_views(
+        /// Opentype Mark2 Record (GPOS Mark-to-Mark Attachment) format definition
+        ///
+        /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/gpos#lookup-type-6-subtable-mark-to-mark-attachment-positioning
+        ///
+        /// Parametric in `mark_class_count :~ U16` and `view ~ <Mark2Array table frame>`
+        fn mark2_record(module: &mut FormatModule, anchor_table: FormatRef) -> DepFormat<1, 1> {
+            module.register_format_args_views(
                 "opentype.layout.mark2_array.mark2_record",
-                vec![(Label::Borrowed("mark_class_count"), ValueType::U16)],
-                vec![Label::Borrowed("_array_view")],
+                [(Label::Borrowed("mark_class_count"), ValueType::U16)],
+                [Label::Borrowed("_array_view")],
                 record_auto([
                     // REVIEW[epic=many-offsets-design-pattern] - for-each style
                     (
@@ -3044,12 +3067,17 @@ mod gpos {
             )
         }
 
-        pub(super) fn mark2_array(module: &mut FormatModule, anchor_table: FormatRef) -> FormatRef {
+        /// Mark2Array (GPOS Mark-to-Mark Attachment) format definition
+        ///
+        /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/gpos#lookup-type-6-subtable-mark-to-mark-attachment-positioning
+        ///
+        /// Parametric in `mark_class_count :~ U16`
+        pub(super) fn mark2_array(module: &mut FormatModule, anchor_table: FormatRef) -> DepFormat<1, 0> {
             let mark2_record = mark2_record(module, anchor_table);
 
-            module.define_format_args(
+            module.register_format_args(
                 "opentype.layout.mark2_array",
-                vec![(Label::Borrowed("mark_class_count"), ValueType::U16)],
+                [(Label::Borrowed("mark_class_count"), ValueType::U16)],
                 let_view(
                     "array_view",
                     record([
@@ -3060,9 +3088,9 @@ mod gpos {
                             "mark2_records",
                             repeat_count(
                                 var("mark2_count"),
-                                mark2_record.call_args_views(
-                                    vec![var("mark_class_count")],
-                                    vec![vvar("array_view")],
+                                mark2_record.invoke_args_views(
+                                    [var("mark_class_count")],
+                                    [vvar("array_view")],
                                 ),
                             ),
                         ),
@@ -3114,7 +3142,7 @@ mod gpos {
                             "mark2_array",
                             util::read_phantom_view_offset16(
                                 vvar("table_view"),
-                                mark2_array.call_args(vec![var("mark_class_count")]),
+                                mark2_array.invoke_args([var("mark_class_count")]),
                             ),
                         ),
                     ],
@@ -3127,6 +3155,8 @@ mod gpos {
     }
 
     /// Ground (non-recursive) GPOS lookup subtable type enumeration
+    ///
+    /// Parametric over `lookup_type :~ U16`
     pub(crate) fn ground_pos(
         module: &mut FormatModule,
         class_def: FormatRef,
@@ -3136,7 +3166,7 @@ mod gpos {
         anchor_table: FormatRef,
         sequence_context: FormatRef,
         chained_sequence_context: FormatRef,
-    ) -> FormatRef {
+    ) -> DepFormat<1, 0> {
         let single_pos = single_pos(module, coverage_table, value_format_flags, value_record);
         let pair_pos = pair_pos(
             module,
@@ -3150,9 +3180,10 @@ mod gpos {
         let mark_base_pos = mark_base_pos(module, coverage_table, anchor_table, mark_array);
         let mark_lig_pos = mark_lig_pos(module, coverage_table, anchor_table, mark_array);
         let mark_mark_pos = mark_mark_pos(module, coverage_table, anchor_table, mark_array);
-        module.define_format_args(
+
+        module.register_format_args(
             "opentype.layout.ground_pos",
-            vec![(Label::from("lookup_type"), ValueType::Base(BaseType::U16))],
+            [(Label::from("lookup_type"), ValueType::U16)],
             match_variant(
                 var("lookup_type"),
                 [
@@ -3178,7 +3209,7 @@ mod gpos {
     /// Lookup type 9 subtable: positioning suhbtable extension
     ///
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/gpos#lookup-type-9-subtable-positioning-subtable-extension
-    pub(crate) fn pos_extension(module: &mut FormatModule, ground_pos: FormatRef) -> FormatRef {
+    pub(crate) fn pos_extension(module: &mut FormatModule, ground_pos: DepFormat<1, 0>) -> FormatRef {
         module.define_format(
             "opentype.layout.pos_extension",
             let_view(
@@ -3196,7 +3227,7 @@ mod gpos {
                             "extension_offset",
                             util::read_phantom_view_offset32(
                                 vvar("table_view"),
-                                ground_pos.call_args(vec![var("extension_lookup_type")]),
+                                ground_pos.invoke_args([var("extension_lookup_type")]),
                             ),
                         ),
                     ],
@@ -3212,7 +3243,7 @@ mod gpos {
         module: &mut FormatModule,
         script_list: FormatRef,
         feature_list: FormatRef,
-        ground_pos: FormatRef,
+        ground_pos: DepFormat<1, 0>,
         pos_extension: FormatRef,
         feature_variations: FormatRef,
     ) -> FormatRef {
@@ -3599,7 +3630,7 @@ mod gsub {
         let reverse_chain_single_subst = reverse_chain_single_subst(module, coverage_table);
         module.register_format_args(
             "opentype.layout.ground_subst",
-            [(Label::from("lookup_type"), ValueType::Base(BaseType::U16))],
+            [(Label::from("lookup_type"), ValueType::U16)],
             match_variant(
                 var("lookup_type"),
                 [
@@ -5401,6 +5432,8 @@ mod gasp {
 }
 
 mod glyf {
+    use doodle::numeric::BasicUnaryOp;
+
     use super::*;
 
     mod simple {
@@ -5475,7 +5508,7 @@ mod glyf {
                     is_finished,
                     update_totlen,
                     Expr::U16(0),
-                    ValueType::Base(BaseType::U16),
+                    ValueType::U16,
                     flag_list_entry,
                 ),
                 lambda_tuple(["_len", "flags"], var("flags")),
@@ -5505,21 +5538,21 @@ mod glyf {
         fn x_coords(field_set: Expr) -> Format {
             if_then_else(
                 record_proj(field_set.clone(), "x_short_vector"),
-                // this wants to be i16
+                // overall type is i16
                 map(
                     u8(),
                     lambda(
                         "abs",
-                        util::u8_to_i16(
-                            var("abs"),
+                        util::map_var_u8_to_i16(
+                            "abs",
                             record_proj(field_set.clone(), "x_is_same_or_positive_x_short_vector"),
                         ),
                     ),
                 ),
                 if_then_else(
                     record_proj(field_set.clone(), "x_is_same_or_positive_x_short_vector"),
-                    // this wants to be i16
-                    compute(Expr::U16(0)),
+                    // type is i16
+                    compute(poly_zero()),
                     util::s16be(),
                 ),
             )
@@ -5530,34 +5563,31 @@ mod glyf {
         fn y_coords(field_set: Expr) -> Format {
             if_then_else(
                 record_proj(field_set.clone(), "y_short_vector"),
-                // this wants to be i16
+                // overall type is i16
                 map(
                     u8(),
                     lambda(
                         "abs",
-                        util::u8_to_i16(
-                            var("abs"),
+                        util::map_var_u8_to_i16(
+                            "abs",
                             record_proj(field_set.clone(), "y_is_same_or_positive_y_short_vector"),
                         ),
                     ),
                 ),
                 if_then_else(
                     record_proj(field_set.clone(), "y_is_same_or_positive_y_short_vector"),
-                    // this wants to be i16
-                    compute(Expr::U16(0)),
+                    //  type is i16
+                    compute(poly_zero()),
                     util::s16be(),
                 ),
             )
         }
 
-        pub(crate) fn table(module: &mut FormatModule) -> FormatRef {
+        pub(crate) fn table(module: &mut FormatModule) -> DepFormat<1, 0> {
             let simple_flags_raw = flags_raw(module);
-            module.define_format_args(
+            module.register_format_args(
                 "opentype.glyf.simple",
-                vec![(
-                    Label::Borrowed("n_contours"),
-                    ValueType::Base(BaseType::U16),
-                )],
+                [(Label::Borrowed("n_contours"), ValueType::U16)],
                 record([
                     (
                         "end_points_of_contour",
@@ -5758,14 +5788,8 @@ mod glyf {
             let mk_branch = |elem_t: ValueType| ValueType::Seq(Box::new(elem_t));
             let mut branches = std::collections::BTreeMap::new();
             // NOTE - at this layer, the u16-valued offsets are still half-value
-            branches.insert(
-                Label::Borrowed("Offsets16"),
-                mk_branch(ValueType::Base(BaseType::U16)),
-            );
-            branches.insert(
-                Label::Borrowed("Offsets32"),
-                mk_branch(ValueType::Base(BaseType::U32)),
-            );
+            branches.insert(Label::Borrowed("Offsets16"), mk_branch(ValueType::U16));
+            branches.insert(Label::Borrowed("Offsets32"), mk_branch(ValueType::U32));
             ValueType::Union(branches)
         };
 
@@ -5840,25 +5864,28 @@ mod glyf {
         )
     }
 
+    /// Glyph description (empty, simple or composite) format definition
+    ///
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/glyf#table-organization
+    ///
+    /// Parametric in `n_contours :~ I16`
     fn glyf_description(
         module: &mut FormatModule,
-        simple_glyf_table: FormatRef,
+        simple_glyf_table: DepFormat<1, 0>,
         composite_glyf_table: FormatRef,
     ) -> FormatRef {
         module.define_format_args(
             "opentype.glyf.description",
-            vec![(
-                Label::Borrowed("n_contours"),
-                ValueType::Base(BaseType::U16),
-            )],
+            // actually I16 but we don't hjave that yet
+            vec![(Label::Borrowed("n_contours"), ValueType::UnknownNumeric)],
             match_variant(
                 var("n_contours"),
                 [
-                    (Pattern::U16(0), "HeaderOnly", Format::EMPTY),
+                    (Pattern::z_const(0), "HeaderOnly", Format::EMPTY),
                     (
-                        Pattern::Int(Bounds::new(1, i16::MAX as usize)),
+                        Pattern::z_range(1, i16::MAX),
                         "Simple",
-                        simple_glyf_table.call_args(vec![var("n_contours")]),
+                        simple_glyf_table.invoke_args([numeric(num::unary_with_rep(BasicUnaryOp::AbsVal, Some(MachineRep::U16), num::num_var("n_contours")))]),
                     ),
                     (Pattern::Wildcard, "Composite", composite_glyf_table.call()),
                 ],
@@ -5874,14 +5901,8 @@ pub(crate) mod loca {
         module.define_format_args(
             "opentype.loca.table",
             vec![
-                (
-                    Label::Borrowed("num_glyphs"),
-                    ValueType::Base(BaseType::U16),
-                ),
-                (
-                    Label::Borrowed("index_to_loc_format"),
-                    ValueType::Base(BaseType::U16),
-                ),
+                (Label::Borrowed("num_glyphs"), ValueType::U16),
+                (Label::Borrowed("index_to_loc_format"), ValueType::U16),
             ],
             record([(
                 "offsets",
@@ -6302,14 +6323,8 @@ pub(crate) mod hmtx {
         module.define_format_args(
             "opentype.hmtx.table",
             vec![
-                (
-                    Label::Borrowed("num_long_metrics"),
-                    ValueType::Base(BaseType::U16),
-                ),
-                (
-                    Label::Borrowed("num_glyphs"),
-                    ValueType::Base(BaseType::U16),
-                ),
+                (Label::Borrowed("num_long_metrics"), ValueType::U16),
+                (Label::Borrowed("num_glyphs"), ValueType::U16),
             ],
             record([
                 (
@@ -6465,7 +6480,7 @@ pub(crate) mod cmap {
 
         let cmap_subtable = module.define_format_args(
             "opentype.cmap.subtable",
-            vec![(Label::Borrowed("_platform"), ValueType::Base(BaseType::U16))],
+            vec![(Label::Borrowed("_platform"), ValueType::U16)],
             let_view(
                 "table_view",
                 record([
@@ -6570,7 +6585,7 @@ pub(crate) mod cmap {
     fn subtable_format0(module: &mut FormatModule) -> FormatRef {
         module.define_format_args(
             "opentype.cmap_subtable.format0",
-            vec![(Label::Borrowed("_platform"), ValueType::Base(BaseType::U16))],
+            vec![(Label::Borrowed("_platform"), ValueType::U16)],
             util::slice_record(
                 "length",
                 [
@@ -6598,7 +6613,7 @@ pub(crate) mod cmap {
         // Format 2: High-byte mapping through table
         module.define_format_args(
             "opentype.cmap_subtable.format2",
-            vec![(Label::Borrowed("_platform"), ValueType::Base(BaseType::U16))],
+            vec![(Label::Borrowed("_platform"), ValueType::U16)],
             util::slice_record(
                 "length",
                 [
@@ -6635,7 +6650,7 @@ pub(crate) mod cmap {
     fn subtable_format4(module: &mut FormatModule) -> FormatRef {
         module.define_format_args(
             "opentype.cmap_subtable.format4",
-            vec![(Label::Borrowed("_platform"), ValueType::Base(BaseType::U16))],
+            vec![(Label::Borrowed("_platform"), ValueType::U16)],
             util::slice_record(
                 "length",
                 [
@@ -6666,7 +6681,7 @@ pub(crate) mod cmap {
     fn subtable_format6(module: &mut FormatModule) -> FormatRef {
         module.define_format_args(
             "opentype.cmap_subtable.format6",
-            vec![(Label::Borrowed("_platform"), ValueType::Base(BaseType::U16))],
+            vec![(Label::Borrowed("_platform"), ValueType::U16)],
             /* Previously defined as a slice_record but sufficiently large `entry_count` values
              * could cause length to wrap around mod 65536 and lead to slice boundary violation
              * while reading `glyph_id_array`
@@ -6685,7 +6700,7 @@ pub(crate) mod cmap {
     fn subtable_format8(module: &mut FormatModule, sequential_map_group: FormatRef) -> FormatRef {
         module.define_format_args(
             "opentype.cmap_subtable.format8",
-            vec![(Label::Borrowed("_platform"), ValueType::Base(BaseType::U16))],
+            vec![(Label::Borrowed("_platform"), ValueType::U16)],
             util::slice_record(
                 "length",
                 [
@@ -6708,7 +6723,7 @@ pub(crate) mod cmap {
     fn subtable_format10(module: &mut FormatModule) -> FormatRef {
         module.define_format_args(
             "opentype.cmap_subtable.format10",
-            vec![(Label::Borrowed("_platform"), ValueType::Base(BaseType::U16))],
+            vec![(Label::Borrowed("_platform"), ValueType::U16)],
             util::slice_record(
                 "length",
                 [
@@ -6727,7 +6742,7 @@ pub(crate) mod cmap {
     fn subtable_format12(module: &mut FormatModule, sequential_map_group: FormatRef) -> FormatRef {
         module.define_format_args(
             "opentype.cmap_subtable.format12",
-            vec![(Label::Borrowed("_platform"), ValueType::Base(BaseType::U16))],
+            vec![(Label::Borrowed("_platform"), ValueType::U16)],
             util::slice_record(
                 "length",
                 [
@@ -6750,7 +6765,7 @@ pub(crate) mod cmap {
 
         module.define_format_args(
             "opentype.cmap_subtable.format13",
-            vec![(Label::Borrowed("_platform"), ValueType::Base(BaseType::U16))],
+            vec![(Label::Borrowed("_platform"), ValueType::U16)],
             util::slice_record(
                 "length",
                 [
