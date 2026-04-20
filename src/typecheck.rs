@@ -4314,4 +4314,36 @@ mod tests {
         assert_eq!(output, expected);
         Ok(())
     }
+
+    #[test]
+    fn test_standalone_auto_arith_inference() -> TCResult<()> {
+        use crate::{
+            helper::*,
+            numeric::{
+                core::{NumRep, TypedConst},
+                helper as num,
+            },
+        };
+
+        let mut tc = TypeChecker::new();
+        let f: Format = record([
+            (
+                "x",
+                compute_numeric(num::expr_const(TypedConst::new(0, NumRep::Auto))),
+            ),
+            ("y", compute(add(var("x"), Expr::U32(1)))),
+        ]);
+        let module = FormatModule::new();
+        let scope = UScope::new();
+        let ut = tc.infer_utype_format(&f, Ctxt::new(&module, &scope))?;
+        let output = tc
+            .reify(ut)
+            .unwrap_or_else(|| panic!("reify returned None"));
+        let expected = AugValueType::Record(vec![
+            ("x".into(), AugValueType::Base(BaseType::U32)),
+            ("y".into(), AugValueType::Base(BaseType::U32)),
+        ]);
+        assert_eq!(output, expected);
+        Ok(())
+    }
 }
