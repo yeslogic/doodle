@@ -916,6 +916,8 @@ fn embed_pattern(pat: &GTPattern) -> RustPattern {
         TypedPattern::U16(n) => RustPattern::PrimLiteral(RustPrimLit::Numeric(RustNumLit::U16(*n))),
         TypedPattern::U32(n) => RustPattern::PrimLiteral(RustPrimLit::Numeric(RustNumLit::U32(*n))),
         TypedPattern::U64(n) => RustPattern::PrimLiteral(RustPrimLit::Numeric(RustNumLit::U64(*n))),
+        TypedPattern::ZConst(_, z) => RustPattern::PrimLiteral(RustPrimLit::Numeric(RustNumLit::SomeInt(z.clone()))),
+        TypedPattern::ZRange(_, range) => RustPattern::PrimRange(RustPrimLit::Numeric(RustNumLit::SomeInt(range.min.clone())), Some(RustPrimLit::Numeric(RustNumLit::SomeInt(range.max.clone())))),
         TypedPattern::Int(gt, bounds) => match bounds.is_exact() {
             Some(n) => RustPattern::PrimLiteral(RustPrimLit::Numeric(RustNumLit::Usize(n))),
             None => match gt {
@@ -4065,6 +4067,14 @@ impl<'a> Elaborator<'a> {
             Pattern::Int(bounds) => {
                 let gt = self.get_gt_from_index(index);
                 GTPattern::Int(gt, *bounds)
+            }
+            Pattern::ZConst(z) => {
+                let gt = self.get_gt_from_index(index);
+                GTPattern::ZConst(gt, z.clone())
+            }
+            Pattern::ZRange(zb) => {
+                let gt = self.get_gt_from_index(index);
+                GTPattern::ZRange(gt, zb.clone())
             }
             Pattern::Char(c) => GTPattern::Char(*c),
             Pattern::Tuple(elts) => {

@@ -2,6 +2,8 @@ use std::borrow::Cow;
 use std::ops::Add;
 use std::rc::Rc;
 
+use num_bigint::BigInt;
+
 use super::rust_ast::{PrimType, RustType, RustTypeDecl};
 use super::{AtomType, LocalType};
 use crate::bounds::Bounds;
@@ -9,6 +11,7 @@ use crate::byte_set::ByteSet;
 use crate::codegen::rust_ast::{RustLt, RustParams, UseParams};
 use crate::numeric::elaborator::TypedExpr as TypedNumExpr;
 use crate::{Arith, BaseKind, Endian, IntRel, Label, StyleHint, TypeHint, UnaryOp};
+use crate::numeric::core::Bounds as NumBounds;
 
 pub(crate) mod variables;
 
@@ -934,6 +937,8 @@ pub enum TypedPattern<TypeRep> {
     U32(u32),
     U64(u64),
     Int(TypeRep, Bounds),
+    ZConst(TypeRep, BigInt),
+    ZRange(TypeRep, NumBounds),
     Char(char),
     Tuple(TypeRep, Vec<TypedPattern<TypeRep>>),
     Variant(TypeRep, Label, Box<TypedPattern<TypeRep>>),
@@ -956,6 +961,8 @@ impl TypedPattern<GenType> {
             | TypedPattern::Tuple(gt, ..)
             | TypedPattern::Option(gt, ..)
             | TypedPattern::Int(gt, ..)
+            | TypedPattern::ZConst(gt, ..)
+            | TypedPattern::ZRange(gt, ..)
             | TypedPattern::Variant(gt, ..)
             | TypedPattern::Seq(gt, ..) => Cow::Borrowed(gt),
         }
@@ -974,6 +981,8 @@ impl<TypeRep> std::hash::Hash for TypedPattern<TypeRep> {
             TypedPattern::U32(n) => n.hash(state),
             TypedPattern::U64(n) => n.hash(state),
             TypedPattern::Int(_, bounds) => bounds.hash(state),
+            TypedPattern::ZConst(_, z) => z.hash(state),
+            TypedPattern::ZRange(_, range) => range.hash(state),
             TypedPattern::Char(c) => c.hash(state),
             TypedPattern::Tuple(_, tup) => tup.hash(state),
             TypedPattern::Variant(_, lbl, inner) => {
@@ -1248,6 +1257,8 @@ mod __impls {
                 TypedPattern::U32(n) => Pattern::U32(n),
                 TypedPattern::U64(n) => Pattern::U64(n),
                 TypedPattern::Int(_, bounds) => Pattern::Int(bounds),
+                TypedPattern::ZConst(_, z) => Pattern::ZConst(z),
+                TypedPattern::ZRange(_, bounds) => Pattern::ZRange(bounds),
                 TypedPattern::Char(c) => Pattern::Char(c),
                 TypedPattern::Tuple(_, elts) => Pattern::Tuple(revec(elts)),
                 TypedPattern::Variant(_, name, inner) => Pattern::Variant(name, rebox(inner)),

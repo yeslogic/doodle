@@ -796,6 +796,7 @@ impl ViewExpr {
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(tag = "tag", content = "args")]
 pub enum CommonOp {
+    // FIXME[epic=signed-parse] - add in expressivity for signed-integer parsing as commonop
     EndianParse(BaseKind<Endian>),
 }
 

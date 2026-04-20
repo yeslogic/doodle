@@ -1,7 +1,9 @@
 use crate::alt::{FormatExt, FormatModuleExt, ValueTypeExt};
 use crate::bounds::Bounds;
 use crate::{BaseType, Expr, Format, FormatModule, IntoLabel, Label, TypeScope, ValueType};
+use crate::numeric::core::Bounds as NumBounds;
 use anyhow::Result as AResult;
+use num_bigint::BigInt;
 use serde::Serialize;
 use std::rc::Rc;
 
@@ -16,6 +18,8 @@ pub enum Pattern {
     U32(u32),
     U64(u64),
     Int(Bounds),
+    ZConst(#[serde(serialize_with = "crate::numeric::core::ser_bigint")] BigInt),
+    ZRange(NumBounds),
     Char(char),
     Tuple(Vec<Pattern>),
     Variant(Label, Box<Pattern>),
@@ -25,6 +29,18 @@ pub enum Pattern {
 
 impl Pattern {
     pub const UNIT: Pattern = Pattern::Tuple(Vec::new());
+
+    pub fn z_const<N>(n: N) -> Pattern
+    where BigInt: From<N>
+    {
+        Pattern::ZConst(BigInt::from(n))
+    }
+
+    pub fn z_range<N>(min: N, max: N) -> Pattern
+    where BigInt: From<N>
+    {
+        Pattern::ZRange(NumBounds::new(min.into(), max.into()))
+    }
 
     /// Constructs a pattern that matches against literal sequence of bytes.
     pub fn from_bytes(bs: &[u8]) -> Pattern {
@@ -51,10 +67,10 @@ impl Pattern {
             (Pattern::U16(..), ValueType::Base(BaseType::U16)) => {}
             (Pattern::U32(..), ValueType::Base(BaseType::U32)) => {}
             (Pattern::U64(..), ValueType::Base(BaseType::U64)) => {}
-            (Pattern::Int(..), ValueType::Base(BaseType::U8)) => {}
-            (Pattern::Int(..), ValueType::Base(BaseType::U16)) => {}
-            (Pattern::Int(..), ValueType::Base(BaseType::U32)) => {}
-            (Pattern::Int(..), ValueType::Base(BaseType::U64)) => {}
+            (Pattern::Int(..), ValueType::Base(BaseType::U8 | BaseType::U16 | BaseType::U32 | BaseType::U64)) => {}
+            (Pattern::ZConst(..), ValueType::Base(BaseType::U8 | BaseType::U16 | BaseType::U32 | BaseType::U64)) => {}
+            (Pattern::ZRange(..), ValueType::Base(BaseType::U8 | BaseType::U16 | BaseType::U32 | BaseType::U64)) => {}
+            (Pattern::ZConst(..) | Pattern::ZRange(..), ValueType::UnknownNumeric) => {},
             (Pattern::Tuple(ps), ValueType::Tuple(ts)) if ps.len() == ts.len() => {
                 for (p, t) in Iterator::zip(ps.iter(), ts.iter()) {
                     p.build_scope(scope, Rc::new(t.clone()));
@@ -99,10 +115,10 @@ impl Pattern {
             (Pattern::U16(..), ValueTypeExt::Base(BaseType::U16)) => {}
             (Pattern::U32(..), ValueTypeExt::Base(BaseType::U32)) => {}
             (Pattern::U64(..), ValueTypeExt::Base(BaseType::U64)) => {}
-            (
-                Pattern::Int(..),
-                ValueTypeExt::Base(BaseType::U8 | BaseType::U16 | BaseType::U32 | BaseType::U64),
-            ) => {}
+            (Pattern::Int(..), ValueTypeExt::Base(BaseType::U8 | BaseType::U16 | BaseType::U32 | BaseType::U64)) => {}
+            (Pattern::ZConst(..), ValueTypeExt::Base(BaseType::U8 | BaseType::U16 | BaseType::U32 | BaseType::U64)) => {}
+            (Pattern::ZRange(..), ValueTypeExt::Base(BaseType::U8 | BaseType::U16 | BaseType::U32 | BaseType::U64)) => {}
+            (Pattern::ZConst(..) | Pattern::ZRange(..), ValueTypeExt::UnknownNumeric) => {},
             (Pattern::Tuple(ps), ValueTypeExt::Tuple(ts)) if ps.len() == ts.len() => {
                 for (p, t) in Iterator::zip(ps.iter(), ts.iter()) {
                     p.build_scope_ext(scope, Rc::new(t.clone()));
@@ -187,6 +203,8 @@ impl Pattern {
             | Pattern::U32(_)
             | Pattern::U64(_)
             | Pattern::Int(_)
+            | Pattern::ZConst(_)
+            | Pattern::ZRange(_)
             | Pattern::Char(_) => false,
             Pattern::Tuple(ts) => ts.iter().any(|p| p.shadows(name)),
             Pattern::Variant(_, p) => p.shadows(name),

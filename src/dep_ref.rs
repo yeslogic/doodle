@@ -40,6 +40,10 @@ impl<const M: usize> DepFormat<0, M> {
 }
 
 impl<const N: usize, const M: usize> DepFormat<N, M> {
+    pub fn get_level(&self) -> usize {
+        self.inner.get_level()
+    }
+
     pub fn invoke_args_views(&self, args: [Expr; N], views: [ViewExpr; M]) -> Format {
         self.inner.call_args_views(args.to_vec(), views.to_vec())
     }

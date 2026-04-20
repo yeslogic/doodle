@@ -11,6 +11,7 @@ use crate::read::ReadCtxt;
 use crate::{
     Arith, BaseKind, DynFormat, Endian, Expr, Format, IntRel, Label, Pattern, UnaryOp, ViewExpr,
 };
+use num_bigint::BigInt;
 use serde::Serialize;
 use std::borrow::Cow;
 use std::cmp::Ordering;
@@ -414,6 +415,30 @@ impl ParsedValue {
                 },
                 _ => false,
             },
+            Pattern::ZConst(z) => match self {
+                ParsedValue::Flat(Parsed { inner: v, .. }) => match v {
+                    Value::U8(n) => z == &BigInt::from(*n),
+                    Value::U16(n) => z == &BigInt::from(*n),
+                    Value::U32(n) => z == &BigInt::from(*n),
+                    Value::U64(n) => z == &BigInt::from(*n),
+                    Value::Usize(n) => z == &BigInt::from(*n),
+                    Value::Numeric(tc) => tc.eq_num(z),
+                    _ => false,
+                }
+                _ => false,
+            }
+            Pattern::ZRange(bounds) => match self {
+                ParsedValue::Flat(Parsed { inner: v, .. }) => match v {
+                    Value::U8(n) => bounds.contains(&BigInt::from(*n)),
+                    Value::U16(n) => bounds.contains(&BigInt::from(*n)),
+                    Value::U32(n) => bounds.contains(&BigInt::from(*n)),
+                    Value::U64(n) => bounds.contains(&BigInt::from(*n)),
+                    Value::Usize(n) => bounds.contains(&BigInt::from(*n)),
+                    Value::Numeric(tc) => bounds.contains(tc.as_raw_value()),
+                    _ => false,
+                },
+                _ => false,
+            }
         }
     }
 

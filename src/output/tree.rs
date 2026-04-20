@@ -1752,6 +1752,8 @@ impl<'module> TreePrinter<'module> {
                 .cat(Fragment::Char(')'))
                 .group(),
             Pattern::Int(..)
+            | Pattern::ZConst(..)
+            | Pattern::ZRange(..)
             | Pattern::U8(..)
             | Pattern::U16(..)
             | Pattern::U32(..)
