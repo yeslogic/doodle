@@ -1833,6 +1833,7 @@ pub fn phantom(format: Format) -> Format {
     Format::Phantom(Box::new(format))
 }
 
+// SECTION - helpers related to the embedded `numeric` model
 /// Helper function for [`Format::Compute`] over [`Expr::Numeric`].
 pub fn compute_numeric(n_expr: NumExpr) -> Format {
     compute(numeric(n_expr))
@@ -1853,6 +1854,32 @@ pub fn map_numeric(f: Format, map_fn: impl FnOnce(NumExpr) -> NumExpr) -> Format
     const IDENT: &str = "raw";
     chain(f, IDENT, compute(numeric(map_fn(num::num_var(IDENT)))))
 }
+
+/// Polymorphic (auto-rep) zero-value within the embedded `numeric` model.
+///
+/// # Notes
+///
+/// Should only be used in contexts where the type-inference over the overall expression or format is
+/// guaranteed to resolve it to a specific numeric type, as it does not have an inherent type on its own and will
+/// cause a type-inference failure if it is not resolved by the context.
+pub fn poly_zero() -> Expr {
+    poly_const::<u8>(0)
+}
+
+/// General constructor for polymorphic (auto-rep) numeric constants within the embedded `numeric` model.
+///
+/// # Notes
+///
+/// Should only be used in contexts where the type-inference over the overall expression or format is
+/// guaranteed to resolve it to a specific numeric type, as it does not have an inherent type on its own and will
+/// cause a type-inference failure if it is not resolved by the context.
+pub fn poly_const<N>(n: N) -> Expr
+where
+    num_bigint::BigInt: From<N>,
+{
+    numeric(num::auto_const(n))
+}
+// !SECTION
 
 #[cfg(test)]
 mod tests {
