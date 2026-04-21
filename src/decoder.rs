@@ -206,7 +206,7 @@ impl Value {
                 Value::Usize(n) => range.contains(&BigInt::from(*n)),
                 Value::Numeric(n) => range.contains(n.as_raw_value()),
                 _ => false,
-            }
+            },
             Pattern::Char(c0) => matches!(self, Value::Char(c1) if c0 == c1),
             Pattern::Tuple(ps) => match self {
                 Value::Tuple(vs) if ps.len() == vs.len() => {

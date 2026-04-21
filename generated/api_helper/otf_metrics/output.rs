@@ -1688,16 +1688,10 @@ mod layout {
             AnchorTable::Format1(AnchorTableFormat1 {
                 x_coordinate,
                 y_coordinate,
-            }) => toks(format!(
-                "({}, {})",
-                as_s16(*x_coordinate),
-                as_s16(*y_coordinate)
-            )),
+            }) => toks(format!("({}, {})", x_coordinate, y_coordinate)),
             AnchorTable::Format2(f2) => toks(format!(
                 "({}, {})@[{}]",
-                as_s16(f2.x_coordinate),
-                as_s16(f2.y_coordinate),
-                f2.anchor_point
+                f2.x_coordinate, f2.y_coordinate, f2.anchor_point
             )),
             AnchorTable::Format3(AnchorTableFormat3 {
                 x_coordinate,
@@ -1724,12 +1718,7 @@ mod layout {
                         y_tokens,
                     )))
                 };
-                tok(format!(
-                    "({}, {})",
-                    as_s16(*x_coordinate),
-                    as_s16(*y_coordinate),
-                ))
-                .then(extra)
+                tok(format!("({}, {})", x_coordinate, y_coordinate,)).then(extra)
             }
         }
     }

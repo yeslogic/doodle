@@ -1652,7 +1652,6 @@ pub mod base {
         u64le, U64LE, 8, U64Le;
     }
 
-
     // TODO[epic=signed-parse] - add stylehint support for signed-parse operations
     /// Parses a u8 value and performs a bitwise cast to i8.
     pub fn i8() -> Format {
@@ -1676,9 +1675,8 @@ pub mod base {
     pub fn i64be() -> Format {
         map_numeric(u64be(), |v| num::cast_bitwise(MachineRep::I64, v))
     }
-
 }
-pub use base::{bit, u8, u16be, u16le, u32be, u32le, u64be, u64le, i8, i16be, i32be, i64be};
+pub use base::{bit, i8, i16be, i32be, i64be, u8, u16be, u16le, u32be, u32le, u64be, u64le};
 
 pub mod ascii {
     use super::{mk_ascii_string, *};

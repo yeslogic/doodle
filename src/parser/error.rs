@@ -14,7 +14,7 @@ pub(crate) fn mk_trace(value: &impl std::hash::Hash) -> TraceHash {
 }
 
 /// General error type for both recoverable and unrecoverable errors encountered during parsing operations
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub enum ParseError {
     /// Explicit `Format::Fail` or any of its derived equivalents
     FailToken(TraceHash),
@@ -39,6 +39,14 @@ pub enum ParseError {
     InternalError(StateError),
     /// An operation performed on values derived via parsing is not sound, mostly due to a bad assumption of the format for what is being parsed
     UnsoundOperation(Option<&'static str>, TraceHash),
+    /// A numeric evaluation error
+    BadEval(crate::numeric::eval::EvalError),
+}
+
+impl From<crate::numeric::eval::EvalError> for ParseError {
+    fn from(err: crate::numeric::eval::EvalError) -> Self {
+        Self::BadEval(err)
+    }
 }
 
 /// Error-kind indicator that distinguishes between different Overrun errors.
@@ -102,6 +110,7 @@ impl std::fmt::Display for ParseError {
                 ),
             },
             ParseError::InternalError(e) => write!(f, "unrecoverable internal error: {e}"),
+            ParseError::BadEval(e) => write!(f, "{e}"),
         }
     }
 }
@@ -110,6 +119,7 @@ impl std::error::Error for ParseError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             ParseError::InternalError(e) => Some(e),
+            ParseError::BadEval(e) => Some(e),
             _ => None,
         }
     }

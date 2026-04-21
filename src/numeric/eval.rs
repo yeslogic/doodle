@@ -59,10 +59,22 @@ where
 }
 
 /// Error type for failed coercion of `Eval<T>` into `T` (via [`Eval::eval`])
+#[derive(Clone, Debug)]
 pub enum EvalError {
     Indirect(BigInt),
     NotANumber,
 }
+
+impl std::fmt::Display for EvalError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EvalError::Indirect(v) => write!(f, "out-of-range value: {v}"),
+            EvalError::NotANumber => write!(f, "operation yielded NaN"),
+        }
+    }
+}
+
+impl std::error::Error for EvalError {}
 
 impl<T: Copy> Eval<T> {
     /// Attempts to evaluate `self` as a value of type `T`, returning `Err` if `self` is `NaN` or `Indirect`.

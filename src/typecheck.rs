@@ -3,15 +3,18 @@ use std::{
     rc::Rc,
 };
 
-use crate::{base_set::PrimIntSet, numeric::{
-    MachineRep, NumRep,
-    core::{BitWidth, Bounds as ZBounds, Expr as NExpr},
-    elaborator::{IntType, PrimInt},
-}};
 use crate::valuetype::{SeqBorrowHint, augmented::AugValueType};
 use crate::{
     Arith, BaseType, DynFormat, Expr, Format, FormatModule, Label, Pattern, UnaryOp, ValueType,
     ViewExpr, ViewFormat,
+};
+use crate::{
+    base_set::PrimIntSet,
+    numeric::{
+        MachineRep, NumRep,
+        core::{BitWidth, Bounds as ZBounds, Expr as NExpr},
+        elaborator::{IntType, PrimInt},
+    },
 };
 
 pub mod base_set;
@@ -920,7 +923,11 @@ impl TypeChecker {
         let new_scope = UScope::Multi(&tmp);
         let new_ctxt = ctxt.with_scope(&new_scope);
         let local_rhs_var = self.infer_var_format(rhs_format, new_ctxt)?;
-        let _tmp = ("unify_utype_format_match_case", pvar, format!("{:?}", head_t));
+        let _tmp = (
+            "unify_utype_format_match_case",
+            pvar,
+            format!("{:?}", head_t),
+        );
         try_with!( self.unify_var_utype(pvar, head_t) => _tmp );
         self.unify_var_pair(rhs_var, local_rhs_var)?;
         Ok(())
@@ -1494,7 +1501,13 @@ impl TypeChecker {
                             .unwrap()
                             .1
                             .clone();
-                        let _tmp = ("unify_var_proj_field", rec_var, fname, fld_var, format!("{:?}", fld_type));
+                        let _tmp = (
+                            "unify_var_proj_field",
+                            rec_var,
+                            fname,
+                            fld_var,
+                            format!("{:?}", fld_type),
+                        );
                         try_with!(self.unify_var_utype(fld_var, fld_type) => _tmp);
                         Ok(())
                     }
@@ -1537,7 +1550,12 @@ impl TypeChecker {
                 Constraint::Equiv(ut) => match ut.as_ref() {
                     UType::Option(inner) => {
                         let param_t = inner.clone();
-                        let _tmp = ("unify_var_proj_param", opt_v, param_v, format!("{:?}", param_t));
+                        let _tmp = (
+                            "unify_var_proj_param",
+                            opt_v,
+                            param_v,
+                            format!("{:?}", param_t),
+                        );
                         try_with!(self.unify_var_utype(param_v, param_t) => _tmp);
                         Ok(())
                     }
@@ -1572,7 +1590,12 @@ impl TypeChecker {
                 Constraint::Equiv(ut) => match ut.as_ref() {
                     UType::Seq(inner, _) => {
                         let elem_t = inner.clone();
-                        let _tmp = ("unify_var_proj_elem", seq_v, elem_v, format!("{:?}", elem_t));
+                        let _tmp = (
+                            "unify_var_proj_elem",
+                            seq_v,
+                            elem_v,
+                            format!("{:?}", elem_t),
+                        );
                         try_with!(self.unify_var_utype(elem_v, elem_t) => _tmp);
                         Ok(())
                     }
@@ -2031,7 +2054,12 @@ impl TypeChecker {
                             for (fld, ut) in fld_ut.iter() {
                                 keys_ut.insert(fld.clone());
                                 if let Some(var) = fld_p.get(fld) {
-                                    let _tmp = ("unify_constraint_pair@Proj<->Equiv", fld.clone(), *var, format!("{:?}", ut));
+                                    let _tmp = (
+                                        "unify_constraint_pair@Proj<->Equiv",
+                                        fld.clone(),
+                                        *var,
+                                        format!("{:?}", ut),
+                                    );
                                     try_with!(self.unify_var_utype(*var, ut.clone()) => _tmp);
                                 }
                             }

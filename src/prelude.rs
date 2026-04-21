@@ -292,7 +292,7 @@ where
 {
     match rf {
         Ok(f) => Box::new(f),
-        Err(e) => Box::new(move |_| Err(e)),
+        Err(e) => Box::new(move |_| Err(e.clone())),
     }
 }
 
