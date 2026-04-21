@@ -284,24 +284,11 @@ mod util {
         fmt_variant("F2Dot14", u16be())
     }
 
-    /// Parses a u8 value and performs a bitwise cast to i8.
-    pub(crate) fn s8() -> Format {
-        u8()
-    }
-
-    /// Parses a u16 value and performs a bitwise cast to i16.
+    /// Parses a big-endian u16 (2-byte) value that the specification indicates should be interpreted as a signed value.
+    ///
+    /// Does not actually perform type-conversion to i16.
     pub(crate) fn s16be() -> Format {
         u16be()
-    }
-
-    /// Parses a u32 value and performs a bitwise cast to i32.
-    pub(crate) fn s32be() -> Format {
-        u32be()
-    }
-
-    /// Parses a u64 value and performs a bitwise cast to i64.
-    pub(crate) fn s64be() -> Format {
-        u64be()
     }
 
     /// Helper function for parsing a big-endian u24 (3-byte) value
