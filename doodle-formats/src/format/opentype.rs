@@ -6839,7 +6839,7 @@ pub(crate) mod head {
         ]);
 
         // NOTE - Should be 2 for modern fonts but we shouldn't enforce that too strongly
-        /* ConstEnum(s16be) {
+        /* ConstEnum(i16be) {
          *     Mixed    =  0,
          *     StrongLR =  1,
          *     WeakLR   =  2,
