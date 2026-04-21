@@ -14,6 +14,36 @@ fn sig_bits(x: usize) -> usize {
     }
 }
 
+macro_rules! into_bounds {
+    ($t:ty) => {
+        impl From<$t> for Bounds {
+            fn from(x: $t) -> Self {
+                Bounds { min: x as usize, max: Some(x as usize) }
+            }
+        }
+
+        impl From<std::ops::RangeInclusive<$t>> for Bounds {
+            fn from(x: std::ops::RangeInclusive<$t>) -> Self {
+                let (min, max) = x.into_inner();
+                Bounds { min: min as usize, max: Some(max as usize) }
+            }
+        }
+
+        impl From<std::ops::RangeFrom<$t>> for Bounds {
+            fn from(x: std::ops::RangeFrom<$t>) -> Self {
+                let min = x.start as usize;
+                Bounds { min, max: None }
+            }
+        }
+    };
+}
+
+into_bounds!(u8);
+into_bounds!(u16);
+into_bounds!(u32);
+into_bounds!(u64);
+into_bounds!(usize);
+
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub struct Bounds {
     pub(crate) min: usize,
