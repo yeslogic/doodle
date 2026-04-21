@@ -1,4 +1,5 @@
 use crate::Label;
+use crate::codegen::rust_ast::RustType;
 use crate::codegen::{
     rust_ast::{
         ClosureBody, FnEntity, NumType, RustClosure, RustClosureHead, RustEntity, RustExpr,
@@ -325,7 +326,9 @@ pub(crate) fn synthesize(model: &TypedExpr<GenType>) -> RustExpr {
                         fname: RustEntity::Local(induce_binary_fname(op.inner, class)),
                     },
                     vec![lhs, rhs],
-                ),
+                )
+                .call_method("eval")
+                .wrap_try(),
                 class @ (BinOpClass::HomLossy(t1 @ t0, t2) | BinOpClass::HetLossy(t0, t1, t2)) => {
                     RustExpr::Invoke(
                         FnEntity::Synthetic {
@@ -345,6 +348,8 @@ pub(crate) fn synthesize(model: &TypedExpr<GenType>) -> RustExpr {
                             synthesize_binop(op.inner),
                         ],
                     )
+                    .call_method("eval")
+                    .wrap_try()
                 }
             }
         }
@@ -362,7 +367,9 @@ pub(crate) fn synthesize(model: &TypedExpr<GenType>) -> RustExpr {
                         fname: RustEntity::Local(induce_unary_fname(op.inner, class)),
                     },
                     vec![input],
-                ),
+                )
+                .call_method("eval")
+                .wrap_try(),
                 class @ UnaryOpClass::Lossy(t0, t1) => RustExpr::Invoke(
                     FnEntity::Synthetic {
                         fname: RustEntity::Local(Label::Borrowed(SYNTHETIC_UNARY)),
@@ -375,7 +382,9 @@ pub(crate) fn synthesize(model: &TypedExpr<GenType>) -> RustExpr {
                         ))),
                         synthesize_unary(op.inner),
                     ],
-                ),
+                )
+                .call_method("eval")
+                .wrap_try(),
             }
         }
         TypedExpr::ElabCast(_, cast, input) => {
@@ -386,15 +395,27 @@ pub(crate) fn synthesize(model: &TypedExpr<GenType>) -> RustExpr {
                 .clone()
                 .try_map_type(&coerce)
                 .expect("failed to coerce cast signature");
-            match classify_unary(None, sig) {
-                // NOTE - we avoid function stubbing for no-op casts (i.e. T -> T)
-                UnaryOpClass::Pure(_) => input,
-                class @ (UnaryOpClass::Lossy(..) | UnaryOpClass::NonLossy(..)) => RustExpr::Invoke(
-                    FnEntity::Specific {
-                        fname: RustEntity::Local(induce_cast_fname(class)),
-                    },
-                    vec![input],
-                ),
+            let is_arith = cast.op.cast_semantics.is_arithmetic();
+            if is_arith {
+                match classify_unary(None, sig) {
+                    // NOTE - we avoid function stubbing for no-op casts (i.e. T -> T)
+                    UnaryOpClass::Pure(_) => input,
+                    class @ (UnaryOpClass::Lossy(..) | UnaryOpClass::NonLossy(..)) => {
+                        RustExpr::Invoke(
+                            FnEntity::Specific {
+                                fname: RustEntity::Local(induce_cast_fname(class)),
+                            },
+                            vec![input],
+                        )
+                        .call_method("eval")
+                        .wrap_try()
+                    }
+                }
+            } else {
+                RustExpr::Operation(crate::codegen::rust_ast::RustOp::AsCast(
+                    Box::new(input),
+                    RustType::from(sig.1),
+                ))
             }
         }
     }

@@ -424,9 +424,9 @@ impl ParsedValue {
                     Value::Usize(n) => z == &BigInt::from(*n),
                     Value::Numeric(tc) => tc.eq_num(z),
                     _ => false,
-                }
+                },
                 _ => false,
-            }
+            },
             Pattern::ZRange(bounds) => match self {
                 ParsedValue::Flat(Parsed { inner: v, .. }) => match v {
                     Value::U8(n) => bounds.contains(&BigInt::from(*n)),
@@ -438,7 +438,7 @@ impl ParsedValue {
                     _ => false,
                 },
                 _ => false,
-            }
+            },
         }
     }
 

@@ -1,7 +1,7 @@
 use crate::alt::{FormatExt, FormatModuleExt, ValueTypeExt};
 use crate::bounds::Bounds;
-use crate::{BaseType, Expr, Format, FormatModule, IntoLabel, Label, TypeScope, ValueType};
 use crate::numeric::core::Bounds as NumBounds;
+use crate::{BaseType, Expr, Format, FormatModule, IntoLabel, Label, TypeScope, ValueType};
 use anyhow::Result as AResult;
 use num_bigint::BigInt;
 use serde::Serialize;
@@ -31,13 +31,15 @@ impl Pattern {
     pub const UNIT: Pattern = Pattern::Tuple(Vec::new());
 
     pub fn z_const<N>(n: N) -> Pattern
-    where BigInt: From<N>
+    where
+        BigInt: From<N>,
     {
         Pattern::ZConst(BigInt::from(n))
     }
 
     pub fn z_range<N>(min: N, max: N) -> Pattern
-    where BigInt: From<N>
+    where
+        BigInt: From<N>,
     {
         Pattern::ZRange(NumBounds::new(min.into(), max.into()))
     }
@@ -67,10 +69,19 @@ impl Pattern {
             (Pattern::U16(..), ValueType::Base(BaseType::U16)) => {}
             (Pattern::U32(..), ValueType::Base(BaseType::U32)) => {}
             (Pattern::U64(..), ValueType::Base(BaseType::U64)) => {}
-            (Pattern::Int(..), ValueType::Base(BaseType::U8 | BaseType::U16 | BaseType::U32 | BaseType::U64)) => {}
-            (Pattern::ZConst(..), ValueType::Base(BaseType::U8 | BaseType::U16 | BaseType::U32 | BaseType::U64)) => {}
-            (Pattern::ZRange(..), ValueType::Base(BaseType::U8 | BaseType::U16 | BaseType::U32 | BaseType::U64)) => {}
-            (Pattern::ZConst(..) | Pattern::ZRange(..), ValueType::UnknownNumeric) => {},
+            (
+                Pattern::Int(..),
+                ValueType::Base(BaseType::U8 | BaseType::U16 | BaseType::U32 | BaseType::U64),
+            ) => {}
+            (
+                Pattern::ZConst(..),
+                ValueType::Base(BaseType::U8 | BaseType::U16 | BaseType::U32 | BaseType::U64),
+            ) => {}
+            (
+                Pattern::ZRange(..),
+                ValueType::Base(BaseType::U8 | BaseType::U16 | BaseType::U32 | BaseType::U64),
+            ) => {}
+            (Pattern::ZConst(..) | Pattern::ZRange(..), ValueType::UnknownNumeric) => {}
             (Pattern::Tuple(ps), ValueType::Tuple(ts)) if ps.len() == ts.len() => {
                 for (p, t) in Iterator::zip(ps.iter(), ts.iter()) {
                     p.build_scope(scope, Rc::new(t.clone()));
@@ -115,10 +126,19 @@ impl Pattern {
             (Pattern::U16(..), ValueTypeExt::Base(BaseType::U16)) => {}
             (Pattern::U32(..), ValueTypeExt::Base(BaseType::U32)) => {}
             (Pattern::U64(..), ValueTypeExt::Base(BaseType::U64)) => {}
-            (Pattern::Int(..), ValueTypeExt::Base(BaseType::U8 | BaseType::U16 | BaseType::U32 | BaseType::U64)) => {}
-            (Pattern::ZConst(..), ValueTypeExt::Base(BaseType::U8 | BaseType::U16 | BaseType::U32 | BaseType::U64)) => {}
-            (Pattern::ZRange(..), ValueTypeExt::Base(BaseType::U8 | BaseType::U16 | BaseType::U32 | BaseType::U64)) => {}
-            (Pattern::ZConst(..) | Pattern::ZRange(..), ValueTypeExt::UnknownNumeric) => {},
+            (
+                Pattern::Int(..),
+                ValueTypeExt::Base(BaseType::U8 | BaseType::U16 | BaseType::U32 | BaseType::U64),
+            ) => {}
+            (
+                Pattern::ZConst(..),
+                ValueTypeExt::Base(BaseType::U8 | BaseType::U16 | BaseType::U32 | BaseType::U64),
+            ) => {}
+            (
+                Pattern::ZRange(..),
+                ValueTypeExt::Base(BaseType::U8 | BaseType::U16 | BaseType::U32 | BaseType::U64),
+            ) => {}
+            (Pattern::ZConst(..) | Pattern::ZRange(..), ValueTypeExt::UnknownNumeric) => {}
             (Pattern::Tuple(ps), ValueTypeExt::Tuple(ts)) if ps.len() == ts.len() => {
                 for (p, t) in Iterator::zip(ps.iter(), ts.iter()) {
                     p.build_scope_ext(scope, Rc::new(t.clone()));

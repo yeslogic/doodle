@@ -2796,16 +2796,8 @@ impl Promote<OpentypeDeltaSets> for DeltaSets {
                     .iter()
                     .map(|delta_set| {
                         (
-                            delta_set
-                                .delta_data_full_word
-                                .iter()
-                                .map(|u: &u32| *u as i32)
-                                .collect(),
-                            delta_set
-                                .delta_data_half_word
-                                .iter()
-                                .map(|u: &u16| *u as i16)
-                                .collect(),
+                            delta_set.delta_data_full_word.clone(),
+                            delta_set.delta_data_half_word.clone(),
                         )
                     })
                     .collect(),
@@ -2815,16 +2807,8 @@ impl Promote<OpentypeDeltaSets> for DeltaSets {
                     .iter()
                     .map(|delta_set| {
                         (
-                            delta_set
-                                .delta_data_full_word
-                                .iter()
-                                .map(|u: &u16| *u as i16)
-                                .collect(),
-                            delta_set
-                                .delta_data_half_word
-                                .iter()
-                                .map(|u: &u8| *u as i8)
-                                .collect(),
+                            delta_set.delta_data_full_word.clone(),
+                            delta_set.delta_data_half_word.clone(),
                         )
                     })
                     .collect(),
@@ -3460,10 +3444,10 @@ enum DeviceOrVariationIndexTable {
 
 #[derive(Clone, Debug)]
 enum CaretValue {
-    DesignUnits(u16),  // Format1
+    DesignUnits(i16),  // Format1
     ContourPoint(u16), // Format2
     DesignUnitsWithTable {
-        coordinate: u16,
+        coordinate: i16,
         device: Link<DeviceOrVariationIndexTable>,
     }, // Format3
 }
@@ -4807,7 +4791,7 @@ impl<'input> Promote<OpentypeSingleSubstFormat1<'input>> for SingleSubstFormat1 
 #[derive(Debug, Clone)]
 struct SingleSubstFormat1 {
     coverage: CoverageTable,
-    delta_glyph_id: s16,
+    delta_glyph_id: i16,
 }
 
 frame!(OpentypeSingleSubstFormat2);
@@ -5562,11 +5546,6 @@ enum AnchorTable {
     Format3(AnchorTableFormat3),
 }
 
-// TODO - s16be Format , so change to i16 when appropriate
-#[allow(non_camel_case_types)]
-/// Scaffolding type to allow for convenient switch-over from u16 to i16 on field parsed as s16[be]
-type s16 = u16;
-
 impl Promote<OpentypeAnchorTableFormat1> for AnchorTableFormat1 {
     fn promote(orig: &OpentypeAnchorTableFormat1) -> Self {
         AnchorTableFormat1 {
@@ -5622,21 +5601,21 @@ impl<'input> TryPromote<OpentypeAnchorTableFormat3<'input>> for AnchorTableForma
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct AnchorTableFormat1 {
-    x_coordinate: s16,
-    y_coordinate: s16,
+    x_coordinate: i16,
+    y_coordinate: i16,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct AnchorTableFormat2 {
-    x_coordinate: s16,
-    y_coordinate: s16,
+    x_coordinate: i16,
+    y_coordinate: i16,
     anchor_point: u16,
 }
 
 #[derive(Debug, Clone)]
 struct AnchorTableFormat3 {
-    x_coordinate: s16,
-    y_coordinate: s16,
+    x_coordinate: i16,
+    y_coordinate: i16,
     x_device: Option<DeviceOrVariationIndexTable>,
     y_device: Option<DeviceOrVariationIndexTable>,
 }
@@ -6041,10 +6020,10 @@ impl TryPromoteView<OpentypeValueRecord> for ValueRecord {
             .map_err(ValueParseError::value)
         };
         Ok(ValueRecord {
-            x_placement: orig.x_placement.map(as_s16),
-            y_placement: orig.y_placement.map(as_s16),
-            x_advance: orig.x_advance.map(as_s16),
-            y_advance: orig.y_advance.map(as_s16),
+            x_placement: orig.x_placement,
+            y_placement: orig.y_placement,
+            x_advance: orig.x_advance,
+            y_advance: orig.y_advance,
             x_placement_device: follow(OpentypeValueRecord::IX_X_PLACEMENT_DEVICE)?,
             y_placement_device: follow(OpentypeValueRecord::IX_Y_PLACEMENT_DEVICE)?,
             x_advance_device: follow(OpentypeValueRecord::IX_X_ADVANCE_DEVICE)?,
@@ -6418,7 +6397,7 @@ impl Promote<OpentypeKernPair> for KernPair {
         KernPair {
             left: orig.left,
             right: orig.right,
-            value: as_s16(orig.value),
+            value: orig.value,
         }
     }
 }
@@ -6539,7 +6518,7 @@ impl Promote<OpentypeKerningArray> for KerningArray {
         let size = height * width;
         let mut accum = Wec::with_capacity(width, size);
         for row in orig.kerning_values.iter() {
-            accum.extend(row.iter().map(|u| as_s16(*u)));
+            accum.extend(row.iter().copied());
         }
         KerningArray(accum)
     }
@@ -6651,12 +6630,6 @@ impl Ctxt {
     }
 }
 // !SECTION
-
-// NOTE - scaffolding to mark the values we currently parse into u16 but which are logically i16, to flag changes to the gencode API as they crop up
-#[inline(always)]
-const fn as_s16(v: u16) -> i16 {
-    v as i16
-}
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(u16)]
@@ -6818,13 +6791,16 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
             for hmet in hmtx.long_metrics.iter() {
                 accum.push(UnifiedBearing {
                     advance_width: Some(hmet.advance_width),
-                    left_side_bearing: as_s16(hmet.left_side_bearing),
+                    left_side_bearing: hmet.left_side_bearing,
                 });
             }
             for lsb in hmtx.left_side_bearings.iter() {
                 accum.push(UnifiedBearing {
                     advance_width: None,
-                    left_side_bearing: as_s16(*lsb),
+                    left_side_bearing: {
+                        let v = *lsb;
+                        v
+                    },
                 });
             }
             Heap::new(HmtxMetrics(accum))
@@ -6997,7 +6973,7 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
                     accum.push(UnifiedBearing {
                         advance_width: Some(vmet.advance_width),
                         // FIXME - if name gets changed to top_side_bearing, correct accordingly
-                        left_side_bearing: as_s16(vmet.left_side_bearing),
+                        left_side_bearing: vmet.left_side_bearing,
                     });
                 }
                 // FIXME - if name gets changed to top_side_bearings, correct accordingly
@@ -7005,7 +6981,7 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
                     accum.push(UnifiedBearing {
                         advance_width: None,
                         // FIXME - if name gets changed to top_side_bearing, correct accordingly
-                        left_side_bearing: as_s16(*tsb),
+                        left_side_bearing: *tsb,
                     });
                 }
                 VmtxMetrics(accum)
@@ -7246,10 +7222,10 @@ fn is_extra(table_id: &u32) -> bool {
 
 fn bounding_box(gl: &GlyphHeader) -> BoundingBox {
     BoundingBox {
-        x_min: as_s16(gl.x_min),
-        y_min: as_s16(gl.y_min),
-        x_max: as_s16(gl.x_max),
-        y_max: as_s16(gl.y_max),
+        x_min: gl.x_min,
+        y_min: gl.y_min,
+        x_max: gl.x_max,
+        y_max: gl.y_max,
     }
 }
 

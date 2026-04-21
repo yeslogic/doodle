@@ -261,18 +261,16 @@ mod util {
         mul(as_u32(half), Expr::U32(2))
     }
 
-    /// Given a variable identifier `var_name` representing a `u8` value, along with a bit-flag `is_positive` (`1` for positive, `0` for negative),
-    /// yields an expression of type `i16` with the magnitude of the original `u8` value and the appropriate signedness.
-    pub(crate) fn map_var_u8_to_i16(var_name: &'static str, is_positive: Expr) -> Expr {
+    /// Given a bit-flag `is_positive` (`1` for positive, `0` for negative),
+    /// parses a `u8` value and maps it into an expression of type `i16` with the magnitude of the original `u8` value and the appropriate signedness.
+    pub(crate) fn parse_u8_to_i16(is_positive: Expr) -> Format {
         use doodle::numeric::BasicUnaryOp;
-        expr_if_else(
+        if_then_else(
             is_positive,
-            numeric(num::cast_bitwise(MachineRep::I16, num::num_var(var_name))),
-            numeric(num::unary_with_rep(
-                BasicUnaryOp::Negate,
-                Some(MachineRep::I16),
-                num::num_var(var_name),
-            )),
+            map_numeric(u8(), |v| num::cast(MachineRep::I16, v)),
+            map_numeric(u8(), |v| {
+                num::unary_with_rep(BasicUnaryOp::Negate, Some(MachineRep::I16), v)
+            }),
         )
     }
 
@@ -288,22 +286,22 @@ mod util {
 
     /// Parses a u8 value and performs a bitwise cast to i8.
     pub(crate) fn s8() -> Format {
-        i8()
+        u8()
     }
 
     /// Parses a u16 value and performs a bitwise cast to i16.
     pub(crate) fn s16be() -> Format {
-        i16be()
+        u16be()
     }
 
     /// Parses a u32 value and performs a bitwise cast to i32.
     pub(crate) fn s32be() -> Format {
-        i32be()
+        u32be()
     }
 
     /// Parses a u64 value and performs a bitwise cast to i64.
     pub(crate) fn s64be() -> Format {
-        i64be()
+        u64be()
     }
 
     /// Helper function for parsing a big-endian u24 (3-byte) value
@@ -1196,8 +1194,8 @@ mod gvar {
                         fmt_variant("Delta0", compute(var("run_length"))),
                         if_then_else(
                             record_proj(var("control"), "deltas_are_words"),
-                            fmt_variant("Delta16", repeat_count(var("run_length"), util::s16be())),
-                            fmt_variant("Delta8", repeat_count(var("run_length"), util::s8())),
+                            fmt_variant("Delta16", repeat_count(var("run_length"), i16be())),
+                            fmt_variant("Delta8", repeat_count(var("run_length"), i8())),
                         ),
                     )),
                 ),
@@ -1900,9 +1898,9 @@ pub(crate) mod kern {
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/kern#format-0
     fn subtable_format0(module: &mut FormatModule) -> FormatRef {
         let kern_pair = record([
-            ("left", u16be()),        // glyph index for left-hand glyph in kerning pair
-            ("right", u16be()),       // glyph index for right-hand glyph in kerning pair
-            ("value", util::s16be()), // kerning value for given pair, in design-units. Positive values move characters apart, negative values move characters closer together.
+            ("left", u16be()),  // glyph index for left-hand glyph in kerning pair
+            ("right", u16be()), // glyph index for right-hand glyph in kerning pair
+            ("value", i16be()), // kerning value for given pair, in design-units. Positive values move characters apart, negative values move characters closer together.
         ]);
         module.define_format(
             "opentype.kern.subtable.format0",
@@ -1967,7 +1965,7 @@ pub(crate) mod kern {
                             var("left_glyph_count"), // N rows where there are N left-hand classes
                             repeat_count(
                                 var("right_glyph_count"), // M columns
-                                util::s16be(),            // FWORD value at index (i, j)
+                                i16be(),                  // FWORD value at index (i, j)
                             ),
                         ),
                     ),
@@ -2296,7 +2294,7 @@ mod base {
                     // WIP
                     ("table_scope", reify_view(vvar("table_view"))),
                     ("format", u16be()),
-                    ("coordinate", util::s16be()),
+                    ("coordinate", i16be()),
                     (
                         "data",
                         match_variant(
@@ -3072,7 +3070,10 @@ mod gpos {
         /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/gpos#lookup-type-6-subtable-mark-to-mark-attachment-positioning
         ///
         /// Parametric in `mark_class_count :~ U16`
-        pub(super) fn mark2_array(module: &mut FormatModule, anchor_table: FormatRef) -> DepFormat<1, 0> {
+        pub(super) fn mark2_array(
+            module: &mut FormatModule,
+            anchor_table: FormatRef,
+        ) -> DepFormat<1, 0> {
             let mark2_record = mark2_record(module, anchor_table);
 
             module.register_format_args(
@@ -3209,7 +3210,10 @@ mod gpos {
     /// Lookup type 9 subtable: positioning suhbtable extension
     ///
     /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/gpos#lookup-type-9-subtable-positioning-subtable-extension
-    pub(crate) fn pos_extension(module: &mut FormatModule, ground_pos: DepFormat<1, 0>) -> FormatRef {
+    pub(crate) fn pos_extension(
+        module: &mut FormatModule,
+        ground_pos: DepFormat<1, 0>,
+    ) -> FormatRef {
         module.define_format(
             "opentype.layout.pos_extension",
             let_view(
@@ -3309,7 +3313,7 @@ mod gsub {
                     "coverage",
                     util::read_phantom_view_offset16(vvar("table_view"), coverage_table.call()),
                 ),
-                ("delta_glyph_id", util::s16be()),
+                ("delta_glyph_id", i16be()),
             ]),
         );
         // Single substitution format 2
@@ -4389,10 +4393,10 @@ mod layout {
             vec![(Label::Borrowed("flags"), vf_flags_type.clone())],
             vec![Label::Borrowed("table_view")],
             record([
-                opt_field("x_placement", util::s16be()),
-                opt_field("y_placement", util::s16be()),
-                opt_field("x_advance", util::s16be()),
-                opt_field("y_advance", util::s16be()),
+                opt_field("x_placement", i16be()),
+                opt_field("y_placement", i16be()),
+                opt_field("x_advance", i16be()),
+                opt_field("y_advance", i16be()),
                 opt_field(
                     "x_placement_device",
                     util::read_phantom_view_offset16(
@@ -4470,13 +4474,10 @@ mod layout {
         device_or_variation_index_table: FormatRef,
     ) -> FormatRef {
         // REVIEW - should formats 1 and 2 be defined as well?
-        let anchor_format1 = record([
-            ("x_coordinate", util::s16be()),
-            ("y_coordinate", util::s16be()),
-        ]);
+        let anchor_format1 = record([("x_coordinate", i16be()), ("y_coordinate", i16be())]);
         let anchor_format2 = record([
-            ("x_coordinate", util::s16be()),
-            ("y_coordinate", util::s16be()),
+            ("x_coordinate", i16be()),
+            ("y_coordinate", i16be()),
             ("anchor_point", u16be()),
         ]);
         // REVIEW[epic=closure-dep-formats] - should this be a Dep-Format registration (module.define_format_args) instead?
@@ -4485,8 +4486,8 @@ mod layout {
             vec![Label::Borrowed("table_view")],
             record_auto([
                 ("table_scope", reify_view(vvar("table_view"))),
-                ("x_coordinate", util::s16be()),
-                ("y_coordinate", util::s16be()),
+                ("x_coordinate", i16be()),
+                ("y_coordinate", i16be()),
                 // REVIEW - each offset below is individually nullable if the other is set, but it may be invalid for them to both be null simultaneously...?
                 (
                     "x_device",
@@ -4923,7 +4924,7 @@ mod gdef {
         device_or_variation_index_table: FormatRef,
     ) -> FormatRef {
         // REVIEW - should we make formatrefs for formats 1 and 2 for consistency?
-        let caret_value_format_1 = record([("coordinate", util::s16be())]);
+        let caret_value_format_1 = record([("coordinate", i16be())]);
 
         let caret_value_format_2 = record([("caret_value_point_index", u16be())]);
 
@@ -4933,7 +4934,7 @@ mod gdef {
             record([
                 // REVIEW[epic=nested-format-reify-layer] - reified into local scope
                 ("table_scope", reify_view(vvar("table_view"))),
-                ("coordinate", util::s16be()),
+                ("coordinate", i16be()),
                 (
                     "table",
                     util::read_phantom_view_offset16(
@@ -5123,8 +5124,8 @@ mod common {
                     repeat_count(
                         item_count.clone(),
                         deltas(
-                            util::s32be(),
-                            util::s16be(),
+                            i32be(),
+                            i16be(),
                             record_proj(word_delta_count.clone(), "word_count"),
                             region_index_count.clone(),
                         ),
@@ -5135,8 +5136,8 @@ mod common {
                     repeat_count(
                         item_count,
                         deltas(
-                            util::s16be(),
-                            util::s8(),
+                            i16be(),
+                            i8(),
                             record_proj(word_delta_count.clone(), "word_count"),
                             region_index_count,
                         ),
@@ -5437,6 +5438,8 @@ mod glyf {
     use super::*;
 
     mod simple {
+        use doodle::numeric::TypedConst;
+
         use super::*;
 
         pub(crate) fn flags_raw(module: &mut FormatModule) -> FormatRef {
@@ -5538,22 +5541,14 @@ mod glyf {
         fn x_coords(field_set: Expr) -> Format {
             if_then_else(
                 record_proj(field_set.clone(), "x_short_vector"),
-                // overall type is i16
-                map(
-                    u8(),
-                    lambda(
-                        "abs",
-                        util::map_var_u8_to_i16(
-                            "abs",
-                            record_proj(field_set.clone(), "x_is_same_or_positive_x_short_vector"),
-                        ),
-                    ),
-                ),
+                parse_u8_to_i16(record_proj(
+                    field_set.clone(),
+                    "x_is_same_or_positive_x_short_vector",
+                )),
                 if_then_else(
                     record_proj(field_set.clone(), "x_is_same_or_positive_x_short_vector"),
-                    // type is i16
                     compute(poly_zero()),
-                    util::s16be(),
+                    i16be(),
                 ),
             )
         }
@@ -5563,22 +5558,14 @@ mod glyf {
         fn y_coords(field_set: Expr) -> Format {
             if_then_else(
                 record_proj(field_set.clone(), "y_short_vector"),
-                // overall type is i16
-                map(
-                    u8(),
-                    lambda(
-                        "abs",
-                        util::map_var_u8_to_i16(
-                            "abs",
-                            record_proj(field_set.clone(), "y_is_same_or_positive_y_short_vector"),
-                        ),
-                    ),
-                ),
+                parse_u8_to_i16(record_proj(
+                    field_set.clone(),
+                    "y_is_same_or_positive_y_short_vector",
+                )),
                 if_then_else(
                     record_proj(field_set.clone(), "y_is_same_or_positive_y_short_vector"),
-                    //  type is i16
                     compute(poly_zero()),
-                    util::s16be(),
+                    i16be(),
                 ),
             )
         }
@@ -5629,12 +5616,12 @@ mod glyf {
                     are_words,
                     if_then_else(
                         are_xy_values.clone(),
-                        fmt_variant("Int16", util::s16be()),
+                        fmt_variant("Int16", i16be()),
                         fmt_variant("Uint16", u16be()),
                     ),
                     if_then_else(
                         are_xy_values,
-                        fmt_variant("Int8", util::s8()),
+                        fmt_variant("Int8", i8()),
                         fmt_variant("Uint8", u8()),
                     ),
                 )
@@ -5847,18 +5834,18 @@ mod glyf {
         )
     }
 
-    fn glyf_entry(module: &mut FormatModule, glyf_description: FormatRef) -> FormatRef {
+    fn glyf_entry(module: &mut FormatModule, glyf_description: DepFormat<1, 0>) -> FormatRef {
         module.define_format(
             "opentype.glyf.entry",
             record([
-                ("number_of_contours", util::s16be()),
-                ("x_min", util::s16be()),
-                ("y_min", util::s16be()),
-                ("x_max", util::s16be()),
-                ("y_max", util::s16be()),
+                ("number_of_contours", i16be()),
+                ("x_min", i16be()),
+                ("y_min", i16be()),
+                ("x_max", i16be()),
+                ("y_max", i16be()),
                 (
                     "description",
-                    glyf_description.call_args(vec![var("number_of_contours")]),
+                    glyf_description.invoke_args([var("number_of_contours")]),
                 ),
             ]),
         )
@@ -5873,11 +5860,11 @@ mod glyf {
         module: &mut FormatModule,
         simple_glyf_table: DepFormat<1, 0>,
         composite_glyf_table: FormatRef,
-    ) -> FormatRef {
-        module.define_format_args(
+    ) -> DepFormat<1, 0> {
+        module.register_format_args(
             "opentype.glyf.description",
-            // actually I16 but we don't hjave that yet
-            vec![(Label::Borrowed("n_contours"), ValueType::UnknownNumeric)],
+            // actually I16 but we don't have that yet
+            [(Label::Borrowed("n_contours"), ValueType::UnknownNumeric)],
             match_variant(
                 var("n_contours"),
                 [
@@ -5885,7 +5872,11 @@ mod glyf {
                     (
                         Pattern::z_range(1, i16::MAX),
                         "Simple",
-                        simple_glyf_table.invoke_args([numeric(num::unary_with_rep(BasicUnaryOp::AbsVal, Some(MachineRep::U16), num::num_var("n_contours")))]),
+                        simple_glyf_table.invoke_args([numeric(num::unary_with_rep(
+                            BasicUnaryOp::AbsVal,
+                            Some(MachineRep::U16),
+                            num::num_var("n_contours"),
+                        ))]),
                     ),
                     (Pattern::Wildcard, "Composite", composite_glyf_table.call()),
                 ],
@@ -5940,7 +5931,7 @@ pub(crate) mod cvt {
     use super::*;
 
     pub(crate) fn table(_module: &mut FormatModule) -> Format {
-        repeat(util::s16be())
+        repeat(i16be())
     }
 }
 pub(crate) mod post {
@@ -6014,7 +6005,7 @@ pub(crate) mod post {
         let postv2dot5 = record([
             ("num_glyphs", u16be()),
             // TODO - ReadArray<'_, I8> would work here if we had a model compatible with it
-            ("offset", repeat_count(var("num_glyphs"), util::s8())),
+            ("offset", repeat_count(var("num_glyphs"), i8())),
         ]);
 
         module.define_format(
@@ -6022,8 +6013,8 @@ pub(crate) mod post {
             record([
                 ("version", util::version16_16()),
                 ("italic_angle", util::fixed32be()),
-                ("underline_position", util::s16be()),
-                ("underline_thickness", util::s16be()),
+                ("underline_position", i16be()),
+                ("underline_thickness", i16be()),
                 ("is_fixed_pitch", u32be()), // nonzero <=> fixed pitch
                 ("min_mem_type42", u32be()),
                 ("max_mem_type42", u32be()),
@@ -6079,9 +6070,9 @@ mod os2 {
                 expr_gte(table_length, Expr::U32(V0_MIN_LENGTH)),
             ),
             record([
-                ("s_typo_ascender", util::s16be()),
-                ("s_typo_descender", util::s16be()),
-                ("s_typo_line_gap", util::s16be()),
+                ("s_typo_ascender", i16be()),
+                ("s_typo_descender", i16be()),
+                ("s_typo_line_gap", i16be()),
                 ("us_win_ascent", u16be()),
                 ("us_win_descent", u16be()),
                 (
@@ -6096,8 +6087,8 @@ mod os2 {
                                 cond_maybe(
                                     is_within(var(version_ident), Bounds::at_least(2)),
                                     record([
-                                        ("sx_height", util::s16be()),
-                                        ("s_cap_height", util::s16be()),
+                                        ("sx_height", i16be()),
+                                        ("s_cap_height", i16be()),
                                         ("us_default_char", u16be()),
                                         ("us_break_char", u16be()),
                                         ("us_max_context", u16be()),
@@ -6130,21 +6121,21 @@ mod os2 {
             )],
             record([
                 ("version", u16be()),
-                ("x_avg_char_width", util::s16be()),
+                ("x_avg_char_width", i16be()),
                 ("us_weight_class", u16be()),
                 ("us_width_class", u16be()),
                 ("fs_type", u16be()),
-                ("y_subscript_x_size", util::s16be()),
-                ("y_subscript_y_size", util::s16be()),
-                ("y_subscript_x_offset", util::s16be()),
-                ("y_subscript_y_offset", util::s16be()),
-                ("y_superscript_x_size", util::s16be()),
-                ("y_superscript_y_size", util::s16be()),
-                ("y_superscript_x_offset", util::s16be()),
-                ("y_superscript_y_offset", util::s16be()),
-                ("y_strikeout_size", util::s16be()),
-                ("y_strikeout_position", util::s16be()),
-                ("s_family_class", util::s16be()),
+                ("y_subscript_x_size", i16be()),
+                ("y_subscript_y_size", i16be()),
+                ("y_subscript_x_offset", i16be()),
+                ("y_subscript_y_offset", i16be()),
+                ("y_superscript_x_size", i16be()),
+                ("y_superscript_y_size", i16be()),
+                ("y_superscript_x_offset", i16be()),
+                ("y_superscript_y_offset", i16be()),
+                ("y_strikeout_size", i16be()),
+                ("y_strikeout_position", i16be()),
+                ("s_family_class", i16be()),
                 ("panose", repeat_count(Expr::U8(10), u8())),
                 ("ul_unicode_range1", u32be()),
                 ("ul_unicode_range2", u32be()),
@@ -6315,10 +6306,8 @@ pub(crate) mod hmtx {
     use super::*;
 
     pub(crate) fn table(module: &mut FormatModule) -> FormatRef {
-        let long_horizontal_metric = record([
-            ("advance_width", u16be()),
-            ("left_side_bearing", util::s16be()),
-        ]);
+        let long_horizontal_metric =
+            record([("advance_width", u16be()), ("left_side_bearing", i16be())]);
 
         module.define_format_args(
             "opentype.hmtx.table",
@@ -6333,10 +6322,7 @@ pub(crate) mod hmtx {
                 ),
                 (
                     "left_side_bearings", // REVIEW - 'top_side_bearings' in vmtx
-                    repeat_count(
-                        sub(var("num_glyphs"), var("num_long_metrics")),
-                        util::s16be(),
-                    ),
+                    repeat_count(sub(var("num_glyphs"), var("num_long_metrics")), i16be()),
                 ),
             ]),
         )
@@ -6400,16 +6386,16 @@ pub(crate) mod hhea {
                 "minor_version",
                 util::expects_u16be([0x0000, 0x1000]), // NOTE - due to how versions are encoded for hhea/vhea tables v1.1 is `00 01 . 10 00`
             ), // FIXME - hhea only has 1.0, but vhea has 1.1 as well, so we compromise by allowing it in both to re-use it properly
-            ("ascent", util::s16be()), // distance from baseline to highest ascender, in font design units
-            ("descent", util::s16be()), // distance from baseline to lowest descender, in font design units
-            ("line_gap", util::s16be()), // intended gap between baselines, in font design units
+            ("ascent", i16be()), // distance from baseline to highest ascender, in font design units
+            ("descent", i16be()), // distance from baseline to lowest descender, in font design units
+            ("line_gap", i16be()), // intended gap between baselines, in font design units
             ("advance_width_max", u16be()), // must be consistent with horizontal metrics
-            ("min_left_side_bearing", util::s16be()), // must be consistent with horizontal metrics
-            ("min_right_side_bearing", util::s16be()), // must be consistent with horizontal metrics
-            ("x_max_extent", util::s16be()), // `max(left_side_bearing + (x_max - x_min))`
+            ("min_left_side_bearing", i16be()), // must be consistent with horizontal metrics
+            ("min_right_side_bearing", i16be()), // must be consistent with horizontal metrics
+            ("x_max_extent", i16be()), // `max(left_side_bearing + (x_max - x_min))`
             // slope of the caret (rise/run), (1/0) for vertical caret
-            ("caret_slope", record_repeat(["rise", "run"], util::s16be())),
-            ("caret_offset", util::s16be()), // 0 for non-slanted fonts
+            ("caret_slope", record_repeat(["rise", "run"], i16be())),
+            ("caret_offset", i16be()), // 0 for non-slanted fonts
             ("__reservedX4", tuple_repeat(4, util::expect_u16be(0))), // NOTE: 4 separate isolated fields in fathom
             ("metric_data_format", util::expect_u16be(0)),
             // number of `long_horizontal_metric` records in the `htmx_table`, `long_vertical_metrics` in `vmtx_table`
@@ -6605,8 +6591,7 @@ pub(crate) mod cmap {
         let subheader = record([
             ("first_code", u16be()),
             ("entry_count", u16be()),
-            // FIXME - this is actually a signed 16-bit value but we don't support that; it can be unsigned as long as we do the right wrapping addition
-            ("id_delta", util::s16be()),
+            ("id_delta", i16be()),
             ("id_range_offset", u16be()),
         ]);
 
@@ -6852,9 +6837,9 @@ pub(crate) mod head {
         // FIXME - replace with bit_fields_u16 if appropriate
         let head_table_flags = u16be();
 
-        let long_date_time = module.define_format("opentype.types.long_date_time", util::s64be());
+        let long_date_time = module.define_format("opentype.types.long_date_time", i64be());
 
-        let xy_min_max = record_repeat(["x_min", "y_min", "x_max", "y_max"], util::s16be());
+        let xy_min_max = record_repeat(["x_min", "y_min", "x_max", "y_max"], i16be());
 
         // REVIEW[epic=check-zero] - determine whether we should check for zeroing of reserved bit-fields positions
         const SHOULD_CHECK_ZERO: bool = false;

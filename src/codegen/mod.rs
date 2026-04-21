@@ -916,8 +916,13 @@ fn embed_pattern(pat: &GTPattern) -> RustPattern {
         TypedPattern::U16(n) => RustPattern::PrimLiteral(RustPrimLit::Numeric(RustNumLit::U16(*n))),
         TypedPattern::U32(n) => RustPattern::PrimLiteral(RustPrimLit::Numeric(RustNumLit::U32(*n))),
         TypedPattern::U64(n) => RustPattern::PrimLiteral(RustPrimLit::Numeric(RustNumLit::U64(*n))),
-        TypedPattern::ZConst(_, z) => RustPattern::PrimLiteral(RustPrimLit::Numeric(RustNumLit::SomeInt(z.clone()))),
-        TypedPattern::ZRange(_, range) => RustPattern::PrimRange(RustPrimLit::Numeric(RustNumLit::SomeInt(range.min.clone())), Some(RustPrimLit::Numeric(RustNumLit::SomeInt(range.max.clone())))),
+        TypedPattern::ZConst(_, z) => {
+            RustPattern::PrimLiteral(RustPrimLit::Numeric(RustNumLit::SomeInt(z.clone())))
+        }
+        TypedPattern::ZRange(_, range) => RustPattern::PrimRange(
+            RustPrimLit::Numeric(RustNumLit::SomeInt(range.min.clone())),
+            Some(RustPrimLit::Numeric(RustNumLit::SomeInt(range.max.clone()))),
+        ),
         TypedPattern::Int(gt, bounds) => match bounds.is_exact() {
             Some(n) => RustPattern::PrimLiteral(RustPrimLit::Numeric(RustNumLit::Usize(n))),
             None => match gt {
