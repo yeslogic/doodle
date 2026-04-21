@@ -70,7 +70,7 @@ pub struct Config {
 
     /// Set to true when we only care about dumping the list of tables that are present in the font but aren't handled yet
     #[builder(default = "false")]
-    extra_only: bool,
+    pub extra_only: bool,
 
     /// Determines the verbosity level of the output. Default: `VerboseLevel::Baseline`
     #[builder(default)]
@@ -1285,6 +1285,7 @@ impl<'input> container::SingleContainer<obj::AxisValueArr> for OpentypeStat<'inp
 pub enum OpentypeMetrics {
     MultiFont(MultiFontMetrics),
     SingleFont(SingleFontMetrics),
+    ExtraMagic(Vec<u32>),
 }
 
 #[derive(Clone, Debug)]
@@ -6697,15 +6698,15 @@ pub fn analyze_font_fast(test_file: &str) -> TestResult<()> {
     Ok(())
 }
 
-pub fn analyze_font(test_file: &str) -> TestResult<OpentypeMetrics> {
+pub fn analyze_font(test_file: &str, extra_only: bool) -> TestResult<OpentypeMetrics> {
     let buffer = std::fs::read(std::path::Path::new(test_file))?;
     let mut input = Parser::new(&buffer);
     let font = Decoder_opentype_main(&mut input)?;
-    // TODO: do we want to collect (and return) any metrics here?
-    match font.directory {
-        opentype_main_directory::TTCHeader(multi) => {
-            let version = (multi.major_version, multi.minor_version);
-            let (num_fonts, font_metrics) = match multi.header {
+    if extra_only {
+        let mut extra = Vec::new();
+        match font.directory {
+            opentype_main_directory::TTCHeader(multi) => {
+                match multi.header {
                 opentype_ttc_header_header::UnknownVersion(n) => {
                     return Err(Box::new(UnknownValueError {
                         what: "ttc header version".to_string(),
@@ -6713,38 +6714,74 @@ pub fn analyze_font(test_file: &str) -> TestResult<OpentypeMetrics> {
                     }));
                 }
                 opentype_ttc_header_header::Version1(v1header) => {
-                    let mut font_metrics = Vec::with_capacity(v1header.table_directories.len());
                     for font in v1header.table_directories.iter() {
-                        let tmp = match &font.data {
-                            Some(dir) => Some(analyze_table_directory(dir)?),
-                            None => None,
+                        match &font.data {
+                            Some(dir) => analyze_extra_tables(dir, &mut extra),
+                            None => (),
                         };
-                        font_metrics.push(tmp);
                     }
-                    (v1header.num_fonts as usize, font_metrics)
                 }
                 opentype_ttc_header_header::Version2(v2header) => {
-                    let mut font_metrics = Vec::with_capacity(v2header.table_directories.len());
                     for font in v2header.table_directories.iter() {
-                        let tmp = match &font.data {
-                            Some(dir) => Some(analyze_table_directory(dir)?),
-                            None => None,
+                         match &font.data {
+                            Some(dir) => analyze_extra_tables(dir, &mut extra),
+                            None => (),
                         };
-                        font_metrics.push(tmp);
                     }
-                    (v2header.num_fonts as usize, font_metrics)
                 }
-            };
-            let ret = MultiFontMetrics {
-                version,
-                num_fonts,
-                font_metrics,
-            };
-            Ok(OpentypeMetrics::MultiFont(ret))
+                }
+                Ok(OpentypeMetrics::ExtraMagic(extra))
+            },
+            opentype_main_directory::TableDirectory(single) => {
+                analyze_extra_tables(&single, &mut extra);
+                Ok(OpentypeMetrics::ExtraMagic(extra))
+            }
         }
-        opentype_main_directory::TableDirectory(single) => Ok(OpentypeMetrics::SingleFont(
-            analyze_table_directory(&single)?,
-        )),
+    } else {
+        match font.directory {
+            opentype_main_directory::TTCHeader(multi) => {
+                let version = (multi.major_version, multi.minor_version);
+                let (num_fonts, font_metrics) = match multi.header {
+                    opentype_ttc_header_header::UnknownVersion(n) => {
+                        return Err(Box::new(UnknownValueError {
+                            what: "ttc header version".to_string(),
+                            bad_value: n,
+                        }));
+                    }
+                    opentype_ttc_header_header::Version1(v1header) => {
+                        let mut font_metrics = Vec::with_capacity(v1header.table_directories.len());
+                        for font in v1header.table_directories.iter() {
+                            let tmp = match &font.data {
+                                Some(dir) => Some(analyze_table_directory(dir)?),
+                                None => None,
+                            };
+                            font_metrics.push(tmp);
+                        }
+                        (v1header.num_fonts as usize, font_metrics)
+                    }
+                    opentype_ttc_header_header::Version2(v2header) => {
+                        let mut font_metrics = Vec::with_capacity(v2header.table_directories.len());
+                        for font in v2header.table_directories.iter() {
+                            let tmp = match &font.data {
+                                Some(dir) => Some(analyze_table_directory(dir)?),
+                                None => None,
+                            };
+                            font_metrics.push(tmp);
+                        }
+                        (v2header.num_fonts as usize, font_metrics)
+                    }
+                };
+                let ret = MultiFontMetrics {
+                    version,
+                    num_fonts,
+                    font_metrics,
+                };
+                Ok(OpentypeMetrics::MultiFont(ret))
+            }
+            opentype_main_directory::TableDirectory(single) => Ok(OpentypeMetrics::SingleFont(
+                analyze_table_directory(&single)?,
+            )),
+        }
     }
 }
 
@@ -6753,6 +6790,15 @@ fn utf16be_convert(buf: &[u8]) -> String {
         .decode(buf, DecoderTrap::Ignore)
         .unwrap()
         .to_owned()
+}
+
+fn analyze_extra_tables(dir: &OpentypeFontDirectory, extra: &mut Vec<u32>) {
+    let tmp = dir
+        .table_records
+        .iter()
+        .map(|r| r.table_id)
+        .filter(is_extra);
+    extra.extend(tmp);
 }
 
 pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<SingleFontMetrics> {

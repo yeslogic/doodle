@@ -28,6 +28,9 @@ pub fn show_opentype_stats(metrics: &OpentypeMetrics, conf: &Config) {
             }
         }
         OpentypeMetrics::SingleFont(single) => show_font_metrics(single, conf),
+        OpentypeMetrics::ExtraMagic(extra) => {
+            display_extra_tags(&extra).println();
+        }
     }
 }
 

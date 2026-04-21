@@ -90,7 +90,7 @@ fn do_work(iter: impl Iterator<Item = String>, conf: Config, flags: CliFlags) {
         let mut accum = Vec::new();
         for name in iter {
             eprint!("[{name}]: ...");
-            match analyze_font(name.as_str()) {
+            match analyze_font(name.as_str(), conf.extra_only) {
                 Ok(metric) => {
                     eprintln!("Success!");
                     accum.push((name, metric))

@@ -703,6 +703,7 @@ pub(crate) fn table_links(
     let stat_table = stat::table(module, tag);
     let fvar_table = fvar::table(module, tag);
     let gvar_table = gvar::table(module);
+    let dsig_table = dsig::table(module);
 
     module.define_format_args_views(
         "opentype.table_directory.table_links",
@@ -964,6 +965,13 @@ pub(crate) fn table_links(
                     ]),
                 ),
             ),
+            ("dsig",
+                optional_table(
+                    util::FONTVIEW_VAR,
+                    var("tables"),
+                    util::magic(b"DSIG"),
+                    dsig_table.call(),
+            )),
             // !SECTION
             ("__skip", Format::SkipRemainder),
         ]),
@@ -7148,329 +7156,62 @@ pub(crate) mod stat {
     }
 }
 
-/// Alternate definitions for experimental purposes
-pub(crate) mod alt {
+pub(crate) mod dsig {
     use super::*;
-    pub(crate) fn main(module: &mut FormatModule) -> FormatRef {
-        // NOTE - Microsoft defines a tag as consisting on printable ascii characters in the range 0x20 -- 0x7E (inclusive), but some vendors are non-standard so we accept anything
-        let tag = opentype_tag(module);
 
-        let table_record = module.define_format(
-            "opentype.table_record",
-            record([
-                ("table_id", tag.call()), // should be ascending within the repetition "table_records" field in table_directory
-                ("checksum", u32be()),
-                ("offset", u32be()),
-                ("length", u32be()),
-            ]),
-        );
-
-        let table_type = module.get_format_type(table_record.get_level()).clone();
-
-        // let stub_table = module.define_format("opentype.table_stub", Format::EMPTY);
-
-        let table_links = {
-            let stat_table = stat_table(module, tag);
-
-            module.define_format_args_views(
-                "opentype.table_directory.table_links",
-                vec![(
-                    Label::Borrowed("tables"),
-                    ValueType::Seq(Box::new(table_type)),
-                )],
-                vec![FONTVIEW_LBL],
-                record_auto([
-                    (
-                        "stat",
-                        optional_table(
-                            util::FONTVIEW_VAR,
-                            var("tables"),
-                            util::magic(b"STAT"),
-                            stat_table.call(),
-                        ),
-                    ),
-                    ("__skip", Format::SkipRemainder),
-                ]),
-            )
-        };
-
-        let table_directory = module.define_format_views(
-            "opentype.table_directory",
-            vec![FONTVIEW_LBL],
-            record([
-                (
-                    "sfnt_version",
-                    where_lambda(
-                        u32be(),
-                        "version",
-                        expr_match(
-                            var("version"),
-                            [
-                                (Pattern::U32(0x0001_0000), Expr::Bool(true)),
-                                (Pattern::U32(util::magic(b"OTTO")), Expr::Bool(true)),
-                                (Pattern::U32(util::magic(b"true")), Expr::Bool(true)),
-                                (Pattern::Wildcard, Expr::Bool(false)),
-                            ],
-                        ),
-                    ),
-                ),
-                ("num_tables", u16be()),     // number of tables in directory
-                ("search_range", u16be()), // TODO[validation] - should be (maximum power of 2 <= num_tables) x 16
-                ("entry_selector", u16be()), // TODO[validation] - should be Log2(maximum power of 2 <= num_tables)
-                ("range_shift", u16be()), // TODO[validation] - should be (NumTables x 16) - searchRange
-                (
-                    "table_records",
-                    repeat_count(var("num_tables"), table_record.call()),
-                ),
-                (
-                    "table_links",
-                    table_links.call_args_views(vec![var("table_records")], vec![FONTVIEW_VAR]),
-                ),
-            ]),
-        );
-
-        let ttc_header = {
-            // Version 1.0
-            // WIP
-            let ttc_header1 = |font_view: ViewExpr| {
-                record([
-                    ("num_fonts", u32be()),
-                    (
-                        "table_directories",
-                        repeat_count(
-                            var("num_fonts"),
-                            util::read_view_offset32(
-                                font_view.clone(),
-                                table_directory.call_view(font_view),
-                            ),
-                        ),
-                    ),
-                ])
-            };
-
-            // Version 2.0
-            // WIP
-            let ttc_header2 = |font_view: ViewExpr| {
-                record([
-                    ("num_fonts", u32be()),
-                    (
-                        "table_directories",
-                        repeat_count(
-                            var("num_fonts"),
-                            util::read_view_offset32(
-                                font_view.clone(),
-                                table_directory.call_view(font_view),
-                            ),
-                        ),
-                    ),
-                    ("dsig_tag", u32be()),    // either b"DSIG" or 0 if none
-                    ("dsig_length", u32be()), // byte-length or 0 if none
-                    ("dsig_offset", u32be()), // byte-offset or 0 if none
-                ])
-            };
-
-            module.define_format_views(
-                "opentype.ttc_header",
-                vec![FONTVIEW_LBL],
-                record_auto([
-                    (
-                        "ttc_tag",
-                        where_lambda(
-                            u32be(),
-                            "tag",
-                            expr_eq(var("tag"), Expr::U32(util::magic(b"ttcf"))),
-                        ),
-                    ),
-                    ("major_version", u16be()),
-                    ("minor_version", u16be()),
-                    (
-                        "header",
-                        match_variant(
-                            var("major_version"),
-                            [
-                                (Pattern::U16(1), "Version1", ttc_header1(util::FONTVIEW_VAR)),
-                                (Pattern::U16(2), "Version2", ttc_header2(util::FONTVIEW_VAR)),
-                                // REVIEW - is this the preferred pattern (i.e. apply broadly) or do we want to fail here as well?
-                                (bind("unknown"), "UnknownVersion", compute(var("unknown"))),
-                            ],
-                        ),
-                    ),
-                    ("__skip", Format::SkipRemainder),
-                ]),
-            )
-        };
-
-        // NOTE - we have to fail to let text have its chance to parse
-        let unknown_table = Format::Fail;
-
+    /// DSIG Header format definiton
+    ///
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/dsig
+    pub fn table(module: &mut FormatModule) -> FormatRef {
+        let signature_record = signature_record(module);
+        let flags = bit_fields_u16([
+            // NOTE - spec is unclear about what the flag-bits other than bit 0 are actually for, and only specifies 1-7 as being reserved (set to 0)
+            BitFieldKind::Reserved { bit_width: 8, check_zero: false }, // Bits 8-15 : padding
+            BitFieldKind::Reserved { bit_width: 7, check_zero: true }, // Bits 1-7 : reserved
+            BitFieldKind::FlagBit("cannot_be_resigned"), // Bit 0 : Cannot be resigned
+        ]);
         module.define_format(
-            "opentype.main",
-            let_view(
-                "font_view",
-                record([
-                    ("magic", Format::Peek(Box::new(u32be()))),
-                    (
-                        "directory",
-                        match_variant(
-                            var("magic"),
-                            [
-                                (
-                                    Pattern::U32(0x00010000),
-                                    "TableDirectory",
-                                    table_directory.call_view(vvar("font_view")),
-                                ),
-                                (
-                                    Pattern::U32(util::magic(b"OTTO")),
-                                    "TableDirectory",
-                                    table_directory.call_view(vvar("font_view")),
-                                ),
-                                (
-                                    Pattern::U32(util::magic(b"ttcf")),
-                                    "TTCHeader",
-                                    ttc_header.call_view(vvar("font_view")),
-                                ),
-                                // TODO - not yet sure if TrueType fonts will parse correctly under our current table_directory implementation...
-                                (
-                                    Pattern::U32(util::magic(b"true")),
-                                    "TableDirectory",
-                                    table_directory.call_view(vvar("font_view")),
-                                ),
-                                (Pattern::Wildcard, "UnknownTable", unknown_table),
-                            ],
-                        ),
-                    ),
-                ]),
-            ),
-        )
-    }
-
-    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/stat#style-attributes-header
-    pub(crate) fn stat_table(module: &mut FormatModule, tag: FormatRef) -> FormatRef {
-        let _axis_record = {
-            module.define_format(
-                "opentype.stat.axis_record",
-                record([
-                    ("axis_tag", tag.call()),
-                    ("axis_name_id", u16be()),
-                    ("axis_ordering", u16be()),
-                ]),
-            )
-        };
-        let _axis_value_table = {
-            use BitFieldKind::*;
-            let axis_flags = bit_fields_u16([
-                Reserved {
-                    bit_width: 14,
-                    check_zero: false,
-                },
-                FlagBit("elidable_axis_value_name"), // Bit 1 - When set, indicates the 'normal' value for this axis and implies it may be omitted when composing name-strings
-                FlagBit("older_sibling_font_attribute"), // Bit 0 - When set, indicates that the axis information applies to previously released fonts in the same font-family
-            ]);
-            let axis_value = record([("axis_index", u16be()), ("value", util::fixed32be())]);
-            let f1_fields = vec![
-                ("axis_index", u16be()),
-                ("flags", axis_flags.clone()),
-                ("value_name_id", u16be()), // NameId for entries in 'name' table that provide display-string for this attribute value
-                ("value", fixed32be()),
-            ];
-            let f2_fields = vec![
-                ("axis_index", u16be()),
-                ("flags", axis_flags.clone()),
-                ("value_name_id", u16be()), // NameId for entries in 'name' table that provide display-string for this attribute value
-                ("nominal_value", fixed32be()),
-                ("range_min_value", fixed32be()),
-                ("range_max_value", fixed32be()),
-            ];
-            let f3_fields = vec![
-                ("axis_index", u16be()),
-                ("flags", axis_flags.clone()),
-                ("value_name_id", u16be()), // NameId for entries in 'name' table that provide display-string for this attribute value
-                ("value", fixed32be()),
-                ("linked_value", fixed32be()),
-            ];
-            let f4_fields = vec![
-                ("axis_count", u16be()),
-                ("flags", axis_flags.clone()),
-                ("value_name_id", u16be()), // NameId for entries in 'name' table that provide display-string for this combination of axis values
-                ("axis_values", repeat_count(var("axis_count"), axis_value)),
-            ];
-            module.define_format(
-                "opentype.stat.axis_value_table",
-                util::embedded_variadic_alternation(
-                    [("format", where_between_u16(u16be(), 1, 4))],
-                    "format",
-                    [
-                        (1, "Format1", f1_fields),
-                        (2, "Format2", f2_fields),
-                        (3, "Format3", f3_fields),
-                        (4, "Format4", f4_fields),
-                    ],
-                    "data",
-                    util::NestingKind::MinimalVariation,
-                ),
-            )
-        };
-        fn design_axes_array(view: ViewExpr, size: Expr, count: Expr, offs: Expr) -> Format {
-            /* offset32(var("table_start"), record([("design_axes", repeat_count(count, axis_record))])) */
-            fmt_let(
-                "len",
-                mul(size, count),
-                with_view(view.offset(offs), capture_bytes(var("len"))),
-            )
-        }
-        fn axis_value_offsets_array(
-            top_view: ViewExpr,
-            count: Expr,
-            offset_to_start: Expr,
-        ) -> Format {
-            // REVIEW - do we want to wrap in phantom??
-            parse_from_view(
-                top_view.offset(offset_to_start),
-                // REVIEW - do we want to extract into FormatRef??
-                let_view(
-                    "axis_value_view",
-                    record([
-                        ("axis_value_scope", reify_view(vvar("axis_value_view"))),
-                        (
-                            "axis_value_offsets",
-                            with_view(vvar("axis_value_view"), read_array(count, BaseKind::U16BE)),
-                        ), // TODO - ForEach(offset: u16) -> offsetu16(offset, axis_value_table)
-                    ]),
-                ),
-            )
-        }
-        module.define_format(
-            "opentype.stat.table",
+            "opentype.dsig",
             let_view(
                 "table_view",
                 record_auto([
-                    ("major_version", util::expect_u16be(1)),
-                    ("minor_version", util::expects_u16be([1, 2])), // Version 1.0 is deprecated
-                    ("design_axis_size", u16be()), // size (in bytes) of each axis record
-                    ("design_axis_count", u16be()), // number of axis records
-                    ("design_axes_offset", u32be()),
-                    (
-                        "design_axes_array",
-                        design_axes_array(
-                            vvar("table_view"),
-                            var("design_axis_size"),
-                            var("design_axis_count"),
-                            var("_design_axes_offset"),
-                        ),
-                    ),
-                    ("axis_value_count", u16be()),
-                    ("offset_to_axis_value_offsets", u32be()),
-                    (
-                        "axis_value_offsets",
-                        axis_value_offsets_array(
-                            vvar("table_scope"),
-                            var("axis_value_count"),
-                            var("offset_to_axis_value_offsets"),
-                        ),
-                    ), // offset is 0 iff axis_value_count is 0
-                    ("elided_fallback_name_id", u16be()), // omitted in version 1.0, but said version is deprecated
-                ]),
-            ),
+                    ("table_scope", reify_view(vvar("table_view"))),
+                    ("version", where_within(u32be(), 0x0000_0001u32)), // version is 0x0000_0001
+                    ("num_signatures", u16be()),
+                    ("flags", flags),
+                    ("signature_records", repeat_count(var("num_signatures"), signature_record.invoke_views([vvar("table_view")]))),
+                ])
+            )
+        )
+    }
+
+    fn signature_record(module: &mut FormatModule) -> DepFormat<0, 1> {
+        let sig_format1 = sig_format1(module);
+        module.register_format_views(
+            "opentype.dsig.signature_record",
+            [Label::Borrowed("_table_view")],
+            record([
+                ("format", u32be()),
+                ("length", u32be()),
+                ("signature_offset", read_phantom_view_offset32(
+                    vvar("_table_view"),
+                    fmt_match(var("format"), [
+                        (Pattern::U32(1), sig_format1.call())
+                    ])
+                )),
+            ])
+        )
+    }
+
+    fn sig_format1(module: &mut FormatModule) -> FormatRef {
+        module.define_format(
+            "opentype.dsig.sig_format1",
+            record_auto([
+                ("__reserved1", expect_u16be(0)),
+                ("__reserved2", expect_u16be(0)),
+                ("signature_length", u32be()),
+                ("signature", let_view("sig_view", with_view(vvar("sig_view"), capture_bytes(var("signature_length"))))),
+            ]),
         )
     }
 }
