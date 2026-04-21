@@ -3277,6 +3277,11 @@ italic: bool,
 bold: bool
 }
 
+/// expected size: 4
+/// trait-orphaned: no decoder functions provided
+#[derive(Debug, Copy, Clone)]
+pub enum opentype_head_table_font_direction_hint { Mixed, StrongLR, StrongRL, UnknownDirHint(i16), WeakLR, WeakRL }
+
 impl CommonObject for opentype_head_table {
 type Args<'x> = ();
 
@@ -3287,7 +3292,7 @@ Decoder_opentype_head_table(p)
 }
 }
 
-/// expected size: 64
+/// expected size: 72
 /// trait-ready: unique decoder function (d#32)
 #[derive(Debug, Copy, Clone)]
 pub struct opentype_head_table {
@@ -3303,7 +3308,7 @@ modified: i64,
 glyph_extents: opentype_head_table_glyph_extents,
 mac_style: opentype_head_table_mac_style,
 lowest_rec_ppem: u16,
-font_direction_hint: u16,
+font_direction_hint: opentype_head_table_font_direction_hint,
 index_to_loc_format: u16,
 glyph_data_format: u16
 }
@@ -7180,7 +7185,7 @@ Decoder_opentype_table_directory_table_links(p, tables, font_view)
 }
 }
 
-/// expected size: 1200
+/// expected size: 1208
 /// trait-ready: unique decoder function (d#30)
 #[derive(Debug, Clone)]
 pub struct opentype_table_directory_table_links<'input> {
@@ -7220,7 +7225,7 @@ Decoder_opentype_table_directory(p, font_view)
 }
 }
 
-/// expected size: 1240
+/// expected size: 1248
 /// trait-ready: unique decoder function (d#27)
 #[derive(Debug, Clone)]
 pub struct opentype_table_directory<'input> {
@@ -7233,7 +7238,7 @@ table_records: Vec<opentype_table_record>,
 table_links: opentype_table_directory_table_links<'input>
 }
 
-/// expected size: 1248
+/// expected size: 1256
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
 pub struct opentype_ttc_header_header_Version1_table_directories<'input> {
@@ -7285,7 +7290,7 @@ minor_version: u16,
 header: opentype_ttc_header_header<'input>
 }
 
-/// expected size: 1248
+/// expected size: 1256
 /// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InEnum { variants: [Noop, DirectHeap] }, Layout { size: 56, align: 8 (1 << 3) })
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
@@ -7301,7 +7306,7 @@ Decoder_opentype_main(p)
 }
 }
 
-/// expected size: 1256
+/// expected size: 1264
 /// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [Noop, InDef(InEnum { variants: [Noop, DirectHeap] })] }, Layout { size: 64, align: 8 (1 << 3) })
 /// trait-ready: unique decoder function (d#14)
 #[derive(Debug, Clone)]
@@ -8010,7 +8015,7 @@ noise: Vec<u8>,
 waldo: &'input [u8]
 }
 
-/// expected size: 1264
+/// expected size: 1272
 /// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InEnum { variants: [DirectHeap, Noop, Noop, DirectHeap, Noop, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, InDef(InEnum { variants: [Noop, DirectHeap] })] })] }, Noop, DirectHeap, Noop, Noop, Noop, Noop, Noop, Noop, Noop] }, Layout { size: 104, align: 8 (1 << 3) })
 /// trait-orphaned: no decoder functions provided
 #[derive(Debug, Clone)]
@@ -8116,7 +8121,7 @@ _char: u8,
 buf: Vec<u8>
 }
 
-/// expected size: 1264
+/// expected size: 1272
 /// heap outcome (HeapStrategy { absolute_cutoff: None, variant_cutoff: Some(128) }): (InRecord { fields: [InDef(InEnum { variants: [DirectHeap, Noop, Noop, DirectHeap, Noop, Noop, InTuple { pos: [InDef(InRecord { fields: [Noop, InDef(InEnum { variants: [Noop, DirectHeap] })] })] }, Noop, DirectHeap, Noop, Noop, Noop, Noop, Noop, Noop, Noop] })] }, Layout { size: 104, align: 8 (1 << 3) })
 /// trait-unready: multiple (2) decoders exist (d#{0, 1})
 #[derive(Debug, Clone)]
@@ -10973,8 +10978,53 @@ let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
 };
 let font_direction_hint = {
+let disc = {
+let raw = {
 let x = (_input.read_byte()?, _input.read_byte()?);
 u16be(x)
+};
+raw as i16
+};
+match disc {
+0 => {
+{
+();
+opentype_head_table_font_direction_hint::Mixed
+}
+},
+
+1 => {
+{
+();
+opentype_head_table_font_direction_hint::StrongLR
+}
+},
+
+2 => {
+{
+();
+opentype_head_table_font_direction_hint::WeakLR
+}
+},
+
+-1 => {
+{
+();
+opentype_head_table_font_direction_hint::StrongRL
+}
+},
+
+-2 => {
+{
+();
+opentype_head_table_font_direction_hint::WeakRL
+}
+},
+
+other => {
+opentype_head_table_font_direction_hint::UnknownDirHint(other)
+}
+}
 };
 let index_to_loc_format = {
 let inner = {

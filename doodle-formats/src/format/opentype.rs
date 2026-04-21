@@ -284,13 +284,6 @@ mod util {
         fmt_variant("F2Dot14", u16be())
     }
 
-    /// Parses a big-endian u16 (2-byte) value that the specification indicates should be interpreted as a signed value.
-    ///
-    /// Does not actually perform type-conversion to i16.
-    pub(crate) fn s16be() -> Format {
-        u16be()
-    }
-
     /// Helper function for parsing a big-endian u24 (3-byte) value
     pub(crate) fn u24be() -> Format {
         // REVIEW - should U24Be be a CommonOp?
@@ -6854,7 +6847,21 @@ pub(crate) mod head {
          *     WeakRL   = -2,
          * }
          */
-        let glyph_dir_hint = util::s16be();
+        let glyph_dir_hint = chain(
+            i16be(),
+            "disc",
+            compute(interpret_as_enum(
+                var("disc"),
+                [
+                    (Pattern::z_const(0), "Mixed"),
+                    (Pattern::z_const(1), "StrongLR"),
+                    (Pattern::z_const(2), "WeakLR"),
+                    (Pattern::z_const(-1), "StrongRL"),
+                    (Pattern::z_const(-2), "WeakRL"),
+                ],
+                Some("UnknownDirHint"),
+            )),
+        );
 
         module.define_format(
             "opentype.head_table",
