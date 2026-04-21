@@ -1905,6 +1905,27 @@ where
 }
 // !SECTION
 
+/// Given a base expression and a mapping from single-value patterns to variant names (along with an optional label for an unknown-value catch-all),
+/// yields an expression that matches on the base expression and interprets it as the implied enum.
+pub fn interpret_as_enum<const N: usize>(
+    expr: Expr,
+    mapping: [(Pattern, &'static str); N],
+    fallthrough: Option<&'static str>,
+) -> Expr {
+    expr_match(
+        expr,
+        mapping
+            .into_iter()
+            .map(|(pat, vname)| (pat, variant(vname, Expr::UNIT)))
+            .chain(fallthrough.map(|vname| {
+                (
+                    Pattern::Binding(Label::Borrowed("other")),
+                    variant(vname, var("other")),
+                )
+            })),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

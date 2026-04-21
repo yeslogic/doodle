@@ -6632,28 +6632,30 @@ impl Ctxt {
 // !SECTION
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-#[repr(u16)]
 enum DirectionHint {
-    FullyMixed = 0,
-    StrongLR = 1,
-    NeutralLR = 2,
-    StrongRL = -1i16 as u16,
-    NeutralRL = -2i16 as u16,
+    FullyMixed, // 0
+    StrongLR,   // 1,
+    NeutralLR,  // 2,
+    StrongRL,   // -1
+    NeutralRL,  // -2
 }
 
-impl TryFrom<u16> for DirectionHint {
-    type Error = Local<UnknownValueError<u16>>;
+pub type OpentypeDirectionHint = opentype_head_table_font_direction_hint;
 
-    fn try_from(value: u16) -> Result<Self, Self::Error> {
-        match value as i16 {
-            0 => Ok(DirectionHint::FullyMixed),
-            1 => Ok(DirectionHint::StrongLR),
-            2 => Ok(DirectionHint::NeutralLR),
-            -1 => Ok(DirectionHint::StrongRL),
-            -2 => Ok(DirectionHint::NeutralRL),
-            _ => Err(UnknownValueError {
+impl TryFrom<OpentypeDirectionHint> for DirectionHint {
+    type Error = Local<UnknownValueError<i16>>;
+
+    fn try_from(value: OpentypeDirectionHint) -> Result<Self, Self::Error> {
+        use opentype_head_table_font_direction_hint::*;
+        match value {
+            Mixed => Ok(DirectionHint::FullyMixed),
+            StrongLR => Ok(DirectionHint::StrongLR),
+            WeakLR => Ok(DirectionHint::NeutralLR),
+            StrongRL => Ok(DirectionHint::StrongRL),
+            WeakRL => Ok(DirectionHint::NeutralRL),
+            UnknownDirHint(bad_value) => Err(UnknownValueError {
                 what: String::from("direction-hint"),
-                bad_value: value,
+                bad_value,
             }),
         }
     }
