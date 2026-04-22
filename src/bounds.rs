@@ -18,14 +18,20 @@ macro_rules! into_bounds {
     ($t:ty) => {
         impl From<$t> for Bounds {
             fn from(x: $t) -> Self {
-                Bounds { min: x as usize, max: Some(x as usize) }
+                Bounds {
+                    min: x as usize,
+                    max: Some(x as usize),
+                }
             }
         }
 
         impl From<std::ops::RangeInclusive<$t>> for Bounds {
             fn from(x: std::ops::RangeInclusive<$t>) -> Self {
                 let (min, max) = x.into_inner();
-                Bounds { min: min as usize, max: Some(max as usize) }
+                Bounds {
+                    min: min as usize,
+                    max: Some(max as usize),
+                }
             }
         }
 
