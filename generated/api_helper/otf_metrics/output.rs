@@ -7,7 +7,7 @@ use log::error;
 
 // TODO - refactor into more cleanly encapsulated TokenStream producers and consumers
 
-pub fn show_opentype_stats(metrics: &OpentypeMetrics, conf: &Config) {
+pub fn show_opentype_stats(metrics: &OpentypeMetrics, conf: &cli::Config) {
     match metrics {
         OpentypeMetrics::MultiFont(multi) => {
             println!(
@@ -86,7 +86,7 @@ fn display_extra_tags(table_ids: &[u32]) -> TokenStream<'static> {
 }
 
 // FIXME - rewrite into pure TokenStream
-fn show_required_metrics(required: &RequiredTableMetrics, conf: &Config) {
+fn show_required_metrics(required: &RequiredTableMetrics, conf: &cli::Config) {
     display_cmap_metrics(&required.cmap, conf).println();
     // WIP - display_head_metrics(..).println();
     show_head_metrics(&required.head, conf);
@@ -109,7 +109,7 @@ fn show_required_metrics(required: &RequiredTableMetrics, conf: &Config) {
 }
 
 // FIXME - rewrite into pure TokenStream
-fn show_optional_metrics(optional: &OptionalTableMetrics, conf: &Config) {
+fn show_optional_metrics(optional: &OptionalTableMetrics, conf: &cli::Config) {
     // WIP - display_cvt_metrics(..).println();
     show_cvt_metrics(&optional.cvt, conf);
     // WIP - display_fpgm_metrics(..).println();
@@ -139,6 +139,7 @@ fn show_optional_metrics(optional: &OptionalTableMetrics, conf: &Config) {
             display_fvar_metrics(optional.fvar.as_deref(), conf),
             display_gvar_metrics(optional.gvar.as_deref(), conf),
             display_kern_metrics(&optional.kern, conf),
+            display_dsig_metrics(optional.dsig.as_ref(), conf),
         ],
         LineBreak,
     )
@@ -151,6 +152,77 @@ fn show_optional_metrics(optional: &OptionalTableMetrics, conf: &Config) {
     display_vmtx_metrics(&optional.vmtx, conf).println();
 }
 
+use dsig::display_dsig_metrics;
+mod dsig {
+    use crate::api_helper::otf_metrics::arrayfmt::display_items_elided;
+
+    use super::*;
+
+    fn display_dsig_flags(flags: DsigFlags) -> TokenStream<'static> {
+        if flags.cannot_be_resigned {
+            toks("; cannot_be_resigned=TRUE")
+        } else {
+            TokenStream::empty()
+        }
+    }
+
+    fn display_signature_block(sig: SignatureBlock) -> TokenStream<'static> {
+        let mut octets = String::new();
+        for byte in sig.sig {
+            octets.push_str(&format!("{:02x}", byte));
+        }
+        tok(format!("Signature Block: [{} bytes]: ", sig.length,)).then(toks(octets))
+    }
+
+    pub(super) fn display_dsig_metrics(
+        dsig: Option<&DsigMetrics>,
+        conf: &cli::Config,
+    ) -> TokenStream<'static> {
+        let Some(dsig) = dsig else {
+            return TokenStream::empty();
+        };
+
+        let heading =
+            toks(format!("DSIG: version {}", dsig.version)).chain(display_dsig_flags(dsig.flags));
+        if conf.verbosity.is_at_least(cli::VerboseLevel::Detailed) {
+            // NOTE - Signed difference in indentation levels (measured in half-tabs) between each table field and its multiline contents
+            const ADVANCE: i8 = 1;
+            if dsig.signatures.is_empty() {
+                heading.chain(toks("; no signatures"))
+            } else {
+                heading.glue(
+                    LineBreak,
+                    TokenStream::join_with(
+                        vec![
+                            toks(format!(
+                                "Signature Records ({} total):",
+                                dsig.signatures.len()
+                            )),
+                            display_items_elided(
+                                &dsig.signatures,
+                                |ix, sig| {
+                                    tok(format!("[{ix}]: "))
+                                        .then(display_signature_block(sig.clone()))
+                                },
+                                conf.bookend_size,
+                                |start, stop| {
+                                    toks(format!("(skipping signatures {}..{})", start, stop))
+                                        .indent_by(-1)
+                                },
+                            )
+                            .indent_by(1),
+                        ],
+                        LineBreak,
+                    )
+                    .indent_by(1),
+                )
+            }
+        } else {
+            heading
+        }
+    }
+}
+
 use gvar::display_gvar_metrics;
 mod gvar {
     use super::*;
@@ -158,7 +230,7 @@ mod gvar {
     // FIXME - rewrite into pure TokenStream
     pub(super) fn display_gvar_metrics(
         gvar: Option<&GvarMetrics>,
-        conf: &Config,
+        conf: &cli::Config,
     ) -> TokenStream<'static> {
         let Some(gvar) = gvar else {
             return TokenStream::empty();
@@ -168,7 +240,7 @@ mod gvar {
             "gvar: version {}",
             format_version_major_minor(gvar.major_version, gvar.minor_version)
         ));
-        if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
+        if conf.verbosity.is_at_least(cli::VerboseLevel::Detailed) {
             // NOTE - Signed difference in indentation levels (measured in half-tabs) between each table field and its multiline contents
             const ADVANCE: i8 = 1;
 
@@ -304,12 +376,12 @@ mod fvar {
 
     pub(super) fn display_fvar_metrics(
         fvar: Option<&FvarMetrics>,
-        conf: &Config,
+        conf: &cli::Config,
     ) -> TokenStream<'static> {
         let Some(fvar) = fvar else {
             return TokenStream::empty();
         };
-        if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
+        if conf.verbosity.is_at_least(cli::VerboseLevel::Detailed) {
             toks(format!(
                 "fvar: version {}",
                 format_version_major_minor(fvar.major_version, fvar.minor_version)
@@ -361,7 +433,10 @@ mod fvar {
         }
     }
 
-    fn display_instance_record(instance: &InstanceRecord, conf: &Config) -> TokenStream<'static> {
+    fn display_instance_record(
+        instance: &InstanceRecord,
+        conf: &cli::Config,
+    ) -> TokenStream<'static> {
         // FIXME - rewrite into more natively TokenStream-oriented production
         tok(format!(
             "Subfamily={:?};{} ",
@@ -398,7 +473,7 @@ mod fvar {
 }
 
 // FIXME - rewrite into pure TokenStream
-fn show_cvt_metrics(cvt: &Option<CvtMetrics>, _conf: &Config) {
+fn show_cvt_metrics(cvt: &Option<CvtMetrics>, _conf: &cli::Config) {
     let Some(RawArrayMetrics(count)) = cvt else {
         return;
     };
@@ -407,21 +482,21 @@ fn show_cvt_metrics(cvt: &Option<CvtMetrics>, _conf: &Config) {
 }
 
 // FIXME - rewrite into pure TokenStream
-fn show_fpgm_metrics(fpgm: &Option<FpgmMetrics>, _conf: &Config) {
+fn show_fpgm_metrics(fpgm: &Option<FpgmMetrics>, _conf: &cli::Config) {
     if let Some(RawArrayMetrics(count)) = fpgm {
         println!("fpgm: uint8[{count}]")
     }
 }
 
 // FIXME - rewrite into pure TokenStream
-fn show_prep_metrics(prep: &Option<PrepMetrics>, _conf: &Config) {
+fn show_prep_metrics(prep: &Option<PrepMetrics>, _conf: &cli::Config) {
     if let Some(RawArrayMetrics(count)) = prep {
         println!("prep: uint8[{count}]")
     }
 }
 
 // FIXME - rewrite into pure TokenStream
-fn show_loca_metrics(loca: &Option<LocaMetrics>, _conf: &Config) {
+fn show_loca_metrics(loca: &Option<LocaMetrics>, _conf: &cli::Config) {
     if let Some(()) = loca {
         println!("loca: (details omitted)")
     }
@@ -434,7 +509,7 @@ mod gdef {
 
     pub(super) fn display_gdef_metrics(
         gdef: Option<&GdefMetrics>,
-        conf: &Config,
+        conf: &cli::Config,
     ) -> TokenStream<'static> {
         let Some(GdefMetrics {
             major_version,
@@ -452,7 +527,7 @@ mod gdef {
             "GDEF: version {}",
             format_version_major_minor(*major_version, *minor_version)
         ));
-        if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
+        if conf.verbosity.is_at_least(cli::VerboseLevel::Detailed) {
             let mut components = Vec::new();
 
             if let Some(glyph_class_def) = glyph_class_def {
@@ -484,7 +559,7 @@ mod gdef {
             heading
         }
     }
-    fn display_attach_point(point_indices: &[u16], conf: &Config) -> TokenStream<'static> {
+    fn display_attach_point(point_indices: &[u16], conf: &cli::Config) -> TokenStream<'static> {
         arrayfmt::display_items_inline(
             point_indices,
             |point_ix| toks(u16::to_string(point_ix)),
@@ -494,7 +569,7 @@ mod gdef {
     }
 
     /// Tokenizer for `AttachList` (multiline)
-    fn display_attach_list(attach_list: &AttachList, conf: &Config) -> TokenStream<'static> {
+    fn display_attach_list(attach_list: &AttachList, conf: &cli::Config) -> TokenStream<'static> {
         toks("AttachList:").glue(
             LineBreak,
             TokenStream::join_with(
@@ -509,7 +584,10 @@ mod gdef {
     }
 
     /// Tokenizer for arrays of AttachPoints (multiline)
-    fn display_attach_point_array(array: &[AttachPoint], conf: &Config) -> TokenStream<'static> {
+    fn display_attach_point_array(
+        array: &[AttachPoint],
+        conf: &cli::Config,
+    ) -> TokenStream<'static> {
         arrayfmt::display_items_elided(
             array,
             |ix, AttachPoint { point_indices }| {
@@ -529,7 +607,7 @@ mod gdef {
     /// Tokenizer for `LigCaretList` (multiline)
     fn display_lig_caret_list(
         lig_caret_list: &LigCaretList,
-        conf: &Config,
+        conf: &cli::Config,
     ) -> TokenStream<'static> {
         toks("LigCaretList:").glue(
             LineBreak,
@@ -545,7 +623,7 @@ mod gdef {
     }
 
     /// Tokenizer for arrays of LigGlyphs (multiline)
-    fn display_lig_glyph_array(array: &[LigGlyph], conf: &Config) -> TokenStream<'static> {
+    fn display_lig_glyph_array(array: &[LigGlyph], conf: &cli::Config) -> TokenStream<'static> {
         arrayfmt::display_items_elided(
             array,
             |ix, lig_glyph| {
@@ -566,7 +644,7 @@ mod gdef {
     /// Tokenizer for GDEF mark-attach `ClassDef` (multiline)
     fn display_mark_attach_class_def(
         mark_attach_class_def: &ClassDef,
-        conf: &Config,
+        conf: &cli::Config,
     ) -> TokenStream<'static> {
         toks("MarkAttachClassDef:").glue(
             LineBreak,
@@ -575,7 +653,7 @@ mod gdef {
     }
 
     /// Tokenizer for GDEF glyph `ClassDef` (multiline)
-    fn display_glyph_class_def(class_def: &ClassDef, conf: &Config) -> TokenStream<'static> {
+    fn display_glyph_class_def(class_def: &ClassDef, conf: &cli::Config) -> TokenStream<'static> {
         toks("GlyphClassDef:").glue(
             LineBreak,
             display_class_def(class_def, display_glyph_class, conf).indent_by(1),
@@ -594,7 +672,7 @@ mod gdef {
         toks(format_glyph_class(class))
     }
 
-    fn display_mark_glyph_set(mgs: &MarkGlyphSet, conf: &Config) -> TokenStream<'static> {
+    fn display_mark_glyph_set(mgs: &MarkGlyphSet, conf: &cli::Config) -> TokenStream<'static> {
         toks("MarkGlyphSet:").glue(
             LineBreak,
             arrayfmt::display_items_elided(
@@ -633,7 +711,7 @@ mod gdef {
 
     fn display_item_variation_store(
         ivs: &ItemVariationStore,
-        conf: &Config,
+        conf: &cli::Config,
     ) -> TokenStream<'static> {
         toks("ItemVariationStore:").glue(
             LineBreak,
@@ -644,7 +722,10 @@ mod gdef {
         )
     }
 
-    fn display_variation_regions(vrl: &VariationRegionList, conf: &Config) -> TokenStream<'static> {
+    fn display_variation_regions(
+        vrl: &VariationRegionList,
+        conf: &cli::Config,
+    ) -> TokenStream<'static> {
         toks(format!(
             "VariationRegions: {} regions ({} axes)",
             vrl.0.len(),
@@ -669,7 +750,7 @@ mod gdef {
     /// Tokenizer for arrays of ItemVariationData (multiline)
     fn display_variation_data_array(
         ivda: &[Option<ItemVariationData>],
-        conf: &Config,
+        conf: &cli::Config,
     ) -> TokenStream<'static> {
         toks(format!("ItemVariationData[{}]", ivda.len())).glue(
             LineBreak,
@@ -687,7 +768,7 @@ mod gdef {
             .indent_by(2),
         )
     }
-    fn display_variation_data(ivd: &ItemVariationData, conf: &Config) -> TokenStream<'static> {
+    fn display_variation_data(ivd: &ItemVariationData, conf: &cli::Config) -> TokenStream<'static> {
         let full_bits = if ivd.long_words { 32 } else { 16 };
 
         toks("ItemVariationData:").glue(
@@ -717,14 +798,14 @@ mod gdef {
 
     /// Tokenizer for DeltaSets (inline).
     // STUB - scaffolding-only implementation
-    fn display_delta_sets(_sets: &DeltaSets, _conf: &Config) -> TokenStream<'static> {
+    fn display_delta_sets(_sets: &DeltaSets, _conf: &cli::Config) -> TokenStream<'static> {
         // STUB - figure out what we actually want to show
         toks(format!("<display_delta_sets: incomplete>"))
     }
 
     fn display_variation_axes(
         per_region: &[RegionAxisCoordinates],
-        conf: &Config,
+        conf: &cli::Config,
     ) -> TokenStream<'static> {
         TokenStream::join_with(
             vec![
@@ -757,7 +838,7 @@ mod gdef {
 }
 
 /// Tokenizer for `BaseMetrics` (inline)
-fn display_base_metrics(base: &Option<BaseMetrics>, _conf: &Config) -> TokenStream<'static> {
+fn display_base_metrics(base: &Option<BaseMetrics>, _conf: &cli::Config) -> TokenStream<'static> {
     if let Some(BaseMetrics {
         major_version,
         minor_version,
@@ -781,7 +862,7 @@ mod layout {
     pub(super) fn display_layout_metrics(
         layout: Option<&LayoutMetrics>,
         ctxt: Ctxt,
-        conf: &Config,
+        conf: &cli::Config,
     ) -> TokenStream<'static> {
         let Some(LayoutMetrics {
             major_version,
@@ -799,7 +880,7 @@ mod layout {
             name_for_table_disc(ctxt.get_disc().expect("Ctxt missing TableDiscriminator")),
             format_version_major_minor(*major_version, *minor_version)
         ));
-        if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
+        if conf.verbosity.is_at_least(cli::VerboseLevel::Detailed) {
             minimal.glue(
                 LineBreak,
                 TokenStream::join_with(
@@ -826,7 +907,7 @@ mod layout {
     }
 
     // TODO - convert to tokenstream producer
-    fn display_script_list(script_list: &ScriptList, conf: &Config) -> TokenStream<'static> {
+    fn display_script_list(script_list: &ScriptList, conf: &cli::Config) -> TokenStream<'static> {
         if script_list.is_empty() {
             toks("ScriptList [empty]")
         } else {
@@ -849,7 +930,7 @@ mod layout {
     fn display_script_record(
         ix: usize,
         item: &ScriptRecord,
-        conf: &Config,
+        conf: &cli::Config,
     ) -> TokenStream<'static> {
         let Some(ScriptTable {
             default_lang_sys,
@@ -875,7 +956,7 @@ mod layout {
     /// Tokenizer for LangSysRecords (multiline)
     fn display_lang_sys_records(
         lang_sys_records: &[LangSysRecord],
-        conf: &Config,
+        conf: &cli::Config,
     ) -> TokenStream<'static> {
         if lang_sys_records.is_empty() {
             toks("LangSysRecords: <empty list>")
@@ -903,7 +984,7 @@ mod layout {
     /// # Panics
     ///
     /// Will panic if `lang_sys` is `None`.
-    fn display_langsys(lang_sys: &Option<LangSys>, conf: &Config) -> TokenStream<'static> {
+    fn display_langsys(lang_sys: &Option<LangSys>, conf: &cli::Config) -> TokenStream<'static> {
         let Some(LangSys {
             lookup_order_offset,
             required_feature_index,
@@ -925,7 +1006,10 @@ mod layout {
         ))
     }
 
-    fn display_feature_list(feature_list: &FeatureList, conf: &Config) -> TokenStream<'static> {
+    fn display_feature_list(
+        feature_list: &FeatureList,
+        conf: &cli::Config,
+    ) -> TokenStream<'static> {
         if feature_list.is_empty() {
             toks("FeatureList [empty]")
         } else {
@@ -952,7 +1036,7 @@ mod layout {
     }
 
     /// Tokenizer for FeatureTable (inline)
-    fn display_feature_table(table: &FeatureTable, conf: &Config) -> TokenStream<'static> {
+    fn display_feature_table(table: &FeatureTable, conf: &cli::Config) -> TokenStream<'static> {
         let FeatureTable {
             feature_params,
             lookup_list_indices,
@@ -974,7 +1058,7 @@ mod layout {
     fn display_lookup_list(
         lookup_list: &LookupList,
         ctxt: Ctxt,
-        conf: &Config,
+        conf: &cli::Config,
     ) -> TokenStream<'static> {
         toks("LookupList:").glue(
             LineBreak,
@@ -996,7 +1080,7 @@ mod layout {
     fn display_lookup_table(
         table: &LookupTable,
         ctxt: Ctxt,
-        conf: &Config,
+        conf: &cli::Config,
     ) -> TokenStream<'static> {
         // NOTE - because we print the kind of the lookup here, we don't need to list it for every element
         // LINK[format-lookup-subtable] -  (see display_lookup_subtable below)
@@ -1028,7 +1112,7 @@ mod layout {
     fn display_lookup_subtable(
         subtable: &LookupSubtable,
         show_lookup_type: bool,
-        conf: &Config,
+        conf: &cli::Config,
     ) -> TokenStream<'static> {
         let (label, contents) = match subtable {
             LookupSubtable::SinglePos(single_pos) => ("SinglePos", display_single_pos(single_pos)),
@@ -1126,7 +1210,7 @@ mod layout {
 
     fn display_chained_sequence_context(
         chain_ctx: &ChainedSequenceContext,
-        _conf: &Config,
+        _conf: &cli::Config,
     ) -> TokenStream<'static> {
         // REVIEW - since we are already within an inline elision context, try to avoid taking up too much space per item, but this might not want to be a hardcoded value
         // FIXME - show_lookup_table calls this function through display_items_inline already, so we might want to reduce how many values we are willing to show proportionally
@@ -1210,7 +1294,10 @@ mod layout {
         }
     }
 
-    fn display_single_subst(single_subst: &SingleSubst, conf: &Config) -> TokenStream<'static> {
+    fn display_single_subst(
+        single_subst: &SingleSubst,
+        conf: &cli::Config,
+    ) -> TokenStream<'static> {
         match single_subst {
             SingleSubst::Format1(SingleSubstFormat1 {
                 coverage,
@@ -1874,14 +1961,14 @@ mod stat {
     use super::*;
 
     // FIXME - refactor into pure TokenStream
-    pub(crate) fn show_stat_metrics(stat: Option<&StatMetrics>, conf: &Config) {
+    pub(crate) fn show_stat_metrics(stat: Option<&StatMetrics>, conf: &cli::Config) {
         if let Some(stat) = stat {
             println!(
                 "STAT: version {} (elidedFallbackName: name[id={}])",
                 format_version_major_minor(stat.major_version, stat.minor_version),
                 stat.elided_fallback_name_id.0
             );
-            if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
+            if conf.verbosity.is_at_least(cli::VerboseLevel::Detailed) {
                 match stat.design_axes.len() {
                     0 => (),
                     n => {
@@ -1925,7 +2012,7 @@ mod stat {
         }
     }
 
-    fn display_design_axis(axis: &DesignAxis, _conf: &Config) -> TokenStream<'static> {
+    fn display_design_axis(axis: &DesignAxis, _conf: &cli::Config) -> TokenStream<'static> {
         toks(format!(
             "Tag={} ; Axis NameID={} ; Ordering={}",
             axis.axis_tag, axis.axis_name_id.0, axis.axis_ordering
@@ -1949,7 +2036,7 @@ mod stat {
         }
     }
 
-    fn display_axis_value(value: &AxisValue, conf: &Config) -> TokenStream<'static> {
+    fn display_axis_value(value: &AxisValue, conf: &cli::Config) -> TokenStream<'static> {
         match value {
             AxisValue::Format1(AxisValueFormat1 {
                 axis_index,
@@ -2024,7 +2111,7 @@ mod kern {
     /// Tokenizer for KernMEtrics
     pub(super) fn display_kern_metrics(
         kern: &Option<KernMetrics>,
-        conf: &Config,
+        conf: &cli::Config,
     ) -> TokenStream<'static> {
         let Some(kern) = kern else {
             return TokenStream::empty();
@@ -2032,7 +2119,7 @@ mod kern {
 
         let heading = toks(format!("kern: {} kerning subtables", kern.subtables.len()));
 
-        if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
+        if conf.verbosity.is_at_least(cli::VerboseLevel::Detailed) {
             heading.glue(
                 LineBreak,
                 arrayfmt::display_items_elided(
@@ -2074,7 +2161,7 @@ mod kern {
     }
 
     /// Tokenizer for KerningArray (multiline).
-    fn display_kerning_array(array: &KerningArray, conf: &Config) -> TokenStream<'static> {
+    fn display_kerning_array(array: &KerningArray, conf: &cli::Config) -> TokenStream<'static> {
         arrayfmt::display_wec_rows_elided(
             &array.0,
             |ix, row| {
@@ -2094,7 +2181,10 @@ mod kern {
     }
 
     /// Tokenizer for KernClassTable (inline).
-    fn display_kern_class_table(table: &KernClassTable, conf: &Config) -> TokenStream<'static> {
+    fn display_kern_class_table(
+        table: &KernClassTable,
+        conf: &cli::Config,
+    ) -> TokenStream<'static> {
         tok(format!(
             "Classes[first={}, nGlyphs={}]: ",
             format_glyphid_hex(table.first_glyph, true),
@@ -2111,7 +2201,7 @@ mod kern {
     /// Tokenizer for KernSubtableData (inline or multiline).
     fn display_kern_subtable_data(
         subtable_data: &KernSubtableData,
-        conf: &Config,
+        conf: &cli::Config,
     ) -> TokenStream<'static> {
         match subtable_data {
             KernSubtableData::Format0(KernSubtableFormat0 { kern_pairs }) => {
@@ -2146,7 +2236,7 @@ mod kern {
         }
     }
 
-    fn display_kern_subtable(subtable: &KernSubtable, conf: &Config) -> TokenStream<'static> {
+    fn display_kern_subtable(subtable: &KernSubtable, conf: &cli::Config) -> TokenStream<'static> {
         tok(format!(
             "KernSubtable ({}): ",
             format_kern_flags(subtable.flags)
@@ -2159,7 +2249,7 @@ mod kern {
 fn display_class_def(
     class_def: &ClassDef,
     show_fn: impl Fn(&u16) -> TokenStream<'static>,
-    conf: &Config,
+    conf: &cli::Config,
 ) -> TokenStream<'static> {
     match *class_def {
         ClassDef::Format1 {
@@ -2358,7 +2448,7 @@ fn display_coverage_table_overview(cov: &CoverageTable) -> TokenStream<'static> 
 /// The number of glyphs or glyph-ranges explicitly shown at the beginning and end of the coverage is determined by the Config-specified bookending value (`inline_bookend`).
 ///
 /// As the output of this function will almost always be more verbose than that of `display_coverage_table_overview`, it is suitable only for contexts where space is less constrained and a more detailed picture of the coverage is preferred.
-fn display_coverage_table_full(cov: &CoverageTable, conf: &Config) -> TokenStream<'static> {
+fn display_coverage_table_full(cov: &CoverageTable, conf: &cli::Config) -> TokenStream<'static> {
     match cov {
         CoverageTable::Format1 { glyph_array } => {
             tok("Glyphs Covered: ").then(arrayfmt::display_items_inline(
@@ -2397,7 +2487,7 @@ mod gasp {
 
     pub(crate) fn display_gasp_metrics(
         gasp: &Option<GaspMetrics>,
-        conf: &Config,
+        conf: &cli::Config,
     ) -> TokenStream<'static> {
         if let Some(GaspMetrics {
             version,
@@ -2406,7 +2496,7 @@ mod gasp {
         }) = gasp
         {
             let heading = toks(format!("gasp: version {version}, {num_ranges} ranges"));
-            if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
+            if conf.verbosity.is_at_least(cli::VerboseLevel::Detailed) {
                 heading.glue(
                     LineBreak,
                     arrayfmt::display_items_elided(
@@ -2489,12 +2579,14 @@ fn format_version_major_minor(major: u16, minor: u16) -> String {
 
 use cmap::display_cmap_metrics;
 mod cmap {
+    use crate::api_helper::otf_metrics::cmap::EncodingRecord;
+
     use super::*;
 
-    pub(crate) fn display_cmap_metrics(cmap: &Cmap, conf: &Config) -> TokenStream<'static> {
+    pub(crate) fn display_cmap_metrics(cmap: &Cmap, conf: &cli::Config) -> TokenStream<'static> {
         let heading = toks(format!("cmap: version {}", cmap.version));
 
-        if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
+        if conf.verbosity.is_at_least(cli::VerboseLevel::Detailed) {
             heading.glue(
                 LineBreak,
                 arrayfmt::display_items_elided(
@@ -2528,7 +2620,7 @@ mod cmap {
 }
 
 // FIXME - Refactor into pure TokenStream
-fn show_head_metrics(head: &HeadMetrics, _conf: &Config) {
+fn show_head_metrics(head: &HeadMetrics, _conf: &cli::Config) {
     println!(
         "head: version {}, {}",
         format_version_major_minor(head.major_version, head.minor_version),
@@ -2537,7 +2629,7 @@ fn show_head_metrics(head: &HeadMetrics, _conf: &Config) {
 }
 
 // FIXME - Refactor into pure TokenStream
-fn show_hhea_metrics(hhea: &HheaMetrics, _conf: &Config) {
+fn show_hhea_metrics(hhea: &HheaMetrics, _conf: &cli::Config) {
     println!(
         "hhea: table version {}, {} horizontal long metrics",
         format_version_major_minor(hhea.major_version, hhea.minor_version),
@@ -2546,7 +2638,7 @@ fn show_hhea_metrics(hhea: &HheaMetrics, _conf: &Config) {
 }
 
 // FIXME - Refactor into pure TokenStream
-fn show_vhea_metrics(vhea: &Option<VheaMetrics>, _conf: &Config) {
+fn show_vhea_metrics(vhea: &Option<VheaMetrics>, _conf: &cli::Config) {
     if let Some(vhea) = vhea {
         println!(
             "vhea: table version {}, {} vertical long metrics",
@@ -2560,8 +2652,11 @@ use hmtx::display_hmtx_metrics;
 mod hmtx {
     use super::*;
 
-    pub(crate) fn display_hmtx_metrics(hmtx: &HmtxMetrics, conf: &Config) -> TokenStream<'static> {
-        if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
+    pub(crate) fn display_hmtx_metrics(
+        hmtx: &HmtxMetrics,
+        conf: &cli::Config,
+    ) -> TokenStream<'static> {
+        if conf.verbosity.is_at_least(cli::VerboseLevel::Detailed) {
             toks("hmtx:").glue(
                 LineBreak,
                 arrayfmt::display_items_elided(
@@ -2596,7 +2691,7 @@ mod vmtx {
     // FIXME - refactor into pure TokenStream
     pub(crate) fn display_vmtx_metrics(
         vmtx: &Option<VmtxMetrics>,
-        conf: &Config,
+        conf: &cli::Config,
     ) -> TokenStream<'static> {
         let Some(vmtx) = vmtx else {
             return TokenStream::empty();
@@ -2604,7 +2699,7 @@ mod vmtx {
 
         let heading = toks(format!("vmtx: {} vmetrics", vmtx.0.len()));
 
-        if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
+        if conf.verbosity.is_at_least(cli::VerboseLevel::Detailed) {
             heading.glue(
                 LineBreak,
                 arrayfmt::display_items_elided(
@@ -2636,7 +2731,7 @@ mod vmtx {
     }
 }
 
-fn display_maxp_metrics(maxp: &MaxpMetrics, _conf: &Config) -> TokenStream<'static> {
+fn display_maxp_metrics(maxp: &MaxpMetrics, _conf: &cli::Config) -> TokenStream<'static> {
     match maxp {
         MaxpMetrics::Postscript { version } => toks(format!(
             "maxp: version {} (PostScript)",
@@ -2655,7 +2750,7 @@ fn display_maxp_metrics(maxp: &MaxpMetrics, _conf: &Config) -> TokenStream<'stat
 }
 
 // FIXME - rewrite into pure TokenStream
-fn show_name_metrics(name: &NameMetrics, conf: &Config) {
+fn show_name_metrics(name: &NameMetrics, conf: &cli::Config) {
     // STUB - add more details if appropriate
     match &name.lang_tag_records {
         Some(records) => {
@@ -2671,7 +2766,7 @@ fn show_name_metrics(name: &NameMetrics, conf: &Config) {
             name.version, name.name_count
         ),
     }
-    if conf.verbosity.is_at_least(VerboseLevel::Baseline) {
+    if conf.verbosity.is_at_least(cli::VerboseLevel::Baseline) {
         let mut missing_name = true;
         for record in name.name_records.iter() {
             match record {
@@ -2692,12 +2787,12 @@ fn show_name_metrics(name: &NameMetrics, conf: &Config) {
     }
 }
 
-fn show_os2_metrics(os2: &Os2Metrics, _conf: &Config) {
+fn show_os2_metrics(os2: &Os2Metrics, _conf: &cli::Config) {
     // TODO - Metrics type is a stub, enrich if anything is 'interesting'
     println!("os/2: version {}", os2.version);
 }
 
-fn show_post_metrics(post: &PostMetrics, _conf: &Config) {
+fn show_post_metrics(post: &PostMetrics, _conf: &cli::Config) {
     // STUB - Metrics is just an alias for the raw type, enrich and refactor if appropriate
     println!(
         "post: version {} ({})",
@@ -2717,13 +2812,13 @@ mod glyf {
     // FIXME - refactor into pure TokenStream
     pub(crate) fn display_glyf_metrics(
         glyf: &Option<GlyfMetrics>,
-        conf: &Config,
+        conf: &cli::Config,
     ) -> TokenStream<'static> {
         let Some(glyf) = glyf.as_ref() else {
             return TokenStream::empty();
         };
         let hdr = tok(format!("glyf: {} glyphs", glyf.num_glyphs));
-        if conf.verbosity.is_at_least(VerboseLevel::Detailed) {
+        if conf.verbosity.is_at_least(cli::VerboseLevel::Detailed) {
             hdr.then(LineBreak.then(arrayfmt::display_items_elided(
                 glyf.glyphs.as_slice(),
                 display_glyph_metric,
