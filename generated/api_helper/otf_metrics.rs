@@ -6707,31 +6707,31 @@ pub fn analyze_font(test_file: &str, extra_only: bool) -> TestResult<OpentypeMet
         match font.directory {
             opentype_main_directory::TTCHeader(multi) => {
                 match multi.header {
-                opentype_ttc_header_header::UnknownVersion(n) => {
-                    return Err(Box::new(UnknownValueError {
-                        what: "ttc header version".to_string(),
-                        bad_value: n,
-                    }));
-                }
-                opentype_ttc_header_header::Version1(v1header) => {
-                    for font in v1header.table_directories.iter() {
-                        match &font.data {
-                            Some(dir) => analyze_extra_tables(dir, &mut extra),
-                            None => (),
-                        };
+                    opentype_ttc_header_header::UnknownVersion(n) => {
+                        return Err(Box::new(UnknownValueError {
+                            what: "ttc header version".to_string(),
+                            bad_value: n,
+                        }));
                     }
-                }
-                opentype_ttc_header_header::Version2(v2header) => {
-                    for font in v2header.table_directories.iter() {
-                         match &font.data {
-                            Some(dir) => analyze_extra_tables(dir, &mut extra),
-                            None => (),
-                        };
+                    opentype_ttc_header_header::Version1(v1header) => {
+                        for font in v1header.table_directories.iter() {
+                            match &font.data {
+                                Some(dir) => analyze_extra_tables(dir, &mut extra),
+                                None => (),
+                            };
+                        }
                     }
-                }
+                    opentype_ttc_header_header::Version2(v2header) => {
+                        for font in v2header.table_directories.iter() {
+                            match &font.data {
+                                Some(dir) => analyze_extra_tables(dir, &mut extra),
+                                None => (),
+                            };
+                        }
+                    }
                 }
                 Ok(OpentypeMetrics::ExtraMagic(extra))
-            },
+            }
             opentype_main_directory::TableDirectory(single) => {
                 analyze_extra_tables(&single, &mut extra);
                 Ok(OpentypeMetrics::ExtraMagic(extra))

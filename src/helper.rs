@@ -1592,6 +1592,19 @@ pub fn capture_bytes(len: Expr) -> ViewFormat {
     ViewFormat::CaptureBytes(Box::new(len))
 }
 
+/// Constructs a View-based parse of `len` bytes as a borrowed buffer-slice, rather than
+/// as a constructed sequence (Vec) of bytes.
+// TODO[epic=first-class-helper-candidate] - consider implementing 'Here' View to obviate the need for a named view
+pub fn from_here(view_format: ViewFormat) -> Format {
+    const VIEW_NAME: &str = "here_view";
+    let_view(VIEW_NAME, with_view(vvar(VIEW_NAME), view_format))
+}
+
+/// Helper for [`from_here`] fused with [`capture_bytes`].
+pub fn capture_bytes_from_here(len: Expr) -> Format {
+    from_here(capture_bytes(len))
+}
+
 /// Helper for [`ViewFormat::ReadArray`]
 pub fn read_array(len: Expr, kind: BaseKind<Endian>) -> ViewFormat {
     ViewFormat::ReadArray(Box::new(len), kind)

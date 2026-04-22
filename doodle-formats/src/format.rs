@@ -19,10 +19,6 @@ pub mod tiff;
 pub mod waldo;
 pub mod zlib;
 
-pub fn main_stat(module: &mut FormatModule) -> FormatRef {
-    opentype::alt::main(module)
-}
-
 pub fn main(module: &mut FormatModule) -> FormatRef {
     let deflate = deflate::main(module);
 
