@@ -8,84 +8,99 @@ use encoding::{
     DecoderTrap, Encoding,
     all::{MAC_ROMAN, UTF_16BE},
 };
-use fixed::types::{I2F14, I16F16};
 
-// SECTION - CLI-related utilities
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Default)]
-#[repr(u8)]
-pub enum VerboseLevel {
-    #[default]
-    Baseline = 0, // Default verbose level: show at least the presence and version of each table, perhaps more for larger or more detailed tables
-    Detailed = 1, // Show at least as much as necessary to sanity-check specific values at a debugger level
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash)]
-pub enum Verbosity {
-    Minimal,
-    VerboseLevel(VerboseLevel),
-}
-
-impl std::default::Default for Verbosity {
-    fn default() -> Self {
-        Verbosity::VerboseLevel(VerboseLevel::default())
+#[macro_use]
+mod alias {
+    macro_rules! alias {
+        ($( pub type $alias:ident = $orig:ident $(< $lt:lifetime >)? ; )+ ) => {
+            $(
+                pub type $alias$(<$lt>)? = crate::$orig$(<$lt>)?;
+            )*
+        }
     }
 }
 
-impl Verbosity {
-    fn is_at_least(&self, other: impl Into<Self>) -> bool {
-        self >= &other.into()
+pub mod cli {
+    use super::*;
+
+    // SECTION - CLI-related utilities
+    #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Default)]
+    #[repr(u8)]
+    pub enum VerboseLevel {
+        #[default]
+        Baseline = 0, // Default verbose level: show at least the presence and version of each table, perhaps more for larger or more detailed tables
+        Detailed = 1, // Show at least as much as necessary to sanity-check specific values at a debugger level
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash)]
+    pub enum Verbosity {
+        Minimal,
+        VerboseLevel(VerboseLevel),
+    }
+
+    impl std::default::Default for Verbosity {
+        fn default() -> Self {
+            Verbosity::VerboseLevel(VerboseLevel::default())
+        }
+    }
+
+    impl Verbosity {
+        pub(crate) fn is_at_least(&self, other: impl Into<Self>) -> bool {
+            self >= &other.into()
+        }
+    }
+
+    impl VerboseLevel {
+        pub const MIN_LEVEL: Self = VerboseLevel::Baseline;
+        pub const MAX_LEVEL: Self = VerboseLevel::Detailed;
+    }
+
+    impl From<u8> for VerboseLevel {
+        fn from(value: u8) -> Self {
+            let clamped = value.clamp(VerboseLevel::MIN_LEVEL as u8, VerboseLevel::MAX_LEVEL as u8);
+            unsafe { std::mem::transmute(clamped) }
+        }
+    }
+
+    impl From<VerboseLevel> for Verbosity {
+        fn from(value: VerboseLevel) -> Self {
+            Self::VerboseLevel(value)
+        }
+    }
+
+    /// Set of configurable values that control which metrics are shown, and in how much detail
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Builder)]
+    #[builder(setter(into))]
+    #[builder(build_fn(error = "std::convert::Infallible"))]
+    pub struct Config {
+        /// Controls how many leading and trailing values to show (before abbreviating) in multi-line display of array-based values. Default: 8
+        #[builder(default = "8")]
+        pub(crate) bookend_size: usize,
+
+        /// Controls how many leading and trailing values to show (before abbreviating) in inline display of array-based values. Default: 3
+        #[builder(default = "3")]
+        pub(crate) inline_bookend: usize,
+
+        /// Set to true when we only care about dumping the list of tables that are present in the font but aren't handled yet
+        #[builder(default = "false")]
+        pub extra_only: bool,
+
+        /// Determines the verbosity level of the output. Default: `VerboseLevel::Baseline`
+        #[builder(default)]
+        pub(crate) verbosity: Verbosity,
+
+        /// The locale to apply when selecting which records to show while parsing `name` tables. Default: English
+        #[builder(default)]
+        pub(crate) locale: LocaleSelector,
+    }
+
+    impl std::default::Default for Config {
+        fn default() -> Self {
+            ConfigBuilder::default().build().unwrap()
+        }
     }
 }
-
-impl VerboseLevel {
-    pub const MIN_LEVEL: Self = VerboseLevel::Baseline;
-    pub const MAX_LEVEL: Self = VerboseLevel::Detailed;
-}
-
-impl From<u8> for VerboseLevel {
-    fn from(value: u8) -> Self {
-        let clamped = value.clamp(VerboseLevel::MIN_LEVEL as u8, VerboseLevel::MAX_LEVEL as u8);
-        unsafe { std::mem::transmute(clamped) }
-    }
-}
-
-impl From<VerboseLevel> for Verbosity {
-    fn from(value: VerboseLevel) -> Self {
-        Self::VerboseLevel(value)
-    }
-}
-
-/// Set of configurable values that control which metrics are shown, and in how much detail
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Builder)]
-#[builder(setter(into))]
-#[builder(build_fn(error = "std::convert::Infallible"))]
-pub struct Config {
-    /// Controls how many leading and trailing values to show (before abbreviating) in multi-line display of array-based values. Default: 8
-    #[builder(default = "8")]
-    bookend_size: usize,
-
-    /// Controls how many leading and trailing values to show (before abbreviating) in inline display of array-based values. Default: 3
-    #[builder(default = "3")]
-    inline_bookend: usize,
-
-    /// Set to true when we only care about dumping the list of tables that are present in the font but aren't handled yet
-    #[builder(default = "false")]
-    pub extra_only: bool,
-
-    /// Determines the verbosity level of the output. Default: `VerboseLevel::Baseline`
-    #[builder(default)]
-    verbosity: Verbosity,
-
-    /// The locale to apply when selecting which records to show while parsing `name` tables. Default: English
-    #[builder(default)]
-    locale: LocaleSelector,
-}
-
-impl std::default::Default for Config {
-    fn default() -> Self {
-        ConfigBuilder::default().build().unwrap()
-    }
-}
+pub use cli::{Config, ConfigBuilder, VerboseLevel, Verbosity};
 // !SECTION
 
 pub type OpentypeTag = u32;
@@ -97,134 +112,295 @@ impl Promote<OpentypeTag> for Tag {
     }
 }
 
-// REVIEW - no module-level definition so the names are the semi-arbitrary 'first' one the code-generator sees
-pub type OpentypeFixed = opentype_head_table_font_revision;
-pub type Fixed = I16F16;
+pub mod otf_types {
+    use super::traits::Promote;
+    use crate::*;
+    use fixed::types::{I2F14, I16F16};
 
-impl Promote<OpentypeFixed> for Fixed {
-    fn promote(orig: &OpentypeFixed) -> Self {
-        match orig {
-            OpentypeFixed::Fixed32(raw) => I16F16::from_bits(*raw as i32),
+    // REVIEW - no module-level definition so the name is the semi-arbitrary 'first' one the code-generator sees
+    pub type OpentypeFixed = opentype_head_table_font_revision;
+
+    pub type Fixed = I16F16;
+
+    impl Promote<OpentypeFixed> for Fixed {
+        fn promote(orig: &OpentypeFixed) -> Self {
+            match orig {
+                OpentypeFixed::Fixed32(raw) => I16F16::from_bits(*raw as i32),
+            }
         }
     }
-}
 
-pub type OpentypeF2Dot14 = opentype_gvar_tuple_record_coordinates;
-pub type F2Dot14 = I2F14;
+    // REVIEW - no module-level definition so the name is the semi-arbitrary 'first' one the code-generator sees
+    pub type OpentypeF2Dot14 = opentype_gvar_tuple_record_coordinates;
 
-impl Promote<OpentypeF2Dot14> for F2Dot14 {
-    fn promote(orig: &OpentypeF2Dot14) -> Self {
-        match orig {
-            OpentypeF2Dot14::F2Dot14(raw) => I2F14::from_bits(*raw as i16),
+    pub type F2Dot14 = I2F14;
+
+    impl Promote<OpentypeF2Dot14> for F2Dot14 {
+        fn promote(orig: &OpentypeF2Dot14) -> Self {
+            match orig {
+                OpentypeF2Dot14::F2Dot14(raw) => I2F14::from_bits(*raw as i16),
+            }
         }
     }
+    // SECTION - Type aliases for stable referencing of commonly-used generated types
+
+    alias! {
+        pub type OpentypeFontDirectory = opentype_table_directory<'input>;
+
+        pub type OpentypeGlyf = opentype_glyf_table<'a>;
+
+        pub type OpentypeCmap = opentype_cmap_table<'a>;
+
+        pub type OpentypeHead = opentype_head_table;
+
+        pub type OpentypeHhea = opentype_hhea_table;
+
+        pub type OpentypeHmtx = opentype_hmtx_table;
+
+        pub type OpentypeHmtxLongMetric = opentype_hmtx_table_long_metrics;
+
+        pub type OpentypeMaxp = opentype_maxp_table;
+
+        pub type OpentypeName = opentype_name_table<'a>;
+
+        pub type OpentypeOs2 = opentype_os2_table;
+
+        pub type OpentypePost = opentype_post_table<'a>;
+
+        pub type OpentypeBase = opentype_base_table<'a>;
+
+        pub type OpentypeGdef = opentype_gdef_table<'a>;
+
+        pub type OpentypeGpos = opentype_gpos_table<'a>;
+
+        pub type OpentypeGsub = opentype_gsub_table<'a>;
+
+        pub type OpentypeKern = opentype_kern_table<'a>;
+
+        pub type OpentypeStat = opentype_stat_table<'a>;
+
+        pub type OpentypeFvar = opentype_fvar_table<'a>;
+
+        pub type OpentypeGvar = opentype_gvar_table<'a>;
+
+        pub type OpentypeDsig = opentype_dsig<'a>;
+    }
+
+    // STUB[epic=horizontal-for-vertical] - change to distinguished type names once we have them
+    pub type OpentypeVhea = opentype_hhea_table;
+
+    pub type OpentypeVmtx = opentype_hmtx_table;
+
+    pub type OpentypeVmtxLongMetric = opentype_hmtx_table_long_metrics;
 }
-
-// SECTION - Type aliases for stable referencing of commonly-used generated types
-pub type OpentypeFontDirectory<'input> = opentype_table_directory<'input>;
-
-// REVIEW - consider naming for the following glyf-related items
-pub type OpentypeGlyf<'a> = opentype_glyf_table<'a>;
-pub type OpentypeGlyfEntry = opentype_glyf_table_glyphs;
-pub type OpentypeGlyph = opentype_glyf_table_glyphs_Glyph;
-pub type GlyphHeader = opentype_glyf_entry;
-pub type GlyphDescription = opentype_glyf_description;
-pub type SimpleGlyph = opentype_glyf_simple;
-
-pub type OpentypeCmap<'a> = opentype_cmap_table<'a>;
-pub type OpentypeHead = opentype_head_table;
-pub type OpentypeHhea = opentype_hhea_table;
-
-pub type OpentypeHmtx = opentype_hmtx_table;
-pub type OpentypeHmtxLongMetric = opentype_hmtx_table_long_metrics;
-
-pub type OpentypeMaxp = opentype_maxp_table;
-pub type OpentypeName<'a> = opentype_name_table<'a>;
-pub type OpentypeOs2 = opentype_os2_table;
-pub type OpentypePost<'a> = opentype_post_table<'a>;
-
-pub type OpentypeBase<'a> = opentype_base_table<'a>;
-pub type OpentypeGdef<'a> = opentype_gdef_table<'a>;
-
-pub type OpentypeGdefTableData<'a> = opentype_gdef_table_data<'a>;
-
-pub type OpentypeAttachPoint = opentype_gdef_attach_point;
-pub type OpentypeCoverageTable = opentype_coverage_table;
-pub type OpentypeCoverageTableData = opentype_coverage_table_data;
-pub type OpentypeCoverageRangeRecord = opentype_coverage_table_data_Format2_range_records;
-
-pub type OpentypeGpos<'input> = opentype_gpos_table<'input>;
-pub type OpentypeGsub<'input> = opentype_gsub_table<'input>;
-
-pub type OpentypeKern<'a> = opentype_kern_table<'a>;
-pub type OpentypeStat<'a> = opentype_stat_table<'a>;
-pub type OpentypeFvar<'input> = opentype_fvar_table<'input>;
-pub type OpentypeGvar<'input> = opentype_gvar_table<'input>;
-
-// STUB[epic=horizontal-for-vertical] - change to distinguished type names once we have them
-pub type OpentypeVhea = opentype_hhea_table;
-pub type OpentypeVmtx = opentype_hmtx_table;
-pub type OpentypeVmtxLongMetric = opentype_hmtx_table_long_metrics;
+pub use otf_types::*;
 // !SECTION
 
 // SECTION - Helper traits for consistent-style conversion from generated types to the types we use to represent them in the API Helper
 
-/// Helper trait for promoting unexpectedly-null Offset-Options into non-Option values of the target type.
-trait FromNull: Sized {
-    /// Constructs the logically 'null' value of type `Self`.
-    fn from_null() -> Self;
+mod traits {
+    use super::{Link, PResult, View, value_parse::ValueParseError};
+    /// Helper trait for promoting unexpectedly-null Offset-Options into non-Option values of the target type.
+    pub(super) trait FromNull: Sized {
+        /// Constructs the logically 'null' value of type `Self`.
+        fn from_null() -> Self;
 
-    /// Returns `value` if `opt` is `Some(value)`, else returns `Self::from_null()`.
-    fn renew(opt: Option<Self>) -> Self {
-        opt.unwrap_or_else(Self::from_null)
-    }
-}
-
-impl<T> FromNull for T
-where
-    T: std::default::Default,
-{
-    fn from_null() -> Self {
-        T::default()
+        /// Returns `value` if `opt` is `Some(value)`, else returns `Self::from_null()`.
+        fn renew(opt: Option<Self>) -> Self {
+            opt.unwrap_or_else(Self::from_null)
+        }
     }
 
-    fn renew(opt: Option<Self>) -> Self {
-        opt.unwrap_or_default()
-    }
-}
+    impl<T> FromNull for T
+    where
+        T: std::default::Default,
+    {
+        fn from_null() -> Self {
+            T::default()
+        }
 
-impl<T, Original> Promote<Option<Original>> for T
-where
-    T: FromNull + Promote<Original>,
-{
-    fn promote(orig: &Option<Original>) -> Self {
-        Self::renew(orig.as_ref().map(T::promote))
+        fn renew(opt: Option<Self>) -> Self {
+            opt.unwrap_or_default()
+        }
     }
-}
 
-/// Helper trait for converting from a borrowed value of type `Original` into an owned value of type `Self`,
-/// as a short-cut to avoid the need to clone fields we would ultimately either discard, simplify, or unpack
-/// if we were to implement `From<Original>`  instead.
-///
-/// Avoids the need for lifetimes in the signature of the trait or its associated impls, relying on the fact
-/// that the lifetime of the borrowed source-object has no bearing on the target object's longevity.
-trait Promote<Original>: Sized {
-    /// Convert from `Original` into `Self`.
+    impl<T, Original> Promote<Option<Original>> for T
+    where
+        T: FromNull + Promote<Original>,
+    {
+        fn promote(orig: &Option<Original>) -> Self {
+            Self::renew(orig.as_ref().map(T::promote))
+        }
+    }
+
+    /// Helper trait for converting from a borrowed value of type `Original` into an owned value of type `Self`,
+    /// as a short-cut to avoid the need to clone fields we would ultimately either discard, simplify, or unpack
+    /// if we were to implement `From<Original>`  instead.
     ///
-    /// # Panics
-    ///
-    /// Should not panic. If the conversion can fail, use [`TryPromote`] instead
-    fn promote(orig: &Original) -> Self;
-}
+    /// Avoids the need for lifetimes in the signature of the trait or its associated impls, relying on the fact
+    /// that the lifetime of the borrowed source-object has no bearing on the target object's longevity.
+    pub(super) trait Promote<Original>: Sized {
+        /// Convert from `Original` into `Self`.
+        ///
+        /// # Panics
+        ///
+        /// Should not panic. If the conversion can fail, use [`TryPromote`] instead
+        fn promote(orig: &Original) -> Self;
+    }
 
-/// Variant of [`Promote`] for cases where the conversion from `&Original` may have failure-cases.
-trait TryPromote<Original>: Sized {
-    /// The error-type returned when a given conversion cannot succeed.
-    type Error: std::error::Error;
+    /// Variant of [`Promote`] for cases where the conversion from `&Original` may have failure-cases.
+    pub(super) trait TryPromote<Original>: Sized {
+        /// The error-type returned when a given conversion cannot succeed.
+        type Error: std::error::Error;
 
-    /// Fallibly convert from the `Original` into `Self`.
-    fn try_promote(orig: &Original) -> Result<Self, Self::Error>;
+        /// Fallibly convert from the `Original` into `Self`.
+        fn try_promote(orig: &Original) -> Result<Self, Self::Error>;
+    }
+
+    /// Variant of `Promote` for objects holding offsets but which do not encapsulate the `View` they are relative to.
+    pub(super) trait PromoteView<Original>: Sized {
+        /// Convert a source-object to `Self` using the provided `View``.
+        fn promote_view(orig: &Original, view: View<'_>) -> PResult<Self>;
+    }
+
+    /// Variant of `TryPromote` for objects holding offsets but which do not encapsulate the `View` they are relative to.
+    pub(super) trait TryPromoteView<Original>: Sized {
+        /// The error-type returned when a given conversion cannot succeed.
+        type Error<'input>: std::error::Error
+        where
+            Original: 'input;
+
+        /// Fallibly post-process from a source-object to `Self` using the provided `View``.
+        fn try_promote_view<'input>(
+            orig: &'input Original,
+            view: View<'input>,
+        ) -> Result<Self, ValueParseError<Self::Error<'input>>>
+        where
+            Original: 'input;
+    }
+
+    /// Custom trait that facilitates conversion from partially-borrowed non-atomic types
+    /// without needing explicit lifetimes in the trait signature itself.
+    pub(super) trait TryFromRef<Original: _Ref>: Sized {
+        type Error: std::error::Error;
+
+        /// Fallibly convert from the GAT `Ref<'a>` defined on `Original` (via the `_Ref` trait), into `Self`.
+        fn try_from_ref(orig: <Original as _Ref>::Ref<'_>) -> Result<Self, Self::Error>;
+    }
+
+    /// Helper trait for implementing custom partial-borrow-semantics for non-atomic types
+    pub(super) trait _Ref {
+        /// A partial borrow of `Self` that lives at least as long as `'a`.
+        type Ref<'a>;
+    }
+
+    impl<T, U> _Ref for (T, U)
+    where
+        T: Copy + 'static,
+        U: 'static,
+    {
+        type Ref<'a> = (T, &'a U);
+    }
+
+    /// Takes an option over `O` and directly promotes it to `T` if `Some(_)`, otherwise returning `T::from_null()`.
+    pub(super) fn promote_from_null<O, T>(orig_opt: &Option<O>) -> T
+    where
+        T: FromNull + Promote<O>,
+    {
+        T::renew(orig_opt.as_ref().map(T::promote))
+    }
+
+    /// Takes an option over `O` and calls `try_promote` if it is `Some(_)`, otherwise returning
+    /// `Ok(T::from_null())`.
+    pub(super) fn try_promote_from_null<O, T>(orig_opt: &Option<O>) -> Result<T, T::Error>
+    where
+        T: FromNull + TryPromote<O>,
+    {
+        Ok(T::renew(orig_opt.as_ref().map(T::try_promote).transpose()?))
+    }
+
+    /// Takes an iterable over `O` and directly promotes each item to `T`, returning a `Vec<T>`.
+    pub(super) fn promote_all<O, I, T>(orig: I) -> Vec<T>
+    where
+        T: Promote<O>,
+        I: IntoIterator<Item = O>,
+    {
+        orig.into_iter().map(|raw| T::promote(&raw)).collect()
+    }
+
+    /// Takes an iterable over `O` and directly promotes each item to `T`, returning a `Vec<T>`.
+    pub(super) fn promote_all_ok<O, I, T, E>(orig: I, count: usize) -> Result<Vec<T>, E>
+    where
+        T: Promote<O>,
+        I: IntoIterator<Item = Result<O, E>>,
+    {
+        let mut ret = Vec::with_capacity(count);
+        for raw in orig {
+            ret.push(T::promote(&raw?));
+        }
+        Ok(ret)
+    }
+
+    pub(super) fn promote_vec<O, T>(orig_slice: &[O]) -> Vec<T>
+    where
+        T: Promote<O>,
+    {
+        orig_slice.iter().map(T::promote).collect()
+    }
+
+    pub(super) fn try_promote_vec<O, T, E>(orig_slice: &[O]) -> Result<Vec<T>, E>
+    where
+        T: TryPromote<O, Error = E>,
+    {
+        let mut ret = Vec::with_capacity(orig_slice.len());
+        for elem in orig_slice {
+            ret.push(T::try_promote(elem)?);
+        }
+        Ok(ret)
+    }
+
+    pub(super) fn promote_vec_view<O, T>(orig_slice: &[O], view: View<'_>) -> PResult<Vec<T>>
+    where
+        T: PromoteView<O>,
+    {
+        let mut ret = Vec::with_capacity(orig_slice.len());
+        for elem in orig_slice {
+            ret.push(T::promote_view(elem, view)?);
+        }
+        Ok(ret)
+    }
+
+    pub(super) fn promote_opt<O, T>(orig_opt: &Option<O>) -> Option<T>
+    where
+        T: Promote<O>,
+    {
+        orig_opt.as_ref().map(T::promote)
+    }
+
+    pub(super) fn try_promote_opt<O, T>(orig: &Option<O>) -> Result<Option<T>, T::Error>
+    where
+        T: TryPromote<O>,
+    {
+        orig.as_ref().map(T::try_promote).transpose()
+    }
+
+    pub(super) fn try_promote_opt_view<'input, O, T>(
+        orig: &'input Option<O>,
+        view: View<'input>,
+    ) -> Result<Option<T>, ValueParseError<T::Error<'input>>>
+    where
+        T: TryPromoteView<O>,
+    {
+        orig.as_ref()
+            .map(|orig| T::try_promote_view(orig, view))
+            .transpose()
+    }
 }
+use traits::{
+    _Ref, FromNull, Promote, PromoteView, TryFromRef, TryPromote, TryPromoteView, promote_all_ok,
+    promote_from_null, promote_opt, promote_vec, promote_vec_view, try_promote_from_null,
+    try_promote_opt, try_promote_opt_view, try_promote_vec,
+};
 
 #[macro_use]
 /// Submodule for boilerplate around objects holding views and offsets, and the nominal objects those offsets point to.
@@ -240,7 +416,7 @@ pub mod container {
             impl<'input> $crate::api_helper::otf_metrics::container::ViewFrame<'input>
                 for $ty<'input>
             {
-                fn scope(&self) -> View<'input> {
+                fn scope(&self) -> doodle::prelude::View<'input> {
                     self.table_scope
                 }
             }
@@ -339,217 +515,285 @@ pub mod container {
 
         fn get_offset_at_index(&self, ix: usize) -> Option<usize>;
     }
-}
 
-pub fn reify<'input, Frame, Obj>(frame: &'input Frame, _proxy: Obj) -> Obj::Output<'input>
-where
-    Frame: container::ViewFrame<'input> + container::SingleContainer<Obj>,
-    Obj: container::CommonObject,
-{
-    let args = frame.get_args();
-    let offset = frame.get_offset();
-    Obj::parse_offset(frame.scope(), offset, args).unwrap_or_else(|e| {
-        panic!(
-            "failed to parse (reify::<{}, {}>): {e}",
-            std::any::type_name::<Frame>(),
-            std::any::type_name::<Obj>()
-        )
-    })
-}
+    /// Wrapper type for CommonObject artifacts for offsets that are intended to be nullable (which yields Option<T::Output>)
+    pub struct Nullable<T>(pub T);
 
-pub fn reify_index<'input, Frame, Obj, const N: usize>(
-    frame: &'input Frame,
-    _proxy: Obj,
-    ix: usize,
-) -> Obj::Output<'input>
-where
-    Frame: container::ViewFrame<'input> + container::MultiContainer<Obj, N>,
-    Obj: container::CommonObject<Args<'input>: Clone>,
-{
-    let tmp = frame.get_args_array();
-    let offset = frame.get_offset_array()[ix];
-    Obj::parse_offset(frame.scope(), offset, tmp[ix].clone()).unwrap_or_else(|e| {
-        panic!(
-            "failed to parse (reify_index::<{}, {}>(.., {ix}): {e}",
-            std::any::type_name::<Frame>(),
-            std::any::type_name::<Obj>(),
-        )
-    })
-}
+    /// Wrapper type for CommonObject artifacts that are explicitly intended to be non-nullable (panics at runtime if offset is 0)
+    pub struct Mandatory<T>(pub T);
 
-pub fn reify_all_index<'input, Frame, Obj, const N: usize>(
-    frame: &'input Frame,
-    _proxy: Obj,
-    ix: usize,
-) -> impl Iterator<Item = Obj::Output<'input>> + 'input
-where
-    Frame: container::ViewFrame<'input> + container::MultiDynContainer<Obj, N>,
-    Obj: container::CommonObject + 'static,
-{
-    assert!(ix < N, "index out of bounds");
-    let offset_iter = frame.iter_offsets_at_index(ix);
-    let args_iter = frame.iter_args_at_index(ix);
-    Iterator::zip(offset_iter, args_iter).map(move |(offset, args)| {
+    impl<O: CommonObject> CommonObject for Nullable<O> {
+        type Args<'a> = O::Args<'a>;
+        type Output<'a> = Option<O::Output<'a>>;
+
+        fn parse_offset<'input>(
+            view: View<'input>,
+            offset: usize,
+            args: Self::Args<'input>,
+        ) -> PResult<Self::Output<'input>> {
+            O::parse_nullable_offset(view, offset, args)
+        }
+
+        fn parse<'input>(
+            _p: &mut Parser<'input>,
+            _args: Self::Args<'input>,
+        ) -> PResult<Self::Output<'input>> {
+            unimplemented!("Nullable::parse is explicitly left unimplemented")
+        }
+    }
+
+    impl<O: CommonObject> CommonObject for Mandatory<O> {
+        type Args<'a> = O::Args<'a>;
+        type Output<'a> = O::Output<'a>;
+
+        fn parse_offset<'input>(
+            view: View<'input>,
+            offset: usize,
+            args: Self::Args<'input>,
+        ) -> PResult<Self::Output<'input>> {
+            assert_ne!(
+                offset,
+                0,
+                "Mandatory<{}> found offset=0 (null)",
+                std::any::type_name::<O>()
+            );
+            O::parse_offset(view, offset, args)
+        }
+
+        fn parse<'input>(
+            _p: &mut Parser<'input>,
+            _args: Self::Args<'input>,
+        ) -> PResult<Self::Output<'input>> {
+            unimplemented!("Mandatory::parse is explicitly left unimplemented")
+        }
+    }
+}
+use container::{Mandatory, Nullable};
+
+mod fn_reify {
+    use super::PResult;
+    use super::View;
+    use super::container;
+    use super::obj;
+
+    pub(super) fn reify<'input, Frame, Obj>(
+        frame: &'input Frame,
+        _proxy: Obj,
+    ) -> Obj::Output<'input>
+    where
+        Frame: container::ViewFrame<'input> + container::SingleContainer<Obj>,
+        Obj: container::CommonObject,
+    {
+        let args = frame.get_args();
+        let offset = frame.get_offset();
+        Obj::parse_offset(frame.scope(), offset, args).unwrap_or_else(|e| {
+            panic!(
+                "failed to parse (reify::<{}, {}>): {e}",
+                std::any::type_name::<Frame>(),
+                std::any::type_name::<Obj>()
+            )
+        })
+    }
+
+    pub(super) fn reify_index<'input, Frame, Obj, const N: usize>(
+        frame: &'input Frame,
+        _proxy: Obj,
+        ix: usize,
+    ) -> Obj::Output<'input>
+    where
+        Frame: container::ViewFrame<'input> + container::MultiContainer<Obj, N>,
+        Obj: container::CommonObject<Args<'input>: Clone>,
+    {
+        let tmp = frame.get_args_array();
+        let offset = frame.get_offset_array()[ix];
+        Obj::parse_offset(frame.scope(), offset, tmp[ix].clone()).unwrap_or_else(|e| {
+            panic!(
+                "failed to parse (reify_index::<{}, {}>(.., {ix}): {e}",
+                std::any::type_name::<Frame>(),
+                std::any::type_name::<Obj>(),
+            )
+        })
+    }
+
+    pub(super) fn reify_all_index<'input, Frame, Obj, const N: usize>(
+        frame: &'input Frame,
+        _proxy: Obj,
+        ix: usize,
+    ) -> impl Iterator<Item = Obj::Output<'input>> + 'input
+    where
+        Frame: container::ViewFrame<'input> + container::MultiDynContainer<Obj, N>,
+        Obj: container::CommonObject + 'static,
+    {
+        assert!(ix < N, "index out of bounds");
+        let offset_iter = frame.iter_offsets_at_index(ix);
+        let args_iter = frame.iter_args_at_index(ix);
+        Iterator::zip(offset_iter, args_iter).map(move |(offset, args)| {
+            // REVIEW - should individual failure-to-parse cause the entire iteration to panic?
+            Obj::parse_offset(frame.scope(), offset, args).unwrap_or_else(|e| {
+                panic!(
+                    "failed to parse (reify_all_index::<{}, {}>(.., {ix}): {e}",
+                    std::any::type_name::<Frame>(),
+                    std::any::type_name::<Obj>()
+                )
+            })
+        })
+    }
+
+    pub(super) fn reify_all<'input, Frame, Obj>(
+        frame: &'input Frame,
+        _proxy: Obj,
+    ) -> impl Iterator<Item = Obj::Output<'input>> + 'input
+    where
+        Frame: container::ViewFrame<'input> + container::DynContainer<Obj>,
+        Obj: container::CommonObject<Args<'input>: Clone> + 'static,
+    {
         // REVIEW - should individual failure-to-parse cause the entire iteration to panic?
-        Obj::parse_offset(frame.scope(), offset, args).unwrap_or_else(|e| {
-            panic!(
-                "failed to parse (reify_all_index::<{}, {}>(.., {ix}): {e}",
-                std::any::type_name::<Frame>(),
-                std::any::type_name::<Obj>()
-            )
+        Iterator::zip(frame.iter_offsets(), frame.iter_args()).map(move |(offset, args)| {
+            Obj::parse_offset(frame.scope(), offset, args).unwrap_or_else(|e| {
+                panic!(
+                    "failed to parse (reify_all::<{}, {}>): {e}",
+                    std::any::type_name::<Frame>(),
+                    std::any::type_name::<Obj>()
+                )
+            })
         })
-    })
-}
+    }
 
-pub fn reify_all<'input, Frame, Obj>(
-    frame: &'input Frame,
-    _proxy: Obj,
-) -> impl Iterator<Item = Obj::Output<'input>> + 'input
-where
-    Frame: container::ViewFrame<'input> + container::DynContainer<Obj>,
-    Obj: container::CommonObject<Args<'input>: Clone> + 'static,
-{
-    // REVIEW - should individual failure-to-parse cause the entire iteration to panic?
-    Iterator::zip(frame.iter_offsets(), frame.iter_args()).map(move |(offset, args)| {
-        Obj::parse_offset(frame.scope(), offset, args).unwrap_or_else(|e| {
-            panic!(
-                "failed to parse (reify_all::<{}, {}>): {e}",
-                std::any::type_name::<Frame>(),
-                std::any::type_name::<Obj>()
-            )
+    pub(super) fn reify_opt<'input, Frame, Obj>(
+        frame: &'input Frame,
+        _proxy: Obj,
+    ) -> Option<Obj::Output<'input>>
+    where
+        Frame: container::ViewFrame<'input> + container::OptContainer<Obj>,
+        Obj: 'static + for<'a> container::CommonObject<Args<'a> = ()>,
+    {
+        frame.get_offset().map(|offset| {
+            Obj::parse_offset(frame.scope(), offset, ()).unwrap_or_else(|e| {
+                panic!(
+                    "failed to parse (reify_opt::<{}, {}>): {e}",
+                    std::any::type_name::<Frame>(),
+                    std::any::type_name::<Obj>()
+                )
+            })
         })
-    })
-}
+    }
 
-pub fn reify_opt<'input, Frame, Obj>(
-    frame: &'input Frame,
-    _proxy: Obj,
-) -> Option<Obj::Output<'input>>
-where
-    Frame: container::ViewFrame<'input> + container::OptContainer<Obj>,
-    Obj: 'static + for<'a> container::CommonObject<Args<'a> = ()>,
-{
-    frame.get_offset().map(|offset| {
-        Obj::parse_offset(frame.scope(), offset, ()).unwrap_or_else(|e| {
-            panic!(
-                "failed to parse (reify_opt::<{}, {}>): {e}",
-                std::any::type_name::<Frame>(),
-                std::any::type_name::<Obj>()
-            )
+    pub(super) fn reify_opt_index<'input, Frame, Obj, const N: usize>(
+        frame: &'input Frame,
+        _proxy: Obj,
+        ix: usize,
+    ) -> Option<Obj::Output<'input>>
+    where
+        Frame: container::ViewFrame<'input> + container::MultiOptContainer<Obj, N>,
+        // TODO - if constraint on Args is lifted on trait itself, remove this
+        Obj: 'static + for<'a> container::CommonObject<Args<'a> = ()>,
+    {
+        frame.get_offset_at_index(ix).map(|offset| {
+            Obj::parse_offset(frame.scope(), offset, ()).unwrap_or_else(|e| {
+                panic!(
+                    "failed to parse (reify_opt_index::<{}, {}>(.., {ix})): {e}",
+                    std::any::type_name::<Frame>(),
+                    std::any::type_name::<Obj>()
+                )
+            })
         })
-    })
-}
+    }
 
-pub fn reify_opt_index<'input, Frame, Obj, const N: usize>(
-    frame: &'input Frame,
-    _proxy: Obj,
-    ix: usize,
-) -> Option<Obj::Output<'input>>
-where
-    Frame: container::ViewFrame<'input> + container::MultiOptContainer<Obj, N>,
-    // TODO - if constraint on Args is lifted on trait itself, remove this
-    Obj: 'static + for<'a> container::CommonObject<Args<'a> = ()>,
-{
-    frame.get_offset_at_index(ix).map(|offset| {
-        Obj::parse_offset(frame.scope(), offset, ()).unwrap_or_else(|e| {
-            panic!(
-                "failed to parse (reify_opt_index::<{}, {}>(.., {ix})): {e}",
-                std::any::type_name::<Frame>(),
-                std::any::type_name::<Obj>()
-            )
-        })
-    })
-}
+    pub(super) fn reify_dep<'input, Con, Obj>(
+        view: View<'input>,
+        container: &'input Con,
+        _proxy: Obj,
+    ) -> PResult<Obj::Output<'input>>
+    where
+        Con: container::SingleContainer<Obj>,
+        Obj: container::CommonObject,
+    {
+        let args = container.get_args();
+        let offset = container.get_offset();
+        Obj::parse_offset(view, offset, args)
+    }
 
-pub fn reify_dep<'input, Con, Obj>(
-    view: View<'input>,
-    container: &'input Con,
-    _proxy: Obj,
-) -> PResult<Obj::Output<'input>>
-where
-    Con: container::SingleContainer<Obj>,
-    Obj: container::CommonObject,
-{
-    let args = container.get_args();
-    let offset = container.get_offset();
-    Obj::parse_offset(view, offset, args)
-}
+    pub(super) fn reify_index_dep<'input, Con, Obj, const N: usize>(
+        view: View<'input>,
+        container: &'input Con,
+        _proxy: Obj,
+        ix: usize,
+    ) -> PResult<Obj::Output<'input>>
+    where
+        Con: container::MultiContainer<Obj, N>,
+        Obj: container::CommonObject<Args<'input>: Clone>,
+    {
+        let tmp = container.get_args_array();
+        let offset = container.get_offset_array()[ix];
+        Obj::parse_offset(view, offset, tmp[ix].clone())
+    }
 
-pub fn reify_index_dep<'input, Con, Obj, const N: usize>(
-    view: View<'input>,
-    container: &'input Con,
-    _proxy: Obj,
-    ix: usize,
-) -> PResult<Obj::Output<'input>>
-where
-    Con: container::MultiContainer<Obj, N>,
-    Obj: container::CommonObject<Args<'input>: Clone>,
-{
-    let tmp = container.get_args_array();
-    let offset = container.get_offset_array()[ix];
-    Obj::parse_offset(view, offset, tmp[ix].clone())
-}
+    pub(super) fn reify_all_dep<'input, Con, Obj>(
+        view: View<'input>,
+        container: &'input Con,
+        _proxy: Obj,
+    ) -> impl Iterator<Item = PResult<Obj::Output<'input>>> + 'input
+    where
+        Con: container::DynContainer<Obj>,
+        Obj: container::CommonObject<Args<'input>: Clone> + 'static,
+    {
+        Iterator::zip(container.iter_offsets(), container.iter_args())
+            .map(move |(offset, args)| Obj::parse_offset(view, offset, args))
+    }
 
-pub fn reify_all_dep<'input, Con, Obj>(
-    view: View<'input>,
-    container: &'input Con,
-    _proxy: Obj,
-) -> impl Iterator<Item = PResult<Obj::Output<'input>>> + 'input
-where
-    Con: container::DynContainer<Obj>,
-    Obj: container::CommonObject<Args<'input>: Clone> + 'static,
-{
-    Iterator::zip(container.iter_offsets(), container.iter_args())
-        .map(move |(offset, args)| Obj::parse_offset(view, offset, args))
-}
+    pub(super) fn reify_all_index_dep<'input, Con, Obj, const N: usize>(
+        view: View<'input>,
+        container: &'input Con,
+        _proxy: Obj,
+        ix: usize,
+    ) -> impl Iterator<Item = PResult<Obj::Output<'input>>> + 'input
+    where
+        Con: container::MultiDynContainer<Obj, N>,
+        Obj: container::CommonObject + 'static,
+    {
+        assert!(ix < N, "index out of bounds");
+        let offset_iter = container.iter_offsets_at_index(ix);
+        let args_iter = container.iter_args_at_index(ix);
+        Iterator::zip(offset_iter, args_iter)
+            .map(move |(offset, args)| Obj::parse_offset(view, offset, args))
+    }
 
-pub fn reify_all_index_dep<'input, Con, Obj, const N: usize>(
-    view: View<'input>,
-    container: &'input Con,
-    _proxy: Obj,
-    ix: usize,
-) -> impl Iterator<Item = PResult<Obj::Output<'input>>> + 'input
-where
-    Con: container::MultiDynContainer<Obj, N>,
-    Obj: container::CommonObject + 'static,
-{
-    assert!(ix < N, "index out of bounds");
-    let offset_iter = container.iter_offsets_at_index(ix);
-    let args_iter = container.iter_args_at_index(ix);
-    Iterator::zip(offset_iter, args_iter)
-        .map(move |(offset, args)| Obj::parse_offset(view, offset, args))
-}
+    pub(super) fn reify_opt_dep<'input, Con, Obj>(
+        view: View<'input>,
+        container: &'input Con,
+        _proxy: Obj,
+    ) -> Option<PResult<Obj::Output<'input>>>
+    where
+        Con: container::OptContainer<Obj>,
+        // TODO - if constraint on Args is lifted on trait itself, remove this
+        Obj: 'static + for<'a> container::CommonObject<Args<'a> = ()>,
+    {
+        container
+            .get_offset()
+            .map(move |offset| Obj::parse_offset(view, offset, ()))
+    }
 
-pub fn reify_opt_dep<'input, Con, Obj>(
-    view: View<'input>,
-    container: &'input Con,
-    _proxy: Obj,
-) -> Option<PResult<Obj::Output<'input>>>
-where
-    Con: container::OptContainer<Obj>,
-    // TODO - if constraint on Args is lifted on trait itself, remove this
-    Obj: 'static + for<'a> container::CommonObject<Args<'a> = ()>,
-{
-    container
-        .get_offset()
-        .map(move |offset| Obj::parse_offset(view, offset, ()))
+    pub(super) fn reify_opt_index_dep<'input, Con, Obj, const N: usize>(
+        view: View<'input>,
+        container: &'input Con,
+        _proxy: Obj,
+        ix: usize,
+    ) -> Option<PResult<Obj::Output<'input>>>
+    where
+        Con: container::MultiOptContainer<Obj, N>,
+        // TODO - if constraint on Args is lifted on trait itself, remove this
+        Obj: 'static + for<'a> container::CommonObject<Args<'a> = ()>,
+    {
+        container
+            .get_offset_at_index(ix)
+            .map(move |offset| Obj::parse_offset(view, offset, ()))
+    }
 }
+use fn_reify::{
+    reify, reify_all, reify_all_dep, reify_all_index, reify_all_index_dep, reify_dep, reify_index,
+    reify_index_dep, reify_opt, reify_opt_dep, reify_opt_index_dep,
+};
 
-pub fn reify_opt_index_dep<'input, Con, Obj, const N: usize>(
-    view: View<'input>,
-    container: &'input Con,
-    _proxy: Obj,
-    ix: usize,
-) -> Option<PResult<Obj::Output<'input>>>
-where
-    Con: container::MultiOptContainer<Obj, N>,
-    // TODO - if constraint on Args is lifted on trait itself, remove this
-    Obj: 'static + for<'a> container::CommonObject<Args<'a> = ()>,
-{
-    container
-        .get_offset_at_index(ix)
-        .map(move |offset| Obj::parse_offset(view, offset, ()))
-}
 pub mod obj {
     use super::container::CommonObject;
     use super::{PResult, Parser, View};
@@ -684,225 +928,70 @@ pub mod obj {
     proxy!(OpentypeFeatureVariations<'a> = FeatVar);
     proxy!(OpentypeLangSys = LangSys);
     proxy!(OpentypeFeatureTable<'a> = FeatTable);
+
+    proxy!(OpentypeSignatureBlock<'a> = SigBlock);
 }
 
-/// Union over errors that arise during parsing, and generic-type errors arising in manual post-conversion
-///
-/// For soundness, `E` should not be [`doodle::parser::error::ParseError`]
-#[derive(Debug)]
-pub enum ValueParseError<E: std::error::Error> {
-    Value(E),
-    Parse(doodle::parser::error::ParseError),
-}
+mod value_parse {
+    use doodle::parser::error::ParseError;
 
-impl<E: std::error::Error> ValueParseError<E> {
-    /// Infallibly lifts a conversion error to a [`ValueParseError`]
+    /// Union over errors that arise during parsing, and generic-type errors arising in manual post-conversion
     ///
-    /// # Notes
-    ///
-    /// Should not be used to construct [`ValueParseError<ParseError>`]
-    pub fn value(e: E) -> Self {
-        ValueParseError::Value(e)
+    /// For soundness, `E` should not be [`doodle::parser::error::ParseError`]
+    #[derive(Debug)]
+    pub enum ValueParseError<E: std::error::Error> {
+        Value(E),
+        Parse(ParseError),
     }
 
-    /// Fallibly coerces `self` into an error of the generic error-type `E`.
-    ///
-    /// # Panics
-    ///
-    /// Will panic if `self` represents a parser error.
-    pub fn coerce_value(self) -> E {
-        match self {
-            ValueParseError::Value(e) => e,
-            ValueParseError::Parse(e) => panic!("parse error: {e}"),
+    impl<E: std::error::Error> ValueParseError<E> {
+        /// Infallibly lifts a conversion error to a [`ValueParseError`]
+        ///
+        /// # Notes
+        ///
+        /// Should not be used to construct [`ValueParseError<ParseError>`]
+        pub fn value(e: E) -> Self {
+            ValueParseError::Value(e)
+        }
+
+        /// Fallibly coerces `self` into an error of the generic error-type `E`.
+        ///
+        /// # Panics
+        ///
+        /// Will panic if `self` represents a parser error.
+        pub fn coerce_value(self) -> E {
+            match self {
+                ValueParseError::Value(e) => e,
+                ValueParseError::Parse(e) => panic!("parse error: {e}"),
+            }
+        }
+    }
+
+    impl<E: std::error::Error> std::fmt::Display for ValueParseError<E> {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                ValueParseError::Value(e) => write!(f, "value error: {e}"),
+                ValueParseError::Parse(e) => write!(f, "parse error: {e}"),
+            }
+        }
+    }
+
+    impl<E: std::error::Error + 'static> std::error::Error for ValueParseError<E> {
+        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            match self {
+                ValueParseError::Value(e) => Some(e),
+                ValueParseError::Parse(e) => Some(e),
+            }
+        }
+    }
+
+    impl<E: std::error::Error> From<ParseError> for ValueParseError<E> {
+        fn from(e: ParseError) -> Self {
+            ValueParseError::Parse(e)
         }
     }
 }
-
-impl<E: std::error::Error> std::fmt::Display for ValueParseError<E> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ValueParseError::Value(e) => write!(f, "value error: {e}"),
-            ValueParseError::Parse(e) => write!(f, "parse error: {e}"),
-        }
-    }
-}
-
-impl<E: std::error::Error + 'static> std::error::Error for ValueParseError<E> {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            ValueParseError::Value(e) => Some(e),
-            ValueParseError::Parse(e) => Some(e),
-        }
-    }
-}
-
-// NOTE - without specialization, we cannot have both this and From<ParseError>, so we choose the latter
-/*
-impl<E: std::error::Error> From<E> for ValueParseError<E> {
-    fn from(e: E) -> Self {
-        ValueParseError::Value(e)
-    }
-}
-*/
-
-impl<E: std::error::Error> From<doodle::parser::error::ParseError> for ValueParseError<E> {
-    fn from(e: doodle::parser::error::ParseError) -> Self {
-        ValueParseError::Parse(e)
-    }
-}
-
-/// Variant of `Promote` for objects holding offsets but which do not encapsulate the `View` they are relative to.
-trait PromoteView<Original>: Sized {
-    /// Convert a source-object to `Self` using the provided `View``.
-    fn promote_view(orig: &Original, view: View<'_>) -> PResult<Self>;
-}
-
-/// Variant of `TryPromote` for objects holding offsets but which do not encapsulate the `View` they are relative to.
-trait TryPromoteView<Original>: Sized {
-    /// The error-type returned when a given conversion cannot succeed.
-    type Error<'input>: std::error::Error
-    where
-        Original: 'input;
-
-    /// Fallibly post-process from a source-object to `Self` using the provided `View``.
-    fn try_promote_view<'input>(
-        orig: &'input Original,
-        view: View<'input>,
-    ) -> Result<Self, ValueParseError<Self::Error<'input>>>
-    where
-        Original: 'input;
-}
-
-/// Custom trait that facilitates conversion from partially-borrowed non-atomic types
-/// without needing explicit lifetimes in the trait signature itself.
-trait TryFromRef<Original: _Ref>: Sized {
-    type Error: std::error::Error;
-
-    /// Fallibly convert from the GAT `Ref<'a>` defined on `Original` (via the `_Ref` trait), into `Self`.
-    fn try_from_ref(orig: <Original as _Ref>::Ref<'_>) -> Result<Self, Self::Error>;
-}
-
-/// Helper trait for implementing custom partial-borrow-semantics for non-atomic types
-trait _Ref {
-    /// A partial borrow of `Self` that lives at least as long as `'a`.
-    type Ref<'a>;
-}
-
-impl<T, U> _Ref for (T, U)
-where
-    T: Copy + 'static,
-    U: 'static,
-{
-    type Ref<'a> = (T, &'a U);
-}
-
-/// Takes an option over `O` and directly promotes it to `T` if `Some(_)`, otherwise returning `T::from_null()`.
-fn promote_from_null<O, T>(orig_opt: &Option<O>) -> T
-where
-    T: FromNull + Promote<O>,
-{
-    T::renew(orig_opt.as_ref().map(T::promote))
-}
-
-/// Takes an option over `O` and calls `try_promote` if it is `Some(_)`, otherwise returning
-/// `Ok(T::from_null())`.
-fn try_promote_from_null<O, T>(orig_opt: &Option<O>) -> Result<T, T::Error>
-where
-    T: FromNull + TryPromote<O>,
-{
-    Ok(T::renew(orig_opt.as_ref().map(T::try_promote).transpose()?))
-}
-
-/// Takes an iterable over `O` and directly promotes each item to `T`, returning a `Vec<T>`.
-fn promote_all<O, I, T>(orig: I) -> Vec<T>
-where
-    T: Promote<O>,
-    I: IntoIterator<Item = O>,
-{
-    orig.into_iter().map(|raw| T::promote(&raw)).collect()
-}
-
-/// Takes an iterable over `O` and directly promotes each item to `T`, returning a `Vec<T>`.
-fn promote_all_ok<O, I, T, E>(orig: I, count: usize) -> Result<Vec<T>, E>
-where
-    T: Promote<O>,
-    I: IntoIterator<Item = Result<O, E>>,
-{
-    let mut ret = Vec::with_capacity(count);
-    for raw in orig {
-        ret.push(T::promote(&raw?));
-    }
-    Ok(ret)
-}
-
-fn promote_vec<O, T>(orig_slice: &[O]) -> Vec<T>
-where
-    T: Promote<O>,
-{
-    orig_slice.iter().map(T::promote).collect()
-}
-
-fn try_promote_vec<O, T, E>(orig_slice: &[O]) -> Result<Vec<T>, E>
-where
-    T: TryPromote<O, Error = E>,
-{
-    let mut ret = Vec::with_capacity(orig_slice.len());
-    for elem in orig_slice {
-        ret.push(T::try_promote(elem)?);
-    }
-    Ok(ret)
-}
-
-fn promote_vec_view<O, T>(orig_slice: &[O], view: View<'_>) -> PResult<Vec<T>>
-where
-    T: PromoteView<O>,
-{
-    let mut ret = Vec::with_capacity(orig_slice.len());
-    for elem in orig_slice {
-        ret.push(T::promote_view(elem, view)?);
-    }
-    Ok(ret)
-}
-
-fn promote_opt<O, T>(orig_opt: &Option<O>) -> Option<T>
-where
-    T: Promote<O>,
-{
-    orig_opt.as_ref().map(T::promote)
-}
-
-fn try_promote_opt<O, T>(orig: &Option<O>) -> Result<Option<T>, T::Error>
-where
-    T: TryPromote<O>,
-{
-    orig.as_ref().map(T::try_promote).transpose()
-}
-
-fn promote_link<O, T>(orig_link: &Link<O>) -> Link<T>
-where
-    T: Promote<O>,
-{
-    orig_link.as_ref().map(T::promote)
-}
-
-fn try_promote_link<O, T>(orig: &Link<O>) -> Result<Link<T>, T::Error>
-where
-    T: TryPromote<O>,
-{
-    orig.as_ref().map(T::try_promote).transpose()
-}
-
-fn try_promote_opt_view<'input, O, T>(
-    orig: &'input Option<O>,
-    view: View<'input>,
-) -> Result<Option<T>, ValueParseError<T::Error<'input>>>
-where
-    T: TryPromoteView<O>,
-{
-    orig.as_ref()
-        .map(|orig| T::try_promote_view(orig, view))
-        .transpose()
-}
+pub use value_parse::ValueParseError;
 
 // !SECTION
 
@@ -912,201 +1001,153 @@ where
 /// Lexically distinct Option for values that are theoretically non-Nullable and have no FromNull instance.
 type Link<T> = Option<T>;
 
-/// Wrapper type for CommonObject artifacts for offsets that are intended to be nullable (which yields Option<T::Output>)
-pub(crate) struct Nullable<T>(pub T);
-
-/// Wrapper type for CommonObject artifacts that are explicitly intended to be non-nullable (panics at runtime if offset is 0)
-pub(crate) struct Mandatory<T>(pub T);
-
-impl<O: container::CommonObject> container::CommonObject for Nullable<O> {
-    type Args<'a> = O::Args<'a>;
-    type Output<'a> = Option<O::Output<'a>>;
-
-    fn parse_offset<'input>(
-        view: View<'input>,
-        offset: usize,
-        args: Self::Args<'input>,
-    ) -> PResult<Self::Output<'input>> {
-        O::parse_nullable_offset(view, offset, args)
+mod sem_vec {
+    /// Vector of values with representation `T` that have a nominal semantic interpretation specified by `Sem`.
+    ///
+    /// Though generic, the practical usages of this type are for distinguishing `ClassId := u16` and `GlyphId := u16`
+    /// semantics in GSUB/GPOS Lookup tables.
+    #[repr(transparent)]
+    pub(crate) struct SemVec<Sem, T> {
+        pub(crate) inner: Vec<T>,
+        pub(crate) __proxy: std::marker::PhantomData<Sem>,
     }
 
-    fn parse<'input>(
-        _p: &mut Parser<'input>,
-        _args: Self::Args<'input>,
-    ) -> PResult<Self::Output<'input>> {
-        unimplemented!("Nullable::parse is explicitly left unimplemented")
-    }
-}
-
-impl<O: container::CommonObject> container::CommonObject for Mandatory<O> {
-    type Args<'a> = O::Args<'a>;
-    type Output<'a> = O::Output<'a>;
-
-    fn parse_offset<'input>(
-        view: View<'input>,
-        offset: usize,
-        args: Self::Args<'input>,
-    ) -> PResult<Self::Output<'input>> {
-        assert_ne!(
-            offset,
-            0,
-            "Mandatory<{}> found offset=0 (null)",
-            std::any::type_name::<O>()
-        );
-        O::parse_offset(view, offset, args)
-    }
-
-    fn parse<'input>(
-        _p: &mut Parser<'input>,
-        _args: Self::Args<'input>,
-    ) -> PResult<Self::Output<'input>> {
-        unimplemented!("Mandatory::parse is explicitly left unimplemented")
-    }
-}
-
-/// Vector of values with representation `T` that have a nominal semantic interpretation specified by `Sem`.
-///
-/// Though generic, the practical usages of this type are for distinguishing `ClassId := u16` and `GlyphId := u16`
-/// semantics in GSUB/GPOS Lookup tables.
-#[repr(transparent)]
-struct SemVec<Sem, T> {
-    inner: Vec<T>,
-    __proxy: std::marker::PhantomData<Sem>,
-}
-
-impl<Sem, T> Default for SemVec<Sem, T> {
-    fn default() -> Self {
-        Self {
-            inner: Default::default(),
-            __proxy: Default::default(),
-        }
-    }
-}
-
-impl<Sem, T: Clone> Clone for SemVec<Sem, T> {
-    fn clone(&self) -> Self {
-        Self {
-            inner: self.inner.clone(),
-            __proxy: self.__proxy,
-        }
-    }
-}
-
-impl<Sem, T> SemVec<Sem, T> {
-    pub fn new() -> Self {
-        Self {
-            inner: Vec::new(),
-            __proxy: std::marker::PhantomData,
-        }
-    }
-
-    pub fn with_capacity(cap: usize) -> Self {
-        Self {
-            inner: Vec::with_capacity(cap),
-            __proxy: std::marker::PhantomData,
-        }
-    }
-}
-
-impl<Sem, T> AsRef<[T]> for SemVec<Sem, T> {
-    fn as_ref(&self) -> &[T] {
-        self.inner.as_ref()
-    }
-}
-
-impl<Sem, T> From<Vec<T>> for SemVec<Sem, T> {
-    fn from(v: Vec<T>) -> Self {
-        Self {
-            inner: v,
-            __proxy: std::marker::PhantomData,
-        }
-    }
-}
-
-impl<Sem, T> FromIterator<T> for SemVec<Sem, T> {
-    fn from_iter<I>(iter: I) -> Self
-    where
-        I: IntoIterator<Item = T>,
-    {
-        Self {
-            inner: Vec::from_iter(iter),
-            __proxy: std::marker::PhantomData,
-        }
-    }
-}
-
-impl<Sem: SemDisplay> std::fmt::Display for SemVec<Sem, u16> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Sem::fmt_u16_array(&self.inner, f)
-    }
-}
-
-impl<T> std::fmt::Debug for SemVec<ClassId, T>
-where
-    T: std::fmt::Debug,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // REVIEW - consider whether we need this distinction when ChainedRule already discriminates on Sem
-        f.debug_tuple("ClassIds").field(&self.inner).finish()
-    }
-}
-
-impl<T> std::fmt::Debug for SemVec<GlyphId, T>
-where
-    T: std::fmt::Debug,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // REVIEW - consider whether we need this distinction when ChainedRule already discriminates on Sem
-        f.debug_tuple("GlyphIds").field(&self.inner).finish()
-    }
-}
-
-impl<Sem, T> std::ops::Deref for SemVec<Sem, T> {
-    type Target = Vec<T>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
-/// Marker type for SemVec (or any types above it) holding GlyphId-semantics u16 values
-#[derive(Clone)]
-pub(crate) struct GlyphId;
-/// Marker type for SemVec (or any types above it) holding ClassId-semantics u16 values
-#[derive(Clone)]
-pub(crate) struct ClassId;
-
-pub(crate) trait SemDisplay {
-    fn fmt_u16(raw: u16, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
-
-    fn fmt_u16_array(raw: &[u16], f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if raw.is_empty() {
-            write!(f, "ε")
-        } else {
-            let Some((head, rest)) = raw.split_first() else {
-                unreachable!()
-            };
-            Self::fmt_u16(*head, f)?;
-            for g in rest {
-                write!(f, ".")?;
-                Self::fmt_u16(*g, f)?;
+    impl<Sem, T> Default for SemVec<Sem, T> {
+        fn default() -> Self {
+            Self {
+                inner: Default::default(),
+                __proxy: Default::default(),
             }
-            Ok(())
+        }
+    }
+
+    impl<Sem, T: Clone> Clone for SemVec<Sem, T> {
+        fn clone(&self) -> Self {
+            Self {
+                inner: self.inner.clone(),
+                __proxy: self.__proxy,
+            }
+        }
+    }
+
+    impl<Sem, T> SemVec<Sem, T> {
+        pub fn new() -> Self {
+            Self {
+                inner: Vec::new(),
+                __proxy: std::marker::PhantomData,
+            }
+        }
+
+        pub fn with_capacity(cap: usize) -> Self {
+            Self {
+                inner: Vec::with_capacity(cap),
+                __proxy: std::marker::PhantomData,
+            }
+        }
+    }
+
+    impl<Sem, T> AsRef<[T]> for SemVec<Sem, T> {
+        fn as_ref(&self) -> &[T] {
+            self.inner.as_ref()
+        }
+    }
+
+    impl<Sem, T> From<Vec<T>> for SemVec<Sem, T> {
+        fn from(v: Vec<T>) -> Self {
+            Self {
+                inner: v,
+                __proxy: std::marker::PhantomData,
+            }
+        }
+    }
+
+    impl<Sem, T> FromIterator<T> for SemVec<Sem, T> {
+        fn from_iter<I>(iter: I) -> Self
+        where
+            I: IntoIterator<Item = T>,
+        {
+            Self {
+                inner: Vec::from_iter(iter),
+                __proxy: std::marker::PhantomData,
+            }
+        }
+    }
+
+    impl<Sem: SemDisplay> std::fmt::Display for SemVec<Sem, u16> {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            Sem::fmt_u16_array(&self.inner, f)
+        }
+    }
+
+    impl<T> std::fmt::Debug for SemVec<ClassId, T>
+    where
+        T: std::fmt::Debug,
+    {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            // REVIEW - consider whether we need this distinction when ChainedRule already discriminates on Sem
+            f.debug_tuple("ClassIds").field(&self.inner).finish()
+        }
+    }
+
+    impl<T> std::fmt::Debug for SemVec<GlyphId, T>
+    where
+        T: std::fmt::Debug,
+    {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            // REVIEW - consider whether we need this distinction when ChainedRule already discriminates on Sem
+            f.debug_tuple("GlyphIds").field(&self.inner).finish()
+        }
+    }
+
+    impl<Sem, T> std::ops::Deref for SemVec<Sem, T> {
+        type Target = Vec<T>;
+
+        fn deref(&self) -> &Self::Target {
+            &self.inner
+        }
+    }
+
+    /// Marker type for SemVec (or any types above it) holding GlyphId-semantics u16 values
+    #[derive(Clone)]
+    pub(crate) struct GlyphId;
+
+    /// Marker type for SemVec (or any types above it) holding ClassId-semantics u16 values
+    #[derive(Clone)]
+    pub(crate) struct ClassId;
+
+    pub(crate) trait SemDisplay {
+        fn fmt_u16(raw: u16, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
+
+        fn fmt_u16_array(raw: &[u16], f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            if raw.is_empty() {
+                write!(f, "ε")
+            } else {
+                let Some((head, rest)) = raw.split_first() else {
+                    unreachable!()
+                };
+                Self::fmt_u16(*head, f)?;
+                for g in rest {
+                    write!(f, ".")?;
+                    Self::fmt_u16(*g, f)?;
+                }
+                Ok(())
+            }
+        }
+    }
+
+    impl SemDisplay for GlyphId {
+        fn fmt_u16(raw: u16, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "{raw:04x}")
+        }
+    }
+
+    impl SemDisplay for ClassId {
+        fn fmt_u16(raw: u16, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "C{raw}")
         }
     }
 }
-
-impl SemDisplay for GlyphId {
-    fn fmt_u16(raw: u16, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{raw:04x}")
-    }
-}
-
-impl SemDisplay for ClassId {
-    fn fmt_u16(raw: u16, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "C{raw}")
-    }
-}
+use sem_vec::{ClassId, GlyphId, SemDisplay, SemVec};
 
 // !SECTION
 /// Crate-private micro-module for compile-time 'same-type' assertions that can be chained
@@ -1140,6 +1181,7 @@ pub(crate) mod refl {
 }
 use refl::ReflType;
 
+// SECTION - Error-type aliases and markers
 /// Shorthand for qualifying a TryPromote::Error item
 type TPErr<Src, Tgt> = <Tgt as TryPromote<Src>>::Error;
 type TPVErr<'a, Src, Tgt> = <Tgt as TryPromoteView<Src>>::Error<'a>;
@@ -1149,133 +1191,181 @@ type TFRErr<Src, Tgt> = <Tgt as TryFromRef<Src>>::Error;
 
 /// Hint to remind us that a given error-type has strictly local provenance
 type Local<T> = T;
+// !SECTION
 
 // SECTION - crate-local trait impls on top-level table types
+mod __gdef_impl {
+    use super::OpentypeGdef;
+    use super::{Mandatory, Nullable};
+    use super::{container, obj, otf_types};
 
-frame!(OpentypeGdef);
+    frame!(OpentypeGdef);
 
-impl<'input> container::MultiContainer<Nullable<obj::ClsDef>, 2> for OpentypeGdef<'input> {
-    fn get_offset_array(&self) -> [usize; 2] {
-        [
-            self.glyph_class_def.offset as usize,
-            self.mark_attach_class_def.offset as usize,
-        ]
+    impl<'input> container::MultiContainer<Nullable<obj::ClsDef>, 2>
+        for otf_types::OpentypeGdef<'input>
+    {
+        fn get_offset_array(&self) -> [usize; 2] {
+            [
+                self.glyph_class_def.offset as usize,
+                self.mark_attach_class_def.offset as usize,
+            ]
+        }
+
+        fn get_args_array(
+            &self,
+        ) -> [<Nullable<obj::AttList> as container::CommonObject>::Args<'_>; 2] {
+            [(); 2]
+        }
     }
 
-    fn get_args_array(&self) -> [<Nullable<obj::AttList> as container::CommonObject>::Args<'_>; 2] {
-        [(); 2]
-    }
-}
+    impl<'input> container::SingleContainer<Nullable<obj::AttList>>
+        for otf_types::OpentypeGdef<'input>
+    {
+        fn get_offset(&self) -> usize {
+            self.attach_list.offset as usize
+        }
 
-impl<'input> container::SingleContainer<Nullable<obj::AttList>> for OpentypeGdef<'input> {
-    fn get_offset(&self) -> usize {
-        self.attach_list.offset as usize
-    }
-
-    fn get_args(&self) {}
-}
-
-impl<'input> container::SingleContainer<Nullable<obj::LigCarList>> for OpentypeGdef<'input> {
-    fn get_offset(&self) -> usize {
-        self.lig_caret_list.offset as usize
+        fn get_args(&self) {}
     }
 
-    fn get_args(&self) {}
-}
+    impl<'input> container::SingleContainer<Nullable<obj::LigCarList>>
+        for otf_types::OpentypeGdef<'input>
+    {
+        fn get_offset(&self) -> usize {
+            self.lig_caret_list.offset as usize
+        }
 
-frame!(OpentypeGpos);
-
-impl<'input> container::SingleContainer<Mandatory<obj::ScrList>> for OpentypeGpos<'input> {
-    fn get_offset(&self) -> usize {
-        self.script_list.offset as usize
-    }
-
-    fn get_args(&self) {}
-}
-
-impl<'input> container::SingleContainer<Mandatory<obj::FeatList>> for OpentypeGpos<'input> {
-    fn get_offset(&self) -> usize {
-        self.feature_list.offset as usize
-    }
-
-    fn get_args(&self) {}
-}
-
-impl<'input> container::SingleContainer<Mandatory<obj::PosLookups>> for OpentypeGpos<'input> {
-    fn get_offset(&self) -> usize {
-        self.lookup_list.offset as usize
-    }
-
-    fn get_args(&self) {}
-}
-
-impl<'input> container::OptContainer<Nullable<obj::FeatVar>> for OpentypeGpos<'input> {
-    fn contains_object(&self) -> bool {
-        self.feature_variations_offset.is_some()
-    }
-
-    fn get_offset(&self) -> Option<usize> {
-        self.feature_variations_offset
-            .map(|offs| offs.offset as usize)
+        fn get_args(&self) {}
     }
 }
 
-frame!(OpentypeGsub);
+mod __gpos_impl {
+    use super::OpentypeGpos;
+    use super::{Mandatory, Nullable};
+    use super::{container, obj, otf_types};
 
-impl<'input> container::SingleContainer<Mandatory<obj::ScrList>> for OpentypeGsub<'input> {
-    fn get_offset(&self) -> usize {
-        self.script_list.offset as usize
+    frame!(OpentypeGpos);
+
+    impl<'input> container::SingleContainer<Mandatory<obj::ScrList>>
+        for otf_types::OpentypeGpos<'input>
+    {
+        fn get_offset(&self) -> usize {
+            self.script_list.offset as usize
+        }
+
+        fn get_args(&self) {}
     }
 
-    fn get_args(&self) {}
+    impl<'input> container::SingleContainer<Mandatory<obj::FeatList>>
+        for otf_types::OpentypeGpos<'input>
+    {
+        fn get_offset(&self) -> usize {
+            self.feature_list.offset as usize
+        }
+
+        fn get_args(&self) {}
+    }
+
+    impl<'input> container::SingleContainer<Mandatory<obj::PosLookups>>
+        for otf_types::OpentypeGpos<'input>
+    {
+        fn get_offset(&self) -> usize {
+            self.lookup_list.offset as usize
+        }
+
+        fn get_args(&self) {}
+    }
+
+    impl<'input> container::OptContainer<Nullable<obj::FeatVar>> for otf_types::OpentypeGpos<'input> {
+        fn contains_object(&self) -> bool {
+            self.feature_variations_offset.is_some()
+        }
+
+        fn get_offset(&self) -> Option<usize> {
+            self.feature_variations_offset
+                .map(|offs| offs.offset as usize)
+        }
+    }
 }
 
-impl<'input> container::SingleContainer<Mandatory<obj::FeatList>> for OpentypeGsub<'input> {
-    fn get_offset(&self) -> usize {
-        self.feature_list.offset as usize
+mod __gsub_impl {
+    use super::{
+        container::{self, Mandatory, Nullable},
+        obj,
+        otf_types::{self, OpentypeGsub},
+    };
+
+    frame!(OpentypeGsub);
+
+    impl<'input> container::SingleContainer<Mandatory<obj::ScrList>>
+        for otf_types::OpentypeGsub<'input>
+    {
+        fn get_offset(&self) -> usize {
+            self.script_list.offset as usize
+        }
+
+        fn get_args(&self) {}
     }
 
-    fn get_args(&self) {}
+    impl<'input> container::SingleContainer<Mandatory<obj::FeatList>>
+        for otf_types::OpentypeGsub<'input>
+    {
+        fn get_offset(&self) -> usize {
+            self.feature_list.offset as usize
+        }
+
+        fn get_args(&self) {}
+    }
+
+    impl<'input> container::SingleContainer<Mandatory<obj::SubstLookups>>
+        for otf_types::OpentypeGsub<'input>
+    {
+        fn get_offset(&self) -> usize {
+            self.lookup_list.offset as usize
+        }
+
+        fn get_args(&self) {}
+    }
+
+    impl<'input> container::OptContainer<Nullable<obj::FeatVar>> for otf_types::OpentypeGsub<'input> {
+        fn contains_object(&self) -> bool {
+            self.feature_variations_offset.is_some()
+        }
+
+        fn get_offset(&self) -> Option<usize> {
+            self.feature_variations_offset
+                .map(|offs| offs.offset as usize)
+        }
+    }
+
+    impl<'input> container::SingleContainer<obj::DAxisArray> for otf_types::OpentypeStat<'input> {
+        fn get_offset(&self) -> usize {
+            self.design_axes.offset as usize
+        }
+
+        fn get_args(&self) -> <obj::DAxisArray as container::CommonObject>::Args<'_> {
+            self.design_axis_count
+        }
+    }
 }
 
-impl<'input> container::SingleContainer<Mandatory<obj::SubstLookups>> for OpentypeGsub<'input> {
-    fn get_offset(&self) -> usize {
-        self.lookup_list.offset as usize
-    }
+mod __stat_impl {
+    use super::{
+        container::{self, Mandatory, Nullable},
+        obj,
+        otf_types::{self, OpentypeStat},
+    };
 
-    fn get_args(&self) {}
-}
+    frame!(OpentypeStat);
 
-impl<'input> container::OptContainer<Nullable<obj::FeatVar>> for OpentypeGsub<'input> {
-    fn contains_object(&self) -> bool {
-        self.feature_variations_offset.is_some()
-    }
+    impl<'input> container::SingleContainer<obj::AxisValueArr> for otf_types::OpentypeStat<'input> {
+        fn get_offset(&self) -> usize {
+            self.axis_value_offsets.offset as usize
+        }
 
-    fn get_offset(&self) -> Option<usize> {
-        self.feature_variations_offset
-            .map(|offs| offs.offset as usize)
-    }
-}
-
-impl<'input> container::SingleContainer<obj::DAxisArray> for OpentypeStat<'input> {
-    fn get_offset(&self) -> usize {
-        self.design_axes.offset as usize
-    }
-
-    fn get_args(&self) -> <obj::DAxisArray as container::CommonObject>::Args<'_> {
-        self.design_axis_count
-    }
-}
-
-frame!(OpentypeStat);
-
-impl<'input> container::SingleContainer<obj::AxisValueArr> for OpentypeStat<'input> {
-    fn get_offset(&self) -> usize {
-        self.axis_value_offsets.offset as usize
-    }
-
-    fn get_args(&self) -> <obj::AxisValueArr as container::CommonObject>::Args<'_> {
-        self.axis_value_count
+        fn get_args(&self) -> <obj::AxisValueArr as container::CommonObject>::Args<'_> {
+            self.axis_value_count
+        }
     }
 }
 // !SECTION
@@ -1304,66 +1394,85 @@ pub struct SingleFontMetrics {
     extraMagic: Vec<u32>,
 }
 
-pub type OpentypeCmapSubtable<'a> = opentype_cmap_subtable<'a>;
-
-impl<'a> Promote<OpentypeCmapSubtable<'a>> for CmapSubtable {
-    fn promote(orig: &OpentypeCmapSubtable) -> Self {
-        CmapSubtable::AnyFormat(orig.format)
-    }
-}
-
-#[derive(Debug, Clone)]
-enum CmapSubtable {
-    // STUB[scaffolding] - this is intentionally underimplemented to make encoding-record construction happen sooner for debugging
-    AnyFormat(u16),
-}
-
-pub type OpentypeEncodingRecord<'a> = opentype_encoding_record<'a>;
-
-#[derive(Debug, Clone)]
-struct EncodingRecord {
-    platform: u16,
-    encoding: u16,
-    subtable: Link<CmapSubtable>,
-}
-
-impl<'input> container::SingleContainer<Nullable<obj::CmapSub>> for OpentypeEncodingRecord<'input> {
-    fn get_offset(&self) -> usize {
-        self.subtable.offset as usize
-    }
-
-    fn get_args(&self) -> <obj::CmapSub as container::CommonObject>::Args<'_> {
-        self.platform
-    }
-}
-
-impl<'a> PromoteView<OpentypeEncodingRecord<'a>> for EncodingRecord {
-    fn promote_view(orig: &OpentypeEncodingRecord, view: View<'_>) -> PResult<Self> {
-        Ok(EncodingRecord {
-            platform: orig.platform,
-            encoding: orig.encoding,
-            subtable: promote_link(&reify_dep(view, orig, Nullable(obj::CmapSub))?),
-        })
-    }
-}
-
-impl<'a> Promote<OpentypeCmap<'a>> for Cmap {
-    fn promote(orig: &OpentypeCmap) -> Self {
-        Cmap {
-            version: orig.version,
-            encoding_records: promote_vec_view(&orig.encoding_records, orig.table_scope)
-                .expect("bad parse"),
-        }
-    }
-}
-
+// SECTION - API types for CMAP
 // REVIEW - this style of naming and promotion-impl may be useful for other top-level table types
 #[derive(Clone, Debug)]
 // STUB - enrich with any further details we care about presenting
 struct Cmap {
     version: u16,
-    encoding_records: Vec<EncodingRecord>,
+    encoding_records: Vec<cmap::EncodingRecord>,
 }
+
+pub type OpentypeCmapSubtable<'a> = opentype_cmap_subtable<'a>;
+
+mod cmap {
+    use super::Cmap;
+    use super::OpentypeCmapSubtable;
+    use super::fn_reify::{self, reify_dep};
+    use super::otf_types::{self, OpentypeCmap};
+    use super::traits::{Promote, PromoteView, promote_opt, promote_vec_view};
+    use super::{
+        container::{self, Mandatory, Nullable},
+        obj,
+    };
+    use crate::{opentype_cmap_subtable, opentype_encoding_record};
+    use doodle::prelude::*;
+
+    impl<'a> Promote<OpentypeCmapSubtable<'a>> for CmapSubtable {
+        fn promote(orig: &OpentypeCmapSubtable) -> Self {
+            // STUB[epic=scaffolding] - underimplemented conversion to expedite debugging
+            CmapSubtable::AnyFormat(orig.format)
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    pub enum CmapSubtable {
+        // STUB[epic=scaffolding] - this is intentionally underimplemented to make encoding-record construction happen sooner for debugging
+        AnyFormat(u16),
+    }
+
+    pub type OpentypeEncodingRecord<'a> = opentype_encoding_record<'a>;
+
+    #[derive(Debug, Clone)]
+    pub(super) struct EncodingRecord {
+        pub(crate) platform: u16,
+        pub(crate) encoding: u16,
+        pub(crate) subtable: Option<CmapSubtable>,
+    }
+
+    impl<'input> container::SingleContainer<Nullable<obj::CmapSub>> for OpentypeEncodingRecord<'input> {
+        fn get_offset(&self) -> usize {
+            self.subtable.offset as usize
+        }
+
+        fn get_args(&self) -> <obj::CmapSub as container::CommonObject>::Args<'_> {
+            self.platform
+        }
+    }
+
+    impl<'a> PromoteView<OpentypeEncodingRecord<'a>> for EncodingRecord {
+        fn promote_view(orig: &OpentypeEncodingRecord, view: View<'_>) -> PResult<Self> {
+            Ok(EncodingRecord {
+                platform: orig.platform,
+                encoding: orig.encoding,
+                subtable: promote_opt(&fn_reify::reify_dep(view, orig, Nullable(obj::CmapSub))?),
+            })
+        }
+    }
+
+    impl<'a> Promote<otf_types::OpentypeCmap<'a>> for Cmap {
+        fn promote(orig: &otf_types::OpentypeCmap) -> Self {
+            Cmap {
+                version: orig.version,
+                encoding_records: promote_vec_view(&orig.encoding_records, orig.table_scope)
+                    .expect("bad parse"),
+            }
+        }
+    }
+}
+use cmap::{CmapSubtable, EncodingRecord};
+
+// !SECTION
 
 #[derive(Clone, Copy, Debug)]
 // STUB - enrich with any further details we care about presenting
@@ -1397,369 +1506,440 @@ struct VheaMetrics {
     num_lvm: usize,
 }
 
-fn promote_count_array_link<O, T>(count: u16, (offset, link): (u32, Option<&Vec<O>>)) -> Vec<T>
-where
-    T: Promote<O>,
-{
-    let mut result = Vec::with_capacity(count as usize);
-    if count == 0 {
-        // FIXME - in at least one font test-case, the commented-out assertion on the following line causes a panic
-        // debug_assert_eq!(offset, 0, "count=0 requires offset=0, but found offset={offset} instead");
-        assert!(link.is_none() || link.is_some_and(Vec::is_empty));
-    } else {
-        assert_ne!(
-            offset, 0,
-            "count>0 requires offset>0, but found offset=0 instead"
-        );
-        let Some(origs) = link else {
-            unreachable!("offset>0 but link is None");
-        };
-        assert_eq!(origs.len(), count as usize);
-        for orig in origs.iter() {
-            let promoted = T::promote(orig);
-            result.push(promoted);
-        }
-    }
-    result
-}
+pub mod otf_gvar {
+    alias! {
+        pub type OpentypeGvarSerializedData = opentype_gvar_serialized_data;
+        pub type OpentypeGvarIntermediateTuples = opentype_gvar_tuple_variation_header_intermediate_tuples;
+        pub type OpentypeGlyphVariationData = opentype_gvar_glyph_variation_data<'input>;
+        pub type OpentypePackedPoints = opentype_var_packed_point_numbers_run_points;
+        pub type OpentypePackedPointRun = opentype_var_packed_point_numbers_runs;
 
-frame!(OpentypeGvar);
+        pub type OpentypeCoordinateDeltaRun =
+            opentype_gvar_serialized_data_per_tuple_variation_data_x_and_y_coordinate_deltas;
 
-struct GlyphVariationDataArray<'a, 'input> {
-    array_scope: View<'input>,
-    axis_count: u16,
-    offsets_array: &'a opentype_loca_table_offsets,
-}
+        pub type OpentypeXYCoordinateDeltaDeltas =
+            opentype_gvar_serialized_data_per_tuple_variation_data_x_and_y_coordinate_deltas_deltas;
 
-impl<'input> container::DynContainer<obj::GVarData> for OpentypeGvar<'input> {
-    fn count(&self) -> usize {
-        match &self.glyph_variation_data_offsets {
-            opentype_loca_table_offsets::Offsets16(half16s) => half16s.len() - 1,
-            opentype_loca_table_offsets::Offsets32(off32s) => off32s.len() - 1,
-        }
+        pub type OpentypeGvarPerTupleVariationData = opentype_gvar_serialized_data_per_tuple_variation_data;
+
+        pub type OpentypeGvarTupleRecord = opentype_gvar_tuple_record;
+        pub type OpentypeGvarFlags = opentype_gvar_table_flags;
+
+        pub type OpentypeGvarTupleVariationHeader = opentype_gvar_tuple_variation_header;
+        pub type OpentypeGvarTupleVariationHeaderTupleIndex = opentype_gvar_tuple_variation_header_tuple_index;
     }
 
-    fn iter_offsets(&self) -> impl Iterator<Item = usize> {
-        let ret = match &self.glyph_variation_data_offsets {
-            opentype_loca_table_offsets::Offsets16(half16s) => Box::new(
-                half16s
-                    .iter()
-                    .map(|half16| *half16 as usize * 2)
-                    .take(half16s.len() - 1),
-            )
-                as Box<dyn Iterator<Item = usize>>,
-            opentype_loca_table_offsets::Offsets32(off32s) => Box::new(
-                off32s
-                    .iter()
-                    .map(|off32| *off32 as usize)
-                    .take(off32s.len() - 1),
-            ),
-        };
-        // REVIEW - does this merit an intermediate GVarDataArray structure instead?
-        ret.map(|array_rel_offs| array_rel_offs + self.glyph_variation_data_array_offset as usize)
+    pub type OpentypePackedPointRuns = (u16, Vec<OpentypePackedPointRun>);
+    pub type OpentypeXYCoordinateDeltas = (u16, Vec<OpentypeCoordinateDeltaRun>);
+}
+use otf_gvar::*;
+
+pub(crate) mod gvar {
+    use super::*;
+
+    frame!(OpentypeGvar);
+
+    pub(crate) struct GlyphVariationDataArray<'a, 'input> {
+        pub(crate) array_scope: View<'input>,
+        pub(crate) axis_count: u16,
+        pub(crate) offsets_array: &'a opentype_loca_table_offsets,
     }
 
-    fn iter_args(&self) -> impl Iterator<Item = (usize, u16)> {
-        let lengths: Box<dyn Iterator<Item = usize>> = match &self.glyph_variation_data_offsets {
-            opentype_loca_table_offsets::Offsets16(half16s) => Box::new(
-                Iterator::zip(half16s.iter(), half16s[1..].iter())
-                    .map(|(this, next)| (*next - *this) as usize * 2),
-            ),
-            opentype_loca_table_offsets::Offsets32(off32s) => Box::new(
-                Iterator::zip(off32s.iter(), off32s[1..].iter())
-                    .map(|(this, next)| (*next - *this) as usize),
-            ),
-        };
-        Iterator::zip(lengths, std::iter::repeat(self.axis_count))
-    }
-}
-
-impl<'input> container::SingleContainer<Nullable<obj::SharedTupleArr>> for OpentypeGvar<'input> {
-    fn get_offset(&self) -> usize {
-        self.shared_tuples.offset as usize
-    }
-
-    fn get_args(&self) -> (usize, u16) {
-        (self.shared_tuple_count as usize, self.axis_count)
-    }
-}
-
-impl<'input> Promote<OpentypeGvar<'input>> for GvarMetrics {
-    fn promote(orig: &OpentypeGvar<'input>) -> Self {
-        let glyph_variation_data_array = reify_all(orig, obj::GVarData)
-            .map(|data| data.as_ref().map(GlyphVariationData::promote))
-            .collect();
-        let shared_tuples = promote_from_null(&reify(orig, Nullable(obj::SharedTupleArr)));
-        Self {
-            major_version: orig.major_version,
-            minor_version: orig.minor_version,
-            shared_tuples,
-            glyph_count: orig.glyph_count,
-            flags: Promote::promote(&orig.flags),
-            glyph_variation_data_array,
-        }
-    }
-}
-
-pub type OpentypeGvarTupleRecord = opentype_gvar_tuple_record;
-
-impl Promote<Vec<OpentypeGvarTupleRecord>> for Vec<GvarTupleRecord> {
-    fn promote(orig: &Vec<OpentypeGvarTupleRecord>) -> Self {
-        promote_vec(orig)
-    }
-}
-
-impl Promote<OpentypeGvarTupleRecord> for GvarTupleRecord {
-    fn promote(orig: &OpentypeGvarTupleRecord) -> Self {
-        GvarTupleRecord {
-            coordinates: promote_vec(&orig.coordinates),
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct GvarTupleRecord {
-    coordinates: Vec<F2Dot14>,
-}
-
-pub type OpentypeGvarFlags = opentype_gvar_table_flags;
-
-impl Promote<OpentypeGvarFlags> for GvarFlags {
-    fn promote(orig: &OpentypeGvarFlags) -> Self {
-        GvarFlags {
-            is_long_offset: orig.is_long_offset,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct GvarFlags {
-    is_long_offset: bool,
-}
-
-pub type OpentypeGvarTupleVariationHeader = opentype_gvar_tuple_variation_header;
-
-impl Promote<OpentypeGvarTupleVariationHeader> for GvarTupleVariationHeader {
-    fn promote(orig: &OpentypeGvarTupleVariationHeader) -> Self {
-        GvarTupleVariationHeader {
-            variation_data_size: orig.variation_data_size,
-            tuple_index: GvarTupleVariationHeaderTupleIndex::promote(&orig.tuple_index),
-            peak_tuple: promote_opt(&orig.peak_tuple),
-            intermediate_tuples: promote_opt(&orig.intermediate_tuples),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct GvarTupleVariationHeader {
-    variation_data_size: u16,
-    tuple_index: GvarTupleVariationHeaderTupleIndex,
-    peak_tuple: Option<GvarTupleRecord>,
-    intermediate_tuples: Option<GvarIntermediateTuples>,
-}
-
-pub type OpentypeGvarTupleVariationHeaderTupleIndex =
-    opentype_gvar_tuple_variation_header_tuple_index;
-
-impl Promote<OpentypeGvarTupleVariationHeaderTupleIndex> for GvarTupleVariationHeaderTupleIndex {
-    fn promote(orig: &OpentypeGvarTupleVariationHeaderTupleIndex) -> Self {
-        GvarTupleVariationHeaderTupleIndex {
-            embedded_peak_tuple: orig.embedded_peak_tuple,
-            intermediate_region: orig.intermediate_region,
-            private_point_numbers: orig.private_point_numbers,
-            tuple_index: orig.tuple_index,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct GvarTupleVariationHeaderTupleIndex {
-    embedded_peak_tuple: bool,
-    intermediate_region: bool,
-    private_point_numbers: bool,
-    tuple_index: u16,
-}
-
-pub type OpentypeGvarIntermediateTuples = opentype_gvar_tuple_variation_header_intermediate_tuples;
-
-impl Promote<OpentypeGvarIntermediateTuples> for GvarIntermediateTuples {
-    fn promote(orig: &OpentypeGvarIntermediateTuples) -> Self {
-        GvarIntermediateTuples {
-            start_tuple: GvarTupleRecord::promote(&orig.start_tuple),
-            end_tuple: GvarTupleRecord::promote(&orig.end_tuple),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct GvarIntermediateTuples {
-    start_tuple: GvarTupleRecord,
-    end_tuple: GvarTupleRecord,
-}
-
-pub type OpentypeGlyphVariationData<'input> = opentype_gvar_glyph_variation_data<'input>;
-
-frame!(OpentypeGlyphVariationData.data_scope);
-
-impl<'input> container::SingleContainer<obj::GvarSerData> for OpentypeGlyphVariationData<'input> {
-    fn get_offset(&self) -> usize {
-        self.data_offset as usize
-    }
-
-    fn get_args(&self) -> <obj::GvarSerData as container::CommonObject>::Args<'_> {
-        (
-            self.tuple_variation_count.shared_point_numbers,
-            &self.tuple_variation_headers,
-        )
-    }
-}
-
-impl<'input> Promote<OpentypeGlyphVariationData<'input>> for GlyphVariationData {
-    fn promote(orig: &OpentypeGlyphVariationData) -> Self {
-        GlyphVariationData {
-            shared_point_numbers: orig.tuple_variation_count.shared_point_numbers,
-            tuple_count: orig.tuple_variation_count.tuple_count,
-            tuple_variation_headers: promote_vec(&orig.tuple_variation_headers),
-            data: GvarSerializedData::promote(&reify_index(orig, obj::GvarSerData, 0)),
-        }
-    }
-}
-
-pub type OpentypePackedPoints = opentype_var_packed_point_numbers_run_points;
-pub type OpentypePackedPointRun = opentype_var_packed_point_numbers_runs;
-pub type OpentypePackedPointRuns = (u16, Vec<OpentypePackedPointRun>);
-
-impl Promote<OpentypePackedPointRuns> for PackedPointNumbers {
-    fn promote(orig: &OpentypePackedPointRuns) -> Self {
-        PackedPointNumbers {
-            point_numbers: promote_vec(&orig.1),
-        }
-    }
-}
-
-impl Promote<OpentypePackedPointRun> for PackedPointRun {
-    fn promote(orig: &OpentypePackedPointRun) -> Self {
-        PackedPointRun::promote(&orig.points)
-    }
-}
-
-impl Promote<OpentypePackedPoints> for PackedPointRun {
-    fn promote(orig: &OpentypePackedPoints) -> Self {
-        match orig {
-            OpentypePackedPoints::Points8(points) => PackedPointRun::Short(points.clone()),
-            OpentypePackedPoints::Points16(points) => PackedPointRun::Long(points.clone()),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum PackedPointRun {
-    Short(Vec<u8>),
-    Long(Vec<u16>),
-}
-
-#[derive(Debug, Clone)]
-pub struct PackedPointNumbers {
-    point_numbers: Vec<PackedPointRun>,
-}
-
-pub type OpentypeXYCoordinateDeltas = (u16, Vec<OpentypeCoordinateDeltaRun>);
-pub type OpentypeCoordinateDeltaRun =
-    opentype_gvar_serialized_data_per_tuple_variation_data_x_and_y_coordinate_deltas;
-pub type OpentypeXYCoordinateDeltaDeltas =
-    opentype_gvar_serialized_data_per_tuple_variation_data_x_and_y_coordinate_deltas_deltas;
-
-impl Promote<OpentypeCoordinateDeltaRun> for CoordinateDeltas {
-    fn promote(orig: &OpentypeCoordinateDeltaRun) -> Self {
-        CoordinateDeltas::promote(&orig.deltas)
-    }
-}
-
-impl Promote<OpentypeXYCoordinateDeltaDeltas> for CoordinateDeltas {
-    fn promote(orig: &OpentypeXYCoordinateDeltaDeltas) -> Self {
-        match orig {
-            &OpentypeXYCoordinateDeltaDeltas::Delta0(run_length) => {
-                CoordinateDeltas::Zero { run_length }
+    impl<'input> container::DynContainer<obj::GVarData> for otf_types::OpentypeGvar<'input> {
+        fn count(&self) -> usize {
+            match &self.glyph_variation_data_offsets {
+                opentype_loca_table_offsets::Offsets16(half16s) => half16s.len() - 1,
+                opentype_loca_table_offsets::Offsets32(off32s) => off32s.len() - 1,
             }
-            OpentypeXYCoordinateDeltaDeltas::Delta8(raw) => CoordinateDeltas::Short {
-                deltas: raw.iter().map(|x| *x as i8).collect(),
-            },
-            OpentypeXYCoordinateDeltaDeltas::Delta16(raw) => CoordinateDeltas::Long {
-                deltas: raw.iter().map(|x| *x as i16).collect(),
-            },
+        }
+
+        fn iter_offsets(&self) -> impl Iterator<Item = usize> {
+            let ret = match &self.glyph_variation_data_offsets {
+                opentype_loca_table_offsets::Offsets16(half16s) => Box::new(
+                    half16s
+                        .iter()
+                        .map(|half16| *half16 as usize * 2)
+                        .take(half16s.len() - 1),
+                )
+                    as Box<dyn Iterator<Item = usize>>,
+                opentype_loca_table_offsets::Offsets32(off32s) => Box::new(
+                    off32s
+                        .iter()
+                        .map(|off32| *off32 as usize)
+                        .take(off32s.len() - 1),
+                ),
+            };
+            // REVIEW - does this merit an intermediate GVarDataArray structure instead?
+            ret.map(|array_rel_offs| {
+                array_rel_offs + self.glyph_variation_data_array_offset as usize
+            })
+        }
+
+        fn iter_args(&self) -> impl Iterator<Item = (usize, u16)> {
+            let lengths: Box<dyn Iterator<Item = usize>> = match &self.glyph_variation_data_offsets
+            {
+                opentype_loca_table_offsets::Offsets16(half16s) => Box::new(
+                    Iterator::zip(half16s.iter(), half16s[1..].iter())
+                        .map(|(this, next)| (*next - *this) as usize * 2),
+                ),
+                opentype_loca_table_offsets::Offsets32(off32s) => Box::new(
+                    Iterator::zip(off32s.iter(), off32s[1..].iter())
+                        .map(|(this, next)| (*next - *this) as usize),
+                ),
+            };
+            Iterator::zip(lengths, std::iter::repeat(self.axis_count))
         }
     }
-}
 
-#[derive(Debug, Clone)]
-pub enum CoordinateDeltas {
-    Zero { run_length: u8 },
-    Short { deltas: Vec<i8> },
-    Long { deltas: Vec<i16> },
-}
+    impl<'input> container::SingleContainer<Nullable<obj::SharedTupleArr>>
+        for otf_types::OpentypeGvar<'input>
+    {
+        fn get_offset(&self) -> usize {
+            self.shared_tuples.offset as usize
+        }
 
-impl Promote<OpentypeXYCoordinateDeltas> for XYCoordinateDeltas {
-    fn promote(orig: &OpentypeXYCoordinateDeltas) -> Self {
-        XYCoordinateDeltas {
-            xy_deltas: promote_vec(&orig.1),
+        fn get_args(&self) -> (usize, u16) {
+            (self.shared_tuple_count as usize, self.axis_count)
         }
     }
-}
-#[derive(Debug, Clone)]
-pub struct XYCoordinateDeltas {
-    xy_deltas: Vec<CoordinateDeltas>,
-}
 
-pub type OpentypeGvarPerTupleVariationData = opentype_gvar_serialized_data_per_tuple_variation_data;
-
-impl Promote<OpentypeGvarPerTupleVariationData> for GvarPerTupleVariationData {
-    fn promote(orig: &OpentypeGvarPerTupleVariationData) -> Self {
-        GvarPerTupleVariationData {
-            private_point_numbers: promote_opt(&orig.private_point_numbers),
-            x_and_y_coordinate_deltas: XYCoordinateDeltas::promote(&orig.x_and_y_coordinate_deltas),
+    impl<'input> Promote<otf_types::OpentypeGvar<'input>> for GvarMetrics {
+        fn promote(orig: &otf_types::OpentypeGvar<'input>) -> Self {
+            let glyph_variation_data_array = fn_reify::reify_all(orig, obj::GVarData)
+                .map(|data| data.as_ref().map(GlyphVariationData::promote))
+                .collect();
+            let shared_tuples =
+                promote_from_null(&fn_reify::reify(orig, Nullable(obj::SharedTupleArr)));
+            Self {
+                major_version: orig.major_version,
+                minor_version: orig.minor_version,
+                shared_tuples,
+                glyph_count: orig.glyph_count,
+                flags: Promote::promote(&orig.flags),
+                glyph_variation_data_array,
+            }
         }
     }
-}
-#[derive(Debug, Clone)]
-pub struct GvarPerTupleVariationData {
-    private_point_numbers: Option<PackedPointNumbers>,
-    x_and_y_coordinate_deltas: XYCoordinateDeltas,
-}
 
-pub type OpentypeGvarSerializedData = opentype_gvar_serialized_data;
-
-impl Promote<OpentypeGvarSerializedData> for GvarSerializedData {
-    fn promote(orig: &OpentypeGvarSerializedData) -> Self {
-        GvarSerializedData {
-            shared_point_numbers: promote_opt(&orig.shared_point_numbers),
-            per_tuple_variation_data: promote_vec(&orig.per_tuple_variation_data),
+    impl Promote<Vec<OpentypeGvarTupleRecord>> for Vec<GvarTupleRecord> {
+        fn promote(orig: &Vec<OpentypeGvarTupleRecord>) -> Self {
+            promote_vec(orig)
         }
     }
-}
 
-#[derive(Debug, Clone)]
-pub struct GvarSerializedData {
-    shared_point_numbers: Option<PackedPointNumbers>,
-    per_tuple_variation_data: Vec<GvarPerTupleVariationData>,
-}
+    impl Promote<OpentypeGvarTupleRecord> for GvarTupleRecord {
+        fn promote(orig: &OpentypeGvarTupleRecord) -> Self {
+            GvarTupleRecord {
+                coordinates: promote_vec(&orig.coordinates),
+            }
+        }
+    }
 
-#[derive(Debug, Clone)]
-pub struct GlyphVariationData {
-    shared_point_numbers: bool,
-    tuple_count: u16,
-    tuple_variation_headers: Vec<GvarTupleVariationHeader>,
-    data: GvarSerializedData,
-}
+    #[derive(Clone, Debug)]
+    pub struct GvarTupleRecord {
+        pub(crate) coordinates: Vec<otf_types::F2Dot14>,
+    }
 
-#[derive(Debug, Clone)]
-struct GvarMetrics {
-    major_version: u16,
-    minor_version: u16,
-    shared_tuples: Vec<GvarTupleRecord>,
-    glyph_count: u16,
-    flags: GvarFlags,
-    glyph_variation_data_array: Vec<Option<GlyphVariationData>>,
+    impl Promote<OpentypeGvarFlags> for GvarFlags {
+        fn promote(orig: &OpentypeGvarFlags) -> Self {
+            GvarFlags {
+                is_long_offset: orig.is_long_offset,
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    pub struct GvarFlags {
+        pub(crate) is_long_offset: bool,
+    }
+
+    impl Promote<OpentypeGvarTupleVariationHeader> for GvarTupleVariationHeader {
+        fn promote(orig: &OpentypeGvarTupleVariationHeader) -> Self {
+            GvarTupleVariationHeader {
+                variation_data_size: orig.variation_data_size,
+                tuple_index: GvarTupleVariationHeaderTupleIndex::promote(&orig.tuple_index),
+                peak_tuple: promote_opt(&orig.peak_tuple),
+                intermediate_tuples: promote_opt(&orig.intermediate_tuples),
+            }
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct GvarTupleVariationHeader {
+        pub(crate) variation_data_size: u16,
+        pub(crate) tuple_index: GvarTupleVariationHeaderTupleIndex,
+        pub(crate) peak_tuple: Option<GvarTupleRecord>,
+        pub(crate) intermediate_tuples: Option<GvarIntermediateTuples>,
+    }
+
+    impl Promote<OpentypeGvarTupleVariationHeaderTupleIndex> for GvarTupleVariationHeaderTupleIndex {
+        fn promote(orig: &OpentypeGvarTupleVariationHeaderTupleIndex) -> Self {
+            GvarTupleVariationHeaderTupleIndex {
+                embedded_peak_tuple: orig.embedded_peak_tuple,
+                intermediate_region: orig.intermediate_region,
+                private_point_numbers: orig.private_point_numbers,
+                tuple_index: orig.tuple_index,
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    pub struct GvarTupleVariationHeaderTupleIndex {
+        pub(crate) embedded_peak_tuple: bool,
+        pub(crate) intermediate_region: bool,
+        pub(crate) private_point_numbers: bool,
+        pub(crate) tuple_index: u16,
+    }
+
+    impl Promote<OpentypeGvarIntermediateTuples> for GvarIntermediateTuples {
+        fn promote(orig: &OpentypeGvarIntermediateTuples) -> Self {
+            GvarIntermediateTuples {
+                start_tuple: GvarTupleRecord::promote(&orig.start_tuple),
+                end_tuple: GvarTupleRecord::promote(&orig.end_tuple),
+            }
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct GvarIntermediateTuples {
+        pub(crate) start_tuple: GvarTupleRecord,
+        pub(crate) end_tuple: GvarTupleRecord,
+    }
+
+    frame!(OpentypeGlyphVariationData.data_scope);
+
+    impl<'input> container::SingleContainer<obj::GvarSerData> for OpentypeGlyphVariationData<'input> {
+        fn get_offset(&self) -> usize {
+            self.data_offset as usize
+        }
+
+        fn get_args(&self) -> <obj::GvarSerData as container::CommonObject>::Args<'_> {
+            (
+                self.tuple_variation_count.shared_point_numbers,
+                &self.tuple_variation_headers,
+            )
+        }
+    }
+
+    impl<'input> Promote<OpentypeGlyphVariationData<'input>> for GlyphVariationData {
+        fn promote(orig: &OpentypeGlyphVariationData) -> Self {
+            GlyphVariationData {
+                shared_point_numbers: orig.tuple_variation_count.shared_point_numbers,
+                tuple_count: orig.tuple_variation_count.tuple_count,
+                tuple_variation_headers: promote_vec(&orig.tuple_variation_headers),
+                data: GvarSerializedData::promote(&fn_reify::reify_index(
+                    orig,
+                    obj::GvarSerData,
+                    0,
+                )),
+            }
+        }
+    }
+
+    impl Promote<OpentypePackedPointRuns> for PackedPointNumbers {
+        fn promote(orig: &OpentypePackedPointRuns) -> Self {
+            PackedPointNumbers {
+                point_numbers: promote_vec(&orig.1),
+            }
+        }
+    }
+
+    impl Promote<OpentypePackedPointRun> for PackedPointRun {
+        fn promote(orig: &OpentypePackedPointRun) -> Self {
+            PackedPointRun::promote(&orig.points)
+        }
+    }
+
+    impl Promote<OpentypePackedPoints> for PackedPointRun {
+        fn promote(orig: &OpentypePackedPoints) -> Self {
+            match orig {
+                OpentypePackedPoints::Points8(points) => PackedPointRun::Short(points.clone()),
+                OpentypePackedPoints::Points16(points) => PackedPointRun::Long(points.clone()),
+            }
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    pub enum PackedPointRun {
+        Short(Vec<u8>),
+        Long(Vec<u16>),
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct PackedPointNumbers {
+        pub(crate) point_numbers: Vec<PackedPointRun>,
+    }
+
+    impl Promote<OpentypeCoordinateDeltaRun> for CoordinateDeltas {
+        fn promote(orig: &OpentypeCoordinateDeltaRun) -> Self {
+            CoordinateDeltas::promote(&orig.deltas)
+        }
+    }
+
+    impl Promote<OpentypeXYCoordinateDeltaDeltas> for CoordinateDeltas {
+        fn promote(orig: &OpentypeXYCoordinateDeltaDeltas) -> Self {
+            match orig {
+                &OpentypeXYCoordinateDeltaDeltas::Delta0(run_length) => {
+                    CoordinateDeltas::Zero { run_length }
+                }
+                OpentypeXYCoordinateDeltaDeltas::Delta8(raw) => CoordinateDeltas::Short {
+                    deltas: raw.iter().map(|x| *x as i8).collect(),
+                },
+                OpentypeXYCoordinateDeltaDeltas::Delta16(raw) => CoordinateDeltas::Long {
+                    deltas: raw.iter().map(|x| *x as i16).collect(),
+                },
+            }
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    pub enum CoordinateDeltas {
+        Zero { run_length: u8 },
+        Short { deltas: Vec<i8> },
+        Long { deltas: Vec<i16> },
+    }
+
+    impl Promote<OpentypeXYCoordinateDeltas> for XYCoordinateDeltas {
+        fn promote(orig: &OpentypeXYCoordinateDeltas) -> Self {
+            XYCoordinateDeltas {
+                xy_deltas: promote_vec(&orig.1),
+            }
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct XYCoordinateDeltas {
+        pub(crate) xy_deltas: Vec<CoordinateDeltas>,
+    }
+
+    impl Promote<OpentypeGvarPerTupleVariationData> for GvarPerTupleVariationData {
+        fn promote(orig: &OpentypeGvarPerTupleVariationData) -> Self {
+            GvarPerTupleVariationData {
+                private_point_numbers: promote_opt(&orig.private_point_numbers),
+                x_and_y_coordinate_deltas: XYCoordinateDeltas::promote(
+                    &orig.x_and_y_coordinate_deltas,
+                ),
+            }
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct GvarPerTupleVariationData {
+        pub(crate) private_point_numbers: Option<PackedPointNumbers>,
+        pub(crate) x_and_y_coordinate_deltas: XYCoordinateDeltas,
+    }
+
+    impl Promote<OpentypeGvarSerializedData> for GvarSerializedData {
+        fn promote(orig: &OpentypeGvarSerializedData) -> Self {
+            GvarSerializedData {
+                shared_point_numbers: promote_opt(&orig.shared_point_numbers),
+                per_tuple_variation_data: promote_vec(&orig.per_tuple_variation_data),
+            }
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct GvarSerializedData {
+        pub(crate) shared_point_numbers: Option<PackedPointNumbers>,
+        pub(crate) per_tuple_variation_data: Vec<GvarPerTupleVariationData>,
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct GlyphVariationData {
+        pub(crate) shared_point_numbers: bool,
+        pub(crate) tuple_count: u16,
+        pub(crate) tuple_variation_headers: Vec<GvarTupleVariationHeader>,
+        pub(crate) data: GvarSerializedData,
+    }
+
+    #[derive(Debug, Clone)]
+    pub(crate) struct GvarMetrics {
+        pub(crate) major_version: u16,
+        pub(crate) minor_version: u16,
+        pub(crate) shared_tuples: Vec<GvarTupleRecord>,
+        pub(crate) glyph_count: u16,
+        pub(crate) flags: GvarFlags,
+        pub(crate) glyph_variation_data_array: Vec<Option<GlyphVariationData>>,
+    }
 }
+pub(crate) use gvar::{
+    GlyphVariationData, GvarMetrics, GvarPerTupleVariationData, GvarSerializedData,
+    GvarTupleRecord, GvarTupleVariationHeader,
+};
+
+pub mod otf_dsig {
+    alias! {
+        pub type OpentypeSignatureRecord = opentype_dsig_signature_record<'a>;
+        pub type OpentypeSignatureBlock = opentype_dsig_sig_format1<'a>;
+    }
+}
+pub use otf_dsig::*;
+
+pub(crate) mod dsig {
+    use super::container;
+    use super::fn_reify::reify_all;
+    use super::obj;
+    use super::otf_dsig::*;
+    use super::otf_types::OpentypeDsig;
+    use super::traits::{Promote, PromoteView, promote_all};
+
+    alias! {
+        pub type OpentypeDsigFlags = opentype_dsig_flags;
+    }
+
+    frame!(OpentypeDsig);
+
+    impl<'a> container::DynContainer<obj::SigBlock> for OpentypeDsig<'a> {
+        fn count(&self) -> usize {
+            self.num_signatures as usize
+        }
+
+        fn iter_offsets(&self) -> impl Iterator<Item = usize> {
+            self.signature_records
+                .iter()
+                .map(|r| r.signature_offset.offset as usize)
+        }
+
+        fn iter_args(&self) -> impl Iterator<Item = ()> {
+            std::iter::repeat(())
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct SignatureBlock {
+        pub(crate) length: u32,
+        pub(crate) sig: Vec<u8>,
+    }
+
+    impl<'input> Promote<OpentypeSignatureBlock<'input>> for SignatureBlock {
+        fn promote(orig: &OpentypeSignatureBlock<'input>) -> Self {
+            SignatureBlock {
+                length: orig.signature_length,
+                sig: orig.signature.to_vec(),
+            }
+        }
+    }
+
+    pub(crate) type DsigFlags = OpentypeDsigFlags;
+
+    impl<'a> Promote<OpentypeDsig<'a>> for DsigMetrics {
+        fn promote(orig: &OpentypeDsig) -> Self {
+            DsigMetrics {
+                version: orig.version,
+                flags: orig.flags,
+                signatures: promote_all(super::fn_reify::reify_all(orig, obj::SigBlock)),
+            }
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    pub struct DsigMetrics {
+        pub(super) version: u32,
+        pub(super) flags: DsigFlags,
+        pub(super) signatures: Vec<SignatureBlock>,
+    }
+}
+use dsig::*;
 
 #[derive(Debug, Clone)]
 struct FvarMetrics {
@@ -1771,7 +1951,7 @@ struct FvarMetrics {
 
 frame!(OpentypeFvar);
 
-impl<'input> container::DynContainer<obj::AxisRec> for OpentypeFvar<'input> {
+impl<'input> container::DynContainer<obj::AxisRec> for otf_types::OpentypeFvar<'input> {
     fn count(&self) -> usize {
         self.axis_count as usize
     }
@@ -1785,7 +1965,7 @@ impl<'input> container::DynContainer<obj::AxisRec> for OpentypeFvar<'input> {
     }
 }
 
-impl<'input> container::DynContainer<obj::InstanceRec> for OpentypeFvar<'input> {
+impl<'input> container::DynContainer<obj::InstanceRec> for otf_types::OpentypeFvar<'input> {
     fn count(&self) -> usize {
         self.axis_count as usize
     }
@@ -1802,12 +1982,12 @@ impl<'input> container::DynContainer<obj::InstanceRec> for OpentypeFvar<'input> 
     }
 }
 
-impl<'input> Promote<OpentypeFvar<'input>> for FvarMetrics {
-    fn promote(orig: &OpentypeFvar) -> Self {
-        let axes = reify_all(orig, obj::AxisRec)
+impl<'input> Promote<otf_types::OpentypeFvar<'input>> for FvarMetrics {
+    fn promote(orig: &otf_types::OpentypeFvar) -> Self {
+        let axes = fn_reify::reify_all(orig, obj::AxisRec)
             .map(|raw| VariationAxisRecord::promote(&raw))
             .collect();
-        let instances = reify_all(orig, obj::InstanceRec)
+        let instances = fn_reify::reify_all(orig, obj::InstanceRec)
             .map(|raw| InstanceRecord::promote(&raw))
             .collect();
         FvarMetrics {
@@ -1827,7 +2007,7 @@ impl Promote<OpentypeUserTuple> for UserTuple {
     }
 }
 
-type UserTuple = Vec<Fixed>;
+type UserTuple = Vec<otf_types::Fixed>;
 
 pub type OpentypeInstanceRecord = opentype_fvar_instance_record;
 
@@ -1861,9 +2041,9 @@ impl Promote<OpentypeVariationAxisRecord> for VariationAxisRecord {
     fn promote(orig: &OpentypeVariationAxisRecord) -> Self {
         VariationAxisRecord {
             axis_tag: Tag::promote(&orig.axis_tag),
-            min_value: Fixed::promote(&orig.min_value),
-            default_value: Fixed::promote(&orig.default_value),
-            max_value: Fixed::promote(&orig.max_value),
+            min_value: otf_types::Fixed::promote(&orig.min_value),
+            default_value: otf_types::Fixed::promote(&orig.default_value),
+            max_value: otf_types::Fixed::promote(&orig.max_value),
             flags: VariationAxisRecordFlags::promote(&orig.flags),
             axis_name_id: NameId::from(orig.axis_name_id),
         }
@@ -1885,9 +2065,9 @@ struct VariationAxisRecordFlags {
 #[derive(Debug, Clone, Copy)]
 struct VariationAxisRecord {
     axis_tag: Tag,
-    min_value: Fixed,
-    default_value: Fixed,
-    max_value: Fixed,
+    min_value: otf_types::Fixed,
+    default_value: otf_types::Fixed,
+    max_value: otf_types::Fixed,
     flags: VariationAxisRecordFlags,
     axis_name_id: NameId,
 }
@@ -1952,7 +2132,7 @@ impl Promote<OpentypeAxisValueFormat1> for AxisValueFormat1 {
             axis_index: orig.axis_index,
             flags: AxisValueFlags::promote(&orig.flags),
             value_name_id: NameId::from(orig.value_name_id),
-            value: Fixed::promote(&orig.value),
+            value: otf_types::Fixed::promote(&orig.value),
         }
     }
 }
@@ -1962,7 +2142,7 @@ struct AxisValueFormat1 {
     axis_index: u16,
     flags: AxisValueFlags,
     value_name_id: NameId,
-    value: Fixed,
+    value: otf_types::Fixed,
 }
 
 impl Promote<OpentypeAxisValueFormat2> for AxisValueFormat2 {
@@ -1971,9 +2151,9 @@ impl Promote<OpentypeAxisValueFormat2> for AxisValueFormat2 {
             axis_index: orig.axis_index,
             flags: AxisValueFlags::promote(&orig.flags),
             value_name_id: NameId::from(orig.value_name_id),
-            nominal_value: Fixed::promote(&orig.nominal_value),
-            range_min_value: Fixed::promote(&orig.range_min_value),
-            range_max_value: Fixed::promote(&orig.range_max_value),
+            nominal_value: otf_types::Fixed::promote(&orig.nominal_value),
+            range_min_value: otf_types::Fixed::promote(&orig.range_min_value),
+            range_max_value: otf_types::Fixed::promote(&orig.range_max_value),
         }
     }
 }
@@ -1983,9 +2163,9 @@ struct AxisValueFormat2 {
     axis_index: u16,
     flags: AxisValueFlags,
     value_name_id: NameId,
-    nominal_value: Fixed,
-    range_min_value: Fixed,
-    range_max_value: Fixed,
+    nominal_value: otf_types::Fixed,
+    range_min_value: otf_types::Fixed,
+    range_max_value: otf_types::Fixed,
 }
 
 impl Promote<OpentypeAxisValueFormat3> for AxisValueFormat3 {
@@ -1994,8 +2174,8 @@ impl Promote<OpentypeAxisValueFormat3> for AxisValueFormat3 {
             axis_index: orig.axis_index,
             flags: AxisValueFlags::promote(&orig.flags),
             value_name_id: NameId::from(orig.value_name_id),
-            value: Fixed::promote(&orig.value),
-            linked_value: Fixed::promote(&orig.linked_value),
+            value: otf_types::Fixed::promote(&orig.value),
+            linked_value: otf_types::Fixed::promote(&orig.linked_value),
         }
     }
 }
@@ -2004,8 +2184,8 @@ struct AxisValueFormat3 {
     axis_index: u16,
     flags: AxisValueFlags,
     value_name_id: NameId,
-    value: Fixed,
-    linked_value: Fixed,
+    value: otf_types::Fixed,
+    linked_value: otf_types::Fixed,
 }
 
 pub type OpentypeAxisValueRecord = opentype_stat_axis_value_table_data_Format4_axis_values;
@@ -2014,7 +2194,7 @@ impl Promote<OpentypeAxisValueRecord> for AxisValueRecord {
     fn promote(orig: &OpentypeAxisValueRecord) -> Self {
         AxisValueRecord {
             axis_index: orig.axis_index,
-            value: Fixed::promote(&orig.value),
+            value: otf_types::Fixed::promote(&orig.value),
         }
     }
 }
@@ -2022,7 +2202,7 @@ impl Promote<OpentypeAxisValueRecord> for AxisValueRecord {
 #[derive(Clone, Copy, Debug)]
 struct AxisValueRecord {
     axis_index: u16,
-    value: Fixed,
+    value: otf_types::Fixed,
 }
 
 impl Promote<OpentypeAxisValueFormat4> for AxisValueFormat4 {
@@ -2093,12 +2273,12 @@ struct DesignAxis {
     axis_ordering: u16,
 }
 
-impl<'a> Promote<OpentypeStat<'a>> for StatMetrics {
-    fn promote(orig: &OpentypeStat) -> Self {
-        let design_axes = <Vec<DesignAxis>>::promote(&reify(orig, obj::DAxisArray));
+impl<'a> Promote<otf_types::OpentypeStat<'a>> for StatMetrics {
+    fn promote(orig: &otf_types::OpentypeStat) -> Self {
+        let design_axes = <Vec<DesignAxis>>::promote(&fn_reify::reify(orig, obj::DAxisArray));
         let axis_values = {
-            let axis_value_array = reify(orig, obj::AxisValueArr);
-            reify_all(&axis_value_array, obj::AxisValTbl)
+            let axis_value_array = fn_reify::reify(orig, obj::AxisValueArr);
+            fn_reify::reify_all(&axis_value_array, obj::AxisValTbl)
                 .map(|raw| AxisValue::promote(&raw))
                 .collect()
         };
@@ -2493,6 +2673,18 @@ pub struct RawArrayMetrics(usize);
 type CvtMetrics = RawArrayMetrics;
 type FpgmMetrics = RawArrayMetrics;
 
+alias! {
+    pub type OpentypeGlyfEntry = opentype_glyf_table_glyphs;
+
+    pub type OpentypeGlyph = opentype_glyf_table_glyphs_Glyph;
+
+    pub type GlyphHeader = opentype_glyf_entry;
+
+    pub type SimpleGlyph = opentype_glyf_simple;
+
+    pub type GlyphDescription = opentype_glyf_description;
+}
+
 #[derive(Clone, Debug)]
 pub struct GlyfMetrics {
     num_glyphs: usize,
@@ -2501,8 +2693,8 @@ pub struct GlyfMetrics {
 
 frame!(OpentypeGlyf);
 
-impl<'a> Promote<OpentypeGlyf<'a>> for GlyfMetrics {
-    fn promote(orig: &OpentypeGlyf<'a>) -> Self {
+impl<'a> Promote<otf_types::OpentypeGlyf<'a>> for GlyfMetrics {
+    fn promote(orig: &otf_types::OpentypeGlyf<'a>) -> Self {
         Self {
             num_glyphs: orig.glyphs.len(),
             glyphs: promote_vec_view(&orig.glyphs, container::ViewFrame::scope(orig))
@@ -2536,7 +2728,7 @@ impl container::OptContainer<obj::GlyphHdr> for OpentypeGlyfEntry {
 
 impl PromoteView<OpentypeGlyfEntry> for GlyphMetric {
     fn promote_view(orig: &OpentypeGlyfEntry, view: View<'_>) -> PResult<Self> {
-        if let Some(raw) = reify_opt_dep(view, orig, obj::GlyphHdr) {
+        if let Some(raw) = fn_reify::reify_opt_dep(view, orig, obj::GlyphHdr) {
             Ok(GlyphMetric::promote(&raw?))
         } else {
             Ok(GlyphMetric::Empty)
@@ -2732,7 +2924,7 @@ impl<'a> TryPromote<OpentypeMarkGlyphSet<'a>> for MarkGlyphSet {
     fn try_promote(orig: &OpentypeMarkGlyphSet) -> Result<Self, Self::Error> {
         match orig.format {
             1 => {
-                let coverage = reify_all(orig, Nullable(obj::CovTable))
+                let coverage = fn_reify::reify_all(orig, Nullable(obj::CovTable))
                     .map(|raw| raw.as_ref().map(CoverageTable::promote))
                     .collect();
                 Ok(MarkGlyphSet {
@@ -2753,17 +2945,17 @@ pub type OpentypeRegionAxisCoordinates =
     opentype_common_variation_region_list_variation_regions_region_axes;
 #[derive(Debug, Clone, Copy)]
 struct RegionAxisCoordinates {
-    start_coord: F2Dot14,
-    peak_coord: F2Dot14,
-    end_coord: F2Dot14,
+    start_coord: otf_types::F2Dot14,
+    peak_coord: otf_types::F2Dot14,
+    end_coord: otf_types::F2Dot14,
 }
 
 impl Promote<OpentypeRegionAxisCoordinates> for RegionAxisCoordinates {
     fn promote(orig: &OpentypeRegionAxisCoordinates) -> Self {
         RegionAxisCoordinates {
-            start_coord: F2Dot14::promote(&orig.start_coord),
-            peak_coord: F2Dot14::promote(&orig.peak_coord),
-            end_coord: F2Dot14::promote(&orig.end_coord),
+            start_coord: otf_types::F2Dot14::promote(&orig.start_coord),
+            peak_coord: otf_types::F2Dot14::promote(&orig.peak_coord),
+            end_coord: otf_types::F2Dot14::promote(&orig.end_coord),
         }
     }
 }
@@ -2887,9 +3079,10 @@ impl<'input> container::DynContainer<Nullable<obj::ItemVarData>>
 
 impl<'a> Promote<OpentypeItemVariationStore<'a>> for ItemVariationStore {
     fn promote(orig: &OpentypeItemVariationStore) -> Self {
-        let variation_region_list = promote_from_null(&reify(orig, Nullable(obj::VarRegList)));
-        let item_variation_data_list = reify_all(orig, Nullable(obj::ItemVarData))
-            .map(|raw| promote_link(&raw))
+        let variation_region_list =
+            promote_from_null(&fn_reify::reify(orig, Nullable(obj::VarRegList)));
+        let item_variation_data_list = fn_reify::reify_all(orig, Nullable(obj::ItemVarData))
+            .map(|raw| promote_opt(&raw))
             .collect();
         ItemVariationStore {
             variation_region_list,
@@ -2956,7 +3149,7 @@ impl<'a> TryPromoteView<OpentypeGdefTableData<'a>> for GdefTableDataMetrics {
     fn try_promote_view<'input>(
         orig: &'input OpentypeGdefTableData<'a>,
         view: View<'input>,
-    ) -> Result<Self, ValueParseError<Self::Error<'input>>>
+    ) -> Result<Self, value_parse::ValueParseError<Self::Error<'input>>>
     where
         'a: 'input,
     {
@@ -2964,8 +3157,8 @@ impl<'a> TryPromoteView<OpentypeGdefTableData<'a>> for GdefTableDataMetrics {
             OpentypeGdefTableData::Version1_0 => Self::default(),
             OpentypeGdefTableData::Version1_2(inner) => {
                 let mark_glyph_sets_def =
-                    try_promote_opt(&reify_dep(view, inner, Nullable(obj::MarkGlSet))?)
-                        .map_err(ValueParseError::value)?;
+                    try_promote_opt(&fn_reify::reify_dep(view, inner, Nullable(obj::MarkGlSet))?)
+                        .map_err(value_parse::ValueParseError::value)?;
                 GdefTableDataMetrics {
                     mark_glyph_sets_def,
                     item_var_store: None,
@@ -2973,10 +3166,13 @@ impl<'a> TryPromoteView<OpentypeGdefTableData<'a>> for GdefTableDataMetrics {
             }
             OpentypeGdefTableData::Version1_3(inner) => {
                 let mark_glyph_sets_def =
-                    try_promote_opt(&reify_dep(view, inner, Nullable(obj::MarkGlSet))?)
-                        .map_err(ValueParseError::value)?;
-                let item_var_store =
-                    promote_opt(&reify_dep(view, inner, Nullable(obj::ItemVarStore))?);
+                    try_promote_opt(&fn_reify::reify_dep(view, inner, Nullable(obj::MarkGlSet))?)
+                        .map_err(value_parse::ValueParseError::value)?;
+                let item_var_store = promote_opt(&fn_reify::reify_dep(
+                    view,
+                    inner,
+                    Nullable(obj::ItemVarStore),
+                )?);
 
                 GdefTableDataMetrics {
                     mark_glyph_sets_def,
@@ -3200,8 +3396,8 @@ impl<'a> container::DynContainer<obj::AttPoint> for OpentypeAttachList<'a> {
 
 impl<'a> Promote<OpentypeAttachList<'a>> for AttachList {
     fn promote(orig: &OpentypeAttachList) -> Self {
-        let coverage = CoverageTable::promote(&reify(orig, obj::CovTable));
-        let attach_points = reify_all(orig, obj::AttPoint)
+        let coverage = CoverageTable::promote(&fn_reify::reify(orig, obj::CovTable));
+        let attach_points = fn_reify::reify_all(orig, obj::AttPoint)
             .map(|raw| AttachPoint::promote(&raw))
             .collect();
         AttachList {
@@ -3251,9 +3447,9 @@ impl<'a> TryPromote<OpentypeLigCaretList<'a>> for LigCaretList {
     type Error = ReflType<TPErr<OpentypeLigGlyph<'a>, LigGlyph>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeLigCaretList) -> Result<Self, Self::Error> {
-        let coverage = CoverageTable::promote(&reify(orig, obj::CovTable));
+        let coverage = CoverageTable::promote(&fn_reify::reify(orig, obj::CovTable));
         let mut lig_glyphs = Vec::with_capacity(container::DynContainer::count(orig));
-        for opt_raw in reify_all(orig, Nullable(obj::LigGlyph)) {
+        for opt_raw in fn_reify::reify_all(orig, Nullable(obj::LigGlyph)) {
             lig_glyphs.push(try_promote_from_null(&opt_raw)?);
         }
         Ok(LigCaretList {
@@ -3293,7 +3489,7 @@ impl<'a> TryPromote<OpentypeLigGlyph<'a>> for LigGlyph {
 
     fn try_promote(orig: &OpentypeLigGlyph) -> Result<Self, Self::Error> {
         let mut caret_values = Vec::with_capacity(container::DynContainer::count(orig));
-        for opt_raw in reify_all(orig, Nullable(obj::CaretVal)) {
+        for opt_raw in fn_reify::reify_all(orig, Nullable(obj::CaretVal)) {
             caret_values.push(try_promote_opt(&opt_raw)?); // &caret_value.data
         }
         Ok(LigGlyph { caret_values })
@@ -3533,7 +3729,7 @@ impl<'a> TryPromote<OpentypeCaretValueData<'a>> for CaretValue {
                 caret_value_point_index,
             }) => Ok(CaretValue::ContourPoint(*caret_value_point_index)),
             OpentypeCaretValueData::Format3(format3) => {
-                let device = try_promote_opt(&reify(format3, Nullable(obj::DevTable)))?;
+                let device = try_promote_opt(&fn_reify::reify(format3, Nullable(obj::DevTable)))?;
                 Ok(CaretValue::DesignUnitsWithTable {
                     coordinate: format3.coordinate,
                     device,
@@ -3541,6 +3737,18 @@ impl<'a> TryPromote<OpentypeCaretValueData<'a>> for CaretValue {
             }
         }
     }
+}
+
+alias! {
+    pub type OpentypeGdefTableData = opentype_gdef_table_data<'a>;
+
+    pub type OpentypeAttachPoint = opentype_gdef_attach_point;
+
+    pub type OpentypeCoverageTable = opentype_coverage_table;
+
+    pub type OpentypeCoverageTableData = opentype_coverage_table_data;
+
+    pub type OpentypeCoverageRangeRecord = opentype_coverage_table_data_Format2_range_records;
 }
 
 #[derive(Clone, Debug)]
@@ -3554,18 +3762,22 @@ struct GdefMetrics {
     data: GdefTableDataMetrics,
 }
 
-impl<'a> TryPromote<OpentypeGdef<'a>> for GdefMetrics {
-    type Error = ValueParseError<TPErr<OpentypeLigCaretList<'a>, LigCaretList>>;
+impl<'a> TryPromote<otf_types::OpentypeGdef<'a>> for GdefMetrics {
+    type Error = value_parse::ValueParseError<TPErr<OpentypeLigCaretList<'a>, LigCaretList>>;
 
     fn try_promote(gdef: &opentype_gdef_table<'_>) -> Result<GdefMetrics, Self::Error> {
         Ok(GdefMetrics {
             major_version: gdef.major_version,
             minor_version: gdef.minor_version,
-            glyph_class_def: promote_opt(&reify_index(gdef, Nullable(obj::ClsDef), 0)),
-            attach_list: promote_opt(&reify(gdef, Nullable(obj::AttList))),
-            lig_caret_list: try_promote_opt(&reify(gdef, Nullable(obj::LigCarList)))
-                .map_err(ValueParseError::value)?,
-            mark_attach_class_def: promote_opt(&reify_index(gdef, Nullable(obj::ClsDef), 1)),
+            glyph_class_def: promote_opt(&fn_reify::reify_index(gdef, Nullable(obj::ClsDef), 0)),
+            attach_list: promote_opt(&fn_reify::reify(gdef, Nullable(obj::AttList))),
+            lig_caret_list: try_promote_opt(&fn_reify::reify(gdef, Nullable(obj::LigCarList)))
+                .map_err(value_parse::ValueParseError::value)?,
+            mark_attach_class_def: promote_opt(&fn_reify::reify_index(
+                gdef,
+                Nullable(obj::ClsDef),
+                1,
+            )),
             data: GdefTableDataMetrics::try_promote_view(&gdef.data, gdef.table_scope)?,
         })
     }
@@ -3604,7 +3816,7 @@ impl PromoteView<OpentypeLangSysRecord> for LangSysRecord {
     fn promote_view(orig: &OpentypeLangSysRecord, view: View<'_>) -> PResult<Self> {
         Ok(LangSysRecord {
             lang_sys_tag: Tag(orig.lang_sys_tag),
-            lang_sys: promote_opt(&reify_dep(view, orig, Nullable(obj::LangSys))?),
+            lang_sys: promote_opt(&fn_reify::reify_dep(view, orig, Nullable(obj::LangSys))?),
         })
     }
 }
@@ -3630,7 +3842,7 @@ impl<'input> container::SingleContainer<Nullable<obj::LangSys>> for OpentypeScri
 impl<'input> Promote<OpentypeScriptTable<'input>> for ScriptTable {
     fn promote(orig: &OpentypeScriptTable) -> Self {
         ScriptTable {
-            default_lang_sys: promote_opt(&reify(orig, Nullable(obj::LangSys))),
+            default_lang_sys: promote_opt(&fn_reify::reify(orig, Nullable(obj::LangSys))),
             lang_sys_records: promote_vec_view(&orig.lang_sys_records, orig.script_scope)
                 .expect("failed to parse"),
         }
@@ -3657,7 +3869,7 @@ impl<'input> PromoteView<OpentypeScriptRecord<'input>> for ScriptRecord {
     fn promote_view(orig: &OpentypeScriptRecord, view: View<'_>) -> PResult<Self> {
         Ok(ScriptRecord {
             script_tag: Tag(orig.script_tag),
-            script: promote_opt(&reify_dep(view, orig, Nullable(obj::ScrTable))?),
+            script: promote_opt(&fn_reify::reify_dep(view, orig, Nullable(obj::ScrTable))?),
         })
     }
 }
@@ -3699,7 +3911,7 @@ impl<'input> PromoteView<OpentypeFeatureRecord<'input>> for FeatureRecord {
     fn promote_view(orig: &OpentypeFeatureRecord, view: View<'_>) -> PResult<Self> {
         Ok(FeatureRecord {
             feature_tag: Tag(orig.feature_tag),
-            feature: FeatureTable::promote(&reify_dep(view, orig, obj::FeatTable)?),
+            feature: FeatureTable::promote(&fn_reify::reify_dep(view, orig, obj::FeatTable)?),
         })
     }
 }
@@ -3777,7 +3989,7 @@ impl<'input> TryPromote<OpentypeSubstExtension<'input>> for LookupSubtable {
     >;
 
     fn try_promote(orig: &OpentypeSubstExtension) -> Result<Self, Self::Error> {
-        let raw = reify_index(orig, obj::SubstLookup, 0);
+        let raw = fn_reify::reify_index(orig, obj::SubstLookup, 0);
         LookupSubtable::try_promote(&raw)
     }
 }
@@ -3848,7 +4060,7 @@ impl<'input> TryPromote<OpentypePosExtension<'input>> for LookupSubtable {
         ReflType<TPErr<OpentypeGposLookupSubtable<'input>, LookupSubtable>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypePosExtension) -> Result<Self, Self::Error> {
-        let ground = reify_index(orig, obj::PosLookup, 0);
+        let ground = fn_reify::reify_index(orig, obj::PosLookup, 0);
         LookupSubtable::try_promote(&ground)
     }
 }
@@ -3950,12 +4162,12 @@ impl<'input> container::SingleContainer<Nullable<obj::Mark2Arr>> for OpentypeMar
 
 impl<'input> OpentypeMarkMarkPos<'input> {
     pub(crate) fn mark1_array(&self) -> Result<MarkArray, UnknownValueError<u16>> {
-        let raw = reify(self, Nullable(obj::MarkArr));
+        let raw = fn_reify::reify(self, Nullable(obj::MarkArr));
         try_promote_from_null(&raw)
     }
 
     pub(crate) fn mark2_array(&self) -> Result<Mark2Array, UnknownValueError<u16>> {
-        let raw = reify(self, Nullable(obj::Mark2Arr));
+        let raw = fn_reify::reify(self, Nullable(obj::Mark2Arr));
         try_promote_from_null(&raw)
     }
 }
@@ -3971,8 +4183,8 @@ impl<'input> TryPromote<OpentypeMarkMarkPos<'input>> for MarkMarkPos {
 
     fn try_promote(orig: &OpentypeMarkMarkPos) -> Result<Self, Self::Error> {
         Ok(MarkMarkPos {
-            mark1_coverage: CoverageTable::promote(&reify_index(orig, obj::CovTable, 0)),
-            mark2_coverage: CoverageTable::promote(&reify_index(orig, obj::CovTable, 1)),
+            mark1_coverage: CoverageTable::promote(&fn_reify::reify_index(orig, obj::CovTable, 0)),
+            mark2_coverage: CoverageTable::promote(&fn_reify::reify_index(orig, obj::CovTable, 1)),
             mark1_array: orig.mark1_array()?,
             mark2_array: orig.mark2_array()?,
         })
@@ -3994,7 +4206,7 @@ impl<'input> OpentypeMark2Array<'input> {
         let mut records = Vec::with_capacity(self.mark2_records.len());
         for mark2_record in self.mark2_records.iter() {
             let record = Mark2Record::try_promote_view(mark2_record, self.array_scope)
-                .map_err(ValueParseError::coerce_value)?;
+                .map_err(value_parse::ValueParseError::coerce_value)?;
             records.push(record);
         }
         Ok(records)
@@ -4029,7 +4241,7 @@ impl<'a> TryPromoteView<OpentypeMark2Record<'a>> for Mark2Record {
     fn try_promote_view<'input>(
         orig: &'input OpentypeMark2Record<'a>,
         view: View<'input>,
-    ) -> Result<Self, ValueParseError<Self::Error<'input>>>
+    ) -> Result<Self, value_parse::ValueParseError<Self::Error<'input>>>
     where
         'a: 'input,
     {
@@ -4042,7 +4254,7 @@ impl<'a> TryPromoteView<OpentypeMark2Record<'a>> for Mark2Record {
                 let mut p = Parser::from(view);
                 let ret = Decoder_opentype_layout_anchor_table(&mut p)?;
                 mark2_anchors.push(Some(
-                    AnchorTable::try_promote(&ret).map_err(ValueParseError::value)?,
+                    AnchorTable::try_promote(&ret).map_err(value_parse::ValueParseError::value)?,
                 ))
             }
         }
@@ -4095,10 +4307,11 @@ impl<'input> TryPromote<OpentypeMarkLigPos<'input>> for MarkLigPos {
     type Error = ReflType<TPErr<OpentypeMarkArray<'input>, MarkArray>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypeMarkLigPos) -> Result<Self, Self::Error> {
-        let mark_coverage = CoverageTable::promote(&reify_index(orig, obj::CovTable, 0));
-        let ligature_coverage = CoverageTable::promote(&reify_index(orig, obj::CovTable, 1));
-        let mark_array = try_promote_from_null(&reify(orig, Nullable(obj::MarkArr)))?;
-        let ligature_array = try_promote_from_null(&reify(orig, Nullable(obj::LigArr)))?;
+        let mark_coverage = CoverageTable::promote(&fn_reify::reify_index(orig, obj::CovTable, 0));
+        let ligature_coverage =
+            CoverageTable::promote(&fn_reify::reify_index(orig, obj::CovTable, 1));
+        let mark_array = try_promote_from_null(&fn_reify::reify(orig, Nullable(obj::MarkArr)))?;
+        let ligature_array = try_promote_from_null(&fn_reify::reify(orig, Nullable(obj::LigArr)))?;
         Ok(MarkLigPos {
             mark_coverage,
             ligature_coverage,
@@ -4141,7 +4354,7 @@ impl<'input> TryPromote<OpentypeLigatureArray<'input>> for LigatureArray {
         ReflType<TPErr<OpentypeLigatureAttach<'input>, LigatureAttach>, UnknownValueError<u16>>;
     fn try_promote(orig: &OpentypeLigatureArray) -> Result<Self, Self::Error> {
         let mut ligature_attach = Vec::with_capacity(container::DynContainer::count(orig));
-        for raw in reify_all(orig, obj::LigAtt) {
+        for raw in fn_reify::reify_all(orig, obj::LigAtt) {
             ligature_attach.push(LigatureAttach::try_promote(&raw)?);
         }
         Ok(LigatureArray { ligature_attach })
@@ -4199,7 +4412,7 @@ impl<'input> TryPromote<OpentypeComponentRecord<'input>> for ComponentRecord {
 
     fn try_promote(orig: &OpentypeComponentRecord) -> Result<Self, Self::Error> {
         let mut ligature_anchors = Vec::with_capacity(orig.ligature_anchor_offsets.len());
-        for raw in reify_all(orig, Nullable(obj::AncTable)) {
+        for raw in fn_reify::reify_all(orig, Nullable(obj::AncTable)) {
             ligature_anchors.push(raw.as_ref().map(AnchorTable::try_promote).transpose()?);
         }
 
@@ -4259,10 +4472,10 @@ impl<'input> TryPromote<OpentypeMarkBasePos<'input>> for MarkBasePos {
 
     fn try_promote(orig: &OpentypeMarkBasePos) -> Result<Self, Self::Error> {
         Ok(MarkBasePos {
-            mark_coverage: CoverageTable::promote(&reify_index(orig, obj::CovTable, 0)),
-            base_coverage: CoverageTable::promote(&reify_index(orig, obj::CovTable, 1)),
-            mark_array: MarkArray::try_promote(&reify(orig, Mandatory(obj::MarkArr)))?,
-            base_array: BaseArray::try_promote(&reify(orig, Mandatory(obj::BaseArr)))?,
+            mark_coverage: CoverageTable::promote(&fn_reify::reify_index(orig, obj::CovTable, 0)),
+            base_coverage: CoverageTable::promote(&fn_reify::reify_index(orig, obj::CovTable, 1)),
+            mark_array: MarkArray::try_promote(&fn_reify::reify(orig, Mandatory(obj::MarkArr)))?,
+            base_array: BaseArray::try_promote(&fn_reify::reify(orig, Mandatory(obj::BaseArr)))?,
         })
     }
 }
@@ -4294,7 +4507,7 @@ impl<'input> TryPromote<OpentypeMarkArray<'input>> for MarkArray {
 
     fn try_promote(orig: &OpentypeMarkArray) -> Result<Self, Self::Error> {
         let mut mark_records = Vec::with_capacity(orig.mark_records.len());
-        let links = reify_all(orig, Nullable(obj::AncTable));
+        let links = fn_reify::reify_all(orig, Nullable(obj::AncTable));
         for (record, raw_anchor) in Iterator::zip(orig.mark_records.iter(), links) {
             let mark_class = record.mark_class;
             let mark_anchor = raw_anchor
@@ -4347,7 +4560,7 @@ impl<'input> TryPromote<OpentypeBaseArray<'input>> for BaseArray {
         for base_record in orig.base_records.iter() {
             base_records.push(
                 BaseRecord::try_promote_view(base_record, orig.array_scope)
-                    .map_err(ValueParseError::coerce_value)?,
+                    .map_err(value_parse::ValueParseError::coerce_value)?,
             );
         }
         Ok(BaseArray { base_records })
@@ -4387,16 +4600,16 @@ impl<'a> TryPromoteView<OpentypeBaseRecord<'a>> for BaseRecord {
     fn try_promote_view<'input>(
         orig: &'input OpentypeBaseRecord<'a>,
         view: View<'input>,
-    ) -> Result<Self, ValueParseError<Self::Error<'input>>>
+    ) -> Result<Self, value_parse::ValueParseError<Self::Error<'input>>>
     where
         'a: 'input,
     {
         use container::DynContainer;
         let mut base_anchors =
             Vec::with_capacity(DynContainer::<Nullable<obj::AncTable>>::count(orig));
-        for res_raw in reify_all_dep(view, orig, Nullable(obj::AncTable)) {
+        for res_raw in fn_reify::reify_all_dep(view, orig, Nullable(obj::AncTable)) {
             let raw = res_raw?;
-            base_anchors.push(try_promote_opt(&raw).map_err(ValueParseError::value)?);
+            base_anchors.push(try_promote_opt(&raw).map_err(value_parse::ValueParseError::value)?);
         }
         Ok(BaseRecord { base_anchors })
     }
@@ -4466,14 +4679,14 @@ impl<'a> container::MultiDynContainer<Mandatory<obj::CovTable>, 3>
 impl<'a> Promote<OpentypeReverseChainSingleSubst<'a>> for ReverseChainSingleSubst {
     fn promote(orig: &OpentypeReverseChainSingleSubst) -> Self {
         let coverage = CoverageTable::promote(
-            &reify_all_index(orig, Mandatory(obj::CovTable), 0)
+            &fn_reify::reify_all_index(orig, Mandatory(obj::CovTable), 0)
                 .next()
                 .unwrap(),
         );
-        let backtrack_coverages = reify_all_index(orig, Mandatory(obj::CovTable), 1)
+        let backtrack_coverages = fn_reify::reify_all_index(orig, Mandatory(obj::CovTable), 1)
             .map(|raw| CoverageTable::promote(&raw))
             .collect();
-        let lookahead_coverages = reify_all_index(orig, Mandatory(obj::CovTable), 2)
+        let lookahead_coverages = fn_reify::reify_all_index(orig, Mandatory(obj::CovTable), 2)
             .map(|raw| CoverageTable::promote(&raw))
             .collect();
         ReverseChainSingleSubst {
@@ -4481,7 +4694,7 @@ impl<'a> Promote<OpentypeReverseChainSingleSubst<'a>> for ReverseChainSingleSubs
             backtrack_coverages,
             lookahead_coverages,
             glyph_count: orig.glyph_count,
-            substitute_glyph_ids: SemVec::from(orig.substitute_glyph_ids.clone()),
+            substitute_glyph_ids: sem_vec::SemVec::from(orig.substitute_glyph_ids.clone()),
         }
     }
 }
@@ -4492,7 +4705,7 @@ struct ReverseChainSingleSubst {
     backtrack_coverages: Vec<CoverageTable>,
     lookahead_coverages: Vec<CoverageTable>,
     glyph_count: u16, // NOTE - this field is technically extraneous due to being equal to `substitute_glyph_ids.len() as u16`
-    substitute_glyph_ids: SemVec<GlyphId, u16>,
+    substitute_glyph_ids: sem_vec::SemVec<sem_vec::GlyphId, u16>,
 }
 
 pub type OpentypeLigatureSubst<'a> = opentype_layout_ligature_subst<'a>;
@@ -4523,8 +4736,8 @@ impl<'a> container::DynContainer<Mandatory<obj::LigSet>> for OpentypeLigatureSub
 
 impl<'a> Promote<OpentypeLigatureSubst<'a>> for LigatureSubst {
     fn promote(orig: &OpentypeLigatureSubst) -> Self {
-        let coverage = CoverageTable::promote(&reify(orig, Mandatory(obj::CovTable)));
-        let ligature_sets = reify_all(orig, Mandatory(obj::LigSet))
+        let coverage = CoverageTable::promote(&fn_reify::reify(orig, Mandatory(obj::CovTable)));
+        let ligature_sets = fn_reify::reify_all(orig, Mandatory(obj::LigSet))
             .map(|raw| LigatureSet::promote(&raw))
             .collect();
         LigatureSubst {
@@ -4569,7 +4782,7 @@ pub type OpentypeLigature = opentype_gsub_ligature_subst_ligature_table;
 struct Ligature {
     ligature_glyph: u16,
     component_count: u16,
-    component_glyph_ids: SemVec<GlyphId, u16>,
+    component_glyph_ids: sem_vec::SemVec<sem_vec::GlyphId, u16>,
 }
 
 impl Promote<OpentypeLigature> for Ligature {
@@ -4577,14 +4790,14 @@ impl Promote<OpentypeLigature> for Ligature {
         Ligature {
             ligature_glyph: orig.ligature_glyph,
             component_count: orig.component_count,
-            component_glyph_ids: SemVec::from(orig.component_glyph_ids.clone()),
+            component_glyph_ids: sem_vec::SemVec::from(orig.component_glyph_ids.clone()),
         }
     }
 }
 
 impl<'a> Promote<OpentypeLigatureSet<'a>> for LigatureSet {
     fn promote(orig: &OpentypeLigatureSet) -> Self {
-        let ligatures = reify_all(orig, Mandatory(obj::LigTable))
+        let ligatures = fn_reify::reify_all(orig, Mandatory(obj::LigTable))
             .map(|raw| Ligature::promote(&raw))
             .collect();
         LigatureSet { ligatures }
@@ -4620,8 +4833,8 @@ impl<'a> container::DynContainer<Mandatory<obj::AltSet>> for OpentypeAlternateSu
 impl<'a> Promote<OpentypeAlternateSubst<'a>> for AlternateSubst {
     fn promote(orig: &OpentypeAlternateSubst) -> Self {
         AlternateSubst {
-            coverage: CoverageTable::promote(&reify(orig, Mandatory(obj::CovTable))),
-            alternate_sets: reify_all(orig, Mandatory(obj::AltSet))
+            coverage: CoverageTable::promote(&fn_reify::reify(orig, Mandatory(obj::CovTable))),
+            alternate_sets: fn_reify::reify_all(orig, Mandatory(obj::AltSet))
                 .map(|raw| AlternateSet::promote(&raw))
                 .collect(),
         }
@@ -4685,7 +4898,7 @@ impl container::DynContainer<obj::SeqTable> for OpentypeMultipleSubstFormat1 {
 impl<'input> Promote<OpentypeMultipleSubst<'input>> for MultipleSubst {
     fn promote(orig: &OpentypeMultipleSubst) -> Self {
         MultipleSubst {
-            coverage: CoverageTable::promote(&reify(orig, Mandatory(obj::CovTable))),
+            coverage: CoverageTable::promote(&fn_reify::reify(orig, Mandatory(obj::CovTable))),
             subst: MultipleSubstInner::promote_view(&orig.subst, orig.table_scope).unwrap(),
         }
     }
@@ -4703,7 +4916,7 @@ impl PromoteView<OpentypeMultipleSubstFormat1> for MultipleSubstFormat1 {
     fn promote_view(orig: &OpentypeMultipleSubstFormat1, view: View<'_>) -> PResult<Self> {
         let mut sequences =
             Vec::with_capacity(container::DynContainer::<obj::SeqTable>::count(orig));
-        for res_raw in reify_all_dep(view, orig, obj::SeqTable) {
+        for res_raw in fn_reify::reify_all_dep(view, orig, obj::SeqTable) {
             sequences.push(SequenceTable::promote(&res_raw?));
         }
         Ok(MultipleSubstFormat1 { sequences })
@@ -4783,7 +4996,7 @@ impl<'input> container::MultiContainer<obj::CovTable, 1> for OpentypeSingleSubst
 impl<'input> Promote<OpentypeSingleSubstFormat1<'input>> for SingleSubstFormat1 {
     fn promote(orig: &OpentypeSingleSubstFormat1) -> Self {
         SingleSubstFormat1 {
-            coverage: CoverageTable::promote(&reify_index(orig, obj::CovTable, 0)),
+            coverage: CoverageTable::promote(&fn_reify::reify_index(orig, obj::CovTable, 0)),
             delta_glyph_id: orig.delta_glyph_id,
         }
     }
@@ -4810,7 +5023,7 @@ impl<'input> container::MultiContainer<obj::CovTable, 1> for OpentypeSingleSubst
 impl<'input> Promote<OpentypeSingleSubstFormat2<'input>> for SingleSubstFormat2 {
     fn promote(orig: &OpentypeSingleSubstFormat2) -> Self {
         SingleSubstFormat2 {
-            coverage: CoverageTable::promote(&reify_index(orig, obj::CovTable, 0)),
+            coverage: CoverageTable::promote(&fn_reify::reify_index(orig, obj::CovTable, 0)),
             substitute_glyph_ids: orig.substitute_glyph_ids.clone(),
         }
     }
@@ -4861,7 +5074,7 @@ where
     ChainedRule<Sem>: Promote<OpentypeChainedRule>,
 {
     fn promote(orig: &OpentypeChainedRuleSet) -> Self {
-        reify_all(orig, Mandatory(obj::ChainRule))
+        fn_reify::reify_all(orig, Mandatory(obj::ChainRule))
             .map(|raw| ChainedRule::<Sem>::promote(&raw))
             .collect()
     }
@@ -4886,15 +5099,15 @@ type ChainedRuleSet<Sem> = Vec<ChainedRule<Sem>>;
 #[derive(Clone)]
 struct ChainedRule<Sem> {
     backtrack_glyph_count: u16, // REVIEW - this field can be re-synthesized from backtrack_sequence.len()
-    backtrack_sequence: SemVec<Sem, u16>,
+    backtrack_sequence: sem_vec::SemVec<Sem, u16>,
     input_glyph_count: u16, // REVIEW - this field can be re-synthesized from input_sequence.len() + 1
-    input_sequence: SemVec<Sem, u16>, // NOTE - unlike the other two sequence-arrays, this one is one shorter than its associated glyph_count field
+    input_sequence: sem_vec::SemVec<Sem, u16>, // NOTE - unlike the other two sequence-arrays, this one is one shorter than its associated glyph_count field
     lookahead_glyph_count: u16, // REVIEW - this field can be re-synthesized from lookahead_sequence.len()
-    lookahead_sequence: SemVec<Sem, u16>,
+    lookahead_sequence: sem_vec::SemVec<Sem, u16>,
     seq_lookup_records: Vec<SequenceLookup>,
 }
 
-impl std::fmt::Debug for ChainedRule<GlyphId> {
+impl std::fmt::Debug for ChainedRule<sem_vec::GlyphId> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // REVIEW - at the debug level, present a view of ChainedRule<GlyphId> as if it were its own type `ChainedSequenceRule`
         f.debug_struct("ChainedSequenceRule")
@@ -4909,7 +5122,7 @@ impl std::fmt::Debug for ChainedRule<GlyphId> {
     }
 }
 
-impl std::fmt::Debug for ChainedRule<ClassId> {
+impl std::fmt::Debug for ChainedRule<sem_vec::ClassId> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // REVIEW - at the debug level, present a view of ChainedRule<ClassId> as if it were its own type `ChainedClassSequenceRule`
         f.debug_struct("ChainedClassSequenceRule")
@@ -4963,7 +5176,7 @@ enum ChainedSequenceContext {
 #[derive(Debug, Clone)]
 struct ChainedSequenceContextFormat1 {
     coverage: CoverageTable,
-    chained_seq_rule_sets: Vec<ChainedRuleSet<GlyphId>>,
+    chained_seq_rule_sets: Vec<ChainedRuleSet<sem_vec::GlyphId>>,
 }
 
 impl<'a> container::SingleContainer<Mandatory<obj::CovTable>>
@@ -4996,9 +5209,10 @@ impl<'a> container::DynContainer<Nullable<obj::ChainRuleSet>>
 
 impl<'a> PromoteView<OpentypeChainedSequenceContextFormat1<'a>> for ChainedSequenceContextFormat1 {
     fn promote_view(orig: &OpentypeChainedSequenceContextFormat1, view: View<'_>) -> PResult<Self> {
-        let coverage = CoverageTable::promote(&reify_dep(view, orig, Mandatory(obj::CovTable))?);
+        let coverage =
+            CoverageTable::promote(&fn_reify::reify_dep(view, orig, Mandatory(obj::CovTable))?);
         let mut chained_seq_rule_sets = Vec::with_capacity(container::DynContainer::count(orig));
-        for opt_raw in reify_all_dep(view, orig, Nullable(obj::ChainRuleSet)) {
+        for opt_raw in fn_reify::reify_all_dep(view, orig, Nullable(obj::ChainRuleSet)) {
             chained_seq_rule_sets.push(promote_from_null(&opt_raw?));
         }
         Ok(ChainedSequenceContextFormat1 {
@@ -5015,7 +5229,7 @@ struct ChainedSequenceContextFormat2 {
     backtrack_class_def: ClassDef,
     input_class_def: ClassDef,
     lookahead_class_def: ClassDef,
-    chained_class_seq_rule_sets: Vec<ChainedRuleSet<ClassId>>,
+    chained_class_seq_rule_sets: Vec<ChainedRuleSet<sem_vec::ClassId>>,
 }
 
 impl<'a> container::SingleContainer<Mandatory<obj::CovTable>>
@@ -5064,16 +5278,29 @@ impl<'a> container::DynContainer<Nullable<obj::ChainRuleSet>>
 
 impl<'a> PromoteView<OpentypeChainedSequenceContextFormat2<'a>> for ChainedSequenceContextFormat2 {
     fn promote_view(orig: &OpentypeChainedSequenceContextFormat2, view: View<'_>) -> PResult<Self> {
-        let coverage = CoverageTable::promote(&reify_dep(view, orig, Mandatory(obj::CovTable))?);
-        let backtrack_class_def =
-            ClassDef::promote(&reify_index_dep(view, orig, Mandatory(obj::ClsDef), 0)?);
-        let input_class_def =
-            ClassDef::promote(&reify_index_dep(view, orig, Mandatory(obj::ClsDef), 1)?);
-        let lookahead_class_def =
-            ClassDef::promote(&reify_index_dep(view, orig, Mandatory(obj::ClsDef), 2)?);
+        let coverage =
+            CoverageTable::promote(&fn_reify::reify_dep(view, orig, Mandatory(obj::CovTable))?);
+        let backtrack_class_def = ClassDef::promote(&fn_reify::reify_index_dep(
+            view,
+            orig,
+            Mandatory(obj::ClsDef),
+            0,
+        )?);
+        let input_class_def = ClassDef::promote(&fn_reify::reify_index_dep(
+            view,
+            orig,
+            Mandatory(obj::ClsDef),
+            1,
+        )?);
+        let lookahead_class_def = ClassDef::promote(&fn_reify::reify_index_dep(
+            view,
+            orig,
+            Mandatory(obj::ClsDef),
+            2,
+        )?);
         let mut chained_class_seq_rule_sets =
             Vec::with_capacity(container::DynContainer::count(orig));
-        for opt_raw in reify_all_dep(view, orig, Nullable(obj::ChainRuleSet)) {
+        for opt_raw in fn_reify::reify_all_dep(view, orig, Nullable(obj::ChainRuleSet)) {
             chained_class_seq_rule_sets.push(promote_from_null(&opt_raw?));
         }
         Ok(Self {
@@ -5125,7 +5352,7 @@ impl PromoteView<OpentypeChainedSequenceContextFormat3> for ChainedSequenceConte
     fn promote_view(orig: &OpentypeChainedSequenceContextFormat3, view: View<'_>) -> PResult<Self> {
         let follow = |ix: usize| {
             promote_all_ok(
-                reify_all_index_dep(view, orig, Mandatory(obj::CovTable), ix),
+                fn_reify::reify_all_index_dep(view, orig, Mandatory(obj::CovTable), ix),
                 container::MultiDynContainer::counts(orig)[ix],
             )
         };
@@ -5192,7 +5419,7 @@ enum SequenceContext {
 #[derive(Debug, Clone)]
 struct SequenceContextFormat1 {
     coverage: CoverageTable,
-    seq_rule_sets: Vec<RuleSet<GlyphId>>,
+    seq_rule_sets: Vec<RuleSet<sem_vec::GlyphId>>,
 }
 
 pub type OpentypeSequenceContextFormat1<'a> = opentype_layout_sequence_context_format1<'a>;
@@ -5223,9 +5450,10 @@ impl<'a> container::DynContainer<Nullable<obj::SeqRuleSet>> for OpentypeSequence
 
 impl<'a> PromoteView<OpentypeSequenceContextFormat1<'a>> for SequenceContextFormat1 {
     fn promote_view(orig: &OpentypeSequenceContextFormat1, view: View<'_>) -> PResult<Self> {
-        let coverage = CoverageTable::promote(&reify_dep(view, orig, Mandatory(obj::CovTable))?);
+        let coverage =
+            CoverageTable::promote(&fn_reify::reify_dep(view, orig, Mandatory(obj::CovTable))?);
         let mut seq_rule_sets = Vec::with_capacity(container::DynContainer::count(orig));
-        for opt_raw in reify_all_dep(view, orig, Nullable(obj::SeqRuleSet)) {
+        for opt_raw in fn_reify::reify_all_dep(view, orig, Nullable(obj::SeqRuleSet)) {
             seq_rule_sets.push(promote_from_null(&opt_raw?))
         }
         Ok(Self {
@@ -5239,7 +5467,7 @@ impl<'a> PromoteView<OpentypeSequenceContextFormat1<'a>> for SequenceContextForm
 struct SequenceContextFormat2 {
     coverage: CoverageTable,
     class_def: ClassDef,
-    class_seq_rule_sets: Vec<RuleSet<ClassId>>,
+    class_seq_rule_sets: Vec<RuleSet<sem_vec::ClassId>>,
 }
 
 pub type OpentypeSequenceContextFormat2<'a> = opentype_layout_sequence_context_format2<'a>;
@@ -5280,10 +5508,12 @@ impl<'a> container::DynContainer<Nullable<obj::SeqRuleSet>> for OpentypeSequence
 
 impl<'a> PromoteView<OpentypeSequenceContextFormat2<'a>> for SequenceContextFormat2 {
     fn promote_view(orig: &OpentypeSequenceContextFormat2, view: View<'_>) -> PResult<Self> {
-        let coverage = CoverageTable::promote(&reify_dep(view, orig, Mandatory(obj::CovTable))?);
-        let class_def = ClassDef::promote(&reify_dep(view, orig, Mandatory(obj::ClsDef))?);
+        let coverage =
+            CoverageTable::promote(&fn_reify::reify_dep(view, orig, Mandatory(obj::CovTable))?);
+        let class_def =
+            ClassDef::promote(&fn_reify::reify_dep(view, orig, Mandatory(obj::ClsDef))?);
         let mut class_seq_rule_sets = Vec::with_capacity(container::DynContainer::count(orig));
-        for opt_raw in reify_all_dep(view, orig, Nullable(obj::SeqRuleSet)) {
+        for opt_raw in fn_reify::reify_all_dep(view, orig, Nullable(obj::SeqRuleSet)) {
             class_seq_rule_sets.push(promote_from_null(&opt_raw?))
         }
         Ok(Self {
@@ -5325,7 +5555,7 @@ impl container::DynContainer<Mandatory<obj::CovTable>> for OpentypeSequenceConte
 impl PromoteView<OpentypeSequenceContextFormat3> for SequenceContextFormat3 {
     fn promote_view(orig: &OpentypeSequenceContextFormat3, view: View<'_>) -> PResult<Self> {
         let coverage_tables = promote_all_ok(
-            reify_all_dep(view, orig, Mandatory(obj::CovTable)),
+            fn_reify::reify_all_dep(view, orig, Mandatory(obj::CovTable)),
             container::DynContainer::count(orig),
         )?;
         Ok(Self {
@@ -5358,7 +5588,7 @@ impl<'a> container::DynContainer<Mandatory<obj::SeqRule>> for OpentypeRuleSet<'a
 impl<'a, Sem> Promote<OpentypeRuleSet<'a>> for Vec<Rule<Sem>> {
     fn promote(orig: &OpentypeRuleSet<'a>) -> Self {
         let mut accum = Vec::with_capacity(container::DynContainer::count(orig));
-        for raw in reify_all(orig, Mandatory(obj::SeqRule)) {
+        for raw in fn_reify::reify_all(orig, Mandatory(obj::SeqRule)) {
             accum.push(Rule::promote(&raw))
         }
         accum
@@ -5373,7 +5603,7 @@ impl<Sem> Promote<OpentypeRule> for Rule<Sem> {
     fn promote(orig: &OpentypeRule) -> Self {
         Rule {
             glyph_count: orig.glyph_count,
-            input_sequence: SemVec::from(orig.input_sequence.clone()),
+            input_sequence: sem_vec::SemVec::from(orig.input_sequence.clone()),
             // NOTE - we can only specify seq_lookup_records this way because we use SequenceLookup as its own analogue
             seq_lookup_records: orig.seq_lookup_records.clone(),
         }
@@ -5382,7 +5612,7 @@ impl<Sem> Promote<OpentypeRule> for Rule<Sem> {
 
 struct Rule<Sem> {
     glyph_count: u16, // REVIEW - this field can be re-synthesized via `input_sequence.len() + 1`
-    input_sequence: SemVec<Sem, u16>,
+    input_sequence: sem_vec::SemVec<Sem, u16>,
     seq_lookup_records: Vec<SequenceLookup>,
 }
 
@@ -5398,7 +5628,7 @@ impl<Sem> Clone for Rule<Sem> {
 
 impl<Sem> std::fmt::Debug for Rule<Sem>
 where
-    SemVec<Sem, u16>: std::fmt::Debug,
+    sem_vec::SemVec<Sem, u16>: std::fmt::Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Rule")
@@ -5437,11 +5667,11 @@ impl<'input> TryPromote<OpentypeCursivePos<'input>> for CursivePos {
         for entry_exit in orig.entry_exit_records.iter() {
             entry_exit_records.push(
                 EntryExitRecord::try_promote_view(entry_exit, orig.table_scope)
-                    .map_err(ValueParseError::coerce_value)?,
+                    .map_err(value_parse::ValueParseError::coerce_value)?,
             );
         }
         Ok(CursivePos {
-            coverage: CoverageTable::promote(&reify(orig, Mandatory(obj::CovTable))),
+            coverage: CoverageTable::promote(&fn_reify::reify(orig, Mandatory(obj::CovTable))),
             entry_exit_records,
         })
     }
@@ -5479,20 +5709,25 @@ impl<'a> TryPromoteView<OpentypeEntryExitRecord<'a>> for EntryExitRecord {
     fn try_promote_view<'input>(
         orig: &'input OpentypeEntryExitRecord<'a>,
         view: View<'input>,
-    ) -> Result<Self, ValueParseError<Self::Error<'input>>>
+    ) -> Result<Self, value_parse::ValueParseError<Self::Error<'input>>>
     where
         'a: 'input,
     {
         Ok(EntryExitRecord {
-            entry_anchor: try_promote_opt(&reify_index_dep(
+            entry_anchor: try_promote_opt(&fn_reify::reify_index_dep(
                 view,
                 orig,
                 Nullable(obj::AncTable),
                 0,
             )?)
-            .map_err(ValueParseError::value)?,
-            exit_anchor: try_promote_opt(&reify_index_dep(view, orig, Nullable(obj::AncTable), 1)?)
-                .map_err(ValueParseError::value)?,
+            .map_err(value_parse::ValueParseError::value)?,
+            exit_anchor: try_promote_opt(&fn_reify::reify_index_dep(
+                view,
+                orig,
+                Nullable(obj::AncTable),
+                1,
+            )?)
+            .map_err(value_parse::ValueParseError::value)?,
         })
     }
 }
@@ -5676,7 +5911,7 @@ impl<'input> TryPromote<OpentypePairPosFormat1<'input>> for PairPosFormat1 {
     type Error = ReflType<TPErr<OpentypePairSet<'input>, PairSet>, UnknownValueError<u16>>;
 
     fn try_promote(orig: &OpentypePairPosFormat1) -> Result<Self, Self::Error> {
-        let coverage = CoverageTable::promote(&reify(orig, Mandatory(obj::CovTable)));
+        let coverage = CoverageTable::promote(&fn_reify::reify(orig, Mandatory(obj::CovTable)));
         // FIXME - implement container traits instead of open-coding parse logic
         let mut pair_sets = Vec::with_capacity(orig.pair_sets.len());
         for pair_set in orig.pair_sets.iter() {
@@ -5747,16 +5982,16 @@ impl<'input> TryPromote<OpentypePairPosFormat2<'input>> for PairPosFormat2 {
             for class2_record in class1_record.class2_records.iter() {
                 store.push(
                     Class2Record::try_promote_view(class2_record, orig.table_scope)
-                        .map_err(ValueParseError::coerce_value)?,
+                        .map_err(value_parse::ValueParseError::coerce_value)?,
                 );
             }
         }
         let class1_records = Wec::from_vec(store, orig.class2_count as usize);
 
         Ok(PairPosFormat2 {
-            coverage: CoverageTable::promote(&reify_index(orig, obj::CovTable, 0)),
-            class_def1: ClassDef::promote(&reify_index(orig, obj::ClsDef, 0)),
-            class_def2: ClassDef::promote(&reify_index(orig, obj::ClsDef, 1)),
+            coverage: CoverageTable::promote(&fn_reify::reify_index(orig, obj::CovTable, 0)),
+            class_def1: ClassDef::promote(&fn_reify::reify_index(orig, obj::ClsDef, 0)),
+            class_def2: ClassDef::promote(&fn_reify::reify_index(orig, obj::ClsDef, 1)),
             class1_records,
         })
     }
@@ -5787,7 +6022,7 @@ impl TryPromoteView<OpentypeClass2Record> for Class2Record {
     fn try_promote_view<'input>(
         orig: &'input OpentypeClass2Record,
         view: View<'input>,
-    ) -> Result<Self, ValueParseError<Self::Error<'input>>>
+    ) -> Result<Self, value_parse::ValueParseError<Self::Error<'input>>>
     where
         OpentypeClass2Record: 'input,
     {
@@ -5824,7 +6059,7 @@ impl<'input> TryPromote<OpentypePairSet<'input>> for PairSet {
         for record in orig.pair_value_records.iter() {
             accum.push(
                 PairValueRecord::try_promote_view(record, orig.set_scope)
-                    .map_err(ValueParseError::coerce_value)?,
+                    .map_err(value_parse::ValueParseError::coerce_value)?,
             );
         }
         Ok(accum)
@@ -5838,7 +6073,7 @@ impl TryPromoteView<OpentypePairValueRecord> for PairValueRecord {
     fn try_promote_view<'input>(
         orig: &'input OpentypePairValueRecord,
         view: View<'input>,
-    ) -> Result<Self, ValueParseError<Self::Error<'input>>>
+    ) -> Result<Self, value_parse::ValueParseError<Self::Error<'input>>>
     where
         OpentypePairValueRecord: 'input,
     {
@@ -5926,9 +6161,9 @@ impl<'input> TryPromote<OpentypeSinglePosFormat1<'input>> for SinglePosFormat1 {
 
     fn try_promote(orig: &OpentypeSinglePosFormat1) -> Result<Self, Self::Error> {
         Ok(SinglePosFormat1 {
-            coverage: CoverageTable::promote(&reify_index(orig, obj::CovTable, 0)),
+            coverage: CoverageTable::promote(&fn_reify::reify_index(orig, obj::CovTable, 0)),
             value_record: ValueRecord::try_promote_view(&orig.value_record, orig.table_scope)
-                .map_err(ValueParseError::coerce_value)?,
+                .map_err(value_parse::ValueParseError::coerce_value)?,
         })
     }
 }
@@ -5950,11 +6185,11 @@ impl<'input> TryPromote<OpentypeSinglePosFormat2<'input>> for SinglePosFormat2 {
         for value_record in orig.value_records.iter() {
             value_records.push(
                 ValueRecord::try_promote_view(value_record, orig.table_scope)
-                    .map_err(ValueParseError::coerce_value)?,
+                    .map_err(value_parse::ValueParseError::coerce_value)?,
             );
         }
         Ok(SinglePosFormat2 {
-            coverage: CoverageTable::promote(&reify_index(orig, obj::CovTable, 0)),
+            coverage: CoverageTable::promote(&fn_reify::reify_index(orig, obj::CovTable, 0)),
             value_records,
         })
     }
@@ -6004,21 +6239,21 @@ impl TryPromoteView<OpentypeValueRecord> for ValueRecord {
     fn try_promote_view<'input>(
         orig: &'input OpentypeValueRecord,
         view: View<'input>,
-    ) -> Result<Self, ValueParseError<Self::Error<'input>>>
+    ) -> Result<Self, value_parse::ValueParseError<Self::Error<'input>>>
     where
         OpentypeValueRecord: 'input,
     {
         // NOTE - we do not distinguish between omitted device-fields and included-but-zeroed device-fields
         let follow = |ix: usize| -> Result<
             Option<DeviceOrVariationIndexTable>,
-            ValueParseError<Self::Error<'input>>,
+            value_parse::ValueParseError<Self::Error<'input>>,
         > {
             try_promote_opt(
-                &reify_opt_index_dep(view, orig, Nullable(obj::DevTable), ix)
+                &fn_reify::reify_opt_index_dep(view, orig, Nullable(obj::DevTable), ix)
                     .transpose()?
                     .flatten(),
             )
-            .map_err(ValueParseError::value)
+            .map_err(value_parse::ValueParseError::value)
         };
         Ok(ValueRecord {
             x_placement: orig.x_placement,
@@ -6077,7 +6312,7 @@ impl<'input> TryPromote<OpentypeGposLookupTable<'input>> for LookupTable {
     fn try_promote(orig: &OpentypeGposLookupTable) -> Result<Self, Self::Error> {
         let mut subtables = Vec::with_capacity(orig.subtables.len());
         const POS_EXTENSION_LOOKUP_TYPE: u16 = 9;
-        let subtable_iter = reify_all(orig, Mandatory(obj::PosSubtable));
+        let subtable_iter = fn_reify::reify_all(orig, Mandatory(obj::PosSubtable));
 
         let lookup_type = match orig.lookup_type {
             POS_EXTENSION_LOOKUP_TYPE => {
@@ -6152,7 +6387,7 @@ impl<'input> TryPromote<OpentypeGsubLookupTable<'input>> for LookupTable {
     fn try_promote(orig: &OpentypeGsubLookupTable) -> Result<Self, Self::Error> {
         let mut subtables = Vec::with_capacity(orig.subtables.len());
         const SUBST_EXTENSION_LOOKUP_TYPE: u16 = 7;
-        let subtable_iter = reify_all(orig, obj::SubstSubtable);
+        let subtable_iter = fn_reify::reify_all(orig, obj::SubstSubtable);
 
         let lookup_type = match orig.lookup_type {
             SUBST_EXTENSION_LOOKUP_TYPE => {
@@ -6257,7 +6492,7 @@ impl<'input> TryPromote<OpentypeGposLookupList<'input>> for LookupList {
 
     fn try_promote(orig: &OpentypeGposLookupList) -> Result<Self, Self::Error> {
         let mut accum = Vec::with_capacity(container::DynContainer::count(orig));
-        for raw in reify_all(orig, Mandatory(obj::PosLookupTable)) {
+        for raw in fn_reify::reify_all(orig, Mandatory(obj::PosLookupTable)) {
             accum.push(LookupTable::try_promote(&raw)?);
         }
         Ok(accum)
@@ -6287,7 +6522,7 @@ impl<'input> TryPromote<OpentypeGsubLookupList<'input>> for LookupList {
 
     fn try_promote(orig: &OpentypeGsubLookupList) -> Result<Self, Self::Error> {
         let mut accum = Vec::with_capacity(container::DynContainer::count(orig));
-        for raw in reify_all(orig, Mandatory(obj::SubstLookupTable)) {
+        for raw in fn_reify::reify_all(orig, Mandatory(obj::SubstLookupTable)) {
             accum.push(LookupTable::try_promote(&raw)?);
         }
         Ok(accum)
@@ -6316,11 +6551,13 @@ struct LayoutMetrics {
     feature_variations: Option<FeatureVariations>,
 }
 impl LayoutMetrics {
-    fn promote_gpos(gpos: &OpentypeGpos<'_>) -> TestResult<Heap<LayoutMetrics>> {
-        let script_list = ScriptList::promote(&reify(gpos, Mandatory(obj::ScrList)));
-        let feature_list = FeatureList::promote(&reify(gpos, Mandatory(obj::FeatList)));
-        let lookup_list = LookupList::try_promote(&reify(gpos, Mandatory(obj::PosLookups)))?;
-        let feature_variations = promote_opt(&reify_opt(gpos, Nullable(obj::FeatVar)).flatten());
+    fn promote_gpos(gpos: &otf_types::OpentypeGpos<'_>) -> TestResult<Heap<LayoutMetrics>> {
+        let script_list = ScriptList::promote(&fn_reify::reify(gpos, Mandatory(obj::ScrList)));
+        let feature_list = FeatureList::promote(&fn_reify::reify(gpos, Mandatory(obj::FeatList)));
+        let lookup_list =
+            LookupList::try_promote(&fn_reify::reify(gpos, Mandatory(obj::PosLookups)))?;
+        let feature_variations =
+            promote_opt(&fn_reify::reify_opt(gpos, Nullable(obj::FeatVar)).flatten());
         Ok(Heap::new(Self {
             major_version: gpos.major_version,
             minor_version: gpos.minor_version,
@@ -6331,11 +6568,13 @@ impl LayoutMetrics {
         }))
     }
 
-    fn promote_gsub(gsub: &OpentypeGsub<'_>) -> TestResult<Heap<LayoutMetrics>> {
-        let script_list = ScriptList::promote(&reify(gsub, Mandatory(obj::ScrList)));
-        let feature_list = FeatureList::promote(&reify(gsub, Mandatory(obj::FeatList)));
-        let lookup_list = LookupList::try_promote(&reify(gsub, Mandatory(obj::SubstLookups)))?;
-        let feature_variations = promote_opt(&reify_opt(gsub, Nullable(obj::FeatVar)).flatten());
+    fn promote_gsub(gsub: &otf_types::OpentypeGsub<'_>) -> TestResult<Heap<LayoutMetrics>> {
+        let script_list = ScriptList::promote(&fn_reify::reify(gsub, Mandatory(obj::ScrList)));
+        let feature_list = FeatureList::promote(&fn_reify::reify(gsub, Mandatory(obj::FeatList)));
+        let lookup_list =
+            LookupList::try_promote(&fn_reify::reify(gsub, Mandatory(obj::SubstLookups)))?;
+        let feature_variations =
+            promote_opt(&fn_reify::reify_opt(gsub, Nullable(obj::FeatVar)).flatten());
         Ok(Heap::new(Self {
             major_version: gsub.major_version,
             minor_version: gsub.minor_version,
@@ -6495,9 +6734,11 @@ impl<'a> container::SingleContainer<Mandatory<obj::KernArr>> for OpentypeKernSub
 
 impl<'a> Promote<OpentypeKernSubtableFormat2<'a>> for KernSubtableFormat2 {
     fn promote(orig: &OpentypeKernSubtableFormat2) -> Self {
-        let left_class = KernClassTable::promote(&reify_index(orig, Mandatory(obj::KernCls), 0));
-        let right_class = KernClassTable::promote(&reify_index(orig, Mandatory(obj::KernCls), 1));
-        let kerning_array = KerningArray::promote(&reify(orig, Mandatory(obj::KernArr)));
+        let left_class =
+            KernClassTable::promote(&fn_reify::reify_index(orig, Mandatory(obj::KernCls), 0));
+        let right_class =
+            KernClassTable::promote(&fn_reify::reify_index(orig, Mandatory(obj::KernCls), 1));
+        let kerning_array = KerningArray::promote(&fn_reify::reify(orig, Mandatory(obj::KernArr)));
         KernSubtableFormat2 {
             left_class,
             right_class,
@@ -6594,8 +6835,9 @@ pub struct OptionalTableMetrics {
     gsub: Option<Heap<LayoutMetrics>>,
     // STUB - add more tables as we expand opentype definition
     fvar: Option<Heap<FvarMetrics>>,
-    gvar: Option<Heap<GvarMetrics>>,
+    gvar: Option<Heap<gvar::GvarMetrics>>,
     // STUB - add more tables as we expand opentype definition
+    dsig: Option<DsigMetrics>,
     kern: Option<KernMetrics>,
     stat: Option<Heap<StatMetrics>>,
     vhea: Option<VheaMetrics>,
@@ -6792,7 +7034,7 @@ fn utf16be_convert(buf: &[u8]) -> String {
         .to_owned()
 }
 
-fn analyze_extra_tables(dir: &OpentypeFontDirectory, extra: &mut Vec<u32>) {
+fn analyze_extra_tables(dir: &otf_types::OpentypeFontDirectory, extra: &mut Vec<u32>) {
     let tmp = dir
         .table_records
         .iter()
@@ -6801,7 +7043,9 @@ fn analyze_extra_tables(dir: &OpentypeFontDirectory, extra: &mut Vec<u32>) {
     extra.extend(tmp);
 }
 
-pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<SingleFontMetrics> {
+pub fn analyze_table_directory(
+    dir: &otf_types::OpentypeFontDirectory,
+) -> TestResult<SingleFontMetrics> {
     let required = {
         let cmap = {
             let cmap = &dir.table_links.cmap;
@@ -7003,6 +7247,7 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
             })
         };
         let stat = promote_opt(&dir.table_links.stat).map(Heap::new);
+        let dsig = promote_opt(&dir.table_links.dsig);
         let vhea = {
             let vhea = &dir.table_links.vhea;
             vhea.as_ref().map(|vhea| VheaMetrics {
@@ -7051,6 +7296,7 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
             fvar,
             gvar,
             // TODO - add more optional tables as they are added to the spec
+            dsig,
             kern,
             stat,
             vhea,
@@ -7221,7 +7467,7 @@ pub mod table {
     }
 
     impl TableKind {
-        // REVIEW - this should be kept up-to-date
+        // ANCHOR - is_implemented
         pub fn is_implemented(self) -> bool {
             use TableKind::*;
             match self {
@@ -7245,7 +7491,8 @@ pub mod table {
                 Colr | Cpal => false,
                 // Extra
                 Kern | Vhea | Vmtx => true,
-                Dsig | Hdmx | Ltsh | Merg | Meta | Pclt | Vdmx => false,
+                Dsig => true,
+                Hdmx | Ltsh | Merg | Meta | Pclt | Vdmx => false,
             }
         }
     }
@@ -7373,15 +7620,16 @@ pub mod lookup_subtable {
             .table_links
             .gpos
             .as_ref()
-            .map(|gpos| super::reify(gpos, Mandatory(obj::PosLookups)))
+            .map(|gpos| super::fn_reify::reify(gpos, Mandatory(obj::PosLookups)))
         {
-            for entry in super::reify_all(&lookup_list, Mandatory(obj::PosLookupTable)) {
-                if let Some(subtable) = super::reify_all(&entry, Mandatory(obj::PosSubtable)).next()
+            for entry in super::fn_reify::reify_all(&lookup_list, Mandatory(obj::PosLookupTable)) {
+                if let Some(subtable) =
+                    super::fn_reify::reify_all(&entry, Mandatory(obj::PosSubtable)).next()
                 {
                     let ground = match &subtable {
                         OpentypeGposLookupSubtableExt::PosExtension(ext) => {
                             ret.pos_extension = true;
-                            &super::reify(ext, super::obj::PosLookup)
+                            &super::fn_reify::reify(ext, super::obj::PosLookup)
                         }
                         OpentypeGposLookupSubtableExt::GroundPos(ground) => ground,
                     };
@@ -7406,14 +7654,17 @@ pub mod lookup_subtable {
             .table_links
             .gsub
             .as_ref()
-            .map(|gsub| super::reify(gsub, Mandatory(obj::SubstLookups)))
+            .map(|gsub| super::fn_reify::reify(gsub, Mandatory(obj::SubstLookups)))
         {
-            for entry in super::reify_all(&lookup_list, Mandatory(obj::SubstLookupTable)) {
-                if let Some(subtable) = super::reify_all(&entry, super::obj::SubstSubtable).next() {
+            for entry in super::fn_reify::reify_all(&lookup_list, Mandatory(obj::SubstLookupTable))
+            {
+                if let Some(subtable) =
+                    super::fn_reify::reify_all(&entry, super::obj::SubstSubtable).next()
+                {
                     let ground = match &subtable {
                         OpentypeGsubLookupSubtableExt::SubstExtension(ext) => {
                             ret.subst_extension = true;
-                            &super::reify(ext, super::obj::SubstLookup)
+                            &super::fn_reify::reify(ext, super::obj::SubstLookup)
                         }
                         OpentypeGsubLookupSubtableExt::GroundSubst(ground) => ground,
                     };

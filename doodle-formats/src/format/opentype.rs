@@ -5430,7 +5430,6 @@ mod glyf {
     mod simple {
         use super::*;
 
-
         pub(crate) fn flags_raw(module: &mut FormatModule) -> FormatRef {
             use BitFieldKind::*;
 
@@ -7210,7 +7209,10 @@ pub(crate) mod dsig {
                     "signature_offset",
                     read_phantom_view_offset32(
                         vvar("_table_view"),
-                        fmt_match(var("format"), [(Pattern::U32(1), sig_format1.call())]),
+                        fmt_match(
+                            var("format"),
+                            [(Pattern::U32(1), slice(var("length"), sig_format1.call()))],
+                        ),
                     ),
                 ),
             ]),
