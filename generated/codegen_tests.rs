@@ -23,7 +23,8 @@ fn test_decoder_tgz() -> TestResult {
 
 #[test]
 fn test_decoder_font() -> TestResult {
-    let metrics = otf_metrics::analyze_font(&testpath("test-fonts/SourceCodePro-Regular.otf"))?;
+    let metrics =
+        otf_metrics::analyze_font(&testpath("test-fonts/SourceCodePro-Regular.otf"), false)?;
     otf_metrics::output::show_opentype_stats(&metrics, &otf_metrics::Config::default());
     Ok(())
 }
