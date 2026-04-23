@@ -1,8 +1,11 @@
-use super::display::{
-    Token::{self, LineBreak},
-    TokenStream, tok, toks,
+use super::{
+    arrayfmt::*,
+    display::{
+        Token::{self, LineBreak},
+        TokenStream, tok, toks,
+    },
+    *,
 };
-use super::*;
 use log::error;
 
 // TODO - refactor into more cleanly encapsulated TokenStream producers and consumers
@@ -140,6 +143,8 @@ fn show_optional_metrics(optional: &OptionalTableMetrics, conf: &cli::Config) {
             display_gvar_metrics(optional.gvar.as_deref(), conf),
             display_kern_metrics(&optional.kern, conf),
             display_dsig_metrics(optional.dsig.as_ref(), conf),
+            display_hdmx_metrics(optional.hdmx.as_ref(), conf),
+            display_vdmx_metrics(optional.vdmx.as_ref(), conf),
         ],
         LineBreak,
     )
@@ -152,31 +157,129 @@ fn show_optional_metrics(optional: &OptionalTableMetrics, conf: &cli::Config) {
     display_vmtx_metrics(&optional.vmtx, conf).println();
 }
 
-use dsig::display_dsig_metrics;
-mod dsig {
-    use crate::api_helper::otf_metrics::arrayfmt::display_items_elided;
-
+use vdmx::display_vdmx_metrics;
+mod vdmx {
     use super::*;
 
-    fn display_dsig_flags(flags: DsigFlags) -> TokenStream<'static> {
-        if flags.cannot_be_resigned {
-            toks("; cannot_be_resigned=TRUE")
+    pub(super) fn display_vdmx_metrics(
+        vdmx: Option<&VdmxMetrics>,
+        conf: &Config,
+    ) -> TokenStream<'static> {
+        let Some(vdmx) = vdmx else {
+            return TokenStream::empty();
+        };
+
+        let heading = toks(format!("VDMX: version {}", vdmx.version));
+        if conf.verbosity.is_at_least(cli::VerboseLevel::Detailed) {
+            const ADVANCE: i8 = 1;
+            heading
+                .glue(
+                    LineBreak,
+                    TokenStream::join_with(vec![
+                        toks(format!("RatioRanges: {} total", vdmx.ratios.len())),
+                        display_items_elided(
+                            &vdmx.ratios,
+                            |ix, r| tok(format!("[{ix}]: ")).then(display_ratio_range(r)),
+                            conf.bookend_size,
+                            |start, stop| {
+                                toks(format!("(skipping ratio-ranges {start}..{stop})")).indent_by(-1)
+                            },
+                        ).indent_by(ADVANCE),
+                        toks(format!("VDMXGroups: {} total", vdmx.vdmx_groups.len())),
+                        display_items_elided(
+                            &vdmx.vdmx_groups,
+                            |ix, r| tok(format!("[{ix}]: ")).then(display_vdmx_group(r, conf)),
+                            conf.bookend_size,
+                            |start, stop| {
+                                toks(format!("(skipping VDMX groups {start}..{stop})")).indent_by(-1)
+                            },
+                        ).indent_by(ADVANCE),
+                    ],
+                    LineBreak)
+                    .indent_by(1),
+                )
         } else {
-            TokenStream::empty()
+            heading
         }
     }
 
-    fn display_signature_block(sig: SignatureBlock) -> TokenStream<'static> {
-        let mut octets = String::new();
-        for byte in sig.sig {
-            octets.push_str(&format!("{:02x}", byte));
-        }
-        tok(format!("Signature Block: [{} bytes]: ", sig.length,)).then(toks(octets))
+    fn display_ratio_range(rr: &RatioRange) -> TokenStream<'static> {
+        toks(format!("bCharSet={}; {}:{}↔{}:{}", rr.b_char_set, rr.x_ratio, rr.y_start_ratio, rr.x_ratio, rr.y_end_ratio))
     }
+
+
+    fn display_vdmx_group(vg: &VdmxGroup, conf: &Config) -> TokenStream<'static> {
+        toks(format!("yPelHeight[{}→{}]", vg.start_sz, vg.end_sz))
+        .glue(tok("; entry="),
+            display_items_inline(
+                &vg.entry,
+                |vtable| display_vtable(*vtable),
+                conf.inline_bookend,
+                |n| toks(format!("..({n})..")),
+            )
+        )
+    }
+
+    fn display_vtable(vtable: VTable) -> TokenStream<'static> {
+        toks(format!("{}↦[{}←{}]", vtable.y_pel_height, vtable.y_max, vtable.y_min))
+    }
+}
+use hdmx::display_hdmx_metrics;
+mod hdmx {
+    use super::*;
+
+    pub(super) fn display_hdmx_metrics(
+        hdmx: Option<&HdmxMetrics>,
+        conf: &Config,
+    ) -> TokenStream<'static> {
+        let Some(hdmx) = hdmx else {
+            return TokenStream::empty();
+        };
+
+        let heading = toks(format!("hdmx: version {}", hdmx.version));
+        if conf.verbosity.is_at_least(cli::VerboseLevel::Detailed) {
+            heading
+                .chain(toks(format!("; {} records", hdmx.records.len())))
+                .glue(
+                    LineBreak,
+                    display_items_elided(
+                        &hdmx.records,
+                        |ix, r| tok(format!("[{ix}]: ")).then(display_device_record(r, conf)),
+                        conf.bookend_size,
+                        |start, stop| {
+                            toks(format!("(skipping records {start}..{stop})")).indent_by(-1)
+                        },
+                    )
+                    .indent_by(2),
+                )
+        } else {
+            heading
+        }
+    }
+
+    fn display_device_record(dev_record: &DeviceRecord, conf: &Config) -> TokenStream<'static> {
+        TokenStream::join_with(vec![
+            toks(format!("pixelSize={} ppem", dev_record.pixel_size)),
+            toks(format!("maxWidth={} px", dev_record.max_width)),
+            tok("widths=").then(
+                arrayfmt::display_items_inline(
+                    &dev_record.widths,
+                    |width| toks(width.to_string()),
+                    conf.inline_bookend,
+                    |n_skipped| toks(format!("..([{n_skipped}])..")),
+                ))
+        ], tok(" ; "))
+    }
+
+}
+
+use dsig::display_dsig_metrics;
+mod dsig {
+    use super::*;
 
     pub(super) fn display_dsig_metrics(
         dsig: Option<&DsigMetrics>,
-        conf: &cli::Config,
+        conf: &Config,
     ) -> TokenStream<'static> {
         let Some(dsig) = dsig else {
             return TokenStream::empty();
@@ -221,6 +324,21 @@ mod dsig {
             heading
         }
     }
+    fn display_dsig_flags(flags: DsigFlags) -> TokenStream<'static> {
+        if flags.cannot_be_resigned {
+            toks("; cannot_be_resigned=TRUE")
+        } else {
+            TokenStream::empty()
+        }
+    }
+
+    fn display_signature_block(sig: SignatureBlock) -> TokenStream<'static> {
+        let mut octets = String::new();
+        for byte in sig.sig {
+            octets.push_str(&format!("{:02x}", byte));
+        }
+        tok(format!("Signature Block: [{} bytes]: ", sig.length,)).then(toks(octets))
+    }
 }
 
 use gvar::display_gvar_metrics;
@@ -230,7 +348,7 @@ mod gvar {
     // FIXME - rewrite into pure TokenStream
     pub(super) fn display_gvar_metrics(
         gvar: Option<&GvarMetrics>,
-        conf: &cli::Config,
+        conf: &Config,
     ) -> TokenStream<'static> {
         let Some(gvar) = gvar else {
             return TokenStream::empty();

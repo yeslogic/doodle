@@ -184,6 +184,10 @@ pub mod otf_types {
         pub type OpentypeGvar = opentype_gvar_table<'a>;
 
         pub type OpentypeDsig = opentype_dsig<'a>;
+
+        pub type OpentypeHdmx = opentype_hdmx<'a>;
+
+        pub type OpentypeVdmx = opentype_vdmx<'a>;
     }
 
     // STUB[epic=horizontal-for-vertical] - change to distinguished type names once we have them
@@ -397,9 +401,9 @@ mod traits {
     }
 }
 use traits::{
-    _Ref, FromNull, Promote, PromoteView, TryFromRef, TryPromote, TryPromoteView, promote_all_ok,
-    promote_from_null, promote_opt, promote_vec, promote_vec_view, try_promote_from_null,
-    try_promote_opt, try_promote_opt_view, try_promote_vec,
+    _Ref, FromNull, Promote, PromoteView, TryFromRef, TryPromote, TryPromoteView, promote_all,
+    promote_all_ok, promote_from_null, promote_opt, promote_vec, promote_vec_view,
+    try_promote_from_null, try_promote_opt, try_promote_opt_view, try_promote_vec,
 };
 
 #[macro_use]
@@ -930,6 +934,8 @@ pub mod obj {
     proxy!(OpentypeFeatureTable<'a> = FeatTable);
 
     proxy!(OpentypeSignatureBlock<'a> = SigBlock);
+
+    proxy!(OpentypeVdmxGroup = VdmxGroup);
 }
 
 mod value_parse {
@@ -1532,7 +1538,7 @@ pub mod otf_gvar {
     pub type OpentypePackedPointRuns = (u16, Vec<OpentypePackedPointRun>);
     pub type OpentypeXYCoordinateDeltas = (u16, Vec<OpentypeCoordinateDeltaRun>);
 }
-use otf_gvar::*;
+pub use otf_gvar::*;
 
 pub(crate) mod gvar {
     use super::*;
@@ -1866,6 +1872,126 @@ pub(crate) use gvar::{
     GlyphVariationData, GvarMetrics, GvarPerTupleVariationData, GvarSerializedData,
     GvarTupleRecord, GvarTupleVariationHeader,
 };
+
+pub mod otf_hdmx {
+    alias! {
+        pub type OpentypeHdmxDevRecord = opentype_hdmx_device_record<'a>;
+    }
+}
+use otf_hdmx::*;
+
+pub(crate) mod hdmx {
+    use super::*;
+
+    // REVIEW - because we used `read_array` in the definition of `OpentypeHdmxDevRecord`, we need to use `read_to_vec` here, which introduces fallibility after-the-fact (compared to `capture_bytes`, which would not)
+    impl<'a> TryPromote<OpentypeHdmxDevRecord<'a>> for DeviceRecord {
+        type Error = Local<allsorts::error::ParseError>;
+
+        fn try_promote(orig: &OpentypeHdmxDevRecord<'a>) -> Result<Self, Self::Error> {
+            Ok(DeviceRecord {
+                pixel_size: orig.pixel_size,
+                max_width: orig.max_width,
+                widths: orig.widths.read_to_vec()?,
+            })
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct DeviceRecord {
+        pub(crate) pixel_size: u8,
+        pub(crate) max_width: u8,
+        pub(crate) widths: Vec<u8>,
+    }
+
+    impl<'a> TryPromote<OpentypeHdmx<'a>> for HdmxMetrics {
+        type Error =
+            ReflType<TPErr<OpentypeHdmxDevRecord<'a>, DeviceRecord>, allsorts::error::ParseError>;
+
+        fn try_promote(orig: &OpentypeHdmx<'a>) -> Result<Self, Self::Error> {
+            let version = orig.version;
+            let records = try_promote_vec(&orig.records)?;
+            Ok(HdmxMetrics { version, records })
+        }
+    }
+
+    #[derive(Debug, Clone)]
+
+    pub struct HdmxMetrics {
+        pub(crate) version: u16,
+        pub(crate) records: Vec<DeviceRecord>,
+    }
+}
+pub(crate) use hdmx::*;
+
+pub mod otf_vdmx {
+    alias! {
+        pub type OpentypeVdmxGroup = opentype_vdmx_group;
+        pub type OpentypeVdmxVtable = opentype_vdmx_group_v_table;
+        pub type OpentypeRatioRange = opentype_vdmx_ratio_range;
+    }
+}
+pub use otf_vdmx::*;
+
+pub(crate) mod vdmx {
+    use super::*;
+
+    frame!(OpentypeVdmx);
+
+    impl<'a> container::DynContainer<obj::VdmxGroup> for OpentypeVdmx<'a> {
+        fn count(&self) -> usize {
+            // NOTE - specification claims lengtth is `numRatios` but it might be `numRecs` instead, so using actual array-length.
+            self.vdmx_group_offsets.len()
+        }
+
+        fn iter_offsets(&self) -> impl Iterator<Item = usize> {
+            self.vdmx_group_offsets.iter().map(|r| r.offset as usize)
+        }
+
+        fn iter_args(&self) -> impl Iterator<Item = <obj::VdmxGroup as CommonObject>::Args<'_>> {
+            std::iter::repeat(())
+        }
+    }
+
+    impl<'a> Promote<OpentypeVdmx<'a>> for VdmxMetrics {
+        fn promote(orig: &OpentypeVdmx<'a>) -> Self {
+            assert_eq!(orig.num_ratios, orig.num_recs);
+            VdmxMetrics {
+                version: orig.version,
+                ratios: orig.ratio_range.clone(),
+                vdmx_groups: promote_all(reify_all(orig, obj::VdmxGroup)),
+            }
+        }
+    }
+
+    pub type RatioRange = OpentypeRatioRange;
+
+    impl Promote<OpentypeVdmxGroup> for VdmxGroup {
+        fn promote(orig: &OpentypeVdmxGroup) -> Self {
+            VdmxGroup {
+                start_sz: orig.start_sz,
+                end_sz: orig.end_sz,
+                entry: orig.entry.clone(),
+            }
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct VdmxGroup {
+        pub(crate) start_sz: u8,
+        pub(crate) end_sz: u8,
+        pub(crate) entry: Vec<VTable>,
+    }
+
+    pub type VTable = OpentypeVdmxVtable;
+
+    #[derive(Debug, Clone)]
+    pub struct VdmxMetrics {
+        pub(crate) version: u16, // should be 0 or 1
+        pub(crate) ratios: Vec<RatioRange>,
+        pub(crate) vdmx_groups: Vec<VdmxGroup>,
+    }
+}
+pub(crate) use vdmx::*;
 
 pub mod otf_dsig {
     alias! {
@@ -6842,6 +6968,8 @@ pub struct OptionalTableMetrics {
     stat: Option<Heap<StatMetrics>>,
     vhea: Option<VheaMetrics>,
     vmtx: Option<VmtxMetrics>,
+    hdmx: Option<HdmxMetrics>,
+    vdmx: Option<VdmxMetrics>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -6936,8 +7064,44 @@ impl<T> std::error::Error for UnknownValueError<T> where T: std::fmt::Display + 
 pub fn analyze_font_fast(test_file: &str) -> TestResult<()> {
     let buffer = std::fs::read(std::path::Path::new(test_file))?;
     let mut input = Parser::new(&buffer);
-    let _ = Decoder_opentype_main(&mut input)?;
+    let _tmp = Decoder_opentype_main(&mut input)?;
+    // FIXME - temporary hack to check vdmx
+    check_font_vdmx(&_tmp);
     Ok(())
+}
+
+fn check_font_vdmx(font: &opentype_main<'_>) {
+    match &font.directory {
+        opentype_main_directory::TTCHeader(multi) => match &multi.header {
+            opentype_ttc_header_header::Version1(v1header) => {
+                for font in v1header.table_directories.iter() {
+                    match &font.data {
+                        Some(dir) => check_dir_vdmx(dir),
+                        None => (),
+                    };
+                }
+            }
+            opentype_ttc_header_header::Version2(v2header) => {
+                for font in v2header.table_directories.iter() {
+                    match &font.data {
+                        Some(dir) => check_dir_vdmx(dir),
+                        None => (),
+                    };
+                }
+            }
+            opentype_ttc_header_header::UnknownVersion(_) => (),
+        },
+        opentype_main_directory::TableDirectory(dir) => check_dir_vdmx(dir),
+    }
+}
+
+fn check_dir_vdmx(dir: &opentype_table_directory<'_>) {
+    match dir.table_links.vdmx {
+        Some(ref vdmx) => {
+            assert_eq!(vdmx.num_ratios, vdmx.num_recs);
+        }
+        None => (),
+    }
 }
 
 pub fn analyze_font(test_file: &str, extra_only: bool) -> TestResult<OpentypeMetrics> {
@@ -7248,6 +7412,8 @@ pub fn analyze_table_directory(
         };
         let stat = promote_opt(&dir.table_links.stat).map(Heap::new);
         let dsig = promote_opt(&dir.table_links.dsig);
+        let hdmx = try_promote_opt(&dir.table_links.hdmx)?;
+        let vdmx = promote_opt(&dir.table_links.vdmx);
         let vhea = {
             let vhea = &dir.table_links.vhea;
             vhea.as_ref().map(|vhea| VheaMetrics {
@@ -7301,6 +7467,8 @@ pub fn analyze_table_directory(
             stat,
             vhea,
             vmtx,
+            vdmx,
+            hdmx,
         })
     };
     let extraMagic = dir
@@ -7492,7 +7660,8 @@ pub mod table {
                 // Extra
                 Kern | Vhea | Vmtx => true,
                 Dsig => true,
-                Hdmx | Ltsh | Merg | Meta | Pclt | Vdmx => false,
+                Hdmx | Vdmx => true,
+                Ltsh | Merg | Meta | Pclt => false,
             }
         }
     }
