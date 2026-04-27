@@ -1437,7 +1437,7 @@ pub(crate) mod hdmx {
         module.register_format_args(
             "opentype.hdmx.device_record",
             [(Label::Borrowed("num_glyphs"), ValueType::U16)],
-            record([
+            record_auto([
                 ("pixel_size", u8()),
                 ("max_width", u8()),
                 (
@@ -1445,7 +1445,7 @@ pub(crate) mod hdmx {
                     // TODO - should this be capture_bytes instead?
                     from_here(read_array(var("num_glyphs"), BaseKind::U8)),
                 ),
-                ("__pad", Format::Align(4)), // FIXME - is this necessary given the slice?
+                ("__pad", align_to_size::<u32>()),
             ]),
         )
     }
@@ -1469,13 +1469,15 @@ pub(crate) mod vdmx {
                 record([
                     ("table_scope", reify_view(vvar("table_view"))),
                     ("version", expects_u16be([0, 1])),
+                    // REVIEW[epic=validation] - we do not expect num_recs and num_ratios to ever differ
                     ("num_recs", u16be()),
-                    ("num_ratios", u16be()),
+                    ("num_ratios", expect_eq(u16be(), var("num_recs"))),
                     // TODO - RatioRange is a fixed 32-bit record so it ought to be compatible with ReadArray, eventually
                     ("ratio_range", repeat_count(var("num_ratios"), ratio_range)),
                     (
                         "vdmx_group_offsets",
                         repeat_count(
+                            // NOTE - the specification uses `numRatios` as the array-length, and not `numRecs` as might otherwise be expected
                             var("num_ratios"),
                             util::read_phantom_view_offset16(vvar("table_view"), vdmx_group.call()),
                         ),
