@@ -1060,8 +1060,7 @@ pub fn align_then(align: usize, f: Format) -> Format {
 /// use doodle::Format;
 /// assert!(matches!(align_to_size::<u32>(), Format::Align(4)));
 /// ```
-pub fn align_to_size<T>() -> Format
-{
+pub fn align_to_size<T>() -> Format {
     Format::Align(std::mem::size_of::<T>())
 }
 
