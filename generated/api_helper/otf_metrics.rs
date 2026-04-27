@@ -81,6 +81,9 @@ pub mod cli {
         #[builder(default = "3")]
         pub(crate) inline_bookend: usize,
 
+        #[builder(default = "8")]
+        pub(crate) octet_bytes_bookend: usize,
+
         /// Set to true when we only care about dumping the list of tables that are present in the font but aren't handled yet
         #[builder(default = "false")]
         pub extra_only: bool,

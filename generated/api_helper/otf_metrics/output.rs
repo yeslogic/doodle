@@ -172,56 +172,66 @@ mod vdmx {
         let heading = toks(format!("VDMX: version {}", vdmx.version));
         if conf.verbosity.is_at_least(cli::VerboseLevel::Detailed) {
             const ADVANCE: i8 = 1;
-            heading
-                .glue(
-                    LineBreak,
-                    TokenStream::join_with(vec![
+            heading.glue(
+                LineBreak,
+                TokenStream::join_with(
+                    vec![
                         toks(format!("RatioRanges: {} total", vdmx.ratios.len())),
                         display_items_elided(
                             &vdmx.ratios,
                             |ix, r| tok(format!("[{ix}]: ")).then(display_ratio_range(r)),
                             conf.bookend_size,
                             |start, stop| {
-                                toks(format!("(skipping ratio-ranges {start}..{stop})")).indent_by(-1)
+                                toks(format!("(skipping ratio-ranges {start}..{stop})"))
+                                    .indent_by(-1)
                             },
-                        ).indent_by(ADVANCE),
+                        )
+                        .indent_by(ADVANCE),
                         toks(format!("VDMXGroups: {} total", vdmx.vdmx_groups.len())),
                         display_items_elided(
                             &vdmx.vdmx_groups,
                             |ix, r| tok(format!("[{ix}]: ")).then(display_vdmx_group(r, conf)),
                             conf.bookend_size,
                             |start, stop| {
-                                toks(format!("(skipping VDMX groups {start}..{stop})")).indent_by(-1)
+                                toks(format!("(skipping VDMX groups {start}..{stop})"))
+                                    .indent_by(-1)
                             },
-                        ).indent_by(ADVANCE),
+                        )
+                        .indent_by(ADVANCE),
                     ],
-                    LineBreak)
-                    .indent_by(1),
+                    LineBreak,
                 )
+                .indent_by(1),
+            )
         } else {
             heading
         }
     }
 
     fn display_ratio_range(rr: &RatioRange) -> TokenStream<'static> {
-        toks(format!("bCharSet={}; {}:{}↔{}:{}", rr.b_char_set, rr.x_ratio, rr.y_start_ratio, rr.x_ratio, rr.y_end_ratio))
+        toks(format!(
+            "bCharSet={}; {}:{}↔{}:{}",
+            rr.b_char_set, rr.x_ratio, rr.y_start_ratio, rr.x_ratio, rr.y_end_ratio
+        ))
     }
 
-
     fn display_vdmx_group(vg: &VdmxGroup, conf: &Config) -> TokenStream<'static> {
-        toks(format!("yPelHeight[{}→{}]", vg.start_sz, vg.end_sz))
-        .glue(tok("; entry="),
+        toks(format!("yPelHeight[{}, {}]", vg.start_sz, vg.end_sz)).glue(
+            tok("; entry="),
             display_items_inline(
                 &vg.entry,
                 |vtable| display_vtable(*vtable),
                 conf.inline_bookend,
-                |n| toks(format!("..({n})..")),
-            )
+                |n| toks(format!("..(skipping {n} vTables)..")),
+            ),
         )
     }
 
     fn display_vtable(vtable: VTable) -> TokenStream<'static> {
-        toks(format!("{}↦[{}←{}]", vtable.y_pel_height, vtable.y_max, vtable.y_min))
+        toks(format!(
+            "{}@[{}, {}]",
+            vtable.y_pel_height, vtable.y_min, vtable.y_max
+        ))
     }
 }
 use hdmx::display_hdmx_metrics;
@@ -258,19 +268,20 @@ mod hdmx {
     }
 
     fn display_device_record(dev_record: &DeviceRecord, conf: &Config) -> TokenStream<'static> {
-        TokenStream::join_with(vec![
-            toks(format!("pixelSize={} ppem", dev_record.pixel_size)),
-            toks(format!("maxWidth={} px", dev_record.max_width)),
-            tok("widths=").then(
-                arrayfmt::display_items_inline(
+        TokenStream::join_with(
+            vec![
+                toks(format!("pixelSize={} ppem", dev_record.pixel_size)),
+                toks(format!("maxWidth={} px", dev_record.max_width)),
+                tok("widths=").then(arrayfmt::display_items_inline(
                     &dev_record.widths,
                     |width| toks(width.to_string()),
                     conf.inline_bookend,
                     |n_skipped| toks(format!("..([{n_skipped}])..")),
-                ))
-        ], tok(" ; "))
+                )),
+            ],
+            tok(" ; "),
+        )
     }
-
 }
 
 use dsig::display_dsig_metrics;
@@ -305,7 +316,7 @@ mod dsig {
                                 &dsig.signatures,
                                 |ix, sig| {
                                     tok(format!("[{ix}]: "))
-                                        .then(display_signature_block(sig.clone()))
+                                        .then(display_signature_block(sig.clone(), conf))
                                 },
                                 conf.bookend_size,
                                 |start, stop| {
@@ -332,10 +343,24 @@ mod dsig {
         }
     }
 
-    fn display_signature_block(sig: SignatureBlock) -> TokenStream<'static> {
+    fn display_signature_block(sig: SignatureBlock, conf: &Config) -> TokenStream<'static> {
         let mut octets = String::new();
-        for byte in sig.sig {
-            octets.push_str(&format!("{:02x}", byte));
+        let min_abbrev = conf.octet_bytes_bookend * 2;
+        if sig.sig.len() <= min_abbrev {
+            for byte in sig.sig {
+                octets.push_str(&format!("{:02x}", byte));
+            }
+        } else {
+            let (pref, _mid, suff) = unsafe {
+                trisect_unchecked(&sig.sig, conf.octet_bytes_bookend, conf.octet_bytes_bookend)
+            };
+            for byte in pref {
+                octets.push_str(&format!("{:02x}", byte));
+            }
+            octets.push_str(&format!("...({} bytes)...", _mid.len()));
+            for byte in suff.iter().rev() {
+                octets.push_str(&format!("{:02x}", byte));
+            }
         }
         tok(format!("Signature Block: [{} bytes]: ", sig.length,)).then(toks(octets))
     }
