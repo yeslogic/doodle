@@ -908,13 +908,11 @@ pub fn where_between_u32(format: Format, lower: u32, upper: u32) -> Format {
     where_between(format, lower, upper, Expr::U32)
 }
 
-/// Numeric validation helper that constrains a given format to yield a value that falls in an abstract range,
-/// represented by a value `range` that a `Bounds` value can be constructed from via an `.into()` call.
+/// Numeric validation helper that constrains a given format to yield a value that falls in an abstract range
+/// ([`Bounds`]), based on a value of some type `R` that can natively be converted to [`Bounds`]
+/// (e.g. any 64-bit or smaller unsigned integer-type, or a `RangeInclusive`/`RangeFrom` thereof).
 ///
-/// Unlike [`where_between`], the range in question need not be closed (i.e. bounded both above and below).
-/// In return, there is a loss of flexibility, as the range must be specified via numeric consts, rather than
-/// arbitrary `Expr` values that are not required to be constants.
-///
+/// Unlike [`where_between`], the range in question need not be closed, and need only have a lower bound.
 /// However, the complexity of the test will typically be higher for this helper than for [`where_between`];
 /// this is doubly true for closed ranges whose minimum is `0`, in which case [`where_between`] tests a single
 /// integer comparison.
@@ -925,11 +923,25 @@ where
     where_lambda(format, "x", is_within(var("x"), range.into()))
 }
 
+/// Disjunctive version of [`where_within`] that applies to a collection of range-like value
+/// rather than a single range-generator.
+///
+/// For more details, see [`where_within`] and [`is_within_any`].
 pub fn where_within_any<R>(format: Format, ranges: impl IntoIterator<Item = R>) -> Format
 where
     R: Into<Bounds>,
 {
     where_lambda(format, "x", is_within_any(var("x"), ranges))
+}
+
+/// Given a `Format`, constructs a parse that only succeeds if it yields a value
+/// that is (numerically) equal to `expected`.
+///
+/// Only works for formats that yield single integral values, and does not work
+/// for tuples, arrays, records, or any non-integral type.
+pub fn expect_eq(format: Format, expected: Expr) -> Format {
+    const IDENT: &str = "actual";
+    where_lambda(format, IDENT, expr_eq(var(IDENT), expected))
 }
 
 /// Homogenous-format tuple whose elements are all `format`, repeating `count` times
@@ -1033,9 +1045,31 @@ pub fn for_each(seq: Expr, name: impl IntoLabel, inner: Format) -> Format {
     Format::ForEach(Box::new(seq), name.into(), Box::new(inner))
 }
 
-/// Helper for specifying a byte-aligned Format with a given byte-multiple `align`
-pub fn aligned(f: Format, align: usize) -> Format {
+/// Given an alignment `align` and a Format `f`, constructs a parse that seeks to the nearest offset
+/// that is byte-aligned to a width of `align`, and then parses `f` and yields its result.
+pub fn align_then(align: usize, f: Format) -> Format {
     monad_seq(Format::Align(align), f)
+}
+
+/// Helper for constructing `Format::Align` that aligns to the size (in bytes) of the parametric type `T`.
+///
+/// # Examples
+///
+/// ```
+/// use doodle::helper::align_to_size;
+/// use doodle::Format;
+/// assert!(matches!(align_to_size::<u32>(), Format::Align(4)));
+/// ```
+pub fn align_to_size<T>() -> Format
+{
+    Format::Align(std::mem::size_of::<T>())
+}
+
+/// Given a format `f` and an alignment `align`, constructs a parse that first parses `f` and then
+/// seeks to the nearest offset that is byte-aligned to a width of `align`, then yielding the
+/// original result of `f`.
+pub fn then_align(f: Format, align: usize) -> Format {
+    chain(f, "x", align_then(align, compute(var("x"))))
 }
 
 /// Helper method for [`Format::LetFormat`]
@@ -1468,8 +1502,7 @@ pub fn seq_last_unchecked(seq: Expr) -> Expr {
 
 /// Returns `true` if the value of `x` is contained by `bounds` and false if it lies outside.
 ///
-/// If `x` is not an integral-typed value, will cause a runtime error
-/// when encountered by the interpreter or compiler.
+/// If `x` is not an integral-typed value, will cause a runtime error when encountered by the interpreter or compiler.
 pub fn is_within(x: Expr, bounds: Bounds) -> Expr {
     expr_match(
         x,
