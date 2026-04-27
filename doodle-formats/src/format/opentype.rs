@@ -704,6 +704,8 @@ pub(crate) fn table_links(
     let fvar_table = fvar::table(module, tag);
     let gvar_table = gvar::table(module);
     let dsig_table = dsig::table(module);
+    let hdmx_table = hdmx::table(module);
+    let vdmx_table = vdmx::table(module);
 
     module.define_format_args_views(
         "opentype.table_directory.table_links",
@@ -974,6 +976,25 @@ pub(crate) fn table_links(
                     dsig_table.call(),
                 ),
             ),
+            (
+                "hdmx",
+                optional_table(
+                    util::FONTVIEW_VAR,
+                    var("tables"),
+                    util::magic(b"hdmx"),
+                    hdmx_table.invoke_args([record_proj(var("maxp"), "num_glyphs")]),
+                ),
+            ),
+            (
+                "vdmx",
+                optional_table(
+                    util::FONTVIEW_VAR,
+                    var("tables"),
+                    util::magic(b"VDMX"),
+                    vdmx_table.call(),
+                ),
+            ),
+            // ANCHOR - table frontier
             // !SECTION
             ("__skip", Format::SkipRemainder),
         ]),
@@ -1153,7 +1174,341 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
     )
 }
 
-mod gvar {
+// ANCHOR - `stat` table
+pub(crate) mod stat {
+    use super::*;
+
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/stat#style-attributes-header
+    pub(crate) fn table(module: &mut FormatModule, tag: FormatRef) -> FormatRef {
+        let design_axes_array = design_axes_array(module, tag);
+        let axis_value_array = axis_value_array(module);
+        module.define_format(
+            "opentype.stat_table",
+            let_view(
+                "table_view",
+                record([
+                    ("table_scope", reify_view(vvar("table_view"))),
+                    ("major_version", util::expect_u16be(1)),
+                    ("minor_version", util::expects_u16be([1, 2])), // Version 1.0 is deprecated
+                    ("design_axis_size", u16be()), // size (in bytes) of each axis record
+                    ("design_axis_count", u16be()), // number of axis records
+                    (
+                        "design_axes",
+                        util::read_phantom_view_offset32(
+                            vvar("table_view"),
+                            design_axes_array.call_args(vec![var("design_axis_count")]),
+                        ),
+                    ), // offset is 0 iff design_axis_count is 0
+                    ("axis_value_count", u16be()),
+                    (
+                        "axis_value_offsets",
+                        util::read_phantom_view_offset32(
+                            vvar("table_view"),
+                            axis_value_array.call_args(vec![var("axis_value_count")]),
+                        ),
+                    ), // offset is 0 iff axis_value_count is 0
+                    ("elided_fallback_name_id", u16be()), // omitted in version 1.0, but said version is deprecated
+                ]),
+            ),
+        )
+    }
+
+    fn design_axes_array(module: &mut FormatModule, tag: FormatRef) -> FormatRef {
+        let axis_record = record([
+            ("axis_tag", tag.call()),
+            ("axis_name_id", u16be()),
+            ("axis_ordering", u16be()),
+        ]);
+        module.define_format_args(
+            "opentype.stat.design_axes_array",
+            vec![(Label::Borrowed("design_axis_count"), ValueType::U16)],
+            record([(
+                "design_axes",
+                repeat_count(var("design_axis_count"), axis_record),
+            )]),
+        )
+    }
+
+    fn axis_value_array(module: &mut FormatModule) -> FormatRef {
+        let axis_value_table = axis_value_table(module);
+        module.define_format_args(
+            "opentype.stat.axis_value_array",
+            vec![(Label::Borrowed("axis_value_count"), ValueType::U16)],
+            let_view(
+                "array_view",
+                record([
+                    ("array_scope", reify_view(vvar("array_view"))),
+                    (
+                        "axis_values",
+                        repeat_count(
+                            var("axis_value_count"),
+                            util::read_phantom_view_offset16(
+                                vvar("array_view"),
+                                axis_value_table.call(),
+                            ),
+                        ),
+                    ),
+                ]),
+            ),
+        )
+    }
+
+    fn axis_value_table(module: &mut FormatModule) -> FormatRef {
+        use BitFieldKind::*;
+        let axis_flags = bit_fields_u16([
+            Reserved {
+                bit_width: 14,
+                check_zero: false,
+            },
+            FlagBit("elidable_axis_value_name"), // Bit 1 - When set, indicates the 'normal' value for this axis and implies it may be omitted when composing name-strings
+            FlagBit("older_sibling_font_attribute"), // Bit 0 - When set, indicates that the axis information applies to previously released fonts in the same font-family
+        ]);
+        let axis_value_record = record([("axis_index", u16be()), ("value", util::fixed32be())]);
+        let f1_fields = vec![
+            ("axis_index", u16be()),
+            ("flags", axis_flags.clone()),
+            ("value_name_id", u16be()), // NameId for entries in 'name' table that provide display-string for this attribute value
+            ("value", fixed32be()),
+        ];
+        let f2_fields = vec![
+            ("axis_index", u16be()),
+            ("flags", axis_flags.clone()),
+            ("value_name_id", u16be()), // NameId for entries in 'name' table that provide display-string for this attribute value
+            ("nominal_value", fixed32be()),
+            ("range_min_value", fixed32be()),
+            ("range_max_value", fixed32be()),
+        ];
+        let f3_fields = vec![
+            ("axis_index", u16be()),
+            ("flags", axis_flags.clone()),
+            ("value_name_id", u16be()), // NameId for entries in 'name' table that provide display-string for this attribute value
+            ("value", fixed32be()),
+            ("linked_value", fixed32be()),
+        ];
+        let f4_fields = vec![
+            ("axis_count", u16be()),
+            ("flags", axis_flags.clone()),
+            ("value_name_id", u16be()), // NameId for entries in 'name' table that provide display-string for this combination of axis values
+            (
+                "axis_values",
+                repeat_count(var("axis_count"), axis_value_record),
+            ),
+        ];
+        module.define_format(
+            "opentype.stat.axis_value_table",
+            util::embedded_variadic_alternation(
+                [("format", where_between_u16(u16be(), 1, 4))],
+                "format",
+                [
+                    (1, "Format1", f1_fields),
+                    (2, "Format2", f2_fields),
+                    (3, "Format3", f3_fields),
+                    (4, "Format4", f4_fields),
+                ],
+                "data",
+                util::NestingKind::MinimalVariation,
+            ),
+        )
+    }
+}
+
+// ANCHOR - dsig table
+pub(crate) mod dsig {
+    use super::*;
+
+    /// DSIG Header format definiton
+    ///
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/dsig
+    pub fn table(module: &mut FormatModule) -> FormatRef {
+        let signature_record = signature_record(module);
+        let flags = bit_fields_u16([
+            // NOTE - spec is unclear about what the flag-bits other than bit 0 are actually for, and only specifies 1-7 as being reserved (set to 0)
+            BitFieldKind::Reserved {
+                bit_width: 8,
+                check_zero: false,
+            }, // Bits 8-15 : padding
+            BitFieldKind::Reserved {
+                bit_width: 7,
+                check_zero: true,
+            }, // Bits 1-7 : reserved
+            BitFieldKind::FlagBit("cannot_be_resigned"), // Bit 0 : Cannot be resigned
+        ]);
+        module.define_format(
+            "opentype.dsig",
+            let_view(
+                "table_view",
+                record_auto([
+                    ("table_scope", reify_view(vvar("table_view"))),
+                    ("version", where_within(u32be(), 0x0000_0001u32)), // version is 0x0000_0001
+                    ("num_signatures", u16be()),
+                    ("flags", flags),
+                    (
+                        "signature_records",
+                        repeat_count(
+                            var("num_signatures"),
+                            signature_record.invoke_views([vvar("table_view")]),
+                        ),
+                    ),
+                ]),
+            ),
+        )
+    }
+
+    fn signature_record(module: &mut FormatModule) -> DepFormat<0, 1> {
+        let sig_format1 = sig_format1(module);
+        module.register_format_views(
+            "opentype.dsig.signature_record",
+            [Label::Borrowed("_table_view")],
+            record([
+                ("format", u32be()),
+                ("length", u32be()),
+                (
+                    "signature_offset",
+                    read_phantom_view_offset32(
+                        vvar("_table_view"),
+                        fmt_match(
+                            var("format"),
+                            [(Pattern::U32(1), slice(var("length"), sig_format1.call()))],
+                        ),
+                    ),
+                ),
+            ]),
+        )
+    }
+
+    fn sig_format1(module: &mut FormatModule) -> FormatRef {
+        module.define_format(
+            "opentype.dsig.sig_format1",
+            record_auto([
+                ("__reserved1", expect_u16be(0)),
+                ("__reserved2", expect_u16be(0)),
+                ("signature_length", u32be()),
+                (
+                    "signature",
+                    capture_bytes_from_here(var("signature_length")),
+                ),
+            ]),
+        )
+    }
+}
+
+// ANCHOR - hdmx
+pub(crate) mod hdmx {
+    use super::*;
+
+    /// HDMX table format definition
+    ///
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/hdmx
+    ///
+    /// Parametric in `num_glyphs :~ U16` (taken from `maxp`)
+    pub(crate) fn table(module: &mut FormatModule) -> DepFormat<1, 0> {
+        let device_record = device_record(module);
+        // helper format for the `size_device_record` field, which is a u32be that should be divisible by 4 (32-bit alignment)
+        let size32 = where_lambda(
+            u32be(),
+            "size",
+            expr_eq(rem(var("size"), Expr::U32(4)), Expr::U32(0)),
+        );
+        module.register_format_args(
+            "opentype.hdmx",
+            [(Label::Borrowed("num_glyphs"), ValueType::U16)],
+            record([
+                ("version", expect_u16be(0)),   // table version, should be 0
+                ("num_records", u16be()),       // number of device records
+                ("size_device_record", size32), // should be 32-bit aligned
+                (
+                    "records",
+                    repeat_count(
+                        var("num_records"),
+                        slice(
+                            var("size_device_record"),
+                            device_record.invoke_args([var("num_glyphs")]),
+                        ),
+                    ),
+                ),
+            ]),
+        )
+    }
+
+    /// HDMX Device Record format definition
+    ///
+    /// Parametric in `num_glyphs :~ U16`
+    fn device_record(module: &mut FormatModule) -> DepFormat<1, 0> {
+        module.register_format_args(
+            "opentype.hdmx.device_record",
+            [(Label::Borrowed("num_glyphs"), ValueType::U16)],
+            record_auto([
+                ("pixel_size", u8()),
+                ("max_width", u8()),
+                (
+                    "widths",
+                    // TODO - should this be capture_bytes instead?
+                    from_here(read_array(var("num_glyphs"), BaseKind::U8)),
+                ),
+                ("__pad", align_to_size::<u32>()),
+            ]),
+        )
+    }
+}
+
+// ANCHOR - vdmx
+pub(crate) mod vdmx {
+    use super::*;
+
+    pub(crate) fn table(module: &mut FormatModule) -> FormatRef {
+        let vdmx_group = vdmx_group(module);
+        let ratio_range = record_repeat(
+            ["b_char_set", "x_ratio", "y_start_ratio", "y_end_ratio"],
+            u8(),
+        );
+
+        module.define_format(
+            "opentype.vdmx",
+            let_view(
+                "table_view",
+                record([
+                    ("table_scope", reify_view(vvar("table_view"))),
+                    ("version", expects_u16be([0, 1])),
+                    // REVIEW[epic=validation] - we do not expect num_recs and num_ratios to ever differ
+                    ("num_recs", u16be()),
+                    ("num_ratios", expect_eq(u16be(), var("num_recs"))),
+                    // TODO - RatioRange is a fixed 32-bit record so it ought to be compatible with ReadArray, eventually
+                    ("ratio_range", repeat_count(var("num_ratios"), ratio_range)),
+                    (
+                        "vdmx_group_offsets",
+                        repeat_count(
+                            // NOTE - the specification uses `numRatios` as the array-length, and not `numRecs` as might otherwise be expected
+                            var("num_ratios"),
+                            util::read_phantom_view_offset16(vvar("table_view"), vdmx_group.call()),
+                        ),
+                    ),
+                ]),
+            ),
+        )
+    }
+
+    fn vdmx_group(module: &mut FormatModule) -> FormatRef {
+        let v_table = module.define_format(
+            "opentype.vdmx.group.v_table",
+            record([
+                ("y_pel_height", u16be()), // yPelHeight to which values apply
+                ("y_max", i16be()),        // maximum value (in pels) for this yPelHeight
+                ("y_min", i16be()),        // minimum value (in pels) for this yPelHeight
+            ]),
+        );
+        module.define_format(
+            "opentype.vdmx.group",
+            record([
+                ("recs", u16be()),  // Number of height records in this group
+                ("start_sz", u8()), // Starting yPelHeight
+                ("end_sz", u8()),   // Ending yPelHeight
+                ("entry", repeat_count(var("recs"), v_table.call())),
+            ]),
+        )
+    }
+}
+
+pub(crate) mod gvar {
     use super::*;
 
     // REVIEW - do we consider it sensible to set this to `true`?
@@ -2053,7 +2408,7 @@ pub(crate) mod kern {
     }
 }
 
-mod base {
+pub(crate) mod base {
     use super::*;
 
     /// BASE table format definition
@@ -2307,7 +2662,7 @@ mod base {
     }
 }
 
-mod gpos {
+pub(crate) mod gpos {
     use super::*;
     use doodle::DepFormat;
 
@@ -3257,7 +3612,7 @@ mod gpos {
     }
 }
 
-mod gsub {
+pub(crate) mod gsub {
     use doodle::DepFormat;
 
     use super::*;
@@ -3711,7 +4066,7 @@ mod gsub {
 }
 
 /// Module for sub-formats used in both GSUB and GPOS
-mod layout {
+pub(crate) mod layout {
     use doodle::DepFormat;
 
     use super::*;
@@ -4763,7 +5118,7 @@ mod layout {
     }
 }
 
-mod gdef {
+pub(crate) mod gdef {
     use super::*;
 
     pub(crate) fn table(
@@ -5023,7 +5378,7 @@ mod gdef {
     }
 }
 
-mod common {
+pub(crate) mod common {
     use super::*;
 
     pub(crate) fn item_variation_store(module: &mut FormatModule) -> FormatRef {
@@ -5352,7 +5707,8 @@ mod common {
     }
 }
 
-mod prep {
+// ANCHOR - prep table
+pub(crate) mod prep {
     use super::*;
 
     // REVIEW - this function breaks the convention of `-> FormatRef` but it's an edge-case already
@@ -5362,7 +5718,7 @@ mod prep {
     }
 }
 // REVIEW - the generated names for gasp subtypes can be run-on, consider pruning name tokens or module.define_format(_args) for brevity
-mod gasp {
+pub(crate) mod gasp {
     use super::*;
 
     /// Format for a gasp-record, parametric in the version of the `gasp` table.
@@ -5422,7 +5778,8 @@ mod gasp {
     }
 }
 
-mod glyf {
+// ANCHOR - glyf table
+pub(crate) mod glyf {
     use doodle::numeric::BasicUnaryOp;
 
     use super::*;
@@ -5873,6 +6230,7 @@ mod glyf {
     }
 }
 
+// ANCHOR - loca table
 pub(crate) mod loca {
     use super::*;
 
@@ -5905,6 +6263,7 @@ pub(crate) mod loca {
     }
 }
 
+// ANCHOR - fpgm table
 pub(crate) mod fpgm {
     use super::*;
 
@@ -5915,6 +6274,7 @@ pub(crate) mod fpgm {
     }
 }
 
+// ANCHOR - cvt table
 pub(crate) mod cvt {
     use super::*;
 
@@ -5922,6 +6282,8 @@ pub(crate) mod cvt {
         repeat(i16be())
     }
 }
+
+// ANCHOR - post table
 pub(crate) mod post {
     use super::*;
 
@@ -6027,7 +6389,8 @@ pub(crate) mod post {
     }
 }
 
-mod os2 {
+// ANCHOR - os2 table
+pub(crate) mod os2 {
     use super::*;
 
     /// Conditional r1ecord-format consisting of OS/2 table fields for each version of the OS/2 table
@@ -6139,7 +6502,8 @@ mod os2 {
     }
 }
 
-mod name {
+// ANCHOR - name table
+pub(crate) mod name {
     use super::*;
 
     pub(crate) fn table(module: &mut FormatModule) -> FormatRef {
@@ -6286,10 +6650,13 @@ mod name {
     }
 }
 
+// ANCHOR - vmtx table
 pub(crate) mod vmtx {
     // STUB[epic=horizontal-for-vertical] - this technically works as-is, but certain fields might want to be named differently
     pub(crate) use super::hmtx::table;
 }
+
+// ANCHOR - hmtx table
 pub(crate) mod hmtx {
     use super::*;
 
@@ -6317,6 +6684,7 @@ pub(crate) mod hmtx {
     }
 }
 
+// ANCHOR - maxp table
 pub(crate) mod maxp {
     use super::*;
 
@@ -6364,6 +6732,7 @@ pub(crate) mod maxp {
     }
 }
 
+// ANCHOR - hhea table
 pub(crate) mod hhea {
     use super::*;
 
@@ -7016,221 +7385,4 @@ use table::{optional_table, required_table, required_table_with_len};
 
 pub(crate) fn opentype_tag(module: &mut FormatModule) -> FormatRef {
     module.define_format("opentype.types.tag", u32be())
-}
-
-// ANCHOR - `stat` table
-pub(crate) mod stat {
-    use super::*;
-
-    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/stat#style-attributes-header
-    pub(crate) fn table(module: &mut FormatModule, tag: FormatRef) -> FormatRef {
-        let design_axes_array = design_axes_array(module, tag);
-        let axis_value_array = axis_value_array(module);
-        module.define_format(
-            "opentype.stat_table",
-            let_view(
-                "table_view",
-                record([
-                    ("table_scope", reify_view(vvar("table_view"))),
-                    ("major_version", util::expect_u16be(1)),
-                    ("minor_version", util::expects_u16be([1, 2])), // Version 1.0 is deprecated
-                    ("design_axis_size", u16be()), // size (in bytes) of each axis record
-                    ("design_axis_count", u16be()), // number of axis records
-                    (
-                        "design_axes",
-                        util::read_phantom_view_offset32(
-                            vvar("table_view"),
-                            design_axes_array.call_args(vec![var("design_axis_count")]),
-                        ),
-                    ), // offset is 0 iff design_axis_count is 0
-                    ("axis_value_count", u16be()),
-                    (
-                        "axis_value_offsets",
-                        util::read_phantom_view_offset32(
-                            vvar("table_view"),
-                            axis_value_array.call_args(vec![var("axis_value_count")]),
-                        ),
-                    ), // offset is 0 iff axis_value_count is 0
-                    ("elided_fallback_name_id", u16be()), // omitted in version 1.0, but said version is deprecated
-                ]),
-            ),
-        )
-    }
-
-    fn design_axes_array(module: &mut FormatModule, tag: FormatRef) -> FormatRef {
-        let axis_record = record([
-            ("axis_tag", tag.call()),
-            ("axis_name_id", u16be()),
-            ("axis_ordering", u16be()),
-        ]);
-        module.define_format_args(
-            "opentype.stat.design_axes_array",
-            vec![(Label::Borrowed("design_axis_count"), ValueType::U16)],
-            record([(
-                "design_axes",
-                repeat_count(var("design_axis_count"), axis_record),
-            )]),
-        )
-    }
-
-    fn axis_value_array(module: &mut FormatModule) -> FormatRef {
-        let axis_value_table = axis_value_table(module);
-        module.define_format_args(
-            "opentype.stat.axis_value_array",
-            vec![(Label::Borrowed("axis_value_count"), ValueType::U16)],
-            let_view(
-                "array_view",
-                record([
-                    ("array_scope", reify_view(vvar("array_view"))),
-                    (
-                        "axis_values",
-                        repeat_count(
-                            var("axis_value_count"),
-                            util::read_phantom_view_offset16(
-                                vvar("array_view"),
-                                axis_value_table.call(),
-                            ),
-                        ),
-                    ),
-                ]),
-            ),
-        )
-    }
-
-    fn axis_value_table(module: &mut FormatModule) -> FormatRef {
-        use BitFieldKind::*;
-        let axis_flags = bit_fields_u16([
-            Reserved {
-                bit_width: 14,
-                check_zero: false,
-            },
-            FlagBit("elidable_axis_value_name"), // Bit 1 - When set, indicates the 'normal' value for this axis and implies it may be omitted when composing name-strings
-            FlagBit("older_sibling_font_attribute"), // Bit 0 - When set, indicates that the axis information applies to previously released fonts in the same font-family
-        ]);
-        let axis_value_record = record([("axis_index", u16be()), ("value", util::fixed32be())]);
-        let f1_fields = vec![
-            ("axis_index", u16be()),
-            ("flags", axis_flags.clone()),
-            ("value_name_id", u16be()), // NameId for entries in 'name' table that provide display-string for this attribute value
-            ("value", fixed32be()),
-        ];
-        let f2_fields = vec![
-            ("axis_index", u16be()),
-            ("flags", axis_flags.clone()),
-            ("value_name_id", u16be()), // NameId for entries in 'name' table that provide display-string for this attribute value
-            ("nominal_value", fixed32be()),
-            ("range_min_value", fixed32be()),
-            ("range_max_value", fixed32be()),
-        ];
-        let f3_fields = vec![
-            ("axis_index", u16be()),
-            ("flags", axis_flags.clone()),
-            ("value_name_id", u16be()), // NameId for entries in 'name' table that provide display-string for this attribute value
-            ("value", fixed32be()),
-            ("linked_value", fixed32be()),
-        ];
-        let f4_fields = vec![
-            ("axis_count", u16be()),
-            ("flags", axis_flags.clone()),
-            ("value_name_id", u16be()), // NameId for entries in 'name' table that provide display-string for this combination of axis values
-            (
-                "axis_values",
-                repeat_count(var("axis_count"), axis_value_record),
-            ),
-        ];
-        module.define_format(
-            "opentype.stat.axis_value_table",
-            util::embedded_variadic_alternation(
-                [("format", where_between_u16(u16be(), 1, 4))],
-                "format",
-                [
-                    (1, "Format1", f1_fields),
-                    (2, "Format2", f2_fields),
-                    (3, "Format3", f3_fields),
-                    (4, "Format4", f4_fields),
-                ],
-                "data",
-                util::NestingKind::MinimalVariation,
-            ),
-        )
-    }
-}
-
-pub(crate) mod dsig {
-    use super::*;
-
-    /// DSIG Header format definiton
-    ///
-    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/dsig
-    pub fn table(module: &mut FormatModule) -> FormatRef {
-        let signature_record = signature_record(module);
-        let flags = bit_fields_u16([
-            // NOTE - spec is unclear about what the flag-bits other than bit 0 are actually for, and only specifies 1-7 as being reserved (set to 0)
-            BitFieldKind::Reserved {
-                bit_width: 8,
-                check_zero: false,
-            }, // Bits 8-15 : padding
-            BitFieldKind::Reserved {
-                bit_width: 7,
-                check_zero: true,
-            }, // Bits 1-7 : reserved
-            BitFieldKind::FlagBit("cannot_be_resigned"), // Bit 0 : Cannot be resigned
-        ]);
-        module.define_format(
-            "opentype.dsig",
-            let_view(
-                "table_view",
-                record_auto([
-                    ("table_scope", reify_view(vvar("table_view"))),
-                    ("version", where_within(u32be(), 0x0000_0001u32)), // version is 0x0000_0001
-                    ("num_signatures", u16be()),
-                    ("flags", flags),
-                    (
-                        "signature_records",
-                        repeat_count(
-                            var("num_signatures"),
-                            signature_record.invoke_views([vvar("table_view")]),
-                        ),
-                    ),
-                ]),
-            ),
-        )
-    }
-
-    fn signature_record(module: &mut FormatModule) -> DepFormat<0, 1> {
-        let sig_format1 = sig_format1(module);
-        module.register_format_views(
-            "opentype.dsig.signature_record",
-            [Label::Borrowed("_table_view")],
-            record([
-                ("format", u32be()),
-                ("length", u32be()),
-                (
-                    "signature_offset",
-                    read_phantom_view_offset32(
-                        vvar("_table_view"),
-                        fmt_match(
-                            var("format"),
-                            [(Pattern::U32(1), slice(var("length"), sig_format1.call()))],
-                        ),
-                    ),
-                ),
-            ]),
-        )
-    }
-
-    fn sig_format1(module: &mut FormatModule) -> FormatRef {
-        module.define_format(
-            "opentype.dsig.sig_format1",
-            record_auto([
-                ("__reserved1", expect_u16be(0)),
-                ("__reserved2", expect_u16be(0)),
-                ("signature_length", u32be()),
-                (
-                    "signature",
-                    capture_bytes_from_here(var("signature_length")),
-                ),
-            ]),
-        )
-    }
 }

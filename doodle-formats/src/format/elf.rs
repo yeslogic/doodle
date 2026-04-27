@@ -20,9 +20,9 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
         module.define_format_args(
             name,
             vec![ISBE_ARG],
-            aligned(
-                if_then_else(var("is_be"), be_version, le_version),
+            align_then(
                 size_of::<T>(),
+                if_then_else(var("is_be"), be_version, le_version),
             ),
         )
     }
