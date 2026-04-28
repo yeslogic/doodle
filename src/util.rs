@@ -91,3 +91,59 @@ impl<T> std::ops::Index<usize> for IxHeap<Vec<T>> {
         self.get(ix)
     }
 }
+
+pub mod with_err {
+    #[derive(Clone, Debug)]
+    pub struct WithErr<T, E0> {
+        value: T,
+        errs: Vec<E0>,
+    }
+
+    impl<T, E0> WithErr<T, E0> {
+        pub const fn new(value: T) -> Self {
+            Self {
+                value,
+                errs: Vec::new(),
+            }
+        }
+
+        pub fn with_err(value: T, err: E0) -> Self {
+            Self {
+                value,
+                errs: vec![err],
+            }
+        }
+
+        pub fn join<U, E1>(self, mut f: impl FnMut(T) -> EResult<U, E0, E1>) -> EResult<U, E0, E1> {
+            let mut this_errs = self.errs;
+            let mut ret = f(self.value)?;
+            ret.errs.append(&mut this_errs);
+            Ok(ret)
+        }
+
+        pub fn into_inner(self) -> T {
+            self.value
+        }
+
+        pub const fn has_errs(&self) -> bool {
+            !self.errs.is_empty()
+        }
+
+        pub fn into_strict(self) -> Result<T, Vec<E0>> {
+            if !self.errs.is_empty() {
+                Err(self.errs)
+            } else {
+                Ok(self.value)
+            }
+        }
+    }
+
+    impl<T, E> AsRef<T> for WithErr<T, E> {
+        fn as_ref(&self) -> &T {
+            &self.value
+        }
+    }
+
+    pub type EResult<T, E0, E1 = E0> = Result<WithErr<T, E0>, E1>;
+}
+pub(crate) use with_err::{EResult, WithErr};
