@@ -2,8 +2,9 @@ use std::{fmt, io, rc::Rc};
 
 use crate::precedence::{Precedence, cond_paren};
 use crate::{
-    Arith, CommonOp, DynFormat, Expr, FieldLabel, Format, FormatModule, IntRel, Label, Pattern,
-    RecordFormat, StyleHint, UnaryOp, ViewExpr, ViewFormat, byte_set::ByteSet,
+    Arith, CommonOp, DynFormat, Expr, Format, FormatModule, IntRel, Label, Pattern, StyleHint,
+    UnaryOp, ViewExpr, ViewFormat, byte_set::ByteSet, record_fmt::FieldLabel,
+    record_fmt::RecordFormat,
 };
 use crate::{
     decoder::{SeqKind, Value},
