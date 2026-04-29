@@ -271,6 +271,7 @@ impl<'module> TreePrinter<'module> {
             // FIXME[epic=workaround-hack] - we cannot easily reconstruct the format corresponding to the inner value, so we discard the format-hint
             Value::Option(Some(value)) => self.is_atomic_value(value, None),
             Value::PhantomData => true,
+            Value::Poison => true,
         }
     }
 
@@ -642,6 +643,7 @@ impl<'module> TreePrinter<'module> {
                     let record_format = fmt.to_record_format();
                     self.compile_record(value_fields, Some(&record_format))
                 }
+                Value::Poison => self.compile_value(value),
                 _ => panic!("expected record, found {value}"),
             },
             Format::Hint(StyleHint::AsciiStr, str_format) => {
@@ -798,6 +800,7 @@ impl<'module> TreePrinter<'module> {
             Value::PhantomData => {
                 Fragment::string("PhantomData<_>").delimit(Fragment::Char('<'), Fragment::Char('>'))
             }
+            Value::Poison => Fragment::string("NO_DATA"),
         }
     }
 
