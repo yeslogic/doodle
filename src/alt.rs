@@ -14,7 +14,7 @@ use serde::Serialize;
 use crate::{
     BaseKind, BaseType, ByteSet, DynFormat, Endian, Expr, Format, FormatModule, FormatRef,
     IntoLabel, IxHeap, Label, Pattern, StyleHint, TypeScope, ValueKind, ValueType, ViewExpr,
-    typecheck::error::UnificationError, valuetype::Container,
+    typecheck::error::UnificationError, validation::Condition, valuetype::Container,
 };
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Eq, Ord, Hash)]
@@ -68,7 +68,7 @@ pub enum MonoKind {
     Bits,
     WithRelativeOffset(Box<Expr>, Box<Expr>),
     Map(Box<Expr>),
-    Where(Box<Expr>),
+    Where(Condition),
     Let(Label, Box<Expr>),
     LetView(Label),
     Dynamic(Label, DynFormat),
@@ -1855,8 +1855,8 @@ mod __impls {
                     MonoKind::Map(expr),
                     Box::new(FormatExt::from(*format)),
                 )),
-                Format::Where(format, expr) => FormatExt::Epi(EpiFormat::Mono(
-                    MonoKind::Where(expr),
+                Format::Where(format, cond) => FormatExt::Epi(EpiFormat::Mono(
+                    MonoKind::Where(cond),
                     Box::new(FormatExt::from(*format)),
                 )),
                 Format::Compute(expr) => FormatExt::Ground(GroundFormat::Compute(expr)),

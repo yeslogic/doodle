@@ -2,7 +2,7 @@
     └── png <- png.main :=
         ├── signature <- [ ... ]
         ├── ihdr <- png.ihdr :=
-        │   ├── length <- assert (length -> length <= 2147483647) ReadU32Be := 13
+        │   ├── length <- require (length -> length <= 2147483647) ReadU32Be := 13
         │   ├── tag <- png.ihdr-tag
         │   ├── data <- slice length png.ihdr-data :=
         │   │   ├── width <- ReadU32Be := 50
@@ -15,7 +15,7 @@
         │   └── crc <- ReadU32Be := 1592150037
         ├── chunks <- repeat png.chunk(...) :=
         │   ├── 0 <- png.chunk(...) :=
-        │   │   ├── length <- assert (length -> length <= 2147483647) ReadU32Be := 87
+        │   │   ├── length <- require (length -> length <= 2147483647) ReadU32Be := 87
         │   │   ├── tag <- png.tag := "PLTE"
         │   │   ├── data <- slice length (match tag { ... }) :=
         │   │   │   └── PLTE <- png.plte :=
@@ -51,7 +51,7 @@
         │   │   │            138 138 138
         │   │   └── crc <- ReadU32Be := 1943707985
         │   ├── 1 <- png.chunk(...) :=
-        │   │   ├── length <- assert (length -> length <= 2147483647) ReadU32Be := 1
+        │   │   ├── length <- require (length -> length <= 2147483647) ReadU32Be := 1
         │   │   ├── tag <- png.tag := "tRNS"
         │   │   ├── data <- slice length (match tag { ... }) :=
         │   │   │   └── tRNS <- png.trns(...) :=
@@ -60,7 +60,7 @@
         │   │   │                            0
         │   │   └── crc <- ReadU32Be := 1088870502
         │   ├── 2 <- png.chunk(...) :=
-        │   │   ├── length <- assert (length -> length <= 2147483647) ReadU32Be := 1
+        │   │   ├── length <- require (length -> length <= 2147483647) ReadU32Be := 1
         │   │   ├── tag <- png.tag := "bKGD"
         │   │   ├── data <- slice length (match tag { ... }) :=
         │   │   │   └── bKGD <- png.bkgd(...) :=
@@ -68,7 +68,7 @@
         │   │   │           └── palette-index <- ReadU8 := 0
         │   │   └── crc <- ReadU32Be := 2282036552
         │   ├── 3 <- png.chunk(...) :=
-        │   │   ├── length <- assert (length -> length <= 2147483647) ReadU32Be := 9
+        │   │   ├── length <- require (length -> length <= 2147483647) ReadU32Be := 9
         │   │   ├── tag <- png.tag := "pHYs"
         │   │   ├── data <- slice length (match tag { ... }) :=
         │   │   │   └── pHYs <- png.phys :=
@@ -77,7 +77,7 @@
         │   │   │       └── unit-specifier <- ReadU8 := 1
         │   │   └── crc <- ReadU32Be := 10132504
         │   └── 4 <- png.chunk(...) :=
-        │       ├── length <- assert (length -> length <= 2147483647) ReadU32Be := 7
+        │       ├── length <- require (length -> length <= 2147483647) ReadU32Be := 7
         │       ├── tag <- png.tag := "tIME"
         │       ├── data <- slice length (match tag { ... }) :=
         │       │   └── tIME <- png.time :=
@@ -89,7 +89,7 @@
         │       │       └── second <- ReadU8 := 34
         │       └── crc <- ReadU32Be := 491070829
         ├── idat <- let-format idat (map (xs -> flat-map (x -> x.data) xs) (repeat1 png.idat)) (decode-bytes idat zlib.main) :=
-        │   ├── compression-method-flags <- assert (method-info -> method-info.compression-method == 8) { ... } :=
+        │   ├── compression-method-flags <- require (method-info -> method-info.compression-method == 8) { ... } :=
         │   │   ├── compression-info <- compute _packed_bits >> 4 & 15 := 4
         │   │   └── compression-method <- compute _packed_bits & 15 := 8
         │   ├── flags <- { ... } :=
@@ -290,6 +290,6 @@
         │   └── adler32 <- ReadU32Be := 1593402930
         ├── more-chunks <- repeat png.chunk(...) := []
         └── iend <- png.iend :=
-            ├── length <- assert (length -> length == 0) ReadU32Be := 0
+            ├── length <- require (length -> length == 0) ReadU32Be := 0
             ├── tag <- png.iend-tag
             └── crc <- ReadU32Be := 2923585666

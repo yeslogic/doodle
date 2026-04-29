@@ -187,29 +187,29 @@
         │   │       ├── marker <- { ... }
         │   │       ├── length <- ReadU16Be := 17
         │   │       └── data <- slice (length - 2) jpeg.sof-data :=
-        │   │           ├── sample-precision <- assert (x -> match x { ... }) ReadU8 := 8
+        │   │           ├── sample-precision <- require (x -> match x { ... }) ReadU8 := 8
         │   │           ├── num-lines <- ReadU16Be := 709
-        │   │           ├── num-samples-per-line <- assert (x -> x != 0) ReadU16Be := 709
-        │   │           ├── num-image-components <- assert (x -> x != 0) ReadU8 := 3
+        │   │           ├── num-samples-per-line <- require (x -> x != 0) ReadU16Be := 709
+        │   │           ├── num-image-components <- require (x -> x != 0) ReadU8 := 3
         │   │           └── image-components <- repeat-count num-image-components jpeg.sof-image-component :=
         │   │               ├── 0 <- jpeg.sof-image-component :=
         │   │               │   ├── id <- ReadU8 := 1
         │   │               │   ├── sampling-factor <- { ... } :=
         │   │               │   │   ├── horizontal <- compute _packed_bits >> 4 & 15 := 1
         │   │               │   │   └── vertical <- compute _packed_bits & 15 := 1
-        │   │               │   └── quantization-table-id <- assert (x -> x <= 3) ReadU8 := 0
+        │   │               │   └── quantization-table-id <- require (x -> x <= 3) ReadU8 := 0
         │   │               ├── 1 <- jpeg.sof-image-component :=
         │   │               │   ├── id <- ReadU8 := 2
         │   │               │   ├── sampling-factor <- { ... } :=
         │   │               │   │   ├── horizontal <- compute _packed_bits >> 4 & 15 := 1
         │   │               │   │   └── vertical <- compute _packed_bits & 15 := 1
-        │   │               │   └── quantization-table-id <- assert (x -> x <= 3) ReadU8 := 1
+        │   │               │   └── quantization-table-id <- require (x -> x <= 3) ReadU8 := 1
         │   │               └── 2 <- jpeg.sof-image-component :=
         │   │                   ├── id <- ReadU8 := 3
         │   │                   ├── sampling-factor <- { ... } :=
         │   │                   │   ├── horizontal <- compute _packed_bits >> 4 & 15 := 1
         │   │                   │   └── vertical <- compute _packed_bits & 15 := 1
-        │   │                   └── quantization-table-id <- assert (x -> x <= 3) ReadU8 := 1
+        │   │                   └── quantization-table-id <- require (x -> x <= 3) ReadU8 := 1
         │   ├── scan <- jpeg.scan :=
         │   │   ├── segments <- repeat jpeg.table-or-misc :=
         │   │   │   ├── 0 <- jpeg.table-or-misc :=
@@ -268,7 +268,7 @@
         │   │   │   ├── marker <- { ... }
         │   │   │   ├── length <- ReadU16Be := 12
         │   │   │   └── data <- slice (length - 2) jpeg.sos-data :=
-        │   │   │       ├── num-image-components <- assert (x -> match x { ... }) ReadU8 := 3
+        │   │   │       ├── num-image-components <- require (x -> match x { ... }) ReadU8 := 3
         │   │   │       ├── image-components <- repeat-count num-image-components jpeg.sos-image-component :=
         │   │   │       │   ├── 0 <- jpeg.sos-image-component :=
         │   │   │       │   │   ├── component-selector <- ReadU8 := 1
@@ -285,8 +285,8 @@
         │   │   │       │       └── entropy-coding-table-ids <- jpeg.sos-image-component.entropy-coding-table-ids :=
         │   │   │       │           ├── dc-entropy-coding-table-id <- compute _packed_bits >> 4 & 15 := 1
         │   │   │       │           └── ac-entropy-coding-table-id <- compute _packed_bits & 15 := 1
-        │   │   │       ├── start-spectral-selection <- assert (x -> x <= 63) ReadU8 := 0
-        │   │   │       ├── end-spectral-selection <- assert (x -> x <= 63) ReadU8 := 63
+        │   │   │       ├── start-spectral-selection <- require (x -> x <= 63) ReadU8 := 0
+        │   │   │       ├── end-spectral-selection <- require (x -> x <= 63) ReadU8 := 63
         │   │   │       └── approximation-bit-position <- jpeg.sos-data.approximation-bit-position :=
         │   │   │           ├── high <- compute _packed_bits >> 4 & 15 := 0
         │   │   │           └── low <- compute _packed_bits & 15 := 0
