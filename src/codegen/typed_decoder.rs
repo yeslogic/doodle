@@ -1,4 +1,5 @@
 use crate::byte_set::ByteSet;
+use crate::validation::TypedCondition;
 use crate::{
     BaseKind, Endian, Format, FormatModule, Label, MatchTree, MaybeTyped, Next, StyleHint,
 };
@@ -173,7 +174,7 @@ pub(crate) enum TypedDecoder<TypeRep> {
     Where(
         TypeRep,
         Box<TypedDecoderExt<TypeRep>>,
-        Box<TypedExpr<TypeRep>>,
+        TypedCondition<TypeRep>,
     ),
     Compute(TypeRep, Box<TypedExpr<TypeRep>>),
     Let(
@@ -639,9 +640,9 @@ impl<'a> GTCompiler<'a> {
                 let da = Box::new(self.compile_gt_format(a, None, next.clone())?);
                 Ok(TypedDecoder::Map(gt.clone(), da, expr.clone()))
             }
-            TypedFormat::Where(gt, a, expr) => {
+            TypedFormat::Where(gt, a, cond) => {
                 let da = Box::new(self.compile_gt_format(a, None, next.clone())?);
-                Ok(TypedDecoder::Where(gt.clone(), da, expr.clone()))
+                Ok(TypedDecoder::Where(gt.clone(), da, cond.clone()))
             }
             TypedFormat::Compute(gt, expr) => Ok(TypedDecoder::Compute(gt.clone(), expr.clone())),
             TypedFormat::Pos => Ok(TypedDecoder::Pos),

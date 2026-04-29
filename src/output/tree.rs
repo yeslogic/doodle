@@ -1,6 +1,7 @@
 use std::{fmt, io, rc::Rc};
 
 use crate::precedence::{Precedence, cond_paren};
+use crate::validation::{Condition, Severity};
 use crate::{
     Arith, CommonOp, DynFormat, Expr, Format, FormatModule, IntRel, Label, Pattern, StyleHint,
     UnaryOp, ViewExpr, ViewFormat, byte_set::ByteSet, record_fmt::FieldLabel,
@@ -2278,10 +2279,14 @@ impl<'module> TreePrinter<'module> {
                     Precedence::FORMAT_COMPOUND,
                 )
             }
-            Format::Where(format, expr) => {
+            Format::Where(format, Condition { expr, severity }) => {
                 let expr_frag = self.compile_expr(expr, Precedence::ATOM);
+                let label = match severity {
+                    Severity::Require => "require",
+                    Severity::Expect => "expect",
+                };
                 cond_paren(
-                    self.compile_nested_format("assert", Some(&[expr_frag]), format, prec),
+                    self.compile_nested_format(label, Some(&[expr_frag]), format, prec),
                     prec,
                     Precedence::FORMAT_COMPOUND,
                 )

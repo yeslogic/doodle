@@ -4,6 +4,7 @@ use num_traits::{ToPrimitive, Zero};
 
 use crate::byte_set::ByteSet;
 pub use crate::marker::BaseKind;
+use crate::validation::Condition;
 use crate::{
     Arith, BaseType, Expr, Format, IntRel, IntoLabel, Label, OwnedRecordFormat, Pattern,
     RecordBuilder, StyleHint, TypeHint, UnaryOp, ValueType, ViewExpr, ViewFormat,
@@ -861,7 +862,7 @@ pub fn dup(count: Expr, expr: Expr) -> Expr {
 
 /// Composed `Format::Where` and `Expr::Lambda` taking a raw format, an arbitrary name for the lambda expression head, and the lambda body as an Expr.
 pub fn where_lambda(raw: Format, name: impl IntoLabel, body: Expr) -> Format {
-    Format::Where(Box::new(raw), Box::new(lambda(name, body)))
+    Format::Where(Box::new(raw), Condition::from_lambda(lambda(name, body)))
 }
 
 /// Numeric validation helper that constrains a given format to yield a value that falls in the inclusive range `lower..=upper`

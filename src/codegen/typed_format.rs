@@ -11,6 +11,7 @@ use crate::byte_set::ByteSet;
 use crate::codegen::rust_ast::{RustLt, RustParams, UseParams};
 use crate::numeric::core::Bounds as NumBounds;
 use crate::numeric::elaborator::TypedExpr as TypedNumExpr;
+use crate::validation::TypedCondition;
 use crate::{Arith, BaseKind, Endian, IntRel, Label, StyleHint, TypeHint, UnaryOp};
 
 pub(crate) mod variables;
@@ -166,9 +167,13 @@ impl<TypeRep> std::hash::Hash for TypedFormat<TypeRep> {
                 ofs.hash(state);
                 inner.hash(state);
             }
-            TypedFormat::Map(_, orig, f) | TypedFormat::Where(_, orig, f) => {
+            TypedFormat::Map(_, orig, f) => {
                 orig.hash(state);
                 f.hash(state);
+            }
+            TypedFormat::Where(_, orig, cond) => {
+                orig.hash(state);
+                cond.hash(state);
             }
             TypedFormat::Compute(_, expr) => expr.hash(state),
             TypedFormat::LetView(_, lb, inner) => {
@@ -259,7 +264,7 @@ pub enum TypedFormat<TypeRep> {
         Box<TypedFormat<TypeRep>>,
     ),
     Map(TypeRep, Box<TypedFormat<TypeRep>>, Box<TypedExpr<TypeRep>>),
-    Where(TypeRep, Box<TypedFormat<TypeRep>>, Box<TypedExpr<TypeRep>>),
+    Where(TypeRep, Box<TypedFormat<TypeRep>>, TypedCondition<TypeRep>),
     Compute(TypeRep, Box<TypedExpr<TypeRep>>),
     Let(
         TypeRep,
@@ -1200,7 +1205,7 @@ mod __impls {
                     Format::WithRelativeOffset(rebox(base_addr), rebox(ofs), rebox(inner))
                 }
                 TypedFormat::Map(_, inner, lambda) => Format::Map(rebox(inner), rebox(lambda)),
-                TypedFormat::Where(_, inner, lambda) => Format::Where(rebox(inner), rebox(lambda)),
+                TypedFormat::Where(_, inner, cond) => Format::Where(rebox(inner), cond.forget()),
                 TypedFormat::Compute(_, expr) => Format::Compute(rebox(expr)),
                 TypedFormat::Let(_, name, val, inner) => {
                     Format::Let(name, rebox(val), rebox(inner))

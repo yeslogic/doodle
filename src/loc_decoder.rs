@@ -8,6 +8,7 @@ use crate::decoder::{
 };
 use crate::error::{DecodeError, LocDecodeError};
 use crate::read::ReadCtxt;
+use crate::validation::{Condition, Severity};
 use crate::{
     Arith, BaseKind, DynFormat, Endian, Expr, Format, IntRel, Label, Pattern, UnaryOp, ViewExpr,
 };
@@ -1815,11 +1816,22 @@ impl Decoder {
                 let image = ParsedValue::inherit(&orig, v);
                 Ok((ParsedValue::Mapped(Box::new(orig), Box::new(image)), input))
             }
-            Decoder::Where(d, expr) => {
+            Decoder::Where(d, cond) => {
                 let (v, input) = d.parse_with_loc(program, scope, input)?;
+                let Condition { expr, severity } = cond;
                 match expr.eval_lambda_with_loc(scope, &v).unwrap_bool() {
                     true => Ok((v, input)),
-                    false => Err(DecodeError::loc_bad_where(scope, expr.clone(), Box::new(v))),
+                    false => {
+                        match severity {
+                            Severity::Expect => {
+                                // TODO[epic=with-err] - figure out how to use WithErr appropriately
+                                todo!("implement warning handling in loc decoders");
+                            }
+                            Severity::Require => {
+                                Err(DecodeError::loc_bad_where(scope, expr.clone(), Box::new(v)))
+                            }
+                        }
+                    }
                 }
             }
             Decoder::Compute(expr) => {

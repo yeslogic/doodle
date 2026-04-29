@@ -10,6 +10,7 @@ use crate::byte_set::ByteSet;
 use crate::error::{DecodeError, DecodeResult};
 use crate::numeric::{TypedConst, core::Value as NumValue};
 use crate::read::ReadCtxt;
+use crate::validation::Condition;
 use crate::{
     Arith, DynFormat, Expr, Format, FormatModule, IntRel, MatchTree, Next, TypeScope, ValueType,
     ViewExpr, pattern::Pattern,
@@ -1032,7 +1033,7 @@ pub enum Decoder {
     Bits(Box<Decoder>),
     WithRelativeOffset(Box<Expr>, Box<Expr>, Box<Decoder>),
     Map(Box<Decoder>, Box<Expr>),
-    Where(Box<Decoder>, Box<Expr>),
+    Where(Box<Decoder>, Condition),
     Compute(Box<Expr>),
     Let(Label, Box<Expr>, Box<Decoder>),
     Match(Box<Expr>, Vec<(Pattern, Decoder)>),
@@ -1965,11 +1966,18 @@ impl Decoder {
                 let v = expr.eval_lambda(scope, &orig);
                 Ok((Value::Mapped(Box::new(orig), Box::new(v)), input))
             }
-            Decoder::Where(d, expr) => {
+            Decoder::Where(d, cond) => {
                 let (v, input) = d.parse(program, scope, input)?;
+                let Condition { expr, severity } = cond;
                 match expr.eval_lambda(scope, &v).unwrap_bool() {
                     true => Ok((v, input)),
-                    false => Err(DecodeError::bad_where(scope, expr.clone(), Box::new(v))),
+                    false => {
+                        if severity.is_strict() {
+                            Err(DecodeError::bad_where(scope, expr.clone(), Box::new(v)))
+                        } else {
+                            todo!("non-strict where conditions not yet implemented")
+                        }
+                    }
                 }
             }
             Decoder::Compute(expr) => {
@@ -2974,19 +2982,8 @@ mod tests {
     #[test]
     #[ignore] // TODO can we distinguish a Union based on disjoint Where clauses?
     fn compile_where_u16be_eq() {
-        let u8 = Format::Byte(ByteSet::full());
-        let u16be = map(
-            tuple([u8.clone(), u8]),
-            lambda("x", Expr::U16Be(Box::new(var("x")))),
-        );
-        let a = Format::Where(
-            Box::new(u16be.clone()),
-            Box::new(lambda("x", expr_eq(var("x"), Expr::U16(0x00FF)))),
-        );
-        let b = Format::Where(
-            Box::new(u16be),
-            Box::new(lambda("x", expr_eq(var("x"), Expr::U16(0xFF00)))),
-        );
+        let a = where_lambda(u16be(), "x", expr_eq(var("x"), Expr::U16(0x00FF)));
+        let b = where_lambda(u16be(), "x", expr_eq(var("x"), Expr::U16(0xFF00)));
         let f = Format::Union(vec![a, b]);
         let d = Compiler::compile_one(&f).unwrap();
         accepts(
