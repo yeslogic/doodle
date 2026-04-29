@@ -2,10 +2,13 @@ use crate::byte_set::ByteSet;
 use crate::decoder::{Scope, ScopeEntry, Value};
 use crate::loc_decoder::{LocScope, ParsedValue};
 use crate::read::ReadCtxt;
+use crate::util::EResult;
 use crate::{Expr, Label};
 
 pub type DecodeResult<T> = Result<T, DecodeError>;
-pub type LocDecodeError<T> = Result<T, DecodeError<crate::loc_decoder::ParsedValue>>;
+pub type EDecodeResult<T> = EResult<T, DecodeError>;
+pub type LocDecodeResult<T> = Result<T, DecodeError<crate::loc_decoder::ParsedValue>>;
+pub type ELocDecodeResult<T> = EResult<T, DecodeError<crate::loc_decoder::ParsedValue>>;
 
 #[derive(Debug)]
 pub enum DecodeError<V: Clone = Value> {

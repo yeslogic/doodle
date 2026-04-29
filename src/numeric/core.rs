@@ -864,6 +864,7 @@ impl<'a> TryFrom<&'a crate::decoder::Value> for StrictValue {
             | Raw::Char(..)
             | Raw::View { .. }
             | Raw::PhantomData
+            | Raw::Poison
             | Raw::EnumFromTo(..)
             | Raw::Option(..)
             | Raw::Tuple(..)

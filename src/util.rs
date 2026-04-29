@@ -92,7 +92,7 @@ impl<T> std::ops::Index<usize> for IxHeap<Vec<T>> {
     }
 }
 
-pub mod with_err {
+mod with_err {
     #[derive(Clone, Debug)]
     pub struct WithErr<T, E0> {
         value: T,
@@ -114,6 +114,13 @@ pub mod with_err {
             }
         }
 
+        pub fn map<U>(self, f: impl FnOnce(T) -> U) -> WithErr<U, E0> {
+            WithErr {
+                value: f(self.value),
+                errs: self.errs,
+            }
+        }
+
         pub fn join<U, E1>(self, mut f: impl FnMut(T) -> EResult<U, E0, E1>) -> EResult<U, E0, E1> {
             let mut this_errs = self.errs;
             let mut ret = f(self.value)?;
@@ -121,7 +128,32 @@ pub mod with_err {
             Ok(ret)
         }
 
+        pub fn fold<U, E1>(
+            init: U,
+            values: impl IntoIterator<Item = T>,
+            f: impl Fn(U, T) -> EResult<U, E0, E1>,
+        ) -> EResult<U, E0, E1> {
+            let mut acc = WithErr::new(init);
+            for value in values {
+                let mut this_errs = acc.errs;
+                let mut new_acc = f(acc.value, value)?;
+                new_acc.errs.append(&mut this_errs);
+                acc = new_acc;
+            }
+            Ok(acc)
+        }
+
         pub fn into_inner(self) -> T {
+            self.value
+        }
+
+        pub fn extract_warn(self) -> T
+        where
+            E0: std::fmt::Display,
+        {
+            for err in self.errs.iter() {
+                log::warn!("[non-fatal error]: {err}");
+            }
             self.value
         }
 
@@ -145,5 +177,18 @@ pub mod with_err {
     }
 
     pub type EResult<T, E0, E1 = E0> = Result<WithErr<T, E0>, E1>;
+
+    pub fn downgrade_error<T, E0>(val: EResult<T, E0>, default: T) -> WithErr<T, E0>
+    where
+        E0: std::fmt::Display,
+    {
+        match val {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("downgraded error: {e}");
+                WithErr::with_err(default, e)
+            }
+        }
+    }
 }
-pub(crate) use with_err::{EResult, WithErr};
+pub(crate) use with_err::{EResult, WithErr, downgrade_error};

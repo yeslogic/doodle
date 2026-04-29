@@ -6,7 +6,7 @@ use crate::decoder::{
     search::{find_index_by_key_sorted, find_index_by_key_unsorted},
     seq_kind::sub_range,
 };
-use crate::error::{DecodeError, LocDecodeError};
+use crate::error::{DecodeError, LocDecodeResult};
 use crate::read::ReadCtxt;
 use crate::validation::{Condition, Severity};
 use crate::{
@@ -467,6 +467,7 @@ impl ParsedValue {
         }
     }
 
+
     pub(crate) fn from_evaluated(expr_value: Value) -> Self {
         match expr_value {
             Value::Bool(_)
@@ -479,6 +480,7 @@ impl ParsedValue {
             | Value::Usize(_)
             | Value::EnumFromTo(_)
             | Value::PhantomData
+            | Value::Poison
             | Value::Char(_) => ParsedValue::Flat(Parsed {
                 loc: ParseLoc::Synthesized,
                 inner: expr_value,
@@ -1243,7 +1245,7 @@ impl Program {
     pub fn run_with_loc<'input>(
         &self,
         input: ReadCtxt<'input>,
-    ) -> LocDecodeError<(ParsedValue, ReadCtxt<'input>)> {
+    ) -> LocDecodeResult<(ParsedValue, ReadCtxt<'input>)> {
         self.decoders[0]
             .0
             .parse_with_loc(self, &LocScope::Empty, input)
@@ -1476,7 +1478,7 @@ impl Decoder {
         program: &Program,
         scope: &LocScope<'_>,
         input: ReadCtxt<'input>,
-    ) -> LocDecodeError<(ParsedValue, ReadCtxt<'input>)> {
+    ) -> LocDecodeResult<(ParsedValue, ReadCtxt<'input>)> {
         let start_offset = input.offset;
         match self {
             Decoder::Call(n, es, vs) => {
