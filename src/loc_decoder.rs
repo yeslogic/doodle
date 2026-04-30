@@ -467,7 +467,6 @@ impl ParsedValue {
         }
     }
 
-
     pub(crate) fn from_evaluated(expr_value: Value) -> Self {
         match expr_value {
             Value::Bool(_)

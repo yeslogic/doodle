@@ -10,7 +10,7 @@ use crate::byte_set::ByteSet;
 use crate::error::{DecodeError, DecodeResult, EDecodeResult};
 use crate::numeric::{TypedConst, core::Value as NumValue};
 use crate::read::ReadCtxt;
-use crate::util::{WithErr, downgrade_error};
+use crate::util::WithErr;
 use crate::validation::Condition;
 use crate::{
     Arith, DynFormat, Expr, Format, FormatModule, IntRel, MatchTree, Next, TypeScope, ValueType,
@@ -1804,13 +1804,7 @@ impl Decoder {
                         .collect::<Vec<u8>>()
                 };
                 let new_input = ReadCtxt::new(&bytes);
-                // NOTE - downgrade_error here makes any failure-to-decode a non-failing error, which we should review the design implications of
-                // FIXME - the choice of Value::PhantomData as a default is arbitrary and should be reviewed properly
-                downgrade_error(
-                    a.parse(program, scope, new_input),
-                    (Value::Poison, input),
-                )
-                .join(|(va, rem_input)| {
+                a.parse(program, scope, new_input)?.join(|(va, rem_input)| {
                     Ok(match rem_input.read_byte() {
                         Some((b, _)) => {
                             // FIXME - this error-value doesn't properly distinguish between offsets within the main input or the sub-buffer
