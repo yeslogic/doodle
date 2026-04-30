@@ -92,7 +92,7 @@ impl<T> std::ops::Index<usize> for IxHeap<Vec<T>> {
     }
 }
 
-mod with_err {
+pub(crate) mod with_err {
     #[derive(Clone, Debug)]
     pub struct WithErr<T, E0> {
         value: T,
