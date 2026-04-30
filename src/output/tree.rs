@@ -1056,7 +1056,7 @@ impl<'module> TreePrinter<'module> {
         vals: &Parsed<Vec<ParsedValue>>,
         formats: Option<&[Format]>,
     ) -> Fragment {
-        let Parsed { inner, loc } = vals;
+        let Parsed { inner, .. } = vals;
         let frag_value = if inner.is_empty() {
             Fragment::String("()".into())
         } else {
@@ -1078,7 +1078,7 @@ impl<'module> TreePrinter<'module> {
             ));
             frag
         };
-        self.compile_with_location(frag_value, *loc)
+        frag_value
     }
 
     fn compile_parsed_seq(

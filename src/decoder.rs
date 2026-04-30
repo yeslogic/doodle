@@ -22,6 +22,35 @@ pub mod seq_kind;
 use seq_kind::sub_range;
 pub use seq_kind::{SeqKind, ValueSeq};
 
+/// Helper macro for discarding identifiers but keeping their repetition-group
+macro_rules! wildcard {
+    ( $x:ident ) => {
+        _
+    };
+}
+pub(crate) use wildcard;
+
+/// Helper macro for breaking out of a loop if a "done" flag is set in a `WithErr` value.
+///
+/// Syntax:
+///
+/// Takes the `WithErr` value as the first argument,
+/// with a comma-separated and parenthesized list of identifiers (up to but **excluding** the "done" flag),
+/// separated by `=>`.
+///
+/// ```ignore
+/// break_if_done!(expr => (ident1, ident2, ..., identN))
+/// ```
+macro_rules! break_if_done {
+    ( $expr:expr => ( $($x:ident),+ ) ) => {
+        let ($($crate::decoder::wildcard!($x)),* , done) = $expr.as_ref();
+        if *done {
+            break;
+        }
+    };
+}
+pub(crate) use break_if_done;
+
 pub(crate) fn extract_pair<T>(mut vec: Vec<T>) -> (T, T) {
     assert_eq!(vec.len(), 2, "expected pair");
     unsafe {
@@ -1709,29 +1738,22 @@ impl Decoder {
                     Err(DecodeError::unexpected(b, *bs, input.offset))
                 }
             }
-            Decoder::Variant(label, d) => {
-                d.parse(program, scope, input)?.join(move |(v, input)| {
-                    Ok(WithErr::new((
-                        Value::Variant(label.clone(), Box::new(v)),
-                        input,
-                    )))
-                })
-            }
+            Decoder::Variant(label, d) => Ok(d
+                .parse(program, scope, input)?
+                .map(move |(v, input)| (Value::Variant(label.clone(), Box::new(v)), input))),
             Decoder::Branch(tree, branches) => {
                 let index = tree.matches(input).ok_or(DecodeError::NoValidBranch {
                     offset: input.offset,
                 })?;
                 let d = &branches[index];
-                d.parse(program, scope, input)?
-                    .join(|(v, input)| Ok(WithErr::new((Value::Branch(index, Box::new(v)), input))))
+                Ok(d.parse(program, scope, input)?
+                    .map(|(v, input)| (Value::Branch(index, Box::new(v)), input)))
             }
             Decoder::Parallel(branches) => {
                 for (index, d) in branches.iter().enumerate() {
                     let res = d.parse(program, scope, input);
                     if let Ok(p) = res {
-                        return p.join(|(v, input)| {
-                            Ok(WithErr::new((Value::Branch(index, Box::new(v)), input)))
-                        });
+                        return Ok(p.map(|(v, input)| (Value::Branch(index, Box::new(v)), input)));
                     }
                 }
                 Err(DecodeError::<Value>::fail(scope, input))
@@ -1870,6 +1892,7 @@ impl Decoder {
                 let mut res = WithErr::new((Vec::new(), input));
                 loop {
                     let v = &res.as_ref().0;
+                    // REVIEW - does the order of the conditions in the OR matter?
                     if reps_left_tree
                         .matches(input)
                         .ok_or(DecodeError::NoValidBranch {
@@ -1902,6 +1925,7 @@ impl Decoder {
                 }
             }
             Decoder::RepeatUntilLast(expr, a) => {
+                // third value is "done" flag
                 let mut res = WithErr::new((Vec::new(), input, false));
                 loop {
                     res = res.join(|(mut v, input, _done)| {
@@ -1911,14 +1935,12 @@ impl Decoder {
                             (v, next_input, done)
                         }))
                     })?;
-                    let done = res.as_ref().2;
-                    if done {
-                        break;
-                    }
+                    break_if_done!(res => (v, input));
                 }
                 Ok(res.map(|(v, input, _)| (Value::Seq(v.into()), input)))
             }
             Decoder::RepeatUntilSeq(expr, a) => {
+                // third value is "done" flag
                 let mut res = WithErr::new((Vec::new(), input, false));
                 loop {
                     res = res.join(|(mut v, input, _done)| {
@@ -1933,10 +1955,7 @@ impl Decoder {
                             (v, next_input, done)
                         }))
                     })?;
-                    let (.., done) = res.as_ref();
-                    if *done {
-                        break;
-                    }
+                    break_if_done!(res => (v, input));
                 }
                 Ok(res.map(|(v, input, _)| (Value::Seq(v.into()), input)))
             }
@@ -1959,10 +1978,7 @@ impl Decoder {
                                 (v, next_accum, next_input, false)
                             }))
                     })?;
-                    let (.., is_done) = res.as_ref();
-                    if *is_done {
-                        break;
-                    }
+                    break_if_done!(res => (v, accum, input));
                 }
                 Ok(res.map(|(v, accum, input, _)| {
                     (Value::Tuple(vec![accum, Value::Seq(v.into())]), input)
