@@ -182,6 +182,7 @@ impl Resolvable for RustExpr {
                 }
                 VecExpr::List(exprs) => exprs.resolve(ctx),
             },
+            RustExpr::Macro(RustMacro::Log(_, msg)) => msg.args.resolve(ctx),
             RustExpr::Operation(op) => op.resolve(ctx),
             RustExpr::BlockScope(stmts, expr) => {
                 stmts.resolve(ctx);

@@ -1944,6 +1944,50 @@ pub enum FnEntity {
 pub(crate) enum RustMacro {
     Matches(Box<RustExpr>, Vec<RustPattern>),
     Vec(VecExpr),
+    Log(LogFn, LogMessage),
+}
+
+#[derive(Debug, Clone)]
+pub struct LogMessage {
+    pub format_string: Label,
+    pub args: Vec<RustExpr>,
+}
+
+impl ToFragment for LogMessage {
+    fn to_fragment(&self) -> Fragment {
+        let args_fragment = Fragment::seq(
+            self.args
+                .iter()
+                .map(|arg| arg.to_fragment_precedence(Precedence::Top)),
+            Some(Fragment::string(", ")),
+        );
+        Fragment::intervene(
+            Fragment::string(format!("\"{}\"", self.format_string)),
+            Fragment::string(", "),
+            args_fragment,
+        )
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LogFn {
+    Error,
+    Warn,
+    Info,
+    Debug,
+    Trace,
+}
+
+impl ToFragment for LogFn {
+    fn to_fragment(&self) -> Fragment {
+        match self {
+            LogFn::Error => Fragment::string("log::error!"),
+            LogFn::Warn => Fragment::string("log::warn!"),
+            LogFn::Info => Fragment::string("log::info!"),
+            LogFn::Debug => Fragment::string("log::debug!"),
+            LogFn::Trace => Fragment::string("log::trace!"),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -2270,6 +2314,7 @@ impl RustExpr {
             },
             RustExpr::Macro(RustMacro::Matches(..)) => Some(PrimType::Bool),
             RustExpr::Macro(RustMacro::Vec(..)) => None,
+            RustExpr::Macro(RustMacro::Log(..)) => Some(PrimType::Unit),
             RustExpr::ArrayLit(..) => None,
             RustExpr::MethodCall(_recv, _method, _args) => {
                 match _method {
@@ -2438,6 +2483,7 @@ impl RustExpr {
                 VecExpr::Repeat(x, n) => x.is_pure() && n.is_pure(),
                 VecExpr::List(xs) => xs.iter().all(Self::is_pure),
             },
+            RustExpr::Macro(RustMacro::Log(..)) => false,
             RustExpr::PrimitiveLit(..) => true,
             RustExpr::ArrayLit(arr) => arr.iter().all(Self::is_pure),
             // REVIEW - over types we have no control over, clone itself can be impure, but it should never be so for the code we ourselves are generating
@@ -2556,6 +2602,9 @@ impl RustExpr {
             RustExpr::Macro(RustMacro::Matches(..)) => false,
             // Special case - `vec!` will typically be constructed only over simple sub-expressions
             RustExpr::Macro(RustMacro::Vec(..)) => false,
+
+            // Special case - `log::*` macros will never be value-producing in practice
+            RustExpr::Macro(RustMacro::Log(..)) => true,
 
             // REVIEW - is there a better heuristic?
             RustExpr::Closure(..) => true,
@@ -2767,6 +2816,30 @@ impl ToFragment for FnEntity {
     }
 }
 
+impl ToFragment for RustMacro {
+    fn to_fragment(&self) -> Fragment {
+        match self {
+            RustMacro::Matches(head, pats) => Fragment::string("matches!")
+                .cat(
+                    head.to_fragment_precedence(Precedence::Top)
+                        .cat(Fragment::string(", "))
+                        .cat(Fragment::seq(
+                            pats.iter().map(|p| p.to_fragment()),
+                            Some(Fragment::string(" | ")),
+                        ))
+                        .delimit(Fragment::Char('('), Fragment::Char(')')),
+                )
+                .group(),
+            RustMacro::Vec(vec_expr) => Fragment::string("vec!").cat(vec_expr.to_fragment()),
+            RustMacro::Log(log_fn, log_msg) => log_fn.to_fragment().cat(
+                log_msg
+                    .to_fragment()
+                    .delimit(Fragment::Char('('), Fragment::Char(')')),
+            ),
+        }
+    }
+}
+
 impl ToFragmentExt for RustExpr {
     fn to_fragment_precedence(&self, prec: Precedence) -> Fragment {
         match self {
@@ -2867,20 +2940,7 @@ impl ToFragmentExt for RustExpr {
                 prec,
                 Precedence::INVOKE,
             ),
-            RustExpr::Macro(RustMacro::Matches(head, pats)) => Fragment::string("matches!")
-                .cat(
-                    head.to_fragment_precedence(Precedence::Top)
-                        .cat(Fragment::string(", "))
-                        .cat(Fragment::seq(
-                            pats.iter().map(|p| p.to_fragment()),
-                            Some(Fragment::string(" | ")),
-                        ))
-                        .delimit(Fragment::Char('('), Fragment::Char(')')),
-                )
-                .group(),
-            RustExpr::Macro(RustMacro::Vec(vec_expr)) => {
-                Fragment::string("vec!").cat(vec_expr.to_fragment())
-            }
+            RustExpr::Macro(m) => m.to_fragment(),
             RustExpr::Tuple(elts) => match elts.as_slice() {
                 [elt] => elt
                     .to_fragment_precedence(Precedence::Top)
@@ -4227,6 +4287,7 @@ pub mod short_circuit {
                 }
                 RustExpr::Macro(RustMacro::Matches(expr, ..)) => expr.is_short_circuiting(),
                 RustExpr::Macro(RustMacro::Vec(vec_expr)) => vec_expr.is_short_circuiting(),
+                RustExpr::Macro(RustMacro::Log(..)) => false,
                 RustExpr::Control(ctrl) => ctrl.is_short_circuiting(),
                 RustExpr::Closure(..) => false,
                 RustExpr::Index(head, index) => {
@@ -4309,6 +4370,8 @@ pub mod short_circuit {
                 }
                 RustExpr::Macro(RustMacro::Matches(expr, ..)) => expr.check_eval_purity(),
                 RustExpr::Macro(RustMacro::Vec(vec_expr)) => vec_expr.check_eval_purity(),
+                // REVIEW - has side effects but does not short circuit
+                RustExpr::Macro(RustMacro::Log(..)) => EvalPurity::Pure,
                 RustExpr::Control(ctrl) => ctrl.check_eval_purity(),
                 RustExpr::Index(head, index) => {
                     head.check_eval_purity() | index.check_eval_purity()
@@ -4406,6 +4469,8 @@ use num_bigint::BigInt;
 pub use short_circuit::{ShortCircuit, ShortCircuitExt, ValueCheckpoint};
 
 pub mod var_container {
+    use crate::codegen::rust_ast::LogMessage;
+
     use super::{
         ClosureBody, FnEntity, MatchCaseLHS, OwnedRustExpr, RustCatchAll, RustClosure,
         RustClosureHead, RustControl, RustEntity, RustExpr, RustMacro, RustMatchBody,
@@ -4628,6 +4693,9 @@ pub mod var_container {
                 }
                 RustExpr::Macro(RustMacro::Matches(expr, ..)) => expr.contains_var_ref(var),
                 RustExpr::Macro(RustMacro::Vec(vec_expr)) => vec_expr.contains_var_ref(var),
+                RustExpr::Macro(RustMacro::Log(_, LogMessage { args, .. })) => {
+                    args.contains_var_ref(var)
+                }
                 RustExpr::Control(ctrl) => ctrl.contains_var_ref(var),
                 RustExpr::PrimitiveLit(..) => false,
                 RustExpr::ConstNum(..) => false,
