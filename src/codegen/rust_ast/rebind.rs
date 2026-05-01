@@ -3,6 +3,9 @@ use crate::codegen::util::MapLike;
 
 use super::*;
 
+/// Trait for globally substituting the final names of ad-hoc types
+/// in a Rust program, both at the type-definition level, in parameters and enum scope-expressions,
+/// and as fragments of decoder names.
 pub trait Rebindable {
     fn rebind(&mut self, table: &impl MapLike<Label, Label>);
 }
@@ -186,6 +189,9 @@ impl Rebindable for RustExpr {
                     rust_exprs.rebind(table);
                 }
             },
+            RustExpr::Macro(RustMacro::Log(_log_fn, log_msg)) => {
+                log_msg.args.rebind(table);
+            }
             RustExpr::Struct(con, expr) => {
                 con.rebind(table);
                 match expr {

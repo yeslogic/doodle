@@ -3637,15 +3637,17 @@ impl ToAst for DerivedLogic<GTExpr> {
                 let bind_cond = GenStmt::Embed(RustStmt::assign(model::WHERE_CHECK, is_valid));
                 let ctrl = {
                     let b_valid = GenBlock::simple_expr(RustExpr::local(model::WHERE_INNER));
+                    let trace = get_trace(&());
                     let b_invalid = match severity {
                         Severity::Require => {
-                            GenBlock::explicit_return(model::err_where_unsatisfied(get_trace(&())))
+                            GenBlock::explicit_return(model::err_where_unsatisfied(trace))
                         }
                         Severity::Expect => {
-                            // TODO[epic=with-err] - figure out appropriate way to signal expect-failure without returning a hard error
-                            unimplemented!(
-                                "handle `expect` severity for unsatisfied where-clauses: ideally this would trigger some kind of warning rather than an error, but we haven't worked out exactly what to do yet"
-                            )
+                            let (handle_err, value) = model::yield_value_with_error(
+                                RustExpr::local(model::WHERE_INNER),
+                                model::err_where_unsatisfied(trace),
+                            );
+                            GenBlock::lift_block(handle_err, value)
                         }
                     };
                     GenControl::If(

@@ -306,7 +306,7 @@ mod util {
     /// Parses a `U16Be` value that is expected to be equal to `val`
     pub(crate) fn expect_u16be(val: u16) -> Format {
         // REVIEW - if we cared to do it, we could use `chain(is_bytes(val.to_be_bytes()), "_", compute(Expr::U16(val)))` (at the cost of worsening error reporting)
-        where_lambda(u16be(), "x", expr_eq(var("x"), Expr::U16(val)))
+        expect_lambda(u16be(), "x", expr_eq(var("x"), Expr::U16(val)))
     }
 
     /// Parses a `U16Be` value that is expected to be equal to one of the values in `vals`
@@ -1339,7 +1339,7 @@ pub(crate) mod dsig {
                 "table_view",
                 record_auto([
                     ("table_scope", reify_view(vvar("table_view"))),
-                    ("version", where_within(u32be(), 0x0000_0001u32)), // version is 0x0000_0001
+                    ("version", expect_within(u32be(), 0x0000_0001u32)), // version is 0x0000_0001
                     ("num_signatures", u16be()),
                     ("flags", flags),
                     (

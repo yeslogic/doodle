@@ -4,7 +4,7 @@ use num_traits::{ToPrimitive, Zero};
 
 use crate::byte_set::ByteSet;
 pub use crate::marker::BaseKind;
-use crate::validation::Condition;
+use crate::validation::{Condition, Severity};
 use crate::{
     Arith, BaseType, Expr, Format, IntRel, IntoLabel, Label, OwnedRecordFormat, Pattern,
     RecordBuilder, StyleHint, TypeHint, UnaryOp, ValueType, ViewExpr, ViewFormat,
@@ -865,6 +865,14 @@ pub fn where_lambda(raw: Format, name: impl IntoLabel, body: Expr) -> Format {
     Format::Where(Box::new(raw), Condition::from_lambda(lambda(name, body)))
 }
 
+/// Similar to [`where_lambda`], but with `Expect`-level severity instead of `Assert`.
+pub fn expect_lambda(raw: Format, name: impl IntoLabel, body: Expr) -> Format {
+    Format::Where(
+        Box::new(raw),
+        Condition::new(lambda(name, body), Severity::Expect),
+    )
+}
+
 /// Numeric validation helper that constrains a given format to yield a value that falls in the inclusive range `lower..=upper`
 ///
 /// Attempts to check for `lower == 0` to avoid vacuous lower bounds on unsigned types.
@@ -922,6 +930,14 @@ where
     R: Into<Bounds>,
 {
     where_lambda(format, "x", is_within(var("x"), range.into()))
+}
+
+/// Similar to [`where_within`], but with `Expect`-level severity instead of `Assert`.
+pub fn expect_within<R>(format: Format, range: R) -> Format
+where
+    R: Into<Bounds>,
+{
+    expect_lambda(format, "x", is_within(var("x"), range.into()))
 }
 
 /// Disjunctive version of [`where_within`] that applies to a collection of range-like value
