@@ -306,7 +306,7 @@ mod util {
     /// Parses a `U16Be` value that is expected to be equal to `val`
     pub(crate) fn expect_u16be(val: u16) -> Format {
         // REVIEW - if we cared to do it, we could use `chain(is_bytes(val.to_be_bytes()), "_", compute(Expr::U16(val)))` (at the cost of worsening error reporting)
-        where_lambda(u16be(), "x", expr_eq(var("x"), Expr::U16(val)))
+        expect_lambda(u16be(), "x", expr_eq(var("x"), Expr::U16(val)))
     }
 
     /// Parses a `U16Be` value that is expected to be equal to one of the values in `vals`
@@ -713,7 +713,7 @@ pub(crate) fn table_links(
             Label::Borrowed("tables"),
             ValueType::Seq(Box::new(table_type)),
         )],
-        vec![Label::Borrowed("font_view")],
+        vec![FONTVIEW_LBL],
         record_auto([
             (
                 "cmap",
@@ -1024,7 +1024,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
 
     let table_directory = module.define_format_views(
         "opentype.table_directory",
-        vec![Label::Borrowed("font_view")],
+        vec![FONTVIEW_LBL],
         record([
             (
                 "sfnt_version",
@@ -1052,7 +1052,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
             ),
             (
                 "table_links",
-                table_links.call_args_views(vec![var("table_records")], vec![vvar("font_view")]),
+                table_links.call_args_views(vec![var("table_records")], vec![FONTVIEW_VAR]),
             ),
         ]),
     );
@@ -1136,7 +1136,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
     module.define_format(
         "opentype.main",
         let_view(
-            "font_view",
+            FONTVIEW_LBL,
             record([
                 ("magic", Format::Peek(Box::new(u32be()))),
                 (
@@ -1147,23 +1147,23 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                             (
                                 Pattern::U32(0x00010000),
                                 "TableDirectory",
-                                table_directory.call_view(vvar("font_view")),
+                                table_directory.call_view(FONTVIEW_VAR),
                             ),
                             (
                                 Pattern::U32(util::magic(b"OTTO")),
                                 "TableDirectory",
-                                table_directory.call_view(vvar("font_view")),
+                                table_directory.call_view(FONTVIEW_VAR),
                             ),
                             (
                                 Pattern::U32(util::magic(b"ttcf")),
                                 "TTCHeader",
-                                ttc_header.call_view(vvar("font_view")),
+                                ttc_header.call_view(FONTVIEW_VAR),
                             ),
                             // TODO - not yet sure if TrueType fonts will parse correctly under our current table_directory implementation...
                             (
                                 Pattern::U32(util::magic(b"true")),
                                 "TableDirectory",
-                                table_directory.call_view(vvar("font_view")),
+                                table_directory.call_view(FONTVIEW_VAR),
                             ),
                             (Pattern::Wildcard, "UnknownTable", unknown_table),
                         ],
@@ -1339,7 +1339,7 @@ pub(crate) mod dsig {
                 "table_view",
                 record_auto([
                     ("table_scope", reify_view(vvar("table_view"))),
-                    ("version", where_within(u32be(), 0x0000_0001u32)), // version is 0x0000_0001
+                    ("version", expect_within(u32be(), 0x0000_0001u32)), // version is 0x0000_0001
                     ("num_signatures", u16be()),
                     ("flags", flags),
                     (

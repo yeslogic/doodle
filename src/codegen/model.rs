@@ -436,6 +436,28 @@ pub fn view_offset(view: RustExpr, offset: RustExpr) -> RustExpr {
 
 // !SECTION
 
+// SECTION - helper functions for various kinds of error-handling patterns
+
+pub fn yield_value_with_error(value: RustExpr, error: RustExpr) -> (Vec<RustStmt>, RustExpr) {
+    let handle_err = {
+        let RustExpr::ResultErr(error) = error else {
+            unreachable!()
+        };
+        let log_message = LogMessage {
+            format_string: Label::Borrowed("expect-level value assertion failed: {}"),
+            args: vec![*error],
+        };
+        [RustStmt::Expr(RustExpr::Macro(RustMacro::Log(
+            LogFn::Error,
+            log_message,
+        )))]
+        .to_vec()
+    };
+    (handle_err, value)
+}
+
+// !SECTION
+
 // SECTION - corollary functions for prelude-defined helpers
 
 /// Corollary for the helper-function [`crate::prelude::repeat_between_finished`], as a RustExpr.

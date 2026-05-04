@@ -16,6 +16,7 @@ use crate::{
     numeric::elaborator::{TypedBinOp, TypedCast, TypedUnaryOp},
     parser::error::TraceHash,
     typecheck::{TypeChecker, UType, UVar, WHNFSolution},
+    validation::{Severity, TypedCondition},
     valuetype::{SeqBorrowHint, ValueType},
 };
 
@@ -524,10 +525,12 @@ impl CodeGen {
                     Box::new(cl_inner),
                 ))
             }
-            TypedDecoder::Where(_gt, inner, f) => {
+            TypedDecoder::Where(_gt, inner, cond) => {
                 let cl_inner = self.translate(inner.get_dec());
+                let f = *cond.expr.clone();
                 CaseLogic::Derived(DerivedLogic::Where(
-                    Box::new(GenLambda::from_expr(*f.clone(), ClosureKind::Transform)),
+                    Box::new(GenLambda::from_expr(f, ClosureKind::Transform)),
+                    cond.severity,
                     Box::new(cl_inner),
                 ))
             }
@@ -3496,7 +3499,8 @@ enum DerivedLogic<ExprT> {
     MapOf(Box<GenLambda>, Box<CaseLogic<ExprT>>),
     Let(Label, Box<RustExpr>, Box<CaseLogic<ExprT>>),
     Dynamic(DynamicLogic<ExprT>, Box<CaseLogic<ExprT>>),
-    Where(Box<GenLambda>, Box<CaseLogic<ExprT>>),
+    // FIXME[epic=with-err] - handle severity appropriately
+    Where(Box<GenLambda>, Severity, Box<CaseLogic<ExprT>>),
     Maybe(Box<RustExpr>, Box<CaseLogic<ExprT>>),
     DecodeBytes(Box<RustExpr>, Box<CaseLogic<ExprT>>),
     ParseView(Box<RustExpr>, Box<CaseLogic<ExprT>>),
@@ -3627,14 +3631,25 @@ impl ToAst for DerivedLogic<GTExpr> {
                     ))),
                 )
             }
-            DerivedLogic::Where(f, inner) => {
+            DerivedLogic::Where(f, severity, inner) => {
                 let assign_inner = GenStmt::assign(model::WHERE_INNER, inner.to_ast(ctxt));
                 let is_valid = f.apply(RustExpr::local(model::WHERE_INNER), ExprInfo::default());
                 let bind_cond = GenStmt::Embed(RustStmt::assign(model::WHERE_CHECK, is_valid));
                 let ctrl = {
                     let b_valid = GenBlock::simple_expr(RustExpr::local(model::WHERE_INNER));
-                    let b_invalid =
-                        GenBlock::explicit_return(model::err_where_unsatisfied(get_trace(&())));
+                    let trace = get_trace(&());
+                    let b_invalid = match severity {
+                        Severity::Require => {
+                            GenBlock::explicit_return(model::err_where_unsatisfied(trace))
+                        }
+                        Severity::Expect => {
+                            let (handle_err, value) = model::yield_value_with_error(
+                                RustExpr::local(model::WHERE_INNER),
+                                model::err_where_unsatisfied(trace),
+                            );
+                            GenBlock::lift_block(handle_err, value)
+                        }
+                    };
                     GenControl::If(
                         Box::new(RustExpr::local(model::WHERE_CHECK)),
                         b_valid,
@@ -4440,7 +4455,7 @@ impl<'a> Elaborator<'a> {
                 )
             }
             Format::Map(inner, lambda) => {
-                // FIXME - adhoc types introduced by Map are not properly path-named
+                // REVIEW - double-check whether adhoc types introduced by Map are properly path-named
                 let index = self.get_and_increment_index();
                 self.codegen
                     .name_gen
@@ -4452,15 +4467,21 @@ impl<'a> Elaborator<'a> {
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::Map(gt, Box::new(t_inner), Box::new(t_lambda))
             }
-            Format::Where(inner, lambda) => {
+            Format::Where(inner, cond) => {
                 let index = self.get_and_increment_index();
                 let t_inner = self.elaborate_format(inner, dyn_scope);
+                // FIXME[epic=with-err] - implement with-err support appropriately.
+                let lambda = &cond.expr;
                 let t_lambda = self.elaborate_expr_lambda(lambda);
                 let gt = self.get_gt_from_index(index);
-                TypedFormat::Where(gt, Box::new(t_inner), Box::new(t_lambda))
+                TypedFormat::Where(
+                    gt,
+                    Box::new(t_inner),
+                    TypedCondition::new(t_lambda, cond.severity),
+                )
             }
             Format::Compute(expr) => {
-                // FIXME - adhoc types introduced by Compute are not properly path-named
+                // REVIEW - double-check whether adhoc types introduced by Compute are properly path-named
                 let index = self.get_and_increment_index();
                 let t_expr = self.elaborate_expr(expr);
                 let gt = self.get_gt_from_index(index);
@@ -4519,7 +4540,7 @@ impl<'a> Elaborator<'a> {
                 TypedFormat::Apply(gt, lbl.clone(), t_dynf)
             }
             Format::LetFormat(f0, name, f) => {
-                // FIXME - adhoc types introduced in LetFormat are not properly path-named
+                // REVIEW - double-check whether adhoc types introduced in LetFormat are properly path-named
                 let index = self.get_and_increment_index();
                 self.codegen
                     .name_gen
@@ -4532,7 +4553,7 @@ impl<'a> Elaborator<'a> {
                 TypedFormat::LetFormat(gt, Box::new(t_f0), name.clone(), Box::new(t_f))
             }
             Format::MonadSeq(f0, f) => {
-                // FIXME - adhoc types introduced in MonadSeq are not properly path-named
+                // REVIEW - double-check whether adhoc types introduced in MonadSeq are properly path-named
                 let index = self.get_and_increment_index();
                 self.codegen
                     .name_gen
@@ -4574,6 +4595,7 @@ impl<'a> Elaborator<'a> {
                     StyleHint::Common(common_op) => match common_op {
                         CommonOp::EndianParse(base_kind) => {
                             // double-check the base kind against the type
+                            // FIXME - extract into proper method that can then support future common-ops more adequately
                             let ty = gt.to_rust_type();
                             let prim1 = PrimType::from(BaseType::from(*base_kind));
                             let Some(prim0) = ty.try_as_prim() else {

@@ -1,20 +1,23 @@
+use std::borrow::Cow;
+use std::cmp::Ordering;
+
+use num_bigint::BigInt;
+use serde::Serialize;
+
 use crate::byte_set::ByteSet;
 use crate::decoder::View;
+use crate::decoder::break_if_done;
 use crate::decoder::{
     Compiler, Decoder, Program, ScopeEntry, SeqKind, UnknownVarError, Value, ValueSeq, cow_map,
     cow_remap, extract_pair,
     search::{find_index_by_key_sorted, find_index_by_key_unsorted},
     seq_kind::sub_range,
 };
-use crate::error::{DecodeError, LocDecodeError};
+use crate::error::{DecodeError, ELocDecodeResult, LocDecodeResult};
 use crate::read::ReadCtxt;
-use crate::{
-    Arith, BaseKind, DynFormat, Endian, Expr, Format, IntRel, Label, Pattern, UnaryOp, ViewExpr,
-};
-use num_bigint::BigInt;
-use serde::Serialize;
-use std::borrow::Cow;
-use std::cmp::Ordering;
+use crate::util::WithErr;
+use crate::validation::Condition;
+use crate::{BaseKind, DynFormat, Endian, Expr, Format, Label, Pattern, ViewExpr};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Serialize)]
 pub enum ParseLoc {
@@ -235,8 +238,8 @@ impl ParsedValue {
         })
     }
 
-    /// Helper function that constructs a Synthesized `ParsedValue` as appropriate and immediately
-    /// ascribes it the same location as an original `ParsedValue`.
+    /// Helper function that constructs promotes a `Value` `v` into a Synthesized `ParsedValue`,
+    /// and immediately resets its parse-location to the same as that of `orig`.
     ///
     /// Mostly useful for handling `Format::Map`.
     fn inherit(orig: &ParsedValue, v: Value) -> ParsedValue {
@@ -478,6 +481,7 @@ impl ParsedValue {
             | Value::Usize(_)
             | Value::EnumFromTo(_)
             | Value::PhantomData
+            | Value::Poison
             | Value::Char(_) => ParsedValue::Flat(Parsed {
                 loc: ParseLoc::Synthesized,
                 inner: expr_value,
@@ -621,213 +625,22 @@ impl Expr {
             }
             Expr::Lambda(_, _) => panic!("cannot eval lambda"),
 
-            Expr::IntRel(IntRel::Eq, x, y) => Cow::Owned(ParsedValue::from_evaluated(
-                match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::Bool(x == y),
-                    (Value::U16(x), Value::U16(y)) => Value::Bool(x == y),
-                    (Value::U32(x), Value::U32(y)) => Value::Bool(x == y),
-                    (Value::U64(x), Value::U64(y)) => Value::Bool(x == y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                },
-            )),
-            Expr::IntRel(IntRel::Ne, x, y) => Cow::Owned(ParsedValue::from_evaluated(
-                match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::Bool(x != y),
-                    (Value::U16(x), Value::U16(y)) => Value::Bool(x != y),
-                    (Value::U32(x), Value::U32(y)) => Value::Bool(x != y),
-                    (Value::U64(x), Value::U64(y)) => Value::Bool(x != y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                },
-            )),
-            Expr::IntRel(IntRel::Lt, x, y) => Cow::Owned(ParsedValue::from_evaluated(
-                match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::Bool(x < y),
-                    (Value::U16(x), Value::U16(y)) => Value::Bool(x < y),
-                    (Value::U32(x), Value::U32(y)) => Value::Bool(x < y),
-                    (Value::U64(x), Value::U64(y)) => Value::Bool(x < y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                },
-            )),
-            Expr::IntRel(IntRel::Gt, x, y) => Cow::Owned(ParsedValue::from_evaluated(
-                match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::Bool(x > y),
-                    (Value::U16(x), Value::U16(y)) => Value::Bool(x > y),
-                    (Value::U32(x), Value::U32(y)) => Value::Bool(x > y),
-                    (Value::U64(x), Value::U64(y)) => Value::Bool(x > y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                },
-            )),
-            Expr::IntRel(IntRel::Lte, x, y) => Cow::Owned(ParsedValue::from_evaluated(
-                match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::Bool(x <= y),
-                    (Value::U16(x), Value::U16(y)) => Value::Bool(x <= y),
-                    (Value::U32(x), Value::U32(y)) => Value::Bool(x <= y),
-                    (Value::U64(x), Value::U64(y)) => Value::Bool(x <= y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                },
-            )),
-            Expr::IntRel(IntRel::Gte, x, y) => Cow::Owned(ParsedValue::from_evaluated(
-                match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::Bool(x >= y),
-                    (Value::U16(x), Value::U16(y)) => Value::Bool(x >= y),
-                    (Value::U32(x), Value::U32(y)) => Value::Bool(x >= y),
-                    (Value::U64(x), Value::U64(y)) => Value::Bool(x >= y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                },
-            )),
-            Expr::Arith(Arith::Add, x, y) => Cow::Owned(ParsedValue::from_evaluated(
-                match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_add(x, y).unwrap()),
-                    (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_add(x, y).unwrap()),
-                    (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_add(x, y).unwrap()),
-                    (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_add(x, y).unwrap()),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                },
-            )),
-            Expr::Arith(Arith::Sub, x, y) => Cow::Owned(ParsedValue::from_evaluated(
-                match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_sub(x, y).unwrap()),
-                    (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_sub(x, y).unwrap()),
-                    (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_sub(x, y).unwrap()),
-                    (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_sub(x, y).unwrap()),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                },
-            )),
-            Expr::Arith(Arith::Mul, x, y) => Cow::Owned(ParsedValue::from_evaluated(
-                match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_mul(x, y).unwrap()),
-                    (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_mul(x, y).unwrap()),
-                    (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_mul(x, y).unwrap()),
-                    (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_mul(x, y).unwrap()),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                },
-            )),
-            Expr::Arith(Arith::Div, x, y) => Cow::Owned(ParsedValue::from_evaluated(
-                match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_div(x, y).unwrap()),
-                    (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_div(x, y).unwrap()),
-                    (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_div(x, y).unwrap()),
-                    (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_div(x, y).unwrap()),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                },
-            )),
-            Expr::Arith(Arith::Rem, x, y) => Cow::Owned(ParsedValue::from_evaluated(
-                match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_rem(x, y).unwrap()),
-                    (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_rem(x, y).unwrap()),
-                    (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_rem(x, y).unwrap()),
-                    (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_rem(x, y).unwrap()),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                },
-            )),
-            Expr::Arith(Arith::BitAnd, x, y) => Cow::Owned(ParsedValue::from_evaluated(
-                match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::U8(x & y),
-                    (Value::U16(x), Value::U16(y)) => Value::U16(x & y),
-                    (Value::U32(x), Value::U32(y)) => Value::U32(x & y),
-                    (Value::U64(x), Value::U64(y)) => Value::U64(x & y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                },
-            )),
-            Expr::Arith(Arith::BitOr, x, y) => Cow::Owned(ParsedValue::from_evaluated(
-                match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::U8(x | y),
-                    (Value::U16(x), Value::U16(y)) => Value::U16(x | y),
-                    (Value::U32(x), Value::U32(y)) => Value::U32(x | y),
-                    (Value::U64(x), Value::U64(y)) => Value::U64(x | y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                },
-            )),
-            Expr::Arith(Arith::BoolAnd, x, y) => Cow::Owned(ParsedValue::from_evaluated(
-                match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
-                    (Value::Bool(b0), Value::Bool(b1)) => Value::Bool(b0 && b1),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                },
-            )),
-            Expr::Arith(Arith::BoolOr, x, y) => Cow::Owned(ParsedValue::from_evaluated(
-                match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
-                    (Value::Bool(b0), Value::Bool(b1)) => Value::Bool(b0 || b1),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                },
-            )),
-            Expr::Arith(Arith::Shl, x, y) => Cow::Owned(ParsedValue::from_evaluated(
-                match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
-                    (Value::U8(x), Value::U8(y)) => {
-                        Value::U8(u8::checked_shl(x, u32::from(y)).unwrap())
-                    }
-                    (Value::U16(x), Value::U16(y)) => {
-                        Value::U16(u16::checked_shl(x, u32::from(y)).unwrap())
-                    }
-                    (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_shl(x, y).unwrap()),
-                    (Value::U64(x), Value::U64(y)) => {
-                        Value::U64(u64::checked_shl(x, u32::try_from(y).unwrap()).unwrap())
-                    }
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                },
-            )),
-            Expr::Arith(Arith::Shr, x, y) => Cow::Owned(ParsedValue::from_evaluated(
-                match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
-                    (Value::U8(x), Value::U8(y)) => {
-                        Value::U8(u8::checked_shr(x, u32::from(y)).unwrap())
-                    }
-                    (Value::U16(x), Value::U16(y)) => {
-                        Value::U16(u16::checked_shr(x, u32::from(y)).unwrap())
-                    }
-                    (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_shr(x, y).unwrap()),
-                    (Value::U64(x), Value::U64(y)) => {
-                        Value::U64(u64::checked_shr(x, u32::try_from(y).unwrap()).unwrap())
-                    }
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                },
-            )),
-            Expr::Unary(UnaryOp::BoolNot, x) => Cow::Owned(ParsedValue::from_evaluated(
-                match x.eval_value_with_loc(scope) {
-                    Value::Bool(x) => Value::Bool(!x),
-                    x => panic!("unexpected operand: expecting boolean, found `{x:?}`"),
-                },
-            )),
-            Expr::Unary(UnaryOp::IntSucc, x) => Cow::Owned(ParsedValue::from_evaluated(
-                match x.eval_value_with_loc(scope) {
-                    Value::U8(x) => Value::U8(
-                        x.checked_add(1)
-                            .unwrap_or_else(|| panic!("IntSucc(u8::MAX) overflow")),
-                    ),
-                    Value::U16(x) => Value::U16(
-                        x.checked_add(1)
-                            .unwrap_or_else(|| panic!("IntSucc(u16::MAX) overflow")),
-                    ),
-                    Value::U32(x) => Value::U32(
-                        x.checked_add(1)
-                            .unwrap_or_else(|| panic!("IntSucc(u32::MAX) overflow")),
-                    ),
-                    Value::U64(x) => Value::U64(
-                        x.checked_add(1)
-                            .unwrap_or_else(|| panic!("IntSucc(u64::MAX) overflow")),
-                    ),
-                    x => panic!("unexpected operand: expected integral value, found `{x:?}`"),
-                },
-            )),
-            Expr::Unary(UnaryOp::IntPred, x) => Cow::Owned(ParsedValue::from_evaluated(
-                match x.eval_value_with_loc(scope) {
-                    Value::U8(x) => Value::U8(
-                        x.checked_sub(1)
-                            .unwrap_or_else(|| panic!("IntPred(0u8) underflow")),
-                    ),
-                    Value::U16(x) => Value::U16(
-                        x.checked_sub(1)
-                            .unwrap_or_else(|| panic!("IntPred(0u16) underflow")),
-                    ),
-                    Value::U32(x) => Value::U32(
-                        x.checked_sub(1)
-                            .unwrap_or_else(|| panic!("IntPred(0u32) underflow")),
-                    ),
-                    Value::U64(x) => Value::U64(
-                        x.checked_sub(1)
-                            .unwrap_or_else(|| panic!("IntPred(0u64) underflow")),
-                    ),
-                    x => panic!("unexpected operand: expected integral value, found `{x:?}`"),
-                },
-            )),
+            Expr::IntRel(rel, x, y) => Cow::Owned(ParsedValue::from_evaluated({
+                let left = x.eval_value_with_loc(scope);
+                let right = y.eval_value_with_loc(scope);
+                Value::int_rel(*rel, left, right)
+            })),
+            Expr::Arith(op, x, y) => Cow::Owned(ParsedValue::from_evaluated({
+                let left = x.eval_value_with_loc(scope);
+                let right = y.eval_value_with_loc(scope);
+                Value::arith(*op, left, right)
+            })),
+            Expr::Unary(op, x) => Cow::Owned(ParsedValue::from_evaluated({
+                let value = x.eval_value_with_loc(scope);
+                Value::unary(*op, value)
+            })),
+
+            // FIXME - extract common logic for As-expr on Value instead of separate impl for decoder and loc_decoder
             Expr::AsU8(x) => Cow::Owned(ParsedValue::from_evaluated(
                 match x.eval_value_with_loc(scope) {
                     Value::U8(x) => Value::U8(x),
@@ -852,6 +665,7 @@ impl Expr {
                     Value::U16(x) => Value::U16(x),
                     Value::U32(x) => Value::U16(u16::try_from(x).unwrap()),
                     Value::U64(x) => Value::U16(u16::try_from(x).unwrap()),
+                    Value::Usize(x) => Value::U16(u16::try_from(x).unwrap()),
                     x => panic!("cannot convert {x:?} to U16"),
                 },
             )),
@@ -861,6 +675,7 @@ impl Expr {
                     Value::U16(x) => Value::U32(u32::from(x)),
                     Value::U32(x) => Value::U32(x),
                     Value::U64(x) => Value::U32(u32::try_from(x).unwrap()),
+                    Value::Usize(x) => Value::U32(u32::try_from(x).unwrap()),
                     x => panic!("cannot convert {x:?} to U32"),
                 },
             )),
@@ -870,6 +685,7 @@ impl Expr {
                     Value::U16(x) => Value::U64(u64::from(x)),
                     Value::U32(x) => Value::U64(u64::from(x)),
                     Value::U64(x) => Value::U64(x),
+                    Value::Usize(x) => Value::U64(u64::try_from(x).unwrap()),
                     x => panic!("cannot convert {x:?} to U64"),
                 },
             )),
@@ -1242,10 +1058,11 @@ impl Program {
     pub fn run_with_loc<'input>(
         &self,
         input: ReadCtxt<'input>,
-    ) -> LocDecodeError<(ParsedValue, ReadCtxt<'input>)> {
-        self.decoders[0]
+    ) -> LocDecodeResult<(ParsedValue, ReadCtxt<'input>)> {
+        Ok(self.decoders[0]
             .0
-            .parse_with_loc(self, &LocScope::Empty, input)
+            .parse_with_loc(self, &LocScope::Empty, input)?
+            .extract_warn())
     }
 }
 
@@ -1321,7 +1138,7 @@ impl<'a> LocScope<'a> {
     fn get_view_by_name(&self, name: &str) -> View<'a> {
         match self {
             LocScope::Empty => panic!("view not found: {name}"),
-            LocScope::Multi(multi) => multi.parent.get_view_by_name(name),
+            LocScope::Multi(multi) => multi.get_view_by_name(name),
             LocScope::Single(single) => single.parent.get_view_by_name(name),
             LocScope::Decoder(decoder) => decoder.parent.get_view_by_name(name),
             LocScope::View(view) => view.get_view_by_name(name),
@@ -1358,6 +1175,22 @@ impl<'a> LocMultiScope<'a> {
     pub fn push_view(&mut self, name: impl Into<Label>, view: View<'a>) {
         self.entries
             .push((name.into(), ViewOrParsedValue::View(view)))
+    }
+
+    fn get_view_by_name(&self, name: &str) -> View<'a> {
+        for (n, vv) in self.entries.iter().rev() {
+            if n == name {
+                if let ViewOrParsedValue::View(view) = vv {
+                    return *view;
+                } else {
+                    log::warn!(
+                        "LocMultiScope::get_view_by_name: query for `{name}` encountered a value-binding before any view-bindings, skipping..."
+                    );
+                    continue;
+                }
+            }
+        }
+        self.parent.get_view_by_name(name)
     }
 
     fn get_value_by_name(&self, name: &str) -> Result<&ParsedValue, UnknownVarError> {
@@ -1475,7 +1308,7 @@ impl Decoder {
         program: &Program,
         scope: &LocScope<'_>,
         input: ReadCtxt<'input>,
-    ) -> LocDecodeError<(ParsedValue, ReadCtxt<'input>)> {
+    ) -> ELocDecodeResult<(ParsedValue, ReadCtxt<'input>)> {
         let start_offset = input.offset;
         match self {
             Decoder::Call(n, es, vs) => {
@@ -1492,42 +1325,143 @@ impl Decoder {
                     .0
                     .parse_with_loc(program, &LocScope::Multi(&new_scope), input)
             }
+            Decoder::Phantom => Ok(WithErr::new((ParsedValue::new_phantom(), input))),
+            Decoder::Fail => Err(DecodeError::<ParsedValue>::loc_fail(scope, input)),
+            Decoder::Pos => {
+                let pos = input.offset as u64;
+                Ok(WithErr::new((
+                    ParsedValue::from_evaluated(Value::U64(pos)),
+                    input,
+                )))
+            }
             Decoder::SkipRemainder => {
                 let start = input.offset;
                 let input = input.skip_remainder();
                 let ret = ParsedValue::unit_spanning(start, input.offset - start);
-                Ok((ret, input))
+                Ok(WithErr::new((ret, input)))
             }
-            Decoder::Fail => Err(DecodeError::<ParsedValue>::loc_fail(scope, input)),
             Decoder::EndOfInput => match input.read_byte() {
-                None => Ok((ParsedValue::unit_at(start_offset), input)),
+                None => Ok(WithErr::new((ParsedValue::unit_at(start_offset), input))),
                 Some((b, _)) => Err(DecodeError::<ParsedValue>::trailing(b, input.offset)),
             },
-            Decoder::Phantom => Ok((ParsedValue::new_phantom(), input)),
             Decoder::Align(n) => {
                 let skip = (n - (input.offset % n)) % n;
                 let (_, input) = input
                     .split_at(skip)
                     .ok_or(DecodeError::overrun(skip, input.offset))?;
-                Ok((ParsedValue::unit_spanning(start_offset, skip), input))
+                Ok(WithErr::new((
+                    ParsedValue::unit_spanning(start_offset, skip),
+                    input,
+                )))
             }
-            Decoder::Pos => {
-                let pos = input.offset as u64;
-                Ok((ParsedValue::from_evaluated(Value::U64(pos)), input))
-            }
-            Decoder::ForEach(expr, lbl, a) => {
-                let mut input = input;
-                let val = expr.eval_with_loc(scope);
-                let seq = val.get_sequence().expect("bad type for ForEach input");
-                let mut v = Vec::with_capacity(seq.len());
-                for e in seq {
-                    let new_scope = LocScope::Single(LocSingleScope::new(scope, lbl, &e));
-                    let (va, next_input) = a.parse_with_loc(program, &new_scope, input)?;
-                    v.push(va);
-                    input = next_input;
+            Decoder::Byte(bs) => {
+                let (b, input) = input
+                    .read_byte()
+                    .ok_or(DecodeError::overbyte(input.offset))?;
+                if bs.contains(b) {
+                    Ok(WithErr::new((
+                        ParsedValue::new_flat(Value::U8(b), start_offset, 1),
+                        input,
+                    )))
+                } else {
+                    Err(DecodeError::unexpected(b, *bs, input.offset))
                 }
+            }
+            Decoder::Variant(label, d) => Ok(d
+                .parse_with_loc(program, scope, input)?
+                .map(move |(v, input)| (ParsedValue::Variant(label.clone(), Box::new(v)), input))),
+            Decoder::Branch(tree, branches) => {
+                let index = tree.matches(input).ok_or(DecodeError::NoValidBranch {
+                    offset: input.offset,
+                })?;
+                let d = &branches[index];
+                Ok(d.parse_with_loc(program, scope, input)?
+                    .map(|(v, input)| (ParsedValue::Branch(index, Box::new(v)), input)))
+            }
+            Decoder::Parallel(branches) => {
+                for (index, d) in branches.iter().enumerate() {
+                    let res = d.parse_with_loc(program, scope, input);
+                    if let Ok(p) = res {
+                        return Ok(
+                            p.map(|(v, input)| (ParsedValue::Branch(index, Box::new(v)), input))
+                        );
+                    }
+                }
+                Err(DecodeError::loc_fail(scope, input))
+            }
+            Decoder::Tuple(fields) => Ok(WithErr::fold(
+                (Vec::with_capacity(fields.len()), input),
+                fields.iter(),
+                |(mut v, input), f| {
+                    Ok(f.parse_with_loc(program, scope, input)?
+                        .map(move |(vf, next_input)| {
+                            v.push(vf);
+                            (v, next_input)
+                        }))
+                },
+            )?
+            .map(|(v, input)| {
                 let total_len = input.offset - start_offset;
-                Ok((ParsedValue::new_seq(v, start_offset, total_len), input))
+                (ParsedValue::new_tuple(v, start_offset, total_len), input)
+            })),
+            Decoder::Sequence(decs) => Ok(WithErr::fold(
+                (Vec::with_capacity(decs.len()), input),
+                decs.iter(),
+                |(mut vs, input), f| {
+                    Ok(f.parse_with_loc(program, scope, input)?
+                        .map(move |(vf, next_input)| {
+                            vs.push(vf);
+                            (vs, next_input)
+                        }))
+                },
+            )?
+            .map(|(v, input)| {
+                let total_len = input.offset - start_offset;
+                (ParsedValue::new_seq(v, start_offset, total_len), input)
+            })),
+            Decoder::While(tree, a) => {
+                let mut input = input;
+                let mut res = WithErr::new((Vec::new(), input));
+                while tree.matches(input).ok_or(DecodeError::NoValidBranch {
+                    offset: input.offset,
+                })? == 0
+                {
+                    res = res.join(|(mut v, input)| {
+                        Ok(a.parse_with_loc(program, scope, input)?
+                            .map(|(va, next_input)| {
+                                v.push(va);
+                                (v, next_input)
+                            }))
+                    })?;
+                    input = res.as_ref().1;
+                }
+                Ok(res.map(|(v, input)| {
+                    let total_len = input.offset - start_offset;
+                    (ParsedValue::new_seq(v, start_offset, total_len), input)
+                }))
+            }
+            Decoder::Until(tree, a) => {
+                let mut res = WithErr::new((Vec::new(), input));
+                loop {
+                    res = res.join(|(mut v, input)| {
+                        Ok(a.parse_with_loc(program, scope, input)?
+                            .map(|(va, next_input)| {
+                                v.push(va);
+                                (v, next_input)
+                            }))
+                    })?;
+                    let input = res.as_ref().1;
+                    if tree.matches(input).ok_or(DecodeError::NoValidBranch {
+                        offset: input.offset,
+                    })? == 0
+                    {
+                        break;
+                    }
+                }
+                Ok(res.map(|(v, input)| {
+                    let total_len = input.offset - start_offset;
+                    (ParsedValue::new_seq(v, start_offset, total_len), input)
+                }))
             }
             Decoder::DecodeBytes(bytes, a) => {
                 let bytes = {
@@ -1539,128 +1473,87 @@ impl Decoder {
                         .collect::<Vec<u8>>()
                 };
                 let new_input = ReadCtxt::new(&bytes);
-                let (va, rem_input) = a.parse_with_loc(program, scope, new_input)?;
-                match rem_input.read_byte() {
-                    Some((b, _)) => {
-                        // FIXME - this error-value doesn't properly distinguish between offsets within the main input or the sub-buffer
-                        Err(DecodeError::Trailing {
-                            byte: b,
-                            offset: rem_input.offset,
+                a.parse_with_loc(program, scope, new_input)?
+                    .join(|(va, rem_input)| {
+                        Ok(match rem_input.read_byte() {
+                            Some((b, _)) => {
+                                // FIXME - this error-value doesn't properly distinguish between offsets within the main input or the sub-buffer
+                                let err = DecodeError::Trailing {
+                                    byte: b,
+                                    offset: rem_input.offset,
+                                };
+                                WithErr::with_err((va, input), err)
+                            }
+                            None => WithErr::new((va, input)),
                         })
-                    }
-                    None => Ok((va, input)),
-                }
+                    })
             }
             Decoder::ParseFromView(v_expr, a) => {
                 let view = Self::eval_view_expr_with_loc(scope, v_expr)?;
-                let (va, _) = a.parse_with_loc(program, scope, view)?;
-                Ok((va, input))
+                Ok(a.parse_with_loc(program, scope, view)?
+                    .map(|(va, _)| (va, input)))
             }
-            Decoder::Byte(bs) => {
-                let (b, input) = input
-                    .read_byte()
-                    .ok_or(DecodeError::overbyte(input.offset))?;
-                if bs.contains(b) {
-                    Ok((ParsedValue::new_flat(Value::U8(b), start_offset, 1), input))
-                } else {
-                    Err(DecodeError::unexpected(b, *bs, input.offset))
-                }
+            Decoder::LetFormat(da, name, db) => {
+                da.parse_with_loc(program, scope, input)?
+                    .join(|(va, input)| {
+                        let new_scope = LocScope::Single(LocSingleScope::new(scope, name, &va));
+                        db.parse_with_loc(program, &new_scope, input)
+                    })
             }
-            Decoder::Variant(label, d) => {
-                let (v, input) = d.parse_with_loc(program, scope, input)?;
-                Ok((ParsedValue::Variant(label.clone(), Box::new(v)), input))
-            }
-            Decoder::Branch(tree, branches) => {
-                let index = tree.matches(input).ok_or(DecodeError::NoValidBranch {
-                    offset: input.offset,
-                })?;
-                let d = &branches[index];
-                let (v, input) = d.parse_with_loc(program, scope, input)?;
-                Ok((ParsedValue::Branch(index, Box::new(v)), input))
-            }
-            Decoder::Parallel(branches) => {
-                for (index, d) in branches.iter().enumerate() {
-                    let res = d.parse_with_loc(program, scope, input);
-                    if let Ok((v, input)) = res {
-                        return Ok((ParsedValue::Branch(index, Box::new(v)), input));
-                    }
-                }
-                Err(DecodeError::loc_fail(scope, input))
-            }
-            Decoder::Tuple(fields) => {
-                let mut input = input;
-                let mut v = Vec::with_capacity(fields.len());
-                for f in fields {
-                    let (vf, next_input) = f.parse_with_loc(program, scope, input)?;
-                    input = next_input;
-                    v.push(vf.clone());
-                }
-                let total_len = input.offset - start_offset;
-                Ok((ParsedValue::new_tuple(v, start_offset, total_len), input))
-            }
-            Decoder::Sequence(fields) => {
-                let mut input = input;
-                let mut v = Vec::with_capacity(fields.len());
-                for f in fields {
-                    let (vf, next_input) = f.parse_with_loc(program, scope, input)?;
-                    input = next_input;
-                    v.push(vf.clone());
-                }
-                let total_len = input.offset - start_offset;
-                Ok((ParsedValue::new_seq(v, start_offset, total_len), input))
-            }
-            Decoder::While(tree, a) => {
-                let mut input = input;
-                let mut v = Vec::new();
-                while tree.matches(input).ok_or(DecodeError::NoValidBranch {
-                    offset: input.offset,
-                })? == 0
-                {
-                    let (va, next_input) = a.parse_with_loc(program, scope, input)?;
-                    input = next_input;
-                    v.push(va);
-                }
-                let total_len = input.offset - start_offset;
-                Ok((ParsedValue::new_seq(v, start_offset, total_len), input))
-            }
-            Decoder::Until(tree, a) => {
-                let mut input = input;
-                let mut v = Vec::new();
-                loop {
-                    let (va, next_input) = a.parse_with_loc(program, scope, input)?;
-                    input = next_input;
-                    v.push(va);
-                    if tree.matches(input).ok_or(DecodeError::NoValidBranch {
-                        offset: input.offset,
-                    })? == 0
-                    {
-                        break;
-                    }
-                }
-                let total_len = input.offset - start_offset;
-                Ok((ParsedValue::new_seq(v, start_offset, total_len), input))
+            Decoder::MonadSeq(da, db) => da
+                .parse_with_loc(program, scope, input)?
+                .join(|(_, input)| db.parse_with_loc(program, scope, input)),
+            Decoder::ForEach(expr, lbl, a) => {
+                let val = expr.eval_with_loc(scope);
+                let seq = val.get_sequence().expect("bad type for ForEach input");
+                Ok(WithErr::fold(
+                    (Vec::with_capacity(seq.len()), input),
+                    seq,
+                    |(mut v, input), e| {
+                        let new_scope = LocScope::Single(LocSingleScope::new(scope, lbl, &e));
+                        Ok(a.parse_with_loc(program, &new_scope, input)?
+                            .map(|(va, next_input)| {
+                                v.push(va);
+                                (v, next_input)
+                            }))
+                    },
+                )?
+                .map(|(v, input)| {
+                    let total_len = input.offset - start_offset;
+                    (ParsedValue::new_seq(v, start_offset, total_len), input)
+                }))
             }
             Decoder::RepeatCount(expr, a) => {
-                let mut input = input;
                 let count = expr.eval_value_with_loc(scope).unwrap_usize();
-                let mut v = Vec::with_capacity(count);
-                for _ in 0..count {
-                    let (va, next_input) = a.parse_with_loc(program, scope, input)?;
-                    input = next_input;
-                    v.push(va);
-                }
-                let total_len = input.offset - start_offset;
-                Ok((ParsedValue::new_seq(v, start_offset, total_len), input))
+                Ok(WithErr::fold(
+                    (Vec::with_capacity(count), input),
+                    0..count,
+                    |(mut v, input), _| {
+                        Ok(a.parse_with_loc(program, scope, input)?
+                            .map(|(va, next_input)| {
+                                v.push(va);
+                                (v, next_input)
+                            }))
+                    },
+                )?
+                .map(|(v, input)| {
+                    let total_len = input.offset - start_offset;
+                    (ParsedValue::new_seq(v, start_offset, total_len), input)
+                }))
             }
-            Decoder::RepeatBetween(tree, min, max, a) => {
-                let mut input = input;
+            Decoder::RepeatBetween(reps_left_tree, min, max, a) => {
                 let min = min.eval_value_with_loc(scope).unwrap_usize();
                 let max = max.eval_value_with_loc(scope).unwrap_usize();
-                let mut v = Vec::new();
+                let mut res = WithErr::new((Vec::new(), input));
                 loop {
-                    if tree.matches(input).ok_or(DecodeError::NoValidBranch {
-                        offset: input.offset,
-                    })? == 0
+                    let v = &res.as_ref().0;
+                    // REVIEW - does the order of the conditions in the OR matter?
+                    if reps_left_tree
+                        .matches(input)
+                        .ok_or(DecodeError::NoValidBranch {
+                            offset: input.offset,
+                        })?
+                        == 0
                         || v.len() == max
                     {
                         if v.len() < min {
@@ -1668,112 +1561,129 @@ impl Decoder {
                         }
                         break;
                     }
-                    let (va, next_input) = a.parse_with_loc(program, scope, input)?;
-                    input = next_input;
-                    v.push(va);
+                    res = res.join(|(mut v, input)| {
+                        Ok(a.parse_with_loc(program, scope, input)?
+                            .map(move |(va, next_input)| {
+                                v.push(va);
+                                (v, next_input)
+                            }))
+                    })?;
                 }
-                let total_len = input.offset - start_offset;
-                Ok((ParsedValue::new_seq(v, start_offset, total_len), input))
-            }
-            Decoder::RepeatUntilLast(expr, a) => {
-                let mut input = input;
-                let mut v = Vec::new();
-                loop {
-                    let (va, next_input) = a.parse_with_loc(program, scope, input)?;
-                    input = next_input;
-                    let done = expr.eval_lambda_with_loc(scope, &va).unwrap_bool();
-                    v.push(va);
-                    if done {
-                        break;
-                    }
-                }
-                let total_len = input.offset - start_offset;
-                Ok((ParsedValue::new_seq(v, start_offset, total_len), input))
-            }
-            Decoder::RepeatUntilSeq(expr, a) => {
-                let mut input = input;
-                let mut v = Vec::new();
-                loop {
-                    let (va, next_input) = a.parse_with_loc(program, scope, input)?;
-                    input = next_input;
-                    v.push(va);
-                    let vs = ParsedValue::from_evaluated_seq(v);
-                    let done = expr.eval_lambda_with_loc(scope, &vs).unwrap_bool();
-                    v = match vs {
-                        ParsedValue::Seq(v) => v.inner.into_vec(),
-                        _ => unreachable!(),
-                    };
-                    if done {
-                        break;
-                    }
-                }
-                let total_len = input.offset - start_offset;
-                Ok((ParsedValue::new_seq(v, start_offset, total_len), input))
-            }
-            Decoder::AccumUntil(f_done, f_update, init, _vt, a) => {
-                let mut input = input;
-                let mut v = Vec::new();
-                let mut accum = init.eval_value_with_loc(scope);
-                loop {
-                    let done_arg = ParsedValue::from_evaluated(Value::Tuple(vec![
-                        accum.clone(),
-                        ParsedValue::new_seq(v.clone(), start_offset, input.offset - start_offset)
-                            .clone_into_value(),
-                    ]));
-                    let is_done = f_done.eval_lambda_with_loc(scope, &done_arg).unwrap_bool();
-                    if is_done {
-                        break;
-                    }
-                    let (next_elem, next_input) = a.parse_with_loc(program, scope, input)?;
-                    v.push(next_elem.clone());
-                    let update_arg = ParsedValue::from_evaluated(Value::Tuple(vec![
-                        accum.clone(),
-                        next_elem.clone_into_value(),
-                    ]));
-                    let next_accum = f_update.eval_lambda_with_loc(scope, &update_arg);
-                    accum = next_accum;
-                    input = next_input;
-                }
-                let total_len = input.offset - start_offset;
-                Ok((
-                    ParsedValue::new_tuple(
-                        vec![
-                            ParsedValue::from_evaluated(accum),
-                            ParsedValue::new_seq(v, start_offset, total_len),
-                        ],
-                        start_offset,
-                        total_len,
-                    ),
-                    input,
-                ))
+                Ok(res.map(|(v, input)| {
+                    let total_len = input.offset - start_offset;
+                    (ParsedValue::new_seq(v, start_offset, total_len), input)
+                }))
             }
             Decoder::Maybe(expr, a) => {
                 let is_present = expr.eval_value_with_loc(scope).unwrap_bool();
                 if is_present {
-                    let (raw, next_input) = a.parse_with_loc(program, scope, input)?;
-                    Ok((ParsedValue::Option(Some(Box::new(raw))), next_input))
+                    Ok(a.parse_with_loc(program, scope, input)?
+                        .map(|(val, input)| (ParsedValue::Option(Some(Box::new(val))), input)))
                 } else {
-                    Ok((ParsedValue::Option(None), input))
+                    Ok(WithErr::new((ParsedValue::Option(None), input)))
                 }
             }
-            Decoder::Peek(a) => {
-                let (v, _next_input) = a.parse_with_loc(program, scope, input)?;
-                Ok((v, input))
+            Decoder::RepeatUntilLast(expr, a) => {
+                // third value is "done" flag
+                let mut res = WithErr::new((Vec::new(), input, false));
+                loop {
+                    res = res.join(|(mut v, input, _done)| {
+                        Ok(a.parse_with_loc(program, scope, input)?
+                            .map(move |(va, next_input)| {
+                                let done = expr.eval_lambda_with_loc(scope, &va).unwrap_bool();
+                                v.push(va);
+                                (v, next_input, done)
+                            }))
+                    })?;
+                    let done = res.as_ref().2;
+                    if done {
+                        break;
+                    }
+                }
+                Ok(res.map(|(v, input, _)| {
+                    let total_len = input.offset - start_offset;
+                    (ParsedValue::new_seq(v, start_offset, total_len), input)
+                }))
             }
-            Decoder::LetFormat(da, name, db) => {
-                let (va, input) = da.parse_with_loc(program, scope, input)?;
-                let new_scope = LocScope::Single(LocSingleScope::new(scope, name, &va));
-                db.parse_with_loc(program, &new_scope, input)
+            Decoder::RepeatUntilSeq(expr, a) => {
+                // third value is "done" flag
+                let mut res = WithErr::new((Vec::new(), input, false));
+                loop {
+                    res = res.join(|(mut v, input, _done)| {
+                        Ok(a.parse_with_loc(program, scope, input)?
+                            .map(|(va, next_input)| {
+                                v.push(va);
+                                let vs = ParsedValue::from_evaluated_seq(v);
+                                let done = expr.eval_lambda_with_loc(scope, &vs).unwrap_bool();
+                                v = match vs {
+                                    ParsedValue::Seq(v) => v.inner.into_vec(),
+                                    _ => unreachable!(),
+                                };
+                                (v, next_input, done)
+                            }))
+                    })?;
+                    break_if_done!(res => (v, input));
+                }
+                let total_len = input.offset - start_offset;
+                Ok(res
+                    .map(|(v, input, _)| (ParsedValue::new_seq(v, start_offset, total_len), input)))
             }
-            Decoder::MonadSeq(da, db) => {
-                let (_, input) = da.parse_with_loc(program, scope, input)?;
-                db.parse_with_loc(program, scope, input)
+            Decoder::AccumUntil(f_done, f_update, init, _vt, a) => {
+                let accum = init.eval_value_with_loc(scope);
+                let mut res = WithErr::new((Vec::new(), accum, input, false));
+                loop {
+                    res = res.join(|(mut v, accum, input, _done)| {
+                        let done_arg = ParsedValue::from_evaluated(Value::Tuple(vec![
+                            accum.clone(),
+                            ParsedValue::new_seq(
+                                v.clone(),
+                                start_offset,
+                                input.offset - start_offset,
+                            )
+                            .clone_into_value(),
+                        ]));
+                        let is_done = f_done.eval_lambda_with_loc(scope, &done_arg).unwrap_bool();
+                        if is_done {
+                            return Ok(WithErr::new((v, accum, input, true)));
+                        }
+                        Ok(a.parse_with_loc(program, scope, input)?.map(
+                            |(next_elem, next_input)| {
+                                v.push(next_elem.clone());
+                                let update_arg = ParsedValue::from_evaluated(Value::Tuple(vec![
+                                    accum.clone(),
+                                    next_elem.clone_into_value(),
+                                ]));
+                                let next_accum = f_update.eval_lambda_with_loc(scope, &update_arg);
+                                (v, next_accum, next_input, false)
+                            },
+                        ))
+                    })?;
+                    break_if_done!(res => (v, accum, input));
+                }
+                Ok(res.map(|(v, accum, input, _)| {
+                    let total_len = input.offset - start_offset;
+                    (
+                        ParsedValue::new_tuple(
+                            vec![
+                                ParsedValue::from_evaluated(accum),
+                                ParsedValue::new_seq(v, start_offset, total_len),
+                            ],
+                            start_offset,
+                            total_len,
+                        ),
+                        input,
+                    )
+                }))
             }
+
+            Decoder::Peek(a) => Ok(a
+                .parse_with_loc(program, scope, input)?
+                .map(|(v, _)| (v, input))),
             Decoder::PeekNot(a) => {
                 if a.parse_with_loc(program, scope, input).is_ok() {
                     Err(DecodeError::loc_fail(scope, input))
                 } else {
-                    Ok((ParsedValue::unit_at(start_offset), input))
+                    Ok(WithErr::new((ParsedValue::unit_at(start_offset), input)))
                 }
             }
             Decoder::Slice(expr, a) => {
@@ -1781,23 +1691,26 @@ impl Decoder {
                 let (slice, input) = input
                     .split_at(size)
                     .ok_or(DecodeError::overrun(size, input.offset))?;
-                let (v, _) = a.parse_with_loc(program, scope, slice)?;
-                Ok((v, input))
+                Ok(a.parse_with_loc(program, scope, slice)?
+                    .map(|(v, _)| (v, input)))
             }
             Decoder::Bits(a) => {
+                // FIXME - copying the entire buffer as bits feels inefficient, we should measure performance and see if there is a better alternative
                 let mut bits = Vec::with_capacity(input.remaining().len() * 8);
                 for b in input.remaining() {
                     for i in 0..8 {
                         bits.push((b & (1 << i)) >> i);
                     }
                 }
-                let (v, bits) = a.parse_with_loc(program, scope, ReadCtxt::new(&bits))?;
-                let bytes_remain = bits.remaining().len() >> 3;
-                let bytes_read = input.remaining().len() - bytes_remain;
-                let (_, input) = input
-                    .split_at(bytes_read)
-                    .ok_or(DecodeError::overrun(bytes_read, input.offset))?;
-                Ok((v, input))
+                a.parse_with_loc(program, scope, ReadCtxt::new(&bits))?
+                    .join(|(v, bits)| {
+                        let bytes_remain = bits.remaining().len() >> 3;
+                        let bytes_read = input.remaining().len() - bytes_remain;
+                        let (_, input) = input
+                            .split_at(bytes_read)
+                            .ok_or(DecodeError::overrun(bytes_read, input.offset))?;
+                        Ok(WithErr::new((v, input)))
+                    })
             }
             Decoder::WithRelativeOffset(base_addr, expr, a) => {
                 let base_addr = base_addr.eval_value_with_loc(scope).unwrap_usize();
@@ -1806,25 +1719,40 @@ impl Decoder {
                 let seek_input = input
                     .seek_to(abs_offset)
                     .ok_or(DecodeError::bad_seek(abs_offset, input.input.len()))?;
-                let (v, _) = a.parse_with_loc(program, scope, seek_input)?;
-                Ok((v, input))
+                Ok(a.parse_with_loc(program, scope, seek_input)?
+                    .map(|(v, _)| (v, input)))
             }
             Decoder::Map(d, expr) => {
-                let (orig, input) = d.parse_with_loc(program, scope, input)?;
-                let v = expr.eval_lambda_with_loc(scope, &orig);
-                let image = ParsedValue::inherit(&orig, v);
-                Ok((ParsedValue::Mapped(Box::new(orig), Box::new(image)), input))
+                Ok(d.parse_with_loc(program, scope, input)?
+                    .map(|(orig, input)| {
+                        let v = expr.eval_lambda_with_loc(scope, &orig);
+                        let image = ParsedValue::inherit(&orig, v);
+                        (ParsedValue::Mapped(Box::new(orig), Box::new(image)), input)
+                    }))
             }
-            Decoder::Where(d, expr) => {
-                let (v, input) = d.parse_with_loc(program, scope, input)?;
-                match expr.eval_lambda_with_loc(scope, &v).unwrap_bool() {
-                    true => Ok((v, input)),
-                    false => Err(DecodeError::loc_bad_where(scope, expr.clone(), Box::new(v))),
-                }
+            Decoder::Where(d, cond) => {
+                d.parse_with_loc(program, scope, input)?.join(|(v, input)| {
+                    let Condition { expr, severity } = cond;
+                    match expr.eval_lambda_with_loc(scope, &v).unwrap_bool() {
+                        true => Ok(WithErr::new((v, input))),
+                        false => {
+                            let err = DecodeError::loc_bad_where(
+                                scope,
+                                expr.clone(),
+                                Box::new(v.clone()),
+                            );
+                            if severity.is_strict() {
+                                Err(err)
+                            } else {
+                                Ok(WithErr::with_err((v, input), err))
+                            }
+                        }
+                    }
+                })
             }
             Decoder::Compute(expr) => {
                 let v = expr.eval_with_loc(scope);
-                Ok((v.as_ref().clone(), input))
+                Ok(WithErr::new((v.as_ref().clone(), input)))
             }
             Decoder::Let(name, expr, d) => {
                 let v = expr.eval_with_loc(scope).as_ref().clone();
@@ -1840,15 +1768,16 @@ impl Decoder {
                 let head = head.eval_with_loc(scope);
                 for (index, (pattern, decoder)) in branches.iter().enumerate() {
                     if let Some(pattern_scope) = head.matches(scope, pattern) {
-                        let (v, input) = decoder.parse_with_loc(
-                            program,
-                            &LocScope::Multi(&pattern_scope),
-                            input,
-                        )?;
-                        return Ok((ParsedValue::Branch(index, Box::new(v)), input));
+                        return Ok(decoder
+                            .parse_with_loc(program, &LocScope::Multi(&pattern_scope), input)?
+                            .map(|(v, input)| (ParsedValue::Branch(index, Box::new(v)), input)));
                     }
                 }
-                panic!("non-exhaustive patterns");
+                // REVIEW - should this be an error instead of a panic?
+                panic!(
+                    "non-exhaustive patterns: {head:?} not in {:#?}",
+                    branches.iter().map(|(p, _)| p).collect::<Vec<_>>()
+                );
             }
             Decoder::Dynamic(name, DynFormat::Huffman(lengths_expr, opt_values_expr), d) => {
                 let lengths_val = lengths_expr.eval_with_loc(scope);
@@ -1873,15 +1802,13 @@ impl Decoder {
                 let d = scope.get_decoder_by_name(name);
                 d.parse_with_loc(program, scope, input)
             }
-            Decoder::LiftedOption(None) => {
-                let v = ParsedValue::from_evaluated(Value::Option(None));
-                Ok((v, input))
-            }
-            Decoder::LiftedOption(Some(d)) => {
-                let (v, input) = d.parse_with_loc(program, scope, input)?;
-                let some_v = ParsedValue::Option(Some(Box::new(v)));
-                Ok((some_v, input))
-            }
+            Decoder::LiftedOption(None) => Ok(WithErr::new((
+                ParsedValue::from_evaluated(Value::Option(None)),
+                input,
+            ))),
+            Decoder::LiftedOption(Some(d)) => Ok(d
+                .parse_with_loc(program, scope, input)?
+                .map(|(v, input)| (ParsedValue::Option(Some(Box::new(v))), input))),
             Decoder::CaptureBytes(v_expr, len) => {
                 let len = len.eval_value_with_loc(scope).unwrap_usize();
 
@@ -1904,7 +1831,10 @@ impl Decoder {
                 }
 
                 // return the accumulated bytes, along with the original input
-                Ok((ParsedValue::new_seq(accum, view_window.offset, len), input))
+                Ok(WithErr::new((
+                    ParsedValue::new_seq(accum, view_window.offset, len),
+                    input,
+                )))
             }
             Decoder::ReadArray(v_expr, len, kind) => {
                 let len = len.eval_value_with_loc(scope).unwrap_usize();
@@ -1919,17 +1849,17 @@ impl Decoder {
                     buf = new_buf;
                 }
 
-                Ok((
+                Ok(WithErr::new((
                     ParsedValue::new_seq(accum, view_window.offset, len * kind.size()),
                     input,
-                ))
+                )))
             }
             Decoder::ReifyView(v_expr) => {
                 let view = Self::eval_view_expr_with_loc(scope, v_expr)?;
                 let v = ParsedValue::from_evaluated(Value::View {
                     offset: view.offset,
                 });
-                Ok((v, input))
+                Ok(WithErr::new((v, input)))
             }
         }
     }

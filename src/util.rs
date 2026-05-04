@@ -91,3 +91,104 @@ impl<T> std::ops::Index<usize> for IxHeap<Vec<T>> {
         self.get(ix)
     }
 }
+
+pub(crate) mod with_err {
+    #[derive(Clone, Debug)]
+    pub struct WithErr<T, E0> {
+        value: T,
+        errs: Vec<E0>,
+    }
+
+    impl<T, E0> WithErr<T, E0> {
+        pub const fn new(value: T) -> Self {
+            Self {
+                value,
+                errs: Vec::new(),
+            }
+        }
+
+        pub fn with_err(value: T, err: E0) -> Self {
+            Self {
+                value,
+                errs: vec![err],
+            }
+        }
+
+        pub fn map<U>(self, f: impl FnOnce(T) -> U) -> WithErr<U, E0> {
+            WithErr {
+                value: f(self.value),
+                errs: self.errs,
+            }
+        }
+
+        pub fn join<U, E1>(self, mut f: impl FnMut(T) -> EResult<U, E0, E1>) -> EResult<U, E0, E1> {
+            let mut this_errs = self.errs;
+            let mut ret = f(self.value)?;
+            ret.errs.append(&mut this_errs);
+            Ok(ret)
+        }
+
+        pub fn fold<U, E1>(
+            init: U,
+            values: impl IntoIterator<Item = T>,
+            f: impl Fn(U, T) -> EResult<U, E0, E1>,
+        ) -> EResult<U, E0, E1> {
+            let mut acc = WithErr::new(init);
+            for value in values {
+                let mut this_errs = acc.errs;
+                let mut new_acc = f(acc.value, value)?;
+                new_acc.errs.append(&mut this_errs);
+                acc = new_acc;
+            }
+            Ok(acc)
+        }
+
+        pub fn into_inner(self) -> T {
+            self.value
+        }
+
+        pub fn extract_warn(self) -> T
+        where
+            E0: std::fmt::Display,
+        {
+            for err in self.errs.iter() {
+                log::warn!("[non-fatal error]: {err}");
+            }
+            self.value
+        }
+
+        pub const fn has_errs(&self) -> bool {
+            !self.errs.is_empty()
+        }
+
+        pub fn into_strict(self) -> Result<T, Vec<E0>> {
+            if !self.errs.is_empty() {
+                Err(self.errs)
+            } else {
+                Ok(self.value)
+            }
+        }
+    }
+
+    impl<T, E> AsRef<T> for WithErr<T, E> {
+        fn as_ref(&self) -> &T {
+            &self.value
+        }
+    }
+
+    pub type EResult<T, E0, E1 = E0> = Result<WithErr<T, E0>, E1>;
+
+    pub fn downgrade_error<T, E0>(val: EResult<T, E0>, default: T) -> WithErr<T, E0>
+    where
+        E0: std::fmt::Display,
+    {
+        match val {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("downgraded error: {e}");
+                WithErr::with_err(default, e)
+            }
+        }
+    }
+}
+pub(crate) use with_err::{EResult, WithErr, downgrade_error};

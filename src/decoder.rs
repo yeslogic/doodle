@@ -7,18 +7,48 @@ use num_bigint::BigInt;
 use serde::Serialize;
 
 use crate::byte_set::ByteSet;
-use crate::error::{DecodeError, DecodeResult};
+use crate::error::{DecodeError, DecodeResult, EDecodeResult};
 use crate::numeric::{TypedConst, core::Value as NumValue};
 use crate::read::ReadCtxt;
+use crate::util::WithErr;
+use crate::validation::Condition;
 use crate::{
-    Arith, DynFormat, Expr, Format, FormatModule, IntRel, MatchTree, Next, TypeScope, ValueType,
-    ViewExpr, pattern::Pattern,
+    BaseKind, DynFormat, Endian, Expr, Format, FormatModule, IntoLabel, Label, MatchTree,
+    MaybeTyped, Next, Pattern, TypeHint, TypeScope, ValueType, ViewExpr, ViewFormat,
 };
-use crate::{BaseKind, Endian, IntoLabel, Label, MaybeTyped, TypeHint, UnaryOp, ViewFormat};
 
 pub mod seq_kind;
 use seq_kind::sub_range;
 pub use seq_kind::{SeqKind, ValueSeq};
+
+/// Helper macro for discarding identifiers but keeping their repetition-group
+macro_rules! wildcard {
+    ( $x:ident ) => {
+        _
+    };
+}
+pub(crate) use wildcard;
+
+/// Helper macro for breaking out of a loop if a "done" flag is set in a `WithErr` value.
+///
+/// Syntax:
+///
+/// Takes the `WithErr` value as the first argument,
+/// with a comma-separated and parenthesized list of identifiers (up to but **excluding** the "done" flag),
+/// separated by `=>`.
+///
+/// ```ignore
+/// break_if_done!(expr => (ident1, ident2, ..., identN))
+/// ```
+macro_rules! break_if_done {
+    ( $expr:expr => ( $($x:ident),+ ) ) => {
+        let ($($crate::decoder::wildcard!($x)),* , done) = $expr.as_ref();
+        if *done {
+            break;
+        }
+    };
+}
+pub(crate) use break_if_done;
 
 pub(crate) fn extract_pair<T>(mut vec: Vec<T>) -> (T, T) {
     assert_eq!(vec.len(), 2, "expected pair");
@@ -65,6 +95,8 @@ pub enum Value {
     Mapped(Box<Value>, Box<Value>),
     /// Branch: (Branch Index, Nominal Value)
     Branch(usize, Box<Value>),
+    /// Poison value, used as a placeholder when a value is required but the right type cannot be induced artificially, e.g. downcasting a hard-error to a soft-error on an embedded parse
+    Poison,
 }
 
 impl From<usize> for Value {
@@ -139,6 +171,7 @@ impl std::fmt::Display for Value {
             Value::Branch(n, value) => write!(f, "({n} :~ {value})"),
             // REVIEW - is this over-verbose?
             Value::PhantomData => write!(f, "<PhantomData>"),
+            Value::Poison => write!(f, "NO_VALUE"),
         }
     }
 }
@@ -147,6 +180,7 @@ impl Value {
     fn tuple_proj(&self, index: usize) -> &Self {
         match self.coerce_mapped_value() {
             Value::Tuple(vs) => &vs[index],
+            Value::Poison => self,
             _ => panic!("expected tuple"),
         }
     }
@@ -272,11 +306,12 @@ impl Value {
 
     fn record_proj(&self, label: &str) -> &Self {
         match self {
+            Value::Poison => self,
             Value::Record(fields) => match fields.iter().find(|(l, _)| label == l) {
                 Some((_, v)) => v,
                 None => panic!("{label} not found in record"),
             },
-            _ => panic!("expected record, found {self:?}"),
+            other => panic!("expected record, found {other:?}"),
         }
     }
 
@@ -368,6 +403,156 @@ impl Value {
     }
 }
 
+mod value {
+    use super::Value;
+    use crate::{Arith, IntRel, UnaryOp};
+
+    fn __rel<T>(rel: IntRel, left: T, right: T) -> bool
+    where
+        T: Eq + Ord,
+    {
+        match rel {
+            IntRel::Eq => left == right,
+            IntRel::Ne => left != right,
+            IntRel::Gt => left > right,
+            IntRel::Gte => left >= right,
+            IntRel::Lt => left < right,
+            IntRel::Lte => left <= right,
+        }
+    }
+
+    fn __arith<T>(arith: Arith, left: T, right: T) -> T
+    where
+        T: num_traits::CheckedAdd,
+        T: num_traits::CheckedSub,
+        T: num_traits::CheckedMul,
+        T: num_traits::CheckedDiv,
+        T: num_traits::CheckedRem,
+        T: num_traits::CheckedShl,
+        T: num_traits::CheckedShr,
+        T: num_traits::AsPrimitive<u32>,
+        T: std::ops::BitOr<Output = T>,
+        T: std::ops::BitAnd<Output = T>,
+    {
+        match arith {
+            Arith::Add => left
+                .checked_add(&right)
+                .unwrap_or_else(|| panic!("integer overflow")),
+            Arith::Sub => left
+                .checked_sub(&right)
+                .unwrap_or_else(|| panic!("integer overflow")),
+            Arith::Mul => left
+                .checked_mul(&right)
+                .unwrap_or_else(|| panic!("integer overflow")),
+            Arith::Div => left
+                .checked_div(&right)
+                .unwrap_or_else(|| panic!("integer overflow")),
+            Arith::Rem => left
+                .checked_rem(&right)
+                .unwrap_or_else(|| panic!("integer overflow")),
+            Arith::Shl => left << right.as_(),
+            Arith::Shr => left >> right.as_(),
+            Arith::BitOr => left | right,
+            Arith::BitAnd => left & right,
+            Arith::BoolOr | Arith::BoolAnd => unreachable!("bool ops should be handled separately"),
+        }
+    }
+
+    fn __unary<T>(op: UnaryOp, value: T) -> T
+    where
+        T: num_traits::CheckedAdd,
+        T: num_traits::CheckedSub,
+        T: num_traits::One,
+    {
+        match op {
+            UnaryOp::IntPred => value.checked_sub(&T::one()).unwrap_or_else(|| {
+                panic!(
+                    "__unary::<{}>@IntPred: integer underflow",
+                    std::any::type_name::<T>()
+                )
+            }),
+            UnaryOp::IntSucc => value.checked_add(&T::one()).unwrap_or_else(|| {
+                panic!(
+                    "__unary::<{}>@IntSucc: integer overflow",
+                    std::any::type_name::<T>()
+                )
+            }),
+            UnaryOp::BoolNot => unreachable!("bool ops should be handled separately"),
+        }
+    }
+
+    impl Value {
+        pub fn int_rel(rel: IntRel, left: Value, right: Value) -> Value {
+            match (left, right) {
+                (Value::U8(l), Value::U8(r)) => Value::Bool(__rel(rel, l, r)),
+                (Value::U16(l), Value::U16(r)) => Value::Bool(__rel(rel, l, r)),
+                (Value::U32(l), Value::U32(r)) => Value::Bool(__rel(rel, l, r)),
+                (Value::U64(l), Value::U64(r)) => Value::Bool(__rel(rel, l, r)),
+                (Value::Usize(l), Value::Usize(r)) => Value::Bool(__rel(rel, l, r)),
+                (Value::Numeric(_l), Value::Numeric(_r)) => {
+                    unimplemented!("int_rel: TypedConst comparison not yet implemented");
+                }
+                (left, right) => {
+                    panic!("cannot apply int-rel {rel:?} to (`{left:?}`, `{right:?}`)")
+                }
+            }
+        }
+
+        pub fn arith(arith: Arith, left: Value, right: Value) -> Value {
+            if matches!(arith, Arith::BoolOr | Arith::BoolAnd) {
+                match (left, right) {
+                    (Value::Bool(l), Value::Bool(r)) => match arith {
+                        Arith::BoolOr => Value::Bool(l || r),
+                        Arith::BoolAnd => Value::Bool(l && r),
+                        _ => unreachable!(),
+                    },
+                    (left, right) => {
+                        panic!(
+                            "cannot perform boolean operation on non-boolean operand-pair (`{left:?}`, `{right:?}`)"
+                        );
+                    }
+                }
+            } else {
+                match (left, right) {
+                    (Value::U8(l), Value::U8(r)) => Value::U8(__arith(arith, l, r)),
+                    (Value::U16(l), Value::U16(r)) => Value::U16(__arith(arith, l, r)),
+                    (Value::U32(l), Value::U32(r)) => Value::U32(__arith(arith, l, r)),
+                    (Value::U64(l), Value::U64(r)) => Value::U64(__arith(arith, l, r)),
+                    (Value::Usize(l), Value::Usize(r)) => Value::Usize(__arith(arith, l, r)),
+                    (Value::Numeric(_l), Value::Numeric(_r)) => {
+                        panic!(
+                            "raw arithmetic on numerics should be done in numeric model, or with Expr-level casts beforehand"
+                        );
+                    }
+                    (left, right) => {
+                        panic!("cannot apply arith {arith:?} to (`{left:?}`, `{right:?}`)")
+                    }
+                }
+            }
+        }
+
+        pub fn unary(op: UnaryOp, value: Value) -> Value {
+            match op {
+                UnaryOp::BoolNot => match value {
+                    Value::Bool(b) => Value::Bool(!b),
+                    _ => panic!("cannot apply bool-not to non-boolean operand (`{value:?}`)"),
+                },
+                op => match value {
+                    Value::U8(i) => Value::U8(__unary(op, i)),
+                    Value::U16(i) => Value::U16(__unary(op, i)),
+                    Value::U32(i) => Value::U32(__unary(op, i)),
+                    Value::U64(i) => Value::U64(__unary(op, i)),
+                    Value::Usize(i) => Value::Usize(__unary(op, i)),
+                    Value::Numeric(_i) => {
+                        panic!("top-level unary operations should not be performed on raw-numeric");
+                    }
+                    _ => panic!("cannot apply unary {op:?} to non-numeric operand (`{value:?}`)"),
+                },
+            }
+        }
+    }
+}
+
 impl Expr {
     pub fn eval<'a>(&'a self, scope: &'a Scope<'a>) -> Cow<'a, Value> {
         match self {
@@ -425,247 +610,22 @@ impl Expr {
             }
             Expr::Lambda(_, _) => panic!("cannot eval lambda"),
 
-            Expr::IntRel(IntRel::Eq, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::Bool(x == y),
-                    (Value::U16(x), Value::U16(y)) => Value::Bool(x == y),
-                    (Value::U32(x), Value::U32(y)) => Value::Bool(x == y),
-                    (Value::U64(x), Value::U64(y)) => Value::Bool(x == y),
-                    (Value::Usize(x), Value::Usize(y)) => Value::Bool(x == y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::IntRel(IntRel::Ne, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::Bool(x != y),
-                    (Value::U16(x), Value::U16(y)) => Value::Bool(x != y),
-                    (Value::U32(x), Value::U32(y)) => Value::Bool(x != y),
-                    (Value::U64(x), Value::U64(y)) => Value::Bool(x != y),
-                    (Value::Usize(x), Value::Usize(y)) => Value::Bool(x != y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::IntRel(IntRel::Lt, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::Bool(x < y),
-                    (Value::U16(x), Value::U16(y)) => Value::Bool(x < y),
-                    (Value::U32(x), Value::U32(y)) => Value::Bool(x < y),
-                    (Value::U64(x), Value::U64(y)) => Value::Bool(x < y),
-                    (Value::Usize(x), Value::Usize(y)) => Value::Bool(x < y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::IntRel(IntRel::Gt, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::Bool(x > y),
-                    (Value::U16(x), Value::U16(y)) => Value::Bool(x > y),
-                    (Value::U32(x), Value::U32(y)) => Value::Bool(x > y),
-                    (Value::U64(x), Value::U64(y)) => Value::Bool(x > y),
-                    (Value::Usize(x), Value::Usize(y)) => Value::Bool(x > y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::IntRel(IntRel::Lte, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::Bool(x <= y),
-                    (Value::U16(x), Value::U16(y)) => Value::Bool(x <= y),
-                    (Value::U32(x), Value::U32(y)) => Value::Bool(x <= y),
-                    (Value::U64(x), Value::U64(y)) => Value::Bool(x <= y),
-                    (Value::Usize(x), Value::Usize(y)) => Value::Bool(x <= y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::IntRel(IntRel::Gte, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::Bool(x >= y),
-                    (Value::U16(x), Value::U16(y)) => Value::Bool(x >= y),
-                    (Value::U32(x), Value::U32(y)) => Value::Bool(x >= y),
-                    (Value::U64(x), Value::U64(y)) => Value::Bool(x >= y),
-                    (Value::Usize(x), Value::Usize(y)) => Value::Bool(x >= y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::Arith(Arith::Add, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_add(x, y).unwrap()),
-                    (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_add(x, y).unwrap()),
-                    (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_add(x, y).unwrap()),
-                    (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_add(x, y).unwrap()),
-                    (Value::Usize(x), Value::Usize(y)) => {
-                        Value::Usize(usize::checked_add(x, y).unwrap())
-                    }
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::Arith(Arith::Sub, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_sub(x, y).unwrap()),
-                    (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_sub(x, y).unwrap()),
-                    (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_sub(x, y).unwrap()),
-                    (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_sub(x, y).unwrap()),
-                    (Value::Usize(x), Value::Usize(y)) => {
-                        Value::Usize(usize::checked_sub(x, y).unwrap())
-                    }
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::Arith(Arith::Mul, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_mul(x, y).unwrap()),
-                    (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_mul(x, y).unwrap()),
-                    (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_mul(x, y).unwrap()),
-                    (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_mul(x, y).unwrap()),
-                    (Value::Usize(x), Value::Usize(y)) => {
-                        Value::Usize(usize::checked_mul(x, y).unwrap())
-                    }
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::Arith(Arith::Div, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_div(x, y).unwrap()),
-                    (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_div(x, y).unwrap()),
-                    (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_div(x, y).unwrap()),
-                    (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_div(x, y).unwrap()),
-                    (Value::Usize(x), Value::Usize(y)) => {
-                        Value::Usize(usize::checked_div(x, y).unwrap())
-                    }
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::Arith(Arith::Rem, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_rem(x, y).unwrap()),
-                    (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_rem(x, y).unwrap()),
-                    (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_rem(x, y).unwrap()),
-                    (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_rem(x, y).unwrap()),
-                    (Value::Usize(x), Value::Usize(y)) => {
-                        Value::Usize(usize::checked_rem(x, y).unwrap())
-                    }
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::Arith(Arith::BitAnd, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::U8(x & y),
-                    (Value::U16(x), Value::U16(y)) => Value::U16(x & y),
-                    (Value::U32(x), Value::U32(y)) => Value::U32(x & y),
-                    (Value::U64(x), Value::U64(y)) => Value::U64(x & y),
-                    (Value::Usize(x), Value::Usize(y)) => Value::Usize(x & y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::Arith(Arith::BitOr, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::U8(x | y),
-                    (Value::U16(x), Value::U16(y)) => Value::U16(x | y),
-                    (Value::U32(x), Value::U32(y)) => Value::U32(x | y),
-                    (Value::U64(x), Value::U64(y)) => Value::U64(x | y),
-                    (Value::Usize(x), Value::Usize(y)) => Value::Usize(x | y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::Arith(Arith::BoolAnd, x, y) => {
-                // REVIEW - do we want left-biased short-circuiting?
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::Bool(b0), Value::Bool(b1)) => Value::Bool(b0 && b1),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::Arith(Arith::BoolOr, x, y) => {
-                // REVIEW - do we want left-biased short-circuiting?
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::Bool(b0), Value::Bool(b1)) => Value::Bool(b0 || b1),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::Arith(Arith::Shl, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => {
-                        Value::U8(u8::checked_shl(x, u32::from(y)).unwrap())
-                    }
-                    (Value::U16(x), Value::U16(y)) => {
-                        Value::U16(u16::checked_shl(x, u32::from(y)).unwrap())
-                    }
-                    (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_shl(x, y).unwrap()),
-                    (Value::U64(x), Value::U64(y)) => {
-                        Value::U64(u64::checked_shl(x, u32::try_from(y).unwrap()).unwrap())
-                    }
-                    (Value::Usize(x), Value::Usize(y)) => {
-                        Value::Usize(usize::checked_shl(x, u32::try_from(y).unwrap()).unwrap())
-                    }
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::Arith(Arith::Shr, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => {
-                        Value::U8(u8::checked_shr(x, u32::from(y)).unwrap())
-                    }
-                    (Value::U16(x), Value::U16(y)) => {
-                        Value::U16(u16::checked_shr(x, u32::from(y)).unwrap())
-                    }
-                    (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_shr(x, y).unwrap()),
-                    (Value::U64(x), Value::U64(y)) => {
-                        Value::U64(u64::checked_shr(x, u32::try_from(y).unwrap()).unwrap())
-                    }
-                    (Value::Usize(x), Value::Usize(y)) => {
-                        Value::Usize(usize::checked_shr(x, u32::try_from(y).unwrap()).unwrap())
-                    }
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::Unary(UnaryOp::BoolNot, x) => Cow::Owned(match x.eval_value(scope) {
-                Value::Bool(x) => Value::Bool(!x),
-                x => panic!("unexpected operand: expecting boolean, found `{x:?}`"),
+            Expr::IntRel(rel, x, y) => Cow::Owned({
+                let left = x.eval_value(scope);
+                let right = y.eval_value(scope);
+                Value::int_rel(*rel, left, right)
             }),
-            Expr::Unary(UnaryOp::IntSucc, x) => Cow::Owned(match x.eval_value(scope) {
-                Value::U8(x) => Value::U8(
-                    x.checked_add(1)
-                        .unwrap_or_else(|| panic!("IntSucc(u8::MAX) overflowed")),
-                ),
-                Value::U16(x) => Value::U16(
-                    x.checked_add(1)
-                        .unwrap_or_else(|| panic!("IntSucc(u16::MAX) overflowed")),
-                ),
-                Value::U32(x) => Value::U32(
-                    x.checked_add(1)
-                        .unwrap_or_else(|| panic!("IntSucc(u32::MAX) overflowed")),
-                ),
-                Value::U64(x) => Value::U64(
-                    x.checked_add(1)
-                        .unwrap_or_else(|| panic!("IntSucc(u64::MAX) overflowed")),
-                ),
-                Value::Usize(x) => Value::Usize(
-                    x.checked_add(1)
-                        .unwrap_or_else(|| panic!("IntSucc(usize::MAX) overflowed")),
-                ),
-                x => panic!("unexpected operand: expected integral value, found `{x:?}`"),
+            Expr::Arith(op, x, y) => Cow::Owned({
+                let left = x.eval_value(scope);
+                let right = y.eval_value(scope);
+                Value::arith(*op, left, right)
             }),
-            Expr::Unary(UnaryOp::IntPred, x) => Cow::Owned(match x.eval_value(scope) {
-                Value::U8(x) => Value::U8(
-                    x.checked_sub(1)
-                        .unwrap_or_else(|| panic!("IntPred(0u8) underflow")),
-                ),
-                Value::U16(x) => Value::U16(
-                    x.checked_sub(1)
-                        .unwrap_or_else(|| panic!("IntPred(0u16) underflow")),
-                ),
-                Value::U32(x) => Value::U32(
-                    x.checked_sub(1)
-                        .unwrap_or_else(|| panic!("IntPred(0u32) underflow")),
-                ),
-                Value::U64(x) => Value::U64(
-                    x.checked_sub(1)
-                        .unwrap_or_else(|| panic!("IntPred(0u64) underflow")),
-                ),
-                Value::Usize(x) => Value::Usize(
-                    x.checked_sub(1)
-                        .unwrap_or_else(|| panic!("IntPred(0u64) underflow")),
-                ),
-                x => panic!("unexpected operand: expected integral value, found `{x:?}`"),
+            Expr::Unary(op, x) => Cow::Owned({
+                let value = x.eval_value(scope);
+                Value::unary(*op, value)
             }),
 
+            // FIXME - extract common logic for As-expr on Value instead of separate impl for decoder and loc_decoder
             Expr::AsU8(x) => {
                 Cow::Owned(match x.eval_value(scope) {
                     Value::U8(x) => Value::U8(x),
@@ -1032,7 +992,7 @@ pub enum Decoder {
     Bits(Box<Decoder>),
     WithRelativeOffset(Box<Expr>, Box<Expr>, Box<Decoder>),
     Map(Box<Decoder>, Box<Expr>),
-    Where(Box<Decoder>, Box<Expr>),
+    Where(Box<Decoder>, Condition),
     Compute(Box<Expr>),
     Let(Label, Box<Expr>, Box<Decoder>),
     Match(Box<Expr>, Vec<(Pattern, Decoder)>),
@@ -1067,7 +1027,10 @@ impl Program {
     }
 
     pub fn run<'input>(&self, input: ReadCtxt<'input>) -> DecodeResult<(Value, ReadCtxt<'input>)> {
-        self.decoders[0].0.parse(self, &Scope::Empty, input)
+        Ok(self.decoders[0]
+            .0
+            .parse(self, &Scope::Empty, input)?
+            .extract_warn())
     }
 }
 
@@ -1496,7 +1459,7 @@ impl<'a> Scope<'a> {
     fn get_view_by_name(&self, name: &str) -> View<'a> {
         match self {
             Scope::Empty => panic!("view not found: {name}"),
-            Scope::Multi(multi) => multi.parent.get_view_by_name(name),
+            Scope::Multi(multi) => multi.get_view_by_name(name),
             Scope::Single(single) => single.parent.get_view_by_name(name),
             Scope::Decoder(decoder) => decoder.parent.get_view_by_name(name),
             Scope::View(view) => view.get_view_by_name(name),
@@ -1539,6 +1502,22 @@ impl<'a> MultiScope<'a> {
 
     pub fn push_view(&mut self, name: impl Into<Label>, view: View<'a>) {
         self.entries.push((name.into(), ViewOrValue::View(view)));
+    }
+
+    fn get_view_by_name(&self, name: &str) -> View<'a> {
+        for (n, v) in self.entries.iter().rev() {
+            if n == name {
+                if let ViewOrValue::View(v) = v {
+                    return *v;
+                } else {
+                    log::warn!(
+                        "MultiScope::get_view_by_name: query for `{name}` encountered a value-binding before any view-bindings, skipping..."
+                    );
+                    continue;
+                }
+            }
+        }
+        self.parent.get_view_by_name(name)
     }
 
     fn get_value_by_name(&self, name: &str) -> Result<&Value, UnknownVarError> {
@@ -1652,7 +1631,7 @@ impl Decoder {
         program: &Program,
         scope: &Scope<'_>,
         input: ReadCtxt<'input>,
-    ) -> DecodeResult<(Value, ReadCtxt<'input>)> {
+    ) -> EDecodeResult<(Value, ReadCtxt<'input>)> {
         match self {
             Decoder::Call(n, es, vs) => {
                 let mut new_scope = MultiScope::with_capacity(&Scope::Empty, es.len());
@@ -1668,18 +1647,18 @@ impl Decoder {
                     .0
                     .parse(program, &Scope::Multi(&new_scope), input)
             }
-            Decoder::Phantom => Ok((Value::PhantomData, input)),
+            Decoder::Phantom => Ok(WithErr::new((Value::PhantomData, input))),
             Decoder::Fail => Err(DecodeError::<Value>::fail(scope, input)),
             Decoder::Pos => {
                 let pos = input.offset as u64;
-                Ok((Value::U64(pos), input))
+                Ok(WithErr::new((Value::U64(pos), input)))
             }
             Decoder::SkipRemainder => {
                 let input = input.skip_remainder();
-                Ok((Value::UNIT, input))
+                Ok(WithErr::new((Value::UNIT, input)))
             }
             Decoder::EndOfInput => match input.read_byte() {
-                None => Ok((Value::UNIT, input)),
+                None => Ok(WithErr::new((Value::UNIT, input))),
                 Some((b, _)) => Err(DecodeError::trailing(b, input.offset)),
             },
             Decoder::Align(n) => {
@@ -1687,79 +1666,87 @@ impl Decoder {
                 let (_, input) = input
                     .split_at(skip)
                     .ok_or(DecodeError::overrun(skip, input.offset))?;
-                Ok((Value::UNIT, input))
+                Ok(WithErr::new((Value::UNIT, input)))
             }
             Decoder::Byte(bs) => {
                 let (b, input) = input
                     .read_byte()
                     .ok_or(DecodeError::overbyte(input.offset))?;
                 if bs.contains(b) {
-                    Ok((Value::U8(b), input))
+                    Ok(WithErr::new((Value::U8(b), input)))
                 } else {
                     Err(DecodeError::unexpected(b, *bs, input.offset))
                 }
             }
-            Decoder::Variant(label, d) => {
-                let (v, input) = d.parse(program, scope, input)?;
-                Ok((Value::Variant(label.clone(), Box::new(v)), input))
-            }
+            Decoder::Variant(label, d) => Ok(d
+                .parse(program, scope, input)?
+                .map(move |(v, input)| (Value::Variant(label.clone(), Box::new(v)), input))),
             Decoder::Branch(tree, branches) => {
                 let index = tree.matches(input).ok_or(DecodeError::NoValidBranch {
                     offset: input.offset,
                 })?;
                 let d = &branches[index];
-                let (v, input) = d.parse(program, scope, input)?;
-                Ok((Value::Branch(index, Box::new(v)), input))
+                Ok(d.parse(program, scope, input)?
+                    .map(|(v, input)| (Value::Branch(index, Box::new(v)), input)))
             }
             Decoder::Parallel(branches) => {
                 for (index, d) in branches.iter().enumerate() {
                     let res = d.parse(program, scope, input);
-                    if let Ok((v, input)) = res {
-                        return Ok((Value::Branch(index, Box::new(v)), input));
+                    if let Ok(p) = res {
+                        return Ok(p.map(|(v, input)| (Value::Branch(index, Box::new(v)), input)));
                     }
                 }
                 Err(DecodeError::<Value>::fail(scope, input))
             }
-            Decoder::Tuple(fields) => {
-                let mut input = input;
-                let mut v = Vec::with_capacity(fields.len());
-                for f in fields {
-                    let (vf, next_input) = f.parse(program, scope, input)?;
-                    input = next_input;
-                    v.push(vf.clone());
-                }
-                Ok((Value::Tuple(v), input))
-            }
-            Decoder::Sequence(decs) => {
-                let mut input = input;
-                let mut v = Vec::with_capacity(decs.len());
-                for d in decs {
-                    let (vf, next_input) = d.parse(program, scope, input)?;
-                    input = next_input;
-                    v.push(vf.clone());
-                }
-                Ok((Value::Seq(SeqKind::Strict(v)), input))
-            }
+            Decoder::Tuple(fields) => Ok(WithErr::fold(
+                (Vec::with_capacity(fields.len()), input),
+                fields.iter(),
+                |(mut v, input), f| {
+                    Ok(f.parse(program, scope, input)?.map(move |(vf, new_input)| {
+                        v.push(vf);
+                        (v, new_input)
+                    }))
+                },
+            )?
+            .map(|(v, input)| (Value::Tuple(v), input))),
+            Decoder::Sequence(decs) => Ok(WithErr::fold(
+                (Vec::with_capacity(decs.len()), input),
+                decs.iter(),
+                |(mut v, input), f| {
+                    Ok(f.parse(program, scope, input)?.map(move |(vf, new_input)| {
+                        v.push(vf);
+                        (v, new_input)
+                    }))
+                },
+            )?
+            .map(|(v, input)| (Value::Seq(SeqKind::Strict(v)), input))),
             Decoder::While(tree, a) => {
                 let mut input = input;
-                let mut v = Vec::new();
+                let mut res = WithErr::new((Vec::new(), input));
                 while tree.matches(input).ok_or(DecodeError::NoValidBranch {
                     offset: input.offset,
                 })? == 0
                 {
-                    let (va, next_input) = a.parse(program, scope, input)?;
-                    input = next_input;
-                    v.push(va);
+                    res = res.join(|(mut v, input)| {
+                        Ok(a.parse(program, scope, input)?.map(|(va, next_input)| {
+                            v.push(va);
+                            (v, next_input)
+                        }))
+                    })?;
+                    input = res.as_ref().1;
                 }
-                Ok((Value::Seq(v.into()), input))
+                Ok(res.map(|(v, input)| (Value::Seq(v.into()), input)))
             }
             Decoder::Until(tree, a) => {
-                let mut input = input;
-                let mut v = Vec::new();
+                let mut res = WithErr::new((Vec::new(), input));
                 loop {
-                    let (va, next_input) = a.parse(program, scope, input)?;
-                    input = next_input;
-                    v.push(va);
+                    res = res.join(|(mut v, input)| {
+                        Ok(a.parse(program, scope, input)?.map(|(va, next_input)| {
+                            v.push(va);
+                            (v, next_input)
+                        }))
+                    })?;
+                    let input = res.as_ref().1;
                     if tree.matches(input).ok_or(DecodeError::NoValidBranch {
                         offset: input.offset,
                     })? == 0
@@ -1767,7 +1754,7 @@ impl Decoder {
                         break;
                     }
                 }
-                Ok((Value::Seq(v.into()), input))
+                Ok(res.map(|(v, input)| (Value::Seq(v.into()), input)))
             }
             Decoder::DecodeBytes(bytes, a) => {
                 let bytes = {
@@ -1779,63 +1766,73 @@ impl Decoder {
                         .collect::<Vec<u8>>()
                 };
                 let new_input = ReadCtxt::new(&bytes);
-                let (va, rem_input) = a.parse(program, scope, new_input)?;
-                // REVIEW - do we *actually* want to enforce full-consumption of the sub-buffer (i.e. no strictly partial reads)
-                match rem_input.read_byte() {
-                    Some((b, _)) => {
-                        // FIXME - this error-value doesn't properly distinguish between offsets within the main input or the sub-buffer
-                        Err(DecodeError::Trailing {
-                            byte: b,
-                            offset: rem_input.offset,
-                        })
-                    }
-                    None => Ok((va, input)),
-                }
+                a.parse(program, scope, new_input)?.join(|(va, rem_input)| {
+                    Ok(match rem_input.read_byte() {
+                        Some((b, _)) => {
+                            // FIXME - this error-value doesn't properly distinguish between offsets within the main input or the sub-buffer
+                            let err = DecodeError::Trailing {
+                                byte: b,
+                                offset: rem_input.offset,
+                            };
+                            WithErr::with_err((va, input), err)
+                        }
+                        None => WithErr::new((va, input)),
+                    })
+                })
             }
             Decoder::ParseFromView(v_expr, a) => {
                 let view_window = Self::eval_view_expr(scope, v_expr)?;
-                let (va, _) = a.parse(program, scope, view_window)?;
-                Ok((va, input))
+                Ok(a.parse(program, scope, view_window)?
+                    .map(|(va, _)| (va, input)))
             }
             Decoder::LetFormat(da, name, db) => {
-                let (va, input) = da.parse(program, scope, input)?;
-                let new_scope = Scope::Single(SingleScope::new(scope, name, &va));
-                db.parse(program, &new_scope, input)
+                da.parse(program, scope, input)?.join(|(va, input)| {
+                    let new_scope = Scope::Single(SingleScope::new(scope, name, &va));
+                    db.parse(program, &new_scope, input)
+                })
             }
-            Decoder::MonadSeq(da, db) => {
-                let (_, input) = da.parse(program, scope, input)?;
-                db.parse(program, scope, input)
-            }
+            Decoder::MonadSeq(da, db) => da
+                .parse(program, scope, input)?
+                .join(|(_, input)| db.parse(program, scope, input)),
             Decoder::ForEach(expr, lbl, a) => {
-                let mut input = input;
+                // we need val because it would otherwise be a dropped temporary binding
                 let val = expr.eval_value(scope);
                 let seq = val.get_sequence().expect("bad type for ForEach input");
-                let mut v = Vec::with_capacity(seq.len());
-                for e in seq {
-                    let new_scope = Scope::Single(SingleScope::new(scope, lbl, &e));
-                    let (va, next_input) = a.parse(program, &new_scope, input)?;
-                    v.push(va);
-                    input = next_input;
-                }
-                Ok((Value::Seq(v.into()), input))
+                Ok(WithErr::fold(
+                    (Vec::with_capacity(seq.len()), input),
+                    seq,
+                    |(mut v, input), e| {
+                        let new_scope = Scope::Single(SingleScope::new(scope, lbl, &e));
+                        Ok(a.parse(program, &new_scope, input)?
+                            .map(|(va, next_input)| {
+                                v.push(va);
+                                (v, next_input)
+                            }))
+                    },
+                )?
+                .map(|(v, input)| (Value::Seq(v.into()), input)))
             }
             Decoder::RepeatCount(expr, a) => {
-                let mut input = input;
                 let count = expr.eval_value(scope).unwrap_usize();
-                let mut v = Vec::with_capacity(count);
-                for _ in 0..count {
-                    let (va, next_input) = a.parse(program, scope, input)?;
-                    input = next_input;
-                    v.push(va);
-                }
-                Ok((Value::Seq(v.into()), input))
+                Ok(WithErr::fold(
+                    (Vec::with_capacity(count), input),
+                    0..count,
+                    |(mut v, input), _| {
+                        Ok(a.parse(program, scope, input)?.map(|(va, next_input)| {
+                            v.push(va);
+                            (v, next_input)
+                        }))
+                    },
+                )?
+                .map(|(v, input)| (Value::Seq(v.into()), input)))
             }
             Decoder::RepeatBetween(reps_left_tree, min, max, a) => {
-                let mut input = input;
                 let min = min.eval_value(scope).unwrap_usize();
                 let max = max.eval_value(scope).unwrap_usize();
-                let mut v = Vec::new();
+                let mut res = WithErr::new((Vec::new(), input));
                 loop {
+                    let v = &res.as_ref().0;
+                    // REVIEW - does the order of the conditions in the OR matter?
                     if reps_left_tree
                         .matches(input)
                         .ok_or(DecodeError::NoValidBranch {
@@ -1849,82 +1846,90 @@ impl Decoder {
                         }
                         break;
                     }
-                    let (va, next_input) = a.parse(program, scope, input)?;
-                    input = next_input;
-                    v.push(va);
+                    res = res.join(|(mut v, input)| {
+                        Ok(a.parse(program, scope, input)?.map(|(va, next_input)| {
+                            v.push(va);
+                            (v, next_input)
+                        }))
+                    })?;
                 }
-                Ok((Value::Seq(v.into()), input))
+                Ok(res.map(|(v, input)| (Value::Seq(v.into()), input)))
             }
             Decoder::Maybe(expr, a) => {
                 let is_present = expr.eval_value(scope).unwrap_bool();
                 if is_present {
-                    let (raw, next_input) = a.parse(program, scope, input)?;
-                    Ok((Value::Option(Some(Box::new(raw))), next_input))
+                    Ok(a.parse(program, scope, input)?
+                        .map(|(val, input)| (Value::Option(Some(Box::new(val))), input)))
                 } else {
-                    Ok((Value::Option(None), input))
+                    Ok(WithErr::new((Value::Option(None), input)))
                 }
             }
             Decoder::RepeatUntilLast(expr, a) => {
-                let mut input = input;
-                let mut v = Vec::new();
+                // third value is "done" flag
+                let mut res = WithErr::new((Vec::new(), input, false));
                 loop {
-                    let (va, next_input) = a.parse(program, scope, input)?;
-                    input = next_input;
-                    let done = expr.eval_lambda(scope, &va).unwrap_bool();
-                    v.push(va);
-                    if done {
-                        break;
-                    }
+                    res = res.join(|(mut v, input, _done)| {
+                        Ok(a.parse(program, scope, input)?.map(|(va, next_input)| {
+                            let done = expr.eval_lambda(scope, &va).unwrap_bool();
+                            v.push(va);
+                            (v, next_input, done)
+                        }))
+                    })?;
+                    break_if_done!(res => (v, input));
                 }
-                Ok((Value::Seq(v.into()), input))
+                Ok(res.map(|(v, input, _)| (Value::Seq(v.into()), input)))
             }
             Decoder::RepeatUntilSeq(expr, a) => {
-                let mut input = input;
-                let mut v = Vec::new();
+                // third value is "done" flag
+                let mut res = WithErr::new((Vec::new(), input, false));
                 loop {
-                    let (va, next_input) = a.parse(program, scope, input)?;
-                    input = next_input;
-                    v.push(va);
-                    let vs = Value::Seq(v.into());
-                    let done = expr.eval_lambda(scope, &vs).unwrap_bool();
-                    v = match vs {
-                        Value::Seq(v) => v.into_vec(),
-                        _ => unreachable!(),
-                    };
-                    if done {
-                        break;
-                    }
+                    res = res.join(|(mut v, input, _done)| {
+                        Ok(a.parse(program, scope, input)?.map(|(va, next_input)| {
+                            v.push(va);
+                            let vs = Value::Seq(v.into());
+                            let done = expr.eval_lambda(scope, &vs).unwrap_bool();
+                            let v = match vs {
+                                Value::Seq(v) => v.into_vec(),
+                                _ => unreachable!(),
+                            };
+                            (v, next_input, done)
+                        }))
+                    })?;
+                    break_if_done!(res => (v, input));
                 }
-                Ok((Value::Seq(v.into()), input))
+                Ok(res.map(|(v, input, _)| (Value::Seq(v.into()), input)))
             }
             Decoder::AccumUntil(f_done, f_update, init, _vt, a) => {
-                let mut input = input;
-                let mut v = Vec::new();
-                let mut accum = init.eval_value(scope);
+                let accum = init.eval_value(scope);
+                let mut res = WithErr::new((Vec::new(), accum, input, false));
                 loop {
-                    let done_arg = Value::Tuple(vec![accum.clone(), Value::Seq(v.clone().into())]);
-                    let is_done = f_done.eval_lambda(scope, &done_arg).unwrap_bool();
-                    if is_done {
-                        break;
-                    }
-                    let (next_elem, next_input) = a.parse(program, scope, input)?;
-                    v.push(next_elem.clone());
-                    let update_arg = Value::Tuple(vec![accum.clone(), next_elem]);
-                    let next_accum = f_update.eval_lambda(scope, &update_arg);
-                    accum = next_accum;
-                    input = next_input;
+                    res = res.join(|(mut v, accum, input, _done)| {
+                        let done_arg =
+                            Value::Tuple(vec![accum.clone(), Value::Seq(v.clone().into())]);
+                        let is_done = f_done.eval_lambda(scope, &done_arg).unwrap_bool();
+                        if is_done {
+                            return Ok(WithErr::new((v, accum, input, true)));
+                        }
+                        Ok(a.parse(program, scope, input)?
+                            .map(|(next_elem, next_input)| {
+                                v.push(next_elem.clone());
+                                let update_arg = Value::Tuple(vec![accum.clone(), next_elem]);
+                                let next_accum = f_update.eval_lambda(scope, &update_arg);
+                                (v, next_accum, next_input, false)
+                            }))
+                    })?;
+                    break_if_done!(res => (v, accum, input));
                 }
-                Ok((Value::Tuple(vec![accum, Value::Seq(v.into())]), input))
+                Ok(res.map(|(v, accum, input, _)| {
+                    (Value::Tuple(vec![accum, Value::Seq(v.into())]), input)
+                }))
             }
-            Decoder::Peek(a) => {
-                let (v, _next_input) = a.parse(program, scope, input)?;
-                Ok((v, input))
-            }
+            Decoder::Peek(a) => Ok(a.parse(program, scope, input)?.map(|(v, _)| (v, input))),
             Decoder::PeekNot(a) => {
                 if a.parse(program, scope, input).is_ok() {
                     Err(DecodeError::<Value>::fail(scope, input))
                 } else {
-                    Ok((Value::Tuple(vec![]), input))
+                    Ok(WithErr::new((Value::Tuple(vec![]), input)))
                 }
             }
             Decoder::Slice(expr, a) => {
@@ -1932,23 +1937,25 @@ impl Decoder {
                 let (slice, input) = input
                     .split_at(size)
                     .ok_or(DecodeError::overrun(size, input.offset))?;
-                let (v, _) = a.parse(program, scope, slice)?;
-                Ok((v, input))
+                Ok(a.parse(program, scope, slice)?.map(|(v, _)| (v, input)))
             }
             Decoder::Bits(a) => {
+                // FIXME - copying the entire buffer as bits feels inefficient, we should measure performance and see if there is a better alternative
                 let mut bits = Vec::with_capacity(input.remaining().len() * 8);
                 for b in input.remaining() {
                     for i in 0..8 {
                         bits.push((b & (1 << i)) >> i);
                     }
                 }
-                let (v, bits) = a.parse(program, scope, ReadCtxt::new(&bits))?;
-                let bytes_remain = bits.remaining().len() >> 3;
-                let bytes_read = input.remaining().len() - bytes_remain;
-                let (_, input) = input
-                    .split_at(bytes_read)
-                    .ok_or(DecodeError::overrun(bytes_read, input.offset))?;
-                Ok((v, input))
+                a.parse(program, scope, ReadCtxt::new(&bits))?
+                    .join(|(v, bits)| {
+                        let bytes_remain = bits.remaining().len() >> 3;
+                        let bytes_read = input.remaining().len() - bytes_remain;
+                        let (_, input) = input
+                            .split_at(bytes_read)
+                            .ok_or(DecodeError::overrun(bytes_read, input.offset))?;
+                        Ok(WithErr::new((v, input)))
+                    })
             }
             Decoder::WithRelativeOffset(base_addr, expr, a) => {
                 let base = base_addr.eval_value(scope).unwrap_usize();
@@ -1957,24 +1964,31 @@ impl Decoder {
                 let seek_input = input
                     .seek_to(abs_offset)
                     .ok_or(DecodeError::bad_seek(abs_offset, input.input.len()))?;
-                let (v, _) = a.parse(program, scope, seek_input)?;
-                Ok((v, input))
+
+                Ok(a.parse(program, scope, seek_input)?
+                    .map(|(v, _)| (v, input)))
             }
-            Decoder::Map(d, expr) => {
-                let (orig, input) = d.parse(program, scope, input)?;
+            Decoder::Map(d, expr) => Ok(d.parse(program, scope, input)?.map(|(orig, input)| {
                 let v = expr.eval_lambda(scope, &orig);
-                Ok((Value::Mapped(Box::new(orig), Box::new(v)), input))
-            }
-            Decoder::Where(d, expr) => {
-                let (v, input) = d.parse(program, scope, input)?;
+                (Value::Mapped(Box::new(orig), Box::new(v)), input)
+            })),
+            Decoder::Where(d, cond) => d.parse(program, scope, input)?.join(|(v, input)| {
+                let Condition { expr, severity } = cond;
                 match expr.eval_lambda(scope, &v).unwrap_bool() {
-                    true => Ok((v, input)),
-                    false => Err(DecodeError::bad_where(scope, expr.clone(), Box::new(v))),
+                    true => Ok(WithErr::new((v, input))),
+                    false => {
+                        let err = DecodeError::bad_where(scope, expr.clone(), Box::new(v.clone()));
+                        if severity.is_strict() {
+                            Err(err)
+                        } else {
+                            Ok(WithErr::with_err((v, input), err))
+                        }
+                    }
                 }
-            }
+            }),
             Decoder::Compute(expr) => {
                 let v = expr.eval_value(scope);
-                Ok((v, input))
+                Ok(WithErr::new((v, input)))
             }
             Decoder::Let(name, expr, d) => {
                 let v = expr.eval_value(scope);
@@ -1990,11 +2004,12 @@ impl Decoder {
                 let head = head.eval(scope);
                 for (index, (pattern, decoder)) in branches.iter().enumerate() {
                     if let Some(pattern_scope) = head.matches(scope, pattern) {
-                        let (v, input) =
-                            decoder.parse(program, &Scope::Multi(&pattern_scope), input)?;
-                        return Ok((Value::Branch(index, Box::new(v)), input));
+                        return Ok(decoder
+                            .parse(program, &Scope::Multi(&pattern_scope), input)?
+                            .map(|(v, input)| (Value::Branch(index, Box::new(v)), input)));
                     }
                 }
+                // REVIEW - should this be an error instead of a panic?
                 panic!(
                     "non-exhaustive patterns: {head:?} not in {:#?}",
                     branches.iter().map(|(p, _)| p).collect::<Vec<_>>()
@@ -2023,11 +2038,10 @@ impl Decoder {
                 let d = scope.get_decoder_by_name(name);
                 d.parse(program, scope, input)
             }
-            Decoder::LiftedOption(None) => Ok((Value::Option(None), input)),
-            Decoder::LiftedOption(Some(dec)) => {
-                let (v, input) = dec.parse(program, scope, input)?;
-                Ok((Value::Option(Some(Box::new(v))), input))
-            }
+            Decoder::LiftedOption(None) => Ok(WithErr::new((Value::Option(None), input))),
+            Decoder::LiftedOption(Some(dec)) => Ok(dec
+                .parse(program, scope, input)?
+                .map(|(v, input)| (Value::Option(Some(Box::new(v))), input))),
             Decoder::CaptureBytes(v_expr, len) => {
                 let len = len.eval_value(scope).unwrap_usize();
 
@@ -2045,7 +2059,7 @@ impl Decoder {
                 }
 
                 // return the accumulated bytes, along with the original input
-                Ok((Value::Seq(SeqKind::Strict(accum)), input))
+                Ok(WithErr::new((Value::Seq(SeqKind::Strict(accum)), input)))
             }
             Decoder::ReadArray(v_expr, len, kind) => {
                 let len = len.eval_value(scope).unwrap_usize();
@@ -2060,16 +2074,16 @@ impl Decoder {
                     buf = new_buf;
                 }
 
-                Ok((Value::Seq(SeqKind::Strict(accum)), input))
+                Ok(WithErr::new((Value::Seq(SeqKind::Strict(accum)), input)))
             }
             Decoder::ReifyView(v_expr) => {
                 let view = Self::eval_view_expr(scope, v_expr)?;
-                Ok((
+                Ok(WithErr::new((
                     Value::View {
                         offset: view.offset,
                     },
                     input,
-                ))
+                )))
             }
         }
     }
@@ -2230,7 +2244,8 @@ mod tests {
         let program = Program::new();
         let (val, remain) = d
             .parse(&program, &Scope::Empty, ReadCtxt::new(input))
-            .unwrap();
+            .unwrap()
+            .into_inner();
         assert_eq!(val, expect);
         assert_eq!(remain.remaining(), tail);
     }
@@ -2974,19 +2989,8 @@ mod tests {
     #[test]
     #[ignore] // TODO can we distinguish a Union based on disjoint Where clauses?
     fn compile_where_u16be_eq() {
-        let u8 = Format::Byte(ByteSet::full());
-        let u16be = map(
-            tuple([u8.clone(), u8]),
-            lambda("x", Expr::U16Be(Box::new(var("x")))),
-        );
-        let a = Format::Where(
-            Box::new(u16be.clone()),
-            Box::new(lambda("x", expr_eq(var("x"), Expr::U16(0x00FF)))),
-        );
-        let b = Format::Where(
-            Box::new(u16be),
-            Box::new(lambda("x", expr_eq(var("x"), Expr::U16(0xFF00)))),
-        );
+        let a = where_lambda(u16be(), "x", expr_eq(var("x"), Expr::U16(0x00FF)));
+        let b = where_lambda(u16be(), "x", expr_eq(var("x"), Expr::U16(0xFF00)));
         let f = Format::Union(vec![a, b]);
         let d = Compiler::compile_one(&f).unwrap();
         accepts(

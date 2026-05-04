@@ -1,9 +1,11 @@
 use std::{fmt, io, rc::Rc};
 
 use crate::precedence::{Precedence, cond_paren};
+use crate::validation::{Condition, Severity};
 use crate::{
-    Arith, CommonOp, DynFormat, Expr, FieldLabel, Format, FormatModule, IntRel, Label, Pattern,
-    RecordFormat, StyleHint, UnaryOp, ViewExpr, ViewFormat, byte_set::ByteSet,
+    Arith, CommonOp, DynFormat, Expr, Format, FormatModule, IntRel, Label, Pattern, StyleHint,
+    UnaryOp, ViewExpr, ViewFormat, byte_set::ByteSet, record_fmt::FieldLabel,
+    record_fmt::RecordFormat,
 };
 use crate::{
     decoder::{SeqKind, Value},
@@ -269,6 +271,7 @@ impl<'module> TreePrinter<'module> {
             // FIXME[epic=workaround-hack] - we cannot easily reconstruct the format corresponding to the inner value, so we discard the format-hint
             Value::Option(Some(value)) => self.is_atomic_value(value, None),
             Value::PhantomData => true,
+            Value::Poison => true,
         }
     }
 
@@ -640,6 +643,7 @@ impl<'module> TreePrinter<'module> {
                     let record_format = fmt.to_record_format();
                     self.compile_record(value_fields, Some(&record_format))
                 }
+                Value::Poison => self.compile_value(value),
                 _ => panic!("expected record, found {value}"),
             },
             Format::Hint(StyleHint::AsciiStr, str_format) => {
@@ -796,6 +800,7 @@ impl<'module> TreePrinter<'module> {
             Value::PhantomData => {
                 Fragment::string("PhantomData<_>").delimit(Fragment::Char('<'), Fragment::Char('>'))
             }
+            Value::Poison => Fragment::string("NO_DATA"),
         }
     }
 
@@ -1051,7 +1056,7 @@ impl<'module> TreePrinter<'module> {
         vals: &Parsed<Vec<ParsedValue>>,
         formats: Option<&[Format]>,
     ) -> Fragment {
-        let Parsed { inner, loc } = vals;
+        let Parsed { inner, .. } = vals;
         let frag_value = if inner.is_empty() {
             Fragment::String("()".into())
         } else {
@@ -1073,7 +1078,7 @@ impl<'module> TreePrinter<'module> {
             ));
             frag
         };
-        self.compile_with_location(frag_value, *loc)
+        frag_value
     }
 
     fn compile_parsed_seq(
@@ -2277,10 +2282,14 @@ impl<'module> TreePrinter<'module> {
                     Precedence::FORMAT_COMPOUND,
                 )
             }
-            Format::Where(format, expr) => {
+            Format::Where(format, Condition { expr, severity }) => {
                 let expr_frag = self.compile_expr(expr, Precedence::ATOM);
+                let label = match severity {
+                    Severity::Require => "require",
+                    Severity::Expect => "expect",
+                };
                 cond_paren(
-                    self.compile_nested_format("assert", Some(&[expr_frag]), format, prec),
+                    self.compile_nested_format(label, Some(&[expr_frag]), format, prec),
                     prec,
                     Precedence::FORMAT_COMPOUND,
                 )

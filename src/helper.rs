@@ -4,6 +4,7 @@ use num_traits::{ToPrimitive, Zero};
 
 use crate::byte_set::ByteSet;
 pub use crate::marker::BaseKind;
+use crate::validation::{Condition, Severity};
 use crate::{
     Arith, BaseType, Expr, Format, IntRel, IntoLabel, Label, OwnedRecordFormat, Pattern,
     RecordBuilder, StyleHint, TypeHint, UnaryOp, ValueType, ViewExpr, ViewFormat,
@@ -861,7 +862,15 @@ pub fn dup(count: Expr, expr: Expr) -> Expr {
 
 /// Composed `Format::Where` and `Expr::Lambda` taking a raw format, an arbitrary name for the lambda expression head, and the lambda body as an Expr.
 pub fn where_lambda(raw: Format, name: impl IntoLabel, body: Expr) -> Format {
-    Format::Where(Box::new(raw), Box::new(lambda(name, body)))
+    Format::Where(Box::new(raw), Condition::from_lambda(lambda(name, body)))
+}
+
+/// Similar to [`where_lambda`], but with `Expect`-level severity instead of `Assert`.
+pub fn expect_lambda(raw: Format, name: impl IntoLabel, body: Expr) -> Format {
+    Format::Where(
+        Box::new(raw),
+        Condition::new(lambda(name, body), Severity::Expect),
+    )
 }
 
 /// Numeric validation helper that constrains a given format to yield a value that falls in the inclusive range `lower..=upper`
@@ -921,6 +930,14 @@ where
     R: Into<Bounds>,
 {
     where_lambda(format, "x", is_within(var("x"), range.into()))
+}
+
+/// Similar to [`where_within`], but with `Expect`-level severity instead of `Assert`.
+pub fn expect_within<R>(format: Format, range: R) -> Format
+where
+    R: Into<Bounds>,
+{
+    expect_lambda(format, "x", is_within(var("x"), range.into()))
 }
 
 /// Disjunctive version of [`where_within`] that applies to a collection of range-like value
