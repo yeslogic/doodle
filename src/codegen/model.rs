@@ -1,5 +1,3 @@
-use core::error;
-
 use crate::{BaseKind, Endian, Label};
 
 use super::rust_ast::*;

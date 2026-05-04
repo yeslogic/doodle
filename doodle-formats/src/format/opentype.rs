@@ -713,7 +713,7 @@ pub(crate) fn table_links(
             Label::Borrowed("tables"),
             ValueType::Seq(Box::new(table_type)),
         )],
-        vec![Label::Borrowed("font_view")],
+        vec![FONTVIEW_LBL],
         record_auto([
             (
                 "cmap",
@@ -1024,7 +1024,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
 
     let table_directory = module.define_format_views(
         "opentype.table_directory",
-        vec![Label::Borrowed("font_view")],
+        vec![FONTVIEW_LBL],
         record([
             (
                 "sfnt_version",
@@ -1052,7 +1052,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
             ),
             (
                 "table_links",
-                table_links.call_args_views(vec![var("table_records")], vec![vvar("font_view")]),
+                table_links.call_args_views(vec![var("table_records")], vec![FONTVIEW_VAR]),
             ),
         ]),
     );
@@ -1136,7 +1136,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
     module.define_format(
         "opentype.main",
         let_view(
-            "font_view",
+            FONTVIEW_LBL,
             record([
                 ("magic", Format::Peek(Box::new(u32be()))),
                 (
@@ -1147,23 +1147,23 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                             (
                                 Pattern::U32(0x00010000),
                                 "TableDirectory",
-                                table_directory.call_view(vvar("font_view")),
+                                table_directory.call_view(FONTVIEW_VAR),
                             ),
                             (
                                 Pattern::U32(util::magic(b"OTTO")),
                                 "TableDirectory",
-                                table_directory.call_view(vvar("font_view")),
+                                table_directory.call_view(FONTVIEW_VAR),
                             ),
                             (
                                 Pattern::U32(util::magic(b"ttcf")),
                                 "TTCHeader",
-                                ttc_header.call_view(vvar("font_view")),
+                                ttc_header.call_view(FONTVIEW_VAR),
                             ),
                             // TODO - not yet sure if TrueType fonts will parse correctly under our current table_directory implementation...
                             (
                                 Pattern::U32(util::magic(b"true")),
                                 "TableDirectory",
-                                table_directory.call_view(vvar("font_view")),
+                                table_directory.call_view(FONTVIEW_VAR),
                             ),
                             (Pattern::Wildcard, "UnknownTable", unknown_table),
                         ],
