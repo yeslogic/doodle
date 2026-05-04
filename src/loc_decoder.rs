@@ -1,3 +1,9 @@
+use std::borrow::Cow;
+use std::cmp::Ordering;
+
+use num_bigint::BigInt;
+use serde::Serialize;
+
 use crate::byte_set::ByteSet;
 use crate::decoder::View;
 use crate::decoder::break_if_done;
@@ -11,13 +17,7 @@ use crate::error::{DecodeError, ELocDecodeResult, LocDecodeResult};
 use crate::read::ReadCtxt;
 use crate::util::WithErr;
 use crate::validation::Condition;
-use crate::{
-    Arith, BaseKind, DynFormat, Endian, Expr, Format, IntRel, Label, Pattern, UnaryOp, ViewExpr,
-};
-use num_bigint::BigInt;
-use serde::Serialize;
-use std::borrow::Cow;
-use std::cmp::Ordering;
+use crate::{BaseKind, DynFormat, Endian, Expr, Format, Label, Pattern, ViewExpr};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Serialize)]
 pub enum ParseLoc {
@@ -625,213 +625,22 @@ impl Expr {
             }
             Expr::Lambda(_, _) => panic!("cannot eval lambda"),
 
-            Expr::IntRel(IntRel::Eq, x, y) => Cow::Owned(ParsedValue::from_evaluated(
-                match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::Bool(x == y),
-                    (Value::U16(x), Value::U16(y)) => Value::Bool(x == y),
-                    (Value::U32(x), Value::U32(y)) => Value::Bool(x == y),
-                    (Value::U64(x), Value::U64(y)) => Value::Bool(x == y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                },
-            )),
-            Expr::IntRel(IntRel::Ne, x, y) => Cow::Owned(ParsedValue::from_evaluated(
-                match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::Bool(x != y),
-                    (Value::U16(x), Value::U16(y)) => Value::Bool(x != y),
-                    (Value::U32(x), Value::U32(y)) => Value::Bool(x != y),
-                    (Value::U64(x), Value::U64(y)) => Value::Bool(x != y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                },
-            )),
-            Expr::IntRel(IntRel::Lt, x, y) => Cow::Owned(ParsedValue::from_evaluated(
-                match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::Bool(x < y),
-                    (Value::U16(x), Value::U16(y)) => Value::Bool(x < y),
-                    (Value::U32(x), Value::U32(y)) => Value::Bool(x < y),
-                    (Value::U64(x), Value::U64(y)) => Value::Bool(x < y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                },
-            )),
-            Expr::IntRel(IntRel::Gt, x, y) => Cow::Owned(ParsedValue::from_evaluated(
-                match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::Bool(x > y),
-                    (Value::U16(x), Value::U16(y)) => Value::Bool(x > y),
-                    (Value::U32(x), Value::U32(y)) => Value::Bool(x > y),
-                    (Value::U64(x), Value::U64(y)) => Value::Bool(x > y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                },
-            )),
-            Expr::IntRel(IntRel::Lte, x, y) => Cow::Owned(ParsedValue::from_evaluated(
-                match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::Bool(x <= y),
-                    (Value::U16(x), Value::U16(y)) => Value::Bool(x <= y),
-                    (Value::U32(x), Value::U32(y)) => Value::Bool(x <= y),
-                    (Value::U64(x), Value::U64(y)) => Value::Bool(x <= y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                },
-            )),
-            Expr::IntRel(IntRel::Gte, x, y) => Cow::Owned(ParsedValue::from_evaluated(
-                match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::Bool(x >= y),
-                    (Value::U16(x), Value::U16(y)) => Value::Bool(x >= y),
-                    (Value::U32(x), Value::U32(y)) => Value::Bool(x >= y),
-                    (Value::U64(x), Value::U64(y)) => Value::Bool(x >= y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                },
-            )),
-            Expr::Arith(Arith::Add, x, y) => Cow::Owned(ParsedValue::from_evaluated(
-                match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_add(x, y).unwrap()),
-                    (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_add(x, y).unwrap()),
-                    (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_add(x, y).unwrap()),
-                    (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_add(x, y).unwrap()),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                },
-            )),
-            Expr::Arith(Arith::Sub, x, y) => Cow::Owned(ParsedValue::from_evaluated(
-                match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_sub(x, y).unwrap()),
-                    (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_sub(x, y).unwrap()),
-                    (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_sub(x, y).unwrap()),
-                    (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_sub(x, y).unwrap()),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                },
-            )),
-            Expr::Arith(Arith::Mul, x, y) => Cow::Owned(ParsedValue::from_evaluated(
-                match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_mul(x, y).unwrap()),
-                    (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_mul(x, y).unwrap()),
-                    (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_mul(x, y).unwrap()),
-                    (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_mul(x, y).unwrap()),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                },
-            )),
-            Expr::Arith(Arith::Div, x, y) => Cow::Owned(ParsedValue::from_evaluated(
-                match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_div(x, y).unwrap()),
-                    (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_div(x, y).unwrap()),
-                    (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_div(x, y).unwrap()),
-                    (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_div(x, y).unwrap()),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                },
-            )),
-            Expr::Arith(Arith::Rem, x, y) => Cow::Owned(ParsedValue::from_evaluated(
-                match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_rem(x, y).unwrap()),
-                    (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_rem(x, y).unwrap()),
-                    (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_rem(x, y).unwrap()),
-                    (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_rem(x, y).unwrap()),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                },
-            )),
-            Expr::Arith(Arith::BitAnd, x, y) => Cow::Owned(ParsedValue::from_evaluated(
-                match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::U8(x & y),
-                    (Value::U16(x), Value::U16(y)) => Value::U16(x & y),
-                    (Value::U32(x), Value::U32(y)) => Value::U32(x & y),
-                    (Value::U64(x), Value::U64(y)) => Value::U64(x & y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                },
-            )),
-            Expr::Arith(Arith::BitOr, x, y) => Cow::Owned(ParsedValue::from_evaluated(
-                match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::U8(x | y),
-                    (Value::U16(x), Value::U16(y)) => Value::U16(x | y),
-                    (Value::U32(x), Value::U32(y)) => Value::U32(x | y),
-                    (Value::U64(x), Value::U64(y)) => Value::U64(x | y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                },
-            )),
-            Expr::Arith(Arith::BoolAnd, x, y) => Cow::Owned(ParsedValue::from_evaluated(
-                match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
-                    (Value::Bool(b0), Value::Bool(b1)) => Value::Bool(b0 && b1),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                },
-            )),
-            Expr::Arith(Arith::BoolOr, x, y) => Cow::Owned(ParsedValue::from_evaluated(
-                match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
-                    (Value::Bool(b0), Value::Bool(b1)) => Value::Bool(b0 || b1),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                },
-            )),
-            Expr::Arith(Arith::Shl, x, y) => Cow::Owned(ParsedValue::from_evaluated(
-                match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
-                    (Value::U8(x), Value::U8(y)) => {
-                        Value::U8(u8::checked_shl(x, u32::from(y)).unwrap())
-                    }
-                    (Value::U16(x), Value::U16(y)) => {
-                        Value::U16(u16::checked_shl(x, u32::from(y)).unwrap())
-                    }
-                    (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_shl(x, y).unwrap()),
-                    (Value::U64(x), Value::U64(y)) => {
-                        Value::U64(u64::checked_shl(x, u32::try_from(y).unwrap()).unwrap())
-                    }
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                },
-            )),
-            Expr::Arith(Arith::Shr, x, y) => Cow::Owned(ParsedValue::from_evaluated(
-                match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
-                    (Value::U8(x), Value::U8(y)) => {
-                        Value::U8(u8::checked_shr(x, u32::from(y)).unwrap())
-                    }
-                    (Value::U16(x), Value::U16(y)) => {
-                        Value::U16(u16::checked_shr(x, u32::from(y)).unwrap())
-                    }
-                    (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_shr(x, y).unwrap()),
-                    (Value::U64(x), Value::U64(y)) => {
-                        Value::U64(u64::checked_shr(x, u32::try_from(y).unwrap()).unwrap())
-                    }
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                },
-            )),
-            Expr::Unary(UnaryOp::BoolNot, x) => Cow::Owned(ParsedValue::from_evaluated(
-                match x.eval_value_with_loc(scope) {
-                    Value::Bool(x) => Value::Bool(!x),
-                    x => panic!("unexpected operand: expecting boolean, found `{x:?}`"),
-                },
-            )),
-            Expr::Unary(UnaryOp::IntSucc, x) => Cow::Owned(ParsedValue::from_evaluated(
-                match x.eval_value_with_loc(scope) {
-                    Value::U8(x) => Value::U8(
-                        x.checked_add(1)
-                            .unwrap_or_else(|| panic!("IntSucc(u8::MAX) overflow")),
-                    ),
-                    Value::U16(x) => Value::U16(
-                        x.checked_add(1)
-                            .unwrap_or_else(|| panic!("IntSucc(u16::MAX) overflow")),
-                    ),
-                    Value::U32(x) => Value::U32(
-                        x.checked_add(1)
-                            .unwrap_or_else(|| panic!("IntSucc(u32::MAX) overflow")),
-                    ),
-                    Value::U64(x) => Value::U64(
-                        x.checked_add(1)
-                            .unwrap_or_else(|| panic!("IntSucc(u64::MAX) overflow")),
-                    ),
-                    x => panic!("unexpected operand: expected integral value, found `{x:?}`"),
-                },
-            )),
-            Expr::Unary(UnaryOp::IntPred, x) => Cow::Owned(ParsedValue::from_evaluated(
-                match x.eval_value_with_loc(scope) {
-                    Value::U8(x) => Value::U8(
-                        x.checked_sub(1)
-                            .unwrap_or_else(|| panic!("IntPred(0u8) underflow")),
-                    ),
-                    Value::U16(x) => Value::U16(
-                        x.checked_sub(1)
-                            .unwrap_or_else(|| panic!("IntPred(0u16) underflow")),
-                    ),
-                    Value::U32(x) => Value::U32(
-                        x.checked_sub(1)
-                            .unwrap_or_else(|| panic!("IntPred(0u32) underflow")),
-                    ),
-                    Value::U64(x) => Value::U64(
-                        x.checked_sub(1)
-                            .unwrap_or_else(|| panic!("IntPred(0u64) underflow")),
-                    ),
-                    x => panic!("unexpected operand: expected integral value, found `{x:?}`"),
-                },
-            )),
+            Expr::IntRel(rel, x, y) => Cow::Owned(ParsedValue::from_evaluated({
+                let left = x.eval_value_with_loc(scope);
+                let right = y.eval_value_with_loc(scope);
+                Value::int_rel(*rel, left, right)
+            })),
+            Expr::Arith(op, x, y) => Cow::Owned(ParsedValue::from_evaluated({
+                let left = x.eval_value_with_loc(scope);
+                let right = y.eval_value_with_loc(scope);
+                Value::arith(*op, left, right)
+            })),
+            Expr::Unary(op, x) => Cow::Owned(ParsedValue::from_evaluated({
+                let value = x.eval_value_with_loc(scope);
+                Value::unary(*op, value)
+            })),
+
+            // FIXME - extract common logic for As-expr on Value instead of separate impl for decoder and loc_decoder
             Expr::AsU8(x) => Cow::Owned(ParsedValue::from_evaluated(
                 match x.eval_value_with_loc(scope) {
                     Value::U8(x) => Value::U8(x),
@@ -856,6 +665,7 @@ impl Expr {
                     Value::U16(x) => Value::U16(x),
                     Value::U32(x) => Value::U16(u16::try_from(x).unwrap()),
                     Value::U64(x) => Value::U16(u16::try_from(x).unwrap()),
+                    Value::Usize(x) => Value::U16(u16::try_from(x).unwrap()),
                     x => panic!("cannot convert {x:?} to U16"),
                 },
             )),
@@ -865,6 +675,7 @@ impl Expr {
                     Value::U16(x) => Value::U32(u32::from(x)),
                     Value::U32(x) => Value::U32(x),
                     Value::U64(x) => Value::U32(u32::try_from(x).unwrap()),
+                    Value::Usize(x) => Value::U32(u32::try_from(x).unwrap()),
                     x => panic!("cannot convert {x:?} to U32"),
                 },
             )),
@@ -874,6 +685,7 @@ impl Expr {
                     Value::U16(x) => Value::U64(u64::from(x)),
                     Value::U32(x) => Value::U64(u64::from(x)),
                     Value::U64(x) => Value::U64(x),
+                    Value::Usize(x) => Value::U64(u64::try_from(x).unwrap()),
                     x => panic!("cannot convert {x:?} to U64"),
                 },
             )),
@@ -1326,7 +1138,7 @@ impl<'a> LocScope<'a> {
     fn get_view_by_name(&self, name: &str) -> View<'a> {
         match self {
             LocScope::Empty => panic!("view not found: {name}"),
-            LocScope::Multi(multi) => multi.parent.get_view_by_name(name),
+            LocScope::Multi(multi) => multi.get_view_by_name(name),
             LocScope::Single(single) => single.parent.get_view_by_name(name),
             LocScope::Decoder(decoder) => decoder.parent.get_view_by_name(name),
             LocScope::View(view) => view.get_view_by_name(name),
@@ -1363,6 +1175,22 @@ impl<'a> LocMultiScope<'a> {
     pub fn push_view(&mut self, name: impl Into<Label>, view: View<'a>) {
         self.entries
             .push((name.into(), ViewOrParsedValue::View(view)))
+    }
+
+    fn get_view_by_name(&self, name: &str) -> View<'a> {
+        for (n, vv) in self.entries.iter().rev() {
+            if n == name {
+                if let ViewOrParsedValue::View(view) = vv {
+                    return *view;
+                } else {
+                    log::warn!(
+                        "LocMultiScope::get_view_by_name: query for `{name}` encountered a value-binding before any view-bindings, skipping..."
+                    );
+                    continue;
+                }
+            }
+        }
+        self.parent.get_view_by_name(name)
     }
 
     fn get_value_by_name(&self, name: &str) -> Result<&ParsedValue, UnknownVarError> {

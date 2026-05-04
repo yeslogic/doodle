@@ -13,10 +13,9 @@ use crate::read::ReadCtxt;
 use crate::util::WithErr;
 use crate::validation::Condition;
 use crate::{
-    Arith, DynFormat, Expr, Format, FormatModule, IntRel, MatchTree, Next, TypeScope, ValueType,
-    ViewExpr, pattern::Pattern,
+    BaseKind, DynFormat, Endian, Expr, Format, FormatModule, IntoLabel, Label, MatchTree,
+    MaybeTyped, Next, Pattern, TypeHint, TypeScope, ValueType, ViewExpr, ViewFormat,
 };
-use crate::{BaseKind, Endian, IntoLabel, Label, MaybeTyped, TypeHint, UnaryOp, ViewFormat};
 
 pub mod seq_kind;
 use seq_kind::sub_range;
@@ -404,6 +403,156 @@ impl Value {
     }
 }
 
+mod value {
+    use super::Value;
+    use crate::{Arith, IntRel, UnaryOp};
+
+    fn __rel<T>(rel: IntRel, left: T, right: T) -> bool
+    where
+        T: Eq + Ord,
+    {
+        match rel {
+            IntRel::Eq => left == right,
+            IntRel::Ne => left != right,
+            IntRel::Gt => left > right,
+            IntRel::Gte => left >= right,
+            IntRel::Lt => left < right,
+            IntRel::Lte => left <= right,
+        }
+    }
+
+    fn __arith<T>(arith: Arith, left: T, right: T) -> T
+    where
+        T: num_traits::CheckedAdd,
+        T: num_traits::CheckedSub,
+        T: num_traits::CheckedMul,
+        T: num_traits::CheckedDiv,
+        T: num_traits::CheckedRem,
+        T: num_traits::CheckedShl,
+        T: num_traits::CheckedShr,
+        T: num_traits::AsPrimitive<u32>,
+        T: std::ops::BitOr<Output = T>,
+        T: std::ops::BitAnd<Output = T>,
+    {
+        match arith {
+            Arith::Add => left
+                .checked_add(&right)
+                .unwrap_or_else(|| panic!("integer overflow")),
+            Arith::Sub => left
+                .checked_sub(&right)
+                .unwrap_or_else(|| panic!("integer overflow")),
+            Arith::Mul => left
+                .checked_mul(&right)
+                .unwrap_or_else(|| panic!("integer overflow")),
+            Arith::Div => left
+                .checked_div(&right)
+                .unwrap_or_else(|| panic!("integer overflow")),
+            Arith::Rem => left
+                .checked_rem(&right)
+                .unwrap_or_else(|| panic!("integer overflow")),
+            Arith::Shl => left << right.as_(),
+            Arith::Shr => left >> right.as_(),
+            Arith::BitOr => left | right,
+            Arith::BitAnd => left & right,
+            Arith::BoolOr | Arith::BoolAnd => unreachable!("bool ops should be handled separately"),
+        }
+    }
+
+    fn __unary<T>(op: UnaryOp, value: T) -> T
+    where
+        T: num_traits::CheckedAdd,
+        T: num_traits::CheckedSub,
+        T: num_traits::One,
+    {
+        match op {
+            UnaryOp::IntPred => value.checked_sub(&T::one()).unwrap_or_else(|| {
+                panic!(
+                    "__unary::<{}>@IntPred: integer underflow",
+                    std::any::type_name::<T>()
+                )
+            }),
+            UnaryOp::IntSucc => value.checked_add(&T::one()).unwrap_or_else(|| {
+                panic!(
+                    "__unary::<{}>@IntSucc: integer overflow",
+                    std::any::type_name::<T>()
+                )
+            }),
+            UnaryOp::BoolNot => unreachable!("bool ops should be handled separately"),
+        }
+    }
+
+    impl Value {
+        pub fn int_rel(rel: IntRel, left: Value, right: Value) -> Value {
+            match (left, right) {
+                (Value::U8(l), Value::U8(r)) => Value::Bool(__rel(rel, l, r)),
+                (Value::U16(l), Value::U16(r)) => Value::Bool(__rel(rel, l, r)),
+                (Value::U32(l), Value::U32(r)) => Value::Bool(__rel(rel, l, r)),
+                (Value::U64(l), Value::U64(r)) => Value::Bool(__rel(rel, l, r)),
+                (Value::Usize(l), Value::Usize(r)) => Value::Bool(__rel(rel, l, r)),
+                (Value::Numeric(_l), Value::Numeric(_r)) => {
+                    unimplemented!("int_rel: TypedConst comparison not yet implemented");
+                }
+                (left, right) => {
+                    panic!("cannot apply int-rel {rel:?} to (`{left:?}`, `{right:?}`)")
+                }
+            }
+        }
+
+        pub fn arith(arith: Arith, left: Value, right: Value) -> Value {
+            if matches!(arith, Arith::BoolOr | Arith::BoolAnd) {
+                match (left, right) {
+                    (Value::Bool(l), Value::Bool(r)) => match arith {
+                        Arith::BoolOr => Value::Bool(l || r),
+                        Arith::BoolAnd => Value::Bool(l && r),
+                        _ => unreachable!(),
+                    },
+                    (left, right) => {
+                        panic!(
+                            "cannot perform boolean operation on non-boolean operand-pair (`{left:?}`, `{right:?}`)"
+                        );
+                    }
+                }
+            } else {
+                match (left, right) {
+                    (Value::U8(l), Value::U8(r)) => Value::U8(__arith(arith, l, r)),
+                    (Value::U16(l), Value::U16(r)) => Value::U16(__arith(arith, l, r)),
+                    (Value::U32(l), Value::U32(r)) => Value::U32(__arith(arith, l, r)),
+                    (Value::U64(l), Value::U64(r)) => Value::U64(__arith(arith, l, r)),
+                    (Value::Usize(l), Value::Usize(r)) => Value::Usize(__arith(arith, l, r)),
+                    (Value::Numeric(_l), Value::Numeric(_r)) => {
+                        panic!(
+                            "raw arithmetic on numerics should be done in numeric model, or with Expr-level casts beforehand"
+                        );
+                    }
+                    (left, right) => {
+                        panic!("cannot apply arith {arith:?} to (`{left:?}`, `{right:?}`)")
+                    }
+                }
+            }
+        }
+
+        pub fn unary(op: UnaryOp, value: Value) -> Value {
+            match op {
+                UnaryOp::BoolNot => match value {
+                    Value::Bool(b) => Value::Bool(!b),
+                    _ => panic!("cannot apply bool-not to non-boolean operand (`{value:?}`)"),
+                },
+                op => match value {
+                    Value::U8(i) => Value::U8(__unary(op, i)),
+                    Value::U16(i) => Value::U16(__unary(op, i)),
+                    Value::U32(i) => Value::U32(__unary(op, i)),
+                    Value::U64(i) => Value::U64(__unary(op, i)),
+                    Value::Usize(i) => Value::Usize(__unary(op, i)),
+                    Value::Numeric(_i) => {
+                        panic!("top-level unary operations should not be performed on raw-numeric");
+                    }
+                    _ => panic!("cannot apply unary {op:?} to non-numeric operand (`{value:?}`)"),
+                },
+            }
+        }
+    }
+}
+
 impl Expr {
     pub fn eval<'a>(&'a self, scope: &'a Scope<'a>) -> Cow<'a, Value> {
         match self {
@@ -461,247 +610,22 @@ impl Expr {
             }
             Expr::Lambda(_, _) => panic!("cannot eval lambda"),
 
-            Expr::IntRel(IntRel::Eq, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::Bool(x == y),
-                    (Value::U16(x), Value::U16(y)) => Value::Bool(x == y),
-                    (Value::U32(x), Value::U32(y)) => Value::Bool(x == y),
-                    (Value::U64(x), Value::U64(y)) => Value::Bool(x == y),
-                    (Value::Usize(x), Value::Usize(y)) => Value::Bool(x == y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::IntRel(IntRel::Ne, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::Bool(x != y),
-                    (Value::U16(x), Value::U16(y)) => Value::Bool(x != y),
-                    (Value::U32(x), Value::U32(y)) => Value::Bool(x != y),
-                    (Value::U64(x), Value::U64(y)) => Value::Bool(x != y),
-                    (Value::Usize(x), Value::Usize(y)) => Value::Bool(x != y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::IntRel(IntRel::Lt, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::Bool(x < y),
-                    (Value::U16(x), Value::U16(y)) => Value::Bool(x < y),
-                    (Value::U32(x), Value::U32(y)) => Value::Bool(x < y),
-                    (Value::U64(x), Value::U64(y)) => Value::Bool(x < y),
-                    (Value::Usize(x), Value::Usize(y)) => Value::Bool(x < y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::IntRel(IntRel::Gt, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::Bool(x > y),
-                    (Value::U16(x), Value::U16(y)) => Value::Bool(x > y),
-                    (Value::U32(x), Value::U32(y)) => Value::Bool(x > y),
-                    (Value::U64(x), Value::U64(y)) => Value::Bool(x > y),
-                    (Value::Usize(x), Value::Usize(y)) => Value::Bool(x > y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::IntRel(IntRel::Lte, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::Bool(x <= y),
-                    (Value::U16(x), Value::U16(y)) => Value::Bool(x <= y),
-                    (Value::U32(x), Value::U32(y)) => Value::Bool(x <= y),
-                    (Value::U64(x), Value::U64(y)) => Value::Bool(x <= y),
-                    (Value::Usize(x), Value::Usize(y)) => Value::Bool(x <= y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::IntRel(IntRel::Gte, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::Bool(x >= y),
-                    (Value::U16(x), Value::U16(y)) => Value::Bool(x >= y),
-                    (Value::U32(x), Value::U32(y)) => Value::Bool(x >= y),
-                    (Value::U64(x), Value::U64(y)) => Value::Bool(x >= y),
-                    (Value::Usize(x), Value::Usize(y)) => Value::Bool(x >= y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::Arith(Arith::Add, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_add(x, y).unwrap()),
-                    (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_add(x, y).unwrap()),
-                    (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_add(x, y).unwrap()),
-                    (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_add(x, y).unwrap()),
-                    (Value::Usize(x), Value::Usize(y)) => {
-                        Value::Usize(usize::checked_add(x, y).unwrap())
-                    }
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::Arith(Arith::Sub, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_sub(x, y).unwrap()),
-                    (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_sub(x, y).unwrap()),
-                    (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_sub(x, y).unwrap()),
-                    (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_sub(x, y).unwrap()),
-                    (Value::Usize(x), Value::Usize(y)) => {
-                        Value::Usize(usize::checked_sub(x, y).unwrap())
-                    }
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::Arith(Arith::Mul, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_mul(x, y).unwrap()),
-                    (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_mul(x, y).unwrap()),
-                    (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_mul(x, y).unwrap()),
-                    (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_mul(x, y).unwrap()),
-                    (Value::Usize(x), Value::Usize(y)) => {
-                        Value::Usize(usize::checked_mul(x, y).unwrap())
-                    }
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::Arith(Arith::Div, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_div(x, y).unwrap()),
-                    (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_div(x, y).unwrap()),
-                    (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_div(x, y).unwrap()),
-                    (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_div(x, y).unwrap()),
-                    (Value::Usize(x), Value::Usize(y)) => {
-                        Value::Usize(usize::checked_div(x, y).unwrap())
-                    }
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::Arith(Arith::Rem, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_rem(x, y).unwrap()),
-                    (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_rem(x, y).unwrap()),
-                    (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_rem(x, y).unwrap()),
-                    (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_rem(x, y).unwrap()),
-                    (Value::Usize(x), Value::Usize(y)) => {
-                        Value::Usize(usize::checked_rem(x, y).unwrap())
-                    }
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::Arith(Arith::BitAnd, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::U8(x & y),
-                    (Value::U16(x), Value::U16(y)) => Value::U16(x & y),
-                    (Value::U32(x), Value::U32(y)) => Value::U32(x & y),
-                    (Value::U64(x), Value::U64(y)) => Value::U64(x & y),
-                    (Value::Usize(x), Value::Usize(y)) => Value::Usize(x & y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::Arith(Arith::BitOr, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => Value::U8(x | y),
-                    (Value::U16(x), Value::U16(y)) => Value::U16(x | y),
-                    (Value::U32(x), Value::U32(y)) => Value::U32(x | y),
-                    (Value::U64(x), Value::U64(y)) => Value::U64(x | y),
-                    (Value::Usize(x), Value::Usize(y)) => Value::Usize(x | y),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::Arith(Arith::BoolAnd, x, y) => {
-                // REVIEW - do we want left-biased short-circuiting?
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::Bool(b0), Value::Bool(b1)) => Value::Bool(b0 && b1),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::Arith(Arith::BoolOr, x, y) => {
-                // REVIEW - do we want left-biased short-circuiting?
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::Bool(b0), Value::Bool(b1)) => Value::Bool(b0 || b1),
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::Arith(Arith::Shl, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => {
-                        Value::U8(u8::checked_shl(x, u32::from(y)).unwrap())
-                    }
-                    (Value::U16(x), Value::U16(y)) => {
-                        Value::U16(u16::checked_shl(x, u32::from(y)).unwrap())
-                    }
-                    (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_shl(x, y).unwrap()),
-                    (Value::U64(x), Value::U64(y)) => {
-                        Value::U64(u64::checked_shl(x, u32::try_from(y).unwrap()).unwrap())
-                    }
-                    (Value::Usize(x), Value::Usize(y)) => {
-                        Value::Usize(usize::checked_shl(x, u32::try_from(y).unwrap()).unwrap())
-                    }
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::Arith(Arith::Shr, x, y) => {
-                Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                    (Value::U8(x), Value::U8(y)) => {
-                        Value::U8(u8::checked_shr(x, u32::from(y)).unwrap())
-                    }
-                    (Value::U16(x), Value::U16(y)) => {
-                        Value::U16(u16::checked_shr(x, u32::from(y)).unwrap())
-                    }
-                    (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_shr(x, y).unwrap()),
-                    (Value::U64(x), Value::U64(y)) => {
-                        Value::U64(u64::checked_shr(x, u32::try_from(y).unwrap()).unwrap())
-                    }
-                    (Value::Usize(x), Value::Usize(y)) => {
-                        Value::Usize(usize::checked_shr(x, u32::try_from(y).unwrap()).unwrap())
-                    }
-                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                })
-            }
-            Expr::Unary(UnaryOp::BoolNot, x) => Cow::Owned(match x.eval_value(scope) {
-                Value::Bool(x) => Value::Bool(!x),
-                x => panic!("unexpected operand: expecting boolean, found `{x:?}`"),
+            Expr::IntRel(rel, x, y) => Cow::Owned({
+                let left = x.eval_value(scope);
+                let right = y.eval_value(scope);
+                Value::int_rel(*rel, left, right)
             }),
-            Expr::Unary(UnaryOp::IntSucc, x) => Cow::Owned(match x.eval_value(scope) {
-                Value::U8(x) => Value::U8(
-                    x.checked_add(1)
-                        .unwrap_or_else(|| panic!("IntSucc(u8::MAX) overflowed")),
-                ),
-                Value::U16(x) => Value::U16(
-                    x.checked_add(1)
-                        .unwrap_or_else(|| panic!("IntSucc(u16::MAX) overflowed")),
-                ),
-                Value::U32(x) => Value::U32(
-                    x.checked_add(1)
-                        .unwrap_or_else(|| panic!("IntSucc(u32::MAX) overflowed")),
-                ),
-                Value::U64(x) => Value::U64(
-                    x.checked_add(1)
-                        .unwrap_or_else(|| panic!("IntSucc(u64::MAX) overflowed")),
-                ),
-                Value::Usize(x) => Value::Usize(
-                    x.checked_add(1)
-                        .unwrap_or_else(|| panic!("IntSucc(usize::MAX) overflowed")),
-                ),
-                x => panic!("unexpected operand: expected integral value, found `{x:?}`"),
+            Expr::Arith(op, x, y) => Cow::Owned({
+                let left = x.eval_value(scope);
+                let right = y.eval_value(scope);
+                Value::arith(*op, left, right)
             }),
-            Expr::Unary(UnaryOp::IntPred, x) => Cow::Owned(match x.eval_value(scope) {
-                Value::U8(x) => Value::U8(
-                    x.checked_sub(1)
-                        .unwrap_or_else(|| panic!("IntPred(0u8) underflow")),
-                ),
-                Value::U16(x) => Value::U16(
-                    x.checked_sub(1)
-                        .unwrap_or_else(|| panic!("IntPred(0u16) underflow")),
-                ),
-                Value::U32(x) => Value::U32(
-                    x.checked_sub(1)
-                        .unwrap_or_else(|| panic!("IntPred(0u32) underflow")),
-                ),
-                Value::U64(x) => Value::U64(
-                    x.checked_sub(1)
-                        .unwrap_or_else(|| panic!("IntPred(0u64) underflow")),
-                ),
-                Value::Usize(x) => Value::Usize(
-                    x.checked_sub(1)
-                        .unwrap_or_else(|| panic!("IntPred(0u64) underflow")),
-                ),
-                x => panic!("unexpected operand: expected integral value, found `{x:?}`"),
+            Expr::Unary(op, x) => Cow::Owned({
+                let value = x.eval_value(scope);
+                Value::unary(*op, value)
             }),
 
+            // FIXME - extract common logic for As-expr on Value instead of separate impl for decoder and loc_decoder
             Expr::AsU8(x) => {
                 Cow::Owned(match x.eval_value(scope) {
                     Value::U8(x) => Value::U8(x),
@@ -1535,7 +1459,7 @@ impl<'a> Scope<'a> {
     fn get_view_by_name(&self, name: &str) -> View<'a> {
         match self {
             Scope::Empty => panic!("view not found: {name}"),
-            Scope::Multi(multi) => multi.parent.get_view_by_name(name),
+            Scope::Multi(multi) => multi.get_view_by_name(name),
             Scope::Single(single) => single.parent.get_view_by_name(name),
             Scope::Decoder(decoder) => decoder.parent.get_view_by_name(name),
             Scope::View(view) => view.get_view_by_name(name),
@@ -1578,6 +1502,22 @@ impl<'a> MultiScope<'a> {
 
     pub fn push_view(&mut self, name: impl Into<Label>, view: View<'a>) {
         self.entries.push((name.into(), ViewOrValue::View(view)));
+    }
+
+    fn get_view_by_name(&self, name: &str) -> View<'a> {
+        for (n, v) in self.entries.iter().rev() {
+            if n == name {
+                if let ViewOrValue::View(v) = v {
+                    return *v;
+                } else {
+                    log::warn!(
+                        "MultiScope::get_view_by_name: query for `{name}` encountered a value-binding before any view-bindings, skipping..."
+                    );
+                    continue;
+                }
+            }
+        }
+        self.parent.get_view_by_name(name)
     }
 
     fn get_value_by_name(&self, name: &str) -> Result<&Value, UnknownVarError> {
