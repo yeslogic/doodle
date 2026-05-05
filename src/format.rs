@@ -144,6 +144,11 @@ pub enum Format {
     // !SECTION
     // Include a format in the tree as a placeholder, without ever processing it
     Phantom(Box<Format>),
+    /// Parse a format but require it to be fully error-free, including formerly non-critical errors
+    Enforce(Box<Format>),
+    /// Parse a format but downgrade any errors it produces to warnings, producing a default value if it has already failed
+    // NOTE - because of Value::Poison, the default expression is not used in interpreter mode
+    Permit(Box<Format>, Box<Expr>),
 }
 
 impl Format {
@@ -306,7 +311,9 @@ impl Format {
             Format::LetFormat(first, _, second) | Format::MonadSeq(first, second) => {
                 first.match_bounds(module) + second.match_bounds(module)
             }
-            Format::Hint(.., inner) => inner.match_bounds(module),
+            Format::Permit(inner, ..) | Format::Enforce(inner) | Format::Hint(.., inner) => {
+                inner.match_bounds(module)
+            }
             Format::LiftedOption(opt) => match opt {
                 None => Bounds::exact(0),
                 Some(f) => f.match_bounds(module),
@@ -388,6 +395,8 @@ impl Format {
                 f0.lookahead_bounds(module),
                 f0.match_bounds(module) + f.lookahead_bounds(module),
             ),
+            Format::Permit(f, _expr) => f.lookahead_bounds(module),
+            Format::Enforce(f) => f.lookahead_bounds(module),
             Format::Hint(_, f) => f.lookahead_bounds(module),
             Format::LiftedOption(opt) => match opt {
                 None => Bounds::exact(0),
@@ -461,7 +470,9 @@ impl Format {
             Format::MonadSeq(first, second) | Format::LetFormat(first, _, second) => {
                 first.depends_on_next(module) || second.depends_on_next(module)
             }
-            Format::Hint(_, f) => f.depends_on_next(module),
+            Format::Enforce(f) | Format::Permit(f, _) | Format::Hint(_, f) => {
+                f.depends_on_next(module)
+            }
             Format::LiftedOption(opt) => opt.as_ref().is_some_and(|f| f.depends_on_next(module)),
             Format::Phantom(_) => false,
         }

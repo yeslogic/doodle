@@ -1967,6 +1967,24 @@ where
 }
 // !SECTION
 
+// SECTION - error marshalling
+
+/// Helper for [`Format::Permit`], which downgrades errors in the interior format to warnings,
+/// and substitutes in a custom value if the parse did not succeed.
+///
+/// The ValueType of the format and the replacement value must be the same.
+pub fn permit(format: Format, if_error: Expr) -> Format {
+    Format::Permit(Box::new(format), Box::new(if_error))
+}
+
+/// Helper for [`Format::Enforce`], which upgrades warnings to errors in the interior format.
+///
+// FIXME - Does not yet work properly in generated code.
+pub fn enforce(format: Format) -> Format {
+    Format::Enforce(Box::new(format))
+}
+// !SECTION
+
 /// Given a base expression and a mapping from single-value patterns to variant names (along with an optional label for an unknown-value catch-all),
 /// yields an expression that matches on the base expression and interprets it as the implied enum.
 pub fn interpret_as_enum<const N: usize>(

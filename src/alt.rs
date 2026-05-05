@@ -76,6 +76,8 @@ pub enum MonoKind {
     ParseFromView(ViewExpr),
     Hint(StyleHint),
     Phantom,
+    Enforce,
+    Permit(Box<Expr>),
 }
 
 /// Descent-patterns for Formats that hold `Vec<Format>`
@@ -1243,6 +1245,12 @@ impl FormatModuleExt {
                             self.infer_format_ext_type(scope, f)
                         }
                         MonoKind::Hint(_) => self.infer_format_ext_type(scope, f),
+                        MonoKind::Enforce => self.infer_format_ext_type(scope, f),
+                        MonoKind::Permit(dft) => {
+                            let t0 = dft.infer_type_ext(scope)?;
+                            let t1 = self.infer_format_ext_type(scope, f)?;
+                            Ok(t0.unify(&t1)?)
+                        }
                         MonoKind::Phantom => {
                             let _ = self.infer_format_ext_type(scope, f);
                             Ok(ValueTypeExt::UNIT)
@@ -1919,6 +1927,14 @@ mod __impls {
                     let inner = Box::new(FormatExt::from(*inner));
                     FormatExt::Epi(EpiFormat::Mono(MonoKind::Phantom, inner))
                 }
+                Format::Enforce(format) => FormatExt::Epi(EpiFormat::Mono(
+                    MonoKind::Enforce,
+                    Box::new(FormatExt::from(*format)),
+                )),
+                Format::Permit(format, expr) => FormatExt::Epi(EpiFormat::Mono(
+                    MonoKind::Permit(expr),
+                    Box::new(FormatExt::from(*format)),
+                )),
             }
         }
     }
@@ -1996,6 +2012,8 @@ mod __impls {
                 MonoKind::Hint(style_hint) => Format::Hint(style_hint, inner),
                 MonoKind::LetView(ident) => Format::LetView(ident, inner),
                 MonoKind::Phantom => Format::Phantom(inner),
+                MonoKind::Enforce => Format::Enforce(inner),
+                MonoKind::Permit(expr) => Format::Permit(inner, expr),
             }
         }
     }

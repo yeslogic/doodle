@@ -104,6 +104,8 @@ impl<'module> TreePrinter<'module> {
             Format::Phantom(_) => true,
             Format::Byte(bs) => bs.len() == 1,
             Format::Tuple(fields) => fields.iter().all(|f| self.is_implied_value_format(f)),
+            Format::Enforce(f) => self.is_implied_value_format(f),
+            Format::Permit(f, _e) => self.is_implied_value_format(f),
             Format::Hint(StyleHint::Common(_), inner) => self.is_implied_value_format(inner),
             Format::Hint(StyleHint::AsciiChar, inner) => self.is_implied_value_format(inner),
             Format::Hint(StyleHint::AsciiStr, inner) => self.is_implied_value_format(inner),
@@ -558,6 +560,8 @@ impl<'module> TreePrinter<'module> {
             Format::LetFormat(_f0, _name, f) => self.compile_parsed_decoded_value(value, f),
             Format::MonadSeq(_f0, f) => self.compile_parsed_decoded_value(value, f),
             Format::Hint(_hint, f) => self.compile_parsed_decoded_value(value, f),
+            Format::Permit(f, _e) => self.compile_parsed_decoded_value(value, f),
+            Format::Enforce(f) => self.compile_parsed_decoded_value(value, f),
             // REVIEW[epic=view-format] - is this correct?
             Format::WithView(_ident, _vf) => self.compile_parsed_value(value),
         }
@@ -664,6 +668,11 @@ impl<'module> TreePrinter<'module> {
                 // REVIEW - do we want to modify the output based on the hint?
                 self.compile_decoded_value(value, inner)
             }
+            Format::Permit(format, _) => {
+                // FIXME - because the value produced by this node might appear from nowhere, it might not look right to the inner format (e.g. as when it would expect Branch)
+                self.compile_decoded_value(value, format)
+            }
+            Format::Enforce(format) => self.compile_decoded_value(value, format),
             Format::Repeat(format)
             | Format::Repeat1(format)
             | Format::ForEach(_, _, format)
@@ -748,6 +757,10 @@ impl<'module> TreePrinter<'module> {
                 Value::Branch(index, value) => {
                     let (_pattern, format) = &branches[*index];
                     frag.append(self.compile_decoded_value(value, format));
+                    frag
+                }
+                Value::Poison => {
+                    frag.append(self.compile_value(value));
                     frag
                 }
                 _ => panic!("expected branch, found {value}"),
@@ -2440,6 +2453,19 @@ impl<'module> TreePrinter<'module> {
                 //     Precedence::FORMAT_COMPOUND,
                 // )
             }
+            Format::Permit(format, expr) => {
+                let dft_frag = self.compile_expr(expr, Precedence::Top);
+                cond_paren(
+                    self.compile_nested_format("permit", Some(&[dft_frag]), format, prec),
+                    prec,
+                    Precedence::FORMAT_COMPOUND,
+                )
+            }
+            Format::Enforce(format) => cond_paren(
+                self.compile_nested_format("enforce", None, format, prec),
+                prec,
+                Precedence::FORMAT_COMPOUND,
+            ),
             Format::WithView(view, view_format) => {
                 let view_frag = self.compile_view_expr(view, Precedence::Atomic);
                 let view_fmt_frag = match view_format {

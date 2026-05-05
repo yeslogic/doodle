@@ -969,11 +969,14 @@ pub(crate) fn table_links(
             ),
             (
                 "dsig",
-                optional_table(
-                    util::FONTVIEW_VAR,
-                    var("tables"),
-                    util::magic(b"DSIG"),
-                    dsig_table.call(),
+                permit(
+                    optional_table(
+                        util::FONTVIEW_VAR,
+                        var("tables"),
+                        util::magic(b"DSIG"),
+                        dsig_table.call(),
+                    ),
+                    expr_none(),
                 ),
             ),
             (

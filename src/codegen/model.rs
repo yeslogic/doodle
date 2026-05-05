@@ -148,6 +148,9 @@ pub const VARIANT_INNER: &str = "inner";
 
 pub const WHERE_INNER: &str = "inner";
 pub const WHERE_CHECK: &str = "is_valid";
+
+pub const PERMIT_BIND: &str = "res";
+pub const PERMIT_ERR: &str = "err";
 // !SECTION
 
 // !SECTION
@@ -440,12 +443,14 @@ pub fn view_offset(view: RustExpr, offset: RustExpr) -> RustExpr {
 
 pub fn yield_value_with_error(value: RustExpr, error: RustExpr) -> (Vec<RustStmt>, RustExpr) {
     let handle_err = {
-        let RustExpr::ResultErr(error) = error else {
-            unreachable!()
+        let error = if let RustExpr::ResultErr(error) = error {
+            *error
+        } else {
+            error
         };
         let log_message = LogMessage {
             format_string: Label::Borrowed("expect-level value assertion failed: {}"),
-            args: vec![*error],
+            args: vec![error],
         };
         [RustStmt::Expr(RustExpr::Macro(RustMacro::Log(
             LogFn::Error,
