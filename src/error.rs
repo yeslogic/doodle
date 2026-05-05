@@ -7,11 +7,57 @@ use crate::{Expr, Label};
 
 pub type DecodeResult<T> = Result<T, DecodeError>;
 pub type EDecodeResult<T> = EResult<T, DecodeError>;
-pub type LocDecodeResult<T> = Result<T, DecodeError<crate::loc_decoder::ParsedValue>>;
-pub type ELocDecodeResult<T> = EResult<T, DecodeError<crate::loc_decoder::ParsedValue>>;
+// FIXME - update and replace DecodeErrorKind with DecodeError below
+pub type LocDecodeResult<T> = Result<T, DecodeErrorKind<crate::loc_decoder::ParsedValue>>;
+pub type ELocDecodeResult<T> = EResult<T, DecodeErrorKind<crate::loc_decoder::ParsedValue>>;
 
 #[derive(Debug)]
-pub enum DecodeError<V: Clone = Value> {
+pub struct DecodeError<V: Clone = Value> {
+    pub err: Box<DecodeErrorKind<V>>,
+    pub _trace: Vec<Box<dyn std::fmt::Debug + Sync + Send + 'static>>,
+}
+
+impl<V: Clone + std::fmt::Debug> crate::util::ErrTrace for DecodeError<V> {
+    fn with_trace<T>(mut self, ctxt: T) -> Self
+    where
+        T: std::fmt::Debug + Sync + Send + 'static,
+    {
+        self._trace.push(Box::new(ctxt));
+        self
+    }
+}
+
+impl<V: Clone + std::fmt::Debug> From<DecodeErrorKind<V>> for DecodeError<V> {
+    fn from(err: DecodeErrorKind<V>) -> Self {
+        DecodeError {
+            err: Box::new(err),
+            _trace: Vec::new(),
+        }
+    }
+}
+
+impl<V: Clone + std::fmt::Debug> std::fmt::Display for DecodeError<V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self._trace.is_empty() {
+            write!(f, "{}", self.err)
+        } else {
+            writeln!(f, "{} (", self.err)?;
+            for item in self._trace.iter() {
+                writeln!(f, "\t{item:?}")?;
+            }
+            write!(f, ")")
+        }
+    }
+}
+
+impl<V: Clone + std::fmt::Debug + 'static> std::error::Error for DecodeError<V> {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.err)
+    }
+}
+
+#[derive(Debug)]
+pub enum DecodeErrorKind<V: Clone = Value> {
     Fail {
         bindings: Vec<(Label, ScopeEntry<V>)>,
         offset: usize,
@@ -47,7 +93,19 @@ pub enum DecodeError<V: Clone = Value> {
     },
 }
 
-impl<V: std::fmt::Debug + Clone> std::fmt::Display for DecodeError<V> {
+impl<V: Clone> DecodeErrorKind<V> {
+    pub fn with_trace<T>(self, trace: T) -> DecodeError<V>
+    where
+        T: std::fmt::Debug + Sync + Send + 'static,
+    {
+        DecodeError {
+            err: Box::new(self),
+            _trace: vec![Box::new(trace)],
+        }
+    }
+}
+
+impl<V: std::fmt::Debug + Clone> std::fmt::Display for DecodeErrorKind<V> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Fail {
@@ -117,15 +175,15 @@ impl<V: std::fmt::Debug + Clone> std::fmt::Display for DecodeError<V> {
     }
 }
 
-impl<V: std::fmt::Debug + Clone> std::error::Error for DecodeError<V> {}
+impl<V: std::fmt::Debug + Clone> std::error::Error for DecodeErrorKind<V> {}
 
-impl DecodeError<Value> {
-    pub fn fail(scope: &Scope<'_>, input: ReadCtxt<'_>) -> DecodeError<Value> {
+impl DecodeErrorKind<Value> {
+    pub fn fail(scope: &Scope<'_>, input: ReadCtxt<'_>) -> DecodeErrorKind<Value> {
         let mut bindings = Vec::new();
         scope.get_bindings(&mut bindings);
         let offset = input.offset;
         let buffer = input.input.to_owned();
-        DecodeError::Fail {
+        DecodeErrorKind::Fail {
             bindings,
             offset,
             buffer,
@@ -136,10 +194,10 @@ impl DecodeError<Value> {
         scope: &Scope<'_>,
         assertion: Box<Expr>,
         exception: Box<Value>,
-    ) -> DecodeError<Value> {
+    ) -> DecodeErrorKind<Value> {
         let mut bindings = Vec::new();
         scope.get_bindings(&mut bindings);
-        DecodeError::BadWhere {
+        DecodeErrorKind::BadWhere {
             bindings,
             assertion,
             exception,
@@ -147,13 +205,13 @@ impl DecodeError<Value> {
     }
 }
 
-impl DecodeError<ParsedValue> {
-    pub fn loc_fail(scope: &LocScope<'_>, input: ReadCtxt<'_>) -> DecodeError<ParsedValue> {
+impl DecodeErrorKind<ParsedValue> {
+    pub fn loc_fail(scope: &LocScope<'_>, input: ReadCtxt<'_>) -> DecodeErrorKind<ParsedValue> {
         let mut bindings = Vec::new();
         scope.get_bindings(&mut bindings);
         let buffer = input.input.to_owned();
         let offset = input.offset;
-        DecodeError::Fail {
+        DecodeErrorKind::Fail {
             bindings,
             buffer,
             offset,
@@ -164,10 +222,10 @@ impl DecodeError<ParsedValue> {
         scope: &LocScope<'_>,
         assertion: Box<Expr>,
         exception: Box<ParsedValue>,
-    ) -> DecodeError<ParsedValue> {
+    ) -> DecodeErrorKind<ParsedValue> {
         let mut bindings = Vec::new();
         scope.get_bindings(&mut bindings);
-        DecodeError::BadWhere {
+        DecodeErrorKind::BadWhere {
             bindings,
             assertion,
             exception,
@@ -175,13 +233,13 @@ impl DecodeError<ParsedValue> {
     }
 }
 
-impl<V: Clone> DecodeError<V> {
+impl<V: Clone> DecodeErrorKind<V> {
     pub fn trailing(byte: u8, offset: usize) -> Self {
         Self::Trailing { byte, offset }
     }
 
     pub fn bad_seek(seek_offset: usize, buffer_len: usize) -> Self {
-        DecodeError::SeekPastEnd {
+        DecodeErrorKind::SeekPastEnd {
             seek_offset,
             buffer_len,
         }

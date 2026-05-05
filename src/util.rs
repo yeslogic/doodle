@@ -192,3 +192,31 @@ pub(crate) mod with_err {
     }
 }
 pub(crate) use with_err::{EResult, WithErr, downgrade_error};
+
+pub trait ErrTrace {
+    fn with_trace<T>(self, trace: T) -> Self
+    where
+        T: std::fmt::Debug + Send + Sync + 'static;
+}
+
+#[macro_export]
+/// Perform a `?` operation but add additional trace-context to TCError values if encountered
+///
+/// # Syntax
+///
+/// ```ignore
+/// try_with!( self.unify_var_pair(v1, v2) => ("unify_var_pair", v1, v2) );
+/// try_with!( self.unify_var_pair(v1, v2) ); // equivalent to `?`
+/// ```
+#[allow(unused_macros)]
+macro_rules! try_with {
+    ($x:expr_2021 => $y:expr_2021) => {
+        match $x {
+            Ok(val) => val,
+            Err(e) => return Err(e.with_trace($y)),
+        }
+    };
+    ($x:expr_2021 $(=> ())?) => {
+        $x?
+    };
+}

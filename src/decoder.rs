@@ -7,9 +7,11 @@ use num_bigint::BigInt;
 use serde::Serialize;
 
 use crate::byte_set::ByteSet;
-use crate::error::{DecodeError, DecodeResult, EDecodeResult};
+use crate::error::{DecodeError, DecodeErrorKind, DecodeResult, EDecodeResult};
 use crate::numeric::{TypedConst, core::Value as NumValue};
 use crate::read::ReadCtxt;
+use crate::try_with;
+use crate::util::ErrTrace as _;
 use crate::util::WithErr;
 use crate::validation::Condition;
 use crate::{
@@ -1643,12 +1645,15 @@ impl Decoder {
                     let vv = Self::eval_view_expr(scope, v)?;
                     new_scope.push_view(name.clone(), vv);
                 }
+                Ok(try_with! (
                 program.decoders[*n]
                     .0
                     .parse(program, &Scope::Multi(&new_scope), input)
+                => ("parse@Call", *n)
+                ))
             }
             Decoder::Phantom => Ok(WithErr::new((Value::PhantomData, input))),
-            Decoder::Fail => Err(DecodeError::<Value>::fail(scope, input)),
+            Decoder::Fail => Err(DecodeErrorKind::<Value>::fail(scope, input).into()),
             Decoder::Pos => {
                 let pos = input.offset as u64;
                 Ok(WithErr::new((Value::U64(pos), input)))
@@ -1659,30 +1664,30 @@ impl Decoder {
             }
             Decoder::EndOfInput => match input.read_byte() {
                 None => Ok(WithErr::new((Value::UNIT, input))),
-                Some((b, _)) => Err(DecodeError::trailing(b, input.offset)),
+                Some((b, _)) => Err(DecodeErrorKind::trailing(b, input.offset).into()),
             },
             Decoder::Align(n) => {
                 let skip = (n - (input.offset % n)) % n;
                 let (_, input) = input
                     .split_at(skip)
-                    .ok_or(DecodeError::overrun(skip, input.offset))?;
+                    .ok_or(DecodeErrorKind::overrun(skip, input.offset))?;
                 Ok(WithErr::new((Value::UNIT, input)))
             }
             Decoder::Byte(bs) => {
                 let (b, input) = input
                     .read_byte()
-                    .ok_or(DecodeError::overbyte(input.offset))?;
+                    .ok_or(DecodeErrorKind::overbyte(input.offset))?;
                 if bs.contains(b) {
                     Ok(WithErr::new((Value::U8(b), input)))
                 } else {
-                    Err(DecodeError::unexpected(b, *bs, input.offset))
+                    Err(DecodeErrorKind::unexpected(b, *bs, input.offset).into())
                 }
             }
             Decoder::Variant(label, d) => Ok(d
                 .parse(program, scope, input)?
                 .map(move |(v, input)| (Value::Variant(label.clone(), Box::new(v)), input))),
             Decoder::Branch(tree, branches) => {
-                let index = tree.matches(input).ok_or(DecodeError::NoValidBranch {
+                let index = tree.matches(input).ok_or(DecodeErrorKind::NoValidBranch {
                     offset: input.offset,
                 })?;
                 let d = &branches[index];
@@ -1696,16 +1701,20 @@ impl Decoder {
                         return Ok(p.map(|(v, input)| (Value::Branch(index, Box::new(v)), input)));
                     }
                 }
-                Err(DecodeError::<Value>::fail(scope, input))
+                Err(DecodeErrorKind::<Value>::fail(scope, input).with_trace("no valid branch"))
             }
             Decoder::Tuple(fields) => Ok(WithErr::fold(
                 (Vec::with_capacity(fields.len()), input),
-                fields.iter(),
-                |(mut v, input), f| {
-                    Ok(f.parse(program, scope, input)?.map(move |(vf, new_input)| {
-                        v.push(vf);
-                        (v, new_input)
-                    }))
+                fields.iter().enumerate(),
+                |(mut v, input), (ix, f)| {
+                    Ok(
+                        try_with!(f.parse(program, scope, input) => ("Tuple", ix)).map(
+                            move |(vf, new_input)| {
+                                v.push(vf);
+                                (v, new_input)
+                            },
+                        ),
+                    )
                 },
             )?
             .map(|(v, input)| (Value::Tuple(v), input))),
@@ -1713,25 +1722,33 @@ impl Decoder {
                 (Vec::with_capacity(decs.len()), input),
                 decs.iter(),
                 |(mut v, input), f| {
-                    Ok(f.parse(program, scope, input)?.map(move |(vf, new_input)| {
-                        v.push(vf);
-                        (v, new_input)
-                    }))
+                    Ok(
+                        try_with!(f.parse(program, scope, input) => ("Sequence", v.len())).map(
+                            move |(vf, new_input)| {
+                                v.push(vf);
+                                (v, new_input)
+                            },
+                        ),
+                    )
                 },
             )?
             .map(|(v, input)| (Value::Seq(SeqKind::Strict(v)), input))),
             Decoder::While(tree, a) => {
                 let mut input = input;
                 let mut res = WithErr::new((Vec::new(), input));
-                while tree.matches(input).ok_or(DecodeError::NoValidBranch {
+                while try_with!(tree.matches(input).ok_or(DecodeErrorKind::NoValidBranch {
                     offset: input.offset,
-                })? == 0
+                }) => ("While(matchtree)", res.as_ref().0.len()))
+                    == 0
                 {
                     res = res.join(|(mut v, input)| {
-                        Ok(a.parse(program, scope, input)?.map(|(va, next_input)| {
-                            v.push(va);
-                            (v, next_input)
-                        }))
+                        Ok(
+                            try_with!(a.parse(program, scope, input) => ("While(parse)", v.len()))
+                                .map(|(va, next_input)| {
+                                    v.push(va);
+                                    (v, next_input)
+                                }),
+                        )
                     })?;
                     input = res.as_ref().1;
                 }
@@ -1741,15 +1758,19 @@ impl Decoder {
                 let mut res = WithErr::new((Vec::new(), input));
                 loop {
                     res = res.join(|(mut v, input)| {
-                        Ok(a.parse(program, scope, input)?.map(|(va, next_input)| {
-                            v.push(va);
-                            (v, next_input)
-                        }))
+                        Ok(
+                            try_with!(a.parse(program, scope, input) => ("Until(parse)", v.len()))
+                                .map(|(va, next_input)| {
+                                    v.push(va);
+                                    (v, next_input)
+                                }),
+                        )
                     })?;
                     let input = res.as_ref().1;
-                    if tree.matches(input).ok_or(DecodeError::NoValidBranch {
+                    if try_with!(tree.matches(input).ok_or(DecodeErrorKind::NoValidBranch {
                         offset: input.offset,
-                    })? == 0
+                    }) => ("Until(matchtree)", res.as_ref().0.len()))
+                        == 0
                     {
                         break;
                     }
@@ -1766,34 +1787,40 @@ impl Decoder {
                         .collect::<Vec<u8>>()
                 };
                 let new_input = ReadCtxt::new(&bytes);
-                a.parse(program, scope, new_input)?.join(|(va, rem_input)| {
-                    Ok(match rem_input.read_byte() {
-                        Some((b, _)) => {
-                            // FIXME - this error-value doesn't properly distinguish between offsets within the main input or the sub-buffer
-                            let err = DecodeError::Trailing {
-                                byte: b,
-                                offset: rem_input.offset,
-                            };
-                            WithErr::with_err((va, input), err)
-                        }
-                        None => WithErr::new((va, input)),
-                    })
-                })
+                try_with!(a.parse(program, scope, new_input) => ("DecodeBytes", bytes.len())).join(
+                    |(va, rem_input)| {
+                        Ok(match rem_input.read_byte() {
+                            Some((b, _)) => {
+                                // FIXME - this error-value doesn't properly distinguish between offsets within the main input or the sub-buffer
+                                let err = DecodeErrorKind::Trailing {
+                                    byte: b,
+                                    offset: rem_input.offset,
+                                }
+                                .into();
+                                WithErr::with_err((va, input), err)
+                            }
+                            None => WithErr::new((va, input)),
+                        })
+                    },
+                )
             }
             Decoder::ParseFromView(v_expr, a) => {
                 let view_window = Self::eval_view_expr(scope, v_expr)?;
-                Ok(a.parse(program, scope, view_window)?
+                Ok(try_with!(a.parse(program, scope, view_window) => ("ParseFromView", format!("{:?}", v_expr)))
                     .map(|(va, _)| (va, input)))
             }
             Decoder::LetFormat(da, name, db) => {
-                da.parse(program, scope, input)?.join(|(va, input)| {
-                    let new_scope = Scope::Single(SingleScope::new(scope, name, &va));
-                    db.parse(program, &new_scope, input)
+                try_with!(da.parse(program, scope, input) => ("LetFormat(lhs)", name.to_string()))
+                    .join(|(va, input)| {
+                        let new_scope = Scope::Single(SingleScope::new(scope, name, &va));
+                        db.parse(program, &new_scope, input)
+                    })
+            }
+            Decoder::MonadSeq(da, db) => {
+                try_with!(da.parse(program, scope, input) => "MonadSeq(lhs)").join(|(_, input)| {
+                    Ok(try_with!(db.parse(program, scope, input) => "MonadSeq(rhs)"))
                 })
             }
-            Decoder::MonadSeq(da, db) => da
-                .parse(program, scope, input)?
-                .join(|(_, input)| db.parse(program, scope, input)),
             Decoder::ForEach(expr, lbl, a) => {
                 // we need val because it would otherwise be a dropped temporary binding
                 let val = expr.eval_value(scope);
@@ -1803,7 +1830,7 @@ impl Decoder {
                     seq,
                     |(mut v, input), e| {
                         let new_scope = Scope::Single(SingleScope::new(scope, lbl, &e));
-                        Ok(a.parse(program, &new_scope, input)?
+                        Ok(try_with!(a.parse(program, &new_scope, input) => ("ForEach", v.len(), format!("{e:?}")))
                             .map(|(va, next_input)| {
                                 v.push(va);
                                 (v, next_input)
@@ -1818,10 +1845,13 @@ impl Decoder {
                     (Vec::with_capacity(count), input),
                     0..count,
                     |(mut v, input), _| {
-                        Ok(a.parse(program, scope, input)?.map(|(va, next_input)| {
-                            v.push(va);
-                            (v, next_input)
-                        }))
+                        Ok(
+                            try_with!(a.parse(program, scope, input) => ("RepeatCount", v.len()))
+                                .map(|(va, next_input)| {
+                                    v.push(va);
+                                    (v, next_input)
+                                }),
+                        )
                     },
                 )?
                 .map(|(v, input)| (Value::Seq(v.into()), input)))
@@ -1833,12 +1863,12 @@ impl Decoder {
                 loop {
                     let v = &res.as_ref().0;
                     // REVIEW - does the order of the conditions in the OR matter?
-                    if reps_left_tree
-                        .matches(input)
-                        .ok_or(DecodeError::NoValidBranch {
+                    if reps_left_tree.matches(input).ok_or(
+                        DecodeErrorKind::NoValidBranch {
                             offset: input.offset,
-                        })?
-                        == 0
+                        }
+                        .with_trace(v.len()),
+                    )? == 0
                         || v.len() == max
                     {
                         if v.len() < min {
@@ -1847,10 +1877,13 @@ impl Decoder {
                         break;
                     }
                     res = res.join(|(mut v, input)| {
-                        Ok(a.parse(program, scope, input)?.map(|(va, next_input)| {
-                            v.push(va);
-                            (v, next_input)
-                        }))
+                        Ok(
+                            try_with!(a.parse(program, scope, input) => ("RepeatBetween", v.len()))
+                                .map(|(va, next_input)| {
+                                    v.push(va);
+                                    (v, next_input)
+                                }),
+                        )
                     })?;
                 }
                 Ok(res.map(|(v, input)| (Value::Seq(v.into()), input)))
@@ -1858,7 +1891,7 @@ impl Decoder {
             Decoder::Maybe(expr, a) => {
                 let is_present = expr.eval_value(scope).unwrap_bool();
                 if is_present {
-                    Ok(a.parse(program, scope, input)?
+                    Ok(try_with!(a.parse(program, scope, input) => "Maybe")
                         .map(|(val, input)| (Value::Option(Some(Box::new(val))), input)))
                 } else {
                     Ok(WithErr::new((Value::Option(None), input)))
@@ -1869,7 +1902,7 @@ impl Decoder {
                 let mut res = WithErr::new((Vec::new(), input, false));
                 loop {
                     res = res.join(|(mut v, input, _done)| {
-                        Ok(a.parse(program, scope, input)?.map(|(va, next_input)| {
+                        Ok(try_with!(a.parse(program, scope, input) => ("RepeatUntilLast", v.len())).map(|(va, next_input)| {
                             let done = expr.eval_lambda(scope, &va).unwrap_bool();
                             v.push(va);
                             (v, next_input, done)
@@ -1884,16 +1917,19 @@ impl Decoder {
                 let mut res = WithErr::new((Vec::new(), input, false));
                 loop {
                     res = res.join(|(mut v, input, _done)| {
-                        Ok(a.parse(program, scope, input)?.map(|(va, next_input)| {
-                            v.push(va);
-                            let vs = Value::Seq(v.into());
-                            let done = expr.eval_lambda(scope, &vs).unwrap_bool();
-                            let v = match vs {
-                                Value::Seq(v) => v.into_vec(),
-                                _ => unreachable!(),
-                            };
-                            (v, next_input, done)
-                        }))
+                        Ok(
+                            try_with!(a.parse(program, scope, input) => ("RepeatUntilSeq", format!("len={}", v.len()), format!("{a:?}")))
+                                .map(|(va, next_input)| {
+                                    v.push(va);
+                                    let vs = Value::Seq(v.into());
+                                    let done = expr.eval_lambda(scope, &vs).unwrap_bool();
+                                    let v = match vs {
+                                        Value::Seq(v) => v.into_vec(),
+                                        _ => unreachable!(),
+                                    };
+                                    (v, next_input, done)
+                                }),
+                        )
                     })?;
                     break_if_done!(res => (v, input));
                 }
@@ -1910,7 +1946,7 @@ impl Decoder {
                         if is_done {
                             return Ok(WithErr::new((v, accum, input, true)));
                         }
-                        Ok(a.parse(program, scope, input)?
+                        Ok(try_with!(a.parse(program, scope, input) => ("AccumUntil", format!("len={}", v.len()), format!("accum={:?}", accum)))
                             .map(|(next_elem, next_input)| {
                                 v.push(next_elem.clone());
                                 let update_arg = Value::Tuple(vec![accum.clone(), next_elem]);
@@ -1927,17 +1963,19 @@ impl Decoder {
             Decoder::Peek(a) => Ok(a.parse(program, scope, input)?.map(|(v, _)| (v, input))),
             Decoder::PeekNot(a) => {
                 if a.parse(program, scope, input).is_ok() {
-                    Err(DecodeError::<Value>::fail(scope, input))
+                    Err(DecodeErrorKind::<Value>::fail(scope, input)
+                        .with_trace(("PeekNot", format!("{:?}", a))))
                 } else {
                     Ok(WithErr::new((Value::Tuple(vec![]), input)))
                 }
             }
             Decoder::Slice(expr, a) => {
                 let size = expr.eval_value(scope).unwrap_usize();
-                let (slice, input) = input
-                    .split_at(size)
-                    .ok_or(DecodeError::overrun(size, input.offset))?;
-                Ok(a.parse(program, scope, slice)?.map(|(v, _)| (v, input)))
+                let (slice, input) = input.split_at(size).ok_or(
+                    DecodeErrorKind::overrun(size, input.offset)
+                        .with_trace(("Slice(create)", format!("{:?}->{size}", expr))),
+                )?;
+                Ok(try_with!(a.parse(program, scope, slice) => ("Slice(parse)", format!("{:?}", a))).map(|(v, _)| (v, input)))
             }
             Decoder::Bits(a) => {
                 // FIXME - copying the entire buffer as bits feels inefficient, we should measure performance and see if there is a better alternative
@@ -1947,13 +1985,13 @@ impl Decoder {
                         bits.push((b & (1 << i)) >> i);
                     }
                 }
-                a.parse(program, scope, ReadCtxt::new(&bits))?
+                try_with!(a.parse(program, scope, ReadCtxt::new(&bits)) => ("Bits(parse)", format!("{a:?}")))
                     .join(|(v, bits)| {
                         let bytes_remain = bits.remaining().len() >> 3;
                         let bytes_read = input.remaining().len() - bytes_remain;
                         let (_, input) = input
                             .split_at(bytes_read)
-                            .ok_or(DecodeError::overrun(bytes_read, input.offset))?;
+                            .ok_or(DecodeErrorKind::overrun(bytes_read, input.offset))?;
                         Ok(WithErr::new((v, input)))
                     })
             }
@@ -1961,31 +1999,43 @@ impl Decoder {
                 let base = base_addr.eval_value(scope).unwrap_usize();
                 let offset = expr.eval_value(scope).unwrap_usize();
                 let abs_offset = base + offset;
-                let seek_input = input
-                    .seek_to(abs_offset)
-                    .ok_or(DecodeError::bad_seek(abs_offset, input.input.len()))?;
-
-                Ok(a.parse(program, scope, seek_input)?
+                let seek_input = input.seek_to(abs_offset).ok_or(
+                    DecodeErrorKind::bad_seek(abs_offset, input.input.len())
+                        .with_trace("WithRelativeOffset(seek)"),
+                )?;
+                Ok(try_with!(a.parse(program, scope, seek_input) => ("WithRelativeOffset(parse)", format!("{a:?}")))
                     .map(|(v, _)| (v, input)))
             }
-            Decoder::Map(d, expr) => Ok(d.parse(program, scope, input)?.map(|(orig, input)| {
-                let v = expr.eval_lambda(scope, &orig);
-                (Value::Mapped(Box::new(orig), Box::new(v)), input)
-            })),
-            Decoder::Where(d, cond) => d.parse(program, scope, input)?.join(|(v, input)| {
-                let Condition { expr, severity } = cond;
-                match expr.eval_lambda(scope, &v).unwrap_bool() {
-                    true => Ok(WithErr::new((v, input))),
-                    false => {
-                        let err = DecodeError::bad_where(scope, expr.clone(), Box::new(v.clone()));
-                        if severity.is_strict() {
-                            Err(err)
-                        } else {
-                            Ok(WithErr::with_err((v, input), err))
+            Decoder::Map(d, expr) => Ok(
+                try_with!(d.parse(program, scope, input) => ("Map(parse)", format!("{d:?}"))).map(
+                    |(orig, input)| {
+                        let v = expr.eval_lambda(scope, &orig);
+                        (Value::Mapped(Box::new(orig), Box::new(v)), input)
+                    },
+                ),
+            ),
+            Decoder::Where(d, cond) => {
+                try_with!(d.parse(program, scope, input) => ("Where(parse)", format!("{d:?}")))
+                    .join(|(v, input)| {
+                        let Condition { expr, severity } = cond;
+                        match expr.eval_lambda(scope, &v).unwrap_bool() {
+                            true => Ok(WithErr::new((v, input))),
+                            false => {
+                                let err = DecodeErrorKind::bad_where(
+                                    scope,
+                                    expr.clone(),
+                                    Box::new(v.clone()),
+                                )
+                                .into();
+                                if severity.is_strict() {
+                                    Err(err)
+                                } else {
+                                    Ok(WithErr::with_err((v, input), err))
+                                }
+                            }
                         }
-                    }
-                }
-            }),
+                    })
+            }
             Decoder::Compute(expr) => {
                 let v = expr.eval_value(scope);
                 Ok(WithErr::new((v, input)))
@@ -1993,19 +2043,24 @@ impl Decoder {
             Decoder::Let(name, expr, d) => {
                 let v = expr.eval_value(scope);
                 let let_scope = SingleScope::new(scope, name, &v);
-                d.parse(program, &Scope::Single(let_scope), input)
+                Ok(
+                    try_with!(d.parse(program, &Scope::Single(let_scope), input) => ("Let(parse)", format!("{} := {:?} <- {:?}", name, v, expr), format!("{d:?}"))),
+                )
             }
             Decoder::LetView(name, d) => {
                 let view = input;
                 let let_scope = ViewScope::new(scope, name, view);
-                d.parse(program, &Scope::View(let_scope), input)
+                Ok(
+                    try_with!(d.parse(program, &Scope::View(let_scope), input) => ("LetView(parse)", name.to_string(), format!("{d:?}"))),
+                )
             }
             Decoder::Match(head, branches) => {
                 let head = head.eval(scope);
                 for (index, (pattern, decoder)) in branches.iter().enumerate() {
                     if let Some(pattern_scope) = head.matches(scope, pattern) {
-                        return Ok(decoder
-                            .parse(program, &Scope::Multi(&pattern_scope), input)?
+                        return Ok(try_with!(decoder.parse(program, &Scope::Multi(&pattern_scope), input)
+                        => ("Match(parse)", format!("[{}]: {:?} => {:?}", index, pattern, decoder))
+                        )
                             .map(|(v, input)| (Value::Branch(index, Box::new(v)), input)));
                     }
                 }
@@ -2032,16 +2087,20 @@ impl Decoder {
                 let f = make_huffman_codes(&lengths);
                 let dyn_d = Compiler::compile_one(&f).unwrap();
                 let child_scope = DecoderScope::new(scope, name, dyn_d);
-                d.parse(program, &Scope::Decoder(child_scope), input)
+                Ok(
+                    try_with!(d.parse(program, &Scope::Decoder(child_scope), input) => ("Dynamic(parse)", name.to_string(), format!("{d:?}"))),
+                )
             }
             Decoder::Apply(name) => {
                 let d = scope.get_decoder_by_name(name);
-                d.parse(program, scope, input)
+                Ok(
+                    try_with!(d.parse(program, scope, input) => ("Apply(parse)", name.to_string(), format!("{d:?}"))),
+                )
             }
             Decoder::LiftedOption(None) => Ok(WithErr::new((Value::Option(None), input))),
-            Decoder::LiftedOption(Some(dec)) => Ok(dec
-                .parse(program, scope, input)?
-                .map(|(v, input)| (Value::Option(Some(Box::new(v))), input))),
+            Decoder::LiftedOption(Some(dec)) => Ok(try_with!(dec
+                .parse(program, scope, input) => ("LiftedOption(parse)", format!("{dec:?}")))
+            .map(|(v, input)| (Value::Option(Some(Box::new(v))), input))),
             Decoder::CaptureBytes(v_expr, len) => {
                 let len = len.eval_value(scope).unwrap_usize();
 
@@ -2052,7 +2111,11 @@ impl Decoder {
                 let mut buf = view_window;
                 for _ in 0..len {
                     let Some((byte, new_buf)) = buf.read_byte() else {
-                        return Err(DecodeError::overbyte(buf.offset));
+                        return Err(DecodeErrorKind::overbyte(buf.offset).with_trace((
+                            "CaptureBytes",
+                            format!("len: {len}"),
+                            format!("view: {v_expr:?}"),
+                        )));
                     };
                     accum.push(Value::U8(byte));
                     buf = new_buf;
@@ -2068,8 +2131,8 @@ impl Decoder {
                 // REVIEW - hardcoded big-endianness
                 let mut accum = Vec::with_capacity(len);
                 let mut buf = view_window;
-                for _ in 0..len {
-                    let (val, new_buf) = read_base(buf, *kind)?;
+                for ix in 0..len {
+                    let (val, new_buf) = try_with!(read_base(buf, *kind) => ("ReadArray", format!("index: {ix}"), format!("kind: {kind:?}"), format!("view: {v_expr:?}")));
                     accum.push(val);
                     buf = new_buf;
                 }
@@ -2077,7 +2140,7 @@ impl Decoder {
                 Ok(WithErr::new((Value::Seq(SeqKind::Strict(accum)), input)))
             }
             Decoder::ReifyView(v_expr) => {
-                let view = Self::eval_view_expr(scope, v_expr)?;
+                let view = try_with!(Self::eval_view_expr(scope, v_expr) => ("ReifyView", format!("view: {v_expr:?}")));
                 Ok(WithErr::new((
                     Value::View {
                         offset: view.offset,
@@ -2088,7 +2151,10 @@ impl Decoder {
         }
     }
 
-    fn eval_view_expr<'a>(scope: &Scope<'a>, v_expr: &ViewExpr) -> Result<View<'a>, DecodeError> {
+    fn eval_view_expr<'a>(
+        scope: &Scope<'a>,
+        v_expr: &ViewExpr,
+    ) -> Result<View<'a>, DecodeErrorKind> {
         match v_expr {
             ViewExpr::Var(ident) => {
                 let view = scope.get_view_by_name(ident);
@@ -2098,7 +2164,7 @@ impl Decoder {
                 let offset = offset.eval_value(scope).unwrap_usize();
                 let base_view = Self::eval_view_expr(scope, base)?;
                 let Some((_, view_window)) = base_view.split_at(offset) else {
-                    return Err(DecodeError::overrun(offset, base_view.offset));
+                    return Err(DecodeErrorKind::overrun(offset, base_view.offset));
                 };
                 Ok(view_window)
             }
@@ -2109,29 +2175,29 @@ impl Decoder {
 fn read_base(
     buf: ReadCtxt<'_>,
     kind: BaseKind<Endian>,
-) -> Result<(Value, ReadCtxt<'_>), DecodeError> {
+) -> Result<(Value, ReadCtxt<'_>), DecodeErrorKind> {
     match kind {
         BaseKind::U8 => {
             let Some((byte, new_buf)) = buf.read_byte() else {
-                return Err(DecodeError::overbyte(buf.offset));
+                return Err(DecodeErrorKind::overbyte(buf.offset));
             };
             Ok((Value::U8(byte), new_buf))
         }
         BaseKind::U16BE => {
             let Some((val, new_buf)) = buf.read_u16be() else {
-                return Err(DecodeError::overrun(kind.size(), buf.offset));
+                return Err(DecodeErrorKind::overrun(kind.size(), buf.offset));
             };
             Ok((Value::U16(val), new_buf))
         }
         BaseKind::U32BE => {
             let Some((val, new_buf)) = buf.read_u32be() else {
-                return Err(DecodeError::overrun(kind.size(), buf.offset));
+                return Err(DecodeErrorKind::overrun(kind.size(), buf.offset));
             };
             Ok((Value::U32(val), new_buf))
         }
         BaseKind::U64BE => {
             let Some((val, new_buf)) = buf.read_u64be() else {
-                return Err(DecodeError::overrun(kind.size(), buf.offset));
+                return Err(DecodeErrorKind::overrun(kind.size(), buf.offset));
             };
             Ok((Value::U64(val), new_buf))
         }
