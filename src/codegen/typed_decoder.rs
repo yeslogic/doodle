@@ -101,6 +101,8 @@ impl TypedDecoder<GenType> {
             | TypedDecoder::LetFormat(t, ..)
             | TypedDecoder::MonadSeq(t, ..)
             | TypedDecoder::Hint(t, ..)
+            | TypedDecoder::Permit(t, ..)
+            | TypedDecoder::Enforce(t, ..)
             | TypedDecoder::LiftedOption(t, ..)
             | TypedDecoder::AccumUntil(t, ..) => Some(Cow::Borrowed(t)),
         }
@@ -248,6 +250,12 @@ pub(crate) enum TypedDecoder<TypeRep> {
     ),
     ReifyView(TypeRep, TypedViewExpr<TypeRep>),
     Phantom,
+    Enforce(TypeRep, Box<TypedDecoderExt<TypeRep>>),
+    Permit(
+        TypeRep,
+        Box<TypedDecoderExt<TypeRep>>,
+        Box<TypedExpr<TypeRep>>,
+    ),
 }
 
 #[derive(Clone, Debug)]
@@ -721,6 +729,14 @@ impl<'a> GTCompiler<'a> {
                 )),
                 TypedViewFormat::ReifyView => Ok(TypedDecoder::ReifyView(gt.clone(), view.clone())),
             },
+            TypedFormat::Enforce(gt, inner) => {
+                let da = Box::new(self.compile_gt_format(inner, None, next)?);
+                Ok(TypedDecoder::Enforce(gt.clone(), da))
+            }
+            TypedFormat::Permit(gt, inner, expr) => {
+                let da = Box::new(self.compile_gt_format(inner, None, next)?);
+                Ok(TypedDecoder::Permit(gt.clone(), da, expr.clone()))
+            }
         }?;
         Ok(TypedDecoderExt::new(dec, args))
     }

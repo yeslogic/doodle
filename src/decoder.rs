@@ -11,8 +11,8 @@ use crate::error::{DecodeError, DecodeErrorKind, DecodeResult, EDecodeResult};
 use crate::numeric::{TypedConst, core::Value as NumValue};
 use crate::read::ReadCtxt;
 use crate::try_with;
-use crate::util::ErrTrace as _;
 use crate::util::WithErr;
+use crate::util::{ErrTrace as _, downgrade_error};
 use crate::validation::Condition;
 use crate::{
     BaseKind, DynFormat, Endian, Expr, Format, FormatModule, IntoLabel, Label, MatchTree,
@@ -1015,6 +1015,8 @@ pub enum Decoder {
     ReadArray(ViewExpr, Box<Expr>, BaseKind<Endian>),
     ReifyView(ViewExpr),
     Phantom,
+    Enforce(Box<Decoder>),
+    Permit(Box<Decoder>, Box<Expr>),
 }
 
 #[derive(Clone, Debug)]
@@ -1325,6 +1327,14 @@ impl<'a> Compiler<'a> {
             Format::Where(a, expr) => {
                 let da = Box::new(self.compile_format(a, next.clone())?);
                 Ok(Decoder::Where(da, expr.clone()))
+            }
+            Format::Enforce(a) => {
+                let da = Box::new(self.compile_format(a, next.clone())?);
+                Ok(Decoder::Enforce(da))
+            }
+            Format::Permit(a, expr) => {
+                let da = Box::new(self.compile_format(a, next.clone())?);
+                Ok(Decoder::Permit(da, expr.clone()))
             }
             Format::Compute(expr) => Ok(Decoder::Compute(expr.clone())),
             Format::Let(name, expr, a) => {
@@ -2147,6 +2157,24 @@ impl Decoder {
                     },
                     input,
                 )))
+            }
+            Decoder::Enforce(a) => {
+                let res = a.parse(program, scope, input)?;
+                match res.into_strict() {
+                    Ok((v, input)) => Ok(WithErr::new((v, input))),
+                    Err(mut errs) => {
+                        let e = errs.swap_remove(0);
+                        return Err(e);
+                    }
+                }
+            }
+            Decoder::Permit(a, expr) => {
+                let _dft = expr.eval_value(scope);
+                // TODO: do something with _dft
+                Ok(downgrade_error(
+                    a.parse(program, scope, input),
+                    (Value::Poison, input),
+                ))
             }
         }
     }

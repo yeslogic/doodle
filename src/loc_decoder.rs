@@ -16,6 +16,7 @@ use crate::decoder::{
 use crate::error::{DecodeErrorKind, ELocDecodeResult, LocDecodeResult};
 use crate::read::ReadCtxt;
 use crate::util::WithErr;
+use crate::util::downgrade_error;
 use crate::validation::Condition;
 use crate::{BaseKind, DynFormat, Endian, Expr, Format, Label, Pattern, ViewExpr};
 
@@ -1860,6 +1861,24 @@ impl Decoder {
                     offset: view.offset,
                 });
                 Ok(WithErr::new((v, input)))
+            }
+            Decoder::Permit(inner, dft) => {
+                let _dft = dft.eval_value_with_loc(scope);
+                Ok(downgrade_error(
+                    inner.parse_with_loc(program, scope, input),
+                    (ParsedValue::from_evaluated(Value::Poison), input),
+                ))
+            }
+            Decoder::Enforce(inner) => {
+                let res = inner.parse_with_loc(program, scope, input)?;
+                match res.into_strict() {
+                    Ok((v, input)) => Ok(WithErr::new((v, input))),
+                    Err(mut errs) => {
+                        // REVIEW - is there a better way to represent the error-state?
+                        let e = errs.swap_remove(0);
+                        Err(e)
+                    }
+                }
             }
         }
     }

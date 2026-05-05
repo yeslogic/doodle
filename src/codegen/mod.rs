@@ -659,6 +659,17 @@ impl CodeGen {
             TypedDecoder::ReifyView(_, view) => {
                 CaseLogic::View(ViewLogic::ReifyView(embed_view_expr(view)))
             }
+            TypedDecoder::Permit(_, inner, dft) => {
+                let cl_inner = self.translate(inner.get_dec());
+                CaseLogic::Derived(DerivedLogic::Permit(
+                    Box::new(cl_inner),
+                    Box::new(embed_expr_nat(dft)),
+                ))
+            }
+            TypedDecoder::Enforce(_, inner) => {
+                let cl_inner = self.translate(inner.get_dec());
+                CaseLogic::Derived(DerivedLogic::Enforce(Box::new(cl_inner)))
+            }
         }
     }
 }
@@ -1457,10 +1468,12 @@ fn try_as_matches_macro_cases(
     Some(accum)
 }
 
+/// Shorthand for embedding an expression with `ExprInfo::Natural`
 fn embed_expr_nat(expr: &TypedExpr<GenType>) -> RustExpr {
     embed_expr(expr, ExprInfo::Natural)
 }
 
+/// Shorthand for embedding an expression with `ExprInfo::EmbedOwned`
 fn embed_expr_owned(x: &TypedExpr<GenType>) -> RustExpr {
     embed_expr(x, ExprInfo::EmbedOwned)
 }
@@ -2605,7 +2618,7 @@ impl GenBlock {
     /// Applies a lambda-abstraction to a `GenBlock` so that engine logic isn't affected
     /// by short-circuiting behavior of `?` and `return Err(...)` within the block in question
     ///
-    /// Used when the value of `Err` must be inspected (as in `PeekNot`` or `Alts`),
+    /// Used when the value of `Err` must be inspected (as in `PeekNot` or `Alts`),
     /// rather than externally short-circuited on via `?` (in which case, [`local_try`] should be used).
     fn abstracted_try(self) -> GenBlock {
         if self.stmts.iter().any(GenStmt::is_short_circuiting) {
@@ -3504,6 +3517,8 @@ enum DerivedLogic<ExprT> {
     Maybe(Box<RustExpr>, Box<CaseLogic<ExprT>>),
     DecodeBytes(Box<RustExpr>, Box<CaseLogic<ExprT>>),
     ParseView(Box<RustExpr>, Box<CaseLogic<ExprT>>),
+    Permit(Box<CaseLogic<ExprT>>, Box<RustExpr>),
+    Enforce(Box<CaseLogic<ExprT>>),
 }
 
 impl ToAst for DerivedLogic<GTExpr> {
@@ -3573,6 +3588,35 @@ impl ToAst for DerivedLogic<GTExpr> {
                 let if_false = GenBlock::simple_expr(RustExpr::local("None"));
                 let ctrl = model::simplifying_if((**is_present).clone(), if_true, Some(if_false));
                 GenBlock::single_expr(ctrl)
+            }
+            DerivedLogic::Permit(inner, expr) => {
+                let rhs = inner.to_ast(ctxt).abstracted_try();
+                let bind_res = GenStmt::assign(model::PERMIT_BIND, rhs);
+                let if_ok = GenBlock::simple_expr(RustExpr::local(model::PERMIT_BIND));
+                let if_err = {
+                    let (stmts, expr) = model::yield_value_with_error(
+                        (&**expr).clone(),
+                        RustExpr::local(model::PERMIT_ERR),
+                    );
+                    GenBlock::lift_block(stmts, expr)
+                };
+                let ctrl = GenExpr::Control(Box::new(RustControl::Match(
+                    Box::new(RustExpr::local(model::PERMIT_BIND)),
+                    RustMatchBody::Irrefutable(
+                        [
+                            (model::match_case_ok_bind(model::PERMIT_BIND), if_ok),
+                            (model::match_case_err_bind(model::PERMIT_ERR), if_err),
+                        ]
+                        .to_vec(),
+                    ),
+                )));
+                let block = GenBlock::from_parts(vec![bind_res], Some(ctrl));
+                block
+            }
+            DerivedLogic::Enforce(inner) => {
+                // FIXME[epic=permit-enforce] - because soft-errors are logged transiently without any value-level record that they were encountered, we do not yet have any way of handling Enforce in generated code
+                let ret = inner.to_ast(ctxt);
+                ret
             }
             DerivedLogic::VariantOf(constr, inner) => {
                 let bind_inner = GenStmt::assign(model::VARIANT_INNER, inner.to_ast(ctxt));
@@ -4466,6 +4510,19 @@ impl<'a> Elaborator<'a> {
                 let t_lambda = self.elaborate_expr_lambda(lambda);
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::Map(gt, Box::new(t_inner), Box::new(t_lambda))
+            }
+            Format::Enforce(inner) => {
+                let index = self.get_and_increment_index();
+                let t_inner = self.elaborate_format(inner, dyn_scope);
+                let gt = self.get_gt_from_index(index);
+                TypedFormat::Enforce(gt, Box::new(t_inner))
+            }
+            Format::Permit(inner, dft) => {
+                let index = self.get_and_increment_index();
+                let t_inner = self.elaborate_format(inner, dyn_scope);
+                let t_dft = self.elaborate_expr(dft);
+                let gt = self.get_gt_from_index(index);
+                TypedFormat::Permit(gt, Box::new(t_inner), Box::new(t_dft))
             }
             Format::Where(inner, cond) => {
                 let index = self.get_and_increment_index();

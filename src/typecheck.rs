@@ -3706,6 +3706,20 @@ impl TypeChecker {
                 self.unify_var_pair(newvar, inner_v)?;
                 Ok(newvar)
             }
+            Format::Enforce(inner) => {
+                let newvar = self.get_new_uvar();
+                let inner_v = self.infer_var_format(inner, ctxt)?;
+                self.unify_var_pair(newvar, inner_v)?;
+                Ok(newvar)
+            }
+            Format::Permit(inner, dft) => {
+                let newvar = self.get_new_uvar();
+                let inner_v = self.infer_var_format(inner, ctxt)?;
+                let dft_v = self.infer_var_expr(dft, ctxt.scope)?;
+                self.unify_var_pair(newvar, inner_v)?;
+                self.unify_var_pair(newvar, dft_v)?;
+                Ok(newvar)
+            }
             Format::LiftedOption(opt_f) => {
                 let newvar = self.get_new_uvar();
                 let inner_var = match opt_f {

@@ -10996,7 +10996,8 @@ None => {
 None
 }
 };
-let dsig = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1146308935u32, tables)).copied() {
+let dsig = {
+let res = (|| match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1146308935u32, tables)).copied() {
 Some(ref table) => {
 let mut view_parser = Parser::from(font_view.offset(table.offset as usize)?);
 let view_input = &mut view_parser;
@@ -11004,11 +11005,22 @@ let sz = table.length as usize;
 view_input.start_slice(sz)?;
 let ret = (Decoder_opentype_dsig(view_input))?;
 view_input.end_slice()?;
-Some(ret)
+PResult::Ok(Some(ret))
 },
 
 None => {
+PResult::Ok(None)
+}
+})();
+match res {
+Ok(res) => {
+res
+},
+
+Err(err) => {
+log::error!("expect-level value assertion failed: {}", err);
 None
+}
 }
 };
 let hdmx = match (find_by_key_unsorted(|elem: &opentype_table_record| elem.table_id, 1751412088u32, tables)).copied() {
