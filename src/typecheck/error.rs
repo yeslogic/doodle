@@ -1,6 +1,7 @@
 use std::rc::Rc;
 
 use crate::typecheck::base_set::TryFromPrimIntError;
+use crate::util::ErrTrace;
 
 use super::base_set::{BaseSet, IntSet, TryFromBaseTypeError};
 use super::*;
@@ -154,6 +155,16 @@ pub struct TCError {
     pub(crate) _trace: Vec<Box<dyn std::fmt::Debug + 'static + Send + Sync>>,
 }
 
+impl ErrTrace for TCError {
+    fn with_trace<T>(mut self, trace: T) -> Self
+    where
+        T: std::fmt::Debug + Send + Sync + 'static,
+    {
+        self._trace.push(Box::new(trace));
+        self
+    }
+}
+
 impl From<TCErrorKind> for TCError {
     fn from(value: TCErrorKind) -> Self {
         Self {
@@ -163,24 +174,17 @@ impl From<TCErrorKind> for TCError {
     }
 }
 
-impl TCError {
-    #[allow(dead_code)]
-    pub(crate) fn with_trace<T>(mut self, trace: T) -> Self
-    where
-        T: std::fmt::Debug + Send + Sync + 'static,
-    {
-        self._trace.push(Box::new(trace));
-        self
-    }
-}
-
 impl std::fmt::Display for TCError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "{} (", self.err)?;
-        for item in self._trace.iter() {
-            writeln!(f, "\t{item:?}")?;
+        if self._trace.is_empty() {
+            write!(f, "{}", self.err)
+        } else {
+            writeln!(f, "{} (", self.err)?;
+            for item in self._trace.iter() {
+                writeln!(f, "\t{item:?}")?;
+            }
+            write!(f, ")")
         }
-        write!(f, ")")
     }
 }
 

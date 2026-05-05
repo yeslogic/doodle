@@ -3,6 +3,8 @@ use std::{
     rc::Rc,
 };
 
+use crate::try_with;
+use crate::util::ErrTrace as _;
 use crate::valuetype::{SeqBorrowHint, augmented::AugValueType};
 use crate::{
     Arith, BaseType, DynFormat, Expr, Format, FormatModule, Label, Pattern, UnaryOp, ValueType,
@@ -18,13 +20,7 @@ use crate::{
 };
 
 pub mod base_set;
-#[cfg(any())]
-use base_set::PrimIntSet;
 use base_set::{BaseSet, IntSet, UintSet};
-
-pub(crate) mod deps;
-#[cfg(any())]
-use deps::{DepGraph, DepPath, DepSolutions, VarSolution};
 
 pub(crate) mod error;
 use error::{
@@ -295,27 +291,6 @@ pub(crate) mod scope {
     }
 }
 use scope::{Ctxt, UMultiScope, UScope, USingleScope, ViewMultiScope};
-
-/// Perform a `?` operation but add additional trace-context to TCError values if encountered
-///
-/// # Syntax
-///
-/// ```ignore
-/// try_with!( self.unify_var_pair(v1, v2) => ("unify_var_pair", v1, v2) );
-/// try_with!( self.unify_var_pair(v1, v2) ); // equivalent to `?`
-/// ```
-#[allow(unused_macros)]
-macro_rules! try_with {
-    ($x:expr_2021 => $y:expr_2021) => {
-        match $x {
-            Ok(val) => val,
-            Err(e) => return Err(e.with_trace($y)),
-        }
-    };
-    ($x:expr_2021 $(=> ())?) => {
-        $x?
-    };
-}
 
 macro_rules! define_metavariable {
     ( $( $name:ident $(, $attr:meta )* );+ $(;)? ) => {

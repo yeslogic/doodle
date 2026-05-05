@@ -13,6 +13,51 @@ pub(crate) fn mk_trace(value: &impl std::hash::Hash) -> TraceHash {
     hasher.finish()
 }
 
+#[derive(Debug)]
+pub struct CtxtParseError {
+    pub err: ParseError,
+    pub _trace: Vec<Box<dyn std::fmt::Debug + Sync + Send + 'static>>,
+}
+
+impl From<ParseError> for CtxtParseError {
+    fn from(err: ParseError) -> Self {
+        CtxtParseError {
+            err,
+            _trace: Vec::new(),
+        }
+    }
+}
+
+impl crate::util::ErrTrace for CtxtParseError {
+    fn with_trace<T>(mut self, ctxt: T) -> Self
+    where
+        T: std::fmt::Debug + Sync + Send + 'static,
+    {
+        self._trace.push(Box::new(ctxt));
+        self
+    }
+}
+
+impl std::fmt::Display for CtxtParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self._trace.is_empty() {
+            write!(f, "{}", self.err)
+        } else {
+            writeln!(f, "{} (", self.err)?;
+            for item in self._trace.iter() {
+                writeln!(f, "\t{item:?}")?;
+            }
+            write!(f, ")")
+        }
+    }
+}
+
+impl std::error::Error for CtxtParseError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.err)
+    }
+}
+
 /// General error type for both recoverable and unrecoverable errors encountered during parsing operations
 #[derive(Clone, Debug)]
 pub enum ParseError {
