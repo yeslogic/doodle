@@ -145,6 +145,7 @@ pub enum Format {
     // Include a format in the tree as a placeholder, without ever processing it
     Phantom(Box<Format>),
     /// Parse a format but require it to be fully error-free, including formerly non-critical errors
+    // TODO - we don't currently have a means of properly supporting this in code-gen
     Enforce(Box<Format>),
     /// Parse a format but downgrade any errors it produces to warnings, producing a default value if it has already failed
     // NOTE - because of Value::Poison, the default expression is not used in interpreter mode
