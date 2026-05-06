@@ -46,8 +46,22 @@ pub enum Value {
     Mapped(Box<Value>, Box<Value>),
     /// Branch: (Branch Index, Nominal Value)
     Branch(usize, Box<Value>),
-    /// Poison value, used as a placeholder when a value is required but the right type cannot be induced artificially, e.g. downcasting a hard-error to a soft-error on an embedded parse
-    Poison,
+    /// Fallback value yielded synthetically when downgrading a normal parse-error to a warning, e.g. in calls to `downgrade_error`.
+    ///
+    /// Projections and other shape-based expectations should be trivially satisfied by this variant, and in the case of
+    /// projections, should return a value that is itself `Poisoned`.
+    ///
+    /// For all purposes that expect a particular "`value-shape", this variant should be handled appropriately,
+    /// rather than being treated as an unexpected case.
+    Poisoned(Option<Box<Value>>),
+}
+
+impl Value {
+    pub const POISON: Value = Value::Poisoned(None);
+
+    pub const fn is_poisoned(&self) -> bool {
+        matches!(self, Value::Poisoned(_))
+    }
 }
 
 impl From<usize> for Value {
@@ -122,7 +136,9 @@ impl std::fmt::Display for Value {
             Value::Branch(n, value) => write!(f, "({n} :~ {value})"),
             // REVIEW - is this over-verbose?
             Value::PhantomData => write!(f, "<PhantomData>"),
-            Value::Poison => write!(f, "NO_VALUE"),
+            Value::Poisoned(None) => write!(f, "NO_VALUE"),
+            // REVIEW - should we bother displaying the inner value?
+            Value::Poisoned(Some(v)) => write!(f, "FALLBACK({v})"),
         }
     }
 }
@@ -131,18 +147,18 @@ impl Value {
     pub(crate) fn tuple_proj(&self, index: usize) -> &Self {
         match self.coerce_mapped_value() {
             Value::Tuple(vs) => &vs[index],
-            Value::Poison => self,
+            Value::Poisoned(..) => &Value::POISON,
             _ => panic!("expected tuple"),
         }
     }
 
     pub(crate) fn record_proj(&self, label: &str) -> &Self {
         match self {
-            Value::Poison => self,
             Value::Record(fields) => match fields.iter().find(|(l, _)| label == l) {
                 Some((_, v)) => v,
                 None => panic!("{label} not found in record"),
             },
+            Value::Poisoned(..) => &Value::POISON,
             other => panic!("expected record, found {other:?}"),
         }
     }
@@ -153,6 +169,7 @@ impl Value {
         scope: &mut MultiScope<'a>,
         pattern: &Pattern,
     ) -> bool {
+        // FIXME - we need to figure out what, if anything, `Value::Poisoned` should match for
         match pattern {
             Pattern::Binding(name) => {
                 scope.push(name.clone(), self);
@@ -230,7 +247,6 @@ impl Value {
                 }
                 _ => false,
             },
-
             Pattern::Variant(label0, p) => match self {
                 Value::Variant(label1, v) if label0 == label1 => v.matches_inner(scope, p),
                 _ => false,
@@ -243,6 +259,12 @@ impl Value {
         }
     }
 
+    /// Given a `Value` and a `Pattern` to attempt to match it to, returns `Some(new_scope)` if
+    /// the Value satisfies the pattern-match (where `new_scope` is a possibly-updated version of
+    /// `scope` that contains all new bindings produced through the pattern-match), and `None`
+    /// if it does not match the pattern in question.
+    ///
+    /// Used for `Decoder::Match`, `Decoder::Destructure`, and evaluation of `Expr::Match`.
     pub(crate) fn matches<'a>(
         &'a self,
         scope: &'a Scope<'a>,
@@ -254,6 +276,8 @@ impl Value {
             .then_some(pattern_scope)
     }
 
+    /// Reduces any referenced `Value` to its underlying nominal value, by recursively unwrapping any
+    /// `Value::Branch` or `Value::Mapped` encompassing it.
     pub fn coerce_mapped_value(&self) -> &Self {
         match self {
             Value::Mapped(_orig, v) => v.coerce_mapped_value(),
@@ -262,6 +286,7 @@ impl Value {
         }
     }
 
+    /// Like `coerce_mapped_value`, but for owned values rather than borrowed ones.
     pub fn extract_mapped_value(self) -> Self {
         match self {
             Value::Mapped(_orig, v) => v.extract_mapped_value(),

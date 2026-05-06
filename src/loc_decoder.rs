@@ -482,7 +482,7 @@ impl ParsedValue {
             | Value::Usize(_)
             | Value::EnumFromTo(_)
             | Value::PhantomData
-            | Value::Poison
+            | Value::Poisoned(_)
             | Value::Char(_) => ParsedValue::Flat(Parsed {
                 loc: ParseLoc::Synthesized,
                 inner: expr_value,
@@ -1866,7 +1866,7 @@ impl Decoder {
                 let _dft = dft.eval_value_with_loc(scope);
                 Ok(downgrade_error(
                     inner.parse_with_loc(program, scope, input),
-                    (ParsedValue::from_evaluated(Value::Poison), input),
+                    (ParsedValue::from_evaluated(Value::POISON), input),
                 ))
             }
             Decoder::Enforce(inner) => {
