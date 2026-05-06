@@ -273,7 +273,9 @@ impl<'module> TreePrinter<'module> {
             // FIXME[epic=workaround-hack] - we cannot easily reconstruct the format corresponding to the inner value, so we discard the format-hint
             Value::Option(Some(value)) => self.is_atomic_value(value, None),
             Value::PhantomData => true,
-            Value::Poison => true,
+            Value::Poisoned(None) => true,
+            // FIXME[epic=poisoned-value-handling] - properly consider if recursion is appropriate here
+            Value::Poisoned(Some(value)) => self.is_atomic_value(value, None),
         }
     }
 
@@ -647,7 +649,7 @@ impl<'module> TreePrinter<'module> {
                     let record_format = fmt.to_record_format();
                     self.compile_record(value_fields, Some(&record_format))
                 }
-                Value::Poison => self.compile_value(value),
+                Value::Poisoned(..) => self.compile_value(value),
                 _ => panic!("expected record, found {value}"),
             },
             Format::Hint(StyleHint::AsciiStr, str_format) => {
@@ -669,8 +671,11 @@ impl<'module> TreePrinter<'module> {
                 self.compile_decoded_value(value, inner)
             }
             Format::Permit(format, _) => {
-                // FIXME - because the value produced by this node might appear from nowhere, it might not look right to the inner format (e.g. as when it would expect Branch)
-                self.compile_decoded_value(value, format)
+                if matches!(value, Value::Poisoned(..)) {
+                    self.compile_value(value)
+                } else {
+                    self.compile_decoded_value(value, format)
+                }
             }
             Format::Enforce(format) => self.compile_decoded_value(value, format),
             Format::Repeat(format)
@@ -759,7 +764,7 @@ impl<'module> TreePrinter<'module> {
                     frag.append(self.compile_decoded_value(value, format));
                     frag
                 }
-                Value::Poison => {
+                Value::Poisoned(..) => {
                     frag.append(self.compile_value(value));
                     frag
                 }
@@ -813,7 +818,8 @@ impl<'module> TreePrinter<'module> {
             Value::PhantomData => {
                 Fragment::string("PhantomData<_>").delimit(Fragment::Char('<'), Fragment::Char('>'))
             }
-            Value::Poison => Fragment::string("NO_DATA"),
+            // NOTE - defaulting to the Display implementation on Value to keep presentation consistent
+            Value::Poisoned(..) => Fragment::string(format!("{value}")),
         }
     }
 
@@ -2117,8 +2123,7 @@ impl<'module> TreePrinter<'module> {
     // FIXME - without a first-class record, Formats will be printed in less sensible ways
     fn compile_format(&mut self, format: &Format, prec: Precedence) -> Fragment {
         match format {
-            // REVIEW - will this break anything?
-            Format::Phantom(_) => Fragment::Empty,
+            Format::Phantom(_f) => Fragment::string("phantom"),
             Format::Variant(label, f) => cond_paren(
                 self.compile_nested_format(
                     "variant",

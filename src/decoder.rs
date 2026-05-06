@@ -1676,11 +1676,10 @@ impl Decoder {
                 }
             }
             Decoder::Permit(a, expr) => {
-                let _dft = expr.eval_value(scope);
-                // TODO: do something with _dft
+                let dft = expr.eval_value(scope);
                 Ok(downgrade_error(
                     a.parse(program, scope, input),
-                    (Value::Poison, input),
+                    (Value::Poisoned(Some(Box::new(dft))), input),
                 ))
             }
         }
