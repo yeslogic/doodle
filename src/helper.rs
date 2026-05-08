@@ -1980,6 +1980,7 @@ pub fn permit(format: Format, if_error: Expr) -> Format {
 /// Helper for [`Format::Enforce`], which upgrades warnings to errors in the interior format.
 ///
 // FIXME - Does not yet work properly in generated code.
+#[cfg(feature = "format_enforce")]
 pub fn enforce(format: Format) -> Format {
     Format::Enforce(Box::new(format))
 }

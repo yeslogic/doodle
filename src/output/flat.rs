@@ -203,6 +203,7 @@ fn check_covered(
             check_covered(module, path, f)?;
         }
         Format::Hint(_hint, format) => check_covered(module, path, format)?,
+        #[cfg(feature = "format_enforce")]
         Format::Enforce(format) => check_covered(module, path, format)?,
         Format::Permit(format, _expr) => check_covered(module, path, format)?,
         Format::WithView(_ident, _vf) => {} // FIXME
@@ -342,7 +343,9 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::Hint(StyleHint::Record { .. }, record_format) => {
                 self.write_record(value, record_format)
             }
-            Format::Permit(format, _) | Format::Enforce(format) => self.write_flat(value, format),
+            Format::Permit(format, _) => self.write_flat(value, format),
+            #[cfg(feature = "format_enforce")]
+            Format::Enforce(format) => self.write_flat(value, format),
             Format::Hint(StyleHint::AsciiStr, str_format) => self.write_flat(value, str_format),
             Format::Hint(StyleHint::AsciiChar, char_format) => self.write_flat(value, char_format),
             Format::Hint(StyleHint::Common(..), inner) => self.write_flat(value, inner),

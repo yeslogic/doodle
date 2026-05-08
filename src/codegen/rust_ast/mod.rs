@@ -1972,20 +1972,20 @@ impl ToFragment for LogMessage {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum LogFn {
     Error,
-    Warn,
-    Info,
-    Debug,
-    Trace,
+    // Warn,
+    // Info,
+    // Debug,
+    // Trace,
 }
 
 impl ToFragment for LogFn {
     fn to_fragment(&self) -> Fragment {
         match self {
             LogFn::Error => Fragment::string("log::error!"),
-            LogFn::Warn => Fragment::string("log::warn!"),
-            LogFn::Info => Fragment::string("log::info!"),
-            LogFn::Debug => Fragment::string("log::debug!"),
-            LogFn::Trace => Fragment::string("log::trace!"),
+            // LogFn::Warn => Fragment::string("log::warn!"),
+            // LogFn::Info => Fragment::string("log::info!"),
+            // LogFn::Debug => Fragment::string("log::debug!"),
+            // LogFn::Trace => Fragment::string("log::trace!"),
         }
     }
 }

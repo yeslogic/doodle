@@ -46,21 +46,13 @@ pub enum Value {
     Mapped(Box<Value>, Box<Value>),
     /// Branch: (Branch Index, Nominal Value)
     Branch(usize, Box<Value>),
-    /// Fallback value yielded synthetically when downgrading a normal parse-error to a warning, e.g. in calls to `downgrade_error`.
-    ///
-    /// Projections and other shape-based expectations should be trivially satisfied by this variant, and in the case of
-    /// projections, should return a value that is itself `Poisoned`.
-    ///
-    /// For all purposes that expect a particular "`value-shape", this variant should be handled appropriately,
-    /// rather than being treated as an unexpected case.
-    Poisoned(Option<Box<Value>>),
+    /// Wrapper to indicate whether a value was parsed successfully, or generated from a fallback `Expr`, for a Decoder within a `Permit` context.
+    Permit(Result<Box<Value>, Option<Box<Value>>>),
 }
 
 impl Value {
-    pub const POISON: Value = Value::Poisoned(None);
-
-    pub const fn is_poisoned(&self) -> bool {
-        matches!(self, Value::Poisoned(_))
+    pub const fn is_fallback(&self) -> bool {
+        matches!(self, Value::Permit(Err(..)))
     }
 }
 
@@ -134,11 +126,11 @@ impl std::fmt::Display for Value {
                 write!(f, "({orig} => {image})")
             }
             Value::Branch(n, value) => write!(f, "({n} :~ {value})"),
-            // REVIEW - is this over-verbose?
-            Value::PhantomData => write!(f, "<PhantomData>"),
-            Value::Poisoned(None) => write!(f, "NO_VALUE"),
-            // REVIEW - should we bother displaying the inner value?
-            Value::Poisoned(Some(v)) => write!(f, "FALLBACK({v})"),
+            Value::PhantomData => write!(f, "PHANTOM_DATA"),
+            // REVIEW[epic=permit] - should the display-form of Permit(Ok(_)) be transparent?
+            Value::Permit(Ok(value)) => write!(f, "{value}"),
+            Value::Permit(Err(Some(v))) => write!(f, "ERROR_FALLBACK({v})"),
+            Value::Permit(Err(None)) => write!(f, "ERROR_FALLBACK"),
         }
     }
 }
@@ -147,7 +139,7 @@ impl Value {
     pub(crate) fn tuple_proj(&self, index: usize) -> &Self {
         match self.coerce_mapped_value() {
             Value::Tuple(vs) => &vs[index],
-            Value::Poisoned(..) => &Value::POISON,
+            Value::Permit(Err(None | Some(_))) => &Value::Permit(Err(None)),
             _ => panic!("expected tuple"),
         }
     }
@@ -158,7 +150,7 @@ impl Value {
                 Some((_, v)) => v,
                 None => panic!("{label} not found in record"),
             },
-            Value::Poisoned(..) => &Value::POISON,
+            Value::Permit(Err(None | Some(_))) => &Value::Permit(Err(None)),
             other => panic!("expected record, found {other:?}"),
         }
     }
@@ -277,11 +269,12 @@ impl Value {
     }
 
     /// Reduces any referenced `Value` to its underlying nominal value, by recursively unwrapping any
-    /// `Value::Branch` or `Value::Mapped` encompassing it.
+    /// `Value::Branch`, `Value::PermitOk`, `Value::Mapped` encompassing it.
     pub fn coerce_mapped_value(&self) -> &Self {
         match self {
             Value::Mapped(_orig, v) => v.coerce_mapped_value(),
             Value::Branch(_n, v) => v.coerce_mapped_value(),
+            Value::Permit(Ok(v)) => v.coerce_mapped_value(),
             v => v,
         }
     }
@@ -291,6 +284,7 @@ impl Value {
         match self {
             Value::Mapped(_orig, v) => v.extract_mapped_value(),
             Value::Branch(_n, v) => v.extract_mapped_value(),
+            Value::Permit(Ok(v)) => v.extract_mapped_value(),
             v => v,
         }
     }

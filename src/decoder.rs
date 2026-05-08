@@ -522,6 +522,7 @@ pub enum Decoder {
     ReadArray(ViewExpr, Box<Expr>, BaseKind<Endian>),
     ReifyView(ViewExpr),
     Phantom,
+    #[cfg(feature = "format_enforce")]
     Enforce(Box<Decoder>),
     Permit(Box<Decoder>, Box<Expr>),
 }
@@ -835,6 +836,7 @@ impl<'a> Compiler<'a> {
                 let da = Box::new(self.compile_format(a, next.clone())?);
                 Ok(Decoder::Where(da, expr.clone()))
             }
+            #[cfg(feature = "format_enforce")]
             Format::Enforce(a) => {
                 let da = Box::new(self.compile_format(a, next.clone())?);
                 Ok(Decoder::Enforce(da))
@@ -1665,6 +1667,7 @@ impl Decoder {
                     input,
                 )))
             }
+            #[cfg(feature = "format_enforce")]
             Decoder::Enforce(a) => {
                 let res = a.parse(program, scope, input)?;
                 match res.into_strict() {
@@ -1678,8 +1681,9 @@ impl Decoder {
             Decoder::Permit(a, expr) => {
                 let dft = expr.eval_value(scope);
                 Ok(downgrade_error(
-                    a.parse(program, scope, input),
-                    (Value::Poisoned(Some(Box::new(dft))), input),
+                    a.parse(program, scope, input)
+                        .map(|ok| ok.map(|(v, input)| (Value::Permit(Ok(Box::new(v))), input))),
+                    (Value::Permit(Err(Some(Box::new(dft)))), input),
                 ))
             }
         }

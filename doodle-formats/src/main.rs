@@ -480,9 +480,9 @@ mod census {
                 crawl(f0, module, pop);
                 crawl(f1, module, pop);
             }
-            Format::Permit(format, ..) | Format::Enforce(format) | Format::Hint(.., format) => {
-                crawl(format, module, pop)
-            }
+            Format::Permit(format, ..) | Format::Hint(.., format) => crawl(format, module, pop),
+            #[cfg(feature = "format_enforce")]
+            Format::Enforce(format) => crawl(format, module, pop),
             Format::LiftedOption(Some(format)) => crawl(format, module, pop),
             Format::LiftedOption(None) => (),
             Format::LetView(.., format) => crawl(format, module, pop),

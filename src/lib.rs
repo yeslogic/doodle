@@ -1198,6 +1198,7 @@ impl FormatModule {
                 self.infer_format_type(scope, f)
             }
             Format::Hint(_hint, f) => self.infer_format_type(scope, f),
+            #[cfg(feature = "format_enforce")]
             Format::Enforce(f) => self.infer_format_type(scope, f),
             Format::Permit(f, expr) => {
                 let t0 = expr.infer_type(scope)?;
@@ -1907,6 +1908,7 @@ impl<'a> MatchTreeStep<'a> {
             }
             TypedFormat::Hint(_, _hint, f) => Self::from_gt_format(module, f, next),
             TypedFormat::Permit(_, f, _expr) => Self::from_gt_format(module, f, next),
+            #[cfg(feature = "format_enforce")]
             TypedFormat::Enforce(_, f) => Self::from_gt_format(module, f, next),
             TypedFormat::WithView(_, _ident, _vf) => Self::from_next(module, next),
         }
@@ -2055,8 +2057,10 @@ impl<'a> MatchTreeStep<'a> {
                 // FIXME - does the construction of a view-binding affect our matchtree?
                 Self::from_format(module, f, next)
             }
-            // REVIEW - do Permit and Enforce themselves affect the matchtree?
-            Format::Permit(f, _) | Format::Enforce(f) => Self::from_format(module, f, next),
+            // REVIEW - it isn't fully clear whether Permit should affect the matchtree in some way...
+            Format::Permit(f, _) => Self::from_format(module, f, next),
+            #[cfg(feature = "format_enforce")]
+            Format::Enforce(f) => Self::from_format(module, f, next),
             Format::Match(_, branches) => {
                 let mut tree = Self::reject();
                 for (_, f) in branches {

@@ -76,6 +76,7 @@ pub enum MonoKind {
     ParseFromView(ViewExpr),
     Hint(StyleHint),
     Phantom,
+    #[cfg(feature = "format_enforce")]
     Enforce,
     Permit(Box<Expr>),
 }
@@ -1245,6 +1246,7 @@ impl FormatModuleExt {
                             self.infer_format_ext_type(scope, f)
                         }
                         MonoKind::Hint(_) => self.infer_format_ext_type(scope, f),
+                        #[cfg(feature = "format_enforce")]
                         MonoKind::Enforce => self.infer_format_ext_type(scope, f),
                         MonoKind::Permit(dft) => {
                             let t0 = dft.infer_type_ext(scope)?;
@@ -1927,6 +1929,7 @@ mod __impls {
                     let inner = Box::new(FormatExt::from(*inner));
                     FormatExt::Epi(EpiFormat::Mono(MonoKind::Phantom, inner))
                 }
+                #[cfg(feature = "format_enforce")]
                 Format::Enforce(format) => FormatExt::Epi(EpiFormat::Mono(
                     MonoKind::Enforce,
                     Box::new(FormatExt::from(*format)),
@@ -2012,6 +2015,7 @@ mod __impls {
                 MonoKind::Hint(style_hint) => Format::Hint(style_hint, inner),
                 MonoKind::LetView(ident) => Format::LetView(ident, inner),
                 MonoKind::Phantom => Format::Phantom(inner),
+                #[cfg(feature = "format_enforce")]
                 MonoKind::Enforce => Format::Enforce(inner),
                 MonoKind::Permit(expr) => Format::Permit(inner, expr),
             }
