@@ -153,7 +153,7 @@ impl<T: Clone> AsRef<T> for Parsed<T> {
 #[derive(Clone, Debug, Serialize)]
 #[serde(tag = "tag", content = "data")]
 pub enum ParsedValue {
-    /// Flat parses of the sub-set of `Value` variants that do not contain any embedded `Value` terms
+    /// Flat parses of the sub-set of `Value` variants that are ground-shaped (i.e. they contain at most one embedded `Value` and are treated transparently if so)
     Flat(Parsed<Value>),
     Tuple(Parsed<Vec<ParsedValue>>),
     Record(Parsed<Vec<(Label, ParsedValue)>>),
@@ -161,6 +161,7 @@ pub enum ParsedValue {
     Seq(Parsed<SeqKind<ParsedValue>>),
     Mapped(Box<ParsedValue>, Box<ParsedValue>),
     Branch(usize, Box<ParsedValue>),
+    Permit(Result<Box<ParsedValue>, Option<Box<ParsedValue>>>),
     Option(Option<Box<ParsedValue>>),
 }
 
@@ -186,6 +187,10 @@ impl ParsedValue {
             ParsedValue::Branch(_ix, inner) => inner.get_loc(),
             ParsedValue::Option(Some(inner)) => inner.get_loc(),
             ParsedValue::Option(None) => ParseLoc::Synthesized,
+            ParsedValue::Permit(Ok(inner)) => inner.get_loc(),
+            ParsedValue::Permit(Err(opt_v)) => opt_v
+                .as_ref()
+                .map_or(ParseLoc::Synthesized, |inner| inner.get_loc()),
         }
     }
 
@@ -260,7 +265,10 @@ impl ParsedValue {
             ParsedValue::Branch(_, inner) => inner.translate(new_loc),
             ParsedValue::Mapped(_, image) => image.translate(new_loc),
             ParsedValue::Option(Some(inner)) => inner.translate(new_loc),
-            ParsedValue::Option(None) => {}
+            ParsedValue::Option(None) => (),
+            ParsedValue::Permit(Ok(inner)) => inner.translate(new_loc),
+            ParsedValue::Permit(Err(Some(inner))) => inner.translate(new_loc),
+            ParsedValue::Permit(Err(None)) => (),
         }
     }
 
@@ -291,6 +299,10 @@ impl From<ParsedValue> for Value {
             }
             ParsedValue::Branch(ix, inner) => Value::Branch(ix, Box::new((*inner).into())),
             ParsedValue::Option(opt) => Value::Option(opt.map(|v| Box::new((*v).into()))),
+            ParsedValue::Permit(res) => match res {
+                Ok(v) => Value::Permit(Ok(Box::new((*v).into()))),
+                Err(opt) => Value::Permit(Err(opt.map(|v| Box::new((*v).into())))),
+            },
         }
     }
 }
@@ -342,6 +354,11 @@ impl ParsedValue {
             }
             ParsedValue::Option(opt) => {
                 Value::Option(opt.as_ref().map(|v| Box::new((**v).clone().into())))
+            }
+            ParsedValue::Permit(Ok(inner)) => Value::Permit(Ok(Box::new(inner.clone_into_value()))),
+            ParsedValue::Permit(Err(None)) => Value::Permit(Err(None)),
+            ParsedValue::Permit(Err(Some(inner))) => {
+                Value::Permit(Err(Some(Box::new(inner.clone_into_value()))))
             }
         }
     }
@@ -482,7 +499,6 @@ impl ParsedValue {
             | Value::Usize(_)
             | Value::EnumFromTo(_)
             | Value::PhantomData
-            | Value::Poisoned(_)
             | Value::Char(_) => ParsedValue::Flat(Parsed {
                 loc: ParseLoc::Synthesized,
                 inner: expr_value,
@@ -531,6 +547,13 @@ impl ParsedValue {
             }
             Value::Option(opt) => {
                 ParsedValue::Option(opt.map(|inner| Box::new(ParsedValue::from_evaluated(*inner))))
+            }
+            Value::Permit(Ok(inner)) => {
+                ParsedValue::Permit(Ok(Box::new(ParsedValue::from_evaluated(*inner))))
+            }
+            Value::Permit(Err(None)) => ParsedValue::Permit(Err(None)),
+            Value::Permit(Err(Some(inner))) => {
+                ParsedValue::Permit(Err(Some(Box::new(ParsedValue::from_evaluated(*inner)))))
             }
         }
     }
@@ -1863,12 +1886,18 @@ impl Decoder {
                 Ok(WithErr::new((v, input)))
             }
             Decoder::Permit(inner, dft) => {
-                let _dft = dft.eval_value_with_loc(scope);
+                let fallback = dft.eval_with_loc(scope);
                 Ok(downgrade_error(
-                    inner.parse_with_loc(program, scope, input),
-                    (ParsedValue::from_evaluated(Value::POISON), input),
+                    inner.parse_with_loc(program, scope, input).map(|ok| {
+                        ok.map(|(v, input)| (ParsedValue::Permit(Ok(Box::new(v))), input))
+                    }),
+                    (
+                        ParsedValue::Permit(Err(Some(Box::new(fallback.into_owned())))),
+                        input,
+                    ),
                 ))
             }
+            #[cfg(feature = "format_enforce")]
             Decoder::Enforce(inner) => {
                 let res = inner.parse_with_loc(program, scope, input)?;
                 match res.into_strict() {

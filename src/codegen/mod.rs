@@ -666,6 +666,7 @@ impl CodeGen {
                     Box::new(embed_expr_nat(dft)),
                 ))
             }
+            #[cfg(feature = "format_enforce")]
             TypedDecoder::Enforce(_, inner) => {
                 let cl_inner = self.translate(inner.get_dec());
                 CaseLogic::Derived(DerivedLogic::Enforce(Box::new(cl_inner)))
@@ -3518,6 +3519,7 @@ enum DerivedLogic<ExprT> {
     DecodeBytes(Box<RustExpr>, Box<CaseLogic<ExprT>>),
     ParseView(Box<RustExpr>, Box<CaseLogic<ExprT>>),
     Permit(Box<CaseLogic<ExprT>>, Box<RustExpr>),
+    #[cfg(feature = "format_enforce")]
     Enforce(Box<CaseLogic<ExprT>>),
 }
 
@@ -3613,6 +3615,7 @@ impl ToAst for DerivedLogic<GTExpr> {
                 let block = GenBlock::from_parts(vec![bind_res], Some(ctrl));
                 block
             }
+            #[cfg(feature = "format_enforce")]
             DerivedLogic::Enforce(inner) => {
                 // FIXME[epic=permit-enforce] - because soft-errors are logged transiently without any value-level record that they were encountered, we do not yet have any way of handling Enforce in generated code
                 let ret = inner.to_ast(ctxt);
@@ -4511,6 +4514,7 @@ impl<'a> Elaborator<'a> {
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::Map(gt, Box::new(t_inner), Box::new(t_lambda))
             }
+            #[cfg(feature = "format_enforce")]
             Format::Enforce(inner) => {
                 let index = self.get_and_increment_index();
                 let t_inner = self.elaborate_format(inner, dyn_scope);

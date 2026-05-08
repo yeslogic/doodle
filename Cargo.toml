@@ -1,5 +1,13 @@
 [workspace]
-members = [".", "generated/", "doodle-formats/", "micro-stat/", "smallsorts", "experiments/analytic-engine/", "experiments/analytic-parser"]
+members = [
+    ".",
+    "generated/",
+    "doodle-formats/",
+    "micro-stat/",
+    "smallsorts",
+    "experiments/analytic-engine/",
+    "experiments/analytic-parser",
+]
 
 [package]
 name = "doodle"
@@ -8,6 +16,8 @@ edition = "2024"
 
 [features]
 default = []
+alt = []
+format_enforce = []
 pattern_matches_auto_rep = []
 __unify_mixed_to_int = []
 

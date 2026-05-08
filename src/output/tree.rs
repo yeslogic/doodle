@@ -1,3 +1,4 @@
+use core::panic;
 use std::{fmt, io, rc::Rc};
 
 use crate::precedence::{Precedence, cond_paren};
@@ -71,6 +72,11 @@ type Field<T> = (Label, T);
 type FieldPValue = Field<ParsedValue>;
 type FieldValue = Field<Value>;
 
+// Centralized logic for what Fragment to display for `{Parsed,}Value::Permit(Err(None))`
+fn fragment_permit_err_none() -> Fragment {
+    Fragment::string("NO_VALUE")
+}
+
 impl<'module> TreePrinter<'module> {
     fn is_implied_value_format_old_style_record(&self, format: &Format) -> bool {
         match format {
@@ -104,6 +110,7 @@ impl<'module> TreePrinter<'module> {
             Format::Phantom(_) => true,
             Format::Byte(bs) => bs.len() == 1,
             Format::Tuple(fields) => fields.iter().all(|f| self.is_implied_value_format(f)),
+            #[cfg(feature = "format_enforce")]
             Format::Enforce(f) => self.is_implied_value_format(f),
             Format::Permit(f, _e) => self.is_implied_value_format(f),
             Format::Hint(StyleHint::Common(_), inner) => self.is_implied_value_format(inner),
@@ -273,9 +280,8 @@ impl<'module> TreePrinter<'module> {
             // FIXME[epic=workaround-hack] - we cannot easily reconstruct the format corresponding to the inner value, so we discard the format-hint
             Value::Option(Some(value)) => self.is_atomic_value(value, None),
             Value::PhantomData => true,
-            Value::Poisoned(None) => true,
-            // FIXME[epic=poisoned-value-handling] - properly consider if recursion is appropriate here
-            Value::Poisoned(Some(value)) => self.is_atomic_value(value, None),
+            Value::Permit(Ok(value) | Err(Some(value))) => self.is_atomic_value(value, None),
+            Value::Permit(Err(None)) => true,
         }
     }
 
@@ -351,6 +357,9 @@ impl<'module> TreePrinter<'module> {
             ParsedValue::Branch(_n, value) => self.compile_parsed_value(value),
             ParsedValue::Option(None) => Fragment::string("none"),
             ParsedValue::Option(Some(value)) => self.compile_parsed_variant("some", value, None),
+            ParsedValue::Permit(Ok(value)) => self.compile_parsed_value(value),
+            ParsedValue::Permit(Err(Some(value))) => self.compile_parsed_value(value),
+            ParsedValue::Permit(Err(None)) => fragment_permit_err_none(),
         }
     }
 
@@ -380,6 +389,20 @@ impl<'module> TreePrinter<'module> {
             preview_len: Some(10),
             flags,
             module,
+        }
+    }
+
+    fn compile_parsed_permit_err(&mut self, value: &Option<Box<ParsedValue>>) -> Fragment {
+        match value {
+            Some(v) => Fragment::string("(FALLBACK)").join_with_wsp(self.compile_parsed_value(v)),
+            None => fragment_permit_err_none(),
+        }
+    }
+
+    fn compile_permit_err(&mut self, err: Option<&Box<Value>>) -> Fragment {
+        match err {
+            None => fragment_permit_err_none(),
+            Some(v) => Fragment::string("(FALLBACK)").join_with_wsp(self.compile_value(v)),
         }
     }
 
@@ -562,7 +585,14 @@ impl<'module> TreePrinter<'module> {
             Format::LetFormat(_f0, _name, f) => self.compile_parsed_decoded_value(value, f),
             Format::MonadSeq(_f0, f) => self.compile_parsed_decoded_value(value, f),
             Format::Hint(_hint, f) => self.compile_parsed_decoded_value(value, f),
-            Format::Permit(f, _e) => self.compile_parsed_decoded_value(value, f),
+            Format::Permit(f, _e) => match value {
+                ParsedValue::Permit(res) => match res {
+                    Ok(v) => self.compile_parsed_decoded_value(v, f),
+                    Err(e) => self.compile_parsed_permit_err(e),
+                },
+                _ => panic!("expected Value::Permit, found {value:?}"),
+            },
+            #[cfg(feature = "format_enforce")]
             Format::Enforce(f) => self.compile_parsed_decoded_value(value, f),
             // REVIEW[epic=view-format] - is this correct?
             Format::WithView(_ident, _vf) => self.compile_parsed_value(value),
@@ -649,7 +679,6 @@ impl<'module> TreePrinter<'module> {
                     let record_format = fmt.to_record_format();
                     self.compile_record(value_fields, Some(&record_format))
                 }
-                Value::Poisoned(..) => self.compile_value(value),
                 _ => panic!("expected record, found {value}"),
             },
             Format::Hint(StyleHint::AsciiStr, str_format) => {
@@ -670,13 +699,14 @@ impl<'module> TreePrinter<'module> {
                 // REVIEW - do we want to modify the output based on the hint?
                 self.compile_decoded_value(value, inner)
             }
-            Format::Permit(format, _) => {
-                if matches!(value, Value::Poisoned(..)) {
-                    self.compile_value(value)
-                } else {
-                    self.compile_decoded_value(value, format)
-                }
-            }
+            Format::Permit(format, _) => match value {
+                Value::Permit(res) => match res {
+                    Ok(ok) => self.compile_decoded_value(ok, format),
+                    Err(err) => self.compile_permit_err(err.as_ref()),
+                },
+                _ => panic!("expected Value::Permit, found {value}"),
+            },
+            #[cfg(feature = "format_enforce")]
             Format::Enforce(format) => self.compile_decoded_value(value, format),
             Format::Repeat(format)
             | Format::Repeat1(format)
@@ -764,10 +794,6 @@ impl<'module> TreePrinter<'module> {
                     frag.append(self.compile_decoded_value(value, format));
                     frag
                 }
-                Value::Poisoned(..) => {
-                    frag.append(self.compile_value(value));
-                    frag
-                }
                 _ => panic!("expected branch, found {value}"),
             },
             Format::Dynamic(_name, _dynformat, format) => self.compile_decoded_value(value, format),
@@ -819,7 +845,8 @@ impl<'module> TreePrinter<'module> {
                 Fragment::string("PhantomData<_>").delimit(Fragment::Char('<'), Fragment::Char('>'))
             }
             // NOTE - defaulting to the Display implementation on Value to keep presentation consistent
-            Value::Poisoned(..) => Fragment::string(format!("{value}")),
+            // REVIEW[epic=permit] - does the refactor from Poisoned to Permit affect what display logic to use?
+            Value::Permit(..) => Fragment::string(format!("{value}")),
         }
     }
 
@@ -2466,6 +2493,7 @@ impl<'module> TreePrinter<'module> {
                     Precedence::FORMAT_COMPOUND,
                 )
             }
+            #[cfg(feature = "format_enforce")]
             Format::Enforce(format) => cond_paren(
                 self.compile_nested_format("enforce", None, format, prec),
                 prec,

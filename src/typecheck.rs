@@ -3706,6 +3706,7 @@ impl TypeChecker {
                 self.unify_var_pair(newvar, inner_v)?;
                 Ok(newvar)
             }
+            #[cfg(feature = "format_enforce")]
             Format::Enforce(inner) => {
                 let newvar = self.get_new_uvar();
                 let inner_v = self.infer_var_format(inner, ctxt)?;

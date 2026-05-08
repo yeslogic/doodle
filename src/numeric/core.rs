@@ -843,7 +843,9 @@ impl<'a> TryFrom<&'a crate::decoder::Value> for StrictValue {
     fn try_from(value: &'a crate::decoder::Value) -> Result<Self, Self::Error> {
         use crate::decoder::Value as Raw;
         match value {
-            Raw::Mapped(_, v) | Raw::Branch(_, v) => Self::try_from(&**v),
+            Raw::Permit(Ok(v) | Err(Some(v))) | Raw::Mapped(_, v) | Raw::Branch(_, v) => {
+                Self::try_from(&**v)
+            }
             Raw::Numeric(typed_const) => {
                 Ok(StrictValue::new(Value::Const((&**typed_const).clone())))
             }
@@ -864,7 +866,7 @@ impl<'a> TryFrom<&'a crate::decoder::Value> for StrictValue {
             | Raw::Char(..)
             | Raw::View { .. }
             | Raw::PhantomData
-            | Raw::Poisoned(..)
+            | Raw::Permit(Err(None))
             | Raw::EnumFromTo(..)
             | Raw::Option(..)
             | Raw::Tuple(..)
@@ -886,10 +888,12 @@ impl<'a> TryFrom<&'a crate::loc_decoder::ParsedValue> for StrictValue {
         match value {
             Raw::Flat(Parsed { inner, .. }) => Self::try_from(inner),
             Raw::Mapped(_, v) | Raw::Branch(_, v) => Self::try_from(&**v),
+            Raw::Permit(Ok(v) | Err(Some(v))) => Self::try_from(&**v),
             Raw::Tuple(..)
             | Raw::Record(..)
             | Raw::Variant(..)
             | Raw::Seq(..)
+            | Raw::Permit(Err(None))
             | Raw::Option(..) => Err(CoerceValueError {
                 bad_value: value.clone_into_value(),
             }),

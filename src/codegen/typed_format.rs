@@ -208,6 +208,7 @@ impl<TypeRep> std::hash::Hash for TypedFormat<TypeRep> {
                 hint.hash(state);
                 f.hash(state);
             }
+            #[cfg(feature = "format_enforce")]
             TypedFormat::Enforce(_, f) => {
                 f.hash(state);
             }
@@ -319,6 +320,7 @@ pub enum TypedFormat<TypeRep> {
     LetView(TypeRep, Label, Box<TypedFormat<TypeRep>>),
     WithView(TypeRep, TypedViewExpr<TypeRep>, TypedViewFormat<TypeRep>),
     Phantom(TypeRep, Box<TypedFormat<TypeRep>>),
+    #[cfg(feature = "format_enforce")]
     Enforce(TypeRep, Box<TypedFormat<TypeRep>>),
     Permit(TypeRep, Box<TypedFormat<TypeRep>>, Box<TypedExpr<TypeRep>>),
 }
@@ -397,9 +399,11 @@ impl TypedFormat<GenType> {
                 f0.lookahead_bounds(),
                 f0.match_bounds() + f.lookahead_bounds(),
             ),
-            TypedFormat::Enforce(.., inner)
-            | TypedFormat::Permit(.., inner, _)
-            | TypedFormat::Hint(.., inner) => inner.lookahead_bounds(),
+            #[cfg(feature = "format_enforce")]
+            TypedFormat::Enforce(.., inner) => inner.lookahead_bounds(),
+            TypedFormat::Permit(.., inner, _) | TypedFormat::Hint(.., inner) => {
+                inner.lookahead_bounds()
+            }
             TypedFormat::LiftedOption(_, f) => f
                 .as_ref()
                 .map_or(Bounds::exact(0), |f| f.lookahead_bounds()),
@@ -475,9 +479,11 @@ impl TypedFormat<GenType> {
             TypedFormat::LetFormat(_, f0, _, f1) | TypedFormat::MonadSeq(_, f0, f1) => {
                 f0.match_bounds() + f1.match_bounds()
             }
-            TypedFormat::Enforce(.., inner)
-            | TypedFormat::Permit(.., inner, _)
-            | TypedFormat::Hint(.., inner) => inner.match_bounds(),
+            #[cfg(feature = "format_enforce")]
+            TypedFormat::Enforce(.., inner) => inner.match_bounds(),
+            TypedFormat::Permit(.., inner, _) | TypedFormat::Hint(.., inner) => {
+                inner.match_bounds()
+            }
             TypedFormat::LiftedOption(_, f) => {
                 f.as_ref().map_or(Bounds::exact(0), |f| f.match_bounds())
             }
@@ -518,7 +524,6 @@ impl TypedFormat<GenType> {
             | TypedFormat::MonadSeq(gt, ..)
             | TypedFormat::Hint(gt, ..)
             | TypedFormat::Permit(gt, ..)
-            | TypedFormat::Enforce(gt, ..)
             | TypedFormat::DecodeBytes(gt, ..)
             | TypedFormat::ParseFromView(gt, ..)
             | TypedFormat::FormatCall(gt, ..)
@@ -551,6 +556,8 @@ impl TypedFormat<GenType> {
             | TypedFormat::Dynamic(gt, ..)
             | TypedFormat::LiftedOption(gt, ..)
             | TypedFormat::Apply(gt, ..) => Some(Cow::Borrowed(gt)),
+            #[cfg(feature = "format_enforce")]
+            TypedFormat::Enforce(gt, ..) => Some(Cow::Borrowed(gt)),
         }
     }
 }
@@ -1242,6 +1249,7 @@ mod __impls {
                 TypedFormat::Apply(_, name, _) => Format::Apply(name),
                 TypedFormat::LiftedOption(_, inner) => Format::LiftedOption(inner.map(rebox)),
                 TypedFormat::Phantom(_, inner) => Format::Phantom(rebox(inner)),
+                #[cfg(feature = "format_enforce")]
                 TypedFormat::Enforce(_, inner) => Format::Enforce(rebox(inner)),
                 TypedFormat::Permit(_, inner, dft) => Format::Permit(rebox(inner), rebox(dft)),
             }

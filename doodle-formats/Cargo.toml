@@ -10,6 +10,7 @@ bench = false
 [features]
 default = []
 alt = []
+format_enforce = []
 
 [[bench]]
 name = "decoder_inflate_bench"
