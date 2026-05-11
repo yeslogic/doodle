@@ -987,7 +987,7 @@ pub struct U16;
 /// Marker type for [`Expr::U32`]-specific generic trait impls
 pub struct U32;
 
-/// Marker type for [`Expr::U32`]-specific generic trait impls
+/// Marker type for [`Expr::U64`]-specific generic trait impls
 pub struct U64;
 
 macro_rules! impl_zeromarker {

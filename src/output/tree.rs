@@ -845,7 +845,6 @@ impl<'module> TreePrinter<'module> {
                 Fragment::string("PhantomData<_>").delimit(Fragment::Char('<'), Fragment::Char('>'))
             }
             // NOTE - defaulting to the Display implementation on Value to keep presentation consistent
-            // REVIEW[epic=permit] - does the refactor from Poisoned to Permit affect what display logic to use?
             Value::Permit(..) => Fragment::string(format!("{value}")),
         }
     }
