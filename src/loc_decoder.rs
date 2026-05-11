@@ -16,7 +16,7 @@ use crate::decoder::{
 use crate::error::{DecodeErrorKind, ELocDecodeResult, LocDecodeResult};
 use crate::read::ReadCtxt;
 use crate::util::WithErr;
-use crate::util::downgrade_error;
+use crate::util::downgrade_error_with;
 use crate::validation::Condition;
 use crate::{BaseKind, DynFormat, Endian, Expr, Format, Label, Pattern, ViewExpr};
 
@@ -483,6 +483,7 @@ impl ParsedValue {
         match self {
             ParsedValue::Mapped(_orig, v) => v.coerce_mapped_value(),
             ParsedValue::Branch(_n, v) => v.coerce_mapped_value(),
+            ParsedValue::Permit(Ok(v)) => v.coerce_mapped_value(),
             v => v,
         }
     }
@@ -1885,18 +1886,19 @@ impl Decoder {
                 });
                 Ok(WithErr::new((v, input)))
             }
-            Decoder::Permit(inner, dft) => {
-                let fallback = dft.eval_with_loc(scope);
-                Ok(downgrade_error(
-                    inner.parse_with_loc(program, scope, input).map(|ok| {
-                        ok.map(|(v, input)| (ParsedValue::Permit(Ok(Box::new(v))), input))
-                    }),
+            Decoder::Permit(inner, dft) => Ok(downgrade_error_with(
+                inner
+                    .parse_with_loc(program, scope, input)
+                    .map(|ok| ok.map(|(v, input)| (ParsedValue::Permit(Ok(Box::new(v))), input))),
+                || {
                     (
-                        ParsedValue::Permit(Err(Some(Box::new(fallback.into_owned())))),
+                        ParsedValue::Permit(Err(Some(Box::new(
+                            dft.eval_with_loc(scope).into_owned(),
+                        )))),
                         input,
-                    ),
-                ))
-            }
+                    )
+                },
+            )),
             #[cfg(feature = "format_enforce")]
             Decoder::Enforce(inner) => {
                 let res = inner.parse_with_loc(program, scope, input)?;

@@ -217,7 +217,11 @@ pub(crate) mod with_err {
 
     pub type EResult<T, E0, E1 = E0> = Result<WithErr<T, E0>, E1>;
 
-    pub fn downgrade_error<T, E0>(val: EResult<T, E0>, default: T) -> WithErr<T, E0>
+    /// Given `val: Result<WithErr<T, E0>, E0>`, returns `v` if `val` is `Ok(v)`, and for `Err(e)`, returns `WithErr::with_err(default(), e)`.
+    pub fn downgrade_error_with<T, E0>(
+        val: EResult<T, E0>,
+        default: impl FnOnce() -> T,
+    ) -> WithErr<T, E0>
     where
         E0: std::fmt::Display,
     {
@@ -225,12 +229,12 @@ pub(crate) mod with_err {
             Ok(v) => v,
             Err(e) => {
                 log::error!("downgraded error: {e}");
-                WithErr::with_err(default, e)
+                WithErr::with_err(default(), e)
             }
         }
     }
 }
-pub(crate) use with_err::{EResult, WithErr, downgrade_error};
+pub(crate) use with_err::{EResult, WithErr, downgrade_error_with};
 
 pub trait ErrTrace {
     fn with_trace<T>(self, trace: T) -> Self
@@ -278,5 +282,13 @@ mod tests {
         let val = x.into_inner();
         assert_eq!(&errs[..], &[0, 1, 2]);
         assert_eq!(&val[..], &["zero", "one", "two"]);
+    }
+
+    #[test]
+    fn test_downgrade_error() {
+        let x = downgrade_error_with::<&'static str, &'static str>(Err("error"), || "default");
+        assert!(x.has_errs());
+        assert!(x.iter_errs().next().is_some_and(|e| *e == "error"));
+        assert_eq!(x.into_inner(), "default");
     }
 }

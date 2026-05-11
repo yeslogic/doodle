@@ -9,7 +9,7 @@ use crate::error::{DecodeErrorKind, DecodeResult, EDecodeResult};
 use crate::read::ReadCtxt;
 use crate::try_with;
 use crate::util::WithErr;
-use crate::util::{ErrTrace as _, downgrade_error};
+use crate::util::{ErrTrace as _, downgrade_error_with};
 use crate::validation::Condition;
 use crate::{
     BaseKind, DynFormat, Endian, Expr, Format, FormatModule, Label, MatchTree, MaybeTyped, Next,
@@ -1678,14 +1678,16 @@ impl Decoder {
                     }
                 }
             }
-            Decoder::Permit(a, expr) => {
-                let dft = expr.eval_value(scope);
-                Ok(downgrade_error(
-                    a.parse(program, scope, input)
-                        .map(|ok| ok.map(|(v, input)| (Value::Permit(Ok(Box::new(v))), input))),
-                    (Value::Permit(Err(Some(Box::new(dft)))), input),
-                ))
-            }
+            Decoder::Permit(a, expr) => Ok(downgrade_error_with(
+                a.parse(program, scope, input)
+                    .map(|ok| ok.map(|(v, input)| (Value::Permit(Ok(Box::new(v))), input))),
+                || {
+                    (
+                        Value::Permit(Err(Some(Box::new(expr.eval_value(scope))))),
+                        input,
+                    )
+                },
+            )),
         }
     }
 
@@ -1844,6 +1846,10 @@ mod tests {
     use super::*;
     use crate::helper::*;
 
+    /// Test-helper function for decoder tests.
+    ///
+    /// Given a decoder `d` and input `input`, checks that `d.parse(input)` returns the value `expect`,
+    /// and that the remaining input after parsing matches `tail`.
     fn accepts(d: &Decoder, input: &[u8], tail: &[u8], expect: Value) {
         let program = Program::new();
         let (val, remain) = d
@@ -2630,5 +2636,114 @@ mod tests {
                 Value::Branch(0, Box::new(Value::U8(0))),
             )]),
         );
+    }
+
+    #[test]
+    fn permit_valid_parse_expected_value() {
+        let f = fmt_some(Format::record([(
+            "foo",
+            mk_ascii_string(byte_seq(b"hello world")),
+        )]));
+        let g = permit(f, expr_none());
+        let d = Compiler::compile_one(&g).unwrap();
+
+        const DATA: &[u8] = b"hello world";
+
+        let expect = Value::Permit(Ok(Box::new(Value::Option(Some(Box::new(Value::Record(
+            vec![(
+                Label::Borrowed("foo"),
+                Value::Seq(SeqKind::Strict(
+                    (b"hello world")
+                        .into_iter()
+                        .map(|b| Value::U8(*b))
+                        .collect::<Vec<_>>(),
+                )),
+            )],
+        )))))));
+        assert!(!expect.is_fallback());
+        accepts(&d, DATA, &[], expect)
+    }
+
+    #[test]
+    fn permit_invalid_parse_expected_value() {
+        let f = fmt_some(Format::record([(
+            "foo",
+            mk_ascii_string(byte_seq(b"hello world")),
+        )]));
+        let df = Compiler::compile_one(&f).unwrap();
+        let g = permit(f, expr_none());
+        let dg = Compiler::compile_one(&g).unwrap();
+
+        let expect = Value::Permit(Err(Some(Box::new(Value::Option(None)))));
+
+        const DATA: &[u8] = b"hello";
+
+        assert!(expect.is_fallback());
+        rejects(&df, DATA);
+        accepts(&dg, DATA, DATA, expect)
+    }
+
+    #[test]
+    fn matches_inner_on_permit_err() {
+        let f = permit(
+            fmt_some(Format::record([("foo", Format::ANY_BYTE)])),
+            expr_none(),
+        );
+        let g = record([
+            ("x", f),
+            (
+                "is_good",
+                fmt_match(
+                    var("x"),
+                    [
+                        (pat_some(bind("y")), compute(Expr::Bool(true))),
+                        (pat_none(), compute(Expr::Bool(false))),
+                    ],
+                ),
+            ),
+        ]);
+        let d = Compiler::compile_one(&g).unwrap();
+
+        const DATA: &[u8] = &[];
+
+        accepts(
+            &d,
+            DATA,
+            DATA,
+            Value::Record(vec![
+                (
+                    Label::Borrowed("x"),
+                    Value::Permit(Err(Some(Box::new(Value::Option(None))))),
+                ),
+                (
+                    Label::Borrowed("is_good"),
+                    Value::Branch(1, Box::new(Value::Bool(false))),
+                ),
+            ]),
+        );
+    }
+
+    #[test]
+    fn test_negative_number_match() {
+        let f = i8();
+        let g = chain(
+            f,
+            "x",
+            fmt_match(
+                var("x"),
+                [
+                    (
+                        Pattern::ZConst(num_bigint::BigInt::from(-1)),
+                        compute(Expr::Bool(true)),
+                    ),
+                    (Pattern::Wildcard, compute(Expr::Bool(false))),
+                ],
+            ),
+        );
+        let d = Compiler::compile_one(&g).unwrap();
+
+        const DATA: &[u8] = &[0xFF];
+
+        accepts(&d, DATA, &[], Value::Branch(0, Box::new(Value::Bool(true))));
     }
 }
