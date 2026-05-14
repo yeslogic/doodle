@@ -176,8 +176,11 @@ fn check_covered(
         Format::LiftedOption(Some(format)) => {
             check_covered(module, path, format)?;
         }
-        Format::Peek(_) => {}    // FIXME
-        Format::PeekNot(_) => {} // FIXME
+        Format::Peek(format) => {
+            check_covered(module, path, format)?;
+        }
+        // NOTE - because PeekNot is expressly negated, its contents will never represent the actual structure of a parsed value
+        Format::PeekNot(_) => (),
         Format::Slice(_, format) => {
             check_covered(module, path, format)?;
         }
@@ -185,7 +188,9 @@ fn check_covered(
         Format::Bits(format) => {
             check_covered(module, path, format)?;
         }
-        Format::WithRelativeOffset(_, _, _) => {} // FIXME
+        Format::WithRelativeOffset(_, _, format) => {
+            check_covered(module, path, format)?;
+        }
         Format::Map(format, _expr) => check_covered(module, path, format)?,
         Format::Where(format, _expr) => check_covered(module, path, format)?,
         Format::Compute(_expr) => {}

@@ -30,6 +30,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
     module.define_format(
         "tiff.main",
         record([
+            // TODO : replace with let-view
             ("start_of_header", pos32()),
             ("byte-order", tiff_byte_order.call()),
             (
@@ -54,6 +55,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
             ),
             (
                 "ifd",
+                // TODO : replace with view-relative parse
                 with_relative_offset(
                     Some(var("start_of_header")),
                     var("offset"),

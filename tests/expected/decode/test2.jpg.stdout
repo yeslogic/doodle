@@ -12,7 +12,7 @@
         │   │               └── exif <- jpeg.app1-exif :=
         │   │                   ├── padding <- [= 0]
         │   │                   └── exif <- tiff.main :=
-        │   │                       ├── start_of_header <- map (x -> as-u32 x) pos := 12
+        │   │                       ├── start_of_header <- pos := 12
         │   │                       ├── byte-order <- tiff.byte-order := be
         │   │                       ├── magic <- match byte-order { ... } := 42
         │   │                       ├── offset <- match byte-order { ... } := 8
