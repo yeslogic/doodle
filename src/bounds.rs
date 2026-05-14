@@ -56,6 +56,16 @@ pub struct Bounds {
     pub(crate) max: Option<usize>,
 }
 
+impl std::fmt::Display for Bounds {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(max) = self.max {
+            write!(f, "({}..={})", self.min, max)
+        } else {
+            write!(f, "({}..)", self.min)
+        }
+    }
+}
+
 impl Bounds {
     #[inline]
     #[must_use]
@@ -69,6 +79,39 @@ impl Bounds {
     /// Return the highest value of the given `Bounds`, which will be `None` for unbounded ranges.
     pub const fn max(&self) -> Option<usize> {
         self.max
+    }
+
+    /// Partial implementation of `Bounds % Bounds`, which is only guaranteed to yield
+    /// the expected answer when both arguments are exact-bounds.
+    ///
+    /// Because remainder operations over ranges do not always yield contiguous ranges
+    /// in either direction (e.g. `3..=5 % 4 -> [3, 0, 1]`; `110 % 11..=12 -> [0, 2]`),
+    /// this method returns `Bounds::any()` if either range is inexact.
+    ///
+    /// Provided that `lhs = Bounds::exact(x)`, and `rhs = Bounds::exact(y)`, the
+    /// result should always be `Bounds::exact(x % y)`.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if both ranges are exact but `rhs == 0`.
+    // REVIEW - should this be a `std::ops::Rem` impl?
+    pub(crate) fn rem(lhs: Bounds, rhs: Bounds) -> Bounds {
+        if let Some(y) = rhs.is_exact() {
+            if let Some(x) = lhs.is_exact() {
+                return Bounds::exact(x.checked_rem(y).unwrap());
+            } else {
+                // NOTE - some edge-cases may have general solutions but we won't attempt to solve them, for now
+                log::warn!(
+                    "cannot generally solve potentially unsound operation Bounds % usize: {lhs} % {y}"
+                );
+            }
+        } else {
+            // NOTE - some edge-cases may have general solutions but we won't attempt to solve them, for now
+            log::warn!(
+                "cannot generally solve potentially unsound operation Bounds % Bounds: {lhs} % {rhs}"
+            );
+        }
+        Bounds::any()
     }
 }
 
@@ -201,17 +244,18 @@ impl Bounds {
         }
     }
 
-    /// Dual method to [`Bounds::union`], which picks the minimum upper-bound of the two `Bounds` objects instead
-    /// of the maximum, but otherwise behaves the same.
-    pub fn intersection(lhs: Bounds, rhs: Bounds) -> Bounds {
-        Bounds {
-            min: usize::min(lhs.min, rhs.min),
-            max: match (lhs.max, rhs.max) {
-                (Some(m1), Some(m2)) => Some(usize::min(m1, m2)),
-                (Some(m1), None) => Some(m1),
-                _ => rhs.max,
-            },
+    /// Clamps `self` to the range `min..=max`.
+    pub fn clamp(self, min: usize, max: usize) -> Option<Bounds> {
+        assert!(min <= max, "Bounds::clamp: min ({min}) > max ({max})");
+        let min = usize::max(min, self.min);
+        let max = self.max.map_or(max, |m| usize::min(m, max));
+        if min > max {
+            return None;
         }
+        Some(Bounds {
+            min: usize::max(self.min, min),
+            max: Some(max),
+        })
     }
 
     /// Converts a `Bounds` that measures in increments of individual bits into the equivalent range

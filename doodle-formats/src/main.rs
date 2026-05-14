@@ -121,7 +121,11 @@ thread_local! {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
-    stderrlog::new().module(module_path!()).init().unwrap();
+    stderrlog::new()
+        .module(module_path!())
+        .verbosity(log::Level::Info)
+        .init()
+        .unwrap();
 
     match Command::parse() {
         Command::Census => {

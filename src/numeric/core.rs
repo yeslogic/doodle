@@ -1,15 +1,18 @@
-use num_bigint::BigInt;
-use num_traits::{One as _, Signed, Zero};
-use serde::Serialize;
 use std::{borrow::Cow, cmp::Ordering};
 
-pub const VOID: &'static VoidScope = &VoidScope;
+use anyhow::anyhow;
+use num_bigint::BigInt;
+use num_traits::{One as _, Signed, ToPrimitive, Zero};
+use serde::Serialize;
 
+use crate::IntRel;
 use crate::decoder::UnknownVarError;
 use crate::scope::{EvalScope, VoidScope};
 use crate::{Label, bounds::Bounds as UBounds};
 
 pub type Number = BigInt;
+
+pub const VOID: &'static VoidScope = &VoidScope;
 
 /// Standalone ground operations on two numeric arguments
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -422,6 +425,59 @@ impl TypedConst {
         &self.0
     }
 
+    /// Attempts to perform a one-to-one value conversion to `usize`.
+    ///
+    /// Does not check if `self` is properly representable, only if its nominal
+    /// value fits within the bounds of `usize`.
+    ///
+    /// Returns an error if the conversion fails.
+    pub fn as_usize(&self) -> Result<usize, anyhow::Error> {
+        match (&self.0).try_into() {
+            Ok(n) => Ok(n),
+            Err(e) => Err(anyhow!(
+                "TypedConst::as_usize: unable to convert typed-const {self:?} to usize: {e}"
+            )),
+        }
+    }
+
+    /// Attempts to coerce the value of `self` to a `u8`, checking that it is both representable,
+    /// and has a representation that is compatible with `u8` (i.e. `NumRep::U8` or `NumRep::Auto`).
+    ///
+    /// Returns an error if the coercion fails, or if the `NumRep` is incompatible.
+    pub fn get_as_u8(&self) -> Result<u8, anyhow::Error> {
+        match self.1 {
+            NumRep::U8 => {
+                if self.is_representable() {
+                    unsafe {
+                        self.get_u8_unchecked().inspect_err(|e| {
+                    log::error!(
+                        "TypedConst::get_as_u8: `{self:?}` supposedly u8-representable, but conversion failed: {e}"
+                    );
+                })
+                    }
+                } else {
+                    return Err(anyhow!("unrepresentable typed-const {self:?}"));
+                }
+            }
+            NumRep::Auto => {
+                log::warn!(
+                    "TypedConst::get_as_u8: encountered auto-rep, attempting coercion to u8"
+                );
+                unsafe { self.get_u8_unchecked() }
+            }
+            _ => {
+                return Err(anyhow!(
+                    "u8-coercion not supported for non-u8 typed-const {self:?}"
+                ));
+            }
+        }
+    }
+
+    ///
+    unsafe fn get_u8_unchecked(&self) -> Result<u8, anyhow::Error> {
+        Ok((&self.0).try_into()?)
+    }
+
     /// Type-agnostic equality on a pure mathematical level.
     ///
     /// This check will return `true` if `self` and `other` have the same value,
@@ -504,6 +560,25 @@ impl TypedConst {
     pub fn get_rep(&self) -> NumRep {
         self.1
     }
+
+    /// Returns `true` if `l <rel> r` holds, based on general arithmetic value and
+    /// irrespective of either `NumRep`.
+    ///
+    /// In particular, unrepresentable values will still be compared as if their
+    /// representational component .
+    pub(crate) fn rel(rel: IntRel, l: &Self, r: &Self) -> bool {
+        let x = &l.0;
+        let y = &r.0;
+        let ord = x.cmp(y);
+        match rel {
+            IntRel::Eq => matches!(ord, Ordering::Equal),
+            IntRel::Ne => !matches!(ord, Ordering::Equal),
+            IntRel::Lt => matches!(ord, Ordering::Less),
+            IntRel::Gt => matches!(ord, Ordering::Greater),
+            IntRel::Lte => matches!(ord, Ordering::Less | Ordering::Equal),
+            IntRel::Gte => matches!(ord, Ordering::Greater | Ordering::Equal),
+        }
+    }
 }
 
 impl TypedConst {
@@ -567,6 +642,12 @@ impl Value {
         match self {
             Value::Const(c) => Some(c),
             // Value::Opt(value) => value.as_deref().and_then(Value::as_const),
+        }
+    }
+
+    pub fn as_usize(&self) -> Option<usize> {
+        match self {
+            Value::Const(tc) => tc.as_raw_value().to_usize(),
         }
     }
 }
