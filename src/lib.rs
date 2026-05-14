@@ -24,7 +24,6 @@ pub mod decoder;
 pub mod dep_ref;
 pub use dep_ref::DepFormat;
 
-pub mod disjoint;
 pub mod error;
 pub mod helper;
 pub mod loc_decoder;
@@ -701,11 +700,8 @@ impl Expr {
             Expr::U32(n) => Bounds::exact(*n as usize),
             Expr::U64(n) => Bounds::exact(*n as usize),
 
-            // REVIEW - does this behave as expected (w.r.t downstream callers) when `n.bounds` returns `Bounds::any()`?
-            Expr::AsU8(n) => n.bounds().clamp(0, u8::MAX as usize).unwrap(),
-            Expr::AsU16(n) => n.bounds().clamp(0, u16::MAX as usize).unwrap(),
-            Expr::AsU32(n) => n.bounds().clamp(0, u32::MAX as usize).unwrap(),
-            Expr::AsU64(n) => n.bounds().clamp(0, u64::MAX as usize).unwrap(),
+            // Shl and Shr misbehave if we use proper upper bounds, so use Bounds::any() instead.
+            Expr::AsU8(_) | Expr::AsU16(_) | Expr::AsU32(_) | Expr::AsU64(_) => Bounds::any(),
 
             Expr::Arith(arith, a, b) => match arith {
                 Arith::Add => a.bounds() + b.bounds(),

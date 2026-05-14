@@ -621,6 +621,34 @@ impl TypedConst {
     }
 }
 
+mod __impl {
+    use super::TypedConst;
+
+    macro_rules! tc_from {
+        ($($ty:ty => $fn:ident),*) => {
+            $(
+                impl From<$ty> for TypedConst {
+                    fn from(value: $ty) -> Self {
+                        TypedConst::$fn(value)
+                    }
+                }
+            )*
+        }
+    }
+
+    tc_from! {
+        u8 => from_u8,
+        u16 => from_u16,
+        u32 => from_u32,
+        u64 => from_u64,
+        i8 => from_i8,
+        i16 => from_i16,
+        i32 => from_i32,
+        i64 => from_i64
+    }
+}
+
+
 #[derive(Clone, PartialEq, Debug)]
 pub enum Value {
     Const(TypedConst),

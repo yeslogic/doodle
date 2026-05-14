@@ -1576,7 +1576,9 @@ pub fn with_relative_offset(base_address: Option<Expr>, offset: Expr, format: Fo
 /// Gets the current stream-position and casts down from U64->U32
 // REVIEW - Since the typechecker now infers a semi-auto type for Format::Pos rather than forcing U64, the cast may be extraneous...
 pub fn pos32() -> Format {
-    map(Format::Pos, lambda("x", Expr::AsU32(Box::new(var("x")))))
+    // FIXME - we are temporarily changing the implementation to just `Format::Pos` to see if things still work
+    // map(Format::Pos, lambda("x", Expr::AsU32(Box::new(var("x")))))
+    Format::Pos
 }
 
 pub fn fmt_let(clone_varname: &'static str, orig: Expr, dep_format: Format) -> Format {
@@ -1978,8 +1980,6 @@ pub fn permit(format: Format, if_error: Expr) -> Format {
 }
 
 /// Helper for [`Format::Enforce`], which upgrades warnings to errors in the interior format.
-///
-// FIXME - Does not yet work properly in generated code.
 #[cfg(feature = "format_enforce")]
 pub fn enforce(format: Format) -> Format {
     Format::Enforce(Box::new(format))
