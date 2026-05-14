@@ -12,7 +12,7 @@ use serde::Serialize;
 
 use crate::bounds::Bounds;
 use crate::byte_set::ByteSet;
-use crate::numeric::core::Expr as NumExpr;
+use crate::numeric::core::{Expr as NumExpr, VOID};
 use crate::read::ReadCtxt;
 
 pub mod alt;
@@ -700,14 +700,46 @@ impl Expr {
             Expr::U16(n) => Bounds::exact(usize::from(*n)),
             Expr::U32(n) => Bounds::exact(*n as usize),
             Expr::U64(n) => Bounds::exact(*n as usize),
-            Expr::Arith(Arith::Add, a, b) => a.bounds() + b.bounds(),
-            Expr::Arith(Arith::Sub, a, b) => a.bounds() - b.bounds(),
-            Expr::Arith(Arith::Mul, a, b) => a.bounds() * b.bounds(),
-            Expr::Arith(Arith::Div, a, b) => a.bounds() / b.bounds(),
-            Expr::Arith(Arith::BitOr, a, b) => a.bounds() | b.bounds(),
-            Expr::Arith(Arith::BitAnd, a, b) => a.bounds() & b.bounds(),
-            Expr::Arith(Arith::Shl, a, b) => a.bounds() << b.bounds(),
-            Expr::Arith(Arith::Shr, a, b) => a.bounds() >> b.bounds(),
+
+            // REVIEW - does this behave as expected (w.r.t downstream callers) when `n.bounds` returns `Bounds::any()`?
+            Expr::AsU8(n) => n.bounds().clamp(0, u8::MAX as usize).unwrap(),
+            Expr::AsU16(n) => n.bounds().clamp(0, u16::MAX as usize).unwrap(),
+            Expr::AsU32(n) => n.bounds().clamp(0, u32::MAX as usize).unwrap(),
+            Expr::AsU64(n) => n.bounds().clamp(0, u64::MAX as usize).unwrap(),
+
+            Expr::Arith(arith, a, b) => match arith {
+                Arith::Add => a.bounds() + b.bounds(),
+                Arith::Sub => a.bounds() - b.bounds(),
+                Arith::Mul => a.bounds() * b.bounds(),
+                Arith::Div => a.bounds() / b.bounds(),
+                Arith::BitOr => a.bounds() | b.bounds(),
+                Arith::BitAnd => a.bounds() & b.bounds(),
+                Arith::Shl => a.bounds() << b.bounds(),
+                Arith::Shr => a.bounds() >> b.bounds(),
+                Arith::Rem => Bounds::rem(a.bounds(), b.bounds()),
+                Arith::BoolOr | Arith::BoolAnd => Bounds::any(),
+            },
+
+            Expr::Unary(op, a) => match op {
+                UnaryOp::BoolNot => Bounds::any(),
+                UnaryOp::IntPred => a.bounds() - Bounds::exact(1),
+                UnaryOp::IntSucc => a.bounds() + Bounds::exact(1),
+            },
+
+            Expr::Numeric(n) => {
+                let tmp = n.eval_strict(VOID);
+                if let Ok(sv) = tmp
+                    && sv.is_valid()
+                    && let Some(n) = sv.value.as_usize()
+                {
+                    Bounds::exact(n)
+                } else {
+                    // NOTE - this case doesn't distinguish between temporary overflow/underflow, negative results, and positive results larger than usize::MAX
+                    Bounds::any()
+                }
+            }
+
+            // TODO - consider the remaining cases in this catch-all and determine, of those remaining, which have statically solvable bounds
             _ => Bounds::any(),
         }
     }
@@ -2349,5 +2381,44 @@ mod test {
             (Label::Borrowed("z"), Value::U8(10)),
         ]);
         assert_eq!(expected, ret);
+    }
+
+    fn assert_bounds<B>(e: Expr, expected: B)
+    where
+        Bounds: From<B>,
+    {
+        let bounds = e.bounds();
+        assert_eq!(Bounds::from(expected), bounds);
+    }
+
+    #[test]
+    fn test_expr_bounds() {
+        use crate::helper::*;
+        use crate::numeric::helper as n;
+
+        // monic const expression
+        assert_bounds(Expr::U8(42), 42u8);
+
+        // arithmetic operations in doodle grammar
+        assert_bounds(add(Expr::U8(1), Expr::U8(2)), 3u8);
+        assert_bounds(mul(Expr::U8(1), Expr::U8(2)), 2u8);
+        assert_bounds(div(Expr::U8(8), Expr::U8(2)), 4u8);
+        assert_bounds(sub(Expr::U8(8), Expr::U8(2)), 6u8);
+
+        // rem works only when both bounds are exact, but const expressions should always have exact-bounds
+        assert_bounds(rem(Expr::U8(5), Expr::U8(2)), 1u8);
+
+        // embedded numeric subtrees
+        assert_bounds(numeric(n::lift_const(5000u32)), 5000u32);
+        assert_bounds(
+            numeric(n::binop_auto(
+                numeric::BasicBinOp::Add,
+                n::lift_const(1u32),
+                n::auto_const(2u32),
+            )),
+            3u32,
+        )
+
+        // STUB - add more cases to test
     }
 }

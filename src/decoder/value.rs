@@ -361,9 +361,7 @@ impl Value {
             Value::U32(n) => usize::try_from(*n).unwrap(),
             Value::U64(n) => usize::try_from(*n).unwrap(),
             Value::Usize(n) => *n,
-            Value::Numeric(_tc) => {
-                unimplemented!("unwrap_usize: conversion from TypedConst not yet supported")
-            }
+            Value::Numeric(tc) => tc.as_usize().unwrap(),
             other => panic!("value is not a number: {other:?}"),
         }
     }
@@ -375,9 +373,7 @@ impl Value {
             Value::U16(..) | Value::U32(..) | Value::U64(..) | Value::Usize(..) => panic!(
                 "value is numeric but not u8 (this may be a soft error, or even success, in future)"
             ),
-            Value::Numeric(_tc) => {
-                unimplemented!("get_as_u8: conversion from TypedConst not yet supported")
-            }
+            Value::Numeric(tc) => tc.get_as_u8().unwrap(),
             _ => panic!("value is not a number"),
         }
     }
@@ -479,9 +475,8 @@ impl Value {
             (Value::U32(l), Value::U32(r)) => Value::Bool(__rel(rel, l, r)),
             (Value::U64(l), Value::U64(r)) => Value::Bool(__rel(rel, l, r)),
             (Value::Usize(l), Value::Usize(r)) => Value::Bool(__rel(rel, l, r)),
-            (Value::Numeric(_l), Value::Numeric(_r)) => {
-                unimplemented!("int_rel: TypedConst comparison not yet implemented");
-            }
+            (Value::Numeric(l), Value::Numeric(r)) => Value::Bool(TypedConst::rel(rel, &l, &r)),
+            // TODO: support comparison between grammar-native machine-integers and numerics with the same rep
             (left, right) => {
                 panic!("cannot apply int-rel {rel:?} to (`{left:?}`, `{right:?}`)")
             }
