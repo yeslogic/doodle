@@ -648,7 +648,6 @@ mod __impl {
     }
 }
 
-
 #[derive(Clone, PartialEq, Debug)]
 pub enum Value {
     Const(TypedConst),
