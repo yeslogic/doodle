@@ -341,7 +341,7 @@ fn print_generated_code(
 }
 
 #[test]
-#[ignore]
+/// Tests that there are no errors or panics encountered when generating code from the root format definition.
 fn test_codegen() {
     let mut module = FormatModule::new();
     let format = format::main(&mut module).call();
