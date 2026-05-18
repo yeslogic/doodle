@@ -758,21 +758,27 @@ impl<'a> GTCompiler<'a> {
 mod tests {
     use std::{fs::File, io::Write};
 
-use super::*;
-    use crate::{Expr, codegen::{ToFragment, generate_code}};
+    use super::*;
     use crate::helper::*;
+    use crate::{
+        Expr,
+        codegen::{ToFragment, generate_code},
+    };
 
     #[test]
     fn runtime_repeat_behavior_test() {
-       let mut module = FormatModule::new();
-        let inner = module.define_format("test.inner", record([
-            ("a",  is_byte(0xAA)),
-            ("bs", repeat(is_byte(0xBB))),
-        ]));
-        let outer = module.define_format("test.outer", record([
-            ("pairs", repeat_count(Expr::U32(2), inner.call())),
-            ("end",   is_byte(0xCC)),
-        ]));
+        let mut module = FormatModule::new();
+        let inner = module.define_format(
+            "test.inner",
+            record([("a", is_byte(0xAA)), ("bs", repeat(is_byte(0xBB)))]),
+        );
+        let outer = module.define_format(
+            "test.outer",
+            record([
+                ("pairs", repeat_count(Expr::U32(2), inner.call())),
+                ("end", is_byte(0xCC)),
+            ]),
+        );
         let top = outer.call();
         let frag = generate_code(&module, &top).to_fragment();
         const TEST_PATH: &str = "tests/runtime_repeat/mod.rs";

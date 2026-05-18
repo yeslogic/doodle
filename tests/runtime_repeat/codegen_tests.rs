@@ -1,7 +1,7 @@
 #![cfg(test)]
 
-use doodle::prelude::*;
 use crate::*;
+use doodle::prelude::*;
 
 #[test]
 fn test_runtime_repeat() {

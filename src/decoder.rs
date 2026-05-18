@@ -2766,7 +2766,14 @@ mod tests {
         let d = Compiler::compile_one(&f).unwrap();
         let input = &[byte];
 
-        accepts(&d, input, &[], Value::Seq(SeqKind::Strict(pattern.into_iter().map(Value::U8).collect())));
+        accepts(
+            &d,
+            input,
+            &[],
+            Value::Seq(SeqKind::Strict(
+                pattern.into_iter().map(Value::U8).collect(),
+            )),
+        );
     }
 
     /// Historical regression for demonstrating the unpatched behavior of the
@@ -2790,13 +2797,10 @@ mod tests {
     #[should_panic = "test demonstrates incorrect behavior and will panic after the bug has been fixed"]
     fn repeat_count_next_context_current_wrong_behavior() {
         // Format: record { pairs: (record { a: 0xAA, bs: [0xBB]* })×2, end: 0xCC }
-        let inner = record([
-            ("a",  is_byte(0xAA)),
-            ("bs", repeat(is_byte(0xBB))),
-        ]);
+        let inner = record([("a", is_byte(0xAA)), ("bs", repeat(is_byte(0xBB)))]);
         let outer = record([
             ("pairs", repeat_count(Expr::U32(2), inner)),
-            ("end",   is_byte(0xCC)),
+            ("end", is_byte(0xCC)),
         ]);
         let d = Compiler::compile_one(&outer).unwrap();
 
@@ -2817,13 +2821,10 @@ mod tests {
     /// variable-count) instead of `next` directly.
     #[test]
     fn repeat_count_next_context_correct_behaviour() {
-        let inner = record([
-            ("a",  is_byte(0xAA)),
-            ("bs", repeat(is_byte(0xBB))),
-        ]);
+        let inner = record([("a", is_byte(0xAA)), ("bs", repeat(is_byte(0xBB)))]);
         let outer = record([
             ("pairs", repeat_count(Expr::U32(2), inner)),
-            ("end",   is_byte(0xCC)),
+            ("end", is_byte(0xCC)),
         ]);
         let d = Compiler::compile_one(&outer).unwrap();
 
@@ -2831,7 +2832,7 @@ mod tests {
 
         let mk_inner = |bs: Vec<Value>| {
             Value::Record(vec![
-                (Label::Borrowed("a"),  Value::U8(0xAA)),
+                (Label::Borrowed("a"), Value::U8(0xAA)),
                 (Label::Borrowed("bs"), Value::Seq(SeqKind::Strict(bs))),
             ])
         };
@@ -2847,5 +2848,5 @@ mod tests {
         ]);
 
         accepts(&d, data, &[], expected);
-}
+    }
 }
