@@ -318,6 +318,9 @@ impl<'a> GTCompiler<'a> {
         Ok(compiler.program)
     }
 
+    /// Given a `TypedFormat` that is either an overall root or the local root of
+    /// a disconnected tree within a Format-forest, performs compilation over the
+    /// format in question as well as all of its directly reachable descendants.
     fn compile_local_root(&mut self, format: &'a GTFormat, is_extra: bool) -> AResult<()> {
         let t = match format.get_type() {
             None => unreachable!("cannot compile program from local-root format with Void type"),
@@ -348,6 +351,10 @@ impl<'a> GTCompiler<'a> {
         self.program.decoders.push((TypedDecoder::Fail.into(), t));
         self.compile_queue.push((f, args, next, n));
         n
+    }
+
+    fn __repeat_next(format: &'a GTFormat, next: Rc<Next<'a>>) -> Rc<Next<'a>> {
+        Rc::new(Next::Repeat(MaybeTyped::Typed(format), next))
     }
 
     fn compile_gt_format(
@@ -413,15 +420,7 @@ impl<'a> GTCompiler<'a> {
                 let da = Box::new(self.compile_gt_format(f, None, Rc::new(Next::Empty))?);
                 Ok(TypedDecoder::ParseFromView(gt.clone(), view.clone(), da))
             }
-            TypedFormat::ForEach(gt, expr, lbl, f) => {
-                let da = Box::new(self.compile_gt_format(f, None, next)?);
-                Ok(TypedDecoder::ForEach(
-                    gt.clone(),
-                    expr.clone(),
-                    lbl.clone(),
-                    da,
-                ))
-            }
+
             TypedFormat::Fail => Ok(TypedDecoder::Fail),
             TypedFormat::EndOfInput => Ok(TypedDecoder::EndOfInput),
             TypedFormat::SkipRemainder => Ok(TypedDecoder::SkipRemainder),
@@ -533,7 +532,7 @@ impl<'a> GTCompiler<'a> {
                 }
             }
             TypedFormat::RepeatCount(gt, expr, a) => {
-                // FIXME probably not right
+                let next = Self::__repeat_next(a, next);
                 let da = Box::new(self.compile_gt_format(a, None, next)?);
                 Ok(TypedDecoder::RepeatCount(gt.clone(), expr.clone(), da))
             }
@@ -585,23 +584,33 @@ impl<'a> GTCompiler<'a> {
                 ))
             }
             TypedFormat::RepeatUntilLast(gt, expr, a) => {
-                // FIXME probably not right
+                let next = Self::__repeat_next(a, next);
                 let da = Box::new(self.compile_gt_format(a, None, next)?);
                 Ok(TypedDecoder::RepeatUntilLast(gt.clone(), expr.clone(), da))
             }
             TypedFormat::RepeatUntilSeq(gt, expr, a) => {
-                // FIXME probably not right
+                let next = Self::__repeat_next(a, next);
                 let da = Box::new(self.compile_gt_format(a, None, next)?);
                 Ok(TypedDecoder::RepeatUntilSeq(gt.clone(), expr.clone(), da))
             }
             TypedFormat::AccumUntil(gt, cond, update, init, _vt, a) => {
-                // FIXME probably not right
+                let next = Self::__repeat_next(a, next);
                 let da = Box::new(self.compile_gt_format(a, None, next)?);
                 Ok(TypedDecoder::AccumUntil(
                     gt.clone(),
                     cond.clone(),
                     update.clone(),
                     init.clone(),
+                    da,
+                ))
+            }
+            TypedFormat::ForEach(gt, expr, lbl, f) => {
+                let next = Self::__repeat_next(f, next);
+                let da = Box::new(self.compile_gt_format(f, None, next)?);
+                Ok(TypedDecoder::ForEach(
+                    gt.clone(),
+                    expr.clone(),
+                    lbl.clone(),
                     da,
                 ))
             }
@@ -742,5 +751,32 @@ impl<'a> GTCompiler<'a> {
             }
         }?;
         Ok(TypedDecoderExt::new(dec, args))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{fs::File, io::Write};
+
+use super::*;
+    use crate::{Expr, codegen::{ToFragment, generate_code}};
+    use crate::helper::*;
+
+    #[test]
+    fn runtime_repeat_behavior_test() {
+       let mut module = FormatModule::new();
+        let inner = module.define_format("test.inner", record([
+            ("a",  is_byte(0xAA)),
+            ("bs", repeat(is_byte(0xBB))),
+        ]));
+        let outer = module.define_format("test.outer", record([
+            ("pairs", repeat_count(Expr::U32(2), inner.call())),
+            ("end",   is_byte(0xCC)),
+        ]));
+        let top = outer.call();
+        let frag = generate_code(&module, &top).to_fragment();
+        const TEST_PATH: &str = "tests/runtime_repeat/mod.rs";
+        let mut f = File::create(TEST_PATH).unwrap();
+        write!(f, "{}", frag).unwrap();
     }
 }

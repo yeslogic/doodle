@@ -593,6 +593,14 @@ impl<'a> Compiler<'a> {
         compiler.compile_format(format, Rc::new(Next::Empty))
     }
 
+    /// Extracted helper to construct the inner `next` value to be used for
+    /// compiling the inner format of `RepeatCount` and similar repeat-style
+    /// formats that terminate on a non-MatchTree condition.
+    fn __repeat_next(format: &'a Format, next: Rc<Next<'a>>) -> Rc<Next<'a>> {
+        // NOTE - stop condition is determined by value at runtime, but structurally the matchtree looks identical to a standard Repeat
+        Rc::new(Next::Repeat(MaybeTyped::Untyped(format), next))
+    }
+
     fn compile_format(&mut self, format: &'a Format, next: Rc<Next<'a>>) -> AResult<Decoder> {
         match format {
             Format::ItemVar(level, arg_exprs, arg_views) => {
@@ -725,7 +733,7 @@ impl<'a> Compiler<'a> {
                 }
             }
             Format::RepeatCount(expr, a) => {
-                // FIXME probably not right
+                let next = Self::__repeat_next(a, next);
                 let da = Box::new(self.compile_format(a, next)?);
                 Ok(Decoder::RepeatCount(expr.clone(), da))
             }
@@ -770,21 +778,22 @@ impl<'a> Compiler<'a> {
             }
             Format::RepeatUntilLast(expr, a) => {
                 // FIXME - the `Next` value we pass in is probably not right
+                let next = Self::__repeat_next(a, next);
                 let da = Box::new(self.compile_format(a, next)?);
                 Ok(Decoder::RepeatUntilLast(expr.clone(), da))
             }
             Format::ForEach(expr, lbl, a) => {
-                // FIXME - the `Next` value we pass in is probably not right
+                let next = Self::__repeat_next(a, next);
                 let da = Box::new(self.compile_format(a, next)?);
                 Ok(Decoder::ForEach(expr.clone(), lbl.clone(), da))
             }
             Format::RepeatUntilSeq(expr, a) => {
-                // FIXME - the `Next` value we pass in is probably not right
+                let next = Self::__repeat_next(a, next);
                 let da = Box::new(self.compile_format(a, next)?);
                 Ok(Decoder::RepeatUntilSeq(expr.clone(), da))
             }
             Format::AccumUntil(f_done, f_update, init, vt, a) => {
-                // FIXME - the `Next` value we pass in is probably not right
+                let next = Self::__repeat_next(a, next);
                 let da = Box::new(self.compile_format(a, next)?);
                 Ok(Decoder::AccumUntil(
                     f_done.clone(),
@@ -2760,7 +2769,8 @@ mod tests {
         accepts(&d, input, &[], Value::Seq(SeqKind::Strict(pattern.into_iter().map(Value::U8).collect())));
     }
 
-    /// Demonstrates the latent `Next`-context bug in `compile_format` for `RepeatCount`.
+    /// Historical regression for demonstrating the unpatched behavior of the
+    /// latent `Next`-context bug in `compile_format` for `RepeatCount`.
     ///
     /// The format `(0xAA (0xBB)*)×2  0xCC` is a well-defined, unambiguous language:
     /// two "runs" of zero-or-more 0xBB bytes each preceded by 0xAA, then a 0xCC sentinel.
@@ -2777,6 +2787,7 @@ mod tests {
     /// `Next::Repeat(a, outer_next)` (for dynamic N).  Either would add 0xAA to the
     /// Repeat's stop-edges, allowing the parse to succeed.
     #[test]
+    #[should_panic = "test demonstrates incorrect behavior and will panic after the bug has been fixed"]
     fn repeat_count_next_context_current_wrong_behavior() {
         // Format: record { pairs: (record { a: 0xAA, bs: [0xBB]* })×2, end: 0xCC }
         let inner = record([
@@ -2790,12 +2801,12 @@ mod tests {
         let d = Compiler::compile_one(&outer).unwrap();
 
         // Compilation succeeds (the MatchTree for the inner Repeat builds fine;
-        // it just has the wrong set of stop-edges at runtime).
+        // it just ends up with the wrong set of stop-edges at runtime).
 
         // Input: [0xAA 0xBB 0xBB] [0xAA 0xBB] 0xCC — two valid groups followed by sentinel.
         let data: &[u8] = &[0xAA, 0xBB, 0xBB, 0xAA, 0xBB, 0xCC];
 
-        // WRONG: currently fails because inner Repeat(0xBB) has no stop-edge for 0xAA.
+        // WRONG: previously fails because inner Repeat(0xBB) has no stop-edge for 0xAA.
         rejects(&d, data);
     }
 
@@ -2805,7 +2816,6 @@ mod tests {
     /// `Next::RepeatCount(n-1, a, outer_next)` (or `Next::Repeat(a, outer_next)` for
     /// variable-count) instead of `next` directly.
     #[test]
-    #[ignore] // FIXME[epic=repeat-next] - RepeatCount compile_format passes wrong Next to inner format
     fn repeat_count_next_context_correct_behaviour() {
         let inner = record([
             ("a",  is_byte(0xAA)),

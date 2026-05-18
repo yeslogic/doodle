@@ -14,6 +14,11 @@ name = "doodle"
 version = "0.1.0"
 edition = "2024"
 
+[[test]]
+name = "runtime_repeat"
+path = "tests/runtime_repeat/mod.rs"
+test = true
+
 [features]
 default = []
 alt = []
