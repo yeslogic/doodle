@@ -2,6 +2,8 @@ use std::{borrow::Cow, fmt::Debug, ops::Index};
 
 use serde::Serialize;
 
+/// Represents a sequence of values, which is either explicitly constructed
+/// or yielded through an array-generator term (i.e. [`crate::Expr::Dup`]).
 #[derive(Clone, PartialEq, Debug, Serialize, Hash, Eq)]
 #[serde(tag = "tag", content = "data")]
 // NOTE - T must be clone in order for `Dup` to be well-founded, as non-Clone values cannot be duped
@@ -10,6 +12,10 @@ pub enum SeqKind<T: Clone> {
     Dup(usize, Box<T>),
 }
 
+/// Abstraction over Value-like constructs that can be iterated over
+/// to yield members of type `V`, where `V` is either `Value` or `ParsedValue`.
+///
+/// Used to allow for `IntRange` to be represented without allocating a `Vec` of `Value`/`ParsedValue`.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ValueSeq<'a, V: Clone = super::Value> {
     ValueSeq(&'a SeqKind<V>),
