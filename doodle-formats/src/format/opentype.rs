@@ -5445,22 +5445,24 @@ pub(crate) mod common {
 
     /// Item Variation Store - deltas array
     ///
-    /// Takes two formats, one for full-word deltas and one for half-word deltas,
-    /// which will either be l32/i16 or i16/i8 depending on the `long_words` portion
-    /// of the `word_delta_count` field (see [`item_variation_data`].
+    /// Takes two formats, one for full-width delta-values (`full_format`)
+    /// and one for half-width delta-values (`half_format`), which will either be
+    /// i32/i16 or i16/i8, based on the `long_words` flag  of the `word_delta_count` field
+    /// in the encompassing `ItemVariationData` table (see [`item_variation_data`]).
     ///
-    /// The number of full-word deltas to parse is given by the expression `word_count`
-    /// and the overall number of deltas of any kind is given by `region_index_count`; we therefore
-    /// derive the number of half-word deltas as the difference between these two values.
+    /// The number of full-width deltas to parse is parametrized by the expression `word_count`,
+    /// and the total number of delta-values (of either width) is given by `region_index_count`;
+    /// we therefore derive the number of half-width deltas as the difference between these two values.
     ///
-    /// Due to implementation limits, we cannot construct a contiguous array of all deltas in a single
-    /// pass, and instead store a record with a separate array for each run of homogenously-typed deltas.
+    /// Due to implementation limits, we cannot construct a contiguous array holding all deltas in a single
+    /// run, and instead store a record with a separate array for each run of homogenously-typed deltas.
     fn deltas(
         full_format: Format,
         half_format: Format,
         word_count: Expr,
         region_index_count: Expr,
     ) -> Format {
+        // REVIEW - does a pair of `(ReadArray<U32BE>, ReadArray<U16BE>)` (and similarly for U16Be/U8) work better?
         record([
             (
                 "delta_data_full_word",
