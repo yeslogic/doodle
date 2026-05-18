@@ -859,7 +859,7 @@ pub(crate) fn table_links(
             // !SECTION
             // SECTION - Bitmap Glyphs
             // FIXME - `EBDT` postponed due to rarity (15 of 659 tested fonts)
-            // FIXM - `EBLC` postponed due to rarity (15 of 659 tested fonts)
+            // FIXME - `EBLC` postponed due to rarity (15 of 659 tested fonts)
             // FIXME - `EBSC` postponed due to rarity (no occurrences among 659 tested fonts)
             // FIXME - `CBDT` postponed due to rarity (2 of 659 tested fonts)
             // FIXME - `CBLC` postponed due to rarity (2 of 659 tested fonts)
@@ -1046,9 +1046,9 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                 ),
             ),
             ("num_tables", u16be()),     // number of tables in directory
-            ("search_range", u16be()), // TODO[validation] - should be (maximum power of 2 <= num_tables) x 16
-            ("entry_selector", u16be()), // TODO[validation] - should be Log2(maximum power of 2 <= num_tables)
-            ("range_shift", u16be()), // TODO[validation] - should be (NumTables x 16) - searchRange
+            ("search_range", u16be()), // TODO[epic=validation] - should be (maximum power of 2 <= num_tables) x 16
+            ("entry_selector", u16be()), // TODO[epic=validation] - should be Log2(maximum power of 2 <= num_tables)
+            ("range_shift", u16be()), // TODO[epic=validation] - should be (NumTables x 16) - searchRange
             (
                 "table_records",
                 repeat_count(var("num_tables"), table_record.call()),
@@ -2063,7 +2063,7 @@ pub(crate) mod fvar {
             ("axis_count", u16be()),
             ("axis_size", util::expect_u16be(20)), // For fvar version 1.0, axis record are fixed-size == 20 (0x0014) bytes
             ("instance_count", u16be()),
-            ("instance_size", u16be()), // not yet enforced, but should be axisCount * sizeOf(Fixed32Be) + (4 or 6)
+            ("instance_size", u16be()), // TODO[epic=validation] - not yet enforced, but should be axisCount * sizeOf(Fixed32Be) + (4 or 6)
         ]);
         // Second half of `fvar` table: offset-linked axes and instances
         let fvar_arrays = record_auto([
@@ -2493,7 +2493,7 @@ pub(crate) mod base {
             (
                 "baseline_tags",
                 repeat_count(var("base_tag_count"), tag.call()),
-            ), // must appear in alphabetical order (not enforced locally)
+            ), // TODO[epic=sorting-validation] - must appear in alphabetical order (not enforced locally)
         ]);
         let axis_table = module.define_format(
             "opentype.layout.axis_table",
@@ -5444,6 +5444,17 @@ pub(crate) mod common {
     }
 
     /// Item Variation Store - deltas array
+    ///
+    /// Takes two formats, one for full-word deltas and one for half-word deltas,
+    /// which will either be l32/i16 or i16/i8 depending on the `long_words` portion
+    /// of the `word_delta_count` field (see [`item_variation_data`].
+    ///
+    /// The number of full-word deltas to parse is given by the expression `word_count`
+    /// and the overall number of deltas of any kind is given by `region_index_count`; we therefore
+    /// derive the number of half-word deltas as the difference between these two values.
+    ///
+    /// Due to implementation limits, we cannot construct a contiguous array of all deltas in a single
+    /// pass, and instead store a record with a separate array for each run of homogenously-typed deltas.
     fn deltas(
         full_format: Format,
         half_format: Format,
@@ -5451,7 +5462,6 @@ pub(crate) mod common {
         region_index_count: Expr,
     ) -> Format {
         record([
-            // FIXME - due to implementation limits, currently broken into two separate arrays rather than fused together
             (
                 "delta_data_full_word",
                 repeat_count(word_count.clone(), full_format),

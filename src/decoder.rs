@@ -2597,7 +2597,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO can we distinguish a Union based on disjoint Where clauses?
+    #[ignore = "matchtree cannot unify based on disjoint where clauses, only byte-patterns"]
     fn compile_where_u16be_eq() {
         let a = where_lambda(u16be(), "x", expr_eq(var("x"), Expr::U16(0x00FF)));
         let b = where_lambda(u16be(), "x", expr_eq(var("x"), Expr::U16(0xFF00)));
@@ -2746,4 +2746,96 @@ mod tests {
 
         accepts(&d, DATA, &[], Value::Branch(0, Box::new(Value::Bool(true))));
     }
+
+    #[test]
+    fn test_bits() {
+        let byte = 0b1101_0110;
+        // pattern is the sequence of bits of `byte`, read from lsb to msb
+        let pattern = [0, 1, 1, 0, 1, 0, 1, 1];
+
+        let f = Format::Bits(Box::new(byte_seq(&pattern)));
+        let d = Compiler::compile_one(&f).unwrap();
+        let input = &[byte];
+
+        accepts(&d, input, &[], Value::Seq(SeqKind::Strict(pattern.into_iter().map(Value::U8).collect())));
+    }
+
+    /// Demonstrates the latent `Next`-context bug in `compile_format` for `RepeatCount`.
+    ///
+    /// The format `(0xAA (0xBB)*)×2  0xCC` is a well-defined, unambiguous language:
+    /// two "runs" of zero-or-more 0xBB bytes each preceded by 0xAA, then a 0xCC sentinel.
+    ///
+    /// The inner `Repeat(Byte(0xBB))` must stop when it sees 0xAA (the start of the next
+    /// outer iteration) as well as when it sees 0xCC (the outer sentinel).  With the
+    /// current code the inner Repeat is compiled with `next = Cat(Byte(0xCC), Empty)`
+    /// (the outer follow-context of the RepeatCount), so its MatchTree only contains a
+    /// stop-edge for 0xCC.  When the Decoder encounters 0xAA after the first run, the
+    /// tree returns `None` → `DecodeErrorKind::NoValidBranch` → parse failure.
+    ///
+    /// The correct `next` for the inner format `a` within `RepeatCount(N, a)` is
+    /// `Next::RepeatCount(N-1, a, outer_next)` (for constant N) or
+    /// `Next::Repeat(a, outer_next)` (for dynamic N).  Either would add 0xAA to the
+    /// Repeat's stop-edges, allowing the parse to succeed.
+    #[test]
+    fn repeat_count_next_context_current_wrong_behavior() {
+        // Format: record { pairs: (record { a: 0xAA, bs: [0xBB]* })×2, end: 0xCC }
+        let inner = record([
+            ("a",  is_byte(0xAA)),
+            ("bs", repeat(is_byte(0xBB))),
+        ]);
+        let outer = record([
+            ("pairs", repeat_count(Expr::U32(2), inner)),
+            ("end",   is_byte(0xCC)),
+        ]);
+        let d = Compiler::compile_one(&outer).unwrap();
+
+        // Compilation succeeds (the MatchTree for the inner Repeat builds fine;
+        // it just has the wrong set of stop-edges at runtime).
+
+        // Input: [0xAA 0xBB 0xBB] [0xAA 0xBB] 0xCC — two valid groups followed by sentinel.
+        let data: &[u8] = &[0xAA, 0xBB, 0xBB, 0xAA, 0xBB, 0xCC];
+
+        // WRONG: currently fails because inner Repeat(0xBB) has no stop-edge for 0xAA.
+        rejects(&d, data);
+    }
+
+    /// Same format and input as above — asserts the CORRECT behaviour that a fix must
+    /// produce.  Marked #[ignore] because it fails with the current (buggy) code.
+    /// Remove #[ignore] once `compile_format` for `RepeatCount` passes
+    /// `Next::RepeatCount(n-1, a, outer_next)` (or `Next::Repeat(a, outer_next)` for
+    /// variable-count) instead of `next` directly.
+    #[test]
+    #[ignore] // FIXME[epic=repeat-next] - RepeatCount compile_format passes wrong Next to inner format
+    fn repeat_count_next_context_correct_behaviour() {
+        let inner = record([
+            ("a",  is_byte(0xAA)),
+            ("bs", repeat(is_byte(0xBB))),
+        ]);
+        let outer = record([
+            ("pairs", repeat_count(Expr::U32(2), inner)),
+            ("end",   is_byte(0xCC)),
+        ]);
+        let d = Compiler::compile_one(&outer).unwrap();
+
+        let data: &[u8] = &[0xAA, 0xBB, 0xBB, 0xAA, 0xBB, 0xCC];
+
+        let mk_inner = |bs: Vec<Value>| {
+            Value::Record(vec![
+                (Label::Borrowed("a"),  Value::U8(0xAA)),
+                (Label::Borrowed("bs"), Value::Seq(SeqKind::Strict(bs))),
+            ])
+        };
+        let expected = Value::Record(vec![
+            (
+                Label::Borrowed("pairs"),
+                Value::Seq(SeqKind::Strict(vec![
+                    mk_inner(vec![Value::U8(0xBB), Value::U8(0xBB)]),
+                    mk_inner(vec![Value::U8(0xBB)]),
+                ])),
+            ),
+            (Label::Borrowed("end"), Value::U8(0xCC)),
+        ]);
+
+        accepts(&d, data, &[], expected);
+}
 }
