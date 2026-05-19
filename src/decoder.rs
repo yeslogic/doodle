@@ -2776,50 +2776,16 @@ mod tests {
         );
     }
 
-    /// Historical regression for demonstrating the unpatched behavior of the
-    /// latent `Next`-context bug in `compile_format` for `RepeatCount`.
+    /// Regression test for the `Next`-context bug in `compile_format` for `RepeatCount`
+    /// (and analogous repeat-like formats).
     ///
     /// The format `(0xAA (0xBB)*)×2  0xCC` is a well-defined, unambiguous language:
     /// two "runs" of zero-or-more 0xBB bytes each preceded by 0xAA, then a 0xCC sentinel.
     ///
     /// The inner `Repeat(Byte(0xBB))` must stop when it sees 0xAA (the start of the next
-    /// outer iteration) as well as when it sees 0xCC (the outer sentinel).  With the
-    /// current code the inner Repeat is compiled with `next = Cat(Byte(0xCC), Empty)`
-    /// (the outer follow-context of the RepeatCount), so its MatchTree only contains a
-    /// stop-edge for 0xCC.  When the Decoder encounters 0xAA after the first run, the
-    /// tree returns `None` → `DecodeErrorKind::NoValidBranch` → parse failure.
-    ///
-    /// The correct `next` for the inner format `a` within `RepeatCount(N, a)` is
-    /// `Next::RepeatCount(N-1, a, outer_next)` (for constant N) or
-    /// `Next::Repeat(a, outer_next)` (for dynamic N).  Either would add 0xAA to the
-    /// Repeat's stop-edges, allowing the parse to succeed.
-    #[test]
-    #[should_panic]
-    #[ignore]
-    fn repeat_count_next_context_current_wrong_behavior() {
-        // Format: record { pairs: (record { a: 0xAA, bs: [0xBB]* })×2, end: 0xCC }
-        let inner = record([("a", is_byte(0xAA)), ("bs", repeat(is_byte(0xBB)))]);
-        let outer = record([
-            ("pairs", repeat_count(Expr::U32(2), inner)),
-            ("end", is_byte(0xCC)),
-        ]);
-        let d = Compiler::compile_one(&outer).unwrap();
-
-        // Compilation succeeds (the MatchTree for the inner Repeat builds fine;
-        // it just ends up with the wrong set of stop-edges at runtime).
-
-        // Input: [0xAA 0xBB 0xBB] [0xAA 0xBB] 0xCC — two valid groups followed by sentinel.
-        let data: &[u8] = &[0xAA, 0xBB, 0xBB, 0xAA, 0xBB, 0xCC];
-
-        // WRONG: previously fails because inner Repeat(0xBB) has no stop-edge for 0xAA.
-        rejects(&d, data);
-    }
-
-    /// Same format and input as above — asserts the CORRECT behaviour that a fix must
-    /// produce.  Marked #[ignore] because it fails with the current (buggy) code.
-    /// Remove #[ignore] once `compile_format` for `RepeatCount` passes
-    /// `Next::RepeatCount(n-1, a, outer_next)` (or `Next::Repeat(a, outer_next)` for
-    /// variable-count) instead of `next` directly.
+    /// outer iteration) as well as when it sees 0xCC (the outer sentinel).  The fix
+    /// passes `Next::Repeat(a, outer_next)` as the inner `next`, so its MatchTree gains a
+    /// stop-edge for 0xAA in addition to 0xCC.
     #[test]
     fn repeat_count_next_context_correct_behaviour() {
         let inner = record([("a", is_byte(0xAA)), ("bs", repeat(is_byte(0xBB)))]);
