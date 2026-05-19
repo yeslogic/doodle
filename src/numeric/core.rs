@@ -448,13 +448,11 @@ impl TypedConst {
         match self.1 {
             NumRep::U8 => {
                 if self.is_representable() {
-                    unsafe {
-                        self.get_u8_unchecked().inspect_err(|e| {
+                    self.get_u8_unchecked().inspect_err(|e| {
                     log::error!(
                         "TypedConst::get_as_u8: `{self:?}` supposedly u8-representable, but conversion failed: {e}"
                     );
                 })
-                    }
                 } else {
                     return Err(anyhow!("unrepresentable typed-const {self:?}"));
                 }
@@ -463,7 +461,7 @@ impl TypedConst {
                 log::warn!(
                     "TypedConst::get_as_u8: encountered auto-rep, attempting coercion to u8"
                 );
-                unsafe { self.get_u8_unchecked() }
+                self.get_u8_unchecked()
             }
             _ => {
                 return Err(anyhow!(
@@ -473,8 +471,13 @@ impl TypedConst {
         }
     }
 
+    /// Internal method used by [`TypedConst::get_as_u8`].
     ///
-    unsafe fn get_u8_unchecked(&self) -> Result<u8, anyhow::Error> {
+    /// Does not validate the `NumRep` of `self`, which may lead to undesired behavior if used incorrectly.
+    ///
+    /// However, this method is not expected to ever panic, and its only caveat is that it will silently
+    /// ignore a `NumRep` that is not inherently compatible with `ValueType::U8` (namely, `NumRep::U8` or `NumRep::Auto`).
+    fn get_u8_unchecked(&self) -> Result<u8, anyhow::Error> {
         Ok((&self.0).try_into()?)
     }
 
@@ -564,8 +567,8 @@ impl TypedConst {
     /// Returns `true` if `l <rel> r` holds, based on general arithmetic value and
     /// irrespective of either `NumRep`.
     ///
-    /// In particular, unrepresentable values will still be compared as if their
-    /// representational component .
+    /// In particular, either or both `TypedConst` can have rep-values for which their
+    /// nominal value is inexpressible, without the comparison being affected.
     pub(crate) fn rel(rel: IntRel, l: &Self, r: &Self) -> bool {
         let x = &l.0;
         let y = &r.0;
