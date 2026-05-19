@@ -700,8 +700,22 @@ impl Expr {
             Expr::U32(n) => Bounds::exact(*n as usize),
             Expr::U64(n) => Bounds::exact(*n as usize),
 
-            // Shl and Shr misbehave if we use proper upper bounds, so use Bounds::any() instead.
-            Expr::AsU8(_) | Expr::AsU16(_) | Expr::AsU32(_) | Expr::AsU64(_) => Bounds::any(),
+            Expr::AsU8(x) => x
+                .bounds()
+                .clamp(0, u8::MAX as usize)
+                .unwrap_or(Bounds::any()),
+            Expr::AsU16(x) => x
+                .bounds()
+                .clamp(0, u16::MAX as usize)
+                .unwrap_or(Bounds::any()),
+            Expr::AsU32(x) => x
+                .bounds()
+                .clamp(0, u32::MAX as usize)
+                .unwrap_or(Bounds::any()),
+            Expr::AsU64(x) => x
+                .bounds()
+                .clamp(0, u64::MAX as usize)
+                .unwrap_or(Bounds::any()),
 
             Expr::Arith(arith, a, b) => match arith {
                 Arith::Add => a.bounds() + b.bounds(),
@@ -1782,7 +1796,7 @@ impl<'a> MatchTreeStep<'a> {
             ),
             TypedFormat::RepeatCount(_, expr, a) => {
                 let bounds = expr.bounds();
-                if let Some(n) = bounds.is_exact() {
+                if let Some(n) = bounds.as_exact() {
                     {
                         let next = next.clone();
                         if n > 0 {
@@ -1814,7 +1828,7 @@ impl<'a> MatchTreeStep<'a> {
             TypedFormat::RepeatBetween(_, xmin, xmax, a) => {
                 let min_bounds = xmin.bounds();
                 let max_bounds = xmax.bounds();
-                match (min_bounds.is_exact(), max_bounds.is_exact()) {
+                match (min_bounds.as_exact(), max_bounds.as_exact()) {
                     (Some(min), Some(max)) => match min.cmp(&max) {
                         Ordering::Less => {
                             if min > 0 {
@@ -1898,7 +1912,7 @@ impl<'a> MatchTreeStep<'a> {
                     Rc::new(Next::Empty),
                 ));
                 let bounds = expr.bounds();
-                if let Some(n) = bounds.is_exact() {
+                if let Some(n) = bounds.as_exact() {
                     Self::from_slice(module, n, inside, next)
                 } else {
                     Self::from_slice(module, bounds.min, inside, Rc::new(Next::Empty))
@@ -2007,7 +2021,7 @@ impl<'a> MatchTreeStep<'a> {
             ),
             Format::RepeatCount(expr, a) => {
                 let bounds = expr.bounds();
-                if let Some(n) = bounds.is_exact() {
+                if let Some(n) = bounds.as_exact() {
                     Self::from_repeat_count(module, n, a, next.clone())
                 } else {
                     Self::from_repeat_count(module, bounds.min, a, Rc::new(Next::Empty))
@@ -2016,7 +2030,7 @@ impl<'a> MatchTreeStep<'a> {
             Format::RepeatBetween(xmin, xmax, a) => {
                 let min_bounds = xmin.bounds();
                 let max_bounds = xmax.bounds();
-                match (min_bounds.is_exact(), max_bounds.is_exact()) {
+                match (min_bounds.as_exact(), max_bounds.as_exact()) {
                     (Some(min), Some(max)) => match min.cmp(&max) {
                         Ordering::Less => {
                             Self::from_repeat_between(module, (min, max), a, next.clone())
@@ -2064,7 +2078,7 @@ impl<'a> MatchTreeStep<'a> {
                     Rc::new(Next::Empty),
                 ));
                 let bounds = expr.bounds();
-                if let Some(n) = bounds.is_exact() {
+                if let Some(n) = bounds.as_exact() {
                     Self::from_slice(module, n, inside, next)
                 } else {
                     Self::from_slice(module, bounds.min, inside, Rc::new(Next::Empty))

@@ -1,3 +1,4 @@
+use num_traits::{CheckedAdd, CheckedDiv, CheckedMul};
 use serde::Serialize;
 use std::{
     num::TryFromIntError,
@@ -15,40 +16,38 @@ fn sig_bits(x: usize) -> usize {
 }
 
 macro_rules! into_bounds {
-    ($t:ty) => {
-        impl From<$t> for Bounds {
-            fn from(x: $t) -> Self {
-                Bounds {
-                    min: x as usize,
-                    max: Some(x as usize),
+    ( $($t:ty),+ ) => {
+        $(
+            impl From<$t> for Bounds {
+                fn from(x: $t) -> Self {
+                    Bounds {
+                        min: x as usize,
+                        max: Some(x as usize),
+                    }
                 }
             }
-        }
 
-        impl From<std::ops::RangeInclusive<$t>> for Bounds {
-            fn from(x: std::ops::RangeInclusive<$t>) -> Self {
-                let (min, max) = x.into_inner();
-                Bounds {
-                    min: min as usize,
-                    max: Some(max as usize),
+            impl From<std::ops::RangeInclusive<$t>> for Bounds {
+                fn from(x: std::ops::RangeInclusive<$t>) -> Self {
+                    let (min, max) = x.into_inner();
+                    Bounds {
+                        min: min as usize,
+                        max: Some(max as usize),
+                    }
                 }
             }
-        }
 
-        impl From<std::ops::RangeFrom<$t>> for Bounds {
-            fn from(x: std::ops::RangeFrom<$t>) -> Self {
-                let min = x.start as usize;
-                Bounds { min, max: None }
+            impl From<std::ops::RangeFrom<$t>> for Bounds {
+                fn from(x: std::ops::RangeFrom<$t>) -> Self {
+                    let min = x.start as usize;
+                    Bounds { min, max: None }
+                }
             }
-        }
+        )+
     };
 }
 
-into_bounds!(u8);
-into_bounds!(u16);
-into_bounds!(u32);
-into_bounds!(u64);
-into_bounds!(usize);
+into_bounds!(u8, u16, u32, u64, usize);
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub struct Bounds {
@@ -94,20 +93,23 @@ impl Bounds {
     /// # Panics
     ///
     /// Will panic if both ranges are exact but `rhs == 0`.
+    ///
+    /// Even if `rhs` contains `0` as its minimum, will return `Bounds::any`
+    /// rather than panicking provided `rhs` is not `Bounds::exact(0)`.
     // REVIEW - should this be a `std::ops::Rem` impl?
     pub(crate) fn rem(lhs: Bounds, rhs: Bounds) -> Bounds {
-        if let Some(y) = rhs.is_exact() {
-            if let Some(x) = lhs.is_exact() {
+        if let Some(y) = rhs.as_exact() {
+            if let Some(x) = lhs.as_exact() {
                 return Bounds::exact(x.checked_rem(y).unwrap());
             } else {
                 // NOTE - some edge-cases may have general solutions but we won't attempt to solve them, for now
-                log::warn!(
+                log::debug!(
                     "cannot generally solve potentially unsound operation Bounds % usize: {lhs} % {y}"
                 );
             }
         } else {
             // NOTE - some edge-cases may have general solutions but we won't attempt to solve them, for now
-            log::warn!(
+            log::debug!(
                 "cannot generally solve potentially unsound operation Bounds % Bounds: {lhs} % {rhs}"
             );
         }
@@ -187,7 +189,7 @@ impl Bounds {
     /// Returns the exact number of significant bits in both `self.min` and `self.max` if they match,
     /// `None` otherwise.
     pub(crate) fn nbits_exact(&self) -> Option<usize> {
-        self.significant_bits().is_exact()
+        self.significant_bits().as_exact()
     }
 
     /// Returns a `Bounds` whose minimum and maximum are both `n`.
@@ -216,7 +218,7 @@ impl Bounds {
     }
 
     /// Returns `Some(n)` if `self` describes only a single exact value `n`, `None` otherwise.
-    pub fn is_exact(&self) -> Option<usize> {
+    pub fn as_exact(&self) -> Option<usize> {
         match self.max {
             Some(n) if n == self.min => Some(n),
             _ => None,
@@ -245,6 +247,15 @@ impl Bounds {
     }
 
     /// Clamps `self` to the range `min..=max`.
+    ///
+    /// If the clamped minimum ends up greater than the clamped maximum, returns `None`.
+    ///
+    /// Otherwise, returns `Some(x)` where `x` is a `Bounds` that covers the intersection
+    /// of the ranges described by `self`, and `min..=max`.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if the provided `min` is greater than the provided `max`.
     pub fn clamp(self, min: usize, max: usize) -> Option<Bounds> {
         assert!(min <= max, "Bounds::clamp: min ({min}) > max ({max})");
         let min = usize::max(min, self.min);
@@ -253,7 +264,7 @@ impl Bounds {
             return None;
         }
         Some(Bounds {
-            min: usize::max(self.min, min),
+            min,
             max: Some(max),
         })
     }
@@ -300,17 +311,23 @@ macro_rules! try_from_bounds {
 
 try_from_bounds!(u8, u16, u32, u64);
 
+impl CheckedAdd for Bounds {
+    fn checked_add(&self, v: &Self) -> Option<Self> {
+        Some(Bounds {
+            min: self.min.checked_add(v.min)?,
+            max: match (self.max, v.max) {
+                (Some(m1), Some(m2)) => m1.checked_add(m2),
+                _ => None,
+            },
+        })
+    }
+}
+
 impl Add for Bounds {
     type Output = Self;
 
     fn add(self, rhs: Bounds) -> Bounds {
-        Bounds {
-            min: self.min.checked_add(rhs.min).unwrap(),
-            max: match (self.max, rhs.max) {
-                (Some(m1), Some(m2)) => Some(m1.checked_add(m2).unwrap()),
-                _ => None,
-            },
-        }
+        self.checked_add(&rhs).unwrap_or(Bounds::any())
     }
 }
 
@@ -328,17 +345,35 @@ impl Sub for Bounds {
     }
 }
 
-impl Mul<Bounds> for Bounds {
+impl CheckedMul for Bounds {
+    fn checked_mul(&self, v: &Self) -> Option<Self> {
+        Some(Bounds {
+            min: self.min.checked_mul(v.min)?,
+            max: match (self.max, v.max) {
+                (Some(m1), Some(m2)) => m1.checked_mul(m2),
+                _ => None,
+            },
+        })
+    }
+}
+
+impl Mul for Bounds {
     type Output = Self;
 
     fn mul(self, rhs: Bounds) -> Bounds {
-        Bounds {
-            min: self.min.checked_mul(rhs.min).unwrap(),
-            max: match (self.max, rhs.max) {
-                (Some(m1), Some(m2)) => Some(m1.checked_mul(m2).unwrap()),
-                _ => None,
+        self.checked_mul(&rhs).unwrap_or(Bounds::any())
+    }
+}
+
+impl CheckedDiv for Bounds {
+    fn checked_div(&self, v: &Self) -> Option<Self> {
+        Some(Bounds {
+            min: match v.max {
+                Some(m2) => self.min.checked_div(m2)?,
+                None => 0,
             },
-        }
+            max: self.max.map(|m1| m1 / usize::max(v.min, 1)),
+        })
     }
 }
 
@@ -346,13 +381,36 @@ impl Div<Bounds> for Bounds {
     type Output = Self;
 
     fn div(self, rhs: Bounds) -> Bounds {
-        Bounds {
-            min: match rhs.max {
-                Some(m2) => self.min.checked_div(m2).unwrap(),
-                None => 0,
-            },
-            max: self.max.map(|m1| m1 / usize::max(rhs.min, 1)),
-        }
+        self.checked_div(&rhs).unwrap_or(Bounds::any())
+    }
+}
+
+impl Bounds {
+    pub fn checked_shl(self, rhs: Self) -> Option<Self> {
+        let min2 = u32::try_from(rhs.min).ok()?;
+        let min = self.min.checked_shl(min2)?;
+        let max = match (self.max, rhs.max) {
+            (Some(m1), Some(m2)) => {
+                let max2 = u32::try_from(m2).ok()?;
+                // REVIEW - there may be edge-cases here where max2 < 64 but m1 overflows, yielding unexpectedly small values
+                m1.checked_shl(max2)
+            }
+            _ => None,
+        };
+        Some(Bounds { min, max })
+    }
+
+    pub fn checked_shr(self, rhs: Self) -> Option<Self> {
+        let min = match rhs.max {
+            Some(m2) => {
+                let m = u32::try_from(m2).ok()?;
+                self.min.checked_shr(m)?
+            }
+            None => 0,
+        };
+        let min0 = u32::try_from(rhs.min).ok()?;
+        let max = self.max.and_then(|m1| m1.checked_shr(min0));
+        Some(Bounds { min, max })
     }
 }
 
@@ -360,16 +418,7 @@ impl Shl<Bounds> for Bounds {
     type Output = Self;
 
     fn shl(self, rhs: Bounds) -> Bounds {
-        Bounds {
-            min: self
-                .min
-                .checked_shl(u32::try_from(rhs.min).unwrap())
-                .unwrap(),
-            max: match (self.max, rhs.max) {
-                (Some(m1), Some(m2)) => Some(m1.checked_shl(u32::try_from(m2).unwrap()).unwrap()),
-                _ => None,
-            },
-        }
+        self.checked_shl(rhs).unwrap_or(Bounds::any())
     }
 }
 
@@ -377,15 +426,7 @@ impl Shr<Bounds> for Bounds {
     type Output = Self;
 
     fn shr(self, rhs: Bounds) -> Bounds {
-        Bounds {
-            min: match rhs.max {
-                Some(m2) => self.min.checked_shr(u32::try_from(m2).unwrap()).unwrap(),
-                None => 0,
-            },
-            max: self
-                .max
-                .map(|m1| m1.checked_shr(u32::try_from(rhs.min).unwrap()).unwrap()),
-        }
+        self.checked_shr(rhs).unwrap_or(Bounds::any())
     }
 }
 
@@ -549,7 +590,7 @@ mod tests {
             let a = a as usize;
             let b = b as usize;
             prop_assert!(
-                (Bounds::exact(a) + Bounds::exact(b)).is_exact().unwrap() == a + b)
+                (Bounds::exact(a) + Bounds::exact(b)).as_exact().unwrap() == a + b)
         }
     }
 
@@ -559,7 +600,7 @@ mod tests {
             let a = a as usize;
             let b = b as usize;
             prop_assert!(
-                (Bounds::exact(a) - Bounds::exact(b)).is_exact().unwrap() == a.saturating_sub(b))
+                (Bounds::exact(a) - Bounds::exact(b)).as_exact().unwrap() == a.saturating_sub(b))
         }
     }
 
@@ -569,7 +610,7 @@ mod tests {
             let a = a as usize;
             let b = b as usize;
             prop_assert!(
-                (Bounds::exact(a) * Bounds::exact(b)).is_exact().unwrap() == a * b)
+                (Bounds::exact(a) * Bounds::exact(b)).as_exact().unwrap() == a * b)
         }
     }
 
@@ -579,7 +620,7 @@ mod tests {
             let a = a as usize;
             let b = b as usize + 1;
             prop_assert!(
-                (Bounds::exact(a) / Bounds::exact(b)).is_exact().unwrap() == a / b)
+                (Bounds::exact(a) / Bounds::exact(b)).as_exact().unwrap() == a / b)
         }
     }
 
@@ -589,7 +630,7 @@ mod tests {
             let a = a as usize;
             let b = b as usize;
             prop_assert!(
-                (Bounds::exact(a) << Bounds::exact(b)).is_exact().unwrap() == a << b)
+                (Bounds::exact(a) << Bounds::exact(b)).as_exact().unwrap() == a << b)
         }
     }
 
@@ -599,7 +640,7 @@ mod tests {
             let a = a as usize;
             let b = b as usize;
             prop_assert!(
-                (Bounds::exact(a) >> Bounds::exact(b)).is_exact().unwrap() == a >> b)
+                (Bounds::exact(a) >> Bounds::exact(b)).as_exact().unwrap() == a >> b)
         }
     }
 

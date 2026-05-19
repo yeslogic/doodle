@@ -538,10 +538,10 @@ impl<'a> GTCompiler<'a> {
             }
             TypedFormat::RepeatBetween(gt, min_expr, max_expr, a) => {
                 // FIXME - preliminary support only for exact-bound limit values
-                let Some(min) = min_expr.bounds().is_exact() else {
+                let Some(min) = min_expr.bounds().as_exact() else {
                     unimplemented!("RepeatBetween on inexact bounds-expr")
                 };
-                let Some(max) = max_expr.bounds().is_exact() else {
+                let Some(max) = max_expr.bounds().as_exact() else {
                     unimplemented!("RepeatBetween on inexact bounds-expr")
                 };
 

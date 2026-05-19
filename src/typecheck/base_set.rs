@@ -301,10 +301,13 @@ pub struct UintSet {
 
 // SECTION - UintSet global consts and constructors
 impl UintSet {
+    /// Internal helper-array that provides the associated member-types in the
+    /// same index-order as the per-member ranks in `UintSet.ranks`
     pub(crate) const IX_ORDER: [BaseType; 4] =
         [BaseType::U8, BaseType::U16, BaseType::U32, BaseType::U64];
 
-    // unrestricted and non-defaulting if more than one solution
+    /// UintSet that allows for all unsigned-int assignments at equal priority,
+    /// without any default tie-breaking if more than one assignment is possible.
     pub const ANY: Self = Self {
         ranks: [Rank::At(3); 4],
     };
@@ -314,21 +317,19 @@ impl UintSet {
         ranks: [Rank::Excluded; 4],
     };
 
-    // U8 or U16, default solution is U8
+    /// Set consisting only of  U8 and U16, with U8 as the default is neither
+    /// is ruled out entirely.
     pub const SHORT8: Self = Self {
         ranks: [Rank::At(0), Rank::At(1), Rank::Excluded, Rank::Excluded],
     };
 
+    /// UintSet containing all unsigned integers, which defaults to `U32`
+    /// if it is not excluded but will not generally produce a unique solution
+    /// if `U32` is excluded.
     pub const ANY32: Self = Self::any_default(BitWidth::Bits32);
 
-    pub const ANY_DEFAULT_U32: Self = Self {
-        ranks: [Rank::At(1), Rank::At(1), Rank::At(0), Rank::At(1)],
-    };
-    pub const ANY_DEFAULT_U64: Self = Self {
-        ranks: [Rank::At(1), Rank::At(1), Rank::At(1), Rank::At(0)],
-    };
-
-    // unrestricted but resolves if ambiguous to the given BitWidth, unless precluded
+    /// For any given `BitWidth`, returns a UintSet that allows for all unsigned integer-types,
+    /// defaulting to the corresponding int-type for the given width (e.g. `Bits32 -> U32`).
     pub const fn any_default(val: BitWidth) -> Self {
         let ranks = match val {
             BitWidth::Bits8 => [Rank::At(0), Rank::At(3), Rank::At(3), Rank::At(3)],
@@ -338,7 +339,10 @@ impl UintSet {
         };
         UintSet { ranks }
     }
-    // Some member of the restricted set of any whose width is no less than the given BitWidth
+
+    /// Constructs a UintSet that only includes unsigned integers with at least the given `BitWidth`.
+    ///
+    /// Does not tie-break if more than one assignment is possible.
     pub const fn at_least(val: BitWidth) -> Self {
         let ranks = match val {
             BitWidth::Bits8 => [Rank::At(3), Rank::At(3), Rank::At(3), Rank::At(3)],
@@ -349,7 +353,8 @@ impl UintSet {
         UintSet { ranks }
     }
 
-    /// Upcasts a `UintSet` into the equivalent `PrimIntSet`.
+    /// Converts a `UintSet` into the equivalent `PrimIntSet`, preserving the ranks
+    /// of each unsigned-int type and excluding all signed-int types.
     pub(crate) const fn to_prim_int_set(self) -> PrimIntSet {
         PrimIntSet {
             ranks: [

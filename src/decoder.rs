@@ -739,10 +739,10 @@ impl<'a> Compiler<'a> {
             }
             Format::RepeatBetween(xmin, xmax, a) => {
                 // FIXME - preliminary support only for exact-bound limit values
-                let Some(min) = xmin.bounds().is_exact() else {
+                let Some(min) = xmin.bounds().as_exact() else {
                     unimplemented!("RepeatBetween on inexact bounds-expr")
                 };
-                let Some(max) = xmax.bounds().is_exact() else {
+                let Some(max) = xmax.bounds().as_exact() else {
                     unimplemented!("RepeatBetween on inexact bounds-expr")
                 };
 

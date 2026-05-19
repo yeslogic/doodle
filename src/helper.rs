@@ -1573,11 +1573,15 @@ pub fn with_relative_offset(base_address: Option<Expr>, offset: Expr, format: Fo
     }
 }
 
-/// Gets the current stream-position and casts down from U64->U32
-// REVIEW - Since the typechecker now infers a semi-auto type for Format::Pos rather than forcing U64, the cast may be extraneous...
+/// Gets the current stream-position as an assumptive U32.
+///
+/// # Note
+///
+/// The exact ValueType of the parsed result-value is unspecified,
+/// but it will always automatically coerce to `U32` provided it is
+/// used in a context where `U32` is the only type-ascription that
+/// yields a sound result.
 pub fn pos32() -> Format {
-    // FIXME - we are temporarily changing the implementation to just `Format::Pos` to see if things still work
-    // map(Format::Pos, lambda("x", Expr::AsU32(Box::new(var("x")))))
     Format::Pos
 }
 

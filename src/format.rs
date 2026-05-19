@@ -120,7 +120,8 @@ pub enum Format {
     Dynamic(Label, DynFormat, Box<Format>),
     /// Apply a dynamic format from a named variable in the scope
     Apply(Label),
-    /// Current byte-offset relative to start-of-buffer (as a U64(?))
+    /// Current byte-offset relative to start-of-buffer
+    // NOTE - default valuetype ascription in absence of any contextual constraints is U64
     Pos,
     /// Skip the remainder of the stream, up until the end of input or the last available byte within a Slice
     SkipRemainder,

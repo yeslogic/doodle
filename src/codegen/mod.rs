@@ -938,7 +938,7 @@ fn embed_pattern(pat: &GTPattern) -> RustPattern {
             RustPrimLit::Numeric(RustNumLit::SomeInt(range.min.clone())),
             Some(RustPrimLit::Numeric(RustNumLit::SomeInt(range.max.clone()))),
         ),
-        TypedPattern::Int(gt, bounds) => match bounds.is_exact() {
+        TypedPattern::Int(gt, bounds) => match bounds.as_exact() {
             Some(n) => RustPattern::PrimLiteral(RustPrimLit::Numeric(RustNumLit::Usize(n))),
             None => match gt {
                 GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::U8))) => {
