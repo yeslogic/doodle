@@ -149,7 +149,7 @@ pub fn bit_fields_u8<const N: usize>(bit_fields: [BitFieldKind; N]) -> Format {
     // NOTE - only bother using where-lambda if zero_mask is non-vacuous
     let packed = if unset_bits_mask != 0 {
         const PREPACKED: &str = "packed";
-        where_lambda(
+        expect_lambda(
             ANY_BYTE,
             PREPACKED,
             expr_eq(
@@ -222,7 +222,7 @@ pub fn bit_fields_u16<const N: usize>(bit_fields: [BitFieldKind; N]) -> Format {
     let packed = if unset_bits_mask != 0 {
         const PREPACKED: &str = "packed";
         // NOTE - only bother using where-lambda if zero_mask is non-vacuous
-        where_lambda(
+        expect_lambda(
             base::u16be(),
             PREPACKED,
             expr_eq(

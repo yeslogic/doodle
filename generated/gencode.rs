@@ -9211,10 +9211,7 @@ PResult::Ok(riff_main { tag, length, data, pad })
 
 /// d#11
 fn Decoder_tiff_main(_input: &mut Parser<'_>) -> Result<tiff_main, ParseError> {
-let start_of_header = {
-let x = _input.get_offset_u64();
-x as u32
-};
+let start_of_header = (_input.get_offset_u64()) as u32;
 let byte_order = (Decoder_tiff_byte_order(_input))?;
 let magic = match byte_order {
 tiff_byte_order::le(..) => {

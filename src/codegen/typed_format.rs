@@ -100,7 +100,7 @@ impl<TypeRep> std::hash::Hash for TypedFormat<TypeRep> {
                 views.hash(state);
             }
             TypedFormat::SkipRemainder
-            | TypedFormat::Pos
+            | TypedFormat::Pos(_)
             | TypedFormat::Fail
             | TypedFormat::EndOfInput => {}
             TypedFormat::DecodeBytes(_, expr, inner) => {
@@ -292,7 +292,7 @@ pub enum TypedFormat<TypeRep> {
         Box<TypedFormat<TypeRep>>,
     ),
     Apply(TypeRep, Label, Rc<TypedDynFormat<TypeRep>>),
-    Pos,
+    Pos(TypeRep),
     SkipRemainder,
     DecodeBytes(TypeRep, Box<TypedExpr<TypeRep>>, Box<TypedFormat<TypeRep>>),
     ParseFromView(TypeRep, TypedViewExpr<TypeRep>, Box<TypedFormat<TypeRep>>),
@@ -334,7 +334,7 @@ impl TypedFormat<GenType> {
 
             TypedFormat::DecodeBytes(_, _, _)
             | TypedFormat::SkipRemainder
-            | TypedFormat::Pos
+            | TypedFormat::Pos(_)
             | TypedFormat::Compute(_, _)
             | TypedFormat::EndOfInput
             | TypedFormat::ParseFromView(_, _, _)
@@ -423,7 +423,7 @@ impl TypedFormat<GenType> {
             | TypedFormat::Peek(_, _)
             | TypedFormat::PeekNot(_, _)
             | TypedFormat::EndOfInput
-            | TypedFormat::Pos
+            | TypedFormat::Pos(_)
             | TypedFormat::Fail => Bounds::exact(0),
 
             TypedFormat::Align(n) => Bounds::new(0, n - 1),
@@ -518,9 +518,8 @@ impl TypedFormat<GenType> {
             | TypedFormat::Phantom(..) => Some(Cow::Owned(GenType::from(RustType::UNIT))),
             TypedFormat::Byte(_) => Some(Cow::Owned(GenType::from(PrimType::U8))),
             // REVIEW - forcing Pos to be a U64-valued format
-            TypedFormat::Pos => Some(Cow::Owned(GenType::from(PrimType::U64))),
-
-            TypedFormat::LetFormat(gt, ..)
+            TypedFormat::Pos(gt)
+            | TypedFormat::LetFormat(gt, ..)
             | TypedFormat::MonadSeq(gt, ..)
             | TypedFormat::Hint(gt, ..)
             | TypedFormat::Permit(gt, ..)
@@ -1177,7 +1176,7 @@ mod __impls {
                     Format::ParseFromView(ViewExpr::from(view), rebox(inner))
                 }
                 TypedFormat::SkipRemainder => Format::SkipRemainder,
-                TypedFormat::Pos => Format::Pos,
+                TypedFormat::Pos(_) => Format::Pos,
                 TypedFormat::Fail => Format::Fail,
                 TypedFormat::EndOfInput => Format::EndOfInput,
                 TypedFormat::Align(n) => Format::Align(n),
