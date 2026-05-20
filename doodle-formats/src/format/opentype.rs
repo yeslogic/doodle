@@ -355,13 +355,10 @@ mod util {
         };
 
         chain(
-            Format::Peek(Box::new(monad_seq(
-                // Process all the fields before the one we care about and discard their cumulative value
-                record(init.iter().cloned()),
-                // Process the field we *do* care about, while still in the peek context, and yield its value as the result of the entire parse
+            Format::Peek(Box::new(pseudo_record(
+                init.iter().cloned(),
                 field_format.clone(),
             ))),
-            // Scope-capture the final field of `field_prefix` under the identifier it is paired
             field_name.clone(),
             dep_format,
         )

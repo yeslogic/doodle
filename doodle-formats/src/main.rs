@@ -121,9 +121,14 @@ thread_local! {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
+    let level = if cfg!(debug_assertions) {
+        log::Level::Debug
+    } else {
+        log::Level::Error
+    };
     stderrlog::new()
         .module(module_path!())
-        .verbosity(log::Level::Info)
+        .verbosity(level)
         .init()
         .unwrap();
 
