@@ -142,11 +142,11 @@ mod util {
         record_auto(accum)
     }
 
-    /// Helper function to generically construct a record-union over a set of common fields (including a discriminant)
+    /// Helper function to generically construct a record-union over a set of common fields (including an unsigned integer discriminant)
     /// and a fixed-size set of variadic continuation-fields chosen based on the discriminant value.
     ///
     /// - `shared_fields` is a list of the `(name, format)` pairs that are invariant and precede the dependent field-set.
-    /// - `discriminant` is the label (in `outer_fields`) corresponding to a `u16`-kinded field that will be used as a discriminant for selecting the branch-specific fields.
+    /// - `discriminant` is the label (in `outer_fields`) corresponding to a numeric-kinded field that will be used as a discriminant for selecting the branch-specific fields.
     /// - `branches` is a list of `(value, variant-name, inner-fields)` 3-tuples that are the (assumed-)exhaustive set of valid sub-format extensions for each legal value of `discriminant`. Any
     ///   value of `discriminant` that is not present in `branches` will be handled as a parse-failure.
     /// - `intermediate` is the name of the field holding the ADT-value that stores the discriminant-specific fields, when `nesting_kind` is `MinimalVariation` (in `UnifiedRecord`, this argument is ignored)
@@ -161,14 +161,15 @@ mod util {
     /// # Panics
     ///
     /// Will panic if `discriminant` specifies a field-name that is not present in `outer_fields`.
-    pub(crate) fn embedded_variadic_alternation<C, const OUTER: usize, const BRANCHES: usize>(
+    pub(crate) fn embedded_variadic_alternation<D, C, const OUTER: usize, const BRANCHES: usize>(
         shared_fields: [(&'static str, Format); OUTER],
         discriminant: &'static str,
-        branches: [(u16, &'static str, C); BRANCHES],
+        branches: [(D, &'static str, C); BRANCHES],
         intermediate: &'static str,
         nesting_kind: NestingKind,
     ) -> Format
     where
+        D: Into<Bounds>,
         C: IntoIterator<Item = (&'static str, Format), IntoIter: DoubleEndedIterator>,
     {
         match nesting_kind {
@@ -176,7 +177,7 @@ mod util {
                 let mut pat_branches = Vec::with_capacity(BRANCHES);
                 for (value, vname, c) in branches.into_iter() {
                     let record_inner = record(c);
-                    pat_branches.push((Pattern::U16(value), vname, record_inner));
+                    pat_branches.push((Pattern::Int(value.into()), vname, record_inner));
                 }
                 let final_field = (intermediate, match_variant(var(discriminant), pat_branches));
                 let mut has_discriminant = false;
@@ -211,7 +212,7 @@ mod util {
                     let unified = Iterator::chain(shared_fields.iter().cloned(), c.into_iter())
                         .collect::<Vec<(&'static str, Format)>>();
                     let record_inner = record(unified);
-                    pat_branches.push((Pattern::U16(value), vname, record_inner));
+                    pat_branches.push((Pattern::Int(value.into()), vname, record_inner));
                 }
                 peek_field_then(
                     field_prefix.as_slice(),
@@ -304,16 +305,19 @@ mod util {
     }
 
     /// Parses a `U16Be` value that is expected to be equal to `val`
+    ///
+    /// Raises warnings, not errors, if the value does not match.
     pub(crate) fn expect_u16be(val: u16) -> Format {
-        // REVIEW - if we cared to do it, we could use `chain(is_bytes(val.to_be_bytes()), "_", compute(Expr::U16(val)))` (at the cost of worsening error reporting)
         expect_lambda(u16be(), "x", expr_eq(var("x"), Expr::U16(val)))
     }
 
     /// Parses a `U16Be` value that is expected to be equal to one of the values in `vals`
     ///
     /// If only one value is expected, use [`expect_u16be`] instead.
+    ///
+    /// Raises warnings, not errors, if the value does not match any of the provided cases.
     pub(crate) fn expects_u16be<const N: usize>(vals: [u16; N]) -> Format {
-        where_lambda(
+        expect_lambda(
             u16be(),
             "x",
             expr_match(
@@ -703,6 +707,8 @@ pub(crate) fn table_links(
     let stat_table = stat::table(module, tag);
     let fvar_table = fvar::table(module, tag);
     let gvar_table = gvar::table(module);
+    let hvar_table = hvar::table(module, item_variation_store);
+
     let dsig_table = dsig::table(module);
     let hdmx_table = hdmx::table(module);
     let vdmx_table = vdmx::table(module);
@@ -922,6 +928,15 @@ pub(crate) fn table_links(
                     var("tables"),
                     util::magic(b"gvar"),
                     gvar_table.call(),
+                ),
+            ),
+            (
+                "hvar",
+                optional_table(
+                    util::FONTVIEW_VAR,
+                    var("tables"),
+                    util::magic(b"HVAR"),
+                    hvar_table.call(),
                 ),
             ),
             // !SECTION
@@ -1303,7 +1318,7 @@ pub(crate) mod stat {
                 [("format", where_between_u16(u16be(), 1, 4))],
                 "format",
                 [
-                    (1, "Format1", f1_fields),
+                    (1u16, "Format1", f1_fields),
                     (2, "Format2", f2_fields),
                     (3, "Format3", f3_fields),
                     (4, "Format4", f4_fields),
@@ -1507,6 +1522,134 @@ pub(crate) mod vdmx {
                 ("end_sz", u8()),   // Ending yPelHeight
                 ("entry", repeat_count(var("recs"), v_table.call())),
             ]),
+        )
+    }
+}
+
+pub(crate) mod hvar {
+    use super::*;
+
+    /// HVAR Table format definition
+    ///
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/hvar#table-formats
+    ///
+    /// Only appears if `hmtx` is present, and like all variable-font tables,
+    /// requires `fvar` and `STAT` to be present.
+    pub(crate) fn table(module: &mut FormatModule, item_variation_store: FormatRef) -> FormatRef {
+        let dsim = delta_set_index_map(module);
+        module.define_format(
+            "opentype.hvar",
+            let_view(
+                "table_view",
+                record_auto([
+                    ("table_scope", reify_view(vvar("table_view"))),
+                    ("major_version", expect_u16be(1)),
+                    ("minor_version", expect_u16be(0)),
+                    (
+                        "item_variation_store",
+                        util::read_phantom_view_offset32(
+                            vvar("table_view"),
+                            item_variation_store.call(),
+                        ),
+                    ),
+                    (
+                        "advance_width_mapping",
+                        util::read_phantom_view_offset32(vvar("table_view"), dsim.call()),
+                    ),
+                    (
+                        "lsb_mapping",
+                        util::read_phantom_view_offset32(vvar("table_view"), dsim.call()),
+                    ),
+                    (
+                        "rsb_mapping",
+                        util::read_phantom_view_offset32(vvar("table_view"), dsim.call()),
+                    ),
+                ]),
+            ),
+        )
+    }
+
+    /// DeltaSetIndexMap format definition
+    ///
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/otvarcommonformats#associating-target-items-to-variation-data
+    // TODO: extract to common format across variations
+    fn delta_set_index_map(module: &mut FormatModule) -> FormatRef {
+        let entry_format = module.define_format(
+            "opentype.var.dsim-entry_format",
+            bit_fields_u8([
+                // 0xC0 - reserved  (Set to 0)
+                BitFieldKind::Reserved {
+                    bit_width: 2,
+                    check_zero: true,
+                },
+                // 2 bits - <size in bytes of map entry> = mapEntrySize + 1
+                BitFieldKind::BitsField {
+                    bit_width: 2,
+                    field_name: "map_entry_size",
+                },
+                // 4 bits - <number of bits for each entry in inner-level index> = innerIndexBitCount + 1
+                BitFieldKind::BitsField {
+                    bit_width: 4,
+                    field_name: "inner_index_bit_count",
+                },
+            ]),
+        );
+        module.define_format(
+            "opentype.var.delta_set_index_map",
+            util::embedded_variadic_alternation(
+                [
+                    (
+                        "format",
+                        expect_lambda(u8(), "val", expr_lte(var("val"), Expr::U8(1))),
+                    ),
+                    ("entry_format", entry_format.call()),
+                    (
+                        "entry_size",
+                        compute(succ(record_proj(var("entry_format"), "map_entry_size"))),
+                    ),
+                    (
+                        "inner_index_bits",
+                        compute(succ(record_proj(
+                            var("entry_format"),
+                            "inner_index_bit_count",
+                        ))),
+                    ),
+                ],
+                "format",
+                [
+                    (
+                        0u8,
+                        "Format0",
+                        [
+                            ("map_count", u16be()),
+                            (
+                                "map_data",
+                                capture_bytes_from_here(mul(
+                                    var("map_count"),
+                                    as_u16(var("entry_size")),
+                                )),
+                            ),
+                        ],
+                    ),
+                    (
+                        1,
+                        "Format1",
+                        [
+                            ("map_count", u32be()),
+                            (
+                                "map_data",
+                                capture_bytes_from_here(mul(
+                                    var("map_count"),
+                                    as_u32(var("entry_size")),
+                                )),
+                            ),
+                        ],
+                    ),
+                ],
+                "map",
+                NestingKind::UnifiedRecord,
+                // NestingKind::MinimalVariation,
+            ),
         )
     }
 }
