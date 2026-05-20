@@ -1375,6 +1375,12 @@ impl MachineSint {
     }
 }
 
+impl std::fmt::Display for MachineSint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_static_str())
+    }
+}
+
 impl ToFragment for MachineSint {
     fn to_fragment(&self) -> Fragment {
         Fragment::string(self.to_static_str())
@@ -1537,6 +1543,27 @@ impl From<AtomType> for RustType {
 impl From<PrimType> for RustType {
     fn from(value: PrimType) -> Self {
         Self::from(AtomType::from(value))
+    }
+}
+
+impl From<NumType> for RustType {
+    fn from(value: NumType) -> Self {
+        match value {
+            NumType::U(u) => RustType::from(u),
+            NumType::I(i) => RustType::from(i),
+        }
+    }
+}
+
+impl From<MachineUint> for RustType {
+    fn from(value: MachineUint) -> Self {
+        Self::from(AtomType::from(PrimType::Unsigned(value)))
+    }
+}
+
+impl From<MachineSint> for RustType {
+    fn from(value: MachineSint) -> Self {
+        Self::from(AtomType::Signed(value))
     }
 }
 

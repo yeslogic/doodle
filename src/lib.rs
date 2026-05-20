@@ -1932,7 +1932,7 @@ impl<'a> MatchTreeStep<'a> {
             | TypedFormat::ParseFromView(..)
             | TypedFormat::Compute(..) => Self::from_next(module, next),
 
-            TypedFormat::Pos => Self::from_next(module, next),
+            TypedFormat::Pos(_) => Self::from_next(module, next),
             TypedFormat::Let(_, _name, _expr, f) => Self::from_gt_format(module, f, next),
             TypedFormat::LetView(_, _name, f) => Self::from_gt_format(module, f, next),
             TypedFormat::Match(_, _, branches) => {

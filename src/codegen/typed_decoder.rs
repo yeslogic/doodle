@@ -10,6 +10,7 @@ use std::rc::Rc;
 
 use crate::codegen::typed_format::{GenType, TypedPattern, TypedViewExpr};
 
+use super::rust_ast::NumType;
 use super::typed_format::TypedViewFormat;
 use super::{
     GTFormat,
@@ -65,7 +66,10 @@ impl TypedDecoder<GenType> {
             TypedDecoder::Byte(set) => {
                 (!set.is_empty()).then_some(Cow::Owned(GenType::from(PrimType::U8)))
             }
-            TypedDecoder::Pos => Some(Cow::Owned(GenType::from(PrimType::U64))),
+            TypedDecoder::Pos(nt) => match nt {
+                NumType::U(m_uint) => Some(Cow::Owned(GenType::Inline(RustType::from(*m_uint)))),
+                NumType::I(m_sint) => Some(Cow::Owned(GenType::Inline(RustType::from(*m_sint)))),
+            },
             TypedDecoder::Call(t, ..)
             | TypedDecoder::Variant(t, ..)
             | TypedDecoder::Parallel(t, ..)
@@ -203,7 +207,7 @@ pub(crate) enum TypedDecoder<TypeRep> {
         Box<TypedExpr<TypeRep>>,
         Box<TypedDecoderExt<TypeRep>>,
     ),
-    Pos,
+    Pos(NumType),
     ForEach(
         TypeRep,
         Box<TypedExpr<TypeRep>>,
@@ -664,7 +668,21 @@ impl<'a> GTCompiler<'a> {
                 Ok(TypedDecoder::Where(gt.clone(), da, cond.clone()))
             }
             TypedFormat::Compute(gt, expr) => Ok(TypedDecoder::Compute(gt.clone(), expr.clone())),
-            TypedFormat::Pos => Ok(TypedDecoder::Pos),
+            TypedFormat::Pos(gt) => {
+                let nt = match gt.try_to_num_type() {
+                    Some(num_t) => match num_t {
+                        NumType::U(_) => num_t,
+                        NumType::I(m_sint) => {
+                            log::debug!("signed-integer type inferred for Format::Pos: {m_sint}");
+                            num_t
+                        }
+                    },
+                    None => {
+                        unreachable!("non-numeric type ascription for Format::Pos: {gt:?}")
+                    }
+                };
+                Ok(TypedDecoder::Pos(nt))
+            }
             TypedFormat::Let(gt, name, expr, a) => {
                 let da = Box::new(self.compile_gt_format(a, None, next.clone())?);
                 Ok(TypedDecoder::Let(

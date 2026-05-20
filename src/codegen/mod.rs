@@ -291,7 +291,7 @@ impl CodeGen {
             TypedDecoder::Fail => CaseLogic::Simple(SimpleLogic::Fail),
             TypedDecoder::EndOfInput => CaseLogic::Simple(SimpleLogic::ExpectEnd),
             TypedDecoder::Align(n) => CaseLogic::Simple(SimpleLogic::SkipToNextMultiple(*n)),
-            TypedDecoder::Pos => CaseLogic::Simple(SimpleLogic::YieldCurrentOffset),
+            TypedDecoder::Pos(nt) => CaseLogic::Simple(SimpleLogic::YieldCurrentOffsetAs(*nt)),
             TypedDecoder::SkipRemainder => CaseLogic::Simple(SimpleLogic::SkipRemainder),
             TypedDecoder::Phantom => CaseLogic::Simple(SimpleLogic::PhantomData),
             TypedDecoder::Byte(bs) => CaseLogic::Simple(SimpleLogic::ByteIn(*bs)),
@@ -2734,7 +2734,7 @@ enum SimpleLogic<ExprT, ViewExprT = TypedViewExpr<GenType>> {
     ByteIn(ByteSet),
     Eval(RustExpr),
     CallDynamic(Label),
-    YieldCurrentOffset,
+    YieldCurrentOffsetAs(NumType),
     SkipRemainder,
     ConstNone,
     PhantomData,
@@ -2784,9 +2784,18 @@ impl ToAst for SimpleLogic<GTExpr> {
             SimpleLogic::SkipToNextMultiple(n) => {
                 GenBlock::simple_expr(model::try_skip_align(ctxt.parser(), *n))
             }
-            SimpleLogic::YieldCurrentOffset => {
-                GenBlock::simple_expr(model::yield_offset_as_u64(ctxt.parser()))
-            }
+            SimpleLogic::YieldCurrentOffsetAs(nt) => match nt {
+                NumType::U(MachineUint::U64) => {
+                    GenBlock::simple_expr(model::yield_offset_as_u64(ctxt.parser()))
+                }
+                other => {
+                    let call = model::yield_offset_as_u64(ctxt.parser());
+                    GenBlock::simple_expr(RustExpr::Operation(RustOp::AsCast(
+                        Box::new(call),
+                        RustType::from(*other),
+                    )))
+                }
+            },
             SimpleLogic::ByteIn(bs) => {
                 let call = ctxt.parser().call_method("read_byte").wrap_try();
                 let bc = ByteCriterion::from(bs);
@@ -4319,8 +4328,9 @@ impl<'a> Elaborator<'a> {
                 TypedFormat::Align(*n)
             }
             Format::Pos => {
-                self.increment_index();
-                TypedFormat::Pos
+                let index = self.get_and_increment_index();
+                let gt = self.get_gt_from_index(index);
+                TypedFormat::Pos(gt)
             }
             Format::Byte(bs) => {
                 self.increment_index();
