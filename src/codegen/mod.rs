@@ -4350,10 +4350,10 @@ impl<'a> Elaborator<'a> {
                     None => {
                         let before = self.get_gt_from_index(index - 1);
                         let after = self.get_gt_from_index(index + 1);
-                        eprintln!("Possible frame-shift error around {index} (looking for Enum)");
-                        eprintln!("[{}]: {before:?}", index - 1);
-                        eprintln!("[{index}]: {gt:?}");
-                        eprintln!("[{}]: {after:?}", index + 1);
+                        log::debug!("Possible frame-shift error around {index} (looking for Enum)");
+                        log::debug!("[{}]: {before:?}", index - 1);
+                        log::debug!("[{index}]: {gt:?}");
+                        log::debug!("[{}]: {after:?}", index + 1);
                         // unreachable!("found non-adhoc type for variant format elaboration: {gt:?} @ {index} ({label}({inner:?})");
                     }
                 }
@@ -4647,12 +4647,13 @@ impl<'a> Elaborator<'a> {
                             None => {
                                 let before = self.get_gt_from_index(index - 1);
                                 let after = self.get_gt_from_index(index + 1);
-                                eprintln!(
-                                    "Possible frame-shift error around {index} (looking for Struct)"
+                                log::debug!(
+                                    "StyleHint::Record found non-adhoc type for record format elaboration; possible frame-shift error around {index})"
                                 );
-                                eprintln!("[{}]: {before:?}", index - 1);
-                                eprintln!("[index]: {gt:?}");
-                                eprintln!("[{}]: {after:?}", index + 1);
+                                log::info!("error encountered on elaboration of: {format:?}");
+                                log::debug!("[{}]: {before:?}", index - 1);
+                                log::debug!("[index]: {gt:?}");
+                                log::debug!("[{}]: {after:?}", index + 1);
                                 // unreachable!("found non-adhoc type for record format elaboration: {gt:?} @ {index} ({flds:#?})");
                             }
                         }
@@ -4849,10 +4850,12 @@ impl<'a> Elaborator<'a> {
                     None => {
                         let before = self.get_gt_from_index(index - 1);
                         let after = self.get_gt_from_index(index + 1);
-                        eprintln!("Possible frame-shift error around {index} (looking for Struct)");
-                        eprintln!("[{}]: {before:?}", index - 1);
-                        eprintln!("[index]: {gt:?}");
-                        eprintln!("[{}]: {after:?}", index + 1);
+                        log::debug!(
+                            "Possible frame-shift error around {index} (looking for Struct)"
+                        );
+                        log::debug!("[{}]: {before:?}", index - 1);
+                        log::debug!("[index]: {gt:?}");
+                        log::debug!("[{}]: {after:?}", index + 1);
                         // unreachable!("found non-adhoc type for expr record elaboration: {gt:?} @ {index} ({flds:#?})");
                     }
                 }
@@ -4926,10 +4929,10 @@ impl<'a> Elaborator<'a> {
                     None => {
                         let before = self.get_gt_from_index(index - 1);
                         let after = self.get_gt_from_index(index + 1);
-                        eprintln!("Possible frame-shift error around {index} (looking for Enum)");
-                        eprintln!("[{}]: {before:?}", index - 1);
-                        eprintln!("[index]: {gt:?}");
-                        eprintln!("[{}]: {after:?}", index + 1);
+                        log::debug!("Possible frame-shift error around {index} (looking for Enum)");
+                        log::debug!("[{}]: {before:?}", index - 1);
+                        log::debug!("[index]: {gt:?}");
+                        log::debug!("[{}]: {after:?}", index + 1);
                         // unreachable!("found non-adhoc type for expr variant elaboration: {gt:?} @ {index} ({lbl}({inner?}))");
                     }
                 }
