@@ -1542,6 +1542,8 @@ pub(crate) mod hvar {
                     ("table_scope", reify_view(vvar("table_view"))),
                     ("major_version", expect_u16be(1)),
                     ("minor_version", expect_u16be(0)),
+                    // NOTE - the HVAR specification implies that the following offset is non-NULL, but the OpenType spec includes the caveat that even not-explicitly NULLable offsets should be handled gracefully if null
+                    // REVIEW[epic=validation] - this IVS must contain sufficient delta-sets that the maximum index found in any DSIM entry is in-bounds, but we cannot check this at this layer.
                     (
                         "item_variation_store",
                         util::read_phantom_view_offset32(
@@ -1549,6 +1551,7 @@ pub(crate) mod hvar {
                             item_variation_store.call(),
                         ),
                     ),
+                    // NOTE - each of the three following offset-fields are specified 'may be NULL', and that glyph ids are to be used directly as indices in place of a DSIM for any which are not provided
                     (
                         "advance_width_mapping",
                         util::read_phantom_view_offset32(vvar("table_view"), dsim.call()),
@@ -1593,60 +1596,52 @@ pub(crate) mod hvar {
         );
         module.define_format(
             "opentype.var.delta_set_index_map",
-            util::embedded_variadic_alternation(
-                [
-                    (
-                        "format",
-                        expect_lambda(u8(), "val", expr_lte(var("val"), Expr::U8(1))),
-                    ),
-                    ("entry_format", entry_format.call()),
-                    (
-                        "entry_size",
-                        compute(succ(record_proj(var("entry_format"), "map_entry_size"))),
-                    ),
-                    (
-                        "inner_index_bits",
-                        compute(succ(record_proj(
-                            var("entry_format"),
-                            "inner_index_bit_count",
-                        ))),
-                    ),
-                ],
-                "format",
-                [
-                    (
-                        0u8,
-                        "Format0",
+            record_auto([
+                (
+                    "format",
+                    expect_lambda(u8(), "val", expr_lte(var("val"), Expr::U8(1))),
+                ),
+                ("_entry_format", entry_format.call()),
+                (
+                    "entry_size",
+                    compute(succ(record_proj(var("_entry_format"), "map_entry_size"))),
+                ),
+                (
+                    "inner_index_bits",
+                    compute(succ(record_proj(
+                        var("_entry_format"),
+                        "inner_index_bit_count",
+                    ))),
+                ),
+                (
+                    "map_count",
+                    fmt_match(
+                        var("format"),
                         [
-                            ("map_count", u16be()),
                             (
-                                "map_data",
-                                capture_bytes_from_here(mul(
-                                    var("map_count"),
-                                    as_u16(var("entry_size")),
-                                )),
+                                Pattern::U8(0),
+                                map(u16be(), lambda("val", as_u32(var("val")))),
                             ),
+                            (Pattern::U8(1), u32be()),
                         ],
                     ),
-                    (
-                        1,
-                        "Format1",
-                        [
-                            ("map_count", u32be()),
-                            (
-                                "map_data",
-                                capture_bytes_from_here(mul(
-                                    var("map_count"),
-                                    as_u32(var("entry_size")),
-                                )),
-                            ),
-                        ],
-                    ),
-                ],
-                "map",
-                NestingKind::UnifiedRecord,
-                // NestingKind::MinimalVariation,
-            ),
+                ),
+                // REVIEW - the current strategy is to merely capture the map data and leave it as an uninterpreted byte-array; any processing can be done downstream of generated code
+                /*
+                 * MapData: captured as an uninterpreted byte-data array
+                 *
+                 * Each logical entry occupies `entry_size` (1-4) bytes, and is to be subsequently interpreted as an `(outerIx, innerIx)` pair:
+                 *   innerIx is stored within the N least-significant-bits of the entry (N = `inner_index_bits`)
+                 *   outerIx is stored within the M most-significant-bits of the entry (M = `entry_size * 8 - inner_index_bits`)
+                 *
+                 * Hence:
+                 *   <entry> = (<outerIx> << inner_index_bits) || <innerIx>
+                 */
+                (
+                    "map_data",
+                    capture_bytes_from_here(mul(var("map_count"), as_u32(var("entry_size")))),
+                ),
+            ]),
         )
     }
 }
