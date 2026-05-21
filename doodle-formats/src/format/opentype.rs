@@ -1535,7 +1535,7 @@ pub(crate) mod hvar {
     pub(crate) fn table(module: &mut FormatModule, item_variation_store: FormatRef) -> FormatRef {
         let dsim = delta_set_index_map(module);
         module.define_format(
-            "opentype.hvar",
+            "opentype.hvar_table",
             let_view(
                 "table_view",
                 record_auto([
@@ -1597,10 +1597,7 @@ pub(crate) mod hvar {
         module.define_format(
             "opentype.var.delta_set_index_map",
             record_auto([
-                (
-                    "format",
-                    expect_lambda(u8(), "val", expr_lte(var("val"), Expr::U8(1))),
-                ),
+                ("format", expect_between_u8(u8(), 0, 1)),
                 ("_entry_format", entry_format.call()),
                 (
                     "entry_size",

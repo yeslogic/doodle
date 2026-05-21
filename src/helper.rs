@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use num_traits::{ToPrimitive, Zero};
+use num_traits::{ToPrimitive, Unsigned, Zero};
 
 use crate::byte_set::ByteSet;
 pub use crate::marker::BaseKind;
@@ -882,7 +882,7 @@ pub fn expect_lambda(raw: Format, name: impl IntoLabel, body: Expr) -> Format {
 /// Does not check that `lower <= upper` as that cannot be statically determined.
 pub fn where_between<N>(format: Format, lower: N, upper: N, inject: impl Fn(N) -> Expr) -> Format
 where
-    N: ToPrimitive + Zero,
+    N: ToPrimitive + Zero + Unsigned,
 {
     let cond = if lower.is_zero() {
         expr_lte(var("x"), inject(upper))
@@ -905,16 +905,68 @@ where
     where_lambda(format, "x", cond)
 }
 
+/// Numeric validation helper that applies a non-fatal constraint a given format
+/// to yield a value that falls in the inclusive range `lower..=upper`
+///
+/// Attempts to optimize the case of `lower == 0` to avoid vacuous lower bounds on unsigned types.
+///
+/// Syntactically equivalent to [`where_between`] but with `Expect`-level severity instead of `Assert`.
+///
+/// # Notes
+///
+/// Does not check that `lower <= upper` as that cannot be statically determined.
+pub fn expect_between<N>(format: Format, lower: N, upper: N, inject: impl Fn(N) -> Expr) -> Format
+where
+    N: ToPrimitive + Zero + Unsigned,
+{
+    let cond = if lower.is_zero() {
+        expr_lte(var("x"), inject(upper))
+    } else {
+        expr_match(
+            var("x"),
+            [
+                (
+                    Pattern::Int(Bounds::new(
+                        lower.to_usize().unwrap(),
+                        upper.to_usize().unwrap(),
+                    )),
+                    Expr::Bool(true),
+                ),
+                (Pattern::Wildcard, Expr::Bool(false)),
+            ],
+        )
+    };
+    expect_lambda(format, "x", cond)
+}
+
+/// Specialized version of [`where_between`] for `u8`
 pub fn where_between_u8(format: Format, lower: u8, upper: u8) -> Format {
     where_between(format, lower, upper, Expr::U8)
 }
 
+/// Specialized version of [`where_between`] for `u16`
 pub fn where_between_u16(format: Format, lower: u16, upper: u16) -> Format {
     where_between(format, lower, upper, Expr::U16)
 }
 
+/// Specialized version of [`where_between`] for `u32`
 pub fn where_between_u32(format: Format, lower: u32, upper: u32) -> Format {
     where_between(format, lower, upper, Expr::U32)
+}
+
+/// Specialized version of [`expect_between`] for `u8`
+pub fn expect_between_u8(format: Format, lower: u8, upper: u8) -> Format {
+    expect_between(format, lower, upper, Expr::U8)
+}
+
+/// Specialized version of [`expect_between`] for `u16`
+pub fn expect_between_u16(format: Format, lower: u16, upper: u16) -> Format {
+    expect_between(format, lower, upper, Expr::U16)
+}
+
+/// Specialized version of [`expect_between`] for `u32`
+pub fn expect_between_u32(format: Format, lower: u32, upper: u32) -> Format {
+    expect_between(format, lower, upper, Expr::U32)
 }
 
 /// Numeric validation helper that constrains a given format to yield a value that falls in an abstract range
