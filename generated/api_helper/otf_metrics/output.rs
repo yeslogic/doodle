@@ -8,6 +8,20 @@ use super::{
 };
 use log::error;
 
+// Indentation constants, measured in half-tabs (two half-tabs collapse to one '\t' in rendered output).
+
+/// Offset of a sub-section content block from a table's top-level heading line.
+const SECTION_INDENT: i8 = 1;
+/// Offset of individual item entries from their enclosing sub-section header.
+const ITEM_INDENT: i8 = 1;
+/// Offset of items from a table heading in flat layouts (no distinct sub-section header).
+/// Always equal to SECTION_INDENT + ITEM_INDENT; declared explicitly so both patterns
+/// are machine-checkable rather than coincidentally equal magic numbers.
+const FLAT_ITEM_INDENT: i8 = SECTION_INDENT + ITEM_INDENT;
+/// Adjustment applied to elision strings to position them at sub-section-header level,
+/// one step above the items they replace.
+const ELISION_DELTA: i8 = -ITEM_INDENT;
+
 // TODO - refactor into more cleanly encapsulated TokenStream producers and consumers
 
 pub fn show_opentype_stats(metrics: &OpentypeMetrics, conf: &cli::Config) {
@@ -38,12 +52,12 @@ pub fn show_opentype_stats(metrics: &OpentypeMetrics, conf: &cli::Config) {
 }
 
 /// Tokenizer specialized for displaying table-directory `sfntVersion` (inline)
-fn display_sfnt_version(magic: u32) -> TokenStream<'static> {
+fn display_sfnt_version(magic: u32) -> TokenStream {
     tok("sfntVersion: ").then(display_u32_ascii(magic)).paren()
 }
 
 /// Tokenizer used for displaying 32-bit binary values as four ASCII characters interpreted in big-endian order. (inline)
-pub(crate) fn display_u32_ascii(val: u32) -> TokenStream<'static> {
+pub(crate) fn display_u32_ascii(val: u32) -> TokenStream {
     let bytes = val.to_be_bytes();
     let mut buf: [u8; 6] = *b"'    '";
     let mut space = false;
@@ -80,7 +94,7 @@ fn show_font_metrics(font: &SingleFontMetrics, conf: &Config) {
     display_extra_tags(&font.extraMagic).println();
 }
 
-fn display_extra_tags(table_ids: &[u32]) -> TokenStream<'static> {
+fn display_extra_tags(table_ids: &[u32]) -> TokenStream {
     let lines = table_ids
         .iter()
         .map(|id| display_u32_ascii(*id).chain(toks(": [MISSING IMPL]")))
@@ -90,41 +104,31 @@ fn display_extra_tags(table_ids: &[u32]) -> TokenStream<'static> {
 
 // FIXME - rewrite into pure TokenStream
 fn show_required_metrics(required: &RequiredTableMetrics, conf: &cli::Config) {
-    display_cmap_metrics(&required.cmap, conf).println();
-    // WIP - display_head_metrics(..).println();
-    show_head_metrics(&required.head, conf);
-    // WIP - display_hhea_metrics(..).println();
-    show_hhea_metrics(&required.hhea, conf);
     TokenStream::join_with(
         vec![
+            display_cmap_metrics(&required.cmap, conf),
+            display_head_metrics(&required.head, conf),
+            display_hhea_metrics(&required.hhea, conf),
             display_hmtx_metrics(&required.hmtx, conf),
             display_maxp_metrics(&required.maxp, conf),
+            display_name_metrics(&required.name, conf),
+            display_os2_metrics(&required.os2, conf),
+            display_post_metrics(&required.post, conf),
         ],
         LineBreak,
     )
     .println();
-    // WIP - display_name_metrics(..).println();
-    show_name_metrics(&required.name, conf);
-    // WIP - display_os2_metrics(..).println();
-    show_os2_metrics(&required.os2, conf);
-    // WIP - display_post_metrics(..).println();
-    show_post_metrics(&required.post, conf);
 }
 
 // FIXME - rewrite into pure TokenStream
 fn show_optional_metrics(optional: &OptionalTableMetrics, conf: &cli::Config) {
-    // WIP - display_cvt_metrics(..).println();
-    show_cvt_metrics(&optional.cvt, conf);
-    // WIP - display_fpgm_metrics(..).println();
-    show_fpgm_metrics(&optional.fpgm, conf);
-    // WIP - display_loca_metrics(..).println();
-    show_loca_metrics(&optional.loca, conf);
-    display_glyf_metrics(&optional.glyf, conf).println();
-    // WIP - display_prep_metrics(..).println();
-    show_prep_metrics(&optional.prep, conf);
-
     TokenStream::join_with(
         vec![
+            display_cvt_metrics(&optional.cvt, conf),
+            display_fpgm_metrics(&optional.fpgm, conf),
+            display_loca_metrics(&optional.loca, conf),
+            display_glyf_metrics(&optional.glyf, conf),
+            display_prep_metrics(&optional.prep, conf),
             display_gasp_metrics(&optional.gasp, conf),
             // STUB - anything between gasp and base go here
             display_base_metrics(&optional.base, conf),
@@ -141,37 +145,31 @@ fn show_optional_metrics(optional: &OptionalTableMetrics, conf: &cli::Config) {
             ),
             display_fvar_metrics(optional.fvar.as_deref(), conf),
             display_gvar_metrics(optional.gvar.as_deref(), conf),
+            display_hvar_metrics(optional.hvar.as_deref(), conf),
             display_kern_metrics(&optional.kern, conf),
             display_dsig_metrics(optional.dsig.as_ref(), conf),
             display_hdmx_metrics(optional.hdmx.as_ref(), conf),
             display_vdmx_metrics(optional.vdmx.as_ref(), conf),
+            display_stat_metrics(optional.stat.as_deref(), conf),
+            display_vhea_metrics(&optional.vhea, conf),
+            display_vmtx_metrics(&optional.vmtx, conf),
         ],
         LineBreak,
     )
     .println();
-
-    // WIP - display_stat_metrics(..).println();
-    show_stat_metrics(optional.stat.as_deref(), conf);
-    // WIP - display_vhea_metrics(..).println();
-    show_vhea_metrics(&optional.vhea, conf);
-    display_vmtx_metrics(&optional.vmtx, conf).println();
 }
 
 use vdmx::display_vdmx_metrics;
 mod vdmx {
     use super::*;
 
-    pub(super) fn display_vdmx_metrics(
-        vdmx: Option<&VdmxMetrics>,
-        conf: &Config,
-    ) -> TokenStream<'static> {
+    pub(super) fn display_vdmx_metrics(vdmx: Option<&VdmxMetrics>, conf: &Config) -> TokenStream {
         let Some(vdmx) = vdmx else {
             return TokenStream::empty();
         };
 
         let heading = toks(format!("VDMX: version {}", vdmx.version));
         if conf.verbosity.is_at_least(cli::VerboseLevel::Detailed) {
-            const ADVANCE: i8 = 1;
             heading.glue(
                 LineBreak,
                 TokenStream::join_with(
@@ -183,10 +181,10 @@ mod vdmx {
                             conf.bookend_size,
                             |start, stop| {
                                 toks(format!("(skipping ratio-ranges {start}..{stop})"))
-                                    .indent_by(-1)
+                                    .indent_by(ELISION_DELTA)
                             },
                         )
-                        .indent_by(ADVANCE),
+                        .indent_by(ITEM_INDENT),
                         toks(format!("VDMXGroups: {} total", vdmx.vdmx_groups.len())),
                         display_items_elided(
                             &vdmx.vdmx_groups,
@@ -194,28 +192,28 @@ mod vdmx {
                             conf.bookend_size,
                             |start, stop| {
                                 toks(format!("(skipping VDMX groups {start}..{stop})"))
-                                    .indent_by(-1)
+                                    .indent_by(ELISION_DELTA)
                             },
                         )
-                        .indent_by(ADVANCE),
+                        .indent_by(ITEM_INDENT),
                     ],
                     LineBreak,
                 )
-                .indent_by(1),
+                .indent_by(SECTION_INDENT),
             )
         } else {
             heading
         }
     }
 
-    fn display_ratio_range(rr: &RatioRange) -> TokenStream<'static> {
+    fn display_ratio_range(rr: &RatioRange) -> TokenStream {
         toks(format!(
             "bCharSet={}; {}:{}↔{}:{}",
             rr.b_char_set, rr.x_ratio, rr.y_start_ratio, rr.x_ratio, rr.y_end_ratio
         ))
     }
 
-    fn display_vdmx_group(vg: &VdmxGroup, conf: &Config) -> TokenStream<'static> {
+    fn display_vdmx_group(vg: &VdmxGroup, conf: &Config) -> TokenStream {
         toks(format!("yPelHeight[{}, {}]", vg.start_sz, vg.end_sz)).glue(
             tok("; entry="),
             display_items_inline(
@@ -227,21 +225,19 @@ mod vdmx {
         )
     }
 
-    fn display_vtable(vtable: VTable) -> TokenStream<'static> {
+    fn display_vtable(vtable: VTable) -> TokenStream {
         toks(format!(
             "{}@[{}, {}]",
             vtable.y_pel_height, vtable.y_min, vtable.y_max
         ))
     }
 }
+
 use hdmx::display_hdmx_metrics;
 mod hdmx {
     use super::*;
 
-    pub(super) fn display_hdmx_metrics(
-        hdmx: Option<&HdmxMetrics>,
-        conf: &Config,
-    ) -> TokenStream<'static> {
+    pub(super) fn display_hdmx_metrics(hdmx: Option<&HdmxMetrics>, conf: &Config) -> TokenStream {
         let Some(hdmx) = hdmx else {
             return TokenStream::empty();
         };
@@ -257,17 +253,18 @@ mod hdmx {
                         |ix, r| tok(format!("[{ix}]: ")).then(display_device_record(r, conf)),
                         conf.bookend_size,
                         |start, stop| {
-                            toks(format!("(skipping records {start}..{stop})")).indent_by(-1)
+                            toks(format!("(skipping records {start}..{stop})"))
+                                .indent_by(ELISION_DELTA)
                         },
                     )
-                    .indent_by(2),
+                    .indent_by(FLAT_ITEM_INDENT),
                 )
         } else {
             heading
         }
     }
 
-    fn display_device_record(dev_record: &DeviceRecord, conf: &Config) -> TokenStream<'static> {
+    fn display_device_record(dev_record: &DeviceRecord, conf: &Config) -> TokenStream {
         TokenStream::join_with(
             vec![
                 toks(format!("pixelSize={} ppem", dev_record.pixel_size)),
@@ -288,10 +285,7 @@ use dsig::display_dsig_metrics;
 mod dsig {
     use super::*;
 
-    pub(super) fn display_dsig_metrics(
-        dsig: Option<&DsigMetrics>,
-        conf: &Config,
-    ) -> TokenStream<'static> {
+    pub(super) fn display_dsig_metrics(dsig: Option<&DsigMetrics>, conf: &Config) -> TokenStream {
         let Some(dsig) = dsig else {
             return TokenStream::empty();
         };
@@ -299,8 +293,6 @@ mod dsig {
         let heading =
             toks(format!("DSIG: version {}", dsig.version)).chain(display_dsig_flags(dsig.flags));
         if conf.verbosity.is_at_least(cli::VerboseLevel::Detailed) {
-            // NOTE - Signed difference in indentation levels (measured in half-tabs) between each table field and its multiline contents
-            const ADVANCE: i8 = 1;
             if dsig.signatures.is_empty() {
                 heading.chain(toks("; no signatures"))
             } else {
@@ -321,21 +313,21 @@ mod dsig {
                                 conf.bookend_size,
                                 |start, stop| {
                                     toks(format!("(skipping signatures {}..{})", start, stop))
-                                        .indent_by(-1)
+                                        .indent_by(ELISION_DELTA)
                                 },
                             )
-                            .indent_by(1),
+                            .indent_by(ITEM_INDENT),
                         ],
                         LineBreak,
                     )
-                    .indent_by(1),
+                    .indent_by(SECTION_INDENT),
                 )
             }
         } else {
             heading
         }
     }
-    fn display_dsig_flags(flags: DsigFlags) -> TokenStream<'static> {
+    fn display_dsig_flags(flags: DsigFlags) -> TokenStream {
         if flags.cannot_be_resigned {
             toks("; cannot_be_resigned=TRUE")
         } else {
@@ -343,7 +335,7 @@ mod dsig {
         }
     }
 
-    fn display_signature_block(sig: SignatureBlock, conf: &Config) -> TokenStream<'static> {
+    fn display_signature_block(sig: SignatureBlock, conf: &Config) -> TokenStream {
         let mut octets = String::new();
         let min_abbrev = conf.octet_bytes_bookend * 2;
         if sig.sig.len() <= min_abbrev {
@@ -366,15 +358,74 @@ mod dsig {
     }
 }
 
+use hvar::display_hvar_metrics;
+mod hvar {
+    use super::*;
+
+    pub(super) fn display_hvar_metrics(hvar: Option<&HvarMetrics>, conf: &Config) -> TokenStream {
+        let Some(hvar) = hvar else {
+            return TokenStream::empty();
+        };
+
+        let heading = toks(format!(
+            "HVAR: version {}",
+            format_version_major_minor(hvar.major_version, hvar.minor_version)
+        ));
+        if conf.verbosity.is_at_least(cli::VerboseLevel::Detailed) {
+            heading.glue(
+                LineBreak,
+                TokenStream::join_with(
+                    vec![
+                        display_item_variation_store(&hvar.item_variation_store, conf),
+                        display_opt_dsim("Advance-Width", &hvar.advance_width_mapping, conf),
+                        display_opt_dsim("Left-Side-Bearing", &hvar.lsb_mapping, conf),
+                        display_opt_dsim("Right-Side-Bearing", &hvar.rsb_mapping, conf),
+                    ],
+                    LineBreak,
+                )
+                .indent_by(SECTION_INDENT),
+            )
+        } else {
+            heading
+        }
+    }
+
+    fn display_opt_dsim(
+        label: &'static str,
+        opt_dsim: &Option<DeltaSetIndexMap>,
+        conf: &Config,
+    ) -> TokenStream {
+        let msg = toks(format!("{label} mapping:"));
+        match opt_dsim {
+            None => TokenStream::join_with(vec![msg, toks("<glyphIndex>")], tok(" ")),
+            Some(dsim) => msg.glue(LineBreak, display_delta_set_index_map(dsim, conf)),
+        }
+    }
+
+    fn display_delta_set_index_map(dsim: &DeltaSetIndexMap, conf: &Config) -> TokenStream {
+        let count = dsim.map_count as usize;
+        let iter = dsim.map_data.iter();
+
+        display_iter_elided(
+            iter,
+            count,
+            |ix, (outer, inner)| {
+                tok(format!("[{ix}]: ")).then(toks(format!("ItemVariationData[{outer}][{inner}]")))
+            },
+            conf.bookend_size,
+            |start, stop| {
+                toks(format!("(skipping entries {}..{})", start, stop)).indent_by(ELISION_DELTA)
+            },
+        )
+        .indent_by(FLAT_ITEM_INDENT)
+    }
+}
+
 use gvar::display_gvar_metrics;
 mod gvar {
     use super::*;
 
-    // FIXME - rewrite into pure TokenStream
-    pub(super) fn display_gvar_metrics(
-        gvar: Option<&GvarMetrics>,
-        conf: &Config,
-    ) -> TokenStream<'static> {
+    pub(super) fn display_gvar_metrics(gvar: Option<&GvarMetrics>, conf: &Config) -> TokenStream {
         let Some(gvar) = gvar else {
             return TokenStream::empty();
         };
@@ -384,9 +435,6 @@ mod gvar {
             format_version_major_minor(gvar.major_version, gvar.minor_version)
         ));
         if conf.verbosity.is_at_least(cli::VerboseLevel::Detailed) {
-            // NOTE - Signed difference in indentation levels (measured in half-tabs) between each table field and its multiline contents
-            const ADVANCE: i8 = 1;
-
             heading.glue(
                 LineBreak,
                 TokenStream::join_with(
@@ -395,17 +443,17 @@ mod gvar {
                             "Shared Tuples ({} total):",
                             gvar.shared_tuples.len()
                         )),
-                        display_shared_tuples(&gvar.shared_tuples).indent_by(ADVANCE),
+                        display_shared_tuples(&gvar.shared_tuples).indent_by(ITEM_INDENT),
                         toks(format!(
                             "Glyph Variation Data ({} glyphs):",
                             gvar.glyph_variation_data_array.len()
                         )),
                         display_glyph_variation_data_array(&gvar.glyph_variation_data_array)
-                            .indent_by(ADVANCE),
+                            .indent_by(ITEM_INDENT),
                     ],
                     LineBreak,
                 )
-                .indent_by(1),
+                .indent_by(SECTION_INDENT),
             )
         } else {
             heading.chain(toks(format!(
@@ -417,7 +465,7 @@ mod gvar {
     }
 
     /// Tokenizer for GVAR `GvarTupleVariationHeader` (inline)
-    fn display_tuple_variation_header(header: &GvarTupleVariationHeader) -> TokenStream<'static> {
+    fn display_tuple_variation_header(header: &GvarTupleVariationHeader) -> TokenStream {
         toks(format!(
             "Header (size: {} bytes)",
             header.variation_data_size
@@ -429,7 +477,7 @@ mod gvar {
     ///
     /// When there is only one tuple variation header (or none), we continue to display it inline.
     /// When there are multiple tuple variation headers, a linebreak is inserted before displaying them in a multiline fashion.
-    fn display_glyph_variation_data(table: &GlyphVariationData) -> TokenStream<'static> {
+    fn display_glyph_variation_data(table: &GlyphVariationData) -> TokenStream {
         let headers = match &table.tuple_variation_headers[..] {
             [] => {
                 error!(
@@ -441,9 +489,6 @@ mod gvar {
             headers => {
                 // FIXME[epic=magic] - arbitrary local bookending const
                 const LOCAL_BOOKEND: usize = 4;
-
-                const ITEM_ADVANCE: i8 = 1;
-                const ELISION_DELTA: i8 = -1;
 
                 let headers_str = arrayfmt::display_items_elided(
                     headers,
@@ -458,7 +503,7 @@ mod gvar {
                         .indent_by(ELISION_DELTA)
                     },
                 )
-                .indent_by(ITEM_ADVANCE);
+                .indent_by(ITEM_INDENT);
                 LineBreak.then(headers_str)
             }
         };
@@ -467,9 +512,7 @@ mod gvar {
     }
 
     /// Tokenizer for arrays of GlyphVariationData (multiline)
-    fn display_glyph_variation_data_array(
-        array: &[Option<GlyphVariationData>],
-    ) -> TokenStream<'static> {
+    fn display_glyph_variation_data_array(array: &[Option<GlyphVariationData>]) -> TokenStream {
         // FIXME[epic=magic-const] - arbitrary local bookending const
         const TABLE_BOOKEND: usize = 4;
 
@@ -481,14 +524,14 @@ mod gvar {
                 toks(format!(
                     "(skipping {n} glyph variation data tables between indices {start}..{stop})"
                 ))
-                .indent_by(-1)
+                .indent_by(ELISION_DELTA)
             },
         )
-        .indent_by(1)
+        .indent_by(ITEM_INDENT)
     }
 
     /// Tokenizer for GVAR shared tuple records (inline)
-    fn display_shared_tuple_record(tuple: &GvarTupleRecord) -> TokenStream<'static> {
+    fn display_shared_tuple_record(tuple: &GvarTupleRecord) -> TokenStream {
         const COORD_BOOKEND: usize = 4;
         arrayfmt::display_items_inline(
             &tuple.coordinates,
@@ -498,7 +541,7 @@ mod gvar {
         )
     }
 
-    fn display_shared_tuples(shared_tuples: &[GvarTupleRecord]) -> TokenStream<'static> {
+    fn display_shared_tuples(shared_tuples: &[GvarTupleRecord]) -> TokenStream {
         // FIXME[epic=magic-const] - arbitrary local bookending const
         const RECORDS_BOOKEND: usize = 4;
 
@@ -508,7 +551,9 @@ mod gvar {
                 toks(format!("[{shared_tuple_ix}]: ")).chain(display_shared_tuple_record(record))
             },
             RECORDS_BOOKEND,
-            |start, stop| toks(format!("(skipping shared tuples {start}..{stop})")).indent_by(-1),
+            |start, stop| {
+                toks(format!("(skipping shared tuples {start}..{stop})")).indent_by(ELISION_DELTA)
+            },
         )
     }
 }
@@ -520,7 +565,7 @@ mod fvar {
     pub(super) fn display_fvar_metrics(
         fvar: Option<&FvarMetrics>,
         conf: &cli::Config,
-    ) -> TokenStream<'static> {
+    ) -> TokenStream {
         let Some(fvar) = fvar else {
             return TokenStream::empty();
         };
@@ -539,7 +584,7 @@ mod fvar {
                             |ix, axis| {
                                 tok(format!("[{ix}]: "))
                                     .then(display_variation_axis_record(axis))
-                                    .indent_by(1)
+                                    .indent_by(ITEM_INDENT)
                             },
                             conf.bookend_size,
                             |start, stop| toks(format!("(skipping axis records {start}..{stop})")),
@@ -553,7 +598,7 @@ mod fvar {
                             |ix, instance| {
                                 tok(format!("[{ix}]: "))
                                     .then(display_instance_record(instance, conf))
-                                    .indent_by(1)
+                                    .indent_by(ITEM_INDENT)
                             },
                             conf.bookend_size,
                             |start, stop| {
@@ -561,7 +606,7 @@ mod fvar {
                             },
                         ),
                     )
-                    .indent_by(1),
+                    .indent_by(SECTION_INDENT),
             )
         } else {
             tok(format!(
@@ -576,11 +621,8 @@ mod fvar {
         }
     }
 
-    fn display_instance_record(
-        instance: &InstanceRecord,
-        conf: &cli::Config,
-    ) -> TokenStream<'static> {
-        // FIXME - rewrite into more natively TokenStream-oriented production
+    fn display_instance_record(instance: &InstanceRecord, conf: &cli::Config) -> TokenStream {
+        // FIXME[epic=tokenstream-refactor] - rewrite into more natively TokenStream-oriented production
         tok(format!(
             "Subfamily={:?};{} ",
             instance.subfamily_nameid,
@@ -597,7 +639,7 @@ mod fvar {
         ))
     }
 
-    fn display_variation_axis_record(axis: &VariationAxisRecord) -> TokenStream<'static> {
+    fn display_variation_axis_record(axis: &VariationAxisRecord) -> TokenStream {
         // TODO - rewrite in more natural TokenStream style
         toks(format!(
             "'{}' axis: [{}, {}] (default: {}){}{:?}",
@@ -615,33 +657,161 @@ mod fvar {
     }
 }
 
-// FIXME - rewrite into pure TokenStream
-fn show_cvt_metrics(cvt: &Option<CvtMetrics>, _conf: &cli::Config) {
+fn display_cvt_metrics(cvt: &Option<CvtMetrics>, _conf: &cli::Config) -> TokenStream {
     let Some(RawArrayMetrics(count)) = cvt else {
-        return;
+        return TokenStream::empty();
     };
-
-    println!("cvt: FWORD[{count}]")
+    toks(format!("cvt: FWORD[{count}]"))
 }
 
-// FIXME - rewrite into pure TokenStream
-fn show_fpgm_metrics(fpgm: &Option<FpgmMetrics>, _conf: &cli::Config) {
-    if let Some(RawArrayMetrics(count)) = fpgm {
-        println!("fpgm: uint8[{count}]")
+fn display_fpgm_metrics(fpgm: &Option<FpgmMetrics>, _conf: &cli::Config) -> TokenStream {
+    let Some(RawArrayMetrics(count)) = fpgm else {
+        return TokenStream::empty();
+    };
+    toks(format!("fpgm: uint8[{count}]"))
+}
+
+fn display_prep_metrics(prep: &Option<PrepMetrics>, _conf: &cli::Config) -> TokenStream {
+    let Some(RawArrayMetrics(count)) = prep else {
+        return TokenStream::empty();
+    };
+    toks(format!("prep: uint8[{count}]"))
+}
+
+fn display_loca_metrics(loca: &Option<LocaMetrics>, _conf: &cli::Config) -> TokenStream {
+    let Some(()) = loca else {
+        return TokenStream::empty();
+    };
+    toks("loca: (details omitted)")
+}
+
+use common::display_item_variation_store;
+pub(crate) mod common {
+    use super::*;
+
+    pub(crate) fn display_item_variation_store(
+        ivs: &ItemVariationStore,
+        conf: &cli::Config,
+    ) -> TokenStream {
+        toks("ItemVariationStore:").glue(
+            LineBreak,
+            display_variation_regions(&ivs.variation_region_list, conf).glue(
+                LineBreak,
+                display_variation_data_array(&ivs.item_variation_data_list, conf),
+            ),
+        )
     }
-}
 
-// FIXME - rewrite into pure TokenStream
-fn show_prep_metrics(prep: &Option<PrepMetrics>, _conf: &cli::Config) {
-    if let Some(RawArrayMetrics(count)) = prep {
-        println!("prep: uint8[{count}]")
+    fn display_variation_regions(vrl: &VariationRegionList, conf: &cli::Config) -> TokenStream {
+        toks(format!(
+            "VariationRegions: {} regions ({} axes)",
+            vrl.0.len(),
+            vrl.0[0].len()
+        ))
+        .glue(
+            LineBreak,
+            arrayfmt::display_items_elided(
+                &vrl.0,
+                |ix, per_region| {
+                    toks(format!("[{ix}]:"))
+                        .glue(LineBreak, display_variation_axes(per_region, conf))
+                        .indent_by(ITEM_INDENT)
+                },
+                conf.bookend_size,
+                |start_ix, end_ix| toks(format!("(skipping regions {start_ix}..{end_ix})")),
+            ),
+        )
+        .indent_by(ITEM_INDENT)
     }
-}
 
-// FIXME - rewrite into pure TokenStream
-fn show_loca_metrics(loca: &Option<LocaMetrics>, _conf: &cli::Config) {
-    if let Some(()) = loca {
-        println!("loca: (details omitted)")
+    /// Tokenizer for arrays of ItemVariationData (multiline)
+    fn display_variation_data_array(
+        ivda: &[Option<ItemVariationData>],
+        conf: &cli::Config,
+    ) -> TokenStream {
+        toks(format!("ItemVariationData[{}]", ivda.len())).glue(
+            LineBreak,
+            arrayfmt::display_items_elided(
+                ivda,
+                |ix, o_ivd| match o_ivd {
+                    Some(ivd) => tok(format!("[{ix}]: ")).then(display_variation_data(ivd, conf)),
+                    None => toks(format!("[{ix}]: <NONE>")),
+                },
+                conf.bookend_size,
+                |start_ix, stop_ix| {
+                    toks(format!("...(skipping entries {start_ix}..{stop_ix})..."))
+                        .indent_by(ELISION_DELTA)
+                },
+            )
+            .indent_by(FLAT_ITEM_INDENT),
+        )
+    }
+    fn display_variation_data(ivd: &ItemVariationData, conf: &cli::Config) -> TokenStream {
+        let full_bits = if ivd.long_words { 32 } else { 16 };
+
+        toks("ItemVariationData:").glue(
+            LineBreak,
+            toks(format!("{} region indices: ", ivd.region_index_count))
+                .chain(arrayfmt::display_items_inline(
+                    &ivd.region_indices,
+                    |ix| toks(format!("{ix}")),
+                    conf.inline_bookend,
+                    |n_skipped| toks(format!("..({n_skipped})..")),
+                ))
+                .glue(
+                    LineBreak,
+                    toks(format!(
+                        "{} delta-sets ({} full [{}-bit], {} half [{}-bit]): ",
+                        ivd.item_count,
+                        ivd.word_count,
+                        full_bits,
+                        ivd.region_index_count - ivd.word_count,
+                        full_bits >> 1
+                    ))
+                    .glue(LineBreak, display_delta_sets(&ivd.delta_sets, conf)),
+                )
+                .indent_by(ITEM_INDENT),
+        )
+    }
+
+    fn display_variation_axes(
+        per_region: &[RegionAxisCoordinates],
+        conf: &cli::Config,
+    ) -> TokenStream {
+        TokenStream::join_with(
+            vec![
+                arrayfmt::display_table_column_horiz(
+                    " start |",
+                    per_region,
+                    |coords| toks(format!("{:.03}", coords.start_coord)),
+                    conf.inline_bookend,
+                    |n_skipped| toks(format!("..{n_skipped:02}..")),
+                ),
+                arrayfmt::display_table_column_horiz(
+                    "  peak |",
+                    per_region,
+                    |coords| toks(format!("{:.03}", coords.peak_coord)),
+                    conf.inline_bookend,
+                    |n_skipped| toks(format!("..{n_skipped:02}..")),
+                ),
+                arrayfmt::display_table_column_horiz(
+                    "   end |",
+                    per_region,
+                    |coords| toks(format!("{:.03}", coords.end_coord)),
+                    conf.inline_bookend,
+                    |n_skipped| toks(format!("..{n_skipped:02}..")),
+                ),
+            ],
+            LineBreak,
+        )
+        .indent_by(FLAT_ITEM_INDENT)
+    }
+
+    /// Tokenizer for DeltaSets (inline).
+    // FIXME[epic=scaffolding] - scaffolding-only implementation
+    fn display_delta_sets(_sets: &DeltaSets, _conf: &cli::Config) -> TokenStream {
+        // TODO - figure out what we actually want to show
+        toks(format!("<display_delta_sets: incomplete>"))
     }
 }
 
@@ -653,7 +823,7 @@ mod gdef {
     pub(super) fn display_gdef_metrics(
         gdef: Option<&GdefMetrics>,
         conf: &cli::Config,
-    ) -> TokenStream<'static> {
+    ) -> TokenStream {
         let Some(GdefMetrics {
             major_version,
             minor_version,
@@ -696,13 +866,13 @@ mod gdef {
 
             heading.glue(
                 LineBreak,
-                TokenStream::join_with(components, LineBreak).indent_by(1),
+                TokenStream::join_with(components, LineBreak).indent_by(SECTION_INDENT),
             )
         } else {
             heading
         }
     }
-    fn display_attach_point(point_indices: &[u16], conf: &cli::Config) -> TokenStream<'static> {
+    fn display_attach_point(point_indices: &[u16], conf: &cli::Config) -> TokenStream {
         arrayfmt::display_items_inline(
             point_indices,
             |point_ix| toks(u16::to_string(point_ix)),
@@ -712,7 +882,7 @@ mod gdef {
     }
 
     /// Tokenizer for `AttachList` (multiline)
-    fn display_attach_list(attach_list: &AttachList, conf: &cli::Config) -> TokenStream<'static> {
+    fn display_attach_list(attach_list: &AttachList, conf: &cli::Config) -> TokenStream {
         toks("AttachList:").glue(
             LineBreak,
             TokenStream::join_with(
@@ -722,21 +892,18 @@ mod gdef {
                 ],
                 LineBreak,
             )
-            .indent_by(1),
+            .indent_by(ITEM_INDENT),
         )
     }
 
     /// Tokenizer for arrays of AttachPoints (multiline)
-    fn display_attach_point_array(
-        array: &[AttachPoint],
-        conf: &cli::Config,
-    ) -> TokenStream<'static> {
+    fn display_attach_point_array(array: &[AttachPoint], conf: &cli::Config) -> TokenStream {
         arrayfmt::display_items_elided(
             array,
             |ix, AttachPoint { point_indices }| {
                 toks(format!("[{ix}]: "))
                     .chain(display_attach_point(point_indices, conf))
-                    .indent_by(1)
+                    .indent_by(ITEM_INDENT)
             },
             conf.bookend_size,
             |start, stop| {
@@ -748,10 +915,7 @@ mod gdef {
     }
 
     /// Tokenizer for `LigCaretList` (multiline)
-    fn display_lig_caret_list(
-        lig_caret_list: &LigCaretList,
-        conf: &cli::Config,
-    ) -> TokenStream<'static> {
+    fn display_lig_caret_list(lig_caret_list: &LigCaretList, conf: &cli::Config) -> TokenStream {
         toks("LigCaretList:").glue(
             LineBreak,
             TokenStream::join_with(
@@ -761,12 +925,12 @@ mod gdef {
                 ],
                 LineBreak,
             )
-            .indent_by(1),
+            .indent_by(ITEM_INDENT),
         )
     }
 
     /// Tokenizer for arrays of LigGlyphs (multiline)
-    fn display_lig_glyph_array(array: &[LigGlyph], conf: &cli::Config) -> TokenStream<'static> {
+    fn display_lig_glyph_array(array: &[LigGlyph], conf: &cli::Config) -> TokenStream {
         arrayfmt::display_items_elided(
             array,
             |ix, lig_glyph| {
@@ -777,7 +941,7 @@ mod gdef {
                         conf.inline_bookend,
                         |num_skipped| toks(format!("...({num_skipped})...")),
                     ))
-                    .indent_by(1)
+                    .indent_by(ITEM_INDENT)
             },
             conf.bookend_size,
             |start, stop| toks(format!("(skipping LigGlyphs {start}..{stop})")),
@@ -788,34 +952,35 @@ mod gdef {
     fn display_mark_attach_class_def(
         mark_attach_class_def: &ClassDef,
         conf: &cli::Config,
-    ) -> TokenStream<'static> {
+    ) -> TokenStream {
         toks("MarkAttachClassDef:").glue(
             LineBreak,
-            display_class_def(mark_attach_class_def, display_mark_attach_class, conf).indent_by(1),
+            display_class_def(mark_attach_class_def, display_mark_attach_class, conf)
+                .indent_by(ITEM_INDENT),
         )
     }
 
     /// Tokenizer for GDEF glyph `ClassDef` (multiline)
-    fn display_glyph_class_def(class_def: &ClassDef, conf: &cli::Config) -> TokenStream<'static> {
+    fn display_glyph_class_def(class_def: &ClassDef, conf: &cli::Config) -> TokenStream {
         toks("GlyphClassDef:").glue(
             LineBreak,
-            display_class_def(class_def, display_glyph_class, conf).indent_by(1),
+            display_class_def(class_def, display_glyph_class, conf).indent_by(ITEM_INDENT),
         )
     }
 
     /// Tokenizer for MarkAttachClass (Uint16) values (inline)
-    fn display_mark_attach_class(mark_attach_class: &u16) -> TokenStream<'static> {
+    fn display_mark_attach_class(mark_attach_class: &u16) -> TokenStream {
         // TODO - if we come up with a semantic association for specific numbers, add branches here
         toks(format!("{mark_attach_class}"))
     }
 
     /// Tokenizer for GlyphClass (Uint16) values (inline)
-    fn display_glyph_class(class: &u16) -> TokenStream<'static> {
+    fn display_glyph_class(class: &u16) -> TokenStream {
         // REVIEW - consider replacing with semantically distinguished const-enum and matching on that instead of raw numbers
         toks(format_glyph_class(class))
     }
 
-    fn display_mark_glyph_set(mgs: &MarkGlyphSet, conf: &cli::Config) -> TokenStream<'static> {
+    fn display_mark_glyph_set(mgs: &MarkGlyphSet, conf: &cli::Config) -> TokenStream {
         toks("MarkGlyphSet:").glue(
             LineBreak,
             arrayfmt::display_items_elided(
@@ -827,16 +992,16 @@ mod gdef {
                             tok(format!("[{ix}]: ")).then(display_coverage_table_full(covt, conf))
                         }
                     })
-                    .indent_by(1)
+                    .indent_by(ITEM_INDENT)
                 },
                 conf.bookend_size,
                 |start, stop| toks(format!("(skipping coverage tables {start}..{stop})")),
             )
-            .indent_by(1),
+            .indent_by(ITEM_INDENT),
         )
     }
 
-    fn display_caret_value(cv: &Option<CaretValue>) -> TokenStream<'static> {
+    fn display_caret_value(cv: &Option<CaretValue>) -> TokenStream {
         match cv {
             None => unreachable!("caret value null link"),
             Some(cv) => match cv {
@@ -851,137 +1016,10 @@ mod gdef {
             },
         }
     }
-
-    fn display_item_variation_store(
-        ivs: &ItemVariationStore,
-        conf: &cli::Config,
-    ) -> TokenStream<'static> {
-        toks("ItemVariationStore:").glue(
-            LineBreak,
-            display_variation_regions(&ivs.variation_region_list, conf).glue(
-                LineBreak,
-                display_variation_data_array(&ivs.item_variation_data_list, conf),
-            ),
-        )
-    }
-
-    fn display_variation_regions(
-        vrl: &VariationRegionList,
-        conf: &cli::Config,
-    ) -> TokenStream<'static> {
-        toks(format!(
-            "VariationRegions: {} regions ({} axes)",
-            vrl.0.len(),
-            vrl.0[0].len()
-        ))
-        .glue(
-            LineBreak,
-            arrayfmt::display_items_elided(
-                &vrl.0,
-                |ix, per_region| {
-                    toks(format!("[{ix}]:"))
-                        .glue(LineBreak, display_variation_axes(per_region, conf))
-                        .indent_by(1)
-                },
-                conf.bookend_size,
-                |start_ix, end_ix| toks(format!("(skipping regions {start_ix}..{end_ix})")),
-            ),
-        )
-        .indent_by(1)
-    }
-
-    /// Tokenizer for arrays of ItemVariationData (multiline)
-    fn display_variation_data_array(
-        ivda: &[Option<ItemVariationData>],
-        conf: &cli::Config,
-    ) -> TokenStream<'static> {
-        toks(format!("ItemVariationData[{}]", ivda.len())).glue(
-            LineBreak,
-            arrayfmt::display_items_elided(
-                ivda,
-                |ix, o_ivd| match o_ivd {
-                    Some(ivd) => tok(format!("[{ix}]: ")).then(display_variation_data(ivd, conf)),
-                    None => toks(format!("[{ix}]: <NONE>")),
-                },
-                conf.bookend_size,
-                |start_ix, stop_ix| {
-                    toks(format!("...(skipping entries {start_ix}..{stop_ix})...")).indent_by(-1)
-                },
-            )
-            .indent_by(2),
-        )
-    }
-    fn display_variation_data(ivd: &ItemVariationData, conf: &cli::Config) -> TokenStream<'static> {
-        let full_bits = if ivd.long_words { 32 } else { 16 };
-
-        toks("ItemVariationData:").glue(
-            LineBreak,
-            toks(format!("{} region indices: ", ivd.region_index_count))
-                .chain(arrayfmt::display_items_inline(
-                    &ivd.region_indices,
-                    |ix| toks(format!("{ix}")),
-                    conf.inline_bookend,
-                    |n_skipped| toks(format!("..({n_skipped})..")),
-                ))
-                .glue(
-                    LineBreak,
-                    toks(format!(
-                        "{} delta-sets ({} full [{}-bit], {} half [{}-bit]): ",
-                        ivd.item_count,
-                        ivd.word_count,
-                        full_bits,
-                        ivd.region_index_count - ivd.word_count,
-                        full_bits >> 1
-                    ))
-                    .glue(LineBreak, display_delta_sets(&ivd.delta_sets, conf)),
-                )
-                .indent_by(1),
-        )
-    }
-
-    /// Tokenizer for DeltaSets (inline).
-    // STUB - scaffolding-only implementation
-    fn display_delta_sets(_sets: &DeltaSets, _conf: &cli::Config) -> TokenStream<'static> {
-        // STUB - figure out what we actually want to show
-        toks(format!("<display_delta_sets: incomplete>"))
-    }
-
-    fn display_variation_axes(
-        per_region: &[RegionAxisCoordinates],
-        conf: &cli::Config,
-    ) -> TokenStream<'static> {
-        TokenStream::join_with(
-            vec![
-                arrayfmt::display_table_column_horiz(
-                    " start |",
-                    per_region,
-                    |coords| toks(format!("{:.03}", coords.start_coord)),
-                    conf.inline_bookend,
-                    |n_skipped| toks(format!("..{n_skipped:02}..")),
-                ),
-                arrayfmt::display_table_column_horiz(
-                    "  peak |",
-                    per_region,
-                    |coords| toks(format!("{:.03}", coords.peak_coord)),
-                    conf.inline_bookend,
-                    |n_skipped| toks(format!("..{n_skipped:02}..")),
-                ),
-                arrayfmt::display_table_column_horiz(
-                    "   end |",
-                    per_region,
-                    |coords| toks(format!("{:.03}", coords.end_coord)),
-                    conf.inline_bookend,
-                    |n_skipped| toks(format!("..{n_skipped:02}..")),
-                ),
-            ],
-            LineBreak,
-        )
-        .indent_by(2)
-    }
 }
 
 /// Tokenizer for `BaseMetrics` (inline)
-fn display_base_metrics(base: &Option<BaseMetrics>, _conf: &cli::Config) -> TokenStream<'static> {
+fn display_base_metrics(base: &Option<BaseMetrics>, _conf: &cli::Config) -> TokenStream {
     if let Some(BaseMetrics {
         major_version,
         minor_version,
@@ -1006,7 +1044,7 @@ mod layout {
         layout: Option<&LayoutMetrics>,
         ctxt: Ctxt,
         conf: &cli::Config,
-    ) -> TokenStream<'static> {
+    ) -> TokenStream {
         let Some(LayoutMetrics {
             major_version,
             minor_version,
@@ -1034,7 +1072,7 @@ mod layout {
                     ],
                     LineBreak,
                 )
-                .indent_by(2),
+                .indent_by(SECTION_INDENT),
             )
         } else {
             minimal
@@ -1050,7 +1088,7 @@ mod layout {
     }
 
     // TODO - convert to tokenstream producer
-    fn display_script_list(script_list: &ScriptList, conf: &cli::Config) -> TokenStream<'static> {
+    fn display_script_list(script_list: &ScriptList, conf: &cli::Config) -> TokenStream {
         if script_list.is_empty() {
             toks("ScriptList [empty]")
         } else {
@@ -1061,20 +1099,17 @@ mod layout {
                     |ix, item| display_script_record(ix, item, conf),
                     conf.bookend_size,
                     |start, stop| {
-                        toks(format!("skipping ScriptRecords {start}..{stop}")).indent_by(-1)
+                        toks(format!("skipping ScriptRecords {start}..{stop}"))
+                            .indent_by(ELISION_DELTA)
                     },
                 )
-                .indent_by(2),
+                .indent_by(ITEM_INDENT),
             )
         }
     }
 
     /// Tokenizer for ScriptRecord (multiline)
-    fn display_script_record(
-        ix: usize,
-        item: &ScriptRecord,
-        conf: &cli::Config,
-    ) -> TokenStream<'static> {
+    fn display_script_record(ix: usize, item: &ScriptRecord, conf: &cli::Config) -> TokenStream {
         let Some(ScriptTable {
             default_lang_sys,
             lang_sys_records,
@@ -1090,7 +1125,7 @@ mod layout {
             langsys @ Some(..) => toks("[Default LangSys]: ")
                 .chain(display_langsys(langsys, conf))
                 .glue(LineBreak, display_lang_sys_records(lang_sys_records, conf))
-                .indent_by(1),
+                .indent_by(ITEM_INDENT),
         };
 
         ix_display.glue(LineBreak, extra)
@@ -1100,7 +1135,7 @@ mod layout {
     fn display_lang_sys_records(
         lang_sys_records: &[LangSysRecord],
         conf: &cli::Config,
-    ) -> TokenStream<'static> {
+    ) -> TokenStream {
         if lang_sys_records.is_empty() {
             toks("LangSysRecords: <empty list>")
         } else {
@@ -1114,10 +1149,11 @@ mod layout {
                     },
                     conf.bookend_size,
                     |start, stop| {
-                        toks(format!("(skipping LangSysRecords {start}..{stop})")).indent_by(-1)
+                        toks(format!("(skipping LangSysRecords {start}..{stop})"))
+                            .indent_by(ELISION_DELTA)
                     },
                 )
-                .indent_by(2),
+                .indent_by(ITEM_INDENT),
             )
         }
     }
@@ -1127,7 +1163,7 @@ mod layout {
     /// # Panics
     ///
     /// Will panic if `lang_sys` is `None`.
-    fn display_langsys(lang_sys: &Option<LangSys>, conf: &cli::Config) -> TokenStream<'static> {
+    fn display_langsys(lang_sys: &Option<LangSys>, conf: &cli::Config) -> TokenStream {
         let Some(LangSys {
             lookup_order_offset,
             required_feature_index,
@@ -1149,10 +1185,7 @@ mod layout {
         ))
     }
 
-    fn display_feature_list(
-        feature_list: &FeatureList,
-        conf: &cli::Config,
-    ) -> TokenStream<'static> {
+    fn display_feature_list(feature_list: &FeatureList, conf: &cli::Config) -> TokenStream {
         if feature_list.is_empty() {
             toks("FeatureList [empty]")
         } else {
@@ -1170,16 +1203,17 @@ mod layout {
                     },
                     conf.bookend_size,
                     |start, stop| {
-                        toks(format!("(skipping FeatureIndices {start}..{stop})")).indent_by(-1)
+                        toks(format!("(skipping FeatureIndices {start}..{stop})"))
+                            .indent_by(ELISION_DELTA)
                     },
                 )
-                .indent_by(2),
+                .indent_by(ITEM_INDENT),
             )
         }
     }
 
     /// Tokenizer for FeatureTable (inline)
-    fn display_feature_table(table: &FeatureTable, conf: &cli::Config) -> TokenStream<'static> {
+    fn display_feature_table(table: &FeatureTable, conf: &cli::Config) -> TokenStream {
         let FeatureTable {
             feature_params,
             lookup_list_indices,
@@ -1202,7 +1236,7 @@ mod layout {
         lookup_list: &LookupList,
         ctxt: Ctxt,
         conf: &cli::Config,
-    ) -> TokenStream<'static> {
+    ) -> TokenStream {
         toks("LookupList:").glue(
             LineBreak,
             arrayfmt::display_items_elided(
@@ -1212,19 +1246,16 @@ mod layout {
                 },
                 conf.bookend_size,
                 |start, stop| {
-                    toks(format!("(skipping LookupTables {start}..{stop})")).indent_by(-1)
+                    toks(format!("(skipping LookupTables {start}..{stop})"))
+                        .indent_by(ELISION_DELTA)
                 },
             )
-            .indent_by(2),
+            .indent_by(ITEM_INDENT),
         )
     }
 
     /// Tokenizer for `LookupTable` (inline).
-    fn display_lookup_table(
-        table: &LookupTable,
-        ctxt: Ctxt,
-        conf: &cli::Config,
-    ) -> TokenStream<'static> {
+    fn display_lookup_table(table: &LookupTable, ctxt: Ctxt, conf: &cli::Config) -> TokenStream {
         // NOTE - because we print the kind of the lookup here, we don't need to list it for every element
         // LINK[format-lookup-subtable] -  (see display_lookup_subtable below)
         let mut stream = tok(format!(
@@ -1256,7 +1287,7 @@ mod layout {
         subtable: &LookupSubtable,
         show_lookup_type: bool,
         conf: &cli::Config,
-    ) -> TokenStream<'static> {
+    ) -> TokenStream {
         let (label, contents) = match subtable {
             LookupSubtable::SinglePos(single_pos) => ("SinglePos", display_single_pos(single_pos)),
             LookupSubtable::PairPos(pair_pos) => ("PairPos", display_pair_pos(pair_pos)),
@@ -1305,7 +1336,7 @@ mod layout {
         }
     }
 
-    fn display_chained_rule<Sem: SemDisplay>(rule: &ChainedRule<Sem>) -> TokenStream<'static> {
+    fn display_chained_rule<Sem: SemDisplay>(rule: &ChainedRule<Sem>) -> TokenStream {
         // FIXME[epic=magic-const] - arbitrary local bookending const
         const THIS_BOOKEND: usize = 1;
         let backtrack = if rule.backtrack_sequence.is_empty() {
@@ -1338,7 +1369,7 @@ mod layout {
     fn display_chained_rule_set<Sem: SemDisplay>(
         glyph: u16,
         set: &ChainedRuleSet<Sem>,
-    ) -> TokenStream<'static> {
+    ) -> TokenStream {
         // FIXME[epic=magic-const] - arbitrary local bookending const
         const THIS_BOOKEND: usize = 1;
         tok(format!("{{{}=>", format_glyphid_hex(glyph, true)))
@@ -1354,7 +1385,7 @@ mod layout {
     fn display_chained_sequence_context(
         chain_ctx: &ChainedSequenceContext,
         _conf: &cli::Config,
-    ) -> TokenStream<'static> {
+    ) -> TokenStream {
         // REVIEW - since we are already within an inline elision context, try to avoid taking up too much space per item, but this might not want to be a hardcoded value
         // FIXME - show_lookup_table calls this function through display_items_inline already, so we might want to reduce how many values we are willing to show proportionally
         // TODO - move into conf and potentially revise how bookending is determined (e.g. dynamic array, closure)
@@ -1437,10 +1468,7 @@ mod layout {
         }
     }
 
-    fn display_single_subst(
-        single_subst: &SingleSubst,
-        conf: &cli::Config,
-    ) -> TokenStream<'static> {
+    fn display_single_subst(single_subst: &SingleSubst, conf: &cli::Config) -> TokenStream {
         match single_subst {
             SingleSubst::Format1(SingleSubstFormat1 {
                 coverage,
@@ -1472,7 +1500,7 @@ mod layout {
         }
     }
 
-    fn display_multi_subst(multi_subst: &MultipleSubst) -> TokenStream<'static> {
+    fn display_multi_subst(multi_subst: &MultipleSubst) -> TokenStream {
         display_coverage_table_overview(&multi_subst.coverage)
             // REVIEW - is this the right balance of specificity and brevity?
             .chain(toks(format!(
@@ -1481,18 +1509,16 @@ mod layout {
             )))
     }
 
-    fn display_alt_subst(alt_subst: &AlternateSubst) -> TokenStream<'static> {
+    fn display_alt_subst(alt_subst: &AlternateSubst) -> TokenStream {
         display_coverage_table_overview(&alt_subst.coverage)
             .glue(tok("=>"), display_alternate_sets(&alt_subst.alternate_sets))
     }
 
-    fn display_ligature_subst(lig_subst: &LigatureSubst) -> TokenStream<'static> {
+    fn display_ligature_subst(lig_subst: &LigatureSubst) -> TokenStream {
         display_ligature_sets(&lig_subst.ligature_sets, lig_subst.coverage.iter())
     }
 
-    fn display_reverse_chain_single_subst(
-        rcs_subst: &ReverseChainSingleSubst,
-    ) -> TokenStream<'static> {
+    fn display_reverse_chain_single_subst(rcs_subst: &ReverseChainSingleSubst) -> TokenStream {
         // REVIEW - since we are already within an inline elision context, try to avoid taking up too much space per item, but this might not want to be a hardcoded value
         // FIXME - show_lookup_table calls this function through display_items_inline already, so we might want to reduce how many values we are willing to show proportionally
         const INLINE_INLINE_BOOKEND: usize = 1;
@@ -1528,7 +1554,7 @@ mod layout {
             .chain(toks(format!("=>{substitute_ids}")))
     }
 
-    fn display_sequence_context(seq_ctx: &SequenceContext) -> TokenStream<'static> {
+    fn display_sequence_context(seq_ctx: &SequenceContext) -> TokenStream {
         match seq_ctx {
             SequenceContext::Format1(SequenceContextFormat1 { coverage, .. }) => tok("Glyphs")
                 .then(TokenStream::paren(display_coverage_table_overview(
@@ -1563,7 +1589,7 @@ mod layout {
         }
     }
 
-    fn display_single_pos(single_pos: &SinglePos) -> TokenStream<'static> {
+    fn display_single_pos(single_pos: &SinglePos) -> TokenStream {
         match single_pos {
             SinglePos::Format1(SinglePosFormat1 { value_record, .. }) => {
                 tok("single").then(TokenStream::paren(display_value_record(value_record)))
@@ -1574,7 +1600,7 @@ mod layout {
         }
     }
 
-    fn display_pair_pos(pair_pos: &PairPos) -> TokenStream<'static> {
+    fn display_pair_pos(pair_pos: &PairPos) -> TokenStream {
         match pair_pos {
             PairPos::Format1(PairPosFormat1 { coverage, .. }) => {
                 tok("byGlyph").then(display_coverage_table_overview(coverage).paren())
@@ -1620,14 +1646,14 @@ mod layout {
         }
     }
 
-    fn display_cursive_pos(cursive_pos: &CursivePos) -> TokenStream<'static> {
+    fn display_cursive_pos(cursive_pos: &CursivePos) -> TokenStream {
         tok("entryExit").then(TokenStream::paren(display_coverage_table_overview(
             &cursive_pos.coverage,
         )))
         // STUB - display EntryExit-record array
     }
 
-    fn display_mark_base_pos(mb_pos: &MarkBasePos) -> TokenStream<'static> {
+    fn display_mark_base_pos(mb_pos: &MarkBasePos) -> TokenStream {
         let lhs = {
             let mark_lhs = tok("Mark").then(TokenStream::paren(display_coverage_table_overview(
                 &mb_pos.mark_coverage,
@@ -1656,7 +1682,7 @@ mod layout {
         lhs.glue(tok("=>"), rhs)
     }
 
-    fn display_mark_lig_pos(ml_pos: &MarkLigPos) -> TokenStream<'static> {
+    fn display_mark_lig_pos(ml_pos: &MarkLigPos) -> TokenStream {
         let lhs = {
             let mark_lhs = tok("Mark").then(TokenStream::paren(display_coverage_table_overview(
                 &ml_pos.mark_coverage,
@@ -1685,7 +1711,7 @@ mod layout {
         lhs.glue(tok("=>"), rhs)
     }
 
-    fn display_mark_mark_pos(mm_pos: &MarkMarkPos) -> TokenStream<'static> {
+    fn display_mark_mark_pos(mm_pos: &MarkMarkPos) -> TokenStream {
         let lhs = {
             let mark_lhs = tok("Mark").then(TokenStream::paren(display_coverage_table_overview(
                 &mm_pos.mark1_coverage,
@@ -1716,7 +1742,7 @@ mod layout {
     fn display_ligature_sets(
         lig_sets: &[LigatureSet],
         mut coverage: impl Iterator<Item = u16>,
-    ) -> TokenStream<'static> {
+    ) -> TokenStream {
         match lig_sets {
             [set] => display_ligature_set(set, coverage.next().expect("missing coverage")),
             more => {
@@ -1733,7 +1759,7 @@ mod layout {
             }
         }
     }
-    fn display_ligature_set(lig_set: &LigatureSet, cov: u16) -> TokenStream<'static> {
+    fn display_ligature_set(lig_set: &LigatureSet, cov: u16) -> TokenStream {
         // FIXME[epic=magic] - arbitrary local bookending const
         const LIG_BOOKEND: usize = 2;
 
@@ -1745,14 +1771,14 @@ mod layout {
         )
     }
 
-    fn display_ligature(lig: &Ligature, cov: u16) -> TokenStream<'static> {
+    fn display_ligature(lig: &Ligature, cov: u16) -> TokenStream {
         toks(format!(
             "(#{cov:04x}.{} => {})",
             &lig.component_glyph_ids, lig.ligature_glyph,
         ))
     }
 
-    fn display_alternate_sets(alt_sets: &[AlternateSet]) -> TokenStream<'static> {
+    fn display_alternate_sets(alt_sets: &[AlternateSet]) -> TokenStream {
         debug_assert!(
             !alt_sets.is_empty(),
             "unexpected empty AlternateSet-array in display_alternate_sets"
@@ -1772,7 +1798,7 @@ mod layout {
     }
 
     /// Tokenizer for `AlternateSubst->AlternateSet` (inline)
-    fn display_alternate_set(alt_set: &AlternateSet) -> TokenStream<'static> {
+    fn display_alternate_set(alt_set: &AlternateSet) -> TokenStream {
         const ALT_GLYPH_BOOKEND: usize = 2;
         arrayfmt::display_items_inline(
             &alt_set.alternate_glyph_ids,
@@ -1782,7 +1808,7 @@ mod layout {
         )
     }
 
-    fn display_sequence_lookup(sl: &SequenceLookup) -> TokenStream<'static> {
+    fn display_sequence_lookup(sl: &SequenceLookup) -> TokenStream {
         let s_ix = sl.sequence_index;
         let ll_ix = sl.lookup_list_index;
         // NOTE - the number in `\[_\]` is meant to mimic the index display of the display_items_elided formatting of LookupList, so it is the lookup index. The number after `@` is the positional index to apply the lookup to
@@ -1792,8 +1818,8 @@ mod layout {
     fn display_mark2_array(
         arr: &Mark2Array,
         coverage: &mut impl Iterator<Item = u16>,
-    ) -> TokenStream<'static> {
-        fn display_mark2_record(mark2_record: &Mark2Record, cov: u16) -> TokenStream<'static> {
+    ) -> TokenStream {
+        fn display_mark2_record(mark2_record: &Mark2Record, cov: u16) -> TokenStream {
             const CLASS_ANCHORS: usize = 2;
 
             tok(format!("{}: ", format_glyphid_hex(cov, true),)).then(
@@ -1824,14 +1850,9 @@ mod layout {
     fn display_ligature_array(
         ligature_array: &LigatureArray,
         coverage: &mut impl Iterator<Item = u16>,
-    ) -> TokenStream<'static> {
-        fn display_ligature_attach(
-            ligature_attach: &LigatureAttach,
-            cov: u16,
-        ) -> TokenStream<'static> {
-            fn display_component_record(
-                component_record: &ComponentRecord,
-            ) -> TokenStream<'static> {
+    ) -> TokenStream {
+        fn display_ligature_attach(ligature_attach: &LigatureAttach, cov: u16) -> TokenStream {
+            fn display_component_record(component_record: &ComponentRecord) -> TokenStream {
                 const CLASS_ANCHOR_BOOKEND: usize = 2;
                 arrayfmt::display_inline_nullable(
                     &component_record.ligature_anchors,
@@ -1866,8 +1887,8 @@ mod layout {
     fn display_base_array(
         base_array: &BaseArray,
         coverage: &mut impl Iterator<Item = u16>,
-    ) -> TokenStream<'static> {
-        fn display_base_record(base_record: &BaseRecord, cov: u16) -> TokenStream<'static> {
+    ) -> TokenStream {
+        fn display_base_record(base_record: &BaseRecord, cov: u16) -> TokenStream {
             const CLASS_ANCHOR_BOOKEND: usize = 2;
             tok(format!("{cov:04x}: ")).then(arrayfmt::display_inline_nullable(
                 &base_record.base_anchors,
@@ -1896,8 +1917,8 @@ mod layout {
     fn display_mark_array(
         mark_array: &MarkArray,
         coverage: &mut impl Iterator<Item = u16>,
-    ) -> TokenStream<'static> {
-        fn display_mark_record(mark_record: &MarkRecord, cov: u16) -> TokenStream<'static> {
+    ) -> TokenStream {
+        fn display_mark_record(mark_record: &MarkRecord, cov: u16) -> TokenStream {
             tok(format!("{cov:04x}=({}, ", mark_record.mark_class,)).then(
                 display_anchor_table(mark_record.mark_anchor.as_ref().expect("broken link"))
                     .chain(toks(")")),
@@ -1916,7 +1937,7 @@ mod layout {
         )
     }
 
-    fn display_anchor_table(anchor: &AnchorTable) -> TokenStream<'static> {
+    fn display_anchor_table(anchor: &AnchorTable) -> TokenStream {
         match anchor {
             AnchorTable::Format1(AnchorTableFormat1 {
                 x_coordinate,
@@ -1934,7 +1955,7 @@ mod layout {
             }) => {
                 let extra = {
                     let tokenize =
-                        |opt_table: &Option<DeviceOrVariationIndexTable>| -> TokenStream<'static> {
+                        |opt_table: &Option<DeviceOrVariationIndexTable>| -> TokenStream {
                             opt_table
                                 .as_ref()
                                 .map_or(toks("ⅈ"), display_device_or_variation_index_table)
@@ -1957,7 +1978,7 @@ mod layout {
     }
 
     /// Raw tokenizer for displaying a `LookupFlag` value (inline).
-    fn display_lookup_flag(flags: &LookupFlag) -> TokenStream<'static> {
+    fn display_lookup_flag(flags: &LookupFlag) -> TokenStream {
         let mut set_flags = Vec::new();
         if flags.right_to_left {
             set_flags.push(toks("RIGHT_TO_LEFT"));
@@ -1997,7 +2018,7 @@ mod layout {
     ///
     /// Otherwise, includes a prefix that separates the displayed content from the previous field and indicates that
     /// a flag-value is being displayed.
-    fn display_lookup_flags(flags: &LookupFlag) -> TokenStream<'static> {
+    fn display_lookup_flags(flags: &LookupFlag) -> TokenStream {
         if flags.mark_attachment_class_filter != 0
             || flags.right_to_left
             || flags.ignore_ligatures
@@ -2044,7 +2065,7 @@ mod layout {
     ///
     /// If both are `None`, returns `None`.
     /// Otherwise, returns an unambiguous display of all non-None values.
-    fn display_opt_xy<T>(what: &str, x: Option<T>, y: Option<T>) -> Option<TokenStream<'static>>
+    fn display_opt_xy<T>(what: &str, x: Option<T>, y: Option<T>) -> Option<TokenStream>
     where
         T: std::fmt::Display,
     {
@@ -2058,7 +2079,7 @@ mod layout {
     }
 
     /// Tokenizer for ValueRecord (inline).
-    fn display_value_record(record: &ValueRecord) -> TokenStream<'static> {
+    fn display_value_record(record: &ValueRecord) -> TokenStream {
         let ValueRecord {
             x_placement,
             y_placement,
@@ -2099,63 +2120,69 @@ mod layout {
     }
 }
 
-use stat::show_stat_metrics;
+use stat::display_stat_metrics;
 mod stat {
     use super::*;
 
-    // FIXME - refactor into pure TokenStream
-    pub(crate) fn show_stat_metrics(stat: Option<&StatMetrics>, conf: &cli::Config) {
-        if let Some(stat) = stat {
-            println!(
-                "STAT: version {} (elidedFallbackName: name[id={}])",
-                format_version_major_minor(stat.major_version, stat.minor_version),
-                stat.elided_fallback_name_id.0
-            );
-            if conf.verbosity.is_at_least(cli::VerboseLevel::Detailed) {
-                match stat.design_axes.len() {
-                    0 => (),
-                    n => {
-                        // FIXME - promote to first-class tokenstream
-                        println!("\tDesignAxes: {n} total");
-                        arrayfmt::display_items_elided(
-                            &stat.design_axes,
-                            |ix, d_axis| {
-                                tok(format!("\t\t[{ix}]: ")).then(display_design_axis(d_axis, conf))
-                            },
-                            conf.bookend_size,
-                            |start, stop| {
-                                toks(format!(
-                                    "\t(skipping design-axes from index {start}..{stop})"
-                                ))
-                            },
-                        )
-                        .println()
-                    }
-                }
-                match stat.axis_values.len() {
-                    0 => (),
-                    n => {
-                        println!("\tAxisValues: {n} total");
-                        arrayfmt::display_items_elided(
-                            &stat.axis_values,
-                            |ix, a_value| {
-                                tok(format!("\t\t[{ix}]: ")).then(display_axis_value(a_value, conf))
-                            },
-                            conf.bookend_size,
-                            |start, stop| {
-                                toks(format!(
-                                    "\t(skipping design-axes from index {start}..{stop})"
-                                ))
-                            },
-                        )
-                        .println()
-                    }
-                }
-            }
+    pub(crate) fn display_stat_metrics(
+        stat: Option<&StatMetrics>,
+        conf: &cli::Config,
+    ) -> TokenStream {
+        let Some(stat) = stat else {
+            return TokenStream::empty();
+        };
+        let header = toks(format!(
+            "STAT: version {} (elidedFallbackName: name[id={}])",
+            format_version_major_minor(stat.major_version, stat.minor_version),
+            stat.elided_fallback_name_id.0,
+        ));
+        if !conf.verbosity.is_at_least(cli::VerboseLevel::Detailed) {
+            return header;
         }
+        header.glue(
+            LineBreak,
+            TokenStream::join_with(
+                vec![
+                    match stat.design_axes.len() {
+                        0 => TokenStream::empty(),
+                        n => toks(format!("DesignAxes: {n} total")),
+                    },
+                    arrayfmt::display_items_elided(
+                        &stat.design_axes,
+                        |ix, d_axis| {
+                            tok(format!("[{ix}]: ")).then(display_design_axis(d_axis, conf))
+                        },
+                        conf.bookend_size,
+                        |start, stop| {
+                            toks(format!("(skipping design-axes {start}..{stop})"))
+                                .indent_by(ELISION_DELTA)
+                        },
+                    )
+                    .indent_by(ITEM_INDENT),
+                    match stat.axis_values.len() {
+                        0 => TokenStream::empty(),
+                        n => toks(format!("AxisValues: {n} total")),
+                    },
+                    arrayfmt::display_items_elided(
+                        &stat.axis_values,
+                        |ix, a_value| {
+                            tok(format!("[{ix}]: ")).then(display_axis_value(a_value, conf))
+                        },
+                        conf.bookend_size,
+                        |start, stop| {
+                            toks(format!("(skipping axis-values {start}..{stop})"))
+                                .indent_by(ELISION_DELTA)
+                        },
+                    )
+                    .indent_by(ITEM_INDENT),
+                ],
+                LineBreak,
+            )
+            .indent_by(SECTION_INDENT),
+        )
     }
 
-    fn display_design_axis(axis: &DesignAxis, _conf: &cli::Config) -> TokenStream<'static> {
+    fn display_design_axis(axis: &DesignAxis, _conf: &cli::Config) -> TokenStream {
         toks(format!(
             "Tag={} ; Axis NameID={} ; Ordering={}",
             axis.axis_tag, axis.axis_name_id.0, axis.axis_ordering
@@ -2179,7 +2206,7 @@ mod stat {
         }
     }
 
-    fn display_axis_value(value: &AxisValue, conf: &cli::Config) -> TokenStream<'static> {
+    fn display_axis_value(value: &AxisValue, conf: &cli::Config) -> TokenStream {
         match value {
             AxisValue::Format1(AxisValueFormat1 {
                 axis_index,
@@ -2255,7 +2282,7 @@ mod kern {
     pub(super) fn display_kern_metrics(
         kern: &Option<KernMetrics>,
         conf: &cli::Config,
-    ) -> TokenStream<'static> {
+    ) -> TokenStream {
         let Some(kern) = kern else {
             return TokenStream::empty();
         };
@@ -2272,10 +2299,11 @@ mod kern {
                     },
                     conf.bookend_size,
                     |start, stop| {
-                        toks(format!("(skipping kern subtables {start}..{stop})")).indent_by(-1)
+                        toks(format!("(skipping kern subtables {start}..{stop})"))
+                            .indent_by(ELISION_DELTA)
                     },
                 )
-                .indent_by(2),
+                .indent_by(FLAT_ITEM_INDENT),
             )
         } else {
             heading
@@ -2304,7 +2332,7 @@ mod kern {
     }
 
     /// Tokenizer for KerningArray (multiline).
-    fn display_kerning_array(array: &KerningArray, conf: &cli::Config) -> TokenStream<'static> {
+    fn display_kerning_array(array: &KerningArray, conf: &cli::Config) -> TokenStream {
         arrayfmt::display_wec_rows_elided(
             &array.0,
             |ix, row| {
@@ -2317,17 +2345,15 @@ mod kern {
             },
             conf.bookend_size / 2, // FIXME - magic constant adjustment
             |start, stop| {
-                toks(format!("(skipping kerning array rows {start}..{stop})")).indent_by(-1)
+                toks(format!("(skipping kerning array rows {start}..{stop})"))
+                    .indent_by(ELISION_DELTA)
             },
         )
-        .indent_by(1)
+        .indent_by(ITEM_INDENT)
     }
 
     /// Tokenizer for KernClassTable (inline).
-    fn display_kern_class_table(
-        table: &KernClassTable,
-        conf: &cli::Config,
-    ) -> TokenStream<'static> {
+    fn display_kern_class_table(table: &KernClassTable, conf: &cli::Config) -> TokenStream {
         tok(format!(
             "Classes[first={}, nGlyphs={}]: ",
             format_glyphid_hex(table.first_glyph, true),
@@ -2345,7 +2371,7 @@ mod kern {
     fn display_kern_subtable_data(
         subtable_data: &KernSubtableData,
         conf: &cli::Config,
-    ) -> TokenStream<'static> {
+    ) -> TokenStream {
         match subtable_data {
             KernSubtableData::Format0(KernSubtableFormat0 { kern_pairs }) => {
                 arrayfmt::display_items_inline(
@@ -2372,14 +2398,14 @@ mod kern {
                 let right = tok("RightClass=").then(display_kern_class_table(right_class, conf));
                 let kern = toks("KerningArray:").glue(
                     LineBreak,
-                    display_kerning_array(kerning_array, conf).indent_by(1),
+                    display_kerning_array(kerning_array, conf).indent_by(ITEM_INDENT),
                 );
                 left.glue(tok("\t"), right).glue(tok("\t"), kern)
             }
         }
     }
 
-    fn display_kern_subtable(subtable: &KernSubtable, conf: &cli::Config) -> TokenStream<'static> {
+    fn display_kern_subtable(subtable: &KernSubtable, conf: &cli::Config) -> TokenStream {
         tok(format!(
             "KernSubtable ({}): ",
             format_kern_flags(subtable.flags)
@@ -2391,9 +2417,9 @@ mod kern {
 /// Tokenizer for ClassDef tables (multi-line)
 fn display_class_def(
     class_def: &ClassDef,
-    show_fn: impl Fn(&u16) -> TokenStream<'static>,
+    show_fn: impl Fn(&u16) -> TokenStream,
     conf: &cli::Config,
-) -> TokenStream<'static> {
+) -> TokenStream {
     match *class_def {
         ClassDef::Format1 {
             start_glyph_id,
@@ -2418,11 +2444,14 @@ fn display_class_def(
                         format_glyphid_hex(start_glyph_id + start as u16, false),
                         format_glyphid_hex(start_glyph_id + stop as u16, false),
                     ))
-                    .indent_by(-1)
+                    .indent_by(ELISION_DELTA)
                 },
             )
-            .indent_by(1);
-            TokenStream::join_with(vec![toks_init, toks_array.indent_by(1)], LineBreak)
+            .indent_by(ITEM_INDENT);
+            TokenStream::join_with(
+                vec![toks_init, toks_array.indent_by(ITEM_INDENT)],
+                LineBreak,
+            )
         }
         ClassDef::Format2 {
             ref class_range_records,
@@ -2443,17 +2472,15 @@ fn display_class_def(
                 toks(format!(
                     "(skipping ranges covering glyphs {low_end}..={high_end})",
                 ))
-                .indent_by(-1)
+                .indent_by(ELISION_DELTA)
             },
         )
-        .indent_by(2),
+        .indent_by(FLAT_ITEM_INDENT),
     }
 }
 
 /// Tokenizer for `DeviceOrVariationIndexTable` (inline)
-fn display_device_or_variation_index_table(
-    table: &DeviceOrVariationIndexTable,
-) -> TokenStream<'static> {
+fn display_device_or_variation_index_table(table: &DeviceOrVariationIndexTable) -> TokenStream {
     match table {
         DeviceOrVariationIndexTable::Device(dev_table) => display_device_table(dev_table),
         DeviceOrVariationIndexTable::VariationIndex(var_ix_table) => {
@@ -2466,13 +2493,13 @@ fn display_device_or_variation_index_table(
 }
 
 /// Tokenizer for `DeviceTable` (inline)
-fn display_device_table(dev_table: &DeviceTable) -> TokenStream<'static> {
+fn display_device_table(dev_table: &DeviceTable) -> TokenStream {
     // NOTE - in the callstacks where this function is called, horizontal space economy is at an ultra-premium so we don't show the actual deltas in the current implementation
     toks(format!("{}..{}", dev_table.start_size, dev_table.end_size))
 }
 
 /// Tokenizer for `VariationIndexTable` (inline)
-fn display_variation_index_table(var_ix_table: &VariationIndexTable) -> TokenStream<'static> {
+fn display_variation_index_table(var_ix_table: &VariationIndexTable) -> TokenStream {
     toks(format!(
         "{}->{}",
         var_ix_table.delta_set_outer_index, var_ix_table.delta_set_inner_index
@@ -2554,7 +2581,7 @@ fn format_glyphid_array_hex(glyphs: &impl AsRef<[u16]>, include_prefix: bool) ->
 ///
 /// In all other cases, the display only shows the total number of covered glyphs (and, for Format2, glyph-ranges)
 /// and the overall span of glyphIds covered (from the first covered glyphId to the last covered glyphId, inclusive).
-fn display_coverage_table_overview(cov: &CoverageTable) -> TokenStream<'static> {
+fn display_coverage_table_overview(cov: &CoverageTable) -> TokenStream {
     match cov {
         CoverageTable::Format1 { glyph_array } => {
             let num_glyphs = glyph_array.len();
@@ -2591,7 +2618,7 @@ fn display_coverage_table_overview(cov: &CoverageTable) -> TokenStream<'static> 
 /// The number of glyphs or glyph-ranges explicitly shown at the beginning and end of the coverage is determined by the Config-specified bookending value (`inline_bookend`).
 ///
 /// As the output of this function will almost always be more verbose than that of `display_coverage_table_overview`, it is suitable only for contexts where space is less constrained and a more detailed picture of the coverage is preferred.
-fn display_coverage_table_full(cov: &CoverageTable, conf: &cli::Config) -> TokenStream<'static> {
+fn display_coverage_table_full(cov: &CoverageTable, conf: &cli::Config) -> TokenStream {
     match cov {
         CoverageTable::Format1 { glyph_array } => {
             tok("Glyphs Covered: ").then(arrayfmt::display_items_inline(
@@ -2612,7 +2639,7 @@ fn display_coverage_table_full(cov: &CoverageTable, conf: &cli::Config) -> Token
     }
 }
 
-fn display_coverage_range_record(coverage_range: &CoverageRangeRecord) -> TokenStream<'static> {
+fn display_coverage_range_record(coverage_range: &CoverageRangeRecord) -> TokenStream {
     let span = coverage_range.end_glyph_id - coverage_range.start_glyph_id;
     let end_coverage_index = coverage_range.value + span;
     toks(format!(
@@ -2631,7 +2658,7 @@ mod gasp {
     pub(crate) fn display_gasp_metrics(
         gasp: &Option<GaspMetrics>,
         conf: &cli::Config,
-    ) -> TokenStream<'static> {
+    ) -> TokenStream {
         if let Some(GaspMetrics {
             version,
             num_ranges,
@@ -2652,7 +2679,7 @@ mod gasp {
                                 ranges[start].range_max_ppem,
                                 ranges[stop - 1].range_max_ppem
                             ))
-                            .indent_by(1)
+                            .indent_by(ITEM_INDENT)
                         },
                     ),
                 )
@@ -2664,7 +2691,7 @@ mod gasp {
         }
     }
 
-    fn display_gasp_range(range_index: usize, range: &GaspRange) -> TokenStream<'static> {
+    fn display_gasp_range(range_index: usize, range: &GaspRange) -> TokenStream {
         let GaspBehaviorFlags {
             symmetric_smoothing: syms,
             symmetric_gridfit: symgrift,
@@ -2706,7 +2733,7 @@ mod gasp {
         } else {
             Token::then(tok(format!("[PPEM <= {}]  ", range.range_max_ppem)), disp)
         }
-        .indent_by(2)
+        .indent_by(FLAT_ITEM_INDENT)
     }
 }
 
@@ -2726,7 +2753,7 @@ mod cmap {
 
     use super::*;
 
-    pub(crate) fn display_cmap_metrics(cmap: &Cmap, conf: &cli::Config) -> TokenStream<'static> {
+    pub(crate) fn display_cmap_metrics(cmap: &Cmap, conf: &cli::Config) -> TokenStream {
         let heading = toks(format!("cmap: version {}", cmap.version));
 
         if conf.verbosity.is_at_least(cli::VerboseLevel::Detailed) {
@@ -2737,10 +2764,11 @@ mod cmap {
                     display_encoding_record,
                     conf.bookend_size,
                     |start, stop| {
-                        toks(format!("(skipping encoding records {start}..{stop})")).indent_by(-1)
+                        toks(format!("(skipping encoding records {start}..{stop})"))
+                            .indent_by(ELISION_DELTA)
                     },
                 )
-                .indent_by(2),
+                .indent_by(FLAT_ITEM_INDENT),
             )
         } else {
             heading.chain(toks(format!(
@@ -2751,7 +2779,7 @@ mod cmap {
     }
 
     /// Tokenizer for an indexed `EncodingRecord` (inline).
-    fn display_encoding_record(ix: usize, record: &EncodingRecord) -> TokenStream<'static> {
+    fn display_encoding_record(ix: usize, record: &EncodingRecord) -> TokenStream {
         // TODO[epic=enrichment]: if we implement subtables and more verbosity levels, show subtable details
         let EncodingRecord {
             platform,
@@ -2762,43 +2790,38 @@ mod cmap {
     }
 }
 
-// FIXME - Refactor into pure TokenStream
-fn show_head_metrics(head: &HeadMetrics, _conf: &cli::Config) {
-    println!(
+fn display_head_metrics(head: &HeadMetrics, _conf: &cli::Config) -> TokenStream {
+    toks(format!(
         "head: version {}, {}",
         format_version_major_minor(head.major_version, head.minor_version),
         head.dir_hint,
-    );
+    ))
 }
 
-// FIXME - Refactor into pure TokenStream
-fn show_hhea_metrics(hhea: &HheaMetrics, _conf: &cli::Config) {
-    println!(
+fn display_hhea_metrics(hhea: &HheaMetrics, _conf: &cli::Config) -> TokenStream {
+    toks(format!(
         "hhea: table version {}, {} horizontal long metrics",
         format_version_major_minor(hhea.major_version, hhea.minor_version),
         hhea.num_lhm,
-    );
+    ))
 }
 
-// FIXME - Refactor into pure TokenStream
-fn show_vhea_metrics(vhea: &Option<VheaMetrics>, _conf: &cli::Config) {
-    if let Some(vhea) = vhea {
-        println!(
-            "vhea: table version {}, {} vertical long metrics",
-            format_version_major_minor(vhea.major_version, vhea.minor_version),
-            vhea.num_lvm,
-        )
-    }
+fn display_vhea_metrics(vhea: &Option<VheaMetrics>, _conf: &cli::Config) -> TokenStream {
+    let Some(vhea) = vhea else {
+        return TokenStream::empty();
+    };
+    toks(format!(
+        "vhea: table version {}, {} vertical long metrics",
+        format_version_major_minor(vhea.major_version, vhea.minor_version),
+        vhea.num_lvm,
+    ))
 }
 
 use hmtx::display_hmtx_metrics;
 mod hmtx {
     use super::*;
 
-    pub(crate) fn display_hmtx_metrics(
-        hmtx: &HmtxMetrics,
-        conf: &cli::Config,
-    ) -> TokenStream<'static> {
+    pub(crate) fn display_hmtx_metrics(hmtx: &HmtxMetrics, conf: &cli::Config) -> TokenStream {
         if conf.verbosity.is_at_least(cli::VerboseLevel::Detailed) {
             toks("hmtx:").glue(
                 LineBreak,
@@ -2807,16 +2830,17 @@ mod hmtx {
                     display_unified_bearing,
                     conf.bookend_size,
                     |start, stop| {
-                        toks(format!("(skipping hmetrics {start}..{stop})")).indent_by(-1)
+                        toks(format!("(skipping hmetrics {start}..{stop})"))
+                            .indent_by(ELISION_DELTA)
                     },
                 )
-                .indent_by(2),
+                .indent_by(FLAT_ITEM_INDENT),
             )
         } else {
             toks(format!("hmtx: {} hmetrics", hmtx.0.len()))
         }
     }
-    fn display_unified_bearing(ix: usize, hmet: &UnifiedBearing) -> TokenStream<'static> {
+    fn display_unified_bearing(ix: usize, hmet: &UnifiedBearing) -> TokenStream {
         match &hmet.advance_width {
             Some(width) => toks(format!(
                 "Glyph ID [{ix}]: advanceWidth={width}, lsb={}",
@@ -2835,7 +2859,7 @@ mod vmtx {
     pub(crate) fn display_vmtx_metrics(
         vmtx: &Option<VmtxMetrics>,
         conf: &cli::Config,
-    ) -> TokenStream<'static> {
+    ) -> TokenStream {
         let Some(vmtx) = vmtx else {
             return TokenStream::empty();
         };
@@ -2850,10 +2874,11 @@ mod vmtx {
                     display_unified_bearing,
                     conf.bookend_size,
                     |start, stop| {
-                        toks(format!("(skipping vmetrics {start}..{stop})")).indent_by(-1)
+                        toks(format!("(skipping vmetrics {start}..{stop})"))
+                            .indent_by(ELISION_DELTA)
                     },
                 )
-                .indent_by(2),
+                .indent_by(FLAT_ITEM_INDENT),
             )
         } else {
             heading
@@ -2861,7 +2886,7 @@ mod vmtx {
     }
 
     /// Tokenizer for a `vmtx` UnifiedBearing (inline)
-    fn display_unified_bearing(ix: usize, vmet: &UnifiedBearing) -> TokenStream<'static> {
+    fn display_unified_bearing(ix: usize, vmet: &UnifiedBearing) -> TokenStream {
         // FIXME - `_width` is a misnomer, should be `_height`
         match &vmet.advance_width {
             Some(height) => toks(format!(
@@ -2874,7 +2899,7 @@ mod vmtx {
     }
 }
 
-fn display_maxp_metrics(maxp: &MaxpMetrics, _conf: &cli::Config) -> TokenStream<'static> {
+fn display_maxp_metrics(maxp: &MaxpMetrics, _conf: &cli::Config) -> TokenStream {
     match maxp {
         MaxpMetrics::Postscript { version } => toks(format!(
             "maxp: version {} (PostScript)",
@@ -2892,60 +2917,57 @@ fn display_maxp_metrics(maxp: &MaxpMetrics, _conf: &cli::Config) -> TokenStream<
     }
 }
 
-// FIXME - rewrite into pure TokenStream
-fn show_name_metrics(name: &NameMetrics, conf: &cli::Config) {
+fn display_name_metrics(name: &NameMetrics, conf: &cli::Config) -> TokenStream {
     // STUB - add more details if appropriate
-    match &name.lang_tag_records {
-        Some(records) => {
-            println!(
-                "name: version {}, {} name_records, {} language tag records",
-                name.version,
-                name.name_count,
-                records.len()
-            );
-        }
-        None => println!(
+    let header = match &name.lang_tag_records {
+        Some(records) => toks(format!(
+            "name: version {}, {} name_records, {} language tag records",
+            name.version,
+            name.name_count,
+            records.len()
+        )),
+        None => toks(format!(
             "name: version {}, {} name_records",
             name.version, name.name_count
-        ),
-    }
+        )),
+    };
     if conf.verbosity.is_at_least(cli::VerboseLevel::Baseline) {
-        let mut missing_name = true;
-        for record in name.name_records.iter() {
-            match record {
-                &NameRecord {
-                    name_id: NameId::FULL_FONT_NAME,
-                    plat_encoding_lang,
-                    ref buf,
-                } => {
-                    if missing_name && plat_encoding_lang.matches_locale(buf, conf.locale) {
-                        println!("\tFull Font Name: {buf}");
-                        missing_name = false;
-                    }
-                }
+        let full_name = name.name_records.iter().find_map(|record| match record {
+            &NameRecord {
+                name_id: NameId::FULL_FONT_NAME,
+                plat_encoding_lang,
+                ref buf,
+            } if plat_encoding_lang.matches_locale(buf, conf.locale) => {
                 // STUB - if there are any more name records we care about, add them here
-                _ => continue,
+                Some(toks(format!("Full Font Name: {buf}")).indent_by(ITEM_INDENT))
             }
+            _ => None,
+        });
+        match full_name {
+            Some(line) => header.glue(LineBreak, line),
+            None => header,
         }
+    } else {
+        header
     }
 }
 
-fn show_os2_metrics(os2: &Os2Metrics, _conf: &cli::Config) {
+fn display_os2_metrics(os2: &Os2Metrics, _conf: &cli::Config) -> TokenStream {
     // TODO - Metrics type is a stub, enrich if anything is 'interesting'
-    println!("os/2: version {}", os2.version);
+    toks(format!("os/2: version {}", os2.version))
 }
 
-fn show_post_metrics(post: &PostMetrics, _conf: &cli::Config) {
+fn display_post_metrics(post: &PostMetrics, _conf: &cli::Config) -> TokenStream {
     // STUB - Metrics is just an alias for the raw type, enrich and refactor if appropriate
-    println!(
+    toks(format!(
         "post: version {} ({})",
         format_version16dot16(post.version),
         if post.is_fixed_pitch {
             "monospaced"
         } else {
             "proportionally spaced"
-        }
-    );
+        },
+    ))
 }
 
 use glyf::display_glyf_metrics;
@@ -2956,7 +2978,7 @@ mod glyf {
     pub(crate) fn display_glyf_metrics(
         glyf: &Option<GlyfMetrics>,
         conf: &cli::Config,
-    ) -> TokenStream<'static> {
+    ) -> TokenStream {
         let Some(glyf) = glyf.as_ref() else {
             return TokenStream::empty();
         };
@@ -2973,7 +2995,7 @@ mod glyf {
         }
     }
 
-    fn display_glyph_metric(ix: usize, glyf: &GlyphMetric) -> TokenStream<'static> {
+    fn display_glyph_metric(ix: usize, glyf: &GlyphMetric) -> TokenStream {
         tok(format!("[{ix}]: "))
             .then(match glyf {
                 GlyphMetric::Empty => toks("<empty>"),
@@ -2986,6 +3008,6 @@ mod glyf {
                     composite.components, composite.instructions, composite.bounding_box,
                 )),
             })
-            .indent_by(1)
+            .indent_by(ITEM_INDENT)
     }
 }

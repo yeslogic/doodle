@@ -9,6 +9,21 @@ use encoding::{
     all::{MAC_ROMAN, UTF_16BE},
 };
 
+/// Helper for providing stable API names for types defined by generated code output.
+///
+/// # Syntax
+///
+/// `alias! { pub type <alias name> = <original name>(<lifetime>)? ; }`
+///
+/// Only the rhs needs a lifetime annotation, as the lhs will inherit it if present.
+///
+/// # Example
+///
+/// For alias-targets with lifetime parameters:
+/// `alias! { pub type Foo = Bar<'a>; }`
+///
+/// For alias-targets without lifetime parameters:
+/// `alias! { pub type Qux = Baz; }`
 #[macro_use]
 mod alias {
     macro_rules! alias {
@@ -186,11 +201,13 @@ pub mod otf_types {
 
         pub type OpentypeGvar = opentype_gvar_table<'a>;
 
-        pub type OpentypeDsig = opentype_dsig<'a>;
+        pub type OpentypeHvar = opentype_hvar_table<'a>;
 
-        pub type OpentypeHdmx = opentype_hdmx<'a>;
+        pub type OpentypeDsig = opentype_dsig_table<'a>;
 
-        pub type OpentypeVdmx = opentype_vdmx<'a>;
+        pub type OpentypeHdmx = opentype_hdmx_table<'a>;
+
+        pub type OpentypeVdmx = opentype_vdmx_table<'a>;
     }
 
     // STUB[epic=horizontal-for-vertical] - change to distinguished type names once we have them
@@ -805,6 +822,29 @@ pub mod obj {
     use super::container::CommonObject;
     use super::{PResult, Parser, View};
 
+    /// Helper for defining proxy-objects to parse from phantom-offsets foundin containers.
+    ///
+    /// # Syntax
+    ///
+    ///  - To merely define a proxy object but generate no boilerplate for it, use:
+    ///
+    /// ```ignore
+    /// proxy!( GenCodeTypeName => MyProxy );
+    /// ```
+    ///
+    /// Which will define a singleton struct named `MyProxy` and bring `super::GenCodeTypeName` into scope.
+    ///
+    /// - To also inherit the same [`CommonObject`] instance from the machine-generated target type, use
+    ///
+    /// ```ignore
+    /// proxy!( GenCodeTypeName = MyProxy );
+    /// ```
+    ///
+    /// or, if the target has a lifetime parameter,
+    ///
+    /// ```ignore
+    /// proxy!( GenCodeTypeName<'lt> = MyProxy );
+    /// ```
     macro_rules! proxy {
         ($real:ident => $proxy:ident) => {
             use super::$real;
@@ -935,10 +975,9 @@ pub mod obj {
     proxy!(OpentypeFeatureVariations<'a> = FeatVar);
     proxy!(OpentypeLangSys = LangSys);
     proxy!(OpentypeFeatureTable<'a> = FeatTable);
-
     proxy!(OpentypeSignatureBlock<'a> = SigBlock);
-
     proxy!(OpentypeVdmxGroup = VdmxGroup);
+    proxy!(OpentypeVarDsim<'a> = Dsim);
 }
 
 mod value_parse {
@@ -1515,6 +1554,205 @@ struct VheaMetrics {
     num_lvm: usize,
 }
 
+pub mod otf_var {
+    alias! {
+        pub type OpentypeVarDsim = opentype_var_delta_set_index_map<'a>;
+    }
+}
+pub use otf_var::*;
+
+pub(crate) mod var_common {
+    use std::ops::RangeInclusive;
+
+    use super::*;
+
+    #[derive(Clone, Debug)]
+    pub struct DeltaSetIndexMap {
+        pub(crate) map_count: u32,
+        pub(crate) map_data: DsimData,
+    }
+
+    impl<'a> Promote<OpentypeVarDsim<'a>> for DeltaSetIndexMap {
+        fn promote(orig: &OpentypeVarDsim<'a>) -> Self {
+            DeltaSetIndexMap {
+                map_count: orig.map_count,
+                map_data: DsimData {
+                    entry_size: orig.entry_size,
+                    inner_index_bits: orig.inner_index_bits,
+                    raw_data: orig.map_data.to_vec(),
+                },
+            }
+        }
+    }
+
+    // REVIEW - this design avoids expanding the data fully in memory, and captures sufficient details to be processed as a standalone object.
+    // REVIEW - do we consider this use-case sufficient to design a custom API for handling N-width entries with arbitrary bit-segmentation into outer-inner index pairs?
+    #[derive(Clone, Debug)]
+    pub struct DsimData {
+        pub(crate) entry_size: u8,
+        pub(crate) inner_index_bits: u8,
+        pub(crate) raw_data: Vec<u8>,
+    }
+
+    impl DsimData {
+        pub fn entry_count(&self) -> u32 {
+            self.raw_data.len() as u32 / self.entry_size as u32
+        }
+
+        pub fn get_entry_raw(&self, index: u32) -> &[u8] {
+            let sz = self.entry_size as usize;
+            let raw_index = index as usize * sz;
+            &self.raw_data[raw_index..raw_index + sz]
+        }
+
+        pub fn get_entry_raw_arr<const N: usize>(&self, index: u32) -> [u8; N] {
+            debug_assert_eq!(N, self.entry_size as usize);
+            self.get_entry_raw(index).try_into().unwrap()
+        }
+
+        /// Random-access for (outer-index, inner-index) pairs
+        pub fn get_entry(&self, index: u32) -> (u16, u16) {
+            let inner_mask = (1u32 << self.inner_index_bits) - 1;
+            match self.entry_size {
+                1 => {
+                    let [b0] = self.get_entry_raw_arr::<1>(index);
+                    let word = b0 as u32;
+                    (
+                        (word >> self.inner_index_bits) as u16,
+                        (word & inner_mask) as u16,
+                    )
+                }
+                2 => {
+                    let raw = self.get_entry_raw_arr::<2>(index);
+                    let word = u16::from_be_bytes(raw) as u32;
+                    (
+                        (word >> self.inner_index_bits) as u16,
+                        (word & inner_mask) as u16,
+                    )
+                }
+                3 => {
+                    let [b0, b1, b2] = self.get_entry_raw_arr::<3>(index);
+                    let word = u32::from_be_bytes([0, b0, b1, b2]);
+                    (
+                        (word >> self.inner_index_bits) as u16,
+                        (word & inner_mask) as u16,
+                    )
+                }
+                4 => {
+                    let raw = self.get_entry_raw_arr::<4>(index);
+                    let word = u32::from_be_bytes(raw);
+                    (
+                        (word >> self.inner_index_bits) as u16,
+                        (word & inner_mask) as u16,
+                    )
+                }
+                _ => unreachable!("DSIM entry size must be 1, 2, 3, or 4"),
+            }
+        }
+
+        pub fn iter(&self) -> impl DoubleEndedIterator + Iterator<Item = (u16, u16)> {
+            self.into_iter()
+        }
+    }
+
+    impl<'a> IntoIterator for &'a DsimData {
+        type Item = (u16, u16);
+
+        type IntoIter = DsimIter<'a>;
+
+        fn into_iter(self) -> Self::IntoIter {
+            DsimIter {
+                rem_range: 0..=(self.entry_count() - 1),
+                dsim: self,
+            }
+        }
+    }
+
+    pub struct DsimIter<'a> {
+        // range representing the unvisited entries, initially `0..=(entry_count - 1)`
+        rem_range: RangeInclusive<u32>,
+        dsim: &'a DsimData,
+    }
+
+    impl<'a> Iterator for DsimIter<'a> {
+        type Item = (u16, u16);
+
+        fn next(&mut self) -> Option<Self::Item> {
+            if let Some(ix) = self.rem_range.next() {
+                Some(self.dsim.get_entry(ix))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl<'a> DoubleEndedIterator for DsimIter<'a> {
+        fn next_back(&mut self) -> Option<Self::Item> {
+            if let Some(ix) = self.rem_range.next_back() {
+                Some(self.dsim.get_entry(ix))
+            } else {
+                None
+            }
+        }
+    }
+}
+pub(crate) use var_common::{DeltaSetIndexMap, DsimData};
+
+pub(crate) mod hvar {
+    use super::*;
+
+    frame!(OpentypeHvar);
+
+    impl<'input> container::SingleContainer<Mandatory<obj::ItemVarStore>> for OpentypeHvar<'input> {
+        fn get_offset(&self) -> usize {
+            self.item_variation_store.offset as usize
+        }
+
+        fn get_args(&self) {}
+    }
+
+    impl<'input> container::MultiContainer<Nullable<obj::Dsim>, 3> for OpentypeHvar<'input> {
+        fn get_offset_array(&self) -> [usize; 3] {
+            [
+                self.advance_width_mapping.offset as usize,
+                self.lsb_mapping.offset as usize,
+                self.rsb_mapping.offset as usize,
+            ]
+        }
+
+        fn get_args_array(&self) -> [(); 3] {
+            [(); 3]
+        }
+    }
+
+    impl<'a> Promote<OpentypeHvar<'a>> for HvarMetrics {
+        fn promote(orig: &OpentypeHvar) -> Self {
+            HvarMetrics {
+                major_version: orig.major_version,
+                minor_version: orig.minor_version,
+                item_variation_store: ItemVariationStore::promote(&reify(
+                    orig,
+                    Mandatory(obj::ItemVarStore),
+                )),
+                advance_width_mapping: promote_opt(&reify_index(orig, Nullable(obj::Dsim), 0)),
+                lsb_mapping: promote_opt(&reify_index(orig, Nullable(obj::Dsim), 1)),
+                rsb_mapping: promote_opt(&reify_index(orig, Nullable(obj::Dsim), 2)),
+            }
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    pub struct HvarMetrics {
+        pub(crate) major_version: u16,
+        pub(crate) minor_version: u16,
+        pub(crate) item_variation_store: ItemVariationStore,
+        pub(crate) advance_width_mapping: Option<DeltaSetIndexMap>,
+        pub(crate) lsb_mapping: Option<DeltaSetIndexMap>,
+        pub(crate) rsb_mapping: Option<DeltaSetIndexMap>,
+    }
+}
+pub(crate) use hvar::HvarMetrics;
+
 pub mod otf_gvar {
     alias! {
         pub type OpentypeGvarSerializedData = opentype_gvar_serialized_data;
@@ -1930,7 +2168,7 @@ pub mod otf_vdmx {
     alias! {
         pub type OpentypeVdmxGroup = opentype_vdmx_group;
         pub type OpentypeVdmxVtable = opentype_vdmx_group_v_table;
-        pub type OpentypeRatioRange = opentype_vdmx_ratio_range;
+        pub type OpentypeRatioRange = opentype_vdmx_table_ratio_range;
     }
 }
 pub use otf_vdmx::*;
@@ -2013,7 +2251,7 @@ pub(crate) mod dsig {
     use super::traits::{Promote, PromoteView, promote_all};
 
     alias! {
-        pub type OpentypeDsigFlags = opentype_dsig_flags;
+        pub type OpentypeDsigFlags = opentype_dsig_table_flags;
     }
 
     frame!(OpentypeDsig);
@@ -3091,6 +3329,7 @@ impl Promote<OpentypeRegionAxisCoordinates> for RegionAxisCoordinates {
 
 pub type OpentypeVariationRegionList = opentype_common_variation_region_list;
 
+// TODO[epic=api-refinement] - replace vec<vec<_>> with Wec<_>
 #[derive(Debug, Clone, Default)]
 struct VariationRegionList(Vec<Vec<RegionAxisCoordinates>>);
 
@@ -3222,7 +3461,7 @@ impl<'a> Promote<OpentypeItemVariationStore<'a>> for ItemVariationStore {
 
 // STUB - this represents the fact that we only record but do not interpret the offset for the ItemVariationStore in the current OpenType implementation
 #[derive(Clone, Debug)]
-struct ItemVariationStore {
+pub(crate) struct ItemVariationStore {
     variation_region_list: VariationRegionList,
     item_variation_data_list: Vec<Option<ItemVariationData>>,
 }
@@ -6964,7 +7203,8 @@ pub struct OptionalTableMetrics {
     gsub: Option<Heap<LayoutMetrics>>,
     // STUB - add more tables as we expand opentype definition
     fvar: Option<Heap<FvarMetrics>>,
-    gvar: Option<Heap<gvar::GvarMetrics>>,
+    gvar: Option<Heap<GvarMetrics>>,
+    hvar: Option<Heap<HvarMetrics>>,
     // STUB - add more tables as we expand opentype definition
     dsig: Option<DsigMetrics>,
     kern: Option<KernMetrics>,
@@ -7071,6 +7311,31 @@ pub fn analyze_font_fast(test_file: &str) -> TestResult<()> {
     // FIXME - temporary hack to check vdmx
     check_font_vdmx(&_tmp);
     Ok(())
+}
+
+fn dir_has_table(dir: &otf_types::OpentypeFontDirectory, tag: u32) -> bool {
+    dir.table_records.iter().any(|r| r.table_id == tag)
+}
+
+pub fn font_has_table(path: &str, tag: u32) -> TestResult<bool> {
+    let buffer = std::fs::read(std::path::Path::new(path))?;
+    let mut input = Parser::new(&buffer);
+    let font = Decoder_opentype_main(&mut input)?;
+    let found = match &font.directory {
+        opentype_main_directory::TTCHeader(multi) => match &multi.header {
+            opentype_ttc_header_header::Version1(v1) => v1
+                .table_directories
+                .iter()
+                .any(|f| f.data.as_ref().map_or(false, |d| dir_has_table(d, tag))),
+            opentype_ttc_header_header::Version2(v2) => v2
+                .table_directories
+                .iter()
+                .any(|f| f.data.as_ref().map_or(false, |d| dir_has_table(d, tag))),
+            opentype_ttc_header_header::UnknownVersion(_) => false,
+        },
+        opentype_main_directory::TableDirectory(dir) => dir_has_table(dir, tag),
+    };
+    Ok(found)
 }
 
 fn check_font_vdmx(font: &opentype_main<'_>) {
@@ -7407,6 +7672,7 @@ pub fn analyze_table_directory(
         };
         let fvar = promote_opt(&dir.table_links.fvar).map(Heap::new);
         let gvar = promote_opt(&dir.table_links.gvar).map(Heap::new);
+        let hvar = promote_opt(&dir.table_links.hvar).map(Heap::new);
         let kern = {
             let kern = &dir.table_links.kern;
             kern.as_ref().map(|kern| KernMetrics {
@@ -7464,6 +7730,7 @@ pub fn analyze_table_directory(
             // TODO - add more variation tables as they are added to the spec
             fvar,
             gvar,
+            hvar,
             // TODO - add more optional tables as they are added to the spec
             dsig,
             kern,
@@ -7656,8 +7923,8 @@ pub mod table {
                 Base | Gdef | Gpos | Gsub => true,
                 Jstf | Math => false,
                 // Variation
-                Fvar | Gvar | Stat => true,
-                Avar | Cvar | Hvar | Mvar | Vvar => false,
+                Fvar | Gvar | Stat | Hvar => true,
+                Avar | Cvar | Mvar | Vvar => false,
                 // Color
                 Colr | Cpal => false,
                 // Extra
@@ -7666,6 +7933,27 @@ pub mod table {
                 Hdmx | Vdmx => true,
                 Ltsh | Merg | Meta | Pclt => false,
             }
+        }
+    }
+
+    impl std::str::FromStr for TableKind {
+        type Err = UnknownValueError<String>;
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            let bytes = s.as_bytes();
+            if bytes.len() > 4 {
+                return Err(UnknownValueError {
+                    what: String::from("TableKind"),
+                    bad_value: s.to_owned(),
+                });
+            }
+            let mut tag = [b' '; 4];
+            tag[..bytes.len()].copy_from_slice(bytes);
+            let val = u32::from_be_bytes(tag);
+            TableKind::try_from(val).map_err(|_| UnknownValueError {
+                what: String::from("TableKind"),
+                bad_value: s.to_owned(),
+            })
         }
     }
 }

@@ -6,7 +6,7 @@ pub fn tok(str: impl Into<doodle::Label>) -> Token {
 /// Converts a `&'static str`, `String`, or `Label` into a `TokenStream`.
 ///
 /// Equivalent to `TokenStream::from(tok(str))`.
-pub fn toks(str: impl Into<doodle::Label>) -> TokenStream<'static> {
+pub fn toks(str: impl Into<doodle::Label>) -> TokenStream {
     TokenStream::from(Token::InlineText(str.into()))
 }
 
@@ -31,8 +31,8 @@ impl std::fmt::Display for Token {
 
 impl Token {
     /// Creates a new `TokenStream` by prepending `self` to `stream`.
-    pub fn then(self, stream: TokenStream<'_>) -> TokenStream<'_> {
-        <Token as Into<TokenStream<'static>>>::into(self).chain(stream)
+    pub fn then(self, stream: TokenStream) -> TokenStream {
+        <Token as Into<TokenStream>>::into(self).chain(stream)
     }
 }
 
@@ -42,7 +42,7 @@ impl From<String> for Token {
     }
 }
 
-impl From<Token> for TokenStream<'static> {
+impl From<Token> for TokenStream {
     fn from(value: Token) -> Self {
         TokenStream {
             inner: Box::new(std::iter::once(value)),
@@ -51,20 +51,20 @@ impl From<Token> for TokenStream<'static> {
 }
 
 #[must_use]
-pub struct TokenStream<'a> {
-    inner: Box<dyn Iterator<Item = Token> + 'a>,
+pub struct TokenStream {
+    inner: Box<dyn Iterator<Item = Token> + 'static>,
 }
 
-impl<'a> TokenStream<'a> {
+impl TokenStream {
     /// Constructs a new empty `TokenStream`.
-    pub fn empty() -> TokenStream<'static> {
+    pub fn empty() -> TokenStream {
         TokenStream {
             inner: Box::new(std::iter::empty()),
         }
     }
 
     /// Creates a new `TokenStream` from a stream of tokens.
-    pub fn from_stream(stream: impl Iterator<Item = Token> + 'a) -> Self {
+    pub fn from_stream(stream: impl Iterator<Item = Token> + 'static) -> Self {
         TokenStream {
             inner: Box::new(stream),
         }
@@ -118,7 +118,7 @@ impl<'a> TokenStream<'a> {
     /// Returns a new `TokenStream` where all co-adjacent inline-text tokens are merged into a single string.
     ///
     /// Implicitly assumes that no newline characters occur within `InlineText` tokens.
-    pub fn group_lines(self) -> TokenStream<'static> {
+    pub fn group_lines(self) -> TokenStream {
         let mut lines = Vec::new();
         let mut line = String::new();
         for token in self.inner {
@@ -173,7 +173,7 @@ impl<'a> TokenStream<'a> {
     }
 
     /// Appends a forced line-break to `self`.
-    pub fn break_line(self) -> TokenStream<'a> {
+    pub fn break_line(self) -> TokenStream {
         TokenStream {
             inner: Box::new(self.inner.chain(std::iter::once(Token::LineBreak))),
         }
@@ -218,7 +218,7 @@ impl<'a> TokenStream<'a> {
     }
 
     /// Joins a stream of streams with a given separator.
-    pub fn join_with(streams: Vec<TokenStream<'static>>, sep: Token) -> TokenStream<'a> {
+    pub fn join_with(streams: Vec<TokenStream>, sep: Token) -> TokenStream {
         TokenStream {
             inner: Box::new(IntersperseIter::new(
                 Box::new(streams.into_iter().map(|s| s.inner)),
@@ -228,16 +228,16 @@ impl<'a> TokenStream<'a> {
     }
 }
 
-pub struct IndentIter<'a> {
+pub struct IndentIter {
     level: Indent,
-    stream: Box<dyn Iterator<Item = Token> + 'a>,
+    stream: Box<dyn Iterator<Item = Token> + 'static>,
     at_line_start: bool,
     // Temporary cache for the next token to be emitted by `stream`, to avoid indenting after the final linebreak in `stream`
     next_token: Option<Token>,
 }
 
-impl<'a> IndentIter<'a> {
-    fn new(level: Indent, stream: Box<dyn Iterator<Item = Token> + 'a>) -> Self {
+impl IndentIter {
+    fn new(level: Indent, stream: Box<dyn Iterator<Item = Token> + 'static>) -> Self {
         Self {
             level,
             stream,
@@ -247,7 +247,7 @@ impl<'a> IndentIter<'a> {
     }
 }
 
-impl<'a> Iterator for IndentIter<'a> {
+impl Iterator for IndentIter {
     type Item = Token;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -297,17 +297,29 @@ impl Indent {
     pub const HT: &str = "    ";
 }
 
-pub struct IntersperseIter<'a, T: Clone> {
-    items: Box<dyn Iterator<Item = Box<dyn Iterator<Item = T> + 'a>>>,
-    rest: Box<dyn Iterator<Item = T> + 'a>,
+pub struct IntersperseIter<T: Clone> {
+    items: Box<dyn Iterator<Item = Box<dyn Iterator<Item = T> + 'static>> + 'static>,
+    rest: Box<dyn Iterator<Item = T> + 'static>,
     sep: T,
     non_empty: bool,
 }
 
-impl<'a, T: 'static + Clone> IntersperseIter<'a, T> {
-    pub fn new(items: Box<dyn Iterator<Item = Box<dyn Iterator<Item = T> + 'a>>>, sep: T) -> Self {
+impl<T: 'static + Clone> IntersperseIter<T> {
+    pub fn new(
+        items: Box<dyn Iterator<Item = Box<dyn Iterator<Item = T> + 'static>> + 'static>,
+        sep: T,
+    ) -> Self {
+        // Pre-filter: skip any segment that yields no items, reconstituting non-empty ones
+        // by prepending their consumed first element. This guarantees every segment seen
+        // by `next()` is non-empty, so separators are never emitted speculatively.
+        let filtered = items.filter_map(|mut iter| {
+            let first = iter.next()?;
+            let reconstituted: Box<dyn Iterator<Item = T> + 'static> =
+                Box::new(std::iter::once(first).chain(iter));
+            Some(reconstituted)
+        });
         Self {
-            items,
+            items: Box::new(filtered),
             rest: Box::new(std::iter::empty()),
             sep,
             non_empty: false,
@@ -315,29 +327,24 @@ impl<'a, T: 'static + Clone> IntersperseIter<'a, T> {
     }
 }
 
-impl<'a, T: Clone> std::iter::Iterator for IntersperseIter<'a, T> {
+impl<T: Clone> std::iter::Iterator for IntersperseIter<T> {
     type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.rest.next() {
             None => match self.items.next() {
-                // Return None iff there are no more tokens in `rest` and no more TokenStreams in `items`
                 None => None,
                 Some(iter) => {
-                    // Once we have run out of tokens in `rest`, we reset `rest` to the next TokenStream in `items`
                     self.rest = iter;
                     if self.non_empty {
-                        // If the previous item (i.e. the full `rest` before depletion) was non-empty, emit the separator and reset to `non_empty = false`
                         self.non_empty = false;
                         Some(self.sep.clone())
                     } else {
-                        // Since the previous `rest` was empty, we skip the separator and recurse the next call to yield the first proper item in our updated `rest`
                         self.next()
                     }
                 }
             },
             Some(item) => {
-                // If at least one item is yielded by `rest`, our current iterator is non-empty and we set `non_empty` to true.
                 self.non_empty = true;
                 Some(item)
             }

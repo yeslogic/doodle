@@ -278,7 +278,7 @@ pub enum EnumLenError<T> {
     TooLong { len: usize, next: T },
 }
 
-impl<T: std::fmt::Display> std::fmt::Display for EnumLenError<T> {
+impl<T: std::fmt::Debug> std::fmt::Display for EnumLenError<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             EnumLenError::TooShort { len, yielded } => write!(
@@ -287,7 +287,7 @@ impl<T: std::fmt::Display> std::fmt::Display for EnumLenError<T> {
             ),
             EnumLenError::TooLong { len, next } => write!(
                 f,
-                "value iterator not fully-consumed (next value: {next}) after yielding all {len} elements requested"
+                "value iterator not fully-consumed (next value: {next:?}) after yielding all {len} elements requested"
             ),
         }
     }
