@@ -1,8 +1,10 @@
 use clap::Parser;
 use doodle_gencode::api_helper::otf_metrics::{
     Config, ConfigBuilder, VerboseLevel, Verbosity, analyze_font, analyze_font_fast,
+    font_has_table,
     lookup_subtable::{analyze_font_lookups, collate_lookups_table},
     output::show_opentype_stats,
+    table::TableKind,
 };
 
 #[derive(Parser)]
@@ -17,6 +19,8 @@ struct Params {
     verbose: u8,
     #[arg(long, short = 'q', conflicts_with = "verbose", default_value_t = false)]
     quiet: bool,
+    #[arg(long, value_name = "TABLE")]
+    scan_for: Option<String>,
     paths: Vec<String>,
 }
 
@@ -36,6 +40,32 @@ pub fn main() -> RunResult<()> {
         .init()?;
     let mut conf_builder = ConfigBuilder::default();
     let params = Params::parse();
+
+    if let Some(tag_str) = params.scan_for {
+        let table_kind: TableKind = tag_str.parse().map_err(|e| format!("{e}") as String)?;
+        let tag = table_kind as u32;
+        let paths = if !params.paths.is_empty() {
+            params.paths
+        } else {
+            std::fs::read_dir("test-fonts")?
+                .flatten()
+                .map(|entry| format!("test-fonts/{}", entry.file_name().to_string_lossy()))
+                .collect()
+        };
+        for path in &paths {
+            match font_has_table(path.as_str(), tag) {
+                Ok(true) => {
+                    println!("{path}");
+                    return Ok(());
+                }
+                Ok(false) => {}
+                Err(e) => eprintln!("[{path}]: Failed! ({e})"),
+            }
+        }
+        println!("No font found containing table '{tag_str}'");
+        return Ok(());
+    }
+
     conf_builder.extra_only(params.extra_only);
     if params.quiet {
         conf_builder.verbosity(Verbosity::Minimal);

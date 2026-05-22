@@ -467,10 +467,13 @@ pub fn pseudo_record<Name: IntoLabel + AsRef<str>>(
     format: Format,
 ) -> Format {
     let prelim = prelim.into_iter().map(|(label, format)| {
-        if label.as_ref().starts_with("__") {
+        if label.as_ref().starts_with("#") {
+            let tmp = label.as_ref().trim_start_matches("#").to_string();
+            (Some(Label::Owned(tmp)), format)
+        } else if label.as_ref().starts_with("__") {
             (None, format)
         } else {
-            (Some(label), format)
+            (Some(label.into()), format)
         }
     });
     Format::chaining(prelim, format)

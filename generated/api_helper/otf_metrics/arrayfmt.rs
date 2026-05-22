@@ -18,17 +18,16 @@ use crate::api_helper::util::{EnumLen, Wec, trisect_unchecked};
 /// true index of the first element skipped and `stop` is the true index of the element where display resumes.
 pub(crate) fn display_nullable<T>(
     opt_items: &[Option<T>],
-    mut display_fn: impl FnMut(usize, &T) -> TokenStream<'static>,
+    mut display_fn: impl FnMut(usize, &T) -> TokenStream,
     bookend: usize,
-    ellipsis: impl Fn(usize, (usize, usize)) -> TokenStream<'static>,
-) -> TokenStream<'static> {
+    ellipsis: impl Fn(usize, (usize, usize)) -> TokenStream,
+) -> TokenStream {
     let items: Vec<(usize, &T)> = opt_items
         .iter()
         .enumerate()
         .filter_map(|(ix, opt)| opt.as_ref().map(|v| (ix, v)))
         .collect();
-    let mut buffer =
-        Vec::<TokenStream<'static>>::with_capacity(Ord::min(items.len(), bookend * 2 + 1));
+    let mut buffer = Vec::<TokenStream>::with_capacity(Ord::min(items.len(), bookend * 2 + 1));
 
     let count = items.len();
 
@@ -63,17 +62,16 @@ pub(crate) fn display_nullable<T>(
 /// As all elements will be formatted on the same line, the `display_fn` closure should not include any line-breaks or indentation.
 pub(crate) fn display_inline_nullable<T>(
     opt_items: &[Option<T>],
-    mut display_fn: impl FnMut(usize, &T) -> TokenStream<'static>,
+    mut display_fn: impl FnMut(usize, &T) -> TokenStream,
     bookend: usize,
-    ellipsis: impl Fn(usize, (usize, usize)) -> TokenStream<'static>,
-) -> TokenStream<'static> {
+    ellipsis: impl Fn(usize, (usize, usize)) -> TokenStream,
+) -> TokenStream {
     let items: Vec<(usize, &T)> = opt_items
         .iter()
         .enumerate()
         .filter_map(|(ix, opt)| opt.as_ref().map(|v| (ix, v)))
         .collect();
-    let mut buffer =
-        Vec::<TokenStream<'static>>::with_capacity(Ord::min(items.len(), bookend * 2 + 1));
+    let mut buffer = Vec::<TokenStream>::with_capacity(Ord::min(items.len(), bookend * 2 + 1));
 
     let count = items.len();
 
@@ -111,13 +109,12 @@ pub(crate) fn display_inline_nullable<T>(
 /// All elements will be written on the same line, and so the `display_fn` closure should not include any line-breaks or indentation.
 pub(crate) fn display_items_inline<T>(
     items: &[T],
-    mut display_fn: impl FnMut(&T) -> TokenStream<'static>,
+    mut display_fn: impl FnMut(&T) -> TokenStream,
     bookend: usize,
-    ellipsis: impl Fn(usize) -> TokenStream<'static>,
-) -> TokenStream<'static> {
+    ellipsis: impl Fn(usize) -> TokenStream,
+) -> TokenStream {
     // Allocate a buffer big enough to hold one string per item in the array, or enough items to show both bookends and one ellipsis-string
-    let mut buffer =
-        Vec::<TokenStream<'static>>::with_capacity(Ord::min(items.len(), bookend * 2 + 1));
+    let mut buffer = Vec::<TokenStream>::with_capacity(Ord::min(items.len(), bookend * 2 + 1));
 
     let count = items.len();
     if count > bookend * 2 {
@@ -140,7 +137,7 @@ pub(crate) fn display_items_inline<T>(
 ///
 /// Formats each element of the input array as a separate line (using `display_fn`), showing only the first and last `bookend` items if the array is long enough (i.e. when the number of elements exceeds `2 * bookend`).
 ///
-/// The `display_fn` closure takes both the index and the value of each element, and should produce a `TokenStream` representing the intended multiline display of that element (including any line-breaks or indentation).
+/// The `display_fn` closure takes both the index and the value of each element, and should produce a `TokenStream` representing the intended multiline display of that element (including any line-breaks and indentation-level changes).
 ///
 /// When the array is long enough to warrant elision, the `ellipsis` closure is used to produce a `TokenStream` representing the desired format of the elision-string, taking as parameters the indices of the first and last items to be elided.
 /// Namely, the first parameter is the index immediately following the last item shown in the initial bookend, and the second parameter is the index preceding the first item shown in the terminal bookend.
@@ -148,31 +145,54 @@ pub(crate) fn display_items_inline<T>(
 /// If the length of `items` is less than or equal to `2 * bookend`, no elision is performed and the `ellipsis` closure will not be called.
 pub(crate) fn display_items_elided<T>(
     items: &[T],
-    display_fn: impl Fn(usize, &T) -> TokenStream<'static>,
+    display_fn: impl Fn(usize, &T) -> TokenStream,
     bookend: usize,
-    ellipsis: impl Fn(usize, usize) -> TokenStream<'static>,
-) -> TokenStream<'static> {
-    let mut buffer =
-        Vec::<TokenStream<'static>>::with_capacity(Ord::min(items.len(), bookend * 2 + 1));
+    ellipsis: impl Fn(usize, usize) -> TokenStream,
+) -> TokenStream
+where
+    for<'a> super::util::EnumLenError<&'a T>: std::fmt::Display,
+{
+    display_iter_elided(items.iter(), items.len(), display_fn, bookend, ellipsis)
+}
 
-    let count = items.len();
+/// General alternative to [`display_items_elided`] that accepts an iterator instead of a slice,
+/// but requires a `count` parameter to determine the length of the iterator for elision purposes.
+pub(crate) fn display_iter_elided<T>(
+    iter: impl Iterator<Item = T>,
+    count: usize,
+    display_fn: impl Fn(usize, T) -> TokenStream,
+    bookend: usize,
+    ellipsis: impl Fn(usize, usize) -> TokenStream,
+) -> TokenStream
+where
+    super::util::EnumLenError<T>: std::fmt::Display,
+{
+    let mut buffer = Vec::<TokenStream>::with_capacity(Ord::min(count, bookend * 2 + 1));
+
     if count > bookend * 2 {
-        for (ix, item) in items.iter().enumerate().take(bookend) {
+        let mut ix_iter = EnumLen::new(iter, count);
+
+        for (ix, item) in ix_iter.iter_with().take(bookend) {
             buffer.push(display_fn(ix, item));
         }
 
+        let n_skipped = count - bookend * 2;
+
+        // REVIEW - do we care to mention the first and last glyphIds elided, or is the number of skipped elements good enough?
         buffer.push(ellipsis(bookend, count - bookend));
 
-        for (ix, item) in items.iter().enumerate().skip(count - bookend) {
+        for (ix, item) in ix_iter.iter_with().skip(n_skipped).take(bookend) {
             buffer.push(display_fn(ix, item));
         }
+
+        const FORBID_LEFTOVER: bool = true;
+
+        match ix_iter.finish(FORBID_LEFTOVER) {
+            Ok(_) => {}
+            Err(e) => panic!("display_iter_elided found error: {e}"),
+        }
     } else {
-        buffer.extend(
-            items
-                .iter()
-                .enumerate()
-                .map(|(ix, item)| display_fn(ix, item)),
-        );
+        buffer.extend(iter.enumerate().map(|(ix, item)| display_fn(ix, item)));
     }
     TokenStream::join_with(buffer, LineBreak)
 }
@@ -193,10 +213,10 @@ pub(crate) fn display_items_elided<T>(
 /// the output is entirely inline, or to increment indentation of indexed items if multiline, to avoid ambiguity between the indexing of rows and the indexing of items within each row.
 pub(crate) fn display_wec_rows_elided<T>(
     matrix: &Wec<T>,
-    display_fn: impl Fn(usize, &[T]) -> TokenStream<'static>,
+    display_fn: impl Fn(usize, &[T]) -> TokenStream,
     bookend: usize,
-    ellipsis: impl Fn(usize, usize) -> TokenStream<'static>,
-) -> TokenStream<'static> {
+    ellipsis: impl Fn(usize, usize) -> TokenStream,
+) -> TokenStream {
     let count = matrix.rows();
     let mut lines = Vec::with_capacity(Ord::min(count, bookend * 2 + 1));
 
@@ -232,10 +252,10 @@ pub(crate) fn display_wec_rows_elided<T>(
 pub(crate) fn display_coverage_linked_array<T>(
     items: &[T],
     coverage: impl Iterator<Item = u16>,
-    mut display_fn: impl FnMut(u16, &T) -> TokenStream<'static>,
+    mut display_fn: impl FnMut(u16, &T) -> TokenStream,
     bookend: usize,
-    ellipsis: impl FnOnce(usize) -> TokenStream<'static>,
-) -> TokenStream<'static> {
+    ellipsis: impl FnOnce(usize) -> TokenStream,
+) -> TokenStream {
     let count = items.len();
     let mut buffer = Vec::with_capacity(Ord::min(count, bookend * 2 + 1));
 
@@ -307,10 +327,10 @@ pub(crate) fn display_coverage_linked_array<T>(
 pub fn display_table_column_horiz<A>(
     heading: &'static str,
     items: &[A],
-    mut display_fn: impl FnMut(&A) -> TokenStream<'static>,
+    mut display_fn: impl FnMut(&A) -> TokenStream,
     bookend: usize,
-    ellipsis: impl FnOnce(usize) -> TokenStream<'static>,
-) -> TokenStream<'static> {
+    ellipsis: impl FnOnce(usize) -> TokenStream,
+) -> TokenStream {
     let count = items.len();
     let mut buf = Vec::with_capacity(Ord::min(count, 2 * bookend + 1));
     if count > 2 * bookend {

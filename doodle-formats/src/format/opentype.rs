@@ -1198,7 +1198,7 @@ pub(crate) mod stat {
         let design_axes_array = design_axes_array(module, tag);
         let axis_value_array = axis_value_array(module);
         module.define_format(
-            "opentype.stat_table",
+            "opentype.stat.table",
             let_view(
                 "table_view",
                 record([
@@ -1349,7 +1349,7 @@ pub(crate) mod dsig {
             BitFieldKind::FlagBit("cannot_be_resigned"), // Bit 0 : Cannot be resigned
         ]);
         module.define_format(
-            "opentype.dsig",
+            "opentype.dsig.table",
             let_view(
                 "table_view",
                 record_auto([
@@ -1425,7 +1425,7 @@ pub(crate) mod hdmx {
             expr_eq(rem(var("size"), Expr::U32(4)), Expr::U32(0)),
         );
         module.register_format_args(
-            "opentype.hdmx",
+            "opentype.hdmx.table",
             [(Label::Borrowed("num_glyphs"), ValueType::U16)],
             record([
                 ("version", expect_u16be(0)),   // table version, should be 0
@@ -1478,7 +1478,7 @@ pub(crate) mod vdmx {
         );
 
         module.define_format(
-            "opentype.vdmx",
+            "opentype.vdmx.table",
             let_view(
                 "table_view",
                 record([
@@ -1535,7 +1535,7 @@ pub(crate) mod hvar {
     pub(crate) fn table(module: &mut FormatModule, item_variation_store: FormatRef) -> FormatRef {
         let dsim = delta_set_index_map(module);
         module.define_format(
-            "opentype.hvar_table",
+            "opentype.hvar.table",
             let_view(
                 "table_view",
                 record_auto([
@@ -1825,7 +1825,7 @@ pub(crate) mod gvar {
 
         // NOTE - can only appear in font files with fvar and glyf tables also present
         module.define_format(
-            "opentype.gvar_table",
+            "opentype.gvar.table",
             let_view(
                 "table_view",
                 record_auto([
@@ -3741,7 +3741,7 @@ pub(crate) mod gpos {
             layout::lookup_list(lookup_table),
         );
         module.define_format(
-            "opentype.gpos_table",
+            "opentype.gpos.table",
             layout::table(script_list, feature_list, lookup_list, feature_variations),
         )
     }
@@ -4194,7 +4194,7 @@ pub(crate) mod gsub {
             layout::lookup_list(lookup_table),
         );
         module.define_format(
-            "opentype.gsub_table",
+            "opentype.gsub.table",
             layout::table(script_list, feature_list, lookup_list, feature_variations),
         )
     }
@@ -7079,7 +7079,7 @@ pub(crate) mod cmap {
             util::slice_record(
                 "length",
                 [
-                    ("format", u16be()), // == 0
+                    ("_format", expect_u16be(0)), // == 0
                     ("length", u16be()),
                     ("language", cmap_language_id(var("_platform"))),
                     (
@@ -7106,7 +7106,7 @@ pub(crate) mod cmap {
             util::slice_record(
                 "length",
                 [
-                    ("format", util::expect_u16be(2)),
+                    ("_format", util::expect_u16be(2)),
                     (
                         "length",
                         where_lambda(
@@ -7143,7 +7143,7 @@ pub(crate) mod cmap {
             util::slice_record(
                 "length",
                 [
-                    ("format", util::expect_u16be(4)),
+                    ("_format", util::expect_u16be(4)),
                     ("length", u16be()),
                     ("language", cmap_language_id(var("_platform"))),
                     (
@@ -7176,7 +7176,7 @@ pub(crate) mod cmap {
              * while reading `glyph_id_array`
              */
             record([
-                ("format", util::expect_u16be(6)),
+                ("_format", util::expect_u16be(6)),
                 ("length", u16be()),
                 ("language", cmap_language_id(var("_platform"))),
                 ("first_code", u16be()),
@@ -7193,7 +7193,7 @@ pub(crate) mod cmap {
             util::slice_record(
                 "length",
                 [
-                    ("format", util::expect_u16be(8)),
+                    ("_format", util::expect_u16be(8)),
                     ("__reserved", util::expect_u16be(0)),
                     ("length", u32be()),
                     ("language", cmap_language_id32(var("_platform"))),
@@ -7216,7 +7216,7 @@ pub(crate) mod cmap {
             util::slice_record(
                 "length",
                 [
-                    ("format", util::expect_u16be(10)),
+                    ("_format", util::expect_u16be(10)),
                     ("__reserved", util::expect_u16be(0)),
                     ("length", u32be()),
                     ("language", cmap_language_id32(var("_platform"))),
@@ -7235,7 +7235,7 @@ pub(crate) mod cmap {
             util::slice_record(
                 "length",
                 [
-                    ("format", util::expect_u16be(12)),
+                    ("_format", util::expect_u16be(12)),
                     ("__reserved", util::expect_u16be(0)),
                     ("length", u32be()),
                     ("language", cmap_language_id32(var("_platform"))),
@@ -7258,7 +7258,7 @@ pub(crate) mod cmap {
             util::slice_record(
                 "length",
                 [
-                    ("format", util::expect_u16be(13)),
+                    ("_format", util::expect_u16be(13)),
                     ("__reserved", util::expect_u16be(0)),
                     ("length", u32be()),
                     ("language", cmap_language_id32(var("_platform"))),
@@ -7318,7 +7318,7 @@ pub(crate) mod cmap {
             util::slice_record(
                 "length",
                 [
-                    ("format", util::expect_u16be(14)),
+                    ("_format", util::expect_u16be(14)),
                     ("length", u32be()),
                     ("num_var_selector_records", u32be()),
                     (
