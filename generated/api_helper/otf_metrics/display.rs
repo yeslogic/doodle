@@ -1,4 +1,15 @@
+//! Specialized types and combinators used to define the display-form
+//! of processed OTF structures, without forcing the caller to decide
+//! whether to build string-buffers in-memory or to emit lines to stdout
+//! one at a time.
+
+use std::fmt::Write as _;
+
 /// Constructs an inline-text `Token` consisting of the string `str`.
+///
+/// # Note
+///
+/// It is the caller's responsibility to ensure that `str` does not contain any newline characters.
 pub fn tok(str: impl Into<doodle::Label>) -> Token {
     Token::InlineText(str.into())
 }
@@ -11,6 +22,9 @@ pub fn toks(str: impl Into<doodle::Label>) -> TokenStream {
 }
 
 /// Simple token consisting of either an inline-string or a newline.
+///
+/// Also includes control-tokens to increase or decrease the relative indentation
+/// by one stage (i.e. one half-tab).
 #[derive(Clone)]
 pub enum Token {
     InlineText(doodle::Label),
@@ -22,8 +36,8 @@ pub enum Token {
 impl std::fmt::Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Token::InlineText(s) => write!(f, "{s}"),
-            Token::LineBreak => write!(f, "\n"),
+            Token::InlineText(s) => f.write_str(s.as_ref()),
+            Token::LineBreak => f.write_char('\n'),
             Token::IncreaseIndent | Token::DecreaseIndent => Ok(()), // No visual representation for indent tokens, since they are handled implicitly by `IndentIter`
         }
     }
@@ -32,7 +46,9 @@ impl std::fmt::Display for Token {
 impl Token {
     /// Creates a new `TokenStream` by prepending `self` to `stream`.
     pub fn then(self, stream: TokenStream) -> TokenStream {
-        <Token as Into<TokenStream>>::into(self).chain(stream)
+        TokenStream {
+            inner: Box::new(std::iter::once(self).chain(stream.inner)),
+        }
     }
 }
 
@@ -96,9 +112,8 @@ impl TokenStream {
         }
     }
 
-    /// Prints the tokens in `self` to stdout, with a single trailing newline.
-    ///
-    /// If `self` is empty, no newline is printed.
+    /// Prints the tokens in `self` to stdout, followed by a newline character
+    /// if self was not empty.
     pub fn println(self) {
         let has_printed = self.print();
         if has_printed {
@@ -116,6 +131,8 @@ impl TokenStream {
     }
 
     /// Returns a new `TokenStream` where all co-adjacent inline-text tokens are merged into a single string.
+    ///
+    /// # Note
     ///
     /// Implicitly assumes that no newline characters occur within `InlineText` tokens.
     pub fn group_lines(self) -> TokenStream {
@@ -173,6 +190,8 @@ impl TokenStream {
     }
 
     /// Appends a forced line-break to `self`.
+    ///
+    /// Will include a line-break even if `self` was originally empty.
     pub fn break_line(self) -> TokenStream {
         TokenStream {
             inner: Box::new(self.inner.chain(std::iter::once(Token::LineBreak))),
@@ -217,7 +236,7 @@ impl TokenStream {
         }
     }
 
-    /// Joins a stream of streams with a given separator.
+    /// Joins a stream-of-streams with a given separator.
     pub fn join_with(streams: Vec<TokenStream>, sep: Token) -> TokenStream {
         TokenStream {
             inner: Box::new(IntersperseIter::new(
@@ -251,40 +270,33 @@ impl Iterator for IndentIter {
     type Item = Token;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(tok) = self.next_token.take() {
-            return Some(tok);
-        } else {
+        self.next_token.take().or_else(|| {
             let next = self.stream.next();
             match next {
                 Some(Token::LineBreak) => {
                     self.at_line_start = true;
-                    return next;
+                    next
                 }
                 Some(Token::IncreaseIndent) => {
                     self.level.0 += 1;
-                    return self.next();
+                    self.next()
                 }
                 Some(Token::DecreaseIndent) => {
                     self.level.0 = self.level.0.saturating_sub(1);
-                    return self.next();
+                    self.next()
                 }
-                Some(tok) => {
+                Some(token) => {
                     if self.at_line_start {
-                        self.next_token = Some(tok);
+                        self.next_token = Some(token);
                         self.at_line_start = false;
-                        let full_tabs = self.level.0 / 2;
-                        let partial_tabs = self.level.0 % 2;
-
-                        let indent_str = "\t".repeat(full_tabs as usize)
-                            + if partial_tabs > 0 { Indent::HT } else { "" };
-                        return Some(Token::InlineText(indent_str.into()));
+                        Some(tok(self.level.render()))
                     } else {
-                        return Some(tok);
+                        Some(token)
                     }
                 }
-                None => return None,
+                None => None,
             }
-        }
+        })
     }
 }
 
@@ -295,12 +307,26 @@ pub struct Indent(u8);
 impl Indent {
     /// Half-Tab for partial indentation
     pub const HT: &str = "    ";
+
+    /// Render the appropriate indentation level as a string.
+    pub fn render(self) -> String {
+        let n = self.0;
+
+        let indent_str = "\t".repeat((n / 2) as usize);
+        if n % 2 > 0 {
+            indent_str + Self::HT
+        } else {
+            indent_str
+        }
+    }
 }
 
+/// Helper iterator for joining a stream-of-streams with a separator ([`TokenStream::join_with`]).
 pub struct IntersperseIter<T: Clone> {
     items: Box<dyn Iterator<Item = Box<dyn Iterator<Item = T> + 'static>> + 'static>,
     rest: Box<dyn Iterator<Item = T> + 'static>,
     sep: T,
+    /// Flag used to determine whether the most recent `rest` iterator yielded from `items` was non-empty.
     non_empty: bool,
 }
 

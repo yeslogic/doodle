@@ -28,20 +28,28 @@ fn check_output(output: Output, expected: ExpectFile) {
 
 macro_rules! fontfile {
     ( $name:expr ) => {
-       concat!(env!("CARGO_MANIFEST_DIR"), "/../test-fonts/", $name)
+        concat!(env!("CARGO_MANIFEST_DIR"), "/../test-fonts/", $name)
     };
 }
 
 macro_rules! testfile {
     ( $name:expr ) => {
-       concat!(env!("CARGO_MANIFEST_DIR"), "/tests/expected/fontinfo/", $name, ".stdout")
+        concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/expected/fontinfo/",
+            $name,
+            ".stdout"
+        )
     };
 }
 
 // ANCHOR - Klei.otf
 #[test]
 fn test_fontinfo_regression_klei() {
-    let output = fontinfo().args(["-vv", fontfile!("Klei.otf")]).output().unwrap();
+    let output = fontinfo()
+        .args(["-vv", fontfile!("Klei.otf")])
+        .output()
+        .unwrap();
     let expected = expect_test::expect_file!(testfile!("Klei.otf"));
     check_output(output, expected)
 }
@@ -49,16 +57,21 @@ fn test_fontinfo_regression_klei() {
 // ANCHOR - DroidSansArabic.ttf
 #[test]
 fn test_fontinfo_regression_droidsansarabic() {
-    let output = fontinfo().args(["-vv", fontfile!("DroidSansArabic.ttf")]).output().unwrap();
+    let output = fontinfo()
+        .args(["-vv", fontfile!("DroidSansArabic.ttf")])
+        .output()
+        .unwrap();
     let expected = expect_test::expect_file!(testfile!("DroidSansArabic.ttf"));
     check_output(output, expected)
 }
 
-
 // ANCHOR - Frankenpax.ttc
 #[test]
 fn test_fontinfo_regression_frankenpax() {
-    let output = fontinfo().args(["-vv", fontfile!("Frankenpax.ttc")]).output().unwrap();
+    let output = fontinfo()
+        .args(["-vv", fontfile!("Frankenpax.ttc")])
+        .output()
+        .unwrap();
     let expected = expect_test::expect_file!(testfile!("Frankenpax.ttc"));
     check_output(output, expected)
 }
