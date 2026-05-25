@@ -143,6 +143,7 @@ fn show_optional_metrics(optional: &OptionalTableMetrics, conf: &cli::Config) {
                 Ctxt::from(TableDiscriminator::Gsub),
                 conf,
             ),
+            display_avar_metrics(optional.avar.as_deref(), conf),
             display_fvar_metrics(optional.fvar.as_deref(), conf),
             display_gvar_metrics(optional.gvar.as_deref(), conf),
             display_hvar_metrics(optional.hvar.as_deref(), conf),
@@ -358,66 +359,152 @@ mod dsig {
     }
 }
 
-use hvar::display_hvar_metrics;
-mod hvar {
+use avar::display_avar_metrics;
+mod avar {
     use super::*;
 
-    pub(super) fn display_hvar_metrics(hvar: Option<&HvarMetrics>, conf: &Config) -> TokenStream {
-        let Some(hvar) = hvar else {
+    pub(super) fn display_avar_metrics(
+        avar: Option<&AvarMetrics>,
+        conf: &cli::Config,
+    ) -> TokenStream {
+        let Some(avar) = avar else {
             return TokenStream::empty();
         };
-
         let heading = toks(format!(
-            "HVAR: version {}",
-            format_version_major_minor(hvar.major_version, hvar.minor_version)
+            "avar: version {}",
+            format_version_major_minor(avar.major_version, avar.minor_version)
         ));
         if conf.verbosity.is_at_least(cli::VerboseLevel::Detailed) {
             heading.glue(
                 LineBreak,
-                TokenStream::join_with(
-                    vec![
-                        display_item_variation_store(&hvar.item_variation_store, conf),
-                        display_opt_dsim("Advance-Width", &hvar.advance_width_mapping, conf),
-                        display_opt_dsim("Left-Side-Bearing", &hvar.lsb_mapping, conf),
-                        display_opt_dsim("Right-Side-Bearing", &hvar.rsb_mapping, conf),
-                    ],
-                    LineBreak,
+                display_items_elided(
+                    &avar.axis_segment_maps,
+                    |ix, map| tok(format!("[{ix}]: ")).then(display_segment_maps(map, conf)),
+                    conf.bookend_size,
+                    |start, stop| {
+                        toks(format!(
+                            "(skipping SegmentMaps for axes {}..{})",
+                            start, stop
+                        ))
+                        .indent_by(ELISION_DELTA)
+                    },
                 )
-                .indent_by(SECTION_INDENT),
+                .indent_by(FLAT_ITEM_INDENT),
             )
         } else {
-            heading
+            heading.chain(toks(format!(
+                "; axisCount={}",
+                avar.axis_segment_maps.len()
+            )))
         }
     }
 
-    fn display_opt_dsim(
-        label: &'static str,
-        opt_dsim: &Option<DeltaSetIndexMap>,
-        conf: &Config,
-    ) -> TokenStream {
-        let msg = toks(format!("{label} mapping:"));
-        match opt_dsim {
-            None => TokenStream::join_with(vec![msg, toks("<glyphIndex>")], tok(" ")),
-            Some(dsim) => msg.glue(LineBreak, display_delta_set_index_map(dsim, conf)),
-        }
-    }
-
-    fn display_delta_set_index_map(dsim: &DeltaSetIndexMap, conf: &Config) -> TokenStream {
-        let count = dsim.map_count as usize;
-        let iter = dsim.map_data.iter();
-
-        display_iter_elided(
-            iter,
-            count,
-            |ix, (outer, inner)| {
-                tok(format!("[{ix}]: ")).then(toks(format!("ItemVariationData[{outer}][{inner}]")))
-            },
-            conf.bookend_size,
-            |start, stop| {
-                toks(format!("(skipping entries {}..{})", start, stop)).indent_by(ELISION_DELTA)
-            },
+    fn display_segment_maps(map: &SegmentMaps, conf: &cli::Config) -> TokenStream {
+        display_items_inline(
+            &map.axis_value_maps,
+            display_axis_value_map,
+            conf.inline_bookend,
+            |n| toks(format!("..({n} axis_value_maps)..")),
         )
-        .indent_by(FLAT_ITEM_INDENT)
+    }
+
+    fn display_axis_value_map(map: &AxisValueMap) -> TokenStream {
+        toks(format!("[{}→{}]", map.from_coordinate, map.to_coordinate))
+    }
+}
+
+use fvar::display_fvar_metrics;
+mod fvar {
+    use super::*;
+
+    pub(super) fn display_fvar_metrics(
+        fvar: Option<&FvarMetrics>,
+        conf: &cli::Config,
+    ) -> TokenStream {
+        let Some(fvar) = fvar else {
+            return TokenStream::empty();
+        };
+        let heading = toks(format!(
+            "fvar: version {}",
+            format_version_major_minor(fvar.major_version, fvar.minor_version)
+        ));
+        if conf.verbosity.is_at_least(cli::VerboseLevel::Detailed) {
+            heading.glue(
+                LineBreak,
+                toks("Axes:")
+                    .glue(
+                        LineBreak,
+                        arrayfmt::display_items_elided(
+                            &fvar.axes,
+                            |ix, axis| {
+                                tok(format!("[{ix}]: "))
+                                    .then(display_variation_axis_record(axis))
+                                    .indent_by(ITEM_INDENT)
+                            },
+                            conf.bookend_size,
+                            |start, stop| toks(format!("(skipping axis records {start}..{stop})")),
+                        ),
+                    )
+                    .glue(LineBreak, toks("Instances:"))
+                    .glue(
+                        LineBreak,
+                        arrayfmt::display_items_elided(
+                            &fvar.instances,
+                            |ix, instance| {
+                                tok(format!("[{ix}]: "))
+                                    .then(display_instance_record(instance, conf))
+                                    .indent_by(ITEM_INDENT)
+                            },
+                            conf.bookend_size,
+                            |start, stop| {
+                                toks(format!("(skipping instance records {start}..{stop})"))
+                            },
+                        ),
+                    )
+                    .indent_by(SECTION_INDENT),
+            )
+        } else {
+            heading.chain(toks(format!(
+                "; {} axes, {} instances",
+                fvar.axes.len(),
+                fvar.instances.len()
+            )))
+        }
+    }
+
+    fn display_instance_record(instance: &InstanceRecord, conf: &cli::Config) -> TokenStream {
+        // FIXME[epic=tokenstream-refactor] - rewrite into more natively TokenStream-oriented production
+        tok(format!(
+            "Subfamily={:?};{} ",
+            instance.subfamily_nameid,
+            match instance.postscript_nameid {
+                None => String::new(),
+                Some(name_id) => format!(" Postscript={name_id:?};"),
+            },
+        ))
+        .then(arrayfmt::display_items_inline(
+            &instance.coordinates,
+            |coord| toks(format!("{coord:+}")),
+            conf.inline_bookend,
+            |n_skipped| toks(format!("...(skipping {n_skipped} coordinates)...")),
+        ))
+    }
+
+    fn display_variation_axis_record(axis: &VariationAxisRecord) -> TokenStream {
+        // TODO - rewrite in more natural TokenStream style
+        toks(format!(
+            "'{}' axis: [{}, {}] (default: {}){}{:?}",
+            axis.axis_tag,
+            axis.min_value,
+            axis.max_value,
+            axis.default_value,
+            if axis.flags.hidden_axis {
+                " (hidden) "
+            } else {
+                " "
+            },
+            axis.axis_name_id,
+        ))
     }
 }
 
@@ -558,102 +645,66 @@ mod gvar {
     }
 }
 
-use fvar::display_fvar_metrics;
-mod fvar {
+use hvar::display_hvar_metrics;
+mod hvar {
     use super::*;
 
-    pub(super) fn display_fvar_metrics(
-        fvar: Option<&FvarMetrics>,
-        conf: &cli::Config,
-    ) -> TokenStream {
-        let Some(fvar) = fvar else {
+    pub(super) fn display_hvar_metrics(hvar: Option<&HvarMetrics>, conf: &Config) -> TokenStream {
+        let Some(hvar) = hvar else {
             return TokenStream::empty();
         };
+
+        let heading = toks(format!(
+            "HVAR: version {}",
+            format_version_major_minor(hvar.major_version, hvar.minor_version)
+        ));
         if conf.verbosity.is_at_least(cli::VerboseLevel::Detailed) {
-            toks(format!(
-                "fvar: version {}",
-                format_version_major_minor(fvar.major_version, fvar.minor_version)
-            ))
-            .glue(
+            heading.glue(
                 LineBreak,
-                toks("Axes:")
-                    .glue(
-                        LineBreak,
-                        arrayfmt::display_items_elided(
-                            &fvar.axes,
-                            |ix, axis| {
-                                tok(format!("[{ix}]: "))
-                                    .then(display_variation_axis_record(axis))
-                                    .indent_by(ITEM_INDENT)
-                            },
-                            conf.bookend_size,
-                            |start, stop| toks(format!("(skipping axis records {start}..{stop})")),
-                        ),
-                    )
-                    .glue(LineBreak, toks("Instances:"))
-                    .glue(
-                        LineBreak,
-                        arrayfmt::display_items_elided(
-                            &fvar.instances,
-                            |ix, instance| {
-                                tok(format!("[{ix}]: "))
-                                    .then(display_instance_record(instance, conf))
-                                    .indent_by(ITEM_INDENT)
-                            },
-                            conf.bookend_size,
-                            |start, stop| {
-                                toks(format!("(skipping instance records {start}..{stop})"))
-                            },
-                        ),
-                    )
-                    .indent_by(SECTION_INDENT),
+                TokenStream::join_with(
+                    vec![
+                        display_item_variation_store(&hvar.item_variation_store, conf),
+                        display_opt_dsim("Advance-Width", &hvar.advance_width_mapping, conf),
+                        display_opt_dsim("Left-Side-Bearing", &hvar.lsb_mapping, conf),
+                        display_opt_dsim("Right-Side-Bearing", &hvar.rsb_mapping, conf),
+                    ],
+                    LineBreak,
+                )
+                .indent_by(SECTION_INDENT),
             )
         } else {
-            tok(format!(
-                "fvar: version {}",
-                format_version_major_minor(fvar.major_version, fvar.minor_version)
-            ))
-            .then(toks(format!(
-                "; {} axes, {} instances",
-                fvar.axes.len(),
-                fvar.instances.len()
-            )))
+            heading
         }
     }
 
-    fn display_instance_record(instance: &InstanceRecord, conf: &cli::Config) -> TokenStream {
-        // FIXME[epic=tokenstream-refactor] - rewrite into more natively TokenStream-oriented production
-        tok(format!(
-            "Subfamily={:?};{} ",
-            instance.subfamily_nameid,
-            match instance.postscript_nameid {
-                None => String::new(),
-                Some(name_id) => format!(" Postscript={name_id:?};"),
-            },
-        ))
-        .then(arrayfmt::display_items_inline(
-            &instance.coordinates,
-            |coord| toks(format!("{coord:+}")),
-            conf.inline_bookend,
-            |n_skipped| toks(format!("...(skipping {n_skipped} coordinates)...")),
-        ))
+    fn display_opt_dsim(
+        label: &'static str,
+        opt_dsim: &Option<DeltaSetIndexMap>,
+        conf: &Config,
+    ) -> TokenStream {
+        let msg = toks(format!("{label} mapping:"));
+        match opt_dsim {
+            None => TokenStream::join_with(vec![msg, toks("<glyphIndex>")], tok(" ")),
+            Some(dsim) => msg.glue(LineBreak, display_delta_set_index_map(dsim, conf)),
+        }
     }
 
-    fn display_variation_axis_record(axis: &VariationAxisRecord) -> TokenStream {
-        // TODO - rewrite in more natural TokenStream style
-        toks(format!(
-            "'{}' axis: [{}, {}] (default: {}){}{:?}",
-            axis.axis_tag,
-            axis.min_value,
-            axis.max_value,
-            axis.default_value,
-            if axis.flags.hidden_axis {
-                " (hidden) "
-            } else {
-                " "
+    fn display_delta_set_index_map(dsim: &DeltaSetIndexMap, conf: &Config) -> TokenStream {
+        let count = dsim.map_count as usize;
+        let iter = dsim.map_data.iter();
+
+        display_iter_elided(
+            iter,
+            count,
+            |ix, (outer, inner)| {
+                tok(format!("[{ix}]: ")).then(toks(format!("ItemVariationData[{outer}][{inner}]")))
             },
-            axis.axis_name_id,
-        ))
+            conf.bookend_size,
+            |start, stop| {
+                toks(format!("(skipping entries {}..{})", start, stop)).indent_by(ELISION_DELTA)
+            },
+        )
+        .indent_by(FLAT_ITEM_INDENT)
     }
 }
 
@@ -703,25 +754,27 @@ pub(crate) mod common {
     }
 
     fn display_variation_regions(vrl: &VariationRegionList, conf: &cli::Config) -> TokenStream {
-        toks(format!(
-            "VariationRegions: {} regions ({} axes)",
-            vrl.0.len(),
-            vrl.0[0].len()
-        ))
-        .glue(
-            LineBreak,
-            arrayfmt::display_items_elided(
-                &vrl.0,
-                |ix, per_region| {
-                    toks(format!("[{ix}]:"))
-                        .glue(LineBreak, display_variation_axes(per_region, conf))
-                        .indent_by(ITEM_INDENT)
-                },
-                conf.bookend_size,
-                |start_ix, end_ix| toks(format!("(skipping regions {start_ix}..{end_ix})")),
-            ),
-        )
-        .indent_by(ITEM_INDENT)
+        let axes_toks = if vrl.0.is_empty() {
+            TokenStream::empty()
+        } else {
+            toks(format!(" ({} axes)", vrl.0[0].len()))
+        };
+        toks(format!("VariationRegions: {} regions", vrl.0.len()))
+            .chain(axes_toks)
+            .glue(
+                LineBreak,
+                arrayfmt::display_items_elided(
+                    &vrl.0,
+                    |ix, per_region| {
+                        toks(format!("[{ix}]:"))
+                            .glue(LineBreak, display_variation_axes(per_region, conf))
+                            .indent_by(ITEM_INDENT)
+                    },
+                    conf.bookend_size,
+                    |start_ix, end_ix| toks(format!("(skipping regions {start_ix}..{end_ix})")),
+                ),
+            )
+            .indent_by(ITEM_INDENT)
     }
 
     /// Tokenizer for arrays of ItemVariationData (multiline)

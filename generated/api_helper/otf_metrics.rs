@@ -2326,6 +2326,86 @@ pub(crate) mod dsig {
 }
 use dsig::*;
 
+pub(crate) mod otf_avar {
+    alias! {
+        pub type OpentypeAxisValueMap = opentype_avar_axis_value_map;
+        pub type OpentypeSegmentMaps = opentype_avar_segment_maps;
+    }
+}
+pub(crate) use otf_avar::*;
+
+pub(crate) mod avar {
+    use super::*;
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    pub struct AxisValueMap {
+        pub from_coordinate: F2Dot14,
+        pub to_coordinate: F2Dot14,
+    }
+
+    impl AxisValueMap {
+        /// Helper function for fromCoordinate comparison of `AxisValueMaps`.
+        pub fn compare_from(&self, other: &Self) -> std::cmp::Ordering {
+            self.from_coordinate.cmp(&other.from_coordinate)
+        }
+
+        /// Helper function for fromCoordinate equality tests of `AxisValueMaps`.
+        pub fn eq_from(&self, other: &Self) -> bool {
+            self.from_coordinate == other.from_coordinate
+        }
+
+        /// Helper function for toCoordinate comparison of `AxisValueMaps`.
+        pub fn compare_to(&self, other: &Self) -> std::cmp::Ordering {
+            self.to_coordinate.cmp(&other.to_coordinate)
+        }
+
+        /// Helper function for toCoordinate equality tests of `AxisValueMaps`.
+        pub fn eq_to(&self, other: &Self) -> bool {
+            self.to_coordinate == other.to_coordinate
+        }
+    }
+
+    impl Promote<OpentypeAxisValueMap> for AxisValueMap {
+        fn promote(orig: &OpentypeAxisValueMap) -> Self {
+            AxisValueMap {
+                from_coordinate: F2Dot14::promote(&orig.from_coordinate),
+                to_coordinate: F2Dot14::promote(&orig.to_coordinate),
+            }
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct SegmentMaps {
+        pub(crate) axis_value_maps: Vec<AxisValueMap>,
+    }
+
+    impl Promote<OpentypeSegmentMaps> for SegmentMaps {
+        fn promote(orig: &OpentypeSegmentMaps) -> Self {
+            Self {
+                axis_value_maps: promote_vec(&orig.axis_value_maps),
+            }
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct AvarMetrics {
+        pub(crate) major_version: u16,
+        pub(crate) minor_version: u16,
+        pub(crate) axis_segment_maps: Vec<SegmentMaps>,
+    }
+
+    impl Promote<OpentypeAvar> for AvarMetrics {
+        fn promote(orig: &OpentypeAvar) -> Self {
+            AvarMetrics {
+                major_version: orig.major_version,
+                minor_version: orig.minor_version,
+                axis_segment_maps: promote_vec(&orig.axis_segment_maps),
+            }
+        }
+    }
+}
+pub(crate) use avar::{AvarMetrics, AxisValueMap, SegmentMaps};
+
 pub(crate) mod otf_fvar {
     use super::*;
 
@@ -7318,6 +7398,7 @@ pub struct OptionalTableMetrics {
     gpos: Option<Heap<LayoutMetrics>>,
     gsub: Option<Heap<LayoutMetrics>>,
     // STUB - add more tables as we expand opentype definition
+    avar: Option<Heap<AvarMetrics>>,
     fvar: Option<Heap<FvarMetrics>>,
     gvar: Option<Heap<GvarMetrics>>,
     hvar: Option<Heap<HvarMetrics>>,
@@ -7591,6 +7672,7 @@ fn analyze_extra_tables(dir: &otf_types::OpentypeFontDirectory, extra: &mut Vec<
     extra.extend(tmp);
 }
 
+// ANCHOR - analyze_table_directory
 pub fn analyze_table_directory(
     dir: &otf_types::OpentypeFontDirectory,
 ) -> TestResult<SingleFontMetrics> {
@@ -7749,6 +7831,7 @@ pub fn analyze_table_directory(
             gsub.as_ref().map(LayoutMetrics::promote_gsub).transpose()?
         };
         // STUB - anything beteween gsub and avar goes here
+        let avar = promote_opt(&dir.table_links.avar).map(Heap::new);
         let fvar = promote_opt(&dir.table_links.fvar).map(Heap::new);
         let gvar = promote_opt(&dir.table_links.gvar).map(Heap::new);
         let hvar = promote_opt(&dir.table_links.hvar).map(Heap::new);
@@ -7808,6 +7891,7 @@ pub fn analyze_table_directory(
             gpos,
             gsub,
             // TODO - add more variation tables as they are added to the spec
+            avar,
             fvar,
             gvar,
             hvar,
@@ -8003,15 +8087,14 @@ pub mod table {
                 Base | Gdef | Gpos | Gsub => true,
                 Jstf | Math => false,
                 // Variation
-                Fvar | Gvar | Stat | Hvar => true,
-                Avar | Cvar | Mvar | Vvar => false,
+                Avar | Fvar | Gvar | Hvar => true,
+                Cvar | Mvar | Vvar => false,
                 // Color
                 Colr | Cpal => false,
                 // Extra
-                Kern | Vhea | Vmtx => true,
-                Dsig => true,
-                Hdmx | Vdmx => true,
+                Dsig | Hdmx | Kern | Stat => true,
                 Ltsh | Merg | Meta | Pclt => false,
+                Vdmx | Vhea | Vmtx => true,
             }
         }
     }
