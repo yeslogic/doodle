@@ -1,0 +1,75 @@
+====== [Font File]: /home/peter/yeslogic/dev/doodle/generated/../test-fonts/Klei.otf =======
+(sfntVersion: OTTO)
+cmap: version 0
+	[0]: platform=0, encoding=3
+	[1]: platform=1, encoding=0
+	[2]: platform=3, encoding=1
+head: version 1.0, Strong LTR or Neutral
+hhea: table version 1.0, 770 horizontal long metrics
+hmtx:
+	Glyph ID [0]: advanceWidth=500, lsb=0
+	Glyph ID [1]: advanceWidth=280, lsb=0
+	Glyph ID [2]: advanceWidth=236, lsb=67
+	Glyph ID [3]: advanceWidth=304, lsb=65
+	Glyph ID [4]: advanceWidth=695, lsb=47
+	Glyph ID [5]: advanceWidth=555, lsb=104
+	Glyph ID [6]: advanceWidth=884, lsb=52
+	Glyph ID [7]: advanceWidth=792, lsb=24
+    (skipping hmetrics 8..762)
+	Glyph ID [762]: advanceWidth=403, lsb=68
+	Glyph ID [763]: advanceWidth=720, lsb=13
+	Glyph ID [764]: advanceWidth=496, lsb=23
+	Glyph ID [765]: advanceWidth=492, lsb=23
+	Glyph ID [766]: advanceWidth=756, lsb=13
+	Glyph ID [767]: advanceWidth=824, lsb=37
+	Glyph ID [768]: advanceWidth=559, lsb=33
+	Glyph ID [769]: advanceWidth=761, lsb=31
+maxp: version 0.5 (PostScript)
+name: version 0, 22 name_records
+    Full Font Name: Klei
+os/2: version 4
+post: version 3.0 (proportionally spaced)
+GDEF: version 1.0
+    GlyphClassDef:
+		(0001 -> 01c7): 1(base)
+		(01c8 -> 01c8): 3(mark)
+		(01c9 -> 02fa): 1(base)
+		(02fb -> 02fb): 2(liga)
+		(02fc -> 02fc): 1(base)
+		(02fd -> 02ff): 2(liga)
+		(0300 -> 0301): 1(base)
+    LigCaretList:
+	Glyphs Covered: [02fb]
+	    [0]: [-4du]
+    MarkAttachClassDef:
+		Glyph 0000: 0
+    MarkGlyphSet: <none>
+    ItemVariationStore: <none>
+GPOS: version 1.0
+    ScriptList
+	[0]: DFLT
+	    [Default LangSys]: feature-indices: [0]
+	    LangSysRecords: <empty list>
+	[1]: latn
+	    [Default LangSys]: feature-indices: [0]
+	    LangSysRecords: <empty list>
+    FeatureList
+	[0]: kern[0]
+    LookupList:
+	[0]: LookupTable: kind=PairPos: [byGlyph([2 ∈ [23,71]]), byGlyph([24]), byGlyph([17]), ...(40 skipped)..., byClass[(0, 0), (1, 1)]([7 ranges; 24 ∈ [66,179]]), byClass[(0, 0), (1, 1)]([∀: 87..=90]), byClass[(0, 0), (1, 1)]([3 ∈ [73,79]])]
+GSUB: version 1.0
+    ScriptList
+	[0]: DFLT
+	    [Default LangSys]: feature-indices: [0]
+	    LangSysRecords: <empty list>
+	[1]: latn
+	    [Default LangSys]: feature-indices: [0]
+	    LangSysRecords: <empty list>
+    FeatureList
+	[0]: liga[0]
+    LookupList:
+	[0]: LookupTable: kind=LigatureSubst: [[(#0047.0047.004d => 767)], [(#0047.0047.004a => 766)], [(#0047.0047 => 763)], [(#0047.004d => 765)], [(#0047.004d => 765)]]
+'CFF ': [MISSING IMPL]
+====== END OF FONT FILE ======
+
+
