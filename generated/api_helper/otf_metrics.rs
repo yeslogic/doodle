@@ -149,7 +149,8 @@ pub mod otf_types {
     }
 
     // REVIEW - no module-level definition so the name is the semi-arbitrary 'first' one the code-generator sees
-    pub type OpentypeF2Dot14 = opentype_gvar_tuple_record_coordinates;
+    // FIXME - lock in a stable definition for F2Dot14 in `opentype.rs` to avoid name-drift
+    pub type OpentypeF2Dot14 = opentype_avar_axis_value_map_from_coordinate;
 
     pub type F2Dot14 = I2F14;
 
@@ -165,19 +166,18 @@ pub mod otf_types {
     alias! {
         pub type OpentypeFontDirectory = opentype_table_directory<'input>;
 
-        pub type OpentypeGlyf = opentype_glyf_table<'a>;
-
+        // GROUP 1 - Required tables
         pub type OpentypeCmap = opentype_cmap_table<'a>;
 
         pub type OpentypeHead = opentype_head_table;
 
         pub type OpentypeHhea = opentype_hhea_table;
 
+        pub type OpentypeMaxp = opentype_maxp_table;
+
         pub type OpentypeHmtx = opentype_hmtx_table;
 
         pub type OpentypeHmtxLongMetric = opentype_hmtx_table_long_metrics;
-
-        pub type OpentypeMaxp = opentype_maxp_table;
 
         pub type OpentypeName = opentype_name_table<'a>;
 
@@ -185,37 +185,55 @@ pub mod otf_types {
 
         pub type OpentypePost = opentype_post_table<'a>;
 
+        // GROUP 2 - TrueType outline tables
+        pub type OpentypeGlyf = opentype_glyf_table<'a>;
+
+        // NOTE - cvt, fpgm, and prep are non-adhoc formats so they do not have an associated type in the generated code
+        // NOTE - loca is not directly manifest as its own metrics table, since it is only used to parse `glyf`.
+        pub type OpentypeLoca = opentype_loca_table;
+
+        pub type OpentypeGasp = opentype_gasp_table;
+
+        // SECTION - Advanced typographic features
         pub type OpentypeBase = opentype_base_table<'a>;
 
         pub type OpentypeGdef = opentype_gdef_table<'a>;
 
-        pub type OpentypeGpos = opentype_gpos_table<'a>;
-
         pub type OpentypeGsub = opentype_gsub_table<'a>;
 
-        pub type OpentypeKern = opentype_kern_table<'a>;
+        pub type OpentypeGpos = opentype_gpos_table<'a>;
+        // !SECTION
 
-        pub type OpentypeStat = opentype_stat_table<'a>;
+        // SECTION - Variable font tables
+        pub type OpentypeAvar = opentype_avar_table;
 
         pub type OpentypeFvar = opentype_fvar_table<'a>;
 
         pub type OpentypeGvar = opentype_gvar_table<'a>;
 
         pub type OpentypeHvar = opentype_hvar_table<'a>;
+        // !SECTION
+
+        // SECTION - Supplementary tables
+        pub type OpentypeHdmx = opentype_hdmx_table<'a>;
 
         pub type OpentypeDsig = opentype_dsig_table<'a>;
 
-        pub type OpentypeHdmx = opentype_hdmx_table<'a>;
+        pub type OpentypeKern = opentype_kern_table<'a>;
+
+        pub type OpentypeStat = opentype_stat_table<'a>;
 
         pub type OpentypeVdmx = opentype_vdmx_table<'a>;
+
+        // STUB[epic=horizontal-for-vertical] - change to distinguished type names once we have them
+        pub type OpentypeVhea = opentype_hhea_table;
+
+        // STUB[epic=horizontal-for-vertical] - change to distinguished type names once we have them
+        pub type OpentypeVmtx = opentype_hmtx_table;
+
+        pub type OpentypeVmtxLongMetric = opentype_hmtx_table_long_metrics;
+        // !SECTION
     }
-
-    // STUB[epic=horizontal-for-vertical] - change to distinguished type names once we have them
-    pub type OpentypeVhea = opentype_hhea_table;
-
-    pub type OpentypeVmtx = opentype_hmtx_table;
-
-    pub type OpentypeVmtxLongMetric = opentype_hmtx_table_long_metrics;
 }
 pub use otf_types::*;
 // !SECTION
@@ -1445,7 +1463,7 @@ pub struct SingleFontMetrics {
 // SECTION - API types for CMAP
 // REVIEW - this style of naming and promotion-impl may be useful for other top-level table types
 #[derive(Clone, Debug)]
-// STUB - enrich with any further details we care about presenting
+// STUB - enrich with any futher details we care about presenting
 struct Cmap {
     version: u16,
     encoding_records: Vec<cmap::EncodingRecord>,
@@ -3037,8 +3055,21 @@ pub struct RequiredTableMetrics {
 // number of elements in the contained array
 pub struct RawArrayMetrics(usize);
 
-type CvtMetrics = RawArrayMetrics;
-type FpgmMetrics = RawArrayMetrics;
+pub(crate) type CvtMetrics = RawArrayMetrics;
+pub(crate) type FpgmMetrics = RawArrayMetrics;
+pub(crate) type PrepMetrics = RawArrayMetrics;
+
+impl Promote<Vec<i16>> for CvtMetrics {
+    fn promote(orig: &Vec<i16>) -> Self {
+        Self(orig.len())
+    }
+}
+
+impl Promote<Vec<u8>> for ReflType<PrepMetrics, FpgmMetrics> {
+    fn promote(orig: &Vec<u8>) -> Self {
+        Self(orig.len())
+    }
+}
 
 alias! {
     pub type OpentypeGlyfEntry = opentype_glyf_table_glyphs;
@@ -3052,11 +3083,16 @@ alias! {
     pub type GlyphDescription = opentype_glyf_description;
 }
 
-#[derive(Clone, Debug)]
-pub struct GlyfMetrics {
-    num_glyphs: usize,
-    glyphs: Vec<GlyphMetric>,
+mod glyf {
+    use super::GlyphMetric;
+
+    #[derive(Clone, Debug)]
+    pub struct GlyfMetrics {
+        pub(crate) num_glyphs: usize,
+        pub(crate) glyphs: Vec<GlyphMetric>,
+    }
 }
+pub(crate) use glyf::GlyfMetrics;
 
 frame!(OpentypeGlyf);
 
@@ -3174,22 +3210,75 @@ impl std::fmt::Display for BoundingBox {
 }
 
 type LocaMetrics = ();
-type PrepMetrics = RawArrayMetrics;
-#[derive(Clone, Debug)]
-struct GaspMetrics {
-    version: u16,
-    num_ranges: usize,
-    ranges: Vec<GaspRange>,
-}
 
-#[derive(Clone, Copy, Debug)]
-struct GaspRange {
-    range_max_ppem: u16,
-    range_gasp_behavior: GaspBehaviorFlags,
+pub(crate) mod otf_gasp {
+    alias! {
+        pub type OpentypeGaspBehavior = opentype_gasp_gasp_record_range_gasp_behavior;
+        pub type OpentypeGaspBehaviorVer1Flags = opentype_gasp_gasp_record_range_gasp_behavior_Version1;
+        pub type OpentypeGaspBehaviorVer0Flags = opentype_gasp_gasp_record_range_gasp_behavior_Version0;
+        pub type OpentypeGaspRange = opentype_gasp_gasp_record;
+    }
 }
+pub(crate) use otf_gasp::*;
 
-// NOTE - Version 1 contains all the fields that version 0 contains, so it can be used as the unifying type
-type GaspBehaviorFlags = opentype_gasp_table_gasp_ranges_range_gasp_behavior_Version1;
+mod gasp {
+    use super::*;
+
+    pub type GaspBehaviorFlags = OpentypeGaspBehaviorVer1Flags;
+
+    impl Promote<OpentypeGaspBehaviorVer0Flags> for GaspBehaviorFlags {
+        fn promote(orig: &OpentypeGaspBehaviorVer0Flags) -> Self {
+            let OpentypeGaspBehaviorVer0Flags { dogray, gridfit } = *orig;
+            GaspBehaviorFlags {
+                symmetric_smoothing: false,
+                symmetric_gridfit: false,
+                dogray,
+                gridfit,
+            }
+        }
+    }
+
+    impl Promote<OpentypeGaspBehavior> for GaspBehaviorFlags {
+        fn promote(orig: &OpentypeGaspBehavior) -> Self {
+            match orig {
+                OpentypeGaspBehavior::Version0(x) => GaspBehaviorFlags::promote(x),
+                OpentypeGaspBehavior::Version1(x) => *x,
+            }
+        }
+    }
+
+    impl Promote<OpentypeGaspRange> for GaspRange {
+        fn promote(r: &OpentypeGaspRange) -> Self {
+            GaspRange {
+                range_max_ppem: r.range_max_ppem,
+                range_gasp_behavior: GaspBehaviorFlags::promote(&r.range_gasp_behavior),
+            }
+        }
+    }
+    #[derive(Clone, Copy, Debug)]
+    pub struct GaspRange {
+        pub(crate) range_max_ppem: u16,
+        pub(crate) range_gasp_behavior: GaspBehaviorFlags,
+    }
+
+    impl Promote<OpentypeGasp> for GaspMetrics {
+        fn promote(gasp: &OpentypeGasp) -> Self {
+            GaspMetrics {
+                version: gasp.version,
+                num_ranges: gasp.num_ranges as usize,
+                ranges: promote_vec(&gasp.gasp_ranges),
+            }
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    pub struct GaspMetrics {
+        pub(crate) version: u16,
+        pub(crate) num_ranges: usize,
+        pub(crate) ranges: Vec<GaspRange>,
+    }
+}
+pub(crate) use gasp::{GaspBehaviorFlags, GaspMetrics, GaspRange};
 
 pub(crate) type CoverageRangeRecord = RangeRecord<u16>;
 
@@ -6961,231 +7050,250 @@ struct BaseMetrics {
     // STUB - add more fields as desired
 }
 
-pub type OpentypeKernCoverage = opentype_kern_kern_subtable_coverage;
+pub(crate) mod otf_kern {
+    use super::*;
 
-impl Promote<OpentypeKernCoverage> for KernFlags {
-    fn promote(orig: &OpentypeKernCoverage) -> Self {
-        KernFlags {
-            r#override: orig.r#override,
-            cross_stream: orig.cross_stream,
-            minimum: orig.minimum,
-            horizontal: orig.horizontal,
+    alias! {
+        pub type OpentypeKernPair = opentype_kern_subtable_format0_kern_pairs;
+        pub type OpentypeKernSubtable = opentype_kern_kern_subtable<'a>;
+        pub type OpentypeKernSubtableData = opentype_kern_kern_subtable_data<'a>;
+        pub type OpentypeKernCoverage = opentype_kern_kern_subtable_coverage;
+        pub type OpentypeKernSubtableFormat0 = opentype_kern_subtable_format0;
+        pub type OpentypeKernSubtableFormat2 = opentype_kern_subtable_format2<'a>;
+        pub type OpentypeKerningArray = opentype_kern_kerning_array;
+        pub type OpentypeKernClassTable = opentype_kern_class_table;
+    }
+
+    frame!(OpentypeKernSubtableFormat2);
+
+    impl<'a> container::MultiContainer<Mandatory<obj::KernCls>, 2> for OpentypeKernSubtableFormat2<'a> {
+        fn get_offset_array(&self) -> [usize; 2] {
+            [
+                self.left_class_offset.offset as usize,
+                self.right_class_offset.offset as usize,
+            ]
+        }
+
+        fn get_args_array(&self) -> [(); 2] {
+            [(); 2]
+        }
+    }
+
+    impl<'a> OpentypeKernSubtableFormat2<'a> {
+        pub(crate) fn n_glyphs_in_class(view: View<'_>, offset: usize) -> u16 {
+            assert_ne!(offset, 0, "offset should be non-zero");
+            let field_shift = size_of::<u16>();
+
+            let start_of_field = view.offset(offset + field_shift).expect("bad offset");
+            start_of_field.read_u16be().expect("bad value")
+        }
+
+        pub fn left_glyph_count(&self) -> u16 {
+            Self::n_glyphs_in_class(self.table_scope, self.left_class_offset.offset as usize)
+        }
+
+        pub fn right_glyph_count(&self) -> u16 {
+            Self::n_glyphs_in_class(self.table_scope, self.right_class_offset.offset as usize)
+        }
+    }
+
+    impl<'a> container::SingleContainer<Mandatory<obj::KernArr>> for OpentypeKernSubtableFormat2<'a> {
+        fn get_offset(&self) -> usize {
+            self.kerning_array_offset.offset as usize
+        }
+
+        fn get_args(&self) -> (u16, u16) {
+            (self.left_glyph_count(), self.right_glyph_count())
         }
     }
 }
+pub(crate) use otf_kern::*;
+pub(crate) mod kern {
+    use super::*;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-struct KernFlags {
-    r#override: bool,
-    cross_stream: bool,
-    minimum: bool,
-    horizontal: bool,
-}
-
-pub type OpentypeKernSubtable<'a> = opentype_kern_kern_subtable<'a>;
-
-impl<'a> Promote<OpentypeKernSubtable<'a>> for KernSubtable {
-    fn promote(orig: &OpentypeKernSubtable) -> Self {
-        let flags = KernFlags::promote(&orig.coverage);
-        let data = KernSubtableData::promote(&orig.data);
-        KernSubtable { flags, data }
-    }
-}
-
-#[derive(Debug, Clone)]
-struct KernSubtable {
-    flags: KernFlags,
-    data: KernSubtableData,
-}
-
-pub type OpentypeKernPair = opentype_kern_subtable_format0_kern_pairs;
-
-impl Promote<OpentypeKernPair> for KernPair {
-    fn promote(orig: &OpentypeKernPair) -> Self {
-        KernPair {
-            left: orig.left,
-            right: orig.right,
-            value: orig.value,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Copy)]
-struct KernPair {
-    left: u16,
-    right: u16,
-    value: i16,
-}
-
-impl PartialEq for KernPair {
-    fn eq(&self, other: &Self) -> bool {
-        self.left == other.left && self.right == other.right
-    }
-}
-
-impl Eq for KernPair {}
-
-impl PartialOrd for KernPair {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for KernPair {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        let this_key = ((self.left as u32) << 16) & (self.right as u32);
-        let other_key = ((other.left as u32) << 16) & (other.right as u32);
-        this_key.cmp(&other_key)
-    }
-}
-
-pub type OpentypeKernSubtableFormat0 = opentype_kern_subtable_format0;
-
-impl Promote<OpentypeKernSubtableFormat0> for KernSubtableFormat0 {
-    fn promote(orig: &OpentypeKernSubtableFormat0) -> Self {
-        KernSubtableFormat0 {
-            kern_pairs: promote_vec(&orig.kern_pairs),
-        }
-    }
-}
-#[derive(Clone, Debug)]
-#[repr(transparent)]
-struct KernSubtableFormat0 {
-    // REVIEW - is Vec the most apt container-type given that we know the array is sorted by left-right key?
-    kern_pairs: Vec<KernPair>,
-}
-
-pub type OpentypeKernSubtableFormat2<'a> = opentype_kern_subtable_format2<'a>;
-
-frame!(OpentypeKernSubtableFormat2);
-
-impl<'a> container::MultiContainer<Mandatory<obj::KernCls>, 2> for OpentypeKernSubtableFormat2<'a> {
-    fn get_offset_array(&self) -> [usize; 2] {
-        [
-            self.left_class_offset.offset as usize,
-            self.right_class_offset.offset as usize,
-        ]
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    pub(crate) struct KernFlags {
+        pub(crate) r#override: bool,
+        pub(crate) cross_stream: bool,
+        pub(crate) minimum: bool,
+        pub(crate) horizontal: bool,
     }
 
-    fn get_args_array(&self) -> [(); 2] {
-        [(); 2]
-    }
-}
-
-impl<'a> OpentypeKernSubtableFormat2<'a> {
-    fn n_glyphs_in_class(view: View<'_>, offset: usize) -> u16 {
-        assert_ne!(offset, 0, "offset should be non-zero");
-        let field_shift = size_of::<u16>();
-
-        let start_of_field = view.offset(offset + field_shift).expect("bad offset");
-        start_of_field.read_u16be().expect("bad value")
-    }
-
-    pub fn left_glyph_count(&self) -> u16 {
-        Self::n_glyphs_in_class(self.table_scope, self.left_class_offset.offset as usize)
-    }
-
-    pub fn right_glyph_count(&self) -> u16 {
-        Self::n_glyphs_in_class(self.table_scope, self.right_class_offset.offset as usize)
-    }
-}
-
-impl<'a> container::SingleContainer<Mandatory<obj::KernArr>> for OpentypeKernSubtableFormat2<'a> {
-    fn get_offset(&self) -> usize {
-        self.kerning_array_offset.offset as usize
-    }
-
-    fn get_args(&self) -> (u16, u16) {
-        (self.left_glyph_count(), self.right_glyph_count())
-    }
-}
-
-impl<'a> Promote<OpentypeKernSubtableFormat2<'a>> for KernSubtableFormat2 {
-    fn promote(orig: &OpentypeKernSubtableFormat2) -> Self {
-        let left_class =
-            KernClassTable::promote(&fn_reify::reify_index(orig, Mandatory(obj::KernCls), 0));
-        let right_class =
-            KernClassTable::promote(&fn_reify::reify_index(orig, Mandatory(obj::KernCls), 1));
-        let kerning_array = KerningArray::promote(&fn_reify::reify(orig, Mandatory(obj::KernArr)));
-        KernSubtableFormat2 {
-            left_class,
-            right_class,
-            kerning_array,
-        }
-    }
-}
-
-pub type OpentypeKerningArray = opentype_kern_kerning_array;
-
-#[derive(Clone, Debug)]
-#[repr(transparent)]
-struct KerningArray(Wec<i16>);
-
-impl Promote<OpentypeKerningArray> for KerningArray {
-    fn promote(orig: &OpentypeKerningArray) -> Self {
-        let height = orig.left_glyph_count as usize;
-        let width = orig.right_glyph_count as usize;
-        let size = height * width;
-        let mut accum = Wec::with_capacity(width, size);
-        for row in orig.kerning_values.iter() {
-            accum.extend(row.iter().copied());
-        }
-        KerningArray(accum)
-    }
-}
-
-#[derive(Debug, Clone)]
-struct KernSubtableFormat2 {
-    left_class: KernClassTable,
-    right_class: KernClassTable,
-    kerning_array: KerningArray,
-}
-
-pub type OpentypeKernClassTable = opentype_kern_class_table;
-
-impl Promote<OpentypeKernClassTable> for KernClassTable {
-    fn promote(orig: &OpentypeKernClassTable) -> Self {
-        KernClassTable {
-            first_glyph: orig.first_glyph,
-            n_glyphs: orig.n_glyphs,
-            class_values: orig.class_values.clone(),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-struct KernClassTable {
-    first_glyph: u16,
-    n_glyphs: u16,
-    class_values: Vec<u16>,
-}
-
-pub type OpentypeKernSubtableData<'a> = opentype_kern_kern_subtable_data<'a>;
-
-impl<'a> Promote<OpentypeKernSubtableData<'a>> for KernSubtableData {
-    fn promote(orig: &OpentypeKernSubtableData) -> Self {
-        match orig {
-            OpentypeKernSubtableData::Format0(f0) => {
-                KernSubtableData::Format0(KernSubtableFormat0::promote(f0))
-            }
-            OpentypeKernSubtableData::Format2(f2) => {
-                KernSubtableData::Format2(KernSubtableFormat2::promote(f2))
+    impl Promote<OpentypeKernCoverage> for KernFlags {
+        fn promote(orig: &OpentypeKernCoverage) -> Self {
+            KernFlags {
+                r#override: orig.r#override,
+                cross_stream: orig.cross_stream,
+                minimum: orig.minimum,
+                horizontal: orig.horizontal,
             }
         }
     }
-}
 
-#[derive(Clone, Debug)]
-enum KernSubtableData {
-    Format0(KernSubtableFormat0),
-    Format2(KernSubtableFormat2),
-}
+    #[derive(Debug, Clone)]
+    pub(crate) struct KernSubtable {
+        pub(crate) flags: KernFlags,
+        pub(crate) data: KernSubtableData,
+    }
 
-#[derive(Debug, Clone, Default)]
-#[repr(transparent)]
-struct KernMetrics {
-    subtables: Vec<KernSubtable>,
+    impl<'a> Promote<OpentypeKernSubtable<'a>> for KernSubtable {
+        fn promote(orig: &OpentypeKernSubtable) -> Self {
+            let flags = KernFlags::promote(&orig.coverage);
+            let data = KernSubtableData::promote(&orig.data);
+            KernSubtable { flags, data }
+        }
+    }
+
+    #[derive(Clone, Debug, Copy)]
+    pub(crate) struct KernPair {
+        pub(crate) left: u16,
+        pub(crate) right: u16,
+        pub(crate) value: i16,
+    }
+
+    impl Promote<OpentypeKernPair> for KernPair {
+        fn promote(orig: &OpentypeKernPair) -> Self {
+            KernPair {
+                left: orig.left,
+                right: orig.right,
+                value: orig.value,
+            }
+        }
+    }
+
+    mod __impl {
+        use super::KernPair;
+
+        impl PartialEq for KernPair {
+            fn eq(&self, other: &Self) -> bool {
+                self.left == other.left && self.right == other.right
+            }
+        }
+
+        impl Eq for KernPair {}
+
+        impl PartialOrd for KernPair {
+            fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+                Some(self.cmp(other))
+            }
+        }
+
+        impl Ord for KernPair {
+            fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+                let this_key = ((self.left as u32) << 16) & (self.right as u32);
+                let other_key = ((other.left as u32) << 16) & (other.right as u32);
+                this_key.cmp(&other_key)
+            }
+        }
+    }
+    #[derive(Clone, Debug)]
+    #[repr(transparent)]
+    pub(crate) struct KernSubtableFormat0 {
+        // REVIEW - is Vec the most apt container-type given that we know the array is sorted by left-right key?
+        pub(crate) kern_pairs: Vec<KernPair>,
+    }
+
+    impl Promote<OpentypeKernSubtableFormat0> for KernSubtableFormat0 {
+        fn promote(orig: &OpentypeKernSubtableFormat0) -> Self {
+            KernSubtableFormat0 {
+                kern_pairs: promote_vec(&orig.kern_pairs),
+            }
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    #[repr(transparent)]
+    pub struct KerningArray(pub(crate) Wec<i16>);
+
+    impl Promote<OpentypeKerningArray> for KerningArray {
+        fn promote(orig: &OpentypeKerningArray) -> Self {
+            let height = orig.left_glyph_count as usize;
+            let width = orig.right_glyph_count as usize;
+            let size = height * width;
+            let mut accum = Wec::with_capacity(width, size);
+            for row in orig.kerning_values.iter() {
+                accum.extend(row.iter().copied());
+            }
+            KerningArray(accum)
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct KernSubtableFormat2 {
+        pub(crate) left_class: KernClassTable,
+        pub(crate) right_class: KernClassTable,
+        pub(crate) kerning_array: KerningArray,
+    }
+
+    impl<'a> Promote<OpentypeKernSubtableFormat2<'a>> for KernSubtableFormat2 {
+        fn promote(orig: &OpentypeKernSubtableFormat2) -> Self {
+            let left_class =
+                KernClassTable::promote(&reify_index(orig, Mandatory(obj::KernCls), 0));
+            let right_class =
+                KernClassTable::promote(&reify_index(orig, Mandatory(obj::KernCls), 1));
+            let kerning_array = KerningArray::promote(&reify(orig, Mandatory(obj::KernArr)));
+            KernSubtableFormat2 {
+                left_class,
+                right_class,
+                kerning_array,
+            }
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct KernClassTable {
+        pub(crate) first_glyph: u16,
+        pub(crate) n_glyphs: u16,
+        pub(crate) class_values: Vec<u16>,
+    }
+
+    impl Promote<OpentypeKernClassTable> for KernClassTable {
+        fn promote(orig: &OpentypeKernClassTable) -> Self {
+            KernClassTable {
+                first_glyph: orig.first_glyph,
+                n_glyphs: orig.n_glyphs,
+                class_values: orig.class_values.clone(),
+            }
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    pub enum KernSubtableData {
+        Format0(KernSubtableFormat0),
+        Format2(KernSubtableFormat2),
+    }
+
+    impl<'a> Promote<OpentypeKernSubtableData<'a>> for KernSubtableData {
+        fn promote(orig: &OpentypeKernSubtableData) -> Self {
+            match orig {
+                OpentypeKernSubtableData::Format0(f0) => {
+                    KernSubtableData::Format0(KernSubtableFormat0::promote(f0))
+                }
+                OpentypeKernSubtableData::Format2(f2) => {
+                    KernSubtableData::Format2(KernSubtableFormat2::promote(f2))
+                }
+            }
+        }
+    }
+
+    impl<'a> Promote<OpentypeKern<'a>> for KernMetrics {
+        fn promote(orig: &OpentypeKern) -> Self {
+            KernMetrics {
+                subtables: promote_vec(&orig.subtables),
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, Default)]
+    #[repr(transparent)]
+    pub struct KernMetrics {
+        pub(crate) subtables: Vec<KernSubtable>,
+    }
 }
+pub(crate) use kern::{
+    KernClassTable, KernFlags, KernMetrics, KernPair, KernSubtable, KernSubtableData,
+    KernSubtableFormat0, KernSubtableFormat2, KerningArray,
+};
 
 type Heap<T> = Box<T>;
 #[derive(Clone, Debug)]
@@ -7599,51 +7707,13 @@ pub fn analyze_table_directory(
         })
     };
     let optional = {
-        let cvt = dir
-            .table_links
-            .cvt
-            .as_ref()
-            .map(|cvt| RawArrayMetrics(cvt.len()));
-        let fpgm = dir
-            .table_links
-            .fpgm
-            .as_ref()
-            .map(|fpgm| RawArrayMetrics(fpgm.len()));
+        let cvt = promote_opt::<_, CvtMetrics>(&dir.table_links.cvt);
+        let fpgm = promote_opt::<_, FpgmMetrics>(&dir.table_links.fpgm);
         let loca = dir.table_links.loca.as_ref().map(|_| ());
-        let glyf = dir.table_links.glyf.as_ref().map(GlyfMetrics::promote);
-        let prep = {
-            let prep = &dir.table_links.prep;
-            prep.as_ref().map(|prep| RawArrayMetrics(prep.len()))
-        };
-        let gasp = {
-            let gasp = &dir.table_links.gasp;
-            gasp.as_ref().map(|gasp| GaspMetrics {
-                version: gasp.version,
-                num_ranges: gasp.num_ranges as usize,
-                ranges: gasp
-                    .gasp_ranges
-                    .iter()
-                    .map(|r| GaspRange {
-                        range_max_ppem: r.range_max_ppem,
-                        range_gasp_behavior: match &r.range_gasp_behavior {
-                            &opentype_gasp_table_gasp_ranges_range_gasp_behavior::Version0(
-                                opentype_gasp_table_gasp_ranges_range_gasp_behavior_Version0 {
-                                    dogray,
-                                    gridfit,
-                                },
-                            ) => GaspBehaviorFlags {
-                                symmetric_smoothing: false,
-                                symmetric_gridfit: false,
-                                dogray,
-                                gridfit,
-                            },
-                            opentype_gasp_table_gasp_ranges_range_gasp_behavior::Version1(x) => *x,
-                        },
-                    })
-                    .collect(),
-            })
-        };
-        // STUB - anything before GDEF goes here
+        let glyf = promote_opt(&dir.table_links.glyf);
+        let prep = promote_opt::<_, PrepMetrics>(&dir.table_links.prep);
+        let gasp = promote_opt(&dir.table_links.gasp);
+        // STUB - anything beteween gasp and BASE goes here
         let base = {
             let base = &dir.table_links.base;
             base.as_ref()
@@ -7670,9 +7740,13 @@ pub fn analyze_table_directory(
             let gsub = &dir.table_links.gsub;
             gsub.as_ref().map(LayoutMetrics::promote_gsub).transpose()?
         };
+        // STUB - anything beteween gsub and avar goes here
         let fvar = promote_opt(&dir.table_links.fvar).map(Heap::new);
         let gvar = promote_opt(&dir.table_links.gvar).map(Heap::new);
         let hvar = promote_opt(&dir.table_links.hvar).map(Heap::new);
+        let dsig = promote_opt(&dir.table_links.dsig);
+        let hdmx = try_promote_opt(&dir.table_links.hdmx)?;
+
         let kern = {
             let kern = &dir.table_links.kern;
             kern.as_ref().map(|kern| KernMetrics {
@@ -7680,8 +7754,6 @@ pub fn analyze_table_directory(
             })
         };
         let stat = promote_opt(&dir.table_links.stat).map(Heap::new);
-        let dsig = promote_opt(&dir.table_links.dsig);
-        let hdmx = try_promote_opt(&dir.table_links.hdmx)?;
         let vdmx = promote_opt(&dir.table_links.vdmx);
         let vhea = {
             let vhea = &dir.table_links.vhea;
