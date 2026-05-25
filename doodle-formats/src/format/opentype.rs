@@ -702,6 +702,7 @@ pub(crate) fn table_links(
     );
     let kern_table = kern::table(module);
     let stat_table = stat::table(module, tag);
+    let avar_table = avar::table(module);
     let fvar_table = fvar::table(module, tag);
     let gvar_table = gvar::table(module);
     let hvar_table = hvar::table(module, item_variation_store);
@@ -909,6 +910,15 @@ pub(crate) fn table_links(
             // STUB - add more table sections
             // SECTION - Font Variations
             // STUB - add more tables
+            (
+                "avar",
+                optional_table(
+                    util::FONTVIEW_VAR,
+                    var("tables"),
+                    util::magic(b"avar"),
+                    avar_table.call(),
+                ),
+            ),
             (
                 "fvar",
                 optional_table(
@@ -1523,121 +1533,183 @@ pub(crate) mod vdmx {
     }
 }
 
-pub(crate) mod hvar {
+pub(crate) mod avar {
     use super::*;
 
-    /// HVAR Table format definition
-    ///
-    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/hvar#table-formats
-    ///
-    /// Only appears if `hmtx` is present, and like all variable-font tables,
-    /// requires `fvar` and `STAT` to be present.
-    pub(crate) fn table(module: &mut FormatModule, item_variation_store: FormatRef) -> FormatRef {
-        let dsim = delta_set_index_map(module);
+    pub(crate) fn table(module: &mut FormatModule) -> FormatRef {
+        let segment_maps = segment_maps(module);
+
         module.define_format(
-            "opentype.hvar.table",
-            let_view(
-                "table_view",
-                record_auto([
-                    ("table_scope", reify_view(vvar("table_view"))),
-                    ("major_version", expect_u16be(1)),
-                    ("minor_version", expect_u16be(0)),
-                    // NOTE - the HVAR specification implies that the following offset is non-NULL, but the OpenType spec includes the caveat that even not-explicitly NULLable offsets should be handled gracefully if null
-                    // REVIEW[epic=validation] - this IVS must contain sufficient delta-sets that the maximum index found in any DSIM entry is in-bounds, but we cannot check this at this layer.
-                    (
-                        "item_variation_store",
-                        util::read_phantom_view_offset32(
-                            vvar("table_view"),
-                            item_variation_store.call(),
+            "opentype.avar.table",
+            record_auto([
+                ("major_version", expect_u16be(1)),
+                ("minor_version", expect_u16be(0)),
+                ("__reserved", expect_u16be(0)),
+                ("axis_count", u16be()), // NOTE - should agree with `axis_count` in `fvar`, which is required in all variable fonts
+                (
+                    "axis_segment_maps",
+                    repeat_count(var("axis_count"), segment_maps.call()),
+                ),
+            ]),
+        )
+    }
+
+    fn segment_maps(module: &mut FormatModule) -> FormatRef {
+        let axis_value_map = module.define_format(
+            "opentype.avar.axis_value_map",
+            record_repeat(["from_coordinate", "to_coordinate"], f2dot14()),
+        );
+
+        module.define_format(
+            "opentype.avar.segment_maps",
+            record_auto([
+                ("position_map_count", u16be()),
+                (
+                    "axis_value_maps",
+                    repeat_count(var("position_map_count"), axis_value_map.call()),
+                ),
+            ]),
+        )
+    }
+}
+
+pub(crate) mod fvar {
+    use doodle::DepFormat;
+
+    use super::*;
+
+    pub(crate) fn table(module: &mut FormatModule, tag: FormatRef) -> FormatRef {
+        let variation_axis_record = variation_axis_record(module, tag);
+        let instance_record = instance_record(module);
+
+        // First half of `fvar` table: fixed-size header
+        let fvar_header = record_auto([
+            ("major_version", util::expect_u16be(1)),
+            ("minor_version", util::expect_u16be(0)),
+            (
+                "offset_axes",
+                where_lambda(u16be(), "raw", is_nonzero_u16(var("raw"))),
+            ),
+            ("__reserved", util::expect_u16be(2)),
+            ("axis_count", u16be()),
+            ("axis_size", util::expect_u16be(20)), // For fvar version 1.0, axis record are fixed-size == 20 (0x0014) bytes
+            ("instance_count", u16be()),
+            ("instance_size", u16be()), // TODO[epic=validation] - not yet enforced, but should be axisCount * sizeOf(Fixed32Be) + (4 or 6)
+        ]);
+        // Second half of `fvar` table: offset-linked axes and instances
+        let fvar_arrays = record_auto([
+            (
+                "_axes_length",
+                compute(mul(var("axis_count"), var("axis_size"))),
+            ),
+            (
+                "#_axes",
+                // TODO - this becomes a lot easier if we use ViewFormats instead of offset-parse patterns
+                // NOTE - because we delay interpretation of the offset above to collect additional fields, we inline and specialize offset16 based on the captured value
+                phantom(parse_from_view(
+                    vvar("table_view").offset(var("offset_axes")),
+                    slice(
+                        var("_axes_length"),
+                        repeat_count(
+                            var("axis_count"),
+                            // because axis_size is fixed at 20 and variation_axis_record is a fixed-width (20 byte) parse, we don't need a slice here
+                            variation_axis_record.call(),
                         ),
                     ),
-                    // NOTE - each of the three following offset-fields are specified 'may be NULL', and that glyph ids are to be used directly as indices in place of a DSIM for any which are not provided
-                    (
-                        "advance_width_mapping",
-                        util::read_phantom_view_offset32(vvar("table_view"), dsim.call()),
+                )),
+            ),
+            (
+                "offset_instances",
+                compute(add(var("offset_axes"), var("_axes_length"))),
+            ),
+            (
+                "#_instances",
+                // NOTE - because we delay interpretation of the offset above to collect additional fields, we inline and specialize offset16 based on the captured value
+                phantom(parse_from_view(
+                    vvar("table_view").offset(var("offset_instances")),
+                    repeat_count(
+                        var("instance_count"),
+                        slice(
+                            var("instance_size"),
+                            instance_record.invoke_args([var("axis_count"), var("instance_size")]),
+                        ),
                     ),
-                    (
-                        "lsb_mapping",
-                        util::read_phantom_view_offset32(vvar("table_view"), dsim.call()),
-                    ),
-                    (
-                        "rsb_mapping",
-                        util::read_phantom_view_offset32(vvar("table_view"), dsim.call()),
-                    ),
-                ]),
+                )),
+            ),
+        ]);
+        let scope_field = record([("table_scope", reify_view(vvar("table_view")))]);
+        module.define_format(
+            "opentype.fvar.table",
+            let_view(
+                "table_view",
+                merge_records([scope_field, fvar_header, fvar_arrays]),
             ),
         )
     }
 
-    /// DeltaSetIndexMap format definition
+    /// InstanceRecord format implementation
     ///
-    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/otvarcommonformats#associating-target-items-to-variation-data
-    // TODO: extract to common format across variations
-    fn delta_set_index_map(module: &mut FormatModule) -> FormatRef {
-        let entry_format = module.define_format(
-            "opentype.var.dsim-entry_format",
-            bit_fields_u8([
-                // 0xC0 - reserved  (Set to 0)
-                BitFieldKind::Reserved {
-                    bit_width: 2,
-                    check_zero: true,
-                },
-                // 2 bits - <size in bytes of map entry> = mapEntrySize + 1
-                BitFieldKind::BitsField {
-                    bit_width: 2,
-                    field_name: "map_entry_size",
-                },
-                // 4 bits - <number of bits for each entry in inner-level index> = innerIndexBitCount + 1
-                BitFieldKind::BitsField {
-                    bit_width: 4,
-                    field_name: "inner_index_bit_count",
-                },
-            ]),
-        );
-        module.define_format(
-            "opentype.var.delta_set_index_map",
-            record_auto([
-                ("format", expect_between_u8(u8(), 0, 1)),
-                ("_entry_format", entry_format.call()),
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/fvar#instancerecord
+    ///
+    /// Parametric over `axis_count :~ U16` and `instance_size :~ U16`.
+    fn instance_record(module: &mut FormatModule) -> DepFormat<2, 0> {
+        let user_tuple = user_tuple(module);
+        module.register_format_args(
+            "opentype.fvar.instance_record",
+            [
+                (Label::Borrowed("axis_count"), ValueType::U16),
+                (Label::Borrowed("instance_size"), ValueType::U16),
+            ],
+            record([
+                ("subfamily_nameid", u16be()),
+                ("flags", util::expect_u16be(0)), // reserved for future use, should be set to 0,
+                ("coordinates", user_tuple.invoke_args([var("axis_count")])),
                 (
-                    "entry_size",
-                    compute(succ(record_proj(var("_entry_format"), "map_entry_size"))),
-                ),
-                (
-                    "inner_index_bits",
-                    compute(succ(record_proj(
-                        var("_entry_format"),
-                        "inner_index_bit_count",
-                    ))),
-                ),
-                (
-                    "map_count",
-                    fmt_match(
-                        var("format"),
-                        [
-                            (
-                                Pattern::U8(0),
-                                map(u16be(), lambda("val", as_u32(var("val")))),
-                            ),
-                            (Pattern::U8(1), u32be()),
-                        ],
+                    "postscript_nameid",
+                    cond_maybe(
+                        // Only included if the extra 2 bytes are implied by `instance_size`, which is otherwise divisible by 4
+                        expr_eq(rem(var("instance_size"), Expr::U16(4)), Expr::U16(2)),
+                        u16be(),
                     ),
                 ),
-                // REVIEW - the current strategy is to merely capture the map data and leave it as an uninterpreted byte-array; any processing can be done downstream of generated code
-                /*
-                 * MapData: captured as an uninterpreted byte-data array
-                 *
-                 * Each logical entry occupies `entry_size` (1-4) bytes, and is to be subsequently interpreted as an `(outerIx, innerIx)` pair:
-                 *   innerIx is stored within the N least-significant-bits of the entry (N = `inner_index_bits`)
-                 *   outerIx is stored within the M most-significant-bits of the entry (M = `entry_size * 8 - inner_index_bits`)
-                 *
-                 * Hence:
-                 *   <entry> = (<outerIx> << inner_index_bits) || <innerIx>
-                 */
-                (
-                    "map_data",
-                    capture_bytes_from_here(mul(var("map_count"), as_u32(var("entry_size")))),
-                ),
+            ]),
+        )
+    }
+
+    /// UserTuple record (part of `InstanceRecord`)
+    ///
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/fvar#instancerecord
+    ///
+    /// Parametric over `axis_count :~ U16`.
+    fn user_tuple(module: &mut FormatModule) -> DepFormat<1, 0> {
+        module.register_format_args(
+            "opentype.fvar.user_tuple",
+            [(Label::Borrowed("axis_count"), ValueType::U16)],
+            record([(
+                "coordinates",
+                repeat_count(var("axis_count"), util::fixed32be()),
+            )]),
+        )
+    }
+
+    fn variation_axis_record(module: &mut FormatModule, tag: FormatRef) -> FormatRef {
+        use BitFieldKind::*;
+        let axis_qual_flags = bit_fields_u16([
+            Reserved {
+                bit_width: 15,
+                check_zero: false,
+            },
+            FlagBit("hidden_axis"),
+        ]);
+        module.define_format(
+            "opentype.fvar.variation_axis_record",
+            record([
+                ("axis_tag", tag.call()),             // 4 bytes
+                ("min_value", util::fixed32be()),     // + 4 = 8 bytes
+                ("default_value", util::fixed32be()), // + 4 = 12 bytes
+                ("max_value", util::fixed32be()),     // +4 = 16 bytes
+                ("flags", axis_qual_flags),           // + 2 = 18 bytes
+                ("axis_name_id", u16be()),            // + 2 = 20 bytes
             ]),
         )
     }
@@ -2174,143 +2246,121 @@ pub(crate) mod gvar {
     }
 }
 
-pub(crate) mod fvar {
-    use doodle::DepFormat;
-
+pub(crate) mod hvar {
     use super::*;
 
-    pub(crate) fn table(module: &mut FormatModule, tag: FormatRef) -> FormatRef {
-        let variation_axis_record = variation_axis_record(module, tag);
-        let instance_record = instance_record(module);
-
-        // First half of `fvar` table: fixed-size header
-        let fvar_header = record_auto([
-            ("major_version", util::expect_u16be(1)),
-            ("minor_version", util::expect_u16be(0)),
-            (
-                "offset_axes",
-                where_lambda(u16be(), "raw", is_nonzero_u16(var("raw"))),
-            ),
-            ("__reserved", util::expect_u16be(2)),
-            ("axis_count", u16be()),
-            ("axis_size", util::expect_u16be(20)), // For fvar version 1.0, axis record are fixed-size == 20 (0x0014) bytes
-            ("instance_count", u16be()),
-            ("instance_size", u16be()), // TODO[epic=validation] - not yet enforced, but should be axisCount * sizeOf(Fixed32Be) + (4 or 6)
-        ]);
-        // Second half of `fvar` table: offset-linked axes and instances
-        let fvar_arrays = record_auto([
-            (
-                "_axes_length",
-                compute(mul(var("axis_count"), var("axis_size"))),
-            ),
-            (
-                "#_axes",
-                // TODO - this becomes a lot easier if we use ViewFormats instead of offset-parse patterns
-                // NOTE - because we delay interpretation of the offset above to collect additional fields, we inline and specialize offset16 based on the captured value
-                phantom(parse_from_view(
-                    vvar("table_view").offset(var("offset_axes")),
-                    slice(
-                        var("_axes_length"),
-                        repeat_count(
-                            var("axis_count"),
-                            // because axis_size is fixed at 20 and variation_axis_record is a fixed-width (20 byte) parse, we don't need a slice here
-                            variation_axis_record.call(),
-                        ),
-                    ),
-                )),
-            ),
-            (
-                "offset_instances",
-                compute(add(var("offset_axes"), var("_axes_length"))),
-            ),
-            (
-                "#_instances",
-                // NOTE - because we delay interpretation of the offset above to collect additional fields, we inline and specialize offset16 based on the captured value
-                phantom(parse_from_view(
-                    vvar("table_view").offset(var("offset_instances")),
-                    repeat_count(
-                        var("instance_count"),
-                        slice(
-                            var("instance_size"),
-                            instance_record.invoke_args([var("axis_count"), var("instance_size")]),
-                        ),
-                    ),
-                )),
-            ),
-        ]);
-        let scope_field = record([("table_scope", reify_view(vvar("table_view")))]);
+    /// HVAR Table format definition
+    ///
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/hvar#table-formats
+    ///
+    /// Only appears if `hmtx` is present, and like all variable-font tables,
+    /// requires `fvar` and `STAT` to be present.
+    pub(crate) fn table(module: &mut FormatModule, item_variation_store: FormatRef) -> FormatRef {
+        let dsim = delta_set_index_map(module);
         module.define_format(
-            "opentype.fvar.table",
+            "opentype.hvar.table",
             let_view(
                 "table_view",
-                merge_records([scope_field, fvar_header, fvar_arrays]),
+                record_auto([
+                    ("table_scope", reify_view(vvar("table_view"))),
+                    ("major_version", expect_u16be(1)),
+                    ("minor_version", expect_u16be(0)),
+                    // NOTE - the HVAR specification implies that the following offset is non-NULL, but the OpenType spec includes the caveat that even not-explicitly NULLable offsets should be handled gracefully if null
+                    // REVIEW[epic=validation] - this IVS must contain sufficient delta-sets that the maximum index found in any DSIM entry is in-bounds, but we cannot check this at this layer.
+                    (
+                        "item_variation_store",
+                        util::read_phantom_view_offset32(
+                            vvar("table_view"),
+                            item_variation_store.call(),
+                        ),
+                    ),
+                    // NOTE - each of the three following offset-fields are specified 'may be NULL', and that glyph ids are to be used directly as indices in place of a DSIM for any which are not provided
+                    (
+                        "advance_width_mapping",
+                        util::read_phantom_view_offset32(vvar("table_view"), dsim.call()),
+                    ),
+                    (
+                        "lsb_mapping",
+                        util::read_phantom_view_offset32(vvar("table_view"), dsim.call()),
+                    ),
+                    (
+                        "rsb_mapping",
+                        util::read_phantom_view_offset32(vvar("table_view"), dsim.call()),
+                    ),
+                ]),
             ),
         )
     }
 
-    /// InstanceRecord format implementation
+    /// DeltaSetIndexMap format definition
     ///
-    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/fvar#instancerecord
-    ///
-    /// Parametric over `axis_count :~ U16` and `instance_size :~ U16`.
-    fn instance_record(module: &mut FormatModule) -> DepFormat<2, 0> {
-        let user_tuple = user_tuple(module);
-        module.register_format_args(
-            "opentype.fvar.instance_record",
-            [
-                (Label::Borrowed("axis_count"), ValueType::U16),
-                (Label::Borrowed("instance_size"), ValueType::U16),
-            ],
-            record([
-                ("subfamily_nameid", u16be()),
-                ("flags", util::expect_u16be(0)), // reserved for future use, should be set to 0,
-                ("coordinates", user_tuple.invoke_args([var("axis_count")])),
+    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/otvarcommonformats#associating-target-items-to-variation-data
+    // TODO: extract to common format across variations
+    fn delta_set_index_map(module: &mut FormatModule) -> FormatRef {
+        let entry_format = module.define_format(
+            "opentype.var.dsim-entry_format",
+            bit_fields_u8([
+                // 0xC0 - reserved  (Set to 0)
+                BitFieldKind::Reserved {
+                    bit_width: 2,
+                    check_zero: true,
+                },
+                // 2 bits - <size in bytes of map entry> = mapEntrySize + 1
+                BitFieldKind::BitsField {
+                    bit_width: 2,
+                    field_name: "map_entry_size",
+                },
+                // 4 bits - <number of bits for each entry in inner-level index> = innerIndexBitCount + 1
+                BitFieldKind::BitsField {
+                    bit_width: 4,
+                    field_name: "inner_index_bit_count",
+                },
+            ]),
+        );
+        module.define_format(
+            "opentype.var.delta_set_index_map",
+            record_auto([
+                ("format", expect_between_u8(u8(), 0, 1)),
+                ("_entry_format", entry_format.call()),
                 (
-                    "postscript_nameid",
-                    cond_maybe(
-                        // Only included if the extra 2 bytes are implied by `instance_size`, which is otherwise divisible by 4
-                        expr_eq(rem(var("instance_size"), Expr::U16(4)), Expr::U16(2)),
-                        u16be(),
+                    "entry_size",
+                    compute(succ(record_proj(var("_entry_format"), "map_entry_size"))),
+                ),
+                (
+                    "inner_index_bits",
+                    compute(succ(record_proj(
+                        var("_entry_format"),
+                        "inner_index_bit_count",
+                    ))),
+                ),
+                (
+                    "map_count",
+                    fmt_match(
+                        var("format"),
+                        [
+                            (
+                                Pattern::U8(0),
+                                map(u16be(), lambda("val", as_u32(var("val")))),
+                            ),
+                            (Pattern::U8(1), u32be()),
+                        ],
                     ),
                 ),
-            ]),
-        )
-    }
-
-    /// UserTuple record (part of `InstanceRecord`)
-    ///
-    /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/fvar#instancerecord
-    ///
-    /// Parametric over `axis_count :~ U16`.
-    fn user_tuple(module: &mut FormatModule) -> DepFormat<1, 0> {
-        module.register_format_args(
-            "opentype.fvar.user_tuple",
-            [(Label::Borrowed("axis_count"), ValueType::U16)],
-            record([(
-                "coordinates",
-                repeat_count(var("axis_count"), util::fixed32be()),
-            )]),
-        )
-    }
-
-    fn variation_axis_record(module: &mut FormatModule, tag: FormatRef) -> FormatRef {
-        use BitFieldKind::*;
-        let axis_qual_flags = bit_fields_u16([
-            Reserved {
-                bit_width: 15,
-                check_zero: false,
-            },
-            FlagBit("hidden_axis"),
-        ]);
-        module.define_format(
-            "opentype.fvar.variation_axis_record",
-            record([
-                ("axis_tag", tag.call()),             // 4 bytes
-                ("min_value", util::fixed32be()),     // + 4 = 8 bytes
-                ("default_value", util::fixed32be()), // + 4 = 12 bytes
-                ("max_value", util::fixed32be()),     // +4 = 16 bytes
-                ("flags", axis_qual_flags),           // + 2 = 18 bytes
-                ("axis_name_id", u16be()),            // + 2 = 20 bytes
+                // REVIEW - the current strategy is to merely capture the map data and leave it as an uninterpreted byte-array; any processing can be done downstream of generated code
+                /*
+                 * MapData: captured as an uninterpreted byte-data array
+                 *
+                 * Each logical entry occupies `entry_size` (1-4) bytes, and is to be subsequently interpreted as an `(outerIx, innerIx)` pair:
+                 *   innerIx is stored within the N least-significant-bits of the entry (N = `inner_index_bits`)
+                 *   outerIx is stored within the M most-significant-bits of the entry (M = `entry_size * 8 - inner_index_bits`)
+                 *
+                 * Hence:
+                 *   <entry> = (<outerIx> << inner_index_bits) || <innerIx>
+                 */
+                (
+                    "map_data",
+                    capture_bytes_from_here(mul(var("map_count"), as_u32(var("entry_size")))),
+                ),
             ]),
         )
     }
