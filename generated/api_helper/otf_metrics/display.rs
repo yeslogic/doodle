@@ -161,10 +161,30 @@ impl TokenStream {
         }
     }
 
+    pub fn is_empty(mut self) -> (bool, Self) {
+        if let Some(next) = self.inner.next() {
+            (
+                false,
+                TokenStream::from_stream(std::iter::once(next).chain(self.inner)),
+            )
+        } else {
+            (true, TokenStream::empty())
+        }
+    }
+
     /// Returns a new `TokenStream` equivalent to `self ++ [glue] ++ other`
+    ///
+    /// # Note
+    ///
+    /// If `other` is empty, will return `self` without `glue`.
     pub fn glue(self, glue: Token, other: Self) -> Self {
-        Self {
-            inner: Box::new(self.inner.chain(std::iter::once(glue).chain(other.inner))),
+        let (is_empty, other) = other.is_empty();
+        if is_empty {
+            self
+        } else {
+            Self {
+                inner: Box::new(self.inner.chain(std::iter::once(glue).chain(other.inner))),
+            }
         }
     }
 
