@@ -1,0 +1,545 @@
+====== [Font File]: /home/peter/yeslogic/dev/doodle/generated/../test-fonts/Frankenpax.ttc =======
+TTC: version 1.0 (3 fonts)
+=== Font @ Index 0 ===
+(sfntVersion: 0x00010000)
+cmap: version 0
+	[0]: platform=0, encoding=3
+	[1]: platform=3, encoding=1
+head: version 1.0, Strong LTR or Neutral
+hhea: table version 1.0, 930 horizontal long metrics
+hmtx:
+	Glyph ID [0]: advanceWidth=694, lsb=40
+	Glyph ID [1]: advanceWidth=240, lsb=0
+	Glyph ID [2]: advanceWidth=696, lsb=0
+	Glyph ID [3]: advanceWidth=696, lsb=0
+	Glyph ID [4]: advanceWidth=696, lsb=0
+	Glyph ID [5]: advanceWidth=696, lsb=0
+	Glyph ID [6]: advanceWidth=696, lsb=0
+	Glyph ID [7]: advanceWidth=696, lsb=0
+    (skipping hmetrics 8..922)
+	Glyph ID [922]: advanceWidth=540, lsb=30
+	Glyph ID [923]: advanceWidth=540, lsb=30
+	Glyph ID [924]: advanceWidth=720, lsb=80
+	Glyph ID [925]: advanceWidth=720, lsb=-2
+	Glyph ID [926]: advanceWidth=680, lsb=-10
+	Glyph ID [927]: advanceWidth=680, lsb=-30
+	Glyph ID [928]: advanceWidth=1691, lsb=0
+	Glyph ID [929]: advanceWidth=785, lsb=357
+maxp: version 1.0 (contents omitted)
+name: version 0, 33 name_records
+    Full Font Name: Minipax
+os/2: version 3
+post: version 2.0 (proportionally spaced)
+loca: (details omitted)
+glyf: 930 glyphs
+    [0]: Simple Glyph [17 contours, 617 coordinates, 0 instructions, xy: [(40, -50) <-> (655, 781)]]
+    [1]: <empty>
+    [2]: Simple Glyph [3 contours, 21 coordinates, 0 instructions, xy: [(0, 0) <-> (696, 740)]]
+    [3]: Simple Glyph [4 contours, 31 coordinates, 0 instructions, xy: [(0, 0) <-> (696, 960)]]
+    [4]: Simple Glyph [4 contours, 35 coordinates, 0 instructions, xy: [(0, 0) <-> (696, 950)]]
+    [5]: Simple Glyph [4 contours, 34 coordinates, 0 instructions, xy: [(0, 0) <-> (696, 970)]]
+    [6]: Simple Glyph [4 contours, 34 coordinates, 0 instructions, xy: [(0, 0) <-> (696, 960)]]
+    [7]: Simple Glyph [5 contours, 45 coordinates, 0 instructions, xy: [(0, 0) <-> (696, 940)]]
+(skipping glyphs 8..922)
+    [922]: Simple Glyph [1 contours, 3 coordinates, 0 instructions, xy: [(30, 49) <-> (570, 529)]]
+    [923]: Simple Glyph [1 contours, 3 coordinates, 0 instructions, xy: [(30, 40) <-> (570, 520)]]
+    [924]: Simple Glyph [1 contours, 3 coordinates, 0 instructions, xy: [(80, 10) <-> (722, 730)]]
+    [925]: Simple Glyph [1 contours, 3 coordinates, 0 instructions, xy: [(-2, 10) <-> (640, 730)]]
+    [926]: Simple Glyph [1 contours, 3 coordinates, 0 instructions, xy: [(-10, 49) <-> (710, 691)]]
+    [927]: Simple Glyph [1 contours, 3 coordinates, 0 instructions, xy: [(-30, 49) <-> (690, 691)]]
+    [928]: Simple Glyph [6 contours, 54 coordinates, 0 instructions, xy: [(0, 0) <-> (1689, 794)]]
+    [929]: Simple Glyph [2 contours, 24 coordinates, 0 instructions, xy: [(357, 377) <-> (477, 664)]]
+GDEF: version 1.3
+    GlyphClassDef:
+		(0002 -> 004c): 1(base)
+		(004e -> 00a9): 1(base)
+		(00ab -> 00d5): 1(base)
+		(00d7 -> 00e3): 1(base)
+		(00e5 -> 0125): 1(base)
+		(0126 -> 0179): 2(liga)
+		(017a -> 01c0): 1(base)
+		(01c2 -> 01c2): 1(base)
+	    (skipping ranges covering glyphs 452..=579)
+		(0311 -> 0311): 1(base)
+		(0317 -> 0317): 1(base)
+		(0352 -> 0352): 1(base)
+		(0353 -> 0365): 3(mark)
+		(0373 -> 0381): 3(mark)
+		(0383 -> 038e): 3(mark)
+		(0390 -> 0391): 1(base)
+		(03a0 -> 03a0): 1(base)
+    MarkAttachClassDef:
+		(0353 -> 0357): 2
+		(0359 -> 035f): 2
+		(0360 -> 0361): 1
+		(0374 -> 0378): 2
+		(037a -> 037f): 2
+		(0383 -> 0387): 2
+		(0389 -> 038e): 2
+    MarkGlyphSet: <none>
+    ItemVariationStore:
+	VariationRegions: 1 regions (1 axes)
+	    [0]:
+		     start |0.000
+		      peak |1.000
+		       end |1.000
+    ItemVariationData[1]
+	    [0]: ItemVariationData:
+		1 region indices: [0]
+		167 delta-sets (1 full [16-bit], 0 half [8-bit]): 
+		<display_delta_sets: incomplete>
+GPOS: version 1.0
+    ScriptList
+	[0]: DFLT
+	    [Default LangSys]: feature-indices: [0, 10, 20]
+	    LangSysRecords: <empty list>
+	[1]: latn
+	    [Default LangSys]: feature-indices: [1, 11, 21]
+	    LangSysRecords:
+		[0]: AZE ; feature-indices: [2, 12, 22]
+		[1]: CRT ; feature-indices: [3, 13, 23]
+		[2]: KAZ ; feature-indices: [4, 14, 24]
+		[3]: MOL ; feature-indices: [5, 15, 25]
+		[4]: NLD ; feature-indices: [6, 16, 26]
+		[5]: ROM ; feature-indices: [7, 17, 27]
+		[6]: TAT ; feature-indices: [8, 18, 28]
+		[7]: TRK ; feature-indices: [9, 19, 29]
+    FeatureList
+	[0]: kern[0]
+	[1]: kern[0]
+	[2]: kern[0]
+	[3]: kern[0]
+	[4]: kern[0]
+	[5]: kern[0]
+	[6]: kern[0]
+	[7]: kern[0]
+    (skipping FeatureIndices 8..22)
+	[22]: mkmk[3, 4]
+	[23]: mkmk[3, 4]
+	[24]: mkmk[3, 4]
+	[25]: mkmk[3, 4]
+	[26]: mkmk[3, 4]
+	[27]: mkmk[3, 4]
+	[28]: mkmk[3, 4]
+	[29]: mkmk[3, 4]
+    LookupList:
+	[0]: LookupTable: kind=PairPos, flags=LookupFlag (IGNORE_MARKS): [byGlyph([2 ∈ [78,234]]), byClass[21 ∈ 21 x 45]([9 ranges; 187 ∈ [2,352]]), byClass[14 ∈ 20 x 14]([8 ranges; 126 ∈ [378,519]]), byClass[(0, 0), (1, 1), (2, 2)]([4 ∈ [713,758]]), byClass[15 ∈ 16 x 15]([24 ranges; 95 ∈ [151,377]])]
+	[1]: LookupTable: kind=MarkBasePos: [Mark([7 ranges; 41 ∈ [851,910]])+Base([6 ∈ [785,928]])=>MarkArray[[0353=(1, (-167, 520)×(0->19, 0->2)), 0354=(1, (-130, 520)×(0->20, 0->2)), ...(37 skipped)..., 0355=(1, (-172, 560)×(0->21, ⅈ)), 0356=(1, (-151, 560))]]+BaseArray[[0311: [[0]=>(272, 0)×(0->9, ⅈ), [1]=>(274, 740)×(0->10, ⅈ), [2]=>(0, 0)], 0317: [[0]=>(346, 0)×(0->11, ⅈ), [1]=>(378, 740)×(0->12, ⅈ), [2]=>(0, 0)], ...(2 skipped)..., 0352: [[0]=>(338, 0)×(0->9, ⅈ), [1]=>(344, 740)×(0->15, ⅈ), [2]=>(344, 370)×(0->16, 0->17)], 0390: [[0]=>(973, 0)×(0->18, ⅈ), [1]=>(973, 740)×(0->18, ⅈ), [2]=>(0, 0)]]]]
+	[2]: LookupTable: kind=MarkBasePos: [Mark([3 ranges; 46 ∈ [851,910]])+Base([14 ranges; 470 ∈ [2,579]])=>MarkArray[[0353=(2, (-167, 520)×(0->19, 0->2)), 0354=(2, (-130, 520)×(0->20, 0->2)), ...(42 skipped)..., 0355=(2, (-172, 560)×(0->21, ⅈ)), 0356=(2, (-151, 560))]]+BaseArray[[0002: [[0]=>(348, 0)×(0->0, ⅈ), [1]=>(626, 10)×(0->15, ⅈ), ...(skipping 3 indices from 2 to 4)..., [5]=>(0, 0), [6]=>(0, 0)], 0003: [[0]=>(348, 0)×(0->0, ⅈ), [1]=>(626, 10)×(0->15, ⅈ), ...(skipping 3 indices from 2 to 4)..., [5]=>(0, 0), [6]=>(0, 0)], ...(466 skipped)..., 0004: [[0]=>(294, 0)×(0->126, ⅈ), [1]=>(0, 0), ...(skipping 3 indices from 2 to 4)..., [5]=>(0, 0), [6]=>(0, 0)], 0005: [[0]=>(220, 0)×(0->159, ⅈ), [1]=>(0, 0), ...(skipping 3 indices from 2 to 4)..., [5]=>(0, 0), [6]=>(0, 0)]]]]
+	[3]: LookupTable: kind=MarkMarkPos, flags=LookupFlag (∅; mark_attachment_class_filter = 1): [Mark([2 ∈ [864,865]])+Mark([3 ∈ [864,873]])=>MarkArray[[0360=(0, (-91, 0)×(0->12, ⅈ)), 0361=(0, (-115, 0)×(0->4, ⅈ))]]+Mark2Array[[#0360: [[0]=>(-84, -211)×(0->25, 0->52)], #0361: [[0]=>(-100, -204)×(0->55, 0->44)], #0369: [[0]=>(100, -204)×(0->37, 0->44)]]]]
+	[4]: LookupTable: kind=MarkMarkPos, flags=LookupFlag (∅; mark_attachment_class_filter = 2): [Mark([6 ranges; 34 ∈ [851,910]])+Mark([8 ranges; 47 ∈ [851,910]])=>MarkArray[[0353=(0, (-167, 520)×(0->19, 0->2)), 0354=(0, (-130, 520)×(0->20, 0->2)), ...(30 skipped)..., 0355=(0, (-172, 560)×(0->21, ⅈ)), 0356=(0, (-151, 560))]]+Mark2Array[[#0353: [[0]=>(-167, 740)×(0->19, 0->1)], #0354: [[0]=>(-130, 769)×(0->20, 0->48)], ...(skipping 43 Mark2Records)..., #0355: [[0]=>(-172, 800)×(0->21, ⅈ)], #0356: [[0]=>(-151, 740)]]]]
+GSUB: version 1.0
+    ScriptList
+	[0]: DFLT
+	    [Default LangSys]: feature-indices: [0, 10, 20, ...(16 skipped)..., 198, 208, 218]
+	    LangSysRecords: <empty list>
+	[1]: latn
+	    [Default LangSys]: feature-indices: [1, 11, 21, ...(16 skipped)..., 199, 209, 219]
+	    LangSysRecords:
+		[0]: AZE ; feature-indices: [2, 12, 22, ...(17 skipped)..., 200, 210, 220]
+		[1]: CRT ; feature-indices: [3, 13, 23, ...(17 skipped)..., 201, 211, 221]
+		[2]: KAZ ; feature-indices: [4, 14, 24, ...(17 skipped)..., 202, 212, 222]
+		[3]: MOL ; feature-indices: [5, 15, 25, ...(17 skipped)..., 203, 213, 223]
+		[4]: NLD ; feature-indices: [6, 16, 26, ...(17 skipped)..., 204, 214, 224]
+		[5]: ROM ; feature-indices: [7, 17, 27, ...(17 skipped)..., 205, 215, 225]
+		[6]: TAT ; feature-indices: [8, 18, 28, ...(17 skipped)..., 206, 216, 226]
+		[7]: TRK ; feature-indices: [9, 19, 29, ...(17 skipped)..., 207, 217, 227]
+    FeatureList
+	[0]: aalt[0, 1]
+	[1]: aalt[0, 1]
+	[2]: aalt[0, 1]
+	[3]: aalt[0, 1]
+	[4]: aalt[0, 1]
+	[5]: aalt[0, 1]
+	[6]: aalt[0, 1]
+	[7]: aalt[0, 1]
+    (skipping FeatureIndices 8..220)
+	[220]: tnum[24]
+	[221]: tnum[24]
+	[222]: tnum[24]
+	[223]: tnum[24]
+	[224]: tnum[24]
+	[225]: tnum[24]
+	[226]: tnum[24]
+	[227]: tnum[24]
+    LookupList:
+	[0]: LookupTable: kind=SingleSubst: [[56 ranges; 218 ∈ [13,869]]=>[#000d->#0185, #000e->#0186, #000f->#0187, ...(skipping 212 substs)..., #0310->#0317, #0364->#0380, #0365->#0381]]
+	[1]: LookupTable: kind=AlternateSubst: [[32 ranges; 136 ∈ [2,862]]=>[[#0208, #017a, #007b], ...(134 skipped)..., [#038e, #037f]]]
+	[2]: LookupTable: kind=ChainedSequenceContext: [[[2 ∈ [189,199]]](?=[[2 ranges; 12 ∈ [851,863]]])=>[[35]@0], [[2 ∈ [189,199]]](?=[[∀: 865..=869], [2 ranges; 12 ∈ [851,863]]])=>[[35]@0], (?<=[[2 ranges; 14 ∈ [851,869]]])[[2 ranges; 14 ∈ [851,869]]]=>[[35]@0], (?<=[[2 ranges; 151 ∈ [2,581]]])[[2 ranges; 14 ∈ [851,869]]]=>[[35]@0]]
+	[3]: LookupTable: kind=ChainedSequenceContext: [[[2 ranges; 14 ∈ [851,869]]](?=[[∀: 884..=897]])=>[[35]@0], (?<=[[∀: 884..=897]])[[2 ranges; 14 ∈ [851,869]]]=>[[35]@0]]
+	[4]: LookupTable: kind=ChainedSequenceContext: [(?<=[[191]])[[199]]=>[[36]@0], (?<=[[41]])[[49]]=>[[36]@0]]
+	[5]: LookupTable: kind=SingleSubst: [[4 ∈ [86,243]]=>(+1)]
+	[6]: LookupTable: kind=SingleSubst: [[4 ∈ [86,243]]=>(+1)]
+	[7]: LookupTable: kind=SingleSubst: [[189]=>(+6)]
+    (skipping LookupTables 8..29)
+	[29]: LookupTable: kind=LigatureSubst: [[[(#0002.000e => 294), (#0002.0014 => 295), ...(4 skipped)..., (#0002.004f => 300), (#0002.0058 => 301)], .., [(#0104.0104.0104 => 377)]]]
+	[30]: LookupTable: kind=LigatureSubst: [[[(#0058.00bb => 344), (#0058.00cc => 345), ...(2 skipped)..., (#0058.0104 => 348), (#0058.010a => 349)], .., [(#00f0.00f0.00bd => 376), (#00f0.00bd => 374), (#00f0.00f0 => 375)]]]
+	[31]: LookupTable: kind=SingleSubst: [[18 ranges; 78 ∈ [2,578]]=>[#0002->#007b, #0003->#007c, #0004->#007d, ...(skipping 72 substs)..., #022a->#020d, #0233->#020e, #0242->#020f]]
+	[32]: LookupTable: kind=SingleSubst: [[18 ranges; 78 ∈ [2,578]]=>[#0002->#007b, #0003->#007c, #0004->#007d, ...(skipping 72 substs)..., #022a->#020d, #0233->#020e, #0242->#020f]]
+	[33]: LookupTable: kind=SingleSubst: [[∀: 584..=593]=>(+30)]
+	[34]: LookupTable: kind=SingleSubst: [[∀: 584..=593]=>(+40)]
+	[35]: LookupTable: kind=SingleSubst: [[4 ranges; 16 ∈ [189,869]]=>[#00bd->#00be, #00c7->#00c8, #0353->#0374, ...(skipping 10 substs)..., #035e->#037f, #0364->#0380, #0365->#0381]]
+	[36]: LookupTable: kind=SingleSubst: [[16 ∈ [2,683]]=>[#0002->#0208, #0031->#0032, #0041->#0209, ...(skipping 10 substs)..., #02a9->#029f, #02aa->#02a0, #02ab->#02a1]]
+fvar: version 1.0
+    Axes:
+	[0]: 'wght' axis: [100, 600] (default: 100) NameId(256)
+    Instances:
+	[0]: Subfamily=NameId(257); [+100]
+	[1]: Subfamily=NameId(258); [+200]
+	[2]: Subfamily=NameId(259); [+400]
+	[3]: Subfamily=NameId(260); [+600]
+gvar: version 1.0
+    Shared Tuples (1 total):
+	[0]: [1]
+    Glyph Variation Data (930 glyphs):
+	    [0]: Header (size: 700 bytes)
+	    [1]: Header (size: 6 bytes)
+	    [2]: Header (size: 49 bytes)
+	    [3]: Header (size: 69 bytes)
+	(skipping 912 glyph variation data tables between indices 4..925)
+	    [926]: Header (size: 6 bytes)
+	    [927]: Header (size: 9 bytes)
+	    [928]: Header (size: 111 bytes)
+	    [929]: Header (size: 55 bytes)
+DSIG: version 1; no signatures
+STAT: version 1.1 (elidedFallbackName: name[id=257])
+    DesignAxes: 2 total
+	[0]: Tag=wght ; Axis NameID=256 ; Ordering=0
+	[1]: Tag=ital ; Axis NameID=256 ; Ordering=1
+    AxisValues: 5 total
+	[0]: Axis[0]: NameId(257) = 100
+	[1]: Axis[0]: NameId(258) = 200
+	[2]: Axis[0]: NameId(259) = 400
+	[3]: Axis[0]: NameId(260) = 600
+	[4]: Axis[1] (Flags: ELIDABLE_AXIS_VALUE_NAME): NameId(2) = 0
+=== Font @ Index 1 ===
+(sfntVersion: OTTO)
+cmap: version 0
+	[0]: platform=0, encoding=3
+	[1]: platform=3, encoding=1
+head: version 1.0, Strong LTR or Neutral
+hhea: table version 1.0, 930 horizontal long metrics
+hmtx:
+	Glyph ID [0]: advanceWidth=694, lsb=39
+	Glyph ID [1]: advanceWidth=200, lsb=0
+	Glyph ID [2]: advanceWidth=706, lsb=0
+	Glyph ID [3]: advanceWidth=706, lsb=0
+	Glyph ID [4]: advanceWidth=706, lsb=0
+	Glyph ID [5]: advanceWidth=706, lsb=0
+	Glyph ID [6]: advanceWidth=706, lsb=0
+	Glyph ID [7]: advanceWidth=706, lsb=0
+    (skipping hmetrics 8..922)
+	Glyph ID [922]: advanceWidth=600, lsb=30
+	Glyph ID [923]: advanceWidth=600, lsb=30
+	Glyph ID [924]: advanceWidth=700, lsb=80
+	Glyph ID [925]: advanceWidth=700, lsb=-22
+	Glyph ID [926]: advanceWidth=700, lsb=-10
+	Glyph ID [927]: advanceWidth=700, lsb=-10
+	Glyph ID [928]: advanceWidth=1795, lsb=0
+	Glyph ID [929]: advanceWidth=769, lsb=359
+maxp: version 0.5 (PostScript)
+name: version 0, 28 name_records
+    Full Font Name: Minipax Bold
+os/2: version 3
+post: version 3.0 (proportionally spaced)
+GDEF: version 1.0
+    GlyphClassDef:
+		(0002 -> 004c): 1(base)
+		(004e -> 00a9): 1(base)
+		(00ab -> 00d5): 1(base)
+		(00d7 -> 00e3): 1(base)
+		(00e5 -> 0125): 1(base)
+		(0126 -> 0179): 2(liga)
+		(017a -> 01c0): 1(base)
+		(01c2 -> 01c2): 1(base)
+	    (skipping ranges covering glyphs 452..=579)
+		(0311 -> 0311): 1(base)
+		(0317 -> 0317): 1(base)
+		(0352 -> 0352): 1(base)
+		(0353 -> 0365): 3(mark)
+		(0373 -> 0381): 3(mark)
+		(0383 -> 038e): 3(mark)
+		(0390 -> 0391): 1(base)
+		(03a0 -> 03a0): 1(base)
+    MarkAttachClassDef:
+		(0353 -> 0357): 2
+		(0359 -> 035f): 2
+		(0360 -> 0361): 1
+		(0374 -> 0378): 2
+		(037a -> 037f): 2
+		(0383 -> 0387): 2
+		(0389 -> 038e): 2
+    MarkGlyphSet: <none>
+    ItemVariationStore: <none>
+GPOS: version 1.0
+    ScriptList
+	[0]: DFLT
+	    [Default LangSys]: feature-indices: [0, 10, 20]
+	    LangSysRecords: <empty list>
+	[1]: latn
+	    [Default LangSys]: feature-indices: [1, 11, 21]
+	    LangSysRecords:
+		[0]: AZE ; feature-indices: [2, 12, 22]
+		[1]: CRT ; feature-indices: [3, 13, 23]
+		[2]: KAZ ; feature-indices: [4, 14, 24]
+		[3]: MOL ; feature-indices: [5, 15, 25]
+		[4]: NLD ; feature-indices: [6, 16, 26]
+		[5]: ROM ; feature-indices: [7, 17, 27]
+		[6]: TAT ; feature-indices: [8, 18, 28]
+		[7]: TRK ; feature-indices: [9, 19, 29]
+    FeatureList
+	[0]: kern[0]
+	[1]: kern[0]
+	[2]: kern[0]
+	[3]: kern[0]
+	[4]: kern[0]
+	[5]: kern[0]
+	[6]: kern[0]
+	[7]: kern[0]
+    (skipping FeatureIndices 8..22)
+	[22]: mkmk[3, 4]
+	[23]: mkmk[3, 4]
+	[24]: mkmk[3, 4]
+	[25]: mkmk[3, 4]
+	[26]: mkmk[3, 4]
+	[27]: mkmk[3, 4]
+	[28]: mkmk[3, 4]
+	[29]: mkmk[3, 4]
+    LookupList:
+	[0]: LookupTable: kind=PairPos, flags=LookupFlag (IGNORE_MARKS): [byGlyph([2 ∈ [78,234]]), byClass[21 ∈ 21 x 45]([9 ranges; 187 ∈ [2,352]]), byClass[14 ∈ 20 x 14]([8 ranges; 126 ∈ [378,519]]), byClass[(0, 0), (1, 1), (2, 2)]([4 ∈ [713,758]]), byClass[15 ∈ 16 x 15]([24 ranges; 95 ∈ [151,377]])]
+	[1]: LookupTable: kind=MarkBasePos: [Mark([7 ranges; 41 ∈ [851,910]])+Base([6 ∈ [785,928]])=>MarkArray[[0353=(1, (-198, 530)), 0354=(1, (-149, 530)), ...(37 skipped)..., 0355=(1, (-193, 560)), 0356=(1, (-151, 560))]]+BaseArray[[0311: [[0]=>(309, 0), [1]=>(283, 740), [2]=>(0, 0)], 0317: [[0]=>(347, 0), [1]=>(411, 740), [2]=>(0, 0)], ...(2 skipped)..., 0352: [[0]=>(375, 0), [1]=>(359, 740), [2]=>(362, 366)], 0390: [[0]=>(1471, 0), [1]=>(1471, 740), [2]=>(0, 0)]]]]
+	[2]: LookupTable: kind=MarkBasePos: [Mark([3 ranges; 46 ∈ [851,910]])+Base([14 ranges; 470 ∈ [2,579]])=>MarkArray[[0353=(2, (-198, 530)), 0354=(2, (-149, 530)), ...(42 skipped)..., 0355=(2, (-193, 560)), 0356=(2, (-151, 560))]]+BaseArray[[0002: [[0]=>(353, 0), [1]=>(641, 10), ...(skipping 3 indices from 2 to 4)..., [5]=>(0, 0), [6]=>(0, 0)], 0003: [[0]=>(353, 0), [1]=>(641, 10), ...(skipping 3 indices from 2 to 4)..., [5]=>(0, 0), [6]=>(0, 0)], ...(466 skipped)..., 0004: [[0]=>(201, 0), [1]=>(0, 0), ...(skipping 3 indices from 2 to 4)..., [5]=>(0, 0), [6]=>(0, 0)], 0005: [[0]=>(198, 0), [1]=>(0, 0), ...(skipping 3 indices from 2 to 4)..., [5]=>(0, 0), [6]=>(0, 0)]]]]
+	[3]: LookupTable: kind=MarkMarkPos, flags=LookupFlag (∅; mark_attachment_class_filter = 1): [Mark([2 ∈ [864,865]])+Mark([3 ∈ [864,873]])=>MarkArray[[0360=(0, (-101, 0)), 0361=(0, (-145, 0))]]+Mark2Array[[#0360: [[0]=>(-101, -230)], #0361: [[0]=>(-145, -210)], #0369: [[0]=>(135, -210)]]]]
+	[4]: LookupTable: kind=MarkMarkPos, flags=LookupFlag (∅; mark_attachment_class_filter = 2): [Mark([6 ranges; 34 ∈ [851,910]])+Mark([8 ranges; 47 ∈ [851,910]])=>MarkArray[[0353=(0, (-198, 530)), 0354=(0, (-149, 530)), ...(30 skipped)..., 0355=(0, (-193, 560)), 0356=(0, (-151, 560))]]+Mark2Array[[#0353: [[0]=>(-198, 760)], #0354: [[0]=>(-149, 800)], ...(skipping 43 Mark2Records)..., #0355: [[0]=>(-193, 800)], #0356: [[0]=>(-151, 740)]]]]
+GSUB: version 1.0
+    ScriptList
+	[0]: DFLT
+	    [Default LangSys]: feature-indices: [0, 10, 20, ...(16 skipped)..., 198, 208, 218]
+	    LangSysRecords: <empty list>
+	[1]: latn
+	    [Default LangSys]: feature-indices: [1, 11, 21, ...(16 skipped)..., 199, 209, 219]
+	    LangSysRecords:
+		[0]: AZE ; feature-indices: [2, 12, 22, ...(17 skipped)..., 200, 210, 220]
+		[1]: CRT ; feature-indices: [3, 13, 23, ...(17 skipped)..., 201, 211, 221]
+		[2]: KAZ ; feature-indices: [4, 14, 24, ...(17 skipped)..., 202, 212, 222]
+		[3]: MOL ; feature-indices: [5, 15, 25, ...(17 skipped)..., 203, 213, 223]
+		[4]: NLD ; feature-indices: [6, 16, 26, ...(17 skipped)..., 204, 214, 224]
+		[5]: ROM ; feature-indices: [7, 17, 27, ...(17 skipped)..., 205, 215, 225]
+		[6]: TAT ; feature-indices: [8, 18, 28, ...(17 skipped)..., 206, 216, 226]
+		[7]: TRK ; feature-indices: [9, 19, 29, ...(17 skipped)..., 207, 217, 227]
+    FeatureList
+	[0]: aalt[0, 1]
+	[1]: aalt[0, 1]
+	[2]: aalt[0, 1]
+	[3]: aalt[0, 1]
+	[4]: aalt[0, 1]
+	[5]: aalt[0, 1]
+	[6]: aalt[0, 1]
+	[7]: aalt[0, 1]
+    (skipping FeatureIndices 8..220)
+	[220]: tnum[24]
+	[221]: tnum[24]
+	[222]: tnum[24]
+	[223]: tnum[24]
+	[224]: tnum[24]
+	[225]: tnum[24]
+	[226]: tnum[24]
+	[227]: tnum[24]
+    LookupList:
+	[0]: LookupTable: kind=SingleSubst: [[56 ranges; 218 ∈ [13,869]]=>[#000d->#0185, #000e->#0186, #000f->#0187, ...(skipping 212 substs)..., #0310->#0317, #0364->#0380, #0365->#0381]]
+	[1]: LookupTable: kind=AlternateSubst: [[32 ranges; 136 ∈ [2,862]]=>[[#0208, #017a, #007b], ...(134 skipped)..., [#038e, #037f]]]
+	[2]: LookupTable: kind=ChainedSequenceContext: [[[2 ∈ [189,199]]](?=[[2 ranges; 12 ∈ [851,863]]])=>[[35]@0], [[2 ∈ [189,199]]](?=[[∀: 865..=869], [2 ranges; 12 ∈ [851,863]]])=>[[35]@0], (?<=[[2 ranges; 14 ∈ [851,869]]])[[2 ranges; 14 ∈ [851,869]]]=>[[35]@0], (?<=[[2 ranges; 151 ∈ [2,581]]])[[2 ranges; 14 ∈ [851,869]]]=>[[35]@0]]
+	[3]: LookupTable: kind=ChainedSequenceContext: [[[2 ranges; 14 ∈ [851,869]]](?=[[∀: 884..=897]])=>[[35]@0], (?<=[[∀: 884..=897]])[[2 ranges; 14 ∈ [851,869]]]=>[[35]@0]]
+	[4]: LookupTable: kind=ChainedSequenceContext: [(?<=[[191]])[[199]]=>[[36]@0], (?<=[[41]])[[49]]=>[[36]@0]]
+	[5]: LookupTable: kind=SingleSubst: [[4 ∈ [86,243]]=>(+1)]
+	[6]: LookupTable: kind=SingleSubst: [[4 ∈ [86,243]]=>(+1)]
+	[7]: LookupTable: kind=SingleSubst: [[189]=>(+6)]
+    (skipping LookupTables 8..29)
+	[29]: LookupTable: kind=LigatureSubst: [[[(#0002.000e => 294), (#0002.0014 => 295), ...(4 skipped)..., (#0002.004f => 300), (#0002.0058 => 301)], .., [(#0104.0104.0104 => 377)]]]
+	[30]: LookupTable: kind=LigatureSubst: [[[(#0058.00bb => 344), (#0058.00cc => 345), ...(2 skipped)..., (#0058.0104 => 348), (#0058.010a => 349)], .., [(#00f0.00f0.00bd => 376), (#00f0.00bd => 374), (#00f0.00f0 => 375)]]]
+	[31]: LookupTable: kind=SingleSubst: [[18 ranges; 78 ∈ [2,578]]=>[#0002->#007b, #0003->#007c, #0004->#007d, ...(skipping 72 substs)..., #022a->#020d, #0233->#020e, #0242->#020f]]
+	[32]: LookupTable: kind=SingleSubst: [[18 ranges; 78 ∈ [2,578]]=>[#0002->#007b, #0003->#007c, #0004->#007d, ...(skipping 72 substs)..., #022a->#020d, #0233->#020e, #0242->#020f]]
+	[33]: LookupTable: kind=SingleSubst: [[∀: 584..=593]=>(+30)]
+	[34]: LookupTable: kind=SingleSubst: [[∀: 584..=593]=>(+40)]
+	[35]: LookupTable: kind=SingleSubst: [[4 ranges; 16 ∈ [189,869]]=>[#00bd->#00be, #00c7->#00c8, #0353->#0374, ...(skipping 10 substs)..., #035e->#037f, #0364->#0380, #0365->#0381]]
+	[36]: LookupTable: kind=SingleSubst: [[16 ∈ [2,683]]=>[#0002->#0208, #0031->#0032, #0041->#0209, ...(skipping 10 substs)..., #02a9->#029f, #02aa->#02a0, #02ab->#02a1]]
+'CFF ': [MISSING IMPL]
+=== Font @ Index 2 ===
+(sfntVersion: 0x00010000)
+cmap: version 0
+	[0]: platform=0, encoding=3
+	[1]: platform=3, encoding=1
+head: version 1.0, Strong LTR or Neutral
+hhea: table version 1.0, 930 horizontal long metrics
+hmtx:
+	Glyph ID [0]: advanceWidth=694, lsb=40
+	Glyph ID [1]: advanceWidth=240, lsb=0
+	Glyph ID [2]: advanceWidth=696, lsb=0
+	Glyph ID [3]: advanceWidth=696, lsb=0
+	Glyph ID [4]: advanceWidth=696, lsb=0
+	Glyph ID [5]: advanceWidth=696, lsb=0
+	Glyph ID [6]: advanceWidth=696, lsb=0
+	Glyph ID [7]: advanceWidth=696, lsb=0
+    (skipping hmetrics 8..922)
+	Glyph ID [922]: advanceWidth=540, lsb=30
+	Glyph ID [923]: advanceWidth=540, lsb=30
+	Glyph ID [924]: advanceWidth=720, lsb=80
+	Glyph ID [925]: advanceWidth=720, lsb=-2
+	Glyph ID [926]: advanceWidth=680, lsb=-10
+	Glyph ID [927]: advanceWidth=680, lsb=-30
+	Glyph ID [928]: advanceWidth=1691, lsb=0
+	Glyph ID [929]: advanceWidth=785, lsb=357
+maxp: version 1.0 (contents omitted)
+name: version 0, 28 name_records
+    Full Font Name: Minipax Regular
+os/2: version 3
+post: version 2.0 (proportionally spaced)
+cvt: FWORD[95]
+fpgm: uint8[3605]
+loca: (details omitted)
+glyf: 930 glyphs
+    [0]: Composite Glyph [1 components, 0 instructions, xy: [(40, -50) <-> (654, 780)]]
+    [1]: <empty>
+    [2]: Simple Glyph [2 contours, 21 coordinates, 62 instructions, xy: [(0, 0) <-> (696, 740)]]
+    [3]: Composite Glyph [2 components, 0 instructions, xy: [(0, 0) <-> (696, 960)]]
+    [4]: Composite Glyph [2 components, 0 instructions, xy: [(0, 0) <-> (696, 950)]]
+    [5]: Composite Glyph [2 components, 0 instructions, xy: [(0, 0) <-> (696, 970)]]
+    [6]: Composite Glyph [2 components, 0 instructions, xy: [(0, 0) <-> (696, 960)]]
+    [7]: Composite Glyph [2 components, 0 instructions, xy: [(0, 0) <-> (696, 940)]]
+(skipping glyphs 8..922)
+    [922]: Simple Glyph [1 contours, 3 coordinates, 15 instructions, xy: [(30, 49) <-> (570, 529)]]
+    [923]: Simple Glyph [1 contours, 3 coordinates, 15 instructions, xy: [(30, 40) <-> (570, 520)]]
+    [924]: Simple Glyph [1 contours, 3 coordinates, 6 instructions, xy: [(80, 10) <-> (722, 730)]]
+    [925]: Simple Glyph [1 contours, 3 coordinates, 6 instructions, xy: [(-2, 10) <-> (640, 730)]]
+    [926]: Simple Glyph [1 contours, 3 coordinates, 15 instructions, xy: [(-10, 49) <-> (710, 691)]]
+    [927]: Simple Glyph [1 contours, 3 coordinates, 15 instructions, xy: [(-30, 49) <-> (690, 691)]]
+    [928]: Simple Glyph [1 contours, 44 coordinates, 292 instructions, xy: [(0, 0) <-> (1689, 794)]]
+    [929]: Simple Glyph [2 contours, 24 coordinates, 34 instructions, xy: [(357, 377) <-> (477, 664)]]
+prep: uint8[225]
+gasp: version 1, 1 ranges
+	[∀ PPEM] (SYMMETRIC_SMOOTHING | SYMMETRIC_GRIDFIT | DOGRAY | GRIDFIT)
+GDEF: version 1.0
+    GlyphClassDef:
+		(0002 -> 004c): 1(base)
+		(004e -> 00a9): 1(base)
+		(00ab -> 00d5): 1(base)
+		(00d7 -> 00e3): 1(base)
+		(00e5 -> 0125): 1(base)
+		(0126 -> 0179): 2(liga)
+		(017a -> 01c0): 1(base)
+		(01c2 -> 01c2): 1(base)
+	    (skipping ranges covering glyphs 452..=579)
+		(0311 -> 0311): 1(base)
+		(0317 -> 0317): 1(base)
+		(0352 -> 0352): 1(base)
+		(0353 -> 0365): 3(mark)
+		(0373 -> 0381): 3(mark)
+		(0383 -> 038e): 3(mark)
+		(0390 -> 0391): 1(base)
+		(03a0 -> 03a0): 1(base)
+    MarkAttachClassDef:
+		(0353 -> 0357): 2
+		(0359 -> 035f): 2
+		(0360 -> 0361): 1
+		(0374 -> 0378): 2
+		(037a -> 037f): 2
+		(0383 -> 0387): 2
+		(0389 -> 038e): 2
+    MarkGlyphSet: <none>
+    ItemVariationStore: <none>
+GPOS: version 1.0
+    ScriptList
+	[0]: DFLT
+	    [Default LangSys]: feature-indices: [0, 10, 20]
+	    LangSysRecords: <empty list>
+	[1]: latn
+	    [Default LangSys]: feature-indices: [1, 11, 21]
+	    LangSysRecords:
+		[0]: AZE ; feature-indices: [2, 12, 22]
+		[1]: CRT ; feature-indices: [3, 13, 23]
+		[2]: KAZ ; feature-indices: [4, 14, 24]
+		[3]: MOL ; feature-indices: [5, 15, 25]
+		[4]: NLD ; feature-indices: [6, 16, 26]
+		[5]: ROM ; feature-indices: [7, 17, 27]
+		[6]: TAT ; feature-indices: [8, 18, 28]
+		[7]: TRK ; feature-indices: [9, 19, 29]
+    FeatureList
+	[0]: kern[0]
+	[1]: kern[0]
+	[2]: kern[0]
+	[3]: kern[0]
+	[4]: kern[0]
+	[5]: kern[0]
+	[6]: kern[0]
+	[7]: kern[0]
+    (skipping FeatureIndices 8..22)
+	[22]: mkmk[3, 4]
+	[23]: mkmk[3, 4]
+	[24]: mkmk[3, 4]
+	[25]: mkmk[3, 4]
+	[26]: mkmk[3, 4]
+	[27]: mkmk[3, 4]
+	[28]: mkmk[3, 4]
+	[29]: mkmk[3, 4]
+    LookupList:
+	[0]: LookupTable: kind=PairPos, flags=LookupFlag (IGNORE_MARKS): [byGlyph([2 ∈ [78,234]]), byClass[21 ∈ 21 x 45]([9 ranges; 187 ∈ [2,352]]), byClass[14 ∈ 20 x 14]([8 ranges; 126 ∈ [378,519]]), byClass[(0, 0), (1, 1), (2, 2)]([4 ∈ [713,758]]), byClass[15 ∈ 16 x 15]([24 ranges; 95 ∈ [151,377]])]
+	[1]: LookupTable: kind=MarkBasePos: [Mark([7 ranges; 41 ∈ [851,910]])+Base([6 ∈ [785,928]])=>MarkArray[[0353=(1, (-167, 520)), 0354=(1, (-130, 520)), ...(37 skipped)..., 0355=(1, (-172, 560)), 0356=(1, (-151, 560))]]+BaseArray[[0311: [[0]=>(272, 0), [1]=>(274, 740), [2]=>(0, 0)], 0317: [[0]=>(346, 0), [1]=>(378, 740), [2]=>(0, 0)], ...(2 skipped)..., 0352: [[0]=>(338, 0), [1]=>(344, 740), [2]=>(344, 370)], 0390: [[0]=>(973, 0), [1]=>(973, 740), [2]=>(0, 0)]]]]
+	[2]: LookupTable: kind=MarkBasePos: [Mark([3 ranges; 46 ∈ [851,910]])+Base([14 ranges; 470 ∈ [2,579]])=>MarkArray[[0353=(2, (-167, 520)), 0354=(2, (-130, 520)), ...(42 skipped)..., 0355=(2, (-172, 560)), 0356=(2, (-151, 560))]]+BaseArray[[0002: [[0]=>(348, 0), [1]=>(626, 10), ...(skipping 3 indices from 2 to 4)..., [5]=>(0, 0), [6]=>(0, 0)], 0003: [[0]=>(348, 0), [1]=>(626, 10), ...(skipping 3 indices from 2 to 4)..., [5]=>(0, 0), [6]=>(0, 0)], ...(466 skipped)..., 0004: [[0]=>(294, 0), [1]=>(0, 0), ...(skipping 3 indices from 2 to 4)..., [5]=>(0, 0), [6]=>(0, 0)], 0005: [[0]=>(220, 0), [1]=>(0, 0), ...(skipping 3 indices from 2 to 4)..., [5]=>(0, 0), [6]=>(0, 0)]]]]
+	[3]: LookupTable: kind=MarkMarkPos, flags=LookupFlag (∅; mark_attachment_class_filter = 1): [Mark([2 ∈ [864,865]])+Mark([7 ∈ [858,906]])=>MarkArray[[0360=(0, (-91, 0)), 0361=(0, (-115, 0))]]+Mark2Array[[#035a: [[0]=>(-159, 569)], #0360: [[0]=>(-84, -211)], ...(skipping 3 Mark2Records)..., #0361: [[0]=>(-159, 799)], #0368: [[0]=>(-159, 578)]]]]
+	[4]: LookupTable: kind=MarkMarkPos, flags=LookupFlag (∅; mark_attachment_class_filter = 2): [Mark([6 ranges; 34 ∈ [851,910]])+Mark([8 ranges; 47 ∈ [851,910]])=>MarkArray[[0353=(0, (-167, 520)), 0354=(0, (-130, 520)), ...(30 skipped)..., 0355=(0, (-172, 560)), 0356=(0, (-151, 560))]]+Mark2Array[[#0353: [[0]=>(-167, 740)], #0354: [[0]=>(-130, 769)], ...(skipping 43 Mark2Records)..., #0355: [[0]=>(-172, 800)], #0356: [[0]=>(-151, 740)]]]]
+GSUB: version 1.0
+    ScriptList
+	[0]: DFLT
+	    [Default LangSys]: feature-indices: [0, 10, 20, ...(16 skipped)..., 198, 208, 218]
+	    LangSysRecords: <empty list>
+	[1]: latn
+	    [Default LangSys]: feature-indices: [1, 11, 21, ...(16 skipped)..., 199, 209, 219]
+	    LangSysRecords:
+		[0]: AZE ; feature-indices: [2, 12, 22, ...(17 skipped)..., 200, 210, 220]
+		[1]: CRT ; feature-indices: [3, 13, 23, ...(17 skipped)..., 201, 211, 221]
+		[2]: KAZ ; feature-indices: [4, 14, 24, ...(17 skipped)..., 202, 212, 222]
+		[3]: MOL ; feature-indices: [5, 15, 25, ...(17 skipped)..., 203, 213, 223]
+		[4]: NLD ; feature-indices: [6, 16, 26, ...(17 skipped)..., 204, 214, 224]
+		[5]: ROM ; feature-indices: [7, 17, 27, ...(17 skipped)..., 205, 215, 225]
+		[6]: TAT ; feature-indices: [8, 18, 28, ...(17 skipped)..., 206, 216, 226]
+		[7]: TRK ; feature-indices: [9, 19, 29, ...(17 skipped)..., 207, 217, 227]
+    FeatureList
+	[0]: aalt[0, 1]
+	[1]: aalt[0, 1]
+	[2]: aalt[0, 1]
+	[3]: aalt[0, 1]
+	[4]: aalt[0, 1]
+	[5]: aalt[0, 1]
+	[6]: aalt[0, 1]
+	[7]: aalt[0, 1]
+    (skipping FeatureIndices 8..220)
+	[220]: tnum[24]
+	[221]: tnum[24]
+	[222]: tnum[24]
+	[223]: tnum[24]
+	[224]: tnum[24]
+	[225]: tnum[24]
+	[226]: tnum[24]
+	[227]: tnum[24]
+    LookupList:
+	[0]: LookupTable: kind=SingleSubst: [[56 ranges; 218 ∈ [13,869]]=>[#000d->#0185, #000e->#0186, #000f->#0187, ...(skipping 212 substs)..., #0310->#0317, #0364->#0380, #0365->#0381]]
+	[1]: LookupTable: kind=AlternateSubst: [[32 ranges; 136 ∈ [2,862]]=>[[#0208, #017a, #007b], ...(134 skipped)..., [#038e, #037f]]]
+	[2]: LookupTable: kind=ChainedSequenceContext: [[[2 ∈ [189,199]]](?=[[2 ranges; 12 ∈ [851,863]]])=>[[35]@0], [[2 ∈ [189,199]]](?=[[∀: 865..=869], [2 ranges; 12 ∈ [851,863]]])=>[[35]@0], (?<=[[2 ranges; 14 ∈ [851,869]]])[[2 ranges; 14 ∈ [851,869]]]=>[[35]@0], (?<=[[2 ranges; 151 ∈ [2,581]]])[[2 ranges; 14 ∈ [851,869]]]=>[[35]@0]]
+	[3]: LookupTable: kind=ChainedSequenceContext: [[[2 ranges; 14 ∈ [851,869]]](?=[[∀: 884..=897]])=>[[35]@0], (?<=[[∀: 884..=897]])[[2 ranges; 14 ∈ [851,869]]]=>[[35]@0]]
+	[4]: LookupTable: kind=ChainedSequenceContext: [(?<=[[191]])[[199]]=>[[36]@0], (?<=[[41]])[[49]]=>[[36]@0]]
+	[5]: LookupTable: kind=SingleSubst: [[4 ∈ [86,243]]=>(+1)]
+	[6]: LookupTable: kind=SingleSubst: [[4 ∈ [86,243]]=>(+1)]
+	[7]: LookupTable: kind=SingleSubst: [[189]=>(+6)]
+    (skipping LookupTables 8..29)
+	[29]: LookupTable: kind=LigatureSubst: [[[(#0002.000e => 294), (#0002.0014 => 295), ...(4 skipped)..., (#0002.004f => 300), (#0002.0058 => 301)], .., [(#0104.0104.0104 => 377)]]]
+	[30]: LookupTable: kind=LigatureSubst: [[[(#0058.00bb => 344), (#0058.00cc => 345), ...(2 skipped)..., (#0058.0104 => 348), (#0058.010a => 349)], .., [(#00f0.00f0.00bd => 376), (#00f0.00bd => 374), (#00f0.00f0 => 375)]]]
+	[31]: LookupTable: kind=SingleSubst: [[18 ranges; 78 ∈ [2,578]]=>[#0002->#007b, #0003->#007c, #0004->#007d, ...(skipping 72 substs)..., #022a->#020d, #0233->#020e, #0242->#020f]]
+	[32]: LookupTable: kind=SingleSubst: [[18 ranges; 78 ∈ [2,578]]=>[#0002->#007b, #0003->#007c, #0004->#007d, ...(skipping 72 substs)..., #022a->#020d, #0233->#020e, #0242->#020f]]
+	[33]: LookupTable: kind=SingleSubst: [[∀: 584..=593]=>(+30)]
+	[34]: LookupTable: kind=SingleSubst: [[∀: 584..=593]=>(+40)]
+	[35]: LookupTable: kind=SingleSubst: [[4 ranges; 16 ∈ [189,869]]=>[#00bd->#00be, #00c7->#00c8, #0353->#0374, ...(skipping 10 substs)..., #035e->#037f, #0364->#0380, #0365->#0381]]
+	[36]: LookupTable: kind=SingleSubst: [[16 ∈ [2,683]]=>[#0002->#0208, #0031->#0032, #0041->#0209, ...(skipping 10 substs)..., #02a9->#029f, #02aa->#02a0, #02ab->#02a1]]
+DSIG: version 1; no signatures
+====== END OF FONT FILE ======
+
+

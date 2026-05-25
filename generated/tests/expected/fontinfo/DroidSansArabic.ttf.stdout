@@ -1,0 +1,125 @@
+====== [Font File]: /home/peter/yeslogic/dev/doodle/generated/../test-fonts/DroidSansArabic.ttf =======
+(sfntVersion: 0x00010000)
+cmap: version 0
+	[0]: platform=3, encoding=1
+head: version 1.0, Strong LTR only
+hhea: table version 1.0, 273 horizontal long metrics
+hmtx:
+	Glyph ID [0]: advanceWidth=1229, lsb=193
+	Glyph ID [1]: advanceWidth=532, lsb=0
+	Glyph ID [2]: advanceWidth=1411, lsb=0
+	Glyph ID [3]: advanceWidth=532, lsb=0
+	Glyph ID [4]: advanceWidth=512, lsb=84
+	Glyph ID [5]: advanceWidth=549, lsb=125
+	Glyph ID [6]: advanceWidth=872, lsb=68
+	Glyph ID [7]: advanceWidth=944, lsb=74
+    (skipping hmetrics 8..270)
+	Glyph ID [270]: advanceWidth=1794, lsb=92
+	Glyph ID [271]: advanceWidth=1112, lsb=113
+	Glyph ID [272]: advanceWidth=0, lsb=-256
+	Glyph ID [273]: lsb=-256
+	Glyph ID [274]: lsb=-266
+	Glyph ID [275]: lsb=-106
+	Glyph ID [276]: lsb=-219
+	Glyph ID [277]: lsb=-96
+maxp: version 1.0 (contents omitted)
+name: version 0, 14 name_records
+    Full Font Name: Droid Sans Arabic
+os/2: version 3
+post: version 2.0 (proportionally spaced)
+cvt: FWORD[70]
+fpgm: uint8[1790]
+loca: (details omitted)
+glyf: 278 glyphs
+    [0]: Simple Glyph [2 contours, 8 coordinates, 21 instructions, xy: [(193, 0) <-> (1034, 1462)]]
+    [1]: <empty>
+    [2]: <empty>
+    [3]: <empty>
+    [4]: Simple Glyph [1 contours, 7 coordinates, 23 instructions, xy: [(84, 0) <-> (397, 502)]]
+    [5]: Simple Glyph [2 contours, 15 coordinates, 30 instructions, xy: [(125, -20) <-> (463, 1370)]]
+    [6]: Simple Glyph [2 contours, 34 coordinates, 45 instructions, xy: [(68, -29) <-> (836, 1483)]]
+    [7]: Simple Glyph [1 contours, 22 coordinates, 45 instructions, xy: [(74, -18) <-> (862, 838)]]
+(skipping glyphs 8..270)
+    [270]: Simple Glyph [2 contours, 40 coordinates, 77 instructions, xy: [(92, -492) <-> (1815, 993)]]
+    [271]: Simple Glyph [2 contours, 33 coordinates, 68 instructions, xy: [(113, -492) <-> (1133, 932)]]
+    [272]: Simple Glyph [3 contours, 24 coordinates, 56 instructions, xy: [(-256, -553) <-> (254, -152)]]
+    [273]: Simple Glyph [3 contours, 24 coordinates, 56 instructions, xy: [(-256, 1182) <-> (254, 1583)]]
+    [274]: Simple Glyph [2 contours, 16 coordinates, 28 instructions, xy: [(-266, 1182) <-> (260, 1411)]]
+    [275]: Simple Glyph [1 contours, 8 coordinates, 13 instructions, xy: [(-106, 1182) <-> (106, 1411)]]
+    [276]: Simple Glyph [2 contours, 23 coordinates, 50 instructions, xy: [(-219, 1182) <-> (205, 1642)]]
+    [277]: Simple Glyph [2 contours, 16 coordinates, 34 instructions, xy: [(-96, 1018) <-> (96, 1481)]]
+prep: uint8[95]
+gasp: version 1, 2 ranges
+	[PPEM <= 8]  (SYMMETRIC_SMOOTHING | DOGRAY)
+	[PPEM <= 65535]  (SYMMETRIC_SMOOTHING | SYMMETRIC_GRIDFIT | DOGRAY | GRIDFIT)
+GDEF: version 1.0
+    GlyphClassDef:
+		(0000 -> 002b): 1(base)
+		(002c -> 0037): 3(mark)
+		(0038 -> 0045): 1(base)
+		(0046 -> 0046): 3(mark)
+		(0047 -> 0095): 1(base)
+		(0096 -> 0098): 3(mark)
+		(0099 -> 0099): 2(liga)
+		(009a -> 00fb): 1(base)
+		(00fc -> 0103): 2(liga)
+		(0104 -> 0115): 1(base)
+    LigCaretList:
+	Glyphs Covered: []
+    MarkGlyphSet: <none>
+    ItemVariationStore: <none>
+GPOS: version 1.0
+    ScriptList
+	[0]: arab
+	    [Default LangSys]: feature-indices: [0, 3]
+	    LangSysRecords:
+		[0]: FAR ; feature-indices: [1, 4]
+		[1]: URD ; feature-indices: [2, 5]
+    FeatureList
+	[0]: mark[0, 1]
+	[1]: mark[0, 1]
+	[2]: mark[0, 1]
+	[3]: mkmk[2]
+	[4]: mkmk[2]
+	[5]: mkmk[2]
+    LookupList:
+	[0]: LookupTable: kind=MarkBasePos, flags=LookupFlag (RIGHT_TO_LEFT): [Mark([3 ranges; 16 ∈ [44,152]])+Base([12 ranges; 175 ∈ [7,251]])=>MarkArray[[002c=(0, (0, 1650)), 002d=(0, (0, 1650)), ...(12 skipped)..., 002e=(0, (20, 1300)), 002f=(0, (20, 1300))]]+BaseArray[[0007: [[0]=>(470, 990), [1]=>(470, -100)], 0008: [[0]=>(260, 2000), [1]=>(260, -100)], ...(171 skipped)..., 0009: [[0]=>(260, 1200), [1]=>(220, -440)], 000a: [[0]=>(260, 1200), [1]=>(220, -440)]]]]
+	[1]: LookupTable: kind=MarkLigPos, flags=LookupFlag (RIGHT_TO_LEFT): [Mark([3 ranges; 16 ∈ [44,152]])+Ligature([∀: 252..=259])=>MarkArray[[002c=(0, (0, 1650)), 002d=(0, (0, 1650)), ...(12 skipped)..., 002e=(0, (20, 1300)), 002f=(0, (20, 1300))]]+LigatureArray[[00fc=[[[0]=>(1100, 1800), [1]=>(970, -200)], [[0]=>(380, 1760), [1]=>(380, -200)]], 00fd=[[[0]=>(1100, 1800), [1]=>(970, -200)], [[0]=>(380, 1760), [1]=>(380, -200)]], ...(skipping 4)..., 00fe=[[[0]=>(1100, 1800), [1]=>(970, -200)], [[0]=>(380, 1480), [1]=>(380, -200)]], 00ff=[[[0]=>(1100, 1800), [1]=>(970, -200)], [[0]=>(380, 1480), [1]=>(380, -200)]]]]]
+	[2]: LookupTable: kind=MarkMarkPos, flags=LookupFlag (RIGHT_TO_LEFT): [Mark([3 ranges; 16 ∈ [44,152]])+Mark([3 ranges; 16 ∈ [44,152]])=>MarkArray[[002c=(0, (0, 1650)), 002d=(0, (0, 1650)), ...(12 skipped)..., 002e=(0, (20, 1300)), 002f=(0, (20, 1300))]]+Mark2Array[[#002c: [[0]=>(0, 2200), [1]=>(0, 0)], #002d: [[0]=>(0, 2140), [1]=>(0, 0)], ...(skipping 12 Mark2Records)..., #002e: [[0]=>(0, 1900), [1]=>(0, 0)], #002f: [[0]=>(0, 2160), [1]=>(0, 0)]]]]
+GSUB: version 1.0
+    ScriptList
+	[0]: arab
+	    [Default LangSys]: feature-indices: [0, 6, 9, ...(1 skipped)..., 19, 12, 3]
+	    LangSysRecords:
+		[0]: FAR ; feature-indices: [1, 7, 10, ...(1 skipped)..., 20, 13, 4]
+		[1]: URD ; feature-indices: [2, 8, 11, ...(2 skipped)..., 21, 14, 5]
+    FeatureList
+	[0]: ccmp[0]
+	[1]: ccmp[0]
+	[2]: ccmp[0]
+	[3]: fina[2]
+	[4]: fina[2]
+	[5]: fina[2]
+	[6]: init[3]
+	[7]: init[3]
+    (skipping FeatureIndices 8..14)
+	[14]: liga[6]
+	[15]: locl[7]
+	[16]: medi[4]
+	[17]: medi[4]
+	[18]: medi[4]
+	[19]: rlig[5]
+	[20]: rlig[5]
+	[21]: rlig[5]
+    LookupList:
+	[0]: LookupTable: kind=LigatureSubst, flags=LookupFlag (RIGHT_TO_LEFT): [[(#0032.002d => 150), (#0032.002f => 151), (#0032.0030 => 152)]]
+	[1]: LookupTable: kind=SingleSubst, flags=LookupFlag (RIGHT_TO_LEFT | IGNORE_MARKS): [[16 ranges; 44 ∈ [12,145]]=>[#000c->#000c, #000e->#000e, #000f->#000f, ...(skipping 38 substs)..., #0089->#0055, #008d->#0054, #0091->#0057]]
+	[2]: LookupTable: kind=SingleSubst, flags=LookupFlag (RIGHT_TO_LEFT | IGNORE_MARKS): [[3 ranges; 52 ∈ [8,87]]=>[#0008->#00aa, #0009->#00ab, #000a->#00ac, ...(skipping 46 substs)..., #0055->#008a, #0056->#0095, #0057->#0092]]
+	[3]: LookupTable: kind=SingleSubst, flags=LookupFlag (RIGHT_TO_LEFT | IGNORE_MARKS): [[9 ranges; 35 ∈ [12,86]]=>[#000c->#00af, #000e->#00b3, #0010->#00b7, ...(skipping 29 substs)..., #0054->#008f, #0055->#008b, #0056->#00fa]]
+	[4]: LookupTable: kind=SingleSubst, flags=LookupFlag (RIGHT_TO_LEFT | IGNORE_MARKS): [[9 ranges; 35 ∈ [12,86]]=>[#000c->#00b0, #000e->#00b4, #0010->#00b8, ...(skipping 29 substs)..., #0054->#0090, #0055->#008c, #0056->#00fb]]
+	[5]: LookupTable: kind=LigatureSubst, flags=LookupFlag (RIGHT_TO_LEFT | IGNORE_MARKS): [[[(#00eb.00aa => 252), (#00eb.00ab => 254), (#00eb.00ad => 256), (#00eb.00b1 => 258)], [(#00ec.00aa => 253), (#00ec.00ab => 255), (#00ec.00ad => 257), (#00ec.00b1 => 259)]]]
+	[6]: LookupTable: kind=LigatureSubst, flags=LookupFlag (RIGHT_TO_LEFT): [[(#000d.00eb.00ec.00f4 => 153)]]
+	[7]: LookupTable: kind=SingleSubst, flags=LookupFlag (RIGHT_TO_LEFT): [[∀: 60..=62]=>[#003c->#005c, #003d->#005d, #003e->#005e]]
+====== END OF FONT FILE ======
+
+
