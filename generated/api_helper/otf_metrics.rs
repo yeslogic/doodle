@@ -2326,136 +2326,143 @@ pub(crate) mod dsig {
 }
 use dsig::*;
 
-#[derive(Debug, Clone)]
-struct FvarMetrics {
-    major_version: u16,
-    minor_version: u16,
-    axes: Vec<VariationAxisRecord>,
-    instances: Vec<InstanceRecord>,
-}
+pub(crate) mod otf_fvar {
+    use super::*;
 
-frame!(OpentypeFvar);
-
-impl<'input> container::DynContainer<obj::AxisRec> for otf_types::OpentypeFvar<'input> {
-    fn count(&self) -> usize {
-        self.axis_count as usize
+    alias! {
+        pub type OpentypeUserTuple = opentype_fvar_user_tuple;
+        pub type OpentypeInstanceRecord = opentype_fvar_instance_record;
+        pub type OpentypeVariationAxisRecord = opentype_fvar_variation_axis_record;
+        pub type OpentypeVariationAxisRecordFlags = opentype_fvar_variation_axis_record_flags;
     }
 
-    fn iter_offsets(&self) -> impl Iterator<Item = usize> {
-        (0..self.axis_count).map(|ix: u16| (self.offset_axes + ix * self.axis_size) as usize)
+    frame!(OpentypeFvar);
+
+    // FIXME[epic=untagged-obj-container] - mark with Mandatory/Nullable
+    impl<'input> container::DynContainer<obj::AxisRec> for OpentypeFvar<'input> {
+        fn count(&self) -> usize {
+            self.axis_count as usize
+        }
+
+        fn iter_offsets(&self) -> impl Iterator<Item = usize> {
+            (0..self.axis_count).map(|ix: u16| (self.offset_axes + ix * self.axis_size) as usize)
+        }
+
+        fn iter_args(&self) -> impl Iterator<Item = ()> {
+            std::iter::repeat(())
+        }
     }
 
-    fn iter_args(&self) -> impl Iterator<Item = ()> {
-        std::iter::repeat(())
-    }
-}
+    // FIXME[epic=untagged-obj-container] - mark with Mandatory/Nullable
+    impl<'input> container::DynContainer<obj::InstanceRec> for OpentypeFvar<'input> {
+        fn count(&self) -> usize {
+            self.axis_count as usize
+        }
 
-impl<'input> container::DynContainer<obj::InstanceRec> for otf_types::OpentypeFvar<'input> {
-    fn count(&self) -> usize {
-        self.axis_count as usize
-    }
+        fn iter_offsets(&self) -> impl Iterator<Item = usize> {
+            (0..self.instance_count).map(|ix: u16| {
+                (self.offset_axes + (self.axis_count * self.axis_size) + ix * self.instance_size)
+                    as usize
+            })
+        }
 
-    fn iter_offsets(&self) -> impl Iterator<Item = usize> {
-        (0..self.instance_count).map(|ix: u16| {
-            (self.offset_axes + (self.axis_count * self.axis_size) + ix * self.instance_size)
-                as usize
-        })
-    }
-
-    fn iter_args(&self) -> impl Iterator<Item = (u16, u16)> {
-        std::iter::repeat((self.axis_count, self.instance_size))
-    }
-}
-
-impl<'input> Promote<otf_types::OpentypeFvar<'input>> for FvarMetrics {
-    fn promote(orig: &otf_types::OpentypeFvar) -> Self {
-        let axes = fn_reify::reify_all(orig, obj::AxisRec)
-            .map(|raw| VariationAxisRecord::promote(&raw))
-            .collect();
-        let instances = fn_reify::reify_all(orig, obj::InstanceRec)
-            .map(|raw| InstanceRecord::promote(&raw))
-            .collect();
-        FvarMetrics {
-            major_version: orig.major_version,
-            minor_version: orig.minor_version,
-            axes,
-            instances,
+        fn iter_args(&self) -> impl Iterator<Item = (u16, u16)> {
+            std::iter::repeat((self.axis_count, self.instance_size))
         }
     }
 }
+use otf_fvar::*;
 
-pub type OpentypeUserTuple = opentype_fvar_user_tuple;
+pub(crate) mod fvar {
+    use super::*;
 
-impl Promote<OpentypeUserTuple> for UserTuple {
-    fn promote(orig: &OpentypeUserTuple) -> Self {
-        promote_vec(&orig.coordinates)
-    }
-}
-
-type UserTuple = Vec<otf_types::Fixed>;
-
-pub type OpentypeInstanceRecord = opentype_fvar_instance_record;
-
-// REVIEW - currently not implemented in the OpentypeLayoutScriptList => ScrList spec;
-type InstanceFlags = ();
-
-impl Promote<OpentypeInstanceRecord> for InstanceRecord {
-    fn promote(orig: &OpentypeInstanceRecord) -> InstanceRecord {
-        InstanceRecord {
-            subfamily_nameid: NameId::from(orig.subfamily_nameid),
-            flags: InstanceFlags::promote(&orig.flags),
-            coordinates: UserTuple::promote(&orig.coordinates),
-            postscript_nameid: promote_opt(&orig.postscript_nameid),
+    impl Promote<OpentypeUserTuple> for UserTuple {
+        fn promote(orig: &OpentypeUserTuple) -> Self {
+            promote_vec(&orig.coordinates)
         }
     }
-}
 
-#[derive(Debug, Clone)]
-struct InstanceRecord {
-    subfamily_nameid: NameId,
-    flags: InstanceFlags,
-    coordinates: UserTuple,
-    postscript_nameid: Option<NameId>,
-}
+    pub type UserTuple = Vec<otf_types::Fixed>;
 
-pub type OpentypeVariationAxisRecord = opentype_fvar_variation_axis_record;
+    // REVIEW - currently not implemented in the OpentypeLayoutScriptList => ScrList spec;
+    type InstanceFlags = ();
 
-pub type OpentypeVariationAxisRecordFlags = opentype_fvar_variation_axis_record_flags;
-
-impl Promote<OpentypeVariationAxisRecord> for VariationAxisRecord {
-    fn promote(orig: &OpentypeVariationAxisRecord) -> Self {
-        VariationAxisRecord {
-            axis_tag: Tag::promote(&orig.axis_tag),
-            min_value: otf_types::Fixed::promote(&orig.min_value),
-            default_value: otf_types::Fixed::promote(&orig.default_value),
-            max_value: otf_types::Fixed::promote(&orig.max_value),
-            flags: VariationAxisRecordFlags::promote(&orig.flags),
-            axis_name_id: NameId::from(orig.axis_name_id),
+    impl Promote<OpentypeInstanceRecord> for InstanceRecord {
+        fn promote(orig: &OpentypeInstanceRecord) -> InstanceRecord {
+            InstanceRecord {
+                subfamily_nameid: NameId::from(orig.subfamily_nameid),
+                flags: InstanceFlags::promote(&orig.flags),
+                coordinates: UserTuple::promote(&orig.coordinates),
+                postscript_nameid: promote_opt(&orig.postscript_nameid),
+            }
         }
     }
-}
 
-impl Promote<OpentypeVariationAxisRecordFlags> for VariationAxisRecordFlags {
-    fn promote(orig: &OpentypeVariationAxisRecordFlags) -> VariationAxisRecordFlags {
-        VariationAxisRecordFlags {
-            hidden_axis: orig.hidden_axis,
+    #[derive(Debug, Clone)]
+    pub struct InstanceRecord {
+        pub(crate) subfamily_nameid: NameId,
+        pub(crate) flags: InstanceFlags,
+        pub(crate) coordinates: UserTuple,
+        pub(crate) postscript_nameid: Option<NameId>,
+    }
+
+    #[derive(Clone, Copy, Debug)]
+    pub struct VariationAxisRecordFlags {
+        pub(crate) hidden_axis: bool,
+    }
+
+    impl Promote<OpentypeVariationAxisRecordFlags> for VariationAxisRecordFlags {
+        fn promote(orig: &OpentypeVariationAxisRecordFlags) -> VariationAxisRecordFlags {
+            VariationAxisRecordFlags {
+                hidden_axis: orig.hidden_axis,
+            }
         }
     }
-}
-#[derive(Clone, Copy, Debug)]
-struct VariationAxisRecordFlags {
-    hidden_axis: bool,
-}
+    #[derive(Debug, Clone, Copy)]
+    pub struct VariationAxisRecord {
+        pub(crate) axis_tag: Tag,
+        pub(crate) min_value: otf_types::Fixed,
+        pub(crate) default_value: otf_types::Fixed,
+        pub(crate) max_value: otf_types::Fixed,
+        pub(crate) flags: VariationAxisRecordFlags,
+        pub(crate) axis_name_id: NameId,
+    }
 
-#[derive(Debug, Clone, Copy)]
-struct VariationAxisRecord {
-    axis_tag: Tag,
-    min_value: otf_types::Fixed,
-    default_value: otf_types::Fixed,
-    max_value: otf_types::Fixed,
-    flags: VariationAxisRecordFlags,
-    axis_name_id: NameId,
+    impl Promote<OpentypeVariationAxisRecord> for VariationAxisRecord {
+        fn promote(orig: &OpentypeVariationAxisRecord) -> Self {
+            VariationAxisRecord {
+                axis_tag: Tag::promote(&orig.axis_tag),
+                min_value: otf_types::Fixed::promote(&orig.min_value),
+                default_value: otf_types::Fixed::promote(&orig.default_value),
+                max_value: otf_types::Fixed::promote(&orig.max_value),
+                flags: VariationAxisRecordFlags::promote(&orig.flags),
+                axis_name_id: NameId::from(orig.axis_name_id),
+            }
+        }
+    }
+
+    impl<'input> Promote<OpentypeFvar<'input>> for FvarMetrics {
+        fn promote(orig: &OpentypeFvar) -> Self {
+            let axes = promote_all(reify_all(orig, obj::AxisRec));
+            let instances = promote_all(reify_all(orig, obj::InstanceRec));
+            FvarMetrics {
+                major_version: orig.major_version,
+                minor_version: orig.minor_version,
+                axes,
+                instances,
+            }
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct FvarMetrics {
+        pub(crate) major_version: u16,
+        pub(crate) minor_version: u16,
+        pub(crate) axes: Vec<VariationAxisRecord>,
+        pub(crate) instances: Vec<InstanceRecord>,
+    }
 }
+pub(crate) use fvar::{FvarMetrics, InstanceRecord, VariationAxisRecord};
 
 #[derive(Debug, Clone)]
 struct StatMetrics {
@@ -2710,7 +2717,7 @@ struct NameRecord {
 // STUB - turn into enum?
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialOrd, PartialEq, Debug, Ord, Eq, Hash)]
-struct NameId(u16);
+pub struct NameId(pub(crate) u16);
 
 impl From<u16> for NameId {
     fn from(value: u16) -> Self {
@@ -7108,6 +7115,7 @@ pub(crate) mod otf_kern {
     }
 }
 pub(crate) use otf_kern::*;
+
 pub(crate) mod kern {
     use super::*;
 
