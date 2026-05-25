@@ -75,3 +75,19 @@ fn test_fontinfo_regression_frankenpax() {
     let expected = expect_test::expect_file!(testfile!("Frankenpax.ttc"));
     check_output(output, expected)
 }
+
+// ANNCHOR - SixtyfourConvergence-Regular-VariableFont_BLED,SCAN,XELA,YELA.ttf
+#[test]
+fn test_fontinfo_regression_sixtyfourconvergence() {
+    let output = fontinfo()
+        .args([
+            "-vv",
+            fontfile!("SixtyfourConvergence-Regular-VariableFont_BLED,SCAN,XELA,YELA.ttf"),
+        ])
+        .output()
+        .unwrap();
+    let expected = expect_test::expect_file!(testfile!(
+        "SixtyfourConvergence-Regular-VariableFont_BLED,SCAN,XELA,YELA.ttf"
+    ));
+    check_output(output, expected)
+}

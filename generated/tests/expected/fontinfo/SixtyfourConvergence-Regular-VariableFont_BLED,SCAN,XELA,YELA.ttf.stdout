@@ -1,0 +1,190 @@
+====== [Font File]: /home/peter/yeslogic/dev/doodle/generated/../test-fonts/SixtyfourConvergence-Regular-VariableFont_BLED,SCAN,XELA,YELA.ttf =======
+(sfntVersion: 0x00010000)
+cmap: version 0
+	[0]: platform=0, encoding=3
+	[1]: platform=3, encoding=1
+head: version 1.0, Strong LTR or Neutral
+hhea: table version 1.0, 3 horizontal long metrics
+hmtx:
+	Glyph ID [0]: advanceWidth=1024, lsb=0
+	Glyph ID [1]: advanceWidth=0, lsb=0
+	Glyph ID [2]: advanceWidth=1024, lsb=0
+	Glyph ID [3]: lsb=103
+	Glyph ID [4]: lsb=103
+	Glyph ID [5]: lsb=103
+	Glyph ID [6]: lsb=103
+	Glyph ID [7]: lsb=103
+    (skipping hmetrics 8..481)
+	Glyph ID [481]: lsb=-25
+	Glyph ID [482]: lsb=-25
+	Glyph ID [483]: lsb=-25
+	Glyph ID [484]: lsb=-25
+	Glyph ID [485]: lsb=-25
+	Glyph ID [486]: lsb=-25
+	Glyph ID [487]: lsb=-25
+	Glyph ID [488]: lsb=-25
+maxp: version 1.0 (contents omitted)
+name: version 0, 56 name_records
+    Full Font Name: Sixtyfour Convergence Regular
+os/2: version 4
+post: version 2.0 (monospaced)
+loca: (details omitted)
+glyf: 489 glyphs
+    [0]: Simple Glyph [1 contours, 4 coordinates, 0 instructions, xy: [(0, -256) <-> (1024, 1024)]]
+    [1]: <empty>
+    [2]: <empty>
+    [3]: Composite Glyph [11 components, 0 instructions, xy: [(103, 14) <-> (921, 882)]]
+    [4]: Composite Glyph [2 components, 0 instructions, xy: [(103, 14) <-> (921, 882)]]
+    [5]: Composite Glyph [2 components, 0 instructions, xy: [(103, 14) <-> (921, 882)]]
+    [6]: Composite Glyph [2 components, 0 instructions, xy: [(103, 14) <-> (921, 882)]]
+    [7]: Composite Glyph [2 components, 0 instructions, xy: [(103, 14) <-> (921, 882)]]
+(skipping glyphs 8..481)
+    [481]: Simple Glyph [1 contours, 12 coordinates, 0 instructions, xy: [(-25, 14) <-> (153, 114)]]
+    [482]: Simple Glyph [1 contours, 12 coordinates, 0 instructions, xy: [(-25, 14) <-> (281, 114)]]
+    [483]: Simple Glyph [1 contours, 12 coordinates, 0 instructions, xy: [(-25, 14) <-> (409, 114)]]
+    [484]: Simple Glyph [1 contours, 12 coordinates, 0 instructions, xy: [(-25, 14) <-> (537, 114)]]
+    [485]: Simple Glyph [1 contours, 12 coordinates, 0 instructions, xy: [(-25, 14) <-> (665, 114)]]
+    [486]: Simple Glyph [1 contours, 12 coordinates, 0 instructions, xy: [(-25, 14) <-> (793, 114)]]
+    [487]: Simple Glyph [1 contours, 12 coordinates, 0 instructions, xy: [(-25, 14) <-> (921, 114)]]
+    [488]: Simple Glyph [1 contours, 12 coordinates, 0 instructions, xy: [(-25, 14) <-> (1049, 114)]]
+prep: uint8[7]
+gasp: version 1, 1 ranges
+	[∀ PPEM] (SYMMETRIC_SMOOTHING | SYMMETRIC_GRIDFIT | DOGRAY | GRIDFIT)
+GSUB: version 1.0
+    ScriptList
+	[0]: DFLT
+	    [Default LangSys]: feature-indices: [0, 1, 2, 3, 4, 5]
+	    LangSysRecords: <empty list>
+    FeatureList
+	[0]: aalt[0, 1]
+	[1]: salt[2]
+	[2]: ss01[parameters located at SoF+6B][3]
+	[3]: ss02[parameters located at SoF+6B][4]
+	[4]: ss03[parameters located at SoF+6B][5]
+	[5]: ss04[parameters located at SoF+6B][6]
+    LookupList:
+	[0]: LookupTable: kind=SingleSubst: [[49 ranges; 162 ∈ [2,342]]=>[#0002->#0106, #000b->#0159, #000c->#015a, ...(skipping 156 substs)..., #0154->#0104, #0155->#0103, #0156->#01bf]]
+	[1]: LookupTable: kind=AlternateSubst: [[7 ∈ [3,57]]=>[[#003c, #0043, #0158], ...(5 skipped)..., [#0042, #0170]]]
+	[2]: LookupTable: kind=SingleSubst: [[∀: 182..=191]=>[#00b6->#00c1, #00b7->#00c0, #00b8->#00c0, ...(skipping 4 substs)..., #00bd->#00c0, #00be->#00c1, #00bf->#00c1]]
+	[3]: LookupTable: kind=SingleSubst: [[∀: 182..=191]=>[#00b6->#00c1, #00b7->#00c0, #00b8->#00c0, ...(skipping 4 substs)..., #00bd->#00c0, #00be->#00c1, #00bf->#00c1]]
+	[4]: LookupTable: kind=SingleSubst: [[52 ranges; 159 ∈ [2,342]]=>[#0002->#0106, #0003->#0158, #000b->#0159, ...(skipping 153 substs)..., #0154->#0104, #0155->#0103, #0156->#01bf]]
+	[5]: LookupTable: kind=SingleSubst: [[93 ∈ [2,254]]=>[#0002->#0106, #0003->#0158, #000b->#0159, ...(skipping 87 substs)..., #00fc->#01df, #00fd->#01e0, #00fe->#0176]]
+	[6]: LookupTable: kind=SingleSubst: [[16 ranges; 72 ∈ [2,342]]=>[#0002->#0106, #0088->#01ae, #009b->#01af, ...(skipping 66 substs)..., #0154->#0104, #0155->#0103, #0156->#01bf]]
+avar: version 1.0
+	[0]: [[-1→-1], [-0.84906→-0.85], [-0.50946→-0.5], ..(2 axis_value_maps).., [0.37→0.37335], [0.67→0.6667], [1→1]]
+	[1]: [[-1→-1], [0→0], [1→1]]
+	[2]: []
+	[3]: []
+fvar: version 1.0
+    Axes:
+	[0]: 'SCAN' axis: [-53, 100] (default: 0) NameId(260)
+	[1]: 'BLED' axis: [0, 100] (default: 0) NameId(261)
+	[2]: 'XELA' axis: [-100, 100] (default: 0) NameId(278)
+	[3]: 'YELA' axis: [-100, 100] (default: 0) NameId(279)
+    Instances:
+	[0]: Subfamily=NameId(262); Postscript=NameId(263); [-53, +0, +0, +0]
+	[1]: Subfamily=NameId(264); Postscript=NameId(265); [-45, +0, +0, +0]
+	[2]: Subfamily=NameId(266); Postscript=NameId(267); [-27, +0, +0, +0]
+	[3]: Subfamily=NameId(268); Postscript=NameId(269); [+0, +0, +0, +0]
+	[4]: Subfamily=NameId(270); Postscript=NameId(271); [+21, +0, +0, +0]
+	[5]: Subfamily=NameId(272); Postscript=NameId(273); [+37, +0, +0, +0]
+	[6]: Subfamily=NameId(274); Postscript=NameId(275); [+67, +0, +0, +0]
+	[7]: Subfamily=NameId(276); Postscript=NameId(277); [+100, +0, +0, +0]
+gvar: version 1.0
+    Shared Tuples (5 total):
+	[0]: [0, 1, 0, 0]
+	[1]: [1, 0, 0, 0]
+	[2]: [1, 1, 0, 0]
+	[3]: [-1, 0, 0, 0]
+	[4]: [-1, 1, 0, 0]
+    Glyph Variation Data (489 glyphs):
+	    [3]: 
+		[0]: Header (size: 2 bytes)
+		[1]: Header (size: 2 bytes)
+		[2]: Header (size: 2 bytes)
+		[3]: Header (size: 2 bytes)
+		[4]: Header (size: 2 bytes)
+	    [4]: 
+		[0]: Header (size: 2 bytes)
+		[1]: Header (size: 2 bytes)
+		[2]: Header (size: 2 bytes)
+		[3]: Header (size: 2 bytes)
+		[4]: Header (size: 2 bytes)
+	    [5]: 
+		[0]: Header (size: 2 bytes)
+		[1]: Header (size: 2 bytes)
+		[2]: Header (size: 2 bytes)
+		[3]: Header (size: 2 bytes)
+		[4]: Header (size: 2 bytes)
+	    [6]: 
+		[0]: Header (size: 2 bytes)
+		[1]: Header (size: 2 bytes)
+		[2]: Header (size: 2 bytes)
+		[3]: Header (size: 2 bytes)
+		[4]: Header (size: 2 bytes)
+	(skipping 476 glyph variation data tables between indices 7..484)
+	    [485]: 
+		[0]: Header (size: 22 bytes)
+		[1]: Header (size: 28 bytes)
+		[2]: Header (size: 4 bytes)
+		[3]: Header (size: 4 bytes)
+		[4]: Header (size: 4 bytes)
+	    [486]: 
+		[0]: Header (size: 22 bytes)
+		[1]: Header (size: 28 bytes)
+		[2]: Header (size: 4 bytes)
+		[3]: Header (size: 4 bytes)
+		[4]: Header (size: 4 bytes)
+	    [487]: 
+		[0]: Header (size: 22 bytes)
+		[1]: Header (size: 28 bytes)
+		[2]: Header (size: 4 bytes)
+		[3]: Header (size: 4 bytes)
+		[4]: Header (size: 4 bytes)
+	    [488]: 
+		[0]: Header (size: 22 bytes)
+		[1]: Header (size: 28 bytes)
+		[2]: Header (size: 4 bytes)
+		[3]: Header (size: 8 bytes)
+		[4]: Header (size: 4 bytes)
+HVAR: version 1.0
+    ItemVariationStore:
+	VariationRegions: 0 regions
+    ItemVariationData[1]
+	    [0]: ItemVariationData:
+		0 region indices: []
+		1 delta-sets (0 full [16-bit], 0 half [8-bit]): 
+		<display_delta_sets: incomplete>
+    Advance-Width mapping:
+	    [0]: ItemVariationData[0][0]
+    Left-Side-Bearing mapping: <glyphIndex>
+    Right-Side-Bearing mapping: <glyphIndex>
+STAT: version 1.1 (elidedFallbackName: name[id=2])
+    DesignAxes: 4 total
+	[0]: Tag=SCAN ; Axis NameID=280 ; Ordering=0
+	[1]: Tag=BLED ; Axis NameID=289 ; Ordering=1
+	[2]: Tag=XELA ; Axis NameID=293 ; Ordering=2
+	[3]: Tag=YELA ; Axis NameID=296 ; Ordering=3
+    AxisValues: 17 total
+	[0]: Axis[0]: NameId(281) = -53
+	[1]: Axis[0]: NameId(282) = -45
+	[2]: Axis[0]: NameId(283) = -27
+	[3]: Axis[0]: NameId(284) = 0
+	[4]: Axis[0]: NameId(285) = 21
+	[5]: Axis[0]: NameId(286) = 37
+	[6]: Axis[0]: NameId(287) = 67
+	[7]: Axis[0]: NameId(288) = 100
+    (skipping axis-values 8..9)
+	[9]: Axis[1]: NameId(291) = 40
+	[10]: Axis[1]: NameId(292) = 100
+	[11]: Axis[2] (Flags: ELIDABLE_AXIS_VALUE_NAME): NameId(290) = 0
+	[12]: Axis[2]: NameId(294) = -100
+	[13]: Axis[2]: NameId(295) = -100
+	[14]: Axis[3] (Flags: ELIDABLE_AXIS_VALUE_NAME): NameId(290) = 0
+	[15]: Axis[3]: NameId(297) = -100
+	[16]: Axis[3]: NameId(298) = -100
+COLR: [MISSING IMPL]
+CPAL: [MISSING IMPL]
+====== END OF FONT FILE ======
+
+
