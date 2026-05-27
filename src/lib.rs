@@ -77,8 +77,11 @@ fn mk_value_expr(vt: &ValueType) -> Option<Expr> {
             BaseType::U64 => Expr::U64(0),
             BaseType::Char => Expr::AsChar(Box::new(Expr::U32(0))),
         }),
-        ValueType::UnknownNumeric => Some(Expr::Numeric(Box::new(NumExpr::Const(
+        ValueType::NumericHole => Some(Expr::Numeric(Box::new(NumExpr::Const(
             numeric::TypedConst::from_u8(0),
+        )))),
+        ValueType::Signed(t) => Some(Expr::Numeric(Box::new(NumExpr::Const(
+            numeric::TypedConst::new(-1, (*t).into()),
         )))),
         ValueType::Tuple(ts) => {
             let mut xs = Vec::with_capacity(ts.len());
@@ -246,7 +249,7 @@ impl Expr {
             Expr::U16(_n) => Ok(ValueType::U16),
             Expr::U32(_n) => Ok(ValueType::U32),
             Expr::U64(_n) => Ok(ValueType::U64),
-            Expr::Numeric(_) => Ok(ValueType::UnknownNumeric),
+            Expr::Numeric(n_tree) => n_tree.infer_type(scope),
             Expr::Tuple(exprs) => {
                 let mut ts = Vec::new();
                 for expr in exprs {
@@ -319,24 +322,18 @@ impl Expr {
                 }
             }
 
-            Expr::Arith(_arith, x, y) => match (x.infer_type(scope)?, y.infer_type(scope)?) {
-                (ValueType::Base(b1), ValueType::Base(b2)) if b1 == b2 && b1.is_numeric() => {
-                    Ok(ValueType::Base(b1))
-                }
-                (ValueType::Base(b), ValueType::UnknownNumeric)
-                | (ValueType::UnknownNumeric, ValueType::Base(b))
-                    if b.is_numeric() =>
-                {
-                    Ok(ValueType::Base(b))
-                }
-                (ValueType::UnknownNumeric, ValueType::UnknownNumeric) => {
-                    // FIXME[epic=unsound] - due to the inherently abstract typing of UnknownNumeric, this is potentially unsound
-                    Ok(ValueType::UnknownNumeric)
-                }
-                (x, y) => Err(anyhow!(
-                    "mismatched operand types for {_arith:?}: {x:?}, {y:?}"
-                )),
-            },
+            Expr::Arith(_arith, x, y) => {
+                let (t1, t2) = (x.infer_type(scope)?, y.infer_type(scope)?);
+                t1.unify(&t2).map_err(|e| anyhow!("{e}")).and_then(|t0| {
+                    if t0.is_numeric() {
+                        Ok(t0)
+                    } else {
+                        Err(anyhow!(
+                            "mismatched operand types for {_arith:?}: {t1:?}, {t2:?}"
+                        ))
+                    }
+                })
+            }
             Expr::Unary(_op @ UnaryOp::BoolNot, x) => match x.infer_type(scope)? {
                 ValueType::Base(BaseType::Bool) => Ok(ValueType::Base(BaseType::Bool)),
                 x => Err(anyhow!("unexpected operand type for {_op:?}: {x:?}")),
@@ -438,7 +435,7 @@ impl Expr {
                 }
             }
             Expr::SeqLength(seq) => match seq.infer_type(scope)? {
-                // FIXME[epic=seqlen-always-u32] - is UnknownNumeric better here?
+                // FIXME[epic=seqlen-always-u32] - this ought to be NumericHole, but there are several Expr/Format-level hardcoded U32 type-assumptions on Expr args that would also need to be fixed in tandem
                 ValueType::Seq(_t) => Ok(ValueType::SEQ_LEN_T),
                 other => Err(anyhow!("seq-length called on non-sequence type: {other:?}")),
             },
@@ -584,16 +581,18 @@ impl Expr {
                 let start_type = start.infer_type(scope)?;
                 let end_type = end.infer_type(scope)?;
 
-                // REVIEW[epic=embedded-num] - is UnknownNumeric acceptable (or likely) in this position?
-                if !matches!(start_type, ValueType::Base(b) if b.is_numeric()) {
+                if !start_type.is_numeric() {
                     return Err(anyhow!("EnumFromTo: start is not numeric: {start_type:?}"));
-                } else if start_type != end_type {
-                    return Err(anyhow!(
-                        "EnumFromTo: start and end do not agree: {start_type:?} != {end_type:?}"
-                    ));
                 }
 
-                Ok(ValueType::Seq(Box::new(start_type)))
+                // NOTE - we don't need to specifically check for `end_type` being numeric because the unification will effectively test that
+                let Ok(t) = start_type.unify(&end_type) else {
+                    return Err(anyhow!(
+                        "EnumFromTo: start and end do not agree: {start_type:?} ∩ {end_type:?} = ∅"
+                    ));
+                };
+
+                Ok(ValueType::Seq(Box::new(t)))
             }
             // REVIEW[epic=dup32] - is there a better way to handle this?
             Expr::Dup(count, expr) => {

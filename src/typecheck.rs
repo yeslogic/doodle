@@ -382,7 +382,7 @@ impl UType {
     /// Will return `None` if the conversion failed due to the presence of a Union-type at any layer.
     pub(crate) fn from_valuetype(vt: &ValueType) -> Option<UType> {
         match vt {
-            ValueType::Any | ValueType::UnknownNumeric => Some(Self::Hole),
+            ValueType::Any | ValueType::NumericHole => Some(Self::Hole),
             ValueType::Empty => Some(Self::Empty),
             ValueType::ViewObj => Some(Self::ViewObj),
             ValueType::PhantomData(inner) => {
@@ -390,6 +390,7 @@ impl UType {
                 Some(UType::PhantomData(Rc::new(inner_t)))
             }
             ValueType::Base(b) => Some(Self::Base(*b)),
+            ValueType::Signed(s) => Some(Self::Int(IntType::from(*s))),
             ValueType::Tuple(vts) => {
                 let mut uts = Vec::with_capacity(vts.len());
                 for vt in vts.iter() {
@@ -3814,14 +3815,13 @@ impl TypeChecker {
                 None
             }
             UType::ViewObj => Some(AugValueType::ViewObj),
-            // FIXME - add AugValueType to specify actual numeric type
             &UType::Int(it) => Some(AugValueType::Int(it.to_prim())),
             &UType::Var(uv) => {
                 let v = self.get_canonical_uvar(uv);
                 match self.substitute_uvar_vtype(v) {
                     Ok(Some(t0)) => match t0 {
                         VType::Base(bs) => match bs.get_unique_solution(uv) {
-                            Ok(b) => Some(AugValueType::Base(b)),
+                            Ok(b) => Some(AugValueType::from(b)),
                             Err(_e) => None,
                         },
                         VType::Int(is) => match is.get_unique_solution(uv) {
@@ -3844,7 +3844,7 @@ impl TypeChecker {
                     }
                 }
             }
-            &UType::Base(base_t) => Some(AugValueType::Base(base_t)),
+            &UType::Base(base_t) => Some(AugValueType::from(base_t)),
             UType::Empty => Some(AugValueType::Empty),
             UType::Tuple(ts) => {
                 let mut vts = Vec::with_capacity(ts.len());
@@ -4232,7 +4232,7 @@ mod tests {
             .reify(ut)
             .unwrap_or_else(|| panic!("reify returned None"));
         let expected = AugValueType::Union(BTreeMap::from([
-            ("A".into(), AugValueType::Base(BaseType::U8)),
+            ("A".into(), AugValueType::from(BaseType::U8)),
             ("B".into(), AugValueType::Tuple(vec![])),
         ]));
         assert_eq!(output, expected);
@@ -4269,8 +4269,8 @@ mod tests {
             .reify(ut)
             .unwrap_or_else(|| panic!("reify returned None"));
         let expected = AugValueType::Record(vec![
-            ("number".into(), AugValueType::Base(BaseType::U8)),
-            ("isEven".into(), AugValueType::Base(BaseType::Bool)),
+            ("number".into(), AugValueType::from(BaseType::U8)),
+            ("isEven".into(), AugValueType::from(BaseType::Bool)),
         ]);
         assert_eq!(output, expected);
         Ok(())
@@ -4312,7 +4312,7 @@ mod tests {
             .reify(ut)
             .unwrap_or_else(|| panic!("reify returned None"));
         let expected = AugValueType::Record(vec![
-            ("number".into(), AugValueType::Base(BaseType::U8)),
+            ("number".into(), AugValueType::from(BaseType::U8)),
             (
                 "parity".into(),
                 AugValueType::Union(BTreeMap::from([
@@ -4383,7 +4383,7 @@ mod tests {
             .reify(ut)
             .unwrap_or_else(|| panic!("reify returned None"));
         let expected = AugValueType::Seq(
-            Box::new(AugValueType::Base(BaseType::U32)),
+            Box::new(AugValueType::from(BaseType::U32)),
             SeqBorrowHint::Constructed,
         );
         assert_eq!(output, expected);
@@ -4406,8 +4406,8 @@ mod tests {
             .reify(ut)
             .unwrap_or_else(|| panic!("reify returned None"));
         let expected = AugValueType::Record(vec![
-            ("x".into(), AugValueType::Base(BaseType::U32)),
-            ("y".into(), AugValueType::Base(BaseType::U32)),
+            ("x".into(), AugValueType::from(BaseType::U32)),
+            ("y".into(), AugValueType::from(BaseType::U32)),
         ]);
         assert_eq!(output, expected);
         Ok(())

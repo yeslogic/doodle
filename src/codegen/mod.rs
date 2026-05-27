@@ -5666,7 +5666,7 @@ mod tests {
             Box::new(ix_dup),
             Box::new(Expr::U32(1)),
             TypeHint::from(crate::ValueType::from(
-                crate::valuetype::augmented::AugValueType::Base(BaseType::U32),
+                crate::valuetype::augmented::AugValueType::from(BaseType::U32),
             )),
             Box::new(Expr::Var("xs".into())),
         ));
