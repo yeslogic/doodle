@@ -356,6 +356,8 @@ impl UType {
         Self::Option(self)
     }
 
+    /// Constructs a `UType::Seq` with an elem-type of `self` and a
+    /// borrow-hint of [`SeqBorrowHint::BufferView`.
     pub fn seq_view(self: Rc<Self>) -> Self {
         Self::Seq(self, SeqBorrowHint::BufferView)
     }
@@ -2386,28 +2388,32 @@ impl TypeChecker {
                 let newvar = self.init_var_simple(UType::Base(BaseType::U8))?.0;
                 let xvar = self.infer_var_expr(x.as_ref(), scope)?;
                 // FIXME[epic=embedded-num] - change to unify_var_intset(xvar, IntSet::ZAny)
-                let _cx = self.unify_var_baseset(xvar, BaseSet::UAny)?;
+                // let _cx = self.unify_var_baseset(xvar, BaseSet::UAny)?;
+                let _cx = self.unify_var_intset(xvar, IntSet::ZAny)?;
                 newvar
             }
             Expr::AsU16(x) => {
                 let newvar = self.init_var_simple(UType::Base(BaseType::U16))?.0;
                 let xvar = self.infer_var_expr(x.as_ref(), scope)?;
                 // FIXME[epic=embedded-num] - change to unify_var_intset(xvar, IntSet::ZAny)
-                let _cx = self.unify_var_baseset(xvar, BaseSet::UAny)?;
+                // let _cx = self.unify_var_baseset(xvar, BaseSet::UAny)?;
+                let _cx = self.unify_var_intset(xvar, IntSet::ZAny)?;
                 newvar
             }
             Expr::AsU32(x) => {
                 let newvar = self.init_var_simple(UType::Base(BaseType::U32))?.0;
                 let xvar = self.infer_var_expr(x.as_ref(), scope)?;
                 // FIXME[epic=embedded-num] - change to unify_var_intset(xvar, IntSet::ZAny)
-                let _cx = self.unify_var_baseset(xvar, BaseSet::UAny)?;
+                // let _cx = self.unify_var_baseset(xvar, BaseSet::UAny)?;
+                let _cx = self.unify_var_intset(xvar, IntSet::ZAny)?;
                 newvar
             }
             Expr::AsU64(x) => {
                 let newvar = self.init_var_simple(UType::Base(BaseType::U64))?.0;
                 let xvar = self.infer_var_expr(x.as_ref(), scope)?;
                 // FIXME[epic=embedded-num] - change to unify_var_intset(xvar, IntSet::ZAny)
-                let _cx = self.unify_var_baseset(xvar, BaseSet::UAny)?;
+                // let _cx = self.unify_var_baseset(xvar, BaseSet::UAny)?;
+                let _cx = self.unify_var_intset(xvar, IntSet::ZAny)?;
                 newvar
             }
             Expr::AsChar(x) => {
@@ -2437,8 +2443,12 @@ impl TypeChecker {
             }
             Expr::SeqLength(seq_expr) => {
                 let newvar = self.get_new_uvar();
-                // NOTE - we can't use `UintSet::any_default(Bits32)` because it causes a multiple-solution error when unified against Format::Pos.
-                self.unify_var_baseset(newvar, BaseSet::Single(BaseType::U32))?;
+
+                //  we have extracted the BaseSet as a local const to make it more visible,
+                // so it is easier for us to change the constraints we apply to SeqLen later.
+                const SEQ_LEN_BASESET: BaseSet = BaseSet::UAny32;
+
+                self.unify_var_baseset(newvar, SEQ_LEN_BASESET)?;
                 let seq_var = self.infer_var_expr(seq_expr.as_ref(), scope)?;
                 let elem_var = self.get_new_uvar();
                 self.unify_var_proj_elem(seq_var, elem_var)?;
@@ -2449,7 +2459,7 @@ impl TypeChecker {
                 let seq_var = self.infer_var_expr(seq_expr.as_ref(), scope)?;
 
                 let index_t = self.infer_utype_expr(index_expr.as_ref(), scope)?;
-                self.unify_utype_baseset(index_t, BaseSet::USome)?;
+                self.unify_utype_baseset(index_t, BaseSet::UAny32)?;
 
                 // directly project newvar as the element-type of seq_var
                 self.unify_var_proj_elem(seq_var, newvar)?;
@@ -2463,8 +2473,8 @@ impl TypeChecker {
                 let start_t = self.infer_utype_expr(start_expr.as_ref(), scope)?;
                 let len_t = self.infer_utype_expr(len_expr.as_ref(), scope)?;
 
-                self.unify_utype_baseset(start_t, BaseSet::USome)?;
-                self.unify_utype_baseset(len_t, BaseSet::USome)?;
+                self.unify_utype_baseset(start_t, BaseSet::UAny32)?;
+                self.unify_utype_baseset(len_t, BaseSet::UAny32)?;
 
                 // ensure that seq_t is a sequence type, and then equate seq_t to newvar
                 let elem_var = self.get_new_uvar();
@@ -2480,8 +2490,8 @@ impl TypeChecker {
                 let start_t = self.infer_utype_expr(start_expr.as_ref(), scope)?;
                 let len_t = self.infer_utype_expr(len_expr.as_ref(), scope)?;
 
-                self.unify_utype_baseset(start_t, BaseSet::USome)?;
-                self.unify_utype_baseset(len_t, BaseSet::USome)?;
+                self.unify_utype_baseset(start_t, BaseSet::UAny32)?;
+                self.unify_utype_baseset(len_t, BaseSet::UAny32)?;
 
                 // ensure that seq_t is a sequence type, and then equate it to newvar
                 let elem_var = self.get_new_uvar();
@@ -2606,7 +2616,7 @@ impl TypeChecker {
                 let start_var = self.infer_var_expr(start, scope)?;
                 let stop_var = self.infer_var_expr(stop, scope)?;
 
-                self.unify_var_baseset(start_var, BaseSet::USome)?;
+                self.unify_var_baseset(start_var, BaseSet::UAny32)?;
                 self.unify_var_pair(start_var, stop_var)?;
 
                 self.unify_var_proj_elem(newvar, start_var)?;
@@ -2618,7 +2628,7 @@ impl TypeChecker {
                 let count_var = self.infer_var_expr(count, scope)?;
                 let x_var = self.infer_var_expr(x, scope)?;
 
-                self.unify_var_baseset(count_var, BaseSet::USome)?;
+                self.unify_var_baseset(count_var, BaseSet::UAny32)?;
                 self.unify_var_proj_elem(newvar, x_var)?;
 
                 newvar
@@ -3591,7 +3601,7 @@ impl TypeChecker {
             Format::Slice(sz, inner) => {
                 let newvar = self.get_new_uvar();
                 let sz_t = self.infer_utype_expr(sz, ctxt.scope)?;
-                self.unify_utype_baseset(sz_t, BaseSet::USome)?;
+                self.unify_utype_baseset(sz_t, BaseSet::UAny32)?;
                 let inner_t = self.infer_utype_format(inner, ctxt)?;
                 self.unify_var_utype(newvar, inner_t)?;
                 Ok(newvar)
@@ -3606,7 +3616,7 @@ impl TypeChecker {
                 let newvar = self.get_new_uvar();
                 let addr_var = self.infer_var_expr(addr, ctxt.scope)?;
                 let offs_var = self.infer_var_expr(offs, ctxt.scope)?;
-                self.unify_var_baseset(addr_var, BaseSet::USome)?;
+                self.unify_var_baseset(addr_var, BaseSet::UAny32)?;
                 // REVIEW - addr_var and offs_var only need to be compatible, not identical, but in our current model it is hard to support heterogenous typings
                 self.unify_var_pair(addr_var, offs_var)?;
                 let inner_t = self.infer_utype_format(inner, ctxt)?;

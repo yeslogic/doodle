@@ -1,6 +1,4 @@
-use doodle::{
-    BaseType, Expr, Format, FormatModule, FormatRef, Label, Pattern, ValueType, helper::*,
-};
+use doodle::{Expr, Format, FormatModule, FormatRef, Label, Pattern, ValueType, helper::*};
 
 /// Helper for JPEG-specific markers (0xFF + id)
 fn marker(id: u8) -> Format {
@@ -189,7 +187,7 @@ pub fn main(module: &mut FormatModule, tiff: FormatRef) -> FormatRef {
         // };
         let dqt_data_elements = module.define_format_args(
             "jpeg.dqt-data.elements",
-            vec![(Label::Borrowed("precision"), ValueType::Base(BaseType::U8))],
+            vec![(Label::Borrowed("precision"), ValueType::U8)],
             match_variant(
                 var("precision"),
                 [
@@ -307,10 +305,7 @@ pub fn main(module: &mut FormatModule, tiff: FormatRef) -> FormatRef {
 
     let app0_data_data = module.define_format_args(
         "jpeg.app0-data.data",
-        vec![(
-            "identifier".into(),
-            ValueType::Seq(Box::new(ValueType::Base(BaseType::U8))),
-        )],
+        vec![("identifier".into(), ValueType::Seq(Box::new(ValueType::U8)))],
         match_variant(
             var("identifier"),
             vec![
@@ -343,10 +338,7 @@ pub fn main(module: &mut FormatModule, tiff: FormatRef) -> FormatRef {
     let app1_xmp = module.define_format("jpeg.app1-xmp", record([("xmp", opaque_bytes())]));
     let app1_data_data = module.define_format_args(
         "jpeg.app1-data.data",
-        vec![(
-            "identifier".into(),
-            ValueType::Seq(Box::new(ValueType::Base(BaseType::U8))),
-        )],
+        vec![("identifier".into(), ValueType::Seq(Box::new(ValueType::U8)))],
         match_variant(
             var("identifier"),
             vec![

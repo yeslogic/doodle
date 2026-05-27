@@ -21,11 +21,15 @@ As currently defined:
 pub enum UType {
     Empty,     // Reserved for value-free Formats (Format::Fail only)
     Hole,      // ground type-hole for shape-only unifications
+    ViewObj, // used only for representing the model-specific `View` type
     Var(UVar), // type-hole
     Base(BaseType),
     Tuple(Vec<Rc<UType>>),
     Record(Vec<(Label, Rc<UType>)>),
     Seq(Rc<UType>),
+    Option(Rc<UType>), // Formats using Maybe, and explicit LiftOption nodes
+    PhantomData(Rc<UType>), // Delayed parses containing type-hints for what value the parse would be if it were eagerly processed, to aid in downstream integration to avoid losing track of what parse should be run
+    Int(IntType), // General member of the numeric sub-model for embedding NumTree expressions in the core Expr grammar
 }
 ```
 
@@ -40,6 +44,10 @@ For this document, we adopt the following notational conventions:
   - The elements of $\mathtt{?X} \simeq \{ \mathtt{Lab_0}\mathop{:}\ \mathtt{T_0}, \ldots, \mathtt{Lab_N}\mathop{:}\ \mathtt{T_N} \}$ are written as `?X.Labi` (signifying `Ti`)
 - `Seq(T)` is written as `[T]`
 - `Empty` is written as `!`
+- `Option(T)` is written as `(T)?`
+- `Int(I)` is written as `T` when unambiguous with `Base` and clarified as `#{T}` when ambiguous or to explicate the distinction even when unambiguous.
+
+`ViewObj` and `PhantomData` are relatively monolithic from the type-checking perspective, and do not have exceptionally complex rules worth elaborating.
 
 ### Simple Constraints
 
@@ -58,6 +66,7 @@ narrowing to the possible combinations that would yield a type-valid sub-tree.
   - A sequence whose element type is `??` (or, post-unification, `?Y`)
   - A tuple-type which can be selectively indexed into with new metavariable associations $\verb!?X![i] \simeq \verb!?Y!$ that will eventually cover all valid indices, but may start out vacuous.
   - A record-type with an unknown set of field-names, which can be selectively populated with new field name-type pairs `(Name, Type)`. If two implicit fields have the same label, their field-types are forced to unify, and otherwise the full shape of the record is delayed until no more fields could possibly be added (usually when the full tree is reified)
+- `NumTree` (Numeric Tree-type [element]): Broadly similar to `Elem`, but generalized over the extended set of signed-or-unsigned machine-integer types supported by the embedded numeric model. Otherwise, functionally equivalent and semi-interoperable with `Elem` up to a certain point.
 
 ### Variant Constraints
 

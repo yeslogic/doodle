@@ -43,20 +43,30 @@ impl BaseType {
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Default, Serialize)]
 pub enum SeqBorrowHint {
     #[default]
+    /// Hint for arbitrary sequences that may either be constructed synthetically or dynamically,
+    /// whether requiring variable-width or context-dependent decoding of a section of
+    /// buffer-data, or whose source-bytes are non-contiguous.
     Constructed,
+    /// Hint specific to [`ViewFormat::ReadArray`], which is backed by a fixed slice of the source-buffer
+    /// and interpreted dynamically as a series of fixed-width values with a common type and unambiguous
+    /// mapping from bytes to values (e.g. `U16Be`).
     ReadArray,
+    /// Hint for an implied view (slice) of the buffer-data, e.g. `ViewFormat::CaptureBytes`.
     BufferView,
 }
 
 impl SeqBorrowHint {
+    /// Returns `true` if the hint is [`SeqBorrowHint::Constructed`].
     pub fn is_constructed(&self) -> bool {
         matches!(self, Self::Constructed)
     }
 
+    /// Returns `true` if the hint is [`SeqBorrowHint::BufferView`].
     pub fn is_buffer_view(&self) -> bool {
         matches!(self, Self::BufferView)
     }
 
+    /// Returns `true` if the hint is [`SeqBorrowHint::ReadArray`].
     pub fn is_read_array(&self) -> bool {
         matches!(self, Self::ReadArray)
     }
@@ -64,12 +74,17 @@ impl SeqBorrowHint {
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub enum ValueType {
+    /// Polymorphic hole used for unconstrained parameter types (e.g. the element type for an empty sequence)
     Any,
+    /// Bottom type representing value-less modes of failure (e.g. `Format::Fail`)
     Empty,
+    /// Model-level type for whatever object type is used to represent the `View` abstraction
     ViewObj,
+    /// Place-holding marker type to associate a selectively deferred parse with its proper type
     PhantomData(Box<ValueType>),
     Base(BaseType),
-    /// Like [`Any`], but known to be a numeric type so any expressions that expect numerics should be considered valid.
+    /// Like [`Any`], but known to be a numeric type so any expressions that expect numerics should treat it as a valid case.
+    // FIXME[epic=unsound] - this should be properly expanded to distinguish statically typeable Num-trees from polymorphic/Auto.
     UnknownNumeric,
     Tuple(Vec<ValueType>),
     Record(Vec<(Label, ValueType)>),
@@ -86,47 +101,60 @@ impl From<BaseType> for ValueType {
 
 impl ValueType {
     pub const BOOL: ValueType = ValueType::Base(BaseType::Bool);
-
     pub const UNIT: ValueType = ValueType::Tuple(Vec::new());
 
-    // TODO - add other numeric types
+    pub const U8: ValueType = ValueType::Base(BaseType::U8);
     pub const U16: ValueType = ValueType::Base(BaseType::U16);
     pub const U32: ValueType = ValueType::Base(BaseType::U32);
+    pub const U64: ValueType = ValueType::Base(BaseType::U64);
+
+    /// Formalization of the hard-coded `u32` type for sequence lengths to avoid hardcoding U32 directly over multiple modules.
+    pub const SEQ_LEN_T: ValueType = ValueType::Base(BaseType::U32);
 
     /// Helper function for constructing `ValueType::Option`.
     pub fn option(ty: Self) -> ValueType {
         ValueType::Option(Box::new(ty))
     }
 
+    /// Given a `ValueType::Record` as `self` along with an identifier `label` that is a field of `self`,
+    /// returns the corresponding type for said field.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if `self` is not a record type, or if `label` is not a field of `self`.
     pub(crate) fn record_proj(&self, label: &str) -> ValueType {
         match self {
             ValueType::Record(fields) => match fields.iter().find(|(l, _)| label == l) {
                 Some((_, t)) => t.clone(),
-                None => panic!("record_proj: field `{label}` not found in record type"),
+                None => panic!(
+                    "ValueType::record_proj: field `{label}` not found in record type: {self:?}"
+                ),
             },
             _ => panic!("projection `_.{label}` failed: expected record type, found {self:?}"),
         }
     }
 
-    pub(crate) fn unwrap_tuple_type(self) -> AResult<Vec<ValueType>> {
+    /// Deconstructs a `ValueType::Tuple` into its component types, preserving the original order.
+    ///
+    /// Returns `Err` if `self` is not a tuple type.
+    pub(crate) fn try_into_tuple_type(self) -> AResult<Vec<ValueType>> {
         match self {
             ValueType::Tuple(ts) => Ok(ts),
             t => Err(anyhow!("type is not a tuple: {t:?}")),
         }
     }
 
-    pub(crate) fn as_tuple_type(&self) -> &[ValueType] {
+    /// Returns a borrowed slice of the component types of a `ValueType::Tuple`.
+    ///
+    /// Returns `Err` if `self` is not a tuple type.`
+    pub(crate) fn try_as_tuple_type(&self) -> AResult<&[ValueType]> {
         match self {
-            ValueType::Tuple(ts) => ts.as_slice(),
-            other => panic!("type is not a tuple: {other:?}"),
+            ValueType::Tuple(ts) => Ok(ts.as_slice()),
+            t => Err(anyhow!("type is not a tuple: {t:?}")),
         }
     }
 
-    pub fn is_equivalent(&self, other: &ValueType) -> Result<(), UnificationError<ValueType>> {
-        self.unify(other)?;
-        Ok(())
-    }
-
+    /// Performs standalone unification between `self` and `other`.
     pub(crate) fn unify(
         &self,
         other: &ValueType,

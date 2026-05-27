@@ -6,7 +6,7 @@ use doodle::{
 };
 
 const ISBE_ARG: (Label, ValueType) = (Label::Borrowed("is_be"), ValueType::Base(BaseType::Bool));
-const CLASS_ARG: (Label, ValueType) = (Label::Borrowed("class"), ValueType::Base(BaseType::U8));
+const CLASS_ARG: (Label, ValueType) = (Label::Borrowed("class"), ValueType::U8);
 
 pub fn main(module: &mut FormatModule) -> FormatRef {
     // SECTION - common byte-oriented types
@@ -197,7 +197,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
         "elf.types.elf-addr",
         vec![
             (Label::Borrowed("is_be"), ValueType::BOOL),
-            (Label::Borrowed("class"), ValueType::Base(BaseType::U8)),
+            (Label::Borrowed("class"), ValueType::U8),
         ],
         match_variant(
             var("class"),
@@ -220,7 +220,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
         "elf.types.elf-off",
         vec![
             (Label::Borrowed("is_be"), ValueType::BOOL),
-            (Label::Borrowed("class"), ValueType::Base(BaseType::U8)),
+            (Label::Borrowed("class"), ValueType::U8),
         ],
         match_variant(
             var("class"),
@@ -244,7 +244,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
         "elf.types.elf-full",
         vec![
             (Label::Borrowed("is_be"), ValueType::BOOL),
-            (Label::Borrowed("class"), ValueType::Base(BaseType::U8)),
+            (Label::Borrowed("class"), ValueType::U8),
         ],
         match_variant(
             var("class"),
@@ -461,7 +461,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
         vec![
             ISBE_ARG,
             CLASS_ARG,
-            (Label::Borrowed("shnum"), ValueType::Base(BaseType::U16)),
+            (Label::Borrowed("shnum"), ValueType::U16),
         ],
         repeat_count(
             var("shnum"),
@@ -536,7 +536,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
         vec![
             ISBE_ARG,
             CLASS_ARG,
-            (Label::Borrowed("phnum"), ValueType::Base(BaseType::U16)),
+            (Label::Borrowed("phnum"), ValueType::U16),
         ],
         repeat_count(
             var("phnum"),
@@ -547,8 +547,8 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
     let elf_section = module.define_format_args(
         "elf.section",
         vec![
-            (Label::Borrowed("type"), ValueType::Base(BaseType::U32)),
-            (Label::Borrowed("size"), ValueType::Base(BaseType::U64)),
+            (Label::Borrowed("type"), ValueType::U32),
+            (Label::Borrowed("size"), ValueType::U64),
         ],
         // FIXME - we can refine this a lot more based on the type passed in
         Format::Match(
