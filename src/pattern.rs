@@ -65,10 +65,10 @@ impl Pattern {
             }
             (Pattern::Wildcard, _) => {}
             (Pattern::Bool(..), ValueType::Base(BaseType::Bool)) => {}
-            (Pattern::U8(..), ValueType::Base(BaseType::U8)) => {}
-            (Pattern::U16(..), ValueType::Base(BaseType::U16)) => {}
-            (Pattern::U32(..), ValueType::Base(BaseType::U32)) => {}
-            (Pattern::U64(..), ValueType::Base(BaseType::U64)) => {}
+            (Pattern::U8(..), &ValueType::U8) => {}
+            (Pattern::U16(..), &ValueType::U16) => {}
+            (Pattern::U32(..), &ValueType::U32) => {}
+            (Pattern::U64(..), &ValueType::U64) => {}
             (
                 Pattern::Int(..),
                 ValueType::Base(BaseType::U8 | BaseType::U16 | BaseType::U32 | BaseType::U64),

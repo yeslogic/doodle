@@ -791,14 +791,32 @@ pub fn shr(value: Expr, places: Expr) -> Expr {
     Expr::Arith(Arith::Shr, Box::new(value), Box::new(places))
 }
 
+/// Computes the length of a Sequence-kinded expression.
+///
+/// # Notes
+///
+/// The default ValueType ascribed to `SeqLength` is currently pinned to `U32`.
+///
+/// - [`crate::Expr::infer_type`] currently assumes `U32` due to limitations in the type inference algorithm
+/// - [`crate::typecheck::TypeChecker::infer_var_expr`] currently assumes `U32`, and a historic effort
+///   to generalize it to the priority-set `[U32 > U8, U16, U64]` was reverted based on polymorphic
+///   unification with `Format::Pos` yielding no clear winner.
 pub fn seq_length(seq: Expr) -> Expr {
     Expr::SeqLength(Box::new(seq))
 }
 
+/// Given an iterable container `elems` of seed-values, and a function that constructs an `Expr` from such seeds,
+/// produces a static `Expr::Seq` containing the resulting expressions in the natural iteration order.
 pub fn expr_lift_seq<T>(elems: impl IntoIterator<Item = T>, f: impl Fn(T) -> Expr) -> Expr {
     Expr::Seq(elems.into_iter().map(f).collect())
 }
 
+/// Helper-function for [`Expr::SubSeq`].
+///
+/// Produces an `Expr` that evaluates to the `length`-element sub-sequence
+/// of `seq` starting at the (0-based) index `start`.
+///
+/// It is the caller's responsibility to ensure that the sub-sequence is well-defined and in-bounds.
 pub fn sub_seq(seq: Expr, start: Expr, length: Expr) -> Expr {
     Expr::SubSeq(Box::new(seq), Box::new(start), Box::new(length))
 }
@@ -1059,7 +1077,7 @@ macro_rules! impl_zeromarker {
 
 impl_zeromarker!(U8, U16, U32, U64);
 
-/// Given the appropriate Marker-type, returns an Expr that evaluates to `true` if the expression `expr` (of the appropriate type for the Marker passed in)
+/// Returns an Expr that evaluates to `true` if the expression `expr`
 /// is non-zero.
 pub fn is_nonzero<T: ZeroMarker>(expr: Expr) -> Expr {
     expr_ne(expr, T::mk_zero())
@@ -1110,6 +1128,11 @@ pub const fn fmt_none() -> Format {
 /// Shortcut for `where_lambda` applied over the simple predicate [`is_nonzero`]
 pub fn where_nonzero<T: ZeroMarker>(format: Format) -> Format {
     where_lambda(format, "x", is_nonzero::<T>(var("x")))
+}
+
+/// Shortcut for `expect_lambda` applied over the simple predicate [`is_nonzero`].
+pub fn expect_nonzero<T: ZeroMarker>(format: Format) -> Format {
+    expect_lambda(format, "x", is_nonzero::<T>(var("x")))
 }
 
 /// Helper for constructing `Format::ForEach`

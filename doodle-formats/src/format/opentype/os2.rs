@@ -6,10 +6,7 @@ use super::*;
 pub(crate) fn table(module: &mut FormatModule, tag: FormatRef) -> FormatRef {
     module.define_format_args(
         "opentype.os2.table",
-        vec![(
-            Label::Borrowed("table_length"),
-            ValueType::Base(BaseType::U32),
-        )],
+        vec![(Label::Borrowed("table_length"), ValueType::U32)],
         record([
             ("version", u16be()),
             ("x_avg_char_width", i16be()),

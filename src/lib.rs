@@ -242,10 +242,10 @@ impl Expr {
                 )),
             },
             Expr::Bool(_b) => Ok(ValueType::Base(BaseType::Bool)),
-            Expr::U8(_n) => Ok(ValueType::Base(BaseType::U8)),
-            Expr::U16(_n) => Ok(ValueType::Base(BaseType::U16)),
-            Expr::U32(_n) => Ok(ValueType::Base(BaseType::U32)),
-            Expr::U64(_n) => Ok(ValueType::Base(BaseType::U64)),
+            Expr::U8(_n) => Ok(ValueType::U8),
+            Expr::U16(_n) => Ok(ValueType::U16),
+            Expr::U32(_n) => Ok(ValueType::U32),
+            Expr::U64(_n) => Ok(ValueType::U64),
             Expr::Numeric(_) => Ok(ValueType::UnknownNumeric),
             Expr::Tuple(exprs) => {
                 let mut ts = Vec::new();
@@ -298,14 +298,16 @@ impl Expr {
             }
             Expr::Lambda(..) => Err(anyhow!("infer_type encountered unexpected lambda")),
 
-            Expr::IntRel(_rel, x, y) => match (x.infer_type(scope)?, y.infer_type(scope)?) {
-                (ValueType::Base(b1), ValueType::Base(b2)) if b1 == b2 && b1.is_numeric() => {
+            Expr::IntRel(_rel, x, y) => {
+                let (t0, t1) = (x.infer_type(scope)?, y.infer_type(scope)?);
+                if t0.unify(&t1).as_ref().is_ok_and(ValueType::is_numeric) {
                     Ok(ValueType::Base(BaseType::Bool))
+                } else {
+                    Err(anyhow!(
+                        "mismatched operand types for {_rel:?}: {t0:?}, {t1:?}"
+                    ))
                 }
-                (x, y) => Err(anyhow!(
-                    "mismatched operand types for {_rel:?}: {x:?}, {y:?}"
-                )),
-            },
+            }
             Expr::Arith(_arith @ (Arith::BoolAnd | Arith::BoolOr), x, y) => {
                 match (x.infer_type(scope)?, y.infer_type(scope)?) {
                     (ValueType::Base(BaseType::Bool), ValueType::Base(BaseType::Bool)) => {
@@ -328,6 +330,7 @@ impl Expr {
                     Ok(ValueType::Base(b))
                 }
                 (ValueType::UnknownNumeric, ValueType::UnknownNumeric) => {
+                    // FIXME[epic=unsound] - due to the inherently abstract typing of UnknownNumeric, this is potentially unsound
                     Ok(ValueType::UnknownNumeric)
                 }
                 (x, y) => Err(anyhow!(
@@ -339,25 +342,27 @@ impl Expr {
                 x => Err(anyhow!("unexpected operand type for {_op:?}: {x:?}")),
             },
             Expr::Unary(_op @ (UnaryOp::IntSucc | UnaryOp::IntPred), x) => {
-                match x.infer_type(scope)? {
-                    t if t.is_numeric() => Ok(t),
-                    x => Err(anyhow!("unexpected operand type for {_op:?}: {x:?}")),
+                let t = x.infer_type(scope)?;
+                if t.is_numeric() {
+                    Ok(t)
+                } else {
+                    Err(anyhow!("unexpected operand type for {_op:?}: {t:?}"))
                 }
             }
             Expr::AsU8(x) => match x.infer_type(scope)? {
-                t if t.is_numeric() => Ok(ValueType::Base(BaseType::U8)),
+                t if t.is_numeric() => Ok(ValueType::U8),
                 x => Err(anyhow!("unsound type cast AsU8(_ : {x:?})")),
             },
             Expr::AsU16(x) => match x.infer_type(scope)? {
-                t if t.is_numeric() => Ok(ValueType::Base(BaseType::U16)),
+                t if t.is_numeric() => Ok(ValueType::U16),
                 x => Err(anyhow!("unsound type cast AsU16(_ : {x:?})")),
             },
             Expr::AsU32(x) => match x.infer_type(scope)? {
-                t if t.is_numeric() => Ok(ValueType::Base(BaseType::U32)),
+                t if t.is_numeric() => Ok(ValueType::U32),
                 x => Err(anyhow!("unsound type cast AsU32(_ : {x:?})")),
             },
             Expr::AsU64(x) => match x.infer_type(scope)? {
-                t if t.is_numeric() => Ok(ValueType::Base(BaseType::U64)),
+                t if t.is_numeric() => Ok(ValueType::U64),
                 x => Err(anyhow!("cannot convert {x:?} to U64")),
             },
             Expr::AsChar(x) => match x.infer_type(scope)? {
@@ -366,74 +371,82 @@ impl Expr {
             },
             Expr::U16Be(bytes) => {
                 let _t = bytes.infer_type(scope)?;
-                match _t.as_tuple_type() {
-                    [ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8)] => {
-                        Ok(ValueType::Base(BaseType::U16))
-                    }
+                match _t.try_as_tuple_type() {
+                    Ok([ValueType::U8, ValueType::U8]) => Ok(ValueType::U16),
                     _ => Err(anyhow!("unsound byte-level type cast U16Be(_ : {_t:?})")),
                 }
             }
             Expr::U16Le(bytes) => {
                 let _t = bytes.infer_type(scope)?;
-                match _t.as_tuple_type() {
-                    [ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8)] => {
-                        Ok(ValueType::Base(BaseType::U16))
-                    }
+                match _t.try_as_tuple_type() {
+                    Ok([ValueType::U8, ValueType::U8]) => Ok(ValueType::U16),
                     _ => Err(anyhow!("unsound byte-level type cast U16Le(_ : {_t:?})")),
                 }
             }
             Expr::U32Be(bytes) => {
                 let _t = bytes.infer_type(scope)?;
-                match _t.as_tuple_type() {
-                    [
-                        ValueType::Base(BaseType::U8),
-                        ValueType::Base(BaseType::U8),
-                        ValueType::Base(BaseType::U8),
-                        ValueType::Base(BaseType::U8),
-                    ] => Ok(ValueType::Base(BaseType::U32)),
+                match _t.try_as_tuple_type() {
+                    Ok([ValueType::U8, ValueType::U8, ValueType::U8, ValueType::U8]) => {
+                        Ok(ValueType::U32)
+                    }
                     _ => Err(anyhow!("unsound byte-level type cast U32Be(_ : {_t:?})")),
                 }
             }
             Expr::U32Le(bytes) => {
                 let _t = bytes.infer_type(scope)?;
-                match _t.as_tuple_type() {
-                    [
-                        ValueType::Base(BaseType::U8),
-                        ValueType::Base(BaseType::U8),
-                        ValueType::Base(BaseType::U8),
-                        ValueType::Base(BaseType::U8),
-                    ] => Ok(ValueType::Base(BaseType::U32)),
+                match _t.try_as_tuple_type() {
+                    Ok([ValueType::U8, ValueType::U8, ValueType::U8, ValueType::U8]) => {
+                        Ok(ValueType::U32)
+                    }
                     _ => Err(anyhow!("unsound byte-level type cast U32Le(_ : {_t:?})")),
                 }
             }
-            Expr::U64Be(bytes) | Expr::U64Le(bytes) => {
+            Expr::U64Be(bytes) => {
                 let _t = bytes.infer_type(scope)?;
-                match _t.as_tuple_type() {
-                    [
-                        ValueType::Base(BaseType::U8),
-                        ValueType::Base(BaseType::U8),
-                        ValueType::Base(BaseType::U8),
-                        ValueType::Base(BaseType::U8),
-                        ValueType::Base(BaseType::U8),
-                        ValueType::Base(BaseType::U8),
-                        ValueType::Base(BaseType::U8),
-                        ValueType::Base(BaseType::U8),
-                    ] => Ok(ValueType::Base(BaseType::U64)),
-                    other => Err(anyhow!(
-                        "U64Be/Le: expected (U8, U8, U8, U8, U8, U8, U8, U8), found {other:#?}"
-                    )),
+                match _t.try_as_tuple_type() {
+                    Ok(
+                        [
+                            ValueType::U8,
+                            ValueType::U8,
+                            ValueType::U8,
+                            ValueType::U8,
+                            ValueType::U8,
+                            ValueType::U8,
+                            ValueType::U8,
+                            ValueType::U8,
+                        ],
+                    ) => Ok(ValueType::U64),
+                    _ => Err(anyhow!("unsound byte-level type cast U64Be(_ : {_t:?})")),
+                }
+            }
+            Expr::U64Le(bytes) => {
+                let _t = bytes.infer_type(scope)?;
+                match _t.try_as_tuple_type() {
+                    Ok(
+                        [
+                            ValueType::U8,
+                            ValueType::U8,
+                            ValueType::U8,
+                            ValueType::U8,
+                            ValueType::U8,
+                            ValueType::U8,
+                            ValueType::U8,
+                            ValueType::U8,
+                        ],
+                    ) => Ok(ValueType::U64),
+                    _ => Err(anyhow!("unsound byte-level type cast U64Le(_ : {_t:?})")),
                 }
             }
             Expr::SeqLength(seq) => match seq.infer_type(scope)? {
-                // REVIEW[epic=seqlen-always-u32] - is UnknownNumeric better here?
-                ValueType::Seq(_t) => Ok(ValueType::Base(BaseType::U32)),
+                // FIXME[epic=seqlen-always-u32] - is UnknownNumeric better here?
+                ValueType::Seq(_t) => Ok(ValueType::SEQ_LEN_T),
                 other => Err(anyhow!("seq-length called on non-sequence type: {other:?}")),
             },
             Expr::SeqIx(seq, index) => match seq.infer_type(scope)? {
                 ValueType::Seq(t) => {
                     let index_type = index.infer_type(scope)?;
-                    // REVIEW[epic=seqlen-always-u32] - this should share whatever type SeqLen gets
-                    if index_type != ValueType::Base(BaseType::U32) {
+                    // FIXME[epic=seqlen-always-u32] - this should share whatever type SeqLen gets
+                    if index_type != ValueType::U32 {
                         return Err(anyhow!(
                             "SeqIx `index` param: expected U32, found {index_type:?}"
                         ));
@@ -442,17 +455,17 @@ impl Expr {
                 }
                 other => Err(anyhow!("SeqIx: expected Seq, found {other:?}")),
             },
-            // REVIEW[epic=seqlen-always-u32] - start and length should share whatever type SeqLen gets
+            // FIXME[epic=seqlen-always-u32] - start and length should share whatever type SeqLen gets
             Expr::SubSeq(seq, start, length) => match seq.infer_type(scope)? {
                 ValueType::Seq(t) => {
                     let start_type = start.infer_type(scope)?;
                     let length_type = length.infer_type(scope)?;
-                    if start_type != ValueType::Base(BaseType::U32) {
+                    if start_type != ValueType::U32 {
                         return Err(anyhow!(
                             "SubSeq `start` param: expected U32, found {start_type:?}"
                         ));
                     }
-                    if length_type != ValueType::Base(BaseType::U32) {
+                    if length_type != ValueType::U32 {
                         return Err(anyhow!(
                             "SubSeq length must be numeric, found {length_type:?}"
                         ));
@@ -461,17 +474,17 @@ impl Expr {
                 }
                 other => Err(anyhow!("SubSeq: expected Seq, found {other:?}")),
             },
-            // REVIEW[epic=seqlen-always-u32] - start and length should share whatever type SeqLen gets
+            // FIXME[epic=seqlen-always-u32] - start and length should share whatever type SeqLen gets
             Expr::SubSeqInflate(seq, start, length) => match seq.infer_type(scope)? {
                 ValueType::Seq(t) => {
                     let start_type = start.infer_type(scope)?;
                     let length_type = length.infer_type(scope)?;
-                    if start_type != ValueType::Base(BaseType::U32) {
+                    if start_type != ValueType::U32 {
                         return Err(anyhow!(
                             "SubSeqInflate `start` param: expected U32, found {start_type:?}"
                         ));
                     }
-                    if length_type != ValueType::Base(BaseType::U32) {
+                    if length_type != ValueType::U32 {
                         return Err(anyhow!(
                             "SubSeqInflate length must be numeric, found {length_type:?}"
                         ));
@@ -503,7 +516,7 @@ impl Expr {
                             .push(name.clone(), ValueType::Tuple(vec![accum_type.clone(), *t]));
                         match expr
                             .infer_type(&child_scope)?
-                            .unwrap_tuple_type()?
+                            .try_into_tuple_type()?
                             .as_mut_slice()
                         {
                             [accum_result, ValueType::Seq(t2)] => {
@@ -584,7 +597,7 @@ impl Expr {
             }
             // REVIEW[epic=dup32] - is there a better way to handle this?
             Expr::Dup(count, expr) => {
-                if count.infer_type(scope)? != ValueType::Base(BaseType::U32) {
+                if count.infer_type(scope)? != ValueType::U32 {
                     return Err(anyhow!("Dup: count is not U32: {count:?}"));
                 }
                 let t = expr.infer_type(scope)?;
@@ -1035,7 +1048,7 @@ impl FormatModule {
             Format::DecodeBytes(bytes, f) => {
                 let bytes_type = bytes.infer_type(scope)?;
                 match bytes_type {
-                    ValueType::Seq(bt) if matches!(*bt, ValueType::Base(BaseType::U8)) => {
+                    ValueType::Seq(bt) if matches!(*bt, ValueType::U8) => {
                         self.infer_format_type(scope, f)
                     }
                     other => Err(anyhow!(
@@ -1050,7 +1063,7 @@ impl FormatModule {
             Format::Fail => Ok(ValueType::Empty),
             Format::SkipRemainder | Format::EndOfInput => Ok(ValueType::Tuple(vec![])),
             Format::Align(_n) => Ok(ValueType::Tuple(vec![])),
-            Format::Byte(_bs) => Ok(ValueType::Base(BaseType::U8)),
+            Format::Byte(_bs) => Ok(ValueType::U8),
             Format::Variant(label, f) => Ok(ValueType::Union(BTreeMap::from([(
                 label.clone(),
                 self.infer_format_type(scope, f)?,
@@ -1268,7 +1281,7 @@ impl FormatModule {
                     DynFormat::Huffman(lengths_expr, _opt_values_expr) => {
                         match lengths_expr.infer_type(scope)? {
                             ValueType::Seq(t) => match &*t {
-                                ValueType::Base(BaseType::U8) | ValueType::Base(BaseType::U16) => {}
+                                &ValueType::U8 | &ValueType::U16 => {}
                                 other => {
                                     return Err(anyhow!(
                                         "Huffman: expected U8 or U16, found {other:?}"
@@ -1283,7 +1296,7 @@ impl FormatModule {
                     }
                 }
                 let mut child_scope = TypeScope::child(scope);
-                child_scope.push_format(name.clone(), ValueType::Base(BaseType::U16));
+                child_scope.push_format(name.clone(), ValueType::U16);
                 self.infer_format_type(&child_scope, format)
             }
             Format::Apply(name) => match scope.get_type_by_name(name) {
@@ -1292,7 +1305,7 @@ impl FormatModule {
                 ValueKind::Value(t) => Err(anyhow!("Apply: expected format, found {t:?}")),
             },
             // REVIEW - do we want to hard-code this as U64 or make it a flexibly abstract integer type?
-            Format::Pos => Ok(ValueType::Base(BaseType::U64)),
+            Format::Pos => Ok(ValueType::U64),
             Format::ForEach(expr, lbl, format) => {
                 let expr_t = expr.infer_type(scope)?;
                 let elem_t = match expr_t {
@@ -1323,7 +1336,7 @@ impl FormatModule {
                         }
                     }
                     // NOTE[epic=view-format] - in the current base-model design and implementation, CaptureBytes captures a `Seq<U8>`
-                    Ok(ValueType::Seq(Box::new(ValueType::Base(BaseType::U8))))
+                    Ok(ValueType::Seq(Box::new(ValueType::U8)))
                 }
                 ViewFormat::ReadArray(len, kind) => {
                     view.check_type(scope)?;

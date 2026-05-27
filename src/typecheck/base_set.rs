@@ -43,7 +43,7 @@ impl BaseSet {
 
     /// Universal set of all integral BaseTypes, with a default solution of U32, i.e. `{U32 > U8, U16, U64}`.
     #[allow(non_upper_case_globals)]
-    pub const USome: Self = Self::U(UintSet::ANY32);
+    pub const UAny32: Self = Self::U(UintSet::ANY32);
 }
 
 impl BaseSet {

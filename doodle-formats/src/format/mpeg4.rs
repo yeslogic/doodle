@@ -1,7 +1,5 @@
 use doodle::helper::{u8, *};
-use doodle::{
-    BaseType, Expr, Format, FormatModule, FormatRef, IntoLabel, Label, Pattern, ValueType,
-};
+use doodle::{Expr, Format, FormatModule, FormatRef, IntoLabel, Label, Pattern, ValueType};
 
 /// Helper for reading the 24-bit `flags` field common to many mpeg4 boxes
 fn u24be() -> Format {
@@ -926,9 +924,9 @@ pub(crate) mod subformats {
         let mpeg4_extent = module.define_format_args(
             "mpeg4.iloc-extent",
             vec![
-                ("offset_size".into(), ValueType::Base(BaseType::U8)),
-                ("length_size".into(), ValueType::Base(BaseType::U8)),
-                ("index_size".into(), ValueType::Base(BaseType::U8)),
+                ("offset_size".into(), ValueType::U8),
+                ("length_size".into(), ValueType::U8),
+                ("index_size".into(), ValueType::U8),
             ],
             record([
                 (
@@ -1170,7 +1168,7 @@ pub(crate) mod subformats {
 
         let infe_data_ver2 = module.define_format_args(
             "mpeg4.infe-data.fields.version-gte2",
-            vec![("version".into(), ValueType::Base(BaseType::U8))],
+            vec![("version".into(), ValueType::U8)],
             record([
                 (
                     "item_ID",
@@ -1192,7 +1190,7 @@ pub(crate) mod subformats {
 
         let infe_data_fields = module.define_format_args(
             "mpeg4.infe-data.fields",
-            vec![("version".into(), ValueType::Base(BaseType::U8))],
+            vec![("version".into(), ValueType::U8)],
             if_then_else_variant(
                 expr_lt(var("version"), Expr::U8(2)),
                 ("Version1", infe_data_ver1.call()),

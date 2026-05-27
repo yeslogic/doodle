@@ -1,6 +1,6 @@
 use doodle::{
-    BaseType, DynFormat, Expr, Format, FormatModule, FormatRef, Label, Pattern, ValueType,
-    bounds::Bounds, helper::*,
+    DynFormat, Expr, Format, FormatModule, FormatRef, Label, Pattern, ValueType, bounds::Bounds,
+    helper::*,
 };
 
 fn shl_u8(x: Expr, r: u8) -> Expr {
@@ -204,8 +204,8 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
     let distance_record0 = module.define_format_args(
         "deflate.distance-record0",
         vec![
-            ("extra-bits".into(), ValueType::Base(BaseType::U8)),
-            ("start".into(), ValueType::Base(BaseType::U16)),
+            ("extra-bits".into(), ValueType::U8),
+            ("start".into(), ValueType::U16),
         ],
         record([
             (
@@ -239,7 +239,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
 
     let distance_record = module.define_format_args(
         "deflate.distance-record",
-        vec![("distance-code".into(), ValueType::Base(BaseType::U16))],
+        vec![("distance-code".into(), ValueType::U16)],
         Format::Match(
             Box::new(as_u8(var("distance-code"))),
             vec![
@@ -630,11 +630,11 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
         module.define_format_args(
             "deflate.dynamic-huffman.literal-length-distance-alphabet-code-lengths",
             vec![
-                (Label::Borrowed("hlit"), ValueType::Base(BaseType::U8)),
-                (Label::Borrowed("hdist"), ValueType::Base(BaseType::U8)),
+                (Label::Borrowed("hlit"), ValueType::U8),
+                (Label::Borrowed("hdist"), ValueType::U8),
                 (
                     Label::Borrowed("code-length-alphabet-code-lengths"),
-                    ValueType::Seq(Box::new(ValueType::Base(BaseType::U8))),
+                    ValueType::Seq(Box::new(ValueType::U8)),
                 ),
             ],
             Format::Dynamic(
@@ -650,7 +650,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                             seq_length(flat_map_accum(
                                 expand_cl_code,
                                 expr_none(),
-                                ValueType::Option(Box::new(ValueType::Base(BaseType::U8))),
+                                ValueType::Option(Box::new(ValueType::U8)),
                                 var("y"),
                             )),
                             add(as_u32(add(var("hlit"), var("hdist"))), Expr::U32(258)),
@@ -756,7 +756,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                         ),
                     ),
                     expr_none(),
-                    ValueType::Option(Box::new(ValueType::Base(BaseType::U8))),
+                    ValueType::Option(Box::new(ValueType::U8)),
                     var("literal-length-distance-alphabet-code-lengths"),
                 )),
             ),
@@ -1052,7 +1052,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                             ],
                         ),
                     ),
-                    ValueType::Base(BaseType::U8),
+                    ValueType::U8,
                     var("codes"),
                 )),
             ),
