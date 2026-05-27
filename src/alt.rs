@@ -14,7 +14,9 @@ use serde::Serialize;
 use crate::{
     BaseKind, BaseType, ByteSet, DynFormat, Endian, Expr, Format, FormatModule, FormatRef,
     IntoLabel, IxHeap, Label, Pattern, StyleHint, TypeScope, ValueKind, ValueType, ViewExpr,
-    typecheck::error::UnificationError, validation::Condition, valuetype::Container,
+    typecheck::error::UnificationError,
+    validation::Condition,
+    valuetype::{Container, SignedIntType},
 };
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Eq, Ord, Hash)]
@@ -312,7 +314,8 @@ pub enum ValueTypeExt {
     Empty,
     ViewObj,
     Base(BaseType),
-    UnknownNumeric,
+    NumericHole,
+    Signed(SignedIntType),
     Tuple(Vec<ValueTypeExt>),
     Record(Vec<(Label, ValueTypeExt)>),
     Union(BTreeMap<Label, ValueTypeExt>),
@@ -332,7 +335,8 @@ impl From<ValueType> for ValueTypeExt {
             ValueType::Empty => ValueTypeExt::Empty,
             ValueType::ViewObj => ValueTypeExt::ViewObj,
             ValueType::Base(b) => ValueTypeExt::Base(b),
-            ValueType::UnknownNumeric => ValueTypeExt::UnknownNumeric,
+            ValueType::NumericHole => ValueTypeExt::NumericHole,
+            ValueType::Signed(s) => ValueTypeExt::Signed(s),
             ValueType::Tuple(v) => {
                 ValueTypeExt::Tuple(v.into_iter().map(ValueTypeExt::from).collect())
             }
@@ -361,7 +365,7 @@ impl ValueTypeExt {
     pub fn is_numeric(&self) -> bool {
         match self {
             ValueTypeExt::Base(bt) => bt.is_numeric(),
-            ValueTypeExt::UnknownNumeric => true,
+            ValueTypeExt::NumericHole | ValueTypeExt::Signed(_) => true,
             ValueTypeExt::EngineSpecific {
                 base_model,
                 alt_model,
@@ -395,7 +399,8 @@ impl ValueTypeExt {
             ValueTypeExt::Empty => false,
             ValueTypeExt::ViewObj => false,
             ValueTypeExt::Base(_) => false,
-            ValueTypeExt::UnknownNumeric => false,
+            ValueTypeExt::NumericHole => false,
+            ValueTypeExt::Signed(_) => false,
             ValueTypeExt::PhantomData(inner) => inner.depends_on_model(),
             ValueTypeExt::Tuple(ts) => ts.iter().any(|t| t.depends_on_model()),
             ValueTypeExt::Record(items) => items.iter().any(|(_, t)| t.depends_on_model()),
@@ -581,7 +586,8 @@ impl ValueTypeExt {
             | ValueTypeExt::Empty
             | ValueTypeExt::ViewObj
             | ValueTypeExt::Base(_)
-            | ValueTypeExt::UnknownNumeric => {
+            | ValueTypeExt::NumericHole
+            | ValueTypeExt::Signed(_) => {
                 unreachable!("excluded by depends_on_model short-circuit")
             }
         }
@@ -629,6 +635,10 @@ impl ValueTypeExt {
                     alt_model,
                 })
             }
+            (ValueTypeExt::NumericHole, ValueTypeExt::NumericHole) => Ok(ValueTypeExt::NumericHole),
+            (ValueTypeExt::NumericHole, t) | (t, ValueTypeExt::NumericHole) if t.is_numeric() => {
+                Ok(t.clone())
+            }
             (ValueTypeExt::Base(b1), ValueTypeExt::Base(b2)) => {
                 if b1 == b2 {
                     Ok(ValueTypeExt::Base(*b1))
@@ -636,7 +646,13 @@ impl ValueTypeExt {
                     Err(UnificationError::Unsatisfiable(self.clone(), other.clone()))
                 }
             }
-
+            (ValueTypeExt::Signed(s1), ValueTypeExt::Signed(s2)) => {
+                if s1 == s2 {
+                    Ok(ValueTypeExt::Signed(*s1))
+                } else {
+                    Err(UnificationError::Unsatisfiable(self.clone(), other.clone()))
+                }
+            }
             (ValueTypeExt::Tuple(ts1), ValueTypeExt::Tuple(ts2)) => {
                 if ts1.len() != ts2.len() {
                     // tuple arity mismatch
@@ -740,7 +756,8 @@ impl ValueTypeExt {
             ValueTypeExt::Empty => Some(ValueType::Empty),
             ValueTypeExt::ViewObj => Some(ValueType::ViewObj),
             ValueTypeExt::Base(b) => Some(ValueType::Base(*b)),
-            ValueTypeExt::UnknownNumeric => Some(ValueType::UnknownNumeric),
+            ValueTypeExt::NumericHole => Some(ValueType::NumericHole),
+            ValueTypeExt::Signed(s) => Some(ValueType::Signed(*s)),
             ValueTypeExt::Tuple(v) => {
                 let mut vs = Vec::with_capacity(v.len());
                 for v in v {
@@ -787,7 +804,8 @@ impl ValueTypeExt {
             ValueTypeExt::Empty => ValueType::Empty,
             ValueTypeExt::ViewObj => ValueType::ViewObj,
             ValueTypeExt::Base(b) => ValueType::Base(b),
-            ValueTypeExt::UnknownNumeric => ValueType::UnknownNumeric,
+            ValueTypeExt::NumericHole => ValueType::NumericHole,
+            ValueTypeExt::Signed(s) => ValueType::Signed(s),
             ValueTypeExt::Tuple(v) => {
                 let mut vs = Vec::with_capacity(v.len());
                 for v in v {
@@ -1348,6 +1366,36 @@ mod __impls {
     use crate::{Arith, TypeHint, UnaryOp, ViewFormat};
     use std::rc::Rc;
 
+    impl crate::numeric::core::Expr {
+        fn infer_type_ext(&self, scope: &TypeScope<'_, ValueTypeExt>) -> AResult<ValueTypeExt> {
+            match self {
+                Self::Const(c) => Ok(c.get_type().into()),
+                Self::BinOp(op, lhs, rhs) => {
+                    if let Some(rep) = op.cast_rep() {
+                        return Ok(ValueTypeExt::from(ValueType::from(rep)));
+                    } else {
+                        let lhs = lhs.infer_type_ext(scope)?;
+                        let rhs = rhs.infer_type_ext(scope)?;
+                        Ok(lhs.unify(&rhs)?)
+                    }
+                }
+                Self::UnaryOp(op, inner) => {
+                    if let Some(rep) = op.cast_rep() {
+                        return Ok(ValueTypeExt::from(ValueType::from(rep)));
+                    } else {
+                        inner.infer_type_ext(scope)
+                    }
+                }
+                Self::Cast(op, _) => Ok(ValueTypeExt::from(ValueType::from(op.out_rep))),
+                Self::NumVar(name) => match scope.get_type_by_name(name) {
+                    crate::ValueKind::View => Err(anyhow!("variable {} is a view", name)),
+                    crate::ValueKind::Value(vt) => Ok(vt.clone()),
+                    crate::ValueKind::Format(_) => Err(anyhow!("variable {} is a format", name)),
+                },
+            }
+        }
+    }
+
     impl Expr {
         pub(crate) fn infer_type_ext(
             &self,
@@ -1368,7 +1416,7 @@ mod __impls {
                 Expr::U16(_n) => Ok(ValueTypeExt::Base(BaseType::U16)),
                 Expr::U32(_n) => Ok(ValueTypeExt::Base(BaseType::U32)),
                 Expr::U64(_n) => Ok(ValueTypeExt::Base(BaseType::U64)),
-                Expr::Numeric(_) => Ok(ValueTypeExt::UnknownNumeric),
+                Expr::Numeric(n_tree) => n_tree.infer_type_ext(scope),
                 Expr::Tuple(exprs) => {
                     let mut ts = Vec::new();
                     for expr in exprs {

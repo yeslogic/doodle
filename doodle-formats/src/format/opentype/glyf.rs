@@ -426,7 +426,7 @@ fn glyf_description(
     module.register_format_args(
         "opentype.glyf.description",
         // actually I16 but we don't have that yet
-        [(Label::Borrowed("n_contours"), ValueType::UnknownNumeric)],
+        [(Label::Borrowed("n_contours"), ValueType::I16)],
         match_variant(
             var("n_contours"),
             [

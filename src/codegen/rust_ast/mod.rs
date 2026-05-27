@@ -1584,19 +1584,20 @@ impl TryFrom<ValueType> for RustType {
 
     fn try_from(value: ValueType) -> Result<Self, Self::Error> {
         match value {
+            // NOTE - this is actually `!`, properly speaking, but `!` can silently coerce to `()` so it oughtn't be a problem
             ValueType::Empty => Ok(RustType::UNIT),
             // REVIEW[epic=hardcoded] - we have to hardcode a lifetime for now
             ValueType::ViewObj => Ok(RustType::ViewObject(RustLt::Parametric(Label::Borrowed(
                 DEFAULT_LT,
             )))),
             ValueType::Base(BaseType::Bool) => Ok(PrimType::Bool.into()),
+            ValueType::Base(BaseType::Char) => Ok(PrimType::Char.into()),
             ValueType::U8 => Ok(PrimType::U8.into()),
             ValueType::U16 => Ok(PrimType::U16.into()),
             ValueType::U32 => Ok(PrimType::U32.into()),
             ValueType::U64 => Ok(PrimType::U64.into()),
-            ValueType::Base(BaseType::Char) => Ok(PrimType::Char.into()),
-            // REVIEW[epic=embedded-num] - double-check this behavior
-            ValueType::UnknownNumeric => Err(value),
+            ValueType::Signed(s) => Ok(MachineSint::from(s).into()),
+            ValueType::NumericHole => Err(value),
             ValueType::Tuple(mut vs) => {
                 let mut buf = Vec::with_capacity(vs.len());
                 for v in vs.drain(..) {

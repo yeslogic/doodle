@@ -1,13 +1,13 @@
 use std::{borrow::Cow, cmp::Ordering};
 
-use anyhow::anyhow;
+use anyhow::{Result as AResult, anyhow};
 use num_bigint::BigInt;
 use num_traits::{One as _, Signed, ToPrimitive, Zero};
 use serde::Serialize;
 
-use crate::IntRel;
 use crate::decoder::UnknownVarError;
 use crate::scope::{EvalScope, VoidScope};
+use crate::{IntRel, ValueType};
 use crate::{Label, bounds::Bounds as UBounds};
 
 pub type Number = BigInt;
@@ -582,6 +582,10 @@ impl TypedConst {
             IntRel::Gte => matches!(ord, Ordering::Greater | Ordering::Equal),
         }
     }
+
+    pub(crate) fn get_type(&self) -> ValueType {
+        ValueType::from(self.1)
+    }
 }
 
 impl TypedConst {
@@ -617,7 +621,7 @@ impl TypedConst {
         TypedConst(BigInt::from(value), NumRep::Concrete(MachineRep::I64))
     }
 
-    #[cfg(test)]
+    #[cfg_attr(not(test), allow(dead_code))]
     /// Replaces the rep of a TypedConst.
     fn replace_rep(self, rep: MachineRep) -> TypedConst {
         TypedConst(self.0, NumRep::Concrete(rep))
@@ -703,7 +707,7 @@ pub struct BinOp {
 }
 
 impl BinOp {
-    #[cfg(test)]
+    #[cfg_attr(not(test), allow(dead_code))]
     fn replace_rep(self, rep: MachineRep) -> Self {
         BinOp {
             op: self.op,
@@ -750,6 +754,15 @@ impl BinOp {
         Self { op, out_rep }
     }
 
+    /// Returns the target machine-representation of the result of this operation,
+    /// if it is specified.
+    ///
+    /// When `None`, the operation will infer the output representation based on the inputs,
+    /// provided that there is a natural choice, according to the following rules:
+    /// - `(Auto, Auto) => Auto`
+    /// - `(Auto, X) | (X, Auto) => X`
+    /// - `(X, X) => X`
+    /// - `(X, Y)` fails due to ambiguity
     pub fn cast_rep(&self) -> Option<MachineRep> {
         self.out_rep
     }
@@ -790,7 +803,7 @@ impl std::fmt::Display for UnaryOp {
 }
 
 impl UnaryOp {
-    #[cfg(test)]
+    #[cfg_attr(not(test), allow(dead_code))]
     fn replace_rep(self, rep: MachineRep) -> Self {
         UnaryOp {
             op: self.op,
@@ -839,7 +852,7 @@ impl CastSemantics {
 }
 
 impl CastOp {
-    #[cfg(test)]
+    #[cfg_attr(not(test), allow(dead_code))]
     fn replace_rep(self, rep: MachineRep) -> Self {
         CastOp {
             out_rep: rep,
@@ -876,7 +889,47 @@ pub enum Expr {
 }
 
 impl Expr {
-    #[cfg(test)]
+    /// Static type inference method to determine the type of `self`.
+    ///
+    /// Explores as much of the tree as is necessary to infer the nominal
+    /// type of the root-node, which is returned as a [`ValueType`].
+    ///
+    /// As long as the type of the root can be determined before any
+    /// unsound subtrees or invalid variable-references are encountered,
+    /// this method is guaranteed to terminate and return a valid result.
+    /// This result will always match the type determination performed
+    /// by `TypeChecker`, provided the latter does not yield an error.
+    pub(crate) fn infer_type(&self, scope: &crate::TypeScope<'_, ValueType>) -> AResult<ValueType> {
+        match self {
+            Expr::Const(c) => Ok(c.get_type()),
+            Expr::BinOp(op, lhs, rhs) => {
+                if let Some(rep) = op.cast_rep() {
+                    return Ok(ValueType::from(rep));
+                } else {
+                    let lhs = lhs.infer_type(scope)?;
+                    let rhs = rhs.infer_type(scope)?;
+                    Ok(lhs.unify(&rhs)?)
+                }
+            }
+            Expr::UnaryOp(op, inner) => {
+                if let Some(rep) = op.cast_rep() {
+                    return Ok(ValueType::from(rep));
+                } else {
+                    inner.infer_type(scope)
+                }
+            }
+            Expr::Cast(op, _) => Ok(op.out_rep.into()),
+            Expr::NumVar(name) => match scope.get_type_by_name(name) {
+                crate::ValueKind::View => Err(anyhow!("variable {} is a view", name)),
+                crate::ValueKind::Value(vt) => Ok(vt.clone()),
+                crate::ValueKind::Format(_) => Err(anyhow!("variable {} is a format", name)),
+            },
+        }
+    }
+}
+
+impl Expr {
+    #[cfg_attr(not(test), expect(dead_code))]
     fn replace_rep(self, rep: MachineRep) -> Self {
         match self {
             Self::Cast(c, inner) => Self::Cast(c.replace_rep(rep), inner),

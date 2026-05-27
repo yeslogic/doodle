@@ -69,19 +69,12 @@ impl Pattern {
             (Pattern::U16(..), &ValueType::U16) => {}
             (Pattern::U32(..), &ValueType::U32) => {}
             (Pattern::U64(..), &ValueType::U64) => {}
+            // REVIEW - should we allow `Pattern::Int` to yield matches for ValueType::Signed(..)?
             (
                 Pattern::Int(..),
                 ValueType::Base(BaseType::U8 | BaseType::U16 | BaseType::U32 | BaseType::U64),
             ) => {}
-            (
-                Pattern::ZConst(..),
-                ValueType::Base(BaseType::U8 | BaseType::U16 | BaseType::U32 | BaseType::U64),
-            ) => {}
-            (
-                Pattern::ZRange(..),
-                ValueType::Base(BaseType::U8 | BaseType::U16 | BaseType::U32 | BaseType::U64),
-            ) => {}
-            (Pattern::ZConst(..) | Pattern::ZRange(..), ValueType::UnknownNumeric) => {}
+            (Pattern::ZConst(..) | Pattern::ZRange(..), t) if t.is_numeric() => {}
             (Pattern::Tuple(ps), ValueType::Tuple(ts)) if ps.len() == ts.len() => {
                 for (p, t) in Iterator::zip(ps.iter(), ts.iter()) {
                     p.build_scope(scope, Rc::new(t.clone()));
@@ -130,15 +123,7 @@ impl Pattern {
                 Pattern::Int(..),
                 ValueTypeExt::Base(BaseType::U8 | BaseType::U16 | BaseType::U32 | BaseType::U64),
             ) => {}
-            (
-                Pattern::ZConst(..),
-                ValueTypeExt::Base(BaseType::U8 | BaseType::U16 | BaseType::U32 | BaseType::U64),
-            ) => {}
-            (
-                Pattern::ZRange(..),
-                ValueTypeExt::Base(BaseType::U8 | BaseType::U16 | BaseType::U32 | BaseType::U64),
-            ) => {}
-            (Pattern::ZConst(..) | Pattern::ZRange(..), ValueTypeExt::UnknownNumeric) => {}
+            (Pattern::ZConst(..) | Pattern::ZRange(..), t) if t.is_numeric() => {}
             (Pattern::Tuple(ps), ValueTypeExt::Tuple(ts)) if ps.len() == ts.len() => {
                 for (p, t) in Iterator::zip(ps.iter(), ts.iter()) {
                     p.build_scope_ext(scope, Rc::new(t.clone()));

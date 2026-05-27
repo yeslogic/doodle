@@ -1,9 +1,17 @@
-use crate::typecheck::error::UnificationError;
-use anyhow::{Result as AResult, anyhow};
-use serde::Serialize;
 use std::collections::{BTreeMap, HashSet};
 
-use super::Label;
+use anyhow::{Result as AResult, anyhow};
+use serde::Serialize;
+
+use crate::codegen::rust_ast::MachineSint;
+use crate::{
+    Label,
+    numeric::{
+        core::{MachineRep, NumRep},
+        elaborator::{IntType, PrimInt},
+    },
+    typecheck::error::UnificationError,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Hash, PartialOrd, Ord)]
 pub enum BaseType {
@@ -37,6 +45,62 @@ impl std::fmt::Display for BaseType {
 impl BaseType {
     pub(crate) fn is_numeric(&self) -> bool {
         matches!(self, Self::U8 | Self::U16 | Self::U32 | Self::U64)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Hash, PartialOrd, Ord)]
+pub enum SignedIntType {
+    I8,
+    I16,
+    I32,
+    I64,
+}
+
+impl SignedIntType {
+    pub const fn to_static_str(self) -> &'static str {
+        match self {
+            Self::I8 => "i8",
+            Self::I16 => "i16",
+            Self::I32 => "i32",
+            Self::I64 => "i64",
+        }
+    }
+}
+
+impl std::fmt::Display for SignedIntType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_static_str())
+    }
+}
+
+macro_rules! from_signed_int {
+    ( $( $tgt:ident ),+ ) => {
+        $(
+            impl From<SignedIntType> for $tgt {
+                fn from(s: SignedIntType) -> Self {
+                    match s {
+                        SignedIntType::I8 => $tgt::I8,
+                        SignedIntType::I16 => $tgt::I16,
+                        SignedIntType::I32 => $tgt::I32,
+                        SignedIntType::I64 => $tgt::I64,
+                    }
+                }
+            }
+        )+
+    }
+}
+
+from_signed_int!(MachineRep, PrimInt, MachineSint);
+
+impl From<SignedIntType> for IntType {
+    fn from(s: SignedIntType) -> Self {
+        IntType::Prim(PrimInt::from(s))
+    }
+}
+
+impl From<SignedIntType> for NumRep {
+    fn from(s: SignedIntType) -> Self {
+        NumRep::Concrete(MachineRep::from(s))
     }
 }
 
@@ -83,9 +147,9 @@ pub enum ValueType {
     /// Place-holding marker type to associate a selectively deferred parse with its proper type
     PhantomData(Box<ValueType>),
     Base(BaseType),
-    /// Like [`Any`], but known to be a numeric type so any expressions that expect numerics should treat it as a valid case.
-    // FIXME[epic=unsound] - this should be properly expanded to distinguish statically typeable Num-trees from polymorphic/Auto.
-    UnknownNumeric,
+    /// Like [`Any`], but for polymorphic numeric nodes or embedded NumTrees with an `Auto` rep.
+    NumericHole,
+    Signed(SignedIntType),
     Tuple(Vec<ValueType>),
     Record(Vec<(Label, ValueType)>),
     Union(BTreeMap<Label, ValueType>),
@@ -99,6 +163,56 @@ impl From<BaseType> for ValueType {
     }
 }
 
+impl From<SignedIntType> for ValueType {
+    fn from(s: SignedIntType) -> Self {
+        ValueType::Signed(s)
+    }
+}
+
+mod __impl {
+    use super::{BaseType, SignedIntType, ValueType};
+    use crate::numeric::{MachineRep, NumRep, PrimInt, elaborator::IntType};
+
+    macro_rules! from_uin {
+        ( $( $src:ident ),+ ) => {
+            $(
+                impl From<$src> for ValueType {
+                    fn from(value: $src) -> Self {
+                        match value {
+                            $src::U8 => ValueType::Base(BaseType::U8),
+                            $src::U16 => ValueType::Base(BaseType::U16),
+                            $src::U32 => ValueType::Base(BaseType::U32),
+                            $src::U64 => ValueType::Base(BaseType::U64),
+                            $src::I8 => ValueType::Signed(SignedIntType::I8),
+                            $src::I16 => ValueType::Signed(SignedIntType::I16),
+                            $src::I32 => ValueType::Signed(SignedIntType::I32),
+                            $src::I64 => ValueType::Signed(SignedIntType::I64),
+                        }
+                    }
+                }
+            )+
+        }
+    }
+
+    from_uin!(PrimInt, MachineRep);
+
+    impl From<NumRep> for ValueType {
+        fn from(value: NumRep) -> Self {
+            match value {
+                NumRep::Auto => ValueType::NumericHole,
+                NumRep::Concrete(m) => m.into(),
+            }
+        }
+    }
+
+    impl From<IntType> for ValueType {
+        fn from(value: IntType) -> Self {
+            let IntType::Prim(prim) = value;
+            prim.into()
+        }
+    }
+}
+
 impl ValueType {
     pub const BOOL: ValueType = ValueType::Base(BaseType::Bool);
     pub const UNIT: ValueType = ValueType::Tuple(Vec::new());
@@ -107,6 +221,11 @@ impl ValueType {
     pub const U16: ValueType = ValueType::Base(BaseType::U16);
     pub const U32: ValueType = ValueType::Base(BaseType::U32);
     pub const U64: ValueType = ValueType::Base(BaseType::U64);
+
+    pub const I8: ValueType = ValueType::Signed(SignedIntType::I8);
+    pub const I16: ValueType = ValueType::Signed(SignedIntType::I16);
+    pub const I32: ValueType = ValueType::Signed(SignedIntType::I32);
+    pub const I64: ValueType = ValueType::Signed(SignedIntType::I64);
 
     /// Formalization of the hard-coded `u32` type for sequence lengths to avoid hardcoding U32 directly over multiple modules.
     pub const SEQ_LEN_T: ValueType = ValueType::Base(BaseType::U32);
@@ -169,13 +288,20 @@ impl ValueType {
             (ValueType::Empty, rhs) => Ok(rhs.clone()),
             (lhs, ValueType::Empty) => Ok(lhs.clone()),
 
-            (ValueType::UnknownNumeric, rhs) if rhs.is_numeric() => Ok(rhs.clone()),
-            (lhs, ValueType::UnknownNumeric) if lhs.is_numeric() => Ok(lhs.clone()),
+            (ValueType::NumericHole, rhs) if rhs.is_numeric() => Ok(rhs.clone()),
+            (lhs, ValueType::NumericHole) if lhs.is_numeric() => Ok(lhs.clone()),
 
             (ValueType::ViewObj, ValueType::ViewObj) => Ok(ValueType::ViewObj),
             (ValueType::Base(b1), ValueType::Base(b2)) => {
                 if b1 == b2 {
                     Ok(ValueType::Base(*b1))
+                } else {
+                    Err(UnificationError::Unsatisfiable(self.clone(), other.clone()))
+                }
+            }
+            (ValueType::Signed(s1), ValueType::Signed(s2)) => {
+                if s1 == s2 {
+                    Ok(ValueType::Signed(*s1))
                 } else {
                     Err(UnificationError::Unsatisfiable(self.clone(), other.clone()))
                 }
@@ -244,7 +370,7 @@ impl ValueType {
     pub(crate) fn is_numeric(&self) -> bool {
         match self {
             ValueType::Base(b) => b.is_numeric(),
-            ValueType::UnknownNumeric => true,
+            ValueType::NumericHole | ValueType::Signed(_) => true,
             _ => false,
         }
     }
@@ -294,8 +420,9 @@ pub(crate) mod augmented {
         Any,
         Empty,
         ViewObj,
-        UnknownNumeric,
-        Base(BaseType),
+        NumericHole,
+        Bool,
+        Char,
         Int(PrimInt),
         Tuple(Vec<AugValueType>),
         Record(Vec<(Label, AugValueType)>),
@@ -309,14 +436,33 @@ pub(crate) mod augmented {
         pub const UNIT: Self = AugValueType::Tuple(Vec::new());
     }
 
+    impl From<BaseType> for AugValueType {
+        fn from(t: BaseType) -> Self {
+            match t {
+                BaseType::Bool => AugValueType::Bool,
+                BaseType::Char => AugValueType::Char,
+                BaseType::U8 => AugValueType::Int(PrimInt::U8),
+                BaseType::U16 => AugValueType::Int(PrimInt::U16),
+                BaseType::U32 => AugValueType::Int(PrimInt::U32),
+                BaseType::U64 => AugValueType::Int(PrimInt::U64),
+            }
+        }
+    }
+
     impl From<ValueType> for AugValueType {
         fn from(t: ValueType) -> Self {
             match t {
-                ValueType::UnknownNumeric => AugValueType::UnknownNumeric,
+                ValueType::NumericHole => AugValueType::NumericHole,
                 ValueType::Any => AugValueType::Any,
                 ValueType::Empty => AugValueType::Empty,
                 ValueType::ViewObj => AugValueType::ViewObj,
-                ValueType::Base(b) => AugValueType::Base(b),
+                ValueType::Base(BaseType::Bool) => AugValueType::Bool,
+                ValueType::Base(BaseType::Char) => AugValueType::Char,
+                ValueType::Base(BaseType::U8) => AugValueType::Int(PrimInt::U8),
+                ValueType::Base(BaseType::U16) => AugValueType::Int(PrimInt::U16),
+                ValueType::Base(BaseType::U32) => AugValueType::Int(PrimInt::U32),
+                ValueType::Base(BaseType::U64) => AugValueType::Int(PrimInt::U64),
+                ValueType::Signed(s) => AugValueType::Int(PrimInt::from(s)),
                 ValueType::Tuple(ts) => {
                     AugValueType::Tuple(ts.into_iter().map(From::from).collect())
                 }
@@ -341,16 +487,10 @@ pub(crate) mod augmented {
                 AugValueType::Any => ValueType::Any,
                 AugValueType::Empty => ValueType::Empty,
                 AugValueType::ViewObj => ValueType::ViewObj,
-                // FIXME[epic=embedded-num, epic=hack] - valuetype does not yet support concrete signed-ints, so we have to treat non-base concrete primitive-integers as UnknownNumeric for now
-                AugValueType::Int(int_t) => {
-                    match BaseType::try_from(int_t) {
-                        // FIXME - this is a hack to allow us to use concrete PrimInts in AugValueType while we still have the old numeric system in ValueType; once we migrate ValueType to use PrimInt, we can remove this and just have AugValueType::Int map directly to ValueType::Int
-                        Ok(base_t) => ValueType::Base(base_t),
-                        Err(_e) => ValueType::UnknownNumeric,
-                    }
-                }
-                AugValueType::UnknownNumeric => ValueType::UnknownNumeric,
-                AugValueType::Base(b) => ValueType::Base(b),
+                AugValueType::Int(int_t) => ValueType::from(int_t),
+                AugValueType::NumericHole => ValueType::NumericHole,
+                AugValueType::Bool => ValueType::Base(BaseType::Bool),
+                AugValueType::Char => ValueType::Base(BaseType::Char),
                 AugValueType::Tuple(ts) => {
                     ValueType::Tuple(ts.into_iter().map(From::from).collect())
                 }
