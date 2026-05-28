@@ -1521,7 +1521,12 @@ impl TypeChecker {
                 self.unify_var_constraint(opt_v, Constraint::Proj(proj))?;
                 Ok(())
             }
-            Constraints::Variant(_) => unreachable!("cannot solve param projection on union"),
+            Constraints::Variant(vmid) => {
+                let vm = self.varmaps.get_varmap(*vmid);
+                unreachable!(
+                    "cannot solve param projection on distinguished union ({vmid}): {vm:?}"
+                )
+            }
             Constraints::Invariant(c) => match c {
                 Constraint::Elem(_) => unreachable!("cannot solve param projection on base-set"),
                 Constraint::NumTree(_) => unreachable!("cannot solve param projection on int-set"),
@@ -3883,10 +3888,10 @@ impl TypeChecker {
 }
 // !SECTION
 
-/// Atomic type for step-by-step expansion.
+/// Atomic solution-type for unsolved terms in a [`UType`] that is being expanded step-by-step.
 ///
 /// Used to fill in gaps in an [`Expansion`], recording either a concrete
-/// ground-type or a meta-variable that must be further expanded.
+/// ground-type (base or int), or a meta-variable that must be further expanded.
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum WHNFSolution {
     Var(UVar),

@@ -102,10 +102,7 @@ fn mk_value_expr(vt: &ValueType) -> Option<Expr> {
             Some(Expr::Variant(lbl.clone(), Box::new(mk_value_expr(branch)?)))
         }
         ValueType::Seq(t) => Some(Expr::Seq(vec![mk_value_expr(t.as_ref())?])),
-        ValueType::Option(t) => Some(Expr::Variant(
-            Label::from("Some"),
-            Box::new(mk_value_expr(t)?),
-        )),
+        ValueType::Option(t) => Some(Expr::LiftOption(Some(Box::new(mk_value_expr(t)?)))),
     }
 }
 
@@ -1303,8 +1300,7 @@ impl FormatModule {
                 ValueKind::View => Err(anyhow!("Apply: expected format, found View")),
                 ValueKind::Value(t) => Err(anyhow!("Apply: expected format, found {t:?}")),
             },
-            // REVIEW - do we want to hard-code this as U64 or make it a flexibly abstract integer type?
-            Format::Pos => Ok(ValueType::U64),
+            Format::Pos => Ok(ValueType::NumericHole),
             Format::ForEach(expr, lbl, format) => {
                 let expr_t = expr.infer_type(scope)?;
                 let elem_t = match expr_t {
@@ -1356,8 +1352,8 @@ impl FormatModule {
                 }
             },
             Format::Phantom(inner) => {
-                self.infer_format_type(scope, &**inner)?;
-                Ok(ValueType::UNIT)
+                let inner_t = self.infer_format_type(scope, &**inner)?;
+                Ok(ValueType::PhantomData(Box::new(inner_t)))
             }
         }
     }

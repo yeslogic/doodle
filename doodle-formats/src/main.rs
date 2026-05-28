@@ -307,7 +307,10 @@ fn check_all(module: &FormatModule) -> AResult<()> {
     for (level, f) in module.iter_formats() {
         if let Some(vt) = typecheck(module, &f).map_err(|err| anyhow!("{err}"))? {
             let mod_vt = module.get_format_type(level);
-            assert_eq!(&vt, mod_vt);
+            assert!(
+                vt.unify(&mod_vt).is_ok(),
+                "incompatible typings:\ntc: {vt:?}\nmodule: {mod_vt:?}"
+            );
         }
     }
     Ok(())
@@ -351,6 +354,13 @@ fn test_codegen() {
     let mut module = FormatModule::new();
     let format = format::main(&mut module).call();
     let _ = generate_code(&module, &format);
+}
+
+#[test]
+fn test_types() -> Result<(), anyhow::Error> {
+    let mut module = FormatModule::new();
+    let _ = format::main(&mut module);
+    check_all(&module)
 }
 
 /// Utility module for crawling a format tree and collecting the set of formats used within it.
