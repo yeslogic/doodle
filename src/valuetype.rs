@@ -274,10 +274,7 @@ impl ValueType {
     }
 
     /// Performs standalone unification between `self` and `other`.
-    pub(crate) fn unify(
-        &self,
-        other: &ValueType,
-    ) -> Result<ValueType, UnificationError<ValueType>> {
+    pub fn unify(&self, other: &ValueType) -> Result<ValueType, UnificationError<ValueType>> {
         match (self, other) {
             (ValueType::Empty, ValueType::Empty) => Ok(ValueType::Empty),
 

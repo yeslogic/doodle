@@ -122,6 +122,7 @@ impl CodeGen {
         AtomType::from(int_t).into()
     }
 
+    /// Takes a [`WHNFSolution`] from a solved TypeChecker and lifts it to the corresponding `RustType`.
     fn lift_whnf_solution(&mut self, tc: &TypeChecker, sol: WHNFSolution, lt: &RustLt) -> RustType {
         match sol {
             WHNFSolution::Base(bt) => Self::lift_base(bt),
@@ -143,7 +144,12 @@ impl CodeGen {
             Expansion::Record(fields) => {
                 if let Some(decl) = self.metavariables.get(&var) {
                     let (type_name, (ix, is_new)) = self.name_gen.get_name(decl);
-                    assert!(!is_new);
+                    if cfg!(debug_assertions) && is_new {
+                        // FIXME - this panic potentially should be softened to just a warning, as it is a watermark for bad invariants but not an outright bug in itself
+                        panic!(
+                            "expansion of {var} -> Record(..) found previously-stored type-declaration, but name-generation generated a new name for it:\nfields: {fields:#?}\ndecl: {decl:?}\nType({ix}), is_new=true: {type_name:?}"
+                        );
+                    }
                     return GenType::Def((ix, type_name), decl.clone());
                 }
 

@@ -706,6 +706,7 @@ pub(crate) fn table_links(
     let fvar_table = fvar::table(module, tag);
     let gvar_table = gvar::table(module);
     let hvar_table = hvar::table(module, item_variation_store);
+    let mvar_table = mvar::table(module, tag, item_variation_store);
 
     let dsig_table = dsig::table(module);
     let hdmx_table = hdmx::table(module);
@@ -944,6 +945,15 @@ pub(crate) fn table_links(
                     var("tables"),
                     util::magic(b"HVAR"),
                     hvar_table.call(),
+                ),
+            ),
+            (
+                "mvar",
+                optional_table(
+                    util::FONTVIEW_VAR,
+                    var("tables"),
+                    util::magic(b"MVAR"),
+                    mvar_table.call(),
                 ),
             ),
             // !SECTION
@@ -1386,6 +1396,8 @@ pub(crate) mod fvar;
 pub(crate) mod gvar;
 
 pub(crate) mod hvar;
+
+pub(crate) mod mvar;
 // !SECTION
 
 // ANCHOR - hdmx
