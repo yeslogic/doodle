@@ -471,7 +471,7 @@ pub mod container {
             impl<'input> $crate::api_helper::otf_metrics::container::ViewFrame<'input>
                 for $ty<'input>
             {
-                fn scope(&self) -> View<'input> {
+                fn scope(&self) -> doodle::prelude::View<'input> {
                     self.$field
                 }
             }
@@ -911,13 +911,14 @@ pub mod obj {
     impl CommonObject for GVarData {
         /// Args: `(len, axis_count)`
         type Args<'a> = (usize, u16);
+        // NOTE - Because the watermark for nullability is the len parameter and not the offset value, `Nullable` is not usable and we return Option on the raw object
         type Output<'a> = Option<OpentypeGlyphVariationData<'a>>;
 
         fn parse<'input>(
             p: &mut Parser<'input>,
             (len, axis_count): (usize, u16),
         ) -> PResult<Self::Output<'input>> {
-            // REVIEW: is this the right layer to perform this check?
+            // REVIEW[epic=validation]: is this the right layer to perform this check?
             if len == 0 {
                 return Ok(None);
             }
@@ -1857,6 +1858,10 @@ pub(crate) mod hvar {
 pub(crate) use hvar::HvarMetrics;
 
 pub mod otf_gvar {
+    use super::otf_types::OpentypeGvar;
+    use super::{Nullable, container, obj};
+    use crate::opentype_loca_table_offsets;
+
     alias! {
         pub type OpentypeGvarSerializedData = opentype_gvar_serialized_data;
         pub type OpentypeGvarIntermediateTuples = opentype_gvar_tuple_variation_header_intermediate_tuples;
@@ -1881,21 +1886,22 @@ pub mod otf_gvar {
 
     pub type OpentypePackedPointRuns = (u16, Vec<OpentypePackedPointRun>);
     pub type OpentypeXYCoordinateDeltas = (u16, Vec<OpentypeCoordinateDeltaRun>);
-}
-pub use otf_gvar::*;
-
-pub(crate) mod gvar {
-    use super::*;
 
     frame!(OpentypeGvar);
 
-    pub(crate) struct GlyphVariationDataArray<'a, 'input> {
-        pub(crate) array_scope: View<'input>,
-        pub(crate) axis_count: u16,
-        pub(crate) offsets_array: &'a opentype_loca_table_offsets,
+    impl<'input> container::SingleContainer<Nullable<obj::SharedTupleArr>> for OpentypeGvar<'input> {
+        fn get_offset(&self) -> usize {
+            self.shared_tuples.offset as usize
+        }
+
+        fn get_args(&self) -> (usize, u16) {
+            (self.shared_tuple_count as usize, self.axis_count)
+        }
     }
 
-    impl<'input> container::DynContainer<obj::GVarData> for otf_types::OpentypeGvar<'input> {
+    // NOTE - though Mandatory, the return type is still `Option<OpentypeGlyphVariationData>`
+    // REVIEW - logically, we really have two separate containers: `GVar -(glyphVariationDataArrayOffset)-> <GlyphVariationDataArray>` and `<GlyphVariationDataArray> -(glyphVariationDataOffsets)-> GlyphVariationData[]`; we don't have a strong case to introduce the `GlyphVariationDataArray` type at this time, though it could possibly de-clutter the design.
+    impl<'input> container::DynContainer<obj::GVarData> for OpentypeGvar<'input> {
         fn count(&self) -> usize {
             match &self.glyph_variation_data_offsets {
                 opentype_loca_table_offsets::Offsets16(half16s) => half16s.len() - 1,
@@ -1919,12 +1925,14 @@ pub(crate) mod gvar {
                         .take(off32s.len() - 1),
                 ),
             };
-            // REVIEW - does this merit an intermediate GVarDataArray structure instead?
+            // REVIEW - does this nesting indicate we should define an intermediate GVarDataArray structure instead?
             ret.map(|array_rel_offs| {
                 array_rel_offs + self.glyph_variation_data_array_offset as usize
             })
         }
 
+        /// Returns an iterator over the per-glyph arguments for the glyph-variation-data array,
+        /// i.e. an iterator over `(len, axis-count)` pairs for each entry in the `glyphVariationDataOffsets` array
         fn iter_args(&self) -> impl Iterator<Item = (usize, u16)> {
             let lengths: Box<dyn Iterator<Item = usize>> = match &self.glyph_variation_data_offsets
             {
@@ -1941,34 +1949,36 @@ pub(crate) mod gvar {
         }
     }
 
-    impl<'input> container::SingleContainer<Nullable<obj::SharedTupleArr>>
-        for otf_types::OpentypeGvar<'input>
-    {
+    frame!(OpentypeGlyphVariationData.data_scope);
+
+    impl<'input> container::SingleContainer<obj::GvarSerData> for OpentypeGlyphVariationData<'input> {
         fn get_offset(&self) -> usize {
-            self.shared_tuples.offset as usize
+            self.data_offset as usize
         }
 
-        fn get_args(&self) -> (usize, u16) {
-            (self.shared_tuple_count as usize, self.axis_count)
+        fn get_args(&self) -> <obj::GvarSerData as container::CommonObject>::Args<'_> {
+            (
+                self.tuple_variation_count.shared_point_numbers,
+                &self.tuple_variation_headers,
+            )
         }
     }
+}
+pub use otf_gvar::*;
 
-    impl<'input> Promote<otf_types::OpentypeGvar<'input>> for GvarMetrics {
-        fn promote(orig: &otf_types::OpentypeGvar<'input>) -> Self {
-            let glyph_variation_data_array = fn_reify::reify_all(orig, obj::GVarData)
-                .map(|data| data.as_ref().map(GlyphVariationData::promote))
-                .collect();
-            let shared_tuples =
-                promote_from_null(&fn_reify::reify(orig, Nullable(obj::SharedTupleArr)));
-            Self {
-                major_version: orig.major_version,
-                minor_version: orig.minor_version,
-                shared_tuples,
-                glyph_count: orig.glyph_count,
-                flags: Promote::promote(&orig.flags),
-                glyph_variation_data_array,
-            }
-        }
+pub(crate) mod gvar {
+    use super::*;
+
+    pub(crate) struct GlyphVariationDataArray<'a, 'input> {
+        pub(crate) array_scope: View<'input>,
+        pub(crate) axis_count: u16,
+        // TODO - introduce proper common alias for loca/gvar offsets array to avoid instability
+        pub(crate) offsets_array: &'a opentype_loca_table_offsets,
+    }
+
+    #[derive(Clone, Debug)]
+    pub struct GvarTupleRecord {
+        pub(crate) coordinates: Vec<otf_types::F2Dot14>,
     }
 
     impl Promote<Vec<OpentypeGvarTupleRecord>> for Vec<GvarTupleRecord> {
@@ -1985,9 +1995,9 @@ pub(crate) mod gvar {
         }
     }
 
-    #[derive(Clone, Debug)]
-    pub struct GvarTupleRecord {
-        pub(crate) coordinates: Vec<otf_types::F2Dot14>,
+    #[derive(Debug, Clone, Copy)]
+    pub struct GvarFlags {
+        pub(crate) is_long_offset: bool,
     }
 
     impl Promote<OpentypeGvarFlags> for GvarFlags {
@@ -1998,9 +2008,12 @@ pub(crate) mod gvar {
         }
     }
 
-    #[derive(Debug, Clone, Copy)]
-    pub struct GvarFlags {
-        pub(crate) is_long_offset: bool,
+    #[derive(Debug, Clone)]
+    pub struct GvarTupleVariationHeader {
+        pub(crate) variation_data_size: u16,
+        pub(crate) tuple_index: GvarTupleVariationHeaderTupleIndex,
+        pub(crate) peak_tuple: Option<GvarTupleRecord>,
+        pub(crate) intermediate_tuples: Option<GvarIntermediateTuples>,
     }
 
     impl Promote<OpentypeGvarTupleVariationHeader> for GvarTupleVariationHeader {
@@ -2014,14 +2027,13 @@ pub(crate) mod gvar {
         }
     }
 
-    #[derive(Debug, Clone)]
-    pub struct GvarTupleVariationHeader {
-        pub(crate) variation_data_size: u16,
-        pub(crate) tuple_index: GvarTupleVariationHeaderTupleIndex,
-        pub(crate) peak_tuple: Option<GvarTupleRecord>,
-        pub(crate) intermediate_tuples: Option<GvarIntermediateTuples>,
+    #[derive(Debug, Clone, Copy)]
+    pub struct GvarTupleVariationHeaderTupleIndex {
+        pub(crate) embedded_peak_tuple: bool,
+        pub(crate) intermediate_region: bool,
+        pub(crate) private_point_numbers: bool,
+        pub(crate) tuple_index: u16,
     }
-
     impl Promote<OpentypeGvarTupleVariationHeaderTupleIndex> for GvarTupleVariationHeaderTupleIndex {
         fn promote(orig: &OpentypeGvarTupleVariationHeaderTupleIndex) -> Self {
             GvarTupleVariationHeaderTupleIndex {
@@ -2033,12 +2045,10 @@ pub(crate) mod gvar {
         }
     }
 
-    #[derive(Debug, Clone, Copy)]
-    pub struct GvarTupleVariationHeaderTupleIndex {
-        pub(crate) embedded_peak_tuple: bool,
-        pub(crate) intermediate_region: bool,
-        pub(crate) private_point_numbers: bool,
-        pub(crate) tuple_index: u16,
+    #[derive(Debug, Clone)]
+    pub struct GvarIntermediateTuples {
+        pub(crate) start_tuple: GvarTupleRecord,
+        pub(crate) end_tuple: GvarTupleRecord,
     }
 
     impl Promote<OpentypeGvarIntermediateTuples> for GvarIntermediateTuples {
@@ -2047,27 +2057,6 @@ pub(crate) mod gvar {
                 start_tuple: GvarTupleRecord::promote(&orig.start_tuple),
                 end_tuple: GvarTupleRecord::promote(&orig.end_tuple),
             }
-        }
-    }
-
-    #[derive(Debug, Clone)]
-    pub struct GvarIntermediateTuples {
-        pub(crate) start_tuple: GvarTupleRecord,
-        pub(crate) end_tuple: GvarTupleRecord,
-    }
-
-    frame!(OpentypeGlyphVariationData.data_scope);
-
-    impl<'input> container::SingleContainer<obj::GvarSerData> for OpentypeGlyphVariationData<'input> {
-        fn get_offset(&self) -> usize {
-            self.data_offset as usize
-        }
-
-        fn get_args(&self) -> <obj::GvarSerData as container::CommonObject>::Args<'_> {
-            (
-                self.tuple_variation_count.shared_point_numbers,
-                &self.tuple_variation_headers,
-            )
         }
     }
 
@@ -2086,12 +2075,23 @@ pub(crate) mod gvar {
         }
     }
 
+    #[derive(Debug, Clone)]
+    pub struct PackedPointNumbers {
+        pub(crate) point_numbers: Vec<PackedPointRun>,
+    }
+
     impl Promote<OpentypePackedPointRuns> for PackedPointNumbers {
         fn promote(orig: &OpentypePackedPointRuns) -> Self {
             PackedPointNumbers {
                 point_numbers: promote_vec(&orig.1),
             }
         }
+    }
+
+    #[derive(Debug, Clone)]
+    pub enum PackedPointRun {
+        Short(Vec<u8>),
+        Long(Vec<u16>),
     }
 
     impl Promote<OpentypePackedPointRun> for PackedPointRun {
@@ -2110,14 +2110,10 @@ pub(crate) mod gvar {
     }
 
     #[derive(Debug, Clone)]
-    pub enum PackedPointRun {
-        Short(Vec<u8>),
-        Long(Vec<u16>),
-    }
-
-    #[derive(Debug, Clone)]
-    pub struct PackedPointNumbers {
-        pub(crate) point_numbers: Vec<PackedPointRun>,
+    pub enum CoordinateDeltas {
+        Zero { run_length: u8 },
+        Short { deltas: Vec<i8> },
+        Long { deltas: Vec<i16> },
     }
 
     impl Promote<OpentypeCoordinateDeltaRun> for CoordinateDeltas {
@@ -2143,10 +2139,8 @@ pub(crate) mod gvar {
     }
 
     #[derive(Debug, Clone)]
-    pub enum CoordinateDeltas {
-        Zero { run_length: u8 },
-        Short { deltas: Vec<i8> },
-        Long { deltas: Vec<i16> },
+    pub struct XYCoordinateDeltas {
+        pub(crate) xy_deltas: Vec<CoordinateDeltas>,
     }
 
     impl Promote<OpentypeXYCoordinateDeltas> for XYCoordinateDeltas {
@@ -2158,8 +2152,9 @@ pub(crate) mod gvar {
     }
 
     #[derive(Debug, Clone)]
-    pub struct XYCoordinateDeltas {
-        pub(crate) xy_deltas: Vec<CoordinateDeltas>,
+    pub struct GvarPerTupleVariationData {
+        pub(crate) private_point_numbers: Option<PackedPointNumbers>,
+        pub(crate) x_and_y_coordinate_deltas: XYCoordinateDeltas,
     }
 
     impl Promote<OpentypeGvarPerTupleVariationData> for GvarPerTupleVariationData {
@@ -2174,9 +2169,9 @@ pub(crate) mod gvar {
     }
 
     #[derive(Debug, Clone)]
-    pub struct GvarPerTupleVariationData {
-        pub(crate) private_point_numbers: Option<PackedPointNumbers>,
-        pub(crate) x_and_y_coordinate_deltas: XYCoordinateDeltas,
+    pub struct GvarSerializedData {
+        pub(crate) shared_point_numbers: Option<PackedPointNumbers>,
+        pub(crate) per_tuple_variation_data: Vec<GvarPerTupleVariationData>,
     }
 
     impl Promote<OpentypeGvarSerializedData> for GvarSerializedData {
@@ -2186,12 +2181,6 @@ pub(crate) mod gvar {
                 per_tuple_variation_data: promote_vec(&orig.per_tuple_variation_data),
             }
         }
-    }
-
-    #[derive(Debug, Clone)]
-    pub struct GvarSerializedData {
-        pub(crate) shared_point_numbers: Option<PackedPointNumbers>,
-        pub(crate) per_tuple_variation_data: Vec<GvarPerTupleVariationData>,
     }
 
     #[derive(Debug, Clone)]
@@ -2210,6 +2199,23 @@ pub(crate) mod gvar {
         pub(crate) glyph_count: u16,
         pub(crate) flags: GvarFlags,
         pub(crate) glyph_variation_data_array: Vec<Option<GlyphVariationData>>,
+    }
+
+    impl<'input> Promote<OpentypeGvar<'input>> for GvarMetrics {
+        fn promote(orig: &OpentypeGvar<'input>) -> Self {
+            let shared_tuples = promote_from_null(&reify(orig, Nullable(obj::SharedTupleArr)));
+            let glyph_variation_data_array = reify_all(orig, obj::GVarData)
+                .map(|data| data.as_ref().map(GlyphVariationData::promote))
+                .collect();
+            Self {
+                major_version: orig.major_version,
+                minor_version: orig.minor_version,
+                shared_tuples,
+                glyph_count: orig.glyph_count,
+                flags: GvarFlags::promote(&orig.flags),
+                glyph_variation_data_array,
+            }
+        }
     }
 }
 pub(crate) use gvar::{

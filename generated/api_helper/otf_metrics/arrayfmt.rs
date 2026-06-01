@@ -27,6 +27,9 @@ pub(crate) fn display_nullable<T>(
         .enumerate()
         .filter_map(|(ix, opt)| opt.as_ref().map(|v| (ix, v)))
         .collect();
+    if items.is_empty() {
+        return toks(format!("[None; {}]", opt_items.len()));
+    }
     let mut buffer = Vec::<TokenStream>::with_capacity(Ord::min(items.len(), bookend * 2 + 1));
 
     let count = items.len();
