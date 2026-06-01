@@ -523,15 +523,23 @@ mod gvar {
                 LineBreak,
                 TokenStream::join_with(
                     vec![
-                        toks(format!(
-                            "Shared Tuples ({} total):",
-                            gvar.shared_tuples.len()
-                        )),
+                        {
+                            let len = gvar.shared_tuples.len();
+                            if len == 0 {
+                                toks("Shared Tuples: <Empty Array>")
+                            } else {
+                                toks(format!("Shared Tuples ({len} total):"))
+                            }
+                        },
                         display_shared_tuples(&gvar.shared_tuples).indent_by(ITEM_INDENT),
-                        toks(format!(
-                            "Glyph Variation Data ({} glyphs):",
-                            gvar.glyph_variation_data_array.len()
-                        )),
+                        {
+                            let len = gvar.glyph_variation_data_array.len();
+                            if len == 0 {
+                                toks("Glyph Variation Data: <Empty Array>")
+                            } else {
+                                toks(format!("Glyph Variation Data ({} glyphs):", len))
+                            }
+                        },
                         display_glyph_variation_data_array(&gvar.glyph_variation_data_array)
                             .indent_by(ITEM_INDENT),
                     ],

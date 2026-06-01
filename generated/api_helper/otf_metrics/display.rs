@@ -220,15 +220,17 @@ impl TokenStream {
 
     /// Returns a new `TokenStream` where each line in `self` is indented by `stops` half-tabs (i.e. 4 spaces).
     ///
-    /// Will prefer using `'\t'` for indentation, and will include a final half-tab iff `stops` is odd.
+    /// If `self` is empty, returns `self` without modification, regardless of the value of `stops`, in order
+    /// to avoid creating unexpected blank lines.
     ///
-    /// Can take a negative value, but the formatting will be incorrect when underflowing the current absolute indentation level.
+    /// Will prefer using `'\t'` for indentation, and will include a final half-tab iff `stops` is odd.
     pub fn indent_by(self, stops: i8) -> Self {
-        // REVIEW - we can change the implementation of IndentIter to support negative stops as equivalent-to-zero and thereby avoid the underflow misalignment-on-reset
+        let (is_empty, this) = self.is_empty();
         match stops.signum() {
-            0 => return self,
+            _ if is_empty => return this,
+            0 => return this,
             1 => (),
-            -1 => return self.decrease_indent_by(-stops as u8),
+            -1 => return this.decrease_indent_by(-stops as u8),
             _ => unreachable!(),
         }
 
@@ -236,7 +238,8 @@ impl TokenStream {
         let reset = std::iter::repeat(Token::DecreaseIndent).take(stops as usize);
         TokenStream {
             inner: Box::new(
-                shift.chain(self.inner).chain(reset), // We rely on the fact that `IndentIter` will ignore all indent tokens at the end of the stream, so we can safely append the necessary `DecreaseIndent` tokens here without worrying about trailing newlines in `self`
+                // NOTE - We rely on the fact that `IndentIter` will ignore all indent tokens at the end of the stream
+                shift.chain(this.inner).chain(reset),
             ),
         }
     }
@@ -251,7 +254,8 @@ impl TokenStream {
         let reset = std::iter::repeat(Token::IncreaseIndent).take(stops as usize);
         TokenStream {
             inner: Box::new(
-                shift.chain(self.inner).chain(reset), // We rely on the fact that `IndentIter` will ignore all indent tokens at the end of the stream, so we can safely append the necessary `DecreaseIndent` tokens here without worrying about trailing newlines in `self`
+                // NOTE - We rely on the fact that `IndentIter` will ignore all indent tokens at the end of the stream
+                shift.chain(self.inner).chain(reset),
             ),
         }
     }
@@ -322,15 +326,28 @@ impl Iterator for IndentIter {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 /// Newtype representing indentation level, measured in 4-space half-tabs.
-pub struct Indent(u8);
+pub struct Indent(i8);
 
 impl Indent {
-    /// Half-Tab for partial indentation
-    pub const HT: &str = "    ";
+    /// Returns the indentation level as a unsigned 8-bit integer, clamped to 0.
+    ///
+    /// If the indentation level is negative, returns 0. Otherwise, returns the indentation level as a `u8`.
+    pub fn as_u8(self) -> u8 {
+        Ord::max(self.0, 0) as u8
+    }
+}
+
+impl Indent {
+    /// Half-Tab for partial indentation, equal to 4 spaces.
+    pub const HT: &str = unsafe { str::from_utf8_unchecked(&[b' '; 4]) };
 
     /// Render the appropriate indentation level as a string.
+    ///
+    /// If the indentation level is negative, will render as 0 (i.e. no indentation).
+    /// This behavior allows for negative indentation levels to be used as a temporary state
+    /// for relative de-indentation without risking underflow or misalignment on reset.
     pub fn render(self) -> String {
-        let n = self.0;
+        let n = self.as_u8();
 
         let indent_str = "\t".repeat((n / 2) as usize);
         if n % 2 > 0 {
