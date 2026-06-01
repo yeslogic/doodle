@@ -473,21 +473,18 @@ mod fvar {
     }
 
     fn display_instance_record(instance: &InstanceRecord, conf: &cli::Config) -> TokenStream {
-        // FIXME[epic=tokenstream-refactor] - rewrite into more natively TokenStream-oriented production
-        tok(format!(
-            "Subfamily={:?};{} ",
-            instance.subfamily_nameid,
-            match instance.postscript_nameid {
-                None => String::new(),
-                Some(name_id) => format!(" Postscript={name_id:?};"),
-            },
-        ))
-        .then(arrayfmt::display_items_inline(
-            &instance.coordinates,
-            |coord| toks(format!("{coord:+}")),
-            conf.inline_bookend,
-            |n_skipped| toks(format!("...(skipping {n_skipped} coordinates)...")),
-        ))
+        tok(format!("Subfamily={:?};", instance.subfamily_nameid)).then(
+            (match instance.postscript_nameid {
+                None => TokenStream::empty(),
+                Some(name_id) => toks(format!(" Postscript={name_id:?};")),
+            })
+            .chain(arrayfmt::display_items_inline(
+                &instance.coordinates,
+                |coord| toks(format!("{coord:+}")),
+                conf.inline_bookend,
+                |n_skipped| toks(format!("...(skipping {n_skipped} coordinates)...")),
+            )),
+        )
     }
 
     fn display_variation_axis_record(axis: &VariationAxisRecord) -> TokenStream {
@@ -574,7 +571,7 @@ mod gvar {
             }
             [header] => display_tuple_variation_header(header),
             headers => {
-                // FIXME[epic=magic] - arbitrary local bookending const
+                // FIXME[epic=magic-const] - arbitrary local bookending const
                 const LOCAL_BOOKEND: usize = 4;
 
                 let headers_str = arrayfmt::display_items_elided(
@@ -1799,7 +1796,7 @@ mod layout {
         match lig_sets {
             [set] => display_ligature_set(set, coverage.next().expect("missing coverage")),
             more => {
-                // FIXME[epic=magic] - arbitrary local bookending const
+                // FIXME[epic=magic-const] - arbitrary local bookending const
                 const LIG_SET_BOOKEND: usize = 1;
 
                 arrayfmt::display_coverage_linked_array(
@@ -1813,7 +1810,7 @@ mod layout {
         }
     }
     fn display_ligature_set(lig_set: &LigatureSet, cov: u16) -> TokenStream {
-        // FIXME[epic=magic] - arbitrary local bookending const
+        // FIXME[epic=magic-const] - arbitrary local bookending const
         const LIG_BOOKEND: usize = 2;
 
         arrayfmt::display_items_inline(
@@ -2574,6 +2571,7 @@ fn format_glyphid_hex(glyph: u16, include_prefix: bool) -> String {
 /// Otherwise, does not include any special prefixes.
 ///
 // REVIEW - we have no cap on how long a glyphId sequence we are willing to show unabridged and we might want one in theory
+// REVIEW - this function is currently not used anywhere, but we are temporarily keeping it around in case future display-forms of new feature-tables might want to use it. If we end up not using it, we should delete it.
 fn format_glyphid_array_hex(glyphs: &impl AsRef<[u16]>, include_prefix: bool) -> String {
     let glyph_array = glyphs.as_ref();
 
@@ -2806,7 +2804,7 @@ mod cmap {
 
     use super::*;
 
-    pub(crate) fn display_cmap_metrics(cmap: &Cmap, conf: &cli::Config) -> TokenStream {
+    pub(crate) fn display_cmap_metrics(cmap: &CmapMetrics, conf: &cli::Config) -> TokenStream {
         let heading = toks(format!("cmap: version {}", cmap.version));
 
         if conf.verbosity.is_at_least(cli::VerboseLevel::Detailed) {
