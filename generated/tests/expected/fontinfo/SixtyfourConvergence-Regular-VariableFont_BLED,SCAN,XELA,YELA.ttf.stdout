@@ -82,14 +82,14 @@ fvar: version 1.0
 	[2]: 'XELA' axis: [-100, 100] (default: 0) NameId(278)
 	[3]: 'YELA' axis: [-100, 100] (default: 0) NameId(279)
     Instances:
-	[0]: Subfamily=NameId(262); Postscript=NameId(263); [-53, +0, +0, +0]
-	[1]: Subfamily=NameId(264); Postscript=NameId(265); [-45, +0, +0, +0]
-	[2]: Subfamily=NameId(266); Postscript=NameId(267); [-27, +0, +0, +0]
-	[3]: Subfamily=NameId(268); Postscript=NameId(269); [+0, +0, +0, +0]
-	[4]: Subfamily=NameId(270); Postscript=NameId(271); [+21, +0, +0, +0]
-	[5]: Subfamily=NameId(272); Postscript=NameId(273); [+37, +0, +0, +0]
-	[6]: Subfamily=NameId(274); Postscript=NameId(275); [+67, +0, +0, +0]
-	[7]: Subfamily=NameId(276); Postscript=NameId(277); [+100, +0, +0, +0]
+	[0]: Subfamily=NameId(262); Postscript=NameId(263);[-53, +0, +0, +0]
+	[1]: Subfamily=NameId(264); Postscript=NameId(265);[-45, +0, +0, +0]
+	[2]: Subfamily=NameId(266); Postscript=NameId(267);[-27, +0, +0, +0]
+	[3]: Subfamily=NameId(268); Postscript=NameId(269);[+0, +0, +0, +0]
+	[4]: Subfamily=NameId(270); Postscript=NameId(271);[+21, +0, +0, +0]
+	[5]: Subfamily=NameId(272); Postscript=NameId(273);[+37, +0, +0, +0]
+	[6]: Subfamily=NameId(274); Postscript=NameId(275);[+67, +0, +0, +0]
+	[7]: Subfamily=NameId(276); Postscript=NameId(277);[+100, +0, +0, +0]
 gvar: version 1.0
     Shared Tuples (5 total):
 	[0]: [0, 1, 0, 0]

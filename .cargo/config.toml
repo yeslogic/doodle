@@ -1,8 +1,7 @@
 [alias]
 cg = "run --bin doodle -- format --output rust --dest generated/gencode.rs"
-cgstat = "run --bin doodle -- format --output rust --stat-only --dest micro-stat/src/gencode_stat.rs"
-coverage = "tarpaulin --workspace --exclude smallsorts micro-stat analytic-parser analytic-engine --out lcov --engine llvm"
-testall = "test --workspace --exclude smallsorts analytic-engine analytic-parser"
+coverage = "tarpaulin --workspace --exclude smallsorts analytic-parser analytic-engine --out lcov --engine llvm"
+testall = "test --workspace --exclude smallsorts --exclude analytic-engine --exclude analytic-parser"
 
 [profile.profiling]
 inherits = "release"
