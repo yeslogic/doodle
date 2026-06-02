@@ -147,6 +147,7 @@ fn show_optional_metrics(optional: &OptionalTableMetrics, conf: &cli::Config) {
             display_fvar_metrics(optional.fvar.as_deref(), conf),
             display_gvar_metrics(optional.gvar.as_deref(), conf),
             display_hvar_metrics(optional.hvar.as_deref(), conf),
+            display_mvar_metrics(optional.mvar.as_deref(), conf),
             display_kern_metrics(&optional.kern, conf),
             display_dsig_metrics(optional.dsig.as_ref(), conf),
             display_hdmx_metrics(optional.hdmx.as_ref(), conf),
@@ -710,6 +711,66 @@ mod hvar {
             },
         )
         .indent_by(FLAT_ITEM_INDENT)
+    }
+}
+
+use mvar::display_mvar_metrics;
+mod mvar {
+    use super::*;
+
+    pub(super) fn display_mvar_metrics(mvar: Option<&MvarMetrics>, conf: &Config) -> TokenStream {
+        let Some(mvar) = mvar else {
+            return TokenStream::empty();
+        };
+
+        let heading = toks(format!(
+            "MVAR: version {}",
+            format_version_major_minor(mvar.major_version, mvar.minor_version)
+        ));
+        if conf.verbosity.is_at_least(cli::VerboseLevel::Detailed) {
+            heading.glue(
+                LineBreak,
+                TokenStream::join_with(
+                    vec![
+                        (if let Some(ref ivs) = mvar.item_variation_store {
+                            toks(format!("ItemVariation:")).glue(
+                                LineBreak,
+                                display_item_variation_store(ivs, conf).indent_by(ITEM_INDENT),
+                            )
+                        } else {
+                            TokenStream::empty()
+                        }),
+                        toks(format!(
+                            "Value records ({} total):",
+                            mvar.value_records.len()
+                        )),
+                        display_items_elided(
+                            &mvar.value_records,
+                            |ix, record| {
+                                tok(format!("[{ix}]: ")).then(display_mvar_value_record(record))
+                            },
+                            conf.bookend_size,
+                            |start, stop| {
+                                toks(format!("(skipping value records {start}..{stop})"))
+                                    .indent_by(ELISION_DELTA)
+                            },
+                        )
+                        .indent_by(ITEM_INDENT),
+                    ],
+                    LineBreak,
+                )
+                .indent_by(SECTION_INDENT),
+            )
+        } else {
+            heading
+        }
+    }
+
+    fn display_mvar_value_record(record: &MvarValueRecord) -> TokenStream {
+        toks(format!(
+            "'{}': ({},{})",
+            record.value_tag, record.delta_set_outer_index, record.delta_set_inner_index,
+        ))
     }
 }
 
