@@ -184,10 +184,10 @@ fvar: version 1.0
     Axes:
 	[0]: 'wght' axis: [100, 600] (default: 100) NameId(256)
     Instances:
-	[0]: Subfamily=NameId(257); [+100]
-	[1]: Subfamily=NameId(258); [+200]
-	[2]: Subfamily=NameId(259); [+400]
-	[3]: Subfamily=NameId(260); [+600]
+	[0]: Subfamily=NameId(257);[+100]
+	[1]: Subfamily=NameId(258);[+200]
+	[2]: Subfamily=NameId(259);[+400]
+	[3]: Subfamily=NameId(260);[+600]
 gvar: version 1.0
     Shared Tuples (1 total):
 	[0]: [1]
