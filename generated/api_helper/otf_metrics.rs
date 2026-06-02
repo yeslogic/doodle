@@ -2705,225 +2705,243 @@ pub(crate) mod fvar {
 }
 pub(crate) use fvar::{FvarMetrics, InstanceRecord, VariationAxisRecord};
 
-#[derive(Debug, Clone)]
-struct StatMetrics {
-    major_version: u16,
-    minor_version: u16,
-    design_axes: Vec<DesignAxis>,
-    axis_values: Vec<AxisValue>,
-    elided_fallback_name_id: NameId,
-}
+pub mod otf_stat {
+    use super::{Mandatory, Nullable, container, obj};
 
-pub type OpentypeAxisValueArray<'a> = opentype_stat_axis_value_array<'a>;
-
-frame!(OpentypeAxisValueArray.array_scope);
-
-impl<'a> container::DynContainer<obj::AxisValTbl> for OpentypeAxisValueArray<'a> {
-    fn count(&self) -> usize {
-        self.axis_values.len()
+    alias! {
+        pub type OpentypeAxisValue = opentype_stat_axis_value_table;
+        pub type OpentypeAxisValueData = opentype_stat_axis_value_table_data;
+        pub type OpentypeAxisValueFormat1 = opentype_stat_axis_value_table_data_Format1;
+        pub type OpentypeAxisValueFormat2 = opentype_stat_axis_value_table_data_Format2;
+        pub type OpentypeAxisValueFormat3 = opentype_stat_axis_value_table_data_Format3;
+        pub type OpentypeAxisValueFormat4 = opentype_stat_axis_value_table_data_Format4;
+        pub type OpentypeAxisValueRecord = opentype_stat_axis_value_table_data_Format4_axis_values;
+        pub type OpentypeAxisValueFlags = opentype_stat_axis_value_table_data_Format1_flags;
+        pub type OpentypeAxisValueArray = opentype_stat_axis_value_array<'a>;
+        pub type OpentypeDesignAxesArray = opentype_stat_design_axes_array;
+        pub type OpentypeDesignAxis = opentype_stat_design_axes_array_design_axes;
     }
 
-    fn iter_offsets(&self) -> impl Iterator<Item = usize> {
-        self.axis_values.iter().map(|x| x.offset as usize)
-    }
+    frame!(OpentypeAxisValueArray.array_scope);
 
-    fn iter_args(
-        &self,
-    ) -> impl Iterator<Item = <obj::AxisValTbl as container::CommonObject>::Args<'_>> {
-        std::iter::repeat(())
-    }
-}
+    impl<'a> container::DynContainer<obj::AxisValTbl> for OpentypeAxisValueArray<'a> {
+        fn count(&self) -> usize {
+            self.axis_values.len()
+        }
 
-pub type OpentypeAxisValue = opentype_stat_axis_value_table;
-pub type OpentypeAxisValueData = opentype_stat_axis_value_table_data;
+        fn iter_offsets(&self) -> impl Iterator<Item = usize> {
+            self.axis_values.iter().map(|x| x.offset as usize)
+        }
 
-pub type OpentypeAxisValueFormat1 = opentype_stat_axis_value_table_data_Format1;
-pub type OpentypeAxisValueFormat2 = opentype_stat_axis_value_table_data_Format2;
-pub type OpentypeAxisValueFormat3 = opentype_stat_axis_value_table_data_Format3;
-pub type OpentypeAxisValueFormat4 = opentype_stat_axis_value_table_data_Format4;
-
-pub type OpentypeAxisValueFlags = opentype_stat_axis_value_table_data_Format1_flags;
-
-impl Promote<OpentypeAxisValueFlags> for AxisValueFlags {
-    fn promote(orig: &OpentypeAxisValueFlags) -> Self {
-        Self {
-            elidable_axis_value_name: orig.elidable_axis_value_name,
-            older_sibling_font_attribute: orig.older_sibling_font_attribute,
+        fn iter_args(
+            &self,
+        ) -> impl Iterator<Item = <obj::AxisValTbl as container::CommonObject>::Args<'_>> {
+            std::iter::repeat(())
         }
     }
 }
+pub use otf_stat::*;
+pub mod stat {
+    use super::*;
 
-#[derive(Debug, Clone, Copy)]
-struct AxisValueFlags {
-    elidable_axis_value_name: bool,
-    older_sibling_font_attribute: bool,
-}
+    #[derive(Debug, Clone)]
+    pub(crate) struct StatMetrics {
+        pub(crate) major_version: u16,
+        pub(crate) minor_version: u16,
+        pub(crate) design_axes: Vec<DesignAxis>,
+        pub(crate) axis_values: Vec<AxisValue>,
+        pub(crate) elided_fallback_name_id: NameId,
+    }
 
-impl Promote<OpentypeAxisValueFormat1> for AxisValueFormat1 {
-    fn promote(orig: &OpentypeAxisValueFormat1) -> Self {
-        AxisValueFormat1 {
-            axis_index: orig.axis_index,
-            flags: AxisValueFlags::promote(&orig.flags),
-            value_name_id: NameId::from(orig.value_name_id),
-            value: otf_types::Fixed::promote(&orig.value),
+    impl<'a> Promote<otf_types::OpentypeStat<'a>> for StatMetrics {
+        fn promote(orig: &otf_types::OpentypeStat) -> Self {
+            let design_axes = <Vec<DesignAxis>>::promote(&fn_reify::reify(orig, obj::DAxisArray));
+            let axis_values = {
+                let axis_value_array = fn_reify::reify(orig, obj::AxisValueArr);
+                fn_reify::reify_all(&axis_value_array, obj::AxisValTbl)
+                    .map(|raw| AxisValue::promote(&raw))
+                    .collect()
+            };
+            StatMetrics {
+                major_version: orig.major_version,
+                minor_version: orig.minor_version,
+                design_axes,
+                axis_values,
+                elided_fallback_name_id: NameId::from(orig.elided_fallback_name_id),
+            }
+        }
+    }
+
+    impl Promote<OpentypeAxisValueFlags> for AxisValueFlags {
+        fn promote(orig: &OpentypeAxisValueFlags) -> Self {
+            Self {
+                elidable_axis_value_name: orig.elidable_axis_value_name,
+                older_sibling_font_attribute: orig.older_sibling_font_attribute,
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    pub(crate) struct AxisValueFlags {
+        pub(crate) elidable_axis_value_name: bool,
+        pub(crate) older_sibling_font_attribute: bool,
+    }
+
+    #[derive(Debug, Clone)]
+    pub(crate) enum AxisValue {
+        Format1(AxisValueFormat1),
+        Format2(AxisValueFormat2),
+        Format3(AxisValueFormat3),
+        Format4(AxisValueFormat4),
+    }
+
+    impl Promote<OpentypeAxisValue> for AxisValue {
+        fn promote(orig: &OpentypeAxisValue) -> Self {
+            Self::promote(&orig.data)
+        }
+    }
+
+    impl Promote<OpentypeAxisValueData> for AxisValue {
+        fn promote(orig: &OpentypeAxisValueData) -> Self {
+            match orig {
+                OpentypeAxisValueData::Format1(f1) => {
+                    AxisValue::Format1(AxisValueFormat1::promote(f1))
+                }
+                OpentypeAxisValueData::Format2(f2) => {
+                    AxisValue::Format2(AxisValueFormat2::promote(f2))
+                }
+                OpentypeAxisValueData::Format3(f3) => {
+                    AxisValue::Format3(AxisValueFormat3::promote(f3))
+                }
+                OpentypeAxisValueData::Format4(f4) => {
+                    AxisValue::Format4(AxisValueFormat4::promote(f4))
+                }
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    pub(crate) struct AxisValueFormat1 {
+        pub(crate) axis_index: u16,
+        pub(crate) flags: AxisValueFlags,
+        pub(crate) value_name_id: NameId,
+        pub(crate) value: otf_types::Fixed,
+    }
+
+    impl Promote<OpentypeAxisValueFormat1> for AxisValueFormat1 {
+        fn promote(orig: &OpentypeAxisValueFormat1) -> Self {
+            AxisValueFormat1 {
+                axis_index: orig.axis_index,
+                flags: AxisValueFlags::promote(&orig.flags),
+                value_name_id: NameId::from(orig.value_name_id),
+                value: otf_types::Fixed::promote(&orig.value),
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    pub(crate) struct AxisValueFormat2 {
+        pub(crate) axis_index: u16,
+        pub(crate) flags: AxisValueFlags,
+        pub(crate) value_name_id: NameId,
+        pub(crate) nominal_value: otf_types::Fixed,
+        pub(crate) range_min_value: otf_types::Fixed,
+        pub(crate) range_max_value: otf_types::Fixed,
+    }
+
+    impl Promote<OpentypeAxisValueFormat2> for AxisValueFormat2 {
+        fn promote(orig: &OpentypeAxisValueFormat2) -> Self {
+            AxisValueFormat2 {
+                axis_index: orig.axis_index,
+                flags: AxisValueFlags::promote(&orig.flags),
+                value_name_id: NameId::from(orig.value_name_id),
+                nominal_value: otf_types::Fixed::promote(&orig.nominal_value),
+                range_min_value: otf_types::Fixed::promote(&orig.range_min_value),
+                range_max_value: otf_types::Fixed::promote(&orig.range_max_value),
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    pub(crate) struct AxisValueFormat3 {
+        pub(crate) axis_index: u16,
+        pub(crate) flags: AxisValueFlags,
+        pub(crate) value_name_id: NameId,
+        pub(crate) value: otf_types::Fixed,
+        pub(crate) linked_value: otf_types::Fixed,
+    }
+
+    impl Promote<OpentypeAxisValueFormat3> for AxisValueFormat3 {
+        fn promote(orig: &OpentypeAxisValueFormat3) -> Self {
+            AxisValueFormat3 {
+                axis_index: orig.axis_index,
+                flags: AxisValueFlags::promote(&orig.flags),
+                value_name_id: NameId::from(orig.value_name_id),
+                value: Fixed::promote(&orig.value),
+                linked_value: Fixed::promote(&orig.linked_value),
+            }
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    pub(crate) struct AxisValueFormat4 {
+        pub(crate) flags: AxisValueFlags,
+        pub(crate) value_name_id: NameId,
+        pub(crate) axis_values: Vec<AxisValueRecord>,
+    }
+
+    impl Promote<OpentypeAxisValueFormat4> for AxisValueFormat4 {
+        fn promote(orig: &OpentypeAxisValueFormat4) -> Self {
+            AxisValueFormat4 {
+                flags: AxisValueFlags::promote(&orig.flags),
+                value_name_id: NameId::from(orig.value_name_id),
+                axis_values: promote_vec(&orig.axis_values),
+            }
+        }
+    }
+
+    #[derive(Clone, Copy, Debug)]
+    pub(crate) struct AxisValueRecord {
+        pub(crate) axis_index: u16,
+        pub(crate) value: Fixed,
+    }
+
+    impl Promote<OpentypeAxisValueRecord> for AxisValueRecord {
+        fn promote(orig: &OpentypeAxisValueRecord) -> Self {
+            AxisValueRecord {
+                axis_index: orig.axis_index,
+                value: Fixed::promote(&orig.value),
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    pub(crate) struct DesignAxis {
+        pub(crate) axis_tag: Tag,
+        pub(crate) axis_name_id: NameId,
+        pub(crate) axis_ordering: u16,
+    }
+
+    impl Promote<OpentypeDesignAxis> for DesignAxis {
+        fn promote(orig: &OpentypeDesignAxis) -> Self {
+            DesignAxis {
+                axis_tag: Tag(orig.axis_tag),
+                axis_name_id: NameId::from(orig.axis_name_id),
+                axis_ordering: orig.axis_ordering,
+            }
+        }
+    }
+
+    impl Promote<OpentypeDesignAxesArray> for Vec<DesignAxis> {
+        fn promote(orig: &OpentypeDesignAxesArray) -> Self {
+            promote_vec(&orig.design_axes)
         }
     }
 }
-
-#[derive(Debug, Clone, Copy)]
-struct AxisValueFormat1 {
-    axis_index: u16,
-    flags: AxisValueFlags,
-    value_name_id: NameId,
-    value: otf_types::Fixed,
-}
-
-impl Promote<OpentypeAxisValueFormat2> for AxisValueFormat2 {
-    fn promote(orig: &OpentypeAxisValueFormat2) -> Self {
-        AxisValueFormat2 {
-            axis_index: orig.axis_index,
-            flags: AxisValueFlags::promote(&orig.flags),
-            value_name_id: NameId::from(orig.value_name_id),
-            nominal_value: otf_types::Fixed::promote(&orig.nominal_value),
-            range_min_value: otf_types::Fixed::promote(&orig.range_min_value),
-            range_max_value: otf_types::Fixed::promote(&orig.range_max_value),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-struct AxisValueFormat2 {
-    axis_index: u16,
-    flags: AxisValueFlags,
-    value_name_id: NameId,
-    nominal_value: otf_types::Fixed,
-    range_min_value: otf_types::Fixed,
-    range_max_value: otf_types::Fixed,
-}
-
-impl Promote<OpentypeAxisValueFormat3> for AxisValueFormat3 {
-    fn promote(orig: &OpentypeAxisValueFormat3) -> Self {
-        AxisValueFormat3 {
-            axis_index: orig.axis_index,
-            flags: AxisValueFlags::promote(&orig.flags),
-            value_name_id: NameId::from(orig.value_name_id),
-            value: otf_types::Fixed::promote(&orig.value),
-            linked_value: otf_types::Fixed::promote(&orig.linked_value),
-        }
-    }
-}
-#[derive(Debug, Clone, Copy)]
-struct AxisValueFormat3 {
-    axis_index: u16,
-    flags: AxisValueFlags,
-    value_name_id: NameId,
-    value: otf_types::Fixed,
-    linked_value: otf_types::Fixed,
-}
-
-pub type OpentypeAxisValueRecord = opentype_stat_axis_value_table_data_Format4_axis_values;
-
-impl Promote<OpentypeAxisValueRecord> for AxisValueRecord {
-    fn promote(orig: &OpentypeAxisValueRecord) -> Self {
-        AxisValueRecord {
-            axis_index: orig.axis_index,
-            value: otf_types::Fixed::promote(&orig.value),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-struct AxisValueRecord {
-    axis_index: u16,
-    value: otf_types::Fixed,
-}
-
-impl Promote<OpentypeAxisValueFormat4> for AxisValueFormat4 {
-    fn promote(orig: &OpentypeAxisValueFormat4) -> Self {
-        AxisValueFormat4 {
-            flags: AxisValueFlags::promote(&orig.flags),
-            value_name_id: NameId::from(orig.value_name_id),
-            axis_values: promote_vec(&orig.axis_values),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-struct AxisValueFormat4 {
-    flags: AxisValueFlags,
-    value_name_id: NameId,
-    axis_values: Vec<AxisValueRecord>,
-}
-
-impl Promote<OpentypeAxisValue> for AxisValue {
-    fn promote(orig: &OpentypeAxisValue) -> Self {
-        Self::promote(&orig.data)
-    }
-}
-
-impl Promote<OpentypeAxisValueData> for AxisValue {
-    fn promote(orig: &OpentypeAxisValueData) -> Self {
-        match orig {
-            OpentypeAxisValueData::Format1(f1) => AxisValue::Format1(AxisValueFormat1::promote(f1)),
-            OpentypeAxisValueData::Format2(f2) => AxisValue::Format2(AxisValueFormat2::promote(f2)),
-            OpentypeAxisValueData::Format3(f3) => AxisValue::Format3(AxisValueFormat3::promote(f3)),
-            OpentypeAxisValueData::Format4(f4) => AxisValue::Format4(AxisValueFormat4::promote(f4)),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-enum AxisValue {
-    Format1(AxisValueFormat1),
-    Format2(AxisValueFormat2),
-    Format3(AxisValueFormat3),
-    Format4(AxisValueFormat4),
-}
-
-pub type OpentypeDesignAxesArray = opentype_stat_design_axes_array;
-
-impl Promote<OpentypeDesignAxesArray> for Vec<DesignAxis> {
-    fn promote(orig: &OpentypeDesignAxesArray) -> Self {
-        promote_vec(&orig.design_axes)
-    }
-}
-
-pub type OpentypeDesignAxis = opentype_stat_design_axes_array_design_axes;
-
-impl Promote<OpentypeDesignAxis> for DesignAxis {
-    fn promote(orig: &OpentypeDesignAxis) -> Self {
-        DesignAxis {
-            axis_tag: Tag(orig.axis_tag),
-            axis_name_id: NameId::from(orig.axis_name_id),
-            axis_ordering: orig.axis_ordering,
-        }
-    }
-}
-#[derive(Debug, Clone, Copy)]
-struct DesignAxis {
-    axis_tag: Tag,
-    axis_name_id: NameId,
-    axis_ordering: u16,
-}
-
-impl<'a> Promote<otf_types::OpentypeStat<'a>> for StatMetrics {
-    fn promote(orig: &otf_types::OpentypeStat) -> Self {
-        let design_axes = <Vec<DesignAxis>>::promote(&fn_reify::reify(orig, obj::DAxisArray));
-        let axis_values = {
-            let axis_value_array = fn_reify::reify(orig, obj::AxisValueArr);
-            fn_reify::reify_all(&axis_value_array, obj::AxisValTbl)
-                .map(|raw| AxisValue::promote(&raw))
-                .collect()
-        };
-        StatMetrics {
-            major_version: orig.major_version,
-            minor_version: orig.minor_version,
-            design_axes,
-            axis_values,
-            elided_fallback_name_id: NameId::from(orig.elided_fallback_name_id),
-        }
-    }
-}
+pub(crate) use stat::{
+    AxisValue, AxisValueFlags, AxisValueFormat1, AxisValueFormat2, AxisValueFormat3,
+    AxisValueFormat4, AxisValueRecord, DesignAxis, StatMetrics,
+};
 
 #[derive(Clone, Debug)]
 struct HmtxMetrics(Vec<UnifiedBearing>);
@@ -7774,7 +7792,7 @@ pub struct OptionalTableMetrics {
     // STUB - add more tables as we expand opentype definition
     dsig: Option<DsigMetrics>,
     kern: Option<KernMetrics>,
-    stat: Option<Heap<StatMetrics>>,
+    stat: Option<Heap<stat::StatMetrics>>,
     vhea: Option<VheaMetrics>,
     vmtx: Option<VmtxMetrics>,
     hdmx: Option<HdmxMetrics>,
