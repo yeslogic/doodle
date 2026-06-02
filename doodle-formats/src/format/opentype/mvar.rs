@@ -25,6 +25,7 @@ pub(crate) fn table(
                         item_variation_store.call(),
                     ),
                 ),
+                // NOTE - the spec indicates that the value-record-size field must be used to determine the size of each value record, to allow for future expansion
                 (
                     "value_records",
                     repeat_count(var("value_record_count"), value_record.call()),
