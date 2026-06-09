@@ -21,5 +21,9 @@ jobs:
           toolchain: ${{ matrix.rust }}
           components: rustfmt
       - run: cargo fmt -- --check
-      - run: cargo test --workspace --exclude smallsorts --exclude analytic-engine --exclude analytic-parser
+      - name: Cargo Test
+        env:
+          RUST_BACKTRACE: 1
+          RUST_LOG: debug
+        run: cargo test --workspace --exclude smallsorts --exclude analytic-engine --exclude analytic-parser
       - run: cargo build
