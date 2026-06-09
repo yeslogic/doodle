@@ -134,6 +134,10 @@ fn do_work(iter: impl Iterator<Item = String>, conf: Config, flags: CliFlags) {
             }
         }
         for (filename, metrics) in accum {
+            let filename = std::path::Path::new(&filename)
+                .file_name()
+                .unwrap_or_else(|| std::ffi::OsStr::new(&filename))
+                .to_string_lossy();
             println!("====== [Font File]: {filename} =======");
             show_opentype_stats(&metrics, &conf);
             println!("====== END OF FONT FILE ======\n\n");
