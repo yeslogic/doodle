@@ -19,6 +19,21 @@ pub mod tiff;
 pub mod waldo;
 pub mod zlib;
 
+pub(crate) fn gzipped(gzip: FormatRef, inner_data: Format) -> Format {
+    chain(
+        gzip.call(),
+        "gzip-raw",
+        for_each(
+            var("gzip-raw"),
+            "item",
+            Format::DecodeBytes(
+                Box::new(record_lens(var("item"), &["data", "inflate"])),
+                Box::new(inner_data),
+            ),
+        ),
+    )
+}
+
 pub fn main(module: &mut FormatModule) -> FormatRef {
     let deflate = deflate::main(module);
 
@@ -40,23 +55,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
     let rle = run_length::main(module);
     let opentype = opentype::main(module);
 
-    let tgz = {
-        module.define_format(
-            "tgz.main",
-            chain(
-                gzip.call(),
-                "gzip-raw",
-                for_each(
-                    var("gzip-raw"),
-                    "item",
-                    Format::DecodeBytes(
-                        Box::new(record_lens(var("item"), &["data", "inflate"])),
-                        Box::new(tar.call()),
-                    ),
-                ),
-            ),
-        )
-    };
+    let tgz = module.define_format("tgz.main", gzipped(gzip, tar.call()));
 
     module.define_format(
         "main",
