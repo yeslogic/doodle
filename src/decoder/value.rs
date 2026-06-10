@@ -477,6 +477,38 @@ impl Value {
             (Value::Usize(l), Value::Usize(r)) => Value::Bool(__rel(rel, l, r)),
             (Value::Numeric(l), Value::Numeric(r)) => Value::Bool(TypedConst::rel(rel, &l, &r)),
             // TODO: support comparison between grammar-native machine-integers and numerics with the same rep
+            (ref left @ Value::Numeric(ref num), ref right @ Value::U8(x))
+            | (ref left @ Value::U8(x), ref right @ Value::Numeric(ref num)) => {
+                if let Ok(y) = num.get_as_unsized::<u8>() {
+                    Value::Bool(__rel(rel, x, y))
+                } else {
+                    panic!("cannot apply int-rel {rel:?} to (`{left:?}`, `{right:?}`)")
+                }
+            }
+            (ref left @ Value::Numeric(ref num), ref right @ Value::U16(x))
+            | (ref left @ Value::U16(x), ref right @ Value::Numeric(ref num)) => {
+                if let Ok(y) = num.get_as_unsized::<u16>() {
+                    Value::Bool(__rel(rel, x, y))
+                } else {
+                    panic!("cannot apply int-rel {rel:?} to (`{left:?}`, `{right:?}`)")
+                }
+            }
+            (ref left @ Value::Numeric(ref num), ref right @ Value::U32(x))
+            | (ref left @ Value::U32(x), ref right @ Value::Numeric(ref num)) => {
+                if let Ok(y) = num.get_as_unsized::<u32>() {
+                    Value::Bool(__rel(rel, x, y))
+                } else {
+                    panic!("cannot apply int-rel {rel:?} to (`{left:?}`, `{right:?}`)")
+                }
+            }
+            (ref left @ Value::Numeric(ref num), ref right @ Value::U64(x))
+            | (ref left @ Value::U64(x), ref right @ Value::Numeric(ref num)) => {
+                if let Ok(y) = num.get_as_unsized::<u64>() {
+                    Value::Bool(__rel(rel, x, y))
+                } else {
+                    panic!("cannot apply int-rel {rel:?} to (`{left:?}`, `{right:?}`)")
+                }
+            }
             (left, right) => {
                 panic!("cannot apply int-rel {rel:?} to (`{left:?}`, `{right:?}`)")
             }

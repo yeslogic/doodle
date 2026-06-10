@@ -1,3 +1,4 @@
+use std::marker::PhantomData;
 use std::{borrow::Cow, cmp::Ordering};
 
 use anyhow::{Result as AResult, anyhow};
@@ -77,6 +78,35 @@ pub enum BitWidth {
     Bits16,
     Bits32,
     Bits64,
+}
+
+macro_rules! from_proxy {
+    ( $($t:ty => $v:ident),* $(,)? ) => {
+        $(
+            impl From<std::marker::PhantomData<$t>> for MachineRep {
+                fn from(_: std::marker::PhantomData<$t>) -> Self {
+                    Self::$v
+                }
+            }
+
+            impl From<std::marker::PhantomData<$t>> for NumRep {
+                fn from(_: std::marker::PhantomData<$t>) -> Self {
+                    Self::$v
+                }
+            }
+        )*
+    };
+}
+
+from_proxy! {
+    i8 => I8,
+    i16 => I16,
+    i32 => I32,
+    i64 => I64,
+    u8 => U8,
+    u16 => U16,
+    u32 => U32,
+    u64 => U64,
 }
 
 /// Machine-representation of a numeric value, consisting of its signedness
@@ -438,6 +468,44 @@ impl TypedConst {
                 "TypedConst::as_usize: unable to convert typed-const {self:?} to usize: {e}"
             )),
         }
+    }
+
+    pub fn get_as_unsized<U>(&self) -> Result<U, anyhow::Error>
+    where
+        U: num_traits::PrimInt + num_traits::Unsigned,
+        PhantomData<U>: Into<NumRep>,
+        for<'a> &'a BigInt: TryInto<U, Error: std::error::Error + Send + Sync + 'static>,
+    {
+        let _proxy: PhantomData<U> = PhantomData;
+        let tgt = _proxy.into();
+        match self.1 {
+            n if n == tgt => {
+                if self.is_representable() {
+                    self.get_unsigned_unchecked::<U>().inspect_err(|e| {
+                        log::error!(
+                            "TypedConst::get_as_unsized: `{self:?}` supposedly representable (as {n:?}), but conversion failed: {e}"
+                        );
+                    })
+                } else {
+                    return Err(anyhow!(
+                        "TypedConst::get_as_unsized: `{self:?}` not representable (as {n:?})"
+                    ));
+                }
+            }
+            NumRep::Auto => self.get_unsigned_unchecked::<U>(),
+            other => {
+                return Err(anyhow!(
+                    "TypedConst::get_as_unsized: `{self:?}` has incompatible representation ({other:?} instead of {tgt:?})"
+                ));
+            }
+        }
+    }
+
+    fn get_unsigned_unchecked<U>(&self) -> Result<U, anyhow::Error>
+    where
+        for<'a> &'a BigInt: TryInto<U, Error: std::error::Error + Send + Sync + 'static>,
+    {
+        Ok((&self.0).try_into()?)
     }
 
     /// Attempts to coerce the value of `self` to a `u8`, checking that it is both representable,
