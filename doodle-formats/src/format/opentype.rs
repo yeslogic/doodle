@@ -609,27 +609,43 @@ pub(crate) fn table_links(
     tag: FormatRef,
     table_type: ValueType,
 ) -> FormatRef {
-    // character mapping table
+    // SECTION - required tables (https://learn.microsoft.com/en-us/typography/opentype/spec/otff#required-tables)
     let cmap_table = cmap::table(module);
     let head_table = head::table(module);
     let hhea_table = hhea::table(module);
-    let vhea_table = vhea::table(module);
-    let maxp_table = maxp::table(module);
     let hmtx_table = hmtx::table(module);
-    let vmtx_table = vmtx::table(module);
+    let maxp_table = maxp::table(module);
     let name_table = name::table(module);
     let os2_table = os2::table(module, tag);
     let post_table = post::table(module);
+    // !SECTION
+
+    // SECTION - truetype outlines (https://learn.microsoft.com/en-us/typography/opentype/spec/otff#tables-related-to-truetype-outlines)
     let cvt_table = cvt::table(module);
     let fpgm_table = fpgm::table(module);
-    let loca_table = loca::table(module);
     let glyf_table = glyf::table(module);
+    let loca_table = loca::table(module);
     let prep_table = prep::table(module);
     let gasp_table = gasp::table(module);
+    // !SECTION
+
+    // STUB - omitted section for CFF outlines (https://learn.microsoft.com/en-us/typography/opentype/spec/otff#tables-related-to-cff-outlines)
+    // STUB - omitted section for bitmap glyphs (https://learn.microsoft.com/en-us/typography/opentype/spec/otff#tables-related-to-bitmap-glyphs)
+
+    // SECTION - advanced typography (https://learn.microsoft.com/en-us/typography/opentype/spec/otff#advanced-typographic-tables)
+    // SECTION - common definitions used primarily in layout tables
     let class_def = common::class_def(module);
     let coverage_table = common::coverage_table(module);
     let device_or_variation_index_table = common::device_or_variation_index_table(module);
+    // NOTE - also used in variable font tables
     let item_variation_store = common::item_variation_store(module);
+    // !SECTION
+    let base_table = base::table(
+        module,
+        tag,
+        device_or_variation_index_table,
+        item_variation_store,
+    );
     let gdef_table = gdef::table(
         module,
         class_def,
@@ -694,23 +710,29 @@ pub(crate) fn table_links(
         subst_extension,
         feature_variations,
     );
-    let base_table = base::table(
-        module,
-        tag,
-        device_or_variation_index_table,
-        item_variation_store,
-    );
-    let kern_table = kern::table(module);
-    let stat_table = stat::table(module, tag);
+    // !SECTION
+
+    // SECTION - variable fonts (https://learn.microsoft.com/en-us/typography/opentype/spec/otff#tables-used-for-opentype-font-variations)
     let avar_table = avar::table(module);
     let fvar_table = fvar::table(module, tag);
     let gvar_table = gvar::table(module);
     let hvar_table = hvar::table(module, item_variation_store);
     let mvar_table = mvar::table(module, tag, item_variation_store);
+    let stat_table = stat::table(module, tag);
+    // !SECTION
 
+    // SECTION - color fonts (https://learn.microsoft.com/en-us/typography/opentype/spec/otff#tables-related-to-color-fonts)
+    let svg_table = svg::table(module);
+    // !SECTION
+
+    // SECTION - other opentyupe tables (https://learn.microsoft.com/en-us/typography/opentype/spec/otff#other-opentype-tables)
     let dsig_table = dsig::table(module);
     let hdmx_table = hdmx::table(module);
+    let kern_table = kern::table(module);
     let vdmx_table = vdmx::table(module);
+    let vhea_table = vhea::table(module);
+    let vmtx_table = vmtx::table(module);
+    // !SECTION
 
     module.define_format_args_views(
         "opentype.table_directory.table_links",
@@ -957,7 +979,18 @@ pub(crate) fn table_links(
                 ),
             ),
             // !SECTION
-            // STUB - add more table sections
+            // SECTION - Color Fonts
+            // STUB - add more tables
+            (
+                "svg",
+                optional_table(
+                    util::FONTVIEW_VAR,
+                    var("tables"),
+                    util::magic(b"SVG "),
+                    svg_table.call(),
+                ),
+            ),
+            // !SECTION
             // SECTION - other tables
             // STUB - add more tables
             (
@@ -1398,6 +1431,10 @@ pub(crate) mod gvar;
 pub(crate) mod hvar;
 
 pub(crate) mod mvar;
+// !SECTION
+
+// SECTION - color font tables
+pub(crate) mod svg;
 // !SECTION
 
 // ANCHOR - hdmx
