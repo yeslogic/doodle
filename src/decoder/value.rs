@@ -657,7 +657,12 @@ mod tests {
 
     #[test]
     fn u64_vs_u64() {
-        check_all_rels(&Value::U64(5), &Value::U64(10_000_000_000), 5, 10_000_000_000);
+        check_all_rels(
+            &Value::U64(5),
+            &Value::U64(10_000_000_000),
+            5,
+            10_000_000_000,
+        );
     }
 
     #[test]
