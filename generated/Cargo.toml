@@ -45,7 +45,7 @@ doodle = { path = "../", version = "0.1.0" }
 encoding = "0.2"
 clap = { version = "4.2", features = ["derive"] }
 derive_builder = "0.20.2"
-fixed = "1.28.0"
+fixed = "1.31.0"
 cfg-if = "1.0.0"
-log = "0.4.29"
+log = "0.4.32"
 stderrlog = "0.6.0"

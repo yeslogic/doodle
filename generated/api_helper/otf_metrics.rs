@@ -131,7 +131,7 @@ pub mod otf_types {
     use crate::*;
     use fixed::types::{I2F14, I16F16};
 
-    // REVIEW - no module-level definition so the name is the semi-arbitrary 'first' one the code-generator sees
+    // REVIEW - 16.16 fixed-point type has no module-level definition so the name is the semi-arbitrary 'first' one the code-generator sees
     pub type OpentypeFixed = opentype_head_table_font_revision;
 
     pub type Fixed = I16F16;
@@ -439,6 +439,25 @@ pub(crate) mod traits {
             .map(|orig| T::try_promote_view(orig, view))
             .transpose()
     }
+
+    /// Helper used for placeholder-promotions from `T` to `()`.
+    ///
+    /// Such promotion impls are used specifically for mapping certain fields
+    /// or positional/indexical elements of type `T` in a raw machine-generated type-object to
+    /// corresponding `()`-typed fields or elements in a hand-written API-layer type-object.
+    // NOTE - we can't implement generically (e.g. over all `T`) since those might clash with derived instances
+    macro_rules! promote_to_unit {
+        ( $( $x:ty ),+ $(,)? ) => {
+            $(
+                impl Promote<$x> for () { fn promote(_orig: &$x) {} }
+            )*
+        };
+    }
+
+    promote_to_unit! {
+        (),
+        u16,
+    }
 }
 use traits::{
     _Ref, FromNull, Promote, PromoteView, TryFromRef, TryPromote, TryPromoteView, promote_all,
@@ -454,7 +473,13 @@ pub mod container {
     /// Boilerplate macro for implementing `ViewFrame` for a type holding a `View`.
     ///
     /// By default, assumes the `View` is kept in a field named `table_scope`, in which case only the type-name is needed.
+    /// (i.e. `frame!(<TYPENAME>)`).
+    ///
     /// Otherwise, `frame!( <TYPENAME> . <field_ident> )` should be passed in.
+    ///
+    /// Only well-defined and syntactically valid when the type passed in has an implicit
+    /// lifetime-parameter and no other generic parameters. The identifier, without any lifetime
+    /// annotations, should be passed into this macro call.
     macro_rules! frame {
         ($ty:ident) => {
             impl<'input> $crate::api_helper::otf_metrics::container::ViewFrame<'input>
@@ -475,6 +500,7 @@ pub mod container {
             }
         };
     }
+
     /// Trait marking a type as holding a `View` that can be used for offset-parsing its direct fields (or their subtrees).
     pub trait ViewFrame<'input> {
         /// Returns the `View`-object directly held by `Self`.
@@ -483,13 +509,141 @@ pub mod container {
 
     pub use doodle::prelude::CommonObject;
 
+    /// Container-trait for types with a singular offset-field pointing to an `Obj`-value.
     pub trait SingleContainer<Obj>
     where
         Obj: CommonObject,
     {
+        /// Returns the value of the offset-field of `Self` that points to the corresponding data for `Obj`,
+        /// as a `usize`.
+        ///
+        /// This value should always be relative to the appropriate `View` for the `Self-contains-Obj` relationship,
         fn get_offset(&self) -> usize;
 
+        /// Returns the arguments that should be passed to the `Obj`-parser in order to parse the data at the
+        /// offset returned by `get_offset`.
         fn get_args(&self) -> Obj::Args<'_>;
+    }
+    /// Container-trait for types that have exactly zero or one offset-fields for a given `Obj`-type.
+    ///
+    /// Note that the optionality expressed pertains to the *field* containing the offset,
+    /// and not to the optionality of a concrete `Obj` value at such an offset. If a field
+    /// containing a possibly-null offset is always present, use [`SingleContainer<Nullable<Obj>>`]
+    /// instead.
+    pub trait OptContainer<Obj>
+    where
+        // NOTE - of the machine-types with a possibly-absent offset-field we have encountered so far, all of them point to objects with no value-dependencies for parsing.
+        // REVIEW - consider relaxing this constraint, and adding an appropriate method to retrieve the Obj::Args value.
+        Obj: for<'a> CommonObject<Args<'a> = ()>,
+    {
+        fn contains_object(&self) -> bool;
+
+        fn get_offset(&self) -> Option<usize>;
+    }
+
+    /// Container-trait for types that store a fixed number of offset-fields (and corresponding Obj-arguments) for a given `Obj`-type.
+    ///
+    /// Additionally parametric over the number of discrete offset-fields that point to `Obj`, which must be a constant value.
+    ///
+    /// Typically used for container-types that have multiple discrete offset-fields that share a common object-type.
+    pub trait MultiContainer<Obj, const N: usize>
+    where
+        Obj: CommonObject,
+    {
+        /// Returns a fixed-size array of offsets, one for each discrete offset-field that points to `Obj`.
+        ///
+        /// # Notes
+        ///
+        /// As there is no direct association of the semantics of which value-field is presented in which
+        /// index in the array, the order of the offsets must be consistently chosen and observed by callers
+        /// to ensure the correct data is being accessed.
+        ///
+        /// By convention, the order in which the corresponding fields are stored in `Self` is used as the
+        /// guidemark for the order of offsets in the array, as this is the only stable and well-defined
+        /// ordering.
+        // REVIEW - should this be replaced with a method that takes in an index-like parameter and returns a singular offset?
+        fn get_offset_array(&self) -> [usize; N];
+
+        /// Returns a fixed-size array of arguments, each one corresponding to the offset-field at the same index
+        /// in [`MultiContainer::get_offset_array`].
+        ///
+        /// # Notes
+        ///
+        /// As with [`MultiContainer::get_offset_array`], the order of the arguments must be consistently chosen,
+        /// and should typically always be the same as the order of appearance of the associated raw fields in
+        /// the type-definition of `Self`.
+        ///
+        /// If `Obj::Args` happens to be `()`, this requirement is vacuous.
+        fn get_args_array(&self) -> [Obj::Args<'_>; N];
+    }
+
+    /// Container-trait for types that store a dynamic number of offsets, most often in cases where a non-constant-length
+    /// vector-of-offsets is held by `Self`.
+    ///
+    /// May also apply to enums whose individual variants do not consistently store the same number of
+    /// offset-fields.
+    ///
+    /// The associated pragmatics differ from [`MultiContainer`], where successive offset-fields usually
+    /// indicate different discrete data-fields in `Self` that happen to share an `Obj`-type. This trait
+    /// typically indicates a single field that contains an array-of-offsets pointing to `Obj`-values.
+    pub trait DynContainer<Obj>
+    where
+        Obj: CommonObject,
+    {
+        /// Returns the exact element-count of the offset-container stored in `self`.
+        fn count(&self) -> usize;
+
+        /// Returns an iterator that yields each offset in the container, in the order in which they are stored.
+        fn iter_offsets(&self) -> impl Iterator<Item = usize>;
+
+        /// Returns an iterator that yields the per-offset arguments, which may sometimes be a fixed
+        /// value repeated for each offset in the container.
+        fn iter_args(&self) -> impl Iterator<Item = Obj::Args<'_>>;
+    }
+
+    /// Container-trait for types that store a fixed number of offset-arrays.
+    ///
+    /// [`MultiDynContainer`] is to [`DynContainer`] as [`MultiContainer`] is to [`SingleContainer`];
+    /// namely, it represents a subset of `N` discrete fields that each store a dynamic array
+    /// of offset-values.
+    pub trait MultiDynContainer<Obj, const N: usize>
+    where
+        Obj: CommonObject,
+    {
+        /// Returns an array containing the exact element-count of each offset-array stored in `self`,
+        /// in a consistent order to the indexing used for [`MultiDynContainer::iter_offsets_at_index`].
+        ///
+        /// For each index `ix`, `counts[ix]` is the element-count of the array whose iterator is
+        /// yielded by `self.iter_offsets_at_index(ix)`.
+        fn counts(&self) -> [usize; N];
+
+        /// Returns an iterator over the offset-array at logical index `ix` within the structure of `self`,
+        /// adhering to the same ordering convention used for [`MultiDynContainer::counts`].
+        fn iter_offsets_at_index(&self, ix: usize) -> impl Iterator<Item = usize>;
+
+        /// Returns an iterator that yields the per-offset arguments, which might be a fixed value repeated
+        /// for each offset in the container.
+        fn iter_args_at_index(&self, ix: usize) -> impl Iterator<Item = Obj::Args<'_>>;
+    }
+
+    /// Conntainer trait for types that logically hold up to `N` offset-fields to `Obj`-values,
+    /// at least one of which is not guaranteed to always be present.
+    pub trait MultiOptContainer<Obj, const N: usize>
+    where
+        // NOTE - of the machine-types with a possibly-absent offset-field we have encountered so far, all of them point to objects with no value-dependencies for parsing.
+        // REVIEW - consider relaxing this constraint, and adding an appropriate method to retrieve the Obj::Args value.
+        Obj: for<'a> CommonObject<Args<'a> = ()>,
+    {
+        /// Returns `true` if the offset-field at logical index `ix` is present, and `false` otherwise.
+        ///
+        /// The indices are fixed based on the static definition of the type, rather than the subset of
+        /// such fields that `self` actually contains.
+        fn has_index(&self, ix: usize) -> bool {
+            self.get_offset_at_index(ix).is_some()
+        }
+
+        /// Given an index `ix`, returns the offset-value stored when the corresponding field is present, or `None` otherwise.
+        fn get_offset_at_index(&self, ix: usize) -> Option<usize>;
     }
 
     impl<Con, Obj> MultiContainer<Obj, 1> for Con
@@ -504,60 +658,6 @@ pub mod container {
         fn get_args_array(&self) -> [Obj::Args<'_>; 1] {
             [self.get_args()]
         }
-    }
-
-    pub trait OptContainer<Obj>
-    where
-        // REVIEW - consider relaxing this constraint in future
-        Obj: for<'a> CommonObject<Args<'a> = ()>,
-    {
-        fn contains_object(&self) -> bool;
-
-        fn get_offset(&self) -> Option<usize>;
-    }
-
-    pub trait MultiContainer<Obj, const N: usize>
-    where
-        Obj: CommonObject,
-    {
-        fn get_offset_array(&self) -> [usize; N];
-
-        fn get_args_array(&self) -> [Obj::Args<'_>; N];
-    }
-
-    pub trait DynContainer<Obj>
-    where
-        Obj: CommonObject,
-    {
-        fn count(&self) -> usize;
-
-        fn iter_offsets(&self) -> impl Iterator<Item = usize>;
-
-        fn iter_args(&self) -> impl Iterator<Item = Obj::Args<'_>>;
-    }
-
-    pub trait MultiDynContainer<Obj, const N: usize>
-    where
-        Obj: CommonObject,
-    {
-        fn counts(&self) -> [usize; N];
-
-        fn iter_offsets_at_index(&self, ix: usize) -> impl Iterator<Item = usize>;
-
-        fn iter_args_at_index(&self, ix: usize) -> impl Iterator<Item = Obj::Args<'_>>;
-    }
-
-    pub trait MultiOptContainer<Obj, const N: usize>
-    where
-        // REVIEW - consider relaxing this constraint in future
-        // TODO: if this constraint is removed, add a method to query arguments
-        Obj: for<'a> CommonObject<Args<'a> = ()>,
-    {
-        fn has_index(&self, ix: usize) -> bool {
-            self.get_offset_at_index(ix).is_some()
-        }
-
-        fn get_offset_at_index(&self, ix: usize) -> Option<usize>;
     }
 
     /// Wrapper type for CommonObject artifacts for offsets that are intended to be nullable (which yields Option<T::Output>)
@@ -3425,143 +3525,151 @@ impl Promote<Vec<u8>> for ReflType<PrepMetrics, FpgmMetrics> {
     }
 }
 
-alias! {
-    pub type OpentypeGlyfEntry = opentype_glyf_table_glyphs;
+pub mod otf_glyf {
+    use super::otf_types::OpentypeGlyf;
+    use super::{container, obj};
 
-    pub type OpentypeGlyph = opentype_glyf_table_glyphs_Glyph;
+    alias! {
+        pub type OpentypeGlyfEntry = opentype_glyf_table_glyphs;
 
-    pub type GlyphHeader = opentype_glyf_entry;
+        pub type OpentypeGlyph = opentype_glyf_table_glyphs_Glyph;
 
-    pub type SimpleGlyph = opentype_glyf_simple;
+        pub type GlyphHeader = opentype_glyf_entry;
 
-    pub type GlyphDescription = opentype_glyf_description;
+        pub type SimpleGlyph = opentype_glyf_simple;
+
+        pub type GlyphDescription = opentype_glyf_description;
+    }
+
+    frame!(OpentypeGlyf);
+
+    impl container::SingleContainer<obj::GlyphHdr> for OpentypeGlyph {
+        fn get_offset(&self) -> usize {
+            self.offset as usize
+        }
+
+        fn get_args(&self) -> () {}
+    }
+
+    impl container::OptContainer<obj::GlyphHdr> for OpentypeGlyfEntry {
+        fn contains_object(&self) -> bool {
+            matches!(self, OpentypeGlyfEntry::Glyph(..))
+        }
+
+        fn get_offset(&self) -> Option<usize> {
+            match self {
+                OpentypeGlyfEntry::EmptyGlyph => None,
+                OpentypeGlyfEntry::Glyph(glyf_entry) => {
+                    Some(container::SingleContainer::get_offset(glyf_entry))
+                }
+            }
+        }
+    }
 }
+pub use otf_glyf::*;
 
 mod glyf {
-    use super::GlyphMetric;
+    use super::container::ViewFrame as _;
+    use super::*;
 
     #[derive(Clone, Debug)]
     pub struct GlyfMetrics {
         pub(crate) num_glyphs: usize,
         pub(crate) glyphs: Vec<GlyphMetric>,
     }
-}
-pub(crate) use glyf::GlyfMetrics;
 
-frame!(OpentypeGlyf);
-
-impl<'a> Promote<otf_types::OpentypeGlyf<'a>> for GlyfMetrics {
-    fn promote(orig: &otf_types::OpentypeGlyf<'a>) -> Self {
-        Self {
-            num_glyphs: orig.glyphs.len(),
-            glyphs: promote_vec_view(&orig.glyphs, container::ViewFrame::scope(orig))
-                .expect("bad parse"),
-        }
-    }
-}
-
-impl container::SingleContainer<obj::GlyphHdr> for OpentypeGlyph {
-    fn get_offset(&self) -> usize {
-        self.offset as usize
-    }
-
-    fn get_args(&self) -> () {}
-}
-
-impl container::OptContainer<obj::GlyphHdr> for OpentypeGlyfEntry {
-    fn contains_object(&self) -> bool {
-        matches!(self, OpentypeGlyfEntry::Glyph(..))
-    }
-
-    fn get_offset(&self) -> Option<usize> {
-        match self {
-            OpentypeGlyfEntry::EmptyGlyph => None,
-            OpentypeGlyfEntry::Glyph(glyf_entry) => {
-                Some(container::SingleContainer::get_offset(glyf_entry))
+    impl<'a> Promote<OpentypeGlyf<'a>> for GlyfMetrics {
+        fn promote(orig: &OpentypeGlyf<'a>) -> Self {
+            Self {
+                num_glyphs: orig.glyphs.len(),
+                glyphs: promote_vec_view(&orig.glyphs, orig.scope()).expect("bad parse"),
             }
         }
     }
-}
 
-impl PromoteView<OpentypeGlyfEntry> for GlyphMetric {
-    fn promote_view(orig: &OpentypeGlyfEntry, view: View<'_>) -> PResult<Self> {
-        if let Some(raw) = fn_reify::reify_opt_dep(view, orig, obj::GlyphHdr) {
-            Ok(GlyphMetric::promote(&raw?))
-        } else {
-            Ok(GlyphMetric::Empty)
-        }
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    pub enum GlyphMetric {
+        Empty,
+        Simple(SimpleGlyphMetric),
+        Composite(CompositeGlyphMetric),
     }
-}
 
-impl Promote<GlyphHeader> for GlyphMetric {
-    fn promote(orig: &GlyphHeader) -> Self {
-        match &orig.description {
-            GlyphDescription::HeaderOnly => GlyphMetric::Empty,
-            GlyphDescription::Simple(simple) => {
-                let contours = orig.number_of_contours as usize;
-                let coordinates = *simple.end_points_of_contour.last().unwrap() as usize + 1;
-                let instructions = simple.instruction_length as usize;
-                let bounding_box = bounding_box(orig);
-                GlyphMetric::Simple(SimpleGlyphMetric {
-                    contours,
-                    coordinates,
-                    instructions,
-                    bounding_box,
-                })
-            }
-            GlyphDescription::Composite(comp) => {
-                let components = comp.glyphs.len();
-                let instructions = comp.instructions.len();
-                let bounding_box = bounding_box(orig);
-                GlyphMetric::Composite(CompositeGlyphMetric {
-                    components,
-                    instructions,
-                    bounding_box,
-                })
+    impl PromoteView<OpentypeGlyfEntry> for GlyphMetric {
+        fn promote_view(orig: &OpentypeGlyfEntry, view: View<'_>) -> PResult<Self> {
+            if let Some(raw) = fn_reify::reify_opt_dep(view, orig, obj::GlyphHdr) {
+                Ok(GlyphMetric::promote(&raw?))
+            } else {
+                Ok(GlyphMetric::Empty)
             }
         }
     }
-}
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum GlyphMetric {
-    Empty,
-    Simple(SimpleGlyphMetric),
-    Composite(CompositeGlyphMetric),
-}
+    impl Promote<GlyphHeader> for GlyphMetric {
+        fn promote(orig: &GlyphHeader) -> Self {
+            match &orig.description {
+                GlyphDescription::HeaderOnly => GlyphMetric::Empty,
+                GlyphDescription::Simple(simple) => {
+                    let contours = orig.number_of_contours as usize;
+                    let coordinates = *simple.end_points_of_contour.last().unwrap() as usize + 1;
+                    let instructions = simple.instruction_length as usize;
+                    let bounding_box = bounding_box(orig);
+                    GlyphMetric::Simple(SimpleGlyphMetric {
+                        contours,
+                        coordinates,
+                        instructions,
+                        bounding_box,
+                    })
+                }
+                GlyphDescription::Composite(comp) => {
+                    let components = comp.glyphs.len();
+                    let instructions = comp.instructions.len();
+                    let bounding_box = bounding_box(orig);
+                    GlyphMetric::Composite(CompositeGlyphMetric {
+                        components,
+                        instructions,
+                        bounding_box,
+                    })
+                }
+            }
+        }
+    }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct SimpleGlyphMetric {
-    contours: usize,
-    coordinates: usize,
-    instructions: usize,
-    bounding_box: BoundingBox,
-}
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    pub struct SimpleGlyphMetric {
+        pub(crate) contours: usize,
+        pub(crate) coordinates: usize,
+        pub(crate) instructions: usize,
+        pub(crate) bounding_box: BoundingBox,
+    }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct CompositeGlyphMetric {
-    components: usize,
-    instructions: usize,
-    bounding_box: BoundingBox,
-}
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    pub struct CompositeGlyphMetric {
+        pub(crate) components: usize,
+        pub(crate) instructions: usize,
+        pub(crate) bounding_box: BoundingBox,
+    }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct BoundingBox {
-    x_min: i16,
-    y_min: i16,
-    x_max: i16,
-    y_max: i16,
-}
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    pub struct BoundingBox {
+        pub(crate) x_min: i16,
+        pub(crate) y_min: i16,
+        pub(crate) x_max: i16,
+        pub(crate) y_max: i16,
+    }
 
-impl std::fmt::Display for BoundingBox {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "[({}, {}) <-> ({}, {})]",
-            self.x_min, self.y_min, self.x_max, self.y_max
-        )
+    impl std::fmt::Display for BoundingBox {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(
+                f,
+                "[({}, {}) <-> ({}, {})]",
+                self.x_min, self.y_min, self.x_max, self.y_max
+            )
+        }
     }
 }
+pub(crate) use glyf::{
+    BoundingBox, CompositeGlyphMetric, GlyfMetrics, GlyphMetric, SimpleGlyphMetric,
+};
 
 type LocaMetrics = ();
 
@@ -3575,7 +3683,7 @@ pub(crate) mod otf_gasp {
 }
 pub(crate) use otf_gasp::*;
 
-mod gasp {
+pub(crate) mod gasp {
     use super::*;
 
     pub type GaspBehaviorFlags = OpentypeGaspBehaviorVer1Flags;
@@ -3634,147 +3742,30 @@ mod gasp {
 }
 pub(crate) use gasp::{GaspBehaviorFlags, GaspMetrics, GaspRange};
 
-pub(crate) type CoverageRangeRecord = RangeRecord<u16>;
-
-impl Promote<OpentypeCoverageRangeRecord> for CoverageRangeRecord {
-    fn promote(orig: &OpentypeCoverageRangeRecord) -> Self {
-        RangeRecord {
-            start_glyph_id: orig.start_glyph_id,
-            end_glyph_id: orig.end_glyph_id,
-            value: orig.start_coverage_index,
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub(crate) enum CoverageTable {
-    Format1 {
-        glyph_array: Vec<u16>,
-    }, // Individual glyph indices
-    Format2 {
-        range_records: Vec<CoverageRangeRecord>,
-    }, // Range of glyphs
-}
-
-impl CoverageTable {
-    pub(crate) fn iter(&self) -> Box<dyn Iterator<Item = u16> + '_> {
-        match self {
-            CoverageTable::Format1 { glyph_array } => Box::new(glyph_array.iter().copied()),
-            CoverageTable::Format2 { range_records } => Box::new(
-                range_records
-                    .iter()
-                    .flat_map(|rr| rr.start_glyph_id..=rr.end_glyph_id),
-            ),
-        }
-    }
-}
-
-impl FromNull for CoverageTable {
-    fn from_null() -> Self {
-        // REVIEW - in practice, we could also pick Format2 instead, but Format1 is simpler...
-        CoverageTable::Format1 {
-            glyph_array: Vec::new(),
-        }
-    }
-}
-
-impl Promote<OpentypeCoverageTable> for CoverageTable {
-    fn promote(orig: &OpentypeCoverageTable) -> Self {
-        Self::promote(&orig.data)
-    }
-}
-
-impl Promote<OpentypeCoverageTableData> for CoverageTable {
-    fn promote(orig: &OpentypeCoverageTableData) -> Self {
-        match orig {
-            OpentypeCoverageTableData::Format1(opentype_coverage_table_data_Format1 {
-                glyph_array,
-                ..
-            }) => Self::Format1 {
-                glyph_array: glyph_array.clone(),
-            },
-            OpentypeCoverageTableData::Format2(opentype_coverage_table_data_Format2 {
-                range_records,
-                ..
-            }) => Self::Format2 {
-                range_records: promote_vec(range_records),
-            },
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-struct MarkGlyphSet {
-    format: u16,
-    mark_glyph_set_count: usize,
-    coverage: Vec<Option<CoverageTable>>,
-}
-
-type OpentypeMarkGlyphSet<'a> = opentype_gdef_mark_glyph_set<'a>;
-
-impl<'input> container::DynContainer<Nullable<obj::CovTable>> for OpentypeMarkGlyphSet<'input> {
-    fn count(&self) -> usize {
-        self.mark_glyph_set_count as usize
-    }
-
-    fn iter_offsets(&self) -> impl Iterator<Item = usize> {
-        self.coverage.iter().map(|off| off.offset as usize)
-    }
-
-    fn iter_args(&self) -> impl Iterator<Item = ()> {
-        std::iter::repeat(())
-    }
-}
-
-frame!(OpentypeMarkGlyphSet);
-
-impl<'a> TryPromote<OpentypeMarkGlyphSet<'a>> for MarkGlyphSet {
-    type Error = Local<UnknownValueError<u16>>;
-
-    fn try_promote(orig: &OpentypeMarkGlyphSet) -> Result<Self, Self::Error> {
-        match orig.format {
-            1 => {
-                let coverage = fn_reify::reify_all(orig, Nullable(obj::CovTable))
-                    .map(|raw| raw.as_ref().map(CoverageTable::promote))
-                    .collect();
-                Ok(MarkGlyphSet {
-                    format: 1,
-                    mark_glyph_set_count: orig.mark_glyph_set_count as usize,
-                    coverage,
-                })
-            }
-            n => Err(UnknownValueError {
-                what: String::from("MarkGlyphSets table format"),
-                bad_value: n,
-            }),
-        }
-    }
-}
-
 pub type OpentypeRegionAxisCoordinates =
     opentype_common_variation_region_list_variation_regions_region_axes;
 #[derive(Debug, Clone, Copy)]
-struct RegionAxisCoordinates {
-    start_coord: otf_types::F2Dot14,
-    peak_coord: otf_types::F2Dot14,
-    end_coord: otf_types::F2Dot14,
+pub struct RegionAxisCoordinates {
+    pub(crate) start_coord: F2Dot14,
+    pub(crate) peak_coord: F2Dot14,
+    pub(crate) end_coord: F2Dot14,
 }
 
 impl Promote<OpentypeRegionAxisCoordinates> for RegionAxisCoordinates {
     fn promote(orig: &OpentypeRegionAxisCoordinates) -> Self {
         RegionAxisCoordinates {
-            start_coord: otf_types::F2Dot14::promote(&orig.start_coord),
-            peak_coord: otf_types::F2Dot14::promote(&orig.peak_coord),
-            end_coord: otf_types::F2Dot14::promote(&orig.end_coord),
+            start_coord: F2Dot14::promote(&orig.start_coord),
+            peak_coord: F2Dot14::promote(&orig.peak_coord),
+            end_coord: F2Dot14::promote(&orig.end_coord),
         }
     }
 }
 
 pub type OpentypeVariationRegionList = opentype_common_variation_region_list;
 
-// TODO[epic=api-refinement] - replace vec<vec<_>> with Wec<_>
+// TODO[epic=api-refinement] - replace Vec<Vec<_>> with Wec<_>
 #[derive(Debug, Clone, Default)]
-struct VariationRegionList(Vec<Vec<RegionAxisCoordinates>>);
+pub struct VariationRegionList(pub(crate) Vec<Vec<RegionAxisCoordinates>>);
 
 impl Promote<OpentypeVariationRegionList> for VariationRegionList {
     fn promote(orig: &OpentypeVariationRegionList) -> Self {
@@ -3824,7 +3815,7 @@ impl Promote<OpentypeDeltaSets> for DeltaSets {
 pub type Deltas<Full, Half> = (Vec<Full>, Vec<Half>);
 
 #[derive(Debug, Clone)]
-enum DeltaSets {
+pub enum DeltaSets {
     Delta16Sets(Vec<Deltas<i16, i8>>),
     Delta32Sets(Vec<Deltas<i32, i16>>),
 }
@@ -3902,269 +3893,260 @@ impl<'a> Promote<OpentypeItemVariationStore<'a>> for ItemVariationStore {
     }
 }
 
-// STUB - this represents the fact that we only record but do not interpret the offset for the ItemVariationStore in the current OpenType implementation
 #[derive(Clone, Debug)]
-pub(crate) struct ItemVariationStore {
-    variation_region_list: VariationRegionList,
-    item_variation_data_list: Vec<Option<ItemVariationData>>,
+pub struct ItemVariationStore {
+    pub(crate) variation_region_list: VariationRegionList,
+    pub(crate) item_variation_data_list: Vec<Option<ItemVariationData>>,
 }
 
-// Helper for dummy promotions for unit model-types from arbitrary fixed preimage-types
-// NOTE - we can't implement generically (e.g. over all `T`) since those might clash with derived instances
-macro_rules! promote_to_unit {
-    ( $( $x:ty ),+ $(,)? ) => {
-        $(
-            impl Promote<$x> for () { fn promote(_orig: &$x) {} }
-        )*
-    };
-}
-
-promote_to_unit! {
-    (),
-    u16,
-}
-
-pub type OpentypeGdefData1Dot2<'a> = opentype_gdef_table_data_Version1_2<'a>;
-
-impl<'a> container::SingleContainer<Nullable<obj::MarkGlSet>> for OpentypeGdefData1Dot2<'a> {
-    fn get_offset(&self) -> usize {
-        self.mark_glyph_sets_def.offset as usize
-    }
-
-    fn get_args(&self) {}
-}
-pub type OpentypeGdefData1Dot3<'a> = opentype_gdef_table_data_Version1_3<'a>;
-
-impl<'a> container::SingleContainer<Nullable<obj::MarkGlSet>> for OpentypeGdefData1Dot3<'a> {
-    fn get_offset(&self) -> usize {
-        self.mark_glyph_sets_def.offset as usize
-    }
-
-    fn get_args(&self) {}
-}
-
-impl<'a> container::SingleContainer<Nullable<obj::ItemVarStore>> for OpentypeGdefData1Dot3<'a> {
-    fn get_offset(&self) -> usize {
-        self.item_var_store.offset as usize
-    }
-
-    fn get_args(&self) {}
-}
-
-impl<'a> TryPromoteView<OpentypeGdefTableData<'a>> for GdefTableDataMetrics {
-    type Error<'input>
-        = ReflType<TPErr<OpentypeMarkGlyphSet<'input>, MarkGlyphSet>, UnknownValueError<u16>>
-    where
-        'a: 'input;
-
-    fn try_promote_view<'input>(
-        orig: &'input OpentypeGdefTableData<'a>,
-        view: View<'input>,
-    ) -> Result<Self, value_parse::ValueParseError<Self::Error<'input>>>
-    where
-        'a: 'input,
-    {
-        Ok(match orig {
-            OpentypeGdefTableData::Version1_0 => Self::default(),
-            OpentypeGdefTableData::Version1_2(inner) => {
-                let mark_glyph_sets_def =
-                    try_promote_opt(&fn_reify::reify_dep(view, inner, Nullable(obj::MarkGlSet))?)
-                        .map_err(value_parse::ValueParseError::value)?;
-                GdefTableDataMetrics {
-                    mark_glyph_sets_def,
-                    item_var_store: None,
-                }
-            }
-            OpentypeGdefTableData::Version1_3(inner) => {
-                let mark_glyph_sets_def =
-                    try_promote_opt(&fn_reify::reify_dep(view, inner, Nullable(obj::MarkGlSet))?)
-                        .map_err(value_parse::ValueParseError::value)?;
-                let item_var_store = promote_opt(&fn_reify::reify_dep(
-                    view,
-                    inner,
-                    Nullable(obj::ItemVarStore),
-                )?);
-
-                GdefTableDataMetrics {
-                    mark_glyph_sets_def,
-                    item_var_store,
-                }
-            }
-        })
+pub mod otf_layout_common {
+    alias! {
+        pub type OpentypeClassDef = opentype_class_def;
+        pub type OpentypeClassDefData = opentype_class_def_data;
+        pub type OpentypeClassDefFormat1 = opentype_class_def_data_Format1;
+        pub type OpentypeClassDefFormat2 = opentype_class_def_data_Format2;
+        pub type OpentypeClassRangeRecord = opentype_class_def_data_Format2_class_range_records;
     }
 }
+pub use otf_layout_common::*;
 
-#[derive(Clone, Debug, Default)]
-struct GdefTableDataMetrics {
-    mark_glyph_sets_def: Option<MarkGlyphSet>,
-    item_var_store: Option<ItemVariationStore>,
-}
+pub(crate) mod layout_common {
+    use super::*;
 
-/**
-```ignore
-   0 <=> No Glyph Class assigned (implicit default)
-   1 <=> Base glyph (single character, spacing glyph)
-   2 <=> Ligature glyph (multiple character, spacing glyph)
-   3 <=> Mark glyph (non-spacing combining glyph)
-   4 <=> Component glyph (part of a single character, spacing glyph)
-```
-*/
-pub type GlyphClass = u16; // REVIEW - consider replacing with semantically distinguished const-enum
-
-fn format_glyph_class(gc: &GlyphClass) -> &'static str {
-    // REVIEW - to the extent we present this info, decide whether to include semantics, numerals, or both
-    match gc {
-        0 => "0(none)",
-        1 => "1(base)",
-        2 => "2(liga)",
-        3 => "3(mark)",
-        4 => "4(comp)",
-        _ => unreachable!("Unexpected glyph class value: {}", gc),
+    #[derive(Clone, Debug)]
+    pub enum ClassDef {
+        Format1 {
+            start_glyph_id: u16,
+            class_value_array: Vec<u16>,
+        },
+        Format2 {
+            class_range_records: Vec<ClassRangeRecord>,
+        },
     }
-}
 
-#[derive(Clone, Debug)]
-pub enum ClassDef {
-    Format1 {
-        start_glyph_id: u16,
-        class_value_array: Vec<u16>,
-    },
-    Format2 {
-        class_range_records: Vec<ClassRangeRecord>,
-    },
-}
-
-impl ClassDef {
-    /// Checks that the number of classes described by `self` is exactly `expected_classes`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the number of classes does not match `expected_classes`.
-    pub(crate) fn validate_class_count(&self, expected_classes: usize) {
-        match self {
+    impl Default for ClassDef {
+        fn default() -> Self {
             ClassDef::Format1 {
-                class_value_array,
-                start_glyph_id: _start_id,
-            } => {
-                let max = expected_classes as u16;
-                let mut actual_set = U16Set::new();
-                actual_set.insert(0);
-                for (_ix, value) in class_value_array.iter().enumerate() {
-                    if *value >= max {
-                        panic!(
-                            "expecting {expected_classes} starting at 0, found ClassValue {value} (>= {max}) at index {_ix} (glyph id: {})",
-                            *_start_id + _ix as u16
-                        );
-                    }
-                    let _ = actual_set.insert(*value);
-                }
-                assert_eq!(
-                    actual_set.len(),
-                    expected_classes,
-                    "expected to find {expected_classes} ClassDefs, found {}-element set {:?}",
-                    actual_set.len(),
-                    actual_set
-                );
-            }
-            ClassDef::Format2 {
-                class_range_records,
-            } => {
-                let max = expected_classes as u16;
-                let mut actual_set = U16Set::new();
-                actual_set.insert(0);
-                for (_ix, rr) in class_range_records.iter().enumerate() {
-                    let value = rr.value;
-                    if value >= max {
-                        panic!(
-                            "expecting {expected_classes} starting at 0, found ClassValue {value} (>= {max}) at index {_ix} (glyph range: {} -> {})",
-                            rr.start_glyph_id, rr.end_glyph_id
-                        );
-                    }
-                    let _ = actual_set.insert(value);
-                }
-                assert_eq!(
-                    actual_set.len(),
-                    expected_classes,
-                    "expected to find {expected_classes} ClassDefs, found {}-element set {:?}",
-                    actual_set.len(),
-                    actual_set
-                );
+                start_glyph_id: 0,
+                class_value_array: Vec::new(),
             }
         }
     }
-}
 
-impl FromNull for ClassDef {
-    fn from_null() -> Self {
-        ClassDef::Format1 {
-            start_glyph_id: 0,
-            class_value_array: Vec::new(),
+    impl ClassDef {
+        /// Checks that the number of classes described by `self` is exactly `expected_classes`.
+        ///
+        /// # Panics
+        ///
+        /// Panics if the number of classes does not match `expected_classes`.
+        pub(crate) fn validate_class_count(&self, expected_classes: usize) {
+            match self {
+                ClassDef::Format1 {
+                    class_value_array,
+                    start_glyph_id: _start_id,
+                } => {
+                    let max = expected_classes as u16;
+                    let mut actual_set = U16Set::new();
+                    actual_set.insert(0);
+                    for (_ix, value) in class_value_array.iter().enumerate() {
+                        if *value >= max {
+                            panic!(
+                                "expecting {expected_classes} starting at 0, found ClassValue {value} (>= {max}) at index {_ix} (glyph id: {})",
+                                *_start_id + _ix as u16
+                            );
+                        }
+                        let _ = actual_set.insert(*value);
+                    }
+                    assert_eq!(
+                        actual_set.len(),
+                        expected_classes,
+                        "expected to find {expected_classes} ClassDefs, found {}-element set {:?}",
+                        actual_set.len(),
+                        actual_set
+                    );
+                }
+                ClassDef::Format2 {
+                    class_range_records,
+                } => {
+                    let max = expected_classes as u16;
+                    let mut actual_set = U16Set::new();
+                    actual_set.insert(0);
+                    for (_ix, rr) in class_range_records.iter().enumerate() {
+                        let value = rr.value;
+                        if value >= max {
+                            panic!(
+                                "expecting {expected_classes} starting at 0, found ClassValue {value} (>= {max}) at index {_ix} (glyph range: {} -> {})",
+                                rr.start_glyph_id, rr.end_glyph_id
+                            );
+                        }
+                        let _ = actual_set.insert(value);
+                    }
+                    assert_eq!(
+                        actual_set.len(),
+                        expected_classes,
+                        "expected to find {expected_classes} ClassDefs, found {}-element set {:?}",
+                        actual_set.len(),
+                        actual_set
+                    );
+                }
+            }
+        }
+    }
+
+    impl Promote<OpentypeClassDef> for ClassDef {
+        fn promote(orig: &OpentypeClassDef) -> Self {
+            Self::promote(&orig.data)
+        }
+    }
+
+    impl Promote<OpentypeClassDefData> for ClassDef {
+        fn promote(orig: &OpentypeClassDefData) -> Self {
+            match *orig {
+                OpentypeClassDefData::Format1(OpentypeClassDefFormat1 {
+                    start_glyph_id,
+                    ref class_value_array,
+                    ..
+                }) => ClassDef::Format1 {
+                    start_glyph_id,
+                    class_value_array: class_value_array.clone(),
+                },
+                OpentypeClassDefData::Format2(OpentypeClassDefFormat2 {
+                    ref class_range_records,
+                    ..
+                }) => ClassDef::Format2 {
+                    class_range_records: promote_vec(class_range_records),
+                },
+            }
+        }
+    }
+
+    /**
+    ```ignore
+       0 <=> No Glyph Class assigned (implicit default)
+       1 <=> Base glyph (single character, spacing glyph)
+       2 <=> Ligature glyph (multiple character, spacing glyph)
+       3 <=> Mark glyph (non-spacing combining glyph)
+       4 <=> Component glyph (part of a single character, spacing glyph)
+    ```
+    */
+    pub type GlyphClass = u16; // REVIEW - consider replacing with semantically distinguished const-enum
+
+    pub fn format_glyph_class(gc: &GlyphClass) -> &'static str {
+        // REVIEW - to the extent we present this info, decide whether to include semantics, numerals, or both
+        match gc {
+            0 => "0(none)",
+            1 => "1(base)",
+            2 => "2(liga)",
+            3 => "3(mark)",
+            4 => "4(comp)",
+            _ => unreachable!("Unexpected glyph class value: {}", gc),
+        }
+    }
+
+    #[derive(Clone, Copy, Debug)]
+    pub struct RangeRecord<T> {
+        pub start_glyph_id: u16,
+        pub end_glyph_id: u16,
+        pub(crate) value: T,
+    }
+
+    pub type ClassRangeRecord = RangeRecord<GlyphClass>;
+
+    impl Promote<OpentypeClassRangeRecord> for ClassRangeRecord {
+        fn promote(orig: &OpentypeClassRangeRecord) -> Self {
+            RangeRecord {
+                start_glyph_id: orig.start_glyph_id,
+                end_glyph_id: orig.end_glyph_id,
+                value: orig.class,
+            }
+        }
+    }
+
+    pub type CoverageRangeRecord = RangeRecord<u16>;
+
+    impl Promote<OpentypeCoverageRangeRecord> for CoverageRangeRecord {
+        fn promote(orig: &OpentypeCoverageRangeRecord) -> Self {
+            RangeRecord {
+                start_glyph_id: orig.start_glyph_id,
+                end_glyph_id: orig.end_glyph_id,
+                value: orig.start_coverage_index,
+            }
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    pub enum CoverageTable {
+        Format1 {
+            /// Array of individual glyph-ids
+            glyph_array: Vec<u16>,
+        },
+        Format2 {
+            /// Array of ranges of glyph-ids
+            range_records: Vec<CoverageRangeRecord>,
+        },
+    }
+
+    impl Default for CoverageTable {
+        fn default() -> Self {
+            CoverageTable::Format1 {
+                glyph_array: Vec::new(),
+            }
+        }
+    }
+
+    impl CoverageTable {
+        pub fn iter(&self) -> Box<dyn Iterator<Item = u16> + '_> {
+            match self {
+                CoverageTable::Format1 { glyph_array } => Box::new(glyph_array.iter().copied()),
+                CoverageTable::Format2 { range_records } => Box::new(
+                    range_records
+                        .iter()
+                        .flat_map(|rr| rr.start_glyph_id..=rr.end_glyph_id),
+                ),
+            }
+        }
+    }
+
+    impl Promote<OpentypeCoverageTable> for CoverageTable {
+        fn promote(orig: &OpentypeCoverageTable) -> Self {
+            Self::promote(&orig.data)
+        }
+    }
+
+    impl Promote<OpentypeCoverageTableData> for CoverageTable {
+        fn promote(orig: &OpentypeCoverageTableData) -> Self {
+            match orig {
+                OpentypeCoverageTableData::Format1(opentype_coverage_table_data_Format1 {
+                    glyph_array,
+                    ..
+                }) => Self::Format1 {
+                    glyph_array: glyph_array.clone(),
+                },
+                OpentypeCoverageTableData::Format2(opentype_coverage_table_data_Format2 {
+                    range_records,
+                    ..
+                }) => Self::Format2 {
+                    range_records: promote_vec(range_records),
+                },
+            }
         }
     }
 }
-
-#[derive(Clone, Copy, Debug)]
-pub struct RangeRecord<T> {
-    start_glyph_id: u16,
-    end_glyph_id: u16,
-    value: T,
-}
-
-pub type ClassRangeRecord = RangeRecord<GlyphClass>;
-
-pub type OpentypeClassRangeRecord = opentype_class_def_data_Format2_class_range_records;
-
-impl Promote<OpentypeClassRangeRecord> for ClassRangeRecord {
-    fn promote(orig: &OpentypeClassRangeRecord) -> Self {
-        RangeRecord {
-            start_glyph_id: orig.start_glyph_id,
-            end_glyph_id: orig.end_glyph_id,
-            value: orig.class,
-        }
-    }
-}
-
-pub type OpentypeClassDef = opentype_class_def;
-pub type OpentypeClassDefData = opentype_class_def_data;
-pub type OpentypeClassDefFormat1 = opentype_class_def_data_Format1;
-pub type OpentypeClassDefFormat2 = opentype_class_def_data_Format2;
-
-impl Promote<OpentypeClassDef> for ClassDef {
-    fn promote(orig: &OpentypeClassDef) -> Self {
-        Self::promote(&orig.data)
-    }
-}
-
-impl Promote<OpentypeClassDefData> for ClassDef {
-    fn promote(orig: &OpentypeClassDefData) -> Self {
-        match *orig {
-            OpentypeClassDefData::Format1(OpentypeClassDefFormat1 {
-                start_glyph_id,
-                ref class_value_array,
-                ..
-            }) => ClassDef::Format1 {
-                start_glyph_id,
-                class_value_array: class_value_array.clone(),
-            },
-            OpentypeClassDefData::Format2(OpentypeClassDefFormat2 {
-                ref class_range_records,
-                ..
-            }) => ClassDef::Format2 {
-                class_range_records: promote_vec(class_range_records),
-            },
-        }
-    }
-}
+pub(crate) use layout_common::{
+    ClassDef, ClassRangeRecord, CoverageRangeRecord, CoverageTable, GlyphClass, RangeRecord,
+    format_glyph_class,
+};
 
 #[derive(Clone, Debug, Default)]
-struct AttachPoint {
-    point_indices: Vec<u16>,
+#[repr(transparent)]
+pub struct AttachPoint {
+    pub(crate) point_indices: Vec<u16>,
 }
 
 #[derive(Clone, Debug)]
-struct AttachList {
-    coverage: CoverageTable,
-    attach_points: Vec<AttachPoint>,
+pub struct AttachList {
+    pub(crate) coverage: CoverageTable,
+    pub(crate) attach_points: Vec<AttachPoint>,
 }
 
 impl Promote<OpentypeAttachPoint> for AttachPoint {
@@ -4175,7 +4157,9 @@ impl Promote<OpentypeAttachPoint> for AttachPoint {
     }
 }
 
-type OpentypeAttachList<'a> = opentype_gdef_attach_list<'a>;
+alias! {
+    pub type OpentypeAttachList = opentype_gdef_attach_list<'a>;
+}
 
 frame!(OpentypeAttachList.list_scope);
 
@@ -4219,9 +4203,9 @@ impl<'a> Promote<OpentypeAttachList<'a>> for AttachList {
 }
 
 #[derive(Clone, Debug)]
-struct LigCaretList {
-    coverage: CoverageTable,
-    lig_glyphs: Vec<LigGlyph>,
+pub struct LigCaretList {
+    pub(crate) coverage: CoverageTable,
+    pub(crate) lig_glyphs: Vec<LigGlyph>,
 }
 
 type OpentypeLigCaretList<'a> = opentype_gdef_lig_caret_list<'a>;
@@ -4271,8 +4255,8 @@ impl<'a> TryPromote<OpentypeLigCaretList<'a>> for LigCaretList {
 }
 
 #[derive(Clone, Debug, Default)]
-struct LigGlyph {
-    caret_values: Vec<Link<CaretValue>>,
+pub struct LigGlyph {
+    pub(crate) caret_values: Vec<Link<CaretValue>>,
 }
 
 pub type OpentypeLigGlyph<'a> = opentype_gdef_lig_glyph<'a>;
@@ -4550,49 +4534,194 @@ impl<'a> TryPromote<OpentypeCaretValueData<'a>> for CaretValue {
     }
 }
 
-alias! {
-    pub type OpentypeGdefTableData = opentype_gdef_table_data<'a>;
+pub mod otf_gdef {
+    use super::{Mandatory, Nullable, container, obj};
 
-    pub type OpentypeAttachPoint = opentype_gdef_attach_point;
+    alias! {
+        pub type OpentypeGdefTableData = opentype_gdef_table_data<'a>;
 
-    pub type OpentypeCoverageTable = opentype_coverage_table;
+        pub type OpentypeAttachPoint = opentype_gdef_attach_point;
 
-    pub type OpentypeCoverageTableData = opentype_coverage_table_data;
+        pub type OpentypeCoverageTable = opentype_coverage_table;
 
-    pub type OpentypeCoverageRangeRecord = opentype_coverage_table_data_Format2_range_records;
-}
+        pub type OpentypeCoverageTableData = opentype_coverage_table_data;
 
-#[derive(Clone, Debug)]
-struct GdefMetrics {
-    major_version: u16,
-    minor_version: u16,
-    glyph_class_def: Option<ClassDef>,
-    attach_list: Option<AttachList>,
-    lig_caret_list: Option<LigCaretList>,
-    mark_attach_class_def: Option<ClassDef>,
-    data: GdefTableDataMetrics,
-}
+        pub type OpentypeCoverageRangeRecord = opentype_coverage_table_data_Format2_range_records;
 
-impl<'a> TryPromote<otf_types::OpentypeGdef<'a>> for GdefMetrics {
-    type Error = value_parse::ValueParseError<TPErr<OpentypeLigCaretList<'a>, LigCaretList>>;
+        pub type OpentypeMarkGlyphSet = opentype_gdef_mark_glyph_set<'a>;
 
-    fn try_promote(gdef: &opentype_gdef_table<'_>) -> Result<GdefMetrics, Self::Error> {
-        Ok(GdefMetrics {
-            major_version: gdef.major_version,
-            minor_version: gdef.minor_version,
-            glyph_class_def: promote_opt(&fn_reify::reify_index(gdef, Nullable(obj::ClsDef), 0)),
-            attach_list: promote_opt(&fn_reify::reify(gdef, Nullable(obj::AttList))),
-            lig_caret_list: try_promote_opt(&fn_reify::reify(gdef, Nullable(obj::LigCarList)))
-                .map_err(value_parse::ValueParseError::value)?,
-            mark_attach_class_def: promote_opt(&fn_reify::reify_index(
-                gdef,
-                Nullable(obj::ClsDef),
-                1,
-            )),
-            data: GdefTableDataMetrics::try_promote_view(&gdef.data, gdef.table_scope)?,
-        })
+        pub type OpentypeGdefData1Dot2 = opentype_gdef_table_data_Version1_2<'a>;
+        pub type OpentypeGdefData1Dot3 = opentype_gdef_table_data_Version1_3<'a>;
+
+    }
+
+    impl<'a> container::SingleContainer<Nullable<obj::MarkGlSet>> for OpentypeGdefData1Dot2<'a> {
+        fn get_offset(&self) -> usize {
+            self.mark_glyph_sets_def.offset as usize
+        }
+
+        fn get_args(&self) {}
+    }
+
+    impl<'a> container::SingleContainer<Nullable<obj::MarkGlSet>> for OpentypeGdefData1Dot3<'a> {
+        fn get_offset(&self) -> usize {
+            self.mark_glyph_sets_def.offset as usize
+        }
+
+        fn get_args(&self) {}
+    }
+
+    impl<'a> container::SingleContainer<Nullable<obj::ItemVarStore>> for OpentypeGdefData1Dot3<'a> {
+        fn get_offset(&self) -> usize {
+            self.item_var_store.offset as usize
+        }
+
+        fn get_args(&self) {}
+    }
+
+    frame!(OpentypeMarkGlyphSet);
+
+    impl<'input> container::DynContainer<Nullable<obj::CovTable>> for OpentypeMarkGlyphSet<'input> {
+        fn count(&self) -> usize {
+            self.mark_glyph_set_count as usize
+        }
+
+        fn iter_offsets(&self) -> impl Iterator<Item = usize> {
+            self.coverage.iter().map(|off| off.offset as usize)
+        }
+
+        fn iter_args(&self) -> impl Iterator<Item = ()> {
+            std::iter::repeat(())
+        }
     }
 }
+pub use otf_gdef::*;
+
+pub(crate) mod gdef {
+    use super::*;
+
+    #[derive(Clone, Debug)]
+    pub struct GdefMetrics {
+        pub(crate) major_version: u16,
+        pub(crate) minor_version: u16,
+        pub(crate) glyph_class_def: Option<ClassDef>,
+        pub(crate) attach_list: Option<AttachList>,
+        pub(crate) lig_caret_list: Option<LigCaretList>,
+        pub(crate) mark_attach_class_def: Option<ClassDef>,
+        pub(crate) data: GdefTableDataMetrics,
+    }
+
+    impl<'a> TryPromote<otf_types::OpentypeGdef<'a>> for GdefMetrics {
+        type Error = value_parse::ValueParseError<TPErr<OpentypeLigCaretList<'a>, LigCaretList>>;
+
+        fn try_promote(gdef: &opentype_gdef_table<'_>) -> Result<GdefMetrics, Self::Error> {
+            Ok(GdefMetrics {
+                major_version: gdef.major_version,
+                minor_version: gdef.minor_version,
+                glyph_class_def: promote_opt(&fn_reify::reify_index(
+                    gdef,
+                    Nullable(obj::ClsDef),
+                    0,
+                )),
+                attach_list: promote_opt(&fn_reify::reify(gdef, Nullable(obj::AttList))),
+                lig_caret_list: try_promote_opt(&fn_reify::reify(gdef, Nullable(obj::LigCarList)))
+                    .map_err(value_parse::ValueParseError::value)?,
+                mark_attach_class_def: promote_opt(&fn_reify::reify_index(
+                    gdef,
+                    Nullable(obj::ClsDef),
+                    1,
+                )),
+                data: GdefTableDataMetrics::try_promote_view(&gdef.data, gdef.table_scope)?,
+            })
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    pub struct MarkGlyphSet {
+        pub(crate) format: u16,
+        pub(crate) mark_glyph_set_count: usize,
+        pub(crate) coverage: Vec<Option<CoverageTable>>,
+    }
+
+    impl<'a> TryPromote<OpentypeMarkGlyphSet<'a>> for MarkGlyphSet {
+        type Error = Local<UnknownValueError<u16>>;
+
+        fn try_promote(orig: &OpentypeMarkGlyphSet) -> Result<Self, Self::Error> {
+            match orig.format {
+                1 => {
+                    let coverage = fn_reify::reify_all(orig, Nullable(obj::CovTable))
+                        .map(|raw| raw.as_ref().map(CoverageTable::promote))
+                        .collect();
+                    Ok(MarkGlyphSet {
+                        format: 1,
+                        mark_glyph_set_count: orig.mark_glyph_set_count as usize,
+                        coverage,
+                    })
+                }
+                n => Err(UnknownValueError {
+                    what: String::from("MarkGlyphSets table format"),
+                    bad_value: n,
+                }),
+            }
+        }
+    }
+
+    impl<'a> TryPromoteView<OpentypeGdefTableData<'a>> for GdefTableDataMetrics {
+        type Error<'input>
+            = ReflType<TPErr<OpentypeMarkGlyphSet<'input>, MarkGlyphSet>, UnknownValueError<u16>>
+        where
+            'a: 'input;
+
+        fn try_promote_view<'input>(
+            orig: &'input OpentypeGdefTableData<'a>,
+            view: View<'input>,
+        ) -> Result<Self, value_parse::ValueParseError<Self::Error<'input>>>
+        where
+            'a: 'input,
+        {
+            Ok(match orig {
+                OpentypeGdefTableData::Version1_0 => Self::default(),
+                OpentypeGdefTableData::Version1_2(inner) => {
+                    let mark_glyph_sets_def = try_promote_opt(&fn_reify::reify_dep(
+                        view,
+                        inner,
+                        Nullable(obj::MarkGlSet),
+                    )?)
+                    .map_err(value_parse::ValueParseError::value)?;
+                    GdefTableDataMetrics {
+                        mark_glyph_sets_def,
+                        item_var_store: None,
+                    }
+                }
+                OpentypeGdefTableData::Version1_3(inner) => {
+                    let mark_glyph_sets_def = try_promote_opt(&fn_reify::reify_dep(
+                        view,
+                        inner,
+                        Nullable(obj::MarkGlSet),
+                    )?)
+                    .map_err(value_parse::ValueParseError::value)?;
+                    let item_var_store = promote_opt(&fn_reify::reify_dep(
+                        view,
+                        inner,
+                        Nullable(obj::ItemVarStore),
+                    )?);
+
+                    GdefTableDataMetrics {
+                        mark_glyph_sets_def,
+                        item_var_store,
+                    }
+                }
+            })
+        }
+    }
+
+    #[derive(Clone, Debug, Default)]
+    pub struct GdefTableDataMetrics {
+        pub(crate) mark_glyph_sets_def: Option<MarkGlyphSet>,
+        pub(crate) item_var_store: Option<ItemVariationStore>,
+    }
+}
+pub(crate) use gdef::{GdefMetrics, GdefTableDataMetrics, MarkGlyphSet};
 
 pub mod otf_layout {
     use super::*;
@@ -8360,6 +8489,9 @@ pub mod table {
     }
 
     impl TableKind {
+        /// Watermark for which Opentype feature-tables are functionally supported, including
+        /// both raw machine-parsing, and subsequent promotion to an API object that we
+        /// have display directives for.
         // ANCHOR - is_implemented
         pub fn is_implemented(self) -> bool {
             use TableKind::*;
@@ -8371,7 +8503,7 @@ pub mod table {
                 // CFF Outline
                 Cff | Cff2 | Vorg => false,
                 // SVG
-                Svg => false,
+                Svg => true,
                 // Bitmap
                 Ebdt | Eblc | Ebsc | Cbdt | Cblc | Sbix => false,
                 // Typographical
