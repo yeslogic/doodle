@@ -494,11 +494,9 @@ impl TypedConst {
                 }
             }
             NumRep::Auto => self.get_unsigned_unchecked::<U>(),
-            other => {
-                Err(anyhow!(
-                    "TypedConst::get_as_unsized: `{self:?}` has incompatible representation ({other:?} instead of {tgt:?})"
-                ))
-            }
+            other => Err(anyhow!(
+                "TypedConst::get_as_unsized: `{self:?}` has incompatible representation ({other:?} instead of {tgt:?})"
+            )),
         }
     }
 
