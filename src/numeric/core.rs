@@ -98,6 +98,7 @@ macro_rules! from_proxy {
     };
 }
 
+// NOTE - Signed impls are currently unused but there is no reason to remove them
 from_proxy! {
     i8 => I8,
     i16 => I16,
@@ -487,16 +488,16 @@ impl TypedConst {
                         );
                     })
                 } else {
-                    return Err(anyhow!(
+                    Err(anyhow!(
                         "TypedConst::get_as_unsized: `{self:?}` not representable (as {n:?})"
-                    ));
+                    ))
                 }
             }
             NumRep::Auto => self.get_unsigned_unchecked::<U>(),
             other => {
-                return Err(anyhow!(
+                Err(anyhow!(
                     "TypedConst::get_as_unsized: `{self:?}` has incompatible representation ({other:?} instead of {tgt:?})"
-                ));
+                ))
             }
         }
     }
