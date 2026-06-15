@@ -476,35 +476,58 @@ impl Value {
             (Value::U64(l), Value::U64(r)) => Value::Bool(__rel(rel, l, r)),
             (Value::Usize(l), Value::Usize(r)) => Value::Bool(__rel(rel, l, r)),
             (Value::Numeric(l), Value::Numeric(r)) => Value::Bool(TypedConst::rel(rel, &l, &r)),
-            // TODO: support comparison between grammar-native machine-integers and numerics with the same rep
-            (ref left @ Value::Numeric(ref num), ref right @ Value::U8(x))
-            | (ref left @ Value::U8(x), ref right @ Value::Numeric(ref num)) => {
-                if let Ok(y) = num.get_as_unsized::<u8>() {
-                    Value::Bool(__rel(rel, x, y))
+            (ref left @ Value::Numeric(ref num), ref right @ Value::U8(r)) => {
+                if let Ok(l) = num.get_as_unsized::<u8>() {
+                    Value::Bool(__rel(rel, l, r))
                 } else {
                     panic!("cannot apply int-rel {rel:?} to (`{left:?}`, `{right:?}`)")
                 }
             }
-            (ref left @ Value::Numeric(ref num), ref right @ Value::U16(x))
-            | (ref left @ Value::U16(x), ref right @ Value::Numeric(ref num)) => {
-                if let Ok(y) = num.get_as_unsized::<u16>() {
-                    Value::Bool(__rel(rel, x, y))
+            (ref left @ Value::U8(l), ref right @ Value::Numeric(ref num)) => {
+                if let Ok(r) = num.get_as_unsized::<u8>() {
+                    Value::Bool(__rel(rel, l, r))
                 } else {
                     panic!("cannot apply int-rel {rel:?} to (`{left:?}`, `{right:?}`)")
                 }
             }
-            (ref left @ Value::Numeric(ref num), ref right @ Value::U32(x))
-            | (ref left @ Value::U32(x), ref right @ Value::Numeric(ref num)) => {
-                if let Ok(y) = num.get_as_unsized::<u32>() {
-                    Value::Bool(__rel(rel, x, y))
+            (ref left @ Value::Numeric(ref num), ref right @ Value::U16(r)) => {
+                if let Ok(l) = num.get_as_unsized::<u16>() {
+                    Value::Bool(__rel(rel, l, r))
                 } else {
                     panic!("cannot apply int-rel {rel:?} to (`{left:?}`, `{right:?}`)")
                 }
             }
-            (ref left @ Value::Numeric(ref num), ref right @ Value::U64(x))
-            | (ref left @ Value::U64(x), ref right @ Value::Numeric(ref num)) => {
-                if let Ok(y) = num.get_as_unsized::<u64>() {
-                    Value::Bool(__rel(rel, x, y))
+            (ref left @ Value::U16(l), ref right @ Value::Numeric(ref num)) => {
+                if let Ok(r) = num.get_as_unsized::<u16>() {
+                    Value::Bool(__rel(rel, l, r))
+                } else {
+                    panic!("cannot apply int-rel {rel:?} to (`{left:?}`, `{right:?}`)")
+                }
+            }
+            (ref left @ Value::Numeric(ref num), ref right @ Value::U32(r)) => {
+                if let Ok(l) = num.get_as_unsized::<u32>() {
+                    Value::Bool(__rel(rel, l, r))
+                } else {
+                    panic!("cannot apply int-rel {rel:?} to (`{left:?}`, `{right:?}`)")
+                }
+            }
+            (ref left @ Value::U32(l), ref right @ Value::Numeric(ref num)) => {
+                if let Ok(r) = num.get_as_unsized::<u32>() {
+                    Value::Bool(__rel(rel, l, r))
+                } else {
+                    panic!("cannot apply int-rel {rel:?} to (`{left:?}`, `{right:?}`)")
+                }
+            }
+            (ref left @ Value::Numeric(ref num), ref right @ Value::U64(r)) => {
+                if let Ok(l) = num.get_as_unsized::<u64>() {
+                    Value::Bool(__rel(rel, l, r))
+                } else {
+                    panic!("cannot apply int-rel {rel:?} to (`{left:?}`, `{right:?}`)")
+                }
+            }
+            (ref left @ Value::U64(l), ref right @ Value::Numeric(ref num)) => {
+                if let Ok(r) = num.get_as_unsized::<u64>() {
+                    Value::Bool(__rel(rel, l, r))
                 } else {
                     panic!("cannot apply int-rel {rel:?} to (`{left:?}`, `{right:?}`)")
                 }
@@ -566,5 +589,220 @@ impl Value {
                 _ => panic!("cannot apply unary {op:?} to non-numeric operand (`{value:?}`)"),
             },
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::numeric::core::{MachineRep, NumRep};
+
+    const ALL_RELS: [IntRel; 6] = [
+        IntRel::Eq,
+        IntRel::Ne,
+        IntRel::Lt,
+        IntRel::Gt,
+        IntRel::Lte,
+        IntRel::Gte,
+    ];
+
+    fn numeric<N>(n: N, rep: NumRep) -> Value
+    where
+        BigInt: From<N>,
+    {
+        Value::Numeric(Rc::new(TypedConst::new(n, rep)))
+    }
+
+    fn numeric_auto<N>(n: N) -> Value
+    where
+        BigInt: From<N>,
+    {
+        Value::Numeric(Rc::new(TypedConst::new_auto(n)))
+    }
+
+    /// Checks that `Value::int_rel` agrees, for every `IntRel` variant and both operand
+    /// orderings, with the natural `i128` comparison of `l` and `r`.
+    fn check_all_rels(left: &Value, right: &Value, l: i128, r: i128) {
+        for &rel in &ALL_RELS {
+            assert_eq!(
+                Value::int_rel(rel, left.clone(), right.clone()),
+                Value::Bool(__rel(rel, l, r)),
+                "int_rel({rel:?}, {left:?}, {right:?})"
+            );
+            assert_eq!(
+                Value::int_rel(rel, right.clone(), left.clone()),
+                Value::Bool(__rel(rel, r, l)),
+                "int_rel({rel:?}, {right:?}, {left:?})"
+            );
+        }
+    }
+
+    // ---- historically-supported, same-variant pairs ----
+
+    #[test]
+    fn u8_vs_u8() {
+        check_all_rels(&Value::U8(5), &Value::U8(10), 5, 10);
+        check_all_rels(&Value::U8(7), &Value::U8(7), 7, 7);
+    }
+
+    #[test]
+    fn u16_vs_u16() {
+        check_all_rels(&Value::U16(5), &Value::U16(1000), 5, 1000);
+    }
+
+    #[test]
+    fn u32_vs_u32() {
+        check_all_rels(&Value::U32(5), &Value::U32(100_000), 5, 100_000);
+    }
+
+    #[test]
+    fn u64_vs_u64() {
+        check_all_rels(&Value::U64(5), &Value::U64(10_000_000_000), 5, 10_000_000_000);
+    }
+
+    #[test]
+    fn usize_vs_usize() {
+        check_all_rels(&Value::Usize(5), &Value::Usize(10), 5, 10);
+    }
+
+    #[test]
+    fn numeric_vs_numeric_pure_value_comparison() {
+        // Numeric vs Numeric compares raw values irrespective of `NumRep`, even when an
+        // operand's value is not representable within its own nominal rep.
+        check_all_rels(
+            &numeric(5u8, NumRep::Concrete(MachineRep::U8)),
+            &numeric_auto(10u64),
+            5,
+            10,
+        );
+        check_all_rels(
+            &numeric(300i32, NumRep::Concrete(MachineRep::U8)),
+            &numeric_auto(300i32),
+            300,
+            300,
+        );
+    }
+
+    // ---- newly-supported: Numeric vs grammar-native machine ints ----
+
+    #[test]
+    fn numeric_u8_concrete_rep_vs_machine_u8() {
+        check_all_rels(
+            &numeric(5u8, NumRep::Concrete(MachineRep::U8)),
+            &Value::U8(10),
+            5,
+            10,
+        );
+    }
+
+    #[test]
+    fn numeric_u16_concrete_rep_vs_machine_u16() {
+        check_all_rels(
+            &numeric(5u16, NumRep::Concrete(MachineRep::U16)),
+            &Value::U16(1000),
+            5,
+            1000,
+        );
+    }
+
+    #[test]
+    fn numeric_u32_concrete_rep_vs_machine_u32() {
+        check_all_rels(
+            &numeric(5u32, NumRep::Concrete(MachineRep::U32)),
+            &Value::U32(100_000),
+            5,
+            100_000,
+        );
+    }
+
+    #[test]
+    fn numeric_u64_concrete_rep_vs_machine_u64() {
+        check_all_rels(
+            &numeric(5u64, NumRep::Concrete(MachineRep::U64)),
+            &Value::U64(10_000_000_000),
+            5,
+            10_000_000_000,
+        );
+    }
+
+    #[test]
+    fn numeric_auto_rep_vs_any_machine_width() {
+        check_all_rels(&numeric_auto(5u8), &Value::U8(10), 5, 10);
+        check_all_rels(&numeric_auto(5u8), &Value::U16(1000), 5, 1000);
+        check_all_rels(&numeric_auto(5u8), &Value::U32(100_000), 5, 100_000);
+        check_all_rels(
+            &numeric_auto(5u8),
+            &Value::U64(10_000_000_000),
+            5,
+            10_000_000_000,
+        );
+    }
+
+    /// Regression test: `Lt`/`Gt`/`Lte`/`Gte` must not be evaluated with swapped operands
+    /// when the `Numeric` value appears as the left-hand operand.
+    #[test]
+    fn numeric_left_operand_ordering_is_not_reversed() {
+        let small = numeric(5u8, NumRep::Concrete(MachineRep::U8));
+        let large = Value::U8(10);
+
+        assert_eq!(
+            Value::int_rel(IntRel::Lt, small.clone(), large.clone()),
+            Value::Bool(true)
+        );
+        assert_eq!(
+            Value::int_rel(IntRel::Gt, small.clone(), large.clone()),
+            Value::Bool(false)
+        );
+        assert_eq!(
+            Value::int_rel(IntRel::Lte, small.clone(), large.clone()),
+            Value::Bool(true)
+        );
+        assert_eq!(
+            Value::int_rel(IntRel::Gte, small.clone(), large.clone()),
+            Value::Bool(false)
+        );
+
+        assert_eq!(
+            Value::int_rel(IntRel::Lt, large.clone(), small.clone()),
+            Value::Bool(false)
+        );
+        assert_eq!(
+            Value::int_rel(IntRel::Gt, large.clone(), small.clone()),
+            Value::Bool(true)
+        );
+    }
+
+    // ---- error cases ----
+
+    #[test]
+    #[should_panic(expected = "cannot apply int-rel")]
+    fn numeric_with_mismatched_concrete_rep_panics() {
+        let left = numeric(5u8, NumRep::Concrete(MachineRep::U16));
+        let right = Value::U8(5);
+        Value::int_rel(IntRel::Eq, left, right);
+    }
+
+    #[test]
+    #[should_panic(expected = "cannot apply int-rel")]
+    fn numeric_with_unrepresentable_concrete_rep_panics() {
+        // 300 does not fit in u8, despite being tagged with `NumRep::U8`
+        let left = numeric(300i32, NumRep::Concrete(MachineRep::U8));
+        let right = Value::U8(5);
+        Value::int_rel(IntRel::Eq, left, right);
+    }
+
+    #[test]
+    #[should_panic(expected = "cannot apply int-rel")]
+    fn numeric_auto_negative_vs_u8_panics() {
+        // -1 cannot be converted to u8, even under `NumRep::Auto`
+        let left = numeric_auto(-1i32);
+        let right = Value::U8(5);
+        Value::int_rel(IntRel::Eq, left, right);
+    }
+
+    #[test]
+    #[should_panic(expected = "cannot apply int-rel")]
+    fn fully_unsupported_combination_panics() {
+        Value::int_rel(IntRel::Eq, Value::Bool(true), Value::U8(1));
     }
 }
