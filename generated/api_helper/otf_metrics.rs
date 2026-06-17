@@ -41,6 +41,7 @@ pub mod cli {
         #[default]
         Baseline = 0, // Default verbose level: show at least the presence and version of each table, perhaps more for larger or more detailed tables
         Detailed = 1, // Show at least as much as necessary to sanity-check specific values at a debugger level
+        Dump = 2,     // Show even raw values that would otherwise be elided
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash)]
@@ -63,7 +64,7 @@ pub mod cli {
 
     impl VerboseLevel {
         pub const MIN_LEVEL: Self = VerboseLevel::Baseline;
-        pub const MAX_LEVEL: Self = VerboseLevel::Detailed;
+        pub const MAX_LEVEL: Self = VerboseLevel::Dump;
     }
 
     impl From<u8> for VerboseLevel {
@@ -198,6 +199,10 @@ pub mod otf_types {
         pub type OpentypeGsub = opentype_gsub_table<'a>;
 
         pub type OpentypeGpos = opentype_gpos_table<'a>;
+        // !SECTION
+
+        // SECTION - Color Fonts
+        pub type OpentypeSvg = opentype_svg_table<'a>;
         // !SECTION
 
         // SECTION - Variable font tables
@@ -1099,6 +1104,7 @@ pub mod obj {
     proxy!(OpentypeSignatureBlock<'a> = SigBlock);
     proxy!(OpentypeVdmxGroup = VdmxGroup);
     proxy!(OpentypeVarDsim<'a> = Dsim);
+    proxy!(OpentypeSvgDocumentList<'a> = SvgDocList);
 }
 
 mod value_parse {
@@ -1170,18 +1176,27 @@ pub use value_parse::ValueParseError;
 /// Lexically distinct Option for values that are theoretically non-Nullable and have no FromNull instance.
 type Link<T> = Option<T>;
 
-mod sem_vec {
+mod sem {
     /// Vector of values with representation `T` that have a nominal semantic interpretation specified by `Sem`.
     ///
     /// Though generic, the practical usages of this type are for distinguishing `ClassId := u16` and `GlyphId := u16`
     /// semantics in GSUB/GPOS Lookup tables.
     #[repr(transparent)]
-    pub(crate) struct SemVec<Sem, T> {
-        pub(crate) inner: Vec<T>,
+    pub(crate) struct WithSem<Sem, T: Sized> {
+        pub(crate) inner: T,
         pub(crate) __proxy: std::marker::PhantomData<Sem>,
     }
 
-    impl<Sem, T> Default for SemVec<Sem, T> {
+    impl<Sem, T> From<T> for WithSem<Sem, T> {
+        fn from(inner: T) -> Self {
+            Self {
+                inner,
+                __proxy: std::marker::PhantomData,
+            }
+        }
+    }
+
+    impl<Sem, T: Default> Default for WithSem<Sem, T> {
         fn default() -> Self {
             Self {
                 inner: Default::default(),
@@ -1190,7 +1205,7 @@ mod sem_vec {
         }
     }
 
-    impl<Sem, T: Clone> Clone for SemVec<Sem, T> {
+    impl<Sem, T: Clone> Clone for WithSem<Sem, T> {
         fn clone(&self) -> Self {
             Self {
                 inner: self.inner.clone(),
@@ -1198,6 +1213,10 @@ mod sem_vec {
             }
         }
     }
+
+    impl<Sem, T: Copy> Copy for WithSem<Sem, T> {}
+
+    pub type SemVec<Sem, T> = WithSem<Sem, Vec<T>>;
 
     impl<Sem, T> SemVec<Sem, T> {
         pub fn new() -> Self {
@@ -1221,15 +1240,6 @@ mod sem_vec {
         }
     }
 
-    impl<Sem, T> From<Vec<T>> for SemVec<Sem, T> {
-        fn from(v: Vec<T>) -> Self {
-            Self {
-                inner: v,
-                __proxy: std::marker::PhantomData,
-            }
-        }
-    }
-
     impl<Sem, T> FromIterator<T> for SemVec<Sem, T> {
         fn from_iter<I>(iter: I) -> Self
         where
@@ -1239,6 +1249,12 @@ mod sem_vec {
                 inner: Vec::from_iter(iter),
                 __proxy: std::marker::PhantomData,
             }
+        }
+    }
+
+    impl<Sem: SemDisplay> std::fmt::Display for WithSem<Sem, u16> {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            Sem::fmt_u16(self.inner, f)
         }
     }
 
@@ -1258,6 +1274,12 @@ mod sem_vec {
         }
     }
 
+    impl std::fmt::Debug for WithSem<ClassId, u16> {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.debug_tuple("ClassId").field(&self.inner).finish()
+        }
+    }
+
     impl<T> std::fmt::Debug for SemVec<GlyphId, T>
     where
         T: std::fmt::Debug,
@@ -1265,6 +1287,12 @@ mod sem_vec {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             // REVIEW - consider whether we need this distinction when ChainedRule already discriminates on Sem
             f.debug_tuple("GlyphIds").field(&self.inner).finish()
+        }
+    }
+
+    impl std::fmt::Debug for WithSem<GlyphId, u16> {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.debug_tuple("GlyphId").field(&self.inner).finish()
         }
     }
 
@@ -1316,7 +1344,7 @@ mod sem_vec {
         }
     }
 }
-use sem_vec::{ClassId, GlyphId, SemDisplay, SemVec};
+use sem::{ClassId, GlyphId, SemDisplay, SemVec, WithSem};
 
 // !SECTION
 /// Crate-private micro-module for compile-time 'same-type' assertions that can be chained
@@ -1916,20 +1944,162 @@ pub mod hhea {
 }
 pub(crate) use hhea::HheaMetrics;
 
-#[derive(Clone, Copy, Debug)]
-// STUB - enrich with any further details we care about presenting
-struct VheaMetrics {
-    major_version: u16,
-    minor_version: u16,
-    num_lvm: usize,
-}
+pub mod vhea {
+    use super::*;
 
-pub mod otf_var {
+    #[derive(Clone, Copy, Debug)]
+    // STUB - enrich with any further details we care about presenting
+    pub struct VheaMetrics {
+        pub(crate) major_version: u16,
+        pub(crate) minor_version: u16,
+        pub(crate) num_lvm: usize,
+    }
+
+    impl Promote<OpentypeVhea> for VheaMetrics {
+        fn promote(vhea: &opentype_hhea_table) -> VheaMetrics {
+            VheaMetrics {
+                major_version: vhea.major_version,
+                minor_version: vhea.minor_version >> 12, // we only care about 0 vs 0x1000, so we can shift right 12
+                num_lvm: vhea.number_of_long_metrics as usize,
+            }
+        }
+    }
+}
+pub(crate) use vhea::VheaMetrics;
+pub mod otf_svg {
+    use super::otf_types::*;
+    use super::{Mandatory, Nullable, container, obj};
+
+    alias! {
+        pub type OpentypeSvgDocumentList = opentype_svg_document_list<'a>;
+        pub type OpentypeSvgDocumentRecord = opentype_svg_document_record<'a>;
+    }
+
+    frame!(OpentypeSvg);
+
+    impl<'input> container::SingleContainer<Mandatory<obj::SvgDocList>> for OpentypeSvg<'input> {
+        fn get_offset(&self) -> usize {
+            self.svg_document_list.offset as usize
+        }
+
+        fn get_args(&self) {}
+    }
+}
+pub use otf_svg::*;
+
+pub mod svg {
+    use super::*;
+
+    #[derive(Debug, Clone)]
+    pub struct SvgMetrics {
+        pub(crate) version: u16,
+        pub(crate) document_list: DocumentList,
+    }
+
+    impl<'a> Promote<OpentypeSvg<'a>> for SvgMetrics {
+        fn promote(orig: &OpentypeSvg) -> Self {
+            SvgMetrics {
+                version: orig.version,
+                document_list: DocumentList::promote(&reify(orig, Mandatory(obj::SvgDocList))),
+            }
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    #[repr(transparent)]
+    pub struct DocumentList {
+        pub(crate) entries: Vec<DocumentRecord>,
+    }
+
+    impl<'a> Promote<OpentypeSvgDocumentList<'a>> for DocumentList {
+        fn promote(orig: &OpentypeSvgDocumentList) -> Self {
+            DocumentList {
+                entries: promote_vec(&orig.document_records),
+            }
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct DocumentRecord {
+        pub(crate) start_glyph_id: WithSem<GlyphId, u16>,
+        pub(crate) end_glyph_id: WithSem<GlyphId, u16>,
+        pub(crate) document_offset: u32,
+        pub(crate) document_length: u32,
+        pub(crate) svg_data: SvgData,
+    }
+
+    impl<'a> Promote<OpentypeSvgDocumentRecord<'a>> for DocumentRecord {
+        fn promote(orig: &OpentypeSvgDocumentRecord) -> Self {
+            DocumentRecord {
+                start_glyph_id: WithSem::from(orig.start_glyph_id),
+                end_glyph_id: WithSem::from(orig.end_glyph_id),
+                document_offset: orig.svg_document_offset,
+                document_length: orig.svg_document_length,
+                svg_data: SvgData::from(orig._svg_document),
+            }
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    pub enum SvgData {
+        HexBlob(Vec<u8>),
+        SvgDoc(SvgInfo),
+    }
+
+    /// Placeholder struct used to record any significant information about an SVG document
+    /// without having to fully process it
+    #[derive(Debug, Clone)]
+    pub struct SvgInfo {
+        // STUB - for now, just capture the full buffer; later on, we might develop a better sense of what information to summarize
+        pub(crate) data: Vec<char>,
+    }
+
+    impl SvgInfo {
+        fn interpret(data: Vec<char>) -> SvgInfo {
+            SvgInfo { data }
+        }
+    }
+
+    impl<'a> From<&'a [u8]> for SvgData {
+        fn from(orig: &'a [u8]) -> Self {
+            let mut input = Parser::new(orig);
+            let Ok(raw) = crate::Decoder_text_maybe_gzip(&mut input) else {
+                return SvgData::HexBlob(orig.to_vec());
+            };
+            match raw {
+                text_maybe_gzip::compressed(mut items) => match items.len() {
+                    1 => {
+                        let text = items.pop().unwrap();
+                        SvgData::SvgDoc(SvgInfo::interpret(text))
+                    }
+                    0 => {
+                        log::error!("gzip-compresed svg document has no utf8 data-blobs");
+                        SvgData::HexBlob(orig.to_vec())
+                    }
+                    2.. => {
+                        log::info!(
+                            "unexpected case: multiple gzip-compressed blobs in svg document"
+                        );
+                        let buffer: Vec<char> = items.into_iter().flatten().collect();
+                        SvgData::SvgDoc(SvgInfo::interpret(buffer))
+                    }
+                },
+                text_maybe_gzip::plain(text) => SvgData::SvgDoc(SvgInfo::interpret(text)),
+            }
+        }
+    }
+}
+pub(crate) use svg::{
+    DocumentList as SvgDocumentList, DocumentRecord as SvgDocumentRecord, SvgData, SvgInfo,
+    SvgMetrics,
+};
+
+pub mod otf_var_common {
     alias! {
         pub type OpentypeVarDsim = opentype_var_delta_set_index_map<'a>;
     }
 }
-pub use otf_var::*;
+pub use otf_var_common::*;
 
 pub(crate) mod var_common {
     use std::ops::RangeInclusive;
@@ -6334,7 +6504,7 @@ pub(crate) mod layout {
         pub(crate) backtrack_coverages: Vec<CoverageTable>,
         pub(crate) lookahead_coverages: Vec<CoverageTable>,
         pub(crate) glyph_count: u16, // NOTE - this field is technically extraneous due to being equal to `substitute_glyph_ids.len() as u16`
-        pub(crate) substitute_glyph_ids: sem_vec::SemVec<sem_vec::GlyphId, u16>,
+        pub(crate) substitute_glyph_ids: sem::SemVec<sem::GlyphId, u16>,
     }
 
     impl<'a> Promote<OpentypeReverseChainSingleSubst<'a>> for ReverseChainSingleSubst {
@@ -6355,7 +6525,7 @@ pub(crate) mod layout {
                 backtrack_coverages,
                 lookahead_coverages,
                 glyph_count: orig.glyph_count,
-                substitute_glyph_ids: sem_vec::SemVec::from(orig.substitute_glyph_ids.clone()),
+                substitute_glyph_ids: sem::SemVec::from(orig.substitute_glyph_ids.clone()),
             }
         }
     }
@@ -6388,7 +6558,7 @@ pub(crate) mod layout {
     pub struct Ligature {
         pub(crate) ligature_glyph: u16,
         pub(crate) component_count: u16,
-        pub(crate) component_glyph_ids: sem_vec::SemVec<sem_vec::GlyphId, u16>,
+        pub(crate) component_glyph_ids: sem::SemVec<sem::GlyphId, u16>,
     }
 
     impl Promote<OpentypeLigature> for Ligature {
@@ -6396,7 +6566,7 @@ pub(crate) mod layout {
             Ligature {
                 ligature_glyph: orig.ligature_glyph,
                 component_count: orig.component_count,
-                component_glyph_ids: sem_vec::SemVec::from(orig.component_glyph_ids.clone()),
+                component_glyph_ids: sem::SemVec::from(orig.component_glyph_ids.clone()),
             }
         }
     }
@@ -6561,11 +6731,11 @@ pub(crate) mod layout {
     #[derive(Clone)]
     pub struct ChainedRule<Sem> {
         pub(crate) backtrack_glyph_count: u16, // REVIEW - this field can be re-synthesized from backtrack_sequence.len()
-        pub(crate) backtrack_sequence: sem_vec::SemVec<Sem, u16>,
+        pub(crate) backtrack_sequence: sem::SemVec<Sem, u16>,
         pub(crate) input_glyph_count: u16, // REVIEW - this field can be re-synthesized from input_sequence.len() + 1
-        pub(crate) input_sequence: sem_vec::SemVec<Sem, u16>, // NOTE - unlike the other two sequence-arrays, this one is one shorter than its associated glyph_count field
+        pub(crate) input_sequence: sem::SemVec<Sem, u16>, // NOTE - unlike the other two sequence-arrays, this one is one shorter than its associated glyph_count field
         pub(crate) lookahead_glyph_count: u16, // REVIEW - this field can be re-synthesized from lookahead_sequence.len()
-        pub(crate) lookahead_sequence: sem_vec::SemVec<Sem, u16>,
+        pub(crate) lookahead_sequence: sem::SemVec<Sem, u16>,
         pub(crate) seq_lookup_records: Vec<SequenceLookup>,
     }
 
@@ -6594,7 +6764,7 @@ pub(crate) mod layout {
         }
     }
 
-    impl std::fmt::Debug for ChainedRule<sem_vec::GlyphId> {
+    impl std::fmt::Debug for ChainedRule<sem::GlyphId> {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             // REVIEW - at the debug level, present a view of ChainedRule<GlyphId> as if it were its own type `ChainedSequenceRule`
             f.debug_struct("ChainedSequenceRule")
@@ -6609,7 +6779,7 @@ pub(crate) mod layout {
         }
     }
 
-    impl std::fmt::Debug for ChainedRule<sem_vec::ClassId> {
+    impl std::fmt::Debug for ChainedRule<sem::ClassId> {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             // REVIEW - at the debug level, present a view of ChainedRule<ClassId> as if it were its own type `ChainedClassSequenceRule`
             f.debug_struct("ChainedClassSequenceRule")
@@ -6666,7 +6836,7 @@ pub(crate) mod layout {
     #[derive(Debug, Clone)]
     pub struct ChainedSequenceContextFormat1 {
         pub(crate) coverage: CoverageTable,
-        pub(crate) chained_seq_rule_sets: Vec<ChainedRuleSet<sem_vec::GlyphId>>,
+        pub(crate) chained_seq_rule_sets: Vec<ChainedRuleSet<sem::GlyphId>>,
     }
 
     impl<'a> PromoteView<OpentypeChainedSequenceContextFormat1<'a>> for ChainedSequenceContextFormat1 {
@@ -6695,7 +6865,7 @@ pub(crate) mod layout {
         pub(crate) backtrack_class_def: ClassDef,
         pub(crate) input_class_def: ClassDef,
         pub(crate) lookahead_class_def: ClassDef,
-        pub(crate) chained_class_seq_rule_sets: Vec<ChainedRuleSet<sem_vec::ClassId>>,
+        pub(crate) chained_class_seq_rule_sets: Vec<ChainedRuleSet<sem::ClassId>>,
     }
 
     impl<'a> PromoteView<OpentypeChainedSequenceContextFormat2<'a>> for ChainedSequenceContextFormat2 {
@@ -6808,7 +6978,7 @@ pub(crate) mod layout {
     #[derive(Debug, Clone)]
     pub struct SequenceContextFormat1 {
         pub(crate) coverage: CoverageTable,
-        pub(crate) seq_rule_sets: Vec<RuleSet<sem_vec::GlyphId>>,
+        pub(crate) seq_rule_sets: Vec<RuleSet<sem::GlyphId>>,
     }
 
     impl<'a> PromoteView<OpentypeSequenceContextFormat1<'a>> for SequenceContextFormat1 {
@@ -6830,7 +7000,7 @@ pub(crate) mod layout {
     pub struct SequenceContextFormat2 {
         pub(crate) coverage: CoverageTable,
         pub(crate) class_def: ClassDef,
-        pub(crate) class_seq_rule_sets: Vec<RuleSet<sem_vec::ClassId>>,
+        pub(crate) class_seq_rule_sets: Vec<RuleSet<sem::ClassId>>,
     }
 
     impl<'a> PromoteView<OpentypeSequenceContextFormat2<'a>> for SequenceContextFormat2 {
@@ -6890,7 +7060,7 @@ pub(crate) mod layout {
 
     pub struct Rule<Sem> {
         pub(crate) glyph_count: u16, // REVIEW - this field can be re-synthesized via `input_sequence.len() + 1`
-        pub(crate) input_sequence: sem_vec::SemVec<Sem, u16>,
+        pub(crate) input_sequence: sem::SemVec<Sem, u16>,
         pub(crate) seq_lookup_records: Vec<SequenceLookup>,
     }
 
@@ -6898,7 +7068,7 @@ pub(crate) mod layout {
         fn promote(orig: &OpentypeRule) -> Self {
             Rule {
                 glyph_count: orig.glyph_count,
-                input_sequence: sem_vec::SemVec::from(orig.input_sequence.clone()),
+                input_sequence: sem::SemVec::from(orig.input_sequence.clone()),
                 // NOTE - we can only specify seq_lookup_records this way because we use SequenceLookup as its own analogue
                 seq_lookup_records: orig.seq_lookup_records.clone(),
             }
@@ -6917,7 +7087,7 @@ pub(crate) mod layout {
 
     impl<Sem> std::fmt::Debug for Rule<Sem>
     where
-        sem_vec::SemVec<Sem, u16>: std::fmt::Debug,
+        sem::SemVec<Sem, u16>: std::fmt::Debug,
     {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             f.debug_struct("Rule")
@@ -7926,6 +8096,8 @@ pub struct OptionalTableMetrics {
     gpos: Option<Heap<LayoutMetrics>>,
     gsub: Option<Heap<LayoutMetrics>>,
     // STUB - add more tables as we expand opentype definition
+    svg: Option<SvgMetrics>,
+    // STUB - add more tables as we expand opentype definition
     avar: Option<Heap<AvarMetrics>>,
     fvar: Option<Heap<FvarMetrics>>,
     gvar: Option<Heap<GvarMetrics>>,
@@ -8243,24 +8415,18 @@ pub fn analyze_table_directory(
                 })
                 .transpose()?
         };
-        // FIXME - reimplement logic in Promote impl
-        let gdef = {
-            let gdef = &dir.table_links.gdef;
-            gdef.as_ref()
-                .map(|gdef| TestResult::Ok(Heap::new(GdefMetrics::try_promote(gdef)?)))
-                .transpose()?
-        };
-        // TODO - rewrite using helpers
+        let gdef = try_promote_opt(&dir.table_links.gdef)?.map(Heap::new);
         let gpos = {
             let gpos = &dir.table_links.gpos;
             gpos.as_ref().map(LayoutMetrics::promote_gpos).transpose()?
         };
-        // TODO - rewrite using helpers
         let gsub = {
             let gsub = &dir.table_links.gsub;
             gsub.as_ref().map(LayoutMetrics::promote_gsub).transpose()?
         };
-        // STUB - anything beteween gsub and avar goes here
+        // STUB - anything between gsub and svg goes here
+        let svg = promote_opt(&dir.table_links.svg);
+        // STUB - anything beteween svgk and avar goes here
         let avar = promote_opt(&dir.table_links.avar).map(Heap::new);
         let fvar = promote_opt(&dir.table_links.fvar).map(Heap::new);
         let gvar = promote_opt(&dir.table_links.gvar).map(Heap::new);
@@ -8278,14 +8444,7 @@ pub fn analyze_table_directory(
         };
         let stat = promote_opt(&dir.table_links.stat).map(Heap::new);
         let vdmx = promote_opt(&dir.table_links.vdmx);
-        let vhea = {
-            let vhea = &dir.table_links.vhea;
-            vhea.as_ref().map(|vhea| VheaMetrics {
-                major_version: vhea.major_version,
-                minor_version: vhea.minor_version >> 12, // we only care about 0 vs 0x1000, so we
-                num_lvm: vhea.number_of_long_metrics as usize,
-            })
-        };
+        let vhea = promote_opt(&dir.table_links.vhea);
         let vmtx = {
             let vmtx = &dir.table_links.vmtx;
             vmtx.as_ref().map(|vmtx| {
@@ -8322,6 +8481,8 @@ pub fn analyze_table_directory(
             gdef,
             gpos,
             gsub,
+            // TODO - add more color-font tables as they are added to the spec
+            svg,
             // TODO - add more variation tables as they are added to the spec
             avar,
             fvar,

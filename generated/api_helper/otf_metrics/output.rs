@@ -143,6 +143,7 @@ fn show_optional_metrics(optional: &OptionalTableMetrics, conf: &cli::Config) {
                 Ctxt::from(TableDiscriminator::Gsub),
                 conf,
             ),
+            display_svg_metrics(&optional.svg, conf),
             display_avar_metrics(optional.avar.as_deref(), conf),
             display_fvar_metrics(optional.fvar.as_deref(), conf),
             display_gvar_metrics(optional.gvar.as_deref(), conf),
@@ -159,6 +160,95 @@ fn show_optional_metrics(optional: &OptionalTableMetrics, conf: &cli::Config) {
         LineBreak,
     )
     .println();
+}
+
+use svg::display_svg_metrics;
+mod svg {
+    use super::*;
+
+    pub(super) fn display_svg_metrics(svg: &Option<SvgMetrics>, conf: &Config) -> TokenStream {
+        let Some(svg) = svg else {
+            return TokenStream::empty();
+        };
+
+        let heading = toks(format!("SVG: version {}", svg.version));
+
+        if conf.verbosity.is_at_least(cli::VerboseLevel::Detailed) {
+            heading.glue(
+                LineBreak,
+                display_svg_document_list(&svg.document_list, conf).indent_by(SECTION_INDENT),
+            )
+        } else {
+            heading
+        }
+    }
+
+    fn display_svg_document_list(document_list: &SvgDocumentList, conf: &Config) -> TokenStream {
+        let records = &document_list.entries[..];
+        TokenStream::join_with(
+            vec![
+                toks(format!("SVG Document Records: {} total", records.len())),
+                display_items_elided(
+                    records,
+                    |ix, record| {
+                        tok(format!("[{ix}]: ")).then(display_svg_document_record(record, conf))
+                    },
+                    conf.bookend_size,
+                    |start, stop| {
+                        toks(format!("(skipping records {start}..{stop})")).indent_by(ELISION_DELTA)
+                    },
+                )
+                .indent_by(ITEM_INDENT),
+            ],
+            LineBreak,
+        )
+    }
+
+    fn display_svg_document_record(record: &SvgDocumentRecord, conf: &Config) -> TokenStream {
+        let start = record.start_glyph_id;
+        let end = record.end_glyph_id;
+        let lead = if start.inner == end.inner {
+            tok(format!("#{}: ", start))
+        } else {
+            tok(format!("[{}→{}]: ", start, end))
+        };
+        lead.then(display_svg_info(
+            record.document_offset,
+            record.document_length,
+            &record.svg_data,
+            conf,
+        ))
+    }
+
+    fn display_svg_info(
+        document_offset: u32,
+        document_length: u32,
+        svg_data: &SvgData,
+        conf: &Config,
+    ) -> TokenStream {
+        tok(format!("[{document_length} bytes@VIEW+{document_offset}]"))
+            .then(display_svg_data(svg_data, conf))
+    }
+
+    fn display_svg_data(svg_data: &SvgData, conf: &Config) -> TokenStream {
+        tok(": ").then(match svg_data {
+            SvgData::HexBlob(bytes) => display_bytes_inline(bytes, conf.octet_bytes_bookend),
+            SvgData::SvgDoc(svg_info) => {
+                let doc = toks(format!("<SVG Document (len={})>", svg_info.data.len()));
+                if conf.verbosity.is_at_least(cli::VerboseLevel::Dump) {
+                    doc.glue(
+                        LineBreak,
+                        toks(
+                            // FIXME - line-breaks are not properly sanitized out so things might look weird
+                            format!("{}", String::from_iter(&svg_info.data[..])),
+                        ),
+                    )
+                } else {
+                    doc
+                }
+            }
+        })
+    }
 }
 
 use vdmx::display_vdmx_metrics;
@@ -338,25 +428,8 @@ mod dsig {
     }
 
     fn display_signature_block(sig: SignatureBlock, conf: &Config) -> TokenStream {
-        let mut octets = String::new();
-        let min_abbrev = conf.octet_bytes_bookend * 2;
-        if sig.sig.len() <= min_abbrev {
-            for byte in sig.sig {
-                octets.push_str(&format!("{:02x}", byte));
-            }
-        } else {
-            let (pref, _mid, suff) = unsafe {
-                trisect_unchecked(&sig.sig, conf.octet_bytes_bookend, conf.octet_bytes_bookend)
-            };
-            for byte in pref {
-                octets.push_str(&format!("{:02x}", byte));
-            }
-            octets.push_str(&format!("...({} bytes)...", _mid.len()));
-            for byte in suff.iter().rev() {
-                octets.push_str(&format!("{:02x}", byte));
-            }
-        }
-        tok(format!("Signature Block: [{} bytes]: ", sig.length,)).then(toks(octets))
+        tok(format!("Signature Block: [{} bytes]: ", sig.length))
+            .then(display_bytes_inline(&sig.sig, conf.octet_bytes_bookend))
     }
 }
 

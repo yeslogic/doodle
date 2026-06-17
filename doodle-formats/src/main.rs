@@ -255,7 +255,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
                         }
                         FormatSelector::Elf => format::elf::main(&mut module).call(),
                         FormatSelector::Waldo => format::waldo::main(&mut module).call(),
-                        FormatSelector::Opentype => format::opentype::main(&mut module).call(),
+                        FormatSelector::Opentype => format::opentype_standalone(&mut module).call(),
                     }
                 }
             };

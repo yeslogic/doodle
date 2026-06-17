@@ -137,9 +137,9 @@ pub fn main(
     let zlib_utf8text = chain(
         zlib.call(),
         "zlib",
-        Format::DecodeBytes(
-            Box::new(record_lens(var("zlib"), &["data", "inflate"])),
-            Box::new(utf8text_nz.call()),
+        decode_bytes(
+            record_lens(var("zlib"), &["data", "inflate"]),
+            utf8text_nz.call(),
         ),
     );
 
@@ -236,10 +236,10 @@ pub fn main(
     let zlib_latin1 = chain(
         zlib.call(),
         "zlib",
-        Format::DecodeBytes(
-            Box::new(record_lens(var("zlib"), &["data", "inflate"])),
+        decode_bytes(
+            record_lens(var("zlib"), &["data", "inflate"]),
             // TODO - we need to define a new format for latin1 without a null terminal (viz. why asciiz_string won't work)
-            Box::new(utf8text.call()),
+            utf8text.call(),
         ),
     );
 
@@ -437,7 +437,7 @@ pub fn main(
                         ),
                     ),
                     "idat",
-                    Format::DecodeBytes(Box::new(var("idat")), Box::new(zlib.call())),
+                    decode_bytes(var("idat"), zlib.call()),
                 ),
             ),
             (

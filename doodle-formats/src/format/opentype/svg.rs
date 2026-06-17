@@ -9,7 +9,7 @@ use super::*;
 /// text for the purposes of validation.
 ///
 /// If gzip-compressed, the leading bytes will be `0x1f 0x8b 0x08`.
-fn svg_document_record(module: &mut FormatModule) -> DepFormat<0, 1> {
+fn svg_document_record(module: &mut FormatModule, text_or_ztext: FormatRef) -> DepFormat<0, 1> {
     module.register_format_view(
         "opentype.svg.document_record",
         Label::Borrowed("list_view"),
@@ -26,12 +26,19 @@ fn svg_document_record(module: &mut FormatModule) -> DepFormat<0, 1> {
                     capture_bytes(var("svg_document_length")),
                 ),
             ),
+            (
+                "#_svg_document_utf8",
+                phantom(parse_from_view(
+                    vvar("list_view").offset(var("svg_document_offset")),
+                    text_or_ztext.call(),
+                )),
+            ),
         ]),
     )
 }
 
-fn svg_document_list(module: &mut FormatModule) -> FormatRef {
-    let svg_document_record = svg_document_record(module);
+fn svg_document_list(module: &mut FormatModule, text_or_ztext: FormatRef) -> FormatRef {
+    let svg_document_record = svg_document_record(module, text_or_ztext);
     module.define_format(
         "opentype.svg.document_list",
         let_view(
@@ -50,8 +57,8 @@ fn svg_document_list(module: &mut FormatModule) -> FormatRef {
     )
 }
 
-pub(crate) fn table(module: &mut FormatModule) -> FormatRef {
-    let svg_document_list = svg_document_list(module);
+pub(crate) fn table(module: &mut FormatModule, text_or_ztext: FormatRef) -> FormatRef {
+    let svg_document_list = svg_document_list(module, text_or_ztext);
     module.define_format(
         "opentype.svg.table",
         let_view(
