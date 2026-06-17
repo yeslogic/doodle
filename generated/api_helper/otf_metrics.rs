@@ -1362,6 +1362,174 @@ pub(crate) type TFRErr<Src, Tgt> = <Tgt as TryFromRef<Src>>::Error;
 type Local<T> = T;
 // !SECTION
 
+pub mod otf_common {
+    use super::{Mandatory, Nullable, container, obj};
+    alias! {
+        pub type OpentypeVariationRegionList = opentype_common_variation_region_list;
+        pub type OpentypeRegionAxisCoordinates =
+            opentype_common_variation_region_list_variation_regions_region_axes;
+
+        pub type OpentypeItemVariationStore = opentype_common_item_variation_store<'a>;
+        pub type OpentypeItemVariationData = opentype_common_item_variation_data;
+        pub type OpentypeDeltaSets = opentype_common_item_variation_data_delta_sets;
+    }
+
+    frame!(OpentypeItemVariationStore);
+
+    impl<'input> container::SingleContainer<Nullable<obj::VarRegList>>
+        for OpentypeItemVariationStore<'input>
+    {
+        fn get_offset(&self) -> usize {
+            self.variation_region_list.offset as usize
+        }
+
+        fn get_args(&self) -> <obj::VarRegList as container::CommonObject>::Args<'_> {}
+    }
+
+    impl<'input> container::DynContainer<Nullable<obj::ItemVarData>>
+        for OpentypeItemVariationStore<'input>
+    {
+        fn count(&self) -> usize {
+            self.item_variation_data_count as usize
+        }
+
+        fn iter_offsets(&self) -> impl Iterator<Item = usize> {
+            self.item_variation_data_list
+                .iter()
+                .map(|x| x.offset as usize)
+        }
+
+        fn iter_args(
+            &self,
+        ) -> impl Iterator<Item = <obj::ItemVarData as container::CommonObject>::Args<'_>> {
+            std::iter::repeat(())
+        }
+    }
+}
+pub use otf_common::*;
+
+pub mod common {
+    use super::*;
+
+    #[derive(Debug, Clone, Copy)]
+    pub struct RegionAxisCoordinates {
+        pub(crate) start_coord: F2Dot14,
+        pub(crate) peak_coord: F2Dot14,
+        pub(crate) end_coord: F2Dot14,
+    }
+
+    impl Promote<OpentypeRegionAxisCoordinates> for RegionAxisCoordinates {
+        fn promote(orig: &OpentypeRegionAxisCoordinates) -> Self {
+            RegionAxisCoordinates {
+                start_coord: F2Dot14::promote(&orig.start_coord),
+                peak_coord: F2Dot14::promote(&orig.peak_coord),
+                end_coord: F2Dot14::promote(&orig.end_coord),
+            }
+        }
+    }
+
+    // TODO[epic=api-refinement] - replace Vec<Vec<_>> with Wec<_>
+    #[derive(Debug, Clone, Default)]
+    pub struct VariationRegionList(pub(crate) Vec<Vec<RegionAxisCoordinates>>);
+
+    impl Promote<OpentypeVariationRegionList> for VariationRegionList {
+        fn promote(orig: &OpentypeVariationRegionList) -> Self {
+            let mut major_accum = Vec::with_capacity(orig.region_count as usize);
+            for per_region in orig.variation_regions.iter() {
+                let mut minor_accum = Vec::with_capacity(orig.axis_count as usize);
+                for coords in per_region.region_axes.iter() {
+                    minor_accum.push(RegionAxisCoordinates::promote(coords));
+                }
+                major_accum.push(minor_accum);
+            }
+            Self(major_accum)
+        }
+    }
+
+    pub type Deltas<Full, Half> = (Vec<Full>, Vec<Half>);
+
+    #[derive(Debug, Clone)]
+    pub enum DeltaSets {
+        Delta16Sets(Vec<Deltas<i16, i8>>),
+        Delta32Sets(Vec<Deltas<i32, i16>>),
+    }
+
+    impl Promote<OpentypeDeltaSets> for DeltaSets {
+        fn promote(orig: &OpentypeDeltaSets) -> Self {
+            match orig {
+                OpentypeDeltaSets::Delta32Sets(delta32s) => DeltaSets::Delta32Sets(
+                    delta32s
+                        .iter()
+                        .map(|delta_set| {
+                            (
+                                delta_set.delta_data_full_word.clone(),
+                                delta_set.delta_data_half_word.clone(),
+                            )
+                        })
+                        .collect(),
+                ),
+                OpentypeDeltaSets::Delta16Sets(delta16s) => DeltaSets::Delta16Sets(
+                    delta16s
+                        .iter()
+                        .map(|delta_set| {
+                            (
+                                delta_set.delta_data_full_word.clone(),
+                                delta_set.delta_data_half_word.clone(),
+                            )
+                        })
+                        .collect(),
+                ),
+            }
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct ItemVariationData {
+        pub(crate) item_count: u16,
+        pub(crate) long_words: bool,
+        pub(crate) word_count: u16,
+        pub(crate) region_index_count: u16,
+        pub(crate) region_indices: Vec<u16>,
+        pub(crate) delta_sets: DeltaSets,
+    }
+
+    impl Promote<OpentypeItemVariationData> for ItemVariationData {
+        fn promote(orig: &OpentypeItemVariationData) -> Self {
+            ItemVariationData {
+                item_count: orig.item_count,
+                long_words: orig.word_delta_count.long_words,
+                word_count: orig.word_delta_count.word_count,
+                region_index_count: orig.region_index_count,
+                region_indices: orig.region_indices.clone(),
+                delta_sets: DeltaSets::promote(&orig.delta_sets),
+            }
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    pub struct ItemVariationStore {
+        pub(crate) variation_region_list: VariationRegionList,
+        pub(crate) item_variation_data_list: Vec<Option<ItemVariationData>>,
+    }
+
+    impl<'a> Promote<OpentypeItemVariationStore<'a>> for ItemVariationStore {
+        fn promote(orig: &OpentypeItemVariationStore) -> Self {
+            let variation_region_list =
+                promote_from_null(&fn_reify::reify(orig, Nullable(obj::VarRegList)));
+            let item_variation_data_list = fn_reify::reify_all(orig, Nullable(obj::ItemVarData))
+                .map(|raw| promote_opt(&raw))
+                .collect();
+            ItemVariationStore {
+                variation_region_list,
+                item_variation_data_list,
+            }
+        }
+    }
+}
+pub(crate) use common::{
+    DeltaSets, ItemVariationData, ItemVariationStore, RegionAxisCoordinates, VariationRegionList,
+};
+
 // SECTION - crate-local trait impls on top-level table types
 mod __gdef_impl {
     use super::OpentypeGdef;
@@ -3742,163 +3910,6 @@ pub(crate) mod gasp {
 }
 pub(crate) use gasp::{GaspBehaviorFlags, GaspMetrics, GaspRange};
 
-pub type OpentypeRegionAxisCoordinates =
-    opentype_common_variation_region_list_variation_regions_region_axes;
-#[derive(Debug, Clone, Copy)]
-pub struct RegionAxisCoordinates {
-    pub(crate) start_coord: F2Dot14,
-    pub(crate) peak_coord: F2Dot14,
-    pub(crate) end_coord: F2Dot14,
-}
-
-impl Promote<OpentypeRegionAxisCoordinates> for RegionAxisCoordinates {
-    fn promote(orig: &OpentypeRegionAxisCoordinates) -> Self {
-        RegionAxisCoordinates {
-            start_coord: F2Dot14::promote(&orig.start_coord),
-            peak_coord: F2Dot14::promote(&orig.peak_coord),
-            end_coord: F2Dot14::promote(&orig.end_coord),
-        }
-    }
-}
-
-pub type OpentypeVariationRegionList = opentype_common_variation_region_list;
-
-// TODO[epic=api-refinement] - replace Vec<Vec<_>> with Wec<_>
-#[derive(Debug, Clone, Default)]
-pub struct VariationRegionList(pub(crate) Vec<Vec<RegionAxisCoordinates>>);
-
-impl Promote<OpentypeVariationRegionList> for VariationRegionList {
-    fn promote(orig: &OpentypeVariationRegionList) -> Self {
-        let mut major_accum = Vec::with_capacity(orig.region_count as usize);
-        for per_region in orig.variation_regions.iter() {
-            let mut minor_accum = Vec::with_capacity(orig.axis_count as usize);
-            for coords in per_region.region_axes.iter() {
-                minor_accum.push(RegionAxisCoordinates::promote(coords));
-            }
-            major_accum.push(minor_accum);
-        }
-        Self(major_accum)
-    }
-}
-
-pub type OpentypeDeltaSets = opentype_common_item_variation_data_delta_sets;
-
-impl Promote<OpentypeDeltaSets> for DeltaSets {
-    fn promote(orig: &OpentypeDeltaSets) -> Self {
-        match orig {
-            OpentypeDeltaSets::Delta32Sets(delta32s) => DeltaSets::Delta32Sets(
-                delta32s
-                    .iter()
-                    .map(|delta_set| {
-                        (
-                            delta_set.delta_data_full_word.clone(),
-                            delta_set.delta_data_half_word.clone(),
-                        )
-                    })
-                    .collect(),
-            ),
-            OpentypeDeltaSets::Delta16Sets(delta16s) => DeltaSets::Delta16Sets(
-                delta16s
-                    .iter()
-                    .map(|delta_set| {
-                        (
-                            delta_set.delta_data_full_word.clone(),
-                            delta_set.delta_data_half_word.clone(),
-                        )
-                    })
-                    .collect(),
-            ),
-        }
-    }
-}
-
-pub type Deltas<Full, Half> = (Vec<Full>, Vec<Half>);
-
-#[derive(Debug, Clone)]
-pub enum DeltaSets {
-    Delta16Sets(Vec<Deltas<i16, i8>>),
-    Delta32Sets(Vec<Deltas<i32, i16>>),
-}
-
-pub type OpentypeItemVariationData = opentype_common_item_variation_data;
-
-impl Promote<OpentypeItemVariationData> for ItemVariationData {
-    fn promote(orig: &OpentypeItemVariationData) -> Self {
-        ItemVariationData {
-            item_count: orig.item_count,
-            long_words: orig.word_delta_count.long_words,
-            word_count: orig.word_delta_count.word_count,
-            region_index_count: orig.region_index_count,
-            region_indices: orig.region_indices.clone(),
-            delta_sets: DeltaSets::promote(&orig.delta_sets),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-struct ItemVariationData {
-    item_count: u16,
-    long_words: bool,
-    word_count: u16,
-    region_index_count: u16,
-    region_indices: Vec<u16>,
-    delta_sets: DeltaSets,
-}
-
-pub type OpentypeItemVariationStore<'a> = opentype_common_item_variation_store<'a>;
-
-frame!(OpentypeItemVariationStore);
-
-impl<'input> container::SingleContainer<Nullable<obj::VarRegList>>
-    for OpentypeItemVariationStore<'input>
-{
-    fn get_offset(&self) -> usize {
-        self.variation_region_list.offset as usize
-    }
-
-    fn get_args(&self) -> <obj::VarRegList as container::CommonObject>::Args<'_> {}
-}
-
-impl<'input> container::DynContainer<Nullable<obj::ItemVarData>>
-    for OpentypeItemVariationStore<'input>
-{
-    fn count(&self) -> usize {
-        self.item_variation_data_count as usize
-    }
-
-    fn iter_offsets(&self) -> impl Iterator<Item = usize> {
-        self.item_variation_data_list
-            .iter()
-            .map(|x| x.offset as usize)
-    }
-
-    fn iter_args(
-        &self,
-    ) -> impl Iterator<Item = <obj::ItemVarData as container::CommonObject>::Args<'_>> {
-        std::iter::repeat(())
-    }
-}
-
-impl<'a> Promote<OpentypeItemVariationStore<'a>> for ItemVariationStore {
-    fn promote(orig: &OpentypeItemVariationStore) -> Self {
-        let variation_region_list =
-            promote_from_null(&fn_reify::reify(orig, Nullable(obj::VarRegList)));
-        let item_variation_data_list = fn_reify::reify_all(orig, Nullable(obj::ItemVarData))
-            .map(|raw| promote_opt(&raw))
-            .collect();
-        ItemVariationStore {
-            variation_region_list,
-            item_variation_data_list,
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct ItemVariationStore {
-    pub(crate) variation_region_list: VariationRegionList,
-    pub(crate) item_variation_data_list: Vec<Option<ItemVariationData>>,
-}
-
 pub mod otf_layout_common {
     alias! {
         pub type OpentypeClassDef = opentype_class_def;
@@ -3906,6 +3917,12 @@ pub mod otf_layout_common {
         pub type OpentypeClassDefFormat1 = opentype_class_def_data_Format1;
         pub type OpentypeClassDefFormat2 = opentype_class_def_data_Format2;
         pub type OpentypeClassRangeRecord = opentype_class_def_data_Format2_class_range_records;
+
+        pub type OpentypeDeviceOrVariationIndexTable = opentype_common_device_or_variation_index_table;
+        pub type OpentypeDeviceTable = opentype_common_device_or_variation_index_table_DeviceTable;
+        pub type OpentypeVariationIndexTable =
+            opentype_common_device_or_variation_index_table_VariationIndexTable;
+        pub type OpentypeDVIOtherTable = opentype_common_device_or_variation_index_table_OtherTable;
     }
 }
 pub use otf_layout_common::*;
@@ -4131,428 +4148,271 @@ pub(crate) mod layout_common {
             }
         }
     }
+
+    /// Interpreted form of the array of delta-values stored in a [`DeviceTable`].
+    ///
+    /// Raw form consists of `{ format : u16, values?: Vec<u16> }`, where `format` is
+    /// a field stored at the same field-offset in both `DeviceTable` and `VariationIndexTable`.
+    ///
+    /// If `format = N ∈ { 1, 2, 3 }`, then the `values` field is present and contains
+    /// the raw binary data for the delta-values.
+    ///
+    /// If `format == 0x0008`, the record is a [`VariationIndexTable`] and there is
+    /// no `values` field to parse.
+    ///
+    /// Any other `format` is non-standard.
+    #[derive(Clone, Debug)]
+    pub enum DeltaValues {
+        Bits2(Vec<i8>),
+        Bits4(Vec<i8>),
+        Bits8(Vec<i8>),
+    }
+
+    /// Re-interprets a value with machine type `u8` as an `N`-bit signed integer
+    /// using the expected two's-complement representation (with machine type `i8`).
+    ///
+    /// If `N == 8`, operationally equivalent to casting `raw as i8`.
+    ///
+    /// # Panics
+    ///
+    /// Due to the limited use of this function, `N` must be in the range `[2, 8]`,
+    /// and though it not necessarily checked, `raw` should contain no more than `N`
+    /// significant bits.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// // bits::<8>(raw) is the same as `raw as i8` so we omit those cases
+    ///
+    /// // We only show the significant endpoints of the positive and negative ranges
+    /// assert_eq!(bits::<4>(0x0), 0x0);
+    /// assert_eq!(bits::<4>(0x7), 0x7);
+    /// assert_eq!(bits::<4>(0x8), -0x8);
+    /// assert_eq!(bits::<4>(0xF), -1);
+    ///
+    /// // There are only four 2-bit values so we can list them all
+    /// assert_eq!(bits::<2>(0b00), 0);
+    /// assert_eq!(bits::<2>(0b01), 1);
+    /// assert_eq!(bits::<2>(0b10), -2);
+    /// assert_eq!(bits::<2>(0b11), -1);
+    /// ```
+    fn bits<const N: usize>(raw: u8) -> i8 {
+        // Shortcut for when we have exactly 8 bits
+        if N == 8 {
+            return raw as i8;
+        }
+        assert!(N > 1 && N < 8);
+        let range_max: i8 = 1 << N;
+        let i_raw = raw as i8;
+        if i_raw >= range_max / 2 {
+            i_raw - range_max
+        } else {
+            i_raw
+        }
+    }
+
+    impl TryFromRef<(u16, Vec<u16>)> for DeltaValues {
+        type Error = Local<UnknownValueError<u16>>;
+
+        fn try_from_ref(value: (u16, &Vec<u16>)) -> Result<Self, Self::Error> {
+            match value.0 {
+                0x0001 => {
+                    // 2-bit Deltas
+                    let mut unpacked_deltas = Vec::with_capacity(8 * value.1.len());
+                    for packed in value
+                        .1
+                        .iter()
+                        .copied()
+                        .flat_map(|word16| word16.to_be_bytes())
+                    {
+                        let hh = bits::<2>(packed >> 6);
+                        let hl = bits::<2>(packed >> 4 & 0b11);
+                        let lh = bits::<2>(packed >> 2 & 0b11);
+                        let ll = bits::<2>(packed & 0b11);
+                        unpacked_deltas.extend_from_slice(&[hh, hl, lh, ll]);
+                    }
+                    Ok(DeltaValues::Bits2(unpacked_deltas))
+                }
+                0x0002 => {
+                    // 4-bit Deltas
+                    let mut unpacked_deltas = Vec::with_capacity(4 * value.1.len());
+                    for packed in value
+                        .1
+                        .iter()
+                        .copied()
+                        .flat_map(|word16| word16.to_be_bytes())
+                    {
+                        let hi = bits::<4>(packed >> 4);
+                        let lo = bits::<4>(packed & 0xf);
+                        unpacked_deltas.extend_from_slice(&[hi, lo]);
+                    }
+                    Ok(DeltaValues::Bits4(unpacked_deltas))
+                }
+                0x0003 => {
+                    // 8-bit Deltas
+                    let mut unpacked_deltas = Vec::with_capacity(4 * value.1.len());
+                    for packed in value
+                        .1
+                        .iter()
+                        .copied()
+                        .flat_map(|word16| word16.to_be_bytes())
+                    {
+                        unpacked_deltas.push(packed as i8)
+                    }
+                    Ok(DeltaValues::Bits8(unpacked_deltas))
+                }
+                _ => Err(UnknownValueError {
+                    what: String::from("delta-format"),
+                    bad_value: value.0,
+                }),
+            }
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    pub struct DeviceTable {
+        pub(crate) start_size: u16,
+        pub(crate) end_size: u16,
+        // REVIEW - do we want to unpack the values into i8-valued deltas based on the format?
+        pub(crate) delta_values: DeltaValues,
+        // Format is implicated by the discriminant of delta_values, so we omit it
+    }
+
+    #[derive(Clone, Debug)]
+    pub struct VariationIndexTable {
+        pub(crate) delta_set_outer_index: u16,
+        pub(crate) delta_set_inner_index: u16,
+        // Format := 0x0008 is implicit, so we omit it
+    }
+
+    #[derive(Clone, Debug)]
+    pub enum DeviceOrVariationIndexTable {
+        Device(DeviceTable),
+        VariationIndex(VariationIndexTable),
+        NonStandard { delta_format: u16 },
+    }
+
+    impl TryPromote<OpentypeDeviceOrVariationIndexTable> for DeviceOrVariationIndexTable {
+        type Error = ReflType<TFRErr<(u16, Vec<u16>), DeltaValues>, UnknownValueError<u16>>;
+
+        fn try_promote(orig: &OpentypeDeviceOrVariationIndexTable) -> Result<Self, Self::Error> {
+            match *orig {
+                OpentypeDeviceOrVariationIndexTable::DeviceTable(OpentypeDeviceTable {
+                    start_size,
+                    end_size,
+                    delta_format,
+                    ref delta_values,
+                }) => Ok(DeviceOrVariationIndexTable::Device(DeviceTable {
+                    start_size,
+                    end_size,
+                    delta_values: DeltaValues::try_from_ref((delta_format, delta_values))?,
+                })),
+                OpentypeDeviceOrVariationIndexTable::VariationIndexTable(
+                    OpentypeVariationIndexTable {
+                        delta_set_outer_index,
+                        delta_set_inner_index,
+                        ..
+                    },
+                ) => Ok(DeviceOrVariationIndexTable::VariationIndex(
+                    VariationIndexTable {
+                        delta_set_outer_index,
+                        delta_set_inner_index,
+                    },
+                )),
+                OpentypeDeviceOrVariationIndexTable::OtherTable(OpentypeDVIOtherTable {
+                    delta_format,
+                    ..
+                }) => Ok(DeviceOrVariationIndexTable::NonStandard { delta_format }),
+            }
+        }
+    }
 }
 pub(crate) use layout_common::{
-    ClassDef, ClassRangeRecord, CoverageRangeRecord, CoverageTable, GlyphClass, RangeRecord,
+    ClassDef, ClassRangeRecord, CoverageRangeRecord, CoverageTable, DeltaValues,
+    DeviceOrVariationIndexTable, DeviceTable, GlyphClass, RangeRecord, VariationIndexTable,
     format_glyph_class,
 };
-
-#[derive(Clone, Debug, Default)]
-#[repr(transparent)]
-pub struct AttachPoint {
-    pub(crate) point_indices: Vec<u16>,
-}
-
-#[derive(Clone, Debug)]
-pub struct AttachList {
-    pub(crate) coverage: CoverageTable,
-    pub(crate) attach_points: Vec<AttachPoint>,
-}
-
-impl Promote<OpentypeAttachPoint> for AttachPoint {
-    fn promote(orig: &OpentypeAttachPoint) -> Self {
-        AttachPoint {
-            point_indices: orig.point_indices.clone(),
-        }
-    }
-}
-
-alias! {
-    pub type OpentypeAttachList = opentype_gdef_attach_list<'a>;
-}
-
-frame!(OpentypeAttachList.list_scope);
-
-impl<'a> container::SingleContainer<obj::CovTable> for OpentypeAttachList<'a> {
-    fn get_offset(&self) -> usize {
-        self.coverage.offset as usize
-    }
-
-    fn get_args(&self) {}
-}
-
-impl<'a> container::DynContainer<obj::AttPoint> for OpentypeAttachList<'a> {
-    fn count(&self) -> usize {
-        self.attach_point_offsets.len()
-    }
-
-    fn iter_offsets(&self) -> impl Iterator<Item = usize> {
-        self.attach_point_offsets
-            .iter()
-            .map(|offset| offset.offset as usize)
-    }
-
-    fn iter_args(
-        &self,
-    ) -> impl Iterator<Item = <obj::AttPoint as container::CommonObject>::Args<'_>> {
-        std::iter::repeat(())
-    }
-}
-
-impl<'a> Promote<OpentypeAttachList<'a>> for AttachList {
-    fn promote(orig: &OpentypeAttachList) -> Self {
-        let coverage = CoverageTable::promote(&fn_reify::reify(orig, obj::CovTable));
-        let attach_points = fn_reify::reify_all(orig, obj::AttPoint)
-            .map(|raw| AttachPoint::promote(&raw))
-            .collect();
-        AttachList {
-            coverage,
-            attach_points,
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct LigCaretList {
-    pub(crate) coverage: CoverageTable,
-    pub(crate) lig_glyphs: Vec<LigGlyph>,
-}
-
-type OpentypeLigCaretList<'a> = opentype_gdef_lig_caret_list<'a>;
-
-frame!(OpentypeLigCaretList.list_scope);
-
-impl container::SingleContainer<obj::CovTable> for OpentypeLigCaretList<'_> {
-    fn get_offset(&self) -> usize {
-        self.coverage.offset as usize
-    }
-
-    fn get_args(&self) -> () {}
-}
-
-impl<'a> container::DynContainer<Nullable<obj::LigGlyph>> for OpentypeLigCaretList<'a> {
-    fn count(&self) -> usize {
-        self.lig_glyph_count as usize
-    }
-
-    fn iter_offsets(&self) -> impl Iterator<Item = usize> {
-        self.lig_glyph_offsets
-            .iter()
-            .map(|offs| offs.offset as usize)
-    }
-
-    fn iter_args(
-        &self,
-    ) -> impl Iterator<Item = <obj::LigGlyph as container::CommonObject>::Args<'_>> {
-        std::iter::repeat(())
-    }
-}
-
-impl<'a> TryPromote<OpentypeLigCaretList<'a>> for LigCaretList {
-    type Error = ReflType<TPErr<OpentypeLigGlyph<'a>, LigGlyph>, UnknownValueError<u16>>;
-
-    fn try_promote(orig: &OpentypeLigCaretList) -> Result<Self, Self::Error> {
-        let coverage = CoverageTable::promote(&fn_reify::reify(orig, obj::CovTable));
-        let mut lig_glyphs = Vec::with_capacity(container::DynContainer::count(orig));
-        for opt_raw in fn_reify::reify_all(orig, Nullable(obj::LigGlyph)) {
-            lig_glyphs.push(try_promote_from_null(&opt_raw)?);
-        }
-        Ok(LigCaretList {
-            coverage,
-            lig_glyphs,
-        })
-    }
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct LigGlyph {
-    pub(crate) caret_values: Vec<Link<CaretValue>>,
-}
-
-pub type OpentypeLigGlyph<'a> = opentype_gdef_lig_glyph<'a>;
-
-frame!(OpentypeLigGlyph);
-
-impl<'a> container::DynContainer<Nullable<obj::CaretVal>> for OpentypeLigGlyph<'a> {
-    fn count(&self) -> usize {
-        self.caret_count as usize
-    }
-
-    fn iter_offsets(&self) -> impl Iterator<Item = usize> {
-        self.caret_values.iter().map(|offs| offs.offset as usize)
-    }
-
-    fn iter_args(
-        &self,
-    ) -> impl Iterator<Item = <obj::CaretVal as container::CommonObject>::Args<'_>> {
-        std::iter::repeat(())
-    }
-}
-
-impl<'a> TryPromote<OpentypeLigGlyph<'a>> for LigGlyph {
-    type Error = ReflType<TPErr<OpentypeCaretValueData<'a>, CaretValue>, UnknownValueError<u16>>;
-
-    fn try_promote(orig: &OpentypeLigGlyph) -> Result<Self, Self::Error> {
-        let mut caret_values = Vec::with_capacity(container::DynContainer::count(orig));
-        for opt_raw in fn_reify::reify_all(orig, Nullable(obj::CaretVal)) {
-            caret_values.push(try_promote_opt(&opt_raw)?); // &caret_value.data
-        }
-        Ok(LigGlyph { caret_values })
-    }
-}
-
-// Caret position given as an x- or y-coordinate, as a number of design units
-#[derive(Clone, Copy, Debug)]
-pub struct CaretValueDesignUnits {
-    coordinate: u16,
-}
-
-// Caret position given as the index to a specific contour point on a glyph
-#[derive(Clone, Copy, Debug)]
-pub struct ContourPoint {
-    index: u16,
-}
-
-#[derive(Clone, Debug)]
-pub enum DeltaValues {
-    Bits2(Vec<i8>),
-    Bits4(Vec<i8>),
-    Bits8(Vec<i8>),
-}
-
-/// Re-interprets a value with machine type `u8` as an `N`-bit signed integer
-/// using the expected two's-complement representation (with machine type `i8`).
-///
-/// If `N == 8`, operationally equivalent to casting `raw as i8`.
-///
-/// # Panics
-///
-/// Due to the limited use of this function, `N` must be in the range `[2, 8]`,
-/// and though it not necessarily checked, `raw` should contain no more than `N`
-/// significant bits.
-///
-/// # Examples
-///
-/// ```ignore
-/// // bits::<8>(raw) is the same as `raw as i8` so we omit those cases
-///
-/// // We only show the significant endpoints of the positive and negative ranges
-/// assert_eq!(bits::<4>(0x0), 0x0);
-/// assert_eq!(bits::<4>(0x7), 0x7);
-/// assert_eq!(bits::<4>(0x8), -0x8);
-/// assert_eq!(bits::<4>(0xF), -1);
-///
-/// // There are only four 2-bit values so we can list them all
-/// assert_eq!(bits::<2>(0b00), 0);
-/// assert_eq!(bits::<2>(0b01), 1);
-/// assert_eq!(bits::<2>(0b10), -2);
-/// assert_eq!(bits::<2>(0b11), -1);
-/// ```
-fn bits<const N: usize>(raw: u8) -> i8 {
-    // Shortcut for when we have exactly 8 bits
-    if N == 8 {
-        return raw as i8;
-    }
-    assert!(N > 1 && N < 8);
-    let range_max: i8 = 1 << N;
-    let i_raw = raw as i8;
-    if i_raw >= range_max / 2 {
-        i_raw - range_max
-    } else {
-        i_raw
-    }
-}
-
-impl TryFromRef<(u16, Vec<u16>)> for DeltaValues {
-    type Error = Local<UnknownValueError<u16>>;
-
-    fn try_from_ref(value: (u16, &Vec<u16>)) -> Result<Self, Self::Error> {
-        match value.0 {
-            0x0001 => {
-                // 2-bit Deltas
-                let mut unpacked_deltas = Vec::with_capacity(8 * value.1.len());
-                for packed in value
-                    .1
-                    .iter()
-                    .copied()
-                    .flat_map(|word16| word16.to_be_bytes())
-                {
-                    let hh = bits::<2>(packed >> 6);
-                    let hl = bits::<2>(packed >> 4 & 0b11);
-                    let lh = bits::<2>(packed >> 2 & 0b11);
-                    let ll = bits::<2>(packed & 0b11);
-                    unpacked_deltas.extend_from_slice(&[hh, hl, lh, ll]);
-                }
-                Ok(DeltaValues::Bits2(unpacked_deltas))
-            }
-            0x0002 => {
-                // 4-bit Deltas
-                let mut unpacked_deltas = Vec::with_capacity(4 * value.1.len());
-                for packed in value
-                    .1
-                    .iter()
-                    .copied()
-                    .flat_map(|word16| word16.to_be_bytes())
-                {
-                    let hi = bits::<4>(packed >> 4);
-                    let lo = bits::<4>(packed & 0xf);
-                    unpacked_deltas.extend_from_slice(&[hi, lo]);
-                }
-                Ok(DeltaValues::Bits4(unpacked_deltas))
-            }
-            0x0003 => {
-                // 8-bit Deltas
-                let mut unpacked_deltas = Vec::with_capacity(4 * value.1.len());
-                for packed in value
-                    .1
-                    .iter()
-                    .copied()
-                    .flat_map(|word16| word16.to_be_bytes())
-                {
-                    unpacked_deltas.push(packed as i8)
-                }
-                Ok(DeltaValues::Bits8(unpacked_deltas))
-            }
-            _ => Err(UnknownValueError {
-                what: String::from("delta-format"),
-                bad_value: value.0,
-            }),
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct DeviceTable {
-    start_size: u16,
-    end_size: u16,
-    // REVIEW - do we want to unpack the values into i8-valued deltas based on the format?
-    delta_values: DeltaValues,
-    // Format is implicated by the discriminant of delta_values, so we omit it
-}
-
-#[derive(Clone, Debug)]
-pub struct VariationIndexTable {
-    delta_set_outer_index: u16,
-    delta_set_inner_index: u16,
-    // Format := 0x0008 is implicit, so we omit it
-}
-
-#[derive(Clone, Debug)]
-pub enum DeviceOrVariationIndexTable {
-    Device(DeviceTable),
-    VariationIndex(VariationIndexTable),
-    NonStandard { delta_format: u16 },
-}
-
-#[derive(Clone, Debug)]
-pub enum CaretValue {
-    DesignUnits(i16),  // Format1
-    ContourPoint(u16), // Format2
-    DesignUnitsWithTable {
-        coordinate: i16,
-        device: Link<DeviceOrVariationIndexTable>,
-    }, // Format3
-}
-
-type OpentypeCaretValue<'a> = opentype_gdef_caret_value<'a>;
-type OpentypeCaretValueData<'a> = opentype_gdef_caret_value_data<'a>;
-type OpentypeCaretValueFormat1 = opentype_gdef_caret_value_data_Format1;
-type OpentypeCaretValueFormat2 = opentype_gdef_caret_value_data_Format2;
-type OpentypeCaretValueFormat3<'a> = opentype_gdef_caret_value_data_format3<'a>;
-
-type OpentypeDeviceOrVariationIndexTable = opentype_common_device_or_variation_index_table;
-type OpentypeDeviceTable = opentype_common_device_or_variation_index_table_DeviceTable;
-type OpentypeVariationIndexTable =
-    opentype_common_device_or_variation_index_table_VariationIndexTable;
-type OpentypeDVIOtherTable = opentype_common_device_or_variation_index_table_OtherTable;
-
-impl TryPromote<OpentypeDeviceOrVariationIndexTable> for DeviceOrVariationIndexTable {
-    type Error = ReflType<TFRErr<(u16, Vec<u16>), DeltaValues>, UnknownValueError<u16>>;
-
-    fn try_promote(orig: &OpentypeDeviceOrVariationIndexTable) -> Result<Self, Self::Error> {
-        match *orig {
-            OpentypeDeviceOrVariationIndexTable::DeviceTable(OpentypeDeviceTable {
-                start_size,
-                end_size,
-                delta_format,
-                ref delta_values,
-            }) => Ok(DeviceOrVariationIndexTable::Device(DeviceTable {
-                start_size,
-                end_size,
-                delta_values: DeltaValues::try_from_ref((delta_format, delta_values))?,
-            })),
-            OpentypeDeviceOrVariationIndexTable::VariationIndexTable(
-                OpentypeVariationIndexTable {
-                    delta_set_outer_index,
-                    delta_set_inner_index,
-                    ..
-                },
-            ) => Ok(DeviceOrVariationIndexTable::VariationIndex(
-                VariationIndexTable {
-                    delta_set_outer_index,
-                    delta_set_inner_index,
-                },
-            )),
-            OpentypeDeviceOrVariationIndexTable::OtherTable(OpentypeDVIOtherTable {
-                delta_format,
-                ..
-            }) => Ok(DeviceOrVariationIndexTable::NonStandard { delta_format }),
-        }
-    }
-}
-
-impl<'a> TryPromote<OpentypeCaretValue<'a>> for CaretValue {
-    type Error = ReflType<TPErr<OpentypeCaretValueData<'a>, CaretValue>, UnknownValueError<u16>>;
-
-    fn try_promote(orig: &OpentypeCaretValue) -> Result<Self, Self::Error> {
-        Self::try_promote(&orig.data)
-    }
-}
-
-frame!(OpentypeCaretValueFormat3);
-
-impl<'a> container::SingleContainer<Nullable<obj::DevTable>> for OpentypeCaretValueFormat3<'a> {
-    fn get_offset(&self) -> usize {
-        self.table.offset as usize
-    }
-
-    fn get_args(&self) -> () {}
-}
-
-impl<'a> TryPromote<OpentypeCaretValueData<'a>> for CaretValue {
-    type Error = ReflType<
-        TPErr<OpentypeDeviceOrVariationIndexTable, DeviceOrVariationIndexTable>,
-        UnknownValueError<u16>,
-    >;
-
-    fn try_promote(orig: &OpentypeCaretValueData) -> Result<Self, Self::Error> {
-        match orig {
-            OpentypeCaretValueData::Format1(OpentypeCaretValueFormat1 { coordinate }) => {
-                Ok(CaretValue::DesignUnits(*coordinate))
-            }
-            OpentypeCaretValueData::Format2(OpentypeCaretValueFormat2 {
-                caret_value_point_index,
-            }) => Ok(CaretValue::ContourPoint(*caret_value_point_index)),
-            OpentypeCaretValueData::Format3(format3) => {
-                let device = try_promote_opt(&fn_reify::reify(format3, Nullable(obj::DevTable)))?;
-                Ok(CaretValue::DesignUnitsWithTable {
-                    coordinate: format3.coordinate,
-                    device,
-                })
-            }
-        }
-    }
-}
 
 pub mod otf_gdef {
     use super::{Mandatory, Nullable, container, obj};
 
     alias! {
         pub type OpentypeGdefTableData = opentype_gdef_table_data<'a>;
-
-        pub type OpentypeAttachPoint = opentype_gdef_attach_point;
+        pub type OpentypeGdefData1Dot2 = opentype_gdef_table_data_Version1_2<'a>;
+        pub type OpentypeGdefData1Dot3 = opentype_gdef_table_data_Version1_3<'a>;
 
         pub type OpentypeCoverageTable = opentype_coverage_table;
-
         pub type OpentypeCoverageTableData = opentype_coverage_table_data;
-
         pub type OpentypeCoverageRangeRecord = opentype_coverage_table_data_Format2_range_records;
 
         pub type OpentypeMarkGlyphSet = opentype_gdef_mark_glyph_set<'a>;
 
-        pub type OpentypeGdefData1Dot2 = opentype_gdef_table_data_Version1_2<'a>;
-        pub type OpentypeGdefData1Dot3 = opentype_gdef_table_data_Version1_3<'a>;
+        pub type OpentypeAttachList = opentype_gdef_attach_list<'a>;
+        pub type OpentypeAttachPoint = opentype_gdef_attach_point;
 
+        pub type OpentypeLigCaretList = opentype_gdef_lig_caret_list<'a>;
+        pub type OpentypeLigGlyph = opentype_gdef_lig_glyph<'a>;
+        pub type OpentypeCaretValue = opentype_gdef_caret_value<'a>;
+        pub type OpentypeCaretValueData = opentype_gdef_caret_value_data<'a>;
+        pub type OpentypeCaretValueFormat1 = opentype_gdef_caret_value_data_Format1;
+        pub type OpentypeCaretValueFormat2 = opentype_gdef_caret_value_data_Format2;
+        pub type OpentypeCaretValueFormat3 = opentype_gdef_caret_value_data_format3<'a>;
+    }
+
+    frame!(OpentypeCaretValueFormat3);
+
+    impl<'a> container::SingleContainer<Nullable<obj::DevTable>> for OpentypeCaretValueFormat3<'a> {
+        fn get_offset(&self) -> usize {
+            self.table.offset as usize
+        }
+
+        fn get_args(&self) -> () {}
+    }
+
+    frame!(OpentypeLigGlyph);
+
+    impl<'a> container::DynContainer<Nullable<obj::CaretVal>> for OpentypeLigGlyph<'a> {
+        fn count(&self) -> usize {
+            self.caret_count as usize
+        }
+
+        fn iter_offsets(&self) -> impl Iterator<Item = usize> {
+            self.caret_values.iter().map(|offs| offs.offset as usize)
+        }
+
+        fn iter_args(
+            &self,
+        ) -> impl Iterator<Item = <obj::CaretVal as container::CommonObject>::Args<'_>> {
+            std::iter::repeat(())
+        }
+    }
+
+    frame!(OpentypeLigCaretList.list_scope);
+
+    impl container::SingleContainer<obj::CovTable> for OpentypeLigCaretList<'_> {
+        fn get_offset(&self) -> usize {
+            self.coverage.offset as usize
+        }
+
+        fn get_args(&self) -> () {}
+    }
+
+    impl<'a> container::DynContainer<Nullable<obj::LigGlyph>> for OpentypeLigCaretList<'a> {
+        fn count(&self) -> usize {
+            self.lig_glyph_count as usize
+        }
+
+        fn iter_offsets(&self) -> impl Iterator<Item = usize> {
+            self.lig_glyph_offsets
+                .iter()
+                .map(|offs| offs.offset as usize)
+        }
+
+        fn iter_args(
+            &self,
+        ) -> impl Iterator<Item = <obj::LigGlyph as container::CommonObject>::Args<'_>> {
+            std::iter::repeat(())
+        }
     }
 
     impl<'a> container::SingleContainer<Nullable<obj::MarkGlSet>> for OpentypeGdefData1Dot2<'a> {
@@ -4594,6 +4454,34 @@ pub mod otf_gdef {
             std::iter::repeat(())
         }
     }
+
+    frame!(OpentypeAttachList.list_scope);
+
+    impl<'a> container::SingleContainer<obj::CovTable> for OpentypeAttachList<'a> {
+        fn get_offset(&self) -> usize {
+            self.coverage.offset as usize
+        }
+
+        fn get_args(&self) {}
+    }
+
+    impl<'a> container::DynContainer<obj::AttPoint> for OpentypeAttachList<'a> {
+        fn count(&self) -> usize {
+            self.attach_point_offsets.len()
+        }
+
+        fn iter_offsets(&self) -> impl Iterator<Item = usize> {
+            self.attach_point_offsets
+                .iter()
+                .map(|offset| offset.offset as usize)
+        }
+
+        fn iter_args(
+            &self,
+        ) -> impl Iterator<Item = <obj::AttPoint as container::CommonObject>::Args<'_>> {
+            std::iter::repeat(())
+        }
+    }
 }
 pub use otf_gdef::*;
 
@@ -4618,22 +4506,144 @@ pub(crate) mod gdef {
             Ok(GdefMetrics {
                 major_version: gdef.major_version,
                 minor_version: gdef.minor_version,
-                glyph_class_def: promote_opt(&fn_reify::reify_index(
-                    gdef,
-                    Nullable(obj::ClsDef),
-                    0,
-                )),
-                attach_list: promote_opt(&fn_reify::reify(gdef, Nullable(obj::AttList))),
-                lig_caret_list: try_promote_opt(&fn_reify::reify(gdef, Nullable(obj::LigCarList)))
+                glyph_class_def: promote_opt(&reify_index(gdef, Nullable(obj::ClsDef), 0)),
+                attach_list: promote_opt(&reify(gdef, Nullable(obj::AttList))),
+                lig_caret_list: try_promote_opt(&reify(gdef, Nullable(obj::LigCarList)))
                     .map_err(value_parse::ValueParseError::value)?,
-                mark_attach_class_def: promote_opt(&fn_reify::reify_index(
-                    gdef,
-                    Nullable(obj::ClsDef),
-                    1,
-                )),
+                mark_attach_class_def: promote_opt(&reify_index(gdef, Nullable(obj::ClsDef), 1)),
                 data: GdefTableDataMetrics::try_promote_view(&gdef.data, gdef.table_scope)?,
             })
         }
+    }
+
+    impl<'a> TryPromote<OpentypeCaretValue<'a>> for CaretValue {
+        type Error =
+            ReflType<TPErr<OpentypeCaretValueData<'a>, CaretValue>, UnknownValueError<u16>>;
+
+        fn try_promote(orig: &OpentypeCaretValue) -> Result<Self, Self::Error> {
+            Self::try_promote(&orig.data)
+        }
+    }
+
+    impl<'a> TryPromote<OpentypeCaretValueData<'a>> for CaretValue {
+        type Error = ReflType<
+            TPErr<OpentypeDeviceOrVariationIndexTable, DeviceOrVariationIndexTable>,
+            UnknownValueError<u16>,
+        >;
+
+        fn try_promote(orig: &OpentypeCaretValueData) -> Result<Self, Self::Error> {
+            match orig {
+                OpentypeCaretValueData::Format1(OpentypeCaretValueFormat1 { coordinate }) => {
+                    Ok(CaretValue::DesignUnits(*coordinate))
+                }
+                OpentypeCaretValueData::Format2(OpentypeCaretValueFormat2 {
+                    caret_value_point_index,
+                }) => Ok(CaretValue::ContourPoint(*caret_value_point_index)),
+                OpentypeCaretValueData::Format3(format3) => {
+                    let device =
+                        try_promote_opt(&fn_reify::reify(format3, Nullable(obj::DevTable)))?;
+                    Ok(CaretValue::DesignUnitsWithTable {
+                        coordinate: format3.coordinate,
+                        device,
+                    })
+                }
+            }
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    pub enum CaretValue {
+        DesignUnits(i16),  // Format1
+        ContourPoint(u16), // Format2
+        DesignUnitsWithTable {
+            coordinate: i16,
+            device: Link<DeviceOrVariationIndexTable>,
+        }, // Format3
+    }
+
+    #[derive(Clone, Debug, Default)]
+    #[repr(transparent)]
+    pub struct AttachPoint {
+        pub(crate) point_indices: Vec<u16>,
+    }
+
+    #[derive(Clone, Debug)]
+    pub struct AttachList {
+        pub(crate) coverage: CoverageTable,
+        pub(crate) attach_points: Vec<AttachPoint>,
+    }
+
+    impl Promote<OpentypeAttachPoint> for AttachPoint {
+        fn promote(orig: &OpentypeAttachPoint) -> Self {
+            AttachPoint {
+                point_indices: orig.point_indices.clone(),
+            }
+        }
+    }
+
+    impl<'a> Promote<OpentypeAttachList<'a>> for AttachList {
+        fn promote(orig: &OpentypeAttachList) -> Self {
+            let coverage = CoverageTable::promote(&fn_reify::reify(orig, obj::CovTable));
+            let attach_points = fn_reify::reify_all(orig, obj::AttPoint)
+                .map(|raw| AttachPoint::promote(&raw))
+                .collect();
+            AttachList {
+                coverage,
+                attach_points,
+            }
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    pub struct LigCaretList {
+        pub(crate) coverage: CoverageTable,
+        pub(crate) lig_glyphs: Vec<LigGlyph>,
+    }
+
+    impl<'a> TryPromote<OpentypeLigCaretList<'a>> for LigCaretList {
+        type Error = ReflType<TPErr<OpentypeLigGlyph<'a>, LigGlyph>, UnknownValueError<u16>>;
+
+        fn try_promote(orig: &OpentypeLigCaretList) -> Result<Self, Self::Error> {
+            let coverage = CoverageTable::promote(&fn_reify::reify(orig, obj::CovTable));
+            let mut lig_glyphs = Vec::with_capacity(container::DynContainer::count(orig));
+            for opt_raw in fn_reify::reify_all(orig, Nullable(obj::LigGlyph)) {
+                lig_glyphs.push(try_promote_from_null(&opt_raw)?);
+            }
+            Ok(LigCaretList {
+                coverage,
+                lig_glyphs,
+            })
+        }
+    }
+
+    #[derive(Clone, Debug, Default)]
+    pub struct LigGlyph {
+        pub(crate) caret_values: Vec<Link<CaretValue>>,
+    }
+
+    impl<'a> TryPromote<OpentypeLigGlyph<'a>> for LigGlyph {
+        type Error =
+            ReflType<TPErr<OpentypeCaretValueData<'a>, CaretValue>, UnknownValueError<u16>>;
+
+        fn try_promote(orig: &OpentypeLigGlyph) -> Result<Self, Self::Error> {
+            let mut caret_values = Vec::with_capacity(container::DynContainer::count(orig));
+            for opt_raw in fn_reify::reify_all(orig, Nullable(obj::CaretVal)) {
+                caret_values.push(try_promote_opt(&opt_raw)?); // &caret_value.data
+            }
+            Ok(LigGlyph { caret_values })
+        }
+    }
+
+    /// Caret position given as an x- or y-coordinate, as a number of design units
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+    pub struct CaretValueDesignUnits {
+        pub(crate) coordinate: u16,
+    }
+
+    /// Caret position given as the index to a specific contour point on a glyph
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+    pub struct ContourPoint {
+        pub(crate) index: u16,
     }
 
     #[derive(Clone, Debug)]
@@ -4664,6 +4674,12 @@ pub(crate) mod gdef {
                 }),
             }
         }
+    }
+
+    #[derive(Clone, Debug, Default)]
+    pub struct GdefTableDataMetrics {
+        pub(crate) mark_glyph_sets_def: Option<MarkGlyphSet>,
+        pub(crate) item_var_store: Option<ItemVariationStore>,
     }
 
     impl<'a> TryPromoteView<OpentypeGdefTableData<'a>> for GdefTableDataMetrics {
@@ -4714,14 +4730,11 @@ pub(crate) mod gdef {
             })
         }
     }
-
-    #[derive(Clone, Debug, Default)]
-    pub struct GdefTableDataMetrics {
-        pub(crate) mark_glyph_sets_def: Option<MarkGlyphSet>,
-        pub(crate) item_var_store: Option<ItemVariationStore>,
-    }
 }
-pub(crate) use gdef::{GdefMetrics, GdefTableDataMetrics, MarkGlyphSet};
+pub(crate) use gdef::{
+    AttachList, AttachPoint, CaretValue, CaretValueDesignUnits, ContourPoint, GdefMetrics,
+    GdefTableDataMetrics, LigCaretList, LigGlyph, MarkGlyphSet,
+};
 
 pub mod otf_layout {
     use super::*;
