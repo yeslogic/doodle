@@ -608,6 +608,7 @@ pub(crate) fn table_links(
     module: &mut FormatModule,
     tag: FormatRef,
     table_type: ValueType,
+    text_or_ztext: FormatRef,
 ) -> FormatRef {
     // SECTION - required tables (https://learn.microsoft.com/en-us/typography/opentype/spec/otff#required-tables)
     let cmap_table = cmap::table(module);
@@ -722,7 +723,7 @@ pub(crate) fn table_links(
     // !SECTION
 
     // SECTION - color fonts (https://learn.microsoft.com/en-us/typography/opentype/spec/otff#tables-related-to-color-fonts)
-    let svg_table = svg::table(module);
+    let svg_table = svg::table(module, text_or_ztext);
     // !SECTION
 
     // SECTION - other opentyupe tables (https://learn.microsoft.com/en-us/typography/opentype/spec/otff#other-opentype-tables)
@@ -1070,7 +1071,7 @@ pub(crate) fn table_links(
 }
 
 // ANCHOR[epic=main-fn]
-pub fn main(module: &mut FormatModule) -> FormatRef {
+pub fn main(module: &mut FormatModule, text_or_ztext: FormatRef) -> FormatRef {
     // NOTE - Microsoft defines a tag as consisting on printable ascii characters in the range 0x20 -- 0x7E (inclusive), but some vendors are non-standard so we accept anything
     let tag = opentype_tag(module);
 
@@ -1088,7 +1089,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
 
     // let stub_table = module.define_format("opentype.table_stub", Format::EMPTY);
 
-    let table_links = table_links(module, tag, table_type);
+    let table_links = table_links(module, tag, table_type, text_or_ztext);
 
     let table_directory = module.define_format_views(
         "opentype.table_directory",

@@ -356,3 +356,27 @@ pub fn display_table_column_horiz<A>(
 
     tok(heading).then(TokenStream::join_with(buf, tok(" ")))
 }
+
+/// Renders `bytes` as an inline hex-dump.
+///
+/// If `bytes` is longer than `2 * bookend`, only the leading and trailing `bookend` bytes
+/// are shown, with the elided middle portion replaced by `...(<n> bytes)...`.
+pub fn display_bytes_inline(bytes: &[u8], bookend: usize) -> TokenStream {
+    let mut octets = String::new();
+    let min_abbrev = bookend * 2;
+    if bytes.len() <= min_abbrev {
+        for byte in bytes {
+            octets.push_str(&format!("{:02x}", byte));
+        }
+    } else {
+        let (pref, mid, suff) = unsafe { trisect_unchecked(bytes, bookend, bookend) };
+        for byte in pref {
+            octets.push_str(&format!("{:02x}", byte));
+        }
+        octets.push_str(&format!("...({} bytes)...", mid.len()));
+        for byte in suff.iter().rev() {
+            octets.push_str(&format!("{:02x}", byte));
+        }
+    }
+    toks(octets)
+}

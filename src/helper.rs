@@ -288,17 +288,6 @@ pub fn seq_repeat(count: usize, format: Format) -> Format {
     Format::Sequence(std::iter::repeat_n(format, count).collect())
 }
 
-/// Helper-function for [`Format::Union`] over branches that are all [`Format::Variant`].
-///
-/// Accepts any iterable container of tuples `(Name, Format)` for any `Name` that implements [`IntoLabel`].
-pub fn alts<Name: IntoLabel>(branches: impl IntoIterator<Item = (Name, Format)>) -> Format {
-    Format::Union(
-        (branches.into_iter())
-            .map(|(label, format)| Format::Variant(label.into(), Box::new(format)))
-            .collect(),
-    )
-}
-
 /// Helper-function for [`Format::Match`] that accepts any iterable container `branches` of `(Pattern, Format)` pairs.
 pub fn fmt_match(head: Expr, branches: impl IntoIterator<Item = (Pattern, Format)>) -> Format {
     Format::Match(Box::new(head), Vec::from_iter(branches))
@@ -346,10 +335,31 @@ pub fn union(branches: impl IntoIterator<Item = Format>) -> Format {
     Format::Union(Vec::from_iter(branches))
 }
 
-/// Helper-function for constructing a [`Format::Union`] over branches that cannot be deterministically distinguished within a fixed finite lookahead.
+/// Helper-function for [`Format::Union`] over branches that are all [`Format::Variant`].
 ///
-/// Accepts any iterable container of tuples `(Name, Format)` for any `Name` that implements [`IntoLabel`], where the `Name` element becomes
-/// an identifying Variant-name for the resulting branch of the union.
+/// Accepts any iterable container of tuples `(Name, Format)` for any `Name` that implements [`IntoLabel`].
+pub fn alts<Name: IntoLabel>(branches: impl IntoIterator<Item = (Name, Format)>) -> Format {
+    Format::Union(
+        (branches.into_iter())
+            .map(|(label, format)| Format::Variant(label.into(), Box::new(format)))
+            .collect(),
+    )
+}
+
+/// Helper-function for [`Format::UnionNondet`].
+///
+/// Accepts any iterable container of `Format`s.
+///
+/// If the branches in question are all `Format::Variant`, use [`alts_nondet`] instead.
+///
+/// If the given branches can be deterministically distinguished within a fixed finite lookahead, use [`union`] instead.
+pub fn union_nondet<Name: IntoLabel>(branches: impl IntoIterator<Item = Format>) -> Format {
+    Format::UnionNondet(Vec::from_iter(branches))
+}
+
+/// Helper-function for constructing a [`Format::UnionNondet`] over branches that are all [`Format::Variant`].
+///
+/// Accepts any iterable container of tuples `(Name, Format)` for any `Name` that implements [`IntoLabel`].
 ///
 /// # Notes
 ///
@@ -357,7 +367,7 @@ pub fn union(branches: impl IntoIterator<Item = Format>) -> Format {
 ///
 /// If there is a potential overlap in the inputs that would be accepted as two distinct branches, the preferred (ideally, more specific) branch
 /// should always appear earlier in the iteration order.
-pub fn union_nondet<Name: IntoLabel>(branches: impl IntoIterator<Item = (Name, Format)>) -> Format {
+pub fn alts_nondet<Name: IntoLabel>(branches: impl IntoIterator<Item = (Name, Format)>) -> Format {
     Format::UnionNondet(
         (branches.into_iter())
             .map(|(label, format)| Format::Variant(label.into(), Box::new(format)))
@@ -1135,7 +1145,11 @@ pub fn expect_nonzero<T: ZeroMarker>(format: Format) -> Format {
     expect_lambda(format, "x", is_nonzero::<T>(var("x")))
 }
 
-/// Helper for constructing `Format::ForEach`
+/// Helper for constructing [`Format::ForEach`].
+///
+/// For each element `elem` in the sequence `seq`, binds the value of `elem` to
+/// the identifier `name` that is implicitly referenced in `inner`, and parses `inner` once,
+/// accumulating each result into a sequence which is then returned.
 pub fn for_each(seq: Expr, name: impl IntoLabel, inner: Format) -> Format {
     Format::ForEach(Box::new(seq), name.into(), Box::new(inner))
 }
@@ -1298,12 +1312,22 @@ pub fn map_option(
 /// Performs an index operation on an expression `seq` with an index `index`, without checking for OOB array access.
 ///
 /// This will result in a runtime panic during parse-evaluation if the index is out of bounds.
+///
+/// # Notes
+///
+/// Under current implementation constraints, an `index` whose Expr-kind is not `U32` may lead to typechecking
+/// failure.
 pub fn index_unchecked(seq: Expr, index: Expr) -> Expr {
     Expr::SeqIx(Box::new(seq), Box::new(index))
 }
 
 /// Performs a guarded index operation on an expression `seq` with an index `index`, returning `Some(elt)`
 /// if the index is in-bounds, or `None` otherwise.
+///
+/// # Notes
+///
+/// Under current implementation constraints, an `index` whose Expr-kind is not `U32` may lead to typechecking
+/// failure.
 pub fn index_checked(seq: Expr, index: Expr) -> Expr {
     let len = seq_length(seq.clone());
     let is_sound = expr_lt(index.clone(), len);
@@ -1720,9 +1744,14 @@ pub fn parse_from_view(view: ViewExpr, format: Format) -> Format {
     Format::ParseFromView(view, Box::new(format))
 }
 
-/// Helper for [`ViewFormat::CaptureBytes`]
+/// Helper for [`ViewFormat::CaptureBytes`].
 pub fn capture_bytes(len: Expr) -> ViewFormat {
     ViewFormat::CaptureBytes(Box::new(len))
+}
+
+/// Helper for [`Format::DecodeBytes`].
+pub fn decode_bytes(bytes: Expr, format: Format) -> Format {
+    Format::DecodeBytes(Box::new(bytes), Box::new(format))
 }
 
 /// Constructs a View-based parse of `len` bytes as a borrowed buffer-slice, rather than

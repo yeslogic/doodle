@@ -33,7 +33,7 @@ pub fn main(module: &mut FormatModule, deflate: FormatRef) -> FormatRef {
     let header = module.define_format(
         "gzip.header",
         record([
-            ("magic", is_bytes(b"\x1F\x8B")),
+            ("magic", byte_seq(b"\x1F\x8B")),
             ("method", u8()),
             ("file-flags", file_flags.call()),
             ("timestamp", u32le()),

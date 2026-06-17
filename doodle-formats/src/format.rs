@@ -26,11 +26,28 @@ pub(crate) fn gzipped(gzip: FormatRef, inner_data: Format) -> Format {
         for_each(
             var("gzip-raw"),
             "item",
-            Format::DecodeBytes(
-                Box::new(record_lens(var("item"), &["data", "inflate"])),
-                Box::new(inner_data),
-            ),
+            decode_bytes(record_lens(var("item"), &["data", "inflate"]), inner_data),
         ),
+    )
+}
+
+pub fn opentype_standalone(module: &mut FormatModule) -> FormatRef {
+    let deflate = deflate::main(module);
+    let gzip = gzip::main(module, deflate);
+    let (text, _utf8nz) = text::main(module);
+    let text_or_ztext = utf8_maybe_gzipped(module, text, gzip);
+    opentype::main(module, text_or_ztext)
+}
+
+pub fn utf8_maybe_gzipped(
+    module: &mut FormatModule,
+    text: FormatRef,
+    gzip: FormatRef,
+) -> FormatRef {
+    let ztext = module.define_format("text.gzip", gzipped(gzip, text.call()));
+    module.define_format(
+        "text.maybe_gzip",
+        alts_nondet(vec![("compressed", ztext.call()), ("plain", text.call())]),
     )
 }
 
@@ -53,7 +70,10 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
     let elf = elf::main(module);
     let waldo = waldo::main(module);
     let rle = run_length::main(module);
-    let opentype = opentype::main(module);
+    // NOTE - ztext would commonly clash with arbitrary gzip so we include it in the forest but not the main alternation
+    let text_or_ztext = utf8_maybe_gzipped(module, text, gzip);
+
+    let opentype = opentype::main(module, text_or_ztext);
 
     let tgz = module.define_format("tgz.main", gzipped(gzip, tar.call()));
 
@@ -62,7 +82,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
         record_auto([
             (
                 "data",
-                union_nondet(vec![
+                alts_nondet(vec![
                     ("waldo", waldo.call()),
                     ("peano", peano.call()),
                     ("gif", gif.call()),
