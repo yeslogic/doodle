@@ -236,12 +236,59 @@ mod svg {
             SvgData::SvgDoc(svg_info) => {
                 let doc = toks(format!("<SVG Document (len={})>", svg_info.data.len()));
                 if conf.verbosity.is_at_least(cli::VerboseLevel::Dump) {
-                    doc.glue(
-                        LineBreak,
-                        toks(
-                            // FIXME - line-breaks are not properly sanitized out so things might look weird
-                            format!("{}", String::from_iter(&svg_info.data[..])),
-                        ),
+                    let chars = &svg_info.data;
+
+                    // Step 0: Validate start-and-end tags
+                    let Some(open_end) = chars
+                        .iter()
+                        .position(|&c| c == '>')
+                        .filter(|&idx| chars[..idx].iter().collect::<String>().starts_with("<svg"))
+                    else {
+                        log::warn!("SVG document does not start with <svg> tag");
+                        // FIXME - we arbitrarily decide to show the first 16 bytes
+                        return doc.glue(
+                            LineBreak,
+                            toks(format!("{}..", String::from_iter(&svg_info.data[..16]))),
+                        );
+                    };
+
+                    const CLOSE_TAG: &str = "</svg>";
+                    let close_len = CLOSE_TAG.chars().count();
+                    if chars.len() < open_end + 1 + close_len {
+                        log::warn!("SVG document too short to contain </svg> tag");
+                        return doc.glue(
+                            LineBreak,
+                            toks(format!("{}", String::from_iter(&svg_info.data[..]))),
+                        );
+                    }
+                    let close_start = chars.len() - close_len;
+                    if &chars[close_start..].iter().collect::<String>() != CLOSE_TAG {
+                        log::warn!("SVG document does not end with </svg> tag");
+                        // FIXME - we arbitrarily decide to show the last 16 bytes
+                        return doc.glue(
+                            LineBreak,
+                            toks(format!(
+                                "..{}",
+                                String::from_iter(&svg_info.data[(chars.len() - 1) - 16..])
+                            )),
+                        );
+                    }
+                    if close_start <= open_end {
+                        log::error!("SVG document <svg> and </svg> overlap (somehow??)");
+                        return doc.glue(
+                            LineBreak,
+                            toks(format!("{}", String::from_iter(&svg_info.data[..]))),
+                        );
+                    }
+
+                    // Step 1: Extract tag-strings, calculate elided interior character count
+                    let open_tag: String = chars[..=open_end].iter().collect();
+                    let close_tag: String = chars[close_start..].iter().collect();
+                    let elided_count = close_start - (open_end + 1);
+
+                    toks(
+                        // FIXME - line-breaks are not properly sanitized out so things might look weird
+                        format!("{open_tag}...[{elided_count} chars]...{close_tag}"),
                     )
                 } else {
                     doc
