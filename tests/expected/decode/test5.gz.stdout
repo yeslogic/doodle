@@ -2,7 +2,7 @@
     └── gzip <- gzip.main :=
         └── 0 :=
             ├── header <- gzip.header :=
-            │   ├── magic <- (...)
+            │   ├── magic <- [ ... ]
             │   ├── method <- ReadU8 := 8
             │   ├── file-flags <- gzip.header.file-flags := bool-flags[fname]
             │   ├── timestamp <- ReadU32Le := 1687676820
