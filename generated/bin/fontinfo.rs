@@ -36,6 +36,7 @@ type RunResult<T> = Result<T, RunError>;
 pub fn main() -> RunResult<()> {
     stderrlog::new()
         .module(module_path!())
+        .module("doodle_gencode")
         .verbosity(log::Level::Info)
         .init()?;
     let mut conf_builder = ConfigBuilder::default();

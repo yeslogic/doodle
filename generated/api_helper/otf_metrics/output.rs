@@ -236,19 +236,19 @@ mod svg {
             SvgData::SvgDoc(svg_info) => {
                 let doc = toks(format!("<SVG Document (len={})>", svg_info.data.len()));
                 if conf.verbosity.is_at_least(cli::VerboseLevel::Dump) {
-                    let chars = &svg_info.data;
+                    // Step 0: remove BOM, whitespace, and prolog
+                    let chars = skip_prolog(pre_sanitize_svg(&svg_info.data));
 
-                    // Step 0: Validate start-and-end tags
+                    // Step 1: Validate start-and-end tags
                     let Some(open_end) = chars
                         .iter()
                         .position(|&c| c == '>')
                         .filter(|&idx| chars[..idx].iter().collect::<String>().starts_with("<svg"))
                     else {
                         log::warn!("SVG document does not start with <svg> tag");
-                        // FIXME - we arbitrarily decide to show the first 16 bytes
                         return doc.glue(
                             LineBreak,
-                            toks(format!("{}..", String::from_iter(&svg_info.data[..16]))),
+                            toks(format!("{}", String::from_iter(&svg_info.data[..]))),
                         );
                     };
 
@@ -281,13 +281,13 @@ mod svg {
                         );
                     }
 
-                    // Step 1: Extract tag-strings, calculate elided interior character count
+                    // Step 2: Extract tag-strings, calculate elided interior character count
                     let open_tag: String = chars[..=open_end].iter().collect();
                     let close_tag: String = chars[close_start..].iter().collect();
                     let elided_count = close_start - (open_end + 1);
 
                     toks(
-                        // FIXME - line-breaks are not properly sanitized out so things might look weird
+                        // FIXME - interior line-breaks are not properly sanitized out so things might look weird
                         format!("{open_tag}...[{elided_count} chars]...{close_tag}"),
                     )
                 } else {
@@ -295,6 +295,215 @@ mod svg {
                 }
             }
         })
+    }
+
+    /// Removes BOM and strips whitespace from SVG char-buffer
+    fn pre_sanitize_svg(data: &[char]) -> &[char] {
+        let (ret, ..) = strip_xml_whitespace(strip_bom(data));
+        ret
+    }
+
+    /// Strip leading BOM from SVG char-buffer
+    fn strip_bom(chars: &[char]) -> &[char] {
+        const BOM: char = '\u{FEFF}';
+        let chars = chars.strip_prefix(&[BOM][..]).unwrap_or(chars);
+        chars
+    }
+
+    /// Strip BOM and leading/trailing whitespace from SVG char-buffer
+    ///
+    /// Also returns the start and end indices of the first/last non-whitespace character
+    /// to enable callers to reproduce the effect on `str`-based duplicates.
+    fn strip_xml_whitespace(chars: &[char]) -> (&[char], usize, usize) {
+        let start = chars
+            .iter()
+            .position(|&c| !c.is_ascii_whitespace())
+            .unwrap_or(chars.len());
+        let end = chars
+            .iter()
+            .rposition(|&c| !c.is_ascii_whitespace())
+            .map_or(start, |i| i + 1);
+        (&chars[start..end], start, end)
+    }
+
+    /// Skip XML comments and xml processing instructions
+    fn skip_prolog(mut chars: &[char]) -> &[char] {
+        let buffer = String::from_iter(chars);
+        let mut buf: &str = &buffer;
+
+        // check-flag that gates post-correction of indices to narrow `chars` and `buf` identically
+        let needs_correction = buf.len() != chars.len();
+
+        // computes the proper slice-indices to narrow `buf` by to match `chars`, if the two are not consistently indexed
+        fn correct<'a, 'b>(
+            mut buf: &'a str,
+            (chars, start, end): (&'b [char], usize, usize),
+        ) -> (&'b [char], &'a str) {
+            match (start > 0, end < chars.len()) {
+                (true, true) => {
+                    let tmp = chars[..start].iter().collect::<String>();
+                    let start = tmp.len();
+                    let tmp = chars[end..].iter().collect::<String>();
+                    let end = buf.len() - tmp.len();
+                    buf = &buf[start..end];
+                }
+                (true, false) => {
+                    let tmp = chars[..start].iter().collect::<String>();
+                    let start = tmp.len();
+                    buf = &buf[start..];
+                }
+                (false, true) => {
+                    let tmp = chars[end..].iter().collect::<String>();
+                    let end = buf.len() - tmp.len();
+                    buf = &buf[..end];
+                }
+                (false, false) => (),
+            }
+            (chars, buf)
+        }
+
+        loop {
+            // sanitize whitespace and synchronize contents of `buf` and `chars`
+            let tmp = strip_xml_whitespace(chars);
+            if needs_correction {
+                let (new_chars, new_buf) = correct(buf, tmp);
+                chars = new_chars;
+                buf = new_buf;
+            } else {
+                let (new_chars, start, end) = tmp;
+                chars = new_chars;
+                buf = &buf[start..end];
+            }
+
+            const XML_PI_START: &str = "<?";
+            const XML_PI_END: &str = "?>";
+
+            const XML_COMMENT_START: &str = "<!--";
+            const XML_COMMENT_END: &str = "-->";
+
+            if buf.starts_with(XML_PI_START) {
+                // skip xml processing instructions
+                match buf.find(XML_PI_END) {
+                    Some(end) => {
+                        const N: usize = XML_PI_END.len();
+                        if needs_correction {
+                            let n_drop = buf[..end + N].chars().count();
+                            buf = &buf[end + N..];
+                            chars = &chars[n_drop..];
+                        } else {
+                            buf = &buf[end + N..];
+                            chars = &chars[end + N..];
+                        }
+                    }
+                    None => {
+                        log::error!("unterminated xml processing instruction");
+                        break;
+                    }
+                }
+            } else if buf.starts_with(XML_COMMENT_START) {
+                // skip xml comments
+                match buf.find(XML_COMMENT_END) {
+                    Some(end) => {
+                        const N: usize = XML_COMMENT_END.len();
+                        if needs_correction {
+                            let n_drop = buf[..end + N].chars().count();
+                            buf = &buf[end + N..];
+                            chars = &chars[n_drop..];
+                        } else {
+                            buf = &buf[end + N..];
+                            chars = &chars[end + N..];
+                        }
+                    }
+                    None => {
+                        log::error!("unterminated xml comment");
+                        break;
+                    }
+                }
+            } else {
+                break;
+            }
+        }
+        chars
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn test_svg_buffer_sanitize() {
+            let base: Vec<char> = "<svg></svg>".chars().collect();
+
+            fn with_bom(base: &[char]) -> Vec<char> {
+                let mut buf = Vec::with_capacity(base.len() + 1);
+                buf.push('\u{FEFF}');
+                buf.extend_from_slice(base);
+                buf
+            }
+            fn with_wsp(base: &[char]) -> Vec<char> {
+                const WSP: [char; 4] = [' ', '\t', '\n', '\r'];
+                let mut buf = Vec::with_capacity(base.len() + WSP.len() * 2);
+                buf.extend_from_slice(&WSP);
+                buf.extend_from_slice(base);
+                buf.extend_from_slice(&WSP);
+                buf
+            }
+            fn with_bom_and_wsp(base: &[char]) -> Vec<char> {
+                const WSP: [char; 4] = [' ', '\t', '\n', '\r'];
+                let mut buf = Vec::with_capacity(base.len() + 1 + WSP.len() * 2);
+                buf.push('\u{FEFF}');
+                buf.extend_from_slice(&WSP);
+                buf.extend_from_slice(base);
+                buf.extend_from_slice(&WSP);
+                buf
+            }
+            fn check(preimage: &[char], expected: &[char]) {
+                assert_eq!(pre_sanitize_svg(preimage), expected);
+            }
+
+            check(&base, &base);
+            check(&with_bom(&base), &base);
+            check(&with_wsp(&base), &base);
+            check(&with_bom_and_wsp(&base), &base);
+        }
+
+        #[test]
+        fn test_skip_prolog() {
+            let base: Vec<char> = "<svg></svg>".chars().collect();
+            const PI: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+            const COMMENT: &str = "<!-- comment -->";
+
+            fn with_comment(base: &[char]) -> Vec<char> {
+                let mut buf = Vec::with_capacity(base.len() + COMMENT.len());
+                buf.extend(COMMENT.chars());
+                buf.extend_from_slice(base);
+                buf
+            }
+
+            fn with_pi(base: &[char]) -> Vec<char> {
+                let mut buf = Vec::with_capacity(base.len() + PI.len());
+                buf.extend(PI.chars());
+                buf.extend_from_slice(base);
+                buf
+            }
+
+            fn with_pi_and_comment(base: &[char]) -> Vec<char> {
+                let mut buf = Vec::with_capacity(base.len() + PI.len() + COMMENT.len());
+                buf.extend(PI.chars());
+                buf.extend(COMMENT.chars());
+                buf.extend_from_slice(base);
+                buf
+            }
+
+            fn check(preimage: &[char], expected: &[char]) {
+                assert_eq!(skip_prolog(preimage), expected);
+            }
+
+            check(&base, &base);
+            check(&with_comment(&base), &base);
+            check(&with_pi(&base), &base);
+            check(&with_pi_and_comment(&base), &base);
+        }
     }
 }
 
