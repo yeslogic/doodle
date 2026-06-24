@@ -15,7 +15,7 @@ pub(crate) fn table(module: &mut FormatModule) -> FormatRef {
             util::embedded_variadic_alternation(
                 [
                     ("table_scope", reify_view(vvar("table_view"))),
-                    ("version", expects_u16be([0, 1])),
+                    ("version", expect_range_u16be(0, 1)),
                     // TODO[epic=validation] - the specification does not explicitly state that numPaletteEntries must be >0, but it is implied by other fields being required-nonzero
                     ("num_palette_entries", expect_nonzero::<U16>(u16be())),
                     ("num_palettes", expect_nonzero::<U16>(u16be())),
