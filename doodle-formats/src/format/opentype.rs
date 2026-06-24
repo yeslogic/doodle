@@ -176,7 +176,12 @@ mod util {
             NestingKind::MinimalVariation => {
                 let mut pat_branches = Vec::with_capacity(BRANCHES);
                 for (value, vname, c) in branches.into_iter() {
-                    let record_inner = record(c);
+                    let fields = c.into_iter().collect::<Vec<_>>();
+                    let record_inner = if fields.is_empty() {
+                        Format::EMPTY
+                    } else {
+                        record(fields)
+                    };
                     pat_branches.push((Pattern::Int(value.into()), vname, record_inner));
                 }
                 let final_field = (intermediate, match_variant(var(discriminant), pat_branches));
@@ -723,6 +728,8 @@ pub(crate) fn table_links(
     // !SECTION
 
     // SECTION - color fonts (https://learn.microsoft.com/en-us/typography/opentype/spec/otff#tables-related-to-color-fonts)
+    let cpal_table = cpal::table(module);
+    // let colr_table = colr::table(module);
     let svg_table = svg::table(module, text_or_ztext);
     // !SECTION
 
@@ -982,6 +989,15 @@ pub(crate) fn table_links(
             // !SECTION
             // SECTION - Color Fonts
             // STUB - add more tables
+            (
+                "cpal",
+                optional_table(
+                    util::FONTVIEW_VAR,
+                    var("tables"),
+                    util::magic(b"CPAL"),
+                    cpal_table.call(),
+                ),
+            ),
             (
                 "svg",
                 optional_table(
@@ -1435,6 +1451,8 @@ pub(crate) mod mvar;
 // !SECTION
 
 // SECTION - color font tables
+pub(crate) mod colr;
+pub(crate) mod cpal;
 pub(crate) mod svg;
 // !SECTION
 
