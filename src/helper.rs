@@ -101,6 +101,25 @@ fn mask_bits_u16(x: Expr, high_bits_used: u8, nbits: u8) -> Expr {
     bit_and(shifted, Expr::U16(mask))
 }
 
+/// Selects `nbits` bits starting from the highest unused bit in an 32-bit packed-field value, returning a U32-typed Expr.
+///
+/// Will panic if `nbits + high_bits_used > 32`.
+fn mask_bits_u32(x: Expr, high_bits_used: u8, nbits: u8) -> Expr {
+    assert!(
+        nbits + high_bits_used <= 32,
+        "mask_bits_u32 cannot create mask {nbits} bits out of available {}",
+        32 - high_bits_used
+    );
+    let shift = 32 - (high_bits_used + nbits) as u32;
+    let mask = (1u32 << nbits) - 1;
+    let shifted = if shift == 0 {
+        x
+    } else {
+        shr(x, Expr::U32(shift))
+    };
+    bit_and(shifted, Expr::U32(mask))
+}
+
 /// Ergonomic helper for parsing an 8-bit 'packed' value into a multi-field record, which allows
 /// per-field specification of how to interpret (and what type to ascribe) each
 /// sub-byte sequence.
@@ -141,7 +160,7 @@ pub fn bit_fields_u8<const N: usize>(bit_fields: [BitFieldKind; N]) -> Format {
             };
             fields.push((Label::Borrowed(name), compute(field_value)));
         } else if bit_field.check_zero() {
-            unset_bits_mask &= ((1u8 << nbits) - 1) << (8 - (high_bits_used + nbits));
+            unset_bits_mask |= ((1u8 << nbits) - 1) << (8 - (high_bits_used + nbits));
         }
         high_bits_used += nbits;
     }
@@ -184,9 +203,18 @@ pub fn u4_pair(hi: &'static str, lo: &'static str) -> Format {
     ])
 }
 
-/// Ergonomic helper for parsing a 16-bit packed value into a multi-field record with more
-/// context-awareness for determining the interpretation (and semantics) of the various
-/// segments of contiguous bits.
+/// Ergonomic helper for parsing a 16-bit 'packed' value into a multi-field record, which allows
+/// per-field specification of how to interpret (and what type to ascribe) each
+/// sub-segment of bits.
+///
+/// The fields in question are implicitly non-overlapping, contiguous, and adjacent, and are read from
+/// MSB-to-LSB in the order they are listed in the `bit_fields` array. Each field, in turn, is treated
+/// as an MSB-to-LSB masked bit-sequence, with the width, type, and record-semantics of each field described
+/// using the [`BitFieldKind`] enum.
+///
+/// # Panics
+///
+/// Requires that the total length of all fields is 16 bits, and panics otherwise.
 pub fn bit_fields_u16<const N: usize>(bit_fields: [BitFieldKind; N]) -> Format {
     const BINDING_NAME: &str = "_packed_bits";
     #[cfg(debug_assertions)]
@@ -214,7 +242,7 @@ pub fn bit_fields_u16<const N: usize>(bit_fields: [BitFieldKind; N]) -> Format {
             };
             fields.push((Label::Borrowed(name), compute(field_value)));
         } else if bit_field.check_zero() {
-            unset_bits_mask &= ((1u16 << nbits) - 1) << (16 - (high_bits_used + nbits));
+            unset_bits_mask |= ((1u16 << nbits) - 1) << (16 - (high_bits_used + nbits));
         }
         high_bits_used += nbits;
     }
@@ -232,6 +260,71 @@ pub fn bit_fields_u16<const N: usize>(bit_fields: [BitFieldKind; N]) -> Format {
         )
     } else {
         base::u16be()
+    };
+
+    record_auto(Iterator::chain(
+        std::iter::once((Label::Borrowed(BINDING_NAME), packed)),
+        fields.into_iter(),
+    ))
+}
+
+/// Ergonomic helper for parsing a 32-bit 'packed' value into a multi-field record, which allows
+/// per-field specification of how to interpret (and what type to ascribe) each
+/// sub-segment of bits.
+///
+/// The fields in question are implicitly non-overlapping, contiguous, and adjacent, and are read from
+/// MSB-to-LSB in the order they are listed in the `bit_fields` array. Each field, in turn, is treated
+/// as an MSB-to-LSB masked bit-sequence, with the width, type, and record-semantics of each field described
+/// using the [`BitFieldKind`] enum.
+///
+/// # Panics
+///
+/// Requires that the total length of all fields is 32 bits, and panics otherwise.
+pub fn bit_fields_u32<const N: usize>(bit_fields: [BitFieldKind; N]) -> Format {
+    const BINDING_NAME: &str = "_packed_bits";
+    #[cfg(debug_assertions)]
+    {
+        let len: u8 = bit_fields.iter().map(BitFieldKind::bit_width).sum();
+        debug_assert_eq!(
+            len, 32,
+            "bad packed-bits field-lengths: total width {len} of {bit_fields:?} != 32"
+        );
+    }
+    let mut fields = Vec::new();
+
+    // mask value that should yield `0` when `&`-ed with the original u32
+    let mut unset_bits_mask: u32 = 0;
+
+    let mut high_bits_used = 0;
+    for bit_field in bit_fields.into_iter() {
+        let nbits = bit_field.bit_width();
+        if let Some(name) = bit_field.field_name() {
+            let raw = mask_bits_u32(var(BINDING_NAME), high_bits_used, nbits);
+            let field_value = if bit_field.is_flag() {
+                is_nonzero_u32(raw)
+            } else {
+                raw
+            };
+            fields.push((Label::Borrowed(name), compute(field_value)));
+        } else if bit_field.check_zero() {
+            unset_bits_mask |= ((1u32 << nbits) - 1) << (32 - (high_bits_used + nbits));
+        }
+        high_bits_used += nbits;
+    }
+
+    let packed = if unset_bits_mask != 0 {
+        const PREPACKED: &str = "packed";
+        // NOTE - only bother using where-lambda if zero_mask is non-vacuous
+        expect_lambda(
+            base::u32be(),
+            PREPACKED,
+            expr_eq(
+                bit_and(var(PREPACKED), Expr::U32(unset_bits_mask)),
+                Expr::U32(0),
+            ),
+        )
+    } else {
+        base::u32be()
     };
 
     record_auto(Iterator::chain(
