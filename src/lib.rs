@@ -972,6 +972,120 @@ impl FormatModule {
         FormatRef(level)
     }
 
+    /// Registers a self-referential ("phantom-recursive") format under `name`.
+    ///
+    /// This is the no-args, no-views convenience form of [`Self::define_format_phantom_rec_args_views`].
+    pub fn define_format_phantom_rec(
+        &mut self,
+        name: impl IntoLabel,
+        outer: impl FnOnce(Format) -> Format,
+        inner: impl FnOnce(FormatRef) -> Format,
+    ) -> FormatRef {
+        self.define_format_phantom_rec_args(name, vec![], outer, inner)
+    }
+
+    /// Registers a self-referential ("phantom-recursive") format under `name`, with arguments but no views.
+    ///
+    /// See [`Self::define_format_phantom_rec_args_views`] for the full behavior.
+    pub fn define_format_phantom_rec_args(
+        &mut self,
+        name: impl IntoLabel,
+        args: Vec<(Label, ValueType)>,
+        outer: impl FnOnce(Format) -> Format,
+        inner: impl FnOnce(FormatRef) -> Format,
+    ) -> FormatRef {
+        self.define_format_phantom_rec_args_views(name, args, vec![], outer, inner)
+    }
+
+    /// Registers a self-referential ("phantom-recursive") format under `name`, with views but no arguments.
+    ///
+    /// See [`Self::define_format_phantom_rec_args_views`] for the full behavior.
+    pub fn define_format_phantom_rec_views(
+        &mut self,
+        name: impl IntoLabel,
+        views: Vec<Label>,
+        outer: impl FnOnce(Format) -> Format,
+        inner: impl FnOnce(FormatRef) -> Format,
+    ) -> FormatRef {
+        self.define_format_phantom_rec_args_views(name, vec![], views, outer, inner)
+    }
+
+    /// Registers a self-referential ("phantom-recursive") format under `name`.
+    ///
+    /// Ordinary [`Self::define_format_args_views`] cannot define a format that refers to its own
+    /// [`FormatRef`], because the level a format will occupy is only known (and only valid to look
+    /// up) once registration has completed, whereas type-checking the format happens beforehand.
+    /// This method allows exactly one, deliberately constrained form of self-reference: a reference
+    /// to the format's own (about-to-be-assigned) level that occurs *only* underneath a
+    /// [`Format::Phantom`] wrapper.
+    ///
+    /// `inner` is given a [`FormatRef`] for the level this call will register, and must produce the
+    /// `Format` that ends up wrapped in `Format::Phantom`; it may invoke that `FormatRef` (via
+    /// [`FormatRef::call`] or its sibling methods) any number of times. `outer` then receives the
+    /// resulting `Format::Phantom(..)` node and weaves it into the format to be registered, e.g. by
+    /// embedding (and, since `Format` is `Clone`, possibly duplicating) it into one or more
+    /// branches of a record or alternation.
+    ///
+    /// The recursion is safe to register because every processing pathway that descends into a
+    /// `Format` for purposes other than naming/typing treats `Format::Phantom`'s contents as opaque
+    /// (no bytes are read on its account), so confining the self-reference there guarantees it can
+    /// never be the cause of unbounded data-driven recursion. It does *not*, on its own, guarantee
+    /// that every later stage that walks into `Phantom` for type- or name-resolution purposes
+    /// already tolerates a self-reference found there; some such stages may need adjustment of
+    /// their own before a format defined this way can be successfully elaborated/compiled/generated.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the constructed format fails to type-check.
+    pub fn define_format_phantom_rec_args_views(
+        &mut self,
+        name: impl IntoLabel,
+        args: Vec<(Label, ValueType)>,
+        views: Vec<Label>,
+        outer: impl FnOnce(Format) -> Format,
+        inner: impl FnOnce(FormatRef) -> Format,
+    ) -> FormatRef {
+        let level = self.names.len();
+        let self_ref = FormatRef(level);
+
+        // Reserve the slot before `inner`/`outer` run, so that the self-reference they embed
+        // (which can only ever be reached through the `Phantom` wrapper applied below) resolves
+        // to a real registration rather than indexing past the end of the module's tables.
+        //
+        // `args`/`views` are real and final already (the caller supplies them up front), but the
+        // format and its inferred type are necessarily provisional at this point - the placeholder
+        // type `ValueType::Any` is never actually inspected: the only thing that consults
+        // `format_types[level]` before it is overwritten below is the `ItemVar` case of
+        // `infer_format_type`, when it reaches the self-reference, and the enclosing
+        // `Format::Phantom` arm only wraps that result in `ValueType::PhantomData` without
+        // examining its shape.
+        self.names.push(name.into());
+        self.args.push(args.clone());
+        self.views.push(views.clone());
+        self.formats.push(Format::EMPTY);
+        self.format_types.push(ValueType::Any);
+
+        let phantom_param = inner(self_ref);
+        let format = outer(Format::Phantom(Box::new(phantom_param)));
+
+        let mut scope = TypeScope::new();
+        for (arg_name, arg_type) in &args {
+            scope.push(arg_name.clone(), arg_type.clone());
+        }
+        for view_name in &views {
+            scope.push_view(view_name.clone());
+        }
+        let format_type = match self.infer_format_type(&scope, &format) {
+            Ok(t) => t,
+            Err(msg) => panic!("{msg}"),
+        };
+
+        self.formats[level] = format;
+        self.format_types[level] = format_type;
+
+        self_ref
+    }
+
     pub fn get_name(&self, level: usize) -> &str {
         &self.names[level]
     }
@@ -2399,6 +2513,37 @@ mod test {
             (Label::Borrowed("z"), Value::U8(10)),
         ]);
         assert_eq!(expected, ret);
+    }
+
+    #[test]
+    fn format_phantom_rec_registers_and_decodes() {
+        use crate::helper::*;
+
+        let mut module = FormatModule::new();
+        let self_ref = module.define_format_phantom_rec(
+            "test.recursive",
+            |phantom_field| {
+                Format::record(vec![
+                    (Label::Borrowed("tag"), u8()),
+                    (Label::Borrowed("child"), phantom_field),
+                ])
+            },
+            |rec_ref| rec_ref.call(),
+        );
+
+        // Registration must have replaced the `ValueType::Any` placeholder with a real type.
+        let level = self_ref.get_level();
+        assert!(!matches!(module.get_format_type(level), ValueType::Any));
+
+        let prog = super::decoder::Compiler::compile_program(&module, &self_ref.call()).unwrap();
+        let buf = ReadCtxt::new(&[42u8]);
+        let (ret, _) = prog.run(buf).unwrap();
+        match ret {
+            Value::Record(fields) => {
+                assert_eq!(fields[0], (Label::Borrowed("tag"), Value::U8(42)));
+            }
+            other => panic!("expected a record, found {other:?}"),
+        }
     }
 
     fn assert_bounds<B>(e: Expr, expected: B)
