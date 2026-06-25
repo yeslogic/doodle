@@ -416,23 +416,30 @@ impl UType {
 }
 
 impl UType {
-    /// Returns an iterator over any embedded UTypes during occurs-checks.
+    /// Returns an iterator over any **directly**-embedded UTypes for use in occurs-checks (to rule out structurally infinite types).
+    ///
+    /// Any `UTypes` that only ever appear as a referential breadcrumb rather than a meaningful component
+    /// are ignored.
     ///
     /// This method presents a context-agnostic view that merely guarantees that the embedded UTypes of
     /// the receiver are all returned eventually, and in whatever order is most convenient.
-    pub fn iter_embedded<'a>(&'a self) -> Box<dyn Iterator<Item = Rc<UType>> + 'a> {
+    pub fn iter_embeds<'a>(&'a self) -> Box<dyn Iterator<Item = Rc<UType>> + 'a> {
         match self {
+            // Special case: PhantomData is reference-only and therefore does not violate occurs-checks even when autorecursively embedded
+            UType::PhantomData(..) => Box::new(std::iter::empty()),
+
+            // Leaf Nodes
             UType::Empty
             | UType::ViewObj
             | UType::Hole
             | UType::Var(..)
             | UType::Int(..)
             | UType::Base(..) => Box::new(std::iter::empty()),
+
+            // Non-leaf Nodes
             UType::Tuple(ts) => Box::new(ts.iter().cloned()),
             UType::Record(fs) => Box::new(fs.iter().map(|(_l, t)| t.clone())),
-            UType::Seq(t, _) | UType::Option(t) | UType::PhantomData(t) => {
-                Box::new(std::iter::once(t.clone()))
-            }
+            UType::Seq(t, _) | UType::Option(t) => Box::new(std::iter::once(t.clone())),
         }
     }
 }
@@ -974,14 +981,35 @@ impl TypeChecker {
         Ok(())
     }
 
-    fn infer_var_format_level(&mut self, level: usize, ctxt: Ctxt<'_>) -> TCResult<UVar> {
+    /// `placeholder`, if supplied, is reused as the level's cache entry while its body is being
+    /// recursively inferred, rather than allocating a fresh `UVar` for that purpose - the latter
+    /// would desynchronize `Elaborator`'s lockstep index-counting (`Elaborator::next_index`),
+    /// which assumes exactly as many `UVar`s are allocated here as indices it increments while
+    /// walking the same format, with no allowance for additional unaccounted-for allocations.
+    /// Callers that already have such a `UVar` on hand (i.e. `Format::ItemVar`'s own `newvar`)
+    /// should supply it; the fallback allocation path exists only for hypothetical future callers
+    /// that do not.
+    fn infer_var_format_level(
+        &mut self,
+        level: usize,
+        ctxt: Ctxt<'_>,
+        placeholder: Option<UVar>,
+    ) -> TCResult<UVar> {
         if let Some(ret) = self.level_vars.get(&level) {
-            Ok(*ret)
-        } else {
-            let ret = self.infer_var_format(ctxt.module.get_format(level), ctxt)?;
-            self.level_vars.insert(level, ret);
-            Ok(ret)
+            return Ok(*ret);
         }
+        // Reserve the level's cache entry *before* recursing into its own format body, so that a
+        // self-reference reached during that recursion (which can only ever occur inside a
+        // `Format::Phantom`, the one place `ItemVar` may validly name its own not-yet-resolved
+        // level) resolves to this placeholder instead of re-entering this same call and
+        // recursing without bound. Once the real result is known, it is unified with the
+        // placeholder, so anything that observed the placeholder in the meantime ends up
+        // equated with the real type regardless.
+        let placeholder = placeholder.unwrap_or_else(|| self.get_new_uvar());
+        self.level_vars.insert(level, placeholder);
+        let ret = self.infer_var_format(ctxt.module.get_format(level), ctxt)?;
+        self.unify_var_pair(placeholder, ret)?;
+        Ok(placeholder)
     }
 
     fn infer_var_view_format(
@@ -1203,7 +1231,7 @@ impl TypeChecker {
         match t.as_ref() {
             UType::Empty | UType::Base(..) => false,
             UType::Var(v) => self.occurs(*v).is_err(),
-            _ => t.iter_embedded().any(|sub_t| self.is_infinite_type(sub_t)),
+            _ => t.iter_embeds().any(|sub_t| self.is_infinite_type(sub_t)),
         }
     }
 
@@ -3417,9 +3445,9 @@ impl TypeChecker {
                     let new_scope = UScope::Multi(&arg_scope);
                     let tmp = ctxt.with_scope(&new_scope);
                     let new_ctxt = tmp.with_view_bindings(&view_scope);
-                    self.infer_var_format_level(*level, new_ctxt)?
+                    self.infer_var_format_level(*level, new_ctxt, Some(newvar))?
                 } else {
-                    self.infer_var_format_level(*level, ctxt)?
+                    self.infer_var_format_level(*level, ctxt, Some(newvar))?
                 };
                 self.unify_var_pair(newvar, level_var)?;
                 Ok(newvar)
