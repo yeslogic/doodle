@@ -105,4 +105,37 @@ impl NameGen {
             }
         }
     }
+
+    /// Reserves a first-pass name and ad-hoc index based on the *current* path context, without
+    /// yet knowing the associated [`RustTypeDecl`].
+    ///
+    /// This exists to support self-referential types: ordinarily, [`Self::get_name`] derives a
+    /// type's name/index from its (by then fully-known) `decl` - but a self-reference reached
+    /// while a type's own `decl` is still being constructed cannot wait for that, since the
+    /// `decl` it would need to look up is the very thing not yet available. This method performs
+    /// exactly the "not yet recorded" half of what [`Self::get_name`] does, so a caller can hand
+    /// the reservation to such a self-reference immediately, then retroactively associate it with
+    /// the real `decl` once known via [`Self::commit_reservation`].
+    pub fn reserve_name(&mut self) -> (Label, usize, PathLabel) {
+        let ix = self.ctr;
+        self.ctr += 1;
+        let loc = self.ctxt.register_path();
+        let name = self.ctxt.find_name_for(&loc).unwrap();
+        (name, ix, loc)
+    }
+
+    /// Associates a previously-[`Self::reserve_name`]'d `(ix, name, path)` with its now-known
+    /// `decl`, completing exactly what [`Self::get_name`]'s "not yet recorded" branch would have
+    /// done in one step, had `decl` been available from the start.
+    pub fn commit_reservation(
+        &mut self,
+        ix: usize,
+        name: Label,
+        path: PathLabel,
+        decl: RustTypeDecl,
+    ) {
+        self.rev_map.insert(decl, (ix, path.clone()));
+        // ensure deduplication happens by forcing a no-op rename by default, exactly as `get_name` does
+        self.name_remap.insert(name, path);
+    }
 }
