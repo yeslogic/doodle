@@ -255,6 +255,11 @@ impl CodeGen {
                         def: RustTypeDef::Struct(RustStruct::Record(Vec::new())),
                         lt: needs_lt.then(|| lt.clone()),
                     };
+                    // Only push on the first reservation: at that point `ix == len`.
+                    // Subsequent self-refs (Same(r) path) must not push again.
+                    if self.defined_types.len() == ix {
+                        self.defined_types.push(placeholder.clone());
+                    }
                     return GenType::Def((ix, name), placeholder);
                 }
                 // Mark `var` in-progress (with no reservation yet - see the field's doc comment
@@ -293,7 +298,7 @@ impl CodeGen {
                     Some((name, ix, path)) => {
                         self.name_gen
                             .commit_reservation(ix, name.clone(), path, rt_decl.clone());
-                        self.defined_types.push(rt_decl.clone());
+                        self.defined_types[ix] = rt_decl.clone();
                         (name, ix)
                     }
                     // Ordinary, non-recursive case: preserve the original content-based dedup.
@@ -333,6 +338,11 @@ impl CodeGen {
                         def: RustTypeDef::Enum(Vec::new()),
                         lt: needs_lt.then(|| lt.clone()),
                     };
+                    // Only push on the first reservation: at that point `ix == len`.
+                    // Subsequent self-refs (Same(r) path) must not push again.
+                    if self.defined_types.len() == ix {
+                        self.defined_types.push(placeholder.clone());
+                    }
                     return GenType::Def((ix, name), placeholder);
                 }
 
@@ -404,7 +414,7 @@ impl CodeGen {
                     Some((name, ix, path)) => {
                         self.name_gen
                             .commit_reservation(ix, name.clone(), path, rt_decl.clone());
-                        self.defined_types.push(rt_decl.clone());
+                        self.defined_types[ix] = rt_decl.clone();
                         (name, ix)
                     }
                     // Ordinary, non-recursive case: preserve the original content-based dedup.
