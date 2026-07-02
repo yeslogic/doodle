@@ -416,23 +416,30 @@ impl UType {
 }
 
 impl UType {
-    /// Returns an iterator over any embedded UTypes during occurs-checks.
+    /// Returns an iterator over any **directly**-embedded UTypes for use in occurs-checks (to rule out structurally infinite types).
+    ///
+    /// Any `UTypes` that only ever appear as a referential breadcrumb rather than a meaningful component
+    /// are ignored.
     ///
     /// This method presents a context-agnostic view that merely guarantees that the embedded UTypes of
     /// the receiver are all returned eventually, and in whatever order is most convenient.
-    pub fn iter_embedded<'a>(&'a self) -> Box<dyn Iterator<Item = Rc<UType>> + 'a> {
+    pub fn iter_embeds<'a>(&'a self) -> Box<dyn Iterator<Item = Rc<UType>> + 'a> {
         match self {
+            // Special case: PhantomData is reference-only and therefore does not violate occurs-checks even when autorecursively embedded
+            UType::PhantomData(..) => Box::new(std::iter::empty()),
+
+            // Leaf Nodes
             UType::Empty
             | UType::ViewObj
             | UType::Hole
             | UType::Var(..)
             | UType::Int(..)
             | UType::Base(..) => Box::new(std::iter::empty()),
+
+            // Non-leaf Nodes
             UType::Tuple(ts) => Box::new(ts.iter().cloned()),
             UType::Record(fs) => Box::new(fs.iter().map(|(_l, t)| t.clone())),
-            UType::Seq(t, _) | UType::Option(t) | UType::PhantomData(t) => {
-                Box::new(std::iter::once(t.clone()))
-            }
+            UType::Seq(t, _) | UType::Option(t) => Box::new(std::iter::once(t.clone())),
         }
     }
 }
@@ -974,14 +981,35 @@ impl TypeChecker {
         Ok(())
     }
 
-    fn infer_var_format_level(&mut self, level: usize, ctxt: Ctxt<'_>) -> TCResult<UVar> {
+    /// `placeholder`, if supplied, is reused as the level's cache entry while its body is being
+    /// recursively inferred, rather than allocating a fresh `UVar` for that purpose - the latter
+    /// would desynchronize `Elaborator`'s lockstep index-counting (`Elaborator::next_index`),
+    /// which assumes exactly as many `UVar`s are allocated here as indices it increments while
+    /// walking the same format, with no allowance for additional unaccounted-for allocations.
+    /// Callers that already have such a `UVar` on hand (i.e. `Format::ItemVar`'s own `newvar`)
+    /// should supply it; the fallback allocation path exists only for hypothetical future callers
+    /// that do not.
+    fn infer_var_format_level(
+        &mut self,
+        level: usize,
+        ctxt: Ctxt<'_>,
+        placeholder: Option<UVar>,
+    ) -> TCResult<UVar> {
         if let Some(ret) = self.level_vars.get(&level) {
-            Ok(*ret)
-        } else {
-            let ret = self.infer_var_format(ctxt.module.get_format(level), ctxt)?;
-            self.level_vars.insert(level, ret);
-            Ok(ret)
+            return Ok(*ret);
         }
+        // Reserve the level's cache entry *before* recursing into its own format body, so that a
+        // self-reference reached during that recursion (which can only ever occur inside a
+        // `Format::Phantom`, the one place `ItemVar` may validly name its own not-yet-resolved
+        // level) resolves to this placeholder instead of re-entering this same call and
+        // recursing without bound. Once the real result is known, it is unified with the
+        // placeholder, so anything that observed the placeholder in the meantime ends up
+        // equated with the real type regardless.
+        let placeholder = placeholder.unwrap_or_else(|| self.get_new_uvar());
+        self.level_vars.insert(level, placeholder);
+        let ret = self.infer_var_format(ctxt.module.get_format(level), ctxt)?;
+        self.unify_var_pair(placeholder, ret)?;
+        Ok(placeholder)
     }
 
     fn infer_var_view_format(
@@ -1203,7 +1231,7 @@ impl TypeChecker {
         match t.as_ref() {
             UType::Empty | UType::Base(..) => false,
             UType::Var(v) => self.occurs(*v).is_err(),
-            _ => t.iter_embedded().any(|sub_t| self.is_infinite_type(sub_t)),
+            _ => t.iter_embeds().any(|sub_t| self.is_infinite_type(sub_t)),
         }
     }
 
@@ -1272,10 +1300,16 @@ impl TypeChecker {
                 }
                 Ok(())
             }
-            UType::Seq(inner, _) | UType::Option(inner) | UType::PhantomData(inner) => {
+            UType::Seq(inner, _) | UType::Option(inner) => {
                 self.occurs_in(v, inner.clone())?;
                 Ok(())
             }
+            // As in `UType::iter_embeds`: PhantomData is reference-only, so a self-reference
+            // reached only through it (as with `Format::Phantom`/`define_format_phantom_rec`)
+            // does not constitute an infinite type, and must not be walked into here - doing so
+            // would recurse without bound around the same self-referential cycle that
+            // `iter_embeds`/`is_infinite_type` already know to treat as opaque.
+            UType::PhantomData(..) => Ok(()),
         }
     }
 
@@ -3417,9 +3451,9 @@ impl TypeChecker {
                     let new_scope = UScope::Multi(&arg_scope);
                     let tmp = ctxt.with_scope(&new_scope);
                     let new_ctxt = tmp.with_view_bindings(&view_scope);
-                    self.infer_var_format_level(*level, new_ctxt)?
+                    self.infer_var_format_level(*level, new_ctxt, Some(newvar))?
                 } else {
-                    self.infer_var_format_level(*level, ctxt)?
+                    self.infer_var_format_level(*level, ctxt, Some(newvar))?
                 };
                 self.unify_var_pair(newvar, level_var)?;
                 Ok(newvar)
@@ -3812,6 +3846,15 @@ impl TypeChecker {
     ///
     /// Will panic if any `UVar` has an unresolved record- or tuple- `ProjShape` constraint.
     pub(crate) fn reify(&self, t: Rc<UType>) -> Option<AugValueType> {
+        self.reify_rec(t, &mut HashSet::new())
+    }
+
+    /// Low-level helper for [`TypeChecker::reify`] that additionally tracks which canonical
+    /// [`UVar`]s are currently being expanded, so that a self-reference reached through a
+    /// [`UType::PhantomData`] (the only way a `UType` graph can legitimately be cyclic, per
+    /// `Format::Phantom`/`define_format_phantom_rec`) resolves to `None` instead of re-entering
+    /// the same expansion without bound.
+    fn reify_rec(&self, t: Rc<UType>, visiting: &mut HashSet<UVar>) -> Option<AugValueType> {
         match t.as_ref() {
             UType::Hole => {
                 log::error!(
@@ -3823,7 +3866,14 @@ impl TypeChecker {
             &UType::Int(it) => Some(AugValueType::Int(it.to_prim())),
             &UType::Var(uv) => {
                 let v = self.get_canonical_uvar(uv);
-                match self.substitute_uvar_vtype(v) {
+                if !visiting.insert(v) {
+                    // `v` is already being expanded further up this same call-stack, i.e. we've
+                    // gone all the way around a self-referential (`Phantom`-guarded) type - there
+                    // is no finite `AugValueType` that can represent this, so give up cleanly
+                    // rather than recursing forever.
+                    return None;
+                }
+                let ret = match self.substitute_uvar_vtype(v) {
                     Ok(Some(t0)) => match t0 {
                         VType::Base(bs) => match bs.get_unique_solution(uv) {
                             Ok(b) => Some(AugValueType::from(b)),
@@ -3833,8 +3883,8 @@ impl TypeChecker {
                             Ok(i) => Some(AugValueType::Int(i)),
                             Err(_e) => None,
                         },
-                        VType::Abstract(ut) => self.reify(ut),
-                        VType::IndefiniteUnion(vmid) => self.reify_union(vmid),
+                        VType::Abstract(ut) => self.reify_rec(ut, visiting),
+                        VType::IndefiniteUnion(vmid) => self.reify_union(vmid, visiting),
                         VType::ImplicitRecord(..) | VType::ImplicitTuple(..) => unreachable!(
                             "Unsolved implicit Tuple or Record leftover from un-unified projection: {t0:?}"
                         ),
@@ -3843,41 +3893,48 @@ impl TypeChecker {
                     Ok(None) => {
                         // substitute_uvar_utype returns none for assumed-partial union types, so handle that case proactively
                         match &self.constraints[v.0] {
-                            Constraints::Variant(vmid) => self.reify_union(*vmid),
+                            Constraints::Variant(vmid) => self.reify_union(*vmid, visiting),
                             _ => None,
                         }
                     }
-                }
+                };
+                visiting.remove(&v);
+                ret
             }
             &UType::Base(base_t) => Some(AugValueType::from(base_t)),
             UType::Empty => Some(AugValueType::Empty),
             UType::Tuple(ts) => {
                 let mut vts = Vec::with_capacity(ts.len());
                 for elt in ts.iter() {
-                    vts.push(self.reify(elt.clone())?);
+                    vts.push(self.reify_rec(elt.clone(), visiting)?);
                 }
                 Some(AugValueType::Tuple(vts))
             }
             UType::Record(fs) => {
                 let mut vfs = Vec::with_capacity(fs.len());
                 for (lab, ft) in fs.iter() {
-                    vfs.push((lab.clone(), self.reify(ft.clone())?));
+                    vfs.push((lab.clone(), self.reify_rec(ft.clone(), visiting)?));
                 }
                 Some(AugValueType::Record(vfs))
             }
-            UType::Seq(t0, h) => Some(AugValueType::Seq(Box::new(self.reify(t0.clone())?), *h)),
-            UType::Option(t0) => Some(AugValueType::Option(Box::new(self.reify(t0.clone())?))),
-            UType::PhantomData(t0) => {
-                Some(AugValueType::PhantomData(Box::new(self.reify(t0.clone())?)))
-            }
+            UType::Seq(t0, h) => Some(AugValueType::Seq(
+                Box::new(self.reify_rec(t0.clone(), visiting)?),
+                *h,
+            )),
+            UType::Option(t0) => Some(AugValueType::Option(Box::new(
+                self.reify_rec(t0.clone(), visiting)?,
+            ))),
+            UType::PhantomData(t0) => Some(AugValueType::PhantomData(Box::new(
+                self.reify_rec(t0.clone(), visiting)?,
+            ))),
         }
     }
 
-    fn reify_union(&self, vmid: VMId) -> Option<AugValueType> {
+    fn reify_union(&self, vmid: VMId, visiting: &mut HashSet<UVar>) -> Option<AugValueType> {
         let vm = self.varmaps.get_varmap(vmid);
         let mut branches = BTreeMap::new();
         for (label, ut) in vm.iter() {
-            let variant_type = self.reify(ut.clone())?;
+            let variant_type = self.reify_rec(ut.clone(), visiting)?;
             // NOTE - only add a variant to the union-type if its inner type is inhabitable
             if !matches!(variant_type, AugValueType::Empty) {
                 branches.insert(label.clone(), variant_type);

@@ -86,7 +86,7 @@ fn name_record(module: &mut FormatModule) -> FormatRef {
 /// NameID format (U16Be)
 ///
 /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/name#name-ids
-fn name_id() -> Format {
+pub(crate) fn name_id() -> Format {
     #![allow(dead_code)]
     const NID_COPYRIGHT_NOTICE: u16 = 0;
     const NID_FAMILY_NAME: u16 = 1;

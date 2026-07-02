@@ -176,7 +176,12 @@ mod util {
             NestingKind::MinimalVariation => {
                 let mut pat_branches = Vec::with_capacity(BRANCHES);
                 for (value, vname, c) in branches.into_iter() {
-                    let record_inner = record(c);
+                    let fields = c.into_iter().collect::<Vec<_>>();
+                    let record_inner = if fields.is_empty() {
+                        Format::EMPTY
+                    } else {
+                        record(fields)
+                    };
                     pat_branches.push((Pattern::Int(value.into()), vname, record_inner));
                 }
                 let final_field = (intermediate, match_variant(var(discriminant), pat_branches));
@@ -285,7 +290,7 @@ mod util {
         fmt_variant("F2Dot14", u16be())
     }
 
-    /// Helper function for parsing a big-endian u24 (3-byte) value
+    /// Helper function for parsing a big-endian u24 (3-byte) as a 32-bit Value
     pub(crate) fn u24be() -> Format {
         // REVIEW - should U24Be be a CommonOp?
         map(
@@ -311,9 +316,18 @@ mod util {
         expect_lambda(u16be(), "x", expr_eq(var("x"), Expr::U16(val)))
     }
 
+    /// Specialized version of `expects_u16be` for a contiguous range of values.
+    ///
+    /// Will typically lead to simpler codegen output as compared to [`expects_u16be`].
+    pub(crate) fn expect_range_u16be(min: u16, max: u16) -> Format {
+        expect_between_u16(u16be(), min, max)
+    }
+
     /// Parses a `U16Be` value that is expected to be equal to one of the values in `vals`
     ///
     /// If only one value is expected, use [`expect_u16be`] instead.
+    ///
+    /// If the values in question happen to be contiguous, use [`expect_range_u16be`] instead.
     ///
     /// Raises warnings, not errors, if the value does not match any of the provided cases.
     pub(crate) fn expects_u16be<const N: usize>(vals: [u16; N]) -> Format {
@@ -322,7 +336,7 @@ mod util {
             "x",
             expr_match(
                 var("x"),
-                // REVIEW - do we want to introduce pattern-OR to simplify the expression?
+                // TODO[epic=pattern-or] - do we want to introduce pattern-OR to simplify the expression?
                 vals.into_iter()
                     .map(|v| (Pattern::U16(v), Expr::Bool(true)))
                     .chain(std::iter::once((Pattern::Wildcard, Expr::Bool(false)))),
@@ -531,6 +545,18 @@ mod util {
         ])
     }
 
+    /// Record-format that reads (and stores) a u24be offset, along with a field `_data` for the phantom-parse of `format` at that offset (relative to `view`).
+    pub(crate) fn read_phantom_view_offset24(view: ViewExpr, format: Format) -> Format {
+        record_auto([
+            // TODO: rename "offset" -> "value" and ensure all calling-fields have 'offset' in field-identifier
+            ("offset", u24be()),
+            (
+                "#_data",
+                phantom(parse_view_offset::<U32>(view, var("offset"), format)),
+            ),
+        ])
+    }
+
     /// Record-format that reads (and stores) a u32be offset, along with a field `_data` for the phantom-parse of `format` at that offset (relative to `view`).
     pub(crate) fn read_phantom_view_offset32(view: ViewExpr, format: Format) -> Format {
         record_auto([
@@ -714,15 +740,18 @@ pub(crate) fn table_links(
     // !SECTION
 
     // SECTION - variable fonts (https://learn.microsoft.com/en-us/typography/opentype/spec/otff#tables-used-for-opentype-font-variations)
+    let delta_set_index_map = var_common::delta_set_index_map(module);
     let avar_table = avar::table(module);
     let fvar_table = fvar::table(module, tag);
     let gvar_table = gvar::table(module);
-    let hvar_table = hvar::table(module, item_variation_store);
+    let hvar_table = hvar::table(module, item_variation_store, delta_set_index_map);
     let mvar_table = mvar::table(module, tag, item_variation_store);
     let stat_table = stat::table(module, tag);
     // !SECTION
 
     // SECTION - color fonts (https://learn.microsoft.com/en-us/typography/opentype/spec/otff#tables-related-to-color-fonts)
+    let cpal_table = cpal::table(module);
+    let colr_table = colr::table(module, item_variation_store, delta_set_index_map);
     let svg_table = svg::table(module, text_or_ztext);
     // !SECTION
 
@@ -982,6 +1011,24 @@ pub(crate) fn table_links(
             // !SECTION
             // SECTION - Color Fonts
             // STUB - add more tables
+            (
+                "colr",
+                optional_table(
+                    util::FONTVIEW_VAR,
+                    var("tables"),
+                    util::magic(b"COLR"),
+                    colr_table.call(),
+                ),
+            ),
+            (
+                "cpal",
+                optional_table(
+                    util::FONTVIEW_VAR,
+                    var("tables"),
+                    util::magic(b"CPAL"),
+                    cpal_table.call(),
+                ),
+            ),
             (
                 "svg",
                 optional_table(
@@ -1423,6 +1470,8 @@ pub(crate) mod gpos;
 // !SECTION
 
 // SECTION - Variable Fonts tables
+pub(crate) mod var_common;
+
 pub(crate) mod avar;
 
 pub(crate) mod fvar;
@@ -1435,6 +1484,8 @@ pub(crate) mod mvar;
 // !SECTION
 
 // SECTION - color font tables
+pub(crate) mod colr;
+pub(crate) mod cpal;
 pub(crate) mod svg;
 // !SECTION
 

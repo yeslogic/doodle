@@ -33,7 +33,7 @@ use ixlabel::IxLabel;
 pub(crate) mod model;
 use model::traits::TraitObject;
 mod name;
-use name::{Derivation, NameAtom};
+use name::{Derivation, NameAtom, PathLabel};
 mod path_names;
 use path_names::NameGen;
 
@@ -87,6 +87,32 @@ pub struct CodeGen {
     name_gen: NameGen,
     defined_types: Vec<RustTypeDecl>,
     metavariables: StableMap<UVar, RustTypeDecl, util::BTree>,
+    /// Vars whose `RustTypeDecl` is currently being constructed (`Expansion::Record`/`Union`
+    /// handling in `lift_uvar`), so a self-reference reached during that construction (which can
+    /// only ever arise from a `Format::Phantom` - the one context in which `Format::ItemVar` may
+    /// validly name a level whose own elaboration is still in progress) resolves here instead of
+    /// recursing into `lift_uvar` for the same var without bound.
+    ///
+    /// The reservation itself is populated lazily, on the *first* self-reference actually
+    /// encountered (`None` until then) rather than eagerly for every var: `NameGen::get_name`'s
+    /// ordinary, decl-content-keyed path deduplicates any two *non*-recursive vars that happen to
+    /// produce structurally identical decls into a single Rust type, and eagerly reserving a
+    /// fresh index for every var (most of which are never self-referenced) would bypass that
+    /// dedup and allocate a same-shaped type twice. A genuinely self-referential decl can never
+    /// collide with anything else this way, since its own content embeds its own reserved index -
+    /// so it's safe to skip dedup specifically (and only) for the vars that escalate here.
+    in_progress: StableMap<UVar, Option<(Label, usize, PathLabel)>, util::FxHash>,
+    /// Vars for which an entry in `in_progress` was actually read by a self-reference while their
+    /// decl was under construction, mapped to whether that var needs a lifetime parameter at all
+    /// (per [`Self::var_needs_lifetime`], computed once on first self-reference and reused for any
+    /// further ones). Tracked so the finished decl can be forced to carry the same lifetime
+    /// verdict its self-referencing placeholder already promised to callers, rather than trusting
+    /// a field/variant-only computation that cannot see that promise. A bare cycle through
+    /// `Format::Phantom` never independently justifies a lifetime - forcing `Some` unconditionally
+    /// produces a struct whose lifetime parameter is otherwise unused (rustc E0392) whenever
+    /// nothing else in the type borrows anything - hence the need to predict this correctly rather
+    /// than guess.
+    recursion_lt_needed: StableMap<UVar, bool, util::FxHash>,
 }
 
 impl CodeGen {
@@ -98,6 +124,61 @@ impl CodeGen {
             name_gen,
             defined_types,
             metavariables,
+            in_progress: StableMap::<_, _, util::FxHash>::default(),
+            recursion_lt_needed: StableMap::<_, _, util::FxHash>::default(),
+        }
+    }
+
+    /// Read-only, side-effect-free walk of `tc`'s solved type-graph to determine whether
+    /// resolving `var` would require a lifetime parameter, without performing any of the
+    /// (mutating) codegen work `lift_uvar` would do for the same purpose.
+    ///
+    /// A var reached while already being visited (a self- or mutually-recursive reference, the
+    /// only way such a cycle can arise given `Format::Phantom`'s role as the sole gateway for
+    /// self-reference) contributes nothing on its own - only genuinely borrowed leaf data
+    /// (`ReadArray`, a borrowed buffer slice, `ViewObj`) or a transitive dependency on one does.
+    fn var_needs_lifetime(
+        tc: &TypeChecker,
+        var: UVar,
+        visiting: &mut std::collections::HashSet<UVar>,
+    ) -> bool {
+        use super::typecheck::Expansion;
+        let var = tc.get_canonical_uvar(var);
+        if !visiting.insert(var) {
+            return false;
+        }
+        let ret = match tc.expand_var(var) {
+            Expansion::Empty | Expansion::Base(_) | Expansion::Int(_) => false,
+            Expansion::Record(fields) => fields
+                .iter()
+                .any(|(_, sol)| Self::solution_needs_lifetime(tc, *sol, visiting)),
+            Expansion::Union(vars) => vars
+                .iter()
+                .any(|(_, sol)| Self::solution_needs_lifetime(tc, *sol, visiting)),
+            Expansion::Seq(sol, hint) => {
+                matches!(hint, SeqBorrowHint::ReadArray | SeqBorrowHint::BufferView)
+                    || Self::solution_needs_lifetime(tc, sol, visiting)
+            }
+            Expansion::Option(sol) | Expansion::PhantomData(sol) => {
+                Self::solution_needs_lifetime(tc, sol, visiting)
+            }
+            Expansion::Tuple(vs) => vs
+                .iter()
+                .any(|sol| Self::solution_needs_lifetime(tc, *sol, visiting)),
+            Expansion::ViewObj => true,
+        };
+        visiting.remove(&var);
+        ret
+    }
+
+    fn solution_needs_lifetime(
+        tc: &TypeChecker,
+        sol: WHNFSolution,
+        visiting: &mut std::collections::HashSet<UVar>,
+    ) -> bool {
+        match sol {
+            WHNFSolution::Base(_) | WHNFSolution::Int(_) => false,
+            WHNFSolution::Var(v) => Self::var_needs_lifetime(tc, v, visiting),
         }
     }
 
@@ -152,6 +233,38 @@ impl CodeGen {
                     }
                     return GenType::Def((ix, type_name), decl.clone());
                 }
+                // A self-reference reached while resolving `var`'s own fields below (always via
+                // a `Format::Phantom`, the only place this can validly occur) resolves here
+                // instead of recursing back into this branch. Its decl content is never actually
+                // read - `to_rust_type()` (the only consumer reachable through `PhantomData`'s
+                // handling) only needs `(ix, name, lt)` - but its `lt` must match whatever this
+                // call ends up settling on, which is why that's forced below whenever this fires.
+                if let Some(reservation) = self.in_progress.get(&var) {
+                    let (name, ix, _) = match reservation {
+                        Some(r) => r.clone(),
+                        None => {
+                            let r = self.name_gen.reserve_name();
+                            self.in_progress.insert(var, Some(r.clone()));
+                            r
+                        }
+                    };
+                    let needs_lt = *self.recursion_lt_needed.entry(var).or_insert_with(|| {
+                        Self::var_needs_lifetime(tc, var, &mut Default::default())
+                    });
+                    let placeholder = RustTypeDecl {
+                        def: RustTypeDef::Struct(RustStruct::Record(Vec::new())),
+                        lt: needs_lt.then(|| lt.clone()),
+                    };
+                    // Only push on the first reservation: at that point `ix == len`.
+                    // Subsequent self-refs (Same(r) path) must not push again.
+                    if self.defined_types.len() == ix {
+                        self.defined_types.push(placeholder.clone());
+                    }
+                    return GenType::Def((ix, name), placeholder);
+                }
+                // Mark `var` in-progress (with no reservation yet - see the field's doc comment
+                // for why this is deferred rather than eager) before recursing into fields.
+                self.in_progress.insert(var, None);
 
                 let mut lt_bound = None;
                 let mut rt_fields = Vec::new();
@@ -167,15 +280,36 @@ impl CodeGen {
                     rt_fields.push((lab.clone(), rt_field));
                     self.name_gen.ctxt.escape();
                 }
+                let reservation = self.in_progress.remove(&var).unwrap();
+                // If a self-reference consulted `recursion_lt_needed` above, honor the same
+                // verdict here, so the placeholder's promised `lt` (already baked into whatever
+                // field embedded it) matches what this decl actually ends up declaring.
+                if let Some(true) = self.recursion_lt_needed.remove(&var) {
+                    lt_bound = Some(lt.clone());
+                }
                 let rt_def = RustTypeDef::Struct(RustStruct::Record(rt_fields));
                 let rt_decl = RustTypeDecl {
                     def: rt_def,
                     lt: lt_bound,
                 };
-                let (type_name, (ix, is_new)) = self.name_gen.get_name(&rt_decl);
-                if is_new {
-                    self.defined_types.push(rt_decl.clone());
-                }
+                let (type_name, ix) = match reservation {
+                    // A self-reference occurred: its placeholder already committed to this
+                    // (ix, name), and dedup against other decls is moot (see field doc comment).
+                    Some((name, ix, path)) => {
+                        self.name_gen
+                            .commit_reservation(ix, name.clone(), path, rt_decl.clone());
+                        self.defined_types[ix] = rt_decl.clone();
+                        (name, ix)
+                    }
+                    // Ordinary, non-recursive case: preserve the original content-based dedup.
+                    None => {
+                        let (name, (ix, is_new)) = self.name_gen.get_name(&rt_decl);
+                        if is_new {
+                            self.defined_types.push(rt_decl.clone());
+                        }
+                        (name, ix)
+                    }
+                };
                 self.metavariables.insert(var, rt_decl.clone());
                 GenType::Def((ix, type_name), rt_decl)
             }
@@ -185,6 +319,36 @@ impl CodeGen {
                     assert!(!is_new);
                     return GenType::Def((ix, type_name), decl.clone());
                 }
+                // See the symmetric comment in the `Expansion::Record` branch above: a
+                // self-reference reached while resolving `var`'s own variants below resolves
+                // here instead of recursing back into this branch.
+                if let Some(reservation) = self.in_progress.get(&var) {
+                    let (name, ix, _) = match reservation {
+                        Some(r) => r.clone(),
+                        None => {
+                            let r = self.name_gen.reserve_name();
+                            self.in_progress.insert(var, Some(r.clone()));
+                            r
+                        }
+                    };
+                    let needs_lt = *self.recursion_lt_needed.entry(var).or_insert_with(|| {
+                        Self::var_needs_lifetime(tc, var, &mut Default::default())
+                    });
+                    let placeholder = RustTypeDecl {
+                        def: RustTypeDef::Enum(Vec::new()),
+                        lt: needs_lt.then(|| lt.clone()),
+                    };
+                    // Only push on the first reservation: at that point `ix == len`.
+                    // Subsequent self-refs (Same(r) path) must not push again.
+                    if self.defined_types.len() == ix {
+                        self.defined_types.push(placeholder.clone());
+                    }
+                    return GenType::Def((ix, name), placeholder);
+                }
+
+                // Mark `var` in-progress (no reservation yet) before recursing into variants -
+                // see the symmetric comment in the `Expansion::Record` branch above.
+                self.in_progress.insert(var, None);
 
                 let mut rt_vars = Vec::new();
                 let mut lt_bound = None;
@@ -234,15 +398,34 @@ impl CodeGen {
                     rt_vars.push(variant);
                     self.name_gen.ctxt.escape();
                 }
+                let reservation = self.in_progress.remove(&var).unwrap();
+                if let Some(true) = self.recursion_lt_needed.remove(&var) {
+                    lt_bound = Some(lt.clone());
+                }
                 let rt_def = RustTypeDef::Enum(rt_vars);
                 let rt_decl = RustTypeDecl {
                     def: rt_def,
                     lt: lt_bound,
                 };
-                let (tname, (ix, is_new)) = self.name_gen.get_name(&rt_decl);
-                if is_new {
-                    self.defined_types.push(rt_decl.clone());
-                }
+                let (tname, ix) = match reservation {
+                    // A self-reference occurred: its placeholder already committed to this
+                    // (ix, name), and dedup against other decls is moot (see field doc comment
+                    // on `in_progress`, above the `Expansion::Record` branch's identical logic).
+                    Some((name, ix, path)) => {
+                        self.name_gen
+                            .commit_reservation(ix, name.clone(), path, rt_decl.clone());
+                        self.defined_types[ix] = rt_decl.clone();
+                        (name, ix)
+                    }
+                    // Ordinary, non-recursive case: preserve the original content-based dedup.
+                    None => {
+                        let (name, (ix, is_new)) = self.name_gen.get_name(&rt_decl);
+                        if is_new {
+                            self.defined_types.push(rt_decl.clone());
+                        }
+                        (name, ix)
+                    }
+                };
                 self.metavariables.insert(var, rt_decl.clone());
                 GenType::Def((ix, tname), rt_decl)
             }
@@ -4279,6 +4462,26 @@ impl<'a> Elaborator<'a> {
                 let t_inner = if let Some(val) = self.t_formats.get(level) {
                     val.clone()
                 } else {
+                    // Reserve a placeholder *before* recursing into the level's own body, so
+                    // that a self-reference reached during that recursion (which can only ever
+                    // occur inside a `Format::Phantom`, the one place `ItemVar` may validly name
+                    // its own not-yet-elaborated level) resolves to this placeholder instead of
+                    // re-entering this same call and recursing without bound.
+                    //
+                    // Unlike the analogous fix in `TypeChecker::infer_var_format_level`, the
+                    // placeholder's *content* is never actually consulted by anything that cares:
+                    // `GTCompiler::compile_gt_format` discards a `FormatCall` node's `t_inner`
+                    // whenever `decoder_map` already has an entry for that level, and a level's
+                    // entry is always inserted into `decoder_map` at the point its `FormatCall`
+                    // node is *discovered*, before its body is ever walked (body-walking is
+                    // deferred via `compile_queue`) - so by the time a self-reference nested in
+                    // that body is reached, the real entry is already present and this
+                    // placeholder is never read. `Format::from`'s reverse conversion likewise
+                    // discards `t_inner` entirely when reconstructing `Format::ItemVar`. This
+                    // insertion also performs no index/`UVar`-style allocation of its own, so it
+                    // cannot desynchronize the lockstep invariant with `TypeChecker`.
+                    let placeholder = Rc::new(TypedFormat::Fail);
+                    self.t_formats.insert(*level, placeholder);
                     let fmt = self.module.get_format(*level);
                     let tmp = self.elaborate_format(fmt, &TypedDynScope::Empty);
                     let ret = Rc::new(tmp);
@@ -5679,6 +5882,153 @@ mod tests {
 
         let f = Format::record(vec![("xs", xs), ("fxs", fxs)]);
         run_headcount(&[("test.compute_complex", f)]);
+    }
+
+    /// Builds the smallest module that exercises `FormatModule::define_format_phantom_rec`'s
+    /// intended use-case: a format that refers to itself solely underneath a `Format::Phantom`.
+    ///
+    /// Registration itself (via [`FormatModule::define_format_phantom_rec`]) succeeds - see
+    /// `crate::test::format_phantom_rec_registers_and_decodes` - and so does decoding via the
+    /// plain (untyped) `decoder::Compiler`. The blockers watermarked below are specific to the
+    /// *codegen* pipeline (`codegen::TypeChecker`/`codegen::Elaborator`), not registration or
+    /// plain decoding.
+    fn make_phantom_rec_module() -> (FormatModule, Format) {
+        let mut module = FormatModule::new();
+        let self_ref = module.define_format_phantom_rec(
+            "test.phantom_rec",
+            |phantom_field| {
+                Format::record(vec![
+                    ("tag", Format::Byte(ByteSet::full())),
+                    ("child", phantom_field),
+                ])
+            },
+            |rec_ref| rec_ref.call(),
+        );
+        let f = self_ref.call();
+        (module, f)
+    }
+
+    /// Like `make_phantom_rec_module`, but with an extra field that genuinely needs a borrowed
+    /// lifetime (`ReadArray`) alongside the self-referencing one - used to confirm that the
+    /// self-reference itself never *causes* a lifetime parameter to be added (see
+    /// `phantom_rec_full_pipeline_repro`'s generated `test_phantom_rec`, which has none), while a
+    /// genuine need elsewhere in the same recursive type is still correctly detected and
+    /// consistently threaded through both the recursive reference and the type's own definition.
+    fn make_phantom_rec_module_with_borrow() -> (FormatModule, Format) {
+        let mut module = FormatModule::new();
+        let self_ref = module.define_format_phantom_rec(
+            "test.phantom_rec_borrow",
+            |phantom_field| {
+                Format::record(vec![
+                    ("tag", Format::Byte(ByteSet::full())),
+                    (
+                        "arr",
+                        crate::helper::from_here(crate::helper::read_array(
+                            Expr::U8(3),
+                            BaseKind::U8,
+                        )),
+                    ),
+                    ("child", phantom_field),
+                ])
+            },
+            |rec_ref| rec_ref.call(),
+        );
+        let f = self_ref.call();
+        (module, f)
+    }
+
+    #[test]
+    fn phantom_rec_with_genuine_borrow_gets_lifetime() {
+        let (module, f) = make_phantom_rec_module_with_borrow();
+        let output = produce_string_gencode(&module, &f);
+        assert!(
+            output.contains("'input"),
+            "expected a lifetime parameter threaded through the recursive type, found none:\n{output}"
+        );
+    }
+
+    /// Like `make_phantom_rec_module`, but a self-referential `Union` (the shape relevant to the
+    /// real motivating case, COLRv1's `PaintTable`, a multi-branch alternation) rather than a
+    /// `Record`.
+    fn make_phantom_rec_union_module() -> (FormatModule, Format) {
+        let mut module = FormatModule::new();
+        let self_ref = module.define_format_phantom_rec(
+            "test.phantom_rec_union",
+            |phantom_field| {
+                Format::Union(vec![
+                    Format::Variant(
+                        Label::Borrowed("Leaf"),
+                        Box::new(Format::Byte(ByteSet::full())),
+                    ),
+                    Format::Variant(Label::Borrowed("Node"), Box::new(phantom_field)),
+                ])
+            },
+            |rec_ref| rec_ref.call(),
+        );
+        let f = self_ref.call();
+        (module, f)
+    }
+
+    #[test]
+    fn phantom_rec_union_full_pipeline() {
+        let (module, f) = make_phantom_rec_union_module();
+        let output = produce_string_gencode(&module, &f);
+        assert!(!output.is_empty());
+        assert!(
+            !output.contains("'input"),
+            "no field here genuinely needs a lifetime - the self-reference alone shouldn't add one:\n{output}"
+        );
+    }
+
+    /// Regression test for the type-checking blocker against `define_format_phantom_rec`-defined
+    /// formats: `TypeChecker::infer_var_format_level` used to populate its `level_vars` cache only
+    /// *after* recursively inferring a level's own body, so a self-reference reached during that
+    /// recursion (necessarily confined within a `Format::Phantom`) found nothing cached and
+    /// recursed again without bound - this overflowed the stack and aborted the process outright
+    /// (not a catchable `panic!`/`Result::Err`). Fixed by seeding the cache with a placeholder
+    /// `UVar` *before* recursing (see `infer_var_format_level`'s doc comment).
+    ///
+    /// This test used to require `--ignored` and a subprocess-based watermark to observe its
+    /// failure safely (a stack overflow can't be asserted against directly); now that the blocker
+    /// is fixed, it runs as an ordinary test.
+    #[test]
+    fn phantom_rec_typecheck_resolves() {
+        let (module, f) = make_phantom_rec_module();
+        let tc = TypeChecker::infer_module(&module, &f).expect("infer_module failed");
+        assert!(tc.size() > 0);
+    }
+
+    /// Regression test for the full codegen pipeline (type-checking, then elaboration, then
+    /// codegen proper) against `define_format_phantom_rec`-defined formats.
+    ///
+    /// This exercised three distinct instances of the same bug class in turn, each fixed the same
+    /// way (reserve a placeholder in the relevant cache *before* recursing into a level's own
+    /// body, rather than inserting the real value only after):
+    /// - `TypeChecker::infer_var_format_level`'s `level_vars` cache (see
+    ///   `phantom_rec_typecheck_resolves` above).
+    /// - `Elaborator::elaborate_format`'s `t_formats` cache.
+    /// - `CodeGen::lift_uvar`'s `self.metavariables` cache (`Expansion::Record`/`Expansion::Union`
+    ///   handling) - empirically confirmed via depth-limited instrumentation to cycle
+    ///   `UVar(0) -> UVar(3) -> UVar(5) -> UVar(0) -> ...`. This last one needed a different
+    ///   shape of fix than the other two: `NameGen`'s naming cache (`rev_map`) is keyed by the
+    ///   *structural content* of a `RustTypeDecl`, not by `UVar`, so a naive placeholder-decl
+    ///   insert would get assigned a different name/index than the real decl once it's complete
+    ///   (different content -> different hash) - silently wrong codegen, not just a crash. The
+    ///   fix instead reserves a name/index from the active naming-context path up front (see
+    ///   `NameGen::reserve_name`/`commit_reservation`), before the real decl is known.
+    ///
+    /// A further subtlety specific to this last fix: a bare self-reference must never by itself
+    /// justify giving the type a lifetime parameter - forcing one unconditionally produces a
+    /// struct/enum whose lifetime parameter is otherwise unused (rustc E0392) whenever nothing
+    /// else in the type borrows anything. See `var_needs_lifetime` and the dedicated regression
+    /// tests `phantom_rec_with_genuine_borrow_gets_lifetime` and `phantom_rec_union_full_pipeline`
+    /// below, which check both directions (a genuine borrow elsewhere still gets a lifetime;
+    /// recursion alone does not).
+    #[test]
+    fn phantom_rec_full_pipeline_repro() {
+        let (module, f) = make_phantom_rec_module();
+        let output = produce_string_gencode(&module, &f);
+        assert!(!output.is_empty());
     }
 
     #[test]
