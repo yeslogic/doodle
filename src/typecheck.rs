@@ -1300,10 +1300,16 @@ impl TypeChecker {
                 }
                 Ok(())
             }
-            UType::Seq(inner, _) | UType::Option(inner) | UType::PhantomData(inner) => {
+            UType::Seq(inner, _) | UType::Option(inner) => {
                 self.occurs_in(v, inner.clone())?;
                 Ok(())
             }
+            // As in `UType::iter_embeds`: PhantomData is reference-only, so a self-reference
+            // reached only through it (as with `Format::Phantom`/`define_format_phantom_rec`)
+            // does not constitute an infinite type, and must not be walked into here - doing so
+            // would recurse without bound around the same self-referential cycle that
+            // `iter_embeds`/`is_infinite_type` already know to treat as opaque.
+            UType::PhantomData(..) => Ok(()),
         }
     }
 
@@ -3840,6 +3846,15 @@ impl TypeChecker {
     ///
     /// Will panic if any `UVar` has an unresolved record- or tuple- `ProjShape` constraint.
     pub(crate) fn reify(&self, t: Rc<UType>) -> Option<AugValueType> {
+        self.reify_rec(t, &mut HashSet::new())
+    }
+
+    /// Low-level helper for [`TypeChecker::reify`] that additionally tracks which canonical
+    /// [`UVar`]s are currently being expanded, so that a self-reference reached through a
+    /// [`UType::PhantomData`] (the only way a `UType` graph can legitimately be cyclic, per
+    /// `Format::Phantom`/`define_format_phantom_rec`) resolves to `None` instead of re-entering
+    /// the same expansion without bound.
+    fn reify_rec(&self, t: Rc<UType>, visiting: &mut HashSet<UVar>) -> Option<AugValueType> {
         match t.as_ref() {
             UType::Hole => {
                 log::error!(
@@ -3851,7 +3866,14 @@ impl TypeChecker {
             &UType::Int(it) => Some(AugValueType::Int(it.to_prim())),
             &UType::Var(uv) => {
                 let v = self.get_canonical_uvar(uv);
-                match self.substitute_uvar_vtype(v) {
+                if !visiting.insert(v) {
+                    // `v` is already being expanded further up this same call-stack, i.e. we've
+                    // gone all the way around a self-referential (`Phantom`-guarded) type - there
+                    // is no finite `AugValueType` that can represent this, so give up cleanly
+                    // rather than recursing forever.
+                    return None;
+                }
+                let ret = match self.substitute_uvar_vtype(v) {
                     Ok(Some(t0)) => match t0 {
                         VType::Base(bs) => match bs.get_unique_solution(uv) {
                             Ok(b) => Some(AugValueType::from(b)),
@@ -3861,8 +3883,8 @@ impl TypeChecker {
                             Ok(i) => Some(AugValueType::Int(i)),
                             Err(_e) => None,
                         },
-                        VType::Abstract(ut) => self.reify(ut),
-                        VType::IndefiniteUnion(vmid) => self.reify_union(vmid),
+                        VType::Abstract(ut) => self.reify_rec(ut, visiting),
+                        VType::IndefiniteUnion(vmid) => self.reify_union(vmid, visiting),
                         VType::ImplicitRecord(..) | VType::ImplicitTuple(..) => unreachable!(
                             "Unsolved implicit Tuple or Record leftover from un-unified projection: {t0:?}"
                         ),
@@ -3871,41 +3893,48 @@ impl TypeChecker {
                     Ok(None) => {
                         // substitute_uvar_utype returns none for assumed-partial union types, so handle that case proactively
                         match &self.constraints[v.0] {
-                            Constraints::Variant(vmid) => self.reify_union(*vmid),
+                            Constraints::Variant(vmid) => self.reify_union(*vmid, visiting),
                             _ => None,
                         }
                     }
-                }
+                };
+                visiting.remove(&v);
+                ret
             }
             &UType::Base(base_t) => Some(AugValueType::from(base_t)),
             UType::Empty => Some(AugValueType::Empty),
             UType::Tuple(ts) => {
                 let mut vts = Vec::with_capacity(ts.len());
                 for elt in ts.iter() {
-                    vts.push(self.reify(elt.clone())?);
+                    vts.push(self.reify_rec(elt.clone(), visiting)?);
                 }
                 Some(AugValueType::Tuple(vts))
             }
             UType::Record(fs) => {
                 let mut vfs = Vec::with_capacity(fs.len());
                 for (lab, ft) in fs.iter() {
-                    vfs.push((lab.clone(), self.reify(ft.clone())?));
+                    vfs.push((lab.clone(), self.reify_rec(ft.clone(), visiting)?));
                 }
                 Some(AugValueType::Record(vfs))
             }
-            UType::Seq(t0, h) => Some(AugValueType::Seq(Box::new(self.reify(t0.clone())?), *h)),
-            UType::Option(t0) => Some(AugValueType::Option(Box::new(self.reify(t0.clone())?))),
-            UType::PhantomData(t0) => {
-                Some(AugValueType::PhantomData(Box::new(self.reify(t0.clone())?)))
-            }
+            UType::Seq(t0, h) => Some(AugValueType::Seq(
+                Box::new(self.reify_rec(t0.clone(), visiting)?),
+                *h,
+            )),
+            UType::Option(t0) => Some(AugValueType::Option(Box::new(
+                self.reify_rec(t0.clone(), visiting)?,
+            ))),
+            UType::PhantomData(t0) => Some(AugValueType::PhantomData(Box::new(
+                self.reify_rec(t0.clone(), visiting)?,
+            ))),
         }
     }
 
-    fn reify_union(&self, vmid: VMId) -> Option<AugValueType> {
+    fn reify_union(&self, vmid: VMId, visiting: &mut HashSet<UVar>) -> Option<AugValueType> {
         let vm = self.varmaps.get_varmap(vmid);
         let mut branches = BTreeMap::new();
         for (label, ut) in vm.iter() {
-            let variant_type = self.reify(ut.clone())?;
+            let variant_type = self.reify_rec(ut.clone(), visiting)?;
             // NOTE - only add a variant to the union-type if its inner type is inhabitable
             if !matches!(variant_type, AugValueType::Empty) {
                 branches.insert(label.clone(), variant_type);
