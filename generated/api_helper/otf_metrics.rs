@@ -1216,6 +1216,10 @@ pub mod obj {
     proxy!(OpentypePaintTable<'input> = PaintTbl);
 
     proxy!(OpentypeColrColorLine = ColorLine);
+    proxy!(OpentypeVarColorLine = VarColorLine);
+
+    proxy!(OpentypeAffine2x3 = Affine2x3);
+    proxy!(OpentypeVarAffine2x3 = VarAffine2x3);
 
     proxy!(OpentypeLayerList<'input> = LayerList);
 
@@ -2363,15 +2367,43 @@ pub mod otf_colr {
         // Paint-table types with offsets to non-PaintTable objects (and associated object definitions)
         pub type OpentypePaintLinearGradient = opentype_colr_paint_table_PaintLinearGradient<'input>;
         pub type OpentypePaintRadialGradient = opentype_colr_paint_table_PaintRadialGradient<'input>;
+        pub type OpentypePaintSweepGradient = opentype_colr_paint_table_PaintSweepGradient<'input>;
+        pub type OpentypePaintVarLinearGradient = opentype_colr_paint_table_PaintVarLinearGradient<'input>;
+        pub type OpentypePaintVarRadialGradient = opentype_colr_paint_table_PaintVarRadialGradient<'input>;
+        pub type OpentypePaintVarSweepGradient = opentype_colr_paint_table_PaintVarSweepGradient<'input>;
+        pub type OpentypePaintTransform = opentype_colr_paint_table_PaintTransform<'input>;
+        pub type OpentypePaintVarTransform = opentype_colr_paint_table_PaintVarTransform<'input>;
 
         pub type OpentypeColrColorLine = opentype_colr_color_line;
         pub type OpentypeColorStop = opentype_colr_color_line_color_stops;
+
+        pub type OpentypeVarColorLine = opentype_colr_var_color_line;
+        pub type OpentypeVarColorStop = opentype_colr_var_color_line_color_stops;
+
+        pub type OpentypeAffine2x3 = opentype_colr_affine2x3;
+        pub type OpentypeVarAffine2x3 = opentype_colr_var_affine2x3;
 
         // paint-table types that contain offsets to other paint-table types
         pub type OpentypePaintComposite = opentype_colr_paint_table_PaintComposite<'input>;
         pub type OpentypePaintGlyph = opentype_colr_paint_table_PaintGlyph<'input>;
         pub type OpentypePaintRotate = opentype_colr_paint_table_PaintRotate<'input>;
         pub type OpentypePaintRotateAroundCenter = opentype_colr_paint_table_PaintRotateAroundCenter<'input>;
+        pub type OpentypePaintVarRotate = opentype_colr_paint_table_PaintVarRotate<'input>;
+        pub type OpentypePaintVarRotateAroundCenter = opentype_colr_paint_table_PaintVarRotateAroundCenter<'input>;
+        pub type OpentypePaintScale = opentype_colr_paint_table_PaintScale<'input>;
+        pub type OpentypePaintScaleAroundCenter = opentype_colr_paint_table_PaintScaleAroundCenter<'input>;
+        pub type OpentypePaintScaleUniform = opentype_colr_paint_table_PaintScaleUniform<'input>;
+        pub type OpentypePaintScaleUniformAroundCenter = opentype_colr_paint_table_PaintScaleUniformAroundCenter<'input>;
+        pub type OpentypePaintVarScale = opentype_colr_paint_table_PaintVarScale<'input>;
+        pub type OpentypePaintVarScaleAroundCenter = opentype_colr_paint_table_PaintVarScaleAroundCenter<'input>;
+        pub type OpentypePaintVarScaleUniform = opentype_colr_paint_table_PaintVarScaleUniform<'input>;
+        pub type OpentypePaintVarScaleUniformAroundCenter = opentype_colr_paint_table_PaintVarScaleUniformAroundCenter<'input>;
+        pub type OpentypePaintSkew = opentype_colr_paint_table_PaintSkew<'input>;
+        pub type OpentypePaintSkewAroundCenter = opentype_colr_paint_table_PaintSkewAroundCenter<'input>;
+        pub type OpentypePaintVarSkew = opentype_colr_paint_table_PaintVarSkew<'input>;
+        pub type OpentypePaintVarSkewAroundCenter = opentype_colr_paint_table_PaintVarSkewAroundCenter<'input>;
+        pub type OpentypePaintTranslate = opentype_colr_paint_table_PaintTranslate<'input>;
+        pub type OpentypePaintVarTranslate = opentype_colr_paint_table_PaintVarTranslate<'input>;
     }
 
     // SECTION - Colr always-present fields
@@ -2473,6 +2505,12 @@ pub mod otf_colr {
     // SECTION - Paint-table types that store offsets to non-Paint-table objects
     frame!(OpentypePaintLinearGradient);
     frame!(OpentypePaintRadialGradient);
+    frame!(OpentypePaintSweepGradient);
+    frame!(OpentypePaintVarLinearGradient);
+    frame!(OpentypePaintVarRadialGradient);
+    frame!(OpentypePaintVarSweepGradient);
+    frame!(OpentypePaintTransform);
+    frame!(OpentypePaintVarTransform);
 
     impl<'a> container::SingleContainer<Mandatory<obj::ColorLine>> for OpentypePaintLinearGradient<'a> {
         fn get_offset(&self) -> usize {
@@ -2484,6 +2522,56 @@ pub mod otf_colr {
     impl<'a> container::SingleContainer<Mandatory<obj::ColorLine>> for OpentypePaintRadialGradient<'a> {
         fn get_offset(&self) -> usize {
             self.color_line.offset as usize
+        }
+        fn get_args(&self) {}
+    }
+
+    impl<'a> container::SingleContainer<Mandatory<obj::ColorLine>> for OpentypePaintSweepGradient<'a> {
+        fn get_offset(&self) -> usize {
+            self.color_line.offset as usize
+        }
+        fn get_args(&self) {}
+    }
+
+    impl<'a> container::SingleContainer<Mandatory<obj::VarColorLine>>
+        for OpentypePaintVarLinearGradient<'a>
+    {
+        fn get_offset(&self) -> usize {
+            self.color_line.offset as usize
+        }
+        fn get_args(&self) {}
+    }
+
+    impl<'a> container::SingleContainer<Mandatory<obj::VarColorLine>>
+        for OpentypePaintVarRadialGradient<'a>
+    {
+        fn get_offset(&self) -> usize {
+            self.color_line.offset as usize
+        }
+        fn get_args(&self) {}
+    }
+
+    impl<'a> container::SingleContainer<Mandatory<obj::VarColorLine>>
+        for OpentypePaintVarSweepGradient<'a>
+    {
+        fn get_offset(&self) -> usize {
+            self.color_line.offset as usize
+        }
+        fn get_args(&self) {}
+    }
+
+    impl<'a> container::SingleContainer<Mandatory<obj::Affine2x3>> for OpentypePaintTransform<'a> {
+        fn get_offset(&self) -> usize {
+            self.transform.offset as usize
+        }
+        fn get_args(&self) {}
+    }
+
+    impl<'a> container::SingleContainer<Mandatory<obj::VarAffine2x3>>
+        for OpentypePaintVarTransform<'a>
+    {
+        fn get_offset(&self) -> usize {
+            self.transform.offset as usize
         }
         fn get_args(&self) {}
     }
@@ -2527,6 +2615,164 @@ pub mod otf_colr {
     impl<'a> container::SingleContainer<Mandatory<obj::PaintTbl>>
         for OpentypePaintRotateAroundCenter<'a>
     {
+        fn get_offset(&self) -> usize {
+            self.paint.offset as usize
+        }
+        fn get_args(&self) {}
+    }
+
+    frame!(OpentypePaintVarRotate);
+    impl<'a> container::SingleContainer<Mandatory<obj::PaintTbl>> for OpentypePaintVarRotate<'a> {
+        fn get_offset(&self) -> usize {
+            self.paint.offset as usize
+        }
+        fn get_args(&self) {}
+    }
+
+    frame!(OpentypePaintVarRotateAroundCenter);
+    impl<'a> container::SingleContainer<Mandatory<obj::PaintTbl>>
+        for OpentypePaintVarRotateAroundCenter<'a>
+    {
+        fn get_offset(&self) -> usize {
+            self.paint.offset as usize
+        }
+        fn get_args(&self) {}
+    }
+
+    frame!(OpentypePaintScale);
+    impl<'a> container::SingleContainer<Mandatory<obj::PaintTbl>> for OpentypePaintScale<'a> {
+        fn get_offset(&self) -> usize {
+            self.paint.offset as usize
+        }
+        fn get_args(&self) {}
+    }
+
+    frame!(OpentypePaintScaleAroundCenter);
+    impl<'a> container::SingleContainer<Mandatory<obj::PaintTbl>>
+        for OpentypePaintScaleAroundCenter<'a>
+    {
+        fn get_offset(&self) -> usize {
+            self.paint.offset as usize
+        }
+        fn get_args(&self) {}
+    }
+
+    frame!(OpentypePaintScaleUniform);
+    impl<'a> container::SingleContainer<Mandatory<obj::PaintTbl>> for OpentypePaintScaleUniform<'a> {
+        fn get_offset(&self) -> usize {
+            self.paint.offset as usize
+        }
+        fn get_args(&self) {}
+    }
+
+    frame!(OpentypePaintScaleUniformAroundCenter);
+    impl<'a> container::SingleContainer<Mandatory<obj::PaintTbl>>
+        for OpentypePaintScaleUniformAroundCenter<'a>
+    {
+        fn get_offset(&self) -> usize {
+            self.paint.offset as usize
+        }
+        fn get_args(&self) {}
+    }
+
+    frame!(OpentypePaintVarScale);
+    impl<'a> container::SingleContainer<Mandatory<obj::PaintTbl>> for OpentypePaintVarScale<'a> {
+        fn get_offset(&self) -> usize {
+            self.paint.offset as usize
+        }
+        fn get_args(&self) {}
+    }
+
+    frame!(OpentypePaintVarScaleAroundCenter);
+    impl<'a> container::SingleContainer<Mandatory<obj::PaintTbl>>
+        for OpentypePaintVarScaleAroundCenter<'a>
+    {
+        fn get_offset(&self) -> usize {
+            self.paint.offset as usize
+        }
+        fn get_args(&self) {}
+    }
+
+    frame!(OpentypePaintVarScaleUniform);
+    impl<'a> container::SingleContainer<Mandatory<obj::PaintTbl>> for OpentypePaintVarScaleUniform<'a> {
+        fn get_offset(&self) -> usize {
+            self.paint.offset as usize
+        }
+        fn get_args(&self) {}
+    }
+
+    frame!(OpentypePaintVarScaleUniformAroundCenter);
+    impl<'a> container::SingleContainer<Mandatory<obj::PaintTbl>>
+        for OpentypePaintVarScaleUniformAroundCenter<'a>
+    {
+        fn get_offset(&self) -> usize {
+            self.paint.offset as usize
+        }
+        fn get_args(&self) {}
+    }
+
+    frame!(OpentypePaintSkew);
+    impl<'a> container::SingleContainer<Mandatory<obj::PaintTbl>> for OpentypePaintSkew<'a> {
+        fn get_offset(&self) -> usize {
+            self.paint.offset as usize
+        }
+        fn get_args(&self) {}
+    }
+
+    frame!(OpentypePaintSkewAroundCenter);
+    impl<'a> container::SingleContainer<Mandatory<obj::PaintTbl>>
+        for OpentypePaintSkewAroundCenter<'a>
+    {
+        fn get_offset(&self) -> usize {
+            self.paint.offset as usize
+        }
+        fn get_args(&self) {}
+    }
+
+    frame!(OpentypePaintVarSkew);
+    impl<'a> container::SingleContainer<Mandatory<obj::PaintTbl>> for OpentypePaintVarSkew<'a> {
+        fn get_offset(&self) -> usize {
+            self.paint.offset as usize
+        }
+        fn get_args(&self) {}
+    }
+
+    frame!(OpentypePaintVarSkewAroundCenter);
+    impl<'a> container::SingleContainer<Mandatory<obj::PaintTbl>>
+        for OpentypePaintVarSkewAroundCenter<'a>
+    {
+        fn get_offset(&self) -> usize {
+            self.paint.offset as usize
+        }
+        fn get_args(&self) {}
+    }
+
+    // NOTE - `frame!` already invoked for these types in the ColorLine/Affine2x3 SECTION above,
+    // as they store offsets to both a nested paint-table (`paint`) and a non-paint-table object.
+    impl<'a> container::SingleContainer<Mandatory<obj::PaintTbl>> for OpentypePaintTransform<'a> {
+        fn get_offset(&self) -> usize {
+            self.paint.offset as usize
+        }
+        fn get_args(&self) {}
+    }
+
+    impl<'a> container::SingleContainer<Mandatory<obj::PaintTbl>> for OpentypePaintVarTransform<'a> {
+        fn get_offset(&self) -> usize {
+            self.paint.offset as usize
+        }
+        fn get_args(&self) {}
+    }
+
+    frame!(OpentypePaintTranslate);
+    impl<'a> container::SingleContainer<Mandatory<obj::PaintTbl>> for OpentypePaintTranslate<'a> {
+        fn get_offset(&self) -> usize {
+            self.paint.offset as usize
+        }
+        fn get_args(&self) {}
+    }
+
+    frame!(OpentypePaintVarTranslate);
+    impl<'a> container::SingleContainer<Mandatory<obj::PaintTbl>> for OpentypePaintVarTranslate<'a> {
         fn get_offset(&self) -> usize {
             self.paint.offset as usize
         }
@@ -2577,6 +2823,90 @@ pub(crate) mod colr {
                     stop_offset: F2Dot14::promote(&orig.stop_offset),
                     palette_index: orig.palette_index,
                     alpha: F2Dot14::promote(&orig.alpha),
+                }
+            }
+        }
+
+        #[derive(Debug, Clone, Copy)]
+        pub struct VarColorStop {
+            pub(crate) stop_offset: F2Dot14,
+            pub(crate) palette_index: u16,
+            pub(crate) alpha: F2Dot14,
+            pub(crate) var_index_base: u32,
+        }
+
+        impl Promote<OpentypeVarColorStop> for VarColorStop {
+            fn promote(orig: &OpentypeVarColorStop) -> Self {
+                VarColorStop {
+                    stop_offset: F2Dot14::promote(&orig.stop_offset),
+                    palette_index: orig.palette_index,
+                    alpha: F2Dot14::promote(&orig.alpha),
+                    var_index_base: orig.var_index_base,
+                }
+            }
+        }
+
+        #[derive(Clone, Debug)]
+        pub struct VarColorLine {
+            pub(crate) extend: u8,
+            pub(crate) num_stops: u16,
+            pub(crate) color_stops: Vec<VarColorStop>,
+        }
+
+        impl Promote<OpentypeVarColorLine> for VarColorLine {
+            fn promote(orig: &OpentypeVarColorLine) -> Self {
+                VarColorLine {
+                    extend: orig.extend,
+                    num_stops: orig.num_stops,
+                    color_stops: orig.color_stops.iter().map(VarColorStop::promote).collect(),
+                }
+            }
+        }
+
+        #[derive(Debug, Clone, Copy)]
+        pub struct Affine2x3 {
+            pub(crate) xx: Fixed,
+            pub(crate) yx: Fixed,
+            pub(crate) xy: Fixed,
+            pub(crate) yy: Fixed,
+            pub(crate) dx: Fixed,
+            pub(crate) dy: Fixed,
+        }
+
+        impl Promote<OpentypeAffine2x3> for Affine2x3 {
+            fn promote(orig: &OpentypeAffine2x3) -> Self {
+                Affine2x3 {
+                    xx: Fixed::promote(&orig.xx),
+                    yx: Fixed::promote(&orig.yx),
+                    xy: Fixed::promote(&orig.xy),
+                    yy: Fixed::promote(&orig.yy),
+                    dx: Fixed::promote(&orig.dx),
+                    dy: Fixed::promote(&orig.dy),
+                }
+            }
+        }
+
+        #[derive(Debug, Clone, Copy)]
+        pub struct VarAffine2x3 {
+            pub(crate) xx: Fixed,
+            pub(crate) yx: Fixed,
+            pub(crate) xy: Fixed,
+            pub(crate) yy: Fixed,
+            pub(crate) dx: Fixed,
+            pub(crate) dy: Fixed,
+            pub(crate) var_index_base: u32,
+        }
+
+        impl Promote<OpentypeVarAffine2x3> for VarAffine2x3 {
+            fn promote(orig: &OpentypeVarAffine2x3) -> Self {
+                VarAffine2x3 {
+                    xx: Fixed::promote(&orig.xx),
+                    yx: Fixed::promote(&orig.yx),
+                    xy: Fixed::promote(&orig.xy),
+                    yy: Fixed::promote(&orig.yy),
+                    dx: Fixed::promote(&orig.dx),
+                    dy: Fixed::promote(&orig.dy),
+                    var_index_base: orig.var_index_base,
                 }
             }
         }
@@ -2678,7 +3008,7 @@ pub(crate) mod colr {
                 alpha: F2Dot14,
             },
             PaintSweepGradient {
-                color_line: usize,
+                color_line: ColorLine,
                 center_x: i16,
                 center_y: i16,
                 start_angle: F2Dot14,
@@ -2687,7 +3017,7 @@ pub(crate) mod colr {
             /// PaintTransform: Stores View
             PaintTransform {
                 paint: usize,
-                transform: usize,
+                transform: Affine2x3,
             },
             /// PaintTranslate: Stores View
             PaintTranslate {
@@ -2696,7 +3026,7 @@ pub(crate) mod colr {
                 dy: i16,
             },
             PaintVarLinearGradient {
-                color_line: usize,
+                color_line: VarColorLine,
                 x0: i16,
                 y0: i16,
                 x1: i16,
@@ -2705,7 +3035,7 @@ pub(crate) mod colr {
                 y2: i16,
             },
             PaintVarRadialGradient {
-                color_line: usize,
+                color_line: VarColorLine,
                 x0: i16,
                 y0: i16,
                 radius0: u16,
@@ -2779,7 +3109,7 @@ pub(crate) mod colr {
                 var_index_base: u32,
             },
             PaintVarSweepGradient {
-                color_line: usize,
+                color_line: VarColorLine,
                 center_x: i16,
                 center_y: i16,
                 start_angle: F2Dot14,
@@ -2788,7 +3118,7 @@ pub(crate) mod colr {
             /// PaintVarTransform: Stores View
             PaintVarTransform {
                 paint: usize,
-                transform: usize,
+                transform: VarAffine2x3,
             },
             /// PaintVarTranslate: Stores View
             PaintVarTranslate {
@@ -2915,40 +3245,106 @@ pub(crate) mod colr {
                             center_y: inner.center_y,
                         }
                     }
-                    OpentypePaintTable::PaintScale(inner) => PaintTable::PaintScale {
-                        paint: inner.paint.offset as usize,
-                        scale_x: F2Dot14::promote(&inner.scale_x),
-                        scale_y: F2Dot14::promote(&inner.scale_y),
-                    },
+                    OpentypePaintTable::PaintScale(inner) => {
+                        let paint = {
+                            let offs = inner.paint.offset as usize;
+                            let key = inner.table_scope.relative_to_absolute(offs);
+                            if !map.contains_key(&key) {
+                                let paint = reify(inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, &paint);
+                                map.insert(key, Rc::new(lifted));
+                            };
+                            key
+                        };
+                        PaintTable::PaintScale {
+                            paint,
+                            scale_x: F2Dot14::promote(&inner.scale_x),
+                            scale_y: F2Dot14::promote(&inner.scale_y),
+                        }
+                    }
                     OpentypePaintTable::PaintScaleAroundCenter(inner) => {
+                        let paint = {
+                            let offs = inner.paint.offset as usize;
+                            let key = inner.table_scope.relative_to_absolute(offs);
+                            if !map.contains_key(&key) {
+                                let paint = reify(inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, &paint);
+                                map.insert(key, Rc::new(lifted));
+                            };
+                            key
+                        };
                         PaintTable::PaintScaleAroundCenter {
-                            paint: inner.paint.offset as usize,
+                            paint,
                             scale_x: F2Dot14::promote(&inner.scale_x),
                             scale_y: F2Dot14::promote(&inner.scale_y),
                             center_x: inner.center_x,
                             center_y: inner.center_y,
                         }
                     }
-                    OpentypePaintTable::PaintScaleUniform(inner) => PaintTable::PaintScaleUniform {
-                        paint: inner.paint.offset as usize,
-                        scale: F2Dot14::promote(&inner.scale),
-                    },
+                    OpentypePaintTable::PaintScaleUniform(inner) => {
+                        let paint = {
+                            let offs = inner.paint.offset as usize;
+                            let key = inner.table_scope.relative_to_absolute(offs);
+                            if !map.contains_key(&key) {
+                                let paint = reify(inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, &paint);
+                                map.insert(key, Rc::new(lifted));
+                            };
+                            key
+                        };
+                        PaintTable::PaintScaleUniform {
+                            paint,
+                            scale: F2Dot14::promote(&inner.scale),
+                        }
+                    }
                     OpentypePaintTable::PaintScaleUniformAroundCenter(inner) => {
+                        let paint = {
+                            let offs = inner.paint.offset as usize;
+                            let key = inner.table_scope.relative_to_absolute(offs);
+                            if !map.contains_key(&key) {
+                                let paint = reify(inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, &paint);
+                                map.insert(key, Rc::new(lifted));
+                            };
+                            key
+                        };
                         PaintTable::PaintScaleUniformAroundCenter {
-                            paint: inner.paint.offset as usize,
+                            paint,
                             scale: F2Dot14::promote(&inner.scale),
                             center_x: inner.center_x,
                             center_y: inner.center_y,
                         }
                     }
-                    OpentypePaintTable::PaintSkew(inner) => PaintTable::PaintSkew {
-                        paint: inner.paint.offset as usize,
-                        x_skew_angle: F2Dot14::promote(&inner.x_skew_angle),
-                        y_skew_angle: F2Dot14::promote(&inner.y_skew_angle),
-                    },
+                    OpentypePaintTable::PaintSkew(inner) => {
+                        let paint = {
+                            let offs = inner.paint.offset as usize;
+                            let key = inner.table_scope.relative_to_absolute(offs);
+                            if !map.contains_key(&key) {
+                                let paint = reify(inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, &paint);
+                                map.insert(key, Rc::new(lifted));
+                            };
+                            key
+                        };
+                        PaintTable::PaintSkew {
+                            paint,
+                            x_skew_angle: F2Dot14::promote(&inner.x_skew_angle),
+                            y_skew_angle: F2Dot14::promote(&inner.y_skew_angle),
+                        }
+                    }
                     OpentypePaintTable::PaintSkewAroundCenter(inner) => {
+                        let paint = {
+                            let offs = inner.paint.offset as usize;
+                            let key = inner.table_scope.relative_to_absolute(offs);
+                            if !map.contains_key(&key) {
+                                let paint = reify(inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, &paint);
+                                map.insert(key, Rc::new(lifted));
+                            };
+                            key
+                        };
                         PaintTable::PaintSkewAroundCenter {
-                            paint: inner.paint.offset as usize,
+                            paint,
                             x_skew_angle: F2Dot14::promote(&inner.x_skew_angle),
                             y_skew_angle: F2Dot14::promote(&inner.y_skew_angle),
                             center_x: inner.center_x,
@@ -2961,25 +3357,55 @@ pub(crate) mod colr {
                     },
                     OpentypePaintTable::PaintSweepGradient(inner) => {
                         PaintTable::PaintSweepGradient {
-                            color_line: inner.color_line.offset as usize,
+                            color_line: ColorLine::promote(&reify(
+                                inner,
+                                Mandatory(obj::ColorLine),
+                            )),
                             center_x: inner.center_x,
                             center_y: inner.center_y,
                             start_angle: F2Dot14::promote(&inner.start_angle),
                             end_angle: F2Dot14::promote(&inner.end_angle),
                         }
                     }
-                    OpentypePaintTable::PaintTransform(inner) => PaintTable::PaintTransform {
-                        paint: inner.paint.offset as usize,
-                        transform: inner.transform.offset as usize,
-                    },
-                    OpentypePaintTable::PaintTranslate(inner) => PaintTable::PaintTranslate {
-                        paint: inner.paint.offset as usize,
-                        dx: inner.dx,
-                        dy: inner.dy,
-                    },
+                    OpentypePaintTable::PaintTransform(inner) => {
+                        let paint = {
+                            let offs = inner.paint.offset as usize;
+                            let key = inner.table_scope.relative_to_absolute(offs);
+                            if !map.contains_key(&key) {
+                                let paint = reify(inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, &paint);
+                                map.insert(key, Rc::new(lifted));
+                            };
+                            key
+                        };
+                        PaintTable::PaintTransform {
+                            paint,
+                            transform: Affine2x3::promote(&reify(inner, Mandatory(obj::Affine2x3))),
+                        }
+                    }
+                    OpentypePaintTable::PaintTranslate(inner) => {
+                        let paint = {
+                            let offs = inner.paint.offset as usize;
+                            let key = inner.table_scope.relative_to_absolute(offs);
+                            if !map.contains_key(&key) {
+                                let paint = reify(inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, &paint);
+                                map.insert(key, Rc::new(lifted));
+                            };
+                            key
+                        };
+                        PaintTable::PaintTranslate {
+                            paint,
+                            dx: inner.dx,
+                            dy: inner.dy,
+                        }
+                    }
                     OpentypePaintTable::PaintVarLinearGradient(inner) => {
                         PaintTable::PaintVarLinearGradient {
-                            color_line: inner.color_line.offset as usize,
+                            color_line: VarColorLine::promote(&reify(
+                                inner,
+                                Mandatory(obj::VarColorLine),
+                            )),
                             x0: inner.x0,
                             y0: inner.y0,
                             x1: inner.x1,
@@ -2990,7 +3416,10 @@ pub(crate) mod colr {
                     }
                     OpentypePaintTable::PaintVarRadialGradient(inner) => {
                         PaintTable::PaintVarRadialGradient {
-                            color_line: inner.color_line.offset as usize,
+                            color_line: VarColorLine::promote(&reify(
+                                inner,
+                                Mandatory(obj::VarColorLine),
+                            )),
                             x0: inner.x0,
                             y0: inner.y0,
                             radius0: inner.radius0,
@@ -2999,29 +3428,73 @@ pub(crate) mod colr {
                             radius1: inner.radius1,
                         }
                     }
-                    OpentypePaintTable::PaintVarRotate(inner) => PaintTable::PaintVarRotate {
-                        paint: inner.paint.offset as usize,
-                        angle: F2Dot14::promote(&inner.angle),
-                        var_index_base: inner.var_index_base,
-                    },
+                    OpentypePaintTable::PaintVarRotate(inner) => {
+                        let paint = {
+                            let offs = inner.paint.offset as usize;
+                            let key = inner.table_scope.relative_to_absolute(offs);
+                            if !map.contains_key(&key) {
+                                let paint = reify(inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, &paint);
+                                map.insert(key, Rc::new(lifted));
+                            };
+                            key
+                        };
+                        PaintTable::PaintVarRotate {
+                            paint,
+                            angle: F2Dot14::promote(&inner.angle),
+                            var_index_base: inner.var_index_base,
+                        }
+                    }
                     OpentypePaintTable::PaintVarRotateAroundCenter(inner) => {
+                        let paint = {
+                            let offs = inner.paint.offset as usize;
+                            let key = inner.table_scope.relative_to_absolute(offs);
+                            if !map.contains_key(&key) {
+                                let paint = reify(inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, &paint);
+                                map.insert(key, Rc::new(lifted));
+                            };
+                            key
+                        };
                         PaintTable::PaintVarRotateAroundCenter {
-                            paint: inner.paint.offset as usize,
+                            paint,
                             angle: F2Dot14::promote(&inner.angle),
                             center_x: inner.center_x,
                             center_y: inner.center_y,
                             var_index_base: inner.var_index_base,
                         }
                     }
-                    OpentypePaintTable::PaintVarScale(inner) => PaintTable::PaintVarScale {
-                        paint: inner.paint.offset as usize,
-                        scale_x: F2Dot14::promote(&inner.scale_x),
-                        scale_y: F2Dot14::promote(&inner.scale_y),
-                        var_index_base: inner.var_index_base,
-                    },
+                    OpentypePaintTable::PaintVarScale(inner) => {
+                        let paint = {
+                            let offs = inner.paint.offset as usize;
+                            let key = inner.table_scope.relative_to_absolute(offs);
+                            if !map.contains_key(&key) {
+                                let paint = reify(inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, &paint);
+                                map.insert(key, Rc::new(lifted));
+                            };
+                            key
+                        };
+                        PaintTable::PaintVarScale {
+                            paint,
+                            scale_x: F2Dot14::promote(&inner.scale_x),
+                            scale_y: F2Dot14::promote(&inner.scale_y),
+                            var_index_base: inner.var_index_base,
+                        }
+                    }
                     OpentypePaintTable::PaintVarScaleAroundCenter(inner) => {
+                        let paint = {
+                            let offs = inner.paint.offset as usize;
+                            let key = inner.table_scope.relative_to_absolute(offs);
+                            if !map.contains_key(&key) {
+                                let paint = reify(inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, &paint);
+                                map.insert(key, Rc::new(lifted));
+                            };
+                            key
+                        };
                         PaintTable::PaintVarScaleAroundCenter {
-                            paint: inner.paint.offset as usize,
+                            paint,
                             scale_x: F2Dot14::promote(&inner.scale_x),
                             scale_y: F2Dot14::promote(&inner.scale_y),
                             center_x: inner.center_x,
@@ -3030,30 +3503,72 @@ pub(crate) mod colr {
                         }
                     }
                     OpentypePaintTable::PaintVarScaleUniform(inner) => {
+                        let paint = {
+                            let offs = inner.paint.offset as usize;
+                            let key = inner.table_scope.relative_to_absolute(offs);
+                            if !map.contains_key(&key) {
+                                let paint = reify(inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, &paint);
+                                map.insert(key, Rc::new(lifted));
+                            };
+                            key
+                        };
                         PaintTable::PaintVarScaleUniform {
-                            paint: inner.paint.offset as usize,
+                            paint,
                             scale: F2Dot14::promote(&inner.scale),
                             var_index_base: inner.var_index_base,
                         }
                     }
                     OpentypePaintTable::PaintVarScaleUniformAroundCenter(inner) => {
+                        let paint = {
+                            let offs = inner.paint.offset as usize;
+                            let key = inner.table_scope.relative_to_absolute(offs);
+                            if !map.contains_key(&key) {
+                                let paint = reify(inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, &paint);
+                                map.insert(key, Rc::new(lifted));
+                            };
+                            key
+                        };
                         PaintTable::PaintVarScaleUniformAroundCenter {
-                            paint: inner.paint.offset as usize,
+                            paint,
                             scale: F2Dot14::promote(&inner.scale),
                             center_x: inner.center_x,
                             center_y: inner.center_y,
                             var_index_base: inner.var_index_base,
                         }
                     }
-                    OpentypePaintTable::PaintVarSkew(inner) => PaintTable::PaintVarSkew {
-                        paint: inner.paint.offset as usize,
-                        x_skew_angle: F2Dot14::promote(&inner.x_skew_angle),
-                        y_skew_angle: F2Dot14::promote(&inner.y_skew_angle),
-                        var_index_base: inner.var_index_base,
-                    },
+                    OpentypePaintTable::PaintVarSkew(inner) => {
+                        let paint = {
+                            let offs = inner.paint.offset as usize;
+                            let key = inner.table_scope.relative_to_absolute(offs);
+                            if !map.contains_key(&key) {
+                                let paint = reify(inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, &paint);
+                                map.insert(key, Rc::new(lifted));
+                            };
+                            key
+                        };
+                        PaintTable::PaintVarSkew {
+                            paint,
+                            x_skew_angle: F2Dot14::promote(&inner.x_skew_angle),
+                            y_skew_angle: F2Dot14::promote(&inner.y_skew_angle),
+                            var_index_base: inner.var_index_base,
+                        }
+                    }
                     OpentypePaintTable::PaintVarSkewAroundCenter(inner) => {
+                        let paint = {
+                            let offs = inner.paint.offset as usize;
+                            let key = inner.table_scope.relative_to_absolute(offs);
+                            if !map.contains_key(&key) {
+                                let paint = reify(inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, &paint);
+                                map.insert(key, Rc::new(lifted));
+                            };
+                            key
+                        };
                         PaintTable::PaintVarSkewAroundCenter {
-                            paint: inner.paint.offset as usize,
+                            paint,
                             x_skew_angle: F2Dot14::promote(&inner.x_skew_angle),
                             y_skew_angle: F2Dot14::promote(&inner.y_skew_angle),
                             center_x: inner.center_x,
@@ -3068,23 +3583,53 @@ pub(crate) mod colr {
                     },
                     OpentypePaintTable::PaintVarSweepGradient(inner) => {
                         PaintTable::PaintVarSweepGradient {
-                            color_line: inner.color_line.offset as usize,
+                            color_line: VarColorLine::promote(&reify(
+                                inner,
+                                Mandatory(obj::VarColorLine),
+                            )),
                             center_x: inner.center_x,
                             center_y: inner.center_y,
                             start_angle: F2Dot14::promote(&inner.start_angle),
                             end_angle: F2Dot14::promote(&inner.end_angle),
                         }
                     }
-                    OpentypePaintTable::PaintVarTransform(inner) => PaintTable::PaintVarTransform {
-                        paint: inner.paint.offset as usize,
-                        transform: inner.transform.offset as usize,
-                    },
-                    OpentypePaintTable::PaintVarTranslate(inner) => PaintTable::PaintVarTranslate {
-                        paint: inner.paint.offset as usize,
-                        dx: inner.dx,
-                        dy: inner.dy,
-                        var_index_base: inner.var_index_base,
-                    },
+                    OpentypePaintTable::PaintVarTransform(inner) => {
+                        let paint = {
+                            let offs = inner.paint.offset as usize;
+                            let key = inner.table_scope.relative_to_absolute(offs);
+                            if !map.contains_key(&key) {
+                                let paint = reify(inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, &paint);
+                                map.insert(key, Rc::new(lifted));
+                            };
+                            key
+                        };
+                        PaintTable::PaintVarTransform {
+                            paint,
+                            transform: VarAffine2x3::promote(&reify(
+                                inner,
+                                Mandatory(obj::VarAffine2x3),
+                            )),
+                        }
+                    }
+                    OpentypePaintTable::PaintVarTranslate(inner) => {
+                        let paint = {
+                            let offs = inner.paint.offset as usize;
+                            let key = inner.table_scope.relative_to_absolute(offs);
+                            if !map.contains_key(&key) {
+                                let paint = reify(inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, &paint);
+                                map.insert(key, Rc::new(lifted));
+                            };
+                            key
+                        };
+                        PaintTable::PaintVarTranslate {
+                            paint,
+                            dx: inner.dx,
+                            dy: inner.dy,
+                            var_index_base: inner.var_index_base,
+                        }
+                    }
                 }
             }
         }
