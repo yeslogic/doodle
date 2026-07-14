@@ -39,6 +39,8 @@ pub(crate) fn table(module: &mut FormatModule) -> FormatRef {
                         1u16,
                         "Version1",
                         vec![
+                            // NOTE - we duplicate `num_palettes` here because the `palette_types_array` phase-two parser needs that argument and it is not locally visible in the `extra` type unless we use UnifiedRecord
+                            ("num_palettes", compute(var("num_palettes"))),
                             (
                                 "palette_types_array",
                                 util::read_phantom_view_offset32(
@@ -48,17 +50,14 @@ pub(crate) fn table(module: &mut FormatModule) -> FormatRef {
                             ),
                             (
                                 "palette_labels_array",
-                                util::read_phantom_view_offset32(
-                                    vvar("table_view"),
-                                    palette_labels_array.invoke_args([var("num_palettes")]),
-                                ),
+                                palette_labels_array
+                                    .invoke_args_views([var("num_palettes")], [vvar("table_view")]),
                             ),
                             (
                                 "palette_entry_labels_array",
-                                util::read_phantom_view_offset32(
-                                    vvar("table_view"),
-                                    palette_entry_labels_array
-                                        .invoke_args([var("num_palette_entries")]),
+                                palette_entry_labels_array.invoke_args_views(
+                                    [var("num_palette_entries")],
+                                    [vvar("table_view")],
                                 ),
                             ),
                         ],
@@ -83,35 +82,40 @@ fn palette_types_array(module: &mut FormatModule) -> DepFormat<1, 0> {
         BitFieldKind::FlagBit("usable_with_dark_background"), // Bit 1: palette is usable with dark background
         BitFieldKind::FlagBit("usable_with_light_background"), // Bit 0: palette is usable with light background
     ]);
+    let palette_type = module.define_format("opentype.cpal.palette_type", flags);
     module.register_format_args(
         "opentype.cpal.palette_types_array",
         [(Label::Borrowed("num_palettes"), ValueType::U16)],
         // TODO[epic=adhoc-readarray] - we ideally want this to be a ReadArray of flags values, but the required machinery isn't yet implemented
-        repeat_count(var("num_palettes"), flags),
+        repeat_count(var("num_palettes"), palette_type.call()),
     )
 }
 
 /// CPAL Palette Labels Array (Version 1)
 ///
 /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/cpal#palette-labels-array
-fn palette_labels_array(module: &mut FormatModule) -> DepFormat<1, 0> {
-    module.register_format_args(
+fn palette_labels_array(module: &mut FormatModule) -> DepFormat<1, 1> {
+    module.register_format_args_views(
         "opentype.cpal.palette_labels_array",
         [(Label::Borrowed("num_palettes"), ValueType::U16)],
-        repeat_count(var("num_palettes"), super::name::name_id()),
-        // from_here(read_array(var("num_palettes"), BaseKind::U16BE)),
+        [(Label::Borrowed("table_view"))],
+        read_array_view_offset32(vvar("table_view"), var("num_palettes"), BaseKind::U16BE),
     )
 }
 
 /// CPAL Palette Entry Labels Array (Version 1)
 ///
 /// C.f. https://learn.microsoft.com/en-us/typography/opentype/spec/cpal#palette-entry-label-array
-fn palette_entry_labels_array(module: &mut FormatModule) -> DepFormat<1, 0> {
-    module.register_format_args(
+fn palette_entry_labels_array(module: &mut FormatModule) -> DepFormat<1, 1> {
+    module.register_format_args_views(
         "opentype.cpal.palette_entry_labels_array",
         [(Label::Borrowed("num_palette_entries"), ValueType::U16)],
-        repeat_count(var("num_palette_entries"), super::name::name_id()),
-        // from_here(read_array(var("num_palette_entries"), BaseKind::U16BE)),
+        [(Label::Borrowed("table_view"))],
+        read_array_view_offset32(
+            vvar("table_view"),
+            var("num_palette_entries"),
+            BaseKind::U16BE,
+        ),
     )
 }
 
