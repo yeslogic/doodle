@@ -203,6 +203,10 @@ pub mod otf_types {
 
         // SECTION - Color Fonts
         pub type OpentypeSvg = opentype_svg_table<'a>;
+
+        pub type OpentypeCpal = opentype_cpal_table<'a>;
+
+        pub type OpentypeColr = opentype_colr_table<'a>;
         // !SECTION
 
         // SECTION - Variable font tables
@@ -743,6 +747,24 @@ mod fn_reify {
             )
         })
     }
+    pub(super) fn reify_const<'call, 'input, Frame, Obj, ArgsTy, Out>(
+        frame: &'call Frame,
+        _proxy: Obj,
+    ) -> Out
+    where
+        Frame: container::ViewFrame<'input> + container::SingleContainer<Obj>,
+        Obj: for<'x> container::CommonObject<Args<'x> = ArgsTy, Output<'x> = Out>,
+    {
+        let args = frame.get_args();
+        let offset = frame.get_offset();
+        Obj::parse_offset(frame.scope(), offset, args).unwrap_or_else(|e| {
+            panic!(
+                "failed to parse (reify_const::<{}, {}>): {e}",
+                std::any::type_name::<Frame>(),
+                std::any::type_name::<Obj>()
+            )
+        })
+    }
 
     pub(super) fn reify_index<'input, Frame, Obj, const N: usize>(
         frame: &'input Frame,
@@ -939,8 +961,8 @@ mod fn_reify {
     }
 }
 use fn_reify::{
-    reify, reify_all, reify_all_dep, reify_all_index, reify_all_index_dep, reify_dep, reify_index,
-    reify_index_dep, reify_opt, reify_opt_dep, reify_opt_index_dep,
+    reify, reify_all, reify_all_dep, reify_all_index, reify_all_index_dep, reify_const, reify_dep,
+    reify_index, reify_index_dep, reify_opt, reify_opt_dep, reify_opt_index_dep,
 };
 
 pub mod obj {
@@ -971,6 +993,9 @@ pub mod obj {
     /// proxy!( GenCodeTypeName<'lt> = MyProxy );
     /// ```
     macro_rules! proxy {
+        ($proxy:ident) => {
+            pub struct $proxy;
+        };
         ($real:ident => $proxy:ident) => {
             use super::$real;
             pub struct $proxy;
@@ -1105,6 +1130,97 @@ pub mod obj {
     proxy!(OpentypeVdmxGroup = VdmxGroup);
     proxy!(OpentypeVarDsim<'a> = Dsim);
     proxy!(OpentypeSvgDocumentList<'a> = SvgDocList);
+
+    proxy!(OpentypeCpalColorRecord => ColorRecArray);
+
+    impl CommonObject for ColorRecArray {
+        // Args: `num_color_records`
+        type Args<'a> = u16;
+
+        type Output<'a> = Vec<OpentypeCpalColorRecord>;
+
+        fn parse<'input>(
+            p: &mut Parser<'input>,
+            num_color_records: u16,
+        ) -> PResult<Self::Output<'input>> {
+            let mut accum = Vec::with_capacity(num_color_records as usize);
+            for _ in 0..num_color_records {
+                accum.push(crate::Decoder_opentype_cpal_color_record(p)?);
+            }
+            Ok(accum)
+        }
+    }
+
+    proxy!(OpentypeCpalPaletteType => PalTypeArray);
+
+    impl CommonObject for PalTypeArray {
+        // Args: `num_palettes`
+        type Args<'a> = u16;
+
+        type Output<'a> = Vec<OpentypeCpalPaletteType>;
+
+        fn parse<'input>(
+            p: &mut Parser<'input>,
+            num_palettes: u16,
+        ) -> PResult<Self::Output<'input>> {
+            let mut accum = Vec::with_capacity(num_palettes as usize);
+            for _ in 0..num_palettes {
+                accum.push(crate::Decoder_opentype_cpal_palette_type(p)?);
+            }
+            Ok(accum)
+        }
+    }
+
+    proxy!(OpentypeColrBaseGlyphRecord => BaseGlyphRecArray);
+
+    impl CommonObject for BaseGlyphRecArray {
+        // Args: `num_base_glyph_records`
+        type Args<'a> = u16;
+
+        type Output<'a> = Vec<OpentypeColrBaseGlyphRecord>;
+
+        fn parse<'input>(
+            p: &mut Parser<'input>,
+            num_base_glyph_records: u16,
+        ) -> PResult<Self::Output<'input>> {
+            let mut accum = Vec::with_capacity(num_base_glyph_records as usize);
+            for _ in 0..num_base_glyph_records {
+                accum.push(crate::Decoder_opentype_colr_base_glyph_record(p)?);
+            }
+            Ok(accum)
+        }
+    }
+
+    proxy!(OpentypeBaseGlyphList<'input> = BaseGlyphList);
+
+    proxy!(OpentypeColrLayerRecord => LayerRecArray);
+
+    impl CommonObject for LayerRecArray {
+        // Args: `num_layer_records`
+        type Args<'a> = u16;
+
+        type Output<'a> = Vec<OpentypeColrLayerRecord>;
+
+        fn parse<'input>(
+            p: &mut Parser<'input>,
+            num_layer_records: u16,
+        ) -> PResult<Self::Output<'input>> {
+            let mut accum = Vec::with_capacity(num_layer_records as usize);
+            for _ in 0..num_layer_records {
+                accum.push(crate::Decoder_opentype_colr_layer_record(p)?);
+            }
+            Ok(accum)
+        }
+    }
+
+    proxy!(OpentypePaintTable<'input> = PaintTbl);
+
+    proxy!(OpentypeColrColorLine = ColorLine);
+
+    proxy!(OpentypeLayerList<'input> = LayerList);
+
+    proxy!(OpentypeClipList<'input> = ClipList);
+    proxy!(OpentypeClipBox = ClipBox);
 }
 
 mod value_parse {
@@ -2094,6 +2210,1121 @@ pub(crate) use svg::{
     SvgMetrics,
 };
 
+pub mod otf_cpal {
+    use super::otf_types::OpentypeCpal;
+    use super::{Mandatory, Nullable, container, obj};
+
+    alias! {
+        pub type OpentypeCpalColorRecord = opentype_cpal_color_record;
+
+        pub type OpentypeCpalExtra = opentype_cpal_table_extra<'input>;
+
+        pub type OpentypeCpalExtraV1 = opentype_cpal_table_extra_Version1<'input>;
+
+        pub type OpentypeCpalPaletteType = opentype_cpal_palette_type;
+
+        pub type OpentypeCpalPaletteLabels = opentype_cpal_palette_labels_array<'input>;
+    }
+
+    frame!(OpentypeCpal);
+
+    impl<'a> container::SingleContainer<Mandatory<obj::ColorRecArray>> for OpentypeCpal<'a> {
+        fn get_offset(&self) -> usize {
+            self.color_records_array.offset as usize
+        }
+
+        fn get_args(&self) -> u16 {
+            self.num_color_records
+        }
+    }
+
+    impl<'a> container::SingleContainer<Nullable<obj::PalTypeArray>> for OpentypeCpalExtraV1<'a> {
+        fn get_offset(&self) -> usize {
+            self.palette_types_array.offset as usize
+        }
+
+        fn get_args(&self) -> <obj::PalTypeArray as container::CommonObject>::Args<'_> {
+            self.num_palettes
+        }
+    }
+}
+pub use otf_cpal::*;
+
+pub(crate) mod cpal {
+    use super::*;
+
+    pub type ColrRecord = opentype_cpal_color_record;
+
+    // TODO - consider using bitflags to mirror the representation of the underlying u32
+    #[derive(Copy, Clone, Debug, PartialEq)]
+    pub struct PaletteType {
+        pub(crate) dark_bg: bool,  // USABLE_WITH_DARK_BACKGROUND (Bit 1)
+        pub(crate) light_bg: bool, // USABLE_WITH_LIGHT_BACKGROUND (Bit 0)
+    }
+
+    impl Promote<OpentypeCpalPaletteType> for PaletteType {
+        fn promote(orig: &OpentypeCpalPaletteType) -> Self {
+            PaletteType {
+                dark_bg: orig.usable_with_dark_background,
+                light_bg: orig.usable_with_light_background,
+            }
+        }
+    }
+
+    pub type PaletteLabel = super::name::NameId;
+
+    #[derive(Debug, Clone)]
+    pub struct CpalVersion1Extra {
+        pub(crate) palette_types_array: Vec<PaletteType>,
+        pub(crate) palette_labels_array: Vec<PaletteLabel>,
+        pub(crate) palette_entry_labels_array: Vec<PaletteLabel>,
+    }
+
+    impl<'a> Promote<OpentypeCpalPaletteLabels<'a>> for Vec<PaletteLabel> {
+        fn promote(orig: &OpentypeCpalPaletteLabels<'a>) -> Self {
+            match orig.data {
+                None => Vec::new(),
+                Some(ref raw) => Vec::from_iter(raw.iter().map(|id| NameId::from(id))),
+            }
+        }
+    }
+
+    impl<'a> PromoteView<OpentypeCpalExtraV1<'a>> for CpalVersion1Extra {
+        fn promote_view(orig: &OpentypeCpalExtraV1<'a>, view: View<'_>) -> PResult<Self> {
+            Ok(CpalVersion1Extra {
+                palette_types_array: promote_all(
+                    reify_dep(view, orig, Nullable(obj::PalTypeArray))?
+                        .into_iter()
+                        .flatten(),
+                ),
+                palette_labels_array: Promote::promote(&orig.palette_labels_array),
+                palette_entry_labels_array: Promote::promote(&orig.palette_entry_labels_array),
+            })
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    pub struct CpalMetrics {
+        pub(crate) version: u16,
+        pub(crate) num_palette_entries: u16,
+        pub(crate) num_palettes: u16,
+        pub(crate) num_color_records: u16,
+        pub(crate) color_records_array: Vec<ColrRecord>,
+        pub(crate) color_record_indices: Vec<u16>,
+        pub(crate) extra: Option<CpalVersion1Extra>,
+    }
+
+    impl<'a> Promote<OpentypeCpal<'a>> for CpalMetrics {
+        fn promote(orig: &OpentypeCpal<'a>) -> Self {
+            CpalMetrics {
+                version: orig.version,
+                num_palette_entries: orig.num_palette_entries,
+                num_palettes: orig.num_palettes,
+                num_color_records: orig.num_color_records,
+                color_records_array: reify_const(orig, Mandatory(obj::ColorRecArray)),
+                color_record_indices: orig.color_record_indices.clone(),
+                extra: match &orig.extra {
+                    OpentypeCpalExtra::Version1(extra) => Some(
+                        CpalVersion1Extra::promote_view(extra, orig.table_scope)
+                            .expect("bad parse"),
+                    ),
+                    _ => None,
+                },
+            }
+        }
+    }
+}
+pub(crate) use cpal::CpalMetrics;
+
+pub mod otf_colr {
+    use super::otf_types::OpentypeColr;
+    use super::{Mandatory, Nullable, container, obj};
+
+    alias! {
+        pub type OpentypeColrBaseGlyphRecord = opentype_colr_base_glyph_record;
+        pub type OpentypeColrLayerRecord = opentype_colr_layer_record;
+
+        pub type OpentypeColrExtra = opentype_colr_table_extra<'input>;
+        pub type OpentypeColrExtraV1 = opentype_colr_table_extra_Version1<'input>;
+
+        pub type OpentypeBaseGlyphList = opentype_colr_base_glyph_list<'input>;
+            pub type OpentypeBaseGlyphPaintRecord = opentype_colr_base_glyph_paint_record<'input>;
+
+        pub type OpentypeLayerList = opentype_colr_layer_list<'input>;
+
+        pub type OpentypeClipList = opentype_colr_clip_list<'input>;
+            pub type OpentypeClipRecord = opentype_colr_clip_record;
+                pub type OpentypeClipBox = opentype_colr_clip_box;
+                    pub type OpentypeClipBoxFormat1 = opentype_colr_clip_box_Format1;
+                    pub type OpentypeClipBoxFormat2 = opentype_colr_clip_box_Format2;
+
+        pub type OpentypePaintTable = opentype_colr_paint_table<'input>;
+
+        // Paint-table types with offsets to non-PaintTable objects (and associated object definitions)
+        pub type OpentypePaintLinearGradient = opentype_colr_paint_table_PaintLinearGradient<'input>;
+        pub type OpentypePaintRadialGradient = opentype_colr_paint_table_PaintRadialGradient<'input>;
+
+        pub type OpentypeColrColorLine = opentype_colr_color_line;
+        pub type OpentypeColorStop = opentype_colr_color_line_color_stops;
+
+        // paint-table types that contain offsets to other paint-table types
+        pub type OpentypePaintComposite = opentype_colr_paint_table_PaintComposite<'input>;
+        pub type OpentypePaintGlyph = opentype_colr_paint_table_PaintGlyph<'input>;
+        pub type OpentypePaintRotate = opentype_colr_paint_table_PaintRotate<'input>;
+        pub type OpentypePaintRotateAroundCenter = opentype_colr_paint_table_PaintRotateAroundCenter<'input>;
+    }
+
+    // SECTION - Colr always-present fields
+    frame!(OpentypeColr);
+
+    impl<'a> container::SingleContainer<Nullable<obj::BaseGlyphRecArray>> for OpentypeColr<'a> {
+        fn get_offset(&self) -> usize {
+            self.base_glyph_records.offset as usize
+        }
+
+        fn get_args(&self) -> <obj::BaseGlyphRecArray as container::CommonObject>::Args<'_> {
+            self.num_base_glyph_records
+        }
+    }
+
+    impl<'a> container::SingleContainer<Nullable<obj::LayerRecArray>> for OpentypeColr<'a> {
+        fn get_offset(&self) -> usize {
+            self.layer_records.offset as usize
+        }
+
+        fn get_args(&self) -> <obj::LayerRecArray as container::CommonObject>::Args<'_> {
+            self.num_layer_records
+        }
+    }
+    // !SECTION
+
+    // SECTION - Version 1 Extra Fields
+    impl<'a> container::SingleContainer<Mandatory<obj::BaseGlyphList>> for OpentypeColrExtraV1<'a> {
+        fn get_offset(&self) -> usize {
+            self.base_glyph_list.offset as usize
+        }
+        fn get_args(&self) -> <obj::BaseGlyphList as container::CommonObject>::Args<'_> {}
+    }
+    impl<'a> container::SingleContainer<Nullable<obj::LayerList>> for OpentypeColrExtraV1<'a> {
+        fn get_offset(&self) -> usize {
+            self.layer_list.offset as usize
+        }
+        fn get_args(&self) {}
+    }
+    impl<'a> container::SingleContainer<Nullable<obj::ClipList>> for OpentypeColrExtraV1<'a> {
+        fn get_offset(&self) -> usize {
+            self.clip_list.offset as usize
+        }
+        fn get_args(&self) {}
+    }
+    impl<'a> container::SingleContainer<Nullable<obj::Dsim>> for OpentypeColrExtraV1<'a> {
+        fn get_offset(&self) -> usize {
+            self.var_index_map.offset as usize
+        }
+        fn get_args(&self) {}
+    }
+    impl<'a> container::SingleContainer<Nullable<obj::ItemVarStore>> for OpentypeColrExtraV1<'a> {
+        fn get_offset(&self) -> usize {
+            self.item_variation_store.offset as usize
+        }
+        fn get_args(&self) {}
+    }
+    // !SECTION
+
+    // SECTION - BaseGlyphList
+    frame!(OpentypeBaseGlyphList.list_scope);
+
+    impl<'a> container::SingleContainer<Mandatory<obj::PaintTbl>> for OpentypeBaseGlyphPaintRecord<'a> {
+        fn get_offset(&self) -> usize {
+            self.paint.offset as usize
+        }
+        fn get_args(&self) {}
+    }
+    // !SECTION
+
+    // SECTION - LayerList
+    frame!(OpentypeLayerList.list_scope);
+
+    impl<'a> container::DynContainer<Mandatory<obj::PaintTbl>> for OpentypeLayerList<'a> {
+        fn count(&self) -> usize {
+            self.num_layers as usize
+        }
+
+        fn iter_offsets(&self) -> impl Iterator<Item = usize> {
+            self.paint_tables.iter().map(|t| t.offset as usize)
+        }
+
+        fn iter_args(&self) -> impl Iterator<Item = ()> {
+            std::iter::repeat(())
+        }
+    }
+    // !SECTION
+
+    // SECTION - ClipList
+    frame!(OpentypeClipList.list_scope);
+    impl container::SingleContainer<Mandatory<obj::ClipBox>> for OpentypeClipRecord {
+        fn get_offset(&self) -> usize {
+            self.clip_box.offset as usize
+        }
+        fn get_args(&self) {}
+    }
+    // !SECTION
+
+    // SECTION - Paint-table types that store offsets to non-Paint-table objects
+    frame!(OpentypePaintLinearGradient);
+    frame!(OpentypePaintRadialGradient);
+
+    impl<'a> container::SingleContainer<Mandatory<obj::ColorLine>> for OpentypePaintLinearGradient<'a> {
+        fn get_offset(&self) -> usize {
+            self.color_line.offset as usize
+        }
+        fn get_args(&self) {}
+    }
+
+    impl<'a> container::SingleContainer<Mandatory<obj::ColorLine>> for OpentypePaintRadialGradient<'a> {
+        fn get_offset(&self) -> usize {
+            self.color_line.offset as usize
+        }
+        fn get_args(&self) {}
+    }
+    // !SECTION
+
+    // SECTION - Paint-table types that store offsets to other paint-table types
+    frame!(OpentypePaintComposite);
+
+    impl<'a> container::MultiContainer<Mandatory<obj::PaintTbl>, 2> for OpentypePaintComposite<'a> {
+        fn get_offset_array(&self) -> [usize; 2] {
+            [
+                self.source_paint.offset as usize,
+                self.backdrop_paint.offset as usize,
+            ]
+        }
+
+        fn get_args_array(
+            &self,
+        ) -> [<Mandatory<obj::PaintTbl> as container::CommonObject>::Args<'_>; 2] {
+            [(); 2]
+        }
+    }
+
+    frame!(OpentypePaintGlyph);
+    impl<'a> container::SingleContainer<Mandatory<obj::PaintTbl>> for OpentypePaintGlyph<'a> {
+        fn get_offset(&self) -> usize {
+            self.paint.offset as usize
+        }
+        fn get_args(&self) {}
+    }
+
+    frame!(OpentypePaintRotate);
+    impl<'a> container::SingleContainer<Mandatory<obj::PaintTbl>> for OpentypePaintRotate<'a> {
+        fn get_offset(&self) -> usize {
+            self.paint.offset as usize
+        }
+        fn get_args(&self) {}
+    }
+
+    frame!(OpentypePaintRotateAroundCenter);
+    impl<'a> container::SingleContainer<Mandatory<obj::PaintTbl>>
+        for OpentypePaintRotateAroundCenter<'a>
+    {
+        fn get_offset(&self) -> usize {
+            self.paint.offset as usize
+        }
+        fn get_args(&self) {}
+    }
+    // !SECTION
+}
+pub use otf_colr::*;
+
+pub(crate) mod colr {
+    use super::*;
+    use std::{collections::HashMap, rc::Rc};
+
+    pub type BaseGlyphRecord = OpentypeColrBaseGlyphRecord;
+    pub type LayerRecord = OpentypeColrLayerRecord;
+
+    pub mod paint_table {
+        use super::*;
+        use std::{collections::HashMap, rc::Rc};
+
+        #[derive(Clone, Debug)]
+        pub struct ColorLine {
+            pub(crate) extend: u8,
+            pub(crate) num_stops: u16,
+            pub(crate) color_stops: Vec<ColorStop>,
+        }
+
+        impl Promote<OpentypeColrColorLine> for ColorLine {
+            fn promote(orig: &OpentypeColrColorLine) -> Self {
+                ColorLine {
+                    extend: orig.extend,
+                    num_stops: orig.num_stops,
+                    color_stops: orig.color_stops.iter().map(ColorStop::promote).collect(),
+                }
+            }
+        }
+
+        #[derive(Debug, Clone, Copy)]
+        pub struct ColorStop {
+            pub(crate) stop_offset: F2Dot14,
+            pub(crate) palette_index: u16,
+            pub(crate) alpha: F2Dot14,
+        }
+
+        impl Promote<OpentypeColorStop> for ColorStop {
+            fn promote(orig: &OpentypeColorStop) -> Self {
+                ColorStop {
+                    stop_offset: F2Dot14::promote(&orig.stop_offset),
+                    palette_index: orig.palette_index,
+                    alpha: F2Dot14::promote(&orig.alpha),
+                }
+            }
+        }
+
+        #[derive(Clone, Debug)]
+        pub enum PaintTable {
+            PaintColrGlyph {
+                glyph_id: u16,
+            },
+            PaintColrLayers {
+                num_layers: u8,
+                first_layer_index: u32,
+            },
+            /// PaintComposite: Stores View
+            PaintComposite {
+                source: usize,
+                composite_mode: u8,
+                backdrop: usize,
+            },
+            /// PaintGlyph: Stores View
+            PaintGlyph {
+                paint: usize,
+                glyph_id: u16,
+            },
+            /// PaintLinearGradient: Stores View
+            PaintLinearGradient {
+                color_line: ColorLine,
+                x0: i16,
+                y0: i16,
+                x1: i16,
+                y1: i16,
+                x2: i16,
+                y2: i16,
+            },
+            /// PaintRadialGradient: Stores View
+            PaintRadialGradient {
+                color_line: ColorLine,
+                x0: i16,
+                y0: i16,
+                radius0: u16,
+                x1: i16,
+                y1: i16,
+                radius1: u16,
+            },
+            /// PaintRotate: Stores View
+            PaintRotate {
+                paint: usize,
+                angle: F2Dot14,
+            },
+            /// PaintRotateAroundCenter: Stores View
+            PaintRotateAroundCenter {
+                paint: usize,
+                angle: F2Dot14,
+                center_x: i16,
+                center_y: i16,
+            },
+            /// PaintScale: Stores View
+            PaintScale {
+                paint: usize,
+                scale_x: F2Dot14,
+                scale_y: F2Dot14,
+            },
+            /// PaintScaleAroundCenter: Stores View
+            PaintScaleAroundCenter {
+                paint: usize,
+                scale_x: F2Dot14,
+                scale_y: F2Dot14,
+                center_x: i16,
+                center_y: i16,
+            },
+            /// PaintScaleUniform: Stores View
+            PaintScaleUniform {
+                paint: usize,
+                scale: F2Dot14,
+            },
+            /// PaintScaleUniformAroundCenter: Stores View
+            PaintScaleUniformAroundCenter {
+                paint: usize,
+                scale: F2Dot14,
+                center_x: i16,
+                center_y: i16,
+            },
+            /// PaintSkew: Stores View
+            PaintSkew {
+                paint: usize,
+                x_skew_angle: F2Dot14,
+                y_skew_angle: F2Dot14,
+            },
+            /// PaintSkewAroundCenter: Stores View
+            PaintSkewAroundCenter {
+                paint: usize,
+                x_skew_angle: F2Dot14,
+                y_skew_angle: F2Dot14,
+                center_x: i16,
+                center_y: i16,
+            },
+            PaintSolid {
+                palette_index: u16,
+                alpha: F2Dot14,
+            },
+            PaintSweepGradient {
+                color_line: usize,
+                center_x: i16,
+                center_y: i16,
+                start_angle: F2Dot14,
+                end_angle: F2Dot14,
+            },
+            /// PaintTransform: Stores View
+            PaintTransform {
+                paint: usize,
+                transform: usize,
+            },
+            /// PaintTranslate: Stores View
+            PaintTranslate {
+                paint: usize,
+                dx: i16,
+                dy: i16,
+            },
+            PaintVarLinearGradient {
+                color_line: usize,
+                x0: i16,
+                y0: i16,
+                x1: i16,
+                y1: i16,
+                x2: i16,
+                y2: i16,
+            },
+            PaintVarRadialGradient {
+                color_line: usize,
+                x0: i16,
+                y0: i16,
+                radius0: u16,
+                x1: i16,
+                y1: i16,
+                radius1: u16,
+            },
+            /// PaintVarRotate: Stores View
+            PaintVarRotate {
+                paint: usize,
+                angle: F2Dot14,
+                var_index_base: u32,
+            },
+            /// PaintVarRotateAroundCenter: Stores View
+            PaintVarRotateAroundCenter {
+                paint: usize,
+                angle: F2Dot14,
+                center_x: i16,
+                center_y: i16,
+                var_index_base: u32,
+            },
+            /// PaintVarScale: Stores View
+            PaintVarScale {
+                paint: usize,
+                scale_x: F2Dot14,
+                scale_y: F2Dot14,
+                var_index_base: u32,
+            },
+            /// PaintVarScaleAroundCenter: Stores View
+            PaintVarScaleAroundCenter {
+                paint: usize,
+                scale_x: F2Dot14,
+                scale_y: F2Dot14,
+                center_x: i16,
+                center_y: i16,
+                var_index_base: u32,
+            },
+            /// PaintVarScaleUniform: Stores View
+            PaintVarScaleUniform {
+                paint: usize,
+                scale: F2Dot14,
+                var_index_base: u32,
+            },
+            /// PaintVarScaleUniformAroundCenter: Stores View
+            PaintVarScaleUniformAroundCenter {
+                paint: usize,
+                scale: F2Dot14,
+                center_x: i16,
+                center_y: i16,
+                var_index_base: u32,
+            },
+            /// PaintVarSkew: Stores View
+            PaintVarSkew {
+                paint: usize,
+                x_skew_angle: F2Dot14,
+                y_skew_angle: F2Dot14,
+                var_index_base: u32,
+            },
+            /// PaintVarSkewAroundCenter: Stores View
+            PaintVarSkewAroundCenter {
+                paint: usize,
+                x_skew_angle: F2Dot14,
+                y_skew_angle: F2Dot14,
+                center_x: i16,
+                center_y: i16,
+                var_index_base: u32,
+            },
+            PaintVarSolid {
+                palette_index: u16,
+                alpha: F2Dot14,
+                var_index_base: u32,
+            },
+            PaintVarSweepGradient {
+                color_line: usize,
+                center_x: i16,
+                center_y: i16,
+                start_angle: F2Dot14,
+                end_angle: F2Dot14,
+            },
+            /// PaintVarTransform: Stores View
+            PaintVarTransform {
+                paint: usize,
+                transform: usize,
+            },
+            /// PaintVarTranslate: Stores View
+            PaintVarTranslate {
+                paint: usize,
+                dx: i16,
+                dy: i16,
+                var_index_base: u32,
+            },
+        }
+
+        impl PaintTable {
+            pub fn lift<'a>(map: &mut PaintMap, orig: &OpentypePaintTable<'a>) -> Self {
+                match orig {
+                    OpentypePaintTable::PaintColrGlyph(inner) => PaintTable::PaintColrGlyph {
+                        glyph_id: inner.glyph_id,
+                    },
+                    OpentypePaintTable::PaintColrLayers(inner) => PaintTable::PaintColrLayers {
+                        num_layers: inner.num_layers,
+                        first_layer_index: inner.first_layer_index,
+                    },
+                    OpentypePaintTable::PaintComposite(inner) => {
+                        let source = {
+                            let offs = inner.source_paint.offset as usize;
+                            let key = inner.table_scope.relative_to_absolute(offs);
+                            if !map.contains_key(&key) {
+                                let source_paint = reify_index(inner, Mandatory(obj::PaintTbl), 0);
+                                let lifted = PaintTable::lift(map, &source_paint);
+                                map.insert(key, Rc::new(lifted));
+                            };
+                            key
+                        };
+                        let backdrop = {
+                            let offs = inner.backdrop_paint.offset as usize;
+                            let key = inner.table_scope.relative_to_absolute(offs);
+                            if !map.contains_key(&key) {
+                                let backdrop_paint =
+                                    reify_index(inner, Mandatory(obj::PaintTbl), 1);
+                                let lifted = PaintTable::lift(map, &backdrop_paint);
+                                map.insert(key, Rc::new(lifted));
+                            };
+                            key
+                        };
+                        PaintTable::PaintComposite {
+                            source,
+                            composite_mode: inner.composite_mode,
+                            backdrop,
+                        }
+                    }
+                    OpentypePaintTable::PaintGlyph(inner) => {
+                        let paint = {
+                            let offs = inner.paint.offset as usize;
+                            let key = inner.table_scope.relative_to_absolute(offs);
+                            if !map.contains_key(&key) {
+                                let paint = reify_index(inner, Mandatory(obj::PaintTbl), 0);
+                                let lifted = PaintTable::lift(map, &paint);
+                                map.insert(key, Rc::new(lifted));
+                            };
+                            key
+                        };
+                        PaintTable::PaintGlyph {
+                            paint,
+                            glyph_id: inner.glyph_id,
+                        }
+                    }
+                    OpentypePaintTable::PaintLinearGradient(inner) => {
+                        PaintTable::PaintLinearGradient {
+                            color_line: ColorLine::promote(&reify(
+                                inner,
+                                Mandatory(obj::ColorLine),
+                            )),
+                            x0: inner.x0,
+                            y0: inner.y0,
+                            x1: inner.x1,
+                            y1: inner.y1,
+                            x2: inner.x2,
+                            y2: inner.y2,
+                        }
+                    }
+                    OpentypePaintTable::PaintRadialGradient(inner) => {
+                        PaintTable::PaintRadialGradient {
+                            color_line: ColorLine::promote(&reify(
+                                inner,
+                                Mandatory(obj::ColorLine),
+                            )),
+                            x0: inner.x0,
+                            y0: inner.y0,
+                            radius0: inner.radius0,
+                            x1: inner.x1,
+                            y1: inner.y1,
+                            radius1: inner.radius1,
+                        }
+                    }
+                    OpentypePaintTable::PaintRotate(inner) => {
+                        let paint = {
+                            let offs = inner.paint.offset as usize;
+                            let key = inner.table_scope.relative_to_absolute(offs);
+                            if !map.contains_key(&key) {
+                                let paint = reify(inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, &paint);
+                                map.insert(key, Rc::new(lifted));
+                            };
+                            key
+                        };
+                        PaintTable::PaintRotate {
+                            paint,
+                            angle: F2Dot14::promote(&inner.angle),
+                        }
+                    }
+                    OpentypePaintTable::PaintRotateAroundCenter(inner) => {
+                        let paint = {
+                            let offs = inner.paint.offset as usize;
+                            let key = inner.table_scope.relative_to_absolute(offs);
+                            if !map.contains_key(&key) {
+                                let paint = reify(inner, Mandatory(obj::PaintTbl));
+                                let lifted = PaintTable::lift(map, &paint);
+                                map.insert(key, Rc::new(lifted));
+                            };
+                            key
+                        };
+                        PaintTable::PaintRotateAroundCenter {
+                            paint,
+                            angle: F2Dot14::promote(&inner.angle),
+                            center_x: inner.center_x,
+                            center_y: inner.center_y,
+                        }
+                    }
+                    OpentypePaintTable::PaintScale(inner) => PaintTable::PaintScale {
+                        paint: inner.paint.offset as usize,
+                        scale_x: F2Dot14::promote(&inner.scale_x),
+                        scale_y: F2Dot14::promote(&inner.scale_y),
+                    },
+                    OpentypePaintTable::PaintScaleAroundCenter(inner) => {
+                        PaintTable::PaintScaleAroundCenter {
+                            paint: inner.paint.offset as usize,
+                            scale_x: F2Dot14::promote(&inner.scale_x),
+                            scale_y: F2Dot14::promote(&inner.scale_y),
+                            center_x: inner.center_x,
+                            center_y: inner.center_y,
+                        }
+                    }
+                    OpentypePaintTable::PaintScaleUniform(inner) => PaintTable::PaintScaleUniform {
+                        paint: inner.paint.offset as usize,
+                        scale: F2Dot14::promote(&inner.scale),
+                    },
+                    OpentypePaintTable::PaintScaleUniformAroundCenter(inner) => {
+                        PaintTable::PaintScaleUniformAroundCenter {
+                            paint: inner.paint.offset as usize,
+                            scale: F2Dot14::promote(&inner.scale),
+                            center_x: inner.center_x,
+                            center_y: inner.center_y,
+                        }
+                    }
+                    OpentypePaintTable::PaintSkew(inner) => PaintTable::PaintSkew {
+                        paint: inner.paint.offset as usize,
+                        x_skew_angle: F2Dot14::promote(&inner.x_skew_angle),
+                        y_skew_angle: F2Dot14::promote(&inner.y_skew_angle),
+                    },
+                    OpentypePaintTable::PaintSkewAroundCenter(inner) => {
+                        PaintTable::PaintSkewAroundCenter {
+                            paint: inner.paint.offset as usize,
+                            x_skew_angle: F2Dot14::promote(&inner.x_skew_angle),
+                            y_skew_angle: F2Dot14::promote(&inner.y_skew_angle),
+                            center_x: inner.center_x,
+                            center_y: inner.center_y,
+                        }
+                    }
+                    OpentypePaintTable::PaintSolid(inner) => PaintTable::PaintSolid {
+                        palette_index: inner.palette_index,
+                        alpha: F2Dot14::promote(&inner.alpha),
+                    },
+                    OpentypePaintTable::PaintSweepGradient(inner) => {
+                        PaintTable::PaintSweepGradient {
+                            color_line: inner.color_line.offset as usize,
+                            center_x: inner.center_x,
+                            center_y: inner.center_y,
+                            start_angle: F2Dot14::promote(&inner.start_angle),
+                            end_angle: F2Dot14::promote(&inner.end_angle),
+                        }
+                    }
+                    OpentypePaintTable::PaintTransform(inner) => PaintTable::PaintTransform {
+                        paint: inner.paint.offset as usize,
+                        transform: inner.transform.offset as usize,
+                    },
+                    OpentypePaintTable::PaintTranslate(inner) => PaintTable::PaintTranslate {
+                        paint: inner.paint.offset as usize,
+                        dx: inner.dx,
+                        dy: inner.dy,
+                    },
+                    OpentypePaintTable::PaintVarLinearGradient(inner) => {
+                        PaintTable::PaintVarLinearGradient {
+                            color_line: inner.color_line.offset as usize,
+                            x0: inner.x0,
+                            y0: inner.y0,
+                            x1: inner.x1,
+                            y1: inner.y1,
+                            x2: inner.x2,
+                            y2: inner.y2,
+                        }
+                    }
+                    OpentypePaintTable::PaintVarRadialGradient(inner) => {
+                        PaintTable::PaintVarRadialGradient {
+                            color_line: inner.color_line.offset as usize,
+                            x0: inner.x0,
+                            y0: inner.y0,
+                            radius0: inner.radius0,
+                            x1: inner.x1,
+                            y1: inner.y1,
+                            radius1: inner.radius1,
+                        }
+                    }
+                    OpentypePaintTable::PaintVarRotate(inner) => PaintTable::PaintVarRotate {
+                        paint: inner.paint.offset as usize,
+                        angle: F2Dot14::promote(&inner.angle),
+                        var_index_base: inner.var_index_base,
+                    },
+                    OpentypePaintTable::PaintVarRotateAroundCenter(inner) => {
+                        PaintTable::PaintVarRotateAroundCenter {
+                            paint: inner.paint.offset as usize,
+                            angle: F2Dot14::promote(&inner.angle),
+                            center_x: inner.center_x,
+                            center_y: inner.center_y,
+                            var_index_base: inner.var_index_base,
+                        }
+                    }
+                    OpentypePaintTable::PaintVarScale(inner) => PaintTable::PaintVarScale {
+                        paint: inner.paint.offset as usize,
+                        scale_x: F2Dot14::promote(&inner.scale_x),
+                        scale_y: F2Dot14::promote(&inner.scale_y),
+                        var_index_base: inner.var_index_base,
+                    },
+                    OpentypePaintTable::PaintVarScaleAroundCenter(inner) => {
+                        PaintTable::PaintVarScaleAroundCenter {
+                            paint: inner.paint.offset as usize,
+                            scale_x: F2Dot14::promote(&inner.scale_x),
+                            scale_y: F2Dot14::promote(&inner.scale_y),
+                            center_x: inner.center_x,
+                            center_y: inner.center_y,
+                            var_index_base: inner.var_index_base,
+                        }
+                    }
+                    OpentypePaintTable::PaintVarScaleUniform(inner) => {
+                        PaintTable::PaintVarScaleUniform {
+                            paint: inner.paint.offset as usize,
+                            scale: F2Dot14::promote(&inner.scale),
+                            var_index_base: inner.var_index_base,
+                        }
+                    }
+                    OpentypePaintTable::PaintVarScaleUniformAroundCenter(inner) => {
+                        PaintTable::PaintVarScaleUniformAroundCenter {
+                            paint: inner.paint.offset as usize,
+                            scale: F2Dot14::promote(&inner.scale),
+                            center_x: inner.center_x,
+                            center_y: inner.center_y,
+                            var_index_base: inner.var_index_base,
+                        }
+                    }
+                    OpentypePaintTable::PaintVarSkew(inner) => PaintTable::PaintVarSkew {
+                        paint: inner.paint.offset as usize,
+                        x_skew_angle: F2Dot14::promote(&inner.x_skew_angle),
+                        y_skew_angle: F2Dot14::promote(&inner.y_skew_angle),
+                        var_index_base: inner.var_index_base,
+                    },
+                    OpentypePaintTable::PaintVarSkewAroundCenter(inner) => {
+                        PaintTable::PaintVarSkewAroundCenter {
+                            paint: inner.paint.offset as usize,
+                            x_skew_angle: F2Dot14::promote(&inner.x_skew_angle),
+                            y_skew_angle: F2Dot14::promote(&inner.y_skew_angle),
+                            center_x: inner.center_x,
+                            center_y: inner.center_y,
+                            var_index_base: inner.var_index_base,
+                        }
+                    }
+                    OpentypePaintTable::PaintVarSolid(inner) => PaintTable::PaintVarSolid {
+                        palette_index: inner.palette_index,
+                        alpha: F2Dot14::promote(&inner.alpha),
+                        var_index_base: inner.var_index_base,
+                    },
+                    OpentypePaintTable::PaintVarSweepGradient(inner) => {
+                        PaintTable::PaintVarSweepGradient {
+                            color_line: inner.color_line.offset as usize,
+                            center_x: inner.center_x,
+                            center_y: inner.center_y,
+                            start_angle: F2Dot14::promote(&inner.start_angle),
+                            end_angle: F2Dot14::promote(&inner.end_angle),
+                        }
+                    }
+                    OpentypePaintTable::PaintVarTransform(inner) => PaintTable::PaintVarTransform {
+                        paint: inner.paint.offset as usize,
+                        transform: inner.transform.offset as usize,
+                    },
+                    OpentypePaintTable::PaintVarTranslate(inner) => PaintTable::PaintVarTranslate {
+                        paint: inner.paint.offset as usize,
+                        dx: inner.dx,
+                        dy: inner.dy,
+                        var_index_base: inner.var_index_base,
+                    },
+                }
+            }
+        }
+    }
+    use paint_table::PaintTable;
+
+    #[derive(Debug, Clone)]
+    pub struct BaseGlyphPaintRecord {
+        pub(crate) glyph_id: WithSem<GlyphId, u16>,
+        pub(crate) paint_offset: usize,
+    }
+
+    impl<'a> Promote<OpentypeBaseGlyphPaintRecord<'a>> for BaseGlyphPaintRecord {
+        fn promote(orig: &OpentypeBaseGlyphPaintRecord<'a>) -> Self {
+            BaseGlyphPaintRecord {
+                glyph_id: WithSem::from(orig.glyph_id),
+                paint_offset: orig.paint.offset as usize,
+            }
+        }
+    }
+
+    /// PaintMap: maps absolute-file-offsets to the PaintTable stored at that offset
+    pub type PaintMap = HashMap<usize, Rc<PaintTable>>;
+
+    #[derive(Debug, Clone)]
+    pub struct BaseGlyphList {
+        pub(crate) base_glyph_paint_records: Vec<BaseGlyphPaintRecord>,
+    }
+
+    impl BaseGlyphList {
+        pub fn lift<'a>(paint_map: &mut PaintMap, orig: &OpentypeBaseGlyphList<'a>) -> Self {
+            let mut base_glyph_paint_records =
+                Vec::with_capacity(orig.base_glyph_paint_records.len());
+            for orig_record in &orig.base_glyph_paint_records {
+                let record = BaseGlyphPaintRecord::promote(orig_record);
+                let key = orig.list_scope.relative_to_absolute(record.paint_offset);
+                if !paint_map.contains_key(&key) {
+                    let table = reify_dep(orig.list_scope, orig_record, Mandatory(obj::PaintTbl))
+                        .expect("bad parse");
+                    let tbl = PaintTable::lift(paint_map, &table);
+                    paint_map.insert(key, Rc::new(tbl));
+                };
+                base_glyph_paint_records.push(record);
+            }
+            BaseGlyphList {
+                base_glyph_paint_records,
+            }
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct LayerList {
+        pub(crate) num_layers: u32,
+        pub(crate) paint_tables: Vec<usize>,
+    }
+
+    impl LayerList {
+        pub fn lift<'a>(paint_map: &mut PaintMap, orig: &OpentypeLayerList<'a>) -> Self {
+            let mut paint_tables = Vec::with_capacity(orig.paint_tables.len());
+            for offs in container::DynContainer::iter_offsets(orig) {
+                let key = orig.list_scope.relative_to_absolute(offs);
+                if !paint_map.contains_key(&key) {
+                    let raw = OpentypePaintTable::parse_offset(orig.list_scope, offs, ())
+                        .expect("bad parse");
+                    let table = PaintTable::lift(paint_map, &raw);
+                    paint_map.insert(key, Rc::new(table));
+                }
+                paint_tables.push(key);
+            }
+            LayerList {
+                num_layers: orig.num_layers,
+                paint_tables,
+            }
+        }
+    }
+
+    #[derive(Clone, Copy, Debug)]
+    pub struct ClipBox {
+        pub(crate) format: u8,
+        pub(crate) x_min: i16,
+        pub(crate) y_min: i16,
+        pub(crate) x_max: i16,
+        pub(crate) y_max: i16,
+        pub(crate) var_index_base: Option<u32>,
+    }
+
+    impl From<OpentypeClipBoxFormat1> for ClipBox {
+        fn from(value: OpentypeClipBoxFormat1) -> Self {
+            let opentype_colr_clip_box_Format1 {
+                format,
+                x_min,
+                y_min,
+                x_max,
+                y_max,
+            } = value;
+            Self {
+                format,
+                x_min,
+                y_min,
+                x_max,
+                y_max,
+                var_index_base: None,
+            }
+        }
+    }
+
+    impl From<OpentypeClipBoxFormat2> for ClipBox {
+        fn from(value: OpentypeClipBoxFormat2) -> Self {
+            let opentype_colr_clip_box_Format2 {
+                format,
+                x_min,
+                y_min,
+                x_max,
+                y_max,
+                var_index_base,
+            } = value;
+            Self {
+                format,
+                x_min,
+                y_min,
+                x_max,
+                y_max,
+                var_index_base: Some(var_index_base),
+            }
+        }
+    }
+
+    impl Promote<OpentypeClipBox> for ClipBox {
+        fn promote(orig: &OpentypeClipBox) -> Self {
+            match orig {
+                &OpentypeClipBox::Format1(format1) => format1.into(),
+                &OpentypeClipBox::Format2(format2) => format2.into(),
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    pub struct ClipRecord {
+        pub(crate) start_glyph_id: WithSem<GlyphId, u16>,
+        pub(crate) end_glyph_id: WithSem<GlyphId, u16>,
+        pub(crate) clip_box: ClipBox,
+    }
+
+    impl PromoteView<OpentypeClipRecord> for ClipRecord {
+        fn promote_view(orig: &OpentypeClipRecord, view: View<'_>) -> PResult<Self> {
+            Ok(ClipRecord {
+                start_glyph_id: WithSem::from(orig.start_glyph_id),
+                end_glyph_id: WithSem::from(orig.end_glyph_id),
+                clip_box: ClipBox::promote(&reify_dep(view, orig, Mandatory(obj::ClipBox))?),
+            })
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct ClipList {
+        pub(crate) num_clips: u32,
+        pub(crate) clips: Vec<ClipRecord>,
+    }
+
+    impl<'a> Promote<OpentypeClipList<'a>> for ClipList {
+        fn promote(orig: &OpentypeClipList<'a>) -> Self {
+            if orig.format != 1 {
+                log::warn!(
+                    "expected ClipList {{ format = 1 }}, found format {} instead",
+                    orig.format
+                );
+            }
+            ClipList {
+                num_clips: orig.num_clips,
+                clips: promote_vec_view(&orig.clips[..], orig.list_scope).expect("bad parse"),
+            }
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    pub struct ColrExtraV1 {
+        pub(crate) base_glyph_list: BaseGlyphList,
+        pub(crate) layer_list: Option<LayerList>,
+        pub(crate) clip_list: Option<ClipList>,
+        pub(crate) var_index_map: Option<var_common::DeltaSetIndexMap>,
+        pub(crate) item_var_store: Option<common::ItemVariationStore>,
+    }
+
+    impl ColrExtraV1 {
+        pub fn lift<'a>(
+            paint_map: &mut PaintMap,
+            orig: &OpentypeColrExtraV1<'a>,
+            view: View<'a>,
+        ) -> PResult<Self> {
+            let base_glyph_list = BaseGlyphList::lift(
+                paint_map,
+                &reify_dep(view, orig, Mandatory(obj::BaseGlyphList))?,
+            );
+            let layer_list = if let Some(ref raw) = reify_dep(view, orig, Nullable(obj::LayerList))?
+            {
+                Some(LayerList::lift(paint_map, raw))
+            } else {
+                None
+            };
+            let clip_list = promote_opt(&reify_dep(view, orig, Nullable(obj::ClipList))?);
+            Ok(ColrExtraV1 {
+                base_glyph_list,
+                layer_list,
+                clip_list,
+                var_index_map: promote_opt(&reify_dep(view, orig, Nullable(obj::Dsim))?),
+                item_var_store: promote_opt(&reify_dep(view, orig, Nullable(obj::ItemVarStore))?),
+            })
+        }
+    }
+    #[derive(Clone, Debug)]
+    pub struct ColrMetrics {
+        pub(crate) version: u16,
+        /// Mapping from paint-table offset (absolute) to Rc<PaintTable> for all paint-tables referenced in optional field tables
+        pub(crate) paint_map: PaintMap,
+        pub(crate) base_glyph_records: Option<Vec<BaseGlyphRecord>>,
+        pub(crate) layer_records: Option<Vec<LayerRecord>>,
+        pub(crate) extra: Option<ColrExtraV1>,
+    }
+
+    impl<'a> Promote<OpentypeColr<'a>> for ColrMetrics {
+        fn promote(orig: &OpentypeColr<'a>) -> Self {
+            let mut paint_map = PaintMap::new();
+            let extra = match &orig.extra {
+                OpentypeColrExtra::Version1(extra) => Some(
+                    ColrExtraV1::lift(&mut paint_map, extra, orig.table_scope).expect("bad parse"),
+                ),
+                _ => None,
+            };
+            ColrMetrics {
+                version: orig.version,
+                paint_map,
+                base_glyph_records: reify(orig, Nullable(obj::BaseGlyphRecArray)),
+                layer_records: reify(orig, Nullable(obj::LayerRecArray)),
+                extra,
+            }
+        }
+    }
+}
+pub(crate) use colr::ColrMetrics;
+
 pub mod otf_var_common {
     alias! {
         pub type OpentypeVarDsim = opentype_var_delta_set_index_map<'a>;
@@ -2102,9 +3333,8 @@ pub mod otf_var_common {
 pub use otf_var_common::*;
 
 pub(crate) mod var_common {
-    use std::ops::RangeInclusive;
-
     use super::*;
+    use std::ops::RangeInclusive;
 
     #[derive(Clone, Debug)]
     pub struct DeltaSetIndexMap {

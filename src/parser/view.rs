@@ -24,6 +24,14 @@ impl<'a> View<'a> {
         }
     }
 
+    pub fn get_offset(&self) -> usize {
+        self.start_offset
+    }
+
+    pub fn relative_to_absolute(&self, relative_offset: usize) -> usize {
+        self.start_offset + relative_offset
+    }
+
     /// Reads a slice of `len` bytes from the View, offset by `offset`.
     pub fn read_len(&self, len: usize) -> &'a [u8] {
         &self.buffer[..len]

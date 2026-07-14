@@ -233,6 +233,7 @@ mod paint_table {
     fn paint_linear_gradient(view: ViewExpr, color_line: FormatRef) -> Format {
         record_auto([
             ("_format", is_byte(4)),
+            ("table_scope", reify_view(view.clone())),
             (
                 "color_line",
                 util::read_phantom_view_offset24(view, color_line.call()),
@@ -250,6 +251,7 @@ mod paint_table {
     fn paint_var_linear_gradient(view: ViewExpr, var_color_line: FormatRef) -> Format {
         record_auto([
             ("_format", is_byte(5)),
+            ("table_scope", reify_view(view.clone())),
             (
                 "color_line",
                 util::read_phantom_view_offset24(view, var_color_line.call()),
@@ -268,6 +270,7 @@ mod paint_table {
     fn paint_radial_gradient(view: ViewExpr, color_line: FormatRef) -> Format {
         record_auto([
             ("_format", is_byte(6)),
+            ("table_scope", reify_view(view.clone())),
             (
                 "color_line",
                 util::read_phantom_view_offset24(view, color_line.call()),
@@ -285,6 +288,7 @@ mod paint_table {
     fn paint_var_radial_gradient(view: ViewExpr, var_color_line: FormatRef) -> Format {
         record_auto([
             ("_format", is_byte(7)),
+            ("table_scope", reify_view(view.clone())),
             (
                 "color_line",
                 util::read_phantom_view_offset24(view, var_color_line.call()),
@@ -303,6 +307,7 @@ mod paint_table {
     fn paint_sweep_gradient(view: ViewExpr, color_line: FormatRef) -> Format {
         record_auto([
             ("_format", is_byte(8)),
+            ("table_scope", reify_view(view.clone())),
             (
                 "color_line",
                 util::read_phantom_view_offset24(view, color_line.call()),
@@ -318,6 +323,7 @@ mod paint_table {
     fn paint_var_sweep_gradient(view: ViewExpr, var_color_line: FormatRef) -> Format {
         record_auto([
             ("_format", is_byte(9)),
+            ("table_scope", reify_view(view.clone())),
             (
                 "color_line",
                 util::read_phantom_view_offset24(view, var_color_line.call()),

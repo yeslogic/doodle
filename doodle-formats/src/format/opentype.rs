@@ -7,9 +7,9 @@ use doodle::{
 
 mod util {
     use super::*;
-    use doodle::IntoLabel;
     #[cfg(feature = "alt")]
     use doodle::alt::FormatExt;
+    use doodle::{Endian, IntoLabel};
 
     pub(crate) fn id<T>(x: T) -> T {
         x
@@ -529,6 +529,23 @@ mod util {
             (
                 "data",
                 with_view(view.offset(var("offset")), capture_bytes(nbytes)),
+            ),
+        ])
+    }
+
+    pub(crate) fn read_array_view_offset32(
+        view: ViewExpr,
+        len: Expr,
+        kind: BaseKind<Endian>,
+    ) -> Format {
+        record_auto([
+            ("offset", u32be()),
+            (
+                "data",
+                cond_maybe(
+                    is_nonzero_u32(var("offset")),
+                    with_view(view.offset(var("offset")), read_array(len, kind)),
+                ),
             ),
         ])
     }
