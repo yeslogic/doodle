@@ -144,6 +144,8 @@ fn show_optional_metrics(optional: &OptionalTableMetrics, conf: &cli::Config) {
                 conf,
             ),
             display_svg_metrics(&optional.svg, conf),
+            display_cpal_metrics(optional.cpal.as_deref(), conf),
+            display_colr_metrics(optional.colr.as_deref(), conf),
             display_avar_metrics(optional.avar.as_deref(), conf),
             display_fvar_metrics(optional.fvar.as_deref(), conf),
             display_gvar_metrics(optional.gvar.as_deref(), conf),
@@ -160,6 +162,182 @@ fn show_optional_metrics(optional: &OptionalTableMetrics, conf: &cli::Config) {
         LineBreak,
     )
     .println();
+}
+
+use cpal::display_cpal_metrics;
+mod cpal {
+    use super::*;
+
+    pub(super) fn display_cpal_metrics(cpal: Option<&CpalMetrics>, conf: &Config) -> TokenStream {
+        let Some(cpal) = cpal else {
+            return TokenStream::empty();
+        };
+        // TODO - implement display for cpal
+        let heading = toks(format!("CPAL: version {}", cpal.version));
+        if conf.verbosity.is_at_least(cli::VerboseLevel::Detailed) {
+            heading.glue(
+                LineBreak,
+                TokenStream::join_with(
+                    vec![
+                        toks(format!(
+                            "{} palettes ({} color records each)",
+                            cpal.num_palettes, cpal.num_color_records
+                        )),
+                        display_palettes(
+                            &cpal.color_records_array,
+                            &cpal.color_record_indices,
+                            cpal.num_color_records,
+                            conf,
+                        )
+                        .indent_by(ITEM_INDENT),
+                        display_cpal_extra_fields(&cpal.extra, conf),
+                    ],
+                    LineBreak,
+                )
+                .indent_by(SECTION_INDENT),
+            )
+        } else {
+            heading
+        }
+    }
+
+    fn display_cpal_extra_fields(extra: &Option<CpalExtraV1>, conf: &Config) -> TokenStream {
+        let Some(extra) = extra else {
+            return TokenStream::empty();
+        };
+        TokenStream::join_with(
+            vec![
+                toks(format!(
+                    "Palette Type Array ({} entries)",
+                    extra.palette_types_array.len()
+                )),
+                display_palette_type_array(&extra.palette_types_array, conf).indent_by(ITEM_INDENT),
+                toks(format!(
+                    "Palette Label Array ({} entries)",
+                    extra.palette_labels_array.len()
+                )),
+                display_labels_array(&extra.palette_labels_array, conf).indent_by(ITEM_INDENT),
+                toks(format!(
+                    "Palette Entry Labels Array ({} entries)",
+                    extra.palette_entry_labels_array.len()
+                )),
+                display_labels_array(&extra.palette_entry_labels_array, conf)
+                    .indent_by(ITEM_INDENT),
+            ],
+            LineBreak,
+        )
+    }
+
+    fn display_palette_type_array(
+        palette_types_array: &[PaletteType],
+        conf: &Config,
+    ) -> TokenStream {
+        display_items_elided(
+            palette_types_array,
+            |ix, &palette_type| tok(format!("[{ix}]: ")).then(display_palette_type(palette_type)),
+            conf.bookend_size,
+            |start, stop| {
+                toks(format!("(skipping palettes {} through {})", start, stop))
+                    .indent_by(ELISION_DELTA)
+            },
+        )
+    }
+
+    fn display_palette_type(palette_type: PaletteType) -> TokenStream {
+        let mut flags = Vec::new();
+        if palette_type.light_bg {
+            flags.push(toks("USABLE_WITH_LIGHT_BACKGROUND"));
+        }
+        if palette_type.dark_bg {
+            flags.push(toks("USABLE_WITH_DARK_BACKGROUND"))
+        }
+        if flags.is_empty() {
+            toks("∅")
+        } else {
+            TokenStream::join_with(flags, tok(" | "))
+        }
+    }
+
+    fn display_labels_array(labels_array: &[NameId], conf: &Config) -> TokenStream {
+        display_items_elided(
+            labels_array,
+            |ix, &name_id| tok(format!("[{ix}]: ")).then(display_name_id(name_id)),
+            conf.bookend_size,
+            |start, stop| {
+                toks(format!("(skipping palettes {} through {})", start, stop))
+                    .indent_by(ELISION_DELTA)
+            },
+        )
+    }
+
+    // FIXME - we currently have no way to figure out what NameRecord is bound to this ID
+    fn display_name_id(name_id: NameId) -> TokenStream {
+        toks(format!("{name_id:?}"))
+    }
+
+    fn display_palettes(
+        color_records_array: &[ColorRecord],
+        color_record_indices: &[u16],
+        num_color_records: u16,
+        conf: &Config,
+    ) -> TokenStream {
+        display_items_elided(
+            color_record_indices,
+            |ix, &start| {
+                let range = (start as usize)..(start + num_color_records) as usize;
+                let palette = &color_records_array[range];
+                tok(format!("[{ix}]: ")).then(display_palette(palette, conf))
+            },
+            conf.bookend_size,
+            |start, stop| {
+                toks(format!("(skipping palettes {} through {})", start, stop))
+                    .indent_by(ELISION_DELTA)
+            },
+        )
+    }
+
+    fn display_palette(color_records: &[ColorRecord], conf: &Config) -> TokenStream {
+        display_items_inline(
+            color_records,
+            display_color_record,
+            conf.inline_bookend,
+            |n_skipped| toks(format!("..({n_skipped})..")),
+        )
+    }
+
+    fn display_color_record(color_rec: &ColorRecord) -> TokenStream {
+        let ColorRecord {
+            blue,
+            green,
+            red,
+            alpha,
+        } = color_rec;
+        toks(format!(
+            "({:02x},{:02x},{:02x};{:02x})",
+            red, green, blue, alpha
+        ))
+    }
+}
+
+use colr::display_colr_metrics;
+mod colr {
+    use super::*;
+
+    pub(super) fn display_colr_metrics(colr: Option<&ColrMetrics>, conf: &Config) -> TokenStream {
+        let Some(colr) = colr else {
+            return TokenStream::empty();
+        };
+        // TODO - implement display for colr
+        let heading = toks(format!("COLR: version {}", colr.version));
+
+        if conf.verbosity.is_at_least(cli::VerboseLevel::Detailed) {
+            // STUB
+            log::warn!("COLR table is not yet implemented");
+            heading
+        } else {
+            heading
+        }
+    }
 }
 
 use svg::display_svg_metrics;
