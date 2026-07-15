@@ -2257,7 +2257,7 @@ pub use otf_cpal::*;
 pub(crate) mod cpal {
     use super::*;
 
-    pub type ColrRecord = opentype_cpal_color_record;
+    pub type ColorRecord = opentype_cpal_color_record;
 
     // TODO - consider using bitflags to mirror the representation of the underlying u32
     #[derive(Copy, Clone, Debug, PartialEq)]
@@ -2277,13 +2277,6 @@ pub(crate) mod cpal {
 
     pub type PaletteLabel = super::name::NameId;
 
-    #[derive(Debug, Clone)]
-    pub struct CpalVersion1Extra {
-        pub(crate) palette_types_array: Vec<PaletteType>,
-        pub(crate) palette_labels_array: Vec<PaletteLabel>,
-        pub(crate) palette_entry_labels_array: Vec<PaletteLabel>,
-    }
-
     impl<'a> Promote<OpentypeCpalPaletteLabels<'a>> for Vec<PaletteLabel> {
         fn promote(orig: &OpentypeCpalPaletteLabels<'a>) -> Self {
             match orig.data {
@@ -2293,9 +2286,17 @@ pub(crate) mod cpal {
         }
     }
 
-    impl<'a> PromoteView<OpentypeCpalExtraV1<'a>> for CpalVersion1Extra {
+    // REVIEW - consider folding each field as an optional field in `CpalMetrics` directly
+    #[derive(Debug, Clone)]
+    pub struct CpalExtraV1 {
+        pub(crate) palette_types_array: Vec<PaletteType>,
+        pub(crate) palette_labels_array: Vec<PaletteLabel>,
+        pub(crate) palette_entry_labels_array: Vec<PaletteLabel>,
+    }
+
+    impl<'a> PromoteView<OpentypeCpalExtraV1<'a>> for CpalExtraV1 {
         fn promote_view(orig: &OpentypeCpalExtraV1<'a>, view: View<'_>) -> PResult<Self> {
-            Ok(CpalVersion1Extra {
+            Ok(CpalExtraV1 {
                 palette_types_array: promote_all(
                     reify_dep(view, orig, Nullable(obj::PalTypeArray))?
                         .into_iter()
@@ -2313,9 +2314,9 @@ pub(crate) mod cpal {
         pub(crate) num_palette_entries: u16,
         pub(crate) num_palettes: u16,
         pub(crate) num_color_records: u16,
-        pub(crate) color_records_array: Vec<ColrRecord>,
+        pub(crate) color_records_array: Vec<ColorRecord>,
         pub(crate) color_record_indices: Vec<u16>,
-        pub(crate) extra: Option<CpalVersion1Extra>,
+        pub(crate) extra: Option<CpalExtraV1>,
     }
 
     impl<'a> Promote<OpentypeCpal<'a>> for CpalMetrics {
@@ -2328,17 +2329,16 @@ pub(crate) mod cpal {
                 color_records_array: reify_const(orig, Mandatory(obj::ColorRecArray)),
                 color_record_indices: orig.color_record_indices.clone(),
                 extra: match &orig.extra {
-                    OpentypeCpalExtra::Version1(extra) => Some(
-                        CpalVersion1Extra::promote_view(extra, orig.table_scope)
-                            .expect("bad parse"),
-                    ),
+                    OpentypeCpalExtra::Version1(extra) => {
+                        Some(CpalExtraV1::promote_view(extra, orig.table_scope).expect("bad parse"))
+                    }
                     _ => None,
                 },
             }
         }
     }
 }
-pub(crate) use cpal::CpalMetrics;
+pub(crate) use cpal::{ColorRecord, CpalExtraV1, CpalMetrics, PaletteLabel, PaletteType};
 
 pub mod otf_colr {
     use super::otf_types::OpentypeColr;
@@ -3804,6 +3804,7 @@ pub(crate) mod colr {
         }
     }
 
+    // REVIEW - should this be folded into `ColrMetrics` as all-optional fields?
     #[derive(Clone, Debug)]
     pub struct ColrExtraV1 {
         pub(crate) base_glyph_list: BaseGlyphList,
@@ -9872,6 +9873,8 @@ pub struct OptionalTableMetrics {
     gsub: Option<Heap<LayoutMetrics>>,
     // STUB - add more tables as we expand opentype definition
     svg: Option<SvgMetrics>,
+    cpal: Option<Heap<CpalMetrics>>,
+    colr: Option<Heap<ColrMetrics>>,
     // STUB - add more tables as we expand opentype definition
     avar: Option<Heap<AvarMetrics>>,
     fvar: Option<Heap<FvarMetrics>>,
@@ -10201,6 +10204,8 @@ pub fn analyze_table_directory(
         };
         // STUB - anything between gsub and svg goes here
         let svg = promote_opt(&dir.table_links.svg);
+        let cpal = promote_opt(&dir.table_links.cpal).map(Heap::new);
+        let colr = promote_opt(&dir.table_links.colr).map(Heap::new);
         // STUB - anything beteween svgk and avar goes here
         let avar = promote_opt(&dir.table_links.avar).map(Heap::new);
         let fvar = promote_opt(&dir.table_links.fvar).map(Heap::new);
@@ -10258,6 +10263,8 @@ pub fn analyze_table_directory(
             gsub,
             // TODO - add more color-font tables as they are added to the spec
             svg,
+            cpal,
+            colr,
             // TODO - add more variation tables as they are added to the spec
             avar,
             fvar,
@@ -10451,8 +10458,9 @@ pub mod table {
                 Cvt | Fpgm | Loca | Glyf | Prep | Gasp => true,
                 // CFF Outline
                 Cff | Cff2 | Vorg => false,
-                // SVG
+                // Color fonts
                 Svg => true,
+                Colr | Cpal => true,
                 // Bitmap
                 Ebdt | Eblc | Ebsc | Cbdt | Cblc | Sbix => false,
                 // Typographical
@@ -10461,8 +10469,6 @@ pub mod table {
                 // Variation
                 Avar | Fvar | Gvar | Hvar | Mvar => true,
                 Cvar | Vvar => false,
-                // Color
-                Colr | Cpal => false,
                 // Extra
                 Dsig | Hdmx | Kern | Stat => true,
                 Ltsh | Merg | Meta | Pclt => false,
