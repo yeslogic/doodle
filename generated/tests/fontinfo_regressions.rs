@@ -47,7 +47,7 @@ macro_rules! testfile {
 #[test]
 fn test_fontinfo_regression_klei() {
     let output = fontinfo()
-        .args(["-vv", fontfile!("Klei.otf")])
+        .args(["analyze", "-vv", fontfile!("Klei.otf")])
         .output()
         .unwrap();
     let expected = expect_test::expect_file!(testfile!("Klei.otf"));
@@ -58,7 +58,7 @@ fn test_fontinfo_regression_klei() {
 #[test]
 fn test_fontinfo_regression_droidsansarabic() {
     let output = fontinfo()
-        .args(["-vv", fontfile!("DroidSansArabic.ttf")])
+        .args(["analyze", "-vv", fontfile!("DroidSansArabic.ttf")])
         .output()
         .unwrap();
     let expected = expect_test::expect_file!(testfile!("DroidSansArabic.ttf"));
@@ -69,7 +69,7 @@ fn test_fontinfo_regression_droidsansarabic() {
 #[test]
 fn test_fontinfo_regression_frankenpax() {
     let output = fontinfo()
-        .args(["-vv", fontfile!("Frankenpax.ttc")])
+        .args(["analyze", "-vv", fontfile!("Frankenpax.ttc")])
         .output()
         .unwrap();
     let expected = expect_test::expect_file!(testfile!("Frankenpax.ttc"));
@@ -81,6 +81,7 @@ fn test_fontinfo_regression_frankenpax() {
 fn test_fontinfo_regression_sixtyfourconvergence() {
     let output = fontinfo()
         .args([
+            "analyze",
             "-vv",
             fontfile!("SixtyfourConvergence-Regular-VariableFont_BLED,SCAN,XELA,YELA.ttf"),
         ])

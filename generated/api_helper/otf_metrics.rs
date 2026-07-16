@@ -114,8 +114,23 @@ pub mod cli {
             ConfigBuilder::default().build().unwrap()
         }
     }
+
+    /// Selector to specify which version of a feature-table is being scanned foIr
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+    pub enum VersionSelector {
+        #[default]
+        Any,
+        Version(u16),
+        MajorOnly {
+            major_version: u16,
+        },
+        MajorMinor {
+            major_version: u16,
+            minor_version: u16,
+        },
+    }
 }
-pub use cli::{Config, ConfigBuilder, VerboseLevel, Verbosity};
+pub use cli::{Config, ConfigBuilder, VerboseLevel, Verbosity, VersionSelector};
 // !SECTION
 
 pub type OpentypeTag = u32;
@@ -1506,6 +1521,9 @@ pub(crate) type TPVErr<'a, Src, Tgt> = <Tgt as TryPromoteView<Src>>::Error<'a>;
 /// Shorthand for qualifying a TryFromRef::Error item in the same style as `TPErr`
 pub(crate) type TFRErr<Src, Tgt> = <Tgt as TryFromRef<Src>>::Error;
 
+/// Shorthand for qualifying a TryFrom::Error item in the same style as `TPErr`
+pub(crate) type TFErr<Src, Tgt> = <Tgt as TryFrom<Src>>::Error;
+
 /// Hint to remind us that a given error-type has strictly local provenance
 type Local<T> = T;
 // !SECTION
@@ -1876,7 +1894,7 @@ pub struct SingleFontMetrics {
     num_tables: usize,
     required: Heap<RequiredTableMetrics>,
     optional: Heap<OptionalTableMetrics>,
-    extraMagic: Vec<u32>,
+    extra_magic: Vec<u32>,
 }
 
 pub mod otf_cmap {
@@ -1966,6 +1984,18 @@ pub mod head {
         pub(crate) major_version: u16,
         pub(crate) minor_version: u16,
         pub(crate) dir_hint: DirectionHint,
+    }
+
+    impl TryPromote<OpentypeHead> for HeadMetrics {
+        type Error = ReflType<TFErr<OpentypeDirectionHint, DirectionHint>, UnknownValueError<i16>>;
+
+        fn try_promote(orig: &OpentypeHead) -> Result<HeadMetrics, Self::Error> {
+            Ok(HeadMetrics {
+                major_version: orig.major_version,
+                minor_version: orig.minor_version,
+                dir_hint: orig.font_direction_hint.try_into()?,
+            })
+        }
     }
 
     #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -5162,18 +5192,170 @@ pub(crate) use stat::{
     AxisValueFormat4, AxisValueRecord, DesignAxis, StatMetrics,
 };
 
-#[derive(Clone, Debug)]
-struct HmtxMetrics(Vec<UnifiedBearing>);
+pub mod mtx_common {
+    /// Selector marker-type for Hmtx
+    pub struct H;
 
-#[derive(Clone, Debug)]
-struct VmtxMetrics(Vec<UnifiedBearing>);
+    /// Selector marker-type for Vmtx
+    pub struct V;
 
-/// Unified Left-or-Top side bearing
-#[derive(Copy, Clone, Debug)]
-struct UnifiedBearing {
-    advance_width: Option<u16>, // FIXME - name is misleading as this also represents 'advance_height' for vmtx
-    left_side_bearing: i16, // FIXME - name is misleading as this also represents 'top_side_bearing' for vmtx
+    /// Unified bearing between LongHorMetric and raw entries in the `leftSideBearings` array in `hmtx`,
+    /// and the analogous items in the two arrays of `vmtx`.
+    pub struct UnifiedBearing<X> {
+        /// Unified field for `advanceWidth` (hmtx) / `advanceHeight` (vmtx)
+        pub(crate) advance_x: Option<u16>,
+        /// Unified field for `leftSideBearing` (hmtx) / `topSideBearing` (vmtx)
+        pub(crate) x_side_bearing: i16,
+        pub(super) __phantom: std::marker::PhantomData<X>,
+    }
+
+    impl<X> Copy for UnifiedBearing<X> {}
+
+    impl<X> Clone for UnifiedBearing<X> {
+        fn clone(&self) -> Self {
+            *self
+        }
+    }
+
+    impl UnifiedBearing<H> {
+        pub fn new_horizontal(advance_width: u16, left_side_bearing: i16) -> UnifiedBearing<H> {
+            UnifiedBearing {
+                advance_x: Some(advance_width),
+                x_side_bearing: left_side_bearing,
+                __phantom: std::marker::PhantomData,
+            }
+        }
+
+        pub fn new_lsb(left_side_bearing: i16) -> UnifiedBearing<H> {
+            UnifiedBearing {
+                advance_x: None,
+                x_side_bearing: left_side_bearing,
+                __phantom: std::marker::PhantomData,
+            }
+        }
+    }
+
+    impl UnifiedBearing<V> {
+        pub fn new_vertical(advance_height: u16, top_side_bearing: i16) -> UnifiedBearing<V> {
+            UnifiedBearing {
+                advance_x: Some(advance_height),
+                x_side_bearing: top_side_bearing,
+                __phantom: std::marker::PhantomData,
+            }
+        }
+
+        pub fn new_tsb(top_side_bearing: i16) -> UnifiedBearing<V> {
+            UnifiedBearing {
+                advance_x: None,
+                x_side_bearing: top_side_bearing,
+                __phantom: std::marker::PhantomData,
+            }
+        }
+    }
+
+    impl std::fmt::Debug for UnifiedBearing<H> {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            if self.advance_x.is_none() {
+                f.debug_struct("UnifiedBearing")
+                    .field("left_side_bearing", &self.x_side_bearing)
+                    .finish()
+            } else {
+                f.debug_struct("UnifiedBearing")
+                    .field("advance_width", &self.advance_x)
+                    .field("left_side_bearing", &self.x_side_bearing)
+                    .finish()
+            }
+        }
+    }
+
+    impl std::fmt::Debug for UnifiedBearing<V> {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            if self.advance_x.is_none() {
+                f.debug_struct("UnifiedBearing")
+                    .field("top_side_bearing", &self.x_side_bearing)
+                    .finish()
+            } else {
+                f.debug_struct("UnifiedBearing")
+                    .field("advance_height", &self.advance_x)
+                    .field("top_side_bearing", &self.x_side_bearing)
+                    .finish()
+            }
+        }
+    }
+
+    impl UnifiedBearing<H> {
+        pub fn advance_width(&self) -> Option<u16> {
+            self.advance_x
+        }
+
+        pub fn left_side_bearing(&self) -> i16 {
+            self.x_side_bearing
+        }
+    }
+
+    impl UnifiedBearing<V> {
+        pub fn advance_height(&self) -> Option<u16> {
+            self.advance_x
+        }
+
+        pub fn top_side_bearing(&self) -> i16 {
+            self.x_side_bearing
+        }
+    }
 }
+pub(crate) use mtx_common::{H, UnifiedBearing, V};
+
+pub mod hmtx {
+    use super::*;
+
+    #[derive(Clone, Debug)]
+    pub struct HmtxMetrics(pub(crate) Vec<UnifiedBearing<H>>);
+
+    impl Promote<OpentypeHmtx> for HmtxMetrics {
+        fn promote(hmtx: &OpentypeHmtx) -> Self {
+            let mut accum =
+                Vec::with_capacity(hmtx.long_metrics.len() + hmtx.left_side_bearings.len());
+            for hmet in hmtx.long_metrics.iter() {
+                accum.push(UnifiedBearing::new_horizontal(
+                    hmet.advance_width,
+                    hmet.left_side_bearing,
+                ));
+            }
+            for lsb in hmtx.left_side_bearings.iter() {
+                accum.push(UnifiedBearing::new_lsb(*lsb));
+            }
+            HmtxMetrics(accum)
+        }
+    }
+}
+pub(crate) use hmtx::HmtxMetrics;
+
+pub mod vmtx {
+    use super::*;
+
+    #[derive(Clone, Debug)]
+    pub struct VmtxMetrics(pub(crate) Vec<UnifiedBearing<V>>);
+
+    impl Promote<OpentypeVmtx> for VmtxMetrics {
+        fn promote(orig: &OpentypeVmtx) -> Self {
+            // FIXME - because OpentypeVmtx is co-aliased with OpentypeHmtx, the field names of `orig` are misleading
+            let mut accum =
+                Vec::with_capacity(orig.long_metrics.len() + orig.left_side_bearings.len());
+            for vmet in orig.long_metrics.iter() {
+                // FIXME - because OpentypeVmtx is co-aliased with OpentypeHmtx, the field names of `vmet` are misleading
+                accum.push(UnifiedBearing::new_vertical(
+                    vmet.advance_width,
+                    vmet.left_side_bearing,
+                ));
+            }
+            for tsb in orig.left_side_bearings.iter() {
+                accum.push(UnifiedBearing::new_tsb(*tsb));
+            }
+            VmtxMetrics(accum)
+        }
+    }
+}
+pub(crate) use vmtx::VmtxMetrics;
 
 pub mod otf_name {
     alias! {
@@ -5596,18 +5778,46 @@ pub(crate) use name::{
     LangTagRecord, LocaleSelector, NameId, NameMetrics, NameRecord, PlatformEncodingLanguageId,
 };
 
-#[derive(Clone, Debug)]
-struct Os2Metrics {
-    version: u16,
-    // STUB - is anything else relevant?
-}
+pub mod os2 {
+    use super::otf_types::OpentypeOs2;
+    use super::traits::Promote;
 
-#[derive(Clone, Debug)]
-struct PostMetrics {
-    version: u32,
-    is_fixed_pitch: bool,
-    // STUB - is anything else relevant?
+    #[derive(Clone, Debug)]
+    pub struct Os2Metrics {
+        pub(crate) version: u16,
+        // STUB - is anything else relevant?
+    }
+
+    impl Promote<OpentypeOs2> for Os2Metrics {
+        fn promote(orig: &OpentypeOs2) -> Os2Metrics {
+            let &OpentypeOs2 { version, .. } = orig;
+            Os2Metrics { version }
+        }
+    }
 }
+pub(crate) use os2::Os2Metrics;
+
+pub mod post {
+    use super::otf_types::OpentypePost;
+    use super::traits::Promote;
+
+    #[derive(Clone, Debug)]
+    pub struct PostMetrics {
+        pub(crate) version: u32,
+        pub(crate) is_fixed_pitch: bool,
+        // STUB - is anything else relevant?
+    }
+
+    impl<'a> Promote<OpentypePost<'a>> for PostMetrics {
+        fn promote(post: &OpentypePost<'a>) -> PostMetrics {
+            PostMetrics {
+                version: post.version,
+                is_fixed_pitch: post.is_fixed_pitch != 0,
+            }
+        }
+    }
+}
+pub(crate) use post::PostMetrics;
 
 #[derive(Clone, Debug)]
 pub struct RequiredTableMetrics {
@@ -9944,7 +10154,13 @@ where
 
 impl<T> std::error::Error for UnknownValueError<T> where T: std::fmt::Display + std::fmt::Debug {}
 
-pub fn analyze_font_fast(test_file: &str) -> TestResult<()> {
+/// Validation-only analysis function.
+///
+/// Parses a font file using the machine-generated decoder (and optionally perform per-table
+/// sanity checks).
+///
+/// Does not convert to `*Metrics` types, or produce any output.
+pub fn analyze_font_fast(test_file: &impl AsRef<std::ffi::OsStr>) -> TestResult<()> {
     let buffer = std::fs::read(std::path::Path::new(test_file))?;
     let mut input = Parser::new(&buffer);
     let _tmp = Decoder_opentype_main(&mut input)?;
@@ -9953,32 +10169,222 @@ pub fn analyze_font_fast(test_file: &str) -> TestResult<()> {
     Ok(())
 }
 
-fn dir_has_table(dir: &otf_types::OpentypeFontDirectory, tag: u32) -> bool {
-    dir.table_records.iter().any(|r| r.table_id == tag)
-}
-
-pub fn font_has_table(path: &str, tag: u32) -> TestResult<bool> {
+/// Quickly check if a font has a given table.
+///
+/// Returns `Ok(true)` if the font contains the indicated table (given by its `u32`-based Tag),
+/// or `Ok(false)` if it does not.
+///
+/// If an error is encountered (either `io` or parse-related), returns `Err`.
+pub fn font_has_table(
+    path: &impl AsRef<std::ffi::OsStr>,
+    tk: TableKind,
+    selector: VersionSelector,
+) -> TestResult<bool> {
     let buffer = std::fs::read(std::path::Path::new(path))?;
     let mut input = Parser::new(&buffer);
     let font = Decoder_opentype_main(&mut input)?;
     let found = match &font.directory {
         opentype_main_directory::TTCHeader(multi) => match &multi.header {
-            opentype_ttc_header_header::Version1(v1) => v1
-                .table_directories
-                .iter()
-                .any(|f| f.data.as_ref().map_or(false, |d| dir_has_table(d, tag))),
-            opentype_ttc_header_header::Version2(v2) => v2
-                .table_directories
-                .iter()
-                .any(|f| f.data.as_ref().map_or(false, |d| dir_has_table(d, tag))),
+            opentype_ttc_header_header::Version1(v1) => v1.table_directories.iter().any(|f| {
+                f.data
+                    .as_ref()
+                    .map_or(false, |d| dir_has_table(d, tk, selector))
+            }),
+            opentype_ttc_header_header::Version2(v2) => v2.table_directories.iter().any(|f| {
+                f.data
+                    .as_ref()
+                    .map_or(false, |d| dir_has_table(d, tk, selector))
+            }),
             opentype_ttc_header_header::UnknownVersion(_) => false,
         },
-        opentype_main_directory::TableDirectory(dir) => dir_has_table(dir, tag),
+        opentype_main_directory::TableDirectory(dir) => dir_has_table(dir, tk, selector),
     };
     Ok(found)
 }
 
+fn dir_has_table(
+    dir: &otf_types::OpentypeFontDirectory,
+    tk: TableKind,
+    selector: VersionSelector,
+) -> bool {
+    let has_table = dir.table_records.iter().any(|r| r.table_id == tk as u32);
+    if !has_table {
+        return false;
+    }
+    match selector {
+        VersionSelector::Any => true,
+        VersionSelector::MajorOnly { major_version } => {
+            matches_version_major_minor(tk, &dir.table_links, major_version, None)
+        }
+        VersionSelector::MajorMinor {
+            major_version,
+            minor_version,
+        } => matches_version_major_minor(tk, &dir.table_links, major_version, Some(minor_version)),
+        VersionSelector::Version(v) => matches_version(tk, &dir.table_links, v),
+    }
+}
+
+mod version_check {
+    use super::table::TableKind;
+    use crate::opentype_table_directory_table_links;
+
+    enum Ver {
+        Version(u16),
+        MajorMinor(u16, u16),
+    }
+
+    impl TableKind {
+        /// Extracts the version (if present, and if a version applies) for the indicated feature-table within `table_links`.
+        ///
+        /// # Panics
+        ///
+        /// Will panic if the table in question has no format implementation.
+        fn get_version(
+            &self,
+            table_links: &opentype_table_directory_table_links<'_>,
+        ) -> Option<Ver> {
+            // unimplemented tables will never appear in table_links, so they cannot have versions
+            debug_assert!(self.is_implemented());
+            use TableKind::*;
+            match self {
+                // Required tables (always present, never `Option`-wrapped)
+                Cmap => Some(Ver::Version(table_links.cmap.version)),
+                Head => Some(Ver::MajorMinor(
+                    table_links.head.major_version,
+                    table_links.head.minor_version,
+                )),
+                Hhea => Some(Ver::MajorMinor(
+                    table_links.hhea.major_version,
+                    table_links.hhea.minor_version,
+                )),
+                Hmtx => None,
+                Maxp => {
+                    // `version` is a packed (major, minor) pair in 16.16 fixed-point form
+                    let version = table_links.maxp.version;
+                    Some(Ver::MajorMinor((version >> 16) as u16, version as u16))
+                }
+                Name => Some(Ver::Version(table_links.name.version)),
+                Os2 => Some(Ver::Version(table_links.os2.version)),
+                Post => {
+                    let version = table_links.post.version;
+                    Some(Ver::MajorMinor((version >> 16) as u16, version as u16))
+                }
+                // TrueType Outline tables (none carry a version)
+                Cvt | Fpgm | Loca | Glyf | Prep => None,
+                Gasp => table_links.gasp.as_ref().map(|t| Ver::Version(t.version)),
+                // Color fonts
+                Svg => table_links.svg.as_ref().map(|t| Ver::Version(t.version)),
+                Colr => table_links.colr.as_ref().map(|t| Ver::Version(t.version)),
+                Cpal => table_links.cpal.as_ref().map(|t| Ver::Version(t.version)),
+                // Advanced Typographic
+                Base => table_links
+                    .base
+                    .as_ref()
+                    .map(|t| Ver::MajorMinor(t.major_version, t.minor_version)),
+                Gdef => table_links
+                    .gdef
+                    .as_ref()
+                    .map(|t| Ver::MajorMinor(t.major_version, t.minor_version)),
+                Gpos => table_links
+                    .gpos
+                    .as_ref()
+                    .map(|t| Ver::MajorMinor(t.major_version, t.minor_version)),
+                Gsub => table_links
+                    .gsub
+                    .as_ref()
+                    .map(|t| Ver::MajorMinor(t.major_version, t.minor_version)),
+                // Font Variations
+                Avar => table_links
+                    .avar
+                    .as_ref()
+                    .map(|t| Ver::MajorMinor(t.major_version, t.minor_version)),
+                Fvar => table_links
+                    .fvar
+                    .as_ref()
+                    .map(|t| Ver::MajorMinor(t.major_version, t.minor_version)),
+                Gvar => table_links
+                    .gvar
+                    .as_ref()
+                    .map(|t| Ver::MajorMinor(t.major_version, t.minor_version)),
+                Hvar => table_links
+                    .hvar
+                    .as_ref()
+                    .map(|t| Ver::MajorMinor(t.major_version, t.minor_version)),
+                Mvar => table_links
+                    .mvar
+                    .as_ref()
+                    .map(|t| Ver::MajorMinor(t.major_version, t.minor_version)),
+                Stat => table_links
+                    .stat
+                    .as_ref()
+                    .map(|t| Ver::MajorMinor(t.major_version, t.minor_version)),
+                // Other
+                // DSIG's `version` is a plain (non-major/minor) `u32` fixed at `0x0000_0001`, so it always fits in a `u16`
+                Dsig => table_links
+                    .dsig
+                    .as_ref()
+                    .map(|t| Ver::Version(t.version as u16)),
+                Hdmx => table_links.hdmx.as_ref().map(|t| Ver::Version(t.version)),
+                Kern => table_links.kern.as_ref().map(|t| Ver::Version(t.version)),
+                Vdmx => table_links.vdmx.as_ref().map(|t| Ver::Version(t.version)),
+                Vhea => table_links
+                    .vhea
+                    .as_ref()
+                    .map(|t| Ver::MajorMinor(t.major_version, t.minor_version)),
+                Vmtx => None,
+                _ => unreachable!("get_version called on unimplemented table {:?}", self),
+            }
+        }
+    }
+
+    /// For a given `TableKind` that includes a major and minor version, return `true` if the
+    /// major version matches `major_version` and the minor version matches `minor_version` (or is `None`).
+    pub fn matches_version_major_minor(
+        tk: TableKind,
+        table_links: &opentype_table_directory_table_links<'_>,
+        major_version: u16,
+        minor_version: Option<u16>,
+    ) -> bool {
+        match tk.get_version(table_links).unwrap() {
+            Ver::MajorMinor(major, minor) => {
+                major == major_version && minor_version.map_or(true, |v| minor == v)
+            }
+            Ver::Version(_) => {
+                log::error!("Table {} is not a major-minor versioned table", tk);
+                std::process::exit(1);
+            }
+        }
+    }
+
+    /// For a given `TableKind` that includes a single version-field, return `true` if the version matches `version`.
+    pub(crate) fn matches_version(
+        tk: TableKind,
+        table_links: &opentype_table_directory_table_links<'_>,
+        version: u16,
+    ) -> bool {
+        match tk.get_version(table_links).unwrap() {
+            Ver::Version(v) => v == version,
+            Ver::MajorMinor(..) => {
+                log::error!("Table {} is not a simply-versioned table", tk);
+                std::process::exit(1);
+            }
+        }
+    }
+}
+use version_check::{matches_version, matches_version_major_minor};
+
+/// Optional validation for `vdmx` table, when present.
+///
+/// Passes when `num_ratios == num_recs`, or when `vdmx` is not present.
 fn check_font_vdmx(font: &opentype_main<'_>) {
+    fn check_dir_vdmx(dir: &opentype_table_directory<'_>) {
+        match dir.table_links.vdmx {
+            Some(ref vdmx) => {
+                assert_eq!(vdmx.num_ratios, vdmx.num_recs);
+            }
+            None => (),
+        }
+    }
     match &font.directory {
         opentype_main_directory::TTCHeader(multi) => match &multi.header {
             opentype_ttc_header_header::Version1(v1header) => {
@@ -10003,16 +10409,18 @@ fn check_font_vdmx(font: &opentype_main<'_>) {
     }
 }
 
-fn check_dir_vdmx(dir: &opentype_table_directory<'_>) {
-    match dir.table_links.vdmx {
-        Some(ref vdmx) => {
-            assert_eq!(vdmx.num_ratios, vdmx.num_recs);
-        }
-        None => (),
-    }
-}
-
-pub fn analyze_font(test_file: &str, extra_only: bool) -> TestResult<OpentypeMetrics> {
+/// Standard font-analysis entrypoint.
+///
+/// Produces an `OpentypeMetrics` value encapsulating the key details of the font.
+///
+/// Possible errors are:
+///   - Filesystem or I/O (file not found, file could not be open for read)
+///   - Errors during first-pass decoding (e.g. malformed file, or malformed font data)
+///   - Errors during type-lifting (e.g. unknown values in key fields/positions, unsatisfied constraints, parse-errors during offset-value reification)
+pub fn analyze_font(
+    test_file: &impl AsRef<std::ffi::OsStr>,
+    extra_only: bool,
+) -> TestResult<OpentypeMetrics> {
     let buffer = std::fs::read(std::path::Path::new(test_file))?;
     let mut input = Parser::new(&buffer);
     let font = Decoder_opentype_main(&mut input)?;
@@ -10099,6 +10507,13 @@ pub fn analyze_font(test_file: &str, extra_only: bool) -> TestResult<OpentypeMet
     }
 }
 
+/// Helper for [`analyze_font`] when `extra_only` is set (via command-line invocation).
+///
+/// Elides the standard output for all fully-supported feature-table types present in the font,
+/// and only returns the one-line-per-table output indicating which not-yet-supported tables are present
+/// in the font.
+///
+/// Used for frequency analysis to determine which unimplemented feature-tables are most common.
 fn analyze_extra_tables(dir: &otf_types::OpentypeFontDirectory, extra: &mut Vec<u32>) {
     let tmp = dir
         .table_records
@@ -10109,63 +10524,31 @@ fn analyze_extra_tables(dir: &otf_types::OpentypeFontDirectory, extra: &mut Vec<
 }
 
 // ANCHOR - analyze_table_directory
+/// Cornerstone function for [`analyze_font`].
+///
+/// Scans the table-directory for a single font (or one of several fonts in a TrueType Collection)
+/// and returns a [`SingleFontMetrics`] object containing the metrics for each table present in the font.
+///
+/// Each supported feature-table must be explicitly promoted from its raw counterpart and persisted within
+/// [`SingleFontMetrics`] in the appropriate sub-structure.
+///
+/// Any feature-tables that are flagged as 'unsupported' (based on [`table::TableKind::is_implemented`])
+/// are collected into the `extra_magic` field of `SingleFontMetrics`.
+///
+/// If a feature-table is flagged as being supported, but its associated promote-persist-display pipeline
+/// is not fully realized, its presence/absence is not reflected in the output.
 pub fn analyze_table_directory(
     dir: &otf_types::OpentypeFontDirectory,
 ) -> TestResult<SingleFontMetrics> {
     let required = {
-        let cmap = {
-            let cmap = &dir.table_links.cmap;
-            Heap::new(CmapMetrics::promote(cmap))
-        };
-        // FIXME - reimplement logic in Promote impl
-        let head = {
-            let head = &dir.table_links.head;
-            Heap::new(HeadMetrics {
-                major_version: head.major_version,
-                minor_version: head.minor_version,
-                dir_hint: head.font_direction_hint.try_into().unwrap(),
-            })
-        };
-        let hhea = { Heap::new(HheaMetrics::promote(&dir.table_links.hhea)) };
+        let cmap = Heap::new(CmapMetrics::promote(&dir.table_links.cmap));
+        let head = Heap::new(HeadMetrics::try_promote(&dir.table_links.head)?);
+        let hhea = Heap::new(HheaMetrics::promote(&dir.table_links.hhea));
         let maxp = Heap::new(MaxpMetrics::promote(&dir.table_links.maxp));
-        // FIXME - reimplement logic in Promote impl
-        let hmtx = {
-            let hmtx = &dir.table_links.hmtx;
-            let mut accum =
-                Vec::with_capacity(hmtx.long_metrics.len() + hmtx.left_side_bearings.len());
-            for hmet in hmtx.long_metrics.iter() {
-                accum.push(UnifiedBearing {
-                    advance_width: Some(hmet.advance_width),
-                    left_side_bearing: hmet.left_side_bearing,
-                });
-            }
-            for lsb in hmtx.left_side_bearings.iter() {
-                accum.push(UnifiedBearing {
-                    advance_width: None,
-                    left_side_bearing: {
-                        let v = *lsb;
-                        v
-                    },
-                });
-            }
-            Heap::new(HmtxMetrics(accum))
-        };
+        let hmtx = Heap::new(HmtxMetrics::promote(&dir.table_links.hmtx));
         let name = Heap::new(NameMetrics::try_promote(&dir.table_links.name)?);
-        // FIXME - reimplement logic in Promote impl
-        let os2 = {
-            let os2 = &dir.table_links.os2;
-            Heap::new(Os2Metrics {
-                version: os2.version,
-            })
-        };
-        // FIXME - reimplement logic in Promote impl
-        let post = {
-            let post = &dir.table_links.post;
-            Heap::new(PostMetrics {
-                version: post.version,
-                is_fixed_pitch: post.is_fixed_pitch != 0,
-            })
-        };
+        let os2 = Heap::new(Os2Metrics::promote(&dir.table_links.os2));
+        let post = Heap::new(PostMetrics::promote(&dir.table_links.post));
         Heap::new(RequiredTableMetrics {
             cmap,
             head,
@@ -10230,30 +10613,7 @@ pub fn analyze_table_directory(
         let stat = promote_opt(&dir.table_links.stat).map(Heap::new);
         let vdmx = promote_opt(&dir.table_links.vdmx);
         let vhea = promote_opt(&dir.table_links.vhea);
-        let vmtx = {
-            let vmtx = &dir.table_links.vmtx;
-            vmtx.as_ref().map(|vmtx| {
-                // FIXME - if name gets changed to top_side_bearings, correct accordingly
-                let mut accum =
-                    Vec::with_capacity(vmtx.long_metrics.len() + vmtx.left_side_bearings.len());
-                for vmet in vmtx.long_metrics.iter() {
-                    accum.push(UnifiedBearing {
-                        advance_width: Some(vmet.advance_width),
-                        // FIXME - if name gets changed to top_side_bearing, correct accordingly
-                        left_side_bearing: vmet.left_side_bearing,
-                    });
-                }
-                // FIXME - if name gets changed to top_side_bearings, correct accordingly
-                for tsb in vmtx.left_side_bearings.iter() {
-                    accum.push(UnifiedBearing {
-                        advance_width: None,
-                        // FIXME - if name gets changed to top_side_bearing, correct accordingly
-                        left_side_bearing: *tsb,
-                    });
-                }
-                VmtxMetrics(accum)
-            })
-        };
+        let vmtx = promote_opt(&dir.table_links.vmtx);
         Heap::new(OptionalTableMetrics {
             cvt,
             fpgm,
@@ -10286,7 +10646,7 @@ pub fn analyze_table_directory(
             hdmx,
         })
     };
-    let extraMagic = dir
+    let extra_magic = dir
         .table_records
         .iter()
         .map(|r| r.table_id)
@@ -10297,7 +10657,7 @@ pub fn analyze_table_directory(
         num_tables: dir.num_tables as usize,
         required,
         optional,
-        extraMagic,
+        extra_magic,
     })
 }
 
@@ -10502,7 +10862,14 @@ pub mod table {
             })
         }
     }
+
+    impl std::fmt::Display for TableKind {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "{}", super::Tag(*self as u32))
+        }
+    }
 }
+use table::TableKind;
 
 /// Returns `true` if `table_id` is not a first-class OpenType table in our current implementation
 ///
@@ -10580,7 +10947,9 @@ pub mod lookup_subtable {
         Multi(Vec<Option<T>>),
     }
 
-    pub fn analyze_font_lookups(test_file: &str) -> TestResult<SingleOrMulti<LookupSet>> {
+    pub fn analyze_font_lookups(
+        test_file: &impl AsRef<std::ffi::OsStr>,
+    ) -> TestResult<SingleOrMulti<LookupSet>> {
         let buffer = std::fs::read(std::path::Path::new(test_file))?;
         let mut input = Parser::new(&buffer);
         let font = Decoder_opentype_main(&mut input)?;
