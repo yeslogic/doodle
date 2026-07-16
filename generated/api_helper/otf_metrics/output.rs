@@ -180,8 +180,8 @@ mod cpal {
                 TokenStream::join_with(
                     vec![
                         toks(format!(
-                            "{} palettes ({} color records each)",
-                            cpal.num_palettes, cpal.num_color_records
+                            "{} palettes ({} entries each)",
+                            cpal.num_palettes, cpal.num_palette_entries
                         )),
                         display_palettes(
                             &cpal.color_records_array,

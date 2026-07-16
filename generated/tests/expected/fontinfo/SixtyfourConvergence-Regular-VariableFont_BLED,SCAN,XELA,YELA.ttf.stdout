@@ -71,7 +71,7 @@ GSUB: version 1.0
 	[5]: LookupTable: kind=SingleSubst: [[93 ∈ [2,254]]=>[#0002->#0106, #0003->#0158, #000b->#0159, ...(skipping 87 substs)..., #00fc->#01df, #00fd->#01e0, #00fe->#0176]]
 	[6]: LookupTable: kind=SingleSubst: [[16 ranges; 72 ∈ [2,342]]=>[#0002->#0106, #0088->#01ae, #009b->#01af, ...(skipping 66 substs)..., #0154->#0104, #0155->#0103, #0156->#01bf]]
 CPAL: version 1
-    2 palettes (12 color records each)
+    2 palettes (6 entries each)
 	[0]: [(ff,12,0d;ff), (ff,18,12;ff), (00,cd,1d;22), (22,cb,26;88), (00,1d,bc;22), (32,16,bb;88)]
 	[1]: [(ff,14,1d;ff), (fb,72,36;ff), (14,ff,1d;77), (72,fb,36;aa), (14,1d,ff;77), (72,36,fb;aa)]
     Palette Type Array (2 entries)
