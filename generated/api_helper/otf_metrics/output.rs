@@ -91,7 +91,7 @@ fn show_font_metrics(font: &SingleFontMetrics, conf: &Config) {
         // WIP - show_optional_metrics(..).println();
         show_optional_metrics(&font.optional, conf);
     }
-    display_extra_tags(&font.extraMagic).println();
+    display_extra_tags(&font.extra_magic).println();
 }
 
 fn display_extra_tags(table_ids: &[u32]) -> TokenStream {
@@ -172,7 +172,6 @@ mod cpal {
         let Some(cpal) = cpal else {
             return TokenStream::empty();
         };
-        // validate_cpal(cpal);
         let heading = toks(format!("CPAL: version {}", cpal.version));
         if conf.verbosity.is_at_least(cli::VerboseLevel::Detailed) {
             heading.glue(
@@ -4161,13 +4160,13 @@ mod hmtx {
             toks(format!("hmtx: {} hmetrics", hmtx.0.len()))
         }
     }
-    fn display_unified_bearing(ix: usize, hmet: &UnifiedBearing) -> TokenStream {
-        match &hmet.advance_width {
+    fn display_unified_bearing(ix: usize, hmet: &UnifiedBearing<H>) -> TokenStream {
+        match hmet.advance_width() {
             Some(width) => toks(format!(
                 "Glyph ID [{ix}]: advanceWidth={width}, lsb={}",
-                hmet.left_side_bearing
+                hmet.left_side_bearing()
             )),
-            None => toks(format!("Glyph ID [{ix}]: lsb={}", hmet.left_side_bearing)),
+            None => toks(format!("Glyph ID [{ix}]: lsb={}", hmet.left_side_bearing())),
         }
     }
 }
@@ -4176,7 +4175,6 @@ use vmtx::display_vmtx_metrics;
 mod vmtx {
     use super::*;
 
-    // FIXME - refactor into pure TokenStream
     pub(crate) fn display_vmtx_metrics(
         vmtx: &Option<VmtxMetrics>,
         conf: &cli::Config,
@@ -4207,15 +4205,13 @@ mod vmtx {
     }
 
     /// Tokenizer for a `vmtx` UnifiedBearing (inline)
-    fn display_unified_bearing(ix: usize, vmet: &UnifiedBearing) -> TokenStream {
-        // FIXME - `_width` is a misnomer, should be `_height`
-        match &vmet.advance_width {
+    fn display_unified_bearing(ix: usize, vmet: &UnifiedBearing<V>) -> TokenStream {
+        match vmet.advance_height() {
             Some(height) => toks(format!(
                 "Glyph ID [{ix}]: advanceHeight={height}, tsb={}",
-                vmet.left_side_bearing // FIXME - `left` is a misnomer, should be `top`
+                vmet.top_side_bearing()
             )),
-            // FIXME - `left` is a misnomer, should be `top`
-            None => toks(format!("Glyph ID [{ix}]: tsb={}", vmet.left_side_bearing)),
+            None => toks(format!("Glyph ID [{ix}]: tsb={}", vmet.top_side_bearing())),
         }
     }
 }
