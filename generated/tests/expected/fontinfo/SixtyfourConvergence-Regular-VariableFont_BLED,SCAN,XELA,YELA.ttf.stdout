@@ -70,6 +70,310 @@ GSUB: version 1.0
 	[4]: LookupTable: kind=SingleSubst: [[52 ranges; 159 ∈ [2,342]]=>[#0002->#0106, #0003->#0158, #000b->#0159, ...(skipping 153 substs)..., #0154->#0104, #0155->#0103, #0156->#01bf]]
 	[5]: LookupTable: kind=SingleSubst: [[93 ∈ [2,254]]=>[#0002->#0106, #0003->#0158, #000b->#0159, ...(skipping 87 substs)..., #00fc->#01df, #00fd->#01e0, #00fe->#0176]]
 	[6]: LookupTable: kind=SingleSubst: [[16 ranges; 72 ∈ [2,342]]=>[#0002->#0106, #0088->#01ae, #009b->#01af, ...(skipping 66 substs)..., #0154->#0104, #0155->#0103, #0156->#01bf]]
+CPAL: version 1
+    2 palettes (12 color records each)
+	[0]: [(ff,12,0d;ff), (ff,18,12;ff), (00,cd,1d;22), (22,cb,26;88), (00,1d,bc;22), (32,16,bb;88)]
+	[1]: [(ff,14,1d;ff), (fb,72,36;ff), (14,ff,1d;77), (72,fb,36;aa), (14,1d,ff;77), (72,36,fb;aa)]
+    Palette Type Array (2 entries)
+	[0]: USABLE_WITH_LIGHT_BACKGROUND
+	[1]: USABLE_WITH_DARK_BACKGROUND
+    Palette Label Array (0 entries)
+    Palette Entry Labels Array (0 entries)
+COLR: version 1
+    Base Glyph Paint Records: 481 total
+	[0]: #0000: Composite (mode 13)
+	    source: VarTranslate dx=20 dy=-5 var-index-base=4
+		paint: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+		    paint: Glyph #0000
+			paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+			    ColorLine extend=pad [palette[4]@0(a=1), palette[5]@0.25(a=1), palette[4]@1(a=1)]
+	    backdrop: Composite (mode 13)
+		source: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+		    paint: Glyph #0000
+			paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+			    ColorLine extend=pad [palette[0]@0(a=1), palette[1]@0.25(a=1), palette[0]@1(a=1)]
+		backdrop: VarTranslate dx=-20 dy=-5 var-index-base=6
+		    paint: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+			paint: Glyph #0000
+			    paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+				ColorLine extend=pad [palette[2]@0(a=1), palette[3]@0.25(a=1), palette[2]@1(a=1)]
+	[1]: #0001: Composite (mode 13)
+	    source: VarTranslate dx=20 dy=-5 var-index-base=4
+		paint: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+		    paint: Glyph #0001
+			paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+			    ColorLine extend=pad [palette[4]@0(a=1), palette[5]@0.25(a=1), palette[4]@1(a=1)]
+	    backdrop: Composite (mode 13)
+		source: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+		    paint: Glyph #0001
+			paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+			    ColorLine extend=pad [palette[0]@0(a=1), palette[1]@0.25(a=1), palette[0]@1(a=1)]
+		backdrop: VarTranslate dx=-20 dy=-5 var-index-base=6
+		    paint: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+			paint: Glyph #0001
+			    paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+				ColorLine extend=pad [palette[2]@0(a=1), palette[3]@0.25(a=1), palette[2]@1(a=1)]
+	[2]: #0002: Composite (mode 13)
+	    source: VarTranslate dx=20 dy=-5 var-index-base=4
+		paint: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+		    paint: Glyph #0002
+			paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+			    ColorLine extend=pad [palette[4]@0(a=1), palette[5]@0.25(a=1), palette[4]@1(a=1)]
+	    backdrop: Composite (mode 13)
+		source: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+		    paint: Glyph #0002
+			paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+			    ColorLine extend=pad [palette[0]@0(a=1), palette[1]@0.25(a=1), palette[0]@1(a=1)]
+		backdrop: VarTranslate dx=-20 dy=-5 var-index-base=6
+		    paint: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+			paint: Glyph #0002
+			    paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+				ColorLine extend=pad [palette[2]@0(a=1), palette[3]@0.25(a=1), palette[2]@1(a=1)]
+	[3]: #0003: Composite (mode 13)
+	    source: VarTranslate dx=20 dy=-5 var-index-base=4
+		paint: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+		    paint: Glyph #0003
+			paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+			    ColorLine extend=pad [palette[4]@0(a=1), palette[5]@0.25(a=1), palette[4]@1(a=1)]
+	    backdrop: Composite (mode 13)
+		source: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+		    paint: Glyph #0003
+			paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+			    ColorLine extend=pad [palette[0]@0(a=1), palette[1]@0.25(a=1), palette[0]@1(a=1)]
+		backdrop: VarTranslate dx=-20 dy=-5 var-index-base=6
+		    paint: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+			paint: Glyph #0003
+			    paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+				ColorLine extend=pad [palette[2]@0(a=1), palette[3]@0.25(a=1), palette[2]@1(a=1)]
+	[4]: #0004: Composite (mode 13)
+	    source: VarTranslate dx=20 dy=-5 var-index-base=4
+		paint: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+		    paint: Glyph #0004
+			paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+			    ColorLine extend=pad [palette[4]@0(a=1), palette[5]@0.25(a=1), palette[4]@1(a=1)]
+	    backdrop: Composite (mode 13)
+		source: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+		    paint: Glyph #0004
+			paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+			    ColorLine extend=pad [palette[0]@0(a=1), palette[1]@0.25(a=1), palette[0]@1(a=1)]
+		backdrop: VarTranslate dx=-20 dy=-5 var-index-base=6
+		    paint: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+			paint: Glyph #0004
+			    paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+				ColorLine extend=pad [palette[2]@0(a=1), palette[3]@0.25(a=1), palette[2]@1(a=1)]
+	[5]: #0005: Composite (mode 13)
+	    source: VarTranslate dx=20 dy=-5 var-index-base=4
+		paint: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+		    paint: Glyph #0005
+			paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+			    ColorLine extend=pad [palette[4]@0(a=1), palette[5]@0.25(a=1), palette[4]@1(a=1)]
+	    backdrop: Composite (mode 13)
+		source: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+		    paint: Glyph #0005
+			paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+			    ColorLine extend=pad [palette[0]@0(a=1), palette[1]@0.25(a=1), palette[0]@1(a=1)]
+		backdrop: VarTranslate dx=-20 dy=-5 var-index-base=6
+		    paint: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+			paint: Glyph #0005
+			    paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+				ColorLine extend=pad [palette[2]@0(a=1), palette[3]@0.25(a=1), palette[2]@1(a=1)]
+	[6]: #0006: Composite (mode 13)
+	    source: VarTranslate dx=20 dy=-5 var-index-base=4
+		paint: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+		    paint: Glyph #0006
+			paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+			    ColorLine extend=pad [palette[4]@0(a=1), palette[5]@0.25(a=1), palette[4]@1(a=1)]
+	    backdrop: Composite (mode 13)
+		source: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+		    paint: Glyph #0006
+			paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+			    ColorLine extend=pad [palette[0]@0(a=1), palette[1]@0.25(a=1), palette[0]@1(a=1)]
+		backdrop: VarTranslate dx=-20 dy=-5 var-index-base=6
+		    paint: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+			paint: Glyph #0006
+			    paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+				ColorLine extend=pad [palette[2]@0(a=1), palette[3]@0.25(a=1), palette[2]@1(a=1)]
+	[7]: #0007: Composite (mode 13)
+	    source: VarTranslate dx=20 dy=-5 var-index-base=4
+		paint: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+		    paint: Glyph #0007
+			paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+			    ColorLine extend=pad [palette[4]@0(a=1), palette[5]@0.25(a=1), palette[4]@1(a=1)]
+	    backdrop: Composite (mode 13)
+		source: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+		    paint: Glyph #0007
+			paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+			    ColorLine extend=pad [palette[0]@0(a=1), palette[1]@0.25(a=1), palette[0]@1(a=1)]
+		backdrop: VarTranslate dx=-20 dy=-5 var-index-base=6
+		    paint: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+			paint: Glyph #0007
+			    paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+				ColorLine extend=pad [palette[2]@0(a=1), palette[3]@0.25(a=1), palette[2]@1(a=1)]
+    (skipping glyphs 0008 through 01d9)
+	[473]: #01d9: Composite (mode 13)
+	    source: VarTranslate dx=20 dy=-5 var-index-base=4
+		paint: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+		    paint: Glyph #01d9
+			paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+			    ColorLine extend=pad [palette[4]@0(a=1), palette[5]@0.25(a=1), palette[4]@1(a=1)]
+	    backdrop: Composite (mode 13)
+		source: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+		    paint: Glyph #01d9
+			paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+			    ColorLine extend=pad [palette[0]@0(a=1), palette[1]@0.25(a=1), palette[0]@1(a=1)]
+		backdrop: VarTranslate dx=-20 dy=-5 var-index-base=6
+		    paint: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+			paint: Glyph #01d9
+			    paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+				ColorLine extend=pad [palette[2]@0(a=1), palette[3]@0.25(a=1), palette[2]@1(a=1)]
+	[474]: #01da: Composite (mode 13)
+	    source: VarTranslate dx=20 dy=-5 var-index-base=4
+		paint: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+		    paint: Glyph #01da
+			paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+			    ColorLine extend=pad [palette[4]@0(a=1), palette[5]@0.25(a=1), palette[4]@1(a=1)]
+	    backdrop: Composite (mode 13)
+		source: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+		    paint: Glyph #01da
+			paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+			    ColorLine extend=pad [palette[0]@0(a=1), palette[1]@0.25(a=1), palette[0]@1(a=1)]
+		backdrop: VarTranslate dx=-20 dy=-5 var-index-base=6
+		    paint: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+			paint: Glyph #01da
+			    paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+				ColorLine extend=pad [palette[2]@0(a=1), palette[3]@0.25(a=1), palette[2]@1(a=1)]
+	[475]: #01db: Composite (mode 13)
+	    source: VarTranslate dx=20 dy=-5 var-index-base=4
+		paint: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+		    paint: Glyph #01db
+			paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+			    ColorLine extend=pad [palette[4]@0(a=1), palette[5]@0.25(a=1), palette[4]@1(a=1)]
+	    backdrop: Composite (mode 13)
+		source: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+		    paint: Glyph #01db
+			paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+			    ColorLine extend=pad [palette[0]@0(a=1), palette[1]@0.25(a=1), palette[0]@1(a=1)]
+		backdrop: VarTranslate dx=-20 dy=-5 var-index-base=6
+		    paint: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+			paint: Glyph #01db
+			    paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+				ColorLine extend=pad [palette[2]@0(a=1), palette[3]@0.25(a=1), palette[2]@1(a=1)]
+	[476]: #01dc: Composite (mode 13)
+	    source: VarTranslate dx=20 dy=-5 var-index-base=4
+		paint: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+		    paint: Glyph #01dc
+			paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+			    ColorLine extend=pad [palette[4]@0(a=1), palette[5]@0.25(a=1), palette[4]@1(a=1)]
+	    backdrop: Composite (mode 13)
+		source: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+		    paint: Glyph #01dc
+			paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+			    ColorLine extend=pad [palette[0]@0(a=1), palette[1]@0.25(a=1), palette[0]@1(a=1)]
+		backdrop: VarTranslate dx=-20 dy=-5 var-index-base=6
+		    paint: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+			paint: Glyph #01dc
+			    paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+				ColorLine extend=pad [palette[2]@0(a=1), palette[3]@0.25(a=1), palette[2]@1(a=1)]
+	[477]: #01dd: Composite (mode 13)
+	    source: VarTranslate dx=20 dy=-5 var-index-base=4
+		paint: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+		    paint: Glyph #01dd
+			paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+			    ColorLine extend=pad [palette[4]@0(a=1), palette[5]@0.25(a=1), palette[4]@1(a=1)]
+	    backdrop: Composite (mode 13)
+		source: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+		    paint: Glyph #01dd
+			paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+			    ColorLine extend=pad [palette[0]@0(a=1), palette[1]@0.25(a=1), palette[0]@1(a=1)]
+		backdrop: VarTranslate dx=-20 dy=-5 var-index-base=6
+		    paint: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+			paint: Glyph #01dd
+			    paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+				ColorLine extend=pad [palette[2]@0(a=1), palette[3]@0.25(a=1), palette[2]@1(a=1)]
+	[478]: #01de: Composite (mode 13)
+	    source: VarTranslate dx=20 dy=-5 var-index-base=4
+		paint: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+		    paint: Glyph #01de
+			paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+			    ColorLine extend=pad [palette[4]@0(a=1), palette[5]@0.25(a=1), palette[4]@1(a=1)]
+	    backdrop: Composite (mode 13)
+		source: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+		    paint: Glyph #01de
+			paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+			    ColorLine extend=pad [palette[0]@0(a=1), palette[1]@0.25(a=1), palette[0]@1(a=1)]
+		backdrop: VarTranslate dx=-20 dy=-5 var-index-base=6
+		    paint: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+			paint: Glyph #01de
+			    paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+				ColorLine extend=pad [palette[2]@0(a=1), palette[3]@0.25(a=1), palette[2]@1(a=1)]
+	[479]: #01df: Composite (mode 13)
+	    source: VarTranslate dx=20 dy=-5 var-index-base=4
+		paint: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+		    paint: Glyph #01df
+			paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+			    ColorLine extend=pad [palette[4]@0(a=1), palette[5]@0.25(a=1), palette[4]@1(a=1)]
+	    backdrop: Composite (mode 13)
+		source: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+		    paint: Glyph #01df
+			paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+			    ColorLine extend=pad [palette[0]@0(a=1), palette[1]@0.25(a=1), palette[0]@1(a=1)]
+		backdrop: VarTranslate dx=-20 dy=-5 var-index-base=6
+		    paint: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+			paint: Glyph #01df
+			    paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+				ColorLine extend=pad [palette[2]@0(a=1), palette[3]@0.25(a=1), palette[2]@1(a=1)]
+	[480]: #01e0: Composite (mode 13)
+	    source: VarTranslate dx=20 dy=-5 var-index-base=4
+		paint: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+		    paint: Glyph #01e0
+			paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+			    ColorLine extend=pad [palette[4]@0(a=1), palette[5]@0.25(a=1), palette[4]@1(a=1)]
+	    backdrop: Composite (mode 13)
+		source: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+		    paint: Glyph #01e0
+			paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+			    ColorLine extend=pad [palette[0]@0(a=1), palette[1]@0.25(a=1), palette[0]@1(a=1)]
+		backdrop: VarTranslate dx=-20 dy=-5 var-index-base=6
+		    paint: VarSkew x=0 y=0 center=(512,450) var-index-base=0
+			paint: Glyph #01e0
+			    paint: LinearGradient p0=(512,0) p1=(512,900) p2=(0,0)
+				ColorLine extend=pad [palette[2]@0(a=1), palette[3]@0.25(a=1), palette[2]@1(a=1)]
+    Variation-Index mapping:
+	    [0]: ItemVariationData[0][0]
+	    [1]: ItemVariationData[1][0]
+	    [2]: ItemVariationData[65535][65535]
+	    [3]: ItemVariationData[65535][65535]
+	    [4]: ItemVariationData[1][2]
+	    [5]: ItemVariationData[0][2]
+	    [6]: ItemVariationData[1][1]
+	    [7]: ItemVariationData[0][1]
+    ItemVariationStore:
+	VariationRegions: 4 regions (4 axes)
+	    [0]:
+		     start |0.000 0.000 0.000 -1.000
+		      peak |0.000 0.000 0.000 -1.000
+		       end |0.000 0.000 0.000 0.000
+	    [1]:
+		     start |0.000 0.000 0.000 0.000
+		      peak |0.000 0.000 0.000 1.000
+		       end |0.000 0.000 0.000 1.000
+	    [2]:
+		     start |0.000 0.000 -1.000 0.000
+		      peak |0.000 0.000 -1.000 0.000
+		       end |0.000 0.000 0.000 0.000
+	    [3]:
+		     start |0.000 0.000 0.000 0.000
+		      peak |0.000 0.000 1.000 0.000
+		       end |0.000 0.000 1.000 0.000
+    ItemVariationData[2]
+	    [0]: ItemVariationData:
+		2 region indices: [0, 1]
+		3 delta-sets (2 full [16-bit], 0 half [8-bit]): 
+		<display_delta_sets: incomplete>
+	    [1]: ItemVariationData:
+		2 region indices: [2, 3]
+		3 delta-sets (2 full [16-bit], 0 half [8-bit]): 
+		<display_delta_sets: incomplete>
 avar: version 1.0
 	[0]: [[-1→-1], [-0.84906→-0.85], [-0.50946→-0.5], ..(2 axis_value_maps).., [0.37→0.37335], [0.67→0.6667], [1→1]]
 	[1]: [[-1→-1], [0→0], [1→1]]
@@ -183,8 +487,6 @@ STAT: version 1.1 (elidedFallbackName: name[id=2])
 	[14]: Axis[3] (Flags: ELIDABLE_AXIS_VALUE_NAME): NameId(290) = 0
 	[15]: Axis[3]: NameId(297) = -100
 	[16]: Axis[3]: NameId(298) = -100
-COLR: [MISSING IMPL]
-CPAL: [MISSING IMPL]
 ====== END OF FONT FILE ======
 
 

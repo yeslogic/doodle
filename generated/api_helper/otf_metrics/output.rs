@@ -172,7 +172,7 @@ mod cpal {
         let Some(cpal) = cpal else {
             return TokenStream::empty();
         };
-        // TODO - implement display for cpal
+        // validate_cpal(cpal);
         let heading = toks(format!("CPAL: version {}", cpal.version));
         if conf.verbosity.is_at_least(cli::VerboseLevel::Detailed) {
             heading.glue(
@@ -186,7 +186,7 @@ mod cpal {
                         display_palettes(
                             &cpal.color_records_array,
                             &cpal.color_record_indices,
-                            cpal.num_color_records,
+                            cpal.num_palette_entries,
                             conf,
                         )
                         .indent_by(ITEM_INDENT),
@@ -198,6 +198,19 @@ mod cpal {
             )
         } else {
             heading
+        }
+    }
+
+    // REVIEW - this was temporarily useful for debugging but isn't strictly necessary anymore
+    fn validate_cpal(cpal: &CpalMetrics) {
+        let max_index = *cpal.color_record_indices.iter().max().unwrap() as usize;
+        let required_len = max_index + cpal.num_palette_entries as usize;
+        let actual_len = cpal.color_records_array.len();
+        if actual_len < required_len {
+            panic!(
+                "CPAL: max index {max_index} + num_palette_entries {num_palette_entries} > actual len {actual_len}",
+                num_palette_entries = cpal.num_palette_entries
+            );
         }
     }
 
@@ -278,13 +291,13 @@ mod cpal {
     fn display_palettes(
         color_records_array: &[ColorRecord],
         color_record_indices: &[u16],
-        num_color_records: u16,
+        num_palette_entries: u16,
         conf: &Config,
     ) -> TokenStream {
         display_items_elided(
             color_record_indices,
             |ix, &start| {
-                let range = (start as usize)..(start + num_color_records) as usize;
+                let range = (start as usize)..(start + num_palette_entries) as usize;
                 let palette = &color_records_array[range];
                 tok(format!("[{ix}]: ")).then(display_palette(palette, conf))
             },
@@ -332,11 +345,692 @@ mod colr {
 
         if conf.verbosity.is_at_least(cli::VerboseLevel::Detailed) {
             // STUB
-            log::warn!("COLR table is not yet implemented");
-            heading
+            heading.glue(
+                LineBreak,
+                TokenStream::join_with(
+                    vec![
+                        display_colr_version0(&colr.base_glyph_records, &colr.layer_records, conf),
+                        display_colr_extra(&colr.extra, &colr.paint_map, conf),
+                    ],
+                    LineBreak,
+                )
+                .indent_by(SECTION_INDENT),
+            )
         } else {
             heading
         }
+    }
+
+    fn display_colr_extra(
+        extra: &Option<ColrExtraV1>,
+        paint_map: &PaintMap,
+        conf: &Config,
+    ) -> TokenStream {
+        let Some(extra) = extra else {
+            return TokenStream::empty();
+        };
+        TokenStream::join_with(
+            vec![
+                display_base_glyph_list(&extra.base_glyph_list, paint_map, conf),
+                display_layer_list(&extra.layer_list, paint_map, conf),
+                display_clip_list(&extra.clip_list, conf),
+                super::hvar::display_opt_dsim("Variation-Index", &extra.var_index_map, conf),
+                extra
+                    .item_var_store
+                    .as_ref()
+                    .map_or(TokenStream::empty(), |ivs| {
+                        display_item_variation_store(ivs, conf)
+                    }),
+            ],
+            LineBreak,
+        )
+    }
+
+    /// Guard against unbounded recursion through the paint graph (COLRv1 fonts are attacker-controlled input).
+    const MAX_PAINT_DEPTH: usize = 64;
+
+    fn display_base_glyph_list(
+        base_glyph_list: &BaseGlyphList,
+        paint_map: &PaintMap,
+        conf: &Config,
+    ) -> TokenStream {
+        let records = &base_glyph_list.base_glyph_paint_records[..];
+        TokenStream::join_with(
+            vec![
+                toks(format!("Base Glyph Paint Records: {} total", records.len())),
+                display_items_elided(
+                    records,
+                    |ix, record| {
+                        tok(format!("[{ix}]: "))
+                            .then(display_base_glyph_paint_record(record, paint_map, conf))
+                    },
+                    conf.bookend_size,
+                    |start, stop| {
+                        toks(format!(
+                            "(skipping glyphs {start_glyph} through {stop_glyph})",
+                            start_glyph = records[start as usize].glyph_id,
+                            stop_glyph = records[stop as usize].glyph_id
+                        ))
+                        .indent_by(ELISION_DELTA)
+                    },
+                )
+                .indent_by(ITEM_INDENT),
+            ],
+            LineBreak,
+        )
+    }
+
+    fn display_base_glyph_paint_record(
+        record: &BaseGlyphPaintRecord,
+        paint_map: &PaintMap,
+        conf: &Config,
+    ) -> TokenStream {
+        tok(format!("#{}: ", record.glyph_id)).then(display_paint_ref(
+            record.paint_offset,
+            paint_map,
+            conf,
+            0,
+        ))
+    }
+
+    fn display_layer_list(
+        layer_list: &Option<LayerList>,
+        paint_map: &PaintMap,
+        conf: &Config,
+    ) -> TokenStream {
+        let Some(layer_list) = layer_list else {
+            return TokenStream::empty();
+        };
+        let paint_tables = &layer_list.paint_tables[..];
+        TokenStream::join_with(
+            vec![
+                toks(format!("Layer List: {} layers", layer_list.num_layers)),
+                display_items_elided(
+                    paint_tables,
+                    |ix, &offset| {
+                        tok(format!("[{ix}]: ")).then(display_paint_ref(offset, paint_map, conf, 0))
+                    },
+                    conf.bookend_size,
+                    |start, stop| {
+                        toks(format!("(skipping layers {start}..{stop})")).indent_by(ELISION_DELTA)
+                    },
+                )
+                .indent_by(ITEM_INDENT),
+            ],
+            LineBreak,
+        )
+    }
+
+    fn display_clip_list(clip_list: &Option<ClipList>, conf: &Config) -> TokenStream {
+        let Some(clip_list) = clip_list else {
+            return TokenStream::empty();
+        };
+        let clips = &clip_list.clips[..];
+        TokenStream::join_with(
+            vec![
+                toks(format!("Clip List: {} total", clip_list.num_clips)),
+                display_items_elided(
+                    clips,
+                    |ix, record| tok(format!("[{ix}]: ")).then(display_clip_record(record)),
+                    conf.bookend_size,
+                    |start, stop| {
+                        toks(format!("(skipping clips {start}..{stop})")).indent_by(ELISION_DELTA)
+                    },
+                )
+                .indent_by(ITEM_INDENT),
+            ],
+            LineBreak,
+        )
+    }
+
+    fn display_clip_record(record: &ClipRecord) -> TokenStream {
+        let start = record.start_glyph_id;
+        let end = record.end_glyph_id;
+        let lead = if start.inner == end.inner {
+            tok(format!("#{}: ", start))
+        } else {
+            tok(format!("[{}→{}]: ", start, end))
+        };
+        lead.then(display_clip_box(&record.clip_box))
+    }
+
+    fn display_clip_box(clip_box: &ClipBox) -> TokenStream {
+        let ClipBox {
+            format,
+            x_min,
+            y_min,
+            x_max,
+            y_max,
+            var_index_base,
+        } = *clip_box;
+        let bbox = format!("bbox=[{x_min},{y_min}]..[{x_max},{y_max}] (format {format})");
+        match var_index_base {
+            Some(vib) => toks(format!("{bbox}, var-index-base={vib}")),
+            None => toks(bbox),
+        }
+    }
+
+    /// Resolves `offset` against `paint_map` and renders the referenced Paint table (recursively).
+    fn display_paint_ref(
+        offset: usize,
+        paint_map: &PaintMap,
+        conf: &Config,
+        depth: usize,
+    ) -> TokenStream {
+        if depth >= MAX_PAINT_DEPTH {
+            return toks(format!("<paint graph too deep, truncated @ 0x{offset:x}>"));
+        }
+        match paint_map.get(&offset) {
+            Some(table) => display_paint_table(table, paint_map, conf, depth + 1),
+            None => {
+                log::warn!("paint-table offset {offset:#x} missing from paint_map");
+                toks(format!("<missing paint @ 0x{offset:x}>"))
+            }
+        }
+    }
+
+    fn labeled_paint_ref(
+        label: &str,
+        offset: usize,
+        paint_map: &PaintMap,
+        conf: &Config,
+        depth: usize,
+    ) -> TokenStream {
+        tok(format!("{label}: ")).then(display_paint_ref(offset, paint_map, conf, depth))
+    }
+
+    /// Combines a one-line heading with an indented block of labeled child nodes (if any).
+    fn paint_node(heading: TokenStream, children: Vec<TokenStream>) -> TokenStream {
+        if children.is_empty() {
+            heading
+        } else {
+            heading.glue(
+                LineBreak,
+                TokenStream::join_with(children, LineBreak).indent_by(ITEM_INDENT),
+            )
+        }
+    }
+
+    fn display_palette_index(idx: u16) -> String {
+        match idx {
+            0xFFFF => "text-foreground-color".to_string(),
+            n => format!("palette[{n}]"),
+        }
+    }
+
+    fn display_extend(extend: u8) -> &'static str {
+        match extend {
+            0 => "pad",
+            1 => "repeat",
+            2 => "reflect",
+            _ => "unknown",
+        }
+    }
+
+    fn display_color_stop(stop: &ColorStop) -> TokenStream {
+        toks(format!(
+            "{}@{}(a={})",
+            display_palette_index(stop.palette_index),
+            stop.stop_offset,
+            stop.alpha
+        ))
+    }
+
+    fn display_var_color_stop(stop: &VarColorStop) -> TokenStream {
+        toks(format!(
+            "{}@{}(a={}, var-index-base={})",
+            display_palette_index(stop.palette_index),
+            stop.stop_offset,
+            stop.alpha,
+            stop.var_index_base
+        ))
+    }
+
+    fn display_color_line(color_line: &ColorLine, conf: &Config) -> TokenStream {
+        tok(format!(
+            "ColorLine extend={} ",
+            display_extend(color_line.extend)
+        ))
+        .then(display_items_inline(
+            &color_line.color_stops,
+            display_color_stop,
+            conf.inline_bookend,
+            |n| toks(format!("..({n})..")),
+        ))
+    }
+
+    fn display_var_color_line(color_line: &VarColorLine, conf: &Config) -> TokenStream {
+        tok(format!(
+            "ColorLine extend={} ",
+            display_extend(color_line.extend)
+        ))
+        .then(display_items_inline(
+            &color_line.color_stops,
+            display_var_color_stop,
+            conf.inline_bookend,
+            |n| toks(format!("..({n})..")),
+        ))
+    }
+
+    fn display_affine2x3(t: &Affine2x3) -> String {
+        format!(
+            "xx={} yx={} xy={} yy={} dx={} dy={}",
+            t.xx, t.yx, t.xy, t.yy, t.dx, t.dy
+        )
+    }
+
+    fn display_var_affine2x3(t: &VarAffine2x3) -> String {
+        format!(
+            "xx={} yx={} xy={} yy={} dx={} dy={} var-index-base={}",
+            t.xx, t.yx, t.xy, t.yy, t.dx, t.dy, t.var_index_base
+        )
+    }
+
+    fn display_paint_table(
+        table: &PaintTable,
+        paint_map: &PaintMap,
+        conf: &Config,
+        depth: usize,
+    ) -> TokenStream {
+        match table {
+            PaintTable::PaintColrGlyph { glyph_id } => paint_node(
+                toks(format!("ColrGlyph {}", format_glyphid_hex(*glyph_id, true))),
+                vec![],
+            ),
+            PaintTable::PaintColrLayers {
+                num_layers,
+                first_layer_index,
+            } => paint_node(
+                toks(format!(
+                    "ColrLayers ({num_layers} layers from layer[{first_layer_index}])"
+                )),
+                vec![],
+            ),
+            PaintTable::PaintComposite {
+                source,
+                composite_mode,
+                backdrop,
+            } => paint_node(
+                toks(format!("Composite (mode {composite_mode})")),
+                vec![
+                    labeled_paint_ref("source", *source, paint_map, conf, depth),
+                    labeled_paint_ref("backdrop", *backdrop, paint_map, conf, depth),
+                ],
+            ),
+            PaintTable::PaintGlyph { paint, glyph_id } => paint_node(
+                toks(format!("Glyph {}", format_glyphid_hex(*glyph_id, true))),
+                vec![labeled_paint_ref("paint", *paint, paint_map, conf, depth)],
+            ),
+            PaintTable::PaintLinearGradient {
+                color_line,
+                x0,
+                y0,
+                x1,
+                y1,
+                x2,
+                y2,
+            } => paint_node(
+                toks(format!(
+                    "LinearGradient p0=({x0},{y0}) p1=({x1},{y1}) p2=({x2},{y2})"
+                )),
+                vec![display_color_line(color_line, conf)],
+            ),
+            PaintTable::PaintRadialGradient {
+                color_line,
+                x0,
+                y0,
+                radius0,
+                x1,
+                y1,
+                radius1,
+            } => paint_node(
+                toks(format!(
+                    "RadialGradient c0=({x0},{y0}) r0={radius0} c1=({x1},{y1}) r1={radius1}"
+                )),
+                vec![display_color_line(color_line, conf)],
+            ),
+            PaintTable::PaintRotate { paint, angle } => paint_node(
+                toks(format!("Rotate angle={angle}")),
+                vec![labeled_paint_ref("paint", *paint, paint_map, conf, depth)],
+            ),
+            PaintTable::PaintRotateAroundCenter {
+                paint,
+                angle,
+                center_x,
+                center_y,
+            } => paint_node(
+                toks(format!(
+                    "Rotate angle={angle} center=({center_x},{center_y})"
+                )),
+                vec![labeled_paint_ref("paint", *paint, paint_map, conf, depth)],
+            ),
+            PaintTable::PaintScale {
+                paint,
+                scale_x,
+                scale_y,
+            } => paint_node(
+                toks(format!("Scale x={scale_x} y={scale_y}")),
+                vec![labeled_paint_ref("paint", *paint, paint_map, conf, depth)],
+            ),
+            PaintTable::PaintScaleAroundCenter {
+                paint,
+                scale_x,
+                scale_y,
+                center_x,
+                center_y,
+            } => paint_node(
+                toks(format!(
+                    "Scale x={scale_x} y={scale_y} center=({center_x},{center_y})"
+                )),
+                vec![labeled_paint_ref("paint", *paint, paint_map, conf, depth)],
+            ),
+            PaintTable::PaintScaleUniform { paint, scale } => paint_node(
+                toks(format!("ScaleUniform scale={scale}")),
+                vec![labeled_paint_ref("paint", *paint, paint_map, conf, depth)],
+            ),
+            PaintTable::PaintScaleUniformAroundCenter {
+                paint,
+                scale,
+                center_x,
+                center_y,
+            } => paint_node(
+                toks(format!(
+                    "ScaleUniform scale={scale} center=({center_x},{center_y})"
+                )),
+                vec![labeled_paint_ref("paint", *paint, paint_map, conf, depth)],
+            ),
+            PaintTable::PaintSkew {
+                paint,
+                x_skew_angle,
+                y_skew_angle,
+            } => paint_node(
+                toks(format!("Skew x={x_skew_angle} y={y_skew_angle}")),
+                vec![labeled_paint_ref("paint", *paint, paint_map, conf, depth)],
+            ),
+            PaintTable::PaintSkewAroundCenter {
+                paint,
+                x_skew_angle,
+                y_skew_angle,
+                center_x,
+                center_y,
+            } => paint_node(
+                toks(format!(
+                    "Skew x={x_skew_angle} y={y_skew_angle} center=({center_x},{center_y})"
+                )),
+                vec![labeled_paint_ref("paint", *paint, paint_map, conf, depth)],
+            ),
+            PaintTable::PaintSolid {
+                palette_index,
+                alpha,
+            } => paint_node(
+                toks(format!(
+                    "Solid color={} alpha={alpha}",
+                    display_palette_index(*palette_index)
+                )),
+                vec![],
+            ),
+            PaintTable::PaintSweepGradient {
+                color_line,
+                center_x,
+                center_y,
+                start_angle,
+                end_angle,
+            } => paint_node(
+                toks(format!(
+                    "SweepGradient center=({center_x},{center_y}) angles=[{start_angle},{end_angle}]"
+                )),
+                vec![display_color_line(color_line, conf)],
+            ),
+            PaintTable::PaintTransform { paint, transform } => paint_node(
+                toks(format!("Transform {}", display_affine2x3(transform))),
+                vec![labeled_paint_ref("paint", *paint, paint_map, conf, depth)],
+            ),
+            PaintTable::PaintTranslate { paint, dx, dy } => paint_node(
+                toks(format!("Translate dx={dx} dy={dy}")),
+                vec![labeled_paint_ref("paint", *paint, paint_map, conf, depth)],
+            ),
+            PaintTable::PaintVarLinearGradient {
+                color_line,
+                x0,
+                y0,
+                x1,
+                y1,
+                x2,
+                y2,
+            } => paint_node(
+                toks(format!(
+                    "VarLinearGradient p0=({x0},{y0}) p1=({x1},{y1}) p2=({x2},{y2})"
+                )),
+                vec![display_var_color_line(color_line, conf)],
+            ),
+            PaintTable::PaintVarRadialGradient {
+                color_line,
+                x0,
+                y0,
+                radius0,
+                x1,
+                y1,
+                radius1,
+            } => paint_node(
+                toks(format!(
+                    "VarRadialGradient c0=({x0},{y0}) r0={radius0} c1=({x1},{y1}) r1={radius1}"
+                )),
+                vec![display_var_color_line(color_line, conf)],
+            ),
+            PaintTable::PaintVarRotate {
+                paint,
+                angle,
+                var_index_base,
+            } => paint_node(
+                toks(format!(
+                    "VarRotate angle={angle} var-index-base={var_index_base}"
+                )),
+                vec![labeled_paint_ref("paint", *paint, paint_map, conf, depth)],
+            ),
+            PaintTable::PaintVarRotateAroundCenter {
+                paint,
+                angle,
+                center_x,
+                center_y,
+                var_index_base,
+            } => paint_node(
+                toks(format!(
+                    "VarRotate angle={angle} center=({center_x},{center_y}) var-index-base={var_index_base}"
+                )),
+                vec![labeled_paint_ref("paint", *paint, paint_map, conf, depth)],
+            ),
+            PaintTable::PaintVarScale {
+                paint,
+                scale_x,
+                scale_y,
+                var_index_base,
+            } => paint_node(
+                toks(format!(
+                    "VarScale x={scale_x} y={scale_y} var-index-base={var_index_base}"
+                )),
+                vec![labeled_paint_ref("paint", *paint, paint_map, conf, depth)],
+            ),
+            PaintTable::PaintVarScaleAroundCenter {
+                paint,
+                scale_x,
+                scale_y,
+                center_x,
+                center_y,
+                var_index_base,
+            } => paint_node(
+                toks(format!(
+                    "VarScale x={scale_x} y={scale_y} center=({center_x},{center_y}) var-index-base={var_index_base}"
+                )),
+                vec![labeled_paint_ref("paint", *paint, paint_map, conf, depth)],
+            ),
+            PaintTable::PaintVarScaleUniform {
+                paint,
+                scale,
+                var_index_base,
+            } => paint_node(
+                toks(format!(
+                    "VarScaleUniform scale={scale} var-index-base={var_index_base}"
+                )),
+                vec![labeled_paint_ref("paint", *paint, paint_map, conf, depth)],
+            ),
+            PaintTable::PaintVarScaleUniformAroundCenter {
+                paint,
+                scale,
+                center_x,
+                center_y,
+                var_index_base,
+            } => paint_node(
+                toks(format!(
+                    "VarScaleUniform scale={scale} center=({center_x},{center_y}) var-index-base={var_index_base}"
+                )),
+                vec![labeled_paint_ref("paint", *paint, paint_map, conf, depth)],
+            ),
+            PaintTable::PaintVarSkew {
+                paint,
+                x_skew_angle,
+                y_skew_angle,
+                var_index_base,
+            } => paint_node(
+                toks(format!(
+                    "VarSkew x={x_skew_angle} y={y_skew_angle} var-index-base={var_index_base}"
+                )),
+                vec![labeled_paint_ref("paint", *paint, paint_map, conf, depth)],
+            ),
+            PaintTable::PaintVarSkewAroundCenter {
+                paint,
+                x_skew_angle,
+                y_skew_angle,
+                center_x,
+                center_y,
+                var_index_base,
+            } => paint_node(
+                toks(format!(
+                    "VarSkew x={x_skew_angle} y={y_skew_angle} center=({center_x},{center_y}) var-index-base={var_index_base}"
+                )),
+                vec![labeled_paint_ref("paint", *paint, paint_map, conf, depth)],
+            ),
+            PaintTable::PaintVarSolid {
+                palette_index,
+                alpha,
+                var_index_base,
+            } => paint_node(
+                toks(format!(
+                    "VarSolid color={} alpha={alpha} var-index-base={var_index_base}",
+                    display_palette_index(*palette_index)
+                )),
+                vec![],
+            ),
+            PaintTable::PaintVarSweepGradient {
+                color_line,
+                center_x,
+                center_y,
+                start_angle,
+                end_angle,
+            } => paint_node(
+                toks(format!(
+                    "VarSweepGradient center=({center_x},{center_y}) angles=[{start_angle},{end_angle}]"
+                )),
+                vec![display_var_color_line(color_line, conf)],
+            ),
+            PaintTable::PaintVarTransform { paint, transform } => paint_node(
+                toks(format!("VarTransform {}", display_var_affine2x3(transform))),
+                vec![labeled_paint_ref("paint", *paint, paint_map, conf, depth)],
+            ),
+            PaintTable::PaintVarTranslate {
+                paint,
+                dx,
+                dy,
+                var_index_base,
+            } => paint_node(
+                toks(format!(
+                    "VarTranslate dx={dx} dy={dy} var-index-base={var_index_base}"
+                )),
+                vec![labeled_paint_ref("paint", *paint, paint_map, conf, depth)],
+            ),
+        }
+    }
+
+    fn display_colr_version0(
+        base_glyph_records: &Option<Vec<BaseGlyphRecord>>,
+        layer_records: &Option<Vec<LayerRecord>>,
+        conf: &Config,
+    ) -> TokenStream {
+        let Some(base_glyph_records) = base_glyph_records else {
+            return TokenStream::empty();
+        };
+        let Some(layer_records) = layer_records else {
+            log::warn!("BaseGlyphList found without LayerList");
+            return TokenStream::empty();
+        };
+
+        toks(format!(
+            "Base Glyph Records: {} total",
+            base_glyph_records.len(),
+        ))
+        .glue(
+            LineBreak,
+            display_items_elided(
+                base_glyph_records,
+                |ix, record| {
+                    tok(format!("[{ix}]: ")).then(display_base_glyph_record(
+                        *record,
+                        layer_records,
+                        conf,
+                    ))
+                },
+                conf.bookend_size,
+                |start, stop| {
+                    toks(format!("(skipping records {} through {})", start, stop))
+                        .indent_by(ELISION_DELTA)
+                },
+            )
+            .indent_by(ITEM_INDENT),
+        )
+    }
+
+    fn display_base_glyph_record(
+        record: BaseGlyphRecord,
+        layers: &Vec<LayerRecord>,
+        conf: &Config,
+    ) -> TokenStream {
+        let BaseGlyphRecord {
+            glyph_id,
+            first_layer_index,
+            num_layers,
+        } = record;
+        toks(format!(
+            "{}: {} Layers",
+            format_glyphid_hex(glyph_id, true),
+            num_layers
+        ))
+        .glue(
+            LineBreak,
+            display_items_elided(
+                &layers[first_layer_index as usize..(first_layer_index + num_layers) as usize],
+                |ix, record| tok(format!("[{ix}]: ")).then(display_layer_record(record)),
+                conf.bookend_size,
+                |start, stop| {
+                    toks(format!(
+                        "(skipping base glyph records {} through {})",
+                        start, stop
+                    ))
+                    .indent_by(ELISION_DELTA)
+                },
+            )
+            .indent_by(ITEM_INDENT),
+        )
+    }
+
+    fn display_layer_record(record: &LayerRecord) -> TokenStream {
+        let LayerRecord {
+            glyph_id,
+            palette_index,
+        } = *record;
+        let palette = match palette_index {
+            0xFFFF => toks("text-foreground-color"),
+            n => toks(format!("palette {n}")),
+        };
+        tok(format_glyphid_hex(glyph_id, true)).then(tok(": ").then(palette))
     }
 }
 
@@ -1190,7 +1884,7 @@ mod hvar {
         }
     }
 
-    fn display_opt_dsim(
+    pub(crate) fn display_opt_dsim(
         label: &'static str,
         opt_dsim: &Option<DeltaSetIndexMap>,
         conf: &Config,

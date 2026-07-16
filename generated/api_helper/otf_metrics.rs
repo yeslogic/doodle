@@ -3639,6 +3639,7 @@ pub(crate) mod colr {
     #[derive(Debug, Clone)]
     pub struct BaseGlyphPaintRecord {
         pub(crate) glyph_id: WithSem<GlyphId, u16>,
+        /// Absolute (file-wide) offset of the referenced Paint table, suitable for lookup in `PaintMap`
         pub(crate) paint_offset: usize,
     }
 
@@ -3664,7 +3665,7 @@ pub(crate) mod colr {
             let mut base_glyph_paint_records =
                 Vec::with_capacity(orig.base_glyph_paint_records.len());
             for orig_record in &orig.base_glyph_paint_records {
-                let record = BaseGlyphPaintRecord::promote(orig_record);
+                let mut record = BaseGlyphPaintRecord::promote(orig_record);
                 let key = orig.list_scope.relative_to_absolute(record.paint_offset);
                 if !paint_map.contains_key(&key) {
                     let table = reify_dep(orig.list_scope, orig_record, Mandatory(obj::PaintTbl))
@@ -3672,6 +3673,7 @@ pub(crate) mod colr {
                     let tbl = PaintTable::lift(paint_map, &table);
                     paint_map.insert(key, Rc::new(tbl));
                 };
+                record.paint_offset = key;
                 base_glyph_paint_records.push(record);
             }
             BaseGlyphList {
@@ -3869,7 +3871,10 @@ pub(crate) mod colr {
         }
     }
 }
-pub(crate) use colr::ColrMetrics;
+pub(crate) use colr::{
+    BaseGlyphList, BaseGlyphPaintRecord, BaseGlyphRecord, ClipBox, ClipList, ClipRecord,
+    ColrExtraV1, ColrMetrics, LayerList, LayerRecord, PaintMap, paint_table::*,
+};
 
 pub mod otf_var_common {
     alias! {
