@@ -1,5 +1,3 @@
-use crate::api_helper::otf_metrics::refl::ReflType3;
-
 use super::util::{EnumLen, U16Set, Wec, trisect_unchecked};
 use super::*;
 use derive_builder::Builder;
@@ -1484,6 +1482,7 @@ use sem::{ClassId, GlyphId, SemDisplay, SemVec, WithSem};
 // !SECTION
 /// Crate-private micro-module for compile-time 'same-type' assertions that can be chained
 pub(crate) mod refl {
+    /// Helper-trait for same-type assertions
     pub(crate) trait Refl<T> {
         type Solution;
     }
@@ -1493,25 +1492,46 @@ pub(crate) mod refl {
     }
 
     /// A === B => A, type error otherwise
-    ///
-    /// If Refl is too heavy-handed we can drop the forced unification and use this to merely document
-    /// our expectations about what should be equal without rejecting parameters that are different.
-    ///
-    /// E.g. `ReflType<A, B> = A` (which the compiler might not like, perhaps?)
     pub(crate) type ReflType<A, B> = <A as Refl<B>>::Solution;
 
+    /// Variant of [`ReflType`] for 3-parameter equivalences
     pub(crate) type ReflType3<A, B, C> = ReflType<A, ReflType<B, C>>;
 
+    /// Variant of [`ReflType`] for 4-parameter equivalences
     pub(crate) type ReflType4<A, B, C, D> = ReflType<ReflType<A, B>, ReflType<C, D>>;
 
+    /// Variant of [`ReflType`] for 5-parameter equivalences
     pub(crate) type ReflType5<A, B, C, D, E> = ReflType<ReflType<A, B>, ReflType3<C, D, E>>;
 
+    /// Variant of [`ReflType`] for 6-parameter equivalences
     pub(crate) type ReflType6<A, B, C, D, E, F> = ReflType<ReflType3<A, B, C>, ReflType3<D, E, F>>;
 
+    /// Variant of [`ReflType`] for 7-parameter equivalences
     pub(crate) type ReflType7<A, B, C, D, E, F, G> =
         ReflType<ReflType3<A, B, C>, ReflType4<D, E, F, G>>;
 }
-use refl::ReflType;
+use refl::{ReflType, ReflType3};
+
+/// Crate-private micro-module for compile-time 'extends' assertions (`<A, B: From<A>>`)
+pub(crate) mod extends {
+    /// Helper-trait for from-relationship assertions
+    pub(crate) trait Becomes<A> {
+        type Solution;
+    }
+
+    impl<X, Y> Becomes<Y> for X
+    where
+        Y: From<X>,
+    {
+        type Solution = Y;
+    }
+
+    /// A, B: From<A> => B, type error otherwise
+    ///
+    /// Useful for lifting sub-errors into combined errors that have a `From`/`Into` relation defined
+    pub(crate) type Extends<X, Y> = <X as Becomes<Y>>::Solution;
+}
+use extends::Extends;
 
 // SECTION - Error-type aliases and markers
 /// Shorthand for qualifying a TryPromote::Error item
@@ -6000,8 +6020,14 @@ pub(crate) use glyf::{
     BoundingBox, CompositeGlyphMetric, GlyfMetrics, GlyphMetric, SimpleGlyphMetric,
 };
 
+// STUB - because loca is used to process Glyf and carries little-to-no informative data, LocaMetrics is left as unit
 type LocaMetrics = ();
 
+impl Promote<OpentypeLoca> for LocaMetrics {
+    fn promote(_orig: &OpentypeLoca) -> Self {
+        ()
+    }
+}
 pub(crate) mod otf_gasp {
     alias! {
         pub type OpentypeGaspBehavior = opentype_gasp_gasp_record_range_gasp_behavior;
@@ -7952,14 +7978,28 @@ pub(crate) mod layout {
     }
 
     #[derive(Debug)]
-    pub enum BadExtensionError {
-        InconsistentLookup(u16, u16),
+    pub enum LookupError {
+        BadValue(UnknownValueError<u16>),
+        BadExtensionType { expected: u16, actual: u16 },
     }
 
-    impl std::fmt::Display for BadExtensionError {
+    impl From<UnknownValueError<u16>> for LookupError {
+        fn from(err: UnknownValueError<u16>) -> Self {
+            LookupError::BadValue(err)
+        }
+    }
+
+    impl From<std::convert::Infallible> for LookupError {
+        fn from(_: std::convert::Infallible) -> Self {
+            unreachable!()
+        }
+    }
+
+    impl std::fmt::Display for LookupError {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             match self {
-                BadExtensionError::InconsistentLookup(expected, actual) => {
+                LookupError::BadValue(err) => err.fmt(f),
+                LookupError::BadExtensionType { expected, actual } => {
                     write!(
                         f,
                         "layout extension subtable has inconsistent extension_lookup_type (expecting {expected}, found {actual})"
@@ -7969,7 +8009,14 @@ pub(crate) mod layout {
         }
     }
 
-    impl std::error::Error for BadExtensionError {}
+    impl std::error::Error for LookupError {
+        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            match self {
+                LookupError::BadValue(err) => Some(err),
+                LookupError::BadExtensionType { .. } => None,
+            }
+        }
+    }
 
     #[derive(Clone, Debug)]
     pub enum LookupSubtable {
@@ -8026,7 +8073,7 @@ pub(crate) mod layout {
         }
 
         impl<'input> TryPromote<OpentypeGsubLookupSubtable<'input>> for LookupSubtable {
-            type Error = Local<std::convert::Infallible>; // this is only temporarily the case, as we are almost certainly going to have errors in at least on lookup subtable format
+            type Error = Local<std::convert::Infallible>; // this is only temporarily the case, as we are almost certainly going to have errors in at least one lookup subtable format
 
             fn try_promote(orig: &OpentypeGsubLookupSubtable) -> Result<Self, Self::Error> {
                 Ok(match orig {
@@ -9589,10 +9636,8 @@ pub(crate) mod layout {
     }
 
     impl<'input> TryPromote<OpentypeGposLookupTable<'input>> for LookupTable {
-        type Error = ReflType<
-            TPErr<OpentypeGposLookupSubtable<'input>, LookupSubtable>,
-            UnknownValueError<u16>,
-        >;
+        type Error =
+            Extends<TPErr<OpentypeGposLookupSubtable<'input>, LookupSubtable>, Local<LookupError>>;
 
         fn try_promote(orig: &OpentypeGposLookupTable) -> Result<Self, Self::Error> {
             let mut subtables = Vec::with_capacity(orig.subtables.len());
@@ -9610,12 +9655,11 @@ pub(crate) mod layout {
                                     extension_lookup_type.replace(ext.extension_lookup_type)
                                     && lookup_type != ext.extension_lookup_type
                                 {
-                                    let _err = BadExtensionError::InconsistentLookup(
-                                        lookup_type,
-                                        ext.extension_lookup_type,
-                                    );
-                                    // FIXME - we don't have an error type that makes this easy to fold into the returned error, so we panic for now
-                                    panic!("{_err}");
+                                    let _err = LookupError::BadExtensionType {
+                                        expected: lookup_type,
+                                        actual: ext.extension_lookup_type,
+                                    };
+                                    return Err(_err);
                                 }
                                 subtables.push(LookupSubtable::try_promote(&raw)?);
                             }
@@ -9646,10 +9690,8 @@ pub(crate) mod layout {
     }
 
     impl<'input> TryPromote<OpentypeGsubLookupTable<'input>> for LookupTable {
-        type Error = ReflType<
-            TPErr<OpentypeGsubLookupSubtable<'input>, LookupSubtable>,
-            std::convert::Infallible, // for compatibility with GPOS promotion, can't use BadExtensionError as the error types would collide
-        >;
+        type Error =
+            Extends<TPErr<OpentypeGsubLookupSubtable<'input>, LookupSubtable>, Local<LookupError>>;
 
         fn try_promote(orig: &OpentypeGsubLookupTable) -> Result<Self, Self::Error> {
             let mut subtables = Vec::with_capacity(orig.subtables.len());
@@ -9666,12 +9708,12 @@ pub(crate) mod layout {
                                     extension_lookup_type.replace(ext.extension_lookup_type)
                                     && lookup_type != ext.extension_lookup_type
                                 {
-                                    let _err = BadExtensionError::InconsistentLookup(
-                                        lookup_type,
-                                        ext.extension_lookup_type,
-                                    );
+                                    let _err = LookupError::BadExtensionType {
+                                        expected: lookup_type,
+                                        actual: ext.extension_lookup_type,
+                                    };
                                     // FIXME - we don't have an error type that makes this easy to fold into the returned error, so we panic for now
-                                    panic!("{_err}");
+                                    return Err(_err);
                                 }
                                 subtables.push(LookupSubtable::try_promote(&raw)?);
                             }
@@ -9718,8 +9760,7 @@ pub(crate) mod layout {
     }
 
     impl<'input> TryPromote<OpentypeGposLookupList<'input>> for LookupList {
-        type Error =
-            ReflType<TPErr<OpentypeGposLookupTable<'input>, LookupTable>, UnknownValueError<u16>>;
+        type Error = ReflType<TPErr<OpentypeGposLookupTable<'input>, LookupTable>, LookupError>;
 
         fn try_promote(orig: &OpentypeGposLookupList) -> Result<Self, Self::Error> {
             let mut accum = Vec::with_capacity(container::DynContainer::count(orig));
@@ -9731,7 +9772,7 @@ pub(crate) mod layout {
     }
 
     impl<'input> TryPromote<OpentypeGsubLookupList<'input>> for LookupList {
-        type Error = TPErr<OpentypeGsubLookupTable<'input>, LookupTable>;
+        type Error = ReflType<TPErr<OpentypeGsubLookupTable<'input>, LookupTable>, LookupError>;
 
         fn try_promote(orig: &OpentypeGsubLookupList) -> Result<Self, Self::Error> {
             let mut accum = Vec::with_capacity(container::DynContainer::count(orig));
@@ -9804,11 +9845,25 @@ pub(crate) mod layout {
         }
     }
 
-    impl<'input> TryPromote<OpentypeGpos<'input>> for Heap<LayoutMetrics> {
-        type Error =
-            ReflType<TPErr<OpentypeGposLookupList<'input>, LookupList>, UnknownValueError<u16>>;
-        fn try_promote(orig: &OpentypeGpos<'input>) -> Result<Self, Self::Error> {
+    /// Specialized alias for GPOS
+    pub type GposMetrics = Heap<LayoutMetrics>;
+
+    impl<'a> TryPromote<OpentypeGpos<'a>> for GposMetrics {
+        type Error = ReflType<TPErr<OpentypeGposLookupList<'a>, LookupList>, LookupError>;
+
+        fn try_promote(orig: &OpentypeGpos) -> Result<Self, Self::Error> {
             LayoutMetrics::promote_gpos(orig)
+        }
+    }
+
+    /// Specialized alias for GSUB
+    pub type GsubMetrics = Heap<LayoutMetrics>;
+
+    impl<'a> TryPromote<OpentypeGsub<'a>> for GsubMetrics {
+        type Error = ReflType<TPErr<OpentypeGsubLookupList<'a>, LookupList>, LookupError>;
+
+        fn try_promote(orig: &OpentypeGsub) -> Result<Self, Self::Error> {
+            LayoutMetrics::promote_gsub(orig)
         }
     }
 }
@@ -9822,6 +9877,18 @@ pub(crate) mod base {
         pub(crate) major_version: u16,
         pub(crate) minor_version: u16,
         // STUB - add more fields as desired
+        // horiz_axis
+        // vert_axis
+        // item_variation_store: Option<ItemVariationStore>,
+    }
+
+    impl<'a> Promote<OpentypeBase<'a>> for BaseMetrics {
+        fn promote(orig: &OpentypeBase<'a>) -> BaseMetrics {
+            BaseMetrics {
+                major_version: orig.major_version,
+                minor_version: orig.minor_version,
+            }
+        }
     }
 }
 pub(crate) use base::BaseMetrics;
@@ -9831,13 +9898,16 @@ pub(crate) mod otf_kern {
 
     alias! {
         pub type OpentypeKernPair = opentype_kern_subtable_format0_kern_pairs;
-        pub type OpentypeKernSubtable = opentype_kern_kern_subtable<'a>;
-        pub type OpentypeKernSubtableData = opentype_kern_kern_subtable_data<'a>;
         pub type OpentypeKernCoverage = opentype_kern_kern_subtable_coverage;
-        pub type OpentypeKernSubtableFormat0 = opentype_kern_subtable_format0;
-        pub type OpentypeKernSubtableFormat2 = opentype_kern_subtable_format2<'a>;
-        pub type OpentypeKerningArray = opentype_kern_kerning_array;
         pub type OpentypeKernClassTable = opentype_kern_class_table;
+
+        pub type OpentypeKernSubtable = opentype_kern_kern_subtable<'a>;
+            pub type OpentypeKernSubtableData = opentype_kern_kern_subtable_data<'a>;
+                pub type OpentypeKernSubtableFormat0 = opentype_kern_subtable_format0;
+                pub type OpentypeKernSubtableFormat2 = opentype_kern_subtable_format2<'a>;
+
+        pub type OpentypeKerningArray = opentype_kern_kerning_array;
+
     }
 
     frame!(OpentypeKernSubtableFormat2);
@@ -10509,11 +10579,16 @@ pub fn analyze_font(
 
 /// Helper for [`analyze_font`] when `extra_only` is set (via command-line invocation).
 ///
-/// Elides the standard output for all fully-supported feature-table types present in the font,
-/// and only returns the one-line-per-table output indicating which not-yet-supported tables are present
-/// in the font.
+/// Appends the tag for each 'extra' (i.e. not-yet-implemented) feature-table present in the font,
+/// to the mutably-borrowed vector `extra`.
 ///
-/// Used for frequency analysis to determine which unimplemented feature-tables are most common.
+/// This can be called multiple times over the same mutable accumulator when analyzing the tags present
+/// across the individual fonts in a TrueType Collection.
+///
+/// Tags are inserted in the same order in which they appear in the font's `tableRecords` array,
+/// which per specification must be sorted by ascending value (as a u32).
+///
+/// If the directory does not contain any 'extra' feature-tables, nothing is appended to `extra`.
 fn analyze_extra_tables(dir: &otf_types::OpentypeFontDirectory, extra: &mut Vec<u32>) {
     let tmp = dir
         .table_records
@@ -10563,57 +10638,34 @@ pub fn analyze_table_directory(
     let optional = {
         let cvt = promote_opt::<_, CvtMetrics>(&dir.table_links.cvt);
         let fpgm = promote_opt::<_, FpgmMetrics>(&dir.table_links.fpgm);
-        // FIXME - reimplement logic in Promote impl
-        let loca = dir.table_links.loca.as_ref().map(|_| ());
-        let glyf = promote_opt(&dir.table_links.glyf);
+        let loca = promote_opt::<_, LocaMetrics>(&dir.table_links.loca);
+        let glyf = promote_opt::<_, GlyfMetrics>(&dir.table_links.glyf);
         let prep = promote_opt::<_, PrepMetrics>(&dir.table_links.prep);
-        let gasp = promote_opt(&dir.table_links.gasp);
+        let gasp = promote_opt::<_, GaspMetrics>(&dir.table_links.gasp);
         // STUB - anything beteween gasp and BASE goes here
-        let base = {
-            let base = &dir.table_links.base;
-            // FIXME - reimplement logic in Promote impl
-            base.as_ref()
-                .map(|base| {
-                    TestResult::Ok(BaseMetrics {
-                        major_version: base.major_version,
-                        minor_version: base.minor_version,
-                    })
-                })
-                .transpose()?
-        };
+        let base = promote_opt::<_, BaseMetrics>(&dir.table_links.base);
         let gdef = try_promote_opt(&dir.table_links.gdef)?.map(Heap::new);
-        let gpos = {
-            let gpos = &dir.table_links.gpos;
-            gpos.as_ref().map(LayoutMetrics::promote_gpos).transpose()?
-        };
-        let gsub = {
-            let gsub = &dir.table_links.gsub;
-            gsub.as_ref().map(LayoutMetrics::promote_gsub).transpose()?
-        };
+        let gpos = try_promote_opt::<_, GposMetrics>(&dir.table_links.gpos)?;
+        let gsub = try_promote_opt::<_, GsubMetrics>(&dir.table_links.gsub)?;
         // STUB - anything between gsub and svg goes here
-        let svg = promote_opt(&dir.table_links.svg);
-        let cpal = promote_opt(&dir.table_links.cpal).map(Heap::new);
-        let colr = promote_opt(&dir.table_links.colr).map(Heap::new);
+        let svg = promote_opt::<_, SvgMetrics>(&dir.table_links.svg);
+        let cpal = promote_opt::<_, CpalMetrics>(&dir.table_links.cpal).map(Heap::new);
+        let colr = promote_opt::<_, ColrMetrics>(&dir.table_links.colr).map(Heap::new);
         // STUB - anything beteween svgk and avar goes here
-        let avar = promote_opt(&dir.table_links.avar).map(Heap::new);
-        let fvar = promote_opt(&dir.table_links.fvar).map(Heap::new);
-        let gvar = promote_opt(&dir.table_links.gvar).map(Heap::new);
-        let hvar = promote_opt(&dir.table_links.hvar).map(Heap::new);
-        let mvar = promote_opt(&dir.table_links.mvar).map(Heap::new);
+        let avar = promote_opt::<_, AvarMetrics>(&dir.table_links.avar).map(Heap::new);
+        let fvar = promote_opt::<_, FvarMetrics>(&dir.table_links.fvar).map(Heap::new);
+        let gvar = promote_opt::<_, GvarMetrics>(&dir.table_links.gvar).map(Heap::new);
+        let hvar = promote_opt::<_, HvarMetrics>(&dir.table_links.hvar).map(Heap::new);
+        let mvar = promote_opt::<_, MvarMetrics>(&dir.table_links.mvar).map(Heap::new);
         // STUB - anything between mvar and dsig goes here
-        let dsig = promote_opt(&dir.table_links.dsig);
-        let hdmx = try_promote_opt(&dir.table_links.hdmx)?;
+        let dsig = promote_opt::<_, DsigMetrics>(&dir.table_links.dsig);
+        let hdmx = try_promote_opt::<_, HdmxMetrics>(&dir.table_links.hdmx)?;
 
-        let kern = {
-            let kern = &dir.table_links.kern;
-            kern.as_ref().map(|kern| KernMetrics {
-                subtables: promote_vec(&kern.subtables),
-            })
-        };
-        let stat = promote_opt(&dir.table_links.stat).map(Heap::new);
-        let vdmx = promote_opt(&dir.table_links.vdmx);
-        let vhea = promote_opt(&dir.table_links.vhea);
-        let vmtx = promote_opt(&dir.table_links.vmtx);
+        let kern = promote_opt::<_, KernMetrics>(&dir.table_links.kern);
+        let stat = promote_opt::<_, StatMetrics>(&dir.table_links.stat).map(Heap::new);
+        let vdmx = promote_opt::<_, VdmxMetrics>(&dir.table_links.vdmx);
+        let vhea = promote_opt::<_, VheaMetrics>(&dir.table_links.vhea);
+        let vmtx = promote_opt::<_, VmtxMetrics>(&dir.table_links.vmtx);
         Heap::new(OptionalTableMetrics {
             cvt,
             fpgm,
