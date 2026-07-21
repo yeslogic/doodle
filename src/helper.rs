@@ -2,14 +2,14 @@ use std::collections::BTreeSet;
 
 use num_traits::{ToPrimitive, Unsigned, Zero};
 
+use crate::bounds::Bounds;
 use crate::byte_set::ByteSet;
 pub use crate::marker::BaseKind;
 use crate::validation::{Condition, Severity};
 use crate::{
-    Arith, BaseType, Expr, Format, IntRel, IntoLabel, Label, OwnedRecordFormat, Pattern,
-    RecordBuilder, StyleHint, TypeHint, UnaryOp, ValueType, ViewExpr, ViewFormat,
+    Arith, BaseType, Expr, FixedReadKind, Format, IntRel, IntoLabel, Label, OwnedRecordFormat,
+    Pattern, RecordBuilder, StyleHint, TypeHint, UnaryOp, ValueType, ViewExpr, ViewFormat,
 };
-use crate::{Endian, bounds::Bounds};
 
 use crate::numeric::core::Expr as NumExpr;
 use crate::numeric::helper as num;
@@ -1860,9 +1860,15 @@ pub fn capture_bytes_from_here(len: Expr) -> Format {
     from_here(capture_bytes(len))
 }
 
-/// Helper for [`ViewFormat::ReadArray`]
-pub fn read_array(len: Expr, kind: BaseKind<Endian>) -> ViewFormat {
-    ViewFormat::ReadArray(Box::new(len), kind)
+/// Helper for [`ViewFormat::ReadArray`].
+///
+/// `kind` accepts either a `BaseKind<Endian>` (for the primitive element-kinds that have always
+/// been supported) or a `FormatRef` (for `FixedReadKind::FixedFormat`, i.e. a struct-shaped
+/// element made up purely of fixed-size primitive fields). Eligibility of a `FormatRef` passed
+/// this way is validated later, at typecheck-time (see `typecheck::infer_var_view_format`),
+/// since this function has no `&FormatModule` access with which to validate it eagerly.
+pub fn read_array(len: Expr, kind: impl Into<FixedReadKind>) -> ViewFormat {
+    ViewFormat::ReadArray(Box::new(len), kind.into())
 }
 
 /// Helper for [`Format::Hint`]

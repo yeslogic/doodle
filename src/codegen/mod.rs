@@ -9,9 +9,10 @@ use std::{
 use trace::get_and_increment_seed;
 
 use crate::{
-    Arith, BaseKind, BaseType, CommonOp, DynFormat, Endian, Expr, Format, FormatModule, IntRel,
-    IntoLabel, Label, MatchTree, Pattern, StyleHint, UnaryOp, ViewExpr, ViewFormat,
+    Arith, BaseType, CommonOp, DynFormat, Expr, FixedReadKind, Format, FormatModule, FormatRef,
+    IntRel, IntoLabel, Label, MatchTree, Pattern, StyleHint, UnaryOp, ViewExpr, ViewFormat,
     byte_set::ByteSet,
+    codegen::typed_format::TypedFixedReadKind,
     decoder::extract_pair,
     numeric::elaborator::{TypedBinOp, TypedCast, TypedUnaryOp},
     parser::error::TraceHash,
@@ -19,6 +20,7 @@ use crate::{
     validation::{Severity, TypedCondition},
     valuetype::{SeqBorrowHint, ValueType},
 };
+use intmap::IntMap;
 
 use crate::numeric::{
     core::Expr as NumExpr,
@@ -113,6 +115,14 @@ pub struct CodeGen {
     /// nothing else in the type borrows anything - hence the need to predict this correctly rather
     /// than guess.
     recursion_lt_needed: StableMap<UVar, bool, util::FxHash>,
+    /// Maps the `defined_types` index of a generated struct to the `FormatRef` it was elaborated
+    /// from, for the subset of generated structs that were reached via a
+    /// `FixedReadKind::FixedFormat`-kinded `ReadArray`. Populated in `Elaborator::elaborate_kind`.
+    /// Consulted by `generate_code` to decide which types need a `ReadUnchecked` impl generated,
+    /// and to recover (via `record_fmt::analyze_fixed_shape`) the per-field primitive-read
+    /// sequence that `RustType`/`SourceContext` cannot reconstruct on their own (in particular,
+    /// per-field endianness).
+    fixed_format_defs: IntMap<usize, FormatRef>,
 }
 
 impl CodeGen {
@@ -120,12 +130,14 @@ impl CodeGen {
         let name_gen = NameGen::new();
         let defined_types = Vec::new();
         let metavariables = StableMap::<_, _, util::BTree>::new();
+        let fixed_format_defs = IntMap::new();
         CodeGen {
             name_gen,
             defined_types,
             metavariables,
             in_progress: StableMap::<_, _, util::FxHash>::default(),
             recursion_lt_needed: StableMap::<_, _, util::FxHash>::default(),
+            fixed_format_defs,
         }
     }
 
@@ -180,6 +192,16 @@ impl CodeGen {
             WHNFSolution::Base(_) | WHNFSolution::Int(_) => false,
             WHNFSolution::Var(v) => Self::var_needs_lifetime(tc, v, visiting),
         }
+    }
+
+    /// Updates `fixed_format_defs` to record that the generated struct at index `ix` (in `defined_types`)
+    /// originated from the format referenced by `format_ref`, for later lookup when generating a `ReadUnchecked` impl.
+    ///
+    /// May be called more than once for the same `(ix, format_ref)` pair (elaboration of a given
+    /// `FixedReadKind::FixedFormat` is memoized by level, but a level may be referenced from more
+    /// than one `ReadArray` site) -- such repeated calls are idempotent.
+    fn register_fixed_format_target(&mut self, ix: usize, format_ref: FormatRef) {
+        self.fixed_format_defs.insert(ix, format_ref);
     }
 
     fn lift_base<T>(bt: BaseType) -> T
@@ -433,10 +455,24 @@ impl CodeGen {
                 let inner = self.lift_whnf_solution(tc, sol, lt);
                 match hint {
                     SeqBorrowHint::ReadArray => {
-                        let Some(p) = inner.try_as_prim() else {
-                            unreachable!("unsound ReadArray over non-prim type `{inner:?}`")
-                        };
-                        RustType::ReadArray(lt.clone(), MarkerType::try_from(p).unwrap()).into()
+                        if let Some(p) = inner.try_as_prim()
+                            && let Ok(mt) = MarkerType::try_from(p)
+                        {
+                            RustType::ReadArray(lt.clone(), FixedSizeType::Marker(mt)).into()
+                        } else if let RustType::Atom(AtomType::TypeRef(
+                            local_type @ LocalType::LocalDef(..),
+                        )) = &inner
+                        {
+                            RustType::ReadArray(
+                                lt.clone(),
+                                FixedSizeType::Adhoc(local_type.clone()),
+                            )
+                            .into()
+                        } else {
+                            unreachable!(
+                                "unsound ReadArray over non-prim, non-adhoc type {inner:?}"
+                            )
+                        }
                     }
                     SeqBorrowHint::Constructed => CompType::Vec(Box::new(inner)).into(),
                     SeqBorrowHint::BufferView => CompType::Borrow(
@@ -843,7 +879,7 @@ impl CodeGen {
             TypedDecoder::ReadArray(_, view, len, kind) => CaseLogic::View(ViewLogic::ReadArray(
                 embed_view_expr(view),
                 embed_expr_nat(len),
-                *kind,
+                kind.clone(),
             )),
             TypedDecoder::ReifyView(_, view) => {
                 CaseLogic::View(ViewLogic::ReifyView(embed_view_expr(view)))
@@ -3019,7 +3055,7 @@ impl ToAst for SimpleLogic<GTExpr> {
 enum ViewLogic<ExprT> {
     LetView(Label, Box<CaseLogic<ExprT>>),
     CaptureBytes(RustExpr, RustExpr),
-    ReadArray(RustExpr, RustExpr, BaseKind<Endian>),
+    ReadArray(RustExpr, RustExpr, GTFixedReadKind),
     ReifyView(RustExpr),
 }
 
@@ -3041,9 +3077,26 @@ impl ToAst for ViewLogic<GTExpr> {
                 view.clone(),
                 len.clone().cast_as_usize(),
             )),
-            ViewLogic::ReadArray(view, len, kind) => GenBlock::simple_expr(
-                model::read_array_from_view(view.clone(), len.clone().cast_as_usize(), *kind),
-            ),
+            ViewLogic::ReadArray(view, len, kind) => match kind {
+                TypedFixedReadKind::Base(base_kind) => {
+                    GenBlock::simple_expr(model::read_array_from_view(
+                        view.clone(),
+                        len.clone().cast_as_usize(),
+                        *base_kind,
+                    ))
+                }
+                // NOTE - the emitted `view.as_read_array::<T>(len)` call (see
+                // `model::read_fixed_array_from_view`) only type-checks once `gt`'s RustType
+                // actually implements `ReadUnchecked`; that trait-impl is emitted separately
+                // (see `codegen/model/traits.rs`).
+                TypedFixedReadKind::FixedFormat(gt, _format_ref) => {
+                    GenBlock::simple_expr(model::read_fixed_array_from_view(
+                        view.clone(),
+                        len.clone().cast_as_usize(),
+                        gt.to_rust_type(),
+                    ))
+                }
+            },
             ViewLogic::ReifyView(view) => GenBlock::simple_expr(model::reify_view(view.clone())),
         }
     }
@@ -3974,6 +4027,11 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
         decoders: &sourcemap.decoder_skels,
     };
 
+    let fixed_format_info = model::traits::smallsorts::FixedFormatInfo {
+        module,
+        targets: &elaborator.codegen.fixed_format_defs,
+    };
+
     for (type_decl, (ix, path)) in type_decls.into_iter() {
         let name = elaborator
             .codegen
@@ -4035,6 +4093,24 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
                 },
             };
             tmp.push(trait_comment);
+            if let Some(format_ref) = elaborator.codegen.fixed_format_defs.get(*ix) {
+                items.push(RustItem::from_decl(
+                    model::traits::impl_standalone_read_unchecked(
+                        Box::new(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(
+                            *ix,
+                            name.clone(),
+                            type_decl
+                                .lt_param()
+                                .map(|lt| Box::new(UseParams::from_lt(lt.clone()))),
+                        )))),
+                        fixed_format_info,
+                    ),
+                ));
+                tmp.push(format!(
+                    "fixed-format: emits `ReadUnchecked` (format level {})",
+                    format_ref.get_level()
+                ));
+            }
             tmp
         };
         items.push(it.with_comment(comments));
@@ -4074,6 +4150,11 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
         "non_camel_case_types",
         "non_snake_case",
         "dead_code",
+        // `ReadUnchecked::read_unchecked` impls (see `model::traits::smallsorts`) call other
+        // `unsafe fn`s (e.g. `U16Be::read_unchecked`) without wrapping each call in its own
+        // `unsafe {}` block, relying on pre-2024-edition semantics where an `unsafe fn` body is
+        // itself an implicit unsafe block -- same as `smallsorts` (edition 2021) itself does.
+        "unsafe_op_in_unsafe_fn",
     ]
     .into_iter()
     {
@@ -4163,10 +4244,10 @@ where
             };
             FnSig::new(
                 args,
-                Some(RustType::result_of(
+                Some(Box::new(RustType::result_of(
                     self.ret_type.clone(),
                     RustType::imported("ParseError"),
-                )),
+                ))),
             )
         };
         let ctxt = ProdCtxt {
@@ -4306,11 +4387,65 @@ impl<'a> Elaborator<'a> {
             ViewFormat::ReadArray(len, kind) => {
                 self.increment_index();
                 let t_len = self.elaborate_expr(len);
-                TypedViewFormat::ReadArray(Box::new(t_len), *kind)
+                let t_kind = self.elaborate_kind(kind);
+                TypedViewFormat::ReadArray(Box::new(t_len), t_kind)
             }
             ViewFormat::ReifyView => {
                 self.increment_index();
                 TypedViewFormat::ReifyView
+            }
+        }
+    }
+
+    fn elaborate_kind(&mut self, kind: &FixedReadKind) -> GTFixedReadKind {
+        match kind {
+            FixedReadKind::Base(base_kind) => TypedFixedReadKind::Base(*base_kind),
+            FixedReadKind::FixedFormat(format_ref) => {
+                let level = format_ref.get_level();
+                // Mirrors `Format::ItemVar`'s handling of `t_inner` (below, in
+                // `elaborate_format`): the referenced format is only ever a zero-arg,
+                // zero-view top-level definition -- `record_fmt::analyze_fixed_shape` forbids
+                // anything but a flat record of primitive fields, which rules out formats that
+                // take parameters -- so unlike `ItemVar` there is no argument/view scope to
+                // elaborate here, only the level's own (memoized) body.
+                //
+                // NOTE - this reserves no `next_index`/uvar slot of its own (unlike
+                // `ItemVar`'s `newvar`), matching `typecheck::infer_var_view_format`'s
+                // `FixedFormat` arm, which likewise consumes none beyond what
+                // `infer_var_format_level` lazily assigns to `level`'s own body on first
+                // reference. Consistency between the two lazy, level-keyed caches
+                // (`TypeChecker::level_vars` there, `Elaborator::t_formats` here) is what keeps
+                // this index-alignment-free.
+                self.codegen
+                    .name_gen
+                    .ctxt
+                    .push_atom(NameAtom::Explicit(Label::from(
+                        self.module.get_name(level).to_string(),
+                    )));
+                let t_inner = if let Some(val) = self.t_formats.get(&level) {
+                    val.clone()
+                } else {
+                    let fmt = self.module.get_format(level);
+                    let tmp = self.elaborate_format(fmt, &TypedDynScope::Empty);
+                    let ret = Rc::new(tmp);
+                    self.t_formats.insert(level, ret.clone());
+                    ret
+                };
+                self.codegen.name_gen.ctxt.escape();
+                let gt = t_inner.get_type().unwrap_or_else(|| {
+                    unreachable!(
+                        "FixedFormat-referenced format `{}` has no type",
+                        self.module.get_name(level),
+                    )
+                });
+                // Record the (defined_types-index -> FormatRef) association so that later,
+                // trait-impl generation (`model::traits::smallsorts::ReadUnchecked`) can recover
+                // the exact per-field primitive-read sequence via `record_fmt::analyze_fixed_shape`,
+                // rather than trying (and failing) to reconstruct it from the RustType alone.
+                if let Some((ix, ..)) = gt.try_as_adhoc() {
+                    self.codegen.register_fixed_format_target(ix, *format_ref);
+                }
+                TypedFixedReadKind::FixedFormat(gt.into_owned(), *format_ref)
             }
         }
     }
@@ -5482,6 +5617,7 @@ type GTExpr = TypedExpr<GenType>;
 type GTPattern = TypedPattern<GenType>;
 
 type GTDynFormat = TypedDynFormat<GenType>;
+type GTFixedReadKind = TypedFixedReadKind<GenType>;
 
 #[derive(Clone, Debug, PartialEq)]
 enum TypedDynScope<'a> {
@@ -5736,6 +5872,7 @@ mod __impls {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::BaseKind;
     use crate::TypeHint;
     use crate::helper::{ANY_BYTE, compute, record, succ, var};
     use crate::numeric::MachineRep;
@@ -6118,6 +6255,73 @@ mod tests {
         let outer = module.define_format("test.outer", record([("inner", inner.call())]));
         let output = produce_string_gencode(&module, &outer.call());
         println!("{}", output);
+    }
+
+    #[test]
+    fn test_read_unchecked_generate_impl() {
+        use crate::helper::{base::u16be, record};
+        use intmap::IntMap;
+        use model::traits::smallsorts::{FixedFormatInfo, ReadUnchecked};
+
+        let mut module = FormatModule::new();
+        let point = module.define_format("point", record([("x", u16be()), ("y", u16be())]));
+
+        let mut targets = IntMap::new();
+        targets.insert(0usize, point);
+        let info = FixedFormatInfo {
+            module: &module,
+            targets: &targets,
+        };
+
+        let on_type = Box::new(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(
+            0,
+            Label::from("Point"),
+            None,
+        ))));
+
+        let impl_block = ReadUnchecked::generate_impl(on_type, info);
+        let output = impl_block.to_fragment().to_string();
+        println!("{output}");
+        assert!(
+            output.contains("impl ReadUnchecked for Point"),
+            "expected an `impl ReadUnchecked for Point` block:\n{output}"
+        );
+        assert!(
+            output.contains("unsafe fn read_unchecked"),
+            "expected `read_unchecked` to be declared `unsafe fn`:\n{output}"
+        );
+        assert!(
+            output.contains("U16Be::read_unchecked(ctxt)"),
+            "expected per-field reads via the `U16Be` marker type:\n{output}"
+        );
+        assert!(
+            output.contains("const SIZE: usize = 4"),
+            "expected SIZE to be the sum of per-field widths (2 + 2):\n{output}"
+        );
+    }
+
+    #[test]
+    fn test_fixed_format_read_array_codegen() {
+        use crate::helper::{base::u16be, from_here, read_array, record};
+
+        let mut module = FormatModule::new();
+        let point = module.define_format("point", record([("x", u16be()), ("y", u16be())]));
+        let f = from_here(read_array(Expr::U8(2), point));
+        module.define_format("test.points", f.clone());
+        let output = produce_string_gencode(&module, &f);
+        println!("{output}");
+        assert!(
+            output.contains("ReadArray<'input, point>"),
+            "expected a `ReadArray<'input, point>` type referencing the adhoc `point` struct:\n{output}"
+        );
+        assert!(
+            output.contains("impl ReadUnchecked for point"),
+            "expected an `impl ReadUnchecked for point` block to have been generated:\n{output}"
+        );
+        assert!(
+            output.contains("as_read_array::<point>"),
+            "expected the turbofish call-site to reference the adhoc `point` type:\n{output}"
+        );
     }
 
     #[test]

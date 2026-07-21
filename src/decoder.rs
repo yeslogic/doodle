@@ -7,7 +7,7 @@ use anyhow::{Result as AResult, anyhow};
 use crate::byte_set::ByteSet;
 use crate::error::{DecodeErrorKind, DecodeResult, EDecodeResult};
 use crate::read::ReadCtxt;
-use crate::try_with;
+use crate::record_fmt;
 use crate::util::WithErr;
 use crate::util::{ErrTrace as _, downgrade_error_with};
 use crate::validation::Condition;
@@ -15,6 +15,7 @@ use crate::{
     BaseKind, DynFormat, Endian, Expr, Format, FormatModule, Label, MatchTree, MaybeTyped, Next,
     Pattern, TypeHint, TypeScope, ValueType, ViewExpr, ViewFormat,
 };
+use crate::{FixedReadKind, try_with};
 
 pub mod seq_kind;
 use seq_kind::sub_range;
@@ -475,6 +476,38 @@ impl Expr {
 
 pub(crate) mod search;
 
+/// Compiled (interpreter-ready) form of [`FixedReadKind`], used by [`Decoder::ReadArray`].
+///
+/// Unlike `FixedReadKind::FixedFormat`, which only carries a `FormatRef`, this carries the
+/// flattened field-layout precomputed from it (see `record_fmt::analyze_fixed_shape`) -- a
+/// compiled `Decoder` tree is fully self-contained and is never given `&FormatModule` access
+/// again once built, so the layout has to be resolved once, at compile-time
+/// (`Compiler::compile_format`), rather than looked up per-parse.
+#[derive(Clone, Debug)]
+pub enum ReadArrayKind {
+    Base(BaseKind<Endian>),
+    /// A struct-shaped element made up purely of primitive fields. Persisted (named) fields
+    /// become entries of the resulting `Value::Record`; anonymous/ephemeral fields (`None`)
+    /// are still read -- and so still contribute to `stride` -- but are not persisted.
+    ///
+    /// NOTE - switching struct `ReadUnchecked`/codegen derivation from on-demand to blanket
+    /// (see codegen) requires no change here: this variant already carries the complete field
+    /// layout regardless of which structs end up with a generated Rust-side impl.
+    FixedFormat {
+        fields: Rc<[(Option<Label>, BaseKind<Endian>)]>,
+        stride: usize,
+    },
+}
+
+impl ReadArrayKind {
+    pub(crate) fn stride(&self) -> usize {
+        match self {
+            ReadArrayKind::Base(kind) => kind.size(),
+            ReadArrayKind::FixedFormat { stride, .. } => *stride,
+        }
+    }
+}
+
 /// Decoders with a fixed amount of lookahead
 #[derive(Clone, Debug)]
 pub enum Decoder {
@@ -519,7 +552,7 @@ pub enum Decoder {
     LiftedOption(Option<Box<Decoder>>),
     LetView(Label, Box<Decoder>),
     CaptureBytes(ViewExpr, Box<Expr>),
-    ReadArray(ViewExpr, Box<Expr>, BaseKind<Endian>),
+    ReadArray(ViewExpr, Box<Expr>, ReadArrayKind),
     ReifyView(ViewExpr),
     Phantom,
     #[cfg(feature = "format_enforce")]
@@ -898,8 +931,32 @@ impl<'a> Compiler<'a> {
                     // REVIEW - do we want to fuse WithView and ViewFormat, or keep them separate?
                     Ok(Decoder::CaptureBytes(v_expr.clone(), len.clone()))
                 }
-                ViewFormat::ReadArray(len, k) => {
-                    Ok(Decoder::ReadArray(v_expr.clone(), len.clone(), *k))
+                ViewFormat::ReadArray(len, FixedReadKind::Base(k)) => Ok(Decoder::ReadArray(
+                    v_expr.clone(),
+                    len.clone(),
+                    ReadArrayKind::Base(*k),
+                )),
+                ViewFormat::ReadArray(len, FixedReadKind::FixedFormat(format_ref)) => {
+                    let level = format_ref.get_level();
+                    let format = self.module.get_format(level);
+                    // Re-derives the same `FixedShape` already validated by
+                    // `typecheck::infer_var_view_format` -- cheap and pure over `&Format`, so
+                    // recomputing here (rather than threading it through the AST) keeps this
+                    // as the single source of truth for the field layout.
+                    let shape = record_fmt::analyze_fixed_shape(format).unwrap_or_else(|e| {
+                        panic!(
+                            "format `{}` is not eligible for FixedFormat ReadArray: {e}",
+                            self.module.get_name(level),
+                        )
+                    });
+                    Ok(Decoder::ReadArray(
+                        v_expr.clone(),
+                        len.clone(),
+                        ReadArrayKind::FixedFormat {
+                            fields: shape.fields.into(),
+                            stride: shape.stride,
+                        },
+                    ))
                 }
                 ViewFormat::ReifyView => Ok(Decoder::ReifyView(v_expr.clone())),
             },
@@ -1660,7 +1717,7 @@ impl Decoder {
                 let mut accum = Vec::with_capacity(len);
                 let mut buf = view_window;
                 for ix in 0..len {
-                    let (val, new_buf) = try_with!(read_base(buf, *kind) => ("ReadArray", format!("index: {ix}"), format!("kind: {kind:?}"), format!("view: {v_expr:?}")));
+                    let (val, new_buf) = try_with!(read_array_elem(buf, kind) => ("ReadArray", format!("index: {ix}"), format!("kind: {kind:?}"), format!("view: {v_expr:?}")));
                     accum.push(val);
                     buf = new_buf;
                 }
@@ -1719,6 +1776,36 @@ impl Decoder {
             }
         }
     }
+}
+
+fn read_array_elem<'a>(
+    buf: ReadCtxt<'a>,
+    kind: &ReadArrayKind,
+) -> Result<(Value, ReadCtxt<'a>), DecodeErrorKind> {
+    match kind {
+        ReadArrayKind::Base(kind) => read_base(buf, *kind),
+        ReadArrayKind::FixedFormat { fields, .. } => read_fixed_record(buf, fields),
+    }
+}
+
+/// Reads one element of a `FixedFormat`-kinded `ReadArray`: sequentially reads each field of
+/// `fields` (in order), and constructs a `Value::Record` out of the persisted (named) ones.
+/// Anonymous/ephemeral fields (`None`) are read -- consuming their share of bytes -- but
+/// discarded rather than included in the resulting record, matching `record_fmt::analyze_fixed_shape`.
+fn read_fixed_record<'a>(
+    buf: ReadCtxt<'a>,
+    fields: &[(Option<Label>, BaseKind<Endian>)],
+) -> Result<(Value, ReadCtxt<'a>), DecodeErrorKind> {
+    let mut buf = buf;
+    let mut captured = Vec::with_capacity(fields.len());
+    for (name, kind) in fields {
+        let (v, new_buf) = read_base(buf, *kind)?;
+        if let Some(name) = name {
+            captured.push((name.clone(), v));
+        }
+        buf = new_buf;
+    }
+    Ok((Value::Record(captured), buf))
 }
 
 fn read_base(
@@ -2815,5 +2902,52 @@ mod tests {
         ]);
 
         accepts(&d, data, &[], expected);
+    }
+
+    /// Exercises `FixedReadKind::FixedFormat`: a `ReadArray` whose element-type is a
+    /// defined format (`point`, a record of two `u16be` fields) rather than a bare `BaseKind`.
+    /// Covers eligibility validation (`record_fmt::analyze_fixed_shape`, run both by
+    /// `FormatModule::infer_format_type` and by `Compiler::compile_format`) and the interpreter's
+    /// inline flattened decode (`decoder::read_fixed_record`).
+    #[test]
+    fn read_array_fixed_format() {
+        let mut module = FormatModule::new();
+        let point = module.define_format("point", record([("x", u16be()), ("y", u16be())]));
+        let outer = from_here(read_array(Expr::U8(2), point));
+        let d = Compiler::new(&module)
+            .compile_format(&outer, Rc::new(Next::Empty))
+            .unwrap();
+
+        let mk_point = |x: u16, y: u16| {
+            Value::Record(vec![
+                (Label::Borrowed("x"), Value::U16(x)),
+                (Label::Borrowed("y"), Value::U16(y)),
+            ])
+        };
+        let expected = Value::Seq(SeqKind::Strict(vec![mk_point(1, 2), mk_point(3, 4)]));
+
+        // View-based reads (like `CaptureBytes`) read from a separate `View` established by
+        // `from_here`/`LetView`, and never advance the main `input` cursor -- so `tail` is the
+        // full, unconsumed original input, not the post-read remainder of the view.
+        let data: &[u8] = &[0x00, 0x01, 0x00, 0x02, 0x00, 0x03, 0x00, 0x04];
+        accepts(&d, data, data, expected);
+        // only 3 bytes available for the second point's 4-byte record -> should fail
+        rejects(&d, &[0x00, 0x01, 0x00, 0x02, 0x00, 0x03]);
+    }
+
+    /// An ineligible `FixedFormat` reference (a field with a data-dependent length) must be
+    /// rejected by `record_fmt::analyze_fixed_shape`, surfacing as a panic at compile-time
+    /// (mirroring the existing `Format::to_record_format`/`infer_format_type` panic-on-invariant-
+    /// violation convention) rather than silently producing an incorrect stride.
+    #[test]
+    #[should_panic(expected = "is not eligible for FixedFormat ReadArray")]
+    fn read_array_fixed_format_rejects_dependent_length() {
+        let mut module = FormatModule::new();
+        let variable = module.define_format(
+            "variable",
+            record([("len", u8()), ("data", repeat_count(var("len"), u8()))]),
+        );
+        let outer = from_here(read_array(Expr::U8(1), variable));
+        let _ = Compiler::new(&module).compile_format(&outer, Rc::new(Next::Empty));
     }
 }

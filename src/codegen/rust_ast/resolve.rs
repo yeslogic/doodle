@@ -71,6 +71,7 @@ impl Resolvable for TraitItem {
         match self {
             TraitItem::Method(f) => f.resolve(ctx),
             TraitItem::AssocType(..) => (),
+            TraitItem::Const(.., expr) => expr.resolve(ctx),
         }
     }
 }

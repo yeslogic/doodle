@@ -3,13 +3,14 @@ use std::{
     rc::Rc,
 };
 
-use crate::try_with;
+use crate::record_fmt;
 use crate::util::ErrTrace as _;
 use crate::valuetype::{SeqBorrowHint, augmented::AugValueType};
 use crate::{
     Arith, BaseType, DynFormat, Expr, Format, FormatModule, Label, Pattern, UnaryOp, ValueType,
     ViewExpr, ViewFormat,
 };
+use crate::{FixedReadKind, try_with};
 use crate::{
     base_set::PrimIntSet,
     numeric::{
@@ -1033,13 +1034,56 @@ impl TypeChecker {
                 let newvar = self.get_new_uvar();
                 let len_var = self.infer_var_expr(len, ctxt.scope)?;
                 self.unify_var_baseset(len_var, BaseSet::U(UintSet::ANY))?;
+                let elem_t = match kind {
+                    FixedReadKind::Base(kind) => Rc::new(UType::Base(BaseType::from(*kind))),
+                    FixedReadKind::FixedFormat(format_ref) => {
+                        let level = format_ref.get_level();
+                        let format = ctxt.module.get_format(level);
+                        // Validate that `format` is eligible to be read via a strided
+                        // `ReadArray` -- i.e. that it is fixed-size and composed entirely of
+                        // primitive base-kind fields. This is a precondition enforced on
+                        // construction (mirroring `Format::to_record_format`'s `.unwrap()`),
+                        // not a recoverable `TCError`, since it can only be violated by
+                        // constructing a `FixedReadKind::FixedFormat` around an ineligible
+                        // `FormatRef` directly (`helper::read_array` cannot check this itself,
+                        // as it has no `&FormatModule` access).
+                        record_fmt::analyze_fixed_shape(format).unwrap_or_else(|e| {
+                            panic!(
+                                "format `{}` is not eligible for FixedFormat ReadArray: {e}",
+                                ctxt.module.get_name(level),
+                            )
+                        });
+                        // The level-var already reflects the (regular, non-fixed-size-aware)
+                        // value-type of the referenced format, exactly as `Format::ItemVar`
+                        // computes it -- reuse it rather than re-deriving from `ValueType`.
+                        //
+                        // Unlike `Format::ItemVar`, this bypasses `infer_var_format_level`'s
+                        // self-reference guard entirely rather than threading a `UVar` through
+                        // its `placeholder` parameter: the `analyze_fixed_shape` call above
+                        // already proves `level`'s body is a flat record of primitive base-kind
+                        // fields with no `Format::ItemVar`/`Format::Phantom` anywhere inside it,
+                        // so it can never recurse into itself (or into anything else still being
+                        // inferred further up the call stack) and the guard has nothing to do.
+                        // Reserving a placeholder anyway would allocate an extra `UVar` with no
+                        // matching `next_index` increment on the `Elaborator` side -- its mirror-
+                        // image `elaborate_kind` FixedFormat arm reserves no index of its own,
+                        // only whatever `level`'s own body-walk costs -- desynchronizing the
+                        // lockstep invariant `infer_var_format_level`'s doc comment describes.
+                        let level_var = if let Some(v) = self.level_vars.get(&level) {
+                            *v
+                        } else {
+                            let ret = self.infer_var_format(format, ctxt)?;
+                            self.level_vars.insert(level, ret);
+                            ret
+                        };
+                        Rc::new(UType::Var(level_var))
+                    }
+                };
                 // REVIEW - should we have a special UType for captured View-window reads?
                 self.unify_var_utype(
                     newvar,
                     // REVIEW - how do we distinguish CaptureBytes (seq_view ~> &'a [u8]) from ReadArray (seq_view ~> ReadArray<'a, K>)?
-                    Rc::new(UType::seq_array(Rc::new(UType::Base(BaseType::from(
-                        *kind,
-                    ))))),
+                    Rc::new(UType::seq_array(elem_t)),
                 )?;
                 Ok(newvar)
             }

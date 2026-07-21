@@ -12,8 +12,8 @@ use log::info;
 use serde::Serialize;
 
 use crate::{
-    BaseKind, BaseType, ByteSet, DynFormat, Endian, Expr, Format, FormatModule, FormatRef,
-    IntoLabel, IxHeap, Label, Pattern, StyleHint, TypeScope, ValueKind, ValueType, ViewExpr,
+    BaseType, ByteSet, DynFormat, Expr, FixedReadKind, Format, FormatModule, FormatRef, IntoLabel,
+    IxHeap, Label, Pattern, StyleHint, TypeScope, ValueKind, ValueType, ViewExpr,
     typecheck::error::UnificationError,
     validation::Condition,
     valuetype::{Container, SignedIntType},
@@ -136,7 +136,7 @@ pub enum ViewFormatExt {
     /// Captures a byte-slice of a View, given an expression for the byte-length of the slice
     CaptureBytes(Box<Expr>),
     /// Captures a scoped ReadArray of the given unit, given an expression for element-count (*NOT* byte-length)
-    ReadArray(Box<Expr>, BaseKind<Endian>),
+    ReadArray(Box<Expr>, FixedReadKind),
     /// Constructs a View-object in the value layer
     ReifyView,
 }
@@ -1005,7 +1005,19 @@ impl FormatModuleExt {
                                     ));
                                 }
                             }
-                            let elt = ValueTypeExt::Base((*kind).into());
+                            let elt = match kind {
+                                FixedReadKind::Base(kind) => ValueTypeExt::Base((*kind).into()),
+                                // NOTE - eligibility (fixed-size, all-primitive-fields) of the
+                                // referenced format is not (re-)validated here: `FormatRef`s
+                                // embedded in a `FixedReadKind` are only ever produced by a
+                                // completed `FormatModuleExt::define_format*` call, and the
+                                // authoritative validation happens once, post-`.compile()`, in
+                                // `typecheck::infer_var_view_format` over the base `Format`
+                                // tree (see `record_fmt::analyze_fixed_shape`).
+                                FixedReadKind::FixedFormat(format_ref) => {
+                                    self.get_format_type(format_ref.get_level()).clone()
+                                }
+                            };
                             // TODO - consider if we need to add a valuetype for ReadArray in APM (?)
                             Ok(ValueTypeExt::Seq(Box::new(elt)))
                         }

@@ -1,14 +1,12 @@
 use crate::byte_set::ByteSet;
 use crate::validation::TypedCondition;
-use crate::{
-    BaseKind, Endian, Format, FormatModule, Label, MatchTree, MaybeTyped, Next, StyleHint,
-};
+use crate::{Format, FormatModule, Label, MatchTree, MaybeTyped, Next, StyleHint};
 use anyhow::{Result as AResult, anyhow};
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::codegen::typed_format::{GenType, TypedPattern, TypedViewExpr};
+use crate::codegen::typed_format::{GenType, TypedFixedReadKind, TypedPattern, TypedViewExpr};
 
 use super::rust_ast::NumType;
 use super::typed_format::TypedViewFormat;
@@ -251,7 +249,7 @@ pub(crate) enum TypedDecoder<TypeRep> {
         TypeRep,
         TypedViewExpr<TypeRep>,
         Box<TypedExpr<TypeRep>>,
-        BaseKind<Endian>,
+        TypedFixedReadKind<TypeRep>,
     ),
     ReifyView(TypeRep, TypedViewExpr<TypeRep>),
     Phantom,
@@ -754,7 +752,7 @@ impl<'a> GTCompiler<'a> {
                     gt.clone(),
                     view.clone(),
                     len.clone(),
-                    *kind,
+                    kind.clone(),
                 )),
                 TypedViewFormat::ReifyView => Ok(TypedDecoder::ReifyView(gt.clone(), view.clone())),
             },

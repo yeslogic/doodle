@@ -28,7 +28,7 @@ pub mod error;
 pub mod helper;
 pub mod loc_decoder;
 pub mod marker;
-pub use marker::{BaseKind, Endian};
+pub use marker::{BaseKind, Endian, FixedReadKind};
 pub mod numeric;
 pub mod output;
 pub mod parser;
@@ -774,7 +774,7 @@ pub enum ViewFormat {
     /// CaptureBytes(N): captures a slice of N bytes from the start of the View
     CaptureBytes(Box<Expr>),
     /// ReadArray(M, Kind): captures an array of M elements of the indicated Kind
-    ReadArray(Box<Expr>, BaseKind<Endian>),
+    ReadArray(Box<Expr>, FixedReadKind),
     /// ReifyView: produces a value-element that encapsulates the View-object
     ReifyView,
 }
@@ -873,7 +873,7 @@ pub(crate) use record_fmt::{OwnedRecordFormat, RecordBuilder};
 pub mod format;
 pub use format::Format;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize)]
 pub struct FormatRef(usize);
 
 impl FormatRef {
@@ -1456,9 +1456,26 @@ impl FormatModule {
                         }
                     }
                     // NOTE[epic=view-format] - in the current base-model design and implementation, ReadArray captures a `Seq<K>` where K is informed by `kind`
-                    Ok(ValueType::Seq(Box::new(ValueType::Base(BaseType::from(
-                        *kind,
-                    )))))
+                    let ty = match kind {
+                        FixedReadKind::Base(bk) => ValueType::Base(BaseType::from(*bk)),
+                        FixedReadKind::FixedFormat(format_ref) => {
+                            let level = format_ref.get_level();
+                            // As in `typecheck::infer_var_view_format`, a `FixedFormat`
+                            // reference is only valid if the referenced format is fixed-size
+                            // and composed entirely of primitive fields (see
+                            // `record_fmt::analyze_fixed_shape`); this is a precondition on
+                            // construction, not a recoverable error.
+                            record_fmt::analyze_fixed_shape(self.get_format(level))
+                                .unwrap_or_else(|e| {
+                                    panic!(
+                                        "format `{}` is not eligible for FixedFormat ReadArray: {e}",
+                                        self.get_name(level),
+                                    )
+                                });
+                            self.get_format_type(level).clone()
+                        }
+                    };
+                    Ok(ValueType::Seq(Box::new(ty)))
                 }
                 ViewFormat::ReifyView => {
                     view.check_type(scope)?;

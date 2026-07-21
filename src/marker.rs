@@ -1,3 +1,4 @@
+use crate::FormatRef;
 use crate::valuetype::BaseType;
 use serde::Serialize;
 
@@ -109,5 +110,28 @@ impl<X: Copy> From<BaseKind<X>> for BaseType {
             BaseKind::U32Ext(..) => BaseType::U32,
             BaseKind::U64Ext(..) => BaseType::U64,
         }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize)]
+pub enum FixedReadKind {
+    Base(BaseKind<Endian>),
+    /// Reads a value of the format named by the given [`FormatRef`], which must be provably
+    /// fixed-size and composed entirely of base-kind (`u8`/`u16be`/`u32be`/`u64be`, ...) fields
+    /// with no data-dependent control flow -- see `record_fmt::analyze_fixed_shape`, which is
+    /// used to validate this precondition (at typecheck-time) and to compute the field layout
+    /// (at Decoder-compile-time and codegen-elaboration-time).
+    FixedFormat(FormatRef),
+}
+
+impl From<BaseKind<Endian>> for FixedReadKind {
+    fn from(kind: BaseKind<Endian>) -> Self {
+        FixedReadKind::Base(kind)
+    }
+}
+
+impl From<FormatRef> for FixedReadKind {
+    fn from(format_ref: FormatRef) -> Self {
+        FixedReadKind::FixedFormat(format_ref)
     }
 }
