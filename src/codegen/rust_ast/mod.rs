@@ -13,7 +13,7 @@ use crate::codegen::model::{DEFAULT_LT, READ_ARRAY_IS_COPY, VIEW_OBJECT_IS_COPY}
 use crate::output::{Fragment, FragmentBuilder};
 
 use crate::precedence::{Precedence, cond_paren};
-use crate::{BaseKind, BaseType, IntoLabel, Label, ValueType};
+use crate::{BaseKind, BaseType, Endian, IntoLabel, Label, ValueType};
 
 /// Enum-type (currently degenerate) for specifying the visibility of a top-level item
 #[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
@@ -52,7 +52,9 @@ impl ToFragment for AllowAttr {
 }
 
 pub(crate) enum ModuleAttr {
+    /// Module-level `#![allow(...)]`
     Allow(AllowAttr),
+    /// Module-level `#![cfg_attr(rustfmt, rustfmt::skip)]`
     // REVIEW - this feels a bit like a hack since it is a hard-coded one-off
     RustFmtSkip,
 }
@@ -411,6 +413,8 @@ impl ToFragment for DeclDerives {
 #[derive(Clone, Debug)]
 pub enum TraitItem {
     AssocType(Label, Option<Box<DefParams>>, Box<RustType>),
+    /// A trait-associated const definition: `const <name>: <ty> = <expr>;`
+    Const(Label, Box<RustType>, RustExpr),
     Method(RustFn),
 }
 
@@ -422,6 +426,13 @@ impl ToFragment for TraitItem {
                 .cat(Fragment::opt(params.as_deref(), DefParams::to_fragment))
                 .cat(Fragment::string(" = "))
                 .cat(ty.to_fragment())
+                .cat(Fragment::Char(';')),
+            TraitItem::Const(name, ty, expr) => Fragment::string("const ")
+                .cat(name.to_fragment())
+                .cat(Fragment::string(": "))
+                .cat(ty.to_fragment())
+                .cat(Fragment::string(" = "))
+                .cat(expr.to_fragment_precedence(Precedence::Top))
                 .cat(Fragment::Char(';')),
             TraitItem::Method(method) => method.to_fragment(),
         }
@@ -573,11 +584,11 @@ pub(crate) struct FnSig {
     /// List of arguments with accompanying type annotations
     args: Vec<(Label, RustType)>,
     /// Return type (assumed to be unit if omitted)
-    ret: Option<RustType>,
+    ret: Option<Box<RustType>>,
 }
 
 impl FnSig {
-    pub fn new(args: Vec<(Label, RustType)>, ret: Option<RustType>) -> Self {
+    pub fn new(args: Vec<(Label, RustType)>, ret: Option<Box<RustType>>) -> Self {
         Self { args, ret }
     }
 }
@@ -594,7 +605,7 @@ impl ToFragment for FnSig {
     fn to_fragment(&self) -> Fragment {
         ToFragment::paren_list(self.args.iter()).intervene(
             Fragment::string(" -> "),
-            Fragment::opt(self.ret.as_ref(), RustType::to_fragment),
+            Fragment::opt(self.ret.as_deref(), RustType::to_fragment),
         )
     }
 }
@@ -610,6 +621,9 @@ pub(crate) struct RustFn {
     sig: FnSig,
     /// List of statements comprising the body of the function
     body: Vec<RustStmt>,
+    /// Whether this function is declared `unsafe fn` rather than `fn` (e.g. for implementing a
+    /// trait method with an `unsafe` signature, such as `ReadUnchecked::read_unchecked`).
+    is_unsafe: bool,
 }
 
 impl RustFn {
@@ -624,17 +638,38 @@ impl RustFn {
             params,
             sig,
             body,
+            is_unsafe: false,
+        }
+    }
+
+    pub(crate) fn new_unsafe<L: IntoLabel>(
+        name: L,
+        params: Option<DefParams>,
+        sig: FnSig,
+        body: Vec<RustStmt>,
+    ) -> RustFn {
+        Self {
+            name: name.into(),
+            params,
+            sig,
+            body,
+            is_unsafe: true,
         }
     }
 }
 
 impl ToFragment for RustFn {
     fn to_fragment(&self) -> Fragment {
+        let keyword = if self.is_unsafe {
+            Fragment::string("unsafe fn ")
+        } else {
+            Fragment::string("fn ")
+        };
         let f_name = Fragment::string(self.name.clone());
         let f_params = Fragment::opt(self.params.as_ref(), RustParams::to_fragment);
         let f_sig = self.sig.to_fragment();
         let body = RustStmt::block(self.body.iter());
-        Fragment::string("fn ")
+        keyword
             .cat(f_name)
             .cat(f_params)
             .cat(f_sig)
@@ -691,6 +726,25 @@ impl RustTypeDef {
     }
 }
 
+/// Set of types that are eligible for `ReadArray<'a, _>`.
+///
+/// Includes native [`MarkerType`]s as well as machine-generated adhoc types that
+/// are the result of successful compilation of `ViewFormat::ReadArray(_len, FixedReadKind::FixedFormat(_t))`
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum FixedSizeType {
+    Marker(MarkerType),
+    Adhoc(LocalType),
+}
+
+impl ToFragment for FixedSizeType {
+    fn to_fragment(&self) -> Fragment {
+        match self {
+            FixedSizeType::Marker(mt) => mt.to_fragment(),
+            FixedSizeType::Adhoc(lt) => lt.to_fragment(),
+        }
+    }
+}
+
 /// Entry-type for representing type-level constructions in Rust, for use in function signatures and return types,
 /// the field-types of struct definitions, and expression-level type annotations.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -699,7 +753,7 @@ pub(crate) enum RustType {
     AnonTuple(Vec<RustType>),
     /// Catch-all for generics that we may not be able or willing to hardcode
     Verbatim(Label, Option<Box<UseParams>>),
-    ReadArray(RustLt, MarkerType),
+    ReadArray(RustLt, FixedSizeType),
     ViewObject(RustLt),
 }
 
@@ -724,6 +778,13 @@ impl RustType {
             name.into(),
             params,
         )))
+    }
+
+    pub fn as_local_type(&self) -> Option<&LocalType> {
+        match self {
+            RustType::Atom(AtomType::TypeRef(lt)) => Some(lt),
+            _ => None,
+        }
     }
 
     pub fn as_decl_index(&self) -> Option<usize> {
@@ -810,6 +871,7 @@ impl RustType {
         )))
     }
 
+    /// Returns `Some(PrimType)` if `self` is a primitive type, and `None` otherwise.
     pub fn try_as_prim(&self) -> Option<PrimType> {
         match self {
             RustType::Atom(AtomType::Prim(pt)) => Some(*pt),
@@ -960,7 +1022,7 @@ impl ToFragment for RustType {
             RustType::ReadArray(lt, mt) => {
                 let params = RustParams {
                     lt_params: vec![lt.clone()],
-                    ty_params: vec![*mt],
+                    ty_params: vec![mt.clone()],
                 };
                 Fragment::string("ReadArray").cat(params.to_fragment())
             }
@@ -1213,6 +1275,35 @@ impl MarkerType {
             MarkerType::U64Be => size_of::<u64>(),
         }
     }
+
+    /// The bare identifier of the `smallsorts::binary::*` marker-type this variant represents.
+    pub(crate) const fn name(self) -> &'static str {
+        match self {
+            MarkerType::U8 => "U8",
+            MarkerType::U16Be => "U16Be",
+            MarkerType::U32Be => "U32Be",
+            MarkerType::U64Be => "U64Be",
+        }
+    }
+
+    /// Converts an endian-qualified [`BaseKind`] into the corresponding marker-type.
+    ///
+    /// Panics on a little-endian `kind`, as the runtime does not yet support little-endian
+    /// primitive reads (mirroring the `unimplemented!` arms in `model::read_array_from_view`
+    /// and `decoder::read_base` for the same case).
+    pub(crate) fn from_base_kind_endian(kind: BaseKind<Endian>) -> Self {
+        match kind {
+            BaseKind::U8 => MarkerType::U8,
+            BaseKind::U16Ext(Endian::Be) => MarkerType::U16Be,
+            BaseKind::U32Ext(Endian::Be) => MarkerType::U32Be,
+            BaseKind::U64Ext(Endian::Be) => MarkerType::U64Be,
+            BaseKind::U16Ext(Endian::Le)
+            | BaseKind::U32Ext(Endian::Le)
+            | BaseKind::U64Ext(Endian::Le) => {
+                unimplemented!("little-endian read-array parses not yet implemented")
+            }
+        }
+    }
 }
 
 impl From<BaseKind> for MarkerType {
@@ -1228,12 +1319,15 @@ impl From<BaseKind> for MarkerType {
 
 impl ToFragment for MarkerType {
     fn to_fragment(&self) -> Fragment {
-        match self {
-            MarkerType::U8 => Fragment::string("U8"),
-            MarkerType::U16Be => Fragment::string("U16Be"),
-            MarkerType::U32Be => Fragment::string("U32Be"),
-            MarkerType::U64Be => Fragment::string("U64Be"),
-        }
+        Fragment::string(self.name())
+    }
+}
+
+/// Names the imported `smallsorts::binary::*` marker-type corresponding to `self`, for use as
+/// e.g. an explicit turbofish type-argument (`view.as_read_array::<U16Be>(len)`).
+impl From<MarkerType> for RustType {
+    fn from(mt: MarkerType) -> Self {
+        RustType::imported(mt.name())
     }
 }
 
@@ -1404,7 +1498,14 @@ impl From<ExtIntType> for AtomType {
 }
 
 /// Given a lifetime identifier (including leading tick), constructs a `RustLt` using that identifier.
-pub(crate) fn lt(ident: impl IntoLabel) -> RustLt {
+///
+/// # Example
+///
+/// ```ignore
+/// let x = lt("'_");
+/// assert_eq!(lt, RustLt::WILD);
+/// ```
+pub fn lt(ident: impl IntoLabel) -> RustLt {
     RustLt::Parametric(ident.into())
 }
 
@@ -1416,6 +1517,7 @@ pub enum RustLt {
 }
 
 impl RustLt {
+    #[allow(dead_code)]
     pub const WILD: Self = RustLt::Parametric(Label::Borrowed("'_"));
 }
 
@@ -1742,9 +1844,17 @@ impl ToFragment for RustPrimLit {
     }
 }
 
+/// Specification of a method to be called on a receiver object.
+///
+/// When using [`MethodSpecifier::Arbitrary`], [`SubIdent::ByName`] should be used, and [`SubIdent::ByPosition`] is not typically valid.
+///
+/// If a [`CommonMethod`] is defined for the method in question, or ought be defined, then [`MethodSpecifier::Common`] should be used over
+/// [`MethodSpecifier::Arbitrary`].
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum MethodSpecifier {
+    /// Any method name
     Arbitrary(SubIdent),
+    /// A specific common method hardcoded into the model
     Common(CommonMethod),
 }
 
@@ -1928,7 +2038,10 @@ pub(crate) enum RustExpr {
     PrimitiveLit(RustPrimLit),
     ArrayLit(Vec<RustExpr>),
     /// When calling a method on a receiver, MethodCall is preferred over FieldAccess + FunctionCall
-    MethodCall(Box<RustExpr>, MethodSpecifier, Vec<RustExpr>),
+    /// `MethodCall(receiver, method, generics, args) -> <receiver>.<method>::<generics>(<args>)`
+    ///
+    /// `generics` is typically empty, in which case no turbofish (`::<...>`) is printed at all.
+    MethodCall(Box<RustExpr>, MethodSpecifier, UseParams, Vec<RustExpr>),
     FieldAccess(Box<RustExpr>, SubIdent),
     /// Used for function-calls and tuple-struct constructor expressions
     FunctionCall(Box<RustExpr>, Vec<RustExpr>),
@@ -2259,7 +2372,7 @@ impl RustExpr {
             Self::Owned(OwnedRustExpr { expr, .. }) => expr,
             other => Box::new(other),
         };
-        RustExpr::MethodCall(this, MethodSpecifier::LEN, Vec::new())
+        RustExpr::MethodCall(this, MethodSpecifier::LEN, UseParams::new(), Vec::new())
     }
 
     pub fn vec_is_empty(self) -> Self {
@@ -2267,7 +2380,12 @@ impl RustExpr {
             Self::Owned(OwnedRustExpr { expr, .. }) => expr,
             other => Box::new(other),
         };
-        RustExpr::MethodCall(this, MethodSpecifier::IS_EMPTY, Vec::new())
+        RustExpr::MethodCall(
+            this,
+            MethodSpecifier::IS_EMPTY,
+            UseParams::new(),
+            Vec::new(),
+        )
     }
 
     /// Invokes `<self>.<name>` as a callable method, passing in an empty list of arguments.
@@ -2285,6 +2403,30 @@ impl RustExpr {
         RustExpr::MethodCall(
             Box::new(self),
             SubIdent::ByName(name.into()).into(),
+            UseParams::new(),
+            args.into_iter().collect(),
+        )
+    }
+
+    /// Invokes `<self>.<name>::<ty_args>` as a callable method (i.e. using turbofish syntax to specify
+    /// explicit generic type-arguments), passing in the argument list produced by iterating over `args`.
+    // NOTE - not yet called outside of tests; expected to be picked up by the FixedFormat ReadArray
+
+    // codegen path (see the TODO on `TypedFixedReadKind::FixedFormat` in codegen/mod.rs)
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub fn call_method_turbofish(
+        self,
+        name: impl Into<Label>,
+        ty_args: impl IntoIterator<Item = RustType>,
+        args: impl IntoIterator<Item = Self>,
+    ) -> Self {
+        RustExpr::MethodCall(
+            Box::new(self),
+            SubIdent::ByName(name.into()).into(),
+            UseParams {
+                lt_params: Vec::new(),
+                ty_params: ty_args.into_iter().collect(),
+            },
             args.into_iter().collect(),
         )
     }
@@ -2344,7 +2486,7 @@ impl RustExpr {
             RustExpr::Macro(RustMacro::Vec(..)) => None,
             RustExpr::Macro(RustMacro::Log(..)) => Some(PrimType::Unit),
             RustExpr::ArrayLit(..) => None,
-            RustExpr::MethodCall(_recv, _method, _args) => {
+            RustExpr::MethodCall(_recv, _method, _generics, _args) => {
                 match _method {
                     MethodSpecifier::Common(cm) => {
                         // REVIEW - the current only CommonMethod, Len, is not well-defined over non-empty argument lists, but we don't check this
@@ -2518,7 +2660,7 @@ impl RustExpr {
             RustExpr::OwnedOption(expr, ..) | RustExpr::Owned(OwnedRustExpr { expr, .. }) => {
                 expr.is_pure()
             }
-            RustExpr::MethodCall(x, MethodSpecifier::LEN, args) => {
+            RustExpr::MethodCall(x, MethodSpecifier::LEN, _, args) => {
                 if args.is_empty() {
                     x.is_pure()
                 } else {
@@ -2659,7 +2801,7 @@ impl RustExpr {
             | RustExpr::Borrow(expr) => expr.is_complex(),
 
             // 1 + N cases
-            RustExpr::MethodCall(head, _meth, args) => {
+            RustExpr::MethodCall(head, _meth, _generics, args) => {
                 head.is_complex() || args.iter().any(RustExpr::is_complex)
             }
             RustExpr::FunctionCall(fun, args) => {
@@ -2886,9 +3028,14 @@ impl ToFragmentExt for RustExpr {
                 Some(Fragment::string(", ")),
             )
             .delimit(Fragment::Char('['), Fragment::Char(']')),
-            RustExpr::MethodCall(x, name, args) => cond_paren(
+            RustExpr::MethodCall(x, name, generics, args) => cond_paren(
                 x.to_fragment_precedence(Precedence::Projection)
                     .intervene(Fragment::Char('.'), name.to_fragment())
+                    .cat(if generics.is_empty() {
+                        Fragment::Empty
+                    } else {
+                        Fragment::string("::").cat(generics.to_fragment())
+                    })
                     .cat(ToFragmentExt::paren_list_prec(args, Precedence::Top)),
                 prec,
                 Precedence::Projection,
@@ -4290,7 +4437,7 @@ pub mod short_circuit {
                 RustExpr::Entity(..) => false,
                 RustExpr::PrimitiveLit(..) => false,
                 RustExpr::ConstNum(..) => false,
-                RustExpr::MethodCall(recv, _, args) => {
+                RustExpr::MethodCall(recv, _, _, args) => {
                     recv.is_short_circuiting() || args.is_short_circuiting()
                 }
                 RustExpr::FieldAccess(expr, ..) => expr.is_short_circuiting(),
@@ -4373,7 +4520,7 @@ pub mod short_circuit {
                 RustExpr::Entity(..) | RustExpr::PrimitiveLit(..) => EvalPurity::Pure,
                 RustExpr::ConstNum(..) => EvalPurity::Pure,
                 RustExpr::Closure(..) => EvalPurity::Pure,
-                RustExpr::MethodCall(recv, _, args) => {
+                RustExpr::MethodCall(recv, _, _, args) => {
                     recv.check_eval_purity() | args.check_eval_purity()
                 }
                 RustExpr::FieldAccess(expr, ..) => expr.check_eval_purity(),

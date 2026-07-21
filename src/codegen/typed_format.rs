@@ -12,7 +12,7 @@ use crate::codegen::rust_ast::{RustLt, RustParams, UseParams};
 use crate::numeric::core::Bounds as NumBounds;
 use crate::numeric::elaborator::TypedExpr as TypedNumExpr;
 use crate::validation::TypedCondition;
-use crate::{Arith, BaseKind, Endian, IntRel, Label, StyleHint, TypeHint, UnaryOp};
+use crate::{Arith, BaseKind, Endian, FormatRef, IntRel, Label, StyleHint, TypeHint, UnaryOp};
 
 pub(crate) mod variables;
 
@@ -579,9 +579,28 @@ impl<TypeRep> std::hash::Hash for TypedDynFormat<TypeRep> {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TypedFixedReadKind<TypeRep> {
+    Base(BaseKind<Endian>),
+    /// `TypeRep` is the resolved Rust type of the referenced format -- the same `GenType` its
+    /// own top-level `TypedFormat` node carries (see `Elaborator::elaborate_kind`) -- and
+    /// `FormatRef` identifies which defined format it came from.
+    FixedFormat(TypeRep, FormatRef),
+}
+
+impl<TypeRep> std::hash::Hash for TypedFixedReadKind<TypeRep> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        core::mem::discriminant(self).hash(state);
+        match self {
+            TypedFixedReadKind::Base(base) => base.hash(state),
+            TypedFixedReadKind::FixedFormat(_gt, format_ref) => format_ref.hash(state),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TypedViewFormat<TypeRep> {
     CaptureBytes(Box<TypedExpr<TypeRep>>),
-    ReadArray(Box<TypedExpr<TypeRep>>, BaseKind<Endian>),
+    ReadArray(Box<TypedExpr<TypeRep>>, TypedFixedReadKind<TypeRep>),
     ReifyView,
 }
 
@@ -1023,6 +1042,8 @@ impl<TypeRep> std::hash::Hash for TypedPattern<TypeRep> {
 
 mod __impls {
     use super::{GenType, TypedDynFormat, TypedExpr, TypedFormat, TypedPattern, TypedViewFormat};
+    use crate::FixedReadKind;
+    use crate::codegen::typed_format::TypedFixedReadKind;
     use crate::numeric::elaborator::IntType as ExtIntType;
     use crate::{
         DynFormat, Expr, Format, Pattern, ViewExpr, ViewFormat,
@@ -1269,8 +1290,21 @@ mod __impls {
         fn from(value: TypedViewFormat<TypeRep>) -> Self {
             match value {
                 TypedViewFormat::CaptureBytes(len) => ViewFormat::CaptureBytes(rebox(len)),
-                TypedViewFormat::ReadArray(len, kind) => ViewFormat::ReadArray(rebox(len), kind),
+                TypedViewFormat::ReadArray(len, kind) => {
+                    ViewFormat::ReadArray(rebox(len), kind.into())
+                }
                 TypedViewFormat::ReifyView => ViewFormat::ReifyView,
+            }
+        }
+    }
+
+    impl<TypeRep> From<TypedFixedReadKind<TypeRep>> for FixedReadKind {
+        fn from(value: TypedFixedReadKind<TypeRep>) -> Self {
+            match value {
+                TypedFixedReadKind::Base(base_kind) => FixedReadKind::Base(base_kind),
+                TypedFixedReadKind::FixedFormat(_gt, format_ref) => {
+                    FixedReadKind::FixedFormat(format_ref)
+                }
             }
         }
     }

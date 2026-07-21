@@ -8,8 +8,8 @@ use crate::byte_set::ByteSet;
 use crate::decoder::View;
 use crate::decoder::break_if_done;
 use crate::decoder::{
-    Compiler, Decoder, Program, ScopeEntry, SeqKind, UnknownVarError, Value, ValueSeq, cow_map,
-    cow_remap, extract_pair,
+    Compiler, Decoder, Program, ReadArrayKind, ScopeEntry, SeqKind, UnknownVarError, Value,
+    ValueSeq, cow_map, cow_remap, extract_pair,
     search::{find_index_by_key_sorted, find_index_by_key_unsorted},
     seq_kind::sub_range,
 };
@@ -1869,13 +1869,13 @@ impl Decoder {
                 let mut accum = Vec::with_capacity(len);
                 let mut buf = view_window;
                 for _ in 0..len {
-                    let (val, new_buf) = read_base(buf, *kind)?;
+                    let (val, new_buf) = read_array_elem(buf, kind)?;
                     accum.push(val);
                     buf = new_buf;
                 }
 
                 Ok(WithErr::new((
-                    ParsedValue::new_seq(accum, view_window.offset, len * kind.size()),
+                    ParsedValue::new_seq(accum, view_window.offset, len * kind.stride()),
                     input,
                 )))
             }
@@ -1933,6 +1933,46 @@ impl Decoder {
             }
         }
     }
+}
+
+fn read_array_elem<'a>(
+    buf: ReadCtxt<'a>,
+    kind: &ReadArrayKind,
+) -> Result<(ParsedValue, ReadCtxt<'a>), DecodeErrorKind<ParsedValue>> {
+    match kind {
+        ReadArrayKind::Base(kind) => read_base(buf, *kind),
+        ReadArrayKind::FixedFormat { fields, .. } => read_fixed_record(buf, fields),
+    }
+}
+
+/// Location-tracking counterpart of `decoder::read_fixed_record`: reads each field of `fields`
+/// in order, building a `ParsedValue::Record` spanning the whole element out of the persisted
+/// (named) fields. Anonymous/ephemeral fields (`None`) are read but discarded.
+fn read_fixed_record<'a>(
+    buf: ReadCtxt<'a>,
+    fields: &[(Option<Label>, BaseKind<Endian>)],
+) -> Result<(ParsedValue, ReadCtxt<'a>), DecodeErrorKind<ParsedValue>> {
+    let start = buf.offset;
+    let mut buf = buf;
+    let mut captured = Vec::with_capacity(fields.len());
+    for (name, kind) in fields {
+        let (v, new_buf) = read_base(buf, *kind)?;
+        if let Some(name) = name {
+            captured.push((name.clone(), v));
+        }
+        buf = new_buf;
+    }
+    let length = buf.offset - start;
+    Ok((
+        ParsedValue::Record(Parsed {
+            loc: ParseLoc::InBuffer {
+                offset: start,
+                length,
+            },
+            inner: captured,
+        }),
+        buf,
+    ))
 }
 
 fn read_base(

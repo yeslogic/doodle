@@ -11,6 +11,7 @@ pub enum ValueWidth {
     Fixed(usize),
 }
 
+#[allow(dead_code)]
 impl ValueWidth {
     pub const ZERO: ValueWidth = ValueWidth::Fixed(0);
     pub const DYN: ValueWidth = ValueWidth::Variable { is_dynamic: true };
@@ -82,6 +83,8 @@ impl std::ops::BitAnd for ValueWidth {
     }
 }
 
+// NOTE - because we use [`record_fmt::analyze_fixed_shape`] to determine the width of fixed-size types, this trait is no longer used proactively; it is still useful if we want to implement `ReadFixedSizeDep` when `ReadUnchecked` cannot be implemented instead.
+#[allow(dead_code)]
 /// Trait for types that are effectively hierarchical trees whose leaf-nodes are all primitive parses of fixed width that are read directly from buffered data, in order, without peeking, seeking, or other higher-level state-alteration
 pub trait ReadWidth: ASTContext {
     fn read_width(&self, context: Self::Context<'_>) -> ValueWidth;

@@ -72,6 +72,10 @@ impl Rebindable for TraitItem {
             // REVIEW - though unlikely, we may need to guard against certain rebindings here
             TraitItem::Method(fn_def) => fn_def.rebind(table),
             TraitItem::AssocType(.., rhs) => rhs.rebind(table),
+            TraitItem::Const(.., ty, expr) => {
+                ty.rebind(table);
+                expr.rebind(table);
+            }
         }
     }
 }
@@ -160,8 +164,9 @@ impl Rebindable for RustExpr {
             }
             RustExpr::PrimitiveLit(..) => (),
             RustExpr::ArrayLit(arr) => arr.rebind(table),
-            RustExpr::MethodCall(head, _, args) => {
+            RustExpr::MethodCall(head, _, params, args) => {
                 head.rebind(table);
+                params.rebind(table);
                 args.rebind(table);
             }
             RustExpr::FieldAccess(head, _) => head.rebind(table),
@@ -234,6 +239,14 @@ impl Rebindable for RustExpr {
                 start.rebind(table);
                 stop.rebind(table);
             }
+        }
+    }
+}
+
+impl Rebindable for UseParams {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
+        for tp in self.ty_params.iter_mut() {
+            tp.rebind(table);
         }
     }
 }
@@ -408,8 +421,18 @@ impl Rebindable for RustType {
         match self {
             RustType::Atom(at) => at.rebind(table),
             RustType::AnonTuple(args) => args.iter_mut().for_each(|arg| arg.rebind(table)),
-            // NOTE: provided ReadArray only holds MarkerType, it doesn't need any recursion
-            RustType::ReadArray(..) | RustType::Verbatim(..) | RustType::ViewObject(..) => (),
+            RustType::ReadArray(.., fst) => fst.rebind(table),
+            RustType::Verbatim(.., Some(params)) => params.rebind(table),
+            RustType::Verbatim(.., None) | RustType::ViewObject(..) => (),
+        }
+    }
+}
+
+impl Rebindable for FixedSizeType {
+    fn rebind(&mut self, table: &impl MapLike<Label, Label>) {
+        match self {
+            FixedSizeType::Marker(..) => (),
+            FixedSizeType::Adhoc(lt) => lt.rebind(table),
         }
     }
 }

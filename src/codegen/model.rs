@@ -30,6 +30,7 @@ macro_rules! call {
         RustExpr::MethodCall(
             Box::new($parser),
             mk_method(stringify!($method)),
+            UseParams::new(),
             Vec::new(),
         )
     };
@@ -37,6 +38,7 @@ macro_rules! call {
         RustExpr::MethodCall(
             Box::new($parser),
             mk_method(stringify!($method)),
+            UseParams::new(),
             vec![$($arg),+]
         )
     };
@@ -249,7 +251,10 @@ pub fn read_from_view(view: RustExpr, len: RustExpr) -> RustExpr {
 
 /// Model RustExpr for handling `ViewFormat::ReadArray(len, kind)` in the Parser (View) model.
 pub fn read_array_from_view(view: RustExpr, len: RustExpr, kind: BaseKind<Endian>) -> RustExpr {
-    // NOTE - we need these separate methods because RustExpr::MethodCall doesn't allow turbo-fish type-parameters
+    // NOTE - these are separate hardcoded methods rather than a single turbofish-qualified
+    // `read_array::<T>` call for parity with the non-generic primitive-kind methods on View;
+    // `RustExpr::MethodCall` itself does support turbofish now (`RustExpr::call_method_turbofish`),
+    // and is used for the FixedFormat case (see `read_fixed_array_from_view`, below).
     match kind {
         BaseKind::U8 => try_call!(view, read_array_u8, len),
         BaseKind::U16BE => try_call!(view, read_array_u16be, len),
@@ -259,6 +264,18 @@ pub fn read_array_from_view(view: RustExpr, len: RustExpr, kind: BaseKind<Endian
             unimplemented!("little-endian read-array parses not yet implemented")
         }
     }
+}
+
+/// Model RustExpr for handling `ViewFormat::ReadArray(len, kind)` in the Parser (View) model,
+/// for the `FixedFormat`-kinded case where `elem_ty` is the generated struct-type of the
+/// (statically-verified fixed-size, all-primitive-field) format being read as an array element.
+///
+/// Relies on `View::as_read_array::<T>` (see `parser/view.rs`), which is generic over any
+/// `T: ReadUnchecked`; the emitted call will only type-check once `elem_ty` actually implements
+/// that trait (see the trait-impl-generation work in `codegen/model/traits.rs`).
+pub fn read_fixed_array_from_view(view: RustExpr, len: RustExpr, elem_ty: RustType) -> RustExpr {
+    view.call_method_turbofish("as_read_array", [elem_ty], [len])
+        .wrap_try()
 }
 
 /// Model RustExpr for setup of `Format::Slice` parse-context in the Parser model.

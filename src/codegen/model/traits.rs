@@ -1,5 +1,4 @@
 use super::*;
-use crate::codegen::rust_ast::analysis::{SourceContext, read_width::ReadWidth as _};
 
 pub(crate) trait TraitObject {
     /// Encapsulation of the contextual information needed to implement a trait on an arbitrary RustType
@@ -176,13 +175,13 @@ pub mod object_api {
                         };
                         FnSig::new(
                             args,
-                            Some(RustType::result_of(
+                            Some(Box::new(RustType::result_of(
                                 RustType::Verbatim(
                                     lbl("Self::Output"),
                                     Some(Box::new(UseParams::from_lt(lt(METHOD_LIFETIME)))),
                                 ),
                                 RustType::imported("ParseError"),
-                            )),
+                            ))),
                         )
                     };
                     let body = {
@@ -238,54 +237,113 @@ pub mod object_api {
 
 pub mod smallsorts {
     use super::*;
+    use crate::record_fmt;
+    use crate::{FormatModule, FormatRef};
+    use intmap::IntMap;
 
-    #[expect(dead_code)]
-    pub struct ReadBinaryDep;
+    /// Context needed to generate a `ReadUnchecked` impl for a struct that originated from a
+    /// `FixedReadKind::FixedFormat`-kinded `ReadArray` element.
+    ///
+    /// `RustType`/`SourceContext` cannot recover per-field endianness on their own -- a `u32`
+    /// field looks the same in `RustType` whether it was parsed as `u32be` or `u32le` -- so
+    /// instead of trying to reconstruct the read sequence from the generated type alone, this
+    /// resolves `on_type` back to its originating `Format` (via `targets`, populated by
+    /// `Elaborator::elaborate_kind`, and `module`) and recovers the exact field layout from there
+    /// via `record_fmt::analyze_fixed_shape`.
+    #[derive(Clone, Copy)]
+    pub(crate) struct FixedFormatInfo<'a> {
+        pub module: &'a FormatModule,
+        pub targets: &'a IntMap<usize, FormatRef>,
+    }
 
-    pub struct ReadFixedSizeDep;
+    pub struct ReadUnchecked;
 
-    impl TraitObject for ReadFixedSizeDep {
-        type TypeInfo<'a> = &'a SourceContext<'a>;
+    impl TraitObject for ReadUnchecked {
+        type TypeInfo<'a> = FixedFormatInfo<'a>;
 
         fn get_name() -> &'static str {
-            "ReadFixedSizeDep"
+            "ReadUnchecked"
         }
 
-        // fn lt_params() -> usize {
-        //     0
-        // }
-
-        // fn ty_params() -> usize {
-        //     0
-        // }
-
-        // fn satisfies_requirements(
-        //     on_type: &RustType,
-        //     type_info: Self::TypeInfo<'_>,
-        // ) -> bool {
-        //     on_type.read_width(type_info).as_fixed().is_some()
-        // }
-
         fn generate_impl(on_type: Box<RustType>, type_info: Self::TypeInfo<'_>) -> RustTraitImpl {
+            let Some(LocalType::LocalDef(ix, name, _params)) = on_type.as_local_type() else {
+                unreachable!(
+                    "ReadUnchecked can only be generated for a locally-defined type: {on_type:?}"
+                )
+            };
+            let Some(format_ref) = type_info.targets.get(*ix).copied() else {
+                unreachable!("no FixedFormat source was recorded for type index {ix}: {on_type:?}")
+            };
+            let format = type_info.module.get_format(format_ref.get_level());
+            let shape = record_fmt::analyze_fixed_shape(format).unwrap_or_else(|e| {
+                unreachable!(
+                    "type index {ix} was recorded as a FixedFormat target but is no longer a valid fixed-shape record: {e}"
+                )
+            });
+
             let body = {
-                let size_method = {
+                let host_type = on_type.clone();
+                let size_const = RustExpr::num_lit(shape.stride);
+                let read_unchecked_method = {
+                    let method_lt = Label::Borrowed("'a");
                     let body = {
-                        let size = on_type.read_width(type_info).as_fixed().unwrap();
-                        let val_size = RustExpr::num_lit(size);
-                        vec![RustStmt::Return(ReturnKind::Implicit, val_size)]
+                        let mut stmts = Vec::with_capacity(shape.fields.len() + 1);
+                        let mut field_inits = Vec::with_capacity(shape.fields.len());
+                        for (field_name, kind) in &shape.fields {
+                            let marker = MarkerType::from_base_kind_endian(*kind);
+                            let read_expr = RustExpr::FunctionCall(
+                                Box::new(RustExpr::Entity(RustEntity::Scoped(
+                                    vec![Label::from(marker.name())],
+                                    lbl("read_unchecked"),
+                                ))),
+                                vec![RustExpr::local("ctxt")],
+                            );
+                            match field_name {
+                                Some(field_name) => {
+                                    stmts.push(RustStmt::assign(field_name.clone(), read_expr));
+                                    field_inits.push((
+                                        field_name.clone(),
+                                        Some(RustExpr::local(field_name.clone())),
+                                    ));
+                                }
+                                None => stmts.push(RustStmt::Expr(read_expr)),
+                            }
+                        }
+                        let construct = RustExpr::Struct(
+                            Constructor::Simple(name.clone()),
+                            StructExpr::Record(field_inits),
+                        );
+                        stmts.push(RustStmt::Return(ReturnKind::Implicit, construct));
+                        stmts
                     };
                     let sig = {
-                        // FIXME - add qualification scoping to RustType Verbatim to avoid this hardcoding
-                        let arg_type = RustType::Verbatim(
-                            lbl("Self::Args"),
-                            Some(Box::new(UseParams::from_lt(RustLt::WILD))),
+                        let arg_type = RustType::borrow_of(
+                            None,
+                            Mut::Mutable,
+                            RustType::Verbatim(
+                                Label::Borrowed("ReadCtxt"),
+                                Some(Box::new(UseParams::from_lt(lt(method_lt.clone())))),
+                            ),
                         );
-                        let ret = RustType::from(PrimType::Usize);
-                        FnSig::new(vec![(lbl("args"), arg_type)], Some(ret))
+                        let ret = on_type.clone();
+                        FnSig::new(vec![(lbl("ctxt"), arg_type)], Some(ret))
                     };
-                    RustFn::new("size", None, sig, body)
+                    RustFn::new_unsafe(
+                        "read_unchecked",
+                        Some(DefParams::from_lt(method_lt)),
+                        sig,
+                        body,
+                    )
                 };
-                vec![TraitItem::Method(size_method)]
+                vec![
+                    TraitItem::AssocType(Label::Borrowed("HostType"), None, host_type),
+                    TraitItem::Const(
+                        Label::Borrowed("SIZE"),
+                        Box::new(RustType::from(PrimType::Usize)),
+                        size_const,
+                    ),
+                    TraitItem::Method(read_unchecked_method),
+                ]
             };
             RustTraitImpl {
                 param_bindings: None,
@@ -300,24 +358,12 @@ pub mod smallsorts {
 
 // SECTION - boilerplate for trait implementation
 
-/// Produces an `impl ReadFixedSizeDep` block as a standalone item, assuming that `ReadBinaryDep`
-/// will be implemented separately.
-#[expect(dead_code)]
-pub fn impl_standalone_read_fixed_size_dep(
+/// Produces an `impl ReadUnchecked` block as a standalone item for a type that supports this definition.
+pub fn impl_standalone_read_unchecked(
     on_type: Box<RustType>,
-    context: &SourceContext<'_>,
+    context: smallsorts::FixedFormatInfo<'_>,
 ) -> RustDecl {
-    let impl_block = smallsorts::ReadFixedSizeDep::generate_impl(on_type, context);
+    let impl_block = smallsorts::ReadUnchecked::generate_impl(on_type, context);
     RustDecl::TraitImpl(impl_block)
-}
-
-#[expect(dead_code)]
-pub fn impl_standalone_read_binary_dep(
-    _on_type: Box<RustType>,
-    _context: &SourceContext<'_>,
-) -> RustDecl {
-    // let impl_block = smallsorts::ReadBinaryDep::generate_impl(on_type, context);
-    // RustDecl::TraitImpl(impl_block)
-    todo!()
 }
 // !SECTION
